@@ -21,6 +21,7 @@ import type {
   Column,
   ConditionalFormatRule,
 } from "./cell.js";
+import type { ChartDefinition, ChartRef } from "./chart.js";
 import type {
   CellAddress,
   HighlightRange,
@@ -61,6 +62,20 @@ import type {
   RemoteOperationOptions,
   TransactionResourceLimits,
 } from "./transaction.js";
+
+/** One side panel that `Grid.openPanel` shows on the grid's right edge. */
+export interface GridPanel {
+  /** Text in the panel header; it also names the panel for assistive technology. */
+  title: string;
+  /** Fill `body`, then return a function that releases what `render` set up. */
+  render(body: HTMLElement): () => void;
+  /**
+   * Move keyboard focus into the panel when it opens. Default `true`. Use
+   * `false` for a panel that opens on cell selection, so arrow keys keep moving
+   * the cell cursor.
+   */
+  focus?: boolean;
+}
 
 /** Selection movement applied after a successful editor commit. */
 export type CellEditorNavigation = "down" | "right" | "left" | "none";
@@ -685,6 +700,10 @@ export interface GridEvents {
   };
   /** Built-in toolbar/context-menu export failed after its action was dispatched. */
   "export-error": { format: "csv" | "xlsx"; error: SheetwriteError };
+  /** A chart object on the active sheet was selected; `null` when no object is selected. */
+  "chart-select": ChartRef | null;
+  /** The user pressed Enter on a selected chart, for example to open its editor. */
+  "chart-activate": ChartRef;
 }
 
 /**
@@ -994,6 +1013,24 @@ export interface Grid {
    * no pivot with `id`.
    */
   getPivotResult(sheet: SheetId, id: string): PivotResultView | null;
+  /** Clones of the chart definitions on `sheet` (default: the active sheet). */
+  getCharts(sheet?: SheetId): readonly ChartDefinition[];
+  /** Insert or replace the chart with `chart.id` on `sheet` as one undo entry. Returns `true` if applied. */
+  setChart(sheet: SheetId, chart: ChartDefinition): boolean;
+  /** Remove a chart from `sheet` as one undo entry. Returns `true` if applied. */
+  removeChart(sheet: SheetId, id: string): boolean;
+  /**
+   * Select the chart object `id` on `sheet`, or deselect with `null`. Selecting a
+   * chart on another sheet activates that sheet first. Emits `chart-select`.
+   */
+  selectChart(sheet: SheetId, id: string | null): void;
+  /**
+   * Show `panel` on the grid's right edge and shrink the cells to make room;
+   * `null` closes the open panel. One panel shows at a time: opening a panel
+   * closes the previous one. Escape and the close button close it and return
+   * focus to the grid.
+   */
+  openPanel(panel: GridPanel | null): void;
   setProtectionResolver(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void;
   setNote(addr: CellAddress, text: string | null): ApplyTransactionResult;
   getNote(addr: CellAddress): string | null;

@@ -1350,6 +1350,122 @@ textarea.sheetwrite-ribbon-field {
   }
 }
 
+/* Chart series colors. Each one has at least 3:1 contrast against the
+   default surface of its theme (WCAG 1.4.11). Hosts may override them. */
+.sheetwrite {
+  --sheetwrite-chart-1: #1f6fd1;
+  --sheetwrite-chart-2: #c2410c;
+  --sheetwrite-chart-3: #15803d;
+  --sheetwrite-chart-4: #b91c1c;
+  --sheetwrite-chart-5: #7c3aed;
+  --sheetwrite-chart-6: #0e7490;
+  --sheetwrite-chart-7: #a16207;
+  --sheetwrite-chart-8: #be185d;
+}
+
+[data-theme="dark"] .sheetwrite,
+.dark .sheetwrite {
+  --sheetwrite-chart-1: #60a5fa;
+  --sheetwrite-chart-2: #fb923c;
+  --sheetwrite-chart-3: #4ade80;
+  --sheetwrite-chart-4: #f87171;
+  --sheetwrite-chart-5: #a78bfa;
+  --sheetwrite-chart-6: #22d3ee;
+  --sheetwrite-chart-7: #facc15;
+  --sheetwrite-chart-8: #f472b6;
+}
+
+/* Floating objects (charts) over the cells. */
+.sheetwrite-object {
+  box-sizing: border-box;
+  border: 1px solid var(--sheetwrite-grid-line);
+  background: var(--sheetwrite-bg);
+  color: var(--sheetwrite-fg);
+  cursor: move;
+  outline: none;
+  touch-action: none;
+}
+
+.sheetwrite-object-layer[data-readonly="true"] .sheetwrite-object {
+  cursor: default;
+}
+
+.sheetwrite-object-selected {
+  outline: 2px solid var(--sheetwrite-selection-border);
+  outline-offset: 1px;
+}
+
+.sheetwrite-object-host {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.sheetwrite-object-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 8px;
+  box-sizing: border-box;
+  overflow: hidden;
+  font: var(--sheetwrite-font);
+  font-weight: 600;
+  text-align: center;
+}
+
+.sheetwrite-object-handle {
+  position: absolute;
+  display: none;
+  width: 8px;
+  height: 8px;
+  box-sizing: border-box;
+  border: 1px solid var(--sheetwrite-selection-border);
+  background: var(--sheetwrite-bg);
+}
+
+.sheetwrite-object-selected .sheetwrite-object-handle {
+  display: block;
+}
+
+.sheetwrite-object-layer[data-readonly="true"] .sheetwrite-object-handle {
+  display: none;
+}
+
+.sheetwrite-object-handle[data-handle^="n"] {
+  top: -4px;
+}
+
+.sheetwrite-object-handle[data-handle^="s"] {
+  bottom: -4px;
+}
+
+.sheetwrite-object-handle:is([data-handle="n"], [data-handle="s"]) {
+  left: calc(50% - 4px);
+  cursor: ns-resize;
+}
+
+.sheetwrite-object-handle:is([data-handle="e"], [data-handle="w"]) {
+  top: calc(50% - 4px);
+  cursor: ew-resize;
+}
+
+.sheetwrite-object-handle[data-handle$="w"] {
+  left: -4px;
+}
+
+.sheetwrite-object-handle[data-handle$="e"] {
+  right: -4px;
+}
+
+.sheetwrite-object-handle:is([data-handle="nw"], [data-handle="se"]) {
+  cursor: nwse-resize;
+}
+
+.sheetwrite-object-handle:is([data-handle="ne"], [data-handle="sw"]) {
+  cursor: nesw-resize;
+}
+
 /* @generated icon-sheet: start (bun scripts/icon-sheet.ts) */
 /* Command icons: one sheet, cropped per glyph. Set --sheetwrite-icon-size on the
    icon or any ancestor to scale it. Under a Content Security Policy that blocks
