@@ -1,7 +1,14 @@
 import { describe, expect, it } from "bun:test";
+import { readFile } from "node:fs/promises";
 
 import { sheetwriteWorkbookBackend } from "../packages/xlsx/src/workbook.js";
-import { runWorkbookRoundtrips, type WorkbookRoundtripResaver } from "./conformance/roundtrip.js";
+import {
+  retainedGraphLosses,
+  runWorkbookRoundtrips,
+  structuralDifferences,
+  workbookFeatureState,
+  type WorkbookRoundtripResaver,
+} from "./conformance/roundtrip.js";
 
 const IDENTITY_RESAVER: WorkbookRoundtripResaver = {
   producer: "libreoffice",
@@ -65,5 +72,43 @@ describe("workbook producer roundtrip evidence", () => {
         (entry) => entry.includes(".cells[0].value.value") && entry.includes("lost-value"),
       ),
     ).toBe(true);
+  });
+
+  describe("retained OOXML graphs", () => {
+    // A LibreOffice-written file carries graphs Sheetwrite does not model (its
+    // theme, document properties), which import keeps as opaque parts.
+    async function importedWithGraphs() {
+      const bytes = await readFile("packages/xlsx/test/fixtures/libreoffice-rich.xlsx");
+      const snapshot = await sheetwriteWorkbookBackend.fromXlsxWorkbook(new Uint8Array(bytes));
+      const source = snapshot.workbook.xlsxSource;
+      if (source === undefined || source.graphs.length === 0) {
+        throw new Error("fixture has no retained graphs");
+      }
+      return { snapshot, source };
+    }
+
+    it("allows a producer to add graphs of its own", async () => {
+      const { snapshot: resaved } = await importedWithGraphs();
+      const { xlsxSource: _preserved, ...workbook } = resaved.workbook;
+      const original = { ...resaved, workbook };
+
+      expect(
+        structuralDifferences(workbookFeatureState(original), workbookFeatureState(resaved)),
+      ).toEqual([]);
+      expect(retainedGraphLosses(original, resaved)).toEqual([]);
+    });
+
+    it("reports a graph the round trip dropped", async () => {
+      const { snapshot: original, source } = await importedWithGraphs();
+      const [dropped, ...kept] = source.graphs;
+      const resaved = {
+        ...original,
+        workbook: { ...original.workbook, xlsxSource: { ...source, graphs: kept } },
+      };
+
+      const losses = retainedGraphLosses(original, resaved);
+      expect(losses).toHaveLength(1);
+      expect(losses[0]).toContain(dropped?.type ?? "");
+    });
   });
 });
