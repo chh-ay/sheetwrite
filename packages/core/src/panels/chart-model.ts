@@ -1,6 +1,7 @@
 // Chart definitions that Insert › Chart and the Chart panel build, as plain
 // data, so the rules are tested without a DOM.
 
+import { MAX_CHART_POINTS } from "../charts-live.js";
 import type { CellScalar } from "../types/cell.js";
 import type { ChartAnchor, ChartDefinition, ChartKind, ChartSeries } from "../types/chart.js";
 import type { Range, Selection, SheetId } from "../types/coordinates.js";
@@ -105,7 +106,10 @@ export function chartFromRange(
 
   let categoryText = false;
   let categoryOther = false;
-  for (let row = start.row + 1; row <= end.row; row++) {
+  // A chart reads at most MAX_CHART_POINTS cells per series, so the scan of a
+  // whole-column selection stops there too.
+  const lastScanned = Math.min(end.row, start.row + MAX_CHART_POINTS);
+  for (let row = start.row + 1; row <= lastScanned; row++) {
     const value = read(row, start.col);
     if (typeof value === "string") categoryText = true;
     else if (value !== null) categoryOther = true;

@@ -133,7 +133,11 @@ try {
   runMenu("Region field actions", "Add to Rows");
   assert.equal(ops.length, 2);
   assert.deepEqual(lastOp().rows, [0]);
-  assert.equal(document.activeElement, byLabel("Region actions"), "focus follows the moved field");
+  assert.equal(
+    document.activeElement,
+    byLabel("Region in Rows actions"),
+    "focus follows the moved field",
+  );
 
   runMenu("Amount field actions", "Add to Values");
   assert.equal(ops.length, 3);
@@ -141,21 +145,21 @@ try {
 
   runMenu("Month field actions", "Add to Rows");
   assert.deepEqual(lastOp().rows, [0, 1]);
-  runMenu("Month actions", "Move Up");
+  runMenu("Month in Rows actions", "Move Up");
   assert.equal(ops.length, 5);
   assert.deepEqual(lastOp().rows, [1, 0]);
 
-  runMenu("Month actions", "Move to Columns");
+  runMenu("Month in Rows actions", "Move to Columns");
   assert.equal(ops.length, 6);
   assert.deepEqual([lastOp().rows, lastOp().columns], [[0], [1]]);
 
   // Arrow keys move through a menu; disabled entries are skipped.
-  press(byLabel("Region actions"));
+  press(byLabel("Region in Rows actions"));
   assert.equal(document.activeElement?.textContent, "Move to Filters");
   key(document.activeElement as HTMLElement, "ArrowDown");
   assert.equal(document.activeElement?.textContent, "Move to Columns");
   key(document.activeElement as HTMLElement, "Escape");
-  assert.equal(document.activeElement, byLabel("Region actions"));
+  assert.equal(document.activeElement, byLabel("Region in Rows actions"));
   assert.ok(host.querySelector(".sheetwrite-panel"), "Escape in a menu keeps the panel open");
 
   const aggregation = byLabel<HTMLSelectElement>("Summarize Amount by");
@@ -180,11 +184,10 @@ try {
   assert.equal(ops.length, 10);
   assert.deepEqual(lastOp().filters, [{ field: 0, values: ["East"] }]);
 
-  // Filters come first in the list, so this is the filter entry of Region.
-  runMenu("Region actions", "Remove");
+  runMenu("Region in Filters actions", "Remove");
   assert.equal(ops.length, 11);
   assert.deepEqual([lastOp().filters, lastOp().rows], [[], [0]]);
-  runMenu("Region actions", "Remove");
+  runMenu("Region in Rows actions", "Remove");
   assert.equal(ops.length, 12);
   assert.deepEqual(lastOp().rows, []);
 
@@ -198,7 +201,7 @@ try {
   assert.equal(ops.length, 13);
   assert.deepEqual(lastOp().rows, [0]);
 
-  byLabel("Region actions")
+  byLabel("Region in Rows actions")
     .closest("li")
     ?.dispatchEvent(new Event("dragstart", { bubbles: true }));
   drop(find(".sheetwrite-panel-fields"));
@@ -207,7 +210,7 @@ try {
 
   // Undo from elsewhere updates the list in place.
   grid.undo();
-  assert.ok(byLabel("Region actions"), "undo puts Region back in Rows");
+  assert.ok(byLabel("Region in Rows actions"), "undo puts Region back in Rows");
 
   // Selecting a cell of the output opens the field list without taking focus.
   grid.openPanel(null);

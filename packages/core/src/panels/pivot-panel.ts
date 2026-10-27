@@ -313,7 +313,9 @@ function areaSection(
       },
       { label: "Remove", run: () => actions.commit(removeField(pivot, placement)) },
     ];
-    item.appendChild(menuButton(`${name.textContent} actions`, `${area}-${index}-menu`, menuItems));
+    // The area is part of the name: a field can sit in two areas at once.
+    const actionsLabel = `${name.textContent} in ${label} actions`;
+    item.appendChild(menuButton(actionsLabel, `${area}-${index}-menu`, menuItems));
 
     if (area === "values") {
       const select = selectOf(AGGREGATION_LABELS, value?.aggregation ?? "SUM");

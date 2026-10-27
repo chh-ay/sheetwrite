@@ -99,6 +99,19 @@ describe("chart from a selection", () => {
     ]);
   });
 
+  it("reads a bounded number of cells for a whole-column selection", () => {
+    let reads = 0;
+    const read = (): CellScalar => {
+      reads += 1;
+      return 1;
+    };
+    const chart = chartFromRange(range("s1", 0, 0, 999_999, 1), read, "chart-1", 10);
+
+    expect(reads).toBeLessThanOrEqual(10_002);
+    // The definition still covers the whole selection.
+    expect(chart.series[0]?.values).toEqual(range("s1", 0, 0, 999_999, 0));
+  });
+
   it("stays inside the sheet when the selection ends at the last column", () => {
     const chart = chartFromRange(range("s1", 4, 8, 6, 9), reader([]), "chart-1", 10);
     expect(chart.anchor.col).toBe(9);

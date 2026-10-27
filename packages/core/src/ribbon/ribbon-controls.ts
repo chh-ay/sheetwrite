@@ -591,6 +591,9 @@ function renderPlacement(spec: RibbonPlacementSpec, context: RibbonContext): Rib
       if (next === reason) return;
       reason = next;
       trigger.title = next ?? spec.label;
+      // Assistive technology reads the reason too; a tooltip alone is mouse-only.
+      if (next === null) trigger.removeAttribute("aria-description");
+      else trigger.setAttribute("aria-description", next);
     },
   };
 }

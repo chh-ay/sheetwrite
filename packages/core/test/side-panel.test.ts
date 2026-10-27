@@ -221,6 +221,26 @@ it("validates series ranges as A1 text and shows the error inline", async () => 
   expect(values.value).toBe("B2:B3");
 });
 
+it("opens the Chart panel on Enter on a chart, but not on selection alone", async () => {
+  const { grid, host, panel, key } = await insertedChart();
+  grid.openPanel(null);
+  expect(panel()).toBeNull();
+
+  grid.selectChart("s1", null);
+  grid.selectChart("s1", "chart-1");
+  expect(panel()).toBeNull();
+
+  const frame = host.querySelector<HTMLElement>('.sheetwrite-object[data-chart-id="chart-1"]');
+  if (frame === null) throw new Error("the chart has no object frame");
+  frame.focus();
+  key(frame, "Enter");
+  expect(panel()?.querySelector(".sheetwrite-panel-title")?.textContent).toBe("Chart");
+  expect(panel()?.contains(document.activeElement)).toBe(true);
+  expect(host.querySelector<HTMLElement>('[role="radio"][aria-checked="true"]')?.dataset.kind).toBe(
+    "column",
+  );
+});
+
 it("closes on Escape from inside the panel and gives focus back to the grid", async () => {
   const { host, panel, key } = await insertedChart();
   const focused = document.activeElement;
@@ -266,6 +286,7 @@ it("disables Insert › PivotTable on the default engine and says why", async ()
   const pivot = control("PivotTable");
   expect(pivot.disabled).toBe(true);
   expect(pivot.title).toBe("Pivot tables need the full engine (@sheetwrite/formulas).");
+  expect(pivot.getAttribute("aria-description")).toBe(pivot.title);
 });
 
 it("edits the full-engine field list with one setPivot per action", async () => {
