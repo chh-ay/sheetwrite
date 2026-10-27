@@ -83,7 +83,7 @@ Persisted literals and evaluated formula results use `string | number | boolean 
 | `#NUM!` | Non-finite numeric result, excessive recursion, or an oversized range. |
 | `#SPILL!` | A dynamic result intersects content, another spill, a merge, validation/protection metadata, or a sheet boundary. |
 | `#CALC!` | A supported array calculation has no result, such as `FILTER` without matches or an empty fallback. |
-| `#CYCLE!` | Direct or transitive formula/reference cycle. |
+| `#CYCLE!` | Direct or transitive formula/reference cycle, unless [iterative calculation](/docs/guides/iterative-calculation/) is on. |
 | `#LOADING!` | A formula depends on datasource cells that have not loaded yet. |
 
 Errors are values for display and dependency propagation, not `NaN` or blank rendering. `IFERROR` can replace them. Unsupported or malformed source remains stored even when the result is an error.

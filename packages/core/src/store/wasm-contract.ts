@@ -63,6 +63,8 @@ export type RecomputingCellStore = CellStore & {
 
   removeNamedRange(name: string, scope: number): boolean;
 
+  setIterativeCalculation(enabled: boolean, maxIterations: number, maxChange: number): boolean;
+
   setTable(
     id: string,
     name: string,

@@ -8,10 +8,10 @@ description: "Live workbook schema containing ordered sheets and the active shee
 Live workbook schema containing ordered sheets and the active sheet ID.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L107"><code>packages/core/src/types/document.ts#L107</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L120"><code>packages/core/src/types/document.ts#L120</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>4</span>
+## Members <span class="api-count" data-pagefind-ignore>5</span>
 
 <div class="api-member-list">
 
@@ -50,6 +50,15 @@ xlsxSource?: XlsxSourceSnapshot;
 ```
 
 </details>
+
+<details class="api-member" id="workbook-calculation" data-pagefind-weight="1">
+<summary><code>calculation</code> <span class="api-member-summary">Iterative calculation options; absent means the defaults.</span></summary>
+
+```ts generated
+calculation?: CalculationSettings;
+```
+
+</details>
 </div>
 
 ## Declaration
@@ -63,6 +72,7 @@ export interface Workbook {
   activeSheet: SheetId;
   namedRanges?: NamedRangeSnapshot[];
   xlsxSource?: XlsxSourceSnapshot;
+  calculation?: CalculationSettings;
 }
 ```
 

@@ -109,6 +109,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
     dependencies: ["cell", "coordinates", "table"],
     exports: [
       "AddSheetInput",
+      "CalculationSettings",
       "CellBlock",
       "CellNote",
       "ColumnFilter",

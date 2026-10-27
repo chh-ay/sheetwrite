@@ -1,4 +1,5 @@
 import type {
+  CalculationSettings,
   CellHyperlink,
   CellScalar,
   CellStyle,
@@ -20,6 +21,8 @@ import type {
 } from "@sheetwrite/core";
 import {
   colToA1,
+  DEFAULT_MAX_CHANGE,
+  DEFAULT_MAX_ITERATIONS,
   DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
   dateToSerial,
   isSafeExternalHyperlink,
@@ -28,6 +31,7 @@ import {
   MAX_CONDITIONAL_FORMAT_RULES,
   MAX_HYPERLINK_DISPLAY_LENGTH,
   MAX_HYPERLINKS_PER_SHEET,
+  MAX_ITERATIONS,
   sheetNameKey,
   validateSheetName,
   validateWorkbookTableName,
@@ -1931,6 +1935,32 @@ function reconcileHyperlinks(
   });
 }
 
+/**
+ * Iterative calculation options from `<calcPr>`, or `undefined` when they are
+ * the ECMA defaults. Unreadable counts and deltas fall back to the defaults, and
+ * counts beyond Excel's range are clamped into it, so a damaged attribute never
+ * rejects the file.
+ */
+function workbookCalculation(workbookRoot: XmlElement): CalculationSettings | undefined {
+  const calcPr = xmlChild(workbookRoot, "calcPr");
+  if (!calcPr) return undefined;
+
+  const iterate = xmlBoolean(xmlAttribute(calcPr, "iterate"));
+
+  const count = Number(xmlAttribute(calcPr, "iterateCount") ?? DEFAULT_MAX_ITERATIONS);
+  const maxIterations = Number.isInteger(count)
+    ? Math.min(Math.max(count, 1), MAX_ITERATIONS)
+    : DEFAULT_MAX_ITERATIONS;
+
+  const delta = Number(xmlAttribute(calcPr, "iterateDelta") ?? DEFAULT_MAX_CHANGE);
+  const maxChange = Number.isFinite(delta) && delta >= 0 ? delta : DEFAULT_MAX_CHANGE;
+
+  if (!iterate && maxIterations === DEFAULT_MAX_ITERATIONS && maxChange === DEFAULT_MAX_CHANGE) {
+    return undefined;
+  }
+  return { iterate, maxIterations, maxChange };
+}
+
 function externalNamedRanges(
   workbookRoot: XmlElement,
   sheetIds: ReadonlyMap<string, string>,
@@ -2543,6 +2573,7 @@ export async function readWorkbook(
       block.colCount = Math.max(block.colCount, sheet.columns.length);
     }
   }
+  const calculation = workbookCalculation(workbookRoot);
   const snapshot: WorkbookSnapshot = {
     schemaVersion: 1,
     ...(metadata?.documentId ? { documentId: metadata.documentId } : {}),
@@ -2550,6 +2581,7 @@ export async function readWorkbook(
     workbook: {
       activeSheet,
       ...(namedRanges?.length ? { namedRanges: structuredClone(namedRanges) } : {}),
+      ...(calculation ? { calculation } : {}),
     },
     sheets,
   };

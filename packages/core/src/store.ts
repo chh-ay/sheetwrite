@@ -679,8 +679,13 @@ export class SheetwriteStore implements Store {
     const valuesTouched = new Set<SheetId>();
     const layoutTouched = new Set<SheetId>();
     for (const patch of patches) {
-      if (patch.op === "setNamedRange" || patch.op === "removeNamedRange") {
-        // A chart or pivot may read through a defined name, whose target is not tracked.
+      if (
+        patch.op === "setNamedRange" ||
+        patch.op === "removeNamedRange" ||
+        patch.op === "setCalculation"
+      ) {
+        // A chart or pivot may read through a defined name, whose target is not tracked,
+        // and a calculation change can move any formula result.
         for (const sheet of this.workbook.sheets) valuesTouched.add(sheet.id);
         continue;
       }

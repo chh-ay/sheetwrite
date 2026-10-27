@@ -319,6 +319,7 @@ export function patchSheetId(patch: DocumentOp): SheetId | null {
       return patch.table.range.sheet;
     case "setNamedRange":
     case "removeNamedRange":
+    case "setCalculation":
       return null;
     case "addSheet":
       return patch.sheet.id;

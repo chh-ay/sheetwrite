@@ -565,6 +565,42 @@ describe("workbook document protocol", () => {
     expect(missingScopeResult.errors.map((error) => error.code)).toContain("missing-reference");
   });
 
+  it("accepts Excel's iteration limits and rejects anything the engine would refuse", () => {
+    const boundaries = [
+      { iterate: true, maxIterations: 1, maxChange: 0 },
+      { iterate: false, maxIterations: 32_767, maxChange: 1e300 },
+    ];
+    for (const calculation of boundaries) {
+      expect(validateWorkbookSnapshot(withWorkbook({ calculation })).ok).toBe(true);
+      expect(validateDocumentOperationShape({ op: "setCalculation", calculation })).toEqual([]);
+    }
+
+    const valid = { iterate: true, maxIterations: 100, maxChange: 0.001 };
+    const invalid: Array<[field: string, value: unknown]> = [
+      ["iterate", "1"],
+      ["iterate", undefined],
+      ["maxIterations", 0],
+      ["maxIterations", 32_768],
+      ["maxIterations", 1.5],
+      ["maxIterations", "100"],
+      ["maxChange", -0.001],
+      ["maxChange", Number.POSITIVE_INFINITY],
+      ["maxChange", Number.NaN],
+    ];
+    for (const [field, value] of invalid) {
+      const calculation = { ...valid, [field]: value };
+      const snapshot = validateWorkbookSnapshot(withWorkbook({ calculation }));
+      expect(snapshot.ok).toBe(false);
+      if (snapshot.ok) throw new Error(`calculation.${field} = ${String(value)} accepted`);
+      expect(snapshot.errors.map((error) => error.path)).toEqual([`workbook.calculation.${field}`]);
+      expect(
+        validateDocumentOperationShape({ op: "setCalculation", calculation }).map(
+          (error) => error.path,
+        ),
+      ).toEqual([`operation.calculation.${field}`]);
+    }
+  });
+
   it("enforces every snapshot resource boundary before normalization", () => {
     const snapshot = richSnapshot();
     snapshot.documentId = '雪\u0000"\n\ud800';

@@ -10,6 +10,7 @@ mod dependency;
 mod financial;
 mod functions;
 mod info;
+mod iteration;
 mod lookup;
 mod math;
 mod matrix;
@@ -45,8 +46,13 @@ use date::host_clock_serial;
 #[cfg(test)]
 pub(crate) use date::set_test_clock;
 pub(crate) use dependency::{build_dep_index, DepIndex};
-use dependency::{collect_affected_formulas, direct_readers, seed_dependency_depth_errors};
+use dependency::{
+    collect_affected_formulas, direct_readers, seed_additional_depth_errors,
+    seed_dependency_depth_errors,
+};
 use functions::{apply_func, treats_cell_as_reference, FuncAccumulator, ReductionFold};
+pub(crate) use iteration::IterationLimits;
+use iteration::IterationPassGuard;
 use lookup::{
     find_match_index_indexed, integer_arg, list_reuse, positive_index, remember_list,
     remember_result, remember_table, result_reuse, table_reuse, CachedList, CachedResult,
@@ -72,6 +78,13 @@ thread_local! {
     /// the slots of its expanded expression. Empty while no LET is running,
     /// which leaves a slot use to evaluate its expression directly.
     static LET_SLOT_VALUES: RefCell<Vec<Option<EvalResult>>> = const { RefCell::new(Vec::new()) };
+}
+
+#[cfg(test)]
+thread_local! {
+    /// Formula evaluations on this thread. Tests read it to count how often a
+    /// formula ran, which no value can show.
+    pub(crate) static FORMULA_EVALUATIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
 /// Runs `evaluate` with one empty slot per binding of a LET expansion and
@@ -647,6 +660,7 @@ impl CellStore {
 
         RANGE_SUM_CACHE.with(|cache| cache.borrow_mut().clear());
         let _lookup_pass = LookupPassGuard::begin();
+        let _iteration_pass = IterationPassGuard::begin(self.iteration.is_some());
 
         if self.sheets.iter().all(|sheet| sheet.formulas.is_empty()) {
             for &sheet in seeds {
@@ -703,9 +717,9 @@ impl CellStore {
         let mut memo: FxHashMap<AbsCellKey, EvalResult> =
             FxHashMap::with_capacity_and_hasher(affected.len(), Default::default());
 
-        if let Some(index) = self.graph.index() {
-            seed_dependency_depth_errors(&self.sheets, &affected, index, &mut memo);
-        }
+        let found_cycle = self.graph.index().is_some_and(|index| {
+            seed_dependency_depth_errors(&self.sheets, &affected, index, &mut memo)
+        });
 
         let mut visiting: FxHashSet<AbsCellKey> = FxHashSet::default();
         let mut processed_arrays: FxHashSet<AbsCellKey> = FxHashSet::default();
@@ -720,9 +734,7 @@ impl CellStore {
                 memo: &mut memo,
                 visiting: &mut visiting,
             };
-            for key in &affected {
-                let _ = self.eval_formula_cell(*key, &mut pass, 0);
-            }
+            self.evaluate_pass(&mut pass, found_cycle);
 
             for key in &affected {
                 if let Some(result) = pass.memo.remove(key) {
@@ -735,6 +747,15 @@ impl CellStore {
             }
 
             return;
+        }
+
+        if let Some(limits) = self.iteration.as_deref().copied().filter(|_| found_cycle) {
+            let mut pass = EvalPass {
+                affected: &affected,
+                memo: &mut memo,
+                visiting: &mut visiting,
+            };
+            self.settle_circular_references(&mut pass, limits, false);
         }
 
         let mut seeded_sheets: FxHashSet<usize> = seeds.iter().copied().collect();
@@ -808,6 +829,11 @@ impl CellStore {
                 };
                 let _origin = FormulaOriginGuard::push(local);
                 pass.visiting.insert(key);
+                if self.iteration.is_some() {
+                    iteration::enter_runtime_formula(key);
+                }
+                #[cfg(test)]
+                FORMULA_EVALUATIONS.with(|count| count.set(count.get() + 1));
                 let enclosing_reads = has_spill_refs.then(start_runtime_reads);
                 let ast = if has_spill_refs {
                     self.resolve_spill_refs(&ast, output_sheet, &mut pass, 0)
@@ -889,6 +915,11 @@ impl CellStore {
                     }
                     evaluated => self.install_spill_result(key, evaluated, pass.memo),
                 };
+                if self.iteration.is_some() {
+                    if let Some(value) = self.finish_runtime_formula(key, &mut pass) {
+                        pass.memo.insert(key, value);
+                    }
+                }
 
                 // Formulas that use `A1#` read only the anchor cell. The anchor
                 // counts as changed when its spill range or spilled cells
@@ -1028,7 +1059,11 @@ impl CellStore {
                 processed_arrays.remove(&reader);
             }
 
-            seed_dependency_depth_errors(&self.sheets, &affected, index, &mut memo);
+            if self.iteration.is_some() {
+                seed_additional_depth_errors(&self.sheets, &affected, index, &mut memo);
+            } else {
+                seed_dependency_depth_errors(&self.sheets, &affected, index, &mut memo);
+            }
         }
 
         #[cfg(test)]
@@ -1037,18 +1072,20 @@ impl CellStore {
             self.recomputed_formulas += affected.len() - selected_by_seeds;
         }
 
-        if let Some(index) = self.graph.index() {
-            seed_dependency_depth_errors(&self.sheets, &affected, index, &mut memo);
-        }
+        let found_cycle = self.graph.index().is_some_and(|index| {
+            if self.iteration.is_some() {
+                seed_additional_depth_errors(&self.sheets, &affected, index, &mut memo)
+            } else {
+                seed_dependency_depth_errors(&self.sheets, &affected, index, &mut memo)
+            }
+        });
 
         let mut pass = EvalPass {
             affected: &affected,
             memo: &mut memo,
             visiting: &mut visiting,
         };
-        for key in &affected {
-            let _ = self.eval_formula_cell(*key, &mut pass, 0);
-        }
+        self.evaluate_pass(&mut pass, found_cycle);
 
         for key in &affected {
             if let Some(result) = pass.memo.remove(key) {
@@ -1229,15 +1266,41 @@ impl CellStore {
             return Value::Error(FormulaError::Num);
         }
         if let Some(result) = pass.memo.get(&key) {
+            if self.iteration.is_some() {
+                iteration::record_iteration_read(key);
+            }
             return result.clone();
         }
         if !pass.visiting.insert(key) {
-            return Value::Error(FormulaError::Cycle);
+            return self.back_edge_value(key);
         }
+
+        if self.iteration.is_some() {
+            iteration::enter_runtime_formula(key);
+        }
+        let result = self.eval_formula_body(key, pass, depth);
+        pass.visiting.remove(&key);
+        pass.memo.insert(key, result.clone());
+        if self.iteration.is_some() {
+            self.finish_runtime_formula(key, pass).unwrap_or(result)
+        } else {
+            result
+        }
+    }
+
+    /// Evaluates the formula at `key` without consulting or filling the memo.
+    fn eval_formula_body(
+        &self,
+        key: AbsCellKey,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> EvalResult {
+        #[cfg(test)]
+        FORMULA_EVALUATIONS.with(|count| count.set(count.get() + 1));
 
         let sheet = key.sheet as usize;
         let local = key.local();
-        let result = match self.sheets.get(sheet).and_then(|s| s.formulas.get(local)) {
+        match self.sheets.get(sheet).and_then(|s| s.formulas.get(local)) {
             Some(entry) => match &entry.ast {
                 Some(ast) => {
                     let _origin = FormulaOriginGuard::push(local);
@@ -1257,11 +1320,7 @@ impl CellStore {
                 None => Value::Error(entry.source_error().unwrap_or(FormulaError::Value)),
             },
             None => Value::Number(0.0),
-        };
-
-        pass.visiting.remove(&key);
-        pass.memo.insert(key, result.clone());
-        result
+        }
     }
 
     /// Evaluate a parsed conditional-format expression at one target cell.

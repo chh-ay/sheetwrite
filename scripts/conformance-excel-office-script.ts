@@ -5,6 +5,7 @@ interface OfficeCase {
   formula?: string;
   target?: string;
   numberFormat?: string;
+  calculation?: { iterate: true; maxIterations: number; maxChange: number };
 }
 
 interface OfficePayload {
@@ -44,7 +45,21 @@ export function main(
   );
   const created: ExcelScript.Worksheet[] = [];
   const observations: Array<{ caseId: string; result: Record<string, unknown> }> = [];
+  // The corpus validator keeps one calculation setting for every case, and
+  // iteration leaves formulas without a circular reference unchanged.
+  const calculation = payload.cases.find((entry) => entry.calculation)?.calculation;
+  const iteration = workbook.getApplication().getIterativeCalculation();
+  const previousIteration = {
+    enabled: iteration.getEnabled(),
+    maxIteration: iteration.getMaxIteration(),
+    maxChange: iteration.getMaxChange(),
+  };
   try {
+    if (calculation) {
+      iteration.setEnabled(true);
+      iteration.setMaxIteration(calculation.maxIterations);
+      iteration.setMaxChange(calculation.maxChange);
+    }
     for (let index = 0; index < payload.cases.length; index += 1) {
       const entry = payload.cases[index]!;
       if (entry.kind !== "formula" || !entry.formula || !entry.target) continue;
@@ -78,5 +93,8 @@ export function main(
     });
   } finally {
     for (const sheet of created.reverse()) sheet.delete();
+    iteration.setEnabled(previousIteration.enabled);
+    iteration.setMaxIteration(previousIteration.maxIteration);
+    iteration.setMaxChange(previousIteration.maxChange);
   }
 }

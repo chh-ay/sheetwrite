@@ -243,6 +243,7 @@ export class StoreMutationPolicy {
       case "removeProtectedRange":
       case "setNamedRange":
       case "removeNamedRange":
+      case "setCalculation":
         return [];
       default: {
         const unclassified: never = patch;

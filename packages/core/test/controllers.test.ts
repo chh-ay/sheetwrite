@@ -331,6 +331,22 @@ describe("DocumentController", () => {
     controller.undo();
     expect(store.getWorkbook().namedRanges).toEqual([namedRange]);
 
+    const iterative = { iterate: true, maxIterations: 50, maxChange: 0.01 };
+    const tighter = { iterate: true, maxIterations: 500, maxChange: 0 };
+    expect(
+      controller.commit([{ op: "setCalculation", calculation: iterative }], "api").status,
+    ).toBe("applied");
+    expect(controller.commit([{ op: "setCalculation", calculation: tighter }], "api").status).toBe(
+      "applied",
+    );
+    expect(store.getWorkbook().calculation).toEqual(tighter);
+    controller.undo();
+    expect(store.getWorkbook().calculation).toEqual(iterative);
+    controller.undo();
+    expect(store.getWorkbook().calculation).toBeUndefined();
+    controller.redo();
+    expect(store.getWorkbook().calculation).toEqual(iterative);
+
     const spillRange = { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 2, col: 1 } };
     store.applyTransaction({
       patches: [
@@ -354,6 +370,39 @@ describe("DocumentController", () => {
       row: 0,
       col: 1,
     });
+    controller.destroy();
+    store.dispose();
+  });
+
+  it("converges a circular reference once iterative calculation is committed, and undo restores #CYCLE!", () => {
+    const store = new SheetwriteStore(makeWorkbook(1));
+    const a1 = { sheet: "s1", row: 0, col: 0 };
+    store.applyTransaction({
+      patches: [{ op: "set", addr: a1, value: { kind: "formula", src: "=A1/2+1" } }],
+    });
+    const controller = new DocumentController({
+      store,
+      loadable: store,
+      readOnly: () => false,
+      epoch: () => 0,
+      materializeVirtualColumns: (patches) => patches,
+      onMutationRejected: () => {},
+      onHistoryApplied: () => {},
+    });
+
+    expect(store.getCell(a1).resolved).toBe("#CYCLE!");
+
+    const calculation = { iterate: true, maxIterations: 100, maxChange: 0.001 };
+    expect(controller.commit([{ op: "setCalculation", calculation }], "api").status).toBe(
+      "applied",
+    );
+    const converged = store.getCell(a1).resolved;
+    expect(typeof converged).toBe("number");
+    expect(Math.abs((converged as number) - 2)).toBeLessThanOrEqual(0.001);
+
+    controller.undo();
+    expect(store.getCell(a1).resolved).toBe("#CYCLE!");
+
     controller.destroy();
     store.dispose();
   });

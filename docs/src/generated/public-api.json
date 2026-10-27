@@ -96,6 +96,31 @@
               "memberDocs": []
             },
             {
+              "name": "CalculationSettings",
+              "kind": "interface",
+              "signature": "export interface CalculationSettings { iterate: boolean; maxIterations: number; maxChange: number; }",
+              "owners": [
+                "src/types/document.ts"
+              ],
+              "source": "src/types/document.ts#L110",
+              "jsDocTags": [],
+              "documentation": "Workbook calculation options, mirroring Excel's \"Enable iterative calculation\".\nA workbook without this record uses the defaults.",
+              "memberDocs": [
+                {
+                  "name": "iterate",
+                  "documentation": "Recalculate circular references iteratively instead of showing `#CYCLE!`; Excel default `false`."
+                },
+                {
+                  "name": "maxChange",
+                  "documentation": "Iteration stops once no value changes by more than this; finite and >= 0, Excel default 0.001."
+                },
+                {
+                  "name": "maxIterations",
+                  "documentation": "Most passes over each circular reference; an integer from 1 to 32,767, Excel default 100."
+                }
+              ]
+            },
+            {
               "name": "cellA1",
               "kind": "function",
               "signature": "(row: number, col: number): string",
@@ -138,7 +163,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L331",
+              "source": "src/types/document.ts#L346",
               "jsDocTags": [],
               "documentation": "Sparse row-major cells bounded by one rectangular block.",
               "memberDocs": []
@@ -325,7 +350,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L194",
+              "source": "src/types/document.ts#L209",
               "jsDocTags": [],
               "documentation": "Serializable plain-text note anchored to a cell.",
               "memberDocs": []
@@ -757,7 +782,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L207",
+              "source": "src/types/document.ts#L222",
               "jsDocTags": [],
               "documentation": "The gesture/operation that produced a committed transaction. Consumers\nswitching on reasons MUST keep a default branch — the union grows with new\nmutation features.",
               "memberDocs": []
@@ -918,7 +943,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L976",
+              "source": "src/row-bridge.ts#L979",
               "jsDocTags": [
                 "example",
                 "see"
@@ -1097,7 +1122,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L139",
+              "source": "src/types/document.ts#L154",
               "jsDocTags": [],
               "documentation": "Native comparison semantics for numeric, date-serial, and text-length validation.\nInterval operands are inclusive; `notBetween` accepts values outside that interval.",
               "memberDocs": []
@@ -1109,7 +1134,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L158",
+              "source": "src/types/document.ts#L173",
               "jsDocTags": [],
               "documentation": "Serializable condition enforced by a data-validation rule.\n\n`min` and `max` remain inclusive legacy bounds. Use `comparison` when the\noperator itself is significant; comparison and legacy bounds are mutually exclusive.",
               "memberDocs": []
@@ -1121,7 +1146,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L176",
+              "source": "src/types/document.ts#L191",
               "jsDocTags": [],
               "documentation": "One stable, range-scoped data-entry rule. Blank cells are allowed unless disabled.",
               "memberDocs": []
@@ -1163,13 +1188,37 @@
               "memberDocs": []
             },
             {
+              "name": "DEFAULT_MAX_CHANGE",
+              "kind": "variable",
+              "signature": "0.001",
+              "owners": [
+                "src/document-protocol.ts"
+              ],
+              "source": "src/document-protocol.ts#L48",
+              "jsDocTags": [],
+              "documentation": "Excel's convergence threshold for a new workbook.",
+              "memberDocs": []
+            },
+            {
+              "name": "DEFAULT_MAX_ITERATIONS",
+              "kind": "variable",
+              "signature": "100",
+              "owners": [
+                "src/document-protocol.ts"
+              ],
+              "source": "src/document-protocol.ts#L45",
+              "jsDocTags": [],
+              "documentation": "Excel's iteration count for a new workbook.",
+              "memberDocs": []
+            },
+            {
               "name": "DEFAULT_SNAPSHOT_RESOURCE_LIMITS",
               "kind": "variable",
               "signature": "Readonly<SnapshotResourceLimits>",
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L303",
+              "source": "src/document-protocol.ts#L354",
               "jsDocTags": [],
               "documentation": "Conservative defaults that retain the million-row paged-sheet contract.",
               "memberDocs": []
@@ -1205,7 +1254,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L48",
+              "source": "src/document-protocol.ts#L99",
               "jsDocTags": [],
               "documentation": "Inclusive defaults for every atomic document transaction accepted by a\nStore or Grid. The count bounds object-heavy validation and dispatch; the\nexact UTF-8 JSON size bounds hostile or accidentally oversized payloads.",
               "memberDocs": []
@@ -1347,11 +1396,11 @@
             {
               "name": "DocumentOp",
               "kind": "type",
-              "signature": "export type DocumentOp = | { op: \"set\"; addr: CellAddress; value: CellValue; style?: CellStyle } | { op: \"setRange\"; range: Range; cells: SnapshotCell[] } | { op: \"setBlock\"; range: Range; block: PackedCellBlock } | { op: \"restoreBlock\"; range: Range; encoding: \"deflate-json-v1\"; decodedBytes: number; data: string; } | { op: \"setRangeStyle\"; range: Range; style: Partial<CellStyle> | null } | { op: \"clearRange\"; range: Range; contents?: boolean; style?: boolean } | { op: \"addRows\"; sheet: SheetId; at: number; count: number } | { op: \"removeRows\"; sheet: SheetId; at: number; count: number } | { op: \"moveRows\"; sheet: SheetId; from: number; count: number; to: number } | { op: \"addColumns\"; sheet: SheetId; at: number; columns: Column[] } | { op: \"removeColumns\"; sheet: SheetId; at: number; count: number } | { op: \"moveColumns\"; sheet: SheetId; from: number; count: number; to: number } | { op: \"setColumn\"; sheet: SheetId; col: number; patch: Partial<Column> } | { op: \"setRowMeta\"; sheet: SheetId; row: number; meta: RowMetadata | null } | { op: \"addMerge\"; sheet: SheetId; merge: MergeRange } | { op: \"removeMerge\"; sheet: SheetId; merge: MergeRange } | { op: \"addSheet\"; sheet: SheetSnapshot } | { op: \"removeSheet\"; sheet: SheetId } | { op: \"renameSheet\"; sheet: SheetId; name: string } | { op: \"moveSheet\"; sheet: SheetId; to: number } | { op: \"setSheetVisibility\"; sheet: SheetId; visibility: SheetVisibility } | { op: \"addTable\"; table: WorkbookTable } | { op: \"updateTable\"; sheet: SheetId; tableId: string; patch: WorkbookTablePatch } | { op: \"removeTable\"; sheet: SheetId; tableId: string } | { op: \"setSheetMeta\"; sheet: SheetId; patch: { frozenRows?: number; frozenCols?: number; conditionalFormats?: ConditionalFormatRule[]; rowGroups?: RowGroup[]; sortKeys?: SortKey[]; filters?: Array<[col: number, filter: ColumnFilter]>; }; } | { op: \"setValidationRule\"; sheet: SheetId; rule: DataValidationRule } | { op: \"removeValidationRule\"; sheet: SheetId; id: string } | { op: \"setHyperlink\"; sheet: SheetId; hyperlink: CellHyperlink } | { op: \"removeHyperlink\"; sheet: SheetId; id: string } | { op: \"setProtectedRange\"; sheet: SheetId; protectedRange: ProtectedRange } | { op: \"removeProtectedRange\"; sheet: SheetId; id: string } | { op: \"setNote\"; addr: CellAddress; text: string | null } | { op: \"setNamedRange\"; namedRange: NamedRangeSnapshot } | { op: \"removeNamedRange\"; name: string; scope?: SheetId };",
+              "signature": "export type DocumentOp = | { op: \"set\"; addr: CellAddress; value: CellValue; style?: CellStyle } | { op: \"setRange\"; range: Range; cells: SnapshotCell[] } | { op: \"setBlock\"; range: Range; block: PackedCellBlock } | { op: \"restoreBlock\"; range: Range; encoding: \"deflate-json-v1\"; decodedBytes: number; data: string; } | { op: \"setRangeStyle\"; range: Range; style: Partial<CellStyle> | null } | { op: \"clearRange\"; range: Range; contents?: boolean; style?: boolean } | { op: \"addRows\"; sheet: SheetId; at: number; count: number } | { op: \"removeRows\"; sheet: SheetId; at: number; count: number } | { op: \"moveRows\"; sheet: SheetId; from: number; count: number; to: number } | { op: \"addColumns\"; sheet: SheetId; at: number; columns: Column[] } | { op: \"removeColumns\"; sheet: SheetId; at: number; count: number } | { op: \"moveColumns\"; sheet: SheetId; from: number; count: number; to: number } | { op: \"setColumn\"; sheet: SheetId; col: number; patch: Partial<Column> } | { op: \"setRowMeta\"; sheet: SheetId; row: number; meta: RowMetadata | null } | { op: \"addMerge\"; sheet: SheetId; merge: MergeRange } | { op: \"removeMerge\"; sheet: SheetId; merge: MergeRange } | { op: \"addSheet\"; sheet: SheetSnapshot } | { op: \"removeSheet\"; sheet: SheetId } | { op: \"renameSheet\"; sheet: SheetId; name: string } | { op: \"moveSheet\"; sheet: SheetId; to: number } | { op: \"setSheetVisibility\"; sheet: SheetId; visibility: SheetVisibility } | { op: \"addTable\"; table: WorkbookTable } | { op: \"updateTable\"; sheet: SheetId; tableId: string; patch: WorkbookTablePatch } | { op: \"removeTable\"; sheet: SheetId; tableId: string } | { op: \"setSheetMeta\"; sheet: SheetId; patch: { frozenRows?: number; frozenCols?: number; conditionalFormats?: ConditionalFormatRule[]; rowGroups?: RowGroup[]; sortKeys?: SortKey[]; filters?: Array<[col: number, filter: ColumnFilter]>; }; } | { op: \"setValidationRule\"; sheet: SheetId; rule: DataValidationRule } | { op: \"removeValidationRule\"; sheet: SheetId; id: string } | { op: \"setHyperlink\"; sheet: SheetId; hyperlink: CellHyperlink } | { op: \"removeHyperlink\"; sheet: SheetId; id: string } | { op: \"setProtectedRange\"; sheet: SheetId; protectedRange: ProtectedRange } | { op: \"removeProtectedRange\"; sheet: SheetId; id: string } | { op: \"setNote\"; addr: CellAddress; text: string | null } | { op: \"setNamedRange\"; namedRange: NamedRangeSnapshot } | { op: \"removeNamedRange\"; name: string; scope?: SheetId } | { op: \"setCalculation\"; calculation: CalculationSettings };",
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L428",
+              "source": "src/types/document.ts#L445",
               "jsDocTags": [],
               "documentation": "Exhaustive serializable operation union for workbook mutations.",
               "memberDocs": []
@@ -1363,7 +1412,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L3217",
+              "source": "src/document-protocol.ts#L3307",
               "jsDocTags": [],
               "documentation": "Exhaustive stable target identity used by persistence/logging layers.",
               "memberDocs": []
@@ -1387,7 +1436,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L350",
+              "source": "src/document-protocol.ts#L401",
               "jsDocTags": [],
               "documentation": "Path-qualified validation failure for a document operation.",
               "memberDocs": []
@@ -1399,7 +1448,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L365",
+              "source": "src/document-protocol.ts#L416",
               "jsDocTags": [],
               "documentation": "Success or structured errors returned by document validation.",
               "memberDocs": []
@@ -2205,7 +2254,7 @@
               "owners": [
                 "src/store/data-engine.ts"
               ],
-              "source": "src/store/data-engine.ts#L256",
+              "source": "src/store/data-engine.ts#L258",
               "jsDocTags": [],
               "documentation": "Error thrown when an operation requires datasource cells that are not loaded.",
               "memberDocs": []
@@ -2454,6 +2503,18 @@
               "memberDocs": []
             },
             {
+              "name": "MAX_ITERATIONS",
+              "kind": "variable",
+              "signature": "32767",
+              "owners": [
+                "src/document-protocol.ts"
+              ],
+              "source": "src/document-protocol.ts#L51",
+              "jsDocTags": [],
+              "documentation": "Largest iteration count Excel accepts.",
+              "memberDocs": []
+            },
+            {
               "name": "MemoryPersistenceAdapter",
               "kind": "class",
               "signature": "class MemoryPersistenceAdapter implements PersistenceAdapter { constructor(...snapshots: readonly WorkbookSnapshot[]); commit: (request: PersistenceCommitRequest) => Promise<PersistenceCommitResponse>; commitBatch: (request: PersistenceBatchCommitRequest) => Promise<PersistenceCommitResponse>; load: (documentId: string, signal?: AbortSignal) => Promise<WorkbookSnapshot> }",
@@ -2489,7 +2550,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L247",
+              "source": "src/types/document.ts#L262",
               "jsDocTags": [],
               "documentation": "Structured warning or rejection produced while applying an operation.",
               "memberDocs": []
@@ -2501,7 +2562,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L200",
+              "source": "src/types/document.ts#L215",
               "jsDocTags": [],
               "documentation": "Atomic or partial handling for locally denied operations.",
               "memberDocs": []
@@ -2513,7 +2574,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L126",
+              "source": "src/types/document.ts#L141",
               "jsDocTags": [],
               "documentation": "Workbook-global or sheet-scoped named range used by formulas and persistence.",
               "memberDocs": [
@@ -2554,7 +2615,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L320",
+              "source": "src/types/document.ts#L335",
               "jsDocTags": [],
               "documentation": "Dense row-major mutation payload. Primitive arrays keep large paste/fill\noperations JSON-safe without allocating one operation object per cell.\nFormula/reference tuples are sparse exceptions keyed by row-major offset.",
               "memberDocs": []
@@ -2905,7 +2966,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L186",
+              "source": "src/types/document.ts#L201",
               "jsDocTags": [],
               "documentation": "Serializable client UX policy. A host resolver decides whether a local mutation may proceed.",
               "memberDocs": []
@@ -2917,7 +2978,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L228",
+              "source": "src/types/document.ts#L243",
               "jsDocTags": [],
               "documentation": "Local operation and protected-range context supplied to the host policy.",
               "memberDocs": []
@@ -2929,7 +2990,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L235",
+              "source": "src/types/document.ts#L250",
               "jsDocTags": [],
               "documentation": "Host-owned client UX permission callback for protected mutations.",
               "memberDocs": []
@@ -3138,7 +3199,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L75",
+              "source": "src/document-protocol.ts#L126",
               "jsDocTags": [],
               "documentation": "Validate and merge transaction ceiling overrides without retaining the\ncaller-owned object. Every ceiling is an inclusive non-negative safe integer.",
               "memberDocs": []
@@ -3260,7 +3321,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L395",
+              "source": "src/row-bridge.ts#L396",
               "jsDocTags": [],
               "documentation": "Projects canonical document transactions into host-owned row changes.\n\nThe bridge only owns compact data-space identity arrays. It never writes to\n`defaultRows`, never renders, and never creates a second document store.",
               "memberDocs": [
@@ -3325,7 +3386,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L166",
+              "source": "src/row-bridge.ts#L167",
               "jsDocTags": [],
               "documentation": "Every possible projection produced by a row bridge.",
               "memberDocs": []
@@ -3349,7 +3410,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L209",
+              "source": "src/row-bridge.ts#L210",
               "jsDocTags": [],
               "documentation": "Callback accepted by imperative and framework adapters.",
               "memberDocs": []
@@ -3361,7 +3422,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L145",
+              "source": "src/row-bridge.ts#L146",
               "jsDocTags": [],
               "documentation": "A document operation that needs a host-side action rather than row mutation.",
               "memberDocs": []
@@ -3393,7 +3454,7 @@
             {
               "name": "RowBridgeMetadataDelta",
               "kind": "interface",
-              "signature": "export interface RowBridgeMetadataDelta<Id extends RowBridgeId = RowBridgeId> { readonly kind: \"metadata\"; readonly metadata: | \"column\" | \"row\" | \"sheet\" | \"merge\" | \"table\" | \"validation\" | \"hyperlink\" | \"protected-range\" | \"note\" | \"named-range\"; readonly transaction: RowBridgeTransaction; readonly transactionId: string; readonly source: OperationSource; readonly previous: unknown; readonly next: unknown; readonly operation: DocumentOp; readonly rowIds: readonly (Id | null)[]; }",
+              "signature": "export interface RowBridgeMetadataDelta<Id extends RowBridgeId = RowBridgeId> { readonly kind: \"metadata\"; readonly metadata: | \"column\" | \"row\" | \"sheet\" | \"merge\" | \"table\" | \"validation\" | \"hyperlink\" | \"protected-range\" | \"note\" | \"named-range\" | \"calculation\"; readonly transaction: RowBridgeTransaction; readonly transactionId: string; readonly source: OperationSource; readonly previous: unknown; readonly next: unknown; readonly operation: DocumentOp; readonly rowIds: readonly (Id | null)[]; }",
               "owners": [
                 "src/row-bridge.ts"
               ],
@@ -3446,7 +3507,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L202",
+              "source": "src/row-bridge.ts#L203",
               "jsDocTags": [],
               "documentation": "Result of projection or reconciliation.",
               "memberDocs": []
@@ -3470,7 +3531,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L187",
+              "source": "src/row-bridge.ts#L188",
               "jsDocTags": [],
               "documentation": "Input to {@link RowBridge.reconcile}.",
               "memberDocs": [
@@ -3491,7 +3552,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L178",
+              "source": "src/row-bridge.ts#L179",
               "jsDocTags": [],
               "documentation": "Reconciliation status for a canonical transaction response.",
               "memberDocs": []
@@ -3527,7 +3588,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L984",
+              "source": "src/row-bridge.ts#L987",
               "jsDocTags": [],
               "documentation": "Compute a deterministic identity for a canonical transaction.",
               "memberDocs": []
@@ -3539,7 +3600,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L158",
+              "source": "src/row-bridge.ts#L159",
               "jsDocTags": [],
               "documentation": "An explicit projection record for an operation with no row-space meaning.",
               "memberDocs": []
@@ -3575,7 +3636,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L303",
+              "source": "src/types/document.ts#L318",
               "jsDocTags": [],
               "documentation": "Persistent display and grouping metadata for one document row.",
               "memberDocs": []
@@ -3898,7 +3959,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L238",
+              "source": "src/types/document.ts#L253",
               "jsDocTags": [],
               "documentation": "Stable lifecycle rejection codes suitable for inline sheet-management UI.",
               "memberDocs": []
@@ -3958,7 +4019,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L340",
+              "source": "src/types/document.ts#L355",
               "jsDocTags": [],
               "documentation": "Serializable complete state for one workbook sheet.",
               "memberDocs": [
@@ -4274,7 +4335,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L309",
+              "source": "src/types/document.ts#L324",
               "jsDocTags": [],
               "documentation": "Serializable cell value and optional style inside a snapshot block.",
               "memberDocs": []
@@ -4298,7 +4359,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L329",
+              "source": "src/document-protocol.ts#L380",
               "jsDocTags": [],
               "documentation": "Stable resource failure raised by direct workbook construction paths.",
               "memberDocs": []
@@ -4310,7 +4371,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L285",
+              "source": "src/document-protocol.ts#L336",
               "jsDocTags": [],
               "documentation": "Resource ceilings applied before snapshot normalization or store allocation.",
               "memberDocs": [
@@ -4351,7 +4412,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L282",
+              "source": "src/document-protocol.ts#L333",
               "jsDocTags": [],
               "documentation": "Allocation mode used when enforcing snapshot construction capacity.",
               "memberDocs": []
@@ -4363,7 +4424,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L370",
+              "source": "src/document-protocol.ts#L421",
               "jsDocTags": [],
               "documentation": "Path-qualified schema failure found while validating an untrusted snapshot.",
               "memberDocs": []
@@ -4375,7 +4436,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L321",
+              "source": "src/document-protocol.ts#L372",
               "jsDocTags": [],
               "documentation": "Validation and allocation policy for an untrusted workbook snapshot.",
               "memberDocs": [
@@ -5167,7 +5228,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L55",
+              "source": "src/document-protocol.ts#L106",
               "jsDocTags": [],
               "documentation": "Successful byte/count inspection or one structured transaction rejection.",
               "memberDocs": []
@@ -5203,7 +5264,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L97",
+              "source": "src/document-protocol.ts#L148",
               "jsDocTags": [],
               "documentation": "Incrementally validate the operation count and exact encoded payload size\nwithout constructing a JSON string. Compact operation ranges are measured by\ntheir serialized fields; their logical cell area is deliberately irrelevant.",
               "memberDocs": []
@@ -5215,7 +5276,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L3179",
+              "source": "src/document-protocol.ts#L3269",
               "jsDocTags": [],
               "documentation": "Validate and canonically order a schema-1 snapshot without hydrating runtime state.",
               "memberDocs": []
@@ -5239,7 +5300,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L133",
+              "source": "src/types/document.ts#L148",
               "jsDocTags": [],
               "documentation": "Reject-or-warn policy attached to a data-validation rule.",
               "memberDocs": []
@@ -5430,17 +5491,21 @@
             {
               "name": "Workbook",
               "kind": "interface",
-              "signature": "export interface Workbook { sheets: Sheet[]; activeSheet: SheetId; namedRanges?: NamedRangeSnapshot[]; xlsxSource?: XlsxSourceSnapshot; }",
+              "signature": "export interface Workbook { sheets: Sheet[]; activeSheet: SheetId; namedRanges?: NamedRangeSnapshot[]; xlsxSource?: XlsxSourceSnapshot; calculation?: CalculationSettings; }",
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L107",
+              "source": "src/types/document.ts#L120",
               "jsDocTags": [],
               "documentation": "Live workbook schema containing ordered sheets and the active sheet ID.",
               "memberDocs": [
                 {
                   "name": "activeSheet",
                   "documentation": "Active sheet ID and initial tab presented when the grid is created."
+                },
+                {
+                  "name": "calculation",
+                  "documentation": "Iterative calculation options; absent means the defaults."
                 },
                 {
                   "name": "namedRanges",
@@ -5463,7 +5528,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L41",
+              "source": "src/document-protocol.ts#L42",
               "jsDocTags": [],
               "documentation": "Current workbook snapshot schema version accepted by Sheetwrite.",
               "memberDocs": []
@@ -5471,11 +5536,11 @@
             {
               "name": "WorkbookSnapshot",
               "kind": "interface",
-              "signature": "export interface WorkbookSnapshot { schemaVersion: 1; documentId?: string; version?: number; workbook: { activeSheet: SheetId; namedRanges?: NamedRangeSnapshot[]; xlsxSource?: XlsxSourceSnapshot; }; sheets: SheetSnapshot[]; }",
+              "signature": "export interface WorkbookSnapshot { schemaVersion: 1; documentId?: string; version?: number; workbook: { activeSheet: SheetId; namedRanges?: NamedRangeSnapshot[]; xlsxSource?: XlsxSourceSnapshot; calculation?: CalculationSettings; }; sheets: SheetSnapshot[]; }",
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L414",
+              "source": "src/types/document.ts#L429",
               "jsDocTags": [],
               "documentation": "Schema-versioned serializable workbook document.",
               "memberDocs": []
@@ -5783,7 +5848,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L380",
+              "source": "src/types/document.ts#L395",
               "jsDocTags": [],
               "documentation": "What an opaque graph reads; any change to it drops the graph on save.",
               "memberDocs": [
@@ -5808,7 +5873,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L391",
+              "source": "src/types/document.ts#L406",
               "jsDocTags": [],
               "documentation": "One relationship from the package, workbook, or a sheet to a retained part graph.",
               "memberDocs": [
@@ -5837,7 +5902,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L369",
+              "source": "src/types/document.ts#L384",
               "jsDocTags": [],
               "documentation": "One retained OOXML part, kept as its original compressed ZIP payload so a\nsave copies it without inflating or recompressing. Runtime copies are frozen.",
               "memberDocs": [
@@ -5854,7 +5919,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L406",
+              "source": "src/types/document.ts#L421",
               "jsDocTags": [],
               "documentation": "Bounded, frozen record of the OOXML parts Sheetwrite does not model.",
               "memberDocs": [
@@ -6022,7 +6087,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L976",
+              "source": "src/row-bridge.ts#L979",
               "jsDocTags": [
                 "example",
                 "see"
@@ -6406,7 +6471,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L395",
+              "source": "src/row-bridge.ts#L396",
               "jsDocTags": [],
               "documentation": "Projects canonical document transactions into host-owned row changes.\n\nThe bridge only owns compact data-space identity arrays. It never writes to\n`defaultRows`, never renders, and never creates a second document store.",
               "memberDocs": [
@@ -6471,7 +6536,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L166",
+              "source": "src/row-bridge.ts#L167",
               "jsDocTags": [],
               "documentation": "Every possible projection produced by a row bridge.",
               "memberDocs": []
@@ -6495,7 +6560,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L209",
+              "source": "src/row-bridge.ts#L210",
               "jsDocTags": [],
               "documentation": "Callback accepted by imperative and framework adapters.",
               "memberDocs": []
@@ -6507,7 +6572,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L145",
+              "source": "src/row-bridge.ts#L146",
               "jsDocTags": [],
               "documentation": "A document operation that needs a host-side action rather than row mutation.",
               "memberDocs": []
@@ -6539,7 +6604,7 @@
             {
               "name": "RowBridgeMetadataDelta",
               "kind": "interface",
-              "signature": "export interface RowBridgeMetadataDelta<Id extends RowBridgeId = RowBridgeId> { readonly kind: \"metadata\"; readonly metadata: | \"column\" | \"row\" | \"sheet\" | \"merge\" | \"table\" | \"validation\" | \"hyperlink\" | \"protected-range\" | \"note\" | \"named-range\"; readonly transaction: RowBridgeTransaction; readonly transactionId: string; readonly source: OperationSource; readonly previous: unknown; readonly next: unknown; readonly operation: DocumentOp; readonly rowIds: readonly (Id | null)[]; }",
+              "signature": "export interface RowBridgeMetadataDelta<Id extends RowBridgeId = RowBridgeId> { readonly kind: \"metadata\"; readonly metadata: | \"column\" | \"row\" | \"sheet\" | \"merge\" | \"table\" | \"validation\" | \"hyperlink\" | \"protected-range\" | \"note\" | \"named-range\" | \"calculation\"; readonly transaction: RowBridgeTransaction; readonly transactionId: string; readonly source: OperationSource; readonly previous: unknown; readonly next: unknown; readonly operation: DocumentOp; readonly rowIds: readonly (Id | null)[]; }",
               "owners": [
                 "src/row-bridge.ts"
               ],
@@ -6592,7 +6657,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L202",
+              "source": "src/row-bridge.ts#L203",
               "jsDocTags": [],
               "documentation": "Result of projection or reconciliation.",
               "memberDocs": []
@@ -6616,7 +6681,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L187",
+              "source": "src/row-bridge.ts#L188",
               "jsDocTags": [],
               "documentation": "Input to {@link RowBridge.reconcile}.",
               "memberDocs": [
@@ -6637,7 +6702,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L178",
+              "source": "src/row-bridge.ts#L179",
               "jsDocTags": [],
               "documentation": "Reconciliation status for a canonical transaction response.",
               "memberDocs": []
@@ -6673,7 +6738,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L984",
+              "source": "src/row-bridge.ts#L987",
               "jsDocTags": [],
               "documentation": "Compute a deterministic identity for a canonical transaction.",
               "memberDocs": []
@@ -6685,7 +6750,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L158",
+              "source": "src/row-bridge.ts#L159",
               "jsDocTags": [],
               "documentation": "An explicit projection record for an operation with no row-space meaning.",
               "memberDocs": []
@@ -7367,7 +7432,7 @@
             {
               "name": "CellStore",
               "kind": "class",
-              "signature": "class CellStore { acknowledgeRevision: (revision: bigint) => void; addPagedSheet: (n_cols: number, row_count: number, chunk_rows: number, byte_budget: number, max_dirty_cells: number) => number; addRows: (sheet: number, at: number, count: number) => void; addSheet: (n_cols: number, row_count: number) => number; admitSourceRange: (sheet: number, r0: number, c0: number, r1: number, c1: number) => boolean; aggregate: (sheet: number, col: number, op: number) => number; beginMutation: () => bigint; beginPageLoad: () => void; canDirtyCell: (sheet: number, row: number, col: number) => boolean; captureRange: (sheet: number, r0: number, c0: number, rows: number, cols: number) => RangeSnapshot | undefined; captureReferences: (sheet: number, max_entries: number) => SourceSnapshot | undefined; captureSources: (sheet: number, r0: number, c0: number, rows: number, cols: number) => SourceSnapshot | undefined; captureSourcesForRows: (sheet: number, rows: Uint32Array, cols: Uint32Array) => SourceSnapshot | undefined; cellSnapshots: (sheet: number, rows: Uint32Array, cols: Uint32Array) => CellSnapshot | undefined; cellState: (sheet: number, row: number, col: number) => number; clearCell: (sheet: number, row: number, col: number, style: number) => void; clearRange: (sheet: number, r0: number, c0: number, r1: number, c1: number, contents: boolean, style: boolean) => boolean; colCount: (sheet: number) => number; columnsFullyLoaded: (sheet: number, start_row: number, end_row: number, cols: Uint32Array) => boolean; commitSources: () => void; compactStringStorage: () => void; dataEdge: (sheet: number, row: number, col: number, d_row: number, d_col: number) => number; dataEdgeOrdered: (sheet: number, order: Uint32Array, row: number, col: number, d_row: number, d_col: number) => number; dirtyRevision: (sheet: number, row: number, col: number) => bigint; distinctValues: (sheet: number, col: number, limit: number) => DistinctColumn; exportMemoryState: () => Uint8Array; filterRows: (sheet: number, col: number, needle: string) => Uint32Array; filterRowsMulti: (sheet: number, cols: Uint32Array, kinds: Uint8Array, flags: Uint8Array, nums: Float64Array, num_counts: Uint32Array, text_counts: Uint32Array, value_nums: Float64Array, value_texts: string[]) => Uint32Array; formulaMatrixResourceStats: () => Float64Array; formulaReadBands: (sheet: number, start_row: number, end_row: number, cols: Uint32Array, max_cells: number) => Uint32Array; formulaSource: (sheet: number, row: number, col: number) => string | undefined; free: () => void; getCell: (sheet: number, row: number, col: number) => CellOut; getWindow: (sheet: number, row_start: number, row_end: number, cols: Uint32Array) => WindowView; getWindowRows: (sheet: number, rows: Uint32Array, cols: Uint32Array) => WindowView; hydratePageNumbers: (sheet: number, col: number, start_row: number, values: Float64Array, style: number, protected_offsets: Uint32Array) => void; hydratePageStringsPacked: (sheet: number, col: number, start_row: number, buf: string, utf16_lens: Uint32Array, style: number, protected_offsets: Uint32Array) => void; importRangeMemoryState: (bytes: Uint8Array, sheet: number, row_start: number, col_start: number) => RangeSnapshot; insertCols: (sheet: number, at: number, count: number) => void; isFullyLoaded: (sheet: number) => boolean; isPaged: (sheet: number) => boolean; isSheetAlive: (sheet: number) => boolean; loadedSpans: (sheet: number, start_row: number, end_row: number, col: number) => Uint32Array; markCellCleanRevision: (sheet: number, row: number, col: number, revision: bigint) => boolean; markRangeClean: (sheet: number, start_row: number, end_row: number, start_col: number, end_col: number) => void; memoryStats: () => Float64Array; pagedDirtyCoordinates: (sheet: number) => Float64Array; pagedStats: (sheet: number) => Float64Array; persistedCellData: (sheet: number) => Float64Array; pinRange: (sheet: number, start_row: number, end_row: number, cols: Uint32Array) => void; pinReadWindow: (sheet: number, start_row: number, end_row: number, rows: Uint32Array, cols: Uint32Array) => void; pinViewportBands: (sheet: number, bands: Uint32Array) => void; poolStrings: (ids: Uint32Array) => string[]; queryResourceStats: () => Float64Array; rangeFullyLoaded: (sheet: number, r0: number, c0: number, r1: number, c1: number) => boolean; rangeStyleIds: (sheet: number, r0: number, c0: number, r1: number, c1: number) => Uint32Array; recompute: (sheet: number) => void; recomputeVolatile: (serial: number) => boolean; referenceTarget: (sheet: number, row: number, col: number) => Uint32Array | undefined; referencesTargeting: (target_sheet: number, max_entries: number) => Uint32Array | undefined; remapRangeStyles: (sheet: number, r0: number, c0: number, r1: number, c1: number, old_ids: Uint32Array, new_ids: Uint32Array) => boolean; removeCols: (sheet: number, at: number, count: number) => void; removeNamedRange: (name: string, scope: number) => boolean; removeRows: (sheet: number, at: number, count: number) => void; removeSheet: (sheet: number) => boolean; removeTable: (id: string) => boolean; renameSheet: (sheet: number, id: string, name: string) => boolean; resetFormulaMatrixResourceStats: () => void; resetQueryResourceStats: () => void; restoreRange: (sheet: number, r0: number, c0: number, snapshot: RangeSnapshot) => boolean; rowCount: (sheet: number) => number; search: (sheet: number, cols: Uint32Array, query: string, case_insensitive: boolean, whole_cell: boolean) => Uint32Array; setBlockPacked: (sheet: number, start_row: number, start_col: number, rows: number, cols: number, kinds: Uint8Array, numbers: Float64Array, text_buf: Uint8Array, text_offsets: Uint32Array, styles: Uint32Array, formula_offsets: Uint32Array, formula_sources: string[], reference_offsets: Uint32Array, reference_targets: Uint32Array) => number; setBool: (sheet: number, row: number, col: number, value: boolean, style: number) => void; setColumnBlockPacked: (sheet: number, start_row: number, start_col: number, rows: number, cols: number, kinds: Uint8Array, numbers: Float64Array, text_buf: Uint8Array, text_offsets: Uint32Array, styles: Uint32Array, formula_offsets: Uint32Array, formula_sources: string[], reference_offsets: Uint32Array, reference_targets: Uint32Array) => number; setColumnNumbers: (sheet: number, col: number, start_row: number, values: Float64Array, style: number) => void; setColumnStrings: (sheet: number, col: number, start_row: number, values: string[], style: number) => void; setColumnStringsPacked: (sheet: number, col: number, start_row: number, buf: string, utf16_lens: Uint32Array, style: number) => void; setConditionalRules: (sheet: number, kinds: Uint8Array, bounds: Uint32Array, nums: Float64Array, strs: string[], flags: Uint8Array) => void; setFormula: (sheet: number, row: number, col: number, src: string, style: number) => number; setNamedRange: (name: string, scope: number, sheet: number, row_start: number, col_start: number, row_end: number, col_end: number) => boolean; setNumber: (sheet: number, row: number, col: number, value: number, style: number) => void; setSheetName: (sheet: number, id: string, name: string) => void; setSheetOrder: (order: Uint32Array) => boolean; setSparseBlock: (sheet: number, start_row: number, start_col: number, rows: number, cols: number, offsets: Uint32Array, kinds: Uint8Array, numbers: Float64Array, texts: string[], styles: Uint32Array, formula_offsets: Uint32Array, formula_sources: string[], reference_offsets: Uint32Array, reference_targets: Uint32Array) => number; setSpillBlockers: (sheet: number, bounds: Uint32Array) => boolean; setString: (sheet: number, row: number, col: number, value: string, style: number) => void; setTable: (id: string, name: string, sheet: number, row_start: number, col_start: number, row_end: number, col_end: number, header_row: boolean, totals_row: boolean, column_ids: string[], column_names: string[]) => boolean; sheetSpanFormulaCells: (sheet: number) => Uint32Array; snapshotNumbers: (snapshot: RangeSnapshot) => Float64Array; snapshotTexts: (snapshot: RangeSnapshot) => string[]; sortRows: (sheet: number, col: number, ascending: boolean) => Uint32Array; sortRowsMulti: (sheet: number, cols: Uint32Array, ascending: Uint8Array, candidates: Uint32Array) => Uint32Array; spillAnchorCol: (sheet: number, row: number, col: number) => number; spillAnchorRow: (sheet: number, row: number, col: number) => number; spillDerivedMask: (sheet: number, row_start: number, row_end: number, cols: Uint32Array) => Uint8Array; spillOwnerCoordinates: (sheet: number, row_start: number, row_end: number, cols: Uint32Array) => Uint32Array; stringPoolEpoch: () => number; styleIdAt: (sheet: number, row: number, col: number) => number; wasmCommittedBytes: () => number; static importMemoryState: (bytes: Uint8Array) => CellStore }",
+              "signature": "class CellStore { acknowledgeRevision: (revision: bigint) => void; addPagedSheet: (n_cols: number, row_count: number, chunk_rows: number, byte_budget: number, max_dirty_cells: number) => number; addRows: (sheet: number, at: number, count: number) => void; addSheet: (n_cols: number, row_count: number) => number; admitSourceRange: (sheet: number, r0: number, c0: number, r1: number, c1: number) => boolean; aggregate: (sheet: number, col: number, op: number) => number; beginMutation: () => bigint; beginPageLoad: () => void; canDirtyCell: (sheet: number, row: number, col: number) => boolean; captureRange: (sheet: number, r0: number, c0: number, rows: number, cols: number) => RangeSnapshot | undefined; captureReferences: (sheet: number, max_entries: number) => SourceSnapshot | undefined; captureSources: (sheet: number, r0: number, c0: number, rows: number, cols: number) => SourceSnapshot | undefined; captureSourcesForRows: (sheet: number, rows: Uint32Array, cols: Uint32Array) => SourceSnapshot | undefined; cellSnapshots: (sheet: number, rows: Uint32Array, cols: Uint32Array) => CellSnapshot | undefined; cellState: (sheet: number, row: number, col: number) => number; clearCell: (sheet: number, row: number, col: number, style: number) => void; clearRange: (sheet: number, r0: number, c0: number, r1: number, c1: number, contents: boolean, style: boolean) => boolean; colCount: (sheet: number) => number; columnsFullyLoaded: (sheet: number, start_row: number, end_row: number, cols: Uint32Array) => boolean; commitSources: () => void; compactStringStorage: () => void; dataEdge: (sheet: number, row: number, col: number, d_row: number, d_col: number) => number; dataEdgeOrdered: (sheet: number, order: Uint32Array, row: number, col: number, d_row: number, d_col: number) => number; dirtyRevision: (sheet: number, row: number, col: number) => bigint; distinctValues: (sheet: number, col: number, limit: number) => DistinctColumn; exportMemoryState: () => Uint8Array; filterRows: (sheet: number, col: number, needle: string) => Uint32Array; filterRowsMulti: (sheet: number, cols: Uint32Array, kinds: Uint8Array, flags: Uint8Array, nums: Float64Array, num_counts: Uint32Array, text_counts: Uint32Array, value_nums: Float64Array, value_texts: string[]) => Uint32Array; formulaMatrixResourceStats: () => Float64Array; formulaReadBands: (sheet: number, start_row: number, end_row: number, cols: Uint32Array, max_cells: number) => Uint32Array; formulaSource: (sheet: number, row: number, col: number) => string | undefined; free: () => void; getCell: (sheet: number, row: number, col: number) => CellOut; getWindow: (sheet: number, row_start: number, row_end: number, cols: Uint32Array) => WindowView; getWindowRows: (sheet: number, rows: Uint32Array, cols: Uint32Array) => WindowView; hydratePageNumbers: (sheet: number, col: number, start_row: number, values: Float64Array, style: number, protected_offsets: Uint32Array) => void; hydratePageStringsPacked: (sheet: number, col: number, start_row: number, buf: string, utf16_lens: Uint32Array, style: number, protected_offsets: Uint32Array) => void; importRangeMemoryState: (bytes: Uint8Array, sheet: number, row_start: number, col_start: number) => RangeSnapshot; insertCols: (sheet: number, at: number, count: number) => void; isFullyLoaded: (sheet: number) => boolean; isPaged: (sheet: number) => boolean; isSheetAlive: (sheet: number) => boolean; loadedSpans: (sheet: number, start_row: number, end_row: number, col: number) => Uint32Array; markCellCleanRevision: (sheet: number, row: number, col: number, revision: bigint) => boolean; markRangeClean: (sheet: number, start_row: number, end_row: number, start_col: number, end_col: number) => void; memoryStats: () => Float64Array; pagedDirtyCoordinates: (sheet: number) => Float64Array; pagedStats: (sheet: number) => Float64Array; persistedCellData: (sheet: number) => Float64Array; pinRange: (sheet: number, start_row: number, end_row: number, cols: Uint32Array) => void; pinReadWindow: (sheet: number, start_row: number, end_row: number, rows: Uint32Array, cols: Uint32Array) => void; pinViewportBands: (sheet: number, bands: Uint32Array) => void; poolStrings: (ids: Uint32Array) => string[]; queryResourceStats: () => Float64Array; rangeFullyLoaded: (sheet: number, r0: number, c0: number, r1: number, c1: number) => boolean; rangeStyleIds: (sheet: number, r0: number, c0: number, r1: number, c1: number) => Uint32Array; recompute: (sheet: number) => void; recomputeVolatile: (serial: number) => boolean; referenceTarget: (sheet: number, row: number, col: number) => Uint32Array | undefined; referencesTargeting: (target_sheet: number, max_entries: number) => Uint32Array | undefined; remapRangeStyles: (sheet: number, r0: number, c0: number, r1: number, c1: number, old_ids: Uint32Array, new_ids: Uint32Array) => boolean; removeCols: (sheet: number, at: number, count: number) => void; removeNamedRange: (name: string, scope: number) => boolean; removeRows: (sheet: number, at: number, count: number) => void; removeSheet: (sheet: number) => boolean; removeTable: (id: string) => boolean; renameSheet: (sheet: number, id: string, name: string) => boolean; resetFormulaMatrixResourceStats: () => void; resetQueryResourceStats: () => void; restoreRange: (sheet: number, r0: number, c0: number, snapshot: RangeSnapshot) => boolean; rowCount: (sheet: number) => number; search: (sheet: number, cols: Uint32Array, query: string, case_insensitive: boolean, whole_cell: boolean) => Uint32Array; setBlockPacked: (sheet: number, start_row: number, start_col: number, rows: number, cols: number, kinds: Uint8Array, numbers: Float64Array, text_buf: Uint8Array, text_offsets: Uint32Array, styles: Uint32Array, formula_offsets: Uint32Array, formula_sources: string[], reference_offsets: Uint32Array, reference_targets: Uint32Array) => number; setBool: (sheet: number, row: number, col: number, value: boolean, style: number) => void; setColumnBlockPacked: (sheet: number, start_row: number, start_col: number, rows: number, cols: number, kinds: Uint8Array, numbers: Float64Array, text_buf: Uint8Array, text_offsets: Uint32Array, styles: Uint32Array, formula_offsets: Uint32Array, formula_sources: string[], reference_offsets: Uint32Array, reference_targets: Uint32Array) => number; setColumnNumbers: (sheet: number, col: number, start_row: number, values: Float64Array, style: number) => void; setColumnStrings: (sheet: number, col: number, start_row: number, values: string[], style: number) => void; setColumnStringsPacked: (sheet: number, col: number, start_row: number, buf: string, utf16_lens: Uint32Array, style: number) => void; setConditionalRules: (sheet: number, kinds: Uint8Array, bounds: Uint32Array, nums: Float64Array, strs: string[], flags: Uint8Array) => void; setFormula: (sheet: number, row: number, col: number, src: string, style: number) => number; setIterativeCalculation: (enabled: boolean, max_iterations: number, max_change: number) => boolean; setNamedRange: (name: string, scope: number, sheet: number, row_start: number, col_start: number, row_end: number, col_end: number) => boolean; setNumber: (sheet: number, row: number, col: number, value: number, style: number) => void; setSheetName: (sheet: number, id: string, name: string) => void; setSheetOrder: (order: Uint32Array) => boolean; setSparseBlock: (sheet: number, start_row: number, start_col: number, rows: number, cols: number, offsets: Uint32Array, kinds: Uint8Array, numbers: Float64Array, texts: string[], styles: Uint32Array, formula_offsets: Uint32Array, formula_sources: string[], reference_offsets: Uint32Array, reference_targets: Uint32Array) => number; setSpillBlockers: (sheet: number, bounds: Uint32Array) => boolean; setString: (sheet: number, row: number, col: number, value: string, style: number) => void; setTable: (id: string, name: string, sheet: number, row_start: number, col_start: number, row_end: number, col_end: number, header_row: boolean, totals_row: boolean, column_ids: string[], column_names: string[]) => boolean; sheetSpanFormulaCells: (sheet: number) => Uint32Array; snapshotNumbers: (snapshot: RangeSnapshot) => Float64Array; snapshotTexts: (snapshot: RangeSnapshot) => string[]; sortRows: (sheet: number, col: number, ascending: boolean) => Uint32Array; sortRowsMulti: (sheet: number, cols: Uint32Array, ascending: Uint8Array, candidates: Uint32Array) => Uint32Array; spillAnchorCol: (sheet: number, row: number, col: number) => number; spillAnchorRow: (sheet: number, row: number, col: number) => number; spillDerivedMask: (sheet: number, row_start: number, row_end: number, cols: Uint32Array) => Uint8Array; spillOwnerCoordinates: (sheet: number, row_start: number, row_end: number, cols: Uint32Array) => Uint32Array; stringPoolEpoch: () => number; styleIdAt: (sheet: number, row: number, col: number) => number; wasmCommittedBytes: () => number; static importMemoryState: (bytes: Uint8Array) => CellStore }",
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
@@ -7564,6 +7629,10 @@
                   "documentation": "Parse and store a formula at `(row, col)`.\n\nSetters only mark cells dirty; they do not recompute formulas. The host\ncalls `recompute(sheet)` once at the transaction barrier so a multi-cell\nedit performs one dependency-scoped pass instead of one full-sheet pass\nper setter. A successful parse returns the pre-write cached scalar; a\nparse rejection returns `0.0`, and a rejected write returns `NaN`.\n\nThe dependency index is invalidated only when the rewrite changes what\nthe formula reads or whether it produces an array. A constant-only edit\nkeeps the cached index, so its next recompute visits just the edited\nformula and its dependents instead of every formula in the workbook."
                 },
                 {
+                  "name": "setIterativeCalculation",
+                  "documentation": "Turns iterative calculation on or off with Excel's limits: at most\n`max_iterations` (1 to 32,767) passes over each circular reference,\nstopping once no member changes by more than `max_change` (finite, not\nnegative). Rejects limits outside those ranges. Recalculates every\nformula when the setting changes."
+                },
+                {
                   "name": "setSheetOrder",
                   "documentation": "Set the workbook tab order: every live sheet handle exactly once.\n3-D references such as `Sheet1:Sheet3!A1` span the tabs between their\nendpoints, so formulas whose span changed are re-placed, their\ndependencies patched, and their results recomputed. Rejects an order\nthat omits, repeats or adds a handle."
                 },
@@ -7624,7 +7693,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L428",
+              "source": "pkg/sheetwrite_wasm.d.ts#L436",
               "jsDocTags": [],
               "documentation": "Distinct-value scan result for one column: parallel kind/number/text\narrays whose buffers are surrendered once through the `take*` accessors.",
               "memberDocs": [
@@ -7661,7 +7730,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L512",
+              "source": "pkg/sheetwrite_wasm.d.ts#L520",
               "jsDocTags": [],
               "documentation": "Names accepted by the full engine, including aliases.",
               "memberDocs": []
@@ -7673,7 +7742,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L514",
+              "source": "pkg/sheetwrite_wasm.d.ts#L522",
               "jsDocTags": [],
               "documentation": "Sources accepted by asynchronous initialization: a fetchable URL/request/response, raw module bytes, or a precompiled `WebAssembly.Module`.",
               "memberDocs": []
@@ -7681,11 +7750,11 @@
             {
               "name": "InitOutput",
               "kind": "interface",
-              "signature": "export interface InitOutput { readonly memory: WebAssembly.Memory; readonly __wbg_cellout_free: (a: number, b: number) => void; readonly __wbg_cellsnapshot_free: (a: number, b: number) => void; readonly __wbg_cellstore_free: (a: number, b: number) => void; readonly __wbg_distinctcolumn_free: (a: number, b: number) => void; readonly __wbg_rangesnapshot_free: (a: number, b: number) => void; readonly __wbg_sourcesnapshot_free: (a: number, b: number) => void; readonly __wbg_windowview_free: (a: number, b: number) => void; readonly cellout_kind: (a: number) => number; readonly cellout_num: (a: number) => number; readonly cellout_string: (a: number) => [number, number]; readonly cellout_style: (a: number) => number; readonly cellsnapshot_kinds: (a: number) => [number, number]; readonly cellsnapshot_numbers: (a: number) => [number, number]; readonly cellsnapshot_strings: (a: number) => [number, number]; readonly cellsnapshot_styles: (a: number) => [number, number]; readonly cellsnapshot_textIndex: (a: number) => [number, number]; readonly cellstore_acknowledgeRevision: (a: number, b: bigint) => void; readonly cellstore_addPagedSheet: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_addRows: (a: number, b: number, c: number, d: number) => void; readonly cellstore_addSheet: (a: number, b: number, c: number) => number; readonly cellstore_admitSourceRange: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_aggregate: (a: number, b: number, c: number, d: number) => number; readonly cellstore_beginMutation: (a: number) => bigint; readonly cellstore_beginPageLoad: (a: number) => void; readonly cellstore_canDirtyCell: (a: number, b: number, c: number, d: number) => number; readonly cellstore_captureRange: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_captureReferences: (a: number, b: number, c: number) => number; readonly cellstore_captureSources: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_captureSourcesForRows: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_cellSnapshots: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_cellState: (a: number, b: number, c: number, d: number) => number; readonly cellstore_clearCell: (a: number, b: number, c: number, d: number, e: number) => void; readonly cellstore_clearRange: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => number; readonly cellstore_colCount: (a: number, b: number) => number; readonly cellstore_columnsFullyLoaded: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_commitSources: (a: number) => void; readonly cellstore_compactStringStorage: (a: number) => void; readonly cellstore_dataEdge: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_dataEdgeOrdered: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => number; readonly cellstore_dirtyRevision: (a: number, b: number, c: number, d: number) => bigint; readonly cellstore_distinctValues: (a: number, b: number, c: number, d: number) => number; readonly cellstore_exportMemoryState: (a: number) => [number, number]; readonly cellstore_filterRows: (a: number, b: number, c: number, d: number, e: number) => [number, number]; readonly cellstore_filterRowsMulti: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number) => [number, number]; readonly cellstore_formulaMatrixResourceStats: (a: number) => [number, number]; readonly cellstore_formulaReadBands: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number]; readonly cellstore_formulaSource: (a: number, b: number, c: number, d: number) => [number, number]; readonly cellstore_getCell: (a: number, b: number, c: number, d: number) => number; readonly cellstore_getWindow: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_getWindowRows: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_hydratePageNumbers: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => void; readonly cellstore_hydratePageStringsPacked: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number) => void; readonly cellstore_importMemoryState: (a: any) => number; readonly cellstore_importRangeMemoryState: (a: number, b: any, c: number, d: number, e: number) => number; readonly cellstore_insertCols: (a: number, b: number, c: number, d: number) => void; readonly cellstore_isFullyLoaded: (a: number, b: number) => number; readonly cellstore_isPaged: (a: number, b: number) => number; readonly cellstore_isSheetAlive: (a: number, b: number) => number; readonly cellstore_loadedSpans: (a: number, b: number, c: number, d: number, e: number) => [number, number]; readonly cellstore_markCellCleanRevision: (a: number, b: number, c: number, d: number, e: bigint) => number; readonly cellstore_markRangeClean: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_memoryStats: (a: number) => [number, number]; readonly cellstore_new: () => number; readonly cellstore_pagedDirtyCoordinates: (a: number, b: number) => [number, number]; readonly cellstore_pagedStats: (a: number, b: number) => [number, number]; readonly cellstore_persistedCellData: (a: number, b: number) => [number, number]; readonly cellstore_pinRange: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_pinReadWindow: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void; readonly cellstore_pinViewportBands: (a: number, b: number, c: number, d: number) => void; readonly cellstore_poolStrings: (a: number, b: number, c: number) => [number, number]; readonly cellstore_queryResourceStats: (a: number) => [number, number]; readonly cellstore_rangeFullyLoaded: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_rangeStyleIds: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number]; readonly cellstore_recompute: (a: number, b: number) => void; readonly cellstore_recomputeVolatile: (a: number, b: number) => number; readonly cellstore_referenceTarget: (a: number, b: number, c: number, d: number) => [number, number]; readonly cellstore_referencesTargeting: (a: number, b: number, c: number) => [number, number]; readonly cellstore_remapRangeStyles: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => number; readonly cellstore_removeCols: (a: number, b: number, c: number, d: number) => void; readonly cellstore_removeNamedRange: (a: number, b: number, c: number, d: number) => number; readonly cellstore_removeRows: (a: number, b: number, c: number, d: number) => void; readonly cellstore_removeSheet: (a: number, b: number) => number; readonly cellstore_removeTable: (a: number, b: number, c: number) => number; readonly cellstore_renameSheet: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_resetFormulaMatrixResourceStats: (a: number) => void; readonly cellstore_resetQueryResourceStats: (a: number) => void; readonly cellstore_restoreRange: (a: number, b: number, c: number, d: number, e: number) => number; readonly cellstore_rowCount: (a: number, b: number) => number; readonly cellstore_search: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number]; readonly cellstore_setBlockPacked: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number, s: number, t: number, u: number, v: number, w: number, x: number) => number; readonly cellstore_setBool: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_setColumnBlockPacked: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number, s: number, t: number, u: number, v: number, w: number, x: number) => number; readonly cellstore_setColumnNumbers: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void; readonly cellstore_setColumnStrings: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void; readonly cellstore_setColumnStringsPacked: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => void; readonly cellstore_setConditionalRules: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number) => void; readonly cellstore_setFormula: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => number; readonly cellstore_setNamedRange: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => number; readonly cellstore_setNumber: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_setSheetName: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_setSheetOrder: (a: number, b: number, c: number) => number; readonly cellstore_setSparseBlock: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number, s: number, t: number, u: number, v: number, w: number, x: number) => number; readonly cellstore_setSpillBlockers: (a: number, b: number, c: number, d: number) => number; readonly cellstore_setString: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void; readonly cellstore_setTable: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number) => number; readonly cellstore_sheetSpanFormulaCells: (a: number, b: number) => [number, number]; readonly cellstore_snapshotNumbers: (a: number, b: number) => [number, number]; readonly cellstore_snapshotTexts: (a: number, b: number) => [number, number]; readonly cellstore_sortRows: (a: number, b: number, c: number, d: number) => [number, number]; readonly cellstore_sortRowsMulti: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number]; readonly cellstore_spillAnchorCol: (a: number, b: number, c: number, d: number) => number; readonly cellstore_spillAnchorRow: (a: number, b: number, c: number, d: number) => number; readonly cellstore_spillDerivedMask: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number]; readonly cellstore_spillOwnerCoordinates: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number]; readonly cellstore_stringPoolEpoch: (a: number) => number; readonly cellstore_styleIdAt: (a: number, b: number, c: number, d: number) => number; readonly cellstore_wasmCommittedBytes: (a: number) => number; readonly distinctcolumn_takeKinds: (a: number) => [number, number]; readonly distinctcolumn_takeNumbers: (a: number) => [number, number]; readonly distinctcolumn_takeTexts: (a: number) => [number, number]; readonly functionNames: () => [number, number]; readonly rangesnapshot_byteLength: (a: number) => number; readonly rangesnapshot_exportMemoryState: (a: number, b: number) => [number, number]; readonly rangesnapshot_formulaOffsets: (a: number) => [number, number]; readonly rangesnapshot_formulaSources: (a: number) => [number, number]; readonly rangesnapshot_kinds: (a: number) => [number, number]; readonly rangesnapshot_referenceOffsets: (a: number) => [number, number]; readonly rangesnapshot_referenceTargets: (a: number) => [number, number]; readonly rangesnapshot_styleIds: (a: number) => [number, number]; readonly sourcesnapshot_byteLength: (a: number) => number; readonly sourcesnapshot_formulaOffsets: (a: number) => [number, number]; readonly sourcesnapshot_formulaSources: (a: number) => [number, number]; readonly sourcesnapshot_referenceOffsets: (a: number) => [number, number]; readonly sourcesnapshot_referenceTargets: (a: number) => [number, number]; readonly sourcesnapshot_spillDerived: (a: number) => [number, number]; readonly windowview_nCols: (a: number) => number; readonly windowview_nRows: (a: number) => number; readonly windowview_takeStrings: (a: number) => [number, number]; readonly windowview_stringPoolEpoch: (a: number) => number; readonly windowview_takePacked: (a: number) => [number, number]; readonly __wbindgen_malloc: (a: number, b: number) => number; readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number; readonly __wbindgen_externrefs: WebAssembly.Table; readonly __wbindgen_free: (a: number, b: number, c: number) => void; readonly __externref_drop_slice: (a: number, b: number) => void; readonly __externref_table_alloc: () => number; readonly __wbindgen_start: () => void; }",
+              "signature": "export interface InitOutput { readonly memory: WebAssembly.Memory; readonly __wbg_cellout_free: (a: number, b: number) => void; readonly __wbg_cellsnapshot_free: (a: number, b: number) => void; readonly __wbg_cellstore_free: (a: number, b: number) => void; readonly __wbg_distinctcolumn_free: (a: number, b: number) => void; readonly __wbg_rangesnapshot_free: (a: number, b: number) => void; readonly __wbg_sourcesnapshot_free: (a: number, b: number) => void; readonly __wbg_windowview_free: (a: number, b: number) => void; readonly cellout_kind: (a: number) => number; readonly cellout_num: (a: number) => number; readonly cellout_string: (a: number) => [number, number]; readonly cellout_style: (a: number) => number; readonly cellsnapshot_kinds: (a: number) => [number, number]; readonly cellsnapshot_numbers: (a: number) => [number, number]; readonly cellsnapshot_strings: (a: number) => [number, number]; readonly cellsnapshot_styles: (a: number) => [number, number]; readonly cellsnapshot_textIndex: (a: number) => [number, number]; readonly cellstore_acknowledgeRevision: (a: number, b: bigint) => void; readonly cellstore_addPagedSheet: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_addRows: (a: number, b: number, c: number, d: number) => void; readonly cellstore_addSheet: (a: number, b: number, c: number) => number; readonly cellstore_admitSourceRange: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_aggregate: (a: number, b: number, c: number, d: number) => number; readonly cellstore_beginMutation: (a: number) => bigint; readonly cellstore_beginPageLoad: (a: number) => void; readonly cellstore_canDirtyCell: (a: number, b: number, c: number, d: number) => number; readonly cellstore_captureRange: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_captureReferences: (a: number, b: number, c: number) => number; readonly cellstore_captureSources: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_captureSourcesForRows: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_cellSnapshots: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_cellState: (a: number, b: number, c: number, d: number) => number; readonly cellstore_clearCell: (a: number, b: number, c: number, d: number, e: number) => void; readonly cellstore_clearRange: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => number; readonly cellstore_colCount: (a: number, b: number) => number; readonly cellstore_columnsFullyLoaded: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_commitSources: (a: number) => void; readonly cellstore_compactStringStorage: (a: number) => void; readonly cellstore_dataEdge: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_dataEdgeOrdered: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => number; readonly cellstore_dirtyRevision: (a: number, b: number, c: number, d: number) => bigint; readonly cellstore_distinctValues: (a: number, b: number, c: number, d: number) => number; readonly cellstore_exportMemoryState: (a: number) => [number, number]; readonly cellstore_filterRows: (a: number, b: number, c: number, d: number, e: number) => [number, number]; readonly cellstore_filterRowsMulti: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number) => [number, number]; readonly cellstore_formulaMatrixResourceStats: (a: number) => [number, number]; readonly cellstore_formulaReadBands: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number]; readonly cellstore_formulaSource: (a: number, b: number, c: number, d: number) => [number, number]; readonly cellstore_getCell: (a: number, b: number, c: number, d: number) => number; readonly cellstore_getWindow: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_getWindowRows: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_hydratePageNumbers: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => void; readonly cellstore_hydratePageStringsPacked: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number) => void; readonly cellstore_importMemoryState: (a: any) => number; readonly cellstore_importRangeMemoryState: (a: number, b: any, c: number, d: number, e: number) => number; readonly cellstore_insertCols: (a: number, b: number, c: number, d: number) => void; readonly cellstore_isFullyLoaded: (a: number, b: number) => number; readonly cellstore_isPaged: (a: number, b: number) => number; readonly cellstore_isSheetAlive: (a: number, b: number) => number; readonly cellstore_loadedSpans: (a: number, b: number, c: number, d: number, e: number) => [number, number]; readonly cellstore_markCellCleanRevision: (a: number, b: number, c: number, d: number, e: bigint) => number; readonly cellstore_markRangeClean: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_memoryStats: (a: number) => [number, number]; readonly cellstore_new: () => number; readonly cellstore_pagedDirtyCoordinates: (a: number, b: number) => [number, number]; readonly cellstore_pagedStats: (a: number, b: number) => [number, number]; readonly cellstore_persistedCellData: (a: number, b: number) => [number, number]; readonly cellstore_pinRange: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_pinReadWindow: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void; readonly cellstore_pinViewportBands: (a: number, b: number, c: number, d: number) => void; readonly cellstore_poolStrings: (a: number, b: number, c: number) => [number, number]; readonly cellstore_queryResourceStats: (a: number) => [number, number]; readonly cellstore_rangeFullyLoaded: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_rangeStyleIds: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number]; readonly cellstore_recompute: (a: number, b: number) => void; readonly cellstore_recomputeVolatile: (a: number, b: number) => number; readonly cellstore_referenceTarget: (a: number, b: number, c: number, d: number) => [number, number]; readonly cellstore_referencesTargeting: (a: number, b: number, c: number) => [number, number]; readonly cellstore_remapRangeStyles: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => number; readonly cellstore_removeCols: (a: number, b: number, c: number, d: number) => void; readonly cellstore_removeNamedRange: (a: number, b: number, c: number, d: number) => number; readonly cellstore_removeRows: (a: number, b: number, c: number, d: number) => void; readonly cellstore_removeSheet: (a: number, b: number) => number; readonly cellstore_removeTable: (a: number, b: number, c: number) => number; readonly cellstore_renameSheet: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_resetFormulaMatrixResourceStats: (a: number) => void; readonly cellstore_resetQueryResourceStats: (a: number) => void; readonly cellstore_restoreRange: (a: number, b: number, c: number, d: number, e: number) => number; readonly cellstore_rowCount: (a: number, b: number) => number; readonly cellstore_search: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number]; readonly cellstore_setBlockPacked: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number, s: number, t: number, u: number, v: number, w: number, x: number) => number; readonly cellstore_setBool: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_setColumnBlockPacked: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number, s: number, t: number, u: number, v: number, w: number, x: number) => number; readonly cellstore_setColumnNumbers: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void; readonly cellstore_setColumnStrings: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void; readonly cellstore_setColumnStringsPacked: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => void; readonly cellstore_setConditionalRules: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number) => void; readonly cellstore_setFormula: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => number; readonly cellstore_setIterativeCalculation: (a: number, b: number, c: number, d: number) => number; readonly cellstore_setNamedRange: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => number; readonly cellstore_setNumber: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_setSheetName: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_setSheetOrder: (a: number, b: number, c: number) => number; readonly cellstore_setSparseBlock: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number, s: number, t: number, u: number, v: number, w: number, x: number) => number; readonly cellstore_setSpillBlockers: (a: number, b: number, c: number, d: number) => number; readonly cellstore_setString: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void; readonly cellstore_setTable: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number) => number; readonly cellstore_sheetSpanFormulaCells: (a: number, b: number) => [number, number]; readonly cellstore_snapshotNumbers: (a: number, b: number) => [number, number]; readonly cellstore_snapshotTexts: (a: number, b: number) => [number, number]; readonly cellstore_sortRows: (a: number, b: number, c: number, d: number) => [number, number]; readonly cellstore_sortRowsMulti: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number]; readonly cellstore_spillAnchorCol: (a: number, b: number, c: number, d: number) => number; readonly cellstore_spillAnchorRow: (a: number, b: number, c: number, d: number) => number; readonly cellstore_spillDerivedMask: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number]; readonly cellstore_spillOwnerCoordinates: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number]; readonly cellstore_stringPoolEpoch: (a: number) => number; readonly cellstore_styleIdAt: (a: number, b: number, c: number, d: number) => number; readonly cellstore_wasmCommittedBytes: (a: number) => number; readonly distinctcolumn_takeKinds: (a: number) => [number, number]; readonly distinctcolumn_takeNumbers: (a: number) => [number, number]; readonly distinctcolumn_takeTexts: (a: number) => [number, number]; readonly functionNames: () => [number, number]; readonly rangesnapshot_byteLength: (a: number) => number; readonly rangesnapshot_exportMemoryState: (a: number, b: number) => [number, number]; readonly rangesnapshot_formulaOffsets: (a: number) => [number, number]; readonly rangesnapshot_formulaSources: (a: number) => [number, number]; readonly rangesnapshot_kinds: (a: number) => [number, number]; readonly rangesnapshot_referenceOffsets: (a: number) => [number, number]; readonly rangesnapshot_referenceTargets: (a: number) => [number, number]; readonly rangesnapshot_styleIds: (a: number) => [number, number]; readonly sourcesnapshot_byteLength: (a: number) => number; readonly sourcesnapshot_formulaOffsets: (a: number) => [number, number]; readonly sourcesnapshot_formulaSources: (a: number) => [number, number]; readonly sourcesnapshot_referenceOffsets: (a: number) => [number, number]; readonly sourcesnapshot_referenceTargets: (a: number) => [number, number]; readonly sourcesnapshot_spillDerived: (a: number) => [number, number]; readonly windowview_nCols: (a: number) => number; readonly windowview_nRows: (a: number) => number; readonly windowview_takeStrings: (a: number) => [number, number]; readonly windowview_stringPoolEpoch: (a: number) => number; readonly windowview_takePacked: (a: number) => [number, number]; readonly __wbindgen_malloc: (a: number, b: number) => number; readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number; readonly __wbindgen_externrefs: WebAssembly.Table; readonly __wbindgen_free: (a: number, b: number, c: number) => void; readonly __externref_drop_slice: (a: number, b: number) => void; readonly __externref_table_alloc: () => number; readonly __wbindgen_start: () => void; }",
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L516",
+              "source": "pkg/sheetwrite_wasm.d.ts#L524",
               "jsDocTags": [],
               "documentation": "Result of module initialization: the instantiated exports plus the shared linear memory.",
               "memberDocs": []
@@ -7697,7 +7766,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L677",
+              "source": "pkg/sheetwrite_wasm.d.ts#L686",
               "jsDocTags": [
                 "param",
                 "returns"
@@ -7739,7 +7808,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L454",
+              "source": "pkg/sheetwrite_wasm.d.ts#L462",
               "jsDocTags": [],
               "documentation": "Opaque, store-local history payload for one dense rectangular cell block.\n\nThe host may retain this object in undo history, but it is deliberately not\npart of the serialized document protocol. A deduplicated local dictionary\nowns captured text independently of the store's pool epoch.",
               "memberDocs": [
@@ -7756,7 +7825,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L476",
+              "source": "pkg/sheetwrite_wasm.d.ts#L484",
               "jsDocTags": [],
               "documentation": "Compact serializable projection of persisted derived-cell sources and spill\nidentity in one range. Offsets are row-major and sorted; reference targets\nare packed `[sheet_handle, row, col]` triples.",
               "memberDocs": []
@@ -7768,7 +7837,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L667",
+              "source": "pkg/sheetwrite_wasm.d.ts#L676",
               "jsDocTags": [],
               "documentation": "Sources accepted by synchronous initialization: raw module bytes or a precompiled `WebAssembly.Module`.",
               "memberDocs": []
@@ -7780,7 +7849,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L491",
+              "source": "pkg/sheetwrite_wasm.d.ts#L499",
               "jsDocTags": [],
               "documentation": "A bulk window of resolved cells, row-major over `n_rows x n_cols`.",
               "memberDocs": [
@@ -10629,7 +10698,7 @@
             {
               "name": "CellStore",
               "kind": "class",
-              "signature": "class CellStore { acknowledgeRevision: (revision: bigint) => void; addPagedSheet: (n_cols: number, row_count: number, chunk_rows: number, byte_budget: number, max_dirty_cells: number) => number; addRows: (sheet: number, at: number, count: number) => void; addSheet: (n_cols: number, row_count: number) => number; admitSourceRange: (sheet: number, r0: number, c0: number, r1: number, c1: number) => boolean; aggregate: (sheet: number, col: number, op: number) => number; beginMutation: () => bigint; beginPageLoad: () => void; canDirtyCell: (sheet: number, row: number, col: number) => boolean; captureRange: (sheet: number, r0: number, c0: number, rows: number, cols: number) => RangeSnapshot | undefined; captureReferences: (sheet: number, max_entries: number) => SourceSnapshot | undefined; captureSources: (sheet: number, r0: number, c0: number, rows: number, cols: number) => SourceSnapshot | undefined; captureSourcesForRows: (sheet: number, rows: Uint32Array, cols: Uint32Array) => SourceSnapshot | undefined; cellSnapshots: (sheet: number, rows: Uint32Array, cols: Uint32Array) => CellSnapshot | undefined; cellState: (sheet: number, row: number, col: number) => number; clearCell: (sheet: number, row: number, col: number, style: number) => void; clearRange: (sheet: number, r0: number, c0: number, r1: number, c1: number, contents: boolean, style: boolean) => boolean; colCount: (sheet: number) => number; columnsFullyLoaded: (sheet: number, start_row: number, end_row: number, cols: Uint32Array) => boolean; commitSources: () => void; compactStringStorage: () => void; dataEdge: (sheet: number, row: number, col: number, d_row: number, d_col: number) => number; dataEdgeOrdered: (sheet: number, order: Uint32Array, row: number, col: number, d_row: number, d_col: number) => number; dirtyRevision: (sheet: number, row: number, col: number) => bigint; distinctValues: (sheet: number, col: number, limit: number) => DistinctColumn; exportMemoryState: () => Uint8Array; filterRows: (sheet: number, col: number, needle: string) => Uint32Array; filterRowsMulti: (sheet: number, cols: Uint32Array, kinds: Uint8Array, flags: Uint8Array, nums: Float64Array, num_counts: Uint32Array, text_counts: Uint32Array, value_nums: Float64Array, value_texts: string[]) => Uint32Array; formulaMatrixResourceStats: () => Float64Array; formulaReadBands: (sheet: number, start_row: number, end_row: number, cols: Uint32Array, max_cells: number) => Uint32Array; formulaSource: (sheet: number, row: number, col: number) => string | undefined; free: () => void; getCell: (sheet: number, row: number, col: number) => CellOut; getWindow: (sheet: number, row_start: number, row_end: number, cols: Uint32Array) => WindowView; getWindowRows: (sheet: number, rows: Uint32Array, cols: Uint32Array) => WindowView; hydratePageNumbers: (sheet: number, col: number, start_row: number, values: Float64Array, style: number, protected_offsets: Uint32Array) => void; hydratePageStringsPacked: (sheet: number, col: number, start_row: number, buf: string, utf16_lens: Uint32Array, style: number, protected_offsets: Uint32Array) => void; importRangeMemoryState: (bytes: Uint8Array, sheet: number, row_start: number, col_start: number) => RangeSnapshot; insertCols: (sheet: number, at: number, count: number) => void; isFullyLoaded: (sheet: number) => boolean; isPaged: (sheet: number) => boolean; isSheetAlive: (sheet: number) => boolean; loadedSpans: (sheet: number, start_row: number, end_row: number, col: number) => Uint32Array; markCellCleanRevision: (sheet: number, row: number, col: number, revision: bigint) => boolean; markRangeClean: (sheet: number, start_row: number, end_row: number, start_col: number, end_col: number) => void; memoryStats: () => Float64Array; pagedDirtyCoordinates: (sheet: number) => Float64Array; pagedStats: (sheet: number) => Float64Array; persistedCellData: (sheet: number) => Float64Array; pinRange: (sheet: number, start_row: number, end_row: number, cols: Uint32Array) => void; pinReadWindow: (sheet: number, start_row: number, end_row: number, rows: Uint32Array, cols: Uint32Array) => void; pinViewportBands: (sheet: number, bands: Uint32Array) => void; poolStrings: (ids: Uint32Array) => string[]; queryResourceStats: () => Float64Array; rangeFullyLoaded: (sheet: number, r0: number, c0: number, r1: number, c1: number) => boolean; rangeStyleIds: (sheet: number, r0: number, c0: number, r1: number, c1: number) => Uint32Array; recompute: (sheet: number) => void; recomputeVolatile: (serial: number) => boolean; referenceTarget: (sheet: number, row: number, col: number) => Uint32Array | undefined; referencesTargeting: (target_sheet: number, max_entries: number) => Uint32Array | undefined; remapRangeStyles: (sheet: number, r0: number, c0: number, r1: number, c1: number, old_ids: Uint32Array, new_ids: Uint32Array) => boolean; removeCols: (sheet: number, at: number, count: number) => void; removeNamedRange: (name: string, scope: number) => boolean; removeRows: (sheet: number, at: number, count: number) => void; removeSheet: (sheet: number) => boolean; removeTable: (id: string) => boolean; renameSheet: (sheet: number, id: string, name: string) => boolean; resetFormulaMatrixResourceStats: () => void; resetQueryResourceStats: () => void; restoreRange: (sheet: number, r0: number, c0: number, snapshot: RangeSnapshot) => boolean; rowCount: (sheet: number) => number; search: (sheet: number, cols: Uint32Array, query: string, case_insensitive: boolean, whole_cell: boolean) => Uint32Array; setBlockPacked: (sheet: number, start_row: number, start_col: number, rows: number, cols: number, kinds: Uint8Array, numbers: Float64Array, text_buf: Uint8Array, text_offsets: Uint32Array, styles: Uint32Array, formula_offsets: Uint32Array, formula_sources: string[], reference_offsets: Uint32Array, reference_targets: Uint32Array) => number; setBool: (sheet: number, row: number, col: number, value: boolean, style: number) => void; setColumnBlockPacked: (sheet: number, start_row: number, start_col: number, rows: number, cols: number, kinds: Uint8Array, numbers: Float64Array, text_buf: Uint8Array, text_offsets: Uint32Array, styles: Uint32Array, formula_offsets: Uint32Array, formula_sources: string[], reference_offsets: Uint32Array, reference_targets: Uint32Array) => number; setColumnNumbers: (sheet: number, col: number, start_row: number, values: Float64Array, style: number) => void; setColumnStrings: (sheet: number, col: number, start_row: number, values: string[], style: number) => void; setColumnStringsPacked: (sheet: number, col: number, start_row: number, buf: string, utf16_lens: Uint32Array, style: number) => void; setConditionalRules: (sheet: number, kinds: Uint8Array, bounds: Uint32Array, nums: Float64Array, strs: string[], flags: Uint8Array) => void; setFormula: (sheet: number, row: number, col: number, src: string, style: number) => number; setNamedRange: (name: string, scope: number, sheet: number, row_start: number, col_start: number, row_end: number, col_end: number) => boolean; setNumber: (sheet: number, row: number, col: number, value: number, style: number) => void; setSheetName: (sheet: number, id: string, name: string) => void; setSheetOrder: (order: Uint32Array) => boolean; setSparseBlock: (sheet: number, start_row: number, start_col: number, rows: number, cols: number, offsets: Uint32Array, kinds: Uint8Array, numbers: Float64Array, texts: string[], styles: Uint32Array, formula_offsets: Uint32Array, formula_sources: string[], reference_offsets: Uint32Array, reference_targets: Uint32Array) => number; setSpillBlockers: (sheet: number, bounds: Uint32Array) => boolean; setString: (sheet: number, row: number, col: number, value: string, style: number) => void; setTable: (id: string, name: string, sheet: number, row_start: number, col_start: number, row_end: number, col_end: number, header_row: boolean, totals_row: boolean, column_ids: string[], column_names: string[]) => boolean; sheetSpanFormulaCells: (sheet: number) => Uint32Array; snapshotNumbers: (snapshot: RangeSnapshot) => Float64Array; snapshotTexts: (snapshot: RangeSnapshot) => string[]; sortRows: (sheet: number, col: number, ascending: boolean) => Uint32Array; sortRowsMulti: (sheet: number, cols: Uint32Array, ascending: Uint8Array, candidates: Uint32Array) => Uint32Array; spillAnchorCol: (sheet: number, row: number, col: number) => number; spillAnchorRow: (sheet: number, row: number, col: number) => number; spillDerivedMask: (sheet: number, row_start: number, row_end: number, cols: Uint32Array) => Uint8Array; spillOwnerCoordinates: (sheet: number, row_start: number, row_end: number, cols: Uint32Array) => Uint32Array; stringPoolEpoch: () => number; styleIdAt: (sheet: number, row: number, col: number) => number; wasmCommittedBytes: () => number; static importMemoryState: (bytes: Uint8Array) => CellStore }",
+              "signature": "class CellStore { acknowledgeRevision: (revision: bigint) => void; addPagedSheet: (n_cols: number, row_count: number, chunk_rows: number, byte_budget: number, max_dirty_cells: number) => number; addRows: (sheet: number, at: number, count: number) => void; addSheet: (n_cols: number, row_count: number) => number; admitSourceRange: (sheet: number, r0: number, c0: number, r1: number, c1: number) => boolean; aggregate: (sheet: number, col: number, op: number) => number; beginMutation: () => bigint; beginPageLoad: () => void; canDirtyCell: (sheet: number, row: number, col: number) => boolean; captureRange: (sheet: number, r0: number, c0: number, rows: number, cols: number) => RangeSnapshot | undefined; captureReferences: (sheet: number, max_entries: number) => SourceSnapshot | undefined; captureSources: (sheet: number, r0: number, c0: number, rows: number, cols: number) => SourceSnapshot | undefined; captureSourcesForRows: (sheet: number, rows: Uint32Array, cols: Uint32Array) => SourceSnapshot | undefined; cellSnapshots: (sheet: number, rows: Uint32Array, cols: Uint32Array) => CellSnapshot | undefined; cellState: (sheet: number, row: number, col: number) => number; clearCell: (sheet: number, row: number, col: number, style: number) => void; clearRange: (sheet: number, r0: number, c0: number, r1: number, c1: number, contents: boolean, style: boolean) => boolean; colCount: (sheet: number) => number; columnsFullyLoaded: (sheet: number, start_row: number, end_row: number, cols: Uint32Array) => boolean; commitSources: () => void; compactStringStorage: () => void; dataEdge: (sheet: number, row: number, col: number, d_row: number, d_col: number) => number; dataEdgeOrdered: (sheet: number, order: Uint32Array, row: number, col: number, d_row: number, d_col: number) => number; dirtyRevision: (sheet: number, row: number, col: number) => bigint; distinctValues: (sheet: number, col: number, limit: number) => DistinctColumn; exportMemoryState: () => Uint8Array; filterRows: (sheet: number, col: number, needle: string) => Uint32Array; filterRowsMulti: (sheet: number, cols: Uint32Array, kinds: Uint8Array, flags: Uint8Array, nums: Float64Array, num_counts: Uint32Array, text_counts: Uint32Array, value_nums: Float64Array, value_texts: string[]) => Uint32Array; formulaMatrixResourceStats: () => Float64Array; formulaReadBands: (sheet: number, start_row: number, end_row: number, cols: Uint32Array, max_cells: number) => Uint32Array; formulaSource: (sheet: number, row: number, col: number) => string | undefined; free: () => void; getCell: (sheet: number, row: number, col: number) => CellOut; getWindow: (sheet: number, row_start: number, row_end: number, cols: Uint32Array) => WindowView; getWindowRows: (sheet: number, rows: Uint32Array, cols: Uint32Array) => WindowView; hydratePageNumbers: (sheet: number, col: number, start_row: number, values: Float64Array, style: number, protected_offsets: Uint32Array) => void; hydratePageStringsPacked: (sheet: number, col: number, start_row: number, buf: string, utf16_lens: Uint32Array, style: number, protected_offsets: Uint32Array) => void; importRangeMemoryState: (bytes: Uint8Array, sheet: number, row_start: number, col_start: number) => RangeSnapshot; insertCols: (sheet: number, at: number, count: number) => void; isFullyLoaded: (sheet: number) => boolean; isPaged: (sheet: number) => boolean; isSheetAlive: (sheet: number) => boolean; loadedSpans: (sheet: number, start_row: number, end_row: number, col: number) => Uint32Array; markCellCleanRevision: (sheet: number, row: number, col: number, revision: bigint) => boolean; markRangeClean: (sheet: number, start_row: number, end_row: number, start_col: number, end_col: number) => void; memoryStats: () => Float64Array; pagedDirtyCoordinates: (sheet: number) => Float64Array; pagedStats: (sheet: number) => Float64Array; persistedCellData: (sheet: number) => Float64Array; pinRange: (sheet: number, start_row: number, end_row: number, cols: Uint32Array) => void; pinReadWindow: (sheet: number, start_row: number, end_row: number, rows: Uint32Array, cols: Uint32Array) => void; pinViewportBands: (sheet: number, bands: Uint32Array) => void; poolStrings: (ids: Uint32Array) => string[]; queryResourceStats: () => Float64Array; rangeFullyLoaded: (sheet: number, r0: number, c0: number, r1: number, c1: number) => boolean; rangeStyleIds: (sheet: number, r0: number, c0: number, r1: number, c1: number) => Uint32Array; recompute: (sheet: number) => void; recomputeVolatile: (serial: number) => boolean; referenceTarget: (sheet: number, row: number, col: number) => Uint32Array | undefined; referencesTargeting: (target_sheet: number, max_entries: number) => Uint32Array | undefined; remapRangeStyles: (sheet: number, r0: number, c0: number, r1: number, c1: number, old_ids: Uint32Array, new_ids: Uint32Array) => boolean; removeCols: (sheet: number, at: number, count: number) => void; removeNamedRange: (name: string, scope: number) => boolean; removeRows: (sheet: number, at: number, count: number) => void; removeSheet: (sheet: number) => boolean; removeTable: (id: string) => boolean; renameSheet: (sheet: number, id: string, name: string) => boolean; resetFormulaMatrixResourceStats: () => void; resetQueryResourceStats: () => void; restoreRange: (sheet: number, r0: number, c0: number, snapshot: RangeSnapshot) => boolean; rowCount: (sheet: number) => number; search: (sheet: number, cols: Uint32Array, query: string, case_insensitive: boolean, whole_cell: boolean) => Uint32Array; setBlockPacked: (sheet: number, start_row: number, start_col: number, rows: number, cols: number, kinds: Uint8Array, numbers: Float64Array, text_buf: Uint8Array, text_offsets: Uint32Array, styles: Uint32Array, formula_offsets: Uint32Array, formula_sources: string[], reference_offsets: Uint32Array, reference_targets: Uint32Array) => number; setBool: (sheet: number, row: number, col: number, value: boolean, style: number) => void; setColumnBlockPacked: (sheet: number, start_row: number, start_col: number, rows: number, cols: number, kinds: Uint8Array, numbers: Float64Array, text_buf: Uint8Array, text_offsets: Uint32Array, styles: Uint32Array, formula_offsets: Uint32Array, formula_sources: string[], reference_offsets: Uint32Array, reference_targets: Uint32Array) => number; setColumnNumbers: (sheet: number, col: number, start_row: number, values: Float64Array, style: number) => void; setColumnStrings: (sheet: number, col: number, start_row: number, values: string[], style: number) => void; setColumnStringsPacked: (sheet: number, col: number, start_row: number, buf: string, utf16_lens: Uint32Array, style: number) => void; setConditionalRules: (sheet: number, kinds: Uint8Array, bounds: Uint32Array, nums: Float64Array, strs: string[], flags: Uint8Array) => void; setFormula: (sheet: number, row: number, col: number, src: string, style: number) => number; setIterativeCalculation: (enabled: boolean, max_iterations: number, max_change: number) => boolean; setNamedRange: (name: string, scope: number, sheet: number, row_start: number, col_start: number, row_end: number, col_end: number) => boolean; setNumber: (sheet: number, row: number, col: number, value: number, style: number) => void; setSheetName: (sheet: number, id: string, name: string) => void; setSheetOrder: (order: Uint32Array) => boolean; setSparseBlock: (sheet: number, start_row: number, start_col: number, rows: number, cols: number, offsets: Uint32Array, kinds: Uint8Array, numbers: Float64Array, texts: string[], styles: Uint32Array, formula_offsets: Uint32Array, formula_sources: string[], reference_offsets: Uint32Array, reference_targets: Uint32Array) => number; setSpillBlockers: (sheet: number, bounds: Uint32Array) => boolean; setString: (sheet: number, row: number, col: number, value: string, style: number) => void; setTable: (id: string, name: string, sheet: number, row_start: number, col_start: number, row_end: number, col_end: number, header_row: boolean, totals_row: boolean, column_ids: string[], column_names: string[]) => boolean; sheetSpanFormulaCells: (sheet: number) => Uint32Array; snapshotNumbers: (snapshot: RangeSnapshot) => Float64Array; snapshotTexts: (snapshot: RangeSnapshot) => string[]; sortRows: (sheet: number, col: number, ascending: boolean) => Uint32Array; sortRowsMulti: (sheet: number, cols: Uint32Array, ascending: Uint8Array, candidates: Uint32Array) => Uint32Array; spillAnchorCol: (sheet: number, row: number, col: number) => number; spillAnchorRow: (sheet: number, row: number, col: number) => number; spillDerivedMask: (sheet: number, row_start: number, row_end: number, cols: Uint32Array) => Uint8Array; spillOwnerCoordinates: (sheet: number, row_start: number, row_end: number, cols: Uint32Array) => Uint32Array; stringPoolEpoch: () => number; styleIdAt: (sheet: number, row: number, col: number) => number; wasmCommittedBytes: () => number; static importMemoryState: (bytes: Uint8Array) => CellStore }",
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
@@ -10826,6 +10895,10 @@
                   "documentation": "Parse and store a formula at `(row, col)`.\n\nSetters only mark cells dirty; they do not recompute formulas. The host\ncalls `recompute(sheet)` once at the transaction barrier so a multi-cell\nedit performs one dependency-scoped pass instead of one full-sheet pass\nper setter. A successful parse returns the pre-write cached scalar; a\nparse rejection returns `0.0`, and a rejected write returns `NaN`.\n\nThe dependency index is invalidated only when the rewrite changes what\nthe formula reads or whether it produces an array. A constant-only edit\nkeeps the cached index, so its next recompute visits just the edited\nformula and its dependents instead of every formula in the workbook."
                 },
                 {
+                  "name": "setIterativeCalculation",
+                  "documentation": "Turns iterative calculation on or off with Excel's limits: at most\n`max_iterations` (1 to 32,767) passes over each circular reference,\nstopping once no member changes by more than `max_change` (finite, not\nnegative). Rejects limits outside those ranges. Recalculates every\nformula when the setting changes."
+                },
+                {
                   "name": "setSheetOrder",
                   "documentation": "Set the workbook tab order: every live sheet handle exactly once.\n3-D references such as `Sheet1:Sheet3!A1` span the tabs between their\nendpoints, so formulas whose span changed are re-placed, their\ndependencies patched, and their results recomputed. Rejects an order\nthat omits, repeats or adds a handle."
                 },
@@ -10886,7 +10959,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L428",
+              "source": "pkg/sheetwrite_wasm.d.ts#L436",
               "jsDocTags": [],
               "documentation": "Distinct-value scan result for one column: parallel kind/number/text\narrays whose buffers are surrendered once through the `take*` accessors.",
               "memberDocs": [
@@ -10923,7 +10996,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L509",
+              "source": "pkg/sheetwrite_wasm.d.ts#L517",
               "jsDocTags": [],
               "documentation": "Sources accepted by asynchronous initialization: a fetchable URL/request/response, raw module bytes, or a precompiled `WebAssembly.Module`.",
               "memberDocs": []
@@ -10931,11 +11004,11 @@
             {
               "name": "InitOutput",
               "kind": "interface",
-              "signature": "export interface InitOutput { readonly memory: WebAssembly.Memory; readonly __wbg_cellout_free: (a: number, b: number) => void; readonly __wbg_cellsnapshot_free: (a: number, b: number) => void; readonly __wbg_cellstore_free: (a: number, b: number) => void; readonly __wbg_distinctcolumn_free: (a: number, b: number) => void; readonly __wbg_rangesnapshot_free: (a: number, b: number) => void; readonly __wbg_sourcesnapshot_free: (a: number, b: number) => void; readonly __wbg_windowview_free: (a: number, b: number) => void; readonly cellout_kind: (a: number) => number; readonly cellout_num: (a: number) => number; readonly cellout_string: (a: number) => [number, number]; readonly cellout_style: (a: number) => number; readonly cellsnapshot_kinds: (a: number) => [number, number]; readonly cellsnapshot_numbers: (a: number) => [number, number]; readonly cellsnapshot_strings: (a: number) => [number, number]; readonly cellsnapshot_styles: (a: number) => [number, number]; readonly cellsnapshot_textIndex: (a: number) => [number, number]; readonly cellstore_acknowledgeRevision: (a: number, b: bigint) => void; readonly cellstore_addPagedSheet: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_addRows: (a: number, b: number, c: number, d: number) => void; readonly cellstore_addSheet: (a: number, b: number, c: number) => number; readonly cellstore_admitSourceRange: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_aggregate: (a: number, b: number, c: number, d: number) => number; readonly cellstore_beginMutation: (a: number) => bigint; readonly cellstore_beginPageLoad: (a: number) => void; readonly cellstore_canDirtyCell: (a: number, b: number, c: number, d: number) => number; readonly cellstore_captureRange: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_captureReferences: (a: number, b: number, c: number) => number; readonly cellstore_captureSources: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_captureSourcesForRows: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_cellSnapshots: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_cellState: (a: number, b: number, c: number, d: number) => number; readonly cellstore_clearCell: (a: number, b: number, c: number, d: number, e: number) => void; readonly cellstore_clearRange: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => number; readonly cellstore_colCount: (a: number, b: number) => number; readonly cellstore_columnsFullyLoaded: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_commitSources: (a: number) => void; readonly cellstore_compactStringStorage: (a: number) => void; readonly cellstore_dataEdge: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_dataEdgeOrdered: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => number; readonly cellstore_dirtyRevision: (a: number, b: number, c: number, d: number) => bigint; readonly cellstore_distinctValues: (a: number, b: number, c: number, d: number) => number; readonly cellstore_exportMemoryState: (a: number) => [number, number]; readonly cellstore_filterRows: (a: number, b: number, c: number, d: number, e: number) => [number, number]; readonly cellstore_filterRowsMulti: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number) => [number, number]; readonly cellstore_formulaMatrixResourceStats: (a: number) => [number, number]; readonly cellstore_formulaReadBands: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number]; readonly cellstore_formulaSource: (a: number, b: number, c: number, d: number) => [number, number]; readonly cellstore_getCell: (a: number, b: number, c: number, d: number) => number; readonly cellstore_getWindow: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_getWindowRows: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_hydratePageNumbers: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => void; readonly cellstore_hydratePageStringsPacked: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number) => void; readonly cellstore_importMemoryState: (a: any) => number; readonly cellstore_importRangeMemoryState: (a: number, b: any, c: number, d: number, e: number) => number; readonly cellstore_insertCols: (a: number, b: number, c: number, d: number) => void; readonly cellstore_isFullyLoaded: (a: number, b: number) => number; readonly cellstore_isPaged: (a: number, b: number) => number; readonly cellstore_isSheetAlive: (a: number, b: number) => number; readonly cellstore_loadedSpans: (a: number, b: number, c: number, d: number, e: number) => [number, number]; readonly cellstore_markCellCleanRevision: (a: number, b: number, c: number, d: number, e: bigint) => number; readonly cellstore_markRangeClean: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_memoryStats: (a: number) => [number, number]; readonly cellstore_new: () => number; readonly cellstore_pagedDirtyCoordinates: (a: number, b: number) => [number, number]; readonly cellstore_pagedStats: (a: number, b: number) => [number, number]; readonly cellstore_persistedCellData: (a: number, b: number) => [number, number]; readonly cellstore_pinRange: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_pinReadWindow: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void; readonly cellstore_pinViewportBands: (a: number, b: number, c: number, d: number) => void; readonly cellstore_poolStrings: (a: number, b: number, c: number) => [number, number]; readonly cellstore_queryResourceStats: (a: number) => [number, number]; readonly cellstore_rangeFullyLoaded: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_rangeStyleIds: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number]; readonly cellstore_recompute: (a: number, b: number) => void; readonly cellstore_recomputeVolatile: (a: number, b: number) => number; readonly cellstore_referenceTarget: (a: number, b: number, c: number, d: number) => [number, number]; readonly cellstore_referencesTargeting: (a: number, b: number, c: number) => [number, number]; readonly cellstore_remapRangeStyles: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => number; readonly cellstore_removeCols: (a: number, b: number, c: number, d: number) => void; readonly cellstore_removeNamedRange: (a: number, b: number, c: number, d: number) => number; readonly cellstore_removeRows: (a: number, b: number, c: number, d: number) => void; readonly cellstore_removeSheet: (a: number, b: number) => number; readonly cellstore_removeTable: (a: number, b: number, c: number) => number; readonly cellstore_renameSheet: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_resetFormulaMatrixResourceStats: (a: number) => void; readonly cellstore_resetQueryResourceStats: (a: number) => void; readonly cellstore_restoreRange: (a: number, b: number, c: number, d: number, e: number) => number; readonly cellstore_rowCount: (a: number, b: number) => number; readonly cellstore_search: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number]; readonly cellstore_setBlockPacked: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number, s: number, t: number, u: number, v: number, w: number, x: number) => number; readonly cellstore_setBool: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_setColumnBlockPacked: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number, s: number, t: number, u: number, v: number, w: number, x: number) => number; readonly cellstore_setColumnNumbers: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void; readonly cellstore_setColumnStrings: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void; readonly cellstore_setColumnStringsPacked: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => void; readonly cellstore_setConditionalRules: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number) => void; readonly cellstore_setFormula: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => number; readonly cellstore_setNamedRange: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => number; readonly cellstore_setNumber: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_setSheetName: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_setSheetOrder: (a: number, b: number, c: number) => number; readonly cellstore_setSparseBlock: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number, s: number, t: number, u: number, v: number, w: number, x: number) => number; readonly cellstore_setSpillBlockers: (a: number, b: number, c: number, d: number) => number; readonly cellstore_setString: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void; readonly cellstore_setTable: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number) => number; readonly cellstore_sheetSpanFormulaCells: (a: number, b: number) => [number, number]; readonly cellstore_snapshotNumbers: (a: number, b: number) => [number, number]; readonly cellstore_snapshotTexts: (a: number, b: number) => [number, number]; readonly cellstore_sortRows: (a: number, b: number, c: number, d: number) => [number, number]; readonly cellstore_sortRowsMulti: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number]; readonly cellstore_spillAnchorCol: (a: number, b: number, c: number, d: number) => number; readonly cellstore_spillAnchorRow: (a: number, b: number, c: number, d: number) => number; readonly cellstore_spillDerivedMask: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number]; readonly cellstore_spillOwnerCoordinates: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number]; readonly cellstore_stringPoolEpoch: (a: number) => number; readonly cellstore_styleIdAt: (a: number, b: number, c: number, d: number) => number; readonly cellstore_wasmCommittedBytes: (a: number) => number; readonly distinctcolumn_takeKinds: (a: number) => [number, number]; readonly distinctcolumn_takeNumbers: (a: number) => [number, number]; readonly distinctcolumn_takeTexts: (a: number) => [number, number]; readonly rangesnapshot_byteLength: (a: number) => number; readonly rangesnapshot_exportMemoryState: (a: number, b: number) => [number, number]; readonly rangesnapshot_formulaOffsets: (a: number) => [number, number]; readonly rangesnapshot_formulaSources: (a: number) => [number, number]; readonly rangesnapshot_kinds: (a: number) => [number, number]; readonly rangesnapshot_referenceOffsets: (a: number) => [number, number]; readonly rangesnapshot_referenceTargets: (a: number) => [number, number]; readonly rangesnapshot_styleIds: (a: number) => [number, number]; readonly sourcesnapshot_byteLength: (a: number) => number; readonly sourcesnapshot_formulaOffsets: (a: number) => [number, number]; readonly sourcesnapshot_formulaSources: (a: number) => [number, number]; readonly sourcesnapshot_referenceOffsets: (a: number) => [number, number]; readonly sourcesnapshot_referenceTargets: (a: number) => [number, number]; readonly sourcesnapshot_spillDerived: (a: number) => [number, number]; readonly windowview_nCols: (a: number) => number; readonly windowview_nRows: (a: number) => number; readonly windowview_takeStrings: (a: number) => [number, number]; readonly windowview_stringPoolEpoch: (a: number) => number; readonly windowview_takePacked: (a: number) => [number, number]; readonly __wbindgen_malloc: (a: number, b: number) => number; readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number; readonly __wbindgen_externrefs: WebAssembly.Table; readonly __wbindgen_free: (a: number, b: number, c: number) => void; readonly __externref_drop_slice: (a: number, b: number) => void; readonly __externref_table_alloc: () => number; readonly __wbindgen_start: () => void; }",
+              "signature": "export interface InitOutput { readonly memory: WebAssembly.Memory; readonly __wbg_cellout_free: (a: number, b: number) => void; readonly __wbg_cellsnapshot_free: (a: number, b: number) => void; readonly __wbg_cellstore_free: (a: number, b: number) => void; readonly __wbg_distinctcolumn_free: (a: number, b: number) => void; readonly __wbg_rangesnapshot_free: (a: number, b: number) => void; readonly __wbg_sourcesnapshot_free: (a: number, b: number) => void; readonly __wbg_windowview_free: (a: number, b: number) => void; readonly cellout_kind: (a: number) => number; readonly cellout_num: (a: number) => number; readonly cellout_string: (a: number) => [number, number]; readonly cellout_style: (a: number) => number; readonly cellsnapshot_kinds: (a: number) => [number, number]; readonly cellsnapshot_numbers: (a: number) => [number, number]; readonly cellsnapshot_strings: (a: number) => [number, number]; readonly cellsnapshot_styles: (a: number) => [number, number]; readonly cellsnapshot_textIndex: (a: number) => [number, number]; readonly cellstore_acknowledgeRevision: (a: number, b: bigint) => void; readonly cellstore_addPagedSheet: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_addRows: (a: number, b: number, c: number, d: number) => void; readonly cellstore_addSheet: (a: number, b: number, c: number) => number; readonly cellstore_admitSourceRange: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_aggregate: (a: number, b: number, c: number, d: number) => number; readonly cellstore_beginMutation: (a: number) => bigint; readonly cellstore_beginPageLoad: (a: number) => void; readonly cellstore_canDirtyCell: (a: number, b: number, c: number, d: number) => number; readonly cellstore_captureRange: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_captureReferences: (a: number, b: number, c: number) => number; readonly cellstore_captureSources: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_captureSourcesForRows: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_cellSnapshots: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_cellState: (a: number, b: number, c: number, d: number) => number; readonly cellstore_clearCell: (a: number, b: number, c: number, d: number, e: number) => void; readonly cellstore_clearRange: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => number; readonly cellstore_colCount: (a: number, b: number) => number; readonly cellstore_columnsFullyLoaded: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_commitSources: (a: number) => void; readonly cellstore_compactStringStorage: (a: number) => void; readonly cellstore_dataEdge: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_dataEdgeOrdered: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => number; readonly cellstore_dirtyRevision: (a: number, b: number, c: number, d: number) => bigint; readonly cellstore_distinctValues: (a: number, b: number, c: number, d: number) => number; readonly cellstore_exportMemoryState: (a: number) => [number, number]; readonly cellstore_filterRows: (a: number, b: number, c: number, d: number, e: number) => [number, number]; readonly cellstore_filterRowsMulti: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number) => [number, number]; readonly cellstore_formulaMatrixResourceStats: (a: number) => [number, number]; readonly cellstore_formulaReadBands: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number]; readonly cellstore_formulaSource: (a: number, b: number, c: number, d: number) => [number, number]; readonly cellstore_getCell: (a: number, b: number, c: number, d: number) => number; readonly cellstore_getWindow: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_getWindowRows: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_hydratePageNumbers: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => void; readonly cellstore_hydratePageStringsPacked: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number) => void; readonly cellstore_importMemoryState: (a: any) => number; readonly cellstore_importRangeMemoryState: (a: number, b: any, c: number, d: number, e: number) => number; readonly cellstore_insertCols: (a: number, b: number, c: number, d: number) => void; readonly cellstore_isFullyLoaded: (a: number, b: number) => number; readonly cellstore_isPaged: (a: number, b: number) => number; readonly cellstore_isSheetAlive: (a: number, b: number) => number; readonly cellstore_loadedSpans: (a: number, b: number, c: number, d: number, e: number) => [number, number]; readonly cellstore_markCellCleanRevision: (a: number, b: number, c: number, d: number, e: bigint) => number; readonly cellstore_markRangeClean: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_memoryStats: (a: number) => [number, number]; readonly cellstore_new: () => number; readonly cellstore_pagedDirtyCoordinates: (a: number, b: number) => [number, number]; readonly cellstore_pagedStats: (a: number, b: number) => [number, number]; readonly cellstore_persistedCellData: (a: number, b: number) => [number, number]; readonly cellstore_pinRange: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_pinReadWindow: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void; readonly cellstore_pinViewportBands: (a: number, b: number, c: number, d: number) => void; readonly cellstore_poolStrings: (a: number, b: number, c: number) => [number, number]; readonly cellstore_queryResourceStats: (a: number) => [number, number]; readonly cellstore_rangeFullyLoaded: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_rangeStyleIds: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number]; readonly cellstore_recompute: (a: number, b: number) => void; readonly cellstore_recomputeVolatile: (a: number, b: number) => number; readonly cellstore_referenceTarget: (a: number, b: number, c: number, d: number) => [number, number]; readonly cellstore_referencesTargeting: (a: number, b: number, c: number) => [number, number]; readonly cellstore_remapRangeStyles: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => number; readonly cellstore_removeCols: (a: number, b: number, c: number, d: number) => void; readonly cellstore_removeNamedRange: (a: number, b: number, c: number, d: number) => number; readonly cellstore_removeRows: (a: number, b: number, c: number, d: number) => void; readonly cellstore_removeSheet: (a: number, b: number) => number; readonly cellstore_removeTable: (a: number, b: number, c: number) => number; readonly cellstore_renameSheet: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_resetFormulaMatrixResourceStats: (a: number) => void; readonly cellstore_resetQueryResourceStats: (a: number) => void; readonly cellstore_restoreRange: (a: number, b: number, c: number, d: number, e: number) => number; readonly cellstore_rowCount: (a: number, b: number) => number; readonly cellstore_search: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number]; readonly cellstore_setBlockPacked: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number, s: number, t: number, u: number, v: number, w: number, x: number) => number; readonly cellstore_setBool: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_setColumnBlockPacked: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number, s: number, t: number, u: number, v: number, w: number, x: number) => number; readonly cellstore_setColumnNumbers: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void; readonly cellstore_setColumnStrings: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void; readonly cellstore_setColumnStringsPacked: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => void; readonly cellstore_setConditionalRules: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number) => void; readonly cellstore_setFormula: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => number; readonly cellstore_setIterativeCalculation: (a: number, b: number, c: number, d: number) => number; readonly cellstore_setNamedRange: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => number; readonly cellstore_setNumber: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_setSheetName: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_setSheetOrder: (a: number, b: number, c: number) => number; readonly cellstore_setSparseBlock: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number, s: number, t: number, u: number, v: number, w: number, x: number) => number; readonly cellstore_setSpillBlockers: (a: number, b: number, c: number, d: number) => number; readonly cellstore_setString: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void; readonly cellstore_setTable: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number) => number; readonly cellstore_sheetSpanFormulaCells: (a: number, b: number) => [number, number]; readonly cellstore_snapshotNumbers: (a: number, b: number) => [number, number]; readonly cellstore_snapshotTexts: (a: number, b: number) => [number, number]; readonly cellstore_sortRows: (a: number, b: number, c: number, d: number) => [number, number]; readonly cellstore_sortRowsMulti: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number]; readonly cellstore_spillAnchorCol: (a: number, b: number, c: number, d: number) => number; readonly cellstore_spillAnchorRow: (a: number, b: number, c: number, d: number) => number; readonly cellstore_spillDerivedMask: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number]; readonly cellstore_spillOwnerCoordinates: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number]; readonly cellstore_stringPoolEpoch: (a: number) => number; readonly cellstore_styleIdAt: (a: number, b: number, c: number, d: number) => number; readonly cellstore_wasmCommittedBytes: (a: number) => number; readonly distinctcolumn_takeKinds: (a: number) => [number, number]; readonly distinctcolumn_takeNumbers: (a: number) => [number, number]; readonly distinctcolumn_takeTexts: (a: number) => [number, number]; readonly rangesnapshot_byteLength: (a: number) => number; readonly rangesnapshot_exportMemoryState: (a: number, b: number) => [number, number]; readonly rangesnapshot_formulaOffsets: (a: number) => [number, number]; readonly rangesnapshot_formulaSources: (a: number) => [number, number]; readonly rangesnapshot_kinds: (a: number) => [number, number]; readonly rangesnapshot_referenceOffsets: (a: number) => [number, number]; readonly rangesnapshot_referenceTargets: (a: number) => [number, number]; readonly rangesnapshot_styleIds: (a: number) => [number, number]; readonly sourcesnapshot_byteLength: (a: number) => number; readonly sourcesnapshot_formulaOffsets: (a: number) => [number, number]; readonly sourcesnapshot_formulaSources: (a: number) => [number, number]; readonly sourcesnapshot_referenceOffsets: (a: number) => [number, number]; readonly sourcesnapshot_referenceTargets: (a: number) => [number, number]; readonly sourcesnapshot_spillDerived: (a: number) => [number, number]; readonly windowview_nCols: (a: number) => number; readonly windowview_nRows: (a: number) => number; readonly windowview_takeStrings: (a: number) => [number, number]; readonly windowview_stringPoolEpoch: (a: number) => number; readonly windowview_takePacked: (a: number) => [number, number]; readonly __wbindgen_malloc: (a: number, b: number) => number; readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number; readonly __wbindgen_externrefs: WebAssembly.Table; readonly __wbindgen_free: (a: number, b: number, c: number) => void; readonly __externref_drop_slice: (a: number, b: number) => void; readonly __externref_table_alloc: () => number; readonly __wbindgen_start: () => void; }",
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L511",
+              "source": "pkg/sheetwrite_wasm.d.ts#L519",
               "jsDocTags": [],
               "documentation": "Result of module initialization: the instantiated exports plus the shared linear memory.",
               "memberDocs": []
@@ -10947,7 +11020,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L671",
+              "source": "pkg/sheetwrite_wasm.d.ts#L680",
               "jsDocTags": [
                 "param",
                 "returns"
@@ -10989,7 +11062,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L454",
+              "source": "pkg/sheetwrite_wasm.d.ts#L462",
               "jsDocTags": [],
               "documentation": "Opaque, store-local history payload for one dense rectangular cell block.\n\nThe host may retain this object in undo history, but it is deliberately not\npart of the serialized document protocol. A deduplicated local dictionary\nowns captured text independently of the store's pool epoch.",
               "memberDocs": [
@@ -11006,7 +11079,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L476",
+              "source": "pkg/sheetwrite_wasm.d.ts#L484",
               "jsDocTags": [],
               "documentation": "Compact serializable projection of persisted derived-cell sources and spill\nidentity in one range. Offsets are row-major and sorted; reference targets\nare packed `[sheet_handle, row, col]` triples.",
               "memberDocs": []
@@ -11018,7 +11091,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L661",
+              "source": "pkg/sheetwrite_wasm.d.ts#L670",
               "jsDocTags": [],
               "documentation": "Sources accepted by synchronous initialization: raw module bytes or a precompiled `WebAssembly.Module`.",
               "memberDocs": []
@@ -11030,7 +11103,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L491",
+              "source": "pkg/sheetwrite_wasm.d.ts#L499",
               "jsDocTags": [],
               "documentation": "A bulk window of resolved cells, row-major over `n_rows x n_cols`.",
               "memberDocs": [

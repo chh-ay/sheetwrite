@@ -51,6 +51,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
       { label: "Host-owned rows", href: "/docs/guides/host-owned-rows/" },
       { label: "Formulas", href: "/docs/guides/formulas/" },
       { label: "Analysis formulas", href: "/docs/guides/analysis-formulas/" },
+      { label: "Iterative calculation", href: "/docs/guides/iterative-calculation/" },
       { label: "Styling", href: "/docs/guides/styling/" },
       { label: "Persistence", href: "/docs/guides/persistence/" },
       { label: "Collaboration", href: "/docs/guides/collaboration/" },

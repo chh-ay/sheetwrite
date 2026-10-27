@@ -21,6 +21,7 @@ import {
 import { preparedRestore } from "./transaction-preparation.js";
 import type { MergeRange, Range } from "./types/coordinates.js";
 import type {
+  CalculationSettings,
   DocumentOp,
   MutationIssue,
   SheetSnapshot,
@@ -39,6 +40,56 @@ import {
 
 /** Current workbook snapshot schema version accepted by Sheetwrite. */
 export const WORKBOOK_SCHEMA_VERSION = 1 as const;
+
+/** Excel's iteration count for a new workbook. */
+export const DEFAULT_MAX_ITERATIONS = 100;
+
+/** Excel's convergence threshold for a new workbook. */
+export const DEFAULT_MAX_CHANGE = 0.001;
+
+/** Largest iteration count Excel accepts. */
+export const MAX_ITERATIONS = 32_767;
+
+/** Settings of a workbook that has never touched iterative calculation. */
+export const DEFAULT_CALCULATION_SETTINGS: Readonly<CalculationSettings> = Object.freeze({
+  iterate: false,
+  maxIterations: DEFAULT_MAX_ITERATIONS,
+  maxChange: DEFAULT_MAX_CHANGE,
+});
+
+/** Limits the engine accepts; anything else would be rejected by `setIterativeCalculation`. */
+export function isValidCalculationSettings(settings: CalculationSettings): boolean {
+  return (
+    typeof settings.iterate === "boolean" &&
+    Number.isInteger(settings.maxIterations) &&
+    settings.maxIterations >= 1 &&
+    settings.maxIterations <= MAX_ITERATIONS &&
+    Number.isFinite(settings.maxChange) &&
+    settings.maxChange >= 0
+  );
+}
+
+/**
+ * Detached copy of non-default settings, or `undefined` for the defaults, so
+ * workbooks that never enable iteration keep byte-identical snapshots.
+ */
+export function storedCalculationSettings(
+  settings: CalculationSettings | undefined,
+): CalculationSettings | undefined {
+  if (
+    settings === undefined ||
+    (settings.iterate === DEFAULT_CALCULATION_SETTINGS.iterate &&
+      settings.maxIterations === DEFAULT_CALCULATION_SETTINGS.maxIterations &&
+      settings.maxChange === DEFAULT_CALCULATION_SETTINGS.maxChange)
+  ) {
+    return undefined;
+  }
+  return {
+    iterate: settings.iterate,
+    maxIterations: settings.maxIterations,
+    maxChange: settings.maxChange,
+  };
+}
 
 /**
  * Inclusive defaults for every atomic document transaction accepted by a
@@ -1848,6 +1899,38 @@ function validateProtectedRangeShape(
   optionalString(protectedRange, "permissionKey", path, errors);
 }
 
+function validateCalculationShape(
+  value: unknown,
+  path: string,
+  errors: DocumentValidationError[],
+): void {
+  const calculation = recordAt(value, path, errors);
+  if (!calculation) return;
+
+  if (typeof ownValue(calculation, "iterate") !== "boolean") {
+    invalid(errors, `${path}.iterate`, "iterate must be a boolean");
+  }
+
+  const maxIterations = ownValue(calculation, "maxIterations");
+  if (
+    typeof maxIterations !== "number" ||
+    !Number.isInteger(maxIterations) ||
+    maxIterations < 1 ||
+    maxIterations > MAX_ITERATIONS
+  ) {
+    invalid(
+      errors,
+      `${path}.maxIterations`,
+      `maxIterations must be an integer from 1 to ${MAX_ITERATIONS}`,
+    );
+  }
+
+  const maxChange = ownValue(calculation, "maxChange");
+  if (!finiteNumber(maxChange) || maxChange < 0) {
+    invalid(errors, `${path}.maxChange`, "maxChange must be a finite number >= 0");
+  }
+}
+
 function validateNamedRangeShape(
   entry: unknown,
   path: string,
@@ -2288,6 +2371,9 @@ export function validateDocumentOperationShape(
       requireString(operation, "name", path, errors, true);
       optionalString(operation, "scope", path, errors);
       break;
+    case "setCalculation":
+      validateCalculationShape(ownValue(operation, "calculation"), `${path}.calculation`, errors);
+      break;
     default: {
       const unsupported: never = operationKind;
       invalid(errors, `${path}.op`, `Document operation kind ${String(unsupported)} is invalid`);
@@ -2724,6 +2810,10 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
     namedRanges?.forEach((entry, index) => {
       validateNamedRangeShape(entry, `workbook.namedRanges[${index}]`, errors);
     });
+    const calculation = ownValue(workbook, "calculation");
+    if (calculation !== undefined) {
+      validateCalculationShape(calculation, "workbook.calculation", errors);
+    }
   }
 
   const sheets = arrayAt(ownValue(candidate, "sheets"), "sheets", errors);
@@ -3258,6 +3348,8 @@ export function documentOpTarget(operation: DocumentOp): string {
       return operation.namedRange.name;
     case "removeNamedRange":
       return operation.name;
+    case "setCalculation":
+      return "calculation";
     default: {
       const exhaustive: never = operation;
       return exhaustive;

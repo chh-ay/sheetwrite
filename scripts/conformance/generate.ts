@@ -934,6 +934,138 @@ function canaryCases(inventory: FormulaInventory): ConformanceCase[] {
   ];
 }
 
+/** Classic circular references that converge under iterative calculation. */
+function circularReferenceCases(inventory: FormulaInventory): ConformanceCase[] {
+  const subjects = new Map(
+    supportedInventorySubjects(inventory).map((entry) => [
+      `${entry.subject.kind}:${entry.subject.name}`,
+      entry,
+    ]),
+  );
+  const subject = (kind: FormulaSubject["kind"], name: string): InventorySubject => {
+    const value = subjects.get(`${kind}:${name}`);
+    if (!value) throw new Error(`Subject ${kind}:${name} is absent from the typed inventory`);
+    return value;
+  };
+  const add = subject("operator", "add");
+  const ifFunction = subject("function", "IF");
+  const circularSource = sourceWithChecksum({
+    title: "Remove or allow a circular reference in Excel",
+    section: "Change the number of times Excel iterates formulas",
+    url: "https://support.microsoft.com/en-us/office/remove-or-allow-a-circular-reference-in-excel-8540bd0f-6e97-4483-bcf7-1b49cd50d123",
+    license: SPEC_LICENSE,
+    authorship: "spec-derived",
+  });
+  // A tight maximum change leaves every converged result within the case
+  // tolerance, however many recalculations a producer runs before reading.
+  const iterative = { iterate: true, maxIterations: 100, maxChange: 1e-9 } as const;
+  const multiply = subject("operator", "multiply");
+  return [
+    finalizedCase({
+      id: "formula.iterative.running-total",
+      area: "formula",
+      dialect: "shared",
+      category: "normal",
+      family: ifFunction.family,
+      kind: "formula",
+      subject: ifFunction.subject,
+      source: circularSource,
+      evidence: {
+        kind: "property",
+        basis: "documented-semantics",
+        oracle:
+          "A self-referencing running total adds one per iteration and stops adding at 100. It reaches 100 within the configured 100 iterations.",
+      },
+      tolerance: { kind: "exact" },
+      inputs: [],
+      formula: "=IF(A1<100,A1+1,A1)",
+      target: "A1",
+      calculation: iterative,
+      expected: { type: "number", value: 100 },
+      observations: [],
+    }),
+    finalizedCase({
+      id: "formula.iterative.fixed-point",
+      area: "formula",
+      dialect: "shared",
+      category: "normal",
+      family: add.family,
+      kind: "formula",
+      subject: add.subject,
+      source: circularSource,
+      evidence: {
+        kind: "property",
+        basis: "documented-semantics",
+        oracle: "Iterating x = x/2 + 1 from any start converges to its fixed point 2.",
+      },
+      tolerance: { kind: "absolute", value: 1e-6 },
+      inputs: [],
+      formula: "=A1/2+1",
+      target: "A1",
+      calculation: iterative,
+      expected: { type: "number", value: 2, tolerance: { kind: "absolute", value: 1e-6 } },
+      observations: [],
+    }),
+    finalizedCase({
+      id: "formula.iterative.interest-on-balance",
+      area: "formula",
+      dialect: "shared",
+      category: "normal",
+      family: multiply.family,
+      kind: "formula",
+      subject: multiply.subject,
+      source: circularSource,
+      evidence: {
+        kind: "property",
+        basis: "documented-semantics",
+        oracle:
+          "Interest charged on a balance that includes it, i = r(p + i), has the closed form i = rp / (1 - r) = 100 / 0.9.",
+      },
+      tolerance: { kind: "absolute", value: 1e-6 },
+      inputs: [
+        { cell: "A1", value: 1000 },
+        { cell: "B1", value: 0.1 },
+      ],
+      formula: "=B1*(A1+C1)",
+      target: "C1",
+      calculation: iterative,
+      expected: {
+        type: "number",
+        value: 100 / 0.9,
+        tolerance: { kind: "absolute", value: 1e-6 },
+      },
+      observations: [],
+    }),
+    finalizedCase({
+      id: "formula.iterative.newton-square-root",
+      area: "formula",
+      dialect: "shared",
+      category: "normal",
+      family: ifFunction.family,
+      kind: "formula",
+      subject: ifFunction.subject,
+      source: circularSource,
+      evidence: {
+        kind: "property",
+        basis: "documented-semantics",
+        oracle:
+          "Newton steps x - (x^2 - 2) / 2x on the cell's own value converge to the square root of 2.",
+      },
+      tolerance: { kind: "absolute", value: 1e-9 },
+      inputs: [],
+      formula: "=IF(A1=0,1,A1-(A1^2-2)/(2*A1))",
+      target: "A1",
+      calculation: iterative,
+      expected: {
+        type: "number",
+        value: Math.SQRT2,
+        tolerance: { kind: "absolute", value: 1e-9 },
+      },
+      observations: [],
+    }),
+  ];
+}
+
 export function supportedNamesChecksum(inventory: FormulaInventory): string {
   const names = supportedInventorySubjects(inventory)
     .map(({ subject }) => `${subject.kind}:${subject.name}`)
@@ -948,16 +1080,17 @@ export function generateConformanceEvidence(inventory: FormulaInventory): {
   const canaries = canaryCases(inventory);
   const formulaCanaries = canaries.filter((entry) => entry.area === "formula").length;
   const workbookCanaries = canaries.filter((entry) => entry.area === "workbook").length;
+  const circular = circularReferenceCases(inventory);
   const generatedFormulas = generatedFormulaCases(
     inventory,
-    REQUIRED_COUNTS.formula - formulaCanaries,
+    REQUIRED_COUNTS.formula - formulaCanaries - circular.length,
   );
   const mutations = generatedMutationCases(REQUIRED_COUNTS.mutation);
   const workbooks = generatedWorkbookCases(REQUIRED_COUNTS.workbook - workbookCanaries);
   const corpus: ConformanceCorpus = {
     protocol: 1,
     license: "MIT; original vectors derived independently from cited public specifications",
-    cases: [...canaries, ...generatedFormulas, ...mutations, ...workbooks],
+    cases: [...canaries, ...circular, ...generatedFormulas, ...mutations, ...workbooks],
   };
   const operationShapes = corpus.cases
     .filter((entry) => entry.area === "mutation" || entry.area === "workbook")

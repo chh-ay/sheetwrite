@@ -789,22 +789,53 @@ fn formula_exists(sheets: &[SheetData], key: AbsCellKey) -> bool {
     formula_entry(sheets, key).is_some()
 }
 
+/// Seeds `memo` with the depth and cycle errors of `affected`. Returns whether
+/// any formula met a circular reference, so iterative calculation runs its
+/// component pass only for workbooks that have one.
 pub(super) fn seed_dependency_depth_errors(
     sheets: &[SheetData],
     affected: &FxHashSet<AbsCellKey>,
     index: &DepIndex,
     memo: &mut FxHashMap<AbsCellKey, EvalResult>,
-) {
+) -> bool {
+    seed_depth_errors(sheets, affected, index, memo, false)
+}
+
+/// Spill expansion may add formulas, but must not replace values of components
+/// that iterative calculation has already settled before installing spills.
+pub(super) fn seed_additional_depth_errors(
+    sheets: &[SheetData],
+    affected: &FxHashSet<AbsCellKey>,
+    index: &DepIndex,
+    memo: &mut FxHashMap<AbsCellKey, EvalResult>,
+) -> bool {
+    seed_depth_errors(sheets, affected, index, memo, true)
+}
+
+fn seed_depth_errors(
+    sheets: &[SheetData],
+    affected: &FxHashSet<AbsCellKey>,
+    index: &DepIndex,
+    memo: &mut FxHashMap<AbsCellKey, EvalResult>,
+    preserve_results: bool,
+) -> bool {
     if !index.has_formula_dependencies {
-        return;
+        return false;
     }
 
     let mut walk = DependencyDepthWalk::new(sheets, affected);
+    let mut found_cycle = false;
     for &key in affected {
         if let Err(error) = walk.depth(key) {
-            memo.insert(key, Value::Error(error));
+            found_cycle |= error == FormulaError::Cycle;
+            if preserve_results {
+                memo.entry(key).or_insert(Value::Error(error));
+            } else {
+                memo.insert(key, Value::Error(error));
+            }
         }
     }
+    found_cycle
 }
 
 /// A node of the depth/cycle graph. A range read is one node shared by all of
@@ -826,9 +857,8 @@ enum NodeDepth {
     Done(Result<usize, FormulaError>),
 }
 
-/// One node on the explicit walk stack; formula chains can be far deeper than
-/// the native stack allows.
-struct DependencyFrame<'a> {
+/// The outgoing edges of one graph node, read from the formula entry in place.
+struct EdgeCursor<'a> {
     node: DependencyNode,
     /// The formula's direct reads; empty for a range node.
     cells: &'a [AbsCellKey],
@@ -837,38 +867,40 @@ struct DependencyFrame<'a> {
     /// For a formula, the index into `cells` then `ranges`; for a range, the
     /// index into the walk's column-major formula list.
     next: usize,
-    /// The deepest dependency so far, or the first error one reported.
-    deepest: Result<usize, FormulaError>,
 }
 
-impl DependencyFrame<'_> {
-    fn include(&mut self, dependency: Result<usize, FormulaError>) {
-        self.deepest = self
-            .deepest
-            .and_then(|deepest| dependency.map(|depth| deepest.max(depth)));
-    }
-
-    fn finish(&self) -> Result<usize, FormulaError> {
-        let own_depth = usize::from(matches!(self.node, DependencyNode::Formula(_)));
-        self.deepest.and_then(|deepest| {
-            let depth = deepest + own_depth;
-            if depth > FORMULA_RECURSION_LIMIT {
-                Err(FormulaError::Num)
-            } else {
-                Ok(depth)
+impl<'a> EdgeCursor<'a> {
+    fn new(sheets: &'a [SheetData], formulas: &[AbsCellKey], node: DependencyNode) -> Self {
+        let (cells, ranges, next): (&'a [AbsCellKey], &'a [CellRange], usize) = match node {
+            DependencyNode::Formula(key) => formula_entry(sheets, key)
+                .map_or((&[], &[], 0), |entry| {
+                    (&entry.reads.cells, &entry.reads.ranges, 0)
+                }),
+            DependencyNode::Range(range) => {
+                let first = (range.sheet, range.col_start, range.row_start);
+                let next = formulas.partition_point(|&key| column_major(key) < first);
+                (&[], &[], next)
             }
-        })
+        };
+        Self {
+            node,
+            cells,
+            ranges,
+            next,
+        }
     }
 
-    fn next_dependency(
+    /// The next dependency inside the walked graph: direct reads of formulas
+    /// in `nodes`, every range read, and the members of a range in `formulas`.
+    fn next_dependency<State>(
         &mut self,
         formulas: &[AbsCellKey],
-        nodes: &FxHashMap<DependencyNode, NodeDepth>,
+        nodes: &FxHashMap<DependencyNode, State>,
     ) -> Option<DependencyNode> {
         match self.node {
             DependencyNode::Formula(_) => {
-                // Only affected formulas carry depth; other direct reads are
-                // values that cannot extend a chain.
+                // Only walked formulas can extend a path; other direct reads
+                // are values.
                 while let Some(&cell) = self.cells.get(self.next) {
                     self.next += 1;
                     let dependency = DependencyNode::Formula(cell);
@@ -906,8 +938,47 @@ impl DependencyFrame<'_> {
     }
 }
 
+/// One node on the explicit walk stack; formula chains can be far deeper than
+/// the native stack allows.
+struct DependencyFrame<'a> {
+    edges: EdgeCursor<'a>,
+    /// The deepest dependency so far, or the first error one reported.
+    deepest: Result<usize, FormulaError>,
+}
+
+impl DependencyFrame<'_> {
+    fn include(&mut self, dependency: Result<usize, FormulaError>) {
+        self.deepest = self
+            .deepest
+            .and_then(|deepest| dependency.map(|depth| deepest.max(depth)));
+    }
+
+    fn finish(&self) -> Result<usize, FormulaError> {
+        let own_depth = usize::from(matches!(self.edges.node, DependencyNode::Formula(_)));
+        self.deepest.and_then(|deepest| {
+            let depth = deepest + own_depth;
+            if depth > FORMULA_RECURSION_LIMIT {
+                Err(FormulaError::Num)
+            } else {
+                Ok(depth)
+            }
+        })
+    }
+}
+
 fn column_major(key: AbsCellKey) -> (u32, u32, u32) {
     (key.sheet, key.col, key.row)
+}
+
+/// Affected formulas in column-major order, so a range finds its members
+/// without probing each of its cells.
+fn column_major_formulas(
+    sheets: &[SheetData],
+    keys: impl Iterator<Item = AbsCellKey>,
+) -> Vec<AbsCellKey> {
+    let mut formulas: Vec<AbsCellKey> = keys.filter(|&key| formula_exists(sheets, key)).collect();
+    formulas.sort_unstable_by_key(|&key| column_major(key));
+    formulas
 }
 
 /// Depth and cycle checks over the affected formulas. Scratch memory is one
@@ -916,8 +987,6 @@ fn column_major(key: AbsCellKey) -> (u32, u32, u32) {
 /// entries in place.
 struct DependencyDepthWalk<'a> {
     sheets: &'a [SheetData],
-    /// Affected formulas in column-major order, so a range finds its members
-    /// without probing each of its cells.
     formulas: Vec<AbsCellKey>,
     nodes: FxHashMap<DependencyNode, NodeDepth>,
     stack: Vec<DependencyFrame<'a>>,
@@ -925,13 +994,7 @@ struct DependencyDepthWalk<'a> {
 
 impl<'a> DependencyDepthWalk<'a> {
     fn new(sheets: &'a [SheetData], affected: &FxHashSet<AbsCellKey>) -> Self {
-        let mut formulas: Vec<AbsCellKey> = affected
-            .iter()
-            .copied()
-            .filter(|&key| formula_exists(sheets, key))
-            .collect();
-        formulas.sort_unstable_by_key(|&key| column_major(key));
-
+        let formulas = column_major_formulas(sheets, affected.iter().copied());
         let mut nodes = FxHashMap::with_capacity_and_hasher(formulas.len(), Default::default());
         nodes.extend(
             formulas
@@ -962,7 +1025,7 @@ impl<'a> DependencyDepthWalk<'a> {
         let mut finished = Ok(0);
         while let Some(frame) = self.stack.last_mut() {
             let dependency = if frame.deepest.is_ok() {
-                frame.next_dependency(&self.formulas, &self.nodes)
+                frame.edges.next_dependency(&self.formulas, &self.nodes)
             } else {
                 None
             };
@@ -976,7 +1039,7 @@ impl<'a> DependencyDepthWalk<'a> {
             }
 
             finished = frame.finish();
-            let node = frame.node;
+            let node = frame.edges.node;
             self.stack.pop();
             self.nodes.insert(node, NodeDepth::Done(finished));
             if let Some(parent) = self.stack.last_mut() {
@@ -987,31 +1050,172 @@ impl<'a> DependencyDepthWalk<'a> {
     }
 
     fn enter(&mut self, node: DependencyNode) {
-        let (cells, ranges, next): (&'a [AbsCellKey], &'a [CellRange], usize) = match node {
-            DependencyNode::Formula(key) => self
-                .sheets
-                .get(key.sheet as usize)
-                .and_then(|sheet| sheet.formulas.get(key.local()))
-                .map_or((&[], &[], 0), |entry| {
-                    (&entry.reads.cells, &entry.reads.ranges, 0)
-                }),
-            DependencyNode::Range(range) => {
-                let first = (range.sheet, range.col_start, range.row_start);
-                let next = self
-                    .formulas
-                    .partition_point(|&key| column_major(key) < first);
-                (&[], &[], next)
-            }
-        };
         self.nodes.insert(node, NodeDepth::Visiting);
         self.stack.push(DependencyFrame {
-            node,
-            cells,
-            ranges,
-            next,
+            edges: EdgeCursor::new(self.sheets, &self.formulas, node),
             deepest: Ok(0),
         });
     }
+}
+
+/// Strongly connected components of the formulas in `cyclic`, the formulas the
+/// depth walk reported as `Cycle`: the members of circular references and the
+/// formulas reading them. Components come in evaluation order, each after
+/// every component it reads.
+pub(super) struct CircularComponents {
+    /// Every formula of `cyclic`, grouped by component.
+    formulas: Vec<AbsCellKey>,
+    /// Per component: where its formulas end in `formulas`, and whether it is
+    /// circular (more than one node, or a formula that reads itself).
+    ends: Vec<(usize, bool)>,
+}
+
+impl CircularComponents {
+    /// Each component's formulas and whether they form a circular reference.
+    pub(super) fn iter(&self) -> impl Iterator<Item = (&[AbsCellKey], bool)> {
+        let mut start = 0;
+        self.ends.iter().map(move |&(end, circular)| {
+            let members = &self.formulas[start..end];
+            start = end;
+            (members, circular)
+        })
+    }
+}
+
+#[derive(Clone, Copy)]
+enum ComponentState {
+    Unvisited,
+    /// On the component stack, with its discovery index.
+    Open(u32),
+    Closed,
+}
+
+struct ComponentFrame<'a> {
+    edges: EdgeCursor<'a>,
+    index: u32,
+    low_link: u32,
+    reads_itself: bool,
+}
+
+/// Tarjan's algorithm over the walk graph, restricted to `cyclic` and the
+/// ranges they read, with an explicit stack for the same reason as the depth
+/// walk. One pass: O(formulas + ranges + edges) time and one entry per node.
+struct ComponentWalk<'a> {
+    sheets: &'a [SheetData],
+    formulas: Vec<AbsCellKey>,
+    nodes: FxHashMap<DependencyNode, ComponentState>,
+    /// Entered nodes not yet assigned to a component.
+    open: Vec<DependencyNode>,
+    stack: Vec<ComponentFrame<'a>>,
+    discovered: u32,
+}
+
+impl<'a> ComponentWalk<'a> {
+    fn enter(&mut self, node: DependencyNode) {
+        let index = self.discovered;
+        self.discovered += 1;
+        self.nodes.insert(node, ComponentState::Open(index));
+        self.open.push(node);
+        self.stack.push(ComponentFrame {
+            edges: EdgeCursor::new(self.sheets, &self.formulas, node),
+            index,
+            low_link: index,
+            reads_itself: false,
+        });
+    }
+
+    /// Walks from `root` until its frame finishes, appending every component
+    /// it completes to `output`.
+    fn walk(&mut self, root: DependencyNode, output: &mut CircularComponents) {
+        self.enter(root);
+        while let Some(frame) = self.stack.last_mut() {
+            if let Some(dependency) = frame.edges.next_dependency(&self.formulas, &self.nodes) {
+                if dependency == frame.edges.node {
+                    frame.reads_itself = true;
+                    continue;
+                }
+                match self.nodes.get(&dependency).copied() {
+                    Some(ComponentState::Open(index)) => {
+                        frame.low_link = frame.low_link.min(index);
+                    }
+                    Some(ComponentState::Closed) => {}
+                    Some(ComponentState::Unvisited) | None => self.enter(dependency),
+                }
+                continue;
+            }
+
+            let Some(frame) = self.stack.pop() else {
+                break;
+            };
+            if let Some(parent) = self.stack.last_mut() {
+                parent.low_link = parent.low_link.min(frame.low_link);
+            }
+            if frame.low_link == frame.index {
+                self.close_component(&frame, output);
+            }
+        }
+    }
+
+    /// Moves the open nodes down to `frame`'s node, which roots them, into
+    /// one component.
+    fn close_component(&mut self, frame: &ComponentFrame<'_>, output: &mut CircularComponents) {
+        let start = output.formulas.len();
+        let mut size = 0usize;
+        while let Some(node) = self.open.pop() {
+            self.nodes.insert(node, ComponentState::Closed);
+            size += 1;
+            if let DependencyNode::Formula(key) = node {
+                output.formulas.push(key);
+            }
+            if node == frame.edges.node {
+                break;
+            }
+        }
+
+        // A range read by no circular formula forms a component of its own.
+        if output.formulas.len() == start {
+            return;
+        }
+
+        // Row-major member order is the order Excel calculates a sheet in.
+        output.formulas[start..].sort_unstable_by_key(|key| (key.sheet, key.row, key.col));
+        output
+            .ends
+            .push((output.formulas.len(), size > 1 || frame.reads_itself));
+    }
+}
+
+pub(super) fn circular_components(
+    sheets: &[SheetData],
+    cyclic: &[AbsCellKey],
+) -> CircularComponents {
+    let formulas = column_major_formulas(sheets, cyclic.iter().copied());
+    let mut nodes = FxHashMap::with_capacity_and_hasher(formulas.len(), Default::default());
+    nodes.extend(
+        formulas
+            .iter()
+            .map(|&key| (DependencyNode::Formula(key), ComponentState::Unvisited)),
+    );
+
+    let mut output = CircularComponents {
+        formulas: Vec::with_capacity(formulas.len()),
+        ends: Vec::new(),
+    };
+    let mut walk = ComponentWalk {
+        sheets,
+        formulas,
+        nodes,
+        open: Vec::new(),
+        stack: Vec::new(),
+        discovered: 0,
+    };
+    for position in 0..walk.formulas.len() {
+        let root = DependencyNode::Formula(walk.formulas[position]);
+        if matches!(walk.nodes.get(&root), Some(ComponentState::Unvisited)) {
+            walk.walk(root, &mut output);
+        }
+    }
+    output
 }
 
 #[cfg(test)]

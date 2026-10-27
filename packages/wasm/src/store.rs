@@ -15,7 +15,7 @@ use crate::cells::{
     encode_num, encode_str_id, payload_num, payload_str_id, DEFAULT_MAX_PAGED_DIRTY_CELLS,
     DEFAULT_PAGE_CHUNK_ROWS,
 };
-use crate::eval::RandomSource;
+use crate::eval::{IterationLimits, RandomSource};
 use crate::graph::{DirtyRect, FormulaGraph};
 use crate::memory::{
     StoreMemoryStats, SHEET_INDEXES_METADATA, STRING_INDEX, STRING_POOL_SPANS, STRING_POOL_UTF8,
@@ -278,6 +278,10 @@ pub struct CellStore {
     pub(crate) volatile_serial: f64,
     pub(crate) random: RandomSource,
     pub(crate) spill_owner_cell_limit: usize,
+    /// Iterative calculation limits; `None` while iteration is off, as in a
+    /// new Excel workbook, so circular references show `#CYCLE!`. Boxed so
+    /// workbooks that never turn iteration on pay one pointer.
+    pub(crate) iteration: Option<Box<IterationLimits>>,
     /// Formulas each recompute pass selected, summed over passes. Tests read
     /// it to bound recalculation work, which no value can show.
     #[cfg(test)]
@@ -360,6 +364,7 @@ impl CellStore {
             volatile_serial: 0.0,
             random: RandomSource::from_host(),
             spill_owner_cell_limit: MAX_SPILL_OWNER_CELLS,
+            iteration: None,
             tables: HashMap::new(),
             #[cfg(test)]
             recomputed_formulas: 0,
@@ -2257,6 +2262,38 @@ impl CellStore {
         self.recompute_all_sheets();
         true
     }
+
+    /// Turns iterative calculation on or off with Excel's limits: at most
+    /// `max_iterations` (1 to 32,767) passes over each circular reference,
+    /// stopping once no member changes by more than `max_change` (finite, not
+    /// negative). Rejects limits outside those ranges. Recalculates every
+    /// formula when the setting changes.
+    #[wasm_bindgen(js_name = setIterativeCalculation)]
+    pub fn set_iterative_calculation(
+        &mut self,
+        enabled: bool,
+        max_iterations: u32,
+        max_change: f64,
+    ) -> bool {
+        let Some(limits) = IterationLimits::new(max_iterations, max_change) else {
+            return false;
+        };
+
+        let next = enabled.then(|| Box::new(limits));
+        if self.iteration == next {
+            return true;
+        }
+
+        // Which formulas sit on a circular reference is known only to a
+        // pass, so every formula recalculates, as in Excel.
+        self.iteration = next;
+        for sheet in &mut self.sheets {
+            sheet.formulas.mark_all_dirty();
+        }
+        self.recompute_all_sheets();
+        true
+    }
+
     #[wasm_bindgen(js_name = setTable)]
     #[expect(
         clippy::too_many_arguments,
@@ -3274,6 +3311,9 @@ impl CellStore {
             std::mem::size_of::<CellStore>(),
             std::mem::size_of::<CellStore>(),
         );
+        if self.iteration.is_some() {
+            metadata.add_payload(size_of::<IterationLimits>(), size_of::<IterationLimits>());
+        }
         metadata.add_vec::<SheetData>(self.sheets.len(), self.sheets.capacity());
         metadata.add_vec::<String>(self.sheet_names.len(), self.sheet_names.capacity());
         for name in &self.sheet_names {

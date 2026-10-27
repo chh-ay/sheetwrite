@@ -7,6 +7,7 @@ import {
 import {
   type AdmittedTransactionResources,
   admitTransactionResources,
+  DEFAULT_CALCULATION_SETTINGS,
   DEFAULT_TRANSACTION_RESOURCE_LIMITS,
   resolveTransactionResourceValidation,
   validateTransactionResources,
@@ -759,6 +760,12 @@ export class DocumentController {
               range.name.toUpperCase() === patch.name.toUpperCase() && range.scope === patch.scope,
           );
         return previous ? [{ op: "setNamedRange", namedRange: { ...previous } }] : [];
+      }
+      case "setCalculation": {
+        // Absent settings are the defaults, which undo must restore explicitly.
+        const previous =
+          this.options.store.getWorkbook().calculation ?? DEFAULT_CALCULATION_SETTINGS;
+        return [{ op: "setCalculation", calculation: { ...previous } }];
       }
     }
   }

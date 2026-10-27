@@ -214,6 +214,9 @@ export async function captureGoogleWithDependencies(
       observationStart,
       observationStart + MAX_GOOGLE_CASES_PER_WORKBOOK,
     );
+    // The corpus validator keeps one calculation setting for every case, and
+    // iteration leaves formulas without a circular reference unchanged.
+    const calculation = batch.find((entry) => entry.calculation)?.calculation;
     const created = await dependencies.request("https://sheets.googleapis.com/v4/spreadsheets", {
       method: "POST",
       body: canonicalJson({
@@ -221,6 +224,14 @@ export async function captureGoogleWithDependencies(
           title: `sheetwrite-conformance-${capturedAt}-batch-${String(batchIndex + 1).padStart(3, "0")}`,
           locale: "en_US",
           timeZone: "UTC",
+          ...(calculation
+            ? {
+                iterativeCalculationSettings: {
+                  maxIterations: calculation.maxIterations,
+                  convergenceThreshold: calculation.maxChange,
+                },
+              }
+            : {}),
         },
         sheets: batch.map((_entry, index) => ({ properties: { title: sheetTitle(index) } })),
       }),

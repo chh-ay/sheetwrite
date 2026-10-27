@@ -58,6 +58,8 @@ export {
 } from "./delimited-text.js";
 
 export {
+  DEFAULT_MAX_CHANGE,
+  DEFAULT_MAX_ITERATIONS,
   DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
   DEFAULT_TRANSACTION_RESOURCE_LIMITS,
   type DocumentValidationError,
@@ -70,6 +72,7 @@ export {
   SnapshotValidationError,
   type SnapshotValidationOptions,
   type TransactionResourceValidationResult,
+  MAX_ITERATIONS,
   validateTransactionResources,
   validateWorkbookSnapshot,
   WORKBOOK_SCHEMA_VERSION,
@@ -250,6 +253,7 @@ export {
 export type {
   AggregateOp,
   ApplyTransactionResult,
+  CalculationSettings,
   CellAddress,
   CellAlign,
   CellBlock,

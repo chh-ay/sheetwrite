@@ -2,6 +2,15 @@ declare namespace ExcelScript {
   type CalculationType = "fullRebuild";
   interface Application {
     calculate(type: CalculationType): void;
+    getIterativeCalculation(): IterativeCalculation;
+  }
+  interface IterativeCalculation {
+    getEnabled(): boolean;
+    getMaxChange(): number;
+    getMaxIteration(): number;
+    setEnabled(enabled: boolean): void;
+    setMaxChange(maxChange: number): void;
+    setMaxIteration(maxIteration: number): void;
   }
   interface Range {
     setValue(value: string | number | boolean): void;

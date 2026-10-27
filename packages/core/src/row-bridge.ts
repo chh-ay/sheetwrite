@@ -138,7 +138,8 @@ export interface RowBridgeMetadataDelta<
     | "hyperlink"
     | "protected-range"
     | "note"
-    | "named-range";
+    | "named-range"
+    | "calculation";
 }
 
 /** A document operation that needs a host-side action rather than row mutation. */
@@ -929,6 +930,8 @@ export class RowBridge<
       case "setNamedRange":
       case "removeNamedRange":
         return [this.metadata(transaction, operation, "named-range", sheet)];
+      case "setCalculation":
+        return [this.metadata(transaction, operation, "calculation", null)];
       default:
         return assertNever(operation);
     }

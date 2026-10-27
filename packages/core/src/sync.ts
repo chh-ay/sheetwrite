@@ -2134,6 +2134,7 @@ const DOCUMENT_OPERATION_KINDS: Record<DocumentOp["op"], true> = {
   setNote: true,
   setNamedRange: true,
   removeNamedRange: true,
+  setCalculation: true,
 };
 
 function assertPendingCommit(

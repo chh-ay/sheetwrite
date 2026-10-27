@@ -7,7 +7,15 @@ import type {
   WorkbookSnapshot,
   WorkbookTableXmlElement,
 } from "@sheetwrite/core";
-import { colToA1, labelToCol, rangeA1, sheetNameKey, validateSheetName } from "@sheetwrite/core";
+import {
+  colToA1,
+  DEFAULT_MAX_CHANGE,
+  DEFAULT_MAX_ITERATIONS,
+  labelToCol,
+  rangeA1,
+  sheetNameKey,
+  validateSheetName,
+} from "@sheetwrite/core";
 
 import { formulaContainsExternalReference, spillReferencesToXlsx } from "./formula.js";
 import { type ContentTypeOverride, contentTypesXml, relationshipsXml } from "./opc.js";
@@ -1011,10 +1019,28 @@ function workbookXml(
     }
     xml.append("</definedNames>");
   }
-  xml.append('<calcPr fullCalcOnLoad="1" forceFullCalc="1"/>');
+  xml.append(`<calcPr fullCalcOnLoad="1"${iterationAttributes(snapshot)} forceFullCalc="1"/>`);
   xml.append(hook?.workbookXml?.(extraIds).afterCalcPr ?? "");
   xml.append("</workbook>");
   return xml.finish();
+}
+
+/**
+ * `<calcPr>` iteration attributes. Limits are written even while iteration is
+ * off so a later "Enable iterative calculation" in Excel keeps them; default
+ * workbooks write none, which Excel reads as the same defaults.
+ */
+function iterationAttributes(snapshot: WorkbookSnapshot): string {
+  const calculation = snapshot.workbook.calculation;
+  if (
+    !calculation ||
+    (!calculation.iterate &&
+      calculation.maxIterations === DEFAULT_MAX_ITERATIONS &&
+      calculation.maxChange === DEFAULT_MAX_CHANGE)
+  ) {
+    return "";
+  }
+  return `${calculation.iterate ? ' iterate="1"' : ""} iterateCount="${calculation.maxIterations}" iterateDelta="${calculation.maxChange}"`;
 }
 
 /** Yield worksheet data before constructing later parts, bounded by the XML/ZIP chunk windows. */

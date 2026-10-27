@@ -103,6 +103,19 @@ export interface RowGroup {
   collapsed: boolean;
 }
 
+/**
+ * Workbook calculation options, mirroring Excel's "Enable iterative calculation".
+ * A workbook without this record uses the defaults.
+ */
+export interface CalculationSettings {
+  /** Recalculate circular references iteratively instead of showing `#CYCLE!`; Excel default `false`. */
+  iterate: boolean;
+  /** Most passes over each circular reference; an integer from 1 to 32,767, Excel default 100. */
+  maxIterations: number;
+  /** Iteration stops once no value changes by more than this; finite and >= 0, Excel default 0.001. */
+  maxChange: number;
+}
+
 /** Live workbook schema containing ordered sheets and the active sheet ID. */
 export interface Workbook {
   /** Sheets in display/tab order. */
@@ -113,6 +126,8 @@ export interface Workbook {
   namedRanges?: NamedRangeSnapshot[];
   /** Opaque OOXML graphs from an imported file; edits drop the graphs that depend on them. */
   xlsxSource?: XlsxSourceSnapshot;
+  /** Iterative calculation options; absent means the defaults. */
+  calculation?: CalculationSettings;
 }
 
 export interface AddSheetInput {
@@ -420,6 +435,8 @@ export interface WorkbookSnapshot {
     namedRanges?: NamedRangeSnapshot[];
     /** Opaque OOXML graphs kept for the next XLSX save; never interpreted by Sheetwrite. */
     xlsxSource?: XlsxSourceSnapshot;
+    /** Iterative calculation options; omitted when every field has its default. */
+    calculation?: CalculationSettings;
   };
   sheets: SheetSnapshot[];
 }
@@ -476,4 +493,5 @@ export type DocumentOp =
   | { op: "removeProtectedRange"; sheet: SheetId; id: string }
   | { op: "setNote"; addr: CellAddress; text: string | null }
   | { op: "setNamedRange"; namedRange: NamedRangeSnapshot }
-  | { op: "removeNamedRange"; name: string; scope?: SheetId };
+  | { op: "removeNamedRange"; name: string; scope?: SheetId }
+  | { op: "setCalculation"; calculation: CalculationSettings };
