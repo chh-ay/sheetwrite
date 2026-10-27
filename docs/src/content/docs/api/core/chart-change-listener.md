@@ -1,14 +1,14 @@
 ---
 title: "ChartChangeListener | @sheetwrite/core"
-description: "Listener for subscribeChartChanges."
+description: "Listener for subscribeChartChanges and ChartViewProvider.subscribe."
 ---
 <!-- api-export:@sheetwrite/core|.|ChartChangeListener -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
 
-Listener for [`subscribeChartChanges`](/docs/api/core/subscribe-chart-changes/).
+Listener for `subscribeChartChanges` and `ChartViewProvider.subscribe`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/charts-live.ts#L40"><code>packages/core/src/charts-live.ts#L40</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/chart.ts#L89"><code>packages/core/src/types/chart.ts#L89</code></a></dd></div>
 </dl>
 
 ## Declaration

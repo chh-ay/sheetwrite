@@ -1,5 +1,10 @@
 import { SheetwriteError } from "./errors.js";
-import { dataProperties, hasControlCharacters, sanitizeRange } from "./hyperlink.js";
+import {
+  dataProperties,
+  hasControlCharacters,
+  NUL_CHARACTER,
+  sanitizeRange,
+} from "./plain-data.js";
 import { moveIndex, remapSpan } from "./store/ranges.js";
 import type {
   ChartAnchor,
@@ -35,13 +40,20 @@ const CHART_KEYS = new Set(["id", "kind", "title", "axes", "legend", "anchor", "
 const AXES_KEYS = new Set(["xTitle", "yTitle"]);
 const ANCHOR_KEYS = new Set(["row", "col", "offsetX", "offsetY", "width", "height"]);
 const SERIES_KEYS = new Set(["name", "nameRange", "values", "categories"]);
-const NUL_CHARACTER = String.fromCharCode(0);
 
 /** The worksheet dimensions a chart is checked against. */
 export interface ChartSheetBounds {
   readonly id: SheetId;
   readonly rowCount: number;
   readonly columns: { readonly length: number };
+}
+
+function isChartKind(value: unknown): value is ChartKind {
+  return CHART_KINDS.has(value);
+}
+
+function isLegendPosition(value: unknown): value is NonNullable<ChartDefinition["legend"]> {
+  return LEGEND_POSITIONS.has(value);
 }
 
 function validChartId(value: unknown): value is string {
@@ -156,9 +168,9 @@ export function sanitizeChartDefinition(value: unknown): ChartDefinition | null 
     if (
       !chart ||
       !validChartId(chart.id) ||
-      !CHART_KINDS.has(chart.kind) ||
+      !isChartKind(chart.kind) ||
       (chart.title !== undefined && !validChartText(chart.title)) ||
-      (chart.legend !== undefined && !LEGEND_POSITIONS.has(chart.legend)) ||
+      (chart.legend !== undefined && !isLegendPosition(chart.legend)) ||
       !Array.isArray(chart.series) ||
       chart.series.length > MAX_CHART_SERIES
     ) {
@@ -178,17 +190,15 @@ export function sanitizeChartDefinition(value: unknown): ChartDefinition | null 
 
     return {
       id: chart.id,
-      // Both were checked against their closed sets above.
-      kind: chart.kind as ChartKind,
+      kind: chart.kind,
       ...(chart.title !== undefined ? { title: chart.title } : {}),
       ...(axes !== undefined ? { axes } : {}),
-      ...(chart.legend !== undefined
-        ? { legend: chart.legend as NonNullable<ChartDefinition["legend"]> }
-        : {}),
+      ...(chart.legend !== undefined ? { legend: chart.legend } : {}),
       anchor,
       series,
     };
   } catch {
+    // Hostile series arrays, including proxies and custom iterators, can throw during iteration.
     return null;
   }
 }
@@ -238,8 +248,8 @@ export function chartFitsSheets(
   });
 }
 
-/** Whether one sheet's charts are canonical, uniquely identified, within limits, and in bounds. */
-export function validSheetCharts(
+/** Whether already-sanitized sheet charts are uniquely identified, within limits, and in bounds. */
+export function sheetChartsFit(
   charts: readonly ChartDefinition[],
   owner: ChartSheetBounds,
   sheets: readonly ChartSheetBounds[],
@@ -248,16 +258,27 @@ export function validSheetCharts(
 
   const ids = new Set<string>();
   for (const chart of charts) {
-    if (
-      ids.has(chart.id) ||
-      !sanitizeChartDefinition(chart) ||
-      !chartFitsSheets(chart, owner, sheets)
-    ) {
-      return false;
-    }
+    if (ids.has(chart.id) || !chartFitsSheets(chart, owner, sheets)) return false;
     ids.add(chart.id);
   }
   return true;
+}
+
+/** Whether one sheet's untrusted charts are valid, uniquely identified, within limits, and in bounds. */
+export function validSheetCharts(
+  charts: readonly ChartDefinition[],
+  owner: ChartSheetBounds,
+  sheets: readonly ChartSheetBounds[],
+): boolean {
+  if (charts.length > MAX_CHARTS_PER_SHEET) return false;
+
+  const sanitized: ChartDefinition[] = [];
+  for (const chart of charts) {
+    const copy = sanitizeChartDefinition(chart);
+    if (!copy) return false;
+    sanitized.push(copy);
+  }
+  return sheetChartsFit(sanitized, owner, sheets);
 }
 
 /** Reject a live workbook whose charts are invalid before a store adopts it. */
@@ -267,22 +288,6 @@ export function assertWorkbookCharts(
   for (const sheet of sheets) {
     const charts = sheet.charts;
     if (!charts) continue;
-
-    if (charts.length > MAX_CHARTS_PER_SHEET) {
-      throw new SheetwriteError(
-        "resource-limit",
-        "snapshot-allocate",
-        `Sheetwrite: chart limit is ${MAX_CHARTS_PER_SHEET} per sheet; observed ${charts.length}`,
-        {
-          context: {
-            resource: "charts",
-            limit: MAX_CHARTS_PER_SHEET,
-            actual: charts.length,
-            sheet: sheet.id,
-          },
-        },
-      );
-    }
 
     if (!validSheetCharts(charts, sheet, sheets)) {
       throw new SheetwriteError(
@@ -393,6 +398,8 @@ export function rebaseChartAxis(
   owner: SheetId,
   edit: ChartAxisEdit,
 ): ChartDefinition {
+  if (!chartTouchesSheet(chart, owner, edit.sheet)) return chart;
+
   const rows = edit.axis === "row";
   const rebased = mapChartSources(chart, (range) => {
     if (range.sheet !== edit.sheet) return range;

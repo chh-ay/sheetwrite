@@ -8,7 +8,7 @@ description: "Stable, serialization-safe diagnostic context."
 Stable, serialization-safe diagnostic context.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/errors.ts#L99"><code>packages/core/src/errors.ts#L99</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/errors.ts#L100"><code>packages/core/src/errors.ts#L100</code></a></dd></div>
 </dl>
 
 ## Declaration

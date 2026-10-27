@@ -40,6 +40,7 @@ const SHEETWRITE_ERROR_OPERATIONS: readonly [
   "query",
   "hyperlink-activate",
   "keyboard-configure",
+  "chart-view",
 ]
 ```
 

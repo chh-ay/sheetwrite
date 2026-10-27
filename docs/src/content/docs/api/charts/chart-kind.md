@@ -1,11 +1,11 @@
 ---
 title: "ChartKind | @sheetwrite/charts"
-description: "Chart families supported by the 0.6 document model."
+description: "Chart families that the document model supports."
 ---
 <!-- api-export:@sheetwrite/charts|.|ChartKind -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/charts/">@sheetwrite/charts</a><span class="api-status" data-kind="type">type</span></div>
 
-Chart families supported by the 0.6 document model.
+Chart families that the document model supports.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/types/chart.d.ts#L3"><code>packages/core/dist/types/chart.d.ts#L3</code></a></dd></div>

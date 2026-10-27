@@ -9152,6 +9152,10 @@ export interface ChartAnchor { row: number; col: number; offsetX: number; offset
 
 Position in worksheet coordinates; dimensions and offsets use CSS pixels.
 
+Members:
+- `col` — 0-based column of the cell that holds the top-left corner.
+- `row` — 0-based row of the cell that holds the top-left corner.
+
 ##### `ChartChangeEvent` — interface
 
 ```ts
@@ -9163,7 +9167,9 @@ once per commit, only when `charts` is not empty; each chart appears once.
 A chart that no longer exists resolves to `null`.
 
 Members:
-- `epoch` — Store epoch after the commit.
+- `charts` — Charts to resolve again, in commit order of the edits that touched them.
+- `epoch` — Store epoch after the commit. `undefined` when the store sent its change
+event without an epoch, which a custom `Store` can do.
 
 ##### `ChartDefinition` — interface
 
@@ -9173,13 +9179,18 @@ export interface ChartDefinition { id: string; kind: ChartKind; title?: string; 
 
 Persisted chart definition; IDs are unique within the owning sheet.
 
+Members:
+- `axes` — Axis titles; `undefined` shows no axis titles.
+- `legend` — Legend position; `undefined` lets the renderer use its default position.
+- `title` — Text above the chart; `undefined` shows no title.
+
 ##### `ChartKind` — type
 
 ```ts
 export type ChartKind = "column" | "bar" | "line" | "area" | "pie" | "doughnut" | "scatter";
 ```
 
-Chart families supported by the 0.6 document model.
+Chart families that the document model supports.
 
 ##### `ChartRange` — type
 
@@ -9229,21 +9240,16 @@ export interface ChartView { chart: ChartDefinition; series: ChartSeriesView[]; 
 
 One immutable-by-convention rendering input, refreshed on chart-change events.
 
-##### `ChartViewCache` — interface
+##### `ChartViewCache` — type
 
 ```ts
-export interface ChartViewCache { get(chart: ChartRef): ChartView | null; subscribe(listener: (event: ChartChangeEvent) => void): () => void; dispose(): void; }
+export type ChartViewCache = ChartViewProvider;
 ```
 
 Resolved chart views for one store, refreshed only by chart-change events.
 
 Listeners run after the changed charts are invalidated, so `get` inside a
 listener always resolves the committed cell data.
-
-Members:
-- `dispose` — Stop observing the store and release every cached view.
-- `get` — Resolved view for the chart, or `null` when the sheet has no chart with that ID.
-- `subscribe` — Observe charts whose cached views were invalidated; returns the unsubscribe function.
 
 ##### `createChartViewCache` — function
 
@@ -9670,6 +9676,10 @@ export interface ChartAnchor { row: number; col: number; offsetX: number; offset
 
 Position in worksheet coordinates; dimensions and offsets use CSS pixels.
 
+Members:
+- `col` — 0-based column of the cell that holds the top-left corner.
+- `row` — 0-based row of the cell that holds the top-left corner.
+
 ##### `ChartChangeEvent` — interface
 
 ```ts
@@ -9681,7 +9691,9 @@ once per commit, only when `charts` is not empty; each chart appears once.
 A chart that no longer exists resolves to `null`.
 
 Members:
-- `epoch` — Store epoch after the commit.
+- `charts` — Charts to resolve again, in commit order of the edits that touched them.
+- `epoch` — Store epoch after the commit. `undefined` when the store sent its change
+event without an epoch, which a custom `Store` can do.
 
 ##### `ChartChangeListener` — type
 
@@ -9689,7 +9701,7 @@ Members:
 export type ChartChangeListener = (event: ChartChangeEvent) => void;
 ```
 
-Listener for {@link subscribeChartChanges}.
+Listener for `subscribeChartChanges` and `ChartViewProvider.subscribe`.
 
 ##### `ChartDefinition` — interface
 
@@ -9699,13 +9711,18 @@ export interface ChartDefinition { id: string; kind: ChartKind; title?: string; 
 
 Persisted chart definition; IDs are unique within the owning sheet.
 
+Members:
+- `axes` — Axis titles; `undefined` shows no axis titles.
+- `legend` — Legend position; `undefined` lets the renderer use its default position.
+- `title` — Text above the chart; `undefined` shows no title.
+
 ##### `ChartKind` — type
 
 ```ts
 export type ChartKind = "column" | "bar" | "line" | "area" | "pie" | "doughnut" | "scatter";
 ```
 
-Chart families supported by the 0.6 document model.
+Chart families that the document model supports.
 
 ##### `ChartRange` — type
 
@@ -9774,7 +9791,7 @@ Members:
 export type ChartViewProviderFactory = (store: Store) => ChartViewProvider;
 ```
 
-Creates a provider owned and disposed by one renderer or host.
+Creates a chart provider owned and disposed by one renderer or host.
 
 ##### `colToA1` — function
 
@@ -11270,7 +11287,8 @@ Observe runtime memory buckets available in the current JS host without fabricat
 
 Open cached chart views through the optional backend. Import
 `@sheetwrite/charts/register` or call its `registerChartsBackend` first.
-Throws if no provider is registered. The caller must dispose the result.
+Throws a `SheetwriteError` with code `"optional-backend-unavailable"` if no
+provider is registered. The caller must dispose the result.
 
 ##### `OperationSource` — type
 
@@ -12305,7 +12323,7 @@ Stable public failure codes. Messages are diagnostic and are not API contracts.
 ##### `SHEETWRITE_ERROR_OPERATIONS` — variable
 
 ```ts
-readonly ["initialize", "create-grid", "datasource-request", "renderer-worker", "export-xlsx", "xlsx-import", "xlsx-export", "delimited-parse", "delimited-import", "delimited-encode", "delimited-export", "delimited-options", "snapshot-validate", "snapshot-allocate", "persistence", "pending-storage", "synchronize", "presence", "revision", "comments", "query", "hyperlink-activate", "keyboard-configure"]
+readonly ["initialize", "create-grid", "datasource-request", "renderer-worker", "export-xlsx", "xlsx-import", "xlsx-export", "delimited-parse", "delimited-import", "delimited-encode", "delimited-export", "delimited-options", "snapshot-validate", "snapshot-allocate", "persistence", "pending-storage", "synchronize", "presence", "revision", "comments", "query", "hyperlink-activate", "keyboard-configure", "chart-view"]
 ```
 
 Stable operations at which a consumer-visible failure can surface.
@@ -12324,7 +12342,7 @@ Members:
 ##### `SheetwriteError` — class
 
 ```ts
-class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: "aborted" | "batch-limit" | "blocked" | "buffer-byte-limit" | "buffer-count-limit" | "buffer-operation-limit" | "comment-failed" | "commit-rejected" | "conflict" | "datasource-request-failed" | "delimited-text-invalid-limit" | "delimited-text-resource-limit" | "export-failed" | "future-distance-limit" | "incomplete-data" | "initialization-failed" | "initialization-required" | "invalid-batch" | "invalid-id" | "invalid-limits" | "invalid-operations" | "invalid-shortcut" | "invalid-snapshot" | "invalid-version" | "late-echo" | "limit" | "not-found" | "operation-limit" | "optional-backend-unavailable" | "payload-limit" | "pending-byte-limit" | "pending-capacity" | "pending-count-limit" | "pending-operation-limit" | "presence-failed" | "quota" | "remote-operations-rejected" | "renderer-fallback" | "resource-limit" | "response-id-mismatch" | "revision-failed" | "shortcut-conflict" | "sync-failed" | "sync-storage-failed" | "transaction" | "unavailable" | "unsafe-hyperlink" | "unsupported-schema" | "xlsx-import-failed" | "xlsx-invalid-options" | "xlsx-resource-limit"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: "comments" | "create-grid" | "datasource-request" | "delimited-encode" | "delimited-export" | "delimited-import" | "delimited-options" | "delimited-parse" | "export-xlsx" | "hyperlink-activate" | "initialize" | "keyboard-configure" | "pending-storage" | "persistence" | "presence" | "query" | "renderer-worker" | "revision" | "snapshot-allocate" | "snapshot-validate" | "synchronize" | "xlsx-export" | "xlsx-import"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }
+class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: "aborted" | "batch-limit" | "blocked" | "buffer-byte-limit" | "buffer-count-limit" | "buffer-operation-limit" | "comment-failed" | "commit-rejected" | "conflict" | "datasource-request-failed" | "delimited-text-invalid-limit" | "delimited-text-resource-limit" | "export-failed" | "future-distance-limit" | "incomplete-data" | "initialization-failed" | "initialization-required" | "invalid-batch" | "invalid-id" | "invalid-limits" | "invalid-operations" | "invalid-shortcut" | "invalid-snapshot" | "invalid-version" | "late-echo" | "limit" | "not-found" | "operation-limit" | "optional-backend-unavailable" | "payload-limit" | "pending-byte-limit" | "pending-capacity" | "pending-count-limit" | "pending-operation-limit" | "presence-failed" | "quota" | "remote-operations-rejected" | "renderer-fallback" | "resource-limit" | "response-id-mismatch" | "revision-failed" | "shortcut-conflict" | "sync-failed" | "sync-storage-failed" | "transaction" | "unavailable" | "unsafe-hyperlink" | "unsupported-schema" | "xlsx-import-failed" | "xlsx-invalid-options" | "xlsx-resource-limit"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: "chart-view" | "comments" | "create-grid" | "datasource-request" | "delimited-encode" | "delimited-export" | "delimited-import" | "delimited-options" | "delimited-parse" | "export-xlsx" | "hyperlink-activate" | "initialize" | "keyboard-configure" | "pending-storage" | "persistence" | "presence" | "query" | "renderer-worker" | "revision" | "snapshot-allocate" | "snapshot-validate" | "synchronize" | "xlsx-export" | "xlsx-import"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }
 ```
 
 Canonical envelope for thrown and callback-delivered Sheetwrite failures.
@@ -13984,7 +14002,7 @@ Stable public failure codes. Messages are diagnostic and are not API contracts.
 ##### `SHEETWRITE_ERROR_OPERATIONS` — variable
 
 ```ts
-readonly ["initialize", "create-grid", "datasource-request", "renderer-worker", "export-xlsx", "xlsx-import", "xlsx-export", "delimited-parse", "delimited-import", "delimited-encode", "delimited-export", "delimited-options", "snapshot-validate", "snapshot-allocate", "persistence", "pending-storage", "synchronize", "presence", "revision", "comments", "query", "hyperlink-activate", "keyboard-configure"]
+readonly ["initialize", "create-grid", "datasource-request", "renderer-worker", "export-xlsx", "xlsx-import", "xlsx-export", "delimited-parse", "delimited-import", "delimited-encode", "delimited-export", "delimited-options", "snapshot-validate", "snapshot-allocate", "persistence", "pending-storage", "synchronize", "presence", "revision", "comments", "query", "hyperlink-activate", "keyboard-configure", "chart-view"]
 ```
 
 Stable operations at which a consumer-visible failure can surface.
@@ -13992,7 +14010,7 @@ Stable operations at which a consumer-visible failure can surface.
 ##### `SheetwriteError` — class
 
 ```ts
-class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: "aborted" | "batch-limit" | "blocked" | "buffer-byte-limit" | "buffer-count-limit" | "buffer-operation-limit" | "comment-failed" | "commit-rejected" | "conflict" | "datasource-request-failed" | "delimited-text-invalid-limit" | "delimited-text-resource-limit" | "export-failed" | "future-distance-limit" | "incomplete-data" | "initialization-failed" | "initialization-required" | "invalid-batch" | "invalid-id" | "invalid-limits" | "invalid-operations" | "invalid-shortcut" | "invalid-snapshot" | "invalid-version" | "late-echo" | "limit" | "not-found" | "operation-limit" | "optional-backend-unavailable" | "payload-limit" | "pending-byte-limit" | "pending-capacity" | "pending-count-limit" | "pending-operation-limit" | "presence-failed" | "quota" | "remote-operations-rejected" | "renderer-fallback" | "resource-limit" | "response-id-mismatch" | "revision-failed" | "shortcut-conflict" | "sync-failed" | "sync-storage-failed" | "transaction" | "unavailable" | "unsafe-hyperlink" | "unsupported-schema" | "xlsx-import-failed" | "xlsx-invalid-options" | "xlsx-resource-limit"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: "comments" | "create-grid" | "datasource-request" | "delimited-encode" | "delimited-export" | "delimited-import" | "delimited-options" | "delimited-parse" | "export-xlsx" | "hyperlink-activate" | "initialize" | "keyboard-configure" | "pending-storage" | "persistence" | "presence" | "query" | "renderer-worker" | "revision" | "snapshot-allocate" | "snapshot-validate" | "synchronize" | "xlsx-export" | "xlsx-import"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }
+class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: "aborted" | "batch-limit" | "blocked" | "buffer-byte-limit" | "buffer-count-limit" | "buffer-operation-limit" | "comment-failed" | "commit-rejected" | "conflict" | "datasource-request-failed" | "delimited-text-invalid-limit" | "delimited-text-resource-limit" | "export-failed" | "future-distance-limit" | "incomplete-data" | "initialization-failed" | "initialization-required" | "invalid-batch" | "invalid-id" | "invalid-limits" | "invalid-operations" | "invalid-shortcut" | "invalid-snapshot" | "invalid-version" | "late-echo" | "limit" | "not-found" | "operation-limit" | "optional-backend-unavailable" | "payload-limit" | "pending-byte-limit" | "pending-capacity" | "pending-count-limit" | "pending-operation-limit" | "presence-failed" | "quota" | "remote-operations-rejected" | "renderer-fallback" | "resource-limit" | "response-id-mismatch" | "revision-failed" | "shortcut-conflict" | "sync-failed" | "sync-storage-failed" | "transaction" | "unavailable" | "unsafe-hyperlink" | "unsupported-schema" | "xlsx-import-failed" | "xlsx-invalid-options" | "xlsx-resource-limit"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: "chart-view" | "comments" | "create-grid" | "datasource-request" | "delimited-encode" | "delimited-export" | "delimited-import" | "delimited-options" | "delimited-parse" | "export-xlsx" | "hyperlink-activate" | "initialize" | "keyboard-configure" | "pending-storage" | "persistence" | "presence" | "query" | "renderer-worker" | "revision" | "snapshot-allocate" | "snapshot-validate" | "synchronize" | "xlsx-export" | "xlsx-import"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }
 ```
 
 Canonical envelope for thrown and callback-delivered Sheetwrite failures.

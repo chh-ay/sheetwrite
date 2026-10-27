@@ -22,7 +22,7 @@ Source entry: `packages/charts/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/charts/register-charts-backend/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>registerChartsBackend</code></span><span class="api-symbol-card__desc">Register the chart view cache as the core chart view provider, so openChartViews(store) returns live chart views.</span></a>
 </div>
 
-### Interfaces <span class="api-count" data-pagefind-ignore>8</span>
+### Interfaces <span class="api-count" data-pagefind-ignore>7</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/charts/chart-anchor/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>ChartAnchor</code></span><span class="api-symbol-card__desc">Position in worksheet coordinates; dimensions and offsets use CSS pixels.</span></a>
@@ -32,12 +32,12 @@ Source entry: `packages/charts/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/charts/chart-series/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>ChartSeries</code></span><span class="api-symbol-card__desc">Sources are read in row-major order.</span></a>
 <a class="api-symbol-card" href="/docs/api/charts/chart-series-view/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>ChartSeriesView</code></span><span class="api-symbol-card__desc">Resolved plain data; the renderer does not read cells.</span></a>
 <a class="api-symbol-card" href="/docs/api/charts/chart-view/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>ChartView</code></span><span class="api-symbol-card__desc">One immutable-by-convention rendering input, refreshed on chart-change events.</span></a>
-<a class="api-symbol-card" href="/docs/api/charts/chart-view-cache/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>ChartViewCache</code></span><span class="api-symbol-card__desc">Resolved chart views for one store, refreshed only by chart-change events.</span></a>
 </div>
 
-### Types <span class="api-count" data-pagefind-ignore>2</span>
+### Types <span class="api-count" data-pagefind-ignore>3</span>
 
 <div class="api-symbol-grid">
-<a class="api-symbol-card" href="/docs/api/charts/chart-kind/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>ChartKind</code></span><span class="api-symbol-card__desc">Chart families supported by the 0.6 document model.</span></a>
+<a class="api-symbol-card" href="/docs/api/charts/chart-kind/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>ChartKind</code></span><span class="api-symbol-card__desc">Chart families that the document model supports.</span></a>
 <a class="api-symbol-card" href="/docs/api/charts/chart-range/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>ChartRange</code></span><span class="api-symbol-card__desc">A deleted source remains explicit instead of silently reading another cell.</span></a>
+<a class="api-symbol-card" href="/docs/api/charts/chart-view-cache/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>ChartViewCache</code></span><span class="api-symbol-card__desc">Resolved chart views for one store, refreshed only by chart-change events.</span></a>
 </div>

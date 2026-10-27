@@ -16,7 +16,7 @@ Position in worksheet coordinates; dimensions and offsets use CSS pixels.
 <div class="api-member-list">
 
 <details class="api-member" id="chart-anchor-row" data-pagefind-weight="1">
-<summary><code>row</code></summary>
+<summary><code>row</code> <span class="api-member-summary">0-based row of the cell that holds the top-left corner.</span></summary>
 
 ```ts generated
 row: number;
@@ -25,7 +25,7 @@ row: number;
 </details>
 
 <details class="api-member" id="chart-anchor-col" data-pagefind-weight="1">
-<summary><code>col</code></summary>
+<summary><code>col</code> <span class="api-member-summary">0-based column of the cell that holds the top-left corner.</span></summary>
 
 ```ts generated
 col: number;

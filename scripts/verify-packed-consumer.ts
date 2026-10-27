@@ -62,7 +62,10 @@ const auditedLicenseOverrides: Record<string, string> = {
 /** Optional packages that core and the framework adapters must install and run without. */
 const OPTIONAL_PACKAGES = ["@sheetwrite/xlsx", "@sheetwrite/charts"] as const;
 /** Packages that ship only compiled `dist/` output, never their source or tests. */
-const DIST_ONLY_PACKAGES: ReadonlySet<string> = new Set(OPTIONAL_PACKAGES);
+const DIST_ONLY_PACKAGES: Readonly<Record<string, true>> = {
+  "@sheetwrite/xlsx": true,
+  "@sheetwrite/charts": true,
+};
 const packageSpecs: PackageSpec[] = [
   {
     directory: "packages/core",
@@ -249,7 +252,7 @@ async function assertTarball(
     }
   }
 
-  if (DIST_ONLY_PACKAGES.has(manifest.name)) {
+  if (Object.hasOwn(DIST_ONLY_PACKAGES, manifest.name)) {
     for (const path of packedFiles) {
       if (path.startsWith("src/") || path.startsWith("test/") || path.startsWith("node_modules/")) {
         throw new Error(`${manifest.name} tarball contains forbidden path ${path}`);

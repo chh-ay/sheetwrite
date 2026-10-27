@@ -1,7 +1,9 @@
 import {
   type ChartChangeEvent,
-  type ChartRef,
+  type ChartChangeListener,
   type ChartView,
+  type ChartViewProvider,
+  type SheetId,
   resolveChartView,
   type Store,
   subscribeChartChanges,
@@ -13,18 +15,7 @@ import {
  * Listeners run after the changed charts are invalidated, so `get` inside a
  * listener always resolves the committed cell data.
  */
-export interface ChartViewCache {
-  /** Resolved view for the chart, or `null` when the sheet has no chart with that ID. */
-  get(chart: ChartRef): ChartView | null;
-  /** Observe charts whose cached views were invalidated; returns the unsubscribe function. */
-  subscribe(listener: (event: ChartChangeEvent) => void): () => void;
-  /** Stop observing the store and release every cached view. */
-  dispose(): void;
-}
-
-function chartKey(chart: ChartRef): string {
-  return `${chart.sheet}\u0000${chart.id}`;
-}
+export type ChartViewCache = ChartViewProvider;
 
 /**
  * Creates the per-store chart view cache a chart renderer reads from.
@@ -58,17 +49,18 @@ function chartKey(chart: ChartRef): string {
  * ```
  */
 export function createChartViewCache(store: Store): ChartViewCache {
-  const views = new Map<string, ChartView | null>();
-  const listeners = new Set<(event: ChartChangeEvent) => void>();
+  const views = new Map<SheetId, Map<string, ChartView | null>>();
+  const listeners = new Set<ChartChangeListener>();
   let isDisposed = false;
 
   const unsubscribeStore = subscribeChartChanges(store, (event: ChartChangeEvent) => {
-    for (const chart of event.charts) views.delete(chartKey(chart));
+    for (const chart of event.charts) views.get(chart.sheet)?.delete(chart.id);
 
-    for (const listener of [...listeners]) listener(event);
+    for (const listener of listeners) listener(event);
   });
 
   const assertLive = (): void => {
+    // The Vite bundler fixture checks this text to detect the optional chart chunk.
     if (isDisposed) throw new Error("Sheetwrite: chart view cache was disposed");
   };
 
@@ -76,12 +68,16 @@ export function createChartViewCache(store: Store): ChartViewCache {
     get(chart) {
       assertLive();
 
-      const key = chartKey(chart);
-      const cached = views.get(key);
+      let sheetViews = views.get(chart.sheet);
+      const cached = sheetViews?.get(chart.id);
       if (cached !== undefined) return cached;
 
       const view = resolveChartView(store, chart.sheet, chart.id);
-      views.set(key, view);
+      if (!sheetViews) {
+        sheetViews = new Map<string, ChartView | null>();
+        views.set(chart.sheet, sheetViews);
+      }
+      sheetViews.set(chart.id, view);
       return view;
     },
     subscribe(listener) {

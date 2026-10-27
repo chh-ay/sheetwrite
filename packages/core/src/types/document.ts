@@ -499,6 +499,5 @@ export type DocumentOp =
   | { op: "setNamedRange"; namedRange: NamedRangeSnapshot }
   | { op: "removeNamedRange"; name: string; scope?: SheetId }
   | { op: "setCalculation"; calculation: CalculationSettings }
-  /** Create, replace, or move one chart on its owning sheet. */
   | { op: "setChart"; sheet: SheetId; chart: ChartDefinition }
   | { op: "removeChart"; sheet: SheetId; id: string };

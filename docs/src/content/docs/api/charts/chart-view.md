@@ -8,7 +8,7 @@ description: "One immutable-by-convention rendering input, refreshed on chart-ch
 One immutable-by-convention rendering input, refreshed on chart-change events.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/types/chart.d.ts#L53"><code>packages/core/dist/types/chart.d.ts#L53</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/types/chart.d.ts#L58"><code>packages/core/dist/types/chart.d.ts#L58</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>
@@ -60,7 +60,6 @@ export interface ChartView {
 <p class="api-consumers-label">Public exports naming <code>ChartView</code></p>
 
 <ul class="api-consumer-list">
-<li><a href="/docs/api/charts/chart-view-cache/"><code>ChartViewCache</code></a><span class="api-consumer-kind">@sheetwrite/charts</span></li>
 <li><a href="/docs/api/core/chart-view-provider/"><code>ChartViewProvider</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/resolve-chart-view/"><code>resolveChartView</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>

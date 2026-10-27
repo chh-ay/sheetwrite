@@ -10,7 +10,7 @@ once per commit, only when `charts` is not empty; each chart appears once.
 A chart that no longer exists resolves to `null`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/charts-live.d.ts#L19"><code>packages/core/dist/charts-live.d.ts#L19</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/types/chart.d.ts#L72"><code>packages/core/dist/types/chart.d.ts#L72</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>
@@ -24,10 +24,12 @@ A chart that no longer exists resolves to `null`.
 readonly epoch: number | undefined;
 ```
 
+<p class="api-member-doc">Store epoch after the commit. `undefined` when the store sent its change
+event without an epoch, which a custom `Store` can do.</p>
 </details>
 
 <details class="api-member" id="chart-change-event-charts" data-pagefind-weight="1">
-<summary><code>charts</code></summary>
+<summary><code>charts</code> <span class="api-member-summary">Charts to resolve again, in commit order of the edits that touched them.</span></summary>
 
 ```ts generated
 readonly charts: readonly ChartRef[];
@@ -62,7 +64,6 @@ export interface ChartChangeEvent {
 <p class="api-consumers-label">Public exports naming <code>ChartChangeEvent</code></p>
 
 <ul class="api-consumer-list">
-<li><a href="/docs/api/charts/chart-view-cache/"><code>ChartViewCache</code></a><span class="api-consumer-kind">@sheetwrite/charts</span></li>
 <li><a href="/docs/api/core/chart-change-listener/"><code>ChartChangeListener</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>

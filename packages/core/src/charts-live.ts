@@ -4,10 +4,19 @@
 // Nothing here runs for a store until a caller resolves or subscribes, so
 // workbooks without charts pay nothing.
 
+import { chartSourceRanges } from "./chart-definition.js";
 import type { StoreDataEngine } from "./store/data-engine.js";
 import { storeEngine } from "./store/engine-registry.js";
 import type { CellScalar } from "./types/cell.js";
-import type { ChartDefinition, ChartRange, ChartSeries, ChartView } from "./types/chart.js";
+import type {
+  ChartChangeEvent,
+  ChartChangeListener,
+  ChartDefinition,
+  ChartRange,
+  ChartRef,
+  ChartSeries,
+  ChartView,
+} from "./types/chart.js";
 import type { Range, SheetId } from "./types/coordinates.js";
 import type { DocumentOp, Sheet } from "./types/document.js";
 import type { Store } from "./types/store.js";
@@ -19,29 +28,9 @@ import type { ChangeEvent } from "./types/transaction.js";
  */
 export const MAX_CHART_POINTS = 10_000;
 
-/** Stable identity of one chart: the sheet that owns it and its ID on that sheet. */
-export interface ChartRef {
-  readonly sheet: SheetId;
-  readonly id: string;
-}
-
-/**
- * Charts whose `ChartView` may differ after one store commit. Emitted at most
- * once per commit, only when `charts` is not empty; each chart appears once.
- * A chart that no longer exists resolves to `null`.
- */
-export interface ChartChangeEvent {
-  /** Store epoch after the commit. */
-  readonly epoch: number | undefined;
-  readonly charts: readonly ChartRef[];
-}
-
-/** Listener for {@link subscribeChartChanges}. */
-export type ChartChangeListener = (event: ChartChangeEvent) => void;
-
 /** Inclusive rectangle actually read for one series range, after bounds and point limits. */
 interface ReadRect {
-  readonly sheet: SheetId;
+  readonly sheet: Sheet;
   readonly r0: number;
   readonly r1: number;
   readonly c0: number;
@@ -82,7 +71,7 @@ function readRect(sheets: ReadonlyMap<SheetId, Sheet>, range: ChartRange): ReadR
   const rowsNeeded = Math.ceil(MAX_CHART_POINTS / width);
   const r1 = Math.min(lastRow, r0 + rowsNeeded - 1);
   const truncated = (lastRow - r0 + 1) * (lastCol - c0 + 1) > MAX_CHART_POINTS;
-  return { sheet: range.sheet, r0, r1, c0, c1, truncated };
+  return { sheet, r0, r1, c0, c1, truncated };
 }
 
 function sheetMap(store: Store): Map<SheetId, Sheet> {
@@ -98,8 +87,9 @@ function readRange(
   range: ChartRange,
 ): RangeRead {
   const rect = readRect(sheets, range);
-  const sheet = rect ? sheets.get(rect.sheet) : undefined;
-  if (!rect || !sheet) return EMPTY_READ;
+  if (!rect) return EMPTY_READ;
+
+  const sheet = rect.sheet;
 
   const cols: number[] = [];
   for (let col = rect.c0; col <= rect.c1; col++) cols.push(col);
@@ -107,8 +97,8 @@ function readRange(
   // Data rows, not view rows: sorting or filtering the sheet must not reorder a series.
   const rows = { start: rect.r0, end: rect.r1 + 1 };
   const window = store.getDataWindow
-    ? store.getDataWindow(rect.sheet, rows, cols)
-    : store.getVisibleWindow(rect.sheet, rows, cols);
+    ? store.getDataWindow(sheet.id, rows, cols)
+    : store.getVisibleWindow(sheet.id, rows, cols);
 
   const count = Math.min(window.values.length, MAX_CHART_POINTS);
   const values = new Array<CellScalar>(count);
@@ -137,8 +127,16 @@ function seriesName(
   if (series.name !== undefined) return series.name;
   if (series.nameRange === "#REF!") return "#REF!";
   if (series.nameRange) {
-    const first = readRange(store, sheets, series.nameRange).values[0];
-    if (first !== null && first !== undefined) return String(first);
+    // Only the leading cell names the series; do not read the rest of a large label range.
+    // Backwards ranges from custom stores still start at their top-left cell.
+    const { start, end } = series.nameRange;
+    const first = { row: Math.min(start.row, end.row), col: Math.min(start.col, end.col) };
+    const name = readRange(store, sheets, {
+      sheet: series.nameRange.sheet,
+      start: first,
+      end: first,
+    }).values[0];
+    if (name !== null && name !== undefined) return String(name);
   }
   return `Series ${index + 1}`;
 }
@@ -278,25 +276,22 @@ class ChartIndex {
   ): boolean {
     let computed = false;
 
-    for (const series of definition.series) {
-      for (const range of [series.values, series.categories, series.nameRange]) {
-        if (range === undefined) continue;
-        const rect = readRect(sheets, range);
-        if (!rect) continue;
+    for (const range of chartSourceRanges(definition)) {
+      const rect = readRect(sheets, range);
+      if (!rect) continue;
 
-        const list = entries.get(rect.sheet);
-        if (list) list.push({ rect, chart });
-        else entries.set(rect.sheet, [{ rect, chart }]);
+      const list = entries.get(rect.sheet.id);
+      if (list) list.push({ rect, chart });
+      else entries.set(rect.sheet.id, [{ rect, chart }]);
 
-        // One bulk source capture per range, only while no earlier range answered.
-        computed ||=
-          engine === null ||
-          engine.chartSourcesComputed({
-            sheet: rect.sheet,
-            start: { row: rect.r0, col: rect.c0 },
-            end: { row: rect.r1, col: rect.c1 },
-          });
-      }
+      // One bulk source capture per range, only while no earlier range answered.
+      computed ||=
+        engine === null ||
+        engine.chartSourcesComputed({
+          sheet: rect.sheet.id,
+          start: { row: rect.r0, col: rect.c0 },
+          end: { row: rect.r1, col: rect.c1 },
+        });
     }
 
     return computed;
@@ -322,6 +317,137 @@ function mayAddComputedSource(patch: DocumentOp): boolean {
   }
 }
 
+interface PatchContext {
+  readonly index: ChartIndex;
+  readonly hits: Set<number>;
+  readonly direct: ChartRef[];
+  valuesChanged: boolean;
+  rebuild: boolean;
+}
+
+/** Classify committed patches against the old index before rebuilding rewritten sources. */
+function classifyPatch(patch: DocumentOp, context: PatchContext): void {
+  const { index, hits, direct } = context;
+  const hit = (chart: number) => hits.add(chart);
+  const sheetWide = (sheet: SheetId) => index.sources.get(sheet)?.all(hit);
+
+  switch (patch.op) {
+    case "set":
+    case "setRange":
+    case "setBlock":
+    case "restoreBlock":
+    case "clearRange": {
+      const range =
+        patch.op === "set"
+          ? { sheet: patch.addr.sheet, start: patch.addr, end: patch.addr }
+          : patch.range;
+      const sources = index.sources.get(range.sheet);
+      sources?.query(range, hit);
+      context.valuesChanged = true;
+
+      // Spills grow down and right and can reach a source outside the edited rectangle.
+      if (mayAddComputedSource(patch)) {
+        const start = {
+          row: Math.min(range.start.row, range.end.row),
+          col: Math.min(range.start.col, range.end.col),
+        };
+        sources?.query(
+          { sheet: range.sheet, start, end: { row: UNBOUNDED, col: UNBOUNDED } },
+          (chart) => {
+            hits.add(chart);
+            context.rebuild = true;
+          },
+        );
+      }
+      return;
+    }
+    case "setRangeStyle":
+      // The view carries number formats, not other cell styling.
+      if (patch.style === null || patch.style.numberFormat !== undefined)
+        index.sources.get(patch.range.sheet)?.query(patch.range, hit);
+      return;
+    case "setColumn": {
+      const changed = patch.patch;
+      if (
+        changed.numberFormat !== undefined ||
+        changed.numberLocale !== undefined ||
+        changed.cellStyle !== undefined
+      ) {
+        index.sources.get(patch.sheet)?.query(
+          {
+            sheet: patch.sheet,
+            start: { row: 0, col: patch.col },
+            end: { row: UNBOUNDED, col: patch.col },
+          },
+          hit,
+        );
+      }
+      return;
+    }
+    case "addRows":
+    case "removeRows":
+    case "moveRows":
+    case "addColumns":
+    case "removeColumns":
+    case "moveColumns":
+    case "removeSheet":
+      // Structural edits rewrite both sources and owned anchors.
+      sheetWide(patch.sheet);
+      for (const chart of index.owned.get(patch.sheet) ?? []) hits.add(chart);
+      context.valuesChanged = true;
+      context.rebuild = true;
+      return;
+    case "addSheet":
+      for (const chart of patch.sheet.charts ?? []) {
+        direct.push({ sheet: patch.sheet.id, id: chart.id });
+      }
+      context.valuesChanged = true;
+      context.rebuild = true;
+      return;
+    case "setChart":
+      direct.push({ sheet: patch.sheet, id: patch.chart.id });
+      context.rebuild = true;
+      return;
+    case "removeChart":
+      direct.push({ sheet: patch.sheet, id: patch.id });
+      context.rebuild = true;
+      return;
+    case "addTable":
+    case "updateTable":
+    case "removeTable":
+      // Table edits can write header and total cells.
+      sheetWide(patch.op === "addTable" ? patch.table.range.sheet : patch.sheet);
+      context.valuesChanged = true;
+      return;
+    case "renameSheet":
+    case "moveSheet":
+    case "setNamedRange":
+    case "removeNamedRange":
+    case "setCalculation":
+      // Formula results can depend on names, calculation settings and sheet identity/order.
+      context.valuesChanged = true;
+      return;
+    case "setNote":
+    case "setHyperlink":
+    case "removeHyperlink":
+    case "setValidationRule":
+    case "removeValidationRule":
+    case "setProtectedRange":
+    case "removeProtectedRange":
+    case "setRowMeta":
+    case "addMerge":
+    case "removeMerge":
+    case "setSheetMeta":
+    case "setSheetVisibility":
+      // Presentation metadata does not change canonical source values.
+      return;
+    default: {
+      const unhandled: never = patch;
+      return unhandled;
+    }
+  }
+}
+
 /** Per-store subscription state; exists only while at least one listener is attached. */
 class ChartTracker {
   readonly listeners = new Set<ChartChangeListener>();
@@ -339,154 +465,40 @@ class ChartTracker {
 
   private onChange(event: ChangeEvent): void {
     const index = this.index;
-    const hits = new Set<number>();
-    const added: ChartRef[] = [];
-    let valuesChanged = false;
-    let rebuild = false;
-
-    const hit = (chart: number) => hits.add(chart);
-    const sheetWide = (sheet: SheetId) => index.sources.get(sheet)?.all(hit);
-    const ownedBy = (sheet: SheetId) => {
-      for (const chart of index.owned.get(sheet) ?? []) hits.add(chart);
+    const context: PatchContext = {
+      index,
+      hits: new Set<number>(),
+      direct: [],
+      // Volatile recalculation commits no patches but can change values.
+      valuesChanged: event.transaction.patches.length === 0,
+      rebuild: false,
     };
+    for (const patch of event.transaction.patches) classifyPatch(patch, context);
 
-    // Recalculating volatile functions commits no patches but changes values.
-    if (event.transaction.patches.length === 0) valuesChanged = true;
-
-    for (const patch of event.transaction.patches) {
-      switch (patch.op) {
-        case "set":
-        case "setRange":
-        case "setBlock":
-        case "restoreBlock":
-        case "setRangeStyle":
-        case "clearRange": {
-          const range =
-            patch.op === "set"
-              ? { sheet: patch.addr.sheet, start: patch.addr, end: patch.addr }
-              : patch.range;
-          const sources = index.sources.get(range.sheet);
-
-          // Style edits matter only through number formats; the view carries no other style.
-          if (patch.op === "setRangeStyle") {
-            if (patch.style === null || patch.style.numberFormat !== undefined)
-              sources?.query(range, hit);
-            break;
-          }
-
-          sources?.query(range, hit);
-          valuesChanged = true;
-
-          // A new formula, reference or spill makes the charts it can reach follow recalculation.
-          // Spills grow down and right, so a formula can reach any source below and right of it.
-          if (mayAddComputedSource(patch)) {
-            const start = {
-              row: Math.min(range.start.row, range.end.row),
-              col: Math.min(range.start.col, range.end.col),
-            };
-            sources?.query(
-              { sheet: range.sheet, start, end: { row: UNBOUNDED, col: UNBOUNDED } },
-              (chart) => {
-                hits.add(chart);
-                rebuild = true;
-              },
-            );
-          }
-          break;
-        }
-        case "setColumn": {
-          const changed = patch.patch;
-          // Only format fields reach the view; they cover the whole column.
-          if (
-            changed.numberFormat !== undefined ||
-            changed.numberLocale !== undefined ||
-            changed.cellStyle !== undefined
-          ) {
-            index.sources.get(patch.sheet)?.query(
-              {
-                sheet: patch.sheet,
-                start: { row: 0, col: patch.col },
-                end: { row: UNBOUNDED, col: patch.col },
-              },
-              hit,
-            );
-          }
-          break;
-        }
-        case "addRows":
-        case "removeRows":
-        case "moveRows":
-        case "addColumns":
-        case "removeColumns":
-        case "moveColumns":
-        case "removeSheet":
-          // Sources and anchors were rewritten; formulas elsewhere may have moved too.
-          sheetWide(patch.sheet);
-          ownedBy(patch.sheet);
-          valuesChanged = true;
-          rebuild = true;
-          break;
-        case "addSheet":
-          for (const chart of patch.sheet.charts ?? []) {
-            added.push({ sheet: patch.sheet.id, id: chart.id });
-          }
-          valuesChanged = true;
-          rebuild = true;
-          break;
-        case "setChart":
-          added.push({ sheet: patch.sheet, id: patch.chart.id });
-          rebuild = true;
-          break;
-        case "removeChart":
-          added.push({ sheet: patch.sheet, id: patch.id });
-          rebuild = true;
-          break;
-        case "addTable":
-        case "updateTable":
-        case "removeTable":
-          // Table edits can write header and total cells.
-          sheetWide(patch.op === "addTable" ? patch.table.range.sheet : patch.sheet);
-          valuesChanged = true;
-          break;
-        case "setNote":
-        case "setHyperlink":
-        case "removeHyperlink":
-        case "setValidationRule":
-        case "removeValidationRule":
-        case "setProtectedRange":
-        case "removeProtectedRange":
-        case "setRowMeta":
-        case "addMerge":
-        case "removeMerge":
-        case "setSheetMeta":
-        case "setSheetVisibility":
-          // Presentation metadata; chart data reads canonical rows and resolved values.
-          break;
-        default:
-          // Names, calculation settings, sheet order and renames can change formula results.
-          valuesChanged = true;
-      }
-    }
-
+    const { hits, direct, valuesChanged, rebuild } = context;
     if (valuesChanged) for (const chart of index.computed) hits.add(chart);
 
     if (rebuild) this.index = new ChartIndex(this.store);
 
-    if (hits.size === 0 && added.length === 0) return;
+    if (hits.size === 0 && direct.length === 0) return;
 
-    const seen = new Set<string>();
+    const seen = new Map<SheetId, Set<string>>();
     const charts: ChartRef[] = [];
     const push = (ref: ChartRef) => {
-      const key = `${ref.sheet}\u0000${ref.id}`;
-      if (seen.has(key)) return;
-      seen.add(key);
+      let ids = seen.get(ref.sheet);
+      if (!ids) {
+        ids = new Set<string>();
+        seen.set(ref.sheet, ids);
+      }
+      if (ids.has(ref.id)) return;
+      ids.add(ref.id);
       charts.push(ref);
     };
     for (const chart of hits) {
       const ref = index.charts[chart];
       if (ref) push(ref);
     }
-    for (const ref of added) push(ref);
+    for (const ref of direct) push(ref);
 
     const changeEvent: ChartChangeEvent = { epoch: event.epoch, charts };
     for (const listener of this.listeners) listener(changeEvent);

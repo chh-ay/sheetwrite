@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, describe, expect, it } from "bun:test";
 
+import { MAX_CHART_SERIES, MAX_CHARTS_PER_SHEET } from "../src/chart-definition.js";
 import { DocumentController } from "../src/document-controller.js";
 import {
   SnapshotResourceError,
@@ -9,8 +10,9 @@ import {
 import { initSheetwrite } from "../src/grid.js";
 import { rebaseDocumentOperations } from "../src/rebase.js";
 import { SheetwriteStore } from "../src/store.js";
-import type { DocumentOp, Range, Sheet, Workbook, WorkbookSnapshot } from "../src/types.js";
+import type { DocumentOp, Workbook, WorkbookSnapshot } from "../src/types.js";
 import type { ChartDefinition, ChartRange } from "../src/types/chart.js";
+import { range, sheet } from "./fixtures.js";
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -23,20 +25,6 @@ afterEach(() => {
 });
 
 const ROWS = 10;
-
-function sheet(id: string, rowCount = ROWS): Sheet {
-  const columns = ["a", "b", "c", "d"].map((key) => ({
-    key,
-    header: key,
-    width: 80,
-    type: "number" as const,
-  }));
-  return { id, name: id, rowCount, columns };
-}
-
-function range(sheetId: string, r0: number, c0: number, r1: number, c1: number): Range {
-  return { sheet: sheetId, start: { row: r0, col: c0 }, end: { row: r1, col: c1 } };
-}
 
 /** Values in B1:B4 and categories in A1:A4 of `source`, anchored at D3 of its owner. */
 function chart(id: string, source = "data", anchorRow = 2): ChartDefinition {
@@ -108,32 +96,38 @@ describe("chart persistence", () => {
     const own = source.sheets[0]?.charts?.[0];
     if (!own) throw new Error("fixture chart missing");
     own.series.push({ name: "Lost", values: "#REF!" });
+    const owner = source.sheets[0];
+    if (!owner) throw new Error("fixture sheet missing");
+    // Deliberately reverse identifier order so snapshot validation cannot reorder drawings.
+    owner.charts = [chart("z-last-id"), own, chart("a-first-id")];
     const { store } = setup(source);
 
     const exported = store.exportSnapshot();
     const reopened = SheetwriteStore.fromSnapshot(JSON.parse(JSON.stringify(exported)));
     stores.push(reopened);
 
-    expect(chartsOf(reopened, "data")).toEqual([own]);
+    expect(chartsOf(reopened, "data")).toEqual(owner.charts);
     expect(chartsOf(reopened, "other")).toEqual([chart("cross")]);
     expect(reopened.exportSnapshot().sheets).toEqual(exported.sheets);
   });
 
   it("rejects over-limit and malformed charts in snapshots and operations", () => {
-    const thirtyThreeSeries = {
+    const oversizedSeries = {
       ...chart("wide"),
-      series: Array.from({ length: 33 }, () => chart("wide").series[0]),
+      series: Array.from({ length: MAX_CHART_SERIES + 1 }, () => chart("wide").series[0]),
     };
     const cases: Array<[label: string, input: unknown, path: string, code: string]> = [
       [
-        "101 charts",
-        snapshotWith(Array.from({ length: 101 }, (_, index) => chart(`c${index}`))),
+        "too many charts",
+        snapshotWith(
+          Array.from({ length: MAX_CHARTS_PER_SHEET + 1 }, (_, index) => chart(`c${index}`)),
+        ),
         "sheets[0].charts",
         "resource-limit",
       ],
       [
-        "33 series",
-        snapshotWith([thirtyThreeSeries]),
+        "too many series",
+        snapshotWith([oversizedSeries]),
         "sheets[0].charts[0].series",
         "resource-limit",
       ],
@@ -170,7 +164,7 @@ describe("chart persistence", () => {
     }
 
     expect(
-      validateDocumentOperationShape({ op: "setChart", sheet: "data", chart: thirtyThreeSeries }),
+      validateDocumentOperationShape({ op: "setChart", sheet: "data", chart: oversizedSeries }),
     ).toContainEqual(
       expect.objectContaining({ path: "operation.chart.series", code: "resource-limit" }),
     );
@@ -178,7 +172,9 @@ describe("chart persistence", () => {
     const crowded = workbook();
     const data = crowded.sheets[0];
     if (!data) throw new Error("fixture sheet missing");
-    data.charts = Array.from({ length: 101 }, (_, index) => chart(`c${index}`));
+    data.charts = Array.from({ length: MAX_CHARTS_PER_SHEET + 1 }, (_, index) =>
+      chart(`c${index}`),
+    );
     let thrown: unknown;
     try {
       stores.push(new SheetwriteStore(crowded));
@@ -187,7 +183,11 @@ describe("chart persistence", () => {
     }
     // The chart limit itself, not some other allocation guard, refuses the workbook.
     expect(thrown).toBeInstanceOf(SnapshotResourceError);
-    expect(thrown).toMatchObject({ code: "resource-limit", limit: 100, actual: 101 });
+    expect(thrown).toMatchObject({
+      code: "resource-limit",
+      limit: MAX_CHARTS_PER_SHEET,
+      actual: MAX_CHARTS_PER_SHEET + 1,
+    });
   });
 
   it("refuses a live chart whose source leaves the workbook", () => {
@@ -199,13 +199,17 @@ describe("chart persistence", () => {
         .status,
     ).toBe("applied");
 
-    // Each in its own transaction: the missing sheet is refused before the engine sees it.
-    expect(
-      store.applyTransaction({
-        patches: [{ op: "setChart", sheet: "data", chart: chart("ghost", "missing") }],
-      }).status,
-    ).toBe("rejected");
-    store.applyTransaction({
+    const missingSheet = store.applyTransaction({
+      patches: [{ op: "setChart", sheet: "data", chart: chart("ghost", "missing") }],
+    });
+    expect(missingSheet.status).toBe("rejected");
+    if (missingSheet.status === "rejected") {
+      expect(missingSheet.issues).toContainEqual(
+        expect.objectContaining({ kind: "invalid-operation", operationIndex: 0 }),
+      );
+    }
+
+    const outOfBounds = store.applyTransaction({
       patches: [
         {
           op: "setChart",
@@ -214,6 +218,8 @@ describe("chart persistence", () => {
         },
       ],
     });
+    // Bounds failures are no-ops, unlike the missing-sheet admission rejection.
+    expect(outOfBounds).toMatchObject({ status: "noop", reason: "out-of-bounds" });
 
     expect(chartsOf(store, "data")?.map((candidate) => candidate.id)).toEqual(["own"]);
   });
@@ -391,7 +397,7 @@ describe("chart persistence", () => {
     ).toEqual([chart("own")]);
   });
 
-  it("rebases a pending chart across a concurrent row insert", () => {
+  it("rebases pending charts across row inserts and conflicts on replacement or source deletion", () => {
     const remote: DocumentOp[] = [{ op: "addRows", sheet: "data", at: 0, count: 2 }];
 
     const rebased = rebaseDocumentOperations(
@@ -419,6 +425,36 @@ describe("chart persistence", () => {
         [{ op: "removeRows", sheet: "data", at: 1, count: 1 }],
       ).status,
     ).toBe("conflict");
+  });
+
+  it("conflicts when a pending new sheet's chart reads a sheet whose rows moved", () => {
+    const added: DocumentOp = {
+      op: "addSheet",
+      sheet: { ...sheet("report"), order: 2, charts: [chart("cross")], cells: [] },
+    };
+
+    const rebased = rebaseDocumentOperations(
+      [added],
+      [{ op: "moveRows", sheet: "data", from: 0, count: 2, to: 5 }],
+    );
+
+    // A move has no rebase mapping; keeping the old rows would chart other data.
+    expect(rebased).toMatchObject({
+      status: "conflict",
+      conflict: { code: "unsupported-structural" },
+    });
+  });
+
+  it("conflicts when a pending new sheet's chart reads a removed sheet", () => {
+    const added: DocumentOp = {
+      op: "addSheet",
+      sheet: { ...sheet("report"), order: 2, charts: [chart("cross")], cells: [] },
+    };
+
+    const rebased = rebaseDocumentOperations([added], [{ op: "removeSheet", sheet: "data" }]);
+
+    // The store refuses a chart source on a missing sheet, so "rebased" would fail on apply.
+    expect(rebased).toMatchObject({ status: "conflict", conflict: { code: "sheet-removed" } });
   });
 
   it("keeps retained opaque XLSX graphs when a native chart is set or removed", () => {

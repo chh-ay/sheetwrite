@@ -8,7 +8,7 @@ description: "Persisted chart definition; IDs are unique within the owning sheet
 Persisted chart definition; IDs are unique within the owning sheet.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/chart.ts#L28"><code>packages/core/src/types/chart.ts#L28</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/chart.ts#L30"><code>packages/core/src/types/chart.ts#L30</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -44,7 +44,7 @@ kind: ChartKind;
 </details>
 
 <details class="api-member" id="chart-definition-title" data-pagefind-weight="1">
-<summary><code>title</code></summary>
+<summary><code>title</code> <span class="api-member-summary">Text above the chart; undefined shows no title.</span></summary>
 
 ```ts generated
 title?: string;
@@ -53,7 +53,7 @@ title?: string;
 </details>
 
 <details class="api-member" id="chart-definition-axes" data-pagefind-weight="1">
-<summary><code>axes</code></summary>
+<summary><code>axes</code> <span class="api-member-summary">Axis titles; undefined shows no axis titles.</span></summary>
 
 ```ts generated
 axes?: { xTitle?: string; yTitle?: string };
@@ -62,7 +62,7 @@ axes?: { xTitle?: string; yTitle?: string };
 </details>
 
 <details class="api-member" id="chart-definition-legend" data-pagefind-weight="1">
-<summary><code>legend</code></summary>
+<summary><code>legend</code> <span class="api-member-summary">Legend position; undefined lets the renderer use its default position.</span></summary>
 
 ```ts generated
 legend?: "none" | "top" | "right" | "bottom" | "left";

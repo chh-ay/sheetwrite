@@ -21,22 +21,35 @@
               "source": "../core/dist/types/chart.d.ts#L7",
               "jsDocTags": [],
               "documentation": "Position in worksheet coordinates; dimensions and offsets use CSS pixels.",
-              "memberDocs": []
+              "memberDocs": [
+                {
+                  "name": "col",
+                  "documentation": "0-based column of the cell that holds the top-left corner."
+                },
+                {
+                  "name": "row",
+                  "documentation": "0-based row of the cell that holds the top-left corner."
+                }
+              ]
             },
             {
               "name": "ChartChangeEvent",
               "kind": "interface",
               "signature": "export interface ChartChangeEvent { readonly epoch: number | undefined; readonly charts: readonly ChartRef[]; }",
               "owners": [
-                "../core/dist/charts-live.d.ts"
+                "../core/dist/types/chart.d.ts"
               ],
-              "source": "../core/dist/charts-live.d.ts#L19",
+              "source": "../core/dist/types/chart.d.ts#L72",
               "jsDocTags": [],
               "documentation": "Charts whose `ChartView` may differ after one store commit. Emitted at most\nonce per commit, only when `charts` is not empty; each chart appears once.\nA chart that no longer exists resolves to `null`.",
               "memberDocs": [
                 {
+                  "name": "charts",
+                  "documentation": "Charts to resolve again, in commit order of the edits that touched them."
+                },
+                {
                   "name": "epoch",
-                  "documentation": "Store epoch after the commit."
+                  "documentation": "Store epoch after the commit. `undefined` when the store sent its change\nevent without an epoch, which a custom `Store` can do."
                 }
               ]
             },
@@ -47,10 +60,23 @@
               "owners": [
                 "../core/dist/types/chart.d.ts"
               ],
-              "source": "../core/dist/types/chart.d.ts#L23",
+              "source": "../core/dist/types/chart.d.ts#L25",
               "jsDocTags": [],
               "documentation": "Persisted chart definition; IDs are unique within the owning sheet.",
-              "memberDocs": []
+              "memberDocs": [
+                {
+                  "name": "axes",
+                  "documentation": "Axis titles; `undefined` shows no axis titles."
+                },
+                {
+                  "name": "legend",
+                  "documentation": "Legend position; `undefined` lets the renderer use its default position."
+                },
+                {
+                  "name": "title",
+                  "documentation": "Text above the chart; `undefined` shows no title."
+                }
+              ]
             },
             {
               "name": "ChartKind",
@@ -61,7 +87,7 @@
               ],
               "source": "../core/dist/types/chart.d.ts#L3",
               "jsDocTags": [],
-              "documentation": "Chart families supported by the 0.6 document model.",
+              "documentation": "Chart families that the document model supports.",
               "memberDocs": []
             },
             {
@@ -81,9 +107,9 @@
               "kind": "interface",
               "signature": "export interface ChartRef { readonly sheet: SheetId; readonly id: string; }",
               "owners": [
-                "../core/dist/charts-live.d.ts"
+                "../core/dist/types/chart.d.ts"
               ],
-              "source": "../core/dist/charts-live.d.ts#L10",
+              "source": "../core/dist/types/chart.d.ts#L63",
               "jsDocTags": [],
               "documentation": "Stable identity of one chart: the sheet that owns it and its ID on that sheet.",
               "memberDocs": []
@@ -95,7 +121,7 @@
               "owners": [
                 "../core/dist/types/chart.d.ts"
               ],
-              "source": "../core/dist/types/chart.d.ts#L16",
+              "source": "../core/dist/types/chart.d.ts#L18",
               "jsDocTags": [],
               "documentation": "Sources are read in row-major order.",
               "memberDocs": []
@@ -107,7 +133,7 @@
               "owners": [
                 "../core/dist/types/chart.d.ts"
               ],
-              "source": "../core/dist/types/chart.d.ts#L36",
+              "source": "../core/dist/types/chart.d.ts#L41",
               "jsDocTags": [],
               "documentation": "Resolved plain data; the renderer does not read cells. Arrays follow source cells in row-major order.",
               "memberDocs": [
@@ -144,35 +170,22 @@
               "owners": [
                 "../core/dist/types/chart.d.ts"
               ],
-              "source": "../core/dist/types/chart.d.ts#L53",
+              "source": "../core/dist/types/chart.d.ts#L58",
               "jsDocTags": [],
               "documentation": "One immutable-by-convention rendering input, refreshed on chart-change events.",
               "memberDocs": []
             },
             {
               "name": "ChartViewCache",
-              "kind": "interface",
-              "signature": "export interface ChartViewCache { get(chart: ChartRef): ChartView | null; subscribe(listener: (event: ChartChangeEvent) => void): () => void; dispose(): void; }",
+              "kind": "type",
+              "signature": "export type ChartViewCache = ChartViewProvider;",
               "owners": [
                 "src/view-cache.ts"
               ],
-              "source": "src/view-cache.ts#L16",
+              "source": "src/view-cache.ts#L18",
               "jsDocTags": [],
               "documentation": "Resolved chart views for one store, refreshed only by chart-change events.\n\nListeners run after the changed charts are invalidated, so `get` inside a\nlistener always resolves the committed cell data.",
-              "memberDocs": [
-                {
-                  "name": "dispose",
-                  "documentation": "Stop observing the store and release every cached view."
-                },
-                {
-                  "name": "get",
-                  "documentation": "Resolved view for the chart, or `null` when the sheet has no chart with that ID."
-                },
-                {
-                  "name": "subscribe",
-                  "documentation": "Observe charts whose cached views were invalidated; returns the unsubscribe function."
-                }
-              ]
+              "memberDocs": []
             },
             {
               "name": "createChartViewCache",
@@ -181,7 +194,7 @@
               "owners": [
                 "src/view-cache.ts"
               ],
-              "source": "src/view-cache.ts#L60",
+              "source": "src/view-cache.ts#L51",
               "jsDocTags": [
                 "example"
               ],
@@ -566,7 +579,7 @@
               "owners": [
                 "src/types/store.ts"
               ],
-              "source": "src/types/store.ts#L119",
+              "source": "src/types/store.ts#L123",
               "jsDocTags": [],
               "documentation": "Datasource loading state for a resolved cell.",
               "memberDocs": []
@@ -776,22 +789,35 @@
               "source": "src/types/chart.ts#L10",
               "jsDocTags": [],
               "documentation": "Position in worksheet coordinates; dimensions and offsets use CSS pixels.",
-              "memberDocs": []
+              "memberDocs": [
+                {
+                  "name": "col",
+                  "documentation": "0-based column of the cell that holds the top-left corner."
+                },
+                {
+                  "name": "row",
+                  "documentation": "0-based row of the cell that holds the top-left corner."
+                }
+              ]
             },
             {
               "name": "ChartChangeEvent",
               "kind": "interface",
               "signature": "export interface ChartChangeEvent { readonly epoch: number | undefined; readonly charts: readonly ChartRef[]; }",
               "owners": [
-                "src/charts-live.ts"
+                "src/types/chart.ts"
               ],
-              "source": "src/charts-live.ts#L33",
+              "source": "src/types/chart.ts#L78",
               "jsDocTags": [],
               "documentation": "Charts whose `ChartView` may differ after one store commit. Emitted at most\nonce per commit, only when `charts` is not empty; each chart appears once.\nA chart that no longer exists resolves to `null`.",
               "memberDocs": [
                 {
+                  "name": "charts",
+                  "documentation": "Charts to resolve again, in commit order of the edits that touched them."
+                },
+                {
                   "name": "epoch",
-                  "documentation": "Store epoch after the commit."
+                  "documentation": "Store epoch after the commit. `undefined` when the store sent its change\nevent without an epoch, which a custom `Store` can do."
                 }
               ]
             },
@@ -800,11 +826,11 @@
               "kind": "type",
               "signature": "export type ChartChangeListener = (event: ChartChangeEvent) => void;",
               "owners": [
-                "src/charts-live.ts"
+                "src/types/chart.ts"
               ],
-              "source": "src/charts-live.ts#L40",
+              "source": "src/types/chart.ts#L89",
               "jsDocTags": [],
-              "documentation": "Listener for {@link subscribeChartChanges}.",
+              "documentation": "Listener for `subscribeChartChanges` and `ChartViewProvider.subscribe`.",
               "memberDocs": []
             },
             {
@@ -814,10 +840,23 @@
               "owners": [
                 "src/types/chart.ts"
               ],
-              "source": "src/types/chart.ts#L28",
+              "source": "src/types/chart.ts#L30",
               "jsDocTags": [],
               "documentation": "Persisted chart definition; IDs are unique within the owning sheet.",
-              "memberDocs": []
+              "memberDocs": [
+                {
+                  "name": "axes",
+                  "documentation": "Axis titles; `undefined` shows no axis titles."
+                },
+                {
+                  "name": "legend",
+                  "documentation": "Legend position; `undefined` lets the renderer use its default position."
+                },
+                {
+                  "name": "title",
+                  "documentation": "Text above the chart; `undefined` shows no title."
+                }
+              ]
             },
             {
               "name": "ChartKind",
@@ -828,7 +867,7 @@
               ],
               "source": "src/types/chart.ts#L4",
               "jsDocTags": [],
-              "documentation": "Chart families supported by the 0.6 document model.",
+              "documentation": "Chart families that the document model supports.",
               "memberDocs": []
             },
             {
@@ -848,9 +887,9 @@
               "kind": "interface",
               "signature": "export interface ChartRef { readonly sheet: SheetId; readonly id: string; }",
               "owners": [
-                "src/charts-live.ts"
+                "src/types/chart.ts"
               ],
-              "source": "src/charts-live.ts#L23",
+              "source": "src/types/chart.ts#L68",
               "jsDocTags": [],
               "documentation": "Stable identity of one chart: the sheet that owns it and its ID on that sheet.",
               "memberDocs": []
@@ -862,7 +901,7 @@
               "owners": [
                 "src/types/chart.ts"
               ],
-              "source": "src/types/chart.ts#L20",
+              "source": "src/types/chart.ts#L22",
               "jsDocTags": [],
               "documentation": "Sources are read in row-major order.",
               "memberDocs": []
@@ -874,7 +913,7 @@
               "owners": [
                 "src/types/chart.ts"
               ],
-              "source": "src/types/chart.ts#L39",
+              "source": "src/types/chart.ts#L44",
               "jsDocTags": [],
               "documentation": "Resolved plain data; the renderer does not read cells. Arrays follow source cells in row-major order.",
               "memberDocs": [
@@ -911,7 +950,7 @@
               "owners": [
                 "src/types/chart.ts"
               ],
-              "source": "src/types/chart.ts#L57",
+              "source": "src/types/chart.ts#L62",
               "jsDocTags": [],
               "documentation": "One immutable-by-convention rendering input, refreshed on chart-change events.",
               "memberDocs": []
@@ -921,9 +960,9 @@
               "kind": "interface",
               "signature": "export interface ChartViewProvider { get(chart: ChartRef): ChartView | null; subscribe(listener: ChartChangeListener): () => void; dispose(): void; }",
               "owners": [
-                "src/types/chartProvider.ts"
+                "src/types/chart.ts"
               ],
-              "source": "src/types/chartProvider.ts#L6",
+              "source": "src/types/chart.ts#L92",
               "jsDocTags": [],
               "documentation": "Cached chart views supplied by the optional charts package; renderers do not read cells.",
               "memberDocs": [
@@ -946,11 +985,11 @@
               "kind": "type",
               "signature": "export type ChartViewProviderFactory = (store: Store) => ChartViewProvider;",
               "owners": [
-                "src/types/chartProvider.ts"
+                "src/types/store.ts"
               ],
-              "source": "src/types/chartProvider.ts#L16",
+              "source": "src/types/store.ts#L22",
               "jsDocTags": [],
-              "documentation": "Creates a provider owned and disposed by one renderer or host.",
+              "documentation": "Creates a chart provider owned and disposed by one renderer or host.",
               "memberDocs": []
             },
             {
@@ -1835,7 +1874,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L3382",
+              "source": "src/document-protocol.ts#L3378",
               "jsDocTags": [],
               "documentation": "Exhaustive stable target identity used by persistence/logging layers.",
               "memberDocs": []
@@ -2661,7 +2700,7 @@
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L284",
+              "source": "src/hyperlink.ts#L226",
               "jsDocTags": [],
               "documentation": "Return the first validated hyperlink covering an address, or null when none does.",
               "memberDocs": []
@@ -2760,7 +2799,7 @@
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L74",
+              "source": "src/hyperlink.ts#L44",
               "jsDocTags": [],
               "documentation": "Validate, but never activate or fetch, an external hyperlink target.",
               "memberDocs": []
@@ -2772,7 +2811,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L323",
+              "source": "src/errors.ts#L324",
               "jsDocTags": [],
               "documentation": "Narrow same-realm errors, cross-realm errors, and serialized failure envelopes.",
               "memberDocs": []
@@ -2796,7 +2835,7 @@
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L272",
+              "source": "src/hyperlink.ts#L214",
               "jsDocTags": [],
               "documentation": "Shape/security validation shared by mutation, snapshot, clipboard, and activation barriers.",
               "memberDocs": []
@@ -2808,7 +2847,7 @@
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L104",
+              "source": "src/hyperlink.ts#L74",
               "jsDocTags": [],
               "documentation": "Whether an identifier is bounded, non-empty, trimmed, and free of control characters.",
               "memberDocs": []
@@ -2904,7 +2943,7 @@
               "owners": [
                 "src/charts-live.ts"
               ],
-              "source": "src/charts-live.ts#L20",
+              "source": "src/charts-live.ts#L29",
               "jsDocTags": [],
               "documentation": "Most points resolved per series range. Cells are read in row-major order and\ncells past this count are dropped; the series view reports `truncated`.",
               "memberDocs": []
@@ -2940,7 +2979,7 @@
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L14",
+              "source": "src/hyperlink.ts#L20",
               "jsDocTags": [],
               "documentation": "Optional display text ceiling used by SpreadsheetML shared-string implementations.",
               "memberDocs": []
@@ -2952,7 +2991,7 @@
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L10",
+              "source": "src/hyperlink.ts#L16",
               "jsDocTags": [],
               "documentation": "Serialized identifier ceiling; IDs remain stable across history and snapshots.",
               "memberDocs": []
@@ -2964,7 +3003,7 @@
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L12",
+              "source": "src/hyperlink.ts#L18",
               "jsDocTags": [],
               "documentation": "External target ceiling, aligned with the bounded private clipboard payload.",
               "memberDocs": []
@@ -2976,7 +3015,7 @@
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L8",
+              "source": "src/hyperlink.ts#L14",
               "jsDocTags": [],
               "documentation": "Renderer/codec ceiling for one sheet's hyperlink metadata.",
               "memberDocs": []
@@ -3082,9 +3121,9 @@
               "owners": [
                 "src/chart-backend.ts"
               ],
-              "source": "src/chart-backend.ts#L16",
+              "source": "src/chart-backend.ts#L18",
               "jsDocTags": [],
-              "documentation": "Open cached chart views through the optional backend. Import\n`@sheetwrite/charts/register` or call its `registerChartsBackend` first.\nThrows if no provider is registered. The caller must dispose the result.",
+              "documentation": "Open cached chart views through the optional backend. Import\n`@sheetwrite/charts/register` or call its `registerChartsBackend` first.\nThrows a `SheetwriteError` with code `\"optional-backend-unavailable\"` if no\nprovider is registered. The caller must dispose the result.",
               "memberDocs": []
             },
             {
@@ -3118,7 +3157,7 @@
               "owners": [
                 "src/types/store.ts"
               ],
-              "source": "src/types/store.ts#L122",
+              "source": "src/types/store.ts#L126",
               "jsDocTags": [],
               "documentation": "Allocation and load statistics for one paged datasource sheet.",
               "memberDocs": [
@@ -3493,7 +3532,7 @@
               "owners": [
                 "src/types/store.ts"
               ],
-              "source": "src/types/store.ts#L133",
+              "source": "src/types/store.ts#L137",
               "jsDocTags": [],
               "documentation": "Whether a query is complete for the currently loaded datasource pages.",
               "memberDocs": []
@@ -3642,7 +3681,7 @@
               "owners": [
                 "src/charts-live.ts"
               ],
-              "source": "src/charts-live.ts#L154",
+              "source": "src/charts-live.ts#L152",
               "jsDocTags": [],
               "documentation": "Resolve one chart to plain data the renderer draws without reading cells.\nValues that are not numbers (text, booleans, errors, empty cells) become\n`null`. Each series range costs one bulk window read of at most\n`MAX_CHART_POINTS` cells. Returns `null` when the chart does not exist.\n\nCall it after a {@link subscribeChartChanges} event names the chart, not per frame.",
               "memberDocs": []
@@ -3654,7 +3693,7 @@
               "owners": [
                 "src/types/store.ts"
               ],
-              "source": "src/types/store.ts#L113",
+              "source": "src/types/store.ts#L117",
               "jsDocTags": [],
               "documentation": "Authoritative source value, evaluated value, style, and load state for a cell.",
               "memberDocs": []
@@ -3666,7 +3705,7 @@
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L304",
+              "source": "src/hyperlink.ts#L246",
               "jsDocTags": [],
               "documentation": "Host-safe target resolved immediately before hyperlink activation.",
               "memberDocs": []
@@ -3678,7 +3717,7 @@
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L309",
+              "source": "src/hyperlink.ts#L251",
               "jsDocTags": [],
               "documentation": "Revalidate at the final activation boundary; hosts never receive an unsafe URL.",
               "memberDocs": []
@@ -3714,7 +3753,7 @@
               "owners": [
                 "src/types/store.ts"
               ],
-              "source": "src/types/store.ts#L21",
+              "source": "src/types/store.ts#L25",
               "jsDocTags": [],
               "documentation": "Retained logical payload and allocated capacity attributed to one exclusive owner.",
               "memberDocs": [
@@ -4223,7 +4262,7 @@
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L246",
+              "source": "src/hyperlink.ts#L188",
               "jsDocTags": [],
               "documentation": "Sanitize one untrusted clipboard/snapshot value without cloning its object graph.",
               "memberDocs": []
@@ -4235,7 +4274,7 @@
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L176",
+              "source": "src/hyperlink.ts#L118",
               "jsDocTags": [],
               "documentation": "Convert an untrusted style into one bounded, plain renderer-safe value.",
               "memberDocs": []
@@ -4325,7 +4364,7 @@
               "owners": [
                 "src/chart-backend.ts"
               ],
-              "source": "src/chart-backend.ts#L7",
+              "source": "src/chart-backend.ts#L8",
               "jsDocTags": [],
               "documentation": "Register an optional chart provider; `null` removes the current provider.",
               "memberDocs": []
@@ -4591,7 +4630,7 @@
             {
               "name": "SHEETWRITE_ERROR_OPERATIONS",
               "kind": "variable",
-              "signature": "readonly [\"initialize\", \"create-grid\", \"datasource-request\", \"renderer-worker\", \"export-xlsx\", \"xlsx-import\", \"xlsx-export\", \"delimited-parse\", \"delimited-import\", \"delimited-encode\", \"delimited-export\", \"delimited-options\", \"snapshot-validate\", \"snapshot-allocate\", \"persistence\", \"pending-storage\", \"synchronize\", \"presence\", \"revision\", \"comments\", \"query\", \"hyperlink-activate\", \"keyboard-configure\"]",
+              "signature": "readonly [\"initialize\", \"create-grid\", \"datasource-request\", \"renderer-worker\", \"export-xlsx\", \"xlsx-import\", \"xlsx-export\", \"delimited-parse\", \"delimited-import\", \"delimited-encode\", \"delimited-export\", \"delimited-options\", \"snapshot-validate\", \"snapshot-allocate\", \"persistence\", \"pending-storage\", \"synchronize\", \"presence\", \"revision\", \"comments\", \"query\", \"hyperlink-activate\", \"keyboard-configure\", \"chart-view\"]",
               "owners": [
                 "src/errors.ts"
               ],
@@ -4620,11 +4659,11 @@
             {
               "name": "SheetwriteError",
               "kind": "class",
-              "signature": "class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: \"aborted\" | \"batch-limit\" | \"blocked\" | \"buffer-byte-limit\" | \"buffer-count-limit\" | \"buffer-operation-limit\" | \"comment-failed\" | \"commit-rejected\" | \"conflict\" | \"datasource-request-failed\" | \"delimited-text-invalid-limit\" | \"delimited-text-resource-limit\" | \"export-failed\" | \"future-distance-limit\" | \"incomplete-data\" | \"initialization-failed\" | \"initialization-required\" | \"invalid-batch\" | \"invalid-id\" | \"invalid-limits\" | \"invalid-operations\" | \"invalid-shortcut\" | \"invalid-snapshot\" | \"invalid-version\" | \"late-echo\" | \"limit\" | \"not-found\" | \"operation-limit\" | \"optional-backend-unavailable\" | \"payload-limit\" | \"pending-byte-limit\" | \"pending-capacity\" | \"pending-count-limit\" | \"pending-operation-limit\" | \"presence-failed\" | \"quota\" | \"remote-operations-rejected\" | \"renderer-fallback\" | \"resource-limit\" | \"response-id-mismatch\" | \"revision-failed\" | \"shortcut-conflict\" | \"sync-failed\" | \"sync-storage-failed\" | \"transaction\" | \"unavailable\" | \"unsafe-hyperlink\" | \"unsupported-schema\" | \"xlsx-import-failed\" | \"xlsx-invalid-options\" | \"xlsx-resource-limit\"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: \"comments\" | \"create-grid\" | \"datasource-request\" | \"delimited-encode\" | \"delimited-export\" | \"delimited-import\" | \"delimited-options\" | \"delimited-parse\" | \"export-xlsx\" | \"hyperlink-activate\" | \"initialize\" | \"keyboard-configure\" | \"pending-storage\" | \"persistence\" | \"presence\" | \"query\" | \"renderer-worker\" | \"revision\" | \"snapshot-allocate\" | \"snapshot-validate\" | \"synchronize\" | \"xlsx-export\" | \"xlsx-import\"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }",
+              "signature": "class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: \"aborted\" | \"batch-limit\" | \"blocked\" | \"buffer-byte-limit\" | \"buffer-count-limit\" | \"buffer-operation-limit\" | \"comment-failed\" | \"commit-rejected\" | \"conflict\" | \"datasource-request-failed\" | \"delimited-text-invalid-limit\" | \"delimited-text-resource-limit\" | \"export-failed\" | \"future-distance-limit\" | \"incomplete-data\" | \"initialization-failed\" | \"initialization-required\" | \"invalid-batch\" | \"invalid-id\" | \"invalid-limits\" | \"invalid-operations\" | \"invalid-shortcut\" | \"invalid-snapshot\" | \"invalid-version\" | \"late-echo\" | \"limit\" | \"not-found\" | \"operation-limit\" | \"optional-backend-unavailable\" | \"payload-limit\" | \"pending-byte-limit\" | \"pending-capacity\" | \"pending-count-limit\" | \"pending-operation-limit\" | \"presence-failed\" | \"quota\" | \"remote-operations-rejected\" | \"renderer-fallback\" | \"resource-limit\" | \"response-id-mismatch\" | \"revision-failed\" | \"shortcut-conflict\" | \"sync-failed\" | \"sync-storage-failed\" | \"transaction\" | \"unavailable\" | \"unsafe-hyperlink\" | \"unsupported-schema\" | \"xlsx-import-failed\" | \"xlsx-invalid-options\" | \"xlsx-resource-limit\"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: \"chart-view\" | \"comments\" | \"create-grid\" | \"datasource-request\" | \"delimited-encode\" | \"delimited-export\" | \"delimited-import\" | \"delimited-options\" | \"delimited-parse\" | \"export-xlsx\" | \"hyperlink-activate\" | \"initialize\" | \"keyboard-configure\" | \"pending-storage\" | \"persistence\" | \"presence\" | \"query\" | \"renderer-worker\" | \"revision\" | \"snapshot-allocate\" | \"snapshot-validate\" | \"synchronize\" | \"xlsx-export\" | \"xlsx-import\"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }",
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L285",
+              "source": "src/errors.ts#L286",
               "jsDocTags": [],
               "documentation": "Canonical envelope for thrown and callback-delivered Sheetwrite failures.",
               "memberDocs": []
@@ -4648,7 +4687,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L99",
+              "source": "src/errors.ts#L100",
               "jsDocTags": [],
               "documentation": "Stable, serialization-safe diagnostic context.",
               "memberDocs": []
@@ -4660,7 +4699,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L90",
+              "source": "src/errors.ts#L91",
               "jsDocTags": [],
               "documentation": "JSON-safe values accepted in a public failure context.",
               "memberDocs": []
@@ -4672,7 +4711,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L102",
+              "source": "src/errors.ts#L103",
               "jsDocTags": [],
               "documentation": "Structural form preserved across realms and JSON serialization.",
               "memberDocs": []
@@ -4684,7 +4723,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L87",
+              "source": "src/errors.ts#L88",
               "jsDocTags": [],
               "documentation": "Exhaustive stable operation discriminator for consumer-visible failures.",
               "memberDocs": []
@@ -4696,7 +4735,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L112",
+              "source": "src/errors.ts#L113",
               "jsDocTags": [],
               "documentation": "Optional cause, diagnostic context, and boundary-known retryability.",
               "memberDocs": [
@@ -4988,7 +5027,7 @@
               "owners": [
                 "src/types/store.ts"
               ],
-              "source": "src/types/store.ts#L138",
+              "source": "src/types/store.ts#L142",
               "jsDocTags": [],
               "documentation": "Columnar workbook storage, query, transaction, and subscription contract.",
               "memberDocs": [
@@ -5114,7 +5153,7 @@
               "owners": [
                 "src/charts-live.ts"
               ],
-              "source": "src/charts-live.ts#L505",
+              "source": "src/charts-live.ts#L517",
               "jsDocTags": [],
               "documentation": "Listen for commits that change any chart's `ChartView`. Edited rectangles are\nmatched against an index of series ranges, so edits outside every series\nrange cost no chart work. Charts that read formulas, references or spills\nalso change on any commit that changes cell values. Returns an unsubscribe\nfunction; the index is dropped with the last listener.",
               "memberDocs": []
@@ -5807,7 +5846,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L3344",
+              "source": "src/document-protocol.ts#L3340",
               "jsDocTags": [],
               "documentation": "Validate and canonically order a schema-1 snapshot without hydrating runtime state.",
               "memberDocs": []
@@ -5917,7 +5956,7 @@
               "owners": [
                 "src/types/store.ts"
               ],
-              "source": "src/types/store.ts#L45",
+              "source": "src/types/store.ts#L49",
               "jsDocTags": [],
               "documentation": "One rectangular window of resolved cells, returned by `Store.getVisibleWindow`\nin a single call. The renderer paints from this view and MUST NOT call\n`Store.getCell` per cell. `styleIds` are view-local indices into this view's\ncompact `styles` dictionary; on the worker renderer path, `styleIds.buffer` is\ntransferred during paint, so main-thread code must not read it after `paint`.\n\nLifetime: valid until the next store mutation or window refresh.",
               "memberDocs": [
@@ -6978,7 +7017,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L323",
+              "source": "src/errors.ts#L324",
               "jsDocTags": [],
               "documentation": "Narrow same-realm errors, cross-realm errors, and serialized failure envelopes.",
               "memberDocs": []
@@ -7301,7 +7340,7 @@
             {
               "name": "SHEETWRITE_ERROR_OPERATIONS",
               "kind": "variable",
-              "signature": "readonly [\"initialize\", \"create-grid\", \"datasource-request\", \"renderer-worker\", \"export-xlsx\", \"xlsx-import\", \"xlsx-export\", \"delimited-parse\", \"delimited-import\", \"delimited-encode\", \"delimited-export\", \"delimited-options\", \"snapshot-validate\", \"snapshot-allocate\", \"persistence\", \"pending-storage\", \"synchronize\", \"presence\", \"revision\", \"comments\", \"query\", \"hyperlink-activate\", \"keyboard-configure\"]",
+              "signature": "readonly [\"initialize\", \"create-grid\", \"datasource-request\", \"renderer-worker\", \"export-xlsx\", \"xlsx-import\", \"xlsx-export\", \"delimited-parse\", \"delimited-import\", \"delimited-encode\", \"delimited-export\", \"delimited-options\", \"snapshot-validate\", \"snapshot-allocate\", \"persistence\", \"pending-storage\", \"synchronize\", \"presence\", \"revision\", \"comments\", \"query\", \"hyperlink-activate\", \"keyboard-configure\", \"chart-view\"]",
               "owners": [
                 "src/errors.ts"
               ],
@@ -7313,11 +7352,11 @@
             {
               "name": "SheetwriteError",
               "kind": "class",
-              "signature": "class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: \"aborted\" | \"batch-limit\" | \"blocked\" | \"buffer-byte-limit\" | \"buffer-count-limit\" | \"buffer-operation-limit\" | \"comment-failed\" | \"commit-rejected\" | \"conflict\" | \"datasource-request-failed\" | \"delimited-text-invalid-limit\" | \"delimited-text-resource-limit\" | \"export-failed\" | \"future-distance-limit\" | \"incomplete-data\" | \"initialization-failed\" | \"initialization-required\" | \"invalid-batch\" | \"invalid-id\" | \"invalid-limits\" | \"invalid-operations\" | \"invalid-shortcut\" | \"invalid-snapshot\" | \"invalid-version\" | \"late-echo\" | \"limit\" | \"not-found\" | \"operation-limit\" | \"optional-backend-unavailable\" | \"payload-limit\" | \"pending-byte-limit\" | \"pending-capacity\" | \"pending-count-limit\" | \"pending-operation-limit\" | \"presence-failed\" | \"quota\" | \"remote-operations-rejected\" | \"renderer-fallback\" | \"resource-limit\" | \"response-id-mismatch\" | \"revision-failed\" | \"shortcut-conflict\" | \"sync-failed\" | \"sync-storage-failed\" | \"transaction\" | \"unavailable\" | \"unsafe-hyperlink\" | \"unsupported-schema\" | \"xlsx-import-failed\" | \"xlsx-invalid-options\" | \"xlsx-resource-limit\"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: \"comments\" | \"create-grid\" | \"datasource-request\" | \"delimited-encode\" | \"delimited-export\" | \"delimited-import\" | \"delimited-options\" | \"delimited-parse\" | \"export-xlsx\" | \"hyperlink-activate\" | \"initialize\" | \"keyboard-configure\" | \"pending-storage\" | \"persistence\" | \"presence\" | \"query\" | \"renderer-worker\" | \"revision\" | \"snapshot-allocate\" | \"snapshot-validate\" | \"synchronize\" | \"xlsx-export\" | \"xlsx-import\"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }",
+              "signature": "class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: \"aborted\" | \"batch-limit\" | \"blocked\" | \"buffer-byte-limit\" | \"buffer-count-limit\" | \"buffer-operation-limit\" | \"comment-failed\" | \"commit-rejected\" | \"conflict\" | \"datasource-request-failed\" | \"delimited-text-invalid-limit\" | \"delimited-text-resource-limit\" | \"export-failed\" | \"future-distance-limit\" | \"incomplete-data\" | \"initialization-failed\" | \"initialization-required\" | \"invalid-batch\" | \"invalid-id\" | \"invalid-limits\" | \"invalid-operations\" | \"invalid-shortcut\" | \"invalid-snapshot\" | \"invalid-version\" | \"late-echo\" | \"limit\" | \"not-found\" | \"operation-limit\" | \"optional-backend-unavailable\" | \"payload-limit\" | \"pending-byte-limit\" | \"pending-capacity\" | \"pending-count-limit\" | \"pending-operation-limit\" | \"presence-failed\" | \"quota\" | \"remote-operations-rejected\" | \"renderer-fallback\" | \"resource-limit\" | \"response-id-mismatch\" | \"revision-failed\" | \"shortcut-conflict\" | \"sync-failed\" | \"sync-storage-failed\" | \"transaction\" | \"unavailable\" | \"unsafe-hyperlink\" | \"unsupported-schema\" | \"xlsx-import-failed\" | \"xlsx-invalid-options\" | \"xlsx-resource-limit\"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: \"chart-view\" | \"comments\" | \"create-grid\" | \"datasource-request\" | \"delimited-encode\" | \"delimited-export\" | \"delimited-import\" | \"delimited-options\" | \"delimited-parse\" | \"export-xlsx\" | \"hyperlink-activate\" | \"initialize\" | \"keyboard-configure\" | \"pending-storage\" | \"persistence\" | \"presence\" | \"query\" | \"renderer-worker\" | \"revision\" | \"snapshot-allocate\" | \"snapshot-validate\" | \"synchronize\" | \"xlsx-export\" | \"xlsx-import\"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }",
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L285",
+              "source": "src/errors.ts#L286",
               "jsDocTags": [],
               "documentation": "Canonical envelope for thrown and callback-delivered Sheetwrite failures.",
               "memberDocs": []
@@ -7341,7 +7380,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L99",
+              "source": "src/errors.ts#L100",
               "jsDocTags": [],
               "documentation": "Stable, serialization-safe diagnostic context.",
               "memberDocs": []
@@ -7353,7 +7392,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L102",
+              "source": "src/errors.ts#L103",
               "jsDocTags": [],
               "documentation": "Structural form preserved across realms and JSON serialization.",
               "memberDocs": []
@@ -7365,7 +7404,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L87",
+              "source": "src/errors.ts#L88",
               "jsDocTags": [],
               "documentation": "Exhaustive stable operation discriminator for consumer-visible failures.",
               "memberDocs": []

@@ -7,10 +7,10 @@ import type {
   ChartDefinition,
   DocumentOp,
   Range,
-  Sheet,
   Workbook,
 } from "../src/index.js";
 import { SheetwriteStore } from "../src/store.js";
+import { range, sheet } from "./fixtures.js";
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -22,24 +22,10 @@ afterEach(() => {
   for (const store of stores.splice(0)) store.dispose();
 });
 
-function sheet(id: string, rowCount: number): Sheet {
-  const columns = ["a", "b", "c", "d"].map((key) => ({
-    key,
-    header: key,
-    width: 80,
-    type: "number" as const,
-  }));
-  return { id, name: id, rowCount, columns };
-}
-
 function workbook(rowCount: number, extraSheets = 0): Workbook {
   const sheets = [sheet("data", rowCount), sheet("other", rowCount)];
   for (let index = 0; index < extraSheets; index++) sheets.push(sheet(`extra${index}`, rowCount));
   return { activeSheet: "data", sheets };
-}
-
-function range(sheetId: string, r0: number, c0: number, r1: number, c1: number): Range {
-  return { sheet: sheetId, start: { row: r0, col: c0 }, end: { row: r1, col: c1 } };
 }
 
 function chart(id: string, values: Range, categories?: Range): ChartDefinition {
@@ -97,8 +83,7 @@ describe("chart change events", () => {
     expect(events).toHaveLength(1);
   });
 
-  it("matches edits through the index without reading chart definitions", () => {
-    // Many charts on other sheets; a scan over all of them would read every sheet's charts.
+  it("matches only charts whose source overlaps an edit on the edited sheet", () => {
     const { store, events } = setup(10, 40);
     const patches: DocumentOp[] = [];
     for (let index = 0; index < 40; index++) {
@@ -113,26 +98,21 @@ describe("chart change events", () => {
     apply(store, patches);
     events.length = 0;
 
-    let reads = 0;
-    for (const live of store.getWorkbook().sheets) {
-      let charts = live.charts;
-      Object.defineProperty(live, "charts", {
-        configurable: true,
-        enumerable: true,
-        get() {
-          reads++;
-          return charts;
-        },
-        set(value: Sheet["charts"]) {
-          charts = value;
-        },
-      });
-    }
+    // Fifty entries span more than one 32-entry index block on this sheet.
+    apply(store, [set("extra5", 3, 2, 1)]);
+    expect(events).toHaveLength(1);
+    expect(events[0]?.charts.map((ref) => ref.id).sort()).toEqual([
+      "c13",
+      "c23",
+      "c3",
+      "c33",
+      "c43",
+    ]);
+    expect(events[0]?.charts.every((ref) => ref.sheet === "extra5")).toBe(true);
 
-    apply(store, [set("data", 0, 1, 12)]);
-    apply(store, [set("data", 7, 3, 1)]);
-    expect(events.map((event) => event.charts)).toEqual([[{ sheet: "data", id: "sales" }]]);
-    expect(reads).toBe(0);
+    // The same address on a sheet with no matching source must not reach those charts.
+    apply(store, [set("data", 3, 2, 1)]);
+    expect(events).toHaveLength(1);
   });
 
   it("follows recalculated values when a series reads a formula", () => {
@@ -196,6 +176,89 @@ describe("chart change events", () => {
     expect(events).toHaveLength(2);
   });
 
+  const structuralCases: Array<{
+    name: string;
+    patch: DocumentOp;
+    row: number;
+    col: number;
+  }> = [
+    { name: "addRows", patch: { op: "addRows", sheet: "data", at: 0, count: 1 }, row: 3, col: 1 },
+    {
+      name: "removeRows",
+      patch: { op: "removeRows", sheet: "data", at: 0, count: 1 },
+      row: 1,
+      col: 1,
+    },
+    {
+      name: "moveRows",
+      patch: { op: "moveRows", sheet: "data", from: 2, count: 1, to: 5 },
+      row: 5,
+      col: 1,
+    },
+    {
+      name: "addColumns",
+      patch: {
+        op: "addColumns",
+        sheet: "data",
+        at: 0,
+        columns: [{ key: "new", header: "New", width: 80, type: "number" }],
+      },
+      row: 2,
+      col: 2,
+    },
+    {
+      name: "removeColumns",
+      patch: { op: "removeColumns", sheet: "data", at: 0, count: 1 },
+      row: 2,
+      col: 0,
+    },
+    {
+      name: "moveColumns",
+      patch: { op: "moveColumns", sheet: "data", from: 1, count: 1, to: 3 },
+      row: 2,
+      col: 3,
+    },
+  ];
+
+  for (const { name, patch, row, col } of structuralCases) {
+    it(`reports source and owner hits after ${name} and tracks the rewritten source`, () => {
+      const store = new SheetwriteStore(workbook(10));
+      stores.push(store);
+      apply(store, [
+        set("data", 2, 1, 17),
+        {
+          op: "setChart",
+          sheet: "other",
+          chart: chart("cross", range("data", 2, 1, 2, 1)),
+        },
+        {
+          op: "setChart",
+          sheet: "data",
+          chart: {
+            ...chart("anchor", range("other", 0, 0, 0, 0)),
+            anchor: { row: 2, col: 1, offsetX: 0, offsetY: 0, width: 400, height: 300 },
+          },
+        },
+      ]);
+      const events: ChartChangeEvent[] = [];
+      subscribeChartChanges(store, (event) => events.push(event));
+
+      apply(store, [patch]);
+      expect(events).toHaveLength(1);
+      expect(events[0]?.charts).toHaveLength(2);
+      expect(events[0]?.charts).toContainEqual({ sheet: "other", id: "cross" });
+      expect(events[0]?.charts).toContainEqual({ sheet: "data", id: "anchor" });
+      expect(resolveChartView(store, "data", "anchor")?.chart.anchor).toMatchObject({ row, col });
+      expect(resolveChartView(store, "other", "cross")?.series[0]?.values).toEqual([17]);
+
+      // A source edit at its new address must match the rebuilt index, not its old rectangle.
+      apply(store, [set("data", row, col, 23)]);
+      expect(events).toHaveLength(2);
+      expect(events[1]?.charts).toEqual([{ sheet: "other", id: "cross" }]);
+      expect(resolveChartView(store, "other", "cross")?.series[0]?.values).toEqual([23]);
+    });
+  }
+
   it("reports created and removed charts and stops after unsubscribe", () => {
     const { store, events, unsubscribe } = setup();
     apply(store, [
@@ -247,6 +310,61 @@ describe("resolveChartView", () => {
         referenceError: false,
       },
     ]);
+  });
+
+  it("reads the first nameRange cell and follows edits to that label", () => {
+    const { store, events } = setup();
+    apply(store, [
+      set("data", 4, 2, "Revenue"),
+      set("data", 5, 2, "Not the name"),
+      {
+        op: "setChart",
+        sheet: "data",
+        chart: {
+          ...chart("named", range("data", 0, 1, 1, 1)),
+          series: [
+            {
+              values: range("data", 0, 1, 1, 1),
+              nameRange: range("data", 4, 2, 5, 2),
+            },
+          ],
+        },
+      },
+    ]);
+    expect(resolveChartView(store, "data", "named")?.series[0]?.name).toBe("Revenue");
+    events.length = 0;
+
+    apply(store, [set("data", 4, 2, 42)]);
+    expect(events[0]?.charts).toEqual([{ sheet: "data", id: "named" }]);
+    expect(resolveChartView(store, "data", "named")?.series[0]?.name).toBe("42");
+
+    apply(store, [{ op: "clearRange", range: range("data", 4, 2, 4, 2), contents: true }]);
+    expect(resolveChartView(store, "data", "named")?.series[0]?.name).toBe("Series 1");
+  });
+
+  it("keeps deleted values, categories and names explicit as reference errors", () => {
+    const { store } = setup();
+    apply(store, [
+      {
+        op: "setChart",
+        sheet: "data",
+        chart: {
+          ...chart("broken", range("data", 0, 1, 1, 1)),
+          series: [
+            { values: "#REF!" },
+            { values: range("data", 0, 1, 1, 1), categories: "#REF!" },
+            { values: range("data", 0, 1, 1, 1), nameRange: "#REF!" },
+          ],
+        },
+      },
+    ]);
+
+    const series = resolveChartView(store, "data", "broken")?.series;
+    expect(series?.map((entry) => entry.referenceError)).toEqual([true, true, true]);
+    expect(series?.[0]?.values).toEqual([]);
+    expect(series?.[1]?.values).toEqual([10, 20]);
+    expect(series?.[1]?.categories).toEqual([]);
+    expect(series?.[2]?.name).toBe("#REF!");
   });
 
   it("drops points past the limit in row-major order", () => {

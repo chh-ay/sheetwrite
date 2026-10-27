@@ -8,7 +8,7 @@ description: "Stable identity of one chart: the sheet that owns it and its ID on
 Stable identity of one chart: the sheet that owns it and its ID on that sheet.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/charts-live.ts#L23"><code>packages/core/src/charts-live.ts#L23</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/chart.ts#L68"><code>packages/core/src/types/chart.ts#L68</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>
@@ -67,7 +67,6 @@ export interface ChartRef {
 
 <ul class="api-consumer-list">
 <li><a href="/docs/api/charts/chart-change-event/"><code>ChartChangeEvent</code></a><span class="api-consumer-kind">@sheetwrite/charts</span></li>
-<li><a href="/docs/api/charts/chart-view-cache/"><code>ChartViewCache</code></a><span class="api-consumer-kind">@sheetwrite/charts</span></li>
 <li><a href="/docs/api/core/chart-change-event/"><code>ChartChangeEvent</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/chart-view-provider/"><code>ChartViewProvider</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>

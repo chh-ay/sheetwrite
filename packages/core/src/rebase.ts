@@ -3,7 +3,7 @@ import { chartTouchesSheet } from "./chart-definition.js";
 import { decodeRestoreBlock, encodeRestoreBlock } from "./restore-block.js";
 import type { CellValue } from "./types/cell.js";
 import type { ChartDefinition, ChartRange } from "./types/chart.js";
-import type { CellAddress, Range } from "./types/coordinates.js";
+import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
 import type { DocumentOp, PackedCellBlock, SheetSnapshot, SnapshotCell } from "./types/document.js";
 
 /** Stable conservative-rebase conflict category. */
@@ -523,7 +523,7 @@ function transformDirectTarget(
  */
 function transformChart(
   chart: ChartDefinition,
-  owner: string,
+  owner: SheetId,
   change: Exclude<AxisChange, { kind: "move" }>,
   operation: string,
 ): TransformFailure | null {
@@ -835,15 +835,19 @@ function operationTouchesSheet(
       return operation.namedRange.range.sheet === sheet || operation.namedRange.scope === sheet;
     case "removeNamedRange":
       return operation.scope === sheet;
-    case "addSheet":
+    case "addSheet": {
+      const snapshot = operation.sheet;
       return (
-        operation.sheet.id === sheet ||
-        operation.sheet.cells.some((block) =>
+        snapshot.id === sheet ||
+        snapshot.cells.some((block) =>
           block.cells.some(
             (cell) => cell.value.kind === "ref" && cell.value.target.sheet === sheet,
           ),
-        )
+        ) ||
+        // A chart in the new sheet can read any other sheet.
+        (snapshot.charts?.some((chart) => chartTouchesSheet(chart, snapshot.id, sheet)) ?? false)
       );
+    }
     default:
       return "sheet" in operation && operation.sheet === sheet;
   }

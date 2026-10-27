@@ -8,7 +8,7 @@ description: "Structural form preserved across realms and JSON serialization."
 Structural form preserved across realms and JSON serialization.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/errors.ts#L102"><code>packages/core/src/errors.ts#L102</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/errors.ts#L103"><code>packages/core/src/errors.ts#L103</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>6</span>

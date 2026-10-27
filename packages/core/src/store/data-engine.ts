@@ -10,7 +10,7 @@ import {
   MAX_CHARTS_PER_SHEET,
   rebaseChartAxis,
   sanitizeChartDefinition,
-  validSheetCharts,
+  sheetChartsFit,
 } from "../chart-definition.js";
 import { validConditionalRules } from "../conditional-format.js";
 import { dateToSerial } from "../date-serial.js";
@@ -1265,8 +1265,11 @@ export class StoreDataEngine {
     );
     if (!snapshot) return false;
 
-    const sources = consumeSourceSnapshot(snapshot, this.sheetIdsByHandle);
-    return sources.formulaOffsets.length > 0 || sources.referenceOffsets.length > 0;
+    try {
+      return snapshot.formulaOffsets().length > 0 || snapshot.referenceOffsets().length > 0;
+    } finally {
+      snapshot.free();
+    }
   }
 
   aggregate(sheet: SheetId, col: number, op: AggregateOp): number {
@@ -2948,8 +2951,8 @@ export class StoreDataEngine {
     sheet.tables = tables;
   }
 
-  /** Rewrite every chart that is anchored on, or reads from, the edited sheet. */
-  private rebaseCharts(edit: ChartAxisEdit): void {
+  /** Keep chart list identity until a rewrite changes at least one definition. */
+  private rewriteCharts(map: (chart: ChartDefinition, ownerId: SheetId) => ChartDefinition): void {
     for (const owner of this.workbook.sheets) {
       const charts = owner.charts;
       if (!charts) continue;
@@ -2958,13 +2961,21 @@ export class StoreDataEngine {
       for (let index = 0; index < charts.length; index++) {
         const chart = charts[index];
         if (chart === undefined) continue;
-        const rebased = rebaseChartAxis(chart, owner.id, edit);
-        if (rebased === chart) continue;
+
+        const rewritten = map(chart, owner.id);
+        if (rewritten === chart) continue;
+
         next ??= charts.slice();
-        next[index] = rebased;
+        next[index] = rewritten;
       }
+
       if (next) owner.charts = next;
     }
+  }
+
+  /** Rewrite every chart that is anchored on, or reads from, the edited sheet. */
+  private rebaseCharts(edit: ChartAxisEdit): void {
+    this.rewriteCharts((chart, ownerId) => rebaseChartAxis(chart, ownerId, edit));
   }
 
   /**
@@ -3032,7 +3043,8 @@ export class StoreDataEngine {
         if (!chart) return false;
         charts.push(chart);
       }
-      if (!validSheetCharts(charts, sheet, [...this.workbook.sheets, sheet])) return false;
+      if (!sheetChartsFit(charts, sheet, [...this.workbook.sheets, sheet])) return false;
+
       sheet.charts = charts;
     }
     try {
@@ -3114,14 +3126,11 @@ export class StoreDataEngine {
         (hyperlink) =>
           hyperlink.target.kind !== "internal" || hyperlink.target.range.sheet !== sheetId,
       );
-
-      // A chart keeps a source on a removed sheet as an explicit `#REF!`.
-      const charts = owner.charts;
-      if (charts?.length) {
-        const next = charts.map((chart) => invalidateChartSheet(chart, sheetId));
-        if (next.some((chart, index) => chart !== charts[index])) owner.charts = next;
-      }
     }
+
+    // A chart keeps a source on a removed sheet as an explicit `#REF!`.
+    this.rewriteCharts((chart) => invalidateChartSheet(chart, sheetId));
+
     return true;
   }
 

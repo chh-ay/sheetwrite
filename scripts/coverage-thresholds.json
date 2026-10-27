@@ -107,10 +107,6 @@
     {
       "path": "packages/xlsx/src/register.ts",
       "reason": "The one-line entrypoint is covered through the explicit registration contract"
-    },
-    {
-      "path": "packages/core/src/types/chartProvider.ts",
-      "reason": "Type-only modules are verified by package and consumer typechecks"
     }
   ]
 }

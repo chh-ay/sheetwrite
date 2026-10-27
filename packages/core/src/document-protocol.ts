@@ -3199,11 +3199,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
             .sort((a, b) => a.id.localeCompare(b.id))
             .map((table) => structuredClone(table))
         : undefined,
-      charts: sheet.charts
-        ? [...sheet.charts]
-            .sort((a, b) => a.id.localeCompare(b.id))
-            .map((chart) => structuredClone(chart))
-        : undefined,
+      charts: sheet.charts?.map((chart) => structuredClone(chart)),
       cells: sheet.cells.map((block) => ({
         ...block,
         cells: [...block.cells].sort(

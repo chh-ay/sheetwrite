@@ -9,6 +9,10 @@ export {
 
 export { isCellFontFamily } from "./cell-style-fields.js";
 
+export { openChartViews, setChartViewProviderFactory } from "./chart-backend.js";
+
+export { MAX_CHART_POINTS, resolveChartView, subscribeChartChanges } from "./charts-live.js";
+
 export { SHEETWRITE_CLIPBOARD_MIME } from "./clipboard-controller.js";
 
 export {
@@ -229,15 +233,6 @@ export {
   validateSheetName,
 } from "./sheet-name.js";
 
-export {
-  type ChartChangeEvent,
-  type ChartChangeListener,
-  type ChartRef,
-  MAX_CHART_POINTS,
-  resolveChartView,
-  subscribeChartChanges,
-} from "./charts-live.js";
-
 export { IncompleteDataError, SheetwriteStore, type SheetwriteStoreOptions } from "./store.js";
 
 export {
@@ -289,12 +284,17 @@ export type {
   CellVerticalAlign,
   ChangeEvent,
   ChartAnchor,
+  ChartChangeEvent,
+  ChartChangeListener,
   ChartDefinition,
   ChartKind,
   ChartRange,
+  ChartRef,
   ChartSeries,
   ChartSeriesView,
   ChartView,
+  ChartViewProvider,
+  ChartViewProviderFactory,
   Column,
   ColumnarData,
   ColumnFilter,
@@ -410,6 +410,3 @@ export {
   type WorkbookTableResourceLimits,
   workbookTableNameKey,
 } from "./workbook-table.js";
-
-export { openChartViews, setChartViewProviderFactory } from "./chart-backend.js";
-export type { ChartViewProvider, ChartViewProviderFactory } from "./types/chartProvider.js";

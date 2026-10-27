@@ -1,14 +1,14 @@
 ---
 title: "ChartViewProviderFactory | @sheetwrite/core"
-description: "Creates a provider owned and disposed by one renderer or host."
+description: "Creates a chart provider owned and disposed by one renderer or host."
 ---
 <!-- api-export:@sheetwrite/core|.|ChartViewProviderFactory -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
 
-Creates a provider owned and disposed by one renderer or host.
+Creates a chart provider owned and disposed by one renderer or host.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/chartProvider.ts#L16"><code>packages/core/src/types/chartProvider.ts#L16</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/store.ts#L22"><code>packages/core/src/types/store.ts#L22</code></a></dd></div>
 </dl>
 
 ## Declaration

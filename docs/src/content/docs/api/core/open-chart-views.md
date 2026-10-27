@@ -7,10 +7,11 @@ description: "Open cached chart views through the optional backend."
 
 Open cached chart views through the optional backend. Import
 `@sheetwrite/charts/register` or call its `registerChartsBackend` first.
-Throws if no provider is registered. The caller must dispose the result.
+Throws a `SheetwriteError` with code `"optional-backend-unavailable"` if no
+provider is registered. The caller must dispose the result.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/chart-backend.ts#L16"><code>packages/core/src/chart-backend.ts#L16</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/chart-backend.ts#L18"><code>packages/core/src/chart-backend.ts#L18</code></a></dd></div>
 </dl>
 
 ## Declaration

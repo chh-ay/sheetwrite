@@ -50,9 +50,6 @@ import type {
   TransactionResourceLimits,
 } from "./types/transaction.js";
 
-/** Shared result for workbooks without charts, so structural inverses allocate nothing for them. */
-const NO_CHART_RESTORES: readonly DocumentOp[] = [];
-
 export interface DocumentControllerOptions {
   store: Store;
   loadable: SheetwriteStore | null;
@@ -445,7 +442,7 @@ export class DocumentController {
               }
             : null;
         const compact = range ? this.compactHistoryPart(range) : null;
-        const charts = this.chartRestores(patch.sheet, true);
+        const charts = this.chartRestores(patch.sheet, { includeOwned: true });
         return compact
           ? [
               { op: "addRows", sheet: patch.sheet, at: patch.at, count: patch.count },
@@ -468,7 +465,7 @@ export class DocumentController {
             to: patch.from,
           },
           // A partly moved source range does not map back exactly.
-          ...this.chartRestores(patch.sheet, true),
+          ...this.chartRestores(patch.sheet, { includeOwned: true }),
         ];
       case "addColumns":
         return [
@@ -490,7 +487,7 @@ export class DocumentController {
               }
             : null;
         const compact = range ? this.compactHistoryPart(range) : null;
-        const charts = this.chartRestores(patch.sheet, true);
+        const charts = this.chartRestores(patch.sheet, { includeOwned: true });
         return compact
           ? [
               {
@@ -522,7 +519,8 @@ export class DocumentController {
             count: patch.count,
             to: patch.from,
           },
-          ...this.chartRestores(patch.sheet, true),
+          // A partly moved source range does not map back exactly.
+          ...this.chartRestores(patch.sheet, { includeOwned: true }),
         ];
       case "setColumn": {
         const sheet = this.sheetById(patch.sheet);
@@ -568,7 +566,7 @@ export class DocumentController {
         const restore: DocumentOp[] = [
           { op: "addSheet", sheet: snapshot },
           ...this.snapshotExternalFormulaAndRefs(patch.sheet),
-          ...this.chartRestores(patch.sheet, false),
+          ...this.chartRestores(patch.sheet, { includeOwned: false }),
         ];
         for (const namedRange of this.options.store.getWorkbook().namedRanges ?? []) {
           if (namedRange.range.sheet === patch.sheet || namedRange.scope === patch.sheet) {
@@ -1005,20 +1003,22 @@ export class DocumentController {
    * set back after the structure is restored so undo returns them exactly.
    * `includeOwned` false skips charts anchored on `sheet`, which its snapshot carries.
    */
-  private chartRestores(sheet: SheetId, includeOwned: boolean): readonly DocumentOp[] {
-    let restores: DocumentOp[] | null = null;
+  private chartRestores(
+    sheet: SheetId,
+    { includeOwned }: { includeOwned: boolean },
+  ): readonly DocumentOp[] {
+    const restores: DocumentOp[] = [];
     for (const owner of this.options.store.getWorkbook().sheets) {
       const charts = owner.charts;
       if (!charts || (!includeOwned && owner.id === sheet)) continue;
 
       for (const chart of charts) {
         if (chartTouchesSheet(chart, owner.id, sheet)) {
-          restores ??= [];
           restores.push({ op: "setChart", sheet: owner.id, chart: cloneChartDefinition(chart) });
         }
       }
     }
-    return restores ?? NO_CHART_RESTORES;
+    return restores;
   }
 
   private snapshotSheet(id: SheetId): SheetSnapshot | null {
