@@ -6,7 +6,7 @@ use std::collections::HashSet;
 
 use wasm_bindgen::prelude::*;
 
-use crate::cells::{payload_is_str, payload_num, payload_str_id, CellRun};
+use crate::cells::{payload_is_str, payload_num, payload_str_id, source_kind, CellRun};
 use crate::sheet::{formula_error_at, SheetData};
 use crate::store::CellStore;
 use crate::types::{
@@ -190,10 +190,13 @@ impl CellStore {
         // dirty-overlay probe, a payload load and bounds checks for cells that
         // are not numbers, which made this scan 2.6-6x slower than 0.5.0.
         if let Some(column) = s.cells.dense_column(col) {
-            for row in 0..row_count {
-                let value = match column.source(row) {
-                    (KIND_NUMBER, bits) => Some(f64::from_bits(bits)),
-                    (KIND_FORMULA, _) => {
+            let (kinds, payloads) = column.raw_slices();
+            for (row, &raw) in kinds.iter().enumerate() {
+                // The kind byte decides first, so text, booleans and blanks
+                // never load their payload.
+                let value = match source_kind(raw) {
+                    KIND_NUMBER => Some(f64::from_bits(payloads[row])),
+                    KIND_FORMULA => {
                         let (_, payload, _) = column.cell(row);
                         (!payload_is_str(payload)
                             && key_for_index(s, base + row)
@@ -269,6 +272,38 @@ impl CellStore {
         let needle = needle.to_lowercase();
         let mut out: Vec<u32> = Vec::with_capacity(s.cells.row_count().min(1024));
         let mut cache = MatchCache::new();
+
+        // Dense columns read their slices directly; see `aggregate`.
+        if let Some(column) = s.cells.dense_column(col) {
+            let (kinds, payloads) = column.raw_slices();
+            for (row, &raw) in kinds.iter().enumerate() {
+                // Literals never carry the calculated bit, so the raw byte
+                // classifies them; a bare empty byte has no calculated value.
+                let matched = match raw {
+                    KIND_STRING => cache.matches(
+                        &self.strings,
+                        payload_str_id(payloads[row]),
+                        &needle,
+                        true,
+                        false,
+                    ),
+                    KIND_EMPTY => false,
+                    _ => cell_matches_text(
+                        s,
+                        &self.strings,
+                        base + row,
+                        &needle,
+                        true,
+                        false,
+                        &mut cache,
+                    ),
+                };
+                if matched {
+                    out.push(row as u32);
+                }
+            }
+            return out;
+        }
 
         let mut start = base;
         let end = base + s.cells.row_count();
@@ -478,7 +513,6 @@ impl CellStore {
         });
         order
     }
-
 }
 
 #[wasm_bindgen]
@@ -825,11 +859,19 @@ impl CellStore {
         if d_row == 0 {
             return self.data_edge(sheet, order[row] as usize, col, 0, d_col);
         }
+        // Literal kinds decide occupancy from the raw byte; only formula and
+        // calculated cells need the resolved kind with its error lookup.
+        let column = data.cells.dense_column(col);
         let occupied = |view: usize| {
             order.get(view).is_some_and(|&r| {
                 let r = r as usize;
+                let index = col * data.cells.row_count() + r;
                 r < data.cells.row_count()
-                    && resolved_kind(data, col * data.cells.row_count() + r) != 0
+                    && match column.map(|column| column.raw_kind(r)) {
+                        Some(KIND_NUMBER | KIND_STRING | KIND_BOOL) => true,
+                        Some(KIND_EMPTY) => false,
+                        _ => resolved_kind(data, index) != 0,
+                    }
             })
         };
         edge_scan(row, order.len(), d_row.signum() as isize, occupied) as u32
@@ -1237,16 +1279,35 @@ fn sort_finite_number_column_radix(
     ascending: bool,
 ) -> Option<Vec<u32>> {
     let mut pairs = Vec::with_capacity(sheet.cells.row_count());
-    let end = base + sheet.cells.row_count();
-    let mut start = base;
-    while start < end {
-        let run = sheet.cells.run(start, end);
-        for index in run.start..run.end {
-            let value = source_number_in_run(&run, index, sheet.cells.is_paged())?;
-            let key = finite_number_sort_key(value)?;
-            pairs.push((if ascending { key } else { !key }, (index - base) as u32));
+    let direction = |key: u64| if ascending { key } else { !key };
+
+    // A dense column gathers keys from its slices; only literal numbers sort
+    // here, so a formula or any other source ends the numeric path early.
+    let dense = (sheet.cells.row_count() > 0)
+        .then(|| sheet.cells.dense_column(base / sheet.cells.row_count()))
+        .flatten();
+    if let Some(column) = dense {
+        for (row, (kind, payload)) in column.sources().enumerate() {
+            if kind != KIND_NUMBER {
+                return None;
+            }
+            pairs.push((
+                direction(finite_number_sort_key(f64::from_bits(payload))?),
+                row as u32,
+            ));
         }
-        start = run.end;
+    } else {
+        let end = base + sheet.cells.row_count();
+        let mut start = base;
+        while start < end {
+            let run = sheet.cells.run(start, end);
+            for index in run.start..run.end {
+                let value = source_number_in_run(&run, index, true)?;
+                let key = finite_number_sort_key(value)?;
+                pairs.push((direction(key), (index - base) as u32));
+            }
+            start = run.end;
+        }
     }
 
     radix_sort_numeric_pairs(&mut pairs);

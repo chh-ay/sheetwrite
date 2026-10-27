@@ -1,0 +1,201 @@
+{
+  "measuredAt": "2026-10-27T06:34:31.424Z",
+  "pairs": 8,
+  "rows": {
+    "getWindow 40x8": {
+      "aaMinRatio": 0.831110636606825,
+      "aaMaxRatio": 1.1624008546810247,
+      "limit": 1.1624008546810247
+    },
+    "getWindow 1000x8": {
+      "aaMinRatio": 0.8514910226612954,
+      "aaMaxRatio": 1.1448005963750894,
+      "limit": 1.1448005963750894
+    },
+    "getWindow 40x8 cond rules": {
+      "aaMinRatio": 0.9600033755945249,
+      "aaMaxRatio": 1.1894091712469403,
+      "limit": 1.1894091712469403
+    },
+    "getWindow 1000x8 cond rules": {
+      "aaMinRatio": 0.9333833936965346,
+      "aaMaxRatio": 1.2703661732022455,
+      "limit": 1.2703661732022455
+    },
+    "getWindowRows 40x8 sorted": {
+      "aaMinRatio": 0.8964485361019986,
+      "aaMaxRatio": 1.0785411854301397,
+      "limit": 1.0785411854301397
+    },
+    "getWindowRows 1000x8 sorted": {
+      "aaMinRatio": 0.8922530928740913,
+      "aaMaxRatio": 1.1864014980041437,
+      "limit": 1.1864014980041437
+    },
+    "aggregate SUM A": {
+      "aaMinRatio": 0.8658435151809148,
+      "aaMaxRatio": 1.2403938722630246,
+      "limit": 1.2403938722630246
+    },
+    "aggregate AVG D (formulas)": {
+      "aaMinRatio": 0.6595349740732419,
+      "aaMaxRatio": 1.4839354331822423,
+      "limit": 1.4839354331822423
+    },
+    "aggregate COUNT C (mixed)": {
+      "aaMinRatio": 0.751237623440602,
+      "aaMaxRatio": 1.2150226241624882,
+      "limit": 1.2150226241624882
+    },
+    "sortRowsMulti A numeric": {
+      "aaMinRatio": 0.826096788548661,
+      "aaMaxRatio": 1.1460087319340138,
+      "limit": 1.1460087319340138
+    },
+    "sortRowsMulti B text": {
+      "aaMinRatio": 0.8386122866223223,
+      "aaMaxRatio": 1.1317540335555214,
+      "limit": 1.1317540335555214
+    },
+    "sortRowsMulti D formulas": {
+      "aaMinRatio": 0.8556698316100563,
+      "aaMaxRatio": 1.3292118026033424,
+      "limit": 1.3292118026033424
+    },
+    "sortRowsMulti B,A all rows": {
+      "aaMinRatio": 0.8259633709665914,
+      "aaMaxRatio": 1.1838451811530977,
+      "limit": 1.1838451811530977
+    },
+    "sortRowsMulti C,D 50k candidates": {
+      "aaMinRatio": 0.8484017316231212,
+      "aaMaxRatio": 1.277607417289545,
+      "limit": 1.277607417289545
+    },
+    "filterRows B contains": {
+      "aaMinRatio": 0.84538436498539,
+      "aaMaxRatio": 1.2674237295423358,
+      "limit": 1.2674237295423358
+    },
+    "filterRows C mixed": {
+      "aaMinRatio": 0.7909644034563174,
+      "aaMaxRatio": 1.2902001203841622,
+      "limit": 1.2902001203841622
+    },
+    "filterRowsMulti A>100,B~item-1,C set": {
+      "aaMinRatio": 0.8163305932498125,
+      "aaMaxRatio": 1.3016067587900564,
+      "limit": 1.3016067587900564
+    },
+    "search B,C,D substring": {
+      "aaMinRatio": 0.8237451444557373,
+      "aaMaxRatio": 1.3750284542137932,
+      "limit": 1.3750284542137932
+    },
+    "search all cols whole-cell": {
+      "aaMinRatio": 0.865779231388492,
+      "aaMaxRatio": 1.2582193035632134,
+      "limit": 1.2582193035632134
+    },
+    "distinctValues B text": {
+      "aaMinRatio": 0.8336004485260154,
+      "aaMaxRatio": 1.1005143274314562,
+      "limit": 1.1005143274314562
+    },
+    "distinctValues D formulas": {
+      "aaMinRatio": 0.7796825005205483,
+      "aaMaxRatio": 1.2981850645774349,
+      "limit": 1.2981850645774349
+    },
+    "dataEdge E down to gap": {
+      "aaMinRatio": 0.8960961507974078,
+      "aaMaxRatio": 1.363493401012673,
+      "limit": 1.363493401012673
+    },
+    "dataEdge row right": {
+      "aaMinRatio": 0.8680134999962602,
+      "aaMaxRatio": 1.3665460341918614,
+      "limit": 1.3665460341918614
+    },
+    "dataEdgeOrdered E by A order": {
+      "aaMinRatio": 0.8536855451558172,
+      "aaMaxRatio": 1.2779713422093548,
+      "limit": 1.2779713422093548
+    },
+    "getCell 4096 scattered": {
+      "aaMinRatio": 0.8520734439373541,
+      "aaMaxRatio": 1.1920087258402186,
+      "limit": 1.1920087258402186
+    },
+    "cellSnapshots 4096 scattered": {
+      "aaMinRatio": 0.8276293072630965,
+      "aaMaxRatio": 1.3201074082394049,
+      "limit": 1.3201074082394049
+    },
+    "captureRange 1000x8 + numbers": {
+      "aaMinRatio": 0.7958281685459037,
+      "aaMaxRatio": 1.3672005609566154,
+      "limit": 1.3672005609566154
+    },
+    "persistedCellData whole sheet": {
+      "aaMinRatio": 0.9115760155992626,
+      "aaMaxRatio": 1.2986053621559042,
+      "limit": 1.2986053621559042
+    },
+    "rangeStyleIds whole sheet": {
+      "aaMinRatio": 0.8871419846871396,
+      "aaMaxRatio": 1.2327269733595934,
+      "limit": 1.2327269733595934
+    },
+    "range SUM(A) dense numbers": {
+      "aaMinRatio": 0.9054002772334667,
+      "aaMaxRatio": 1.3416975497499295,
+      "limit": 1.3416975497499295
+    },
+    "range SUM(D) calculated values": {
+      "aaMinRatio": 0.7767963235530335,
+      "aaMaxRatio": 2.1238844581321454,
+      "limit": 2.1238844581321454
+    },
+    "range AVERAGE(A)": {
+      "aaMinRatio": 0.8639061503058801,
+      "aaMaxRatio": 1.3212812252200918,
+      "limit": 1.3212812252200918
+    },
+    "range COUNTA(C) mixed": {
+      "aaMinRatio": 0.8861996155905013,
+      "aaMaxRatio": 1.2704901498593688,
+      "limit": 1.2704901498593688
+    },
+    "range MAX(A,D) two ranges": {
+      "aaMinRatio": 0.6329069180067038,
+      "aaMaxRatio": 1.5809055410621755,
+      "limit": 1.5809055410621755
+    },
+    "range COUNTIF(B) text": {
+      "aaMinRatio": 0.8874200191670086,
+      "aaMaxRatio": 1.2088712059165223,
+      "limit": 1.2088712059165223
+    },
+    "range SUMIF(A,>500,D)": {
+      "aaMinRatio": 0.7405200448590356,
+      "aaMaxRatio": 1.5963224458454939,
+      "limit": 1.5963224458454939
+    },
+    "range SUMIFS(A;B,C)": {
+      "aaMinRatio": 0.7934719634780123,
+      "aaMaxRatio": 1.1400156253507452,
+      "limit": 1.1400156253507452
+    },
+    "range SUMPRODUCT(A,D) array args": {
+      "aaMinRatio": 0.6184969456902302,
+      "aaMaxRatio": 1.4767516097308226,
+      "limit": 1.4767516097308226
+    },
+    "range MATCH(B) miss, full scan": {
+      "aaMinRatio": 0.5984514810919689,
+      "aaMaxRatio": 1.2476632604529942,
+      "limit": 1.2476632604529942
+    }
+  }
+}

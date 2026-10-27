@@ -53,6 +53,17 @@ function sorted(values: Iterable<string>): string[] {
   return [...values].sort((left, right) => left.localeCompare(right));
 }
 
+/** The argument after flag `name` in a gate's argv, or undefined when the flag is absent. */
+export function optionValue(args: readonly string[], name: string): string | undefined {
+  const index = args.indexOf(name);
+  if (index < 0) return undefined;
+  const optionArgument = args[index + 1];
+  if (optionArgument === undefined || optionArgument.startsWith("--")) {
+    throw new Error(`${name} requires a value`);
+  }
+  return optionArgument;
+}
+
 /** Validate an exact result matrix. Every diagnostic contains the canonical key. */
 export function validateExactMatrix(
   family: string,

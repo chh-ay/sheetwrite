@@ -1637,13 +1637,46 @@ impl DenseColumn<'_> {
         (kind, payload, self.styles[row])
     }
 
-    /// Source kind and literal payload of `row`. A calculated slot reads as its
-    /// formula or empty source, so column scans can skip non-numeric literals
-    /// before decoding a calculated value.
+    /// Every row's source kind and literal payload, in order. A calculated slot
+    /// reads as its formula or empty source, so scans can skip non-numeric
+    /// literals before decoding a calculated value. Zipping the slices lets
+    /// whole-column scans run without a bounds check per cell.
     #[inline]
-    pub(crate) fn source(&self, row: usize) -> (u8, u64) {
-        dense_source(self.kinds[row], self.payloads[row])
+    pub(crate) fn sources(&self) -> impl Iterator<Item = (u8, u64)> + '_ {
+        self.kinds
+            .iter()
+            .zip(self.payloads)
+            .map(|(&kind, &payload)| dense_source(kind, payload))
     }
+
+    /// The raw kind byte of `row`: a literal kind, empty, or a formula/empty
+    /// source carrying the calculated bit. Scans use it to classify literals
+    /// without loading the payload.
+    #[inline]
+    pub(crate) fn raw_kind(&self, row: usize) -> u8 {
+        self.kinds[row]
+    }
+
+    /// The raw kind bytes and payloads of the column, of equal length so a
+    /// loop bounded by the kinds needs no bounds check on the payloads. A
+    /// literal's raw kind is its kind; use [`source_kind`] for the others.
+    #[inline]
+    pub(crate) fn raw_slices(&self) -> (&[u8], &[u64]) {
+        (self.kinds, &self.payloads[..self.kinds.len()])
+    }
+
+    /// Style ids of `rows`, as one slice so scans hoist the bounds check.
+    #[inline]
+    pub(crate) fn styles(&self, rows: std::ops::RangeInclusive<usize>) -> &[u32] {
+        &self.styles[rows]
+    }
+}
+
+/// The source kind of a raw dense kind byte: drops the calculated bit that
+/// formula and empty sources carry, without loading the payload.
+#[inline]
+pub(crate) fn source_kind(raw: u8) -> u8 {
+    raw & !CALCULATED
 }
 
 /// A borrowed column segment bounded by its source page or column.

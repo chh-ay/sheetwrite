@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { expectedFormulaWorkloadKeys, type FormulaGateCapture } from "./formula-bench.js";
-import { validateExactMatrix } from "./gate-protocol.js";
+import { optionValue, validateExactMatrix } from "./gate-protocol.js";
 import { summarize } from "./stats.js";
 
 /** The ratio limits below were measured at seven pairs; fewer pairs would make them too tight. */
@@ -332,14 +332,6 @@ function report(verdict: FormulaGateVerdict): string {
   }
   lines.push(`Formula gate: ${verdict.passed ? "passed" : "FAILED"}`, "");
   return lines.join("\n");
-}
-
-function optionValue(args: readonly string[], name: string): string | undefined {
-  const index = args.indexOf(name);
-  if (index < 0) return undefined;
-  const value = args[index + 1];
-  if (value === undefined || value.startsWith("--")) throw new Error(`${name} requires a value`);
-  return value;
 }
 
 if (import.meta.main) {
