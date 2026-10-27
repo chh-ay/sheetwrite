@@ -33,8 +33,11 @@ export type PivotSource =
 
 /** One aggregated value field. `name` replaces the default caption. */
 export interface PivotValueField {
+  /** Source field index that the value aggregates. */
   field: number;
+  /** How the field's values in each output cell combine. */
   aggregation: PivotAggregation;
+  /** Custom caption; without it the output shows the default caption. */
   name?: string;
 }
 
@@ -63,6 +66,7 @@ export interface PivotDefinition {
   id: string;
   /** User-facing caption. */
   name: string;
+  /** Data the pivot summarizes. */
   source: PivotSource;
   /**
    * Top-left output cell on the owning sheet. Deleting the anchor's row or
@@ -74,8 +78,11 @@ export interface PivotDefinition {
   rows: number[];
   /** Source field indices that group the output columns, outermost first. */
   columns: number[];
+  /** Aggregated fields, in output order. */
   values: PivotValueField[];
+  /** Keep-lists that limit which source rows contribute; at most one per field. */
   filters?: PivotFilter[];
+  /** Label order of grouped fields; each key names a field that groups its axis. */
   sort?: PivotSort[];
   /**
    * Grand-total row at the bottom (PIVOTBY `row_total_depth`; OOXML
@@ -115,8 +122,11 @@ export type PivotFieldType = "number" | "text" | "boolean" | "mixed" | "blank";
 
 /** One source field offered by the field list. */
 export interface PivotSourceField {
+  /** Source field index, as used by `rows`, `columns`, `values` and `filters`. */
   index: number;
+  /** Field name, from the source header row or table column. */
   header: string;
+  /** Type inferred from the field's data rows. */
   type: PivotFieldType;
 }
 

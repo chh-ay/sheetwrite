@@ -336,6 +336,25 @@ export function cellRange(addr: CellAddress): Range {
   };
 }
 
+/**
+ * The cells whose contents `patch` writes, which pivot output may own; null
+ * for operations that write no cell contents, such as a style-only clear.
+ */
+export function pivotWrittenRange(patch: DocumentOp): Range | null {
+  switch (patch.op) {
+    case "set":
+      return cellRange(patch.addr);
+    case "setRange":
+    case "setBlock":
+    case "restoreBlock":
+      return patch.range;
+    case "clearRange":
+      return patch.contents === false ? null : patch.range;
+    default:
+      return null;
+  }
+}
+
 export function fullSheetRange(sheet: Sheet): Range {
   return {
     sheet: sheet.id,

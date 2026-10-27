@@ -9,6 +9,7 @@
 use std::borrow::Borrow;
 
 use super::CellStore;
+use crate::cells::CellStorage;
 use crate::eval::calculated_slot;
 use crate::graph::{DirtyRect, DirtySeeds};
 use crate::sheet::SheetData;
@@ -22,6 +23,8 @@ pub(crate) use saved::SavedPivots;
 /// for computed output and rejects a saved output.
 pub(crate) const MAX_PIVOT_OUTPUT_CELLS: usize = 1_000_000;
 
+/// The axis of a row or column insert or delete that moves pivot anchors
+/// and sources.
 #[derive(Clone, Copy)]
 pub(crate) enum ShiftAxis {
     Rows,
@@ -30,7 +33,7 @@ pub(crate) enum ShiftAxis {
 
 /// Writes `value` as the calculated value of a pivot anchor. An anchor that
 /// holds a source or a formula keeps it. Returns whether the value changed.
-pub(super) fn set_anchor_value(
+fn set_anchor_value(
     data: &mut SheetData,
     strings: &mut StringStorage,
     anchor: CellKey,
@@ -91,6 +94,35 @@ pub(super) fn shift_anchor(index: u32, at: u32, delta: i64, extent_after: usize)
     } else {
         at.min(extent_after.saturating_sub(1) as u32)
     }
+}
+
+/// The cells an output install changed, reusing the `written` buffer.
+/// Output back over the same cells reports only changed values, so a
+/// recalculation that leaves the output alone does not wake the formulas
+/// that read it.
+fn installed_changes(
+    cells: &CellStorage,
+    same_range: bool,
+    vacated: &[(CellKey, Option<(u8, u64)>)],
+    mut written: Vec<CellKey>,
+) -> Vec<CellKey> {
+    let reinstalled = same_range
+        && vacated.len() == written.len()
+        && vacated
+            .iter()
+            .zip(&written)
+            .all(|((vacated_cell, _), cell)| vacated_cell == cell);
+
+    if reinstalled {
+        written.clear();
+        written.extend(vacated.iter().filter_map(|&(cell, previous)| {
+            let index = cells.idx(cell.0 as usize, cell.1 as usize);
+            (cells.calculated_cell_at(index) != previous).then_some(cell)
+        }));
+    } else {
+        written.extend(vacated.iter().map(|&(cell, _)| cell));
+    }
+    written
 }
 
 impl CellStore {
@@ -154,25 +186,10 @@ impl CellStore {
         let written = data.spill.install(range, &mut data.cells, |offset| {
             calculated_slot(strings, value_at(offset).borrow())
         });
+        let mut installed =
+            installed_changes(&data.cells, vacated_range == Some(range), &vacated, written);
+        changed.append(&mut installed);
 
-        // Output back over the same cells reports only changed values.
-        let reinstalled = vacated_range == Some(range)
-            && vacated.len() == written.len()
-            && vacated
-                .iter()
-                .zip(&written)
-                .all(|((vacated_cell, _), cell)| vacated_cell == cell);
-        if reinstalled {
-            for (&(cell, previous), _) in vacated.iter().zip(&written) {
-                let index = data.cells.idx(cell.0 as usize, cell.1 as usize);
-                if data.cells.calculated_cell_at(index) != previous {
-                    changed.push(cell);
-                }
-            }
-        } else {
-            vacated_cells(&mut changed);
-            changed.extend(written);
-        }
         if set_anchor_value(data, strings, anchor, value_at(0).borrow()) {
             changed.push(anchor);
         }
@@ -265,8 +282,8 @@ mod saved {
     use crate::types::{AbsCellKey, CellKey, FormulaError, Value};
 
     /// Spill contention between saved output and formula spills settles in a
-    /// few rounds; a pivot still pending after this many retries at the next
-    /// recalculation.
+    /// few rounds; a pivot that is still pending after this many rounds
+    /// retries at the next recalculation.
     const MAX_SETTLE_ROUNDS: usize = 32;
     /// Saved outputs one sheet may hold; core's workbook pivot bound is lower.
     const MAX_SAVED_PIVOTS_PER_SHEET: usize = 1_024;

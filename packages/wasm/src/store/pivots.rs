@@ -17,20 +17,23 @@ use std::mem::size_of;
 use rustc_hash::{FxHashMap, FxHashSet};
 use wasm_bindgen::prelude::*;
 
-use super::pivot_output::{attempt_cut, set_anchor_value, shift_anchor, ShiftAxis};
+use super::pivot_output::{attempt_cut, shift_anchor, ShiftAxis};
 use super::{CellStore, TableColumnDefinition};
 use crate::calc::shift_range;
 use crate::eval::{calculated_slot, settled_cell_value};
 use crate::graph::{DirtyRect, DirtySeeds};
 use crate::pivot::{
-    source_fields, Aggregation, PivotCache, PivotFilter, PivotLayout, PivotSource, PivotSpec,
+    source_fields, Aggregation, PivotCache, PivotDefinition, PivotFilter, PivotLayout, PivotSource,
     PivotValue,
 };
 use crate::sheet::SheetData;
 use crate::spill::SpillRange;
 use crate::types::{AbsCellKey, CellKey, FormulaError, StringStorage, Value, KIND_EMPTY};
 
+/// Pivots one sheet may hold; a payload with more is malformed. Core's
+/// workbook pivot bound is lower.
 const MAX_PIVOTS_PER_SHEET: usize = 1_024;
+
 /// Pivot output that keeps changing its own source after this many rounds
 /// is a cycle and shows `#CYCLE!`.
 const MAX_SETTLE_ROUNDS: usize = 32;
@@ -38,6 +41,17 @@ const MAX_SETTLE_ROUNDS: usize = 32;
 const SOURCE_RANGE: u32 = 0;
 const SOURCE_TABLE: u32 = 1;
 const SOURCE_INVALID: u32 = 2;
+
+/// Unused bound slots after a table id, and after the absent-string slot of
+/// an invalid source, so every source takes the slots of a range (sheet,
+/// r0, c0, r1, c1). Twins of `TABLE_SOURCE_PADDING` and
+/// `INVALID_SOURCE_PADDING` in `packages/core/src/pivot.ts`.
+const TABLE_SOURCE_PADDING: usize = 4;
+const INVALID_SOURCE_PADDING: usize = 4;
+
+/// Numbers per pivot in a `pivotStatus` record; twin of
+/// `PIVOT_STATUS_STRIDE` in `packages/core/src/store/data-engine.ts`.
+pub(super) const STATUS_STRIDE: usize = 7;
 
 const FILTER_NULL: u32 = 0;
 const FILTER_NUMBER: u32 = 1;
@@ -74,12 +88,14 @@ enum SourceRef {
     Invalid,
 }
 
+/// One decoded pivot definition: where it reads and writes on the workbook,
+/// plus the fields and options its cache builds from.
 #[derive(Clone, Debug, PartialEq)]
-struct Definition {
+struct SheetPivot {
     id: String,
     source: SourceRef,
     anchor: CellKey,
-    spec: PivotSpec,
+    definition: PivotDefinition,
 }
 
 /// Reads one sheet's packed definitions; see `setPivots`.
@@ -87,6 +103,13 @@ struct Payload<'a> {
     numbers: &'a [f64],
     strings: &'a [String],
     at: usize,
+}
+
+/// The slot as a string or field index; `None` for a negative, fractional or
+/// oversized number.
+fn as_index(number: f64) -> Option<u32> {
+    (number >= 0.0 && number.fract() == 0.0 && number <= f64::from(u32::MAX))
+        .then_some(number as u32)
 }
 
 impl Payload<'_> {
@@ -97,9 +120,15 @@ impl Payload<'_> {
     }
 
     fn index(&mut self) -> Option<u32> {
-        let number = self.number()?;
-        (number >= 0.0 && number.fract() == 0.0 && number <= f64::from(u32::MAX))
-            .then_some(number as u32)
+        as_index(self.number()?)
+    }
+
+    /// Skips `count` unused slots, which must still be finite numbers.
+    fn skip(&mut self, count: usize) -> Option<()> {
+        for _ in 0..count {
+            self.number()?;
+        }
+        Some(())
     }
 
     /// A count of items that each take `numbers_per_item` numbers; a count
@@ -119,100 +148,22 @@ impl Payload<'_> {
         (0..count).map(|_| Some(self.index()? as usize)).collect()
     }
 
-    fn definition(&mut self) -> Option<Definition> {
+    fn definition(&mut self) -> Option<SheetPivot> {
         let id = self.text()?;
-        let source = match self.index()? {
-            SOURCE_RANGE => {
-                let sheet = self.index()? as usize;
-                let (r0, c0, r1, c1) = (self.index()?, self.index()?, self.index()?, self.index()?);
-                if r0 > r1 || c0 > c1 {
-                    return None;
-                }
-                SourceRef::Range {
-                    sheet,
-                    rows: (r0, r1),
-                    cols: (c0, c1),
-                }
-            }
-            SOURCE_TABLE => {
-                let table = self.text()?;
-                for _ in 0..4 {
-                    self.number()?;
-                }
-                SourceRef::Table(table)
-            }
-            SOURCE_INVALID => {
-                for _ in 0..5 {
-                    self.number()?;
-                }
-                SourceRef::Invalid
-            }
-            _ => return None,
-        };
+        let source = self.source()?;
         let anchor = (self.index()?, self.index()?);
         let rows = self.fields()?;
         let columns = self.fields()?;
-
-        let value_count = self.count(VALUE_NUMBERS)?;
-        let mut values = Vec::with_capacity(value_count);
-        for _ in 0..value_count {
-            let field = self.index()? as usize;
-            let aggregation = Aggregation::from_code(self.index()?)?;
-            let name_index = self.number()?;
-            let name = if name_index == NO_NAME {
-                None
-            } else {
-                self.at -= 1;
-                Some(self.text()?)
-            };
-            values.push(PivotValue {
-                field,
-                aggregation,
-                name,
-            });
-        }
-
-        let filter_count = self.count(FILTER_NUMBERS)?;
-        let mut filters = Vec::with_capacity(filter_count);
-        for _ in 0..filter_count {
-            let field = self.index()? as usize;
-            let keep_count = self.count(FILTER_VALUE_NUMBERS)?;
-            let mut keep = Vec::with_capacity(keep_count);
-            for _ in 0..keep_count {
-                keep.push(match self.index()? {
-                    FILTER_NULL => {
-                        self.number()?;
-                        Value::Blank
-                    }
-                    FILTER_NUMBER => Value::number(self.number()?),
-                    FILTER_TEXT => Value::text(self.text()?),
-                    FILTER_BOOL => Value::Bool(self.index()? != 0),
-                    _ => return None,
-                });
-            }
-            filters.push(PivotFilter { field, keep });
-        }
-
-        let mut row_descending = vec![false; rows.len()];
-        let mut column_descending = vec![false; columns.len()];
-        for _ in 0..self.count(SORT_NUMBERS)? {
-            let (axis, field, descending) = (self.index()?, self.index()? as usize, self.index()?);
-            let (fields, directions) = match axis {
-                SORT_ROWS => (&rows, &mut row_descending),
-                SORT_COLUMNS => (&columns, &mut column_descending),
-                _ => return None,
-            };
-            if let Some(level) = fields.iter().position(|&axis_field| axis_field == field) {
-                directions[level] = descending != 0;
-            }
-        }
-
+        let values = self.value_fields()?;
+        let filters = self.filters()?;
+        let (row_descending, column_descending) = self.sort(&rows, &columns)?;
         let flags = self.index()?;
-        Some(Definition {
+
+        Some(SheetPivot {
             id,
             source,
             anchor,
-            spec: PivotSpec {
+            definition: PivotDefinition {
                 rows,
                 columns,
                 values,
@@ -226,9 +177,108 @@ impl Payload<'_> {
             },
         })
     }
+
+    fn source(&mut self) -> Option<SourceRef> {
+        match self.index()? {
+            SOURCE_RANGE => {
+                let sheet = self.index()? as usize;
+                let (r0, c0, r1, c1) = (self.index()?, self.index()?, self.index()?, self.index()?);
+                if r0 > r1 || c0 > c1 {
+                    return None;
+                }
+                Some(SourceRef::Range {
+                    sheet,
+                    rows: (r0, r1),
+                    cols: (c0, c1),
+                })
+            }
+            SOURCE_TABLE => {
+                let table = self.text()?;
+                self.skip(TABLE_SOURCE_PADDING)?;
+                Some(SourceRef::Table(table))
+            }
+            SOURCE_INVALID => {
+                // Core sends no sheet or table here: the slot holds its
+                // absent-string marker.
+                self.number()?;
+                self.skip(INVALID_SOURCE_PADDING)?;
+                Some(SourceRef::Invalid)
+            }
+            _ => None,
+        }
+    }
+
+    fn value_fields(&mut self) -> Option<Vec<PivotValue>> {
+        let count = self.count(VALUE_NUMBERS)?;
+        let mut values = Vec::with_capacity(count);
+        for _ in 0..count {
+            let field = self.index()? as usize;
+            let aggregation = Aggregation::from_code(self.index()?)?;
+            let name_slot = self.number()?;
+            let name = if name_slot == NO_NAME {
+                None
+            } else {
+                Some(self.strings.get(as_index(name_slot)? as usize)?.clone())
+            };
+
+            values.push(PivotValue {
+                field,
+                aggregation,
+                name,
+            });
+        }
+        Some(values)
+    }
+
+    fn filters(&mut self) -> Option<Vec<PivotFilter>> {
+        let count = self.count(FILTER_NUMBERS)?;
+        let mut filters = Vec::with_capacity(count);
+        for _ in 0..count {
+            let field = self.index()? as usize;
+            let keep_count = self.count(FILTER_VALUE_NUMBERS)?;
+            let keep = (0..keep_count)
+                .map(|_| self.filter_value())
+                .collect::<Option<Vec<Value>>>()?;
+            filters.push(PivotFilter::new(field, keep));
+        }
+        Some(filters)
+    }
+
+    /// One kept value: a kind, then its payload (unused for a blank).
+    fn filter_value(&mut self) -> Option<Value> {
+        match self.index()? {
+            FILTER_NULL => {
+                self.number()?;
+                Some(Value::Blank)
+            }
+            FILTER_NUMBER => Some(Value::number(self.number()?)),
+            FILTER_TEXT => Some(Value::text(self.text()?)),
+            FILTER_BOOL => Some(Value::Bool(self.index()? != 0)),
+            _ => None,
+        }
+    }
+
+    /// The descending flag of each row and column level. A sort on a field
+    /// outside its axis is ignored; levels without one sort ascending.
+    fn sort(&mut self, rows: &[usize], columns: &[usize]) -> Option<(Vec<bool>, Vec<bool>)> {
+        let mut row_descending = vec![false; rows.len()];
+        let mut column_descending = vec![false; columns.len()];
+        for _ in 0..self.count(SORT_NUMBERS)? {
+            let (axis, field, descending) = (self.index()?, self.index()? as usize, self.index()?);
+            let (fields, directions) = match axis {
+                SORT_ROWS => (rows, &mut row_descending),
+                SORT_COLUMNS => (columns, &mut column_descending),
+                _ => return None,
+            };
+            if let Some(level) = fields.iter().position(|&axis_field| axis_field == field) {
+                directions[level] = descending != 0;
+            }
+        }
+        Some((row_descending, column_descending))
+    }
 }
 
-fn decode_definitions(numbers: &[f64], strings: &[String]) -> Option<Vec<Definition>> {
+fn decode_definitions(numbers: &[f64], strings: &[String]) -> Option<Vec<SheetPivot>> {
     let mut payload = Payload {
         numbers,
         strings,
@@ -381,11 +431,22 @@ impl Pending {
     fn is_empty(&self) -> bool {
         !self.rebuild && !self.headers && !self.readmit && self.rows.is_empty()
     }
+
+    /// Marks the work done, keeping the row buffer's capacity for the next
+    /// pass.
+    fn clear(&mut self) {
+        self.rebuild = false;
+        self.headers = false;
+        self.readmit = false;
+        self.rows.clear();
+    }
 }
 
 struct Pivot {
-    definition: Definition,
-    /// `None` until built, and after a source error or a cycle.
+    /// The definition as the sheet sent it, with its id, source and anchor.
+    saved: SheetPivot,
+    /// `None` until built, and after a source error, a failed build, a
+    /// cycle, or while its anchor collides with another pivot's.
     cache: Option<PivotCache>,
     /// The source the cache holds.
     source: Option<SourceRect>,
@@ -398,9 +459,9 @@ struct Pivot {
 }
 
 impl Pivot {
-    fn new(definition: Definition) -> Self {
+    fn new(saved: SheetPivot) -> Self {
         Self {
-            definition,
+            saved,
             cache: None,
             source: None,
             layout: None,
@@ -416,14 +477,14 @@ impl Pivot {
     /// Heap bytes the pivot owns; the `Vec<Pivot>` slot is counted by the
     /// registry.
     fn heap_bytes(&self) -> usize {
-        let definition = &self.definition;
-        let table = match &definition.source {
+        let saved = &self.saved;
+        let table = match &saved.source {
             SourceRef::Table(id) => id.capacity(),
             _ => 0,
         };
-        definition.id.capacity()
+        saved.id.capacity()
             + table
-            + definition.spec.retained_bytes()
+            + saved.definition.retained_bytes()
             + self.cache.as_ref().map_or(0, PivotCache::retained_bytes)
             + self.layout.as_ref().map_or(0, PivotLayout::retained_bytes)
             + self.pending.rows.capacity() * size_of::<u32>()
@@ -443,13 +504,21 @@ struct Footprint {
 #[derive(Default)]
 pub(crate) struct PivotRegistry {
     sheets: BTreeMap<usize, Vec<Pivot>>,
+    /// Scratch buffers each update pass refills, so a recompute does not
+    /// allocate: every pivot's footprint in registry order, and the anchor
+    /// counts of one sheet.
+    footprints: Vec<Footprint>,
+    anchor_counts: FxHashMap<CellKey, usize>,
 }
 
 impl PivotRegistry {
     pub(crate) fn retained_bytes(&self) -> usize {
         // A B-tree entry costs its key and value plus a share of the node.
         const BTREE_ENTRY_OVERHEAD: usize = 8;
+        let scratch = self.footprints.capacity() * size_of::<Footprint>()
+            + self.anchor_counts.capacity() * size_of::<(CellKey, usize)>();
         size_of::<Self>()
+            + scratch
             + self
                 .sheets
                 .values()
@@ -467,17 +536,24 @@ impl PivotRegistry {
         self.sheets.values_mut().flatten()
     }
 
-    fn footprints(&self) -> Vec<Footprint> {
+    /// Whether no pivot owes work, so an update pass has nothing to do.
+    fn is_idle(&self) -> bool {
         self.sheets
-            .iter()
-            .flat_map(|(&owner, pivots)| {
+            .values()
+            .flatten()
+            .all(|pivot| pivot.pending.is_empty())
+    }
+
+    fn refresh_footprints(&mut self) {
+        self.footprints.clear();
+        self.footprints
+            .extend(self.sheets.iter().flat_map(|(&owner, pivots)| {
                 pivots.iter().map(move |pivot| Footprint {
                     owner,
                     source: pivot.source,
                     attempt: pivot.attempt,
                 })
-            })
-            .collect()
+            }));
     }
 }
 
@@ -570,15 +646,14 @@ impl CellStore {
                 .find(|pivot| {
                     pivot
                         .as_ref()
-                        .is_some_and(|pivot| pivot.definition.id == definition.id)
+                        .is_some_and(|pivot| pivot.saved.id == definition.id)
                 })
                 .and_then(Option::take);
             match kept {
-                Some(pivot) if pivot.definition == definition => next.push(pivot),
+                Some(pivot) if pivot.saved == definition => next.push(pivot),
                 kept => {
-                    if let Some(old) = kept.filter(|old| old.definition.anchor != definition.anchor)
-                    {
-                        self.remove_pivot_output(sheet, old.definition.anchor);
+                    if let Some(old) = kept.filter(|old| old.saved.anchor != definition.anchor) {
+                        self.remove_pivot_output(sheet, old.saved.anchor);
                     }
                     let data = &mut self.sheets[sheet];
                     data.formulas.mark_cell_dirty(definition.anchor);
@@ -587,7 +662,7 @@ impl CellStore {
             }
         }
         for removed in previous.into_iter().flatten() {
-            self.remove_pivot_output(sheet, removed.definition.anchor);
+            self.remove_pivot_output(sheet, removed.saved.anchor);
         }
 
         if !next.is_empty() {
@@ -612,10 +687,10 @@ impl CellStore {
             return Vec::new();
         };
         let data = &self.sheets[sheet];
-        let mut status = Vec::with_capacity(pivots.len() * 7);
+        let mut status = Vec::with_capacity(pivots.len() * STATUS_STRIDE);
         for pivot in pivots {
-            let (row, col) = pivot.definition.anchor;
-            match (pivot.error, &pivot.layout) {
+            let (row, col) = pivot.saved.anchor;
+            let record: [u32; STATUS_STRIDE] = match (pivot.error, &pivot.layout) {
                 (Some(error), _) => {
                     let user_anchor = data.formulas.contains((row, col))
                         || (data.cells.contains_cell(row as usize, col as usize)
@@ -624,9 +699,9 @@ impl CellStore {
                                 .source_kind_at(data.cells.idx(row as usize, col as usize))
                                 != KIND_EMPTY);
                     let size = u32::from(!user_anchor);
-                    status.extend([error.slot() as u32 + 1, row, col, size, size, 0, 0]);
+                    [error.slot() as u32 + 1, row, col, size, size, 0, 0]
                 }
-                (None, Some(layout)) => status.extend([
+                (None, Some(layout)) => [
                     0,
                     row,
                     col,
@@ -634,9 +709,10 @@ impl CellStore {
                     layout.cols as u32,
                     layout.header_rows as u32,
                     layout.label_cols as u32,
-                ]),
-                (None, None) => status.extend([0, row, col, 0, 0, 0, 0]),
-            }
+                ],
+                (None, None) => [0, row, col, 0, 0, 0, 0],
+            };
+            status.extend(record);
         }
         status
     }
@@ -649,7 +725,7 @@ impl CellStore {
             .pivots
             .as_deref()
             .and_then(|registry| registry.sheets.get(&sheet)?.get(index))
-            .and_then(|pivot| self.resolve_pivot_source(&pivot.definition.source).ok())
+            .and_then(|pivot| self.resolve_pivot_source(&pivot.saved.source).ok())
             .map(|(rect, names)| {
                 source_fields(&StoreSource {
                     sheet: &self.sheets[rect.sheet],
@@ -725,24 +801,26 @@ impl CellStore {
         sheets: I,
         affected: Option<&FxHashSet<AbsCellKey>>,
     ) where
-        I: IntoIterator<Item = usize>,
+        I: IntoIterator<Item = usize> + Clone,
     {
-        let finished: Vec<usize> = sheets.into_iter().collect();
         let Some(registry) = self.pivots.as_deref_mut() else {
             return;
         };
+        let finished = |sheet: usize| sheets.clone().into_iter().any(|done| done == sheet);
+
         for (&owner, pivots) in &mut registry.sheets {
             for pivot in pivots {
                 if let Some(rect) = pivot.source {
                     capture_source(
                         &self.sheets[rect.sheet],
                         rect,
-                        finished.contains(&rect.sheet),
+                        finished(rect.sheet),
                         affected,
                         &mut pivot.pending,
                     );
                 }
-                if let Some(attempt) = pivot.attempt.filter(|_| finished.contains(&owner)) {
+
+                if let Some(attempt) = pivot.attempt.filter(|_| finished(owner)) {
                     let installed = pivot.error.is_none();
                     pivot.pending.readmit |= attempt_cut(&self.sheets[owner], attempt, installed);
                 }
@@ -766,7 +844,8 @@ impl CellStore {
         if let Some(mut registry) = self.pivots.take() {
             for (&owner, pivots) in &mut registry.sheets {
                 for pivot in pivots {
-                    if !std::mem::take(&mut pivot.pending).is_empty() {
+                    if !pivot.pending.is_empty() {
+                        pivot.pending.clear();
                         pivot.cache = None;
                         if self.show_pivot_error(owner, pivot, FormulaError::Cycle, None)
                             && !changed.contains(&owner)
@@ -779,10 +858,12 @@ impl CellStore {
             self.pivots = Some(registry);
         }
         self.recompute_formulas(&changed);
+
         if let Some(registry) = self.pivots.as_deref_mut() {
             for pivot in registry.pivots_mut() {
                 // A stale cache rebuilds at the pivot's next source change.
-                if !std::mem::take(&mut pivot.pending).is_empty() {
+                if !pivot.pending.is_empty() {
+                    pivot.pending.clear();
                     pivot.cache = None;
                 }
             }
@@ -792,30 +873,36 @@ impl CellStore {
     /// Updates each pivot with pending changes. Returns the sheets whose
     /// cells changed; those cells are marked dirty.
     fn update_pivots(&mut self) -> Vec<usize> {
+        // Every change that needs output work marks a pivot pending, including
+        // anchors that a structural edit moves together or apart.
+        if self.pivots.as_deref().is_none_or(PivotRegistry::is_idle) {
+            return Vec::new();
+        }
         let Some(mut registry) = self.pivots.take() else {
             return Vec::new();
         };
-        let mut footprints = registry.footprints();
+
+        registry.refresh_footprints();
         let mut changed = Vec::new();
         let mut index = 0;
         for (&owner, pivots) in &mut registry.sheets {
-            let mut anchor_counts = FxHashMap::default();
+            let anchor_counts = &mut registry.anchor_counts;
+            anchor_counts.clear();
             for pivot in pivots.iter() {
-                *anchor_counts
-                    .entry(pivot.definition.anchor)
-                    .or_insert(0usize) += 1;
+                *anchor_counts.entry(pivot.saved.anchor).or_insert(0) += 1;
             }
+
             for pivot in pivots {
-                let output_changed = if anchor_counts[&pivot.definition.anchor] > 1 {
+                let output_changed = if anchor_counts[&pivot.saved.anchor] > 1 {
                     // Structural deletion can clamp distinct anchors together.
                     // Keep both definitions, but let neither install output.
-                    pivot.pending = Pending::default();
+                    pivot.pending.clear();
                     pivot.cache = None;
-                    footprints[index].attempt = SpillRange::new(pivot.definition.anchor, 1, 1);
+                    registry.footprints[index].attempt = SpillRange::new(pivot.saved.anchor, 1, 1);
                     self.show_pivot_error(owner, pivot, FormulaError::Spill, None)
                 } else {
                     !pivot.pending.is_empty()
-                        && self.update_pivot(owner, pivot, &mut footprints, index)
+                        && self.update_pivot(owner, pivot, &mut registry.footprints, index)
                 };
                 if output_changed && !changed.contains(&owner) {
                     changed.push(owner);
@@ -823,6 +910,7 @@ impl CellStore {
                 index += 1;
             }
         }
+
         self.pivots = Some(registry);
         changed
     }
@@ -834,14 +922,15 @@ impl CellStore {
         footprints: &mut [Footprint],
         index: usize,
     ) -> bool {
-        let pending = std::mem::take(&mut pivot.pending);
-        let refreshed =
-            self.refresh_pivot_cache(pivot, pending.rebuild, pending.headers, pending.rows);
+        let readmit = pivot.pending.readmit;
+        let refreshed = self.refresh_pivot_cache(pivot);
+        pivot.pending.clear();
         footprints[index].source = pivot.source;
         if let Err(error) = refreshed {
             footprints[index].attempt = None;
             return self.show_pivot_error(owner, pivot, error, None);
         }
+
         let Some(cache) = pivot.cache.as_mut() else {
             return self.show_pivot_error(owner, pivot, FormulaError::Ref, None);
         };
@@ -852,15 +941,14 @@ impl CellStore {
         }
 
         // Unchanged groups and intact output: write only the changed cells.
-        let anchor = pivot.definition.anchor;
-        let intact = pivot.error.is_none()
-            && !pending.readmit
-            && pivot.layout.as_ref().is_some_and(|layout| {
-                self.sheets[owner].spill.installed(anchor)
+        let anchor = pivot.saved.anchor;
+        let shown = pivot.error.is_none() && !readmit;
+        let intact = pivot.layout.as_ref().filter(|layout| {
+            shown
+                && self.sheets[owner].spill.installed(anchor)
                     == SpillRange::new(anchor, layout.rows, layout.cols)
-            });
-        if intact {
-            let layout = pivot.layout.as_ref().expect("intact output has a layout");
+        });
+        if let Some(layout) = intact {
             if let Some(offsets) = cache.take_changes(layout) {
                 return self.write_pivot_cells(owner, anchor, cache, layout, &offsets);
             }
@@ -875,6 +963,7 @@ impl CellStore {
         let Some(range) = SpillRange::new(anchor, layout.rows, layout.cols) else {
             return self.show_pivot_error(owner, pivot, FormulaError::Num, None);
         };
+
         footprints[index].attempt = Some(range);
         if meets_upstream_source(footprints, index, range) {
             return self.show_pivot_error(owner, pivot, FormulaError::Spill, Some(range));
@@ -897,15 +986,10 @@ impl CellStore {
     }
 
     /// Builds the cache when the definition or the source bounds changed,
-    /// otherwise updates the changed rows and headers.
-    fn refresh_pivot_cache(
-        &self,
-        pivot: &mut Pivot,
-        rebuild: bool,
-        headers: bool,
-        mut rows: Vec<u32>,
-    ) -> Result<(), FormulaError> {
-        let resolved = self.resolve_pivot_source(&pivot.definition.source);
+    /// otherwise updates the pending rows and headers. Leaves the pending
+    /// work for the caller to clear.
+    fn refresh_pivot_cache(&self, pivot: &mut Pivot) -> Result<(), FormulaError> {
+        let resolved = self.resolve_pivot_source(&pivot.saved.source);
         let (rect, names) = match resolved {
             Ok(resolved) => resolved,
             Err(error) => {
@@ -921,20 +1005,23 @@ impl CellStore {
             names,
         };
 
+        let pending = &mut pivot.pending;
         match pivot.cache.as_mut() {
-            Some(cache) if !rebuild && pivot.source == Some(rect) => {
-                if headers {
+            Some(cache) if !pending.rebuild && pivot.source == Some(rect) => {
+                if pending.headers {
                     cache.update_headers(&source);
                 }
-                rows.sort_unstable();
-                rows.dedup();
-                let rows: Vec<usize> = rows.into_iter().map(|row| row as usize).collect();
-                cache.update_rows(&rows, &source);
+
+                pending.rows.sort_unstable();
+                pending.rows.dedup();
+                cache.update_rows(&pending.rows, &source);
             }
             _ => {
+                // Free the old cache before building the new one, and leave
+                // `None` when the build fails.
                 pivot.cache = None;
                 pivot.source = Some(rect);
-                pivot.cache = Some(PivotCache::build(&pivot.definition.spec, &source)?);
+                pivot.cache = Some(PivotCache::build(&pivot.saved.definition, &source)?);
             }
         }
         Ok(())
@@ -952,17 +1039,18 @@ impl CellStore {
         let data = &mut self.sheets[owner];
         let mut changed = Vec::new();
         for &offset in offsets {
+            // Changes are value cells below the header rows: the anchor is a
+            // header cell, and a changed header forces a relayout instead.
+            debug_assert!(
+                offset >= layout.header_rows * layout.cols,
+                "a changed offset inside the header rows"
+            );
+
             let cell = (
                 anchor.0 + (offset / layout.cols) as u32,
                 anchor.1 + (offset % layout.cols) as u32,
             );
             let value = cache.cell(layout, offset);
-            if cell == anchor {
-                if set_anchor_value(data, &mut self.strings, anchor, &value) {
-                    changed.push(cell);
-                }
-                continue;
-            }
             let index = data.cells.idx(cell.0 as usize, cell.1 as usize);
             let slot = calculated_slot(&mut self.strings, &value);
             if data.cells.calculated_cell_at(index) != Some(slot) {
@@ -987,15 +1075,16 @@ impl CellStore {
     ) -> bool {
         pivot.layout = None;
         pivot.error = Some(error);
-        let (changed, attempt) =
-            self.show_output_error(owner, pivot.definition.anchor, error, attempt);
+        let (changed, attempt) = self.show_output_error(owner, pivot.saved.anchor, error, attempt);
         pivot.attempt = attempt;
         changed
     }
 
-    /// Moves pivot sources and anchors with a row or column insert or delete
-    /// on `sheet`, by the rule core uses. The edit cleared the sheet's spills,
-    /// so the moved pivots rebuild and place their output again.
+    /// Moves range sources and anchors with a row or column insert or delete
+    /// on `sheet`. Core also remaps or drops field indices and sends the
+    /// definitions again; this step only moves the spans and marks the moved
+    /// pivots pending. The edit cleared the sheet's spills, so the moved
+    /// pivots rebuild and place their output again.
     pub(crate) fn shift_pivots(&mut self, sheet: usize, axis: ShiftAxis, at: u32, delta: i64) {
         let extent_after = match axis {
             ShiftAxis::Rows => self.sheets[sheet].cells.row_count(),
@@ -1006,7 +1095,7 @@ impl CellStore {
         };
         for (&owner, pivots) in &mut registry.sheets {
             for pivot in pivots {
-                let definition = &mut pivot.definition;
+                let definition = &mut pivot.saved;
                 let mut moved = owner == sheet;
                 if let SourceRef::Range {
                     sheet: source_sheet,
@@ -1063,7 +1152,7 @@ impl CellStore {
             return;
         };
         for pivot in registry.pivots_mut() {
-            if matches!(pivot.definition.source, SourceRef::Table(_)) {
+            if matches!(pivot.saved.source, SourceRef::Table(_)) {
                 pivot.pending.rebuild = true;
             }
         }

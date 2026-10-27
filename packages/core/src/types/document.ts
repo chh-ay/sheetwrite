@@ -391,7 +391,7 @@ export interface SheetSnapshot {
   rowGroups?: RowGroup[];
   tables?: WorkbookTable[];
   charts?: ChartDefinition[];
-
+  /** Pivot tables anchored on this sheet. */
   pivots?: PivotDefinition[];
   cells: CellBlock[];
 }

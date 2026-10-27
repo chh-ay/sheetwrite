@@ -15,6 +15,7 @@ import {
   withAdmittedTransactionResources,
 } from "./document-protocol.js";
 import {
+  type AxisResize,
   type HistoryAction,
   type HistoryPart,
   type HistoryResourceStats,
@@ -120,7 +121,7 @@ export class DocumentController {
     // Undo entries hold addresses from before this change: a remote row or
     // column insert or delete moves them exactly as a local one does.
     if (outcome.status === "applied") {
-      for (const patch of outcome.transaction.patches) this.rebaseHistoryFor(patch);
+      this.rebaseHistoryFor(outcome.transaction.patches);
     }
 
     return outcome;
@@ -288,7 +289,7 @@ export class DocumentController {
       }
     }
 
-    for (const patch of applied) this.rebaseHistoryFor(patch);
+    this.rebaseHistoryFor(applied);
     this.history.push(inverse, applied);
 
     return outcome;
@@ -1198,20 +1199,34 @@ export class DocumentController {
     return patches;
   }
 
-  private rebaseHistoryFor(patch: DocumentOp): void {
-    switch (patch.op) {
-      case "addRows":
-        this.history.rebaseRows(patch.sheet, patch.at, patch.count);
-        break;
-      case "removeRows":
-        this.history.rebaseRows(patch.sheet, patch.at, -patch.count);
-        break;
-      case "addColumns":
-        this.history.rebaseCols(patch.sheet, patch.at, patch.columns.length);
-        break;
-      case "removeColumns":
-        this.history.rebaseCols(patch.sheet, patch.at, -patch.count);
-        break;
+  /**
+   * Rebase undo history past the row and column edits of one applied
+   * transaction. A deleted pivot anchor falls back inside the sheet as it stood
+   * right after its own edit, and later edits in the batch may resize the sheet
+   * again, so each edit's extent is recovered from the final one.
+   */
+  private rebaseHistoryFor(patches: readonly DocumentOp[]): void {
+    const extents = new Map<SheetId, { row: number; col: number }>();
+    for (const patch of patches) {
+      const edit = axisResize(patch);
+      if (!edit) continue;
+
+      let extent = extents.get(edit.sheet);
+      if (!extent) {
+        const sheet = this.sheetById(edit.sheet);
+        extent = { row: sheet?.rowCount ?? 0, col: sheet?.columns.length ?? 0 };
+        extents.set(edit.sheet, extent);
+      }
+      extent[edit.axis] -= edit.delta;
+    }
+
+    for (const patch of patches) {
+      const edit = axisResize(patch);
+      const extent = edit && extents.get(edit.sheet);
+      if (!edit || !extent) continue;
+
+      extent[edit.axis] += edit.delta;
+      this.history.rebaseAxis(edit, extent[edit.axis]);
     }
   }
 
@@ -1232,7 +1247,7 @@ export class DocumentController {
       this.applyingHistory = false;
     }
     if (outcome.status !== "applied") return outcome;
-    for (const patch of outcome.transaction.patches) this.rebaseHistoryFor(patch);
+    this.rebaseHistoryFor(outcome.transaction.patches);
     this.options.onHistoryApplied();
     return outcome;
   }
@@ -1359,6 +1374,22 @@ function exceedsTransactionLimit(issue: MutationIssue): boolean {
       issue.resource === "encoded-bytes" ||
       issue.resource === "batch-versions")
   );
+}
+
+/** The row or column count change `patch` makes; null for any other operation. */
+function axisResize(patch: DocumentOp): AxisResize | null {
+  switch (patch.op) {
+    case "addRows":
+      return { sheet: patch.sheet, axis: "row", at: patch.at, delta: patch.count };
+    case "removeRows":
+      return { sheet: patch.sheet, axis: "row", at: patch.at, delta: -patch.count };
+    case "addColumns":
+      return { sheet: patch.sheet, axis: "col", at: patch.at, delta: patch.columns.length };
+    case "removeColumns":
+      return { sheet: patch.sheet, axis: "col", at: patch.at, delta: -patch.count };
+    default:
+      return null;
+  }
 }
 
 function previousColumnPatch(column: Column, changed: Partial<Column>): Partial<Column> {

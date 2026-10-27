@@ -429,6 +429,72 @@ describe("pivot structural rewrites", () => {
     grid.undo();
     expect(onlyPivot(grid, "p-range")).toEqual(rangePivot({ anchor: { row: 6, col: 1 } }));
   });
+
+  it.each([
+    ["rows", { op: "removeRows", sheet: "report", at: 2, count: 18 }],
+    ["columns", { op: "removeColumns", sheet: "report", at: 1, count: 5 }],
+  ] as const)(
+    "restores an older pivot undo after the trailing %s holding its anchor are deleted and restored",
+    (_name, operation) => {
+      const grid = mountGrid([]);
+      grid.setPivot(rangePivot());
+      grid.setPivot(rangePivot({ name: "Renamed" }));
+      expect(grid.applyTransaction({ patches: [operation] }).status).toBe("applied");
+
+      grid.undo();
+      const report = grid.store.getWorkbook().sheets.find((sheet) => sheet.id === "report");
+      expect([report?.rowCount, report?.columns.length]).toEqual([20, 6]);
+      expect(onlyPivot(grid, "p-range").name).toBe("Renamed");
+
+      grid.undo();
+      expect(onlyPivot(grid, "p-range")).toEqual(rangePivot());
+    },
+  );
+
+  it.each<[string, DocumentOp[], { row: number; col: number }]>([
+    ["rows", [{ op: "removeRows", sheet: "report", at: 2, count: 18 }], { row: 1, col: 1 }],
+    ["columns", [{ op: "removeColumns", sheet: "report", at: 1, count: 5 }], { row: 2, col: 0 }],
+    [
+      // The fallback must use the row count right after the delete, not after the batch.
+      "rows and then re-adds some",
+      [
+        { op: "removeRows", sheet: "report", at: 2, count: 18 },
+        { op: "addRows", sheet: "report", at: 2, count: 5 },
+      ],
+      { row: 1, col: 1 },
+    ],
+  ])(
+    "keeps an older pivot undo applicable after a peer deletes the trailing %s holding its anchor",
+    (_name, operations, anchor) => {
+      const grid = mountGrid([]);
+      grid.setPivot(rangePivot());
+      grid.setPivot(rangePivot({ name: "Renamed" }));
+      expect(grid.applyRemoteOperations(operations).status).toBe("applied");
+
+      // The recorded anchor fell back inside the shrunken sheet, so the undo still applies.
+      grid.undo();
+      expect(onlyPivot(grid, "p-range")).toEqual(rangePivot({ anchor }));
+    },
+  );
+
+  it.each<[string, DocumentOp]>([
+    ["rows", { op: "removeRows", sheet: "report", at: 1, count: 3 }],
+    ["columns", { op: "removeColumns", sheet: "report", at: 1, count: 2 }],
+  ])(
+    "restores an older pivot undo to its anchor after a non-trailing %s delete is undone",
+    (_name, operation) => {
+      const grid = mountGrid([]);
+      grid.setPivot(rangePivot());
+      grid.setPivot(rangePivot({ name: "Renamed" }));
+      grid.applyTransaction({ patches: [operation] });
+
+      grid.undo();
+      expect(onlyPivot(grid, "p-range")).toEqual(rangePivot({ name: "Renamed" }));
+
+      grid.undo();
+      expect(onlyPivot(grid, "p-range")).toEqual(rangePivot());
+    },
+  );
 });
 
 describe("pivot collaboration", () => {
@@ -672,6 +738,49 @@ describe("pivot engine boundary on the default engine", () => {
       expect(store.removePivot("p-table").status).toBe("applied");
       expect(store.removePivot("p-table").status).toBe("noop");
       expect(store.getPivots().map((pivot) => pivot.id)).toEqual(["p-range"]);
+    } finally {
+      store.dispose();
+    }
+  });
+
+  it("accepts a write into a pivot's output when an earlier patch in the batch removes it", () => {
+    const pivot = rangePivot({ savedOutput: { rows: 2, cols: 2, cells: ["Excel", 10, 20, 30] } });
+    const store = new SheetwriteStore(structuredClone(workbook([pivot])));
+    const addr = { sheet: "report", row: 3, col: 2 };
+    try {
+      const outcome = store.applyTransaction({
+        patches: [
+          { op: "removePivot", sheet: "report", id: pivot.id },
+          { op: "set", addr, value: { kind: "literal", value: 7 } },
+        ],
+      });
+
+      expect(outcome.status === "applied" && outcome.transaction.patches.length).toBe(2);
+      expect(store.getCell(addr).resolved).toBe(7);
+    } finally {
+      store.dispose();
+    }
+  });
+
+  it("releases pivot output only for a replayed write that changes its cell contents", () => {
+    const pivot = rangePivot({ savedOutput: { rows: 2, cols: 2, cells: ["Excel", 10, 20, 30] } });
+    const store = new SheetwriteStore(structuredClone(workbook([pivot])));
+    const output: Range = { sheet: "report", start: { row: 3, col: 2 }, end: { row: 3, col: 2 } };
+    const outside: Range = { sheet: "report", start: { row: 9, col: 0 }, end: { row: 9, col: 0 } };
+    // Releasing an output re-sends the sheet's pivots to the engine in bulk transfers.
+    const bulkCallsToClear = (range: Range, contents: boolean): number => {
+      store.resetRuntimeResourceAccounting();
+      store.applyTransaction(
+        { patches: [{ op: "clearRange", range, contents, style: true }] },
+        { source: "remote" },
+      );
+      return store
+        .getRuntimeResourceSnapshot("edit", "settled")
+        .boundary.reduce((total, stats) => total + stats.bulkCalls, 0);
+    };
+    try {
+      expect(bulkCallsToClear(output, false)).toBe(bulkCallsToClear(outside, false));
+      expect(bulkCallsToClear(output, true)).toBeGreaterThan(bulkCallsToClear(outside, true));
     } finally {
       store.dispose();
     }

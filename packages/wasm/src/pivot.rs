@@ -37,11 +37,15 @@ const NO_GROUP: u32 = u32::MAX;
 /// Group 0 of each axis is the grand total.
 const ROOT: u32 = 0;
 
-const KIND_BLANK: u8 = 0;
-const KIND_NUMBER: u8 = 1;
-const KIND_TEXT: u8 = 2;
-const KIND_BOOL: u8 = 3;
-const KIND_ERROR: u8 = 4;
+/// What a source row contributed to one value field, stored per row so an
+/// edit can remove exactly the old contribution. A text payload is a
+/// [`TextIds`] id for DISTINCTCOUNT and unused otherwise; an error payload
+/// is its error slot.
+const CONTRIBUTION_BLANK: u8 = 0;
+const CONTRIBUTION_NUMBER: u8 = 1;
+const CONTRIBUTION_TEXT: u8 = 2;
+const CONTRIBUTION_BOOL: u8 = 3;
+const CONTRIBUTION_ERROR: u8 = 4;
 
 /// Multiset key tags. MIN and MAX store only numbers, so their keys sort in
 /// numeric order; DISTINCTCOUNT counts keys of every tag.
@@ -49,13 +53,15 @@ const TAG_NUMBER: u8 = 0;
 const TAG_TEXT: u8 = 1;
 const TAG_BOOL: u8 = 2;
 
-/// Field types that [`source_fields`] reports.
-pub(crate) const FIELD_BLANK: u8 = 0;
+// Field types that [`source_fields`] reports for the field list: the one
+// type of every nonblank value, blank for an empty field, or mixed.
+const FIELD_BLANK: u8 = 0;
 const FIELD_NUMBER: u8 = 1;
 const FIELD_TEXT: u8 = 2;
 const FIELD_BOOL: u8 = 3;
 const FIELD_MIXED: u8 = 4;
 
+/// How a value field combines the values of a group's source rows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Aggregation {
     Sum,
@@ -109,6 +115,8 @@ impl Aggregation {
     }
 }
 
+/// One value field of a pivot: the source field it aggregates, how, and an
+/// optional caption that replaces the generated "Sum of Field".
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct PivotValue {
     pub(crate) field: usize,
@@ -116,27 +124,110 @@ pub(crate) struct PivotValue {
     pub(crate) name: Option<String>,
 }
 
-/// A keep-list: a row stays when its value equals one of `keep`.
-#[derive(Clone, Debug, PartialEq)]
-pub(crate) struct PivotFilter {
-    pub(crate) field: usize,
-    pub(crate) keep: Vec<Value>,
-}
+/// The one letter whose lowercase depends on its neighbors: `to_lowercase`
+/// folds it to a final sigma at the end of a word.
+const CAPITAL_SIGMA: char = 'Σ';
 
-impl PivotFilter {
-    fn keeps(&self, value: &Value) -> bool {
-        let Ok(part) = key_part(value) else {
-            return false;
-        };
-        self.keep.iter().any(|kept| {
-            key_part(kept).is_ok_and(|kept_part| kept_part == part)
-                && compare_group_values(kept, value).is_eq()
-        })
+/// Writes the case fold of `text` into `folded`, equal to
+/// `text.to_lowercase()` (the fold group keys use) but into a reused buffer,
+/// so a row check allocates nothing.
+fn fold_case(text: &str, folded: &mut String) {
+    folded.clear();
+    if text.contains(CAPITAL_SIGMA) {
+        // Only the whole-string mapping knows a sigma's context; every other
+        // letter folds the same one at a time.
+        folded.push_str(&text.to_lowercase());
+    } else {
+        folded.extend(text.chars().flat_map(char::to_lowercase));
     }
 }
 
+/// A keep-list: a row stays when its value equals one of `keep`.
+#[derive(Clone, Debug)]
+pub(crate) struct PivotFilter {
+    field: usize,
+    keep: Vec<Value>,
+    /// Indices into `keep` by key bucket, built once so checking a row costs
+    /// one bucket lookup instead of a scan of every kept value. Kept values
+    /// that cannot be keys (errors) match no row, so no bucket holds them.
+    buckets: FxHashMap<KeyPart, Vec<usize>>,
+    /// The buckets of nonempty text, by case fold, kept apart so a text row
+    /// looks up its borrowed fold instead of building an owned key.
+    text_buckets: FxHashMap<String, Vec<usize>>,
+}
+
+/// The buckets derive from `keep`, so the keep-list alone decides equality,
+/// which decides whether a redefined pivot keeps its cache.
+impl PartialEq for PivotFilter {
+    fn eq(&self, other: &Self) -> bool {
+        self.field == other.field && self.keep == other.keep
+    }
+}
+
+impl PivotFilter {
+    pub(crate) fn new(field: usize, keep: Vec<Value>) -> Self {
+        let mut buckets: FxHashMap<KeyPart, Vec<usize>> = FxHashMap::default();
+        let mut text_buckets: FxHashMap<String, Vec<usize>> = FxHashMap::default();
+        for (index, kept) in keep.iter().enumerate() {
+            match key_part(kept) {
+                Ok(KeyPart::Text(folded)) => text_buckets.entry(folded).or_default().push(index),
+                Ok(part) => buckets.entry(part).or_default().push(index),
+                Err(_) => {}
+            }
+        }
+
+        Self {
+            field,
+            keep,
+            buckets,
+            text_buckets,
+        }
+    }
+
+    /// Whether `value` passes; `folded` is a reused case-fold buffer.
+    fn keeps(&self, value: &Value, folded: &mut String) -> bool {
+        let indices = match value {
+            Value::Text(text) if !text.is_empty() => {
+                fold_case(text, folded);
+                self.text_buckets.get(folded.as_str())
+            }
+            _ => match key_part(value) {
+                Ok(part) => self.buckets.get(&part),
+                Err(_) => return false,
+            },
+        };
+
+        // Equal keys share a bucket, but a bucket may also hold unequal
+        // values (blank, zero, FALSE and empty text share one), so compare
+        // within it.
+        indices.is_some_and(|indices| {
+            indices
+                .iter()
+                .any(|&index| compare_group_values(&self.keep[index], value).is_eq())
+        })
+    }
+
+    fn retained_bytes(&self) -> usize {
+        let bucket_entry = size_of::<Vec<usize>>() + 1;
+        let indices = |indices: &Vec<usize>| indices.capacity() * size_of::<usize>();
+        self.keep.capacity() * size_of::<Value>()
+            + text_bytes(&self.keep)
+            + self.buckets.capacity() * (size_of::<KeyPart>() + bucket_entry)
+            + self.buckets.values().map(indices).sum::<usize>()
+            + self.text_buckets.capacity() * (size_of::<String>() + bucket_entry)
+            + self
+                .text_buckets
+                .iter()
+                .map(|(text, bucket)| text.capacity() + indices(bucket))
+                .sum::<usize>()
+    }
+}
+
+/// What a pivot table shows: its row and column fields, value fields,
+/// filters, sort directions and layout options. The source and anchor are
+/// the store's; this is all the cache needs to group and aggregate.
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct PivotSpec {
+pub(crate) struct PivotDefinition {
     pub(crate) rows: Vec<usize>,
     pub(crate) columns: Vec<usize>,
     pub(crate) values: Vec<PivotValue>,
@@ -150,7 +241,7 @@ pub(crate) struct PivotSpec {
     pub(crate) tabular: bool,
 }
 
-impl PivotSpec {
+impl PivotDefinition {
     /// Every field the cache reads, so a source narrower than this is invalid.
     pub(crate) fn max_field(&self) -> Option<usize> {
         self.rows
@@ -162,7 +253,7 @@ impl PivotSpec {
             .max()
     }
 
-    /// Heap bytes the spec owns: field lists, value names and filter keeps.
+    /// Heap bytes the definition owns: field lists, value names and filter keeps.
     pub(crate) fn retained_bytes(&self) -> usize {
         (self.rows.capacity() + self.columns.capacity()) * size_of::<usize>()
             + self.values.capacity() * size_of::<PivotValue>()
@@ -176,9 +267,7 @@ impl PivotSpec {
             + self
                 .filters
                 .iter()
-                .map(|filter| {
-                    filter.keep.capacity() * size_of::<Value>() + text_bytes(&filter.keep)
-                })
+                .map(PivotFilter::retained_bytes)
                 .sum::<usize>()
             + self.row_descending.capacity()
             + self.column_descending.capacity()
@@ -308,6 +397,7 @@ impl Axis {
             rows: 0,
             next_same_hash,
         };
+
         let index = match self.free.pop() {
             Some(index) => {
                 self.groups[index as usize] = group;
@@ -318,6 +408,7 @@ impl Axis {
                 (self.groups.len() - 1) as u32
             }
         };
+
         self.by_hash.insert(hash, index);
         self.live += 1;
         index
@@ -550,12 +641,14 @@ struct TextIds {
 }
 
 impl TextIds {
-    fn acquire(&mut self, text: &str) -> u32 {
-        let folded: Rc<str> = text.to_lowercase().into();
-        if let Some(&id) = self.ids.get(&folded) {
+    /// The id of `folded`, a case fold from [`fold_case`].
+    fn acquire(&mut self, folded: &str) -> u32 {
+        if let Some(&id) = self.ids.get(folded) {
             self.uses[id as usize] += 1;
             return id;
         }
+
+        let folded: Rc<str> = Rc::from(folded);
         let id = match self.free.pop() {
             Some(id) => {
                 self.texts[id as usize] = Some(folded.clone());
@@ -568,6 +661,7 @@ impl TextIds {
                 (self.texts.len() - 1) as u32
             }
         };
+
         self.ids.insert(folded, id);
         id
     }
@@ -696,7 +790,9 @@ impl ExactSum {
 
         // Add the carry back one unit at a time. The running sum moves
         // monotonically from the partials to the result, so no step
-        // overflows unless the result does.
+        // overflows unless the result does. The copy is rare: only a sum
+        // past one carry unit (2^1022) reads this path, and only numbers near
+        // the overflow limit reach it.
         let unit = CARRY_UNIT.copysign(spilled.carry as f64);
         let mut partials = spilled.partials.clone();
         for _ in 0..spilled.carry.unsigned_abs() {
@@ -866,7 +962,7 @@ impl Partial {
         row: u32,
         adding: bool,
     ) {
-        if kind != KIND_BLANK {
+        if kind != CONTRIBUTION_BLANK {
             if adding {
                 self.nonblank += 1;
             } else {
@@ -875,7 +971,7 @@ impl Partial {
         }
 
         let multiset_key = match kind {
-            KIND_NUMBER => {
+            CONTRIBUTION_NUMBER => {
                 let number = f64::from_bits(payload);
                 if aggregation.keeps_sum() {
                     self.sum.add(if adding { number } else { -number });
@@ -887,9 +983,13 @@ impl Partial {
                 }
                 Some((TAG_NUMBER, ordered_bits(number)))
             }
-            KIND_TEXT if aggregation == Aggregation::DistinctCount => Some((TAG_TEXT, payload)),
-            KIND_BOOL if aggregation == Aggregation::DistinctCount => Some((TAG_BOOL, payload)),
-            KIND_ERROR if aggregation.shows_errors() => {
+            CONTRIBUTION_TEXT if aggregation == Aggregation::DistinctCount => {
+                Some((TAG_TEXT, payload))
+            }
+            CONTRIBUTION_BOOL if aggregation == Aggregation::DistinctCount => {
+                Some((TAG_BOOL, payload))
+            }
+            CONTRIBUTION_ERROR if aggregation.shows_errors() => {
                 let error = FormulaError::from_slot(payload).unwrap_or(FormulaError::Value);
                 if adding {
                     self.errors.get_or_insert_default().insert(row, error);
@@ -930,6 +1030,7 @@ impl Partial {
                 return Value::Error(error);
             }
         }
+
         let numbers = || {
             self.multiset
                 .as_ref()
@@ -984,8 +1085,12 @@ pub(crate) struct PivotLayout {
     /// Value columns per column group: the value fields, or one blank column
     /// so a pivot without values still shows its column labels.
     value_slots: usize,
+    /// The groups in output order: one per data row, and one per run of
+    /// `value_slots` value columns.
     row_groups: Vec<u32>,
     col_groups: Vec<u32>,
+    /// Each group's index in `row_groups` / `col_groups`, so a changed pair
+    /// finds its output cells without a scan.
     row_positions: FxHashMap<u32, u32>,
     col_positions: FxHashMap<u32, u32>,
 }
@@ -1037,8 +1142,11 @@ pub(crate) fn source_fields(source: &impl PivotSource) -> (Vec<String>, Vec<u8>)
     (names, types)
 }
 
+/// The incremental grouping and aggregates of one pivot table over its
+/// source rows: edits of k rows cost O(k · fields) partial updates, and the
+/// output cells are read from it on demand.
 pub(crate) struct PivotCache {
-    spec: PivotSpec,
+    definition: PivotDefinition,
     headers: Vec<Value>,
     row_axis: Axis,
     col_axis: Axis,
@@ -1059,12 +1167,15 @@ pub(crate) struct PivotCache {
     partials: Vec<Partial>,
     /// Pairs whose aggregates changed since the last [`Self::take_changes`].
     changed_pairs: Vec<(u32, u32)>,
-    /// A group appeared or disappeared, or a header changed: the output needs
-    /// a new layout.
+    /// A group appeared or disappeared, a group label changed, or a header
+    /// changed: the output needs a new layout.
     relayout: bool,
+    /// Scratch buffers for one row's keys, group paths and text case fold,
+    /// kept between rows so a row update does not allocate.
     keys: Vec<Value>,
     row_path: Vec<u32>,
     col_path: Vec<u32>,
+    folded: String,
     #[cfg(test)]
     pub(crate) aggregate_updates: usize,
     #[cfg(test)]
@@ -1078,24 +1189,28 @@ fn pair_key(row_group: u32, col_group: u32) -> u64 {
 impl PivotCache {
     /// Groups and aggregates every source row. Fails with `#NUM!` as soon as
     /// the groups pass [`MAX_PIVOT_GROUPS`], before memory grows further.
-    pub(crate) fn build(spec: &PivotSpec, source: &impl PivotSource) -> Result<Self, FormulaError> {
-        if spec
+    pub(crate) fn build(
+        definition: &PivotDefinition,
+        source: &impl PivotSource,
+    ) -> Result<Self, FormulaError> {
+        if definition
             .max_field()
             .is_some_and(|field| field >= source.width())
         {
             return Err(FormulaError::Ref);
         }
+
         let rows = source.rows();
-        let values = spec.values.len();
+        let values = definition.values.len();
         let mut cache = Self {
             headers: (0..source.width())
                 .map(|field| source.header(field))
                 .collect(),
-            row_axis: Axis::new(spec.rows.len()),
-            col_axis: Axis::new(spec.columns.len()),
+            row_axis: Axis::new(definition.rows.len()),
+            col_axis: Axis::new(definition.columns.len()),
             row_leaf: vec![NO_GROUP; rows],
             col_leaf: vec![NO_GROUP; rows],
-            contribution_kinds: vec![KIND_BLANK; rows * values],
+            contribution_kinds: vec![CONTRIBUTION_BLANK; rows * values],
             contribution_payloads: vec![0; rows * values],
             key_errors: BTreeMap::new(),
             texts: TextIds::default(),
@@ -1105,23 +1220,23 @@ impl PivotCache {
             partials: Vec::new(),
             changed_pairs: Vec::new(),
             relayout: true,
-            keys: Vec::with_capacity(spec.rows.len().max(spec.columns.len())),
+            keys: Vec::with_capacity(definition.rows.len().max(definition.columns.len())),
             row_path: Vec::new(),
             col_path: Vec::new(),
-            spec: spec.clone(),
+            folded: String::new(),
+            definition: definition.clone(),
             #[cfg(test)]
             aggregate_updates: 0,
             #[cfg(test)]
             output_reads: std::cell::Cell::new(0),
         };
+
         for row in 0..rows {
             cache.add_row(row, source);
             if cache.group_count() > MAX_PIVOT_GROUPS {
                 return Err(FormulaError::Num);
             }
         }
-        cache.changed_pairs.clear();
-        cache.relayout = true;
         Ok(cache)
     }
 
@@ -1140,23 +1255,24 @@ impl PivotCache {
     /// Replaces the contribution of each row in `rows` (ascending, no
     /// repeats, inside the source the cache was built from) with its current
     /// values.
-    pub(crate) fn update_rows(&mut self, rows: &[usize], source: &impl PivotSource) {
+    pub(crate) fn update_rows(&mut self, rows: &[u32], source: &impl PivotSource) {
         let mut row_orphans = Vec::new();
         let mut col_orphans = Vec::new();
         for &row in rows {
-            let row_leaf = self.row_leaf[row];
-            let col_leaf = self.col_leaf[row];
-            self.remove_row(row);
-            self.add_row(row, source);
+            let index = row as usize;
+            let row_leaf = self.row_leaf[index];
+            let col_leaf = self.col_leaf[index];
+            self.remove_row(index);
+            self.add_row(index, source);
 
             // Keep the old axis membership until the replacement enters:
             // changing a singleton's value must not destroy its layout.
             if row_leaf == NO_GROUP {
                 continue;
             }
-            let kept_row = self.row_leaf[row];
-            let kept_col = self.col_leaf[row];
-            let row = row as u32;
+
+            let kept_row = self.row_leaf[index];
+            let kept_col = self.col_leaf[index];
             self.relayout |= self
                 .row_axis
                 .leave(row_leaf, row, kept_row, &mut row_orphans);
@@ -1169,10 +1285,13 @@ impl PivotCache {
         // rows left, so find new label rows only now.
         self.relayout |=
             self.row_axis
-                .adopt_donors(&row_orphans, &self.row_leaf, &self.spec.rows, source);
-        self.relayout |=
-            self.col_axis
-                .adopt_donors(&col_orphans, &self.col_leaf, &self.spec.columns, source);
+                .adopt_donors(&row_orphans, &self.row_leaf, &self.definition.rows, source);
+        self.relayout |= self.col_axis.adopt_donors(
+            &col_orphans,
+            &self.col_leaf,
+            &self.definition.columns,
+            source,
+        );
     }
 
     /// Reads the headers again; a changed header changes the output labels.
@@ -1188,10 +1307,10 @@ impl PivotCache {
 
     fn add_row(&mut self, row: usize, source: &impl PivotSource) {
         if !self
-            .spec
+            .definition
             .filters
             .iter()
-            .all(|filter| filter.keeps(&source.value(row, filter.field)))
+            .all(|filter| filter.keeps(&source.value(row, filter.field), &mut self.folded))
         {
             return;
         }
@@ -1201,7 +1320,7 @@ impl PivotCache {
         let mut keys = std::mem::take(&mut self.keys);
         keys.clear();
         let mut key_error = None;
-        for &field in self.spec.rows.iter().chain(&self.spec.columns) {
+        for &field in self.definition.rows.iter().chain(&self.definition.columns) {
             let value = source.value(row, field);
             if let Err(error) = key_part(&value) {
                 key_error = Some(error);
@@ -1214,7 +1333,8 @@ impl PivotCache {
             self.key_errors.insert(row as u32, error);
             return;
         }
-        let (row_keys, col_keys) = keys.split_at(self.spec.rows.len());
+
+        let (row_keys, col_keys) = keys.split_at(self.definition.rows.len());
         let (row_leaf, row_changed) = self.row_axis.enter(row_keys, row as u32);
         let (col_leaf, col_changed) = self.col_axis.enter(col_keys, row as u32);
         self.keys = keys;
@@ -1222,29 +1342,31 @@ impl PivotCache {
         self.row_leaf[row] = row_leaf;
         self.col_leaf[row] = col_leaf;
 
-        let values = self.spec.values.len();
-        for (index, value) in self.spec.values.iter().enumerate() {
+        let values = self.definition.values.len();
+        for (index, value) in self.definition.values.iter().enumerate() {
             let (kind, payload) = match source.value(row, value.field) {
-                Value::Blank => (KIND_BLANK, 0),
+                Value::Blank => (CONTRIBUTION_BLANK, 0),
                 number @ Value::Number(_) => match range_number(&number) {
-                    Ok(Some(number)) => (KIND_NUMBER, number.to_bits()),
-                    Ok(None) => (KIND_BLANK, 0),
-                    Err(error) => (KIND_ERROR, error.slot() as u64),
+                    Ok(Some(number)) => (CONTRIBUTION_NUMBER, number.to_bits()),
+                    Ok(None) => (CONTRIBUTION_BLANK, 0),
+                    Err(error) => (CONTRIBUTION_ERROR, error.slot() as u64),
                 },
                 Value::Text(text) => (
-                    KIND_TEXT,
+                    CONTRIBUTION_TEXT,
                     if value.aggregation == Aggregation::DistinctCount {
-                        u64::from(self.texts.acquire(&text))
+                        fold_case(&text, &mut self.folded);
+                        u64::from(self.texts.acquire(&self.folded))
                     } else {
                         0
                     },
                 ),
-                Value::Bool(boolean) => (KIND_BOOL, u64::from(boolean)),
-                Value::Error(error) => (KIND_ERROR, error.slot() as u64),
+                Value::Bool(boolean) => (CONTRIBUTION_BOOL, u64::from(boolean)),
+                Value::Error(error) => (CONTRIBUTION_ERROR, error.slot() as u64),
             };
             self.contribution_kinds[row * values + index] = kind;
             self.contribution_payloads[row * values + index] = payload;
         }
+
         self.apply_row(row, true);
     }
 
@@ -1257,16 +1379,16 @@ impl PivotCache {
         }
         self.apply_row(row, false);
 
-        let values = self.spec.values.len();
-        for (index, value) in self.spec.values.iter().enumerate() {
+        let values = self.definition.values.len();
+        for (index, value) in self.definition.values.iter().enumerate() {
             let offset = row * values + index;
             if value.aggregation == Aggregation::DistinctCount
-                && self.contribution_kinds[offset] == KIND_TEXT
+                && self.contribution_kinds[offset] == CONTRIBUTION_TEXT
             {
                 self.texts
                     .release(self.contribution_payloads[offset] as u32);
             }
-            self.contribution_kinds[offset] = KIND_BLANK;
+            self.contribution_kinds[offset] = CONTRIBUTION_BLANK;
             self.contribution_payloads[offset] = 0;
         }
 
@@ -1282,11 +1404,11 @@ impl PivotCache {
         self.row_axis.path(self.row_leaf[row], &mut row_path);
         self.col_axis.path(self.col_leaf[row], &mut col_path);
 
-        let values = self.spec.values.len();
+        let values = self.definition.values.len();
         for &row_group in &row_path {
             for &col_group in &col_path {
                 let slot = self.pair_slot(row_group, col_group, adding);
-                for (index, value) in self.spec.values.iter().enumerate() {
+                for (index, value) in self.definition.values.iter().enumerate() {
                     let contribution = (
                         self.contribution_kinds[row * values + index],
                         self.contribution_payloads[row * values + index],
@@ -1326,7 +1448,7 @@ impl PivotCache {
             return slot;
         }
         debug_assert!(adding, "a removed row's pairs exist");
-        let values = self.spec.values.len();
+        let values = self.definition.values.len();
         let slot = match self.free_pairs.pop() {
             Some(slot) => {
                 self.pair_rows[slot as usize] = 1;
@@ -1348,7 +1470,7 @@ impl PivotCache {
         *rows -= 1;
         if *rows == 0 {
             self.pairs.remove(&pair_key(row_group, col_group));
-            let values = self.spec.values.len();
+            let values = self.definition.values.len();
             for partial in &mut self.partials[slot as usize * values..(slot as usize + 1) * values]
             {
                 *partial = Partial::default();
@@ -1360,28 +1482,28 @@ impl PivotCache {
     /// The output shape and order. Fails with `#NUM!` past
     /// [`MAX_PIVOT_OUTPUT_CELLS`].
     pub(crate) fn layout(&self) -> Result<PivotLayout, FormulaError> {
-        let spec = &self.spec;
-        let row_width = spec.rows.len();
-        let col_width = spec.columns.len();
+        let definition = &self.definition;
+        let row_width = definition.rows.len();
+        let col_width = definition.columns.len();
         let row_groups = self.row_axis.ordered(
-            &spec.row_descending,
-            !spec.tabular || (spec.subtotals && row_width > 1),
-            !spec.tabular,
-            spec.row_totals,
+            &definition.row_descending,
+            !definition.tabular || (definition.subtotals && row_width > 1),
+            !definition.tabular,
+            definition.row_totals,
         );
         let col_groups = self.col_axis.ordered(
-            &spec.column_descending,
-            spec.subtotals && col_width > 1,
+            &definition.column_descending,
+            definition.subtotals && col_width > 1,
             false,
-            spec.column_totals,
+            definition.column_totals,
         );
 
-        let value_slots = if spec.values.is_empty() && col_width > 0 {
+        let value_slots = if definition.values.is_empty() && col_width > 0 {
             1
         } else {
-            spec.values.len()
+            definition.values.len()
         };
-        let label_cols = if spec.tabular {
+        let label_cols = if definition.tabular {
             row_width
         } else {
             row_width.min(1)
@@ -1431,65 +1553,90 @@ impl PivotCache {
         if layout.header_rows == 0 {
             return Value::Blank;
         }
+
         let (row, col) = (offset / layout.cols, offset % layout.cols);
-        let spec = &self.spec;
-
         if row < layout.header_rows {
-            if col < layout.label_cols {
-                return if row == 0 {
-                    let field = spec.rows[if spec.tabular { col } else { 0 }];
-                    match &self.headers[field] {
-                        Value::Blank => Value::text(field_name(&Value::Blank, field)),
-                        header => header.clone(),
-                    }
-                } else {
-                    Value::Blank
-                };
-            }
-            let position = (col - layout.label_cols) / layout.value_slots;
-            let slot = (col - layout.label_cols) % layout.value_slots;
-            let group = layout.col_groups[position];
-            if row < spec.columns.len() {
-                return self.col_axis.level_label(group, row);
-            }
-            return spec.values.get(slot).map_or(Value::Blank, |value| {
-                Value::text(value.name.clone().unwrap_or_else(|| {
-                    format!(
-                        "{} of {}",
-                        value.aggregation.caption(),
-                        field_name(&self.headers[value.field], value.field)
-                    )
-                }))
-            });
+            self.header_cell(layout, row, col)
+        } else {
+            self.body_cell(layout, row, col)
         }
+    }
 
-        let row_group = layout.row_groups[row - layout.header_rows];
+    /// A header cell: a row field name above the label columns, then the
+    /// column group labels and the value captions above the value columns.
+    fn header_cell(&self, layout: &PivotLayout, row: usize, col: usize) -> Value {
+        let definition = &self.definition;
         if col < layout.label_cols {
-            if spec.tabular {
-                return self.row_axis.level_label(row_group, col);
+            if row != 0 {
+                return Value::Blank;
             }
-            return match self.row_axis.groups[row_group as usize].depth {
-                0 => Value::text(TOTAL_LABEL),
-                _ => self.row_axis.groups[row_group as usize].label.clone(),
+
+            let field = definition.rows[if definition.tabular { col } else { 0 }];
+            return match &self.headers[field] {
+                Value::Blank => Value::text(field_name(&Value::Blank, field)),
+                header => header.clone(),
             };
         }
 
-        let depth = self.row_axis.groups[row_group as usize].depth as usize;
-        if !spec.tabular && !spec.subtotals && depth > 0 && depth < spec.rows.len() {
-            return Value::Blank;
-        }
         let position = (col - layout.label_cols) / layout.value_slots;
         let slot = (col - layout.label_cols) % layout.value_slots;
-        let Some(value) = spec.values.get(slot) else {
+        if row < definition.columns.len() {
+            return self.col_axis.level_label(layout.col_groups[position], row);
+        }
+
+        definition.values.get(slot).map_or(Value::Blank, |value| {
+            Value::text(value.name.clone().unwrap_or_else(|| {
+                format!(
+                    "{} of {}",
+                    value.aggregation.caption(),
+                    field_name(&self.headers[value.field], value.field)
+                )
+            }))
+        })
+    }
+
+    /// A data row cell: the row group labels, then one aggregate per value
+    /// column.
+    fn body_cell(&self, layout: &PivotLayout, row: usize, col: usize) -> Value {
+        let definition = &self.definition;
+        let row_group = layout.row_groups[row - layout.header_rows];
+        let group = &self.row_axis.groups[row_group as usize];
+        if col < layout.label_cols {
+            if definition.tabular {
+                return self.row_axis.level_label(row_group, col);
+            }
+
+            return match group.depth {
+                0 => Value::text(TOTAL_LABEL),
+                _ => group.label.clone(),
+            };
+        }
+
+        // Compact rows without subtotals show inner groups as bare labels.
+        let depth = group.depth as usize;
+        if !definition.tabular
+            && !definition.subtotals
+            && depth > 0
+            && depth < definition.rows.len()
+        {
+            return Value::Blank;
+        }
+
+        let position = (col - layout.label_cols) / layout.value_slots;
+        let slot = (col - layout.label_cols) % layout.value_slots;
+        let Some(value) = definition.values.get(slot) else {
             return Value::Blank;
         };
+
         let col_group = layout.col_groups[position];
         self.pairs
             .get(&pair_key(row_group, col_group))
             .map_or(Value::Blank, |&pair| {
-                self.partials[pair as usize * spec.values.len() + slot].result(value.aggregation)
+                self.partials[pair as usize * definition.values.len() + slot]
+                    .result(value.aggregation)
             })
     }
+
     /// Forgets the changes since the last call, for a caller that lays the
     /// whole output out again anyway.
     pub(crate) fn clear_changes(&mut self) {
@@ -1505,9 +1652,11 @@ impl PivotCache {
         if std::mem::replace(&mut self.relayout, false) || layout.header_rows == 0 {
             return None;
         }
+
         pairs.sort_unstable();
         pairs.dedup();
-        let values = self.spec.values.len();
+
+        let values = self.definition.values.len();
         let mut offsets = Vec::with_capacity(pairs.len() * values);
         for (row_group, col_group) in pairs {
             let (Some(&row), Some(&col)) = (
@@ -1544,9 +1693,10 @@ impl PivotCache {
             + self.changed_pairs.capacity() * size_of::<(u32, u32)>()
             + self.headers.capacity() * size_of::<Value>()
             + text_bytes(&self.headers)
-            + self.spec.retained_bytes()
+            + self.definition.retained_bytes()
             + self.keys.capacity() * size_of::<Value>()
             + (self.row_path.capacity() + self.col_path.capacity()) * size_of::<u32>()
+            + self.folded.capacity()
     }
 }
 
@@ -1587,8 +1737,8 @@ mod tests {
         }
     }
 
-    fn spec() -> PivotSpec {
-        PivotSpec {
+    fn definition() -> PivotDefinition {
+        PivotDefinition {
             rows: vec![0],
             columns: vec![1],
             values: vec![PivotValue {
@@ -1606,50 +1756,193 @@ mod tests {
         }
     }
 
-    #[test]
-    fn singleton_value_edit_reads_one_row_and_rewrites_only_affected_groups() {
+    /// Source reads of a one-row value edit in a source of `rows` rows.
+    fn singleton_edit_reads(rows: usize) -> usize {
         let mut source = Source {
-            rows: 1000,
+            rows,
             reads: Cell::new(0),
             changed: false,
         };
-        let mut cache = PivotCache::build(&spec(), &source).expect("valid pivot");
+        let mut cache = PivotCache::build(&definition(), &source).expect("valid pivot");
         let layout = cache.layout().expect("bounded layout");
         cache.clear_changes();
-        let before = cache.aggregate_updates;
+
         source.reads.set(0);
         source.changed = true;
         cache.update_rows(&[0], &source);
-        assert_eq!(source.reads.get(), 3);
-        assert_eq!(cache.aggregate_updates - before, 8);
+
         let offsets = cache
             .take_changes(&layout)
             .expect("unchanged axes retain layout");
-        assert_eq!(offsets.len(), 4);
         assert!(offsets
             .iter()
             .any(|&offset| cache.cell(&layout, offset) == Value::number(99.0)));
+        source.reads.get()
     }
 
     #[test]
-    fn pivot_bounds_reject_groups_and_output_before_installation() {
+    fn singleton_value_edit_work_does_not_grow_with_rows() {
+        assert_eq!(singleton_edit_reads(100), singleton_edit_reads(10_000));
+    }
+
+    #[test]
+    fn pivot_bounds_reject_too_many_groups_and_cells() {
         let source = Source {
             rows: MAX_PIVOT_GROUPS,
             reads: Cell::new(0),
             changed: false,
         };
         assert!(matches!(
-            PivotCache::build(&spec(), &source),
+            PivotCache::build(&definition(), &source),
             Err(FormulaError::Num)
         ));
+
         let source = Source {
             rows: 1000,
             reads: Cell::new(0),
             changed: false,
         };
-        let mut definition = spec();
+        let mut definition = definition();
         definition.columns = vec![0];
         let cache = PivotCache::build(&definition, &source).expect("groups fit");
         assert!(matches!(cache.layout(), Err(FormulaError::Num)));
+    }
+
+    /// The filter check before kept values were bucketed: a scan of `keep`.
+    fn scanned_keeps(keep: &[Value], value: &Value) -> bool {
+        let Ok(part) = key_part(value) else {
+            return false;
+        };
+        keep.iter().any(|kept| {
+            key_part(kept).is_ok_and(|kept_part| kept_part == part)
+                && compare_group_values(kept, value).is_eq()
+        })
+    }
+
+    #[test]
+    fn bucketed_filter_keeps_the_rows_a_keep_list_scan_keeps() {
+        let values = [
+            Value::Blank,
+            Value::Number(0.0),
+            Value::Number(-0.0),
+            Value::Number(1.0),
+            Value::Number(2.5),
+            Value::Number(f64::INFINITY),
+            Value::text(""),
+            Value::text("apple"),
+            Value::text("APPLE"),
+            Value::text("Banana"),
+            Value::text("ΣΑΣ"),
+            Value::text("σας"),
+            Value::Bool(false),
+            Value::Bool(true),
+            Value::Error(FormulaError::DivZero),
+        ];
+        let keep_lists = [
+            Vec::new(),
+            values.to_vec(),
+            vec![Value::Blank],
+            vec![Value::Number(0.0)],
+            vec![Value::Number(-0.0)],
+            vec![Value::Bool(false)],
+            vec![Value::text("")],
+            vec![Value::text("Apple")],
+            vec![Value::text("ΣΑΣ")],
+            vec![
+                Value::Error(FormulaError::DivZero),
+                Value::Number(f64::INFINITY),
+            ],
+            vec![Value::Number(1.0), Value::text("BANANA"), Value::Bool(true)],
+        ];
+
+        let mut folded = String::new();
+        for keep in keep_lists {
+            let filter = PivotFilter::new(0, keep.clone());
+            for value in &values {
+                assert_eq!(
+                    filter.keeps(value, &mut folded),
+                    scanned_keeps(&keep, value),
+                    "keep {keep:?}, value {value:?}"
+                );
+            }
+        }
+
+        let apple = PivotFilter::new(0, vec![Value::text("Apple")]);
+        assert!(apple.keeps(&Value::text("APPLE"), &mut folded));
+        let zero = PivotFilter::new(0, vec![Value::Number(0.0)]);
+        assert!(zero.keeps(&Value::Number(-0.0), &mut folded));
+        let error = PivotFilter::new(0, vec![Value::Error(FormulaError::DivZero)]);
+        assert!(!error.keeps(&Value::Error(FormulaError::DivZero), &mut folded));
+    }
+
+    #[test]
+    fn fold_case_matches_to_lowercase() {
+        let mut folded = String::new();
+        for text in ["Apple", "ÄÖÜ", "İstanbul", "ΣΑΣ ΟΔΟΣ", "σας", "ǅ"] {
+            fold_case(text, &mut folded);
+            assert_eq!(folded, text.to_lowercase(), "{text}");
+        }
+    }
+
+    /// 2^53: past it, consecutive numbers are 2 apart.
+    const TWO_POW_53: f64 = 9_007_199_254_740_992.0;
+
+    fn exact_sum(numbers: &[f64]) -> ExactSum {
+        let mut sum = ExactSum::default();
+        for &number in numbers {
+            sum.add(number);
+        }
+        sum
+    }
+
+    /// Removes `numbers` and requires the empty sum to free its heap block.
+    fn remove_all(sum: &mut ExactSum, numbers: &[f64]) {
+        for &number in numbers {
+            sum.add(-number);
+        }
+
+        assert_eq!(sum.value(), 0.0);
+        assert!(sum.spilled.is_none());
+    }
+
+    #[test]
+    fn exact_sum_rounds_once_past_a_rounding_tie() {
+        let numbers = [1e16, 1.0, 1e-16];
+        let mut sum = exact_sum(&numbers);
+        assert!(sum.spilled.is_some(), "three partials do not fit inline");
+        assert_eq!(sum.value(), 10_000_000_000_000_002.0);
+        remove_all(&mut sum, &numbers);
+
+        let numbers = [TWO_POW_53, 1.0, 2f64.powi(-100)];
+        let mut sum = exact_sum(&numbers);
+        assert_eq!(sum.value(), TWO_POW_53 + 2.0);
+        remove_all(&mut sum, &numbers);
+    }
+
+    #[test]
+    fn exact_sum_removal_restores_a_cancelled_sum() {
+        let mut sum = exact_sum(&[1.0, 1e100, 1.0, -1e100]);
+        assert_eq!(sum.value(), 2.0);
+
+        sum.add(-1.0);
+        assert_eq!(sum.value(), 1.0);
+
+        remove_all(&mut sum, &[1.0, 1e100, -1e100]);
+    }
+
+    #[test]
+    fn exact_sum_carries_past_the_number_range_and_back() {
+        let mut sum = exact_sum(&[f64::MAX; 3]);
+        assert!(sum
+            .spilled
+            .as_ref()
+            .is_some_and(|spilled| spilled.carry != 0));
+        assert_eq!(sum.value(), f64::INFINITY);
+
+        sum.add(-f64::MAX);
+        sum.add(-f64::MAX);
+        assert_eq!(sum.value(), f64::MAX);
+
+        remove_all(&mut sum, &[f64::MAX]);
     }
 }

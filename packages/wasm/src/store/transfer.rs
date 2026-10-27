@@ -338,30 +338,45 @@ mod tests {
     #[cfg(feature = "analysis")]
     #[test]
     fn pivot_memory_transfer_rebuilds_from_resent_definition_without_formula_sources() {
+        use crate::store::pivot_tests::{PivotPayload, SUM};
+
+        const KEY: usize = 0;
+        const VALUE: usize = 1;
         let mut original = CellStore::new();
-        original.add_sheet(2, 10);
-        original.add_sheet(4, 10);
-        original.set_string(0, 0, 0, "Key", 0);
-        original.set_string(0, 0, 1, "Value", 0);
-        original.set_string(0, 1, 0, "A", 0);
-        original.set_number(0, 1, 1, 7.0, 0);
-        let definition = [
-            0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, -1.0, 0.0,
-            0.0, 3.0,
-        ];
-        assert!(original.set_pivots(1, &definition, vec!["pivot".into()]));
+        let source = original.add_sheet(2, 10);
+        let output = original.add_sheet(4, 10);
+        original.set_string(source, 0, KEY, "Key", 0);
+        original.set_string(source, 0, VALUE, "Value", 0);
+        original.set_string(source, 1, KEY, "A", 0);
+        original.set_number(source, 1, VALUE, 7.0, 0);
+        let definition = PivotPayload {
+            source,
+            last_row: 1,
+            last_col: VALUE,
+            rows: &[KEY],
+            value_field: VALUE,
+            aggregations: &[SUM],
+            ..PivotPayload::default()
+        }
+        .numbers();
+        assert!(original.set_pivots(output, &definition, vec!["pivot".into()]));
         original.recompute_changed();
-        assert_eq!(original.get_cell(1, 1, 1).num(), 7.0);
+        assert_eq!(original.get_cell(output, 1, 1).num(), 7.0);
+
         let bytes = original.export_memory_state();
         let mut replacement = CellStore::read_memory_state(&bytes).expect("same-build transfer");
-        assert!(replacement.sheets[1].formulas.is_empty());
-        assert_eq!(replacement.formula_source(1, 0, 0), None);
-        assert!(replacement.set_pivots(1, &definition, vec!["pivot".into()]));
+
+        assert!(replacement.sheets[output].formulas.is_empty());
+        assert_eq!(replacement.formula_source(output, 0, 0), None);
+
+        assert!(replacement.set_pivots(output, &definition, vec!["pivot".into()]));
         replacement.recompute_changed();
-        assert_eq!(replacement.get_cell(1, 1, 1).num(), 7.0);
-        replacement.set_number(0, 1, 1, 11.0, 0);
+        assert_eq!(replacement.get_cell(output, 1, 1).num(), 7.0);
+
+        replacement.set_number(source, 1, VALUE, 11.0, 0);
         replacement.recompute_changed();
-        assert_eq!(replacement.get_cell(1, 1, 1).num(), 11.0);
+
+        assert_eq!(replacement.get_cell(output, 1, 1).num(), 11.0);
     }
 
     #[test]

@@ -19,6 +19,7 @@ import {
   fullSheetRange,
   normalizedRange,
   patchSheetId,
+  pivotWrittenRange,
   rangeContains,
   rangesIntersect,
 } from "./ranges.js";
@@ -178,50 +179,28 @@ export class StoreMutationPolicy {
     if (commitReason === "undo" || commitReason === "redo") return [];
     if (patch.op !== "setPivot" && !this.sheet(sheetId)?.pivots?.length) return [];
 
-    let written: Range;
-    let occupied: { id: string; range: Range } | undefined;
-    switch (patch.op) {
-      case "setPivot": {
-        const pivot = pivotsFor(sheetId).find(
-          (candidate) =>
-            candidate.id !== patch.pivot.id &&
-            candidate.anchor.row === patch.pivot.anchor.row &&
-            candidate.anchor.col === patch.pivot.anchor.col,
-        );
-        if (!pivot) return [];
-        written = cellRange({ sheet: sheetId, ...pivot.anchor });
-        occupied = { id: pivot.id, range: written };
-        break;
-      }
-      case "set":
-        written = cellRange(patch.addr);
-        break;
-      case "setRange":
-      case "setBlock":
-      case "restoreBlock":
-        written = normalizedRange(patch.range);
-        break;
-      case "clearRange":
-        if (patch.contents === false) return [];
-        written = normalizedRange(patch.range);
-        break;
-      default:
-        return [];
+    const pivots = pivotsFor(sheetId);
+    if (patch.op === "setPivot") {
+      const pivot = pivots.find(
+        (candidate) =>
+          candidate.id !== patch.pivot.id &&
+          candidate.anchor.row === patch.pivot.anchor.row &&
+          candidate.anchor.col === patch.pivot.anchor.col,
+      );
+      if (!pivot) return [];
+      const anchor = cellRange({ sheet: sheetId, ...pivot.anchor });
+      return [pivotOutputIssue(pivot.id, anchor, operationIndex)];
     }
 
-    const blocked =
-      occupied ?? outputsFor(sheetId).find((output) => rangesIntersect(output.range, written));
-    if (!blocked) return [];
-    return [
-      {
-        kind: "pivot-output",
-        severity: "error",
-        pivotId: blocked.id,
-        range: blocked.range,
-        operationIndex,
-        message: `Pivot table "${blocked.id}" owns these cells`,
-      },
-    ];
+    const written = pivotWrittenRange(patch);
+    if (!written) return [];
+
+    // Outputs were read before the batch; one an earlier patch removed no longer blocks.
+    const blocked = outputsFor(sheetId).find(
+      (output) =>
+        rangesIntersect(output.range, written) && pivots.some((pivot) => pivot.id === output.id),
+    );
+    return blocked ? [pivotOutputIssue(blocked.id, blocked.range, operationIndex)] : [];
   }
 
   private protectionIssues(
@@ -601,4 +580,15 @@ function validationMessage(rule: DataValidationRule): string {
     case "checkbox":
       return "Value must be a valid checkbox state";
   }
+}
+
+function pivotOutputIssue(pivotId: string, range: Range, operationIndex: number): MutationIssue {
+  return {
+    kind: "pivot-output",
+    severity: "error",
+    pivotId,
+    range,
+    operationIndex,
+    message: `Pivot table "${pivotId}" owns these cells`,
+  };
 }

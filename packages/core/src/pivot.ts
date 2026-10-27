@@ -204,6 +204,75 @@ function validateValueShape(value: unknown, path: string, issues: PivotIssueSink
   }
 }
 
+/** Each field takes at most one filter, and all filters share one value budget. */
+function validateFiltersShape(pivot: PlainRecord, path: string, issues: PivotIssueSink): void {
+  let filterValues = 0;
+  const filteredFields = new Set<unknown>();
+  boundedArray(pivot, "filters", path, issues, false)?.forEach((entry, index) => {
+    const filterPath = `${path}.filters[${index}]`;
+    if (!isPlainRecord(entry)) {
+      issue(issues, filterPath, "Pivot filter must be an object");
+      return;
+    }
+
+    const field = ownValue(entry, "field");
+    if (!isIndex(field, MAX_PIVOT_FIELD_INDEX)) {
+      issue(issues, `${filterPath}.field`, "field must be a source column index");
+    } else if (filteredFields.has(field)) {
+      issue(issues, `${filterPath}.field`, "A field may have only one filter");
+    }
+    filteredFields.add(field);
+
+    const values = ownValue(entry, "values");
+    if (!Array.isArray(values)) {
+      issue(issues, `${filterPath}.values`, "values must be an array");
+      return;
+    }
+    filterValues += values.length;
+    if (filterValues > MAX_PIVOT_FILTER_VALUES) {
+      issue(
+        issues,
+        `${filterPath}.values`,
+        `Pivot filter value limit ${MAX_PIVOT_FILTER_VALUES} exceeded`,
+        "resource-limit",
+      );
+      return;
+    }
+    values.forEach((filterValue, valueIndex) => {
+      if (!isPivotScalar(filterValue)) {
+        issue(issues, `${filterPath}.values[${valueIndex}]`, "Filter value must be a cell scalar");
+      }
+    });
+  });
+}
+
+/** A sort key must name a field that groups its axis. */
+function validateSortShape(
+  pivot: PlainRecord,
+  path: string,
+  grouped: { rows: readonly unknown[]; columns: readonly unknown[] },
+  issues: PivotIssueSink,
+): void {
+  boundedArray(pivot, "sort", path, issues, false)?.forEach((entry, index) => {
+    const sortPath = `${path}.sort[${index}]`;
+    if (!isPlainRecord(entry)) {
+      issue(issues, sortPath, "Pivot sort must be an object");
+      return;
+    }
+
+    const axis = ownValue(entry, "axis");
+    const field = ownValue(entry, "field");
+    if (axis !== "rows" && axis !== "columns") {
+      issue(issues, `${sortPath}.axis`, "axis must be rows or columns");
+    } else if (!isIndex(field) || !grouped[axis].includes(field)) {
+      issue(issues, `${sortPath}.field`, "A sort field must group the sorted axis");
+    }
+    if (typeof ownValue(entry, "descending") !== "boolean") {
+      issue(issues, `${sortPath}.descending`, "descending must be a boolean");
+    }
+  });
+}
+
 /** Shape and resource checks for one untrusted pivot definition. */
 export function validatePivotShape(value: unknown, path: string, issues: PivotIssueSink): void {
   if (!isPlainRecord(value)) {
@@ -244,60 +313,8 @@ export function validatePivotShape(value: unknown, path: string, issues: PivotIs
     validateValueShape(entry, `${path}.values[${index}]`, issues);
   });
 
-  let filterValues = 0;
-  const filteredFields = new Set<unknown>();
-  boundedArray(value, "filters", path, issues, false)?.forEach((entry, index) => {
-    const filterPath = `${path}.filters[${index}]`;
-    if (!isPlainRecord(entry)) {
-      issue(issues, filterPath, "Pivot filter must be an object");
-      return;
-    }
-    const field = ownValue(entry, "field");
-    if (!isIndex(field, MAX_PIVOT_FIELD_INDEX)) {
-      issue(issues, `${filterPath}.field`, "field must be a source column index");
-    } else if (filteredFields.has(field)) {
-      issue(issues, `${filterPath}.field`, "A field may have only one filter");
-    }
-    filteredFields.add(field);
-    const values = ownValue(entry, "values");
-    if (!Array.isArray(values)) {
-      issue(issues, `${filterPath}.values`, "values must be an array");
-      return;
-    }
-    filterValues += values.length;
-    if (filterValues > MAX_PIVOT_FILTER_VALUES) {
-      issue(
-        issues,
-        `${filterPath}.values`,
-        `Pivot filter value limit ${MAX_PIVOT_FILTER_VALUES} exceeded`,
-        "resource-limit",
-      );
-      return;
-    }
-    values.forEach((filterValue, valueIndex) => {
-      if (!isPivotScalar(filterValue)) {
-        issue(issues, `${filterPath}.values[${valueIndex}]`, "Filter value must be a cell scalar");
-      }
-    });
-  });
-
-  boundedArray(value, "sort", path, issues, false)?.forEach((entry, index) => {
-    const sortPath = `${path}.sort[${index}]`;
-    if (!isPlainRecord(entry)) {
-      issue(issues, sortPath, "Pivot sort must be an object");
-      return;
-    }
-    const axis = ownValue(entry, "axis");
-    const field = ownValue(entry, "field");
-    if (axis !== "rows" && axis !== "columns") {
-      issue(issues, `${sortPath}.axis`, "axis must be rows or columns");
-    } else if (!isIndex(field) || !(axis === "rows" ? rows : columns).includes(field)) {
-      issue(issues, `${sortPath}.field`, "A sort field must group the sorted axis");
-    }
-    if (typeof ownValue(entry, "descending") !== "boolean") {
-      issue(issues, `${sortPath}.descending`, "descending must be a boolean");
-    }
-  });
+  validateFiltersShape(value, path, issues);
+  validateSortShape(value, path, { rows, columns }, issues);
 
   for (const key of ["rowTotals", "columnTotals", "subtotals"]) {
     const flag = ownValue(value, key);
@@ -737,6 +754,95 @@ function keepsSpanIntact(edit: PivotAxisEdit, start: number, count: number): boo
 }
 
 /**
+ * The anchor of a pivot on the edited sheet after `edit`, and whether its
+ * saved output survives the edit.
+ */
+function moveAnchor(
+  pivot: PivotDefinition,
+  edit: PivotAxisEdit,
+): { anchor: PivotDefinition["anchor"]; keepsSavedOutput: boolean } {
+  const old = edit.axis === "row" ? pivot.anchor.row : pivot.anchor.col;
+  const remapped = edit.remap(old);
+  const moved = remapped ?? edit.anchorFallback;
+  // A deleted anchor needs an exact inverse even if clamping keeps its index.
+  const anchor =
+    moved === old && remapped !== null
+      ? pivot.anchor
+      : edit.axis === "row"
+        ? { ...pivot.anchor, row: moved }
+        : { ...pivot.anchor, col: moved };
+
+  const saved = pivot.savedOutput;
+  const keepsSavedOutput =
+    !saved || keepsSpanIntact(edit, old, edit.axis === "row" ? saved.rows : saved.cols);
+  return { anchor, keepsSavedOutput };
+}
+
+/**
+ * A live source after `edit`, and the source-column remap a column edit
+ * implies for its fields; null when the field indices stay put.
+ */
+function moveSource(
+  source: PivotSource,
+  edit: PivotAxisEdit,
+  tableColumns: PivotEditPlan["tableColumns"],
+): { source: PivotSource; mapField: ((field: number) => number | null) | null } {
+  if (!source.invalid && "range" in source && source.range.sheet === edit.sheet) {
+    const range = source.range;
+    const start = edit.axis === "row" ? range.start.row : range.start.col;
+    const end = edit.axis === "row" ? range.end.row : range.end.col;
+    const span = edit.span ? edit.span(start, end) : remapSpan(start, end, edit.remap);
+    if (!span) return { source: invalidated(source), mapField: null };
+
+    const [newStart, newEnd] = span;
+    const moved =
+      newStart === start && newEnd === end
+        ? source
+        : {
+            ...source,
+            range:
+              edit.axis === "row"
+                ? {
+                    ...range,
+                    start: { ...range.start, row: newStart },
+                    end: { ...range.end, row: newEnd },
+                  }
+                : {
+                    ...range,
+                    start: { ...range.start, col: newStart },
+                    end: { ...range.end, col: newEnd },
+                  },
+          };
+    const mapField =
+      edit.axis === "col"
+        ? (field: number) => {
+            const mapped = edit.remap(start + field);
+            return mapped === null ? null : mapped - newStart;
+          }
+        : null;
+    return { source: moved, mapField };
+  }
+
+  if (!source.invalid && "table" in source && edit.axis === "col") {
+    const columns = tableColumns.get(source.table);
+    const span = columns
+      ? edit.span
+        ? edit.span(columns.start, columns.end)
+        : remapSpan(columns.start, columns.end, edit.remap)
+      : null;
+    if (columns && span) {
+      const newStart = span[0];
+      const mapField = (field: number) => {
+        const mapped = edit.remap(columns.start + field);
+        return mapped === null ? null : mapped - newStart;
+      };
+      return { source, mapField };
+    }
+  }
+  return { source, mapField: null };
+}
+
+/**
  * Rewrite one pivot owned by `owner` for `plan`. Returns the same object when
  * nothing changes. A source that disappears keeps its reference and becomes
  * invalid; an anchor whose row or column is deleted moves to the fallback.
@@ -746,85 +852,22 @@ export function rebasePivot(
   owner: SheetId,
   plan: PivotEditPlan,
 ): PivotDefinition {
-  let anchor = pivot.anchor;
-  let source = pivot.source;
-  let mapField: ((field: number) => number | null) | null = null;
-
   const edit = plan.axisEdit;
-  let keepsSavedOutput = true;
-  if (edit) {
-    if (owner === edit.sheet) {
-      const old = edit.axis === "row" ? anchor.row : anchor.col;
-      const remapped = edit.remap(old);
-      const moved = remapped ?? edit.anchorFallback;
-      // A deleted anchor needs an exact inverse even if clamping keeps its index.
-      if (moved !== old || remapped === null) {
-        anchor = edit.axis === "row" ? { ...anchor, row: moved } : { ...anchor, col: moved };
-      }
-      const saved = pivot.savedOutput;
-      if (saved) {
-        keepsSavedOutput = keepsSpanIntact(
-          edit,
-          old,
-          edit.axis === "row" ? saved.rows : saved.cols,
-        );
-      }
-    }
+  const { anchor, keepsSavedOutput } =
+    edit && owner === edit.sheet
+      ? moveAnchor(pivot, edit)
+      : { anchor: pivot.anchor, keepsSavedOutput: true };
+  const { source: movedSource, mapField } = edit
+    ? moveSource(pivot.source, edit, plan.tableColumns)
+    : { source: pivot.source, mapField: null };
 
-    if (!source.invalid && "range" in source && source.range.sheet === edit.sheet) {
-      const range = source.range;
-      const start = edit.axis === "row" ? range.start.row : range.start.col;
-      const end = edit.axis === "row" ? range.end.row : range.end.col;
-      const span = edit.span ? edit.span(start, end) : remapSpan(start, end, edit.remap);
-      if (!span) source = invalidated(source);
-      else if (span[0] !== start || span[1] !== end) {
-        source = {
-          ...source,
-          range:
-            edit.axis === "row"
-              ? {
-                  ...range,
-                  start: { ...range.start, row: span[0] },
-                  end: { ...range.end, row: span[1] },
-                }
-              : {
-                  ...range,
-                  start: { ...range.start, col: span[0] },
-                  end: { ...range.end, col: span[1] },
-                },
-        };
-      }
-      if (span && edit.axis === "col") {
-        const newStart = span[0];
-        mapField = (field) => {
-          const mapped = edit.remap(start + field);
-          return mapped === null ? null : mapped - newStart;
-        };
-      }
-    } else if (!source.invalid && "table" in source && edit.axis === "col") {
-      const columns = plan.tableColumns.get(source.table);
-      const span = columns
-        ? edit.span
-          ? edit.span(columns.start, columns.end)
-          : remapSpan(columns.start, columns.end, edit.remap)
-        : null;
-      if (columns && span) {
-        const newStart = span[0];
-        mapField = (field) => {
-          const mapped = edit.remap(columns.start + field);
-          return mapped === null ? null : mapped - newStart;
-        };
-      }
-    }
-  }
-
-  if (!source.invalid) {
-    if (
-      ("range" in source && source.range.sheet === plan.removedSheet) ||
-      ("table" in source && plan.removedTables.has(source.table))
-    ) {
-      source = invalidated(source);
-    }
+  let source = movedSource;
+  if (
+    !source.invalid &&
+    (("range" in source && source.range.sheet === plan.removedSheet) ||
+      ("table" in source && plan.removedTables.has(source.table)))
+  ) {
+    source = invalidated(source);
   }
 
   let moved =
@@ -910,6 +953,17 @@ const SOURCE_TABLE = 1;
 const SOURCE_INVALID = 2;
 /** Marks an absent string, such as a value field without a caption. */
 const NO_STRING = -1;
+/**
+ * Unused bound slots after a table id, and after the absent-string slot of an
+ * invalid source, so every source takes the slots of a range (sheet, r0, c0,
+ * r1, c1). Twins of `TABLE_SOURCE_PADDING` and `INVALID_SOURCE_PADDING` in
+ * `packages/wasm/src/store/pivots.rs`.
+ */
+const TABLE_SOURCE_PADDING = 4;
+const INVALID_SOURCE_PADDING = 4;
+/** Sort axes in the engine payload; twins of the same names in `pivots.rs`. */
+const SORT_ROWS = 0;
+const SORT_COLUMNS = 1;
 /** Filter value kinds in the engine payload. */
 const FILTER_NULL = 0;
 const FILTER_NUMBER = 1;
@@ -967,9 +1021,11 @@ export function encodePivotPayload(
         range.end.col,
       );
     } else if (!source.invalid && "table" in source) {
-      numbers.push(SOURCE_TABLE, text(source.table), 0, 0, 0, 0);
+      numbers.push(SOURCE_TABLE, text(source.table));
+      for (let slot = 0; slot < TABLE_SOURCE_PADDING; slot++) numbers.push(0);
     } else {
-      numbers.push(SOURCE_INVALID, NO_STRING, 0, 0, 0, 0);
+      numbers.push(SOURCE_INVALID, NO_STRING);
+      for (let slot = 0; slot < INVALID_SOURCE_PADDING; slot++) numbers.push(0);
     }
 
     numbers.push(pivot.anchor.row, pivot.anchor.col);
@@ -999,7 +1055,11 @@ export function encodePivotPayload(
     const sort = pivot.sort ?? [];
     numbers.push(sort.length);
     for (const key of sort) {
-      numbers.push(key.axis === "rows" ? 0 : 1, key.field, key.descending ? 1 : 0);
+      numbers.push(
+        key.axis === "rows" ? SORT_ROWS : SORT_COLUMNS,
+        key.field,
+        key.descending ? 1 : 0,
+      );
     }
 
     numbers.push(

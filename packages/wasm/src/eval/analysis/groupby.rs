@@ -9,11 +9,12 @@ use super::super::EvalPass;
 use crate::calc::{parse, Ast, Func};
 use crate::store::CellStore;
 use crate::types::{EvalResult, FormulaError, Value};
-use grouping::{compare_fields, key_part, range_number, KeyPart, TOTAL_LABEL};
+use grouping::{
+    compare_fields, compare_group_values, key_part, range_number, KeyPart, TOTAL_LABEL,
+};
 
-/// Key and aggregate rules that `PIVOTBY` shares with saved pivot tables.
-/// It lives below this family so the formula contract does not read it as a
-/// function family.
+/// Key and aggregate rules that `PIVOTBY` shares with pivot tables. It lives
+/// below this family so the function registry does not list it.
 pub(crate) mod grouping;
 
 pub(crate) const NAMES: &[&str] = &["GROUPBY", "PERCENTOF", "PIVOTBY"];
@@ -263,8 +264,7 @@ impl Axis {
                         .find(|code| code.unsigned_abs() as usize == field + 1)
                         .copied()
                         .unwrap_or(1);
-                    let order = compare_values(&left_fields[field], &right_fields[field])
-                        .expect("checked group key");
+                    let order = compare_group_values(&left_fields[field], &right_fields[field]);
                     if order != Ordering::Equal {
                         // Compare each sibling's full aggregate, not the value
                         // of whichever descendant the sort happens to visit.

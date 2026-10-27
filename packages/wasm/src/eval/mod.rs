@@ -719,7 +719,7 @@ impl CellStore {
 
     /// Ends a pass for `sheets`. The pivot step first records which source
     /// rows and output blockers the pass changed, because finishing clears
-    /// the dirty state that tells.
+    /// the dirty seeds.
     fn finish_recompute<I>(&mut self, sheets: I, affected: Option<&FxHashSet<AbsCellKey>>)
     where
         I: IntoIterator<Item = usize> + Clone,
@@ -735,6 +735,9 @@ impl CellStore {
         }
     }
 
+    /// Recalculates the formulas that the dirty cells of the `seeds` sheets
+    /// affect. It does not settle pivot tables, which is why the pivot settle
+    /// loops call it between their own steps.
     pub(crate) fn recompute_formulas(&mut self, seeds: &[usize]) {
         if seeds.is_empty() {
             return;

@@ -1,7 +1,8 @@
-import { type PivotEditPlan, pivotAxisPlan, rebasePivot } from "./pivot.js";
+import { pivotAxisPlan, rebasePivot } from "./pivot.js";
 import type { TransactionPreparation } from "./transaction-preparation.js";
 import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
 import type { DocumentOp } from "./types/document.js";
+import type { PivotDefinition } from "./types/pivot.js";
 
 export type HistoryPart =
   | { kind: "patches"; patches: DocumentOp[] }
@@ -21,6 +22,23 @@ export type HistoryAction = HistoryPart[];
 interface UndoEntry {
   undo: HistoryAction;
   redo: DocumentOp[];
+}
+
+/** A row or column insert (`delta > 0`) or delete (`delta < 0`) at `at`, in data space. */
+export interface AxisResize {
+  readonly sheet: SheetId;
+  readonly axis: "row" | "col";
+  readonly at: number;
+  readonly delta: number;
+}
+
+type PivotMapper = (pivot: PivotDefinition, owner: SheetId) => PivotDefinition;
+
+/** A recorded pivot whose anchor `deletion` moved to the fallback. */
+interface FallbackAnchor {
+  readonly deletion: AxisResize;
+  /** The pivot before the delete, which the matching insert restores exactly. */
+  readonly before: PivotDefinition;
 }
 
 export interface HistoryResourceStats {
@@ -51,6 +69,13 @@ const DEFAULT_HISTORY_SNAPSHOT_BYTES = 256 * 1024 * 1024;
 export class UndoManager {
   private readonly undoStack: UndoEntry[] = [];
   private readonly redoStack: UndoEntry[] = [];
+  /**
+   * Recorded pivots whose deleted anchor fell back, keyed by the rebased
+   * definition. Undoing the delete inserts the same span, which would push the
+   * fallback anchor `count` cells past its old place. Any later rewrite replaces
+   * the key, so a record only applies while nothing else moved the pivot.
+   */
+  private readonly fallbackAnchors = new WeakMap<PivotDefinition, FallbackAnchor>();
 
   constructor(private readonly limit = DEFAULT_HISTORY_LIMIT) {}
 
@@ -78,20 +103,40 @@ export class UndoManager {
     }
   }
 
-  /** Rebase stored addresses after a row insert/delete in data space. */
-  rebaseRows(sheet: SheetId, at: number, delta: number): void {
-    this.rebase(
-      (addr) => rebaseAddrRows(addr, sheet, at, delta),
-      pivotAxisPlan({ sheet, axis: "row", remap: shiftIndex(at, delta), anchorFallback: at }),
-    );
-  }
+  /**
+   * Rebase stored addresses after a row or column insert or delete in data
+   * space. `extent` is the sheet's row or column count right after the edit.
+   */
+  rebaseAxis(edit: AxisResize, extent: number): void {
+    const { sheet, axis, at, delta } = edit;
+    const remap = shiftIndex(at, delta);
+    // As in the store, a deleted anchor stays inside the sheet, so the entry still applies.
+    const anchorFallback = Math.max(0, Math.min(at, extent - 1));
+    const plan = pivotAxisPlan({ sheet, axis, remap, anchorFallback });
 
-  /** Rebase stored addresses after a column insert/delete in data space. */
-  rebaseCols(sheet: SheetId, at: number, delta: number): void {
-    this.rebase(
-      (addr) => rebaseAddrCols(addr, sheet, at, delta),
-      pivotAxisPlan({ sheet, axis: "col", remap: shiftIndex(at, delta), anchorFallback: at }),
-    );
+    const mapPivot: PivotMapper = (pivot, owner) => {
+      const recorded = this.fallbackAnchors.get(pivot);
+      if (
+        recorded &&
+        recorded.deletion.sheet === sheet &&
+        recorded.deletion.axis === axis &&
+        recorded.deletion.at === at &&
+        recorded.deletion.delta === -delta
+      ) {
+        return recorded.before;
+      }
+
+      const after = rebasePivot(pivot, owner, plan);
+      const anchor = axis === "row" ? pivot.anchor.row : pivot.anchor.col;
+      if (owner === sheet && remap(anchor) === null) {
+        this.fallbackAnchors.set(after, { deletion: edit, before: pivot });
+      }
+      return after;
+    };
+
+    const mapAddr = (addr: CellAddress): CellAddress | null => rebaseAddr(addr, sheet, axis, remap);
+    rebaseEntries(this.undoStack, mapAddr, mapPivot);
+    rebaseEntries(this.redoStack, mapAddr, mapPivot);
   }
 
   undo(): HistoryAction | null {
@@ -166,14 +211,6 @@ export class UndoManager {
       retainedSnapshotBytes,
     };
   }
-
-  private rebase(
-    mapAddr: (addr: CellAddress) => CellAddress | null,
-    pivotPlan: PivotEditPlan,
-  ): void {
-    rebaseEntries(this.undoStack, mapAddr, pivotPlan);
-    rebaseEntries(this.redoStack, mapAddr, pivotPlan);
-  }
 }
 
 function entrySnapshotBytes(entry: UndoEntry): number {
@@ -202,14 +239,15 @@ function disposeEntry(entry: UndoEntry): void {
 function rebaseEntries(
   entries: UndoEntry[],
   mapAddr: (addr: CellAddress) => CellAddress | null,
-  pivotPlan: PivotEditPlan,
+  mapPivot: PivotMapper,
 ): void {
   for (let i = entries.length - 1; i >= 0; i--) {
-    const entry = entries[i]!;
+    const entry = entries[i];
+    if (!entry) continue;
     const undo: HistoryAction = [];
     for (const part of entry.undo) {
       if (part.kind === "patches") {
-        const patches = rebasePatches(part.patches, mapAddr, pivotPlan);
+        const patches = rebasePatches(part.patches, mapAddr, mapPivot);
         if (patches.length > 0) undo.push({ kind: "patches", patches });
         continue;
       }
@@ -227,7 +265,7 @@ function rebaseEntries(
       }
     }
     entry.undo = undo;
-    entry.redo = rebasePatches(entry.redo, mapAddr, pivotPlan);
+    entry.redo = rebasePatches(entry.redo, mapAddr, mapPivot);
     if (entry.undo.length === 0 || entry.redo.length === 0) {
       disposeEntry(entry);
       entries.splice(i, 1);
@@ -238,7 +276,7 @@ function rebaseEntries(
 function rebasePatches(
   patches: DocumentOp[],
   mapAddr: (addr: CellAddress) => CellAddress | null,
-  pivotPlan: PivotEditPlan,
+  mapPivot: PivotMapper,
 ): DocumentOp[] {
   const out: DocumentOp[] = [];
   for (const patch of patches) {
@@ -316,7 +354,7 @@ function rebasePatches(
       continue;
     }
     if (patch.op === "setPivot") {
-      out.push({ ...patch, pivot: rebasePivot(patch.pivot, patch.sheet, pivotPlan) });
+      out.push({ ...patch, pivot: mapPivot(patch.pivot, patch.sheet) });
       continue;
     }
     out.push(patch);
@@ -331,30 +369,15 @@ function shiftIndex(at: number, delta: number): (index: number) => number | null
   return (index) => (index < at ? index : index < at + count ? null : index - count);
 }
 
-function rebaseAddrRows(
+function rebaseAddr(
   addr: CellAddress,
   sheet: SheetId,
-  at: number,
-  delta: number,
+  axis: "row" | "col",
+  remap: (index: number) => number | null,
 ): CellAddress | null {
-  if (addr.sheet !== sheet || addr.row < at) return addr;
-  if (delta >= 0) return { ...addr, row: addr.row + delta };
+  if (addr.sheet !== sheet) return addr;
 
-  const count = -delta;
-  if (addr.row < at + count) return null;
-  return { ...addr, row: addr.row - count };
-}
-
-function rebaseAddrCols(
-  addr: CellAddress,
-  sheet: SheetId,
-  at: number,
-  delta: number,
-): CellAddress | null {
-  if (addr.sheet !== sheet || addr.col < at) return addr;
-  if (delta >= 0) return { ...addr, col: addr.col + delta };
-
-  const count = -delta;
-  if (addr.col < at + count) return null;
-  return { ...addr, col: addr.col - count };
+  const index = remap(axis === "row" ? addr.row : addr.col);
+  if (index === null) return null;
+  return axis === "row" ? { ...addr, row: index } : { ...addr, col: index };
 }

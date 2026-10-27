@@ -129,7 +129,9 @@ import {
   normalizedRange,
   normalizeMerge,
   patchSheetId,
+  pivotWrittenRange,
   positiveCount,
+  rangesIntersect,
   rebaseRangeCols,
   rebaseRangeRows,
   remapSpan,
@@ -798,17 +800,6 @@ export class StoreDataEngine {
       if (sheet) this.syncPivots(sheet);
     }
     this.pivotSheetsDirty.clear();
-  }
-
-  /** Pivots read a table by ID, so a table change re-sends every pivot that reads it. */
-  private markPivotsReadingTable(tableId: string): void {
-    for (const sheet of this.workbook.sheets) {
-      if (
-        sheet.pivots?.some((pivot) => "table" in pivot.source && pivot.source.table === tableId)
-      ) {
-        this.pivotSheetsDirty.add(sheet.id);
-      }
-    }
   }
 
   private spillAnchor(addr: CellAddress): CellAddress | null {
@@ -2072,29 +2063,10 @@ export class StoreDataEngine {
       }
       if (!outputs?.length) continue;
 
-      let written: Range;
-      switch (patch.op) {
-        case "set":
-          written = { sheet: sheetId, start: patch.addr, end: patch.addr };
-          break;
-        case "setRange":
-        case "setBlock":
-        case "restoreBlock":
-        case "clearRange":
-          written = normalizedRange(patch.range);
-          break;
-        default:
-          continue;
-      }
+      const written = pivotWrittenRange(patch);
+      if (!written) continue;
       for (const output of outputs) {
-        if (
-          written.start.row > output.range.end.row ||
-          written.end.row < output.range.start.row ||
-          written.start.col > output.range.end.col ||
-          written.end.col < output.range.start.col
-        ) {
-          continue;
-        }
+        if (!rangesIntersect(output.range, written)) continue;
         let released = releasedBySheet.get(sheetId);
         if (!released) {
           released = new Set();
@@ -2812,7 +2784,6 @@ export class StoreDataEngine {
         const table = structuredClone(patch.table);
         if (!this.syncTable(table)) return false;
         sheet.tables = [...(sheet.tables ?? []), table];
-        this.markPivotsReadingTable(table.id);
         return true;
       }
       case "updateTable": {
@@ -2858,7 +2829,6 @@ export class StoreDataEngine {
         const tables = [...sheet.tables!];
         tables[index] = next;
         sheet.tables = tables;
-        this.markPivotsReadingTable(next.id);
         return true;
       }
       case "removeTable": {
@@ -2889,7 +2859,9 @@ export class StoreDataEngine {
         const sheet = this.workbook.sheets.find((candidate) => candidate.id === patch.sheet);
         if (!sheet?.pivots?.some((pivot) => pivot.id === patch.id)) return false;
         sheet.pivots = sheet.pivots.filter((pivot) => pivot.id !== patch.id);
-        this.pivotSheetsDirty.add(sheet.id);
+        // Free the output now, not at the barrier: a later write in the same
+        // batch may target the cells, and the engine refuses writes into output.
+        this.syncPivots(sheet);
         return true;
       }
       case "setSheetMeta": {
