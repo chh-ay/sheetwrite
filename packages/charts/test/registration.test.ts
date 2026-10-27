@@ -68,4 +68,21 @@ describe("charts package registration", () => {
       views.dispose();
     }
   });
+
+  it("registers the backend when a host only imports the register entry", async () => {
+    const store = new SheetwriteStore(chartWorkbook());
+    stores.push(store);
+    setChartViewProviderFactory(null);
+
+    // The side effect runs on first evaluation, so no other test may import this entry.
+    await import("../src/register.js");
+    setCell(store, 0, 0, 7);
+    const views = openChartViews(store);
+
+    try {
+      expect(views.get(SALES)?.series[0]?.values).toEqual([7, null, null]);
+    } finally {
+      views.dispose();
+    }
+  });
 });
