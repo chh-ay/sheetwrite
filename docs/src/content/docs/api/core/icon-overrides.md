@@ -7,13 +7,13 @@ description: "Per-glyph icon overrides, keyed by the names on the command icon s
 
 Per-glyph icon overrides, keyed by the names on the command icon sheet
 (`ICON_NAMES`). One override applies wherever the glyph shows: the flat
-toolbar, the ribbon and ribbon menus. Strings render as plain text; DOM nodes
-and node factories support SVG or HTML icons. To replace every glyph at once,
-set the `--sheetwrite-icon-sheet` CSS property to a sheet drawn on the layout
-in `@sheetwrite/core/icons.json`.
+toolbar, the ribbon and ribbon menus, and the context menu. Strings render
+as plain text; DOM nodes and node factories support SVG or HTML icons. To
+replace every glyph at once, set the `--sheetwrite-icon-sheet` CSS property
+to a sheet drawn on the layout in `@sheetwrite/core/icons.json`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L292"><code>packages/core/src/types/grid.ts#L292</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L295"><code>packages/core/src/types/grid.ts#L295</code></a></dd></div>
 </dl>
 
 ## Declaration

@@ -10432,7 +10432,8 @@ above it, or to its left when there are none above.
 - `clearAll` — Clear the selection's contents and formatting, as one undoable step.
 - `copy` — Copy the focused rectangle to the system clipboard. Never rejects.
 - `cut` — Copy + clear the source (after the clipboard accepted). Never rejects.
-- `deleteNote` — Remove the focus cell's note as one undoable step. Does nothing when it has none.
+- `deleteNote` — Remove the focus cell's note as one undoable step. Does nothing when it has
+none. Does nothing on a read-only grid.
 - `editNote` — Open the note editor on the focus cell, with its note or empty for a new
 one. Ctrl or Cmd+Enter and leaving the editor save; Escape cancels. Does
 nothing on a read-only grid.
@@ -10688,10 +10689,10 @@ export type IconOverrides = Partial<Record<IconName, ToolbarIcon>>;
 
 Per-glyph icon overrides, keyed by the names on the command icon sheet
 (`ICON_NAMES`). One override applies wherever the glyph shows: the flat
-toolbar, the ribbon and ribbon menus. Strings render as plain text; DOM nodes
-and node factories support SVG or HTML icons. To replace every glyph at once,
-set the `--sheetwrite-icon-sheet` CSS property to a sheet drawn on the layout
-in `@sheetwrite/core/icons.json`.
+toolbar, the ribbon and ribbon menus, and the context menu. Strings render
+as plain text; DOM nodes and node factories support SVG or HTML icons. To
+replace every glyph at once, set the `--sheetwrite-icon-sheet` CSS property
+to a sheet drawn on the layout in `@sheetwrite/core/icons.json`.
 
 ##### `IncompleteDataError` — class
 

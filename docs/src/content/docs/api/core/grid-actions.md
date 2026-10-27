@@ -502,7 +502,8 @@ nothing on a read-only grid.</p>
 deleteNote(): void;
 ```
 
-<p class="api-member-doc">Remove the focus cell's note as one undoable step. Does nothing when it has none.</p>
+<p class="api-member-doc">Remove the focus cell's note as one undoable step. Does nothing when it has
+none. Does nothing on a read-only grid.</p>
 </details>
 
 <details class="api-member" id="grid-actions-undo" data-pagefind-weight="1">
