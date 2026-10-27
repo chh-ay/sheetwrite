@@ -65,7 +65,7 @@ The field list reads plain data. It never reads engine structures.
   `unavailable`.
 
 The store has the same methods. The full engine calculates pivots. Select it
-as shown in [Analysis formulas](/docs/guides/analysis-formulas/). With the
+as shown in [Analysis formulas](/docs/features/formulas/analysis-formulas/). With the
 default engine, the document keeps, saves, undoes and synchronizes the same
 definitions. It shows values saved by Excel without recalculating the pivot.
 `getPivotResult` reports `saved` for those values, or `unavailable` when no
