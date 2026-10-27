@@ -8,17 +8,18 @@ description: "API reference for @sheetwrite/charts."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/index.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>11</dd></div>
+<div><dt>Exports</dt><dd>12</dd></div>
 </dl>
 
 Source entry: `packages/charts/src/index.ts`
 
 ## Exported symbols
 
-### Functions <span class="api-count" data-pagefind-ignore>1</span>
+### Functions <span class="api-count" data-pagefind-ignore>2</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/charts/create-chart-view-cache/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>createChartViewCache</code></span><span class="api-symbol-card__desc">Creates the per-store chart view cache a chart renderer reads from.</span></a>
+<a class="api-symbol-card" href="/docs/api/charts/register-charts-backend/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>registerChartsBackend</code></span><span class="api-symbol-card__desc">Register the chart view cache as the core chart view provider, so openChartViews(store) returns live chart views.</span></a>
 </div>
 
 ### Interfaces <span class="api-count" data-pagefind-ignore>8</span>

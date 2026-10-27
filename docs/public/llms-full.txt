@@ -9280,6 +9280,58 @@ function watchChart(
 }
 ```
 
+##### `registerChartsBackend` — function
+
+```ts
+(): void
+```
+
+Register the chart view cache as the core chart view provider, so
+`openChartViews(store)` returns live chart views.
+@example
+```ts
+import { registerChartsBackend } from "@sheetwrite/charts";
+import { openChartViews, type Store } from "@sheetwrite/core";
+
+registerChartsBackend();
+
+function salesChartValues(store: Store) {
+ const charts = openChartViews(store);
+ const values = charts.get({ sheet: "s", id: "sales" })?.series[0]?.values ?? [];
+ charts.dispose();
+ return values;
+}
+```
+
+#### `@sheetwrite/charts/register` — supported
+
+Declaration target: `./dist/register.d.ts`
+Source entry: `src/register.ts`
+Page: https://sheetwrite.vercel.app/docs/api/charts-register/
+
+##### `registerChartsBackend` — function
+
+```ts
+(): void
+```
+
+Register the chart view cache as the core chart view provider, so
+`openChartViews(store)` returns live chart views.
+@example
+```ts
+import { registerChartsBackend } from "@sheetwrite/charts";
+import { openChartViews, type Store } from "@sheetwrite/core";
+
+registerChartsBackend();
+
+function salesChartValues(store: Store) {
+ const charts = openChartViews(store);
+ const values = charts.get({ sheet: "s", id: "sales" })?.series[0]?.values ?? [];
+ charts.dispose();
+ return values;
+}
+```
+
 ### `@sheetwrite/core`
 
 #### `@sheetwrite/core` — supported
@@ -9702,6 +9754,27 @@ export interface ChartView { chart: ChartDefinition; series: ChartSeriesView[]; 
 ```
 
 One immutable-by-convention rendering input, refreshed on chart-change events.
+
+##### `ChartViewProvider` — interface
+
+```ts
+export interface ChartViewProvider { get(chart: ChartRef): ChartView | null; subscribe(listener: ChartChangeListener): () => void; dispose(): void; }
+```
+
+Cached chart views supplied by the optional charts package; renderers do not read cells.
+
+Members:
+- `dispose` — Stop observing the store and release cached views.
+- `get` — Resolve on first access; later accesses use the cached committed view.
+- `subscribe` — Observe invalidation after cached views have been removed.
+
+##### `ChartViewProviderFactory` — type
+
+```ts
+export type ChartViewProviderFactory = (store: Store) => ChartViewProvider;
+```
+
+Creates a provider owned and disposed by one renderer or host.
 
 ##### `colToA1` — function
 
@@ -11189,6 +11262,16 @@ Members:
 
 Observe runtime memory buckets available in the current JS host without fabricating missing data.
 
+##### `openChartViews` — function
+
+```ts
+(store: Store): ChartViewProvider
+```
+
+Open cached chart views through the optional backend. Import
+`@sheetwrite/charts/register` or call its `registerChartsBackend` first.
+Throws if no provider is registered. The caller must dispose the result.
+
 ##### `OperationSource` — type
 
 ```ts
@@ -12072,6 +12155,14 @@ Current cell, range, row, column, or multi-range selection.
 Convert a date serial back to a `Date`. Read the result with the UTC accessors
 (`getUTCFullYear`, `getUTCMonth`, …) — which is what the renderer does — so the
 calendar fields are stable regardless of the host time zone.
+
+##### `setChartViewProviderFactory` — function
+
+```ts
+(factory: ChartViewProviderFactory | null): void
+```
+
+Register an optional chart provider; `null` removes the current provider.
 
 ##### `setXlsxTableExportBackend` — function
 

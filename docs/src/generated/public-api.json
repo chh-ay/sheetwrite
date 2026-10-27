@@ -187,6 +187,43 @@
               ],
               "documentation": "Creates the per-store chart view cache a chart renderer reads from.\n\nViews resolve lazily on first `get` and stay cached until a chart-change\nevent names that chart, so repeated frames never reread cells.\n@example\n```ts\nimport { createChartViewCache, type ChartView } from \"@sheetwrite/charts\";\nimport type { SheetId, Store } from \"@sheetwrite/core\";\n\nfunction watchChart(\n  store: Store,\n  sheet: SheetId,\n  id: string,\n  render: (view: ChartView | null) => void,\n) {\n  const charts = createChartViewCache(store);\n  render(charts.get({ sheet, id }));\n  const unsubscribe = charts.subscribe((event) => {\n    if (event.charts.some((chart) => chart.sheet === sheet && chart.id === id)) {\n      render(charts.get({ sheet, id }));\n    }\n  });\n  return () => {\n    unsubscribe();\n    charts.dispose();\n  };\n}\n```",
               "memberDocs": []
+            },
+            {
+              "name": "registerChartsBackend",
+              "kind": "function",
+              "signature": "(): void",
+              "owners": [
+                "src/registration.ts"
+              ],
+              "source": "src/registration.ts#L24",
+              "jsDocTags": [
+                "example"
+              ],
+              "documentation": "Register the chart view cache as the core chart view provider, so\n`openChartViews(store)` returns live chart views.\n@example\n```ts\nimport { registerChartsBackend } from \"@sheetwrite/charts\";\nimport { openChartViews, type Store } from \"@sheetwrite/core\";\n\nregisterChartsBackend();\n\nfunction salesChartValues(store: Store) {\n  const charts = openChartViews(store);\n  const values = charts.get({ sheet: \"s\", id: \"sales\" })?.series[0]?.values ?? [];\n  charts.dispose();\n  return values;\n}\n```",
+              "memberDocs": []
+            }
+          ]
+        },
+        {
+          "subpath": "./register",
+          "target": "./dist/register.d.ts",
+          "source": "src/register.ts",
+          "kind": "typescript",
+          "classification": "supported",
+          "exports": [
+            {
+              "name": "registerChartsBackend",
+              "kind": "function",
+              "signature": "(): void",
+              "owners": [
+                "src/registration.ts"
+              ],
+              "source": "src/registration.ts#L24",
+              "jsDocTags": [
+                "example"
+              ],
+              "documentation": "Register the chart view cache as the core chart view provider, so\n`openChartViews(store)` returns live chart views.\n@example\n```ts\nimport { registerChartsBackend } from \"@sheetwrite/charts\";\nimport { openChartViews, type Store } from \"@sheetwrite/core\";\n\nregisterChartsBackend();\n\nfunction salesChartValues(store: Store) {\n  const charts = openChartViews(store);\n  const values = charts.get({ sheet: \"s\", id: \"sales\" })?.series[0]?.values ?? [];\n  charts.dispose();\n  return values;\n}\n```",
+              "memberDocs": []
             }
           ]
         }
@@ -877,6 +914,43 @@
               "source": "src/types/chart.ts#L57",
               "jsDocTags": [],
               "documentation": "One immutable-by-convention rendering input, refreshed on chart-change events.",
+              "memberDocs": []
+            },
+            {
+              "name": "ChartViewProvider",
+              "kind": "interface",
+              "signature": "export interface ChartViewProvider { get(chart: ChartRef): ChartView | null; subscribe(listener: ChartChangeListener): () => void; dispose(): void; }",
+              "owners": [
+                "src/types/chartProvider.ts"
+              ],
+              "source": "src/types/chartProvider.ts#L6",
+              "jsDocTags": [],
+              "documentation": "Cached chart views supplied by the optional charts package; renderers do not read cells.",
+              "memberDocs": [
+                {
+                  "name": "dispose",
+                  "documentation": "Stop observing the store and release cached views."
+                },
+                {
+                  "name": "get",
+                  "documentation": "Resolve on first access; later accesses use the cached committed view."
+                },
+                {
+                  "name": "subscribe",
+                  "documentation": "Observe invalidation after cached views have been removed."
+                }
+              ]
+            },
+            {
+              "name": "ChartViewProviderFactory",
+              "kind": "type",
+              "signature": "export type ChartViewProviderFactory = (store: Store) => ChartViewProvider;",
+              "owners": [
+                "src/types/chartProvider.ts"
+              ],
+              "source": "src/types/chartProvider.ts#L16",
+              "jsDocTags": [],
+              "documentation": "Creates a provider owned and disposed by one renderer or host.",
               "memberDocs": []
             },
             {
@@ -3002,6 +3076,18 @@
               "memberDocs": []
             },
             {
+              "name": "openChartViews",
+              "kind": "function",
+              "signature": "(store: Store): ChartViewProvider",
+              "owners": [
+                "src/chart-backend.ts"
+              ],
+              "source": "src/chart-backend.ts#L16",
+              "jsDocTags": [],
+              "documentation": "Open cached chart views through the optional backend. Import\n`@sheetwrite/charts/register` or call its `registerChartsBackend` first.\nThrows if no provider is registered. The caller must dispose the result.",
+              "memberDocs": []
+            },
+            {
               "name": "OperationSource",
               "kind": "type",
               "signature": "export type OperationSource = \"local\" | \"remote\";",
@@ -4230,6 +4316,18 @@
               "source": "src/date-serial.ts#L38",
               "jsDocTags": [],
               "documentation": "Convert a date serial back to a `Date`. Read the result with the UTC accessors\n(`getUTCFullYear`, `getUTCMonth`, …) — which is what the renderer does — so the\ncalendar fields are stable regardless of the host time zone.",
+              "memberDocs": []
+            },
+            {
+              "name": "setChartViewProviderFactory",
+              "kind": "function",
+              "signature": "(factory: ChartViewProviderFactory | null): void",
+              "owners": [
+                "src/chart-backend.ts"
+              ],
+              "source": "src/chart-backend.ts#L7",
+              "jsDocTags": [],
+              "documentation": "Register an optional chart provider; `null` removes the current provider.",
               "memberDocs": []
             },
             {

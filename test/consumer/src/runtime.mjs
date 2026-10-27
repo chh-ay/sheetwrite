@@ -7,6 +7,7 @@ import * as Shell from "@sheetwrite/core/shell";
 import * as Xlsx from "@sheetwrite/xlsx";
 import "@sheetwrite/xlsx/register";
 import * as Charts from "@sheetwrite/charts";
+import "@sheetwrite/charts/register";
 import * as ReactAdapter from "@sheetwrite/react";
 import * as VueAdapter from "@sheetwrite/vue";
 import { load } from "@sheetwrite/wasm";
@@ -117,7 +118,7 @@ if (tableData.columns.Value?.[0] !== "packed") {
 }
 store.dispose();
 
-// The packed charts entry must resolve a live view from the packed core store.
+// The packed charts register entry must let packed core open live views of a packed store.
 const chartStore = new Core.SheetwriteStore({
   activeSheet: "chart",
   sheets: [
@@ -142,7 +143,7 @@ const chartStore = new Core.SheetwriteStore({
     },
   ],
 });
-const chartViews = Charts.createChartViewCache(chartStore);
+const chartViews = Core.openChartViews(chartStore);
 chartStore.applyTransaction({
   patches: [
     { op: "set", addr: { sheet: "chart", row: 1, col: 0 }, value: { kind: "literal", value: 5 } },

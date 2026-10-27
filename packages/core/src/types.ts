@@ -11,3 +11,4 @@ export type * from "./types/render.js";
 export type * from "./types/store.js";
 export type * from "./types/table.js";
 export type * from "./types/transaction.js";
+export type * from "./types/chartProvider.js";

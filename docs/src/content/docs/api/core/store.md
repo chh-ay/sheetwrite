@@ -308,7 +308,9 @@ export interface Store {
 
 <ul class="api-consumer-list">
 <li><a href="/docs/api/charts/create-chart-view-cache/"><code>createChartViewCache</code></a><span class="api-consumer-kind">@sheetwrite/charts</span></li>
+<li><a href="/docs/api/core/chart-view-provider-factory/"><code>ChartViewProviderFactory</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/open-chart-views/"><code>openChartViews</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/resolve-chart-view/"><code>resolveChartView</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/sheetwrite-store/"><code>SheetwriteStore</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/subscribe-chart-changes/"><code>subscribeChartChanges</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
@@ -317,8 +319,6 @@ export interface Store {
 <li><a href="/docs/api/core/to-tsv/"><code>toTsv</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/to-tsv-stream/"><code>toTsvStream</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/to-xlsx-table/"><code>toXlsxTable</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li><a href="/docs/api/core/to-xlsx-table-stream/"><code>toXlsxTableStream</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li><a href="/docs/api/core/xlsx-table-export-backend/"><code>XlsxTableExportBackend</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li class="api-consumer-more">and 4 more</li>
+<li class="api-consumer-more">and 6 more</li>
 </ul>
 </div>

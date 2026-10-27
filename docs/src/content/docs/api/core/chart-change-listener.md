@@ -39,6 +39,7 @@ export type ChartChangeListener = (event: ChartChangeEvent) => void;
 <p class="api-consumers-label">Public exports naming <code>ChartChangeListener</code></p>
 
 <ul class="api-consumer-list">
+<li><a href="/docs/api/core/chart-view-provider/"><code>ChartViewProvider</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/subscribe-chart-changes/"><code>subscribeChartChanges</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>

@@ -61,6 +61,7 @@ export interface ChartView {
 
 <ul class="api-consumer-list">
 <li><a href="/docs/api/charts/chart-view-cache/"><code>ChartViewCache</code></a><span class="api-consumer-kind">@sheetwrite/charts</span></li>
+<li><a href="/docs/api/core/chart-view-provider/"><code>ChartViewProvider</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/resolve-chart-view/"><code>resolveChartView</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>

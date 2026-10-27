@@ -37,3 +37,17 @@ charts.dispose();
 A `ChartView` contains plain data. Each series has its values, categories, and number formats, and it shows if the source was truncated or refers to a deleted range (`#REF!`). Core reads at most `MAX_CHART_POINTS` points for each series.
 
 When you replace the workbook, you get a new store. Make a new cache for the new store.
+
+## Register with core
+
+Core has `openChartViews(store)`, which returns the same `get`, `subscribe` and `dispose` API. It throws until a chart package is registered. Import `@sheetwrite/charts/register` once, or call `registerChartsBackend()`:
+
+```ts
+import "@sheetwrite/charts/register";
+import { openChartViews } from "@sheetwrite/core";
+
+const charts = openChartViews(store);
+const view = charts.get({ sheet: "s", id: "sales" });
+```
+
+The `@sheetwrite/charts` root entry does not register anything when you import it.

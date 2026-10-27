@@ -7,6 +7,7 @@ description: "Compiler-backed classification of every publishable Sheetwrite pac
 | Package entry point | Target | Classification | API page |
 | --- | --- | --- | --- |
 | `@sheetwrite/charts` | `./dist/index.d.ts` | supported | [Reference](/docs/api/charts/) |
+| `@sheetwrite/charts/register` | `./dist/register.d.ts` | supported | [Reference](/docs/api/charts-register/) |
 | `@sheetwrite/core` | `./dist/index.d.ts` | supported | [Reference](/docs/api/core/) |
 | `@sheetwrite/core/adapter` | `./dist/adapter.d.ts` | supported | [Reference](/docs/api/core-adapter/) |
 | `@sheetwrite/core/browser` | `./dist/indexeddb.d.ts` | supported | [Reference](/docs/api/core-browser/) |

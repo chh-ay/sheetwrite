@@ -104,6 +104,11 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "HyperlinkTarget",
     ],
   },
+  chartProvider: {
+    source: "packages/core/src/types/chartProvider.ts",
+    dependencies: ["chart", "store"],
+    exports: ["ChartViewProvider", "ChartViewProviderFactory"],
+  },
   chart: {
     source: "packages/core/src/types/chart.ts",
     dependencies: ["coordinates"],

@@ -34,6 +34,7 @@ import { createGridController } from "@sheetwrite/core/adapter";
 import * as Xlsx from "@sheetwrite/xlsx";
 import "@sheetwrite/xlsx/register";
 import * as Charts from "@sheetwrite/charts";
+import "@sheetwrite/charts/register";
 
 // Removed pre-release names must stay absent from packed declarations.
 // @ts-expect-error `Patch` was removed in favor of `DocumentOp`.
@@ -114,6 +115,7 @@ void datasource;
 void operation;
 void Xlsx.registerXlsxBackends;
 void Charts.createChartViewCache;
+void Charts.registerChartsBackend;
 
 const positionalDatasource: DataSource = {
   capabilities: { protocol: 2, columns: "windowed" },

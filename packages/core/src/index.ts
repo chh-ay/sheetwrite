@@ -410,3 +410,6 @@ export {
   type WorkbookTableResourceLimits,
   workbookTableNameKey,
 } from "./workbook-table.js";
+
+export { openChartViews, setChartViewProviderFactory } from "./chart-backend.js";
+export type { ChartViewProvider, ChartViewProviderFactory } from "./types/chartProvider.js";
