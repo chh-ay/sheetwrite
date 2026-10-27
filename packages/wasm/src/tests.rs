@@ -5682,3 +5682,126 @@ mod reference_operators {
         assert_eq!(string(&store, summary, 1, 0).as_deref(), Some("#REF!"));
     }
 }
+
+/// The dense column scans in `filterRows`, `dataEdgeOrdered`, `rangeStyleIds`
+/// and `aggregate` classify literals from the raw kind byte. These tests put
+/// formula results and calculated spill cells in the same column, so the
+/// branches that resolve a calculated slot are covered too.
+mod dense_reader_fast_paths {
+    use super::*;
+
+    const ROWS: usize = 14;
+    const SPILL_ANCHOR_ROW: usize = 7;
+    const SPILL_CHILD_ROWS: [usize; 2] = [8, 9];
+    const BLANK_ROWS: [usize; 3] = [3, 12, 13];
+
+    /// Column A: a literal of each kind, formulas with number, text, error
+    /// and boolean results, and `=SEQUENCE(3)`, whose rows 8 and 9 are
+    /// calculated cells with no source. Every written cell has its own style.
+    fn formula_column() -> (CellStore, usize) {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(2, ROWS);
+        store.set_number(sheet, 0, 0, 5.0, 1);
+        store.set_string(sheet, 1, 0, "Needle 7", 2);
+        store.set_bool(sheet, 2, 0, true, 3);
+        store.set_formula(sheet, 4, 0, "=2+3", 4);
+        store.set_formula(sheet, 5, 0, "=\"needle\"", 5);
+        store.set_formula(sheet, 6, 0, "=1/0", 6);
+        store.set_formula(sheet, SPILL_ANCHOR_ROW, 0, "=SEQUENCE(3)", 7);
+        store.set_formula(sheet, 10, 0, "=12345", 8);
+        store.set_formula(sheet, 11, 0, "=TRUE", 9);
+        store.recompute(sheet);
+
+        for (row, value) in SPILL_CHILD_ROWS.into_iter().zip([2.0, 3.0]) {
+            assert_close(store.get_cell(sheet, row, 0).num(), value);
+        }
+        (store, sheet)
+    }
+
+    #[test]
+    fn filter_rows_matches_formula_results_and_spilled_values() {
+        let (store, sheet) = formula_column();
+        let cases: [(&str, &[u32]); 6] = [
+            ("needle", &[1, 5]),
+            ("5", &[0, 4, 10]),
+            ("2", &[8, 10]),
+            ("3", &[9, 10]),
+            ("true", &[2, 11]),
+            ("#div/0", &[6]),
+        ];
+        for (needle, rows) in cases {
+            assert_eq!(
+                store.filter_rows(sheet, 0, needle),
+                rows,
+                "needle {needle:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn data_edge_ordered_treats_formula_and_spilled_cells_as_data() {
+        let (store, sheet) = formula_column();
+        // View order puts blank row 3 first and blank row 12 after the literals.
+        let order: Vec<u32> = [3, 0, 1, 2, 12, 4, 5, 6, 7, 8, 9, 10, 11, 13]
+            .into_iter()
+            .collect();
+        let last_view = (order.len() - 1) as u32;
+        let cases = [
+            (0, 1, 1),
+            (1, 1, 3),
+            (3, 1, 5),
+            (5, 1, 12),
+            (12, 1, last_view),
+            (12, -1, 5),
+            (5, -1, 3),
+        ];
+        for (view, step, expected) in cases {
+            assert_eq!(
+                store.data_edge_ordered(sheet, &order, view, 0, step, 0),
+                expected,
+                "from view {view} by {step}"
+            );
+        }
+    }
+
+    #[test]
+    fn range_style_ids_match_get_cell_styles_with_formulas_and_spills() {
+        let (store, sheet) = formula_column();
+        let ranges = [(0, ROWS - 1), (4, 6), (SPILL_ANCHOR_ROW, 9), (2, 3)];
+        for (first, last) in ranges {
+            let mut expected: Vec<u32> = (first..=last)
+                .map(|row| store.get_cell(sheet, row, 0).style())
+                .collect();
+            expected.sort_unstable();
+            expected.dedup();
+            assert_eq!(
+                store.range_style_ids(sheet, first, 0, last, 0),
+                expected,
+                "rows {first}..={last}"
+            );
+        }
+    }
+
+    #[test]
+    fn aggregate_counts_number_formulas_and_skips_text_and_error_results() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(1, ROWS);
+        store.set_number(sheet, 0, 0, 5.0, 0);
+        store.set_string(sheet, 1, 0, "Needle 7", 0);
+        store.set_bool(sheet, 2, 0, true, 0);
+        store.set_formula(sheet, 4, 0, "=2+3", 0);
+        store.set_formula(sheet, 5, 0, "=\"needle\"", 0);
+        store.set_formula(sheet, 6, 0, "=1/0", 0);
+        store.set_formula(sheet, 10, 0, "=12345", 0);
+        store.recompute(sheet);
+        for row in BLANK_ROWS {
+            assert_eq!(store.get_cell(sheet, row, 0).kind(), KIND_EMPTY);
+        }
+
+        assert_close(store.aggregate(sheet, 0, 0), 12_355.0);
+        assert_close(store.aggregate(sheet, 0, 1), 12_355.0 / 3.0);
+        assert_close(store.aggregate(sheet, 0, 2), 5.0);
+        assert_close(store.aggregate(sheet, 0, 3), 12_345.0);
+        assert_close(store.aggregate(sheet, 0, 4), 3.0);
+    }
+}

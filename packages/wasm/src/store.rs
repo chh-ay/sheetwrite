@@ -4,6 +4,7 @@ use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::mem::size_of;
 
+use rustc_hash::FxHashSet;
 use wasm_bindgen::prelude::*;
 
 use crate::calc::{
@@ -1246,9 +1247,10 @@ impl CellStore {
         if r0 > r1 || c0 > c1 || r1 >= s.cells.row_count() || c1 >= s.cells.n_cols() {
             return Vec::new();
         }
+
         // Neighbouring cells usually share a style, so a run of equal ids costs
         // one compare instead of one hash insert per cell.
-        let mut ids = rustc_hash::FxHashSet::<u32>::default();
+        let mut ids = FxHashSet::<u32>::default();
         for col in c0..=c1 {
             if let Some(column) = s.cells.dense_column(col) {
                 let mut previous = None;
@@ -1268,6 +1270,7 @@ impl CellStore {
                 }
             }
         }
+
         let mut out: Vec<u32> = ids.into_iter().collect();
         out.sort_unstable();
         out

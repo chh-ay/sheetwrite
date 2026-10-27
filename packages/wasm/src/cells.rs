@@ -84,8 +84,10 @@ fn dense_source(kind: u8, payload: u64) -> (u8, u64) {
         (kind, payload)
     }
 }
+/// The resolved kind and payload of a raw dense slot: a calculated slot
+/// decodes its value, a literal is its own value.
 #[inline]
-fn dense_resolved(kind: u8, payload: u64) -> (u8, u64) {
+pub(crate) fn dense_resolved(kind: u8, payload: u64) -> (u8, u64) {
     if kind & CALCULATED != 0 {
         decode_cell(payload)
     } else {

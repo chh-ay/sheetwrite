@@ -6,7 +6,9 @@ use std::collections::HashSet;
 
 use wasm_bindgen::prelude::*;
 
-use crate::cells::{payload_is_str, payload_num, payload_str_id, source_kind, CellRun};
+use crate::cells::{
+    dense_resolved, payload_is_str, payload_num, payload_str_id, source_kind, CellRun,
+};
 use crate::sheet::{formula_error_at, SheetData};
 use crate::store::CellStore;
 use crate::types::{
@@ -127,8 +129,15 @@ impl<'a> ValueSet<'a> {
     }
 }
 
-/// The `aggregate` op code for SUM; every other op also needs count and extrema.
+/// `filterRows` matches text in any letter case, anywhere in the cell.
+const FILTER_CASE_INSENSITIVE: bool = true;
+const FILTER_WHOLE_CELL: bool = false;
+
+/// `aggregate` op codes. Every op except SUM also needs count and extrema.
 const AGGREGATE_SUM: u8 = 0;
+const AGGREGATE_AVERAGE: u8 = 1;
+const AGGREGATE_MIN: u8 = 2;
+const AGGREGATE_MAX: u8 = 3;
 
 /// Running column aggregate. A sum skips the count and extrema updates.
 struct NumericAccumulator {
@@ -188,18 +197,20 @@ impl CellStore {
 
         // Dense columns scan their slices directly. A run read per cell adds a
         // dirty-overlay probe, a payload load and bounds checks for cells that
-        // are not numbers, which made this scan 2.6-6x slower than 0.5.0.
+        // are not numbers, which made this scan 2.6-6x slower than 0.5.4.
         if let Some(column) = s.cells.dense_column(col) {
             let (kinds, payloads) = column.raw_slices();
             for (row, &raw) in kinds.iter().enumerate() {
                 // The kind byte decides first, so text, booleans and blanks
-                // never load their payload.
+                // never load their payload. A formula decodes its own slot and
+                // builds its key from the loop's row and column, without the
+                // style load and the divide that a general cell read costs.
                 let value = match source_kind(raw) {
                     KIND_NUMBER => Some(f64::from_bits(payloads[row])),
                     KIND_FORMULA => {
-                        let (_, payload, _) = column.cell(row);
+                        let (_, payload) = dense_resolved(raw, payloads[row]);
                         (!payload_is_str(payload)
-                            && key_for_index(s, base + row)
+                            && cell_key(row, col)
                                 .is_some_and(|key| formula_error_at(s, key).is_none()))
                         .then(|| payload_num(payload))
                     }
@@ -224,6 +235,7 @@ impl CellStore {
                 start = run.end;
             }
         }
+
         let NumericAccumulator {
             sum,
             count,
@@ -232,28 +244,29 @@ impl CellStore {
         } = acc;
 
         match op {
-            0 => sum,
-            1 => {
+            AGGREGATE_SUM => sum,
+            AGGREGATE_AVERAGE => {
                 if count > 0 {
                     sum / f64::from(count)
                 } else {
                     0.0
                 }
             }
-            2 => {
+            AGGREGATE_MIN => {
                 if count > 0 {
                     min
                 } else {
                     0.0
                 }
             }
-            3 => {
+            AGGREGATE_MAX => {
                 if count > 0 {
                     max
                 } else {
                     0.0
                 }
             }
+            // COUNT is op 4; an unknown op also counts, as it always has.
             _ => f64::from(count),
         }
     }
@@ -278,14 +291,28 @@ impl CellStore {
             let (kinds, payloads) = column.raw_slices();
             for (row, &raw) in kinds.iter().enumerate() {
                 // Literals never carry the calculated bit, so the raw byte
-                // classifies them; a bare empty byte has no calculated value.
+                // classifies them and their payload is their value; a bare
+                // empty byte has no calculated value. Only formula and
+                // calculated slots need the general cell match.
                 let matched = match raw {
                     KIND_STRING => cache.matches(
                         &self.strings,
                         payload_str_id(payloads[row]),
                         &needle,
-                        true,
-                        false,
+                        FILTER_CASE_INSENSITIVE,
+                        FILTER_WHOLE_CELL,
+                    ),
+                    KIND_NUMBER => number_matches_text(
+                        payload_num(payloads[row]),
+                        &needle,
+                        FILTER_CASE_INSENSITIVE,
+                        FILTER_WHOLE_CELL,
+                    ),
+                    KIND_BOOL => matches_needle(
+                        boolean_text(payload_num(payloads[row]) != 0.0),
+                        &needle,
+                        FILTER_CASE_INSENSITIVE,
+                        FILTER_WHOLE_CELL,
                     ),
                     KIND_EMPTY => false,
                     _ => cell_matches_text(
@@ -293,8 +320,8 @@ impl CellStore {
                         &self.strings,
                         base + row,
                         &needle,
-                        true,
-                        false,
+                        FILTER_CASE_INSENSITIVE,
+                        FILTER_WHOLE_CELL,
                         &mut cache,
                     ),
                 };
@@ -312,11 +339,25 @@ impl CellStore {
             for index in run.start..run.end {
                 let (kind, payload) = run.source(index);
                 let matched = if kind == KIND_STRING {
-                    cache.matches(&self.strings, payload_str_id(payload), &needle, true, false)
+                    cache.matches(
+                        &self.strings,
+                        payload_str_id(payload),
+                        &needle,
+                        FILTER_CASE_INSENSITIVE,
+                        FILTER_WHOLE_CELL,
+                    )
                 } else if kind == KIND_EMPTY && run.resolved(index).0 == KIND_EMPTY {
                     false
                 } else {
-                    cell_matches_text(s, &self.strings, index, &needle, true, false, &mut cache)
+                    cell_matches_text(
+                        s,
+                        &self.strings,
+                        index,
+                        &needle,
+                        FILTER_CASE_INSENSITIVE,
+                        FILTER_WHOLE_CELL,
+                        &mut cache,
+                    )
                 };
                 if matched {
                     out.push((index - base) as u32);
@@ -474,7 +515,7 @@ impl CellStore {
         let base = col * s.cells.row_count();
 
         if let Some(order) = if s.cells.row_count() >= MIN_RADIX_SORT_ROWS {
-            sort_finite_number_column_radix(s, base, ascending)
+            sort_finite_number_column_radix(s, col, ascending)
         } else {
             sort_finite_number_column_comparison(s, base, ascending)
         } {
@@ -559,6 +600,7 @@ impl CellStore {
         let mut keys: Vec<ComparableCell<'_>> = Vec::with_capacity(row_count * cols.len());
         for &col in cols {
             let base = col as usize * data.cells.row_count();
+
             let mut cached_run: Option<CellRun<'_>> = None;
             for &row in &rows {
                 let index = base + row as usize;
@@ -1275,7 +1317,7 @@ fn sort_finite_number_column_comparison(
 
 fn sort_finite_number_column_radix(
     sheet: &SheetData,
-    base: usize,
+    col: usize,
     ascending: bool,
 ) -> Option<Vec<u32>> {
     let mut pairs = Vec::with_capacity(sheet.cells.row_count());
@@ -1283,10 +1325,7 @@ fn sort_finite_number_column_radix(
 
     // A dense column gathers keys from its slices; only literal numbers sort
     // here, so a formula or any other source ends the numeric path early.
-    let dense = (sheet.cells.row_count() > 0)
-        .then(|| sheet.cells.dense_column(base / sheet.cells.row_count()))
-        .flatten();
-    if let Some(column) = dense {
+    if let Some(column) = sheet.cells.dense_column(col) {
         for (row, (kind, payload)) in column.sources().enumerate() {
             if kind != KIND_NUMBER {
                 return None;
@@ -1297,12 +1336,16 @@ fn sort_finite_number_column_radix(
             ));
         }
     } else {
+        // Only paged storage has no dense column, and a paged blank source
+        // resolves through the run's overlays before it counts as blank.
+        let paged = sheet.cells.is_paged();
+        let base = col * sheet.cells.row_count();
         let end = base + sheet.cells.row_count();
         let mut start = base;
         while start < end {
             let run = sheet.cells.run(start, end);
             for index in run.start..run.end {
-                let value = source_number_in_run(&run, index, true)?;
+                let value = source_number_in_run(&run, index, paged)?;
                 let key = finite_number_sort_key(value)?;
                 pairs.push((direction(key), (index - base) as u32));
             }
