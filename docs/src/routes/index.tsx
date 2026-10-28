@@ -5,7 +5,7 @@ import { ArchitectureScene } from "../components/landing/ArchitectureScene.js";
 import { CodeTabs } from "../components/landing/CodeTabs.js";
 import { FeatureGlyph, type FeatureGlyphKind } from "../components/landing/FeatureGlyph.js";
 import { GridGlow } from "../components/landing/GridGlow.js";
-import { HeroScene } from "../components/landing/HeroScene.js";
+import { HeroApp } from "../components/landing/HeroApp.js";
 import { StoryReel } from "../components/landing/StoryReel.js";
 import { useScenePlayback } from "../components/landing/useScenePlayback.js";
 import { PackageCommand } from "../components/PackageCommand.js";
@@ -83,6 +83,20 @@ interface Feature {
 }
 
 const FEATURES: readonly Feature[] = [
+  {
+    kind: "spreadsheet",
+    label: "Spreadsheet app",
+    href: "/showcases/spreadsheet/",
+    summary:
+      "An Excel-style ribbon, name box, formula bar and sheet tabs around the Grid. Every command is a public API call.",
+  },
+  {
+    kind: "analysis",
+    label: "Charts & pivot tables",
+    href: "/showcases/analysis/",
+    summary:
+      "Pivot your data and chart any range. Edit a source cell and the pivot and its chart update in place.",
+  },
   {
     kind: "scale",
     label: "Performance & scale",
@@ -246,9 +260,12 @@ function Landing() {
             </p>
             <h1 id="landing-title">The spreadsheet engine for your web app.</h1>
             <p className="sw-lp-hero__lede">
-              A real calculation engine and a canvas Grid in your page. Edit, recalculate, and page
-              through a billion cells. Your application keeps the data, the UI, and the server.
+              A real calculation engine and a canvas Grid in your page, with the ribbon, charts and
+              pivot tables of a spreadsheet app. Your application keeps the data, the UI, and the
+              server.
             </p>
+          </div>
+          <div className="sw-lp-hero__start">
             <div className="sw-lp-actions">
               <Link
                 className="sw-lp-button"
@@ -265,7 +282,7 @@ function Landing() {
               <PackageCommand packages="@sheetwrite/core" />
             </div>
           </div>
-          <HeroScene />
+          <HeroApp />
         </section>
 
         {evidence ? (

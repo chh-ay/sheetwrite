@@ -2,6 +2,8 @@ import type { CSSProperties } from "react";
 
 /** Small looping illustrations for the landing capability cards (CSS keyframes in landing.css). */
 export type FeatureGlyphKind =
+  | "spreadsheet"
+  | "analysis"
   | "scale"
   | "formulas"
   | "collaboration"
@@ -10,6 +12,98 @@ export type FeatureGlyphKind =
   | "host-rows";
 
 const order = (index: number) => ({ "--i": index }) as CSSProperties;
+
+/** The app shell in miniature: ribbon tabs, a pressed command, the formula bar, cells, sheet tabs. */
+function SpreadsheetGlyph() {
+  const cells = [];
+  for (let row = 0; row < 3; row++) {
+    for (let column = 0; column < 5; column++) {
+      cells.push(
+        <rect
+          className="fg-cell"
+          height={12}
+          key={`${row}-${column}`}
+          width={38}
+          x={22 + column * 40}
+          y={66 + row * 13}
+        />,
+      );
+    }
+  }
+  return (
+    <>
+      {["Home", "Insert", "Data"].map((label, index) => (
+        <text className="fg-tab" key={label} x={40 + index * 44} y={15}>
+          {label}
+        </text>
+      ))}
+      <rect className="fg-tab-line" height={2} rx={1} width={32} x={24} y={19} />
+      <rect className="fg-ribbon" height={24} rx={4} width={200} x={20} y={23} />
+      {[0, 1, 2, 3, 4].map((index) => (
+        <rect
+          className="fg-ribbon-button"
+          data-press={index === 2 || undefined}
+          height={14}
+          key={index}
+          rx={3}
+          width={14}
+          x={30 + index * 22}
+          y={28}
+        />
+      ))}
+      <rect className="fg-ribbon-group" height={14} rx={3} width={40} x={150} y={28} />
+      <rect className="fg-namebox" height={11} rx={2} width={26} x={20} y={51} />
+      <text className="fg-fx" x={52} y={60}>
+        fx
+      </text>
+      <rect className="fg-formula" height={11} rx={2} width={156} x={64} y={51} />
+      {cells}
+      <rect className="fg-edit" data-client="a" height={12} width={38} x={62} y={79} />
+      <rect className="fg-sheet-tab" data-active height={8} rx={2} width={30} x={22} y={109} />
+      <rect className="fg-sheet-tab" height={8} rx={2} width={30} x={56} y={109} />
+    </>
+  );
+}
+
+/** A pivot beside a column chart: the bars grow in, then the edited bar follows its cell. */
+function AnalysisGlyph() {
+  const bars = [44, 62, 36, 54];
+  return (
+    <>
+      {["EMEA", "APAC", "AMER", "LATAM"].map((region, row) => (
+        <g key={region}>
+          <rect className="fg-cell" height={16} width={40} x={16} y={18 + row * 19} />
+          <rect
+            className="fg-cell"
+            data-edited={row === 1 || undefined}
+            height={16}
+            width={38}
+            x={58}
+            y={18 + row * 19}
+          />
+          <text className="fg-result" x={20} y={29 + row * 19}>
+            {region}
+          </text>
+        </g>
+      ))}
+      <path className="fg-arrow" d="M 104 56 h 18" />
+      <path className="fg-axis" d="M 134 18 v 80 h 92" />
+      {bars.map((height, index) => (
+        <rect
+          className="fg-chart-bar"
+          data-edited={index === 1 || undefined}
+          height={height}
+          key={height}
+          rx={2}
+          style={order(index)}
+          width={14}
+          x={144 + index * 20}
+          y={98 - height}
+        />
+      ))}
+    </>
+  );
+}
 
 function ScaleGlyph() {
   const tiles = [];
@@ -230,6 +324,8 @@ function HostRowsGlyph() {
 export function FeatureGlyph({ kind }: Readonly<{ kind: FeatureGlyphKind }>) {
   return (
     <svg aria-hidden="true" className="fg" data-kind={kind} viewBox="0 0 240 120">
+      {kind === "spreadsheet" ? <SpreadsheetGlyph /> : null}
+      {kind === "analysis" ? <AnalysisGlyph /> : null}
       {kind === "scale" ? <ScaleGlyph /> : null}
       {kind === "formulas" ? <FormulasGlyph /> : null}
       {kind === "collaboration" ? <CollaborationGlyph /> : null}

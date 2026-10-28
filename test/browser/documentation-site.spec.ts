@@ -197,9 +197,9 @@ test("site root serves the product landing", async ({ page }) => {
 test("landing animations are bounded, replayable, and reduced-motion complete", async ({
   page,
 }) => {
-  // The hero is a scripted timeline: each frame writes styles and text into the SVG.
+  // The hero is a scripted timeline: each frame writes styles and text into its parts.
   const frameOf = (root: Element) =>
-    [...root.querySelectorAll<SVGElement>("[data-part]")]
+    [...root.querySelectorAll<HTMLElement>("[data-part]")]
       .map((part) => `${part.style.cssText}|${part.textContent}`)
       .join("\n");
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -207,14 +207,14 @@ test("landing animations are bounded, replayable, and reduced-motion complete", 
   await waitForHydration(page);
   const story = page.getByTestId("landing-product-story");
   // Reduced motion: the loop does not run, and the still picture is the finished
-  // edit: the recalculated total shows and the dependency paths are drawn.
+  // edit: the chart is in and the recalculated total shows.
   await expect(story).toHaveAttribute("data-landing-running", "false");
-  await expect(story.locator('[data-part="d6"]')).toHaveText("$20,848");
+  await expect(story.locator('[data-part="d6"]')).toHaveText("$21,808");
   const still = await story.evaluate(frameOf);
   await page.waitForTimeout(400);
   expect(await story.evaluate(frameOf)).toBe(still);
   // Seeking in either direction must work without enabling animation.
-  for (const selector of [".sw-hero-scene__captions", ".sw-arch__steps"]) {
+  for (const selector of [".ha-acts", ".sw-arch__steps"]) {
     const chapters = page.locator(`${selector} button`);
     for (let index = (await chapters.count()) - 1; index >= 0; index--) {
       await chapters.nth(index).focus();
