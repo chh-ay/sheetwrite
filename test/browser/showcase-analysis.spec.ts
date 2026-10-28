@@ -142,3 +142,43 @@ test("Insert › Chart adds a chart for the selected cells", async ({ page }) =>
     .toBe(2);
   await expect(chartObjects(page)).toHaveCount(2);
 });
+
+test("the Chart menu inserts the picked kind", async ({ page }) => {
+  await open(page);
+  const nameBox = page.getByRole("textbox", { name: "Cell reference" });
+  await nameBox.fill("A2:C8");
+  await nameBox.press("Enter");
+
+  const ribbon = page.getByRole("region", { name: "Ribbon" });
+  await ribbon.getByRole("tab", { name: "Insert" }).click();
+  await ribbon.getByRole("button", { name: "Chart options" }).click();
+  await page.getByRole("menuitem", { name: "Pie" }).click();
+
+  await expect
+    .poll(() =>
+      page.evaluate(
+        (sheet) => window.__sheetwriteAnalysisGrid?.getCharts(sheet).map((chart) => chart.kind),
+        SUMMARY,
+      ),
+    )
+    .toEqual(["line", "pie"]);
+});
+
+test("a chart's right-click menu deletes it, and undo brings it back", async ({ page }) => {
+  await open(page);
+
+  // The menu closes on scroll, as Excel's does. Bring the chart into view and
+  // let that scroll's event fire first, so it does not close the new menu.
+  await chart(page).scrollIntoViewIfNeeded();
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
+  await chart(page).click({ button: "right" });
+  const menu = page.locator(".sheetwrite-context-menu");
+  await expect(menu.getByText("Edit chart")).toBeVisible();
+  await menu.getByText("Delete chart").click();
+  await expect(chartObjects(page)).toHaveCount(0);
+
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(chartObjects(page)).toHaveCount(1);
+});

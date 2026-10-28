@@ -111,8 +111,9 @@ sheet or a cell. Then the field list opens in the side panel.
 - Drag fields into **Rows**, **Columns**, **Values** and **Filters**, or use the
   actions menu on each field to move it with the keyboard.
 - A value field has an aggregation, and a row or column field has a sort order.
-- Each change is one undo step. Select a cell in a pivot's output to open its
-  field list again.
+- Each change is one undo step. Select a cell in a pivot's output, or
+  right-click it and choose **PivotTable Fields**, to open its field list again.
+  Hosts can do the same with `grid.actions.showPivotFields()`.
 
 With the default engine, **Insert › PivotTable** is disabled, and its tooltip
 says that pivot tables need the full engine.

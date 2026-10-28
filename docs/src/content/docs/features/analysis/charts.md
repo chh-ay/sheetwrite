@@ -135,10 +135,14 @@ source range. A longer range draws its first 10,000 cells and shows a note.
 
 ## Insert and edit in the grid
 
-Grids with the ribbon have **Insert › Chart**. It makes a chart from the
-selection: a text first row gives the series names, and a text first column
-gives the categories. The chart panel opens beside the grid, where you change
-the kind, the ranges and the titles. Each change is one undo step.
+Grids with the ribbon have **Insert › Chart**. Its face makes a column chart
+from the selection, and its menu makes any of the seven kinds. A text first row
+gives the series names, and a text first column gives the categories. The chart
+panel opens beside the grid, where you change the kind, the ranges and the
+titles. Each change is one undo step.
+
+Right-click a chart, or press Shift+F10 on a selected chart, for **Edit chart**
+and **Delete chart**.
 
 Click a chart to select it. Drag it to move it, or drag a handle to resize it.
 On a read-only grid you can select a chart, but not change it.

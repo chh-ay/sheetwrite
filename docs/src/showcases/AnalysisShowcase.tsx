@@ -62,12 +62,12 @@ const TRIES = [
   },
   {
     action: "Insert a chart",
-    how: "Select some of the pivot's months and regions, then Insert › Chart.",
-    result: "A chart of your selection appears, and its panel changes the kind and titles.",
+    how: "Select some of the pivot's months and regions, then open the arrow on Insert › Chart and pick Line.",
+    result: "A line chart of your selection appears, and its panel changes the kind and titles.",
   },
   {
     action: "Move a chart",
-    how: "Select a chart, then drag it or use the arrow keys. Delete removes it.",
+    how: "Select a chart, then drag it or use the arrow keys. Right-click it to edit or delete it.",
     result: "Each move is one undo step.",
   },
 ] as const;
