@@ -6,6 +6,7 @@ import { errorText } from "../lib/errors.js";
 import { ActionError } from "../lib/use-action.js";
 import { CapabilityHero } from "./CapabilityHero.js";
 import { createSpreadsheetScenario } from "./scenarios/spreadsheet.js";
+import SpreadsheetSetupSnippet from "./snippets/spreadsheet-setup.mdx";
 
 import "@sheetwrite/core/styles.css";
 import "@sheetwrite/core/shell.css";
@@ -159,14 +160,9 @@ export default function SpreadsheetShowcase() {
           </div>
           <div>
             <h2>How it is built</h2>
-            <pre className="sw-spreadsheet-code">
-              <code>
-                {"// The full app: ribbon, name box, formula bar, tabs\n"}
-                {"createSpreadsheetShell(host, { ribbon: true, grid });\n\n"}
-                {"// The same ribbon on a grid of its own\n"}
-                {"config: { ribbon: true }"}
-              </code>
-            </pre>
+            <div className="sw-spreadsheet-code">
+              <SpreadsheetSetupSnippet />
+            </div>
             <p>
               Every ribbon command calls <code>grid.actions</code>, so your own toolbar can call the
               same methods.

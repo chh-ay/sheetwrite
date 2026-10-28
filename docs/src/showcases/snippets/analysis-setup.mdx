@@ -1,0 +1,12 @@
+```ts
+// Pivot tables need the full engine; charts draw through their package
+await initSheetwrite(undefined, await import("@sheetwrite/formulas"));
+registerChartsBackend();
+
+grid.setPivot({ id, source, anchor,
+  rows: [MONTH], columns: [REGION],
+  values: [{ field: REVENUE, aggregation: "SUM" }] }, "summary");
+
+// One line series per region, over the pivot's output cells
+grid.setChart({ id, kind: "line", series, anchor }, "summary");
+```
