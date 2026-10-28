@@ -20,7 +20,6 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-aggregate"><code>aggregate</code></a>
 <a href="#cell-store-begin-mutation"><code>beginMutation</code></a>
 <a href="#cell-store-begin-page-load"><code>beginPageLoad</code></a>
-<a href="#cell-store-can-dirty-cell"><code>canDirtyCell</code></a>
 <a href="#cell-store-capture-range"><code>captureRange</code></a>
 <a href="#cell-store-capture-references"><code>captureReferences</code></a>
 <a href="#cell-store-capture-sources"><code>captureSources</code></a>
@@ -35,7 +34,6 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-compact-string-storage"><code>compactStringStorage</code></a>
 <a href="#cell-store-data-edge"><code>dataEdge</code></a>
 <a href="#cell-store-data-edge-ordered"><code>dataEdgeOrdered</code></a>
-<a href="#cell-store-dirty-revision"><code>dirtyRevision</code></a>
 <a href="#cell-store-distinct-values"><code>distinctValues</code></a>
 <a href="#cell-store-export-memory-state"><code>exportMemoryState</code></a>
 <a href="#cell-store-filter-rows"><code>filterRows</code></a>
@@ -47,21 +45,16 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-get-cell"><code>getCell</code></a>
 <a href="#cell-store-get-window"><code>getWindow</code></a>
 <a href="#cell-store-get-window-rows"><code>getWindowRows</code></a>
-<a href="#cell-store-hydrate-page-numbers"><code>hydratePageNumbers</code></a>
-<a href="#cell-store-hydrate-page-strings-packed"><code>hydratePageStringsPacked</code></a>
 <a href="#cell-store-import-range-memory-state"><code>importRangeMemoryState</code></a>
 <a href="#cell-store-insert-cols"><code>insertCols</code></a>
 <a href="#cell-store-is-fully-loaded"><code>isFullyLoaded</code></a>
 <a href="#cell-store-is-paged"><code>isPaged</code></a>
-<a href="#cell-store-is-sheet-alive"><code>isSheetAlive</code></a>
 <a href="#cell-store-loaded-spans"><code>loadedSpans</code></a>
-<a href="#cell-store-mark-cell-clean-revision"><code>markCellCleanRevision</code></a>
 <a href="#cell-store-mark-range-clean"><code>markRangeClean</code></a>
 <a href="#cell-store-memory-stats"><code>memoryStats</code></a>
 <a href="#cell-store-paged-dirty-coordinates"><code>pagedDirtyCoordinates</code></a>
 <a href="#cell-store-paged-stats"><code>pagedStats</code></a>
 <a href="#cell-store-persisted-cell-data"><code>persistedCellData</code></a>
-<a href="#cell-store-pin-range"><code>pinRange</code></a>
 <a href="#cell-store-pin-read-window"><code>pinReadWindow</code></a>
 <a href="#cell-store-pin-viewport-bands"><code>pinViewportBands</code></a>
 <a href="#cell-store-pivot-fields"><code>pivotFields</code></a>
@@ -107,19 +100,16 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-sheet-span-formula-cells"><code>sheetSpanFormulaCells</code></a>
 <a href="#cell-store-snapshot-numbers"><code>snapshotNumbers</code></a>
 <a href="#cell-store-snapshot-texts"><code>snapshotTexts</code></a>
-<a href="#cell-store-sort-rows"><code>sortRows</code></a>
 <a href="#cell-store-sort-rows-multi"><code>sortRowsMulti</code></a>
 <a href="#cell-store-spill-anchor-col"><code>spillAnchorCol</code></a>
 <a href="#cell-store-spill-anchor-row"><code>spillAnchorRow</code></a>
 <a href="#cell-store-spill-derived-mask"><code>spillDerivedMask</code></a>
-<a href="#cell-store-spill-owner-coordinates"><code>spillOwnerCoordinates</code></a>
 <a href="#cell-store-string-pool-epoch"><code>stringPoolEpoch</code></a>
-<a href="#cell-store-style-id-at"><code>styleIdAt</code></a>
 <a href="#cell-store-wasm-committed-bytes"><code>wasmCommittedBytes</code></a>
 <a href="#cell-store-import-memory-state"><code>importMemoryState</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>105</span>
+## Members <span class="api-count" data-pagefind-ignore>95</span>
 
 <div class="api-member-list">
 
@@ -194,15 +184,6 @@ beginMutation: () => bigint;
 
 ```ts generated
 beginPageLoad: () => void;
-```
-
-</details>
-
-<details class="api-member" id="cell-store-can-dirty-cell" data-pagefind-weight="1">
-<summary><code>canDirtyCell</code></summary>
-
-```ts generated
-canDirtyCell: (sheet: number, row: number, col: number) => boolean;
 ```
 
 </details>
@@ -359,15 +340,6 @@ dataEdgeOrdered: (sheet: number, order: Uint32Array, row: number, col: number, d
 
 </details>
 
-<details class="api-member" id="cell-store-dirty-revision" data-pagefind-weight="1">
-<summary><code>dirtyRevision</code></summary>
-
-```ts generated
-dirtyRevision: (sheet: number, row: number, col: number) => bigint;
-```
-
-</details>
-
 <details class="api-member" id="cell-store-distinct-values" data-pagefind-weight="1">
 <summary><code>distinctValues</code></summary>
 
@@ -483,28 +455,6 @@ getWindowRows: (sheet: number, rows: Uint32Array, cols: Uint32Array) => WindowVi
 shape as `get_window`, rows taken from `rows` rather than a range.</p>
 </details>
 
-<details class="api-member" id="cell-store-hydrate-page-numbers" data-pagefind-weight="1">
-<summary><code>hydratePageNumbers</code> <span class="api-member-summary">Hydrate one datasource page column while retaining local dirty cells and request-revision exceptions.</span></summary>
-
-```ts generated
-hydratePageNumbers: (sheet: number, col: number, start_row: number, values: Float64Array, style: number, protected_offsets: Uint32Array) => void;
-```
-
-<p class="api-member-doc">Hydrate one datasource page column while retaining local dirty cells and
-request-revision exceptions. `protected_offsets` is sorted and relative
-to `start_row`.</p>
-</details>
-
-<details class="api-member" id="cell-store-hydrate-page-strings-packed" data-pagefind-weight="1">
-<summary><code>hydratePageStringsPacked</code> <span class="api-member-summary">Packed-string counterpart to [CellStore::hydratepagenumbers].</span></summary>
-
-```ts generated
-hydratePageStringsPacked: (sheet: number, col: number, start_row: number, buf: string, utf16_lens: Uint32Array, style: number, protected_offsets: Uint32Array) => void;
-```
-
-<p class="api-member-doc">Packed-string counterpart to [`CellStore::hydrate_page_numbers`].</p>
-</details>
-
 <details class="api-member" id="cell-store-import-range-memory-state" data-pagefind-weight="1">
 <summary><code>importRangeMemoryState</code></summary>
 
@@ -541,15 +491,6 @@ isPaged: (sheet: number) => boolean;
 
 </details>
 
-<details class="api-member" id="cell-store-is-sheet-alive" data-pagefind-weight="1">
-<summary><code>isSheetAlive</code></summary>
-
-```ts generated
-isSheetAlive: (sheet: number) => boolean;
-```
-
-</details>
-
 <details class="api-member" id="cell-store-loaded-spans" data-pagefind-weight="1">
 <summary><code>loadedSpans</code> <span class="api-member-summary">Loaded row runs of one column inside startrow..endrow, as flat [start, end) pairs in ascending, disjoint order.</span></summary>
 
@@ -564,15 +505,6 @@ A row belongs to a run only when [`Self::columns_fully_loaded`] would
 report it loaded, so a caller can reconcile a whole column with one call
 instead of probing the band row by row. Rows outside the sheet and empty
 requests produce no pairs.</p>
-</details>
-
-<details class="api-member" id="cell-store-mark-cell-clean-revision" data-pagefind-weight="1">
-<summary><code>markCellCleanRevision</code></summary>
-
-```ts generated
-markCellCleanRevision: (sheet: number, row: number, col: number, revision: bigint) => boolean;
-```
-
 </details>
 
 <details class="api-member" id="cell-store-mark-range-clean" data-pagefind-weight="1">
@@ -625,23 +557,14 @@ one `[sheet, row, col]` triple. The allocation scales with serialized
 cells and source bytes, never the logical sheet rectangle.</p>
 </details>
 
-<details class="api-member" id="cell-store-pin-range" data-pagefind-weight="1">
-<summary><code>pinRange</code> <span class="api-member-summary">Replaces caller-owned persistent pins; empty row ranges leave them unchanged.</span></summary>
-
-```ts generated
-pinRange: (sheet: number, start_row: number, end_row: number, cols: Uint32Array) => void;
-```
-
-</details>
-
 <details class="api-member" id="cell-store-pin-read-window" data-pagefind-weight="1">
-<summary><code>pinReadWindow</code> <span class="api-member-summary">Replaces transient read protection without changing explicit or viewport pins.</span></summary>
+<summary><code>pinReadWindow</code> <span class="api-member-summary">Replaces transient read protection without changing viewport pins.</span></summary>
 
 ```ts generated
 pinReadWindow: (sheet: number, start_row: number, end_row: number, rows: Uint32Array, cols: Uint32Array) => void;
 ```
 
-<p class="api-member-doc">Replaces transient read protection without changing explicit or viewport pins.
+<p class="api-member-doc">Replaces transient read protection without changing viewport pins.
 Nonempty `rows` are backing row IDs; otherwise `[start_row, end_row)` is used.</p>
 </details>
 
@@ -1131,16 +1054,6 @@ snapshotTexts: (snapshot: RangeSnapshot) => string[];
 
 </details>
 
-<details class="api-member" id="cell-store-sort-rows" data-pagefind-weight="1">
-<summary><code>sortRows</code> <span class="api-member-summary">Stable row order sorted by a column.</span></summary>
-
-```ts generated
-sortRows: (sheet: number, col: number, ascending: boolean) => Uint32Array;
-```
-
-<p class="api-member-doc">Stable row order sorted by a column. Returns a data-row permutation.</p>
-</details>
-
 <details class="api-member" id="cell-store-sort-rows-multi" data-pagefind-weight="1">
 <summary><code>sortRowsMulti</code></summary>
 
@@ -1177,16 +1090,6 @@ spillDerivedMask: (sheet: number, row_start: number, row_end: number, cols: Uint
 
 </details>
 
-<details class="api-member" id="cell-store-spill-owner-coordinates" data-pagefind-weight="1">
-<summary><code>spillOwnerCoordinates</code> <span class="api-member-summary">Packed row-major [anchorrow, anchorcol, ...] owner coordinates.</span></summary>
-
-```ts generated
-spillOwnerCoordinates: (sheet: number, row_start: number, row_end: number, cols: Uint32Array) => Uint32Array;
-```
-
-<p class="api-member-doc">Packed row-major `[anchor_row, anchor_col, ...]` owner coordinates.</p>
-</details>
-
 <details class="api-member" id="cell-store-string-pool-epoch" data-pagefind-weight="1">
 <summary><code>stringPoolEpoch</code> <span class="api-member-summary">Raw string IDs are valid only within this epoch, including window IDs.</span></summary>
 
@@ -1194,18 +1097,6 @@ spillOwnerCoordinates: (sheet: number, row_start: number, row_end: number, cols:
 stringPoolEpoch: () => number;
 ```
 
-</details>
-
-<details class="api-member" id="cell-store-style-id-at" data-pagefind-weight="1">
-<summary><code>styleIdAt</code> <span class="api-member-summary">Current style-dictionary id at a cell; 0 when out of bounds.</span></summary>
-
-```ts generated
-styleIdAt: (sheet: number, row: number, col: number) => number;
-```
-
-<p class="api-member-doc">Current style-dictionary id at a cell; `0` when out of bounds. Used by
-the host to write derived (reference-shadow) values without disturbing
-the cell's style.</p>
 </details>
 
 <details class="api-member" id="cell-store-wasm-committed-bytes" data-pagefind-weight="1">
@@ -1254,7 +1145,6 @@ class CellStore {
   aggregate: (sheet: number, col: number, op: number) => number;
   beginMutation: () => bigint;
   beginPageLoad: () => void;
-  canDirtyCell: (sheet: number, row: number, col: number) => boolean;
   captureRange: (
     sheet: number,
     r0: number,
@@ -1318,7 +1208,6 @@ class CellStore {
     d_row: number,
     d_col: number,
   ) => number;
-  dirtyRevision: (sheet: number, row: number, col: number) => bigint;
   distinctValues: (
     sheet: number,
     col: number,
@@ -1363,23 +1252,6 @@ class CellStore {
     rows: Uint32Array,
     cols: Uint32Array,
   ) => WindowView;
-  hydratePageNumbers: (
-    sheet: number,
-    col: number,
-    start_row: number,
-    values: Float64Array,
-    style: number,
-    protected_offsets: Uint32Array,
-  ) => void;
-  hydratePageStringsPacked: (
-    sheet: number,
-    col: number,
-    start_row: number,
-    buf: string,
-    utf16_lens: Uint32Array,
-    style: number,
-    protected_offsets: Uint32Array,
-  ) => void;
   importRangeMemoryState: (
     bytes: Uint8Array,
     sheet: number,
@@ -1389,19 +1261,12 @@ class CellStore {
   insertCols: (sheet: number, at: number, count: number) => void;
   isFullyLoaded: (sheet: number) => boolean;
   isPaged: (sheet: number) => boolean;
-  isSheetAlive: (sheet: number) => boolean;
   loadedSpans: (
     sheet: number,
     start_row: number,
     end_row: number,
     col: number,
   ) => Uint32Array;
-  markCellCleanRevision: (
-    sheet: number,
-    row: number,
-    col: number,
-    revision: bigint,
-  ) => boolean;
   markRangeClean: (
     sheet: number,
     start_row: number,
@@ -1413,12 +1278,6 @@ class CellStore {
   pagedDirtyCoordinates: (sheet: number) => Float64Array;
   pagedStats: (sheet: number) => Float64Array;
   persistedCellData: (sheet: number) => Float64Array;
-  pinRange: (
-    sheet: number,
-    start_row: number,
-    end_row: number,
-    cols: Uint32Array,
-  ) => void;
   pinReadWindow: (
     sheet: number,
     start_row: number,
@@ -1631,7 +1490,6 @@ class CellStore {
   sheetSpanFormulaCells: (sheet: number) => Uint32Array;
   snapshotNumbers: (snapshot: RangeSnapshot) => Float64Array;
   snapshotTexts: (snapshot: RangeSnapshot) => string[];
-  sortRows: (sheet: number, col: number, ascending: boolean) => Uint32Array;
   sortRowsMulti: (
     sheet: number,
     cols: Uint32Array,
@@ -1646,14 +1504,7 @@ class CellStore {
     row_end: number,
     cols: Uint32Array,
   ) => Uint8Array;
-  spillOwnerCoordinates: (
-    sheet: number,
-    row_start: number,
-    row_end: number,
-    cols: Uint32Array,
-  ) => Uint32Array;
   stringPoolEpoch: () => number;
-  styleIdAt: (sheet: number, row: number, col: number) => number;
   wasmCommittedBytes: () => number;
   static importMemoryState: (bytes: Uint8Array) => CellStore;
 }

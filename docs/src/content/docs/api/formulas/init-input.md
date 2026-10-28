@@ -8,7 +8,7 @@ description: "Sources accepted by asynchronous initialization: a fetchable URL/r
 Sources accepted by asynchronous initialization: a fetchable URL/request/response, raw module bytes, or a precompiled `WebAssembly.Module`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/pkg/sheetwrite_wasm.d.ts#L564"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L564</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/pkg/sheetwrite_wasm.d.ts#L531"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L531</code></a></dd></div>
 </dl>
 
 ## Declaration
