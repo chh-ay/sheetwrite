@@ -5973,8 +5973,9 @@ sheet or a cell. Then the field list opens in the side panel.
 - Drag fields into **Rows**, **Columns**, **Values** and **Filters**, or use the
 actions menu on each field to move it with the keyboard.
 - A value field has an aggregation, and a row or column field has a sort order.
-- Each change is one undo step. Select a cell in a pivot's output to open its
-field list again.
+- Each change is one undo step. Select a cell in a pivot's output, or
+right-click it and choose **PivotTable Fields**, to open its field list again.
+Hosts can do the same with `grid.actions.showPivotFields()`.
 
 With the default engine, **Insert › PivotTable** is disabled, and its tooltip
 says that pivot tables need the full engine.
@@ -6245,10 +6246,14 @@ it has a description that lists the series.
 
 ## Insert and edit in the grid
 
-Grids with the ribbon have **Insert › Chart**. It makes a chart from the
-selection: a text first row gives the series names, and a text first column
-gives the categories. The chart panel opens beside the grid, where you change
-the kind, the ranges and the titles. Each change is one undo step.
+Grids with the ribbon have **Insert › Chart**. Its face makes a column chart
+from the selection, and its menu makes any of the seven kinds. A text first row
+gives the series names, and a text first column gives the categories. The chart
+panel opens beside the grid, where you change the kind, the ranges and the
+titles. Each change is one undo step.
+
+Right-click a chart, or press Shift+F10 on a selected chart, for **Edit chart**
+and **Delete chart**.
 
 Click a chart to select it. Drag it to move it, or drag a handle to resize it.
 On a read-only grid you can select a chart, but not change it.
@@ -10497,7 +10502,7 @@ Members:
 ##### `ContextMenuActionName` — type
 
 ```ts
-export type ContextMenuActionName = | "cut" | "copy" | "paste" | "clearContents" | "merge" | "unmerge" | "insertRowAbove" | "insertRowBelow" | "deleteRow" | "insertColumnLeft" | "insertColumnRight" | "deleteColumn" | "hideRow" | "showAllRows" | "autoFitRow" | "hideColumn" | "showAllColumns" | "autoFitColumn" | "clearFilter" | "exportCsv" | "exportXlsx" | "editNote" | "deleteNote" | "separator";
+export type ContextMenuActionName = | "cut" | "copy" | "paste" | "clearContents" | "merge" | "unmerge" | "insertRowAbove" | "insertRowBelow" | "deleteRow" | "insertColumnLeft" | "insertColumnRight" | "deleteColumn" | "hideRow" | "showAllRows" | "autoFitRow" | "hideColumn" | "showAllColumns" | "autoFitColumn" | "clearFilter" | "exportCsv" | "exportXlsx" | "editNote" | "deleteNote" | "pivotFields" | "separator";
 ```
 
 Built-in action names accepted by custom context-menu rows.
@@ -11298,7 +11303,7 @@ Grid.redo
 ##### `GridActions` — interface
 
 ```ts
-export interface GridActions { toggleBold(): void; toggleItalic(): void; toggleUnderline(): void; toggleStrikethrough(): void; setAlign(align: CellAlign): void; setTextColor(color: string | null): void; setFillColor(color: string | null): void; toggleBorder(): void; setBorders(preset: BorderPreset): void; setFontFamily(family: string | null): void; setFontSize(size: number | null): void; stepFontSize(direction: 1 | -1): void; setVerticalAlign(align: CellVerticalAlign): void; toggleWrap(): void; setNumberFormat(code: string | null): void; stepDecimals(direction: 1 | -1): void; mergeAndCenter(): void; clearAll(): void; autoSum(): void; find(): void; freezePanes(): void; clearFormat(): void; merge(): void; unmerge(): void; sort(ascending: boolean): void; insertRowAbove(): void; insertRowBelow(): void; deleteRow(): void; insertColumnLeft(): void; insertColumnRight(): void; deleteColumn(): void; hideRows(rows?: readonly number[]): void; showRows(rows?: readonly number[]): void; autoFitRows(): void; hideColumns(cols?: readonly number[]): void; showColumns(cols?: readonly number[]): void; autoFitColumns(cols?: readonly number[]): void; clearFilter(col?: number): void; copy(): Promise<ClipboardOutcome>; cut(): Promise<ClipboardOutcome>; paste(): Promise<ClipboardOutcome>; pasteValues(): Promise<ClipboardOutcome>; clearContents(): void; exportCsv(filename?: string): void; exportXlsx(filename?: string): Promise<void>; editNote(): void; deleteNote(): void; undo(): void; redo(): void; }
+export interface GridActions { toggleBold(): void; toggleItalic(): void; toggleUnderline(): void; toggleStrikethrough(): void; setAlign(align: CellAlign): void; setTextColor(color: string | null): void; setFillColor(color: string | null): void; toggleBorder(): void; setBorders(preset: BorderPreset): void; setFontFamily(family: string | null): void; setFontSize(size: number | null): void; stepFontSize(direction: 1 | -1): void; setVerticalAlign(align: CellVerticalAlign): void; toggleWrap(): void; setNumberFormat(code: string | null): void; stepDecimals(direction: 1 | -1): void; mergeAndCenter(): void; clearAll(): void; autoSum(): void; find(): void; freezePanes(): void; clearFormat(): void; merge(): void; unmerge(): void; sort(ascending: boolean): void; insertRowAbove(): void; insertRowBelow(): void; deleteRow(): void; insertColumnLeft(): void; insertColumnRight(): void; deleteColumn(): void; hideRows(rows?: readonly number[]): void; showRows(rows?: readonly number[]): void; autoFitRows(): void; hideColumns(cols?: readonly number[]): void; showColumns(cols?: readonly number[]): void; autoFitColumns(cols?: readonly number[]): void; clearFilter(col?: number): void; copy(): Promise<ClipboardOutcome>; cut(): Promise<ClipboardOutcome>; paste(): Promise<ClipboardOutcome>; pasteValues(): Promise<ClipboardOutcome>; clearContents(): void; exportCsv(filename?: string): void; exportXlsx(filename?: string): Promise<void>; editNote(): void; deleteNote(): void; showPivotFields(): void; undo(): void; redo(): void; }
 ```
 
 Imperative operations the toolbar and context menu bind to; also exposed as `Grid.actions`.
@@ -11331,6 +11336,9 @@ selection's outer cells and keep each cell's other sides.
 - `setFontSize` — Set the selection's font size in CSS pixels; null returns it to the default.
 - `setNumberFormat` — Set the selection's number format; null returns it to the column's format.
 - `setTextColor` — Set the selection's text color; null returns it to automatic (the theme color).
+- `showPivotFields` — Open the field list of the pivot table whose output holds the focus cell.
+Does nothing when the focus cell is outside every pivot. Does nothing on a
+read-only grid.
 - `stepDecimals` — Show one more (1) or one fewer (-1) decimal place than the focus cell does.
 - `stepFontSize` — Step the focus cell's font size to the next larger (1) or smaller (-1) standard size.
 
