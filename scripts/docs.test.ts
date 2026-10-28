@@ -434,8 +434,9 @@ describe("performance pages", () => {
   });
 
   it("lifts a one-section page's headings to sit right under its title", () => {
+    const fenced = "```md\n### Not a heading\n<h4>Literal</h4>\n```\n";
     const nested = evidence
-      .replace("Render benchmark body.\n", "### Scale\n\n<h4>Card</h4>\n\n#### Detail\n")
+      .replace("Render benchmark body.\n", `### Scale\n\n<h4>Card</h4>\n\n#### Detail\n\n${fenced}`)
       .replace("Runtime resource ownership body.\n", "### Owners\n");
     const pages = new Map(splitPerformancePages(nested).map((page) => [page.route, page.content]));
 
@@ -443,6 +444,8 @@ describe("performance pages", () => {
     expect(render).toMatch(/^## Scale$/m);
     expect(render).toContain("<h3>Card</h3>");
     expect(render).toMatch(/^### Detail$/m);
+    // Code shows its text as written.
+    expect(render).toContain(fenced);
     // A page with several sections keeps their H2s, so nothing moves.
     expect(pages.get("performance/memory.md")).toMatch(/^### Owners$/m);
   });

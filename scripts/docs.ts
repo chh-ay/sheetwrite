@@ -2740,17 +2740,39 @@ export const PERFORMANCE_PAGES: readonly PerformancePage[] = [
 const PERFORMANCE_INTRO =
   "Every number in this section comes from a validated local protocol artifact captured on a clean tree; nothing is published from an unvalidated or protocol-mismatched artifact. Every expected cell carries either a validated timing or its recorded failure - a run that did not complete is shown as a failure, never converted into a timing.";
 
+/** A Markdown code fence line: up to 3 spaces, then 3 or more backticks or tildes. */
+const CODE_FENCE = /^ {0,3}(`{3,}|~{3,})/;
+
 /**
  * Moves every heading below H2 up one level, in Markdown and in raw HTML. A
- * section never holds another H2, so nothing reaches the page's H1.
+ * section never holds another H2, so nothing reaches the page's H1. Fenced
+ * code is left as written: it shows text, not headings.
  */
 function liftHeadings(markdown: string): string {
+  let fence: string | undefined;
   return markdown
-    .replace(/^#(#{2,6} )/gm, "$1")
-    .replace(
-      /<(\/?)h([3-6])\b/g,
-      (_, slash: string, level: string) => `<${slash}h${Number(level) - 1}`,
-    );
+    .split("\n")
+    .map((line) => {
+      const marker = CODE_FENCE.exec(line)?.[1];
+      if (fence === undefined && marker !== undefined) {
+        fence = marker;
+        return line;
+      }
+      if (fence !== undefined) {
+        // A fence closes on the same character, at least as long as it opened.
+        if (marker !== undefined && marker[0] === fence[0] && marker.length >= fence.length) {
+          fence = undefined;
+        }
+        return line;
+      }
+      return line
+        .replace(/^#(#{2,6} )/, "$1")
+        .replace(
+          /<(\/?)h([3-6])\b/g,
+          (_, slash: string, level: string) => `<${slash}h${Number(level) - 1}`,
+        );
+    })
+    .join("\n");
 }
 
 /**
