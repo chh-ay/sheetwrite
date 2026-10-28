@@ -556,6 +556,8 @@ export class GridImpl implements Grid {
   private readonly panelHost: HTMLDivElement;
   /** Cleanup of the open side panel; `null` while no panel is open. */
   private panelDispose: (() => void) | null = null;
+  /** The cell selection last emitted, to tell a real move from a re-emit. */
+  private lastSelectionKey = "";
   /** Detaches the chart and pivot panel controller once its chunk has loaded. */
   private disposePanels: (() => void) | null = null;
 
@@ -968,6 +970,9 @@ export class GridImpl implements Grid {
       },
     });
     this.objectLayer.sync();
+    // The grid emits no selection at construction; start from the real one so
+    // the first re-emit (an undo, say) does not count as a move.
+    this.lastSelectionKey = JSON.stringify(this.getSelection());
 
     this.ariaMirror = new AriaMirror({
       host,
@@ -1708,10 +1713,17 @@ export class GridImpl implements Grid {
 
   private emitSelection(): void {
     this.ariaMirror.bumpVersion();
-    if (this.listeners.selection.size > 0) {
-      const selection = this.getSelection();
-      for (const listener of this.listeners.selection) listener({ selection });
+    const selection = this.getSelection();
+
+    // One thing is selected at a time: a new cell selection, by any route,
+    // deselects the chart. Undo re-emits an unchanged selection and must keep it.
+    const selectionKey = JSON.stringify(selection);
+    if (selectionKey !== this.lastSelectionKey) {
+      this.lastSelectionKey = selectionKey;
+      this.objectLayer.select(null);
     }
+
+    for (const listener of this.listeners.selection) listener({ selection });
     this.emitCommandStateChange();
   }
 

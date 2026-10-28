@@ -226,7 +226,8 @@ export class ObjectLayer {
       if (entry) showSelected(entry, true);
       this.options.onSelect(this.selected);
     }
-    if (focus && entry) entry.frame.focus();
+    // Placement follows the grid's scroll, so focus must not scroll the pane.
+    if (focus && entry) entry.frame.focus({ preventScroll: true });
   }
 
   destroy(): void {
@@ -255,7 +256,10 @@ export class ObjectLayer {
     const frame = document.createElement("div");
     frame.className = "sheetwrite-object";
     frame.tabIndex = -1;
-    frame.setAttribute("role", "img");
+    // A group, not an image: the renderer's SVG is the image and carries the
+    // series description. Children of an image are hidden from screen readers.
+    frame.setAttribute("role", "group");
+    frame.setAttribute("aria-roledescription", "chart");
     frame.setAttribute("aria-current", "false");
     frame.dataset.chartId = chart.id;
     frame.style.cssText = "position:absolute;left:0;top:0;pointer-events:auto;";
@@ -402,7 +406,7 @@ export class ObjectLayer {
       const hadFocus = frame.contains(document.activeElement);
       this.panes[box.pane].appendChild(frame);
       // Moving a node to another parent drops its focus.
-      if (hadFocus) frame.focus();
+      if (hadFocus) frame.focus({ preventScroll: true });
     }
     if (previous?.x !== box.x || previous.y !== box.y) {
       frame.style.transform = `translate(${box.x}px, ${box.y}px)`;
@@ -674,7 +678,9 @@ function createPane(name: PaneName): HTMLDivElement {
   const pane = document.createElement("div");
   pane.className = "sheetwrite-object-pane";
   pane.dataset.pane = name;
-  pane.style.cssText = "position:absolute;overflow:hidden;pointer-events:none;";
+  // `clip`, not `hidden`: a hidden overflow still scrolls when a chart gets
+  // focus or scrollIntoView, which would slide every chart off its cells.
+  pane.style.cssText = "position:absolute;overflow:clip;pointer-events:none;";
   return pane;
 }
 

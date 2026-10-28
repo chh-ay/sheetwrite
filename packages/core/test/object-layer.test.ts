@@ -369,6 +369,32 @@ describe("object layer editing", () => {
     expect(frame.getAttribute("aria-current")).toBe("false");
   });
 
+  it("deselects the chart when the cell selection moves by any route, so one thing is selected", () => {
+    const grid = mountGrid();
+    grid.setChart(chart("c1"), "s1");
+    grid.selectChart("c1", "s1");
+    const events: Array<ChartRef | null> = [];
+    grid.on("chart-select", (event) => events.push(event));
+
+    // The name box, the keyboard and the API all move the selection without a pointer.
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 4, col: 1 } });
+
+    expect(events).toEqual([null]);
+    expect(frameOf(grid, "c1").getAttribute("aria-current")).toBe("false");
+  });
+
+  it("keeps the chart selected when an undo restores its old position", () => {
+    const grid = mountGrid();
+    grid.setChart(chart("c1"), "s1");
+    grid.selectChart("c1", "s1");
+    press(frameOf(grid, "c1"), "ArrowRight");
+
+    grid.undo();
+
+    expect(anchorOf(grid, "c1")).toEqual(chart("c1").anchor);
+    expect(frameOf(grid, "c1").getAttribute("aria-current")).toBe("true");
+  });
+
   it("emits chart-activate on Enter and returns focus to the grid on Escape", () => {
     const grid = mountGrid();
     grid.setChart(chart("c1"), "s1");
@@ -484,8 +510,8 @@ describe("object layer mounting", () => {
   it("unmounts on sheet switch and mounts the charts of the new sheet", () => {
     const disposed: string[] = [];
     setChartRendererFactory(() => ({
-      mount: (_host, ref) => ({ resize() { }, dispose: () => disposed.push(ref.id) }),
-      dispose() { },
+      mount: (_host, ref) => ({ resize() {}, dispose: () => disposed.push(ref.id) }),
+      dispose() {},
     }));
     const grid = mountGrid({}, twoSheetWorkbook());
     grid.setChart(chart("first"), "s1");
