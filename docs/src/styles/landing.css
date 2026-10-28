@@ -2483,7 +2483,7 @@
 .sw-reel__tabs {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--sr-count, 3), minmax(0, 1fr));
   border-bottom: 1px solid var(--sw-border);
 }
 
@@ -2491,7 +2491,7 @@
   position: absolute;
   bottom: 0;
   left: 0;
-  width: calc(100% / 3);
+  width: calc(100% / var(--sr-count, 3));
   height: 2px;
   background: color-mix(in srgb, var(--sw-accent) 25%, transparent);
   content: "";
@@ -2865,6 +2865,80 @@
 }
 .sr-spill :where(.sr-tag, .sr-change-count, .sr-note) {
   animation: sr-appear 0.4s ease-out 3.8s both;
+}
+
+/* Analysis: the pivot fills in, the bars grow, then one order changes and the
+   pivot row, the grand total and the EMEA bar follow it in that order. */
+.sr-bar {
+  fill: color-mix(in srgb, var(--sw-accent) 60%, transparent);
+  transform-box: fill-box;
+  transform-origin: bottom;
+}
+
+.sr-bar[data-edited] {
+  fill: var(--sw-accent-strong);
+}
+
+.sr .sr-total {
+  fill: var(--sw-fg-strong);
+  font-weight: 700;
+}
+
+.sr-analysis .sr-pivot-row {
+  animation: sr-appear 0.4s ease-out both;
+}
+.sr-analysis .sr-bar {
+  animation: sr-bar-grow 0.9s cubic-bezier(0.3, 0.7, 0.3, 1) both;
+}
+/* One animation over the whole loop: grow to the old value, hold, then rise
+   to the new one at the edit. */
+.sr-analysis .sr-bar[data-edited] {
+  animation: sr-bar-follow var(--sr-loop, 10s) linear both;
+}
+.sr-analysis .sr-change[data-step="order"] .sr-flash {
+  animation: sr-flash 1.2s ease-out 6s both;
+}
+.sr-analysis .sr-change[data-step="order"] .sr-before {
+  animation: sr-hide 0.2s linear 6.1s both;
+}
+.sr-analysis .sr-change[data-step="order"] .sr-after {
+  animation: sr-appear 0.2s linear 6.1s both;
+}
+.sr-analysis .sr-change[data-step="pivot"] .sr-flash {
+  animation: sr-flash 1.2s ease-out 6.5s both;
+}
+.sr-analysis .sr-change[data-step="pivot"] .sr-before {
+  animation: sr-hide 0.2s linear 6.6s both;
+}
+.sr-analysis .sr-change[data-step="pivot"] .sr-after {
+  animation: sr-appear 0.2s linear 6.6s both;
+}
+.sr-analysis .sr-link {
+  animation: sr-appear 0.5s ease-out 6.2s both;
+}
+.sr-analysis .sr-note {
+  animation: sr-appear 0.4s ease-out 7.4s both;
+}
+
+@keyframes sr-bar-grow {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+@keyframes sr-bar-follow {
+  0%,
+  24% {
+    transform: scaleY(0);
+  }
+  32%,
+  68% {
+    transform: scaleY(var(--sr-from));
+  }
+  76%,
+  100% {
+    transform: none;
+  }
 }
 
 .sr-offline .sr-dot-bram {
