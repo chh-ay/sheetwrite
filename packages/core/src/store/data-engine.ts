@@ -497,7 +497,7 @@ export class StoreDataEngine {
     assertWorkbookCharts(workbook.sheets);
     this.workbook = workbook;
     this.storageOptions = options;
-    this.wasm = new (getEngine().CellStore)() as RecomputingCellStore;
+    this.wasm = new (getEngine().CellStore)();
     this.boundaryAccounting.record("startup", "js-to-wasm", 0, "scalar");
     this.view = new StoreViewState(this.wasm, workbook, this.handles);
     this.windowReader = new StoreWindowReader(this.wasm, workbook, this.handles, this.styles);
@@ -4141,9 +4141,7 @@ export class StoreDataEngine {
   prepareMemoryRelease(instance: EngineInstance): PreparedEngineMemoryRelease | null {
     if (this.disposed) return null;
 
-    const replacement = instance.CellStore.importMemoryState(
-      this.wasm.exportMemoryState(),
-    ) as RecomputingCellStore;
+    const replacement = instance.CellStore.importMemoryState(this.wasm.exportMemoryState());
     const history: Array<{
       replacement: RangeSnapshot;
       replace(resource: RangeSnapshot): void;
