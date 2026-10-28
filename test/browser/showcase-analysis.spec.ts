@@ -178,6 +178,15 @@ test("a chart's right-click menu deletes it, and undo brings it back", async ({ 
   await expect(menu.getByText("Edit chart")).toBeVisible();
   await menu.getByText("Delete chart").click();
   await expect(chartObjects(page)).toHaveCount(0);
+  // Focus stays in the grid, so the undo below reaches it rather than the page.
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const active = document.activeElement;
+        return active !== null && active.closest(".sheetwrite") !== null;
+      }),
+    )
+    .toBe(true);
 
   await page.keyboard.press("ControlOrMeta+z");
   await expect(chartObjects(page)).toHaveCount(1);

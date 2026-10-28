@@ -2890,6 +2890,10 @@ export class GridImpl implements Grid {
         visible: () => !this.readOnly,
         onClick: () => {
           this.removeChart(chart.id, chart.sheet);
+          // The menu would hand focus back to the chart it opened on, which no
+          // longer exists; whether its frame is gone yet depends on timing.
+          // Focus the grid so Ctrl+Z, arrows and typing keep working.
+          this.host.focus({ preventScroll: true });
         },
       },
     ];
