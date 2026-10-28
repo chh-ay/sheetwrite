@@ -18,5 +18,5 @@ Source entry: `packages/charts/src/register.ts`
 ### Functions <span class="api-count" data-pagefind-ignore>1</span>
 
 <div class="api-symbol-grid">
-<a class="api-symbol-card" href="/docs/api/charts-register/register-charts-backend/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>registerChartsBackend</code></span><span class="api-symbol-card__desc">Register the chart view cache as the core chart view provider, so openChartViews(store) returns live chart views.</span></a>
+<a class="api-symbol-card" href="/docs/api/charts-register/register-charts-backend/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>registerChartsBackend</code></span><span class="api-symbol-card__desc">Register the chart view cache as the core chart view provider, so openChartViews(store) returns live chart views, and the SVG chart renderer, so grids created after this call draw their charts.</span></a>
 </div>

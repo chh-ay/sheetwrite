@@ -11,7 +11,7 @@ any order before the final key, for example "Mod+Shift+K" or "Ctrl+Alt+Delete".
 The parser rejects unknown/repeated modifiers and missing keys.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L356"><code>packages/core/src/types/grid.ts#L356</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L371"><code>packages/core/src/types/grid.ts#L371</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>2</span>

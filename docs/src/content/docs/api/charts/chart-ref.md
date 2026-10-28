@@ -61,7 +61,10 @@ export interface ChartRef {
 
 <ul class="api-consumer-list">
 <li><a href="/docs/api/charts/chart-change-event/"><code>ChartChangeEvent</code></a><span class="api-consumer-kind">@sheetwrite/charts</span></li>
+<li><a href="/docs/api/charts/chart-renderer/"><code>ChartRenderer</code></a><span class="api-consumer-kind">@sheetwrite/charts</span></li>
 <li><a href="/docs/api/core/chart-change-event/"><code>ChartChangeEvent</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/chart-renderer/"><code>ChartRenderer</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/chart-view-provider/"><code>ChartViewProvider</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/grid-events/"><code>GridEvents</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>

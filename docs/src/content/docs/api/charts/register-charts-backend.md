@@ -1,12 +1,13 @@
 ---
 title: "registerChartsBackend | @sheetwrite/charts"
-description: "Register the chart view cache as the core chart view provider, so openChartViews(store) returns live chart views."
+description: "Register the chart view cache as the core chart view provider, so openChartViews(store) returns live chart views, and the SVG chart renderer, so grids created after this call draw their charts."
 ---
 <!-- api-export:@sheetwrite/charts|.|registerChartsBackend -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/charts/">@sheetwrite/charts</a><span class="api-status" data-kind="function">function</span></div>
 
 Register the chart view cache as the core chart view provider, so
-`openChartViews(store)` returns live chart views.
+`openChartViews(store)` returns live chart views, and the SVG chart renderer,
+so grids created after this call draw their charts.
 
 ### Examples
 
@@ -25,7 +26,7 @@ function salesChartValues(store: Store) {
 ```
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/charts/src/registration.ts#L24"><code>packages/charts/src/registration.ts#L24</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/charts/src/registration.ts#L26"><code>packages/charts/src/registration.ts#L26</code></a></dd></div>
 </dl>
 
 ## Declaration
