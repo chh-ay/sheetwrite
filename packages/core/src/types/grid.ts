@@ -224,6 +224,12 @@ export interface GridActions {
    * none. Does nothing on a read-only grid.
    */
   deleteNote(): void;
+  /**
+   * Open the field list of the pivot table whose output holds the focus cell.
+   * Does nothing when the focus cell is outside every pivot. Does nothing on a
+   * read-only grid.
+   */
+  showPivotFields(): void;
   undo(): void;
   redo(): void;
 }
@@ -350,6 +356,7 @@ export type ContextMenuActionName =
   | "exportXlsx"
   | "editNote"
   | "deleteNote"
+  | "pivotFields"
   | "separator";
 
 /** Cell and viewport coordinates resolved for one bundled context-menu opening. */

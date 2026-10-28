@@ -10,17 +10,6 @@ import type { Range, Selection, SheetId } from "../types/coordinates.js";
 export const DEFAULT_CHART_WIDTH = 480;
 export const DEFAULT_CHART_HEIGHT = 288;
 
-/** The chart kinds in the order the kind picker shows them, with their labels. */
-export const CHART_KIND_LABELS: readonly (readonly [ChartKind, string])[] = [
-  ["column", "Column"],
-  ["bar", "Bar"],
-  ["line", "Line"],
-  ["area", "Area"],
-  ["pie", "Pie"],
-  ["doughnut", "Doughnut"],
-  ["scatter", "Scatter"],
-];
-
 /** The sheet facts a selection resolves against. */
 interface SheetSize {
   readonly id: SheetId;
@@ -88,19 +77,21 @@ export function nextChartId(charts: readonly ChartDefinition[]): string {
 }
 
 /**
- * A column chart of `range`, one series per column, as Excel builds it from a
- * selection:
+ * A chart of `range` (column by default), one series per column, as Excel
+ * builds it from a selection:
  * - the first column holds categories when its cells below the first row are
  *   text (empty cells allowed) and the range has more than one column;
  * - the first row holds series names when its cells are all text and the range
  *   has more than one row. The corner cell above the categories is ignored.
- * The chart sits to the right of the range, at the default size.
+ * The chart sits to the right of the range, at the default size. Pie and
+ * doughnut charts keep every series, and the renderer draws the first.
  */
 export function chartFromRange(
   range: Range,
   read: (row: number, col: number) => CellScalar,
   id: string,
   columnCount: number,
+  kind: ChartKind = "column",
 ): ChartDefinition {
   const { start, end } = range;
 
@@ -144,5 +135,5 @@ export function chartFromRange(
     width: DEFAULT_CHART_WIDTH,
     height: DEFAULT_CHART_HEIGHT,
   };
-  return { id, kind: "column", anchor, series };
+  return { id, kind, anchor, series };
 }

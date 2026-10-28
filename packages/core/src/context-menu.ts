@@ -2,6 +2,7 @@ import { type ActionFeedback, actionFeedbackFor } from "./action-feedback.js";
 import type { IconName } from "./icons/icon-names.js";
 import { iconNode } from "./icons/resolve.js";
 import { boundShortcutLabel, formatShortcut, isKeyboardAction, parseShortcut } from "./keymap.js";
+import { pivotAt } from "./panels/panel-loader.js";
 import type {
   ContextMenuActionName,
   ContextMenuContext,
@@ -21,6 +22,12 @@ import { seedWidgetTheme } from "./widget-theme.js";
 function defaultItems(grid: Grid): ContextMenuItem[] {
   const hasNote = (context: ContextMenuContext): boolean =>
     context.cell !== null && grid.getNote(context.cell) !== null;
+  // The field list edits the pivot, so a grid that cannot edit (read-only) does
+  // not offer it. `clearFormat` is the ribbon's stand-in for every edit command.
+  const inPivot = (context: ContextMenuContext): boolean =>
+    context.cell !== null &&
+    !grid.getCommandState("clearFormat").disabled &&
+    pivotAt(grid, context.cell) !== null;
   return [
     { action: "cut" },
     { action: "copy" },
@@ -83,6 +90,8 @@ function defaultItems(grid: Grid): ContextMenuItem[] {
       ],
     },
     { action: "separator" },
+    { action: "pivotFields", visible: inPivot },
+    { action: "separator" },
     { action: "editNote", label: "New note", visible: (context) => !hasNote(context) },
     { action: "editNote", visible: hasNote },
     { action: "deleteNote", visible: hasNote },
@@ -114,6 +123,7 @@ const ACTION_ICON: Record<Exclude<ContextMenuActionName, "separator">, IconName>
   exportXlsx: "exportXlsx",
   editNote: "note",
   deleteNote: "note",
+  pivotFields: "pivotTable",
 };
 
 /** Drops hidden rows, then leading, trailing and doubled separators. */
@@ -159,6 +169,7 @@ const DEFAULT_LABEL: Record<Exclude<ContextMenuActionName, "separator">, string>
   exportXlsx: "Export XLSX",
   editNote: "Edit note",
   deleteNote: "Delete note",
+  pivotFields: "PivotTable Fields",
 };
 
 function actionHandler(
@@ -212,6 +223,8 @@ function actionHandler(
       return () => actions.editNote();
     case "deleteNote":
       return () => actions.deleteNote();
+    case "pivotFields":
+      return () => actions.showPivotFields();
     default:
       return () => {};
   }
@@ -270,19 +283,24 @@ export class ContextMenu {
     this.el = this.createMenuElement("sheetwrite-context-menu");
   }
 
-  open(context: ContextMenuContext): void {
+  /**
+   * Open at the pointer. `items` replaces the configured cell menu, for menus
+   * that belong to something other than a cell (a chart).
+   */
+  open(context: ContextMenuContext, items?: readonly ContextMenuItem[]): void {
     this.closeSubmenusFrom(0);
     const active = document.activeElement;
     this.returnFocus = active instanceof HTMLElement && !this.ownsElement(active) ? active : null;
 
     const configured = this.config.contextMenu;
-    const items =
-      typeof configured === "function"
+    const rows =
+      items ??
+      (typeof configured === "function"
         ? configured(context)
         : Array.isArray(configured)
           ? configured
-          : defaultItems(this.grid);
-    this.fill(this.el, items, context);
+          : defaultItems(this.grid));
+    this.fill(this.el, rows, context);
 
     const menu = this.el;
     menu.style.display = "block";

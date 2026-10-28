@@ -2,6 +2,7 @@
 // public Grid API. The DOM side (ribbon-controls.ts) renders these specs and
 // never decides behavior itself, so Excel parity is reviewed here alone.
 
+import { CHART_KINDS } from "../chart-kinds.js";
 import {
   ACCOUNTING_FORMAT,
   COMMA_FORMAT,
@@ -18,6 +19,7 @@ import type { IconName } from "../icons/icon-names.js";
 import type { PivotDestination } from "../panels/panel-controller.js";
 import { loadPanels, pivotsAvailable } from "../panels/panel-loader.js";
 import type { CellStyle } from "../types/cell.js";
+import type { ChartKind } from "../types/chart.js";
 import type { CellAddress } from "../types/coordinates.js";
 import type { BorderPreset, Grid, GridCommandName } from "../types/grid.js";
 
@@ -386,6 +388,26 @@ const pivotTable: RibbonPlacementSpec = {
   submit: async (grid, destination) => (await loadPanels(grid)).insertPivot(grid, destination),
 };
 
+/** Inserts a chart of `kind` from the selection; the panel code loads on first use. */
+const insertChartOf =
+  (kind: ChartKind) =>
+  async (grid: Grid): Promise<boolean> =>
+    (await loadPanels(grid)).insertChart(grid, kind);
+
+/**
+ * Excel's Insert › Charts: the face inserts a column chart, as Excel's
+ * Recommended Charts usually does for a table, and the menu picks a kind.
+ */
+const chart: RibbonMenuSpec = {
+  kind: "menu",
+  label: "Chart",
+  icon: "chart",
+  availability: "edit",
+  large: true,
+  run: insertChartOf("column"),
+  items: CHART_KINDS.map(({ kind, label, icon }) => ({ label, icon, run: insertChartOf(kind) })),
+};
+
 function outline(group: boolean): (grid: Grid) => void {
   return (grid) => {
     for (const [start, end] of selectedRowSpans(grid)) {
@@ -637,17 +659,7 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
         label: "Charts",
         icon: "chart",
         layout: "flow",
-        controls: [
-          button(
-            "Chart",
-            "chart",
-            async (grid) => (await loadPanels(grid)).insertChart(grid),
-            "edit",
-            {
-              large: true,
-            },
-          ),
-        ],
+        controls: [chart],
       },
       { id: "links", label: "Links", icon: "hyperlink", layout: "flow", controls: [hyperlink] },
       { id: "notes", label: "Notes", icon: "note", layout: "flow", controls: [note] },

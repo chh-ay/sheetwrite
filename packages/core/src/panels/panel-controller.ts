@@ -5,7 +5,7 @@
 
 import { colToA1 } from "../a1.js";
 import { sheetNameKey } from "../sheet-name.js";
-import type { ChartRef } from "../types/chart.js";
+import type { ChartKind, ChartRef } from "../types/chart.js";
 import type { CellAddress, SheetId } from "../types/coordinates.js";
 import type { SheetSnapshot } from "../types/document.js";
 import type { Grid, IconOverrides } from "../types/grid.js";
@@ -63,7 +63,7 @@ export function openChartPanel(grid: Grid, ref: ChartRef, focus = true): void {
 }
 
 /** Show the field list of the pivot `id` on `sheet`. */
-function openPivotPanel(grid: Grid, sheet: SheetId, id: string, focus = true): void {
+export function openPivotPanel(grid: Grid, sheet: SheetId, id: string, focus = true): void {
   const state = stateOf(grid);
   const open: OpenPanel = { kind: "pivot", sheet, id };
   const panel = pivotPanel(grid, sheet, id, focus);
@@ -109,10 +109,11 @@ export function followChart(grid: Grid, ref: ChartRef | null): void {
 }
 
 /**
- * Insert › Chart: a column chart of the selection, in one undo step. The chart
- * is selected and its panel opens. Returns false when nothing was inserted.
+ * Insert › Chart: a chart of the selection (a column chart unless the ribbon
+ * menu picked another kind), in one undo step. The chart is selected and its
+ * panel opens. Returns false when nothing was inserted.
  */
-export function insertChart(grid: Grid): boolean {
+export function insertChart(grid: Grid, kind: ChartKind = "column"): boolean {
   const sheets = grid.store.getWorkbook().sheets;
   const range = selectionRange(grid.getSelection(), sheets);
   const owner = sheets.find((sheet) => sheet.id === range?.sheet);
@@ -123,6 +124,7 @@ export function insertChart(grid: Grid): boolean {
     (row, col) => grid.store.getCell({ sheet: range.sheet, row, col }).resolved,
     nextChartId(grid.getCharts(range.sheet)),
     owner.columns.length,
+    kind,
   );
   if (grid.setChart(chart, range.sheet).status !== "applied") return false;
 

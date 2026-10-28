@@ -149,6 +149,46 @@ it("inserts a chart from the selection in one step, selects it and opens its pan
   expect(panel()?.querySelector(".sheetwrite-panel-note")?.hasAttribute("hidden")).toBe(false);
 });
 
+it("lists the seven chart kinds under Insert › Chart and inserts the picked kind in one step", async () => {
+  const { grid, host, chartOps, control, openTab, press, selectRange } = await setup();
+  openTab("Insert");
+  selectRange(0, 0, 2, 2);
+
+  press(control("Chart options"));
+  const items = [...host.querySelectorAll<HTMLElement>(".sheetwrite-ribbon-menu-item")];
+  expect(items.map((item) => item.textContent)).toEqual([
+    "Column",
+    "Bar",
+    "Line",
+    "Area",
+    "Pie",
+    "Doughnut",
+    "Scatter",
+  ]);
+  expect(items.map((item) => item.querySelector<HTMLElement>("[data-icon]")?.dataset.icon)).toEqual(
+    [
+      "chartColumn",
+      "chartBar",
+      "chartLine",
+      "chartArea",
+      "chartPie",
+      "chartDoughnut",
+      "chartScatter",
+    ],
+  );
+
+  const line = items.find((item) => item.textContent === "Line");
+  if (line === undefined) throw new Error("no Line item");
+  press(line);
+  await loadPanels(grid);
+  await Promise.resolve();
+
+  expect(chartOps.map((chart) => chart.kind)).toEqual(["line"]);
+  expect(grid.getCharts("s1").map((chart) => chart.kind)).toEqual(["line"]);
+  grid.undo();
+  expect(grid.getCharts("s1")).toEqual([]);
+});
+
 it("commits each chart kind, title and legend change as one setChart", async () => {
   const { grid, chartOps, host, field, key, press } = await insertedChart();
   chartOps.length = 0;

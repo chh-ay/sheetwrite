@@ -72,6 +72,8 @@ export interface ObjectLayerOptions {
   focusGrid: () => void;
   onSelect: (chart: ChartRef | null) => void;
   onActivate: (chart: ChartRef) => void;
+  /** Open the chart's own context menu at a client point. */
+  onContextMenu: (chart: ChartRef, clientX: number, clientY: number) => void;
   /** Whether a key press is the grid's undo or redo shortcut, which works with an object focused. */
   isHistoryShortcut: (event: KeyboardEvent) => boolean;
 }
@@ -305,6 +307,12 @@ export class ObjectLayer {
     this.update(entry, chart);
     frame.addEventListener("pointerdown", (event) => this.onObjectPointerDown(event, entry));
     frame.addEventListener("keydown", (event) => this.onObjectKeyDown(event, entry));
+    frame.addEventListener("contextmenu", (event) => {
+      // Ours replaces the browser's menu, and the grid's cell menu must not open too.
+      event.preventDefault();
+      event.stopPropagation();
+      this.openMenu(entry, event.clientX, event.clientY);
+    });
     return entry;
   }
 
@@ -617,6 +625,14 @@ export class ObjectLayer {
     event.stopPropagation();
     if (event.ctrlKey || event.metaKey || event.altKey) return;
 
+    // Shift+F10 and the ContextMenu key open the menu at the chart, as on a cell.
+    if (event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey)) {
+      event.preventDefault();
+      const box = entry.frame.getBoundingClientRect();
+      this.openMenu(entry, box.left, box.top);
+      return;
+    }
+
     const isReadOnly = this.options.readOnly();
     switch (event.key) {
       case "Escape":
@@ -647,6 +663,16 @@ export class ObjectLayer {
       default:
         return;
     }
+  }
+
+  /** Select the chart, then ask the grid for its menu; Escape gives focus back to it. */
+  private openMenu(entry: ObjectEntry, clientX: number, clientY: number): void {
+    this.select(entry.chart.id, true);
+    this.options.onContextMenu(
+      { sheet: this.sheet ?? this.options.activeSheet(), id: entry.chart.id },
+      clientX,
+      clientY,
+    );
   }
 
   /** Move by one document pixel, or by one cell with `byCell`; one commit per press. */

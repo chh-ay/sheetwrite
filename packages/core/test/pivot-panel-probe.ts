@@ -240,6 +240,18 @@ try {
   grid.setSelection({ kind: "cell", addr: { sheet: "data", row: 0, col: 0 } });
   assert.equal(host.querySelector(".sheetwrite-panel"), null, "leaving the output closes it");
 
+  // The context menu's PivotTable Fields: it reopens a closed field list on an
+  // output cell, and does nothing outside every pivot.
+  grid.actions.showPivotFields();
+  assert.equal(host.querySelector(".sheetwrite-panel"), null, "no pivot under A1");
+  grid.setSelection({ kind: "cell", addr: { sheet: "data", row: 1, col: 4 } });
+  grid.openPanel(null);
+  grid.actions.showPivotFields();
+  await Promise.resolve();
+  assert.equal(find(".sheetwrite-panel-title").textContent, "PivotTable Fields");
+  grid.openPanel(null);
+  grid.setSelection({ kind: "cell", addr: { sheet: "data", row: 0, col: 0 } });
+
   // Insert › PivotTable on a new sheet puts the pivot at A3 of that sheet.
   grid.setSelection({ kind: "range", range: source });
   await Promise.resolve();

@@ -395,6 +395,84 @@ describe("object layer editing", () => {
     expect(frameOf(grid, "c1").getAttribute("aria-current")).toBe("true");
   });
 
+  /** The ids of the open top-level context menu's rows, in order. */
+  const menuRows = (grid: GridImpl): string[] => {
+    const menu = hostOf(grid).querySelector<HTMLElement>(".sheetwrite-context-menu");
+    if (menu?.style.display !== "block") return [];
+
+    return [...menu.querySelectorAll<HTMLElement>("[data-context-menu-item]")].map(
+      (row) => row.dataset.contextMenuItem ?? "",
+    );
+  };
+
+  const rightClick = (target: HTMLElement): MouseEvent => {
+    const event = new MouseEvent("contextmenu", {
+      clientX: 120,
+      clientY: 90,
+      bubbles: true,
+      cancelable: true,
+    });
+    target.dispatchEvent(event);
+    return event;
+  };
+
+  it("opens Edit chart and Delete chart on a right-click, and selects the chart", () => {
+    const grid = mountGrid();
+    grid.setChart(chart("c1"), "s1");
+    const activated: ChartRef[] = [];
+    grid.on("chart-activate", (event) => activated.push(event));
+
+    const event = rightClick(frameOf(grid, "c1"));
+
+    // The browser's own menu must not open over ours.
+    expect(event.defaultPrevented).toBe(true);
+    expect(frameOf(grid, "c1").getAttribute("aria-current")).toBe("true");
+    expect(menuRows(grid)).toEqual(["editChart", "deleteChart"]);
+
+    hostOf(grid).querySelector<HTMLElement>('[data-context-menu-item="editChart"]')?.click();
+    expect(activated).toEqual([{ sheet: "s1", id: "c1" }]);
+  });
+
+  it("deletes a chart from its context menu as one undo step", () => {
+    const grid = mountGrid();
+    grid.setChart(chart("c1"), "s1");
+
+    rightClick(frameOf(grid, "c1"));
+    hostOf(grid).querySelector<HTMLElement>('[data-context-menu-item="deleteChart"]')?.click();
+    expect(grid.getCharts()).toEqual([]);
+
+    grid.undo();
+    expect(grid.getCharts()).toEqual([chart("c1")]);
+  });
+
+  it("offers only Edit chart on a read-only grid", () => {
+    const grid = mountGrid();
+    grid.setChart(chart("c1"), "s1");
+    grid.setReadOnly(true);
+
+    rightClick(frameOf(grid, "c1"));
+
+    expect(menuRows(grid)).toEqual(["editChart"]);
+  });
+
+  it("opens the chart menu from the keyboard and gives focus back to the chart on Escape", () => {
+    const grid = mountGrid();
+    grid.setChart(chart("c1"), "s1");
+    grid.selectChart("c1", "s1");
+    const frame = frameOf(grid, "c1");
+    frame.focus();
+
+    press(frame, "F10", true);
+    expect(menuRows(grid)).toEqual(["editChart", "deleteChart"]);
+    const focused = document.activeElement;
+    if (!(focused instanceof HTMLElement)) throw new Error("expected a focused menu row");
+    focused.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(document.activeElement).toBe(frame);
+
+    press(frame, "ContextMenu");
+    expect(menuRows(grid)).toEqual(["editChart", "deleteChart"]);
+  });
+
   it("emits chart-activate on Enter and returns focus to the grid on Escape", () => {
     const grid = mountGrid();
     grid.setChart(chart("c1"), "s1");

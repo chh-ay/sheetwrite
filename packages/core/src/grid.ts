@@ -38,7 +38,7 @@ import { MutationRevisionIndex, type MutationRevisionStats } from "./mutation-re
 import { type NoteCell, NotePopover } from "./note-popover.js";
 import { ObjectLayer } from "./object-layer.js";
 import { OverlayPainter } from "./overlay-painter.js";
-import { attachPanelTriggers } from "./panels/panel-loader.js";
+import { attachPanelTriggers, showPivotFields } from "./panels/panel-loader.js";
 import { clonePivots, pivotOwner, uncomputedPivotResult, withoutSavedOutput } from "./pivot.js";
 import { type PaintedCells, ReadWindowController } from "./read-window-controller.js";
 import {
@@ -74,7 +74,7 @@ import type {
   Column,
   ConditionalFormatRule,
 } from "./types/cell.js";
-import type { ChartDefinition } from "./types/chart.js";
+import type { ChartDefinition, ChartRef } from "./types/chart.js";
 import type {
   CellAddress,
   HighlightRange,
@@ -99,7 +99,7 @@ import type {
   SortKey,
   WorkbookSnapshot,
 } from "./types/document.js";
-import type { KeyboardAction, KeyboardOptions } from "./types/grid.js";
+import type { ContextMenuItem, KeyboardAction, KeyboardOptions } from "./types/grid.js";
 import type {
   CellEditor,
   CellInputSnapshot,
@@ -964,6 +964,8 @@ export class GridImpl implements Grid {
       onActivate: (chart) => {
         for (const fn of this.listeners["chart-activate"]) fn(chart);
       },
+      onContextMenu: (chart, clientX, clientY) =>
+        this.interactions.openMenu(this.chartMenuItems(chart), clientX, clientY),
       isHistoryShortcut: (event) => {
         const action = this.keymap.action(event);
         return action === "undo" || action === "redo";
@@ -2866,6 +2868,33 @@ export class GridImpl implements Grid {
     if (sheet === this.activeSheet) this.objectLayer.select(id);
   }
 
+  /**
+   * A chart's right-click menu. Edit chart does what Enter does; a read-only
+   * grid can open the chart's panel but not delete the chart.
+   */
+  private chartMenuItems(chart: ChartRef): ContextMenuItem[] {
+    return [
+      {
+        id: "editChart",
+        label: "Edit chart",
+        icon: "chart",
+        onClick: () => {
+          for (const fn of this.listeners["chart-activate"]) fn(chart);
+        },
+      },
+      { action: "separator" },
+      {
+        id: "deleteChart",
+        label: "Delete chart",
+        icon: "delete",
+        visible: () => !this.readOnly,
+        onClick: () => {
+          this.removeChart(chart.id, chart.sheet);
+        },
+      },
+    ];
+  }
+
   openPanel(panel: GridPanel | null): void {
     const wasOpen = this.panelDispose !== null;
     const hadFocus = this.panelHost.contains(document.activeElement);
@@ -3128,6 +3157,12 @@ export class GridImpl implements Grid {
 
         const { address } = this.noteCell(focus.row, focus.col);
         if (this.getNote(address) !== null) this.setNote(address, null);
+      },
+      showPivotFields: () => {
+        // The field list edits the pivot, so a read-only grid does not open it.
+        if (this.readOnly) return;
+
+        showPivotFields(this);
       },
       undo: () => this.undo(),
       redo: () => this.redo(),

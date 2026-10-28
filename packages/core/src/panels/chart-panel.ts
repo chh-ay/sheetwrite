@@ -3,7 +3,7 @@
 // chart redraws at once. The controls follow changes from elsewhere (undo,
 // a collaborator) in place, so a field the user is typing in keeps its draft.
 
-import type { IconName } from "../icons/icon-names.js";
+import { CHART_KINDS } from "../chart-kinds.js";
 import { iconNode } from "../icons/resolve.js";
 import type {
   ChartDefinition,
@@ -13,7 +13,6 @@ import type {
   ChartSeries,
 } from "../types/chart.js";
 import type { Grid, GridPanel, IconOverrides } from "../types/grid.js";
-import { CHART_KIND_LABELS } from "./chart-model.js";
 import {
   committingInput,
   panelField,
@@ -24,16 +23,6 @@ import {
   type PanelField,
 } from "./panel-dom.js";
 import { formatRangeText, parseRangeText } from "./range-text.js";
-
-const KIND_ICONS: Readonly<Record<ChartKind, IconName>> = {
-  column: "chartColumn",
-  bar: "chartBar",
-  line: "chartLine",
-  area: "chartArea",
-  pie: "chartPie",
-  doughnut: "chartDoughnut",
-  scatter: "chartScatter",
-};
 
 /** `""` stands for no legend setting: the renderer's default position. */
 const LEGEND_OPTIONS: readonly (readonly [string, string])[] = [
@@ -116,7 +105,7 @@ function renderChartPanel(
   kinds.className = "sheetwrite-panel-kinds";
   kinds.setAttribute("role", "radiogroup");
   kinds.setAttribute("aria-label", "Chart type");
-  const kindButtons = CHART_KIND_LABELS.map(([kind, label]) => {
+  const kindButtons = CHART_KINDS.map(({ kind, label, icon }) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "sheetwrite-panel-kind";
@@ -125,7 +114,7 @@ function renderChartPanel(
     button.dataset.focusKey = `kind-${kind}`;
     const glyph = document.createElement("span");
     glyph.className = "sheetwrite-panel-icon";
-    glyph.appendChild(iconNode(KIND_ICONS[kind], icons));
+    glyph.appendChild(iconNode(icon, icons));
     const text = document.createElement("span");
     text.textContent = label;
     button.append(glyph, text);
@@ -161,7 +150,7 @@ function renderChartPanel(
       End: count - 1,
     };
     const next = moves[event.key];
-    const kind = next === undefined ? undefined : CHART_KIND_LABELS[next]?.[0];
+    const kind = next === undefined ? undefined : CHART_KINDS[next]?.kind;
     if (kind === undefined) return;
     event.preventDefault();
     selectKind(kind);

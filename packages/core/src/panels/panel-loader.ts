@@ -14,6 +14,7 @@ import type {
   insertChart,
   insertPivot,
   openChartPanel,
+  openPivotPanel,
   syncPivotPanel,
 } from "./panel-controller.js";
 
@@ -23,6 +24,7 @@ interface PanelController {
   insertChart: typeof insertChart;
   insertPivot: typeof insertPivot;
   openChartPanel: typeof openChartPanel;
+  openPivotPanel: typeof openPivotPanel;
   syncPivotPanel: typeof syncPivotPanel;
 }
 
@@ -162,6 +164,34 @@ function pivotOutputs(grid: Grid, sheet: SheetId): OutputRect[] {
   });
 }
 
+/** The pivot whose output rectangle holds `row, col`, among `rects` of one sheet. */
+function hitIn(rects: readonly OutputRect[], row: number, col: number): OutputRect | undefined {
+  return rects.find(
+    (rect) => row >= rect.top && row <= rect.bottom && col >= rect.left && col <= rect.right,
+  );
+}
+
+/** The pivot whose output holds `cell`, or null. The context menu asks once per opening. */
+export function pivotAt(
+  grid: Grid,
+  cell: { sheet: SheetId; row: number; col: number },
+): PivotHit | null {
+  const hit = hitIn(pivotOutputs(grid, cell.sheet), cell.row, cell.col);
+  return hit === undefined ? null : { sheet: cell.sheet, id: hit.id };
+}
+
+/**
+ * Open the field list of the pivot under the focus cell, loading the panels on
+ * first use. Does nothing when the focus cell is outside every pivot's output.
+ */
+export function showPivotFields(grid: Grid): void {
+  const cell = focusCell(grid.getSelection());
+  const hit = cell === null ? null : pivotAt(grid, cell);
+  if (hit === null) return;
+
+  requestPanel(grid, (controller) => controller.openPivotPanel(grid, hit.sheet, hit.id));
+}
+
 /**
  * Listen for the triggers that need a panel, on one grid. Returns the
  * disposer, which also detaches the controller when it has loaded.
@@ -180,10 +210,7 @@ export function attachPanelTriggers(grid: Grid, icons?: IconOverrides): () => vo
       rects = pivotOutputs(grid, cell.sheet);
       outputs.set(cell.sheet, rects);
     }
-    const { row, col } = cell;
-    const hit = rects.find(
-      (rect) => row >= rect.top && row <= rect.bottom && col >= rect.left && col <= rect.right,
-    );
+    const hit = hitIn(rects, cell.row, cell.col);
     return hit === undefined ? null : { sheet: cell.sheet, id: hit.id };
   };
 
