@@ -112,6 +112,16 @@ try {
   assert.equal(ops.length, 0, "a bad location makes no pivot");
   assert.equal(find(".sheetwrite-ribbon-form-error").textContent, "No sheet has this name.");
 
+  location.value = "E2:F3";
+  form.dispatchEvent(new Event("submit", { cancelable: true }));
+  await loadPanels(grid);
+  await Promise.resolve();
+  assert.equal(ops.length, 0, "a destination range must not silently become its first cell");
+  assert.equal(
+    find(".sheetwrite-ribbon-form-error").textContent,
+    "Enter a cell for the pivot table, for example Sheet1!H2.",
+  );
+
   location.value = "E2";
   form.dispatchEvent(new Event("submit", { cancelable: true }));
   await loadPanels(grid);

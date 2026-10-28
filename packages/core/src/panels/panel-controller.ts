@@ -155,6 +155,12 @@ export function insertPivot(grid: Grid, destination: PivotDestination): string |
     if ("error" in parsed) {
       return destination.text.trim() === "" ? PIVOT_LOCATION_ERROR : parsed.error;
     }
+    if (
+      parsed.range.start.row !== parsed.range.end.row ||
+      parsed.range.start.col !== parsed.range.end.col
+    ) {
+      return PIVOT_LOCATION_ERROR;
+    }
     anchor = { sheet: parsed.range.sheet, ...parsed.range.start };
   } else {
     newSheet = pivotSheet(workbook.sheets);

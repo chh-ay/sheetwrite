@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, beforeEach, expect, it } from "bun:test";
 
 import { GridImpl, initSheetwrite } from "../src/grid.js";
-import { loadPanels, panelsRequested } from "../src/panels/panel-loader.js";
+import { loadPanels } from "../src/panels/panel-loader.js";
 import { SheetwriteStore } from "../src/store.js";
 import { storeEngine } from "../src/store/engine-registry.js";
 import { installCanvasTestStubs } from "../src/testing.js";
@@ -124,25 +124,6 @@ async function insertedChart() {
   return context;
 }
 
-it("does not request panels for construction or cell edits, and requests them on the first Chart click", async () => {
-  const { grid, openTab, selectRange, press, control, panel } = await setup();
-  expect(panelsRequested(grid)).toBe(false);
-  grid.applyTransaction({
-    patches: [
-      { op: "set", addr: { sheet: "s1", row: 4, col: 0 }, value: { kind: "literal", value: 8 } },
-    ],
-  });
-  selectRange(0, 0, 2, 2);
-  openTab("Insert");
-  expect(panelsRequested(grid)).toBe(false);
-
-  press(control("Chart"));
-  expect(panelsRequested(grid)).toBe(true);
-  await loadPanels(grid);
-  await Promise.resolve();
-  expect(panel()?.querySelector(".sheetwrite-panel-title")?.textContent).toBe("Chart");
-});
-
 it("inserts a chart from the selection in one step, selects it and opens its panel", async () => {
   const { grid, chartOps, panel } = await insertedChart();
 
@@ -246,7 +227,6 @@ it("opens once when chart activation repeats while the panel chunk loads", async
     anchor: { row: 0, col: 3, offsetX: 0, offsetY: 0, width: 480, height: 288 },
     series: [{ values: range(1, 1, 2, 1) }],
   });
-  expect(panelsRequested(grid)).toBe(false);
   const frame = host.querySelector<HTMLElement>('.sheetwrite-object[data-chart-id="cold"]');
   if (frame === null) throw new Error("the chart has no object frame");
   const openPanel = grid.openPanel.bind(grid);
@@ -332,12 +312,19 @@ it("disables Insert › PivotTable on the default engine and says why", async ()
   expect(pivot.getAttribute("aria-description")).toBe(pivot.title);
 });
 
-it("edits the full-engine field list with one setPivot per action", async () => {
-  // Engine selection is process-wide, so the full engine runs in its own process.
-  const probe = Bun.spawn(
-    [process.execPath, "--preload", "./test-setup.ts", "./packages/core/test/pivot-panel-probe.ts"],
-    { cwd: new URL("../../..", import.meta.url).pathname, stdout: "pipe", stderr: "pipe" },
-  );
+it.each([
+  ["loads panels only on first use", "./packages/core/test/panel-loading-probe.ts"],
+  [
+    "edits the full-engine field list with one setPivot per action",
+    "./packages/core/test/pivot-panel-probe.ts",
+  ],
+])("%s", async (_description, path) => {
+  // Isolate process-wide engine selection and module loading mocks.
+  const probe = Bun.spawn([process.execPath, "--preload", "./test-setup.ts", path], {
+    cwd: new URL("../../..", import.meta.url).pathname,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
   const [exitCode, stdout, stderr] = await Promise.all([
     probe.exited,
     new Response(probe.stdout).text(),

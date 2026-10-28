@@ -69,11 +69,6 @@ export function pivotsAvailable(grid: Grid): boolean {
   return storeEngine(grid.store)?.computesPivots === true;
 }
 
-/** Whether this grid has asked for the panel chunk yet. A test seam for the lazy load. */
-export function panelsRequested(grid: Grid): boolean {
-  return STATES.get(grid)?.loading != null;
-}
-
 /**
  * The panel controller, loaded once per page and attached once per grid. A
  * failed load is not cached, so the next use tries again.
