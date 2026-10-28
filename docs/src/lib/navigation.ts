@@ -183,6 +183,14 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
           },
         ],
       },
+      {
+        label: "Analysis",
+        href: "/docs/features/analysis/",
+        items: [
+          { label: "Pivot tables", href: "/docs/features/analysis/pivot-tables/", added: RELEASE },
+          { label: "Charts", href: "/docs/features/analysis/charts/", added: RELEASE },
+        ],
+      },
       { label: "Collaboration", href: "/docs/features/collaboration/" },
       { label: "Worker rendering", href: "/docs/features/worker-rendering/" },
       { label: "Accessibility", href: "/docs/features/accessibility/" },

@@ -23,7 +23,8 @@ export type CapabilityOwnerId =
   | "collaboration"
   | "data-tools"
   | "host-rows"
-  | "spreadsheet";
+  | "spreadsheet"
+  | "analysis";
 
 export type CapabilityArea =
   | "editing"
@@ -155,7 +156,7 @@ export const CAPABILITY_OWNERS: readonly CapabilityOwner[] = [
     href: "/showcases/formulas/",
     routeFile: "docs/src/routes/showcases.formulas.tsx",
     responsibility:
-      "Full formula engine: grouping and pivot tables, dynamic arrays, statistics, regression, LAMBDA helpers, regex, and spill references over a live ledger.",
+      "Full formula engine: GROUPBY and PIVOTBY grouping, dynamic arrays, statistics, regression, LAMBDA helpers, regex, and spill references over a live ledger.",
     kind: "capability",
   },
   {
@@ -203,6 +204,15 @@ export const CAPABILITY_OWNERS: readonly CapabilityOwner[] = [
       "The composable shell as a complete app: Excel-style ribbon, name box, formula bar, sheet tabs and status around one grid, with ribbon folding at narrow widths.",
     kind: "capability",
   },
+  {
+    id: "analysis",
+    label: "Analysis",
+    href: "/showcases/analysis/",
+    routeFile: "docs/src/routes/showcases.analysis.tsx",
+    responsibility:
+      "Pivot tables and live charts over two years of orders: a pivot by month and region, a chart over its output, and the side panel that edits both.",
+    kind: "capability",
+  },
 ];
 
 const ENGINE_SCENARIO = "docs/src/showcases/scenarios/engine.ts";
@@ -215,6 +225,8 @@ const INTEROP_SCENARIO = "docs/src/showcases/scenarios/interoperability.ts";
 const SCALE_SCENARIO = "docs/src/showcases/scenarios/scale.ts";
 const DATABASE_PROTOCOL = "docs/src/showcases/showcase-database.ts";
 const COLLABORATION_PROTOCOL = "docs/src/showcases/collaboration-protocol.ts";
+const ANALYSIS_SCENARIO = "docs/src/showcases/scenarios/analysis.ts";
+const ORDERS_STORY = "docs/src/showcases/scenarios/orders-story.ts";
 
 const VANILLA_SPEC = "test/browser/vanilla-workbench.spec.ts";
 const REACT_SPEC = "test/browser/react-workbench.spec.ts";
@@ -227,6 +239,7 @@ const FORMULAS_SPEC = "test/browser/showcase-formulas.spec.ts";
 const DATABASE_COLLAB_SPEC = "test/browser/database-collaboration.spec.ts";
 const LIFECYCLE_SPEC = "test/browser/framework-lifecycle.spec.ts";
 const HOST_ROWS_SPEC = "test/browser/host-owned-rows.spec.ts";
+const ANALYSIS_SPEC = "test/browser/showcase-analysis.spec.ts";
 
 const HOST_CHROME_BOUNDARY =
   "Product chrome beyond the shell pieces (menus, dialogs, app framing) is host-owned.";
@@ -383,7 +396,7 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
   },
   {
     id: "formulas.dynamic-arrays",
-    title: "Grouping, pivots & dynamic arrays",
+    title: "Grouping formulas & dynamic arrays",
     area: "modeling",
     primary: "formulas",
     interaction:
@@ -393,6 +406,36 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     testPath: FORMULAS_SPEC,
     sharedModules: [FORMULAS_SCENARIO],
     boundary: "Spills stop at the sheet edge and at occupied cells, which show #SPILL!.",
+  },
+  {
+    id: "modeling.pivot-tables",
+    title: "Pivot tables",
+    area: "modeling",
+    primary: "analysis",
+    interaction:
+      "Edit an order and the pivot's month and region totals update in place; move fields between Rows, Columns, Values and Filters in the field list.",
+    scope: "browser",
+    accessibility:
+      "Every field can be moved with its actions menu from the keyboard; areas and fields have names that say where each field is.",
+    testPath: ANALYSIS_SPEC,
+    sharedModules: [ANALYSIS_SCENARIO, ORDERS_STORY],
+    boundary:
+      "Pivot tables need the full engine (@sheetwrite/formulas); filters keep the values they list.",
+  },
+  {
+    id: "modeling.charts",
+    title: "Live charts",
+    area: "modeling",
+    primary: "analysis",
+    interaction:
+      "A line chart reads the pivot output and redraws after an edit; select it to move, resize or delete it, or insert a chart from a selection.",
+    scope: "browser",
+    accessibility:
+      "A chart is an image named by its title and kind, with its series listed; selected charts move with the arrow keys.",
+    testPath: ANALYSIS_SPEC,
+    sharedModules: [ANALYSIS_SCENARIO, ORDERS_STORY],
+    boundary:
+      "Charts draw through the optional @sheetwrite/charts package; without it, a frame shows the title.",
   },
   {
     id: "formulas.lambda",

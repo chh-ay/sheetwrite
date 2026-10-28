@@ -37,6 +37,8 @@ const REQUIRED_CAPABILITY_IDS = [
   "formulas.references-names",
   "formulas.full-engine",
   "formulas.dynamic-arrays",
+  "modeling.pivot-tables",
+  "modeling.charts",
   "formulas.lambda",
   "formulas.spill-references",
   "data.aggregation",

@@ -872,6 +872,50 @@
   );
 }
 
+/* Analysis: a pivot in miniature, and the line chart drawn from the same numbers. */
+.sw-hub-analysis {
+  display: grid;
+  /* The table keeps the width its labels need; the chart takes what is left. */
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 1rem;
+  align-items: center;
+  width: 100%;
+}
+
+/* Each row is its own grid, so fixed widths keep the columns aligned across rows. */
+.sw-hub-analysis__pivot > span {
+  grid-template-columns: 3.5rem 4.75rem 3.5rem;
+}
+
+.sw-hub-analysis__pivot i {
+  padding-inline: 0.4rem;
+}
+
+.sw-hub-analysis__chart {
+  width: 100%;
+  height: auto;
+  border-bottom: 1px solid var(--sw-demo-border-strong);
+  border-left: 1px solid var(--sw-demo-border-strong);
+}
+
+.sw-hub-analysis__chart polyline {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  /* The chart scales with the card; the line keeps its weight. */
+  vector-effect: non-scaling-stroke;
+}
+
+.sw-hub-analysis__chart [data-series="1"] {
+  stroke: var(--sw-hub-accent);
+}
+
+/* EMEA carries the dip, so it takes the same color as the dip row in the pivot. */
+.sw-hub-analysis__chart [data-series="2"] {
+  stroke: var(--sw-demo-danger);
+}
+
 /* The app showcase leads the hub at full width: preview beside the copy. */
 .sw-hub-scenes > li[data-owner="spreadsheet"] {
   grid-column: 1 / -1;

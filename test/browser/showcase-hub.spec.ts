@@ -97,7 +97,7 @@ test("hub links every showcase, filters accessibly, and never clips a card", asy
   await page.getByRole("button", { name: "Formulas", exact: true }).click();
   expect(
     (await launchers.evaluateAll((links) => links.map((link) => link.dataset.owner))).sort(),
-  ).toEqual(["engine", "formulas"]);
+  ).toEqual(["analysis", "engine", "formulas"]);
   await allFilter.click();
   await expect(launchers).toHaveCount(owners.length);
 
