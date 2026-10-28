@@ -564,20 +564,27 @@ function renderPlacement(spec: RibbonPlacementSpec, context: RibbonContext): Rib
     save.textContent = "OK";
     form.append(choices, location, error, save);
 
-    form.addEventListener("submit", (event) => {
+    form.addEventListener("submit", async (event) => {
       event.preventDefault();
-      const message = spec.submit(
-        context.grid,
-        existing.checked ? { kind: "cell", text: field.value } : { kind: "new-sheet" },
-      );
-      if (message !== null) {
-        error.textContent = message;
-        error.hidden = false;
-        (existing.checked ? field : newSheet).focus();
-        return;
+      // Enter may repeat while the optional panel chunk is still loading.
+      if (save.disabled) return;
+      save.disabled = true;
+      try {
+        const message = await spec.submit(
+          context.grid,
+          existing.checked ? { kind: "cell", text: field.value } : { kind: "new-sheet" },
+        );
+        if (message !== null) {
+          error.textContent = message;
+          error.hidden = false;
+          (existing.checked ? field : newSheet).focus();
+          return;
+        }
+        // The command moved focus into the panel it opened; leave it there.
+        context.popup.closeAll(false);
+      } finally {
+        save.disabled = false;
       }
-      // The command moved focus into the panel it opened; leave it there.
-      context.popup.closeAll(false);
     });
     context.popup.open(trigger, form, { role: "dialog", label: spec.label, focus: true });
   });

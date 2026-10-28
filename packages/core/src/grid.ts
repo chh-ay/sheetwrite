@@ -38,6 +38,7 @@ import { MutationRevisionIndex, type MutationRevisionStats } from "./mutation-re
 import { type NoteCell, NotePopover } from "./note-popover.js";
 import { ObjectLayer } from "./object-layer.js";
 import { OverlayPainter } from "./overlay-painter.js";
+import { attachPanelTriggers } from "./panels/panel-loader.js";
 import { clonePivots, pivotOwner, uncomputedPivotResult, withoutSavedOutput } from "./pivot.js";
 import { type PaintedCells, ReadWindowController } from "./read-window-controller.js";
 import {
@@ -952,8 +953,8 @@ export class GridImpl implements Grid {
       theme: () => this.theme,
       zoom: () => this.zoom,
       readOnly: () => this.readOnly,
-      setChart: (chart) => this.setChart(this.activeSheet, chart),
-      removeChart: (id) => this.removeChart(this.activeSheet, id),
+      setChart: (chart) => this.setChart(chart, this.activeSheet),
+      removeChart: (id) => this.removeChart(id, this.activeSheet),
       focusGrid: () => this.host.focus(),
       onSelect: (chart) => {
         for (const fn of this.listeners["chart-select"]) fn(chart);
@@ -1211,15 +1212,10 @@ export class GridImpl implements Grid {
     this.render();
   }
 
-  /**
-   * The chart and pivot panels load as their own chunk, so they cost nothing
-   * before first paint. A data grid has no charts or pivots to edit.
-   */
+  /** Listen for first use without fetching the panel chunk on ordinary grids. */
   private attachPanels(): void {
     if (this.presentation !== "spreadsheet") return;
-    void import("./panels/panel-controller.js").then(({ attachPanels }) => {
-      if (!this.destroyed) this.disposePanels = attachPanels(this, this.config?.icons);
-    });
+    this.disposePanels = attachPanelTriggers(this, this.config?.icons);
   }
 
   private refreshSourcePresence(): void {
@@ -2838,19 +2834,21 @@ export class GridImpl implements Grid {
     return structuredClone(this.sheetById(sheet)?.charts ?? []);
   }
 
-  setChart(sheet: SheetId, chart: ChartDefinition): boolean {
-    const result = this.document.commit(
-      [{ op: "setChart", sheet, chart: structuredClone(chart) }],
-      "api",
-    );
-    return result.status === "applied";
+  setChart(chart: ChartDefinition, sheet: SheetId = this.activeSheet): ApplyTransactionResult {
+    return this.document.commit([{ op: "setChart", sheet, chart: structuredClone(chart) }], "api");
   }
 
-  removeChart(sheet: SheetId, id: string): boolean {
-    return this.document.commit([{ op: "removeChart", sheet, id }], "api").status === "applied";
+  removeChart(id: string, sheet?: SheetId): ApplyTransactionResult {
+    const owner =
+      sheet ??
+      this.store
+        .getWorkbook()
+        .sheets.find((candidate) => candidate.charts?.some((chart) => chart.id === id))?.id ??
+      this.activeSheet;
+    return this.document.commit([{ op: "removeChart", sheet: owner, id }], "api");
   }
 
-  selectChart(sheet: SheetId, id: string | null): void {
+  selectChart(id: string | null, sheet: SheetId = this.activeSheet): void {
     if (id !== null && sheet !== this.activeSheet) this.setActiveSheet(sheet);
     // Charts on other sheets are never selected, so there is nothing to deselect there.
     if (sheet === this.activeSheet) this.objectLayer.select(id);

@@ -6,6 +6,7 @@ import * as formulas from "@sheetwrite/formulas";
 
 import { createGrid, initSheetwrite } from "../src/index.js";
 import type { DocumentOp, PivotDefinition } from "../src/index.js";
+import { loadPanels } from "../src/panels/panel-loader.js";
 import { storeEngine } from "../src/store/engine-registry.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 
@@ -25,9 +26,8 @@ const grid = createGrid(host, {
   workbook: { activeSheet: "data", sheets: [{ id: "data", name: "Data", rowCount: 30, columns }] },
   config: { ribbon: true },
 });
-// The grid loads both chunks lazily; awaiting them runs its mount callbacks first.
+// Await the ribbon's lazy mount; the first submit loads the panel controller.
 await import("../src/ribbon/ribbon.js");
-await import("../src/panels/panel-controller.js");
 
 const ops: PivotDefinition[] = [];
 const setPivot = grid.setPivot.bind(grid);
@@ -89,6 +89,11 @@ try {
     (tab) => tab.textContent === "Insert",
   );
   insertTab?.click();
+  // Let the tab's fit frame settle before opening its popup, just as a user
+  // clicks after the tab has painted. A fit pass closes floating surfaces.
+  const fitted = Promise.withResolvers<void>();
+  requestAnimationFrame(() => fitted.resolve());
+  await fitted.promise;
   const button = find<HTMLButtonElement>(
     '.sheetwrite-ribbon-panel:not([hidden]) [aria-label="PivotTable"]',
   );
@@ -102,11 +107,15 @@ try {
   existing.dispatchEvent(new Event("change", { bubbles: true }));
   location.value = "Nowhere!A1";
   form.dispatchEvent(new Event("submit", { cancelable: true }));
+  await loadPanels(grid);
+  await Promise.resolve();
   assert.equal(ops.length, 0, "a bad location makes no pivot");
   assert.equal(find(".sheetwrite-ribbon-form-error").textContent, "No sheet has this name.");
 
   location.value = "E2";
   form.dispatchEvent(new Event("submit", { cancelable: true }));
+  await loadPanels(grid);
+  await Promise.resolve();
   assert.equal(ops.length, 1);
   assert.deepEqual(lastOp(), {
     id: "pivot-1",
@@ -228,12 +237,29 @@ try {
   find<HTMLFormElement>("form.sheetwrite-ribbon-popup").dispatchEvent(
     new Event("submit", { cancelable: true }),
   );
+  await loadPanels(grid);
+  await Promise.resolve();
   const added = grid.store.getWorkbook().sheets.at(-1);
   assert.equal(added?.name, "Sheet 2");
   assert.equal(grid.getActiveSheet(), added?.id);
-  assert.deepEqual(lastOp().anchor, { row: 2, col: 0 });
-  assert.equal(lastOp().id, "pivot-2");
+  const inserted = grid.getPivots(added?.id).find((pivot) => pivot.id === "pivot-2");
+  assert.deepEqual(inserted?.anchor, { row: 2, col: 0 });
   assert.equal(find(".sheetwrite-panel-title").textContent, "PivotTable Fields");
+  grid.undo();
+  assert.deepEqual(
+    grid.store.getWorkbook().sheets.map((sheet) => sheet.id),
+    ["data"],
+  );
+  assert.equal(
+    grid.getPivots().some((pivot) => pivot.id === "pivot-2"),
+    false,
+  );
+  grid.redo();
+  assert.equal(grid.store.getWorkbook().sheets.at(-1)?.id, added?.id);
+  assert.deepEqual(
+    grid.getPivots(added?.id).find((pivot) => pivot.id === "pivot-2"),
+    inserted,
+  );
 } finally {
   grid.destroy();
   restore();

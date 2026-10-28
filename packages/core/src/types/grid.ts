@@ -1015,15 +1015,19 @@ export interface Grid {
   getPivotResult(sheet: SheetId, id: string): PivotResultView | null;
   /** Clones of the chart definitions on `sheet` (default: the active sheet). */
   getCharts(sheet?: SheetId): readonly ChartDefinition[];
-  /** Insert or replace the chart with `chart.id` on `sheet` as one undo entry. Returns `true` if applied. */
-  setChart(sheet: SheetId, chart: ChartDefinition): boolean;
-  /** Remove a chart from `sheet` as one undo entry. Returns `true` if applied. */
-  removeChart(sheet: SheetId, id: string): boolean;
   /**
-   * Select the chart object `id` on `sheet`, or deselect with `null`. Selecting a
-   * chart on another sheet activates that sheet first. Emits `chart-select`.
+   * Insert or replace the chart with `chart.id` as one undo entry. `sheet`
+   * defaults to the active sheet; chart IDs are unique only within a sheet.
    */
-  selectChart(sheet: SheetId, id: string | null): void;
+  setChart(chart: ChartDefinition, sheet?: SheetId): ApplyTransactionResult;
+  /** Remove a chart from `sheet` (default: the first sheet that holds it) as one undo entry. */
+  removeChart(id: string, sheet?: SheetId): ApplyTransactionResult;
+  /**
+   * Select the chart object `id` on `sheet` (default: the active sheet), or
+   * deselect with `null`. Selecting a chart on another sheet activates that
+   * sheet first. Emits `chart-select`.
+   */
+  selectChart(id: string | null, sheet?: SheetId): void;
   /**
    * Show `panel` on the grid's right edge and shrink the cells to make room;
    * `null` closes the open panel. One panel shows at a time: opening a panel

@@ -18,6 +18,7 @@ import {
   committingInput,
   panelField,
   panelSection,
+  rejectionMessage,
   selectOf,
   type CommittingInput,
   type PanelField,
@@ -44,7 +45,6 @@ const LEGEND_OPTIONS: readonly (readonly [string, string])[] = [
   ["left", "Left"],
 ];
 
-const REJECTED = "The grid did not accept this change.";
 const VALUES_REQUIRED = "A series needs a values range.";
 const MISSING_CHART = "This chart no longer exists.";
 
@@ -106,7 +106,7 @@ function renderChartPanel(
     if (chart === null) return MISSING_CHART;
     const next = edit(chart);
     if (typeof next === "string") return next;
-    return grid.setChart(ref.sheet, next) ? null : REJECTED;
+    return rejectionMessage(grid.setChart(next, ref.sheet));
   };
 
   // Kind: a radio group of toggle buttons. Arrow keys move and select, as in

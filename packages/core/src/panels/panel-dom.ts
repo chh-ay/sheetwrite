@@ -1,5 +1,19 @@
 // DOM helpers shared by the Chart panel and the pivot field list.
 
+import type { ApplyTransactionResult } from "../types/transaction.js";
+
+const NOT_APPLIED = "The grid did not accept this change.";
+
+/**
+ * What a panel shows after one grid operation: null when it was applied, else
+ * the reason the grid gave (protection, a limit, an invalid definition).
+ */
+export function rejectionMessage(result: ApplyTransactionResult): string | null {
+  if (result.status === "applied") return null;
+  if (result.status === "rejected") return result.issues[0]?.message ?? NOT_APPLIED;
+  return NOT_APPLIED;
+}
+
 let fieldSerial = 0;
 
 /** A `<label>` over one control, with an optional inline error under it. */

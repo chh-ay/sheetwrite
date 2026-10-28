@@ -15,12 +15,8 @@ import {
 } from "../format-presets.js";
 import { createHyperlinkId, isSafeExternalHyperlink } from "../hyperlink.js";
 import type { IconName } from "../icons/icon-names.js";
-import {
-  insertChart,
-  insertPivot,
-  pivotsAvailable,
-  type PivotDestination,
-} from "../panels/panel-controller.js";
+import type { PivotDestination } from "../panels/panel-controller.js";
+import { loadPanels, pivotsAvailable } from "../panels/panel-loader.js";
 import type { CellStyle } from "../types/cell.js";
 import type { CellAddress } from "../types/coordinates.js";
 import type { BorderPreset, Grid, GridCommandName } from "../types/grid.js";
@@ -126,7 +122,7 @@ export interface RibbonPlacementSpec {
   /** Why the command cannot run at all here, shown as the tooltip; null when it can. */
   readonly unavailable: (grid: Grid) => string | null;
   /** Run the command; returns an error message to show, or null on success. */
-  readonly submit: (grid: Grid, destination: PivotDestination) => string | null;
+  readonly submit: (grid: Grid, destination: PivotDestination) => Promise<string | null>;
 }
 /** Zoom out / current percent / zoom in, as in Excel's View > Zoom group. */
 interface RibbonZoomSpec {
@@ -387,7 +383,7 @@ const pivotTable: RibbonPlacementSpec = {
   label: "PivotTable",
   icon: "pivotTable",
   unavailable: (grid) => (pivotsAvailable(grid) ? null : PIVOT_NEEDS_FULL_ENGINE),
-  submit: insertPivot,
+  submit: async (grid, destination) => (await loadPanels(grid)).insertPivot(grid, destination),
 };
 
 function outline(group: boolean): (grid: Grid) => void {
@@ -641,7 +637,17 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
         label: "Charts",
         icon: "chart",
         layout: "flow",
-        controls: [button("Chart", "chart", insertChart, "edit", { large: true })],
+        controls: [
+          button(
+            "Chart",
+            "chart",
+            async (grid) => (await loadPanels(grid)).insertChart(grid),
+            "edit",
+            {
+              large: true,
+            },
+          ),
+        ],
       },
       { id: "links", label: "Links", icon: "hyperlink", layout: "flow", controls: [hyperlink] },
       { id: "notes", label: "Notes", icon: "note", layout: "flow", controls: [note] },

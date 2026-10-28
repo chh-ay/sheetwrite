@@ -7,7 +7,7 @@ import type { CellScalar } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
 import type { Grid, GridPanel } from "../types/grid.js";
 import type { PivotDefinition, PivotFieldType, PivotSourceField } from "../types/pivot.js";
-import { panelSection, rebuildPanel, selectOf } from "./panel-dom.js";
+import { panelSection, rebuildPanel, rejectionMessage, selectOf } from "./panel-dom.js";
 import { menuButton, type PanelMenuItem } from "./panel-menu.js";
 import {
   AGGREGATION_LABELS,
@@ -43,7 +43,6 @@ const SORT_OPTIONS: readonly (readonly [string, string])[] = [
 const NEEDS_FULL_ENGINE =
   "Pivot tables need the full engine. Load @sheetwrite/formulas to edit fields.";
 const MISSING_PIVOT = "This pivot table no longer exists.";
-const REJECTED = "The grid did not accept this change.";
 const TOO_MANY_VALUES = `This field has more than ${MAX_FILTER_VALUES.toLocaleString("en-US")} values, so it cannot be a filter.`;
 const EMPTY_AREA = "Drag fields here";
 const BLANK_LABEL = "(blank)";
@@ -111,8 +110,7 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
 
   /** Commit one edit, then rebuild with focus on `focusKey` when given. */
   const commit = (next: PivotDefinition, focusKey?: string): void => {
-    const result = grid.setPivot(next, sheet);
-    message = result.status === "applied" ? null : REJECTED;
+    message = rejectionMessage(grid.setPivot(next, sheet));
     refresh(true);
     if (focusKey !== undefined)
       body.querySelector<HTMLElement>(`[data-focus-key="${focusKey}"]`)?.focus();

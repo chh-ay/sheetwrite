@@ -804,9 +804,11 @@ export class DocumentController {
         return [{ op: "setCalculation", calculation: { ...previous } }];
       }
       case "setPivot": {
-        const previous = this.sheetById(patch.sheet)?.pivots?.find(
-          (pivot) => pivot.id === patch.pivot.id,
-        );
+        const sheet = this.sheetById(patch.sheet);
+        // A sheet created in this batch is removed by the addSheet inverse,
+        // with all its pivots. A later removePivot would target a missing sheet.
+        if (!sheet) return [];
+        const previous = sheet.pivots?.find((pivot) => pivot.id === patch.pivot.id);
         return previous
           ? [{ op: "setPivot", sheet: patch.sheet, pivot: clonePivot(previous) }]
           : [{ op: "removePivot", sheet: patch.sheet, id: patch.pivot.id }];

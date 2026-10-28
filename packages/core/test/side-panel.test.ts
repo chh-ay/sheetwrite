@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, beforeEach, expect, it } from "bun:test";
 
 import { GridImpl, initSheetwrite } from "../src/grid.js";
+import { loadPanels, panelsRequested } from "../src/panels/panel-loader.js";
 import { SheetwriteStore } from "../src/store.js";
 import { storeEngine } from "../src/store/engine-registry.js";
 import { installCanvasTestStubs } from "../src/testing.js";
@@ -10,12 +11,10 @@ let restore: () => void;
 const grids: GridImpl[] = [];
 
 const RIBBON_MODULE = "../src/ribbon/ribbon.js";
-const PANELS_MODULE = "../src/panels/panel-controller.js";
 
 beforeAll(async () => {
   await initSheetwrite();
   await import(RIBBON_MODULE);
-  await import(PANELS_MODULE);
 });
 beforeEach(() => {
   restore = installCanvasTestStubs();
@@ -49,10 +48,8 @@ async function setup(readOnly = false) {
   document.body.appendChild(host);
   const grid = new GridImpl(host, { workbook, readOnly: false, config: { ribbon: true } }, store);
   grids.push(grid);
-  // The grid loads the ribbon and the panel controller lazily; awaiting the
-  // same modules runs the grid's mount callbacks first.
+  // Await the ribbon's lazy mount, but do not load the panels.
   await import(RIBBON_MODULE);
-  await import(PANELS_MODULE);
 
   const patches = CELLS.flatMap((row, r) =>
     row.map((value, col): DocumentOp => ({
@@ -67,9 +64,9 @@ async function setup(readOnly = false) {
   // Count the grid operations each panel action makes.
   const setChart = grid.setChart.bind(grid);
   const chartOps: ChartDefinition[] = [];
-  grid.setChart = (sheet, chart) => {
+  grid.setChart = (chart, sheet) => {
     chartOps.push(structuredClone(chart));
-    return setChart(sheet, chart);
+    return setChart(chart, sheet);
   };
 
   const scope = ".sheetwrite-ribbon-panel:not([hidden])";
@@ -121,10 +118,30 @@ async function insertedChart() {
   context.openTab("Insert");
   context.selectRange(0, 0, 2, 2);
   context.press(context.control("Chart"));
-  // A ribbon command ignores a second start while it runs; let this one settle.
+  // Wait for the same pending load and let the button's command finish.
+  await loadPanels(context.grid);
   await Promise.resolve();
   return context;
 }
+
+it("does not request panels for construction or cell edits, and requests them on the first Chart click", async () => {
+  const { grid, openTab, selectRange, press, control, panel } = await setup();
+  expect(panelsRequested(grid)).toBe(false);
+  grid.applyTransaction({
+    patches: [
+      { op: "set", addr: { sheet: "s1", row: 4, col: 0 }, value: { kind: "literal", value: 8 } },
+    ],
+  });
+  selectRange(0, 0, 2, 2);
+  openTab("Insert");
+  expect(panelsRequested(grid)).toBe(false);
+
+  press(control("Chart"));
+  expect(panelsRequested(grid)).toBe(true);
+  await loadPanels(grid);
+  await Promise.resolve();
+  expect(panel()?.querySelector(".sheetwrite-panel-title")?.textContent).toBe("Chart");
+});
 
 it("inserts a chart from the selection in one step, selects it and opens its panel", async () => {
   const { grid, chartOps, panel } = await insertedChart();
@@ -221,13 +238,39 @@ it("validates series ranges as A1 text and shows the error inline", async () => 
   expect(values.value).toBe("B2:B3");
 });
 
+it("opens once when chart activation repeats while the panel chunk loads", async () => {
+  const { grid, host, panel, key } = await setup();
+  grid.setChart({
+    id: "cold",
+    kind: "column",
+    anchor: { row: 0, col: 3, offsetX: 0, offsetY: 0, width: 480, height: 288 },
+    series: [{ values: range(1, 1, 2, 1) }],
+  });
+  expect(panelsRequested(grid)).toBe(false);
+  const frame = host.querySelector<HTMLElement>('.sheetwrite-object[data-chart-id="cold"]');
+  if (frame === null) throw new Error("the chart has no object frame");
+  const openPanel = grid.openPanel.bind(grid);
+  let opens = 0;
+  grid.openPanel = (content) => {
+    if (content !== null) opens += 1;
+    openPanel(content);
+  };
+
+  key(frame, "Enter");
+  key(frame, "Enter");
+  await loadPanels(grid);
+  await Promise.resolve();
+  expect(opens).toBe(1);
+  expect(panel()?.contains(document.activeElement)).toBe(true);
+});
+
 it("opens the Chart panel on Enter on a chart, but not on selection alone", async () => {
   const { grid, host, panel, key } = await insertedChart();
   grid.openPanel(null);
   expect(panel()).toBeNull();
 
-  grid.selectChart("s1", null);
-  grid.selectChart("s1", "chart-1");
+  grid.selectChart(null, "s1");
+  grid.selectChart("chart-1", "s1");
   expect(panel()).toBeNull();
 
   const frame = host.querySelector<HTMLElement>('.sheetwrite-object[data-chart-id="chart-1"]');
