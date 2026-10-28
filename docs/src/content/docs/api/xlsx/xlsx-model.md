@@ -1,6 +1,6 @@
 ---
 title: "XlsxModel | @sheetwrite/xlsx"
-description: "Implementation-neutral first-sheet table export model."
+description: "XlsxModel interface in @sheetwrite/xlsx: Implementation-neutral first-sheet table export model."
 ---
 <!-- api-export:@sheetwrite/xlsx|.|XlsxModel -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/xlsx/">@sheetwrite/xlsx</a><span class="api-status" data-kind="interface">interface</span></div>

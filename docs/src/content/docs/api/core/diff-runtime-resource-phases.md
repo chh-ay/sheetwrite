@@ -1,6 +1,6 @@
 ---
 title: "diffRuntimeResourcePhases | @sheetwrite/core"
-description: "Diff two validated phases of the same operation by exclusive resource owner."
+description: "diffRuntimeResourcePhases function in @sheetwrite/core: Diff two validated phases of the same operation by exclusive resource owner."
 ---
 <!-- api-export:@sheetwrite/core|.|diffRuntimeResourcePhases -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "SheetwriteErrorCode | @sheetwrite/core"
-description: "Exhaustive stable discriminator for consumer-visible Sheetwrite failures."
+description: "SheetwriteErrorCode type in @sheetwrite/core: Exhaustive stable discriminator for consumer-visible Sheetwrite failures."
 ---
 <!-- api-export:@sheetwrite/core|.|SheetwriteErrorCode -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

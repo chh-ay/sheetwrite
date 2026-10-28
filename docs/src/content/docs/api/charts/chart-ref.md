@@ -1,6 +1,6 @@
 ---
 title: "ChartRef | @sheetwrite/charts"
-description: "Stable identity of one chart: the sheet that owns it and its ID on that sheet."
+description: "ChartRef interface in @sheetwrite/charts: Stable identity of one chart: the sheet that owns it and its ID on that sheet."
 ---
 <!-- api-export:@sheetwrite/charts|.|ChartRef -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/charts/">@sheetwrite/charts</a><span class="api-status" data-kind="interface">interface</span></div>

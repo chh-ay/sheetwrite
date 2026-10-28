@@ -1,13 +1,13 @@
 ---
 title: "ContextMenuItem | @sheetwrite/core"
-description: "Built-in, separator, or custom callback row in the right-click menu."
+description: "ContextMenuItem interface in @sheetwrite/core: Built-in, separator, or custom callback row in the right-click menu."
 ---
 <!-- api-export:@sheetwrite/core|.|ContextMenuItem -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Built-in, separator, or custom callback row in the right-click menu.
 
-### Examples
+## Examples
 
 ```ts compile
 import type { ContextMenuItem, GridConfig } from "@sheetwrite/core";
@@ -20,7 +20,7 @@ const total: ContextMenuItem = {
 const config: GridConfig = { contextMenu: [total, { action: "separator" }, { action: "copy" }] };
 ```
 
-### See also
+## See also
 
 - [ContextMenuItems](/docs/api/core/context-menu-items/)
 - [GridConfig.contextMenu](/docs/api/core/grid-config/#grid-config-context-menu)

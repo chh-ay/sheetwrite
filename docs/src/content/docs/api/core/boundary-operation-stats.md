@@ -1,6 +1,6 @@
 ---
 title: "BoundaryOperationStats | @sheetwrite/core"
-description: "Fixed-cardinality boundary crossing counters for one operation."
+description: "BoundaryOperationStats interface in @sheetwrite/core: Fixed-cardinality boundary crossing counters for one operation."
 ---
 <!-- api-export:@sheetwrite/core|.|BoundaryOperationStats -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

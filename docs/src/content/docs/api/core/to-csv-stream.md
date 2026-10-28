@@ -1,6 +1,6 @@
 ---
 title: "toCsvStream | @sheetwrite/core"
-description: "Export UTF-8 CSV on demand, retaining only one store window and one byte chunk."
+description: "toCsvStream function in @sheetwrite/core: Export UTF-8 CSV on demand, retaining only one store window and one byte chunk."
 ---
 <!-- api-export:@sheetwrite/core|.|toCsvStream -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

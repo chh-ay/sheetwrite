@@ -1,6 +1,6 @@
 ---
 title: "STORE_MEMORY_PROTOCOL_VERSION | @sheetwrite/core"
-description: "Flat WASM store-memory protocol version; decoders reject any mismatch."
+description: "STORE_MEMORY_PROTOCOL_VERSION variable in @sheetwrite/core: Flat WASM store-memory protocol version; decoders reject any mismatch."
 ---
 <!-- api-export:@sheetwrite/core|.|STORE_MEMORY_PROTOCOL_VERSION -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="variable">variable</span></div>

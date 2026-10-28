@@ -1,6 +1,6 @@
 ---
 title: "DataValidationComparison | @sheetwrite/core"
-description: "Native comparison semantics for numeric, date-serial, and text-length validation."
+description: "DataValidationComparison type in @sheetwrite/core: Native comparison semantics for numeric, date-serial, and text-length validation."
 ---
 <!-- api-export:@sheetwrite/core|.|DataValidationComparison -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "ChartViewProvider | @sheetwrite/core"
-description: "Cached chart views supplied by the optional charts package; renderers do not read cells."
+description: "ChartViewProvider interface in @sheetwrite/core: Cached chart views supplied by the optional charts package; renderers do not read cells."
 ---
 <!-- api-export:@sheetwrite/core|.|ChartViewProvider -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

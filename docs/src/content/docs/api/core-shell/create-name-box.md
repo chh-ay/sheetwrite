@@ -1,6 +1,6 @@
 ---
 title: "createNameBox | @sheetwrite/core/shell"
-description: "A1 jump box, like Excel's name box: shows the focused cell's reference, and on Enter selects the typed cell (B7) or range (B2:D9); $ markers are accepted."
+description: "createNameBox function in @sheetwrite/core/shell: A1 jump box, like Excel's name box: shows the focused cell's reference, and on Enter selects the typed cell…"
 ---
 <!-- api-export:@sheetwrite/core|./shell|createNameBox -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-shell/">@sheetwrite/core/shell</a><span class="api-status" data-kind="function">function</span></div>

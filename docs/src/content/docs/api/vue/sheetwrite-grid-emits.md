@@ -1,6 +1,6 @@
 ---
 title: "SheetwriteGridEmits | @sheetwrite/vue"
-description: "Event payloads emitted by the Vue components, keyed by template event name."
+description: "SheetwriteGridEmits interface in @sheetwrite/vue: Event payloads emitted by the Vue components, keyed by template event name."
 ---
 <!-- api-export:@sheetwrite/vue|.|SheetwriteGridEmits -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/vue/">@sheetwrite/vue</a><span class="api-status" data-kind="interface">interface</span></div>

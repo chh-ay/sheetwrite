@@ -1,6 +1,6 @@
 ---
 title: "SortKey | @sheetwrite/core"
-description: "One key of a multi-column sort, applied in array order (first = primary)."
+description: "SortKey interface in @sheetwrite/core: One key of a multi-column sort, applied in array order (first = primary)."
 ---
 <!-- api-export:@sheetwrite/core|.|SortKey -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

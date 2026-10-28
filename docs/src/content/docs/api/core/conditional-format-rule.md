@@ -1,6 +1,6 @@
 ---
 title: "ConditionalFormatRule | @sheetwrite/core"
-description: "Ordered condition and style applied to a cell range."
+description: "ConditionalFormatRule interface in @sheetwrite/core: Ordered condition and style applied to a cell range."
 ---
 <!-- api-export:@sheetwrite/core|.|ConditionalFormatRule -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

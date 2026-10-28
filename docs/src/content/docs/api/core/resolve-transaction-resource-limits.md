@@ -1,6 +1,6 @@
 ---
 title: "resolveTransactionResourceLimits | @sheetwrite/core"
-description: "Validate and merge transaction ceiling overrides without retaining the caller-owned object."
+description: "resolveTransactionResourceLimits function in @sheetwrite/core: Validate and merge transaction ceiling overrides without retaining the caller-owned object."
 ---
 <!-- api-export:@sheetwrite/core|.|resolveTransactionResourceLimits -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

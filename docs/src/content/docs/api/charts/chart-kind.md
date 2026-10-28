@@ -1,6 +1,6 @@
 ---
 title: "ChartKind | @sheetwrite/charts"
-description: "Chart families that the document model supports."
+description: "ChartKind type in @sheetwrite/charts: Chart families that the document model supports."
 ---
 <!-- api-export:@sheetwrite/charts|.|ChartKind -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/charts/">@sheetwrite/charts</a><span class="api-status" data-kind="type">type</span></div>

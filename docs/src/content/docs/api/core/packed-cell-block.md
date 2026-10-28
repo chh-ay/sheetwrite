@@ -1,6 +1,6 @@
 ---
 title: "PackedCellBlock | @sheetwrite/core"
-description: "Dense row-major mutation payload."
+description: "PackedCellBlock interface in @sheetwrite/core: Dense row-major mutation payload."
 ---
 <!-- api-export:@sheetwrite/core|.|PackedCellBlock -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

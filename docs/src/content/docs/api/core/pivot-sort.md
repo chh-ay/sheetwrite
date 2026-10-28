@@ -1,6 +1,6 @@
 ---
 title: "PivotSort | @sheetwrite/core"
-description: "Sort of one axis field by its labels."
+description: "PivotSort interface in @sheetwrite/core: Sort of one axis field by its labels."
 ---
 <!-- api-export:@sheetwrite/core|.|PivotSort -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

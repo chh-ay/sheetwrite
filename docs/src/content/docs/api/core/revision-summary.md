@@ -1,6 +1,6 @@
 ---
 title: "RevisionSummary | @sheetwrite/core"
-description: "Host-provided metadata describing a saved workbook revision."
+description: "RevisionSummary interface in @sheetwrite/core: Host-provided metadata describing a saved workbook revision."
 ---
 <!-- api-export:@sheetwrite/core|.|RevisionSummary -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

@@ -83,7 +83,7 @@ declare global {
 }
 
 const description =
-  "Executable spreadsheet interoperability: XLSX round-trips, committed independent fixtures, CSV/TSV, structured fidelity warnings, resource limits, and the optional package boundary — all running the real published APIs in your browser.";
+  "XLSX round-trips, independent fixture files, CSV/TSV, fidelity warnings and resource limits, all running Sheetwrite's published APIs in your browser.";
 
 export const Route = createFileRoute("/showcases/interoperability")({
   head: () => ({

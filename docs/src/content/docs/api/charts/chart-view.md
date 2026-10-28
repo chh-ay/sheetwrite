@@ -1,6 +1,6 @@
 ---
 title: "ChartView | @sheetwrite/charts"
-description: "One immutable-by-convention rendering input, refreshed on chart-change events."
+description: "ChartView interface in @sheetwrite/charts: One immutable-by-convention rendering input, refreshed on chart-change events."
 ---
 <!-- api-export:@sheetwrite/charts|.|ChartView -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/charts/">@sheetwrite/charts</a><span class="api-status" data-kind="interface">interface</span></div>

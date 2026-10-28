@@ -1,6 +1,6 @@
 ---
 title: "DEFAULT_MAX_CHANGE | @sheetwrite/core"
-description: "Excel's convergence threshold for a new workbook."
+description: "DEFAULT_MAX_CHANGE variable in @sheetwrite/core: Excel's convergence threshold for a new workbook."
 ---
 <!-- api-export:@sheetwrite/core|.|DEFAULT_MAX_CHANGE -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="variable">variable</span></div>

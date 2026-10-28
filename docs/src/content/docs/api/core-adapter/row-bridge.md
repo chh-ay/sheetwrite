@@ -1,6 +1,6 @@
 ---
 title: "RowBridge | @sheetwrite/core/adapter"
-description: "Projects canonical document transactions into host-owned row changes."
+description: "RowBridge class in @sheetwrite/core/adapter: Projects canonical document transactions into host-owned row changes."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|RowBridge -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="class">class</span></div>

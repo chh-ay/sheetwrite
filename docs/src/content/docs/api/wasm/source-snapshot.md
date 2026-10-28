@@ -1,6 +1,6 @@
 ---
 title: "SourceSnapshot | @sheetwrite/wasm"
-description: "Compact serializable projection of persisted derived-cell sources and spill identity in one range."
+description: "SourceSnapshot class in @sheetwrite/wasm: Compact serializable projection of persisted derived-cell sources and spill identity in one range."
 ---
 <!-- api-export:@sheetwrite/wasm|.|SourceSnapshot -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/wasm/">@sheetwrite/wasm</a><span class="api-status" data-kind="class">class</span></div>

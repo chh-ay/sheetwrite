@@ -1,6 +1,6 @@
 ---
 title: "ProtectionResolver | @sheetwrite/core"
-description: "Host-owned client UX permission callback for protected mutations."
+description: "ProtectionResolver type in @sheetwrite/core: Host-owned client UX permission callback for protected mutations."
 ---
 <!-- api-export:@sheetwrite/core|.|ProtectionResolver -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

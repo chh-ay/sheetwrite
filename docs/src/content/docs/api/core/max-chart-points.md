@@ -1,6 +1,6 @@
 ---
 title: "MAX_CHART_POINTS | @sheetwrite/core"
-description: "Most points resolved per series range."
+description: "MAX_CHART_POINTS variable in @sheetwrite/core: Most points resolved per series range."
 ---
 <!-- api-export:@sheetwrite/core|.|MAX_CHART_POINTS -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="variable">variable</span></div>

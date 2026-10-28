@@ -1,6 +1,6 @@
 ---
 title: "DelimitedTextResourceLimits | @sheetwrite/core"
-description: "Resource ceilings shared by synchronous CSV and TSV parsing and encoding."
+description: "DelimitedTextResourceLimits interface in @sheetwrite/core: Resource ceilings shared by synchronous CSV and TSV parsing and encoding."
 ---
 <!-- api-export:@sheetwrite/core|.|DelimitedTextResourceLimits -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

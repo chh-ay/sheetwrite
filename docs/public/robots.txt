@@ -3,4 +3,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://sheetwrite.vercel.app/sitemap.xml
+Sitemap: https://www.sheetwrite.dev/sitemap.xml

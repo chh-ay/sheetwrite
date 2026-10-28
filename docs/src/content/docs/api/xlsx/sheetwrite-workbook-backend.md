@@ -1,6 +1,6 @@
 ---
 title: "sheetwriteWorkbookBackend | @sheetwrite/xlsx"
-description: "Deterministic optional OOXML workbook backend implemented by Sheetwrite."
+description: "sheetwriteWorkbookBackend variable in @sheetwrite/xlsx: Deterministic optional OOXML workbook backend implemented by Sheetwrite."
 ---
 <!-- api-export:@sheetwrite/xlsx|.|sheetwriteWorkbookBackend -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/xlsx/">@sheetwrite/xlsx</a><span class="api-status" data-kind="variable">variable</span></div>

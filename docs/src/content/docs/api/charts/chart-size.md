@@ -1,6 +1,6 @@
 ---
 title: "ChartSize | @sheetwrite/charts"
-description: "Box size in CSS pixels."
+description: "ChartSize interface in @sheetwrite/charts: Box size in CSS pixels."
 ---
 <!-- api-export:@sheetwrite/charts|.|ChartSize -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/charts/">@sheetwrite/charts</a><span class="api-status" data-kind="interface">interface</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "EngineInstance | @sheetwrite/wasm"
-description: "Engine objects and caches owned by one independently collectible WASM instance."
+description: "EngineInstance type in @sheetwrite/wasm: Engine objects and caches owned by one independently collectible WASM instance."
 ---
 <!-- api-export:@sheetwrite/wasm|.|EngineInstance -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/wasm/">@sheetwrite/wasm</a><span class="api-status" data-kind="type">type</span></div>

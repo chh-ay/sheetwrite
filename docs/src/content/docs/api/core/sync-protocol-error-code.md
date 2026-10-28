@@ -1,6 +1,6 @@
 ---
 title: "SyncProtocolErrorCode | @sheetwrite/core"
-description: "Stable category identifying which synchronization protocol bound was violated."
+description: "SyncProtocolErrorCode type in @sheetwrite/core: Stable category identifying which synchronization protocol bound was violated."
 ---
 <!-- api-export:@sheetwrite/core|.|SyncProtocolErrorCode -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

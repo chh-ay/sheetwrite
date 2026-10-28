@@ -1,6 +1,6 @@
 ---
 title: "installDatasourceClockForTest | @sheetwrite/core/testing"
-description: "Installs a deterministic monotonic clock through the public testing entrypoint."
+description: "installDatasourceClockForTest function in @sheetwrite/core/testing: Installs a deterministic monotonic clock through the public testing entrypoint."
 ---
 <!-- api-export:@sheetwrite/core|./testing|installDatasourceClockForTest -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-testing/">@sheetwrite/core/testing</a><span class="api-status" data-kind="function">function</span></div>

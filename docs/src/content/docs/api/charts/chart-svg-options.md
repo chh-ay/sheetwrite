@@ -1,6 +1,6 @@
 ---
 title: "ChartSvgOptions | @sheetwrite/charts"
-description: "Options for renderChartSvg."
+description: "ChartSvgOptions interface in @sheetwrite/charts: Options for renderChartSvg."
 ---
 <!-- api-export:@sheetwrite/charts|.|ChartSvgOptions -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/charts/">@sheetwrite/charts</a><span class="api-status" data-kind="interface">interface</span></div>

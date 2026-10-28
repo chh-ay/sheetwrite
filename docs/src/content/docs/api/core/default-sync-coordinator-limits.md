@@ -1,6 +1,6 @@
 ---
 title: "DEFAULT_SYNC_COORDINATOR_LIMITS | @sheetwrite/core"
-description: "Security and durability defaults bound hostile remote versions, recovery buffers, acknowledgement memory, and the offline pending queue independently."
+description: "DEFAULT_SYNC_COORDINATOR_LIMITS variable in @sheetwrite/core: Security and durability defaults bound hostile remote versions, recovery buffers…"
 ---
 <!-- api-export:@sheetwrite/core|.|DEFAULT_SYNC_COORDINATOR_LIMITS -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="variable">variable</span></div>

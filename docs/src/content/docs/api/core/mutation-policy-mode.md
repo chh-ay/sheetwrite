@@ -1,6 +1,6 @@
 ---
 title: "MutationPolicyMode | @sheetwrite/core"
-description: "Atomic or partial handling for locally denied operations."
+description: "MutationPolicyMode type in @sheetwrite/core: Atomic or partial handling for locally denied operations."
 ---
 <!-- api-export:@sheetwrite/core|.|MutationPolicyMode -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

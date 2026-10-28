@@ -1,6 +1,6 @@
 ---
 title: "DEFAULT_TRANSACTION_RESOURCE_LIMITS | @sheetwrite/core"
-description: "Inclusive defaults for every atomic document transaction accepted by a Store or Grid."
+description: "DEFAULT_TRANSACTION_RESOURCE_LIMITS variable in @sheetwrite/core: Inclusive defaults for every atomic document transaction accepted by a Store or Grid."
 ---
 <!-- api-export:@sheetwrite/core|.|DEFAULT_TRANSACTION_RESOURCE_LIMITS -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="variable">variable</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "ContextMenuContext | @sheetwrite/core"
-description: "Cell and viewport coordinates resolved for one bundled context-menu opening."
+description: "ContextMenuContext interface in @sheetwrite/core: Cell and viewport coordinates resolved for one bundled context-menu opening."
 ---
 <!-- api-export:@sheetwrite/core|.|ContextMenuContext -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

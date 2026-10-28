@@ -1,6 +1,6 @@
 ---
 title: "SheetwriteErrorOperation | @sheetwrite/core"
-description: "Exhaustive stable operation discriminator for consumer-visible failures."
+description: "SheetwriteErrorOperation type in @sheetwrite/core: Exhaustive stable operation discriminator for consumer-visible failures."
 ---
 <!-- api-export:@sheetwrite/core|.|SheetwriteErrorOperation -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

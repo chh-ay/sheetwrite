@@ -1,6 +1,6 @@
 ---
 title: "RowBridgeHostActionDelta | @sheetwrite/core"
-description: "A document operation that needs a host-side action rather than row mutation."
+description: "RowBridgeHostActionDelta interface in @sheetwrite/core: A document operation that needs a host-side action rather than row mutation."
 ---
 <!-- api-export:@sheetwrite/core|.|RowBridgeHostActionDelta -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

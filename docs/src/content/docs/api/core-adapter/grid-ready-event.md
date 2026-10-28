@@ -1,6 +1,6 @@
 ---
 title: "GridReadyEvent | @sheetwrite/core/adapter"
-description: "Grid handle, generation, and reason published after adapter initialization."
+description: "GridReadyEvent interface in @sheetwrite/core/adapter: Grid handle, generation, and reason published after adapter initialization."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|GridReadyEvent -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="interface">interface</span></div>

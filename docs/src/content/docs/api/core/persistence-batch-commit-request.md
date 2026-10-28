@@ -1,6 +1,6 @@
 ---
 title: "PersistenceBatchCommitRequest | @sheetwrite/core"
-description: "Cancellable commit of one atomic batch that spans several server versions."
+description: "PersistenceBatchCommitRequest interface in @sheetwrite/core: Cancellable commit of one atomic batch that spans several server versions."
 ---
 <!-- api-export:@sheetwrite/core|.|PersistenceBatchCommitRequest -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

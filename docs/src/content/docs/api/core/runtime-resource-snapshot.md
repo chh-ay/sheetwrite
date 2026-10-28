@@ -1,6 +1,6 @@
 ---
 title: "RuntimeResourceSnapshot | @sheetwrite/core"
-description: "Complete retained-resource and boundary snapshot for one operation phase."
+description: "RuntimeResourceSnapshot interface in @sheetwrite/core: Complete retained-resource and boundary snapshot for one operation phase."
 ---
 <!-- api-export:@sheetwrite/core|.|RuntimeResourceSnapshot -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

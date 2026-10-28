@@ -1,6 +1,6 @@
 ---
 title: "WorkbookTable | @sheetwrite/core"
-description: "Serializable canonical workbook table."
+description: "WorkbookTable interface in @sheetwrite/core: Serializable canonical workbook table."
 ---
 <!-- api-export:@sheetwrite/core|.|WorkbookTable -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

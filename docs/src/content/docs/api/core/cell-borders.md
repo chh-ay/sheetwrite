@@ -1,6 +1,6 @@
 ---
 title: "CellBorders | @sheetwrite/core"
-description: "Per-side borders; all applies to any side not given its own border."
+description: "CellBorders interface in @sheetwrite/core: Per-side borders; all applies to any side not given its own border."
 ---
 <!-- api-export:@sheetwrite/core|.|CellBorders -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

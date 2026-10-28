@@ -1,6 +1,6 @@
 ---
 title: "GridCommandState | @sheetwrite/react"
-description: "Observable availability and selection-derived activity for one command."
+description: "GridCommandState interface in @sheetwrite/react: Observable availability and selection-derived activity for one command."
 ---
 <!-- api-export:@sheetwrite/react|.|GridCommandState -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/react/">@sheetwrite/react</a><span class="api-status" data-kind="interface">interface</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "CommentAuthorRef | @sheetwrite/core"
-description: "Stable host-provided identity displayed on a comment message."
+description: "CommentAuthorRef interface in @sheetwrite/core: Stable host-provided identity displayed on a comment message."
 ---
 <!-- api-export:@sheetwrite/core|.|CommentAuthorRef -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

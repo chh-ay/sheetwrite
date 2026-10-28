@@ -1,6 +1,6 @@
 ---
 title: "RowData | @sheetwrite/core"
-description: "Object-shaped datasource row keyed by workbook column keys."
+description: "RowData type in @sheetwrite/core: Object-shaped datasource row keyed by workbook column keys."
 ---
 <!-- api-export:@sheetwrite/core|.|RowData -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

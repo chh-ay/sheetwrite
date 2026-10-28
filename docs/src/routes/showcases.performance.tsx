@@ -62,7 +62,7 @@ declare global {
 }
 
 const description =
-  "A real canvas and Worker Grid over exactly 1,000,000 rows by 1,000 columns: one billion logical addresses with windowed loading, a bounded clean cache, sparse durable edits, and measured runtime evidence.";
+  "A live grid over 1,000,000 rows by 1,000 columns: windowed loading, a bounded cache, sparse edits and measured runtime evidence, in your browser.";
 
 export const Route = createFileRoute("/showcases/performance")({
   head: () => ({

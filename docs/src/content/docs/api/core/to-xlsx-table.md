@@ -1,13 +1,13 @@
 ---
 title: "toXlsxTable | @sheetwrite/core"
-description: "Exports a table model through the registered optional XLSX backend."
+description: "toXlsxTable function in @sheetwrite/core: Exports a table model through the registered optional XLSX backend."
 ---
 <!-- api-export:@sheetwrite/core|.|toXlsxTable -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
 
 Exports a table model through the registered optional XLSX backend.
 
-### Examples
+## Examples
 
 ```ts compile
 import { registerXlsxBackends } from "@sheetwrite/xlsx";
@@ -20,7 +20,7 @@ async function download(workbook: Workbook, store: Store) {
 }
 ```
 
-### See also
+## See also
 
 - [fromXlsxTable](/docs/api/core/from-xlsx-table/)
 

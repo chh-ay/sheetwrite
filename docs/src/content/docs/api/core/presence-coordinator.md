@@ -1,6 +1,6 @@
 ---
 title: "PresenceCoordinator | @sheetwrite/core"
-description: "Ephemeral presence lifecycle; it never calls a document mutation API."
+description: "PresenceCoordinator class in @sheetwrite/core: Ephemeral presence lifecycle; it never calls a document mutation API."
 ---
 <!-- api-export:@sheetwrite/core|.|PresenceCoordinator -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="class">class</span></div>

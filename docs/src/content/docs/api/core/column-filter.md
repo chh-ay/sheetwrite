@@ -1,6 +1,6 @@
 ---
 title: "ColumnFilter | @sheetwrite/core"
-description: "One column's filter predicate."
+description: "ColumnFilter type in @sheetwrite/core: One column's filter predicate."
 ---
 <!-- api-export:@sheetwrite/core|.|ColumnFilter -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

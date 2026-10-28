@@ -82,7 +82,7 @@ description: "Timings of store and document writes at production sizes."
 <div><dt>Raw artifact</dt><dd><code>bench/results/core-paths-results.json</code></dd></div>
 </dl>
 
-#### Scale
+## Scale
 
 | Parameter | Value |
 | --- | ---: |
@@ -104,7 +104,7 @@ description: "Timings of store and document writes at production sizes."
 | `clearColumns` | 1,000 |
 | `pagedRows` | 200,000 |
 
-#### Samples
+## Samples
 
 | Scenario | Samples |
 | --- | ---: |
@@ -123,7 +123,7 @@ description: "Timings of store and document writes at production sizes."
 | `paged-evicted-revisit` | 3 |
 | `node-cold-init` | 6 |
 
-#### Counters
+## Counters
 
 Non-time evidence recorded by the same runs.
 
@@ -168,7 +168,7 @@ Non-time evidence recorded by the same runs.
 | `node-cold-init` | `minimalHeartbeatTicks` | 1 |
 | `node-cold-init` | `freshProcesses` | 7 |
 
-#### Correctness checkpoints
+## Correctness checkpoints
 
 | Scenario | Checkpoint |
 | --- | --- |

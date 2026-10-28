@@ -1,6 +1,6 @@
 ---
 title: "RowBridgeDelta | @sheetwrite/svelte"
-description: "Every possible projection produced by a row bridge."
+description: "RowBridgeDelta type in @sheetwrite/svelte: Every possible projection produced by a row bridge."
 ---
 <!-- api-export:@sheetwrite/svelte|.|RowBridgeDelta -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="type">type</span></div>

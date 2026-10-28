@@ -1,6 +1,6 @@
 ---
 title: "RowBridgeHandler | @sheetwrite/core"
-description: "Callback accepted by imperative and framework adapters."
+description: "RowBridgeHandler type in @sheetwrite/core: Callback accepted by imperative and framework adapters."
 ---
 <!-- api-export:@sheetwrite/core|.|RowBridgeHandler -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

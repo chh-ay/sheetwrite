@@ -1,6 +1,6 @@
 ---
 title: "createGridController | @sheetwrite/core/adapter"
-description: "Create a grid and wire its lifecycle once, so the React/Vue/Svelte adapters (and any plain host) share a single, drift-free implementation instead of each re-deriving the same create → subscribe → teardown behavior."
+description: "createGridController function in @sheetwrite/core/adapter: Create a grid and wire its lifecycle once, so the React/Vue/Svelte adapters (and any plain host)…"
 ---
 <!-- api-export:@sheetwrite/core|./adapter|createGridController -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="function">function</span></div>

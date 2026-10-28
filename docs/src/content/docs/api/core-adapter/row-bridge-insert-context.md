@@ -1,6 +1,6 @@
 ---
 title: "RowBridgeInsertContext | @sheetwrite/core/adapter"
-description: "Context supplied when a canonical row insertion needs a host identity."
+description: "RowBridgeInsertContext interface in @sheetwrite/core/adapter: Context supplied when a canonical row insertion needs a host identity."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|RowBridgeInsertContext -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="interface">interface</span></div>

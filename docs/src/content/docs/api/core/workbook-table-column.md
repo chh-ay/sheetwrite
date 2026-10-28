@@ -1,6 +1,6 @@
 ---
 title: "WorkbookTableColumn | @sheetwrite/core"
-description: "Stable identity and display metadata for one ordered table column."
+description: "WorkbookTableColumn interface in @sheetwrite/core: Stable identity and display metadata for one ordered table column."
 ---
 <!-- api-export:@sheetwrite/core|.|WorkbookTableColumn -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

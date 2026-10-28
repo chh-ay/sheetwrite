@@ -1,6 +1,6 @@
 ---
 title: "serialToDate | @sheetwrite/core"
-description: "Convert a date serial back to a Date."
+description: "serialToDate function in @sheetwrite/core: Convert a date serial back to a Date."
 ---
 <!-- api-export:@sheetwrite/core|.|serialToDate -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

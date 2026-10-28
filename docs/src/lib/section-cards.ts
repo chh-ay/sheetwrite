@@ -20,7 +20,10 @@ interface HastNode {
   children?: HastNode[];
 }
 
-/** The pages listed directly under the sidebar group whose own page is `href`. */
+/**
+ * The pages listed directly under the sidebar section or group whose own page
+ * is `href`.
+ */
 export function sectionPages(href: string): Array<NavigationItem & { href: string }> {
   const find = (items: readonly NavigationItem[]): NavigationItem | undefined => {
     for (const item of items) {
@@ -30,9 +33,12 @@ export function sectionPages(href: string): Array<NavigationItem & { href: strin
     }
     return undefined;
   };
-  const group = find(DOCS_NAVIGATION.flatMap((section) => section.items));
-  if (group === undefined) throw new Error(`${href} is not the page of a sidebar group`);
-  return (group.items ?? []).flatMap((item) => {
+  const children =
+    DOCS_NAVIGATION.find((section) => section.href === href)?.items ??
+    find(DOCS_NAVIGATION.flatMap((section) => section.items))?.items;
+  if (children === undefined)
+    throw new Error(`${href} is not the page of a sidebar section or group`);
+  return children.flatMap((item) => {
     // A child group is shown through its own page.
     const page = item.href ?? item.items?.find((child) => child.href !== undefined)?.href;
     return page === undefined ? [] : [{ ...item, href: page }];

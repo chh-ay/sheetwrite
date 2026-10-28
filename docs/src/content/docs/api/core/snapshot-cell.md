@@ -1,6 +1,6 @@
 ---
 title: "SnapshotCell | @sheetwrite/core"
-description: "Serializable cell value and optional style inside a snapshot block."
+description: "SnapshotCell interface in @sheetwrite/core: Serializable cell value and optional style inside a snapshot block."
 ---
 <!-- api-export:@sheetwrite/core|.|SnapshotCell -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

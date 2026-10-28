@@ -1,6 +1,6 @@
 ---
 title: "DistinctColumn | @sheetwrite/formulas"
-description: "Distinct-value scan result for one column: parallel kind/number/text arrays whose buffers are surrendered once through the take accessors."
+description: "DistinctColumn class in @sheetwrite/formulas: Distinct-value scan result for one column: parallel kind/number/text arrays whose buffers are surrendered once…"
 ---
 <!-- api-export:@sheetwrite/formulas|.|DistinctColumn -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/formulas/">@sheetwrite/formulas</a><span class="api-status" data-kind="class">class</span></div>

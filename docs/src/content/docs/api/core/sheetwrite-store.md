@@ -1,13 +1,13 @@
 ---
 title: "SheetwriteStore | @sheetwrite/core"
-description: "Stable public facade and the sole transaction, epoch, policy, and event barrier."
+description: "SheetwriteStore class in @sheetwrite/core: Stable public facade and the sole transaction, epoch, policy, and event barrier."
 ---
 <!-- api-export:@sheetwrite/core|.|SheetwriteStore -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="class">class</span></div>
 
 Stable public facade and the sole transaction, epoch, policy, and event barrier.
 
-### Examples
+## Examples
 
 ```ts compile
 import { initSheetwrite, SheetwriteStore, type Workbook } from "@sheetwrite/core";
@@ -23,7 +23,7 @@ async function total(workbook: Workbook) {
 }
 ```
 
-### See also
+## See also
 
 - Store.aggregate
 - [createGrid](/docs/api/core/create-grid/)

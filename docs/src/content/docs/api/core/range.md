@@ -1,6 +1,6 @@
 ---
 title: "Range | @sheetwrite/core"
-description: "Inclusive rectangular cell range on a stable sheet ID."
+description: "Range interface in @sheetwrite/core: Inclusive rectangular cell range on a stable sheet ID."
 ---
 <!-- api-export:@sheetwrite/core|.|Range -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

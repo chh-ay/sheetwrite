@@ -8,7 +8,7 @@ import stylesheet from "../styles/showcase-formulas.css?url";
 const FormulasShowcase = lazy(() => import("../showcases/FormulasShowcase.js"));
 
 const description =
-  "Thirteen live formulas summarize 20,000 orders with the full Sheetwrite formula engine: GROUPBY and PIVOTBY tables, statistics, distributions, LINEST, NPV and working days, DSUM, LAMBDA helpers, regex, and spill references. Change the data and every answer recalculates.";
+  "Thirteen live formulas over 20,000 orders: GROUPBY, PIVOTBY, statistics, LINEST, NPV, LAMBDA and spills. Change the data and every answer recalculates.";
 
 export const Route = createFileRoute("/showcases/formulas")({
   head: () => ({

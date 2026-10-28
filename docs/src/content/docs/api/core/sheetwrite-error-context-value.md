@@ -1,6 +1,6 @@
 ---
 title: "SheetwriteErrorContextValue | @sheetwrite/core"
-description: "JSON-safe values accepted in a public failure context."
+description: "SheetwriteErrorContextValue type in @sheetwrite/core: JSON-safe values accepted in a public failure context."
 ---
 <!-- api-export:@sheetwrite/core|.|SheetwriteErrorContextValue -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

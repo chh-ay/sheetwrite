@@ -1,6 +1,6 @@
 ---
 title: "cellScalarToText | @sheetwrite/core"
-description: "Spreadsheet display text for a resolved scalar."
+description: "cellScalarToText function in @sheetwrite/core: Spreadsheet display text for a resolved scalar."
 ---
 <!-- api-export:@sheetwrite/core|.|cellScalarToText -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

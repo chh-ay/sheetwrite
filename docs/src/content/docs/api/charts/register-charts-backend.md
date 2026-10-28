@@ -1,6 +1,6 @@
 ---
 title: "registerChartsBackend | @sheetwrite/charts"
-description: "Register the chart view cache as the core chart view provider, so openChartViews(store) returns live chart views, and the SVG chart renderer, so grids created after this call draw their charts."
+description: "registerChartsBackend function in @sheetwrite/charts: Register the chart view cache as the core chart view provider, so openChartViews(store) returns live…"
 ---
 <!-- api-export:@sheetwrite/charts|.|registerChartsBackend -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/charts/">@sheetwrite/charts</a><span class="api-status" data-kind="function">function</span></div>
@@ -9,7 +9,7 @@ Register the chart view cache as the core chart view provider, so
 `openChartViews(store)` returns live chart views, and the SVG chart renderer,
 so grids created after this call draw their charts.
 
-### Examples
+## Examples
 
 ```ts compile
 import { registerChartsBackend } from "@sheetwrite/charts";

@@ -1,6 +1,6 @@
 ---
 title: "RevisionCoordinatorOptions | @sheetwrite/core"
-description: "Document identity and version options for revision coordination."
+description: "RevisionCoordinatorOptions interface in @sheetwrite/core: Document identity and version options for revision coordination."
 ---
 <!-- api-export:@sheetwrite/core|.|RevisionCoordinatorOptions -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

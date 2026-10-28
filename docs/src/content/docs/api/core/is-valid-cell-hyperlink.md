@@ -1,6 +1,6 @@
 ---
 title: "isValidCellHyperlink | @sheetwrite/core"
-description: "Shape/security validation shared by mutation, snapshot, clipboard, and activation barriers."
+description: "isValidCellHyperlink function in @sheetwrite/core: Shape/security validation shared by mutation, snapshot, clipboard, and activation barriers."
 ---
 <!-- api-export:@sheetwrite/core|.|isValidCellHyperlink -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

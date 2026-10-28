@@ -1,6 +1,6 @@
 ---
 title: "InitInput | @sheetwrite/formulas"
-description: "Sources accepted by asynchronous initialization: a fetchable URL/request/response, raw module bytes, or a precompiled WebAssembly.Module."
+description: "InitInput type in @sheetwrite/formulas: Sources accepted by asynchronous initialization: a fetchable URL/request/response, raw module bytes, or a precompiled…"
 ---
 <!-- api-export:@sheetwrite/formulas|.|InitInput -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/formulas/">@sheetwrite/formulas</a><span class="api-status" data-kind="type">type</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "assertRuntimeResourceSnapshot | @sheetwrite/core"
-description: "Reject overlap, negative values, and attempts to fold runtime observations into owner totals."
+description: "assertRuntimeResourceSnapshot function in @sheetwrite/core: Reject overlap, negative values, and attempts to fold runtime observations into owner totals."
 ---
 <!-- api-export:@sheetwrite/core|.|assertRuntimeResourceSnapshot -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

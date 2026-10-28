@@ -2,11 +2,15 @@ import { Link } from "@tanstack/react-router";
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 
 import {
+  breadcrumbsFor,
+  type Crumb,
   DOCS_NAVIGATION,
   type DocumentNeighbours,
   documentNeighbours,
   type NavigationItem,
+  type NavigationLocation,
   navigationBadge,
+  nearestNavigationItem,
 } from "../lib/navigation.js";
 import {
   LATEST_RELEASE,
@@ -51,66 +55,6 @@ function Brand() {
       <span>Sheetwrite</span>
     </Link>
   );
-}
-
-interface NavigationLocation {
-  section: string;
-  /** Groups between the section and the page, outermost first. */
-  ancestors: readonly NavigationItem[];
-  label: string;
-  href: string;
-}
-
-/**
- * Deepest navigation entry whose href contains the current page, with the
- * groups above it, so the sidebar can open exactly that path and the header
- * can show it.
- */
-function nearestNavigationItem(activeHref: string | undefined): NavigationLocation | undefined {
-  if (activeHref === undefined) return undefined;
-  let nearest: NavigationLocation | undefined;
-  const visit = (section: string, item: NavigationItem, ancestors: NavigationItem[]): void => {
-    const { href } = item;
-    if (href !== undefined) {
-      const matches = activeHref === href || (href !== "/docs/" && activeHref.startsWith(href));
-      if (matches && (nearest === undefined || href.length > nearest.href.length)) {
-        nearest = { section, ancestors: [...ancestors], label: item.label, href };
-      }
-    }
-    if (item.items === undefined) return;
-    ancestors.push(item);
-    for (const child of item.items) visit(section, child, ancestors);
-    ancestors.pop();
-  };
-  for (const section of DOCS_NAVIGATION) {
-    for (const item of section.items) visit(section.label, item, []);
-  }
-  return nearest;
-}
-
-interface Crumb {
-  href?: string;
-  label: string;
-}
-
-/**
- * Trail for the page header. Section, group and package names come from the
- * same navigation model the sidebar renders, so the two never disagree about
- * where a page sits; the page's own name ends the trail.
- */
-function breadcrumbsFor(activeHref: string | undefined, title: string): readonly Crumb[] {
-  const trail: Crumb[] = [{ href: "/docs/", label: "Documentation" }];
-  // The overview is the destination itself.
-  if (activeHref === undefined || activeHref === "/docs/") return trail;
-  const nearest = nearestNavigationItem(activeHref);
-  if (nearest === undefined) return [...trail, { label: title }];
-  // A section's index page carries the section's name; one crumb is enough.
-  if (nearest.section === title) return [...trail, { label: title }];
-  trail.push({ label: nearest.section });
-  for (const group of nearest.ancestors) trail.push({ href: group.href, label: group.label });
-  // The entry the page itself belongs to is not a step above it.
-  if (nearest.href !== activeHref) trail.push({ href: nearest.href, label: nearest.label });
-  return [...trail, { label: title }];
 }
 
 function Breadcrumbs({ trail }: Readonly<{ trail: readonly Crumb[] }>) {
@@ -262,7 +206,16 @@ function NavigationSections({
             <NavigationBadgeLabel item={section} />
           </summary>
           <div>
-            <NavigationEntries current={current} items={section.items} onNavigate={onNavigate} />
+            <NavigationEntries
+              current={current}
+              // A section's own page leads its list, named Overview as a group's is.
+              items={
+                section.href === undefined
+                  ? section.items
+                  : [{ label: "Overview", href: section.href }, ...section.items]
+              }
+              onNavigate={onNavigate}
+            />
           </div>
         </details>
       ))}

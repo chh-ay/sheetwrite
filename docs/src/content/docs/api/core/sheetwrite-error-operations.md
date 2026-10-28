@@ -1,6 +1,6 @@
 ---
 title: "SHEETWRITE_ERROR_OPERATIONS | @sheetwrite/core"
-description: "Stable operations at which a consumer-visible failure can surface."
+description: "SHEETWRITE_ERROR_OPERATIONS variable in @sheetwrite/core: Stable operations at which a consumer-visible failure can surface."
 ---
 <!-- api-export:@sheetwrite/core|.|SHEETWRITE_ERROR_OPERATIONS -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="variable">variable</span></div>

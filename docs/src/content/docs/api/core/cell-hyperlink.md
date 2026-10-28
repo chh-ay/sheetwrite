@@ -1,6 +1,6 @@
 ---
 title: "CellHyperlink | @sheetwrite/core"
-description: "Bounded serializable hyperlink metadata applied to one cell or range."
+description: "CellHyperlink interface in @sheetwrite/core: Bounded serializable hyperlink metadata applied to one cell or range."
 ---
 <!-- api-export:@sheetwrite/core|.|CellHyperlink -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

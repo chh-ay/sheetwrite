@@ -1,6 +1,6 @@
 ---
 title: "GridConfig | @sheetwrite/core"
-description: "Toolbar / feature configuration."
+description: "GridConfig interface in @sheetwrite/core: Toolbar / feature configuration."
 ---
 <!-- api-export:@sheetwrite/core|.|GridConfig -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -8,7 +8,7 @@ description: "Toolbar / feature configuration."
 Toolbar / feature configuration. When `config` is set the built-in toolbar is
 shown; control flags default to `true` except the opt-in `export` flag.
 
-### Examples
+## Examples
 
 ```ts compile
 import type { GridConfig } from "@sheetwrite/core";
@@ -26,7 +26,7 @@ const config: GridConfig = {
 };
 ```
 
-### See also
+## See also
 
 - [Grid.setConfig](/docs/api/core/grid/#grid-set-config)
 - [ContextMenuItem](/docs/api/core/context-menu-item/)

@@ -1,6 +1,6 @@
 ---
 title: "KeyboardAction | @sheetwrite/core"
-description: "Built-in actions that can be rebound without replacing navigation."
+description: "KeyboardAction type in @sheetwrite/core: Built-in actions that can be rebound without replacing navigation."
 ---
 <!-- api-export:@sheetwrite/core|.|KeyboardAction -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "PivotDefinition | @sheetwrite/core"
-description: "Serializable pivot-table definition, owned by the sheet that holds its anchor."
+description: "PivotDefinition interface in @sheetwrite/core: Serializable pivot-table definition, owned by the sheet that holds its anchor."
 ---
 <!-- api-export:@sheetwrite/core|.|PivotDefinition -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

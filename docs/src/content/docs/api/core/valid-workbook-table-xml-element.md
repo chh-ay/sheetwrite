@@ -1,6 +1,6 @@
 ---
 title: "validWorkbookTableXmlElement | @sheetwrite/core"
-description: "Validate inert table-rule trees before they enter snapshots or XML output."
+description: "validWorkbookTableXmlElement function in @sheetwrite/core: Validate inert table-rule trees before they enter snapshots or XML output."
 ---
 <!-- api-export:@sheetwrite/core|.|validWorkbookTableXmlElement -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

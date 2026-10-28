@@ -1,6 +1,6 @@
 ---
 title: "formatNumber | @sheetwrite/core"
-description: "Deterministic Excel-style number/date formatter."
+description: "formatNumber function in @sheetwrite/core: Deterministic Excel-style number/date formatter."
 ---
 <!-- api-export:@sheetwrite/core|.|formatNumber -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

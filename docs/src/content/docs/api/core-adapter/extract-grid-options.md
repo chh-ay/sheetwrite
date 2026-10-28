@@ -1,6 +1,6 @@
 ---
 title: "extractGridOptions | @sheetwrite/core/adapter"
-description: "Extracts advanced GridOptions from framework adapter props."
+description: "extractGridOptions function in @sheetwrite/core/adapter: Extracts advanced GridOptions from framework adapter props."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|extractGridOptions -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="function">function</span></div>

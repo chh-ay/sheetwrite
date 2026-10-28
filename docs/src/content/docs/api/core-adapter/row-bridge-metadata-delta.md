@@ -1,6 +1,6 @@
 ---
 title: "RowBridgeMetadataDelta | @sheetwrite/core/adapter"
-description: "A document operation that changes workbook or column metadata."
+description: "RowBridgeMetadataDelta interface in @sheetwrite/core/adapter: A document operation that changes workbook or column metadata."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|RowBridgeMetadataDelta -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="interface">interface</span></div>

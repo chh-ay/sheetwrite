@@ -1,6 +1,6 @@
 ---
 title: "WASM_MEMORY_OWNERS | @sheetwrite/core"
-description: "Stable ordered owner list encoded by the WASM store-memory protocol."
+description: "WASM_MEMORY_OWNERS variable in @sheetwrite/core: Stable ordered owner list encoded by the WASM store-memory protocol."
 ---
 <!-- api-export:@sheetwrite/core|.|WASM_MEMORY_OWNERS -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="variable">variable</span></div>

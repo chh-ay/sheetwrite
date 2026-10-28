@@ -1,6 +1,6 @@
 ---
 title: "SnapshotStorageMode | @sheetwrite/core"
-description: "Allocation mode used when enforcing snapshot construction capacity."
+description: "SnapshotStorageMode type in @sheetwrite/core: Allocation mode used when enforcing snapshot construction capacity."
 ---
 <!-- api-export:@sheetwrite/core|.|SnapshotStorageMode -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

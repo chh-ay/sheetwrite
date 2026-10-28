@@ -1,6 +1,6 @@
 ---
 title: "describeSelection | @sheetwrite/core/shell"
-description: "Human phrase for a selection's geometry; blank for null/single-cell."
+description: "describeSelection function in @sheetwrite/core/shell: Human phrase for a selection's geometry; blank for null/single-cell."
 ---
 <!-- api-export:@sheetwrite/core|./shell|describeSelection -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-shell/">@sheetwrite/core/shell</a><span class="api-status" data-kind="function">function</span></div>

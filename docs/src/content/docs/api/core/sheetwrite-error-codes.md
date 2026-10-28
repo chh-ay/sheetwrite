@@ -1,6 +1,6 @@
 ---
 title: "SHEETWRITE_ERROR_CODES | @sheetwrite/core"
-description: "Stable public failure codes."
+description: "SHEETWRITE_ERROR_CODES variable in @sheetwrite/core: Stable public failure codes."
 ---
 <!-- api-export:@sheetwrite/core|.|SHEETWRITE_ERROR_CODES -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="variable">variable</span></div>

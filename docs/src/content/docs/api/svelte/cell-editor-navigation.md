@@ -1,6 +1,6 @@
 ---
 title: "CellEditorNavigation | @sheetwrite/svelte"
-description: "Selection movement applied after a successful editor commit."
+description: "CellEditorNavigation type in @sheetwrite/svelte: Selection movement applied after a successful editor commit."
 ---
 <!-- api-export:@sheetwrite/svelte|.|CellEditorNavigation -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="type">type</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "XlsxSourceSnapshot | @sheetwrite/core"
-description: "Bounded, frozen record of the OOXML parts Sheetwrite does not model."
+description: "XlsxSourceSnapshot interface in @sheetwrite/core: Bounded, frozen record of the OOXML parts Sheetwrite does not model."
 ---
 <!-- api-export:@sheetwrite/core|.|XlsxSourceSnapshot -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

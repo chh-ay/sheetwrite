@@ -1,6 +1,6 @@
 ---
 title: "IconOverrides | @sheetwrite/core"
-description: "Per-glyph icon overrides, keyed by the names on the command icon sheet (ICONNAMES)."
+description: "IconOverrides type in @sheetwrite/core: Per-glyph icon overrides, keyed by the names on the command icon sheet (ICONNAMES)."
 ---
 <!-- api-export:@sheetwrite/core|.|IconOverrides -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

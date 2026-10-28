@@ -1,6 +1,6 @@
 ---
 title: "SyncPendingQueueLimits | @sheetwrite/core"
-description: "Aggregate ceilings for local commits retained until durable acknowledgement."
+description: "SyncPendingQueueLimits interface in @sheetwrite/core: Aggregate ceilings for local commits retained until durable acknowledgement."
 ---
 <!-- api-export:@sheetwrite/core|.|SyncPendingQueueLimits -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

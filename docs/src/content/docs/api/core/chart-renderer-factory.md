@@ -1,6 +1,6 @@
 ---
 title: "ChartRendererFactory | @sheetwrite/core"
-description: "Creates the chart renderer of one grid."
+description: "ChartRendererFactory type in @sheetwrite/core: Creates the chart renderer of one grid."
 ---
 <!-- api-export:@sheetwrite/core|.|ChartRendererFactory -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

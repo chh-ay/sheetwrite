@@ -1,6 +1,6 @@
 ---
 title: "SyncInitInput | @sheetwrite/wasm"
-description: "Sources accepted by synchronous initialization: raw module bytes or a precompiled WebAssembly.Module."
+description: "SyncInitInput type in @sheetwrite/wasm: Sources accepted by synchronous initialization: raw module bytes or a precompiled WebAssembly.Module."
 ---
 <!-- api-export:@sheetwrite/wasm|.|SyncInitInput -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/wasm/">@sheetwrite/wasm</a><span class="api-status" data-kind="type">type</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "createToolbar | @sheetwrite/core/shell"
-description: "Mount a toolbar bound to grid.actions (custom items receive the grid)."
+description: "createToolbar function in @sheetwrite/core/shell: Mount a toolbar bound to grid.actions (custom items receive the grid)."
 ---
 <!-- api-export:@sheetwrite/core|./shell|createToolbar -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-shell/">@sheetwrite/core/shell</a><span class="api-status" data-kind="function">function</span></div>

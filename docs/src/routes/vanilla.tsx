@@ -7,7 +7,7 @@ import VanillaWorkbench from "../showcases/VanillaWorkbench.js";
 import vanillaStylesheet from "../styles/vanilla-workbench.css?url";
 
 const description =
-  "Edit a revenue pipeline with the core Grid API. Switch the renderer, load rows from a paged source, and import or export a workbook. The host state shows each Grid generation.";
+  "Edit a revenue pipeline with the core Grid API: switch the renderer, load rows from a paged source, and import or export a workbook.";
 
 /** Construction-bound options are deep-linkable; defaults stay out of the URL. */
 interface VanillaSearch {

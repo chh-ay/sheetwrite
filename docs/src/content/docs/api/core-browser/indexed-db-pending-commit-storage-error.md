@@ -1,6 +1,6 @@
 ---
 title: "IndexedDbPendingCommitStorageError | @sheetwrite/core/browser"
-description: "Typed IndexedDB failure raised by durable pending-commit storage."
+description: "IndexedDbPendingCommitStorageError class in @sheetwrite/core/browser: Typed IndexedDB failure raised by durable pending-commit storage."
 ---
 <!-- api-export:@sheetwrite/core|./browser|IndexedDbPendingCommitStorageError -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-browser/">@sheetwrite/core/browser</a><span class="api-status" data-kind="class">class</span></div>

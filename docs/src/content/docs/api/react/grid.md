@@ -1,13 +1,13 @@
 ---
 title: "Grid | @sheetwrite/react"
-description: "Imperative grid handle for document commands, events, rendering, and teardown."
+description: "Grid interface in @sheetwrite/react: Imperative grid handle for document commands, events, rendering, and teardown."
 ---
 <!-- api-export:@sheetwrite/react|.|Grid -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/react/">@sheetwrite/react</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Imperative grid handle for document commands, events, rendering, and teardown.
 
-### Examples
+## Examples
 
 ```ts compile
 import type { Grid } from "@sheetwrite/core";
@@ -22,7 +22,7 @@ function updateTotal(grid: Grid) {
 }
 ```
 
-### See also
+## See also
 
 - [createGrid](/docs/api/core/create-grid/)
 - [Grid.applyTransaction](/docs/api/react/grid/#grid-apply-transaction)

@@ -1,6 +1,6 @@
 ---
 title: "CellEditorRect | @sheetwrite/core"
-description: "Viewport-relative geometry of the cell currently owned by an editor."
+description: "CellEditorRect interface in @sheetwrite/core: Viewport-relative geometry of the cell currently owned by an editor."
 ---
 <!-- api-export:@sheetwrite/core|.|CellEditorRect -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

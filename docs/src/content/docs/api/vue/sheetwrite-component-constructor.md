@@ -1,6 +1,6 @@
 ---
 title: "SheetwriteComponentConstructor | @sheetwrite/vue"
-description: "Vue constructor type for Sheetwrite components: Sheetwrite-owned props, emitted events exposed as on listener props, and the exposed instance surface reachable through a template ref."
+description: "SheetwriteComponentConstructor type in @sheetwrite/vue: Vue constructor type for Sheetwrite components: Sheetwrite-owned props, emitted events exposed as on…"
 ---
 <!-- api-export:@sheetwrite/vue|.|SheetwriteComponentConstructor -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/vue/">@sheetwrite/vue</a><span class="api-status" data-kind="type">type</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "PersistenceCommitRequest | @sheetwrite/core"
-description: "Cancellable pending commit submitted to a persistence adapter."
+description: "PersistenceCommitRequest interface in @sheetwrite/core: Cancellable pending commit submitted to a persistence adapter."
 ---
 <!-- api-export:@sheetwrite/core|.|PersistenceCommitRequest -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

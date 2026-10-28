@@ -1,6 +1,6 @@
 ---
 title: "SheetwriteGrid | @sheetwrite/svelte"
-description: "Advanced component for an existing workbook or datasource."
+description: "SheetwriteGrid variable in @sheetwrite/svelte: Advanced component for an existing workbook or datasource."
 ---
 <!-- api-export:@sheetwrite/svelte|.|SheetwriteGrid -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="variable">variable</span></div>
@@ -8,7 +8,7 @@ description: "Advanced component for an existing workbook or datasource."
 Advanced component for an existing workbook or datasource.
 Advanced framework component for workbook data or datasource input.
 
-### Examples
+## Examples
 
 ```ts compile
 import { mount, unmount } from "svelte";
@@ -21,7 +21,7 @@ function mountWorkbook(target: HTMLElement, workbook: Workbook) {
 }
 ```
 
-### See also
+## See also
 
 - [Sheetwrite](/docs/api/svelte/sheetwrite/)
 - [/docs/frameworks/svelte/](/docs/frameworks/svelte/)

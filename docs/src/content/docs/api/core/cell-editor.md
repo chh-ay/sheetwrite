@@ -1,6 +1,6 @@
 ---
 title: "CellEditor | @sheetwrite/core"
-description: "Framework-neutral named editor definition registered through GridOptions.editors."
+description: "CellEditor interface in @sheetwrite/core: Framework-neutral named editor definition registered through GridOptions.editors."
 ---
 <!-- api-export:@sheetwrite/core|.|CellEditor -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

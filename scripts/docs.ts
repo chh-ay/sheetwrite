@@ -527,13 +527,21 @@ export function unresolvedDocumentationLinks(manifest: PublicApiManifest): strin
   return issues;
 }
 
+/**
+ * JSDoc body, examples and related links. `headingLevel` places the Examples
+ * and See also headings one level below whatever holds the text: 2 for a
+ * symbol page's opening summary (under the page title), 3 for a member's
+ * documentation (under Members), so heading levels never skip.
+ */
 function documentationSections(
   documentation: string,
   pkg: ApiPackage,
   entry: ApiEntryPoint,
   item: ApiExport,
   routes: DocumentationLinkRoutes,
+  headingLevel: 2 | 3,
 ): string {
+  const heading = "#".repeat(headingLevel);
   const sections = documentation.split(/(?:^|\n)@(example|see)\b\s*\n?/);
   const body = [sections[0]?.trim() ?? ""];
   const examples: string[] = [];
@@ -551,8 +559,8 @@ function documentationSections(
       related.push(route === undefined ? `- ${value}` : `- [${label}](${route})`);
     }
   }
-  if (examples.length > 0) body.push("### Examples", ...examples);
-  if (related.length > 0) body.push("### See also", related.join("\n"));
+  if (examples.length > 0) body.push(`${heading} Examples`, ...examples);
+  if (related.length > 0) body.push(`${heading} See also`, related.join("\n"));
   return body.join("\n\n");
 }
 
@@ -562,10 +570,11 @@ function documentationMarkdown(
   item: ApiExport,
   routes: DocumentationLinkRoutes = new Map(),
   source = item.documentation,
+  headingLevel: 2 | 3 = 3,
 ): string {
   const documentation =
     source.trim() || "Source summary unavailable; docs:check rejects this omission.";
-  return documentationSections(documentation, pkg, entry, item, routes).replace(
+  return documentationSections(documentation, pkg, entry, item, routes, headingLevel).replace(
     /\{@link\s+([^\s|}]+)(?:\s*\|\s*([^}]+))?\}/g,
     (_match, target: string, label: string | undefined) => {
       const text = label?.trim() || target;
@@ -605,6 +614,28 @@ function compactSummary(markdown: string): string {
   if (plain.length <= 220) return plain;
   const clipped = plain.slice(0, 217);
   return `${clipped.slice(0, clipped.lastIndexOf(" "))}…`;
+}
+
+/** Search results show about this many characters of a description. */
+const SEARCH_DESCRIPTION_MAX = 160;
+
+/**
+ * The search and social description of one API symbol page: the symbol, its
+ * kind and its package, then the JSDoc summary. The lead keeps a type that
+ * two packages re-export from sharing one description. A long result is
+ * clipped on a word; a short one stays short, as its JSDoc is.
+ */
+export function symbolDescription(
+  name: string,
+  kind: string,
+  packageLabel: string,
+  summary: string,
+): string {
+  const text = `${name} ${kind} in ${packageLabel}: ${summary}`;
+  if (text.length <= SEARCH_DESCRIPTION_MAX) return text;
+
+  const clipped = text.slice(0, SEARCH_DESCRIPTION_MAX - 1);
+  return `${clipped.slice(0, clipped.lastIndexOf(" ")).replace(/[,;:]$/, "")}…`;
 }
 
 const KIND_LABELS: Readonly<Record<string, string>> = {
@@ -1158,11 +1189,11 @@ export async function renderSymbolPage(
 ): Promise<string> {
   const label = entryLabel(pkg, entry);
   const source = packageSourcePath(pkg.name, item.source);
-  const summary = documentationMarkdown(pkg, entry, item, routes);
-  const description = compactSummary(summary);
+  const summary = documentationMarkdown(pkg, entry, item, routes, item.documentation, 2);
   const declaration = parseableDeclaration(item);
   await prepareDeclarationShapes([declaration]);
   const shape = declarationShape(declaration);
+  const description = symbolDescription(item.name, item.kind, label, compactSummary(summary));
   const aliases = await unionAliasIndex(pkg, entry, routes);
   const body = [
     frontmatter(`${item.name} | ${label}`, description).trimEnd(),
@@ -2497,7 +2528,7 @@ function renderCorePathsSection(evidence: CorePathsEvidence, source: string): st
         ],
         ["Raw artifact", `<code>${html(source)}</code>`],
       ]),
-      "#### Scale",
+      "### Scale",
       "",
       "| Parameter | Value |",
       "| --- | ---: |",
@@ -2505,7 +2536,7 @@ function renderCorePathsSection(evidence: CorePathsEvidence, source: string): st
         ([name, value]) => `| \`${name}\` | ${formatCount(value)} |`,
       ),
       "",
-      "#### Samples",
+      "### Samples",
       "",
       "| Scenario | Samples |",
       "| --- | ---: |",
@@ -2519,7 +2550,7 @@ function renderCorePathsSection(evidence: CorePathsEvidence, source: string): st
       ...(counters.length === 0
         ? []
         : [
-            "#### Counters",
+            "### Counters",
             "",
             "Non-time evidence recorded by the same runs.",
             "",
@@ -2528,7 +2559,7 @@ function renderCorePathsSection(evidence: CorePathsEvidence, source: string): st
             ...counters,
             "",
           ]),
-      "#### Correctness checkpoints",
+      "### Correctness checkpoints",
       "",
       "| Scenario | Checkpoint |",
       "| --- | --- |",
@@ -2622,11 +2653,11 @@ function renderXlsxSection(evidence: XlsxEvidence, source: string): string[] {
           `Current and baseline are the same codec at different commits, measured in the same session. Baseline commit: ${shortHash(baselineCommit)}.`,
           "",
         ]),
-    "#### Operation time",
+    "### Operation time",
     "",
     ...benchScaleFigure("operation", measurementGroups("time")),
     "",
-    "#### Peak resident memory",
+    "### Peak resident memory",
     "",
     ...benchScaleFigure("operation", measurementGroups("memory"), "memory"),
     "",
@@ -2710,6 +2741,19 @@ const PERFORMANCE_INTRO =
   "Every number in this section comes from a validated local protocol artifact captured on a clean tree; nothing is published from an unvalidated or protocol-mismatched artifact. Every expected cell carries either a validated timing or its recorded failure - a run that did not complete is shown as a failure, never converted into a timing.";
 
 /**
+ * Moves every heading below H2 up one level, in Markdown and in raw HTML. A
+ * section never holds another H2, so nothing reaches the page's H1.
+ */
+function liftHeadings(markdown: string): string {
+  return markdown
+    .replace(/^#(#{2,6} )/gm, "$1")
+    .replace(
+      /<(\/?)h([3-6])\b/g,
+      (_, slash: string, level: string) => `<${slash}h${Number(level) - 1}`,
+    );
+}
+
+/**
  * Splits the evidence text into the Performance pages. Each `##` section goes
  * to the page that lists it; a section no page lists is an error, so a new
  * benchmark can never drop out of the docs. A page whose evidence is pending
@@ -2733,12 +2777,13 @@ export function splitPerformancePages(
       const section = sections.get(heading);
       return section === undefined ? [] : [section];
     });
-    // A one-section page takes its heading from the page title.
+    // A one-section page takes its heading from the page title, so the
+    // section's own headings move up a level to sit right under it.
     const body =
       present.length === 0
         ? "This benchmark has no validated evidence yet. See [Pending local evidence](/docs/performance/benchmark-protocol/#pending-local-evidence)."
         : page.sections.length === 1
-          ? (present[0] ?? "").replace(/^## [^\n]*\n+/, "")
+          ? liftHeadings((present[0] ?? "").replace(/^## [^\n]*\n+/, ""))
           : present.join("\n\n");
     return {
       route: `performance/${page.slug}.md`,
@@ -3234,8 +3279,6 @@ export function renderCompatibilityResults(
     'title: "Detailed compatibility results"',
     'description: "Checked formula, workbook, clipboard, and XLSX examples with exact sources and limits."',
     "---",
-    "",
-    "# Detailed compatibility results",
     "",
     "This page is generated from checked examples and evidence records. It states only what each named result proves; it is not a percentage or a blanket Excel, Google Sheets, LibreOffice, or OpenFormula compatibility claim.",
     "",

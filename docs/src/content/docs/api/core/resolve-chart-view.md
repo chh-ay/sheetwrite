@@ -1,6 +1,6 @@
 ---
 title: "resolveChartView | @sheetwrite/core"
-description: "Resolve one chart to plain data the renderer draws without reading cells."
+description: "resolveChartView function in @sheetwrite/core: Resolve one chart to plain data the renderer draws without reading cells."
 ---
 <!-- api-export:@sheetwrite/core|.|resolveChartView -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

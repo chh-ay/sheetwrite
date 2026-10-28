@@ -1,6 +1,6 @@
 ---
 title: "GridPanel | @sheetwrite/core"
-description: "One side panel that Grid.openPanel shows on the grid's right edge."
+description: "GridPanel interface in @sheetwrite/core: One side panel that Grid.openPanel shows on the grid's right edge."
 ---
 <!-- api-export:@sheetwrite/core|.|GridPanel -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

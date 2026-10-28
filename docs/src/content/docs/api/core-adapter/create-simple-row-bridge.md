@@ -1,6 +1,6 @@
 ---
 title: "createSimpleRowBridge | @sheetwrite/core/adapter"
-description: "Creates the optional row bridge for a simple data-first input."
+description: "createSimpleRowBridge function in @sheetwrite/core/adapter: Creates the optional row bridge for a simple data-first input."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|createSimpleRowBridge -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="function">function</span></div>

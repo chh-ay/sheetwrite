@@ -1,6 +1,6 @@
 ---
 title: "CellEditorContext | @sheetwrite/svelte"
-description: "Immutable state and guarded completion callbacks for one mounted editor."
+description: "CellEditorContext interface in @sheetwrite/svelte: Immutable state and guarded completion callbacks for one mounted editor."
 ---
 <!-- api-export:@sheetwrite/svelte|.|CellEditorContext -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="interface">interface</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "DEFAULT_XLSX_RESOURCE_LIMITS | @sheetwrite/core"
-description: "Codec defaults combine SpreadsheetML worksheet dimensions with independent ZIP/XML and aggregate-work ceilings for untrusted in-memory conversion."
+description: "DEFAULT_XLSX_RESOURCE_LIMITS variable in @sheetwrite/core: Codec defaults combine SpreadsheetML worksheet dimensions with independent ZIP/XML and…"
 ---
 <!-- api-export:@sheetwrite/core|.|DEFAULT_XLSX_RESOURCE_LIMITS -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="variable">variable</span></div>

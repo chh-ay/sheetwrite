@@ -1,6 +1,6 @@
 ---
 title: "CommitReason | @sheetwrite/core"
-description: "The gesture/operation that produced a committed transaction."
+description: "CommitReason type in @sheetwrite/core: The gesture/operation that produced a committed transaction."
 ---
 <!-- api-export:@sheetwrite/core|.|CommitReason -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

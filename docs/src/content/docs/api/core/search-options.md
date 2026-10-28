@@ -1,6 +1,6 @@
 ---
 title: "SearchOptions | @sheetwrite/core"
-description: "Case, whole-cell, sheet, and column constraints for grid search."
+description: "SearchOptions interface in @sheetwrite/core: Case, whole-cell, sheet, and column constraints for grid search."
 ---
 <!-- api-export:@sheetwrite/core|.|SearchOptions -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

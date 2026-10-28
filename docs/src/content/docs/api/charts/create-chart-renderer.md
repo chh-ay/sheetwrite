@@ -1,6 +1,6 @@
 ---
 title: "createChartRenderer | @sheetwrite/charts"
-description: "Creates the SVG chart renderer for one store."
+description: "createChartRenderer function in @sheetwrite/charts: Creates the SVG chart renderer for one store."
 ---
 <!-- api-export:@sheetwrite/charts|.|createChartRenderer -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/charts/">@sheetwrite/charts</a><span class="api-status" data-kind="function">function</span></div>
@@ -9,7 +9,7 @@ Creates the SVG chart renderer for one store. All mounted charts share one
 view cache. A chart redraws after a chart-change event names it, or after a
 resize, at most once per animation frame. Scrolling never redraws a chart.
 
-### Examples
+## Examples
 
 ```ts compile
 import { createChartRenderer } from "@sheetwrite/charts";

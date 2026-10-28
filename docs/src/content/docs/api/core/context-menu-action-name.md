@@ -1,6 +1,6 @@
 ---
 title: "ContextMenuActionName | @sheetwrite/core"
-description: "Built-in action names accepted by custom context-menu rows."
+description: "ContextMenuActionName type in @sheetwrite/core: Built-in action names accepted by custom context-menu rows."
 ---
 <!-- api-export:@sheetwrite/core|.|ContextMenuActionName -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

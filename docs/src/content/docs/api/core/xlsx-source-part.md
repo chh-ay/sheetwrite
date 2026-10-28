@@ -1,6 +1,6 @@
 ---
 title: "XlsxSourcePart | @sheetwrite/core"
-description: "One retained OOXML part, kept as its original compressed ZIP payload so a save copies it without inflating or recompressing."
+description: "XlsxSourcePart interface in @sheetwrite/core: One retained OOXML part, kept as its original compressed ZIP payload so a save copies it without inflating or…"
 ---
 <!-- api-export:@sheetwrite/core|.|XlsxSourcePart -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

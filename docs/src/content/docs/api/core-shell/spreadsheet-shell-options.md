@@ -1,6 +1,6 @@
 ---
 title: "SpreadsheetShellOptions | @sheetwrite/core/shell"
-description: "Host elements and feature options used to create a spreadsheet shell."
+description: "SpreadsheetShellOptions interface in @sheetwrite/core/shell: Host elements and feature options used to create a spreadsheet shell."
 ---
 <!-- api-export:@sheetwrite/core|./shell|SpreadsheetShellOptions -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-shell/">@sheetwrite/core/shell</a><span class="api-status" data-kind="interface">interface</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "CellRenderer | @sheetwrite/core"
-description: "Custom cell renderer hooks for the main-thread canvas or retained DOM overlay."
+description: "CellRenderer interface in @sheetwrite/core: Custom cell renderer hooks for the main-thread canvas or retained DOM overlay."
 ---
 <!-- api-export:@sheetwrite/core|.|CellRenderer -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

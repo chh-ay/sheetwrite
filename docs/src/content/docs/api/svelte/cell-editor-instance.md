@@ -1,6 +1,6 @@
 ---
 title: "CellEditorInstance | @sheetwrite/svelte"
-description: "Retained lifecycle returned by a custom editor's mount method."
+description: "CellEditorInstance interface in @sheetwrite/svelte: Retained lifecycle returned by a custom editor's mount method."
 ---
 <!-- api-export:@sheetwrite/svelte|.|CellEditorInstance -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="interface">interface</span></div>

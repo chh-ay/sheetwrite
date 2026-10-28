@@ -1,6 +1,6 @@
 ---
 title: "rangeA1 | @sheetwrite/core"
-description: "Two cell corners → A1 range (\"A1:B3\"), collapsing to a single ref when equal."
+description: "rangeA1 function in @sheetwrite/core: Two cell corners → A1 range (\"A1:B3\"), collapsing to a single ref when equal."
 ---
 <!-- api-export:@sheetwrite/core|.|rangeA1 -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

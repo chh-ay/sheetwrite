@@ -1,6 +1,6 @@
 ---
 title: Grid methods
-description: The imperative Grid handle that createGrid returns, grouped by task.
+description: "The imperative Grid handle that createGrid returns, grouped by task: document and sheets, selection and editing, views, layout and lifecycle."
 ---
 
 `createGrid` returns an imperative `Grid` handle. Use it to read and change the document, the selection, the view and the layout.

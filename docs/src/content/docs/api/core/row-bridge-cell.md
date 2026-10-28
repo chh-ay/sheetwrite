@@ -1,6 +1,6 @@
 ---
 title: "RowBridgeCell | @sheetwrite/core"
-description: "A cell effect with semantic column and host row identity."
+description: "RowBridgeCell interface in @sheetwrite/core: A cell effect with semantic column and host row identity."
 ---
 <!-- api-export:@sheetwrite/core|.|RowBridgeCell -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

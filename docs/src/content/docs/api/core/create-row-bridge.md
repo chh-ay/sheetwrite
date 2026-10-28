@@ -1,13 +1,13 @@
 ---
 title: "createRowBridge | @sheetwrite/core"
-description: "Create a typed bridge while preserving row and identity inference."
+description: "createRowBridge function in @sheetwrite/core: Create a typed bridge while preserving row and identity inference."
 ---
 <!-- api-export:@sheetwrite/core|.|createRowBridge -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
 
 Create a typed bridge while preserving row and identity inference.
 
-### Examples
+## Examples
 
 ```ts compile
 import { createRowBridge } from "@sheetwrite/core";
@@ -19,7 +19,7 @@ const bridge = createRowBridge({
 });
 ```
 
-### See also
+## See also
 
 - [RowBridgeOptions](/docs/api/core/row-bridge-options/)
 - [RowBridge](/docs/api/core/row-bridge/)

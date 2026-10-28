@@ -1,6 +1,6 @@
 ---
 title: "RowBridgeTransaction | @sheetwrite/core"
-description: "The canonical transaction identity carried by each projected delta."
+description: "RowBridgeTransaction interface in @sheetwrite/core: The canonical transaction identity carried by each projected delta."
 ---
 <!-- api-export:@sheetwrite/core|.|RowBridgeTransaction -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

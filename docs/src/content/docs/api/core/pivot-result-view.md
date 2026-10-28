@@ -1,6 +1,6 @@
 ---
 title: "PivotResultView | @sheetwrite/core"
-description: "Plain-JSON view of one pivot's output, for the field list and other UI."
+description: "PivotResultView interface in @sheetwrite/core: Plain-JSON view of one pivot's output, for the field list and other UI."
 ---
 <!-- api-export:@sheetwrite/core|.|PivotResultView -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

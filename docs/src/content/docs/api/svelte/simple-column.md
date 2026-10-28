@@ -1,6 +1,6 @@
 ---
 title: "SimpleColumn | @sheetwrite/svelte"
-description: "Column definition accepted by the adapters’ simple row-object API."
+description: "SimpleColumn interface in @sheetwrite/svelte: Column definition accepted by the adapters’ simple row-object API."
 ---
 <!-- api-export:@sheetwrite/svelte|.|SimpleColumn -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="interface">interface</span></div>

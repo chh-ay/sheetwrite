@@ -1,6 +1,6 @@
 ---
 title: "MAX_HYPERLINK_TARGET_LENGTH | @sheetwrite/core"
-description: "External target ceiling, aligned with the bounded private clipboard payload."
+description: "MAX_HYPERLINK_TARGET_LENGTH variable in @sheetwrite/core: External target ceiling, aligned with the bounded private clipboard payload."
 ---
 <!-- api-export:@sheetwrite/core|.|MAX_HYPERLINK_TARGET_LENGTH -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="variable">variable</span></div>

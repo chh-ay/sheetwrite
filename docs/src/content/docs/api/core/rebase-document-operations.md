@@ -1,6 +1,6 @@
 ---
 title: "rebaseDocumentOperations | @sheetwrite/core"
-description: "Conservative server-ordered rebase for pending offline work."
+description: "rebaseDocumentOperations function in @sheetwrite/core: Conservative server-ordered rebase for pending offline work."
 ---
 <!-- api-export:@sheetwrite/core|.|rebaseDocumentOperations -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

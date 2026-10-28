@@ -1,6 +1,6 @@
 ---
 title: "BoundaryTransferKind | @sheetwrite/core"
-description: "Whether a measured boundary crossing transfers one scalar or a packed batch."
+description: "BoundaryTransferKind type in @sheetwrite/core: Whether a measured boundary crossing transfers one scalar or a packed batch."
 ---
 <!-- api-export:@sheetwrite/core|.|BoundaryTransferKind -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

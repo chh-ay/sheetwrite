@@ -31,6 +31,8 @@ export type NavigationItem = NavigationPage | NavigationGroup;
 
 export interface NavigationSection {
   label: string;
+  /** The section's overview page, which lists its pages as cards. */
+  href?: string;
   items: readonly NavigationItem[];
 }
 
@@ -52,6 +54,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
   },
   {
     label: "Getting started",
+    href: "/docs/start/",
     items: [
       { label: "Installation", href: "/docs/start/installation/" },
       { label: "First grid", href: "/docs/start/first-grid/" },
@@ -71,6 +74,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
   },
   {
     label: "Concepts",
+    href: "/docs/concepts/",
     items: [
       { label: "Runtime ownership", href: "/docs/concepts/runtime-ownership/" },
       {
@@ -198,6 +202,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
   },
   {
     label: "Import and export",
+    href: "/docs/import-export/",
     items: [
       { label: "XLSX import", href: "/docs/import-export/xlsx-import/" },
       { label: "XLSX export", href: "/docs/import-export/xlsx-export/" },
@@ -221,6 +226,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
   },
   {
     label: "Tutorials",
+    href: "/docs/tutorials/",
     items: [
       {
         label: "Excel in JavaScript",
@@ -311,9 +317,16 @@ export const AUTHORED_NAVIGATION: readonly NavigationSection[] = DOCS_NAVIGATION
   (section) => section.label !== API_PACKAGES_LABEL,
 );
 
-/** Reading order for previous/next links: every authored page in sidebar order. */
+/**
+ * Reading order for previous/next links: every authored page in sidebar
+ * order, with a section's overview page before the pages it lists.
+ */
 const READING_ORDER: readonly NavigationPage[] = navigationPages(
-  AUTHORED_NAVIGATION.flatMap((section) => section.items),
+  AUTHORED_NAVIGATION.flatMap((section) =>
+    section.href === undefined
+      ? section.items
+      : [{ label: section.label, href: section.href }, ...section.items],
+  ),
 );
 
 export type NavigationBadge = "new" | "updated";
@@ -387,4 +400,92 @@ const FULL_ENGINE_PATHS: readonly string[] = ["/showcases/formulas/", "/test/for
 export function opensFreshDocument(href: string): boolean {
   const path = href.split(/[?#]/, 1)[0] ?? href;
   return FULL_ENGINE_PATHS.includes(path.endsWith("/") ? path : `${path}/`);
+}
+
+/** Where a page sits in the navigation tree. */
+export interface NavigationLocation {
+  section: string;
+  /** The section's overview page, when it has one. */
+  sectionHref?: string;
+  /** Groups between the section and the page, outermost first. */
+  ancestors: readonly NavigationItem[];
+  label: string;
+  href: string;
+}
+
+/**
+ * Deepest navigation entry whose href contains the current page, with the
+ * groups above it, so the sidebar can open exactly that path and the header
+ * can show it.
+ */
+export function nearestNavigationItem(
+  activeHref: string | undefined,
+): NavigationLocation | undefined {
+  if (activeHref === undefined) return undefined;
+  let nearest: NavigationLocation | undefined;
+  const visit = (
+    section: NavigationSection,
+    item: NavigationItem,
+    ancestors: NavigationItem[],
+  ): void => {
+    const { href } = item;
+    if (href !== undefined) {
+      const matches = activeHref === href || (href !== "/docs/" && activeHref.startsWith(href));
+      if (matches && (nearest === undefined || href.length > nearest.href.length)) {
+        nearest = {
+          section: section.label,
+          sectionHref: section.href,
+          ancestors: [...ancestors],
+          label: item.label,
+          href,
+        };
+      }
+    }
+    if (item.items === undefined) return;
+    ancestors.push(item);
+    for (const child of item.items) visit(section, child, ancestors);
+    ancestors.pop();
+  };
+  for (const section of DOCS_NAVIGATION) {
+    // A section's overview matches only itself: its URL is a prefix of its
+    // pages' URLs, but those belong to their own entries.
+    if (section.href === activeHref) {
+      return {
+        section: section.label,
+        sectionHref: section.href,
+        ancestors: [],
+        label: section.label,
+        href: section.href,
+      };
+    }
+    for (const item of section.items) visit(section, item, []);
+  }
+  return nearest;
+}
+
+/** One step of a page's trail; the page itself has no link. */
+export interface Crumb {
+  href?: string;
+  label: string;
+}
+
+/**
+ * Trail for the page header and the breadcrumb structured data. Section, group
+ * and package names come from the same navigation model the sidebar renders,
+ * so the two never disagree about where a page sits; the page's own name ends
+ * the trail.
+ */
+export function breadcrumbsFor(activeHref: string | undefined, title: string): readonly Crumb[] {
+  const trail: Crumb[] = [{ href: "/docs/", label: "Documentation" }];
+  // The overview is the destination itself.
+  if (activeHref === undefined || activeHref === "/docs/") return trail;
+  const nearest = nearestNavigationItem(activeHref);
+  if (nearest === undefined) return [...trail, { label: title }];
+  // A section's index page carries the section's name; one crumb is enough.
+  if (nearest.section === title) return [...trail, { label: title }];
+  trail.push({ label: nearest.section, href: nearest.sectionHref });
+  for (const group of nearest.ancestors) trail.push({ href: group.href, label: group.label });
+  // The entry the page itself belongs to is not a step above it.
+  if (nearest.href !== activeHref) trail.push({ href: nearest.href, label: nearest.label });
+  return [...trail, { label: title }];
 }

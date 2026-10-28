@@ -1,6 +1,6 @@
 ---
 title: "sheetwriteTableExportBackend | @sheetwrite/xlsx"
-description: "Default bounded first-sheet table export backend."
+description: "sheetwriteTableExportBackend variable in @sheetwrite/xlsx: Default bounded first-sheet table export backend."
 ---
 <!-- api-export:@sheetwrite/xlsx|.|sheetwriteTableExportBackend -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/xlsx/">@sheetwrite/xlsx</a><span class="api-status" data-kind="variable">variable</span></div>

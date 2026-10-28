@@ -1,6 +1,6 @@
 ---
 title: "XlsxWorkbookBackend | @sheetwrite/core"
-description: "Optional backend contract for complete workbook XLSX interchange."
+description: "XlsxWorkbookBackend interface in @sheetwrite/core: Optional backend contract for complete workbook XLSX interchange."
 ---
 <!-- api-export:@sheetwrite/core|.|XlsxWorkbookBackend -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "parseCellLiteralInput | @sheetwrite/core"
-description: "Parse imported text as a literal using the same boolean, number, date, and currency rules as parseCellInput."
+description: "parseCellLiteralInput function in @sheetwrite/core: Parse imported text as a literal using the same boolean, number, date, and currency rules as parseCellInput."
 ---
 <!-- api-export:@sheetwrite/core|.|parseCellLiteralInput -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

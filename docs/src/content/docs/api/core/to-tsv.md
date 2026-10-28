@@ -1,6 +1,6 @@
 ---
 title: "toTsv | @sheetwrite/core"
-description: "Export a canonical data-space range as clipboard-compatible TSV (CRLF, no BOM)."
+description: "toTsv function in @sheetwrite/core: Export a canonical data-space range as clipboard-compatible TSV (CRLF, no BOM)."
 ---
 <!-- api-export:@sheetwrite/core|.|toTsv -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

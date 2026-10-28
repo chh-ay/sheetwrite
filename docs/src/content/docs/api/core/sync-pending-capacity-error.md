@@ -1,6 +1,6 @@
 ---
 title: "SyncPendingCapacityError | @sheetwrite/core"
-description: "Typed local transaction rejection produced when the durable queue cannot reserve capacity."
+description: "SyncPendingCapacityError class in @sheetwrite/core: Typed local transaction rejection produced when the durable queue cannot reserve capacity."
 ---
 <!-- api-export:@sheetwrite/core|.|SyncPendingCapacityError -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="class">class</span></div>

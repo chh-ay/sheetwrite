@@ -1,6 +1,6 @@
 ---
 title: "WindowView | @sheetwrite/formulas"
-description: "A bulk window of resolved cells, row-major over nrows x ncols."
+description: "WindowView class in @sheetwrite/formulas: A bulk window of resolved cells, row-major over nrows x ncols."
 ---
 <!-- api-export:@sheetwrite/formulas|.|WindowView -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/formulas/">@sheetwrite/formulas</a><span class="api-status" data-kind="class">class</span></div>

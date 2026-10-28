@@ -1,6 +1,6 @@
 ---
 title: "GridCommandStateChangeEvent | @sheetwrite/core"
-description: "Complete command-state snapshot emitted whenever availability or activity can change."
+description: "GridCommandStateChangeEvent interface in @sheetwrite/core: Complete command-state snapshot emitted whenever availability or activity can change."
 ---
 <!-- api-export:@sheetwrite/core|.|GridCommandStateChangeEvent -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

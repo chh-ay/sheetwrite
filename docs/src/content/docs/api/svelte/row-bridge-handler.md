@@ -1,6 +1,6 @@
 ---
 title: "RowBridgeHandler | @sheetwrite/svelte"
-description: "Callback accepted by imperative and framework adapters."
+description: "RowBridgeHandler type in @sheetwrite/svelte: Callback accepted by imperative and framework adapters."
 ---
 <!-- api-export:@sheetwrite/svelte|.|RowBridgeHandler -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="type">type</span></div>

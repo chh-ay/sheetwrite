@@ -1,6 +1,6 @@
 ---
 title: "createGridFromSnapshot | @sheetwrite/core"
-description: "Mount a grid over a validated, non-dirty snapshot."
+description: "createGridFromSnapshot function in @sheetwrite/core: Mount a grid over a validated, non-dirty snapshot."
 ---
 <!-- api-export:@sheetwrite/core|.|createGridFromSnapshot -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

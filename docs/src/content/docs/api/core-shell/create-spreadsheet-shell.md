@@ -1,6 +1,6 @@
 ---
 title: "createSpreadsheetShell | @sheetwrite/core/shell"
-description: "Mount a complete spreadsheet shell into host: toolbar row, formula row (name box + formula bar), the grid, and a bottom row with sheet tabs and a selection status."
+description: "createSpreadsheetShell function in @sheetwrite/core/shell: Mount a complete spreadsheet shell into host: toolbar row, formula row (name box + formula bar)…"
 ---
 <!-- api-export:@sheetwrite/core|./shell|createSpreadsheetShell -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-shell/">@sheetwrite/core/shell</a><span class="api-status" data-kind="function">function</span></div>

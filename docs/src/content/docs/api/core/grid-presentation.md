@@ -1,6 +1,6 @@
 ---
 title: "GridPresentation | @sheetwrite/core"
-description: "Header semantics used by the retained canvas and accessibility mirror."
+description: "GridPresentation type in @sheetwrite/core: Header semantics used by the retained canvas and accessibility mirror."
 ---
 <!-- api-export:@sheetwrite/core|.|GridPresentation -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

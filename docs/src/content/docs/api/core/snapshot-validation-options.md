@@ -1,6 +1,6 @@
 ---
 title: "SnapshotValidationOptions | @sheetwrite/core"
-description: "Validation and allocation policy for an untrusted workbook snapshot."
+description: "SnapshotValidationOptions interface in @sheetwrite/core: Validation and allocation policy for an untrusted workbook snapshot."
 ---
 <!-- api-export:@sheetwrite/core|.|SnapshotValidationOptions -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

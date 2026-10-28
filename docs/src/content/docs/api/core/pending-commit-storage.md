@@ -1,6 +1,6 @@
 ---
 title: "PendingCommitStorage | @sheetwrite/core"
-description: "Host-owned durable queue."
+description: "PendingCommitStorage interface in @sheetwrite/core: Host-owned durable queue."
 ---
 <!-- api-export:@sheetwrite/core|.|PendingCommitStorage -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

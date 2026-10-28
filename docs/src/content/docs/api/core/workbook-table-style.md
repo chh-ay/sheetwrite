@@ -1,6 +1,6 @@
 ---
 title: "WorkbookTableStyle | @sheetwrite/core"
-description: "Bounded native subset of ECMA-376 table style information."
+description: "WorkbookTableStyle interface in @sheetwrite/core: Bounded native subset of ECMA-376 table style information."
 ---
 <!-- api-export:@sheetwrite/core|.|WorkbookTableStyle -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "RowBridgeId | @sheetwrite/vue"
-description: "A stable host identity for one data-space row."
+description: "RowBridgeId type in @sheetwrite/vue: A stable host identity for one data-space row."
 ---
 <!-- api-export:@sheetwrite/vue|.|RowBridgeId -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/vue/">@sheetwrite/vue</a><span class="api-status" data-kind="type">type</span></div>

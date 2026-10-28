@@ -1,6 +1,6 @@
 ---
 title: "CellInputSnapshot | @sheetwrite/core"
-description: "View-aware editable snapshot of one cell, for hosts building a detached formula bar or cell inspector."
+description: "CellInputSnapshot interface in @sheetwrite/core: View-aware editable snapshot of one cell, for hosts building a detached formula bar or cell inspector."
 ---
 <!-- api-export:@sheetwrite/core|.|CellInputSnapshot -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

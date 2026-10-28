@@ -1,6 +1,6 @@
 ---
 title: "SheetwriteStoreOptions | @sheetwrite/core"
-description: "Storage layout plus snapshot and transaction resource ceilings for one store."
+description: "SheetwriteStoreOptions interface in @sheetwrite/core: Storage layout plus snapshot and transaction resource ceilings for one store."
 ---
 <!-- api-export:@sheetwrite/core|.|SheetwriteStoreOptions -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

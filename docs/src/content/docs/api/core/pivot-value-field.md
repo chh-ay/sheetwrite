@@ -1,6 +1,6 @@
 ---
 title: "PivotValueField | @sheetwrite/core"
-description: "One aggregated value field."
+description: "PivotValueField interface in @sheetwrite/core: One aggregated value field."
 ---
 <!-- api-export:@sheetwrite/core|.|PivotValueField -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

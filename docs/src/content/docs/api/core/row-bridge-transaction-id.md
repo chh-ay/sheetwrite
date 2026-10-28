@@ -1,6 +1,6 @@
 ---
 title: "rowBridgeTransactionId | @sheetwrite/core"
-description: "Compute a deterministic identity for a canonical transaction."
+description: "rowBridgeTransactionId function in @sheetwrite/core: Compute a deterministic identity for a canonical transaction."
 ---
 <!-- api-export:@sheetwrite/core|.|rowBridgeTransactionId -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "SnapshotValidationError | @sheetwrite/core"
-description: "Path-qualified schema failure found while validating an untrusted snapshot."
+description: "SnapshotValidationError class in @sheetwrite/core: Path-qualified schema failure found while validating an untrusted snapshot."
 ---
 <!-- api-export:@sheetwrite/core|.|SnapshotValidationError -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="class">class</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "ToolbarActionName | @sheetwrite/core"
-description: "Built-in action names accepted by custom toolbar items."
+description: "ToolbarActionName type in @sheetwrite/core: Built-in action names accepted by custom toolbar items."
 ---
 <!-- api-export:@sheetwrite/core|.|ToolbarActionName -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

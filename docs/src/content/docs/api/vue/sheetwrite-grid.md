@@ -1,13 +1,13 @@
 ---
 title: "SheetwriteGrid | @sheetwrite/vue"
-description: "Advanced framework component for workbook data or datasource input."
+description: "SheetwriteGrid variable in @sheetwrite/vue: Advanced framework component for workbook data or datasource input."
 ---
 <!-- api-export:@sheetwrite/vue|.|SheetwriteGrid -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/vue/">@sheetwrite/vue</a><span class="api-status" data-kind="variable">variable</span></div>
 
 Advanced framework component for workbook data or datasource input.
 
-### Examples
+## Examples
 
 ```ts compile
 import { createApp, h } from "vue";
@@ -21,7 +21,7 @@ function mountWorkbook(host: HTMLElement, workbook: Workbook) {
 }
 ```
 
-### See also
+## See also
 
 - [Sheetwrite](/docs/api/vue/sheetwrite/)
 - [/docs/frameworks/vue/](/docs/frameworks/vue/)

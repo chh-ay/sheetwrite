@@ -1,6 +1,6 @@
 ---
 title: "DataCell | @sheetwrite/core"
-description: "Datasource cell value with optional cell-specific styling."
+description: "DataCell type in @sheetwrite/core: Datasource cell value with optional cell-specific styling."
 ---
 <!-- api-export:@sheetwrite/core|.|DataCell -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

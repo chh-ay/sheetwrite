@@ -1,6 +1,6 @@
 ---
 title: "SheetNameIssueCode | @sheetwrite/core"
-description: "Stable reason codes returned by worksheet-name validation."
+description: "SheetNameIssueCode type in @sheetwrite/core: Stable reason codes returned by worksheet-name validation."
 ---
 <!-- api-export:@sheetwrite/core|.|SheetNameIssueCode -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

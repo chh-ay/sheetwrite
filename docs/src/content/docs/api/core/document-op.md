@@ -1,6 +1,6 @@
 ---
 title: "DocumentOp | @sheetwrite/core"
-description: "Exhaustive serializable operation union for workbook mutations."
+description: "DocumentOp type in @sheetwrite/core: Exhaustive serializable operation union for workbook mutations."
 ---
 <!-- api-export:@sheetwrite/core|.|DocumentOp -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "FormulaBarOptions | @sheetwrite/core/shell"
-description: "Host elements and callbacks used to bind a formula bar to a Grid."
+description: "FormulaBarOptions interface in @sheetwrite/core/shell: Host elements and callbacks used to bind a formula bar to a Grid."
 ---
 <!-- api-export:@sheetwrite/core|./shell|FormulaBarOptions -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-shell/">@sheetwrite/core/shell</a><span class="api-status" data-kind="interface">interface</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "CellSnapshot | @sheetwrite/wasm"
-description: "Resolved values of a sparse coordinate batch, one entry per requested cell."
+description: "CellSnapshot class in @sheetwrite/wasm: Resolved values of a sparse coordinate batch, one entry per requested cell."
 ---
 <!-- api-export:@sheetwrite/wasm|.|CellSnapshot -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/wasm/">@sheetwrite/wasm</a><span class="api-status" data-kind="class">class</span></div>

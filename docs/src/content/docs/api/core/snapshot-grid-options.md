@@ -1,6 +1,6 @@
 ---
 title: "SnapshotGridOptions | @sheetwrite/core"
-description: "Grid creation options accepted when hydrating a validated snapshot."
+description: "SnapshotGridOptions type in @sheetwrite/core: Grid creation options accepted when hydrating a validated snapshot."
 ---
 <!-- api-export:@sheetwrite/core|.|SnapshotGridOptions -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "createSelectionStatus | @sheetwrite/core/shell"
-description: "<output role=\"status\"> that follows the grid's selection and its values."
+description: "createSelectionStatus function in @sheetwrite/core/shell: <output role=\"status\"> that follows the grid's selection and its values."
 ---
 <!-- api-export:@sheetwrite/core|./shell|createSelectionStatus -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-shell/">@sheetwrite/core/shell</a><span class="api-status" data-kind="function">function</span></div>

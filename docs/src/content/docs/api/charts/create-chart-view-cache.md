@@ -1,6 +1,6 @@
 ---
 title: "createChartViewCache | @sheetwrite/charts"
-description: "Creates the per-store chart view cache a chart renderer reads from."
+description: "createChartViewCache function in @sheetwrite/charts: Creates the per-store chart view cache a chart renderer reads from."
 ---
 <!-- api-export:@sheetwrite/charts|.|createChartViewCache -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/charts/">@sheetwrite/charts</a><span class="api-status" data-kind="function">function</span></div>
@@ -10,7 +10,7 @@ Creates the per-store chart view cache a chart renderer reads from.
 Views resolve lazily on first `get` and stay cached until a chart-change
 event names that chart, so repeated frames never reread cells.
 
-### Examples
+## Examples
 
 ```ts compile
 import { createChartViewCache, type ChartView } from "@sheetwrite/charts";

@@ -1,6 +1,6 @@
 ---
 title: "ChartRange | @sheetwrite/core"
-description: "A deleted source remains explicit instead of silently reading another cell."
+description: "ChartRange type in @sheetwrite/core: A deleted source remains explicit instead of silently reading another cell."
 ---
 <!-- api-export:@sheetwrite/core|.|ChartRange -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

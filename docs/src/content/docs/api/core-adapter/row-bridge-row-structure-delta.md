@@ -1,6 +1,6 @@
 ---
 title: "RowBridgeRowStructureDelta | @sheetwrite/core/adapter"
-description: "Stable row identity effects for insert, delete, and move operations."
+description: "RowBridgeRowStructureDelta interface in @sheetwrite/core/adapter: Stable row identity effects for insert, delete, and move operations."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|RowBridgeRowStructureDelta -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="interface">interface</span></div>

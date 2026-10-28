@@ -1,6 +1,6 @@
 ---
 title: "SheetwriteErrorContext | @sheetwrite/core"
-description: "Stable, serialization-safe diagnostic context."
+description: "SheetwriteErrorContext type in @sheetwrite/core: Stable, serialization-safe diagnostic context."
 ---
 <!-- api-export:@sheetwrite/core|.|SheetwriteErrorContext -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "CalculationSettings | @sheetwrite/core"
-description: "Workbook calculation options, mirroring Excel's \"Enable iterative calculation\"."
+description: "CalculationSettings interface in @sheetwrite/core: Workbook calculation options, mirroring Excel's \"Enable iterative calculation\"."
 ---
 <!-- api-export:@sheetwrite/core|.|CalculationSettings -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

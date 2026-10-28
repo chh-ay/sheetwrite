@@ -1,6 +1,6 @@
 ---
 title: "ColumnarData | @sheetwrite/core"
-description: "Eager column-oriented values used to initialize a sheet."
+description: "ColumnarData interface in @sheetwrite/core: Eager column-oriented values used to initialize a sheet."
 ---
 <!-- api-export:@sheetwrite/core|.|ColumnarData -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

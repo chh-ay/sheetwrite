@@ -1,6 +1,6 @@
 ---
 title: "resolveThemeFromCss | @sheetwrite/core"
-description: "Read --sheetwrite- CSS custom properties into a partial theme."
+description: "resolveThemeFromCss function in @sheetwrite/core: Read --sheetwrite- CSS custom properties into a partial theme."
 ---
 <!-- api-export:@sheetwrite/core|.|resolveThemeFromCss -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

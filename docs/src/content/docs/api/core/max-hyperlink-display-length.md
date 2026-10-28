@@ -1,6 +1,6 @@
 ---
 title: "MAX_HYPERLINK_DISPLAY_LENGTH | @sheetwrite/core"
-description: "Optional display text ceiling used by SpreadsheetML shared-string implementations."
+description: "MAX_HYPERLINK_DISPLAY_LENGTH variable in @sheetwrite/core: Optional display text ceiling used by SpreadsheetML shared-string implementations."
 ---
 <!-- api-export:@sheetwrite/core|.|MAX_HYPERLINK_DISPLAY_LENGTH -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="variable">variable</span></div>

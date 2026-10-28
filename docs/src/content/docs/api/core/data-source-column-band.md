@@ -1,6 +1,6 @@
 ---
 title: "DataSourceColumnBand | @sheetwrite/core"
-description: "One half-open run of workbook columns, in stable sheet order."
+description: "DataSourceColumnBand interface in @sheetwrite/core: One half-open run of workbook columns, in stable sheet order."
 ---
 <!-- api-export:@sheetwrite/core|.|DataSourceColumnBand -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "CellScalar | @sheetwrite/core"
-description: "A scalar that can be displayed directly."
+description: "CellScalar type in @sheetwrite/core: A scalar that can be displayed directly."
 ---
 <!-- api-export:@sheetwrite/core|.|CellScalar -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

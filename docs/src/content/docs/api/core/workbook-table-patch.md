@@ -1,6 +1,6 @@
 ---
 title: "WorkbookTablePatch | @sheetwrite/core"
-description: "Mutable table fields accepted by the explicit update operation."
+description: "WorkbookTablePatch interface in @sheetwrite/core: Mutable table fields accepted by the explicit update operation."
 ---
 <!-- api-export:@sheetwrite/core|.|WorkbookTablePatch -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

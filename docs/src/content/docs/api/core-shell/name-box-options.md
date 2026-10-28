@@ -1,6 +1,6 @@
 ---
 title: "NameBoxOptions | @sheetwrite/core/shell"
-description: "Host elements and callbacks used to bind a name box to a Grid."
+description: "NameBoxOptions interface in @sheetwrite/core/shell: Host elements and callbacks used to bind a name box to a Grid."
 ---
 <!-- api-export:@sheetwrite/core|./shell|NameBoxOptions -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-shell/">@sheetwrite/core/shell</a><span class="api-status" data-kind="interface">interface</span></div>

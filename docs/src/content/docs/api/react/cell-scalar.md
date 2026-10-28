@@ -1,6 +1,6 @@
 ---
 title: "CellScalar | @sheetwrite/react"
-description: "A scalar that can be displayed directly."
+description: "CellScalar type in @sheetwrite/react: A scalar that can be displayed directly."
 ---
 <!-- api-export:@sheetwrite/react|.|CellScalar -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/react/">@sheetwrite/react</a><span class="api-status" data-kind="type">type</span></div>

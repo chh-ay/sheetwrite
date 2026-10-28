@@ -1,6 +1,6 @@
 ---
 title: "documentOpTarget | @sheetwrite/core"
-description: "Exhaustive stable target identity used by persistence/logging layers."
+description: "documentOpTarget function in @sheetwrite/core: Exhaustive stable target identity used by persistence/logging layers."
 ---
 <!-- api-export:@sheetwrite/core|.|documentOpTarget -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

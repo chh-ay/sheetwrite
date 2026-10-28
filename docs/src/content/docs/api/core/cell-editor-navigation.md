@@ -1,6 +1,6 @@
 ---
 title: "CellEditorNavigation | @sheetwrite/core"
-description: "Selection movement applied after a successful editor commit."
+description: "CellEditorNavigation type in @sheetwrite/core: Selection movement applied after a successful editor commit."
 ---
 <!-- api-export:@sheetwrite/core|.|CellEditorNavigation -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "MountedChart | @sheetwrite/core"
-description: "Draws one chart into a box that core places and sizes."
+description: "MountedChart interface in @sheetwrite/core: Draws one chart into a box that core places and sizes."
 ---
 <!-- api-export:@sheetwrite/core|.|MountedChart -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

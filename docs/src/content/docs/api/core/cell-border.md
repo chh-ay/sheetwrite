@@ -1,6 +1,6 @@
 ---
 title: "CellBorder | @sheetwrite/core"
-description: "Visual border applied to one or more sides of a cell."
+description: "CellBorder interface in @sheetwrite/core: Visual border applied to one or more sides of a cell."
 ---
 <!-- api-export:@sheetwrite/core|.|CellBorder -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

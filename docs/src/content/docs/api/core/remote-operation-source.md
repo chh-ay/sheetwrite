@@ -1,6 +1,6 @@
 ---
 title: "RemoteOperationSource | @sheetwrite/core"
-description: "Host subscription contract for ordered versioned operations."
+description: "RemoteOperationSource interface in @sheetwrite/core: Host subscription contract for ordered versioned operations."
 ---
 <!-- api-export:@sheetwrite/core|.|RemoteOperationSource -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

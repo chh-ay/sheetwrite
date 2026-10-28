@@ -1,6 +1,6 @@
 ---
 title: "ValidationPolicy | @sheetwrite/core"
-description: "Reject-or-warn policy attached to a data-validation rule."
+description: "ValidationPolicy type in @sheetwrite/core: Reject-or-warn policy attached to a data-validation rule."
 ---
 <!-- api-export:@sheetwrite/core|.|ValidationPolicy -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

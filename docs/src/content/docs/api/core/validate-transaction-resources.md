@@ -1,6 +1,6 @@
 ---
 title: "validateTransactionResources | @sheetwrite/core"
-description: "Incrementally validate the operation count and exact encoded payload size without constructing a JSON string."
+description: "validateTransactionResources function in @sheetwrite/core: Incrementally validate the operation count and exact encoded payload size without constructing a…"
 ---
 <!-- api-export:@sheetwrite/core|.|validateTransactionResources -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "ICON_NAMES | @sheetwrite/core"
-description: "Every glyph on the command icon sheet."
+description: "ICON_NAMES variable in @sheetwrite/core: Every glyph on the command icon sheet."
 ---
 <!-- api-export:@sheetwrite/core|.|ICON_NAMES -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="variable">variable</span></div>

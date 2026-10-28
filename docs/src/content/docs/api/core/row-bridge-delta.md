@@ -1,6 +1,6 @@
 ---
 title: "RowBridgeDelta | @sheetwrite/core"
-description: "Every possible projection produced by a row bridge."
+description: "RowBridgeDelta type in @sheetwrite/core: Every possible projection produced by a row bridge."
 ---
 <!-- api-export:@sheetwrite/core|.|RowBridgeDelta -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

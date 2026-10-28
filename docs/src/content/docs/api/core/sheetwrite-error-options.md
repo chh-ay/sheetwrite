@@ -1,6 +1,6 @@
 ---
 title: "SheetwriteErrorOptions | @sheetwrite/core"
-description: "Optional cause, diagnostic context, and boundary-known retryability."
+description: "SheetwriteErrorOptions interface in @sheetwrite/core: Optional cause, diagnostic context, and boundary-known retryability."
 ---
 <!-- api-export:@sheetwrite/core|.|SheetwriteErrorOptions -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

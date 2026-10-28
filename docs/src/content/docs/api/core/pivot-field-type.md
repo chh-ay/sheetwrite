@@ -1,6 +1,6 @@
 ---
 title: "PivotFieldType | @sheetwrite/core"
-description: "Inferred type of one source field from its data rows."
+description: "PivotFieldType type in @sheetwrite/core: Inferred type of one source field from its data rows."
 ---
 <!-- api-export:@sheetwrite/core|.|PivotFieldType -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

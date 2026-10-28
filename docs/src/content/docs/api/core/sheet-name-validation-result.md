@@ -1,6 +1,6 @@
 ---
 title: "SheetNameValidationResult | @sheetwrite/core"
-description: "Successful canonical name or an actionable validation failure."
+description: "SheetNameValidationResult type in @sheetwrite/core: Successful canonical name or an actionable validation failure."
 ---
 <!-- api-export:@sheetwrite/core|.|SheetNameValidationResult -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

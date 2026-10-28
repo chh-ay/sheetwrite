@@ -1,6 +1,6 @@
 ---
 title: "DelimitedTextOptions | @sheetwrite/core"
-description: "Optional resource ceilings for an in-memory delimited-text operation."
+description: "DelimitedTextOptions interface in @sheetwrite/core: Optional resource ceilings for an in-memory delimited-text operation."
 ---
 <!-- api-export:@sheetwrite/core|.|DelimitedTextOptions -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

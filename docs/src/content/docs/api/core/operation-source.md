@@ -1,6 +1,6 @@
 ---
 title: "OperationSource | @sheetwrite/core"
-description: "Whether a committed change originated locally or from remote host input."
+description: "OperationSource type in @sheetwrite/core: Whether a committed change originated locally or from remote host input."
 ---
 <!-- api-export:@sheetwrite/core|.|OperationSource -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

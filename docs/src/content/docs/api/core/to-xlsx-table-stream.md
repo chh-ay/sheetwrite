@@ -1,6 +1,6 @@
 ---
 title: "toXlsxTableStream | @sheetwrite/core"
-description: "Stream table XLSX bytes without materializing the finished archive."
+description: "toXlsxTableStream function in @sheetwrite/core: Stream table XLSX bytes without materializing the finished archive."
 ---
 <!-- api-export:@sheetwrite/core|.|toXlsxTableStream -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

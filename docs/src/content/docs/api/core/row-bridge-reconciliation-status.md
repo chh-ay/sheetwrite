@@ -1,6 +1,6 @@
 ---
 title: "RowBridgeReconciliationStatus | @sheetwrite/core"
-description: "Reconciliation status for a canonical transaction response."
+description: "RowBridgeReconciliationStatus type in @sheetwrite/core: Reconciliation status for a canonical transaction response."
 ---
 <!-- api-export:@sheetwrite/core|.|RowBridgeReconciliationStatus -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "RowBridgeId | @sheetwrite/core"
-description: "A stable host identity for one data-space row."
+description: "RowBridgeId type in @sheetwrite/core: A stable host identity for one data-space row."
 ---
 <!-- api-export:@sheetwrite/core|.|RowBridgeId -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

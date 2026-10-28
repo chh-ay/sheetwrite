@@ -1,6 +1,6 @@
 ---
 title: "PagedStoreStats | @sheetwrite/core"
-description: "Allocation and load statistics for one paged datasource sheet."
+description: "PagedStoreStats interface in @sheetwrite/core: Allocation and load statistics for one paged datasource sheet."
 ---
 <!-- api-export:@sheetwrite/core|.|PagedStoreStats -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

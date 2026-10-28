@@ -1,6 +1,6 @@
 ---
 title: "DelimitedTextOptionsError | @sheetwrite/core"
-description: "Stable invalid-option failure for a delimited-text resource ceiling."
+description: "DelimitedTextOptionsError class in @sheetwrite/core: Stable invalid-option failure for a delimited-text resource ceiling."
 ---
 <!-- api-export:@sheetwrite/core|.|DelimitedTextOptionsError -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="class">class</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "BoundaryDirection | @sheetwrite/core"
-description: "Direction of a measured JS/WASM boundary crossing."
+description: "BoundaryDirection type in @sheetwrite/core: Direction of a measured JS/WASM boundary crossing."
 ---
 <!-- api-export:@sheetwrite/core|.|BoundaryDirection -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

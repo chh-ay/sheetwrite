@@ -9,6 +9,7 @@ import {
   navigationPages,
 } from "../docs/src/lib/navigation.js";
 import { sectionCardsMarkdown } from "../docs/src/lib/section-cards.js";
+import { SITE_URL } from "../docs/src/lib/seo.js";
 import type { ApiEntryPoint, ApiExport, ApiPackage, PublicApiManifest } from "./public-api.js";
 
 /**
@@ -28,7 +29,7 @@ import type { ApiEntryPoint, ApiExport, ApiPackage, PublicApiManifest } from "./
  * authoritative set of generator-owned pages, so this module never guesses
  * which page the generator owns and never reads a stale generated page.
  */
-export const LLMS_SITE_BASE = "https://sheetwrite.vercel.app";
+export const LLMS_SITE_BASE = SITE_URL;
 export const LLMS_INDEX_PATH = "docs/public/llms.txt";
 export const LLMS_FULL_PATH = "docs/public/llms-full.txt";
 

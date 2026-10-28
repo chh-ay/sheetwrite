@@ -1,6 +1,6 @@
 ---
 title: "Workbook | @sheetwrite/core"
-description: "Live workbook schema containing ordered sheets and the active sheet ID."
+description: "Workbook interface in @sheetwrite/core: Live workbook schema containing ordered sheets and the active sheet ID."
 ---
 <!-- api-export:@sheetwrite/core|.|Workbook -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

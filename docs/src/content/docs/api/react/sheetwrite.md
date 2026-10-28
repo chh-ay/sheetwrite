@@ -1,6 +1,6 @@
 ---
 title: "Sheetwrite | @sheetwrite/react"
-description: "Convenience component for local object rows."
+description: "Sheetwrite variable in @sheetwrite/react: Convenience component for local object rows."
 ---
 <!-- api-export:@sheetwrite/react|.|Sheetwrite -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/react/">@sheetwrite/react</a><span class="api-status" data-kind="variable">variable</span></div>
@@ -10,7 +10,7 @@ Convenience component for local object rows. It derives a single-sheet workbook 
 through prop-driven resets and unmount cleanup. Pass a `ref` to access the live `Grid`;
 use `SheetwriteGrid` when the host already owns a workbook or datasource.
 
-### Examples
+## Examples
 
 ```tsx compile
 import { Sheetwrite } from "@sheetwrite/react";
@@ -24,7 +24,7 @@ export function Sales() {
 }
 ```
 
-### See also
+## See also
 
 - [SheetwriteGrid](/docs/api/react/sheetwrite-grid/)
 - [/docs/frameworks/react/](/docs/frameworks/react/)

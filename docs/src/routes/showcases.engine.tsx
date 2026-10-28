@@ -1,19 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
 
+import { pageMeta } from "../lib/seo.js";
+
 import stylesheet from "../styles/showcase-engine.css?url";
 
 const EngineShowcase = lazy(() => import("../showcases/EngineShowcase.js"));
 
-const description =
-  "Edit a live 50,000-row FY26 regional forecast in a real Grid and watch the requested page, the recalculation, the paint checkpoint, and the host acknowledgement arrive in order, with the off-screen plan column loaded beside them.";
-
 export const Route = createFileRoute("/showcases/engine")({
   head: () => ({
-    meta: [
-      { name: "description", content: description },
-      { title: "Live financial Grid and engine evidence — Sheetwrite" },
-    ],
+    meta: pageMeta(
+      "Live financial grid and engine events — Sheetwrite",
+      "Edit a live 50,000-row forecast and watch the page request, recalculation, paint and host acknowledgement arrive in order.",
+    ),
     links: [{ rel: "stylesheet", href: stylesheet }],
   }),
   component: EngineRoute,

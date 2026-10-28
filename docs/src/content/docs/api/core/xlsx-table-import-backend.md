@@ -1,6 +1,6 @@
 ---
 title: "XlsxTableImportBackend | @sheetwrite/core"
-description: "Pluggable table import backend."
+description: "XlsxTableImportBackend interface in @sheetwrite/core: Pluggable table import backend."
 ---
 <!-- api-export:@sheetwrite/core|.|XlsxTableImportBackend -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

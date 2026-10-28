@@ -1,6 +1,6 @@
 ---
 title: "assertWorkbookTables | @sheetwrite/core"
-description: "Reject an invalid or oversized live workbook before table arrays are copied to WASM."
+description: "assertWorkbookTables function in @sheetwrite/core: Reject an invalid or oversized live workbook before table arrays are copied to WASM."
 ---
 <!-- api-export:@sheetwrite/core|.|assertWorkbookTables -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

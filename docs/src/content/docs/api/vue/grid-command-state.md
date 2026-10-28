@@ -1,6 +1,6 @@
 ---
 title: "GridCommandState | @sheetwrite/vue"
-description: "Observable availability and selection-derived activity for one command."
+description: "GridCommandState interface in @sheetwrite/vue: Observable availability and selection-derived activity for one command."
 ---
 <!-- api-export:@sheetwrite/vue|.|GridCommandState -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/vue/">@sheetwrite/vue</a><span class="api-status" data-kind="interface">interface</span></div>

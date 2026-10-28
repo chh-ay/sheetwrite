@@ -1,6 +1,6 @@
 ---
 title: "SnapshotResourceLimits | @sheetwrite/core"
-description: "Resource ceilings applied before snapshot normalization or store allocation."
+description: "SnapshotResourceLimits interface in @sheetwrite/core: Resource ceilings applied before snapshot normalization or store allocation."
 ---
 <!-- api-export:@sheetwrite/core|.|SnapshotResourceLimits -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

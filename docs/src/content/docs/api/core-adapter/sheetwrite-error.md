@@ -1,6 +1,6 @@
 ---
 title: "SheetwriteError | @sheetwrite/core/adapter"
-description: "Canonical envelope for thrown and callback-delivered Sheetwrite failures."
+description: "SheetwriteError class in @sheetwrite/core/adapter: Canonical envelope for thrown and callback-delivered Sheetwrite failures."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|SheetwriteError -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="class">class</span></div>

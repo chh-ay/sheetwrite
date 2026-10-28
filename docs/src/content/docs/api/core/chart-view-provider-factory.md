@@ -1,6 +1,6 @@
 ---
 title: "ChartViewProviderFactory | @sheetwrite/core"
-description: "Creates a chart provider owned and disposed by one renderer or host."
+description: "ChartViewProviderFactory type in @sheetwrite/core: Creates a chart provider owned and disposed by one renderer or host."
 ---
 <!-- api-export:@sheetwrite/core|.|ChartViewProviderFactory -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

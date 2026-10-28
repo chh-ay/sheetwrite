@@ -1,6 +1,6 @@
 ---
 title: "CellStore | @sheetwrite/formulas"
-description: "The workbook-wide store: every sheet, one string pool."
+description: "CellStore class in @sheetwrite/formulas: The workbook-wide store: every sheet, one string pool."
 ---
 <!-- api-export:@sheetwrite/formulas|.|CellStore -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/formulas/">@sheetwrite/formulas</a><span class="api-status" data-kind="class">class</span></div>

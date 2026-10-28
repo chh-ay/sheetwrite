@@ -1,6 +1,6 @@
 ---
 title: "fromXlsxTable | @sheetwrite/core"
-description: "Parse the first sheet of .xlsx bytes into ColumnarData."
+description: "fromXlsxTable function in @sheetwrite/core: Parse the first sheet of .xlsx bytes into ColumnarData."
 ---
 <!-- api-export:@sheetwrite/core|.|fromXlsxTable -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
@@ -10,7 +10,7 @@ row is treated as the header and its cell text becomes each column's key.
 Numbers stay numbers, date cells use the date-serial convention, strings are
 verbatim, and empty cells become `null`.
 
-### Examples
+## Examples
 
 ```ts compile
 import { registerXlsxBackends } from "@sheetwrite/xlsx";
@@ -22,7 +22,7 @@ async function openTable(file: File) {
 }
 ```
 
-### See also
+## See also
 
 - [toXlsxTable](/docs/api/core/to-xlsx-table/)
 

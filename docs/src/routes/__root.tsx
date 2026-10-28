@@ -8,6 +8,7 @@ import { SiteError, SiteNotFound } from "../components/RouteFallbacks.js";
 import { initializeCodeEnhancements } from "../lib/code-popovers.ts";
 import { installGridScrollHints } from "../lib/grid-scroll-hint.ts";
 import { installAnchorReveal } from "../lib/reveal-anchor.ts";
+import { SITE_URL } from "../lib/seo.js";
 
 import docsFiguresStylesheet from "../styles/docs-figures.css?url";
 import showcaseStylesheet from "../styles/showcase.css?url";
@@ -20,7 +21,6 @@ import "virtual:expressive-code.css";
 const THEME_SCRIPT =
   'document.documentElement.dataset.theme=localStorage.getItem("sheetwrite-theme")??(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark")';
 
-const SITE_URL = "https://sheetwrite.vercel.app";
 const SITE_TITLE = "Sheetwrite — Spreadsheet, data grid & multi-sheet workbook engine · XLSX/CSV";
 const SITE_DESCRIPTION =
   "Spreadsheet and data-grid engine for multi-sheet workbooks, with XLSX/CSV exchange, Rust/WASM core, and React/Vue/Svelte framework adapters.";

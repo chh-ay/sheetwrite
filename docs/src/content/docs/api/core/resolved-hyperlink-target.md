@@ -1,6 +1,6 @@
 ---
 title: "ResolvedHyperlinkTarget | @sheetwrite/core"
-description: "Host-safe target resolved immediately before hyperlink activation."
+description: "ResolvedHyperlinkTarget type in @sheetwrite/core: Host-safe target resolved immediately before hyperlink activation."
 ---
 <!-- api-export:@sheetwrite/core|.|ResolvedHyperlinkTarget -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
