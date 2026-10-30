@@ -183,18 +183,31 @@ function chartKind(plot: XmlElement): ChartKind | undefined {
   }
 }
 
-function axisTitles(plotArea: XmlElement): ChartDefinition["axes"] {
-  const axes = plotArea.children.filter((entry) =>
-    ["catAx", "dateAx", "valAx"].includes(xmlLocalName(entry.name)),
-  );
-  const titleAt = (positions: readonly string[]) => {
-    const axis = axes.find((entry) => positions.includes(valueOf(entry, "axPos") ?? ""));
+/**
+ * Axis titles by axis role. The plot lists the category (or scatter X) axis
+ * first. A bar chart draws that axis on the left, where the renderer draws
+ * `yTitle`. Producers disagree on `c:axPos` for bar charts, so it is not read.
+ */
+function axisTitles(
+  plotArea: XmlElement,
+  plot: XmlElement,
+  kind: ChartKind,
+): ChartDefinition["axes"] {
+  const titleOf = (axisId: XmlElement | undefined) => {
+    const id = axisId && xmlAttribute(axisId, "val");
+    const axis = plotArea.children.find(
+      (entry) =>
+        ["catAx", "dateAx", "valAx"].includes(xmlLocalName(entry.name)) &&
+        valueOf(entry, "axId") === id,
+    );
     return chartText(axis && xmlChild(axis, "title"));
   };
 
-  // The renderer draws `xTitle` under the plot and `yTitle` beside it, whatever the axis role.
-  const xTitle = titleAt(["b", "t"]);
-  const yTitle = titleAt(["l", "r"]);
+  const [first, second] = xmlChildren(plot, "axId");
+  const categoryTitle = titleOf(first);
+  const valueTitle = titleOf(second);
+  const xTitle = kind === "bar" ? valueTitle : categoryTitle;
+  const yTitle = kind === "bar" ? categoryTitle : valueTitle;
   if (xTitle === undefined && yTitle === undefined) return undefined;
   return {
     ...(xTitle === undefined ? {} : { xTitle }),
@@ -232,7 +245,7 @@ function readDefinition(
   const legend: ChartDefinition["legend"] = legendNode
     ? (Object.entries(LEGEND_POSITIONS).find(([code]) => code === position)?.[1] ?? DEFAULT_LEGEND)
     : "none";
-  const axes = axisTitles(plotArea);
+  const axes = axisTitles(plotArea, plot, kind);
   return {
     id,
     kind,

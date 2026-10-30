@@ -151,7 +151,7 @@ function chartXml(
   if (!circular) xml.append(`<c:axId val="${CATEGORY_AXIS_ID}"/><c:axId val="${VALUE_AXIS_ID}"/>`);
   xml.append(`</c:${plot}>`);
 
-  // Axis titles are positional: `xTitle` sits under the plot, as the renderer draws it.
+  // The renderer draws `xTitle` under the plot; a bar chart has its category axis at the left.
   if (!circular) {
     const horizontalBar = chart.kind === "bar";
     const categoryTitle = horizontalBar ? chart.axes?.yTitle : chart.axes?.xTitle;

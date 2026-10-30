@@ -260,22 +260,34 @@ function sheetwriteWorkbook(): WorkbookSnapshot {
             stopIfTrue: true,
           },
         ],
-        charts: [
-          {
-            id: "amount-chart",
-            kind: "column",
-            title: "Amounts",
-            axes: { xTitle: "Row", yTitle: "Amount" },
-            legend: "bottom",
-            anchor: { row: 1, col: 1, offsetX: 4, offsetY: 2, width: 360, height: 240 },
+        // One chart of each kind, so LibreOffice reads and rewrites every chart part Sheetwrite writes.
+        charts: (["column", "bar", "line", "area", "pie", "doughnut", "scatter"] as const).map(
+          (kind, index) => ({
+            id: `amount-${kind}`,
+            kind,
+            title: `Amounts (${kind})`,
+            ...(kind === "pie" || kind === "doughnut"
+              ? {}
+              : { axes: { xTitle: "Row", yTitle: "Amount" } }),
+            legend: "bottom" as const,
+            anchor: { row: index % 5, col: 1, offsetX: 4, offsetY: 2, width: 360, height: 240 },
             series: [
               {
                 nameRange: { sheet: "data", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
                 values: { sheet: "data", start: { row: 2, col: 0 }, end: { row: 3, col: 0 } },
+                ...(kind === "scatter"
+                  ? {
+                      categories: {
+                        sheet: "data",
+                        start: { row: 2, col: 0 },
+                        end: { row: 3, col: 0 },
+                      },
+                    }
+                  : {}),
               },
             ],
-          },
-        ],
+          }),
+        ),
         cells: [
           {
             startRow: 0,
