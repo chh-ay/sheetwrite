@@ -1,8 +1,19 @@
 {
   "$schema": "https://unpkg.com/@changesets/config@2.3.1/schema.json",
-  "changelog": "@changesets/cli/changelog",
+  "changelog": ["@changesets/changelog-github", { "repo": "chh-ay/sheetwrite" }],
   "commit": false,
-  "fixed": [["@sheetwrite/wasm", "@sheetwrite/formulas"]],
+  "fixed": [
+    [
+      "@sheetwrite/wasm",
+      "@sheetwrite/formulas",
+      "@sheetwrite/core",
+      "@sheetwrite/xlsx",
+      "@sheetwrite/charts",
+      "@sheetwrite/react",
+      "@sheetwrite/vue",
+      "@sheetwrite/svelte"
+    ]
+  ],
   "linked": [],
   "access": "public",
   "baseBranch": "develop",

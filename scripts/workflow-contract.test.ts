@@ -176,4 +176,41 @@ describe("CI and release workflow contracts", () => {
       expect(missingAll.stdout.toString()).toContain(name);
     }
   });
+
+  it("gives changeset versioning the token that the GitHub changelog generator needs", () => {
+    const steps = workflows().version.jobs.version?.steps ?? [];
+    const versioning = steps.find((step) => step.uses?.startsWith("changesets/action@"));
+    if (versioning?.uses === undefined) throw new Error("Missing changesets version step");
+
+    // @changesets/changelog-github reads each entry's pull request and author from GitHub.
+    expect(versioning.with?.version).toBe("bun run changeset:version");
+    expect(versioning.env?.GITHUB_TOKEN).toBe("${{ github.token }}");
+    // Release publication owns GitHub releases, one per version.
+    expect(versioning.with?.createGithubReleases).toBe(false);
+  });
+
+  it("publishes the version GitHub release from the commit and packages that npm verified", () => {
+    const publish = workflows().release.jobs.publish;
+    const steps = publish?.steps ?? [];
+    const releaseIndex = steps.findIndex((step) => step.run === "bun scripts/release-github.ts");
+    const publishIndex = steps.findIndex((step) => step.id === "publish");
+    const step = steps[releaseIndex];
+    if (step === undefined) throw new Error("Missing GitHub release step");
+
+    expect(publishIndex).toBeGreaterThan(-1);
+    expect(releaseIndex).toBeGreaterThan(publishIndex);
+    expect(step.if).toBe("steps.publish.outputs.pending != 'true'");
+    expect(step.env).toEqual({
+      GH_TOKEN: "${{ github.token }}",
+      EXPECTED_SHA: "${{ needs.identity.outputs.commit }}",
+      VERIFIED_PACKAGES: "${{ steps.publish.outputs.verified }}",
+      PUBLISHED_PACKAGES: "${{ steps.publish.outputs.published }}",
+    });
+    // Tags and release notes need the release commit with full tag history.
+    expect(publish?.permissions?.contents).toBe("write");
+    expect(steps[0]?.with).toEqual({
+      ref: "${{ needs.identity.outputs.commit }}",
+      "fetch-depth": 0,
+    });
+  });
 });
