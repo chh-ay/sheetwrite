@@ -10,27 +10,11 @@ import {
 import {
   BUNDLER_SOURCE_MAP_MODE,
   classifyPackedPath,
-  parsePackJson,
   SIZE_PROTOCOL_VERSION,
   summarizePack,
   validateBundlerEvidence,
   validateComparableAttribution,
 } from "./size-report.js";
-
-function packJson(overrides: Record<string, unknown> = {}): string {
-  return JSON.stringify([
-    {
-      filename: "sheetwrite.tgz",
-      size: 4,
-      unpackedSize: 3,
-      files: [
-        { path: "dist/index.js", size: 2 },
-        { path: "package.json", size: 1 },
-      ],
-      ...overrides,
-    },
-  ]);
-}
 
 function evidence(
   assets: unknown[],
@@ -125,25 +109,20 @@ function comparableEvidence(bundler: "next" | "vite", overrides: Record<string, 
   );
 }
 
-describe("npm pack parsing and classification", () => {
-  it("fails closed on malformed, duplicate, and unclassified pack data", () => {
-    expect(() => parsePackJson("not-json")).toThrow("Malformed npm pack JSON");
-    expect(() => parsePackJson("[]")).toThrow("exactly one result");
-    expect(() =>
-      parsePackJson(
-        packJson({
-          unpackedSize: 4,
-          files: [
-            { path: "dist/index.js", size: 2 },
-            { path: "dist/index.js", size: 2 },
-          ],
-        }),
-      ),
-    ).toThrow("duplicate file");
+describe("packed file classification", () => {
+  it("fails closed on unclassified files and inconsistent unpacked sizes", () => {
     expect(() => classifyPackedPath("dist/unexpected.bin")).toThrow("Unclassified");
-    expect(() => summarizePack("test", parsePackJson(packJson({ unpackedSize: 99 })))).toThrow(
-      "do not equal",
-    );
+    expect(() =>
+      summarizePack("test", {
+        filename: "sheetwrite.tgz",
+        size: 4,
+        unpackedSize: 99,
+        files: [
+          { path: "dist/index.js", size: 2 },
+          { path: "package.json", size: 1 },
+        ],
+      }),
+    ).toThrow("do not equal");
   });
 });
 

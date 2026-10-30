@@ -13,7 +13,7 @@ import {
   RELEASE_BUILD_COMMAND,
   type ReleaseArtifactManifest,
   releaseModeDirty,
-  rewriteWorkspaceRanges,
+  packBuiltPackages,
   serializeReleaseManifest,
   validateReleaseManifest,
   verifyReleaseArtifacts,
@@ -215,31 +215,62 @@ describe("canonical release artifacts", () => {
     }
   }
 
-  it("rewrites workspace ranges and enforces release cleanliness", () => {
-    const versions = new Map([
-      ["@sheetwrite/core", "0.1.0"],
-      ["@sheetwrite/react", "0.1.0"],
-      ["@sheetwrite/vue", "0.1.0"],
+  it("assembles built outputs into a real tarball using release manifest policy", async () => {
+    const root = await temporaryDirectory();
+    const source = join(root, "source");
+    await mkdir(join(source, "dist"), { recursive: true });
+    const sourceManifest = {
+      name: "@sheetwrite/core",
+      version: "1.2.3",
+      files: ["dist/*.js"],
+      dependencies: { "@sheetwrite/core": "workspace:*", registry: "^9.0.0" },
+      devDependencies: { "@sheetwrite/core": "workspace:^" },
+      peerDependencies: { "@sheetwrite/core": "workspace:~" },
+      scripts: { prepublishOnly: "exit 1", check: "exit 0" },
+    };
+    await writeFile(join(source, "package.json"), JSON.stringify(sourceManifest));
+    await writeFile(join(source, "dist/index.js"), "export const answer = 42;\n");
+    await writeFile(join(source, "dist/private.txt"), "not published");
+    await writeFile(join(source, "README.md"), "Fixture readme\n");
+    await writeFile(join(source, "LICENSE"), "Fixture package license\n");
+    const [packed] = await packBuiltPackages(join(root, "packed"), [source]);
+    if (packed === undefined) throw new Error("Expected the fixture tarball");
+    expect(packed.artifact.path).toBe("sheetwrite-core-1.2.3.tgz");
+    expect(packed.artifact.files).toEqual([
+      "LICENSE",
+      "README.md",
+      "dist/index.js",
+      "package.json",
     ]);
-    expect(
-      rewriteWorkspaceRanges(
-        {
-          registry: "^9.0.0",
-          "@sheetwrite/core": "workspace:*",
-          "@sheetwrite/react": "workspace:^",
-          "@sheetwrite/vue": "workspace:~",
-        },
-        versions,
-      ),
-    ).toEqual({
-      registry: "^9.0.0",
-      "@sheetwrite/core": "0.1.0",
-      "@sheetwrite/react": "0.1.0",
-      "@sheetwrite/vue": "0.1.0",
+    const extract = (path: string): string => {
+      const result = Bun.spawnSync(["tar", "-xOzf", packed.tarballPath, `package/${path}`]);
+      if (result.exitCode !== 0) throw new Error(result.stderr.toString());
+      return result.stdout.toString();
+    };
+    expect(JSON.parse(extract("package.json"))).toEqual({
+      ...sourceManifest,
+      dependencies: { "@sheetwrite/core": "1.2.3", registry: "^9.0.0" },
+      devDependencies: { "@sheetwrite/core": "1.2.3" },
+      peerDependencies: { "@sheetwrite/core": "1.2.3" },
+      scripts: { check: "exit 0" },
     });
-    expect(() =>
-      rewriteWorkspaceRanges({ "@sheetwrite/missing": "workspace:*" }, versions),
-    ).toThrow("No release version found for @sheetwrite/missing");
+    expect(extract("LICENSE")).toBe("Fixture package license\n");
+    expect(extract("README.md")).toBe("Fixture readme\n");
+    expect(extract("dist/index.js")).toBe("export const answer = 42;\n");
+
+    await writeFile(
+      join(source, "package.json"),
+      JSON.stringify({
+        ...sourceManifest,
+        dependencies: { "@sheetwrite/missing": "workspace:*" },
+      }),
+    );
+    await expect(packBuiltPackages(join(root, "missing"), [source])).rejects.toThrow(
+      "No release version found for @sheetwrite/missing",
+    );
+  });
+
+  it("enforces release cleanliness and empty output directories", () => {
     expect(releaseModeDirty("verification", "")).toBe(false);
     expect(releaseModeDirty("verification", " M package.json\n")).toBe(true);
     expect(() => releaseModeDirty("release", "")).not.toThrow();

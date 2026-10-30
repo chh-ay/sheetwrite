@@ -52,7 +52,7 @@ interface NpmPackResult {
   readonly unpackedSize: number;
   readonly shasum: string;
   readonly integrity: string;
-  readonly files: ReadonlyArray<{ readonly path: string }>;
+  readonly files: ReadonlyArray<{ readonly path: string; readonly size: number }>;
 }
 
 export interface ReleaseToolchain {
@@ -78,6 +78,12 @@ export interface ReleasePackageArtifact {
   readonly integrity: string;
   readonly sha512: string;
   readonly internalDependencies: Readonly<Record<string, string>>;
+}
+
+export interface PackedWorkspacePackage {
+  readonly tarballPath: string;
+  readonly artifact: ReleasePackageArtifact;
+  readonly pack: NpmPackResult;
 }
 
 export interface ReleaseArtifactManifest {
@@ -140,7 +146,7 @@ export function assertOutputDirectoryEmpty(entries: readonly string[]): void {
   }
 }
 
-export function rewriteWorkspaceRanges(
+function rewriteWorkspaceRanges(
   dependencies: Readonly<Record<string, string>> | undefined,
   versions: ReadonlyMap<string, string>,
 ): Record<string, string> | undefined {
@@ -536,18 +542,39 @@ function parsePackResult(output: string, expectedName: string): NpmPackResult {
   if (!Array.isArray(parsed) || parsed.length !== 1) {
     throw new Error("npm pack must return exactly one artifact");
   }
-  const result = parsed[0] as Partial<NpmPackResult>;
+  const result = parsed[0] as Partial<NpmPackResult> | null;
   if (
+    result === null ||
+    typeof result !== "object" ||
     result.name !== expectedName ||
     typeof result.version !== "string" ||
     typeof result.filename !== "string" ||
     !Number.isInteger(result.size) ||
     !Number.isInteger(result.unpackedSize) ||
+    Number(result.size) < 0 ||
+    Number(result.unpackedSize) < 0 ||
     typeof result.shasum !== "string" ||
     typeof result.integrity !== "string" ||
     !Array.isArray(result.files)
   ) {
     throw new Error(`Malformed npm pack result for ${expectedName}`);
+  }
+  const paths = new Set<string>();
+  for (const file of result.files ?? []) {
+    if (
+      file === null ||
+      typeof file !== "object" ||
+      typeof file.path !== "string" ||
+      file.path.length === 0 ||
+      !Number.isInteger(file.size) ||
+      file.size < 0
+    ) {
+      throw new Error(`Malformed npm pack file for ${expectedName}`);
+    }
+    if (paths.has(file.path)) {
+      throw new Error(`${expectedName} npm pack contains duplicate file ${file.path}`);
+    }
+    paths.add(file.path);
   }
   return result as NpmPackResult;
 }
@@ -725,24 +752,26 @@ async function ensureEmptyOutput(root: string): Promise<void> {
   assertOutputDirectoryEmpty(await readdir(root));
 }
 
-export type ReleaseArtifactMode = "verification" | "release";
-
-export async function buildReleaseArtifacts(
+/**
+ * Packs already-built outputs using the release manifest and file policy.
+ * Source directories default to the publishable workspace packages.
+ */
+export async function packBuiltPackages(
   artifactDirectory: string,
-  mode: ReleaseArtifactMode = "verification",
-): Promise<ReleaseArtifactManifest> {
+  sourceDirectories?: readonly string[],
+): Promise<readonly PackedWorkspacePackage[]> {
   const outputRoot = resolve(artifactDirectory);
-  const status = await run(["git", "status", "--porcelain", "--untracked-files=no"]);
-  const dirty = releaseModeDirty(mode, status);
   await ensureEmptyOutput(outputRoot);
-  const [sourceCommit, toolchain, sources] = await Promise.all([
-    run(["git", "rev-parse", "HEAD"]),
-    assertToolchain(),
-    loadSourcePackages(),
-  ]);
-  await run(["bun", "run", "build:packages"]);
-
-  const temporaryRoot = await mkdtemp(join(tmpdir(), "sheetwrite-release-artifacts-"));
+  const sources =
+    sourceDirectories === undefined
+      ? await loadSourcePackages()
+      : await Promise.all(
+          sourceDirectories.map(async (directory) => ({
+            directory: resolve(directory),
+            manifest: await readJson<PackageManifest>(join(directory, "package.json")),
+          })),
+        );
+  const temporaryRoot = await mkdtemp(join(tmpdir(), "sheetwrite-package-assembly-"));
   try {
     const stageRoot = join(temporaryRoot, "stage");
     const tarballRoot = join(temporaryRoot, "tarballs");
@@ -750,7 +779,7 @@ export async function buildReleaseArtifacts(
     const versions = new Map(
       sources.map(({ manifest }) => [manifest.name, manifest.version] as const),
     );
-    const packages: ReleasePackageArtifact[] = [];
+    const packages: PackedWorkspacePackage[] = [];
     for (const source of sources) {
       const staged = await stagePackage(source, stageRoot, versions);
       const result = parsePackResult(
@@ -788,13 +817,43 @@ export async function buildReleaseArtifacts(
       if (
         tarballBytes.byteLength !== artifact.bytes ||
         digest(tarballBytes, "sha1", "hex") !== artifact.shasum ||
-        `sha512-${digest(tarballBytes, "sha512", "base64")}` !== artifact.integrity ||
-        digest(tarballBytes, "sha512", "hex") !== artifact.sha512
+        `sha512-${digest(tarballBytes, "sha512", "base64")}` !== artifact.integrity
       ) {
         throw new Error(`${artifact.name} npm pack digest metadata does not match its tarball`);
       }
-      packages.push(artifact);
+      const outputPath = join(outputRoot, artifact.path);
+      await cp(tarballPath, outputPath);
+      packages.push({ tarballPath: outputPath, artifact, pack: result });
     }
+    return packages;
+  } catch (error) {
+    await rm(outputRoot, { force: true, recursive: true });
+    throw error;
+  } finally {
+    await rm(temporaryRoot, { force: true, recursive: true });
+  }
+}
+
+export type ReleaseArtifactMode = "verification" | "release";
+
+export async function buildReleaseArtifacts(
+  artifactDirectory: string,
+  mode: ReleaseArtifactMode = "verification",
+): Promise<ReleaseArtifactManifest> {
+  const outputRoot = resolve(artifactDirectory);
+  const status = await run(["git", "status", "--porcelain", "--untracked-files=no"]);
+  const dirty = releaseModeDirty(mode, status);
+  await ensureEmptyOutput(outputRoot);
+  const [sourceCommit, toolchain] = await Promise.all([
+    run(["git", "rev-parse", "HEAD"]),
+    assertToolchain(),
+  ]);
+  await run(["bun", "run", "build:packages"]);
+
+  const temporaryRoot = await mkdtemp(join(tmpdir(), "sheetwrite-release-artifacts-"));
+  try {
+    const packed = await packBuiltPackages(join(temporaryRoot, "tarballs"));
+    const packages = packed.map(({ artifact }) => artifact);
     const manifest: ReleaseArtifactManifest = {
       schemaVersion: RELEASE_ARTIFACT_SCHEMA_VERSION,
       sourceCommit,
@@ -804,8 +863,8 @@ export async function buildReleaseArtifacts(
       packages,
     };
     validateReleaseManifest(manifest);
-    for (const artifact of manifest.packages) {
-      await cp(join(tarballRoot, artifact.path), join(outputRoot, artifact.path));
+    for (const { artifact, tarballPath } of packed) {
+      await cp(tarballPath, join(outputRoot, artifact.path));
     }
     await writeFile(
       join(outputRoot, RELEASE_ARTIFACT_MANIFEST),
@@ -831,6 +890,10 @@ function requiredOption(args: readonly string[], name: string): string {
 
 async function cli(): Promise<void> {
   const [command, ...args] = process.argv.slice(2);
+  if (command === "pack") {
+    await packBuiltPackages(requiredOption(args, "--output"));
+    return;
+  }
   if (command === "build") {
     const output = requiredOption(args, "--output");
     const manifest = await buildReleaseArtifacts(output, "verification");
@@ -863,7 +926,7 @@ async function cli(): Promise<void> {
     return;
   }
   throw new Error(
-    "Usage: bun scripts/release-artifacts.ts build --output <directory> | prepare --mode <verification|release> --output <directory> | verify --artifacts <directory> | verify-input --input <directory>",
+    "Usage: bun scripts/release-artifacts.ts pack --output <directory> | build --output <directory> | prepare --mode <verification|release> --output <directory> | verify --artifacts <directory> | verify-input --input <directory>",
   );
 }
 
