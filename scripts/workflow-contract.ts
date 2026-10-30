@@ -4,6 +4,7 @@ interface WorkflowStepBase {
   readonly id?: string;
   readonly name?: string;
   readonly if?: string;
+  readonly env?: Readonly<Record<string, unknown>>;
 }
 
 export interface RunWorkflowStep extends WorkflowStepBase {
@@ -103,6 +104,7 @@ function parseStep(value: unknown, label: string): WorkflowStep {
   optionalString(value.name, `${label}.name`);
   optionalString(value.run, `${label}.run`);
   optionalString(value.if, `${label}.if`);
+  optionalRecord(value.env, `${label}.env`);
   optionalString(value.uses, `${label}.uses`);
   optionalRecord(value.with, `${label}.with`);
   if (value.run !== undefined) {
@@ -117,6 +119,7 @@ function parseStep(value: unknown, label: string): WorkflowStep {
       name: value.name,
       run: value.run,
       if: value.if,
+      env: value.env,
     };
   }
   if (value.uses !== undefined) {
@@ -124,6 +127,7 @@ function parseStep(value: unknown, label: string): WorkflowStep {
       id: value.id,
       name: value.name,
       if: value.if,
+      env: value.env,
       uses: value.uses,
       with: value.with,
     };
