@@ -100,8 +100,11 @@ function parseRange(formula: string, snapshot: WorkbookSnapshot): ChartRange | u
   const startRow = match[4];
   if (!sheet || startColumn === undefined || startRow === undefined) return undefined;
 
-  const start = { row: Number(startRow) - 1, col: labelToCol(startColumn) };
-  const end = { row: Number(match[6] ?? startRow) - 1, col: labelToCol(match[5] ?? startColumn) };
+  // The pattern is case-insensitive, but column labels convert from upper case only.
+  const firstColumn = startColumn.toUpperCase();
+  const lastColumn = (match[5] ?? startColumn).toUpperCase();
+  const start = { row: Number(startRow) - 1, col: labelToCol(firstColumn) };
+  const end = { row: Number(match[6] ?? startRow) - 1, col: labelToCol(lastColumn) };
   if (end.row < start.row || end.col < start.col || end.row >= MAX_ROWS || end.col >= MAX_COLUMNS) {
     return undefined;
   }
@@ -295,9 +298,16 @@ function readAnchor(element: XmlElement, sheet: SheetSnapshot): ChartAnchor | un
   if (!insideSheet(lastCol, MAX_COLUMNS) || !insideSheet(lastRow, MAX_ROWS)) return undefined;
   for (let index = col; index < lastCol; index++)
     width += sheet.columns[index]?.width ?? DEFAULT_COLUMN_PIXELS;
-  const rowHeights = new Map(sheet.rowMeta ?? []);
-  for (let index = row; index < lastRow; index++)
-    height += rowHeights.get(index)?.height ?? DEFAULT_ROW_PIXELS;
+
+  // Sum only the rows with their own height, so a span over the whole sheet
+  // costs one pass over the row metadata, not one step per row.
+  height += (lastRow - row) * DEFAULT_ROW_PIXELS;
+  for (const [index, meta] of sheet.rowMeta ?? []) {
+    if (index >= row && index < lastRow && meta.height !== undefined) {
+      height += meta.height - DEFAULT_ROW_PIXELS;
+    }
+  }
+
   return { row, col, offsetX, offsetY, width, height };
 }
 

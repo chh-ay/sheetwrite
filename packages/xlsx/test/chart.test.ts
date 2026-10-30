@@ -284,4 +284,24 @@ describe("native XLSX charts", () => {
       KINDS.filter((kind) => kind !== "bar"),
     );
   });
+
+  it("reads series ranges written with lower-case column letters", async () => {
+    const parts = unzipSync(await toXlsxWorkbook(authored()));
+    const expected = await fromXlsxWorkbook(withoutSidecar(zipSync(parts)));
+    const chartPart = "xl/charts/sheetwrite-chart1-1.xml";
+    parts[chartPart] = strToU8(
+      strFromU8(parts[chartPart] ?? new Uint8Array()).replace(
+        /<c:f>([^<]*)<\/c:f>/g,
+        (_formula: string, source: string) =>
+          `<c:f>${source.replace(/\$([A-Z]{1,3})\$/g, (column: string) => column.toLowerCase())}</c:f>`,
+      ),
+    );
+
+    const imported = await fromXlsxWorkbook(withoutSidecar(zipSync(parts)));
+
+    expect(strFromU8(parts[chartPart] ?? new Uint8Array())).toMatch(/<c:f>[^<]*\$[a-z]+\$/);
+    expect(imported.sheets[0]?.charts?.[0]?.series).toEqual(
+      expected.sheets[0]?.charts?.[0]?.series ?? [],
+    );
+  });
 });
