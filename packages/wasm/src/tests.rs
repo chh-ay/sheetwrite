@@ -952,6 +952,46 @@ fn public_api_bounds_checks_do_not_panic() {
 }
 
 #[test]
+fn skipped_and_unloaded_window_cells_have_no_style() {
+    let styled_id = 7;
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(1, 1);
+    store.set_number(sheet, 0, 0, 1.0, styled_id);
+    let windows = [
+        store.get_window(sheet, 0, 1, &[0, 1]),
+        store.get_window_rows(sheet, &[0, 9], &[0, 1]),
+    ];
+    for window in windows {
+        let decoded = decode_window(window);
+        let styles: Vec<u32> = decoded
+            .style_index
+            .iter()
+            .map(|&slot| decoded.style_dict[slot as usize])
+            .collect();
+        assert_eq!(styles[0], styled_id);
+        assert!(styles[1..].iter().all(|&style| style == 0));
+    }
+
+    let paged = store.add_paged_sheet(2, 1, 4, 1_000_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
+    store.set_number(paged, 0, 0, 1.0, styled_id);
+    for window in [
+        store.get_window(paged, 0, 1, &[0, 1]),
+        store.get_window_rows(paged, &[0], &[0, 1]),
+    ] {
+        let decoded = decode_window(window);
+        assert_eq!(
+            decoded.style_dict[decoded.style_index[0] as usize],
+            styled_id
+        );
+        assert_eq!(decoded.style_dict[decoded.style_index[1] as usize], 0);
+        assert_eq!(
+            decoded.strings[decoded.string_index[1] as usize],
+            "#LOADING!"
+        );
+    }
+}
+
+#[test]
 fn window_view_uses_error_strings_and_consuming_reads() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(2, 2);
@@ -968,8 +1008,12 @@ fn window_view_uses_error_strings_and_consuming_reads() {
 
     assert_eq!(view.kinds, vec![KIND_STRING, KIND_STRING, KIND_EMPTY]);
     assert_eq!(view.numbers, vec![0.0, 0.0, 0.0]);
-    assert_eq!(view.style_index, vec![0, 1, 0]);
-    assert_eq!(view.style_dict, vec![7, 9]);
+    let styles: Vec<u32> = view
+        .style_index
+        .iter()
+        .map(|&index| view.style_dict[index as usize])
+        .collect();
+    assert_eq!(styles, vec![7, 9, 0]);
     assert_eq!(pooled[0], "hello");
     assert_eq!(view.strings[view.string_index[1] as usize], "#DIV/0!");
 
