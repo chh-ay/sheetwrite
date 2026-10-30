@@ -118,6 +118,24 @@ function deferred<T>(): Deferred<T> {
 }
 
 describe("presence coordinator", () => {
+  it("reports failures while reading the active sheet", async () => {
+    const mounted = mountGrid();
+    const coordinator = new PresenceCoordinator(mounted.grid, new PresenceBus().endpoint(), {
+      actor: { id: "local" },
+      heartbeatMs: 0,
+    });
+    const failures: unknown[] = [];
+    coordinator.on((event) => {
+      if (event.type === "error") failures.push(event.error);
+    });
+    mounted.grid.getActiveSheet = () => "missing";
+
+    await coordinator.publishNow();
+    expect(failures).toHaveLength(1);
+    coordinator.destroy();
+    mounted.grid.destroy();
+  });
+
   it("truncates remote selections, preserves the document, and expires presence", async () => {
     const bus = new PresenceBus();
     const left = mountGrid();
@@ -208,6 +226,31 @@ describe("presence coordinator", () => {
 });
 
 describe("revision coordinator", () => {
+  it("rejects invalid restored versions without poisoning the current version", async () => {
+    const coordinator = new RevisionCoordinator(
+      {
+        async listRevisions() {
+          return [];
+        },
+        async loadRevision() {
+          return snapshot();
+        },
+        async restoreRevision(request) {
+          return {
+            status: "conflict",
+            currentVersion: Number.NaN,
+            clientMutationId: request.clientMutationId,
+          };
+        },
+      },
+      { documentId: "collab-doc", serverVersion: 7 },
+    );
+
+    await expect(coordinator.restore(3, "invalid-version")).rejects.toThrow();
+    expect(coordinator.serverVersion).toBe(7);
+    coordinator.destroy();
+  });
+
   it("migrates previews into read-only grids and restores as a newer auditable version", async () => {
     const requests: RevisionRestoreRequest[] = [];
     const adapter: RevisionAdapter = {

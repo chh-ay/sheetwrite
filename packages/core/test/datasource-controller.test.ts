@@ -1278,8 +1278,8 @@ it("adapts legacy rows through full-width protocol 2 with explicit blank keys", 
   expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("legacy");
   expect(Reflect.ownKeys(returned!.rows[0]!)).toEqual(["k0", "k1", "k2"]);
   expect(returned!.rows[0]).toMatchObject({ k0: "legacy", k1: null, k2: null });
-  expect(store.getCell({ sheet: "s1", row: 0, col: 1 }).resolved).toBe("");
-  expect(store.getCell({ sheet: "s1", row: 0, col: 2 }).resolved).toBe("");
+  expect(store.getCell({ sheet: "s1", row: 0, col: 1 }).resolved).toBeNull();
+  expect(store.getCell({ sheet: "s1", row: 0, col: 2 }).resolved).toBeNull();
 
   const invalid = legacyFullWidthDataSource((request) => ({
     start: request.start,

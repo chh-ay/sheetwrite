@@ -30,6 +30,7 @@ import {
   validatePivotReferences,
   validatePivotShape,
 } from "./pivot.js";
+import { compareCodeUnits } from "./plain-data.js";
 import { preparedRestore } from "./transaction-preparation.js";
 import type { MergeRange, Range } from "./types/coordinates.js";
 import type {
@@ -931,12 +932,11 @@ function preflightSnapshotResources(
           const columns = ownValue(table, "columns");
           if (!Array.isArray(columns)) continue;
           if (columns.length > DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxColumnsPerTable) {
-            return resourceValidationError(
-              "maxMetadataEntries",
-              DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxColumnsPerTable,
-              columns.length,
-              `${path}.tables[${tableIndex}].columns`,
-            );
+            return {
+              path: `${path}.tables[${tableIndex}].columns`,
+              code: "resource-limit",
+              message: `Workbook table column limit ${DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxColumnsPerTable} exceeded by ${columns.length}`,
+            };
           }
           if (columns.length > limits.maxMetadataEntries - metadataEntries) {
             return resourceValidationError(
@@ -1751,8 +1751,8 @@ function validateSheetShape(value: unknown, path: string, errors: DocumentValida
     const metadata = recordAt(entry[1], `${entryPath}[1]`, errors);
     if (!metadata) return;
     const height = ownValue(metadata, "height");
-    if (height !== undefined && (!finiteNumber(height) || height < 0)) {
-      invalid(errors, `${entryPath}[1].height`, "Row height must be finite and non-negative");
+    if (height !== undefined && (!finiteNumber(height) || height <= 0)) {
+      invalid(errors, `${entryPath}[1].height`, "Row height must be finite and positive");
     }
     optionalBoolean(metadata, "hidden", `${entryPath}[1]`, errors);
   });
@@ -2617,7 +2617,8 @@ function higherIndexOverlap(
   return higherIndexOverlap(node.right, rect);
 }
 
-function overlappingMergeIndices(merges: readonly MergeRange[]): boolean[] {
+/** Flags every merge that overlaps another merge, in O(n log n) with an interval tree. */
+export function overlappingMergeIndices(merges: readonly MergeRange[]): boolean[] {
   const indexed: IndexedMerge[] = merges.map((merge, index) => ({ ...merge, index }));
   const starts = indexed
     .slice()
@@ -3247,14 +3248,14 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
         : undefined,
       hyperlinks: sheet.hyperlinks
         ? [...sheet.hyperlinks]
-            .sort((left, right) => left.id.localeCompare(right.id))
+            .sort((left, right) => compareCodeUnits(left.id, right.id))
             .map(cloneCellHyperlink)
         : undefined,
       validationRules: sheet.validationRules
-        ? [...sheet.validationRules].sort((a, b) => a.id.localeCompare(b.id))
+        ? [...sheet.validationRules].sort((a, b) => compareCodeUnits(a.id, b.id))
         : undefined,
       protectedRanges: sheet.protectedRanges
-        ? [...sheet.protectedRanges].sort((a, b) => a.id.localeCompare(b.id))
+        ? [...sheet.protectedRanges].sort((a, b) => compareCodeUnits(a.id, b.id))
         : undefined,
       notes: sheet.notes
         ? [...sheet.notes].sort((a, b) => a.addr.row - b.addr.row || a.addr.col - b.addr.col)
@@ -3263,12 +3264,12 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
       rowMeta: sheet.rowMeta ? [...sheet.rowMeta].sort((a, b) => a[0] - b[0]) : undefined,
       tables: sheet.tables
         ? [...sheet.tables]
-            .sort((a, b) => a.id.localeCompare(b.id))
+            .sort((a, b) => compareCodeUnits(a.id, b.id))
             .map((table) => structuredClone(table))
         : undefined,
       charts: sheet.charts?.map((chart) => structuredClone(chart)),
       pivots: sheet.pivots
-        ? [...sheet.pivots].sort((a, b) => a.id.localeCompare(b.id)).map(clonePivot)
+        ? [...sheet.pivots].sort((a, b) => compareCodeUnits(a.id, b.id)).map(clonePivot)
         : undefined,
       cells: sheet.cells.map((block) => ({
         ...block,

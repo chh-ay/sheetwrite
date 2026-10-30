@@ -1,5 +1,13 @@
 import type { CellRef } from "./selection.js";
 
+/** Last column index (0-based, "XFD") and last row number of an Excel worksheet. */
+const LAST_COLUMN_INDEX = 16_383;
+const LAST_ROW_NUMBER = 1_048_576;
+
+/** A range with a `#REF!` corner; Excel replaces the whole range with `#REF!`. */
+const RANGE_WITH_CORNERS =
+  /"(?:[^"]|"")*"|'(?:[^']|'')*'|(#REF!|\$?[A-Za-z]{1,3}\$?[0-9]+):(#REF!|\$?[A-Za-z]{1,3}\$?[0-9]+)/g;
+
 /** Column index (0-based) → A1 column label (0 → "A", 26 → "AA"). */
 export function colToA1(col: number): string {
   let c = col + 1;
@@ -42,11 +50,13 @@ export function rangeA1(a: CellRef, b: CellRef): string {
  * Shift relative A1 references in a formula by (dRow, dCol) — used when a
  * formula is filled into other cells. Absolute parts ($A, A$1) stay fixed, and
  * tokens preceded by an alphanumeric (function names, identifiers) are skipped.
+ * A reference shifted off the sheet becomes `#REF!`, and so does any range
+ * with such a corner.
  */
 export function shiftA1Refs(src: string, dRow: number, dCol: number): string {
   if (dRow === 0 && dCol === 0) return src;
 
-  return src.replace(
+  const shifted = src.replace(
     /"(?:[^"]|"")*"|'(?:[^']|'')*'|(\$?)([A-Za-z]{1,3})(\$?)([0-9]+)/g,
     (
       match: string,
@@ -60,15 +70,24 @@ export function shiftA1Refs(src: string, dRow: number, dCol: number): string {
       if (match.startsWith('"') || match.startsWith("'")) return match;
       const prev = offset > 0 ? full.charAt(offset - 1) : "";
       if (prev === "_" || /[A-Za-z0-9]/.test(prev)) return match;
+      const next = full.charAt(offset + match.length);
+      if (next === "(" || next === "_" || /[A-Za-z0-9]/.test(next)) return match;
 
       let col = labelToCol(letters.toUpperCase());
       let rowNum = Number(digits);
 
-      if (!ca) col = Math.max(0, col + dCol);
-      if (!ra) rowNum = Math.max(1, rowNum + dRow);
+      if (!ca) col += dCol;
+      if (!ra) rowNum += dRow;
+      if (col < 0 || col > LAST_COLUMN_INDEX || rowNum < 1 || rowNum > LAST_ROW_NUMBER) {
+        return "#REF!";
+      }
 
       return `${ca}${colToA1(col)}${ra}${rowNum}`;
     },
+  );
+
+  return shifted.replace(RANGE_WITH_CORNERS, (match: string, start?: string, end?: string) =>
+    start === "#REF!" || end === "#REF!" ? "#REF!" : match,
   );
 }
 
@@ -98,6 +117,8 @@ export function remapFormulaA1Refs(
       if (match.startsWith('"') || match.startsWith("'")) return match;
       const previous = offset > 0 ? full.charAt(offset - 1) : "";
       if (previous === "!" || previous === "_" || /[A-Za-z0-9]/.test(previous)) return match;
+      const next = full.charAt(offset + match.length);
+      if (next === "(" || next === "_" || /[A-Za-z0-9]/.test(next)) return match;
       const col = labelToCol(letters.toUpperCase());
       const row = Number(digits) - 1;
       const mapped = remap(axis === "row" ? row : col);

@@ -468,6 +468,7 @@ describe("ReadWindowController", () => {
         windowReads += 1;
         return store.getVisibleWindow(...args);
       },
+      viewRowCount: (sheetId: Parameters<Store["viewRowCount"]>[0]) => store.viewRowCount(sheetId),
     } as unknown as Store;
     const sheet = store.getWorkbook().sheets[0]!;
     const geometry = new GeometryLayoutController(
@@ -527,6 +528,7 @@ describe("ReadWindowController", () => {
     } as unknown as DomOverlay;
     const aria = {
       bumpVersion: () => {},
+      setRowCount: () => {},
       update: () => {
         ariaUpdates += 1;
       },
