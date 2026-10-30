@@ -277,6 +277,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
         href: "/docs/reference/formula-functions/",
         items: formulaNav,
       },
+      { label: "Excel function coverage", href: "/docs/reference/excel-function-coverage/" },
       { label: "Document operations", href: "/docs/reference/document-operations/" },
       { label: "Events", href: "/docs/reference/events/" },
       { label: "Compatibility limits", href: "/docs/reference/compatibility-limits/" },

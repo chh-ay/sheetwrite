@@ -1,6 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
+import { validateFormulaContractRepository } from "./formula-contract.js";
+
 const DEFAULT_INVENTORY_PATH = "test/conformance/formula-contract.inventory.json";
 const REQUIRED_SUPPORTED_COUNT = 100;
 
@@ -241,7 +243,13 @@ export async function loadFormulaContractInventory(
   root: string,
   path = DEFAULT_INVENTORY_PATH,
 ): Promise<unknown> {
-  return JSON.parse(await readFile(resolve(root, path), "utf8"));
+  const inventory: unknown = JSON.parse(await readFile(resolve(root, path), "utf8"));
+  const validation = await validateFormulaContractRepository(root, inventory);
+  if (validation.issues.length > 0) {
+    throw new Error(`Formula registry drift:\n${validation.issues.join("\n")}`);
+  }
+
+  return inventory;
 }
 
 /** One generated formula reference page, relative to the docs content root. */
@@ -342,7 +350,7 @@ export function renderFormulaFunctionPages(inventoryValue: unknown): FormulaRefe
     "",
     `This page is generated from the checked version ${inventory.version} \`${contract}\` inventory. It publishes **${required.length} required-supported target functions**, **${incumbent.length} incumbent functions**, and **${extension.length} optional analysis functions** (${functions.length} canonical functions total) without maintaining a second name list. Aliases share their canonical function's build availability.`,
     "",
-    "A function's presence means only the signature and semantic profiles linked in its row. Microsoft Excel documentation supplies the naming/family taxonomy; it is not a blanket Excel claim. Google Sheets and OpenFormula behavior is unverified unless a dialect profile says otherwise.",
+    "A function's presence means only the signature and semantic profiles linked in its row. Microsoft Excel documentation supplies the naming/family taxonomy; it is not a blanket Excel claim. The [Excel function coverage](/docs/reference/excel-function-coverage/) page lists every Excel catalog name, including names that are not supported. Google Sheets and OpenFormula behavior is unverified unless a dialect profile says otherwise.",
     "",
     "## Functions by family",
     "",
@@ -569,4 +577,159 @@ export function formulaFamilyNavigation(
     if (match === null || title === undefined) return [];
     return [{ label: title, href: `${FORMULA_FUNCTIONS_ROUTE}${match[1]}/` }];
   });
+}
+
+interface ExcelCoverageContext {
+  readonly byName: ReadonlyMap<string, FormulaRecord>;
+  readonly dialects: Record<string, JsonObject>;
+  /** Contract scope text for names that are unsupported by design. */
+  readonly exclusions: ReadonlyMap<string, string>;
+  readonly seen: Set<string>;
+  readonly summary: { supported: number; partial: number; missing: number };
+}
+
+function excelDifference(
+  formula: FormulaRecord,
+  dialect: JsonObject,
+): {
+  readonly partial: boolean;
+  readonly notes: readonly string[];
+} {
+  const partial = dialect.excel === "divergent";
+  const notes = stringArray(dialect.divergences, `${formula.dialects}.divergences`)
+    .filter((note) => !note.startsWith("Google Sheets and OpenFormula"))
+    .map((note) => note.replace(/^Available only[^.]*\.\s*/u, ""))
+    .filter((note) => note.length > 0);
+  if (partial && notes.length === 0) {
+    throw new Error(`${formula.canonical} needs an Excel difference`);
+  }
+
+  return { partial, notes };
+}
+
+function renderExcelCoverageRow(value: unknown, context: ExcelCoverageContext): string {
+  const entry = object(value, "Excel function");
+  const name = string(entry.name, "Excel function name");
+  const url = string(entry.url, `${name} URL`);
+  if (!/^[A-Z][A-Z0-9.]*$/u.test(name) || context.seen.has(name)) {
+    throw new Error(`Invalid or duplicate Excel function: ${name}`);
+  }
+  if (!url.startsWith("https://support.microsoft.com/")) {
+    throw new Error(`Excel function ${name} must link to Microsoft Support`);
+  }
+  context.seen.add(name);
+
+  const formula = context.byName.get(name);
+  if (formula === undefined) {
+    context.summary.missing++;
+    const exclusion = context.exclusions.get(name);
+    const note =
+      exclusion === undefined
+        ? "Not registered in either engine."
+        : `Unsupported by design: ${exclusion}`;
+    return `| [\`${name}\`](${url}) | Not supported | Not supported | ${cell(note)} |`;
+  }
+
+  const dialect = context.dialects[formula.dialects];
+  if (dialect === undefined) throw new Error(`${name} has unknown dialect ${formula.dialects}`);
+  const { partial, notes } = excelDifference(formula, dialect);
+  const status = partial ? "Partly supported" : "Supported";
+  const isFull = formula.builds.includes("@sheetwrite/formulas");
+  const isLite = formula.builds.includes("@sheetwrite/wasm");
+  if (!isFull) throw new Error(`${name} is registered without full-engine support`);
+  context.summary[partial ? "partial" : "supported"]++;
+
+  const contractLink = `${FORMULA_FUNCTIONS_ROUTE}${anchor(formula.family)}/`;
+  const alias = name === formula.canonical ? "" : `Alias of \`${formula.canonical}\`. `;
+  const availability = isLite ? "" : "Lite engine: not registered. ";
+  const detail = notes.length > 0 ? `${notes.join(" ")} ` : "";
+  return `| [\`${name}\`](${url}) | ${status} | ${isLite ? status : "Not supported"} | ${cell(`${alias}${availability}${detail}[Contract](${contractLink})`)} |`;
+}
+
+function renderExcelCoverageFamilies(
+  families: readonly unknown[],
+  context: ExcelCoverageContext,
+): string[] {
+  return families.flatMap((value, index) => {
+    const family = object(value, `Excel catalog families[${index}]`);
+    const title = string(family.title, `Excel catalog families[${index}].title`);
+    if (!Array.isArray(family.functions)) throw new Error(`${title} functions must be an array`);
+
+    return [
+      `## ${title}`,
+      "",
+      "| Excel function | Full engine | Lite engine | Notes and differences |",
+      "| --- | --- | --- | --- |",
+      ...family.functions.map((entry) => renderExcelCoverageRow(entry, context)),
+      "",
+    ];
+  });
+}
+
+function unsupportedExamples(value: unknown): Map<string, string> {
+  if (!Array.isArray(value)) throw new Error("unsupportedCategories must be an array");
+
+  return new Map(
+    value.flatMap((entry, index) => {
+      const category = object(entry, `unsupportedCategories[${index}]`);
+      const scope = string(category.scope, `unsupportedCategories[${index}].scope`);
+      return stringArray(category.examples, `unsupportedCategories[${index}].examples`).map(
+        (name) => [name, scope] as const,
+      );
+    }),
+  );
+}
+
+/**
+ * Compare Microsoft's pinned names with the registry-checked contract.
+ * The catalog has no availability flags that could drift from the engine.
+ */
+export function renderExcelCoveragePage(
+  inventoryValue: unknown,
+  catalogValue: unknown,
+): FormulaReferencePage {
+  const inventory = object(inventoryValue, "formula inventory");
+  const functions = parseFunctions(inventory.functions);
+  const catalog = object(catalogValue, "Excel catalog");
+  if (!Array.isArray(catalog.families)) throw new Error("Excel catalog families must be an array");
+
+  const context: ExcelCoverageContext = {
+    byName: new Map(
+      functions.flatMap((formula) =>
+        [formula.canonical, ...formula.aliases].map((name) => [name, formula] as const),
+      ),
+    ),
+    dialects: recordMap(inventory.dialectProfiles, "dialectProfiles"),
+    exclusions: unsupportedExamples(inventory.unsupportedCategories),
+    seen: new Set<string>(),
+    summary: { supported: 0, partial: 0, missing: 0 },
+  };
+  const familyLines = renderExcelCoverageFamilies(catalog.families, context);
+  const { seen, summary } = context;
+
+  return {
+    route: "reference/excel-function-coverage.md",
+    content: [
+      "---",
+      'title: "Excel function coverage"',
+      'description: "Every function in the pinned Microsoft Excel catalog, with full and lite engine availability and known differences."',
+      "---",
+      "",
+      `This table covers **${seen.size} distinct Excel function names** from [Microsoft's category catalog](${string(catalog.source, "Excel catalog source")}), updated ${string(catalog.sourceUpdated, "Excel catalog sourceUpdated")} and retrieved ${string(catalog.retrievedOn, "Excel catalog retrievedOn")}. It includes compatibility names and add-in functions. It is a pinned catalog, not a claim to cover functions Microsoft adds after that date.`,
+      "",
+      `The full engine has **${summary.supported} supported**, **${summary.partial} partly supported**, and **${summary.missing} not supported** names in this catalog. Aliases count as separate Excel names. Functions outside the catalog remain in the [function contract](${FORMULA_FUNCTIONS_ROUTE}).`,
+      "",
+      "## How to read the table",
+      "",
+      "- **Full engine** is `@sheetwrite/formulas`. **Lite engine** is the default `@sheetwrite/wasm` package. Importing the full package alone does not select it; see [engine builds](/docs/reference/formula-functions/#engine-builds).",
+      "- **Supported** means registered and implemented within the linked Sheetwrite signature and semantic contract. It does not mean complete Excel parity, array broadcasting for every scalar function, unlimited numerical precision, or reviewed external results.",
+      "- **Partly supported** means implemented with a known Excel difference, marked as divergent in the formula contract. The row states the difference. Shared resource limits are documented in the [bounded evaluation contract](/docs/reference/formula-functions/#bounded-evaluation-contract).",
+      "- **Not supported** means not registered in that engine; the call evaluates to `#NAME?`. A function that is only in the full engine is not a broken lite implementation. **Unsupported by design** marks a name that the contract's [unsupported categories](/docs/reference/formula-functions/#unsupported-categories) exclude on purpose; other missing names are open gaps.",
+      "- Availability and aliases come from the formula contract, checked against the Rust parser registry and the full engine's analysis registries every time this page is generated or checked. The Microsoft catalog stores names, categories and source links only.",
+      "- To refresh the baseline, update `scripts/excel-functions.json` from the linked Microsoft catalog. Keep one row per name, split compound names, omit the featured-function duplicates, and prefer a function's current category over its compatibility duplicate. Run `bun run docs:generate`, then `bun run docs:check`.",
+      "- Reviewed external workbook results are separate from registry coverage; see [compatibility results](/docs/reference/compatibility-results/).",
+      "",
+      ...familyLines,
+    ].join("\n"),
+  };
 }

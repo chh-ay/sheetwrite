@@ -2,7 +2,7 @@
 
 > Sheetwrite is a framework-agnostic, high-performance spreadsheet grid: a canvas grid backed by a Rust/WASM columnar engine, with an imperative core and React, Vue, and Svelte adapters.
 
-Sheetwrite packages are released together at version 0.6.0. This index is generated from the repository documentation and the compiler-verified public API manifest.
+Sheetwrite packages are released together at version 0.6.1. This index is generated from the repository documentation and the compiler-verified public API manifest.
 
 ## Full text
 
@@ -126,6 +126,7 @@ Sheetwrite packages are released together at version 0.6.0. This index is genera
 ## Release notes
 
 - [Releases](https://www.sheetwrite.dev/docs/releases/): Release notes for each Sheetwrite version, with new features, changes, fixes, performance results, and upgrade steps.
+- [Sheetwrite 0.6.1](https://www.sheetwrite.dev/docs/releases/0.6.1/): Faster data-grid edits, paged scrolling, text lookups and XLSX rejects, and the upgrade checklist for Sheetwrite 0.6.1.
 - [Sheetwrite 0.6.0](https://www.sheetwrite.dev/docs/releases/0.6.0/): Sheetwrite 0.6.0: charts, pivot tables, reference operators, OFFSET and INDIRECT, iterative calculation, the ribbon, kept XLSX parts and the upgrade checklist.
 - [Sheetwrite 0.5.4](https://www.sheetwrite.dev/docs/releases/0.5.4/): No more missing source map references, release notes with size charts, and the upgrade checklist for Sheetwrite 0.5.4.
 - [Sheetwrite 0.5.3](https://www.sheetwrite.dev/docs/releases/0.5.3/): Readable published JavaScript again, package READMEs with install commands for every package manager, and the upgrade checklist for Sheetwrite 0.5.3.
@@ -168,6 +169,7 @@ These pages are generated from checked inventories and evidence. Their tables ar
 - [Render performance](https://www.sheetwrite.dev/docs/performance/render/): Scroll, edit, and interaction timings of the live grid, measured against Handsontable.
 - [XLSX codec performance](https://www.sheetwrite.dev/docs/performance/xlsx-codec/): Import and export time and peak memory for XLSX files.
 - [Detailed compatibility results](https://www.sheetwrite.dev/docs/reference/compatibility-results/): Checked formula, workbook, clipboard, and XLSX examples with exact sources and limits.
+- [Excel function coverage](https://www.sheetwrite.dev/docs/reference/excel-function-coverage/): Every function in the pinned Microsoft Excel catalog, with full and lite engine availability and known differences.
 - [Formula function contract](https://www.sheetwrite.dev/docs/reference/formula-functions/): Generated, source-linked formula names, signatures, semantics, dialect status, and unsupported boundaries.
 - [Dynamic array functions](https://www.sheetwrite.dev/docs/reference/formula-functions/array/): Every dynamic array formula function, its engine build, and its signature, semantic, dialect, and implementation profiles.
 - [Database functions](https://www.sheetwrite.dev/docs/reference/formula-functions/database/): Every database formula function, its engine build, and its signature, semantic, dialect, and implementation profiles.

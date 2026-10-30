@@ -16,6 +16,11 @@ interface Release {
 
 const RELEASES: readonly [Release, ...Release[]] = [
   {
+    version: "0.6.1",
+    date: "2026-10-30",
+    summary: "Faster data-grid edits, paged scrolling, text lookups and XLSX rejects.",
+  },
+  {
     version: "0.6.0",
     date: "2026-10-30",
     summary:

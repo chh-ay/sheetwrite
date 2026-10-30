@@ -78,6 +78,7 @@ import { extractVolatileFunctions } from "./formula-contract.js";
 import {
   formulaFamilyNavigation,
   loadFormulaContractInventory,
+  renderExcelCoveragePage,
   renderFormulaFunctionPages,
   renderFunctionMetadata,
 } from "./formula-docs.js";
@@ -3576,6 +3577,10 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
   }
 
   const formulaPages = renderFormulaFunctionPages(formulaInventory);
+  const excelCatalog: unknown = JSON.parse(
+    await readFile(join(repositoryRoot, "scripts/excel-functions.json"), "utf8"),
+  );
+  const excelCoverage = renderExcelCoveragePage(formulaInventory, excelCatalog);
   // An old overview heading forwards only when exactly one family page holds it;
   // shared headings ("Signature profiles") stay on the overview.
   const formulaHeadingTargets: Record<string, string> = {};
@@ -3624,6 +3629,7 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
       content: renderCompatibilityResults(),
     },
     ...formulaPages.map((page) => ({ path: join(contentRoot, page.route), content: page.content })),
+    { path: join(contentRoot, excelCoverage.route), content: excelCoverage.content },
     {
       path: join(generatedDataRoot, "formula-nav.json"),
       content: stableJson(formulaFamilyNavigation(formulaPages)),
