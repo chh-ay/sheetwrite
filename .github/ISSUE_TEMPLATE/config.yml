@@ -3,3 +3,9 @@ contact_links:
   - name: Private vulnerability report
     url: https://github.com/chh-ay/sheetwrite/security/advisories/new
     about: Report suspected security vulnerabilities privately.
+  - name: Documentation
+    url: https://www.sheetwrite.dev/docs/
+    about: Guides, API reference and compatibility limits.
+  - name: Live examples
+    url: https://www.sheetwrite.dev/showcases/
+    about: See each feature working before you report or request it.

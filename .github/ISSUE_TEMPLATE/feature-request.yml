@@ -1,37 +1,54 @@
-name: Feature request
-description: Propose a focused Sheetwrite capability or improvement
-title: "[Feature]: "
-labels: [enhancement]
+name: Enhancement
+description: A capability or improvement Sheetwrite does not have yet.
+labels: [enhancement, needs-triage]
 body:
+  - type: markdown
+    attributes:
+      value: Write the title as one plain sentence that states the change, for example "Charts follow edits to their source range".
   - type: textarea
     id: problem
     attributes:
       label: Problem
-      description: Describe the user problem and why current APIs do not solve it.
+      description: What you cannot do today, and why the current API does not cover it.
     validations:
       required: true
   - type: textarea
     id: proposal
     attributes:
-      label: Proposed behavior
-      description: Describe the observable result, including framework or runtime constraints.
+      label: Proposal
+      description: The result you want to see. Number the options if there is more than one way.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance
+      description: How we know it is done (behavior, limits, numbers).
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Engine and recalculation
+        - Formula functions
+        - Grid, editing and interaction
+        - Ribbon, toolbar and status bar
+        - XLSX, CSV and file round trips
+        - Charts
+        - Pivot tables
+        - Persistence, sync and collaboration
+        - React, Vue or Svelte adapter
+        - Documentation
+        - Packaging and installation
+        - Other
     validations:
       required: true
   - type: textarea
     id: alternatives
     attributes:
-      label: Alternatives considered
-    validations:
-      required: true
+      label: Alternatives / workaround today (if any)
   - type: input
     id: version
     attributes:
-      label: Current Sheetwrite version
-      placeholder: "0.1.0 or not yet using Sheetwrite"
-    validations:
-      required: true
-  - type: textarea
-    id: environment
-    attributes:
-      label: Relevant environment
-      description: Framework, browser or Node, and bundler when applicable.
+      label: Sheetwrite version you use
+      placeholder: "0.6.0, or not using Sheetwrite yet"

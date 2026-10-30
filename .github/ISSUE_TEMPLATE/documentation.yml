@@ -1,0 +1,26 @@
+name: Documentation
+description: A docs page is wrong, unclear or missing.
+labels: [documentation, area:docs, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: Write the title as one plain sentence, for example "Formulas guide does not explain spill collisions".
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is wrong or missing, and who it affects.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What the page should say, or how the docs should be organized.
+  - type: textarea
+    id: pages
+    attributes:
+      label: Pages
+      description: Links to every affected page.
+    validations:
+      required: true
