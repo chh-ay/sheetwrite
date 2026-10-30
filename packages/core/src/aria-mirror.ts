@@ -4,6 +4,18 @@ import type { VisibleWindowView } from "./types/store.js";
 
 let ariaSeq = 0;
 
+/** Page loads can refresh the same window repeatedly without changing its labels. */
+function updateAttribute(element: HTMLElement, name: string, value: string | null): void {
+  if (element.getAttribute(name) === value) return;
+
+  if (value === null) element.removeAttribute(name);
+  else element.setAttribute(name, value);
+}
+
+function updateText(element: HTMLElement, text: string): void {
+  if (element.textContent !== text) element.textContent = text;
+}
+
 export interface AriaMirrorDeps {
   host: HTMLElement;
   scroller: HTMLElement;
@@ -100,7 +112,7 @@ export class AriaMirror {
     const nRows = view.rows.end - view.rows.start;
 
     if (nRows === this.lastNRows && nCols === this.lastNCols) {
-      this.patchInPlace(view, focus, nRows, nCols);
+      this.patchInPlace(view, focus, nCols);
     } else {
       this.rebuild(view, focus, nRows, nCols);
       this.lastNRows = nRows;
@@ -180,45 +192,42 @@ export class AriaMirror {
    * labels, per-row `aria-rowindex`, ids, text, and selection state on the
    * retained nodes.
    */
-  private patchInPlace(
-    view: VisibleWindowView,
-    focus: CellRef | null,
-    nRows: number,
-    nCols: number,
-  ): void {
+  private patchInPlace(view: VisibleWindowView, focus: CellRef | null, nCols: number): void {
     const selection = this.selection();
     const selectedColumn = selection?.kind === "column" ? selection.col : null;
     const selectedRow = selection?.kind === "row" ? selection.row : null;
-    for (let cj = 0; cj < nCols; cj++) {
-      if (selectedColumn === view.cols[cj]) {
-        this.headerCells[cj]!.setAttribute("aria-selected", "true");
-      } else {
-        this.headerCells[cj]!.removeAttribute("aria-selected");
-      }
-      this.headerCells[cj]!.textContent = this.columnHeader(view.cols[cj]!);
-      this.headerCells[cj]!.setAttribute("aria-colindex", String(view.cols[cj]! + 1));
+    for (const [columnIndex, header] of this.headerCells.entries()) {
+      const col = view.cols[columnIndex];
+      if (col === undefined) throw new Error("ARIA header has no visible column");
+
+      updateAttribute(header, "aria-selected", selectedColumn === col ? "true" : null);
+      updateText(header, this.columnHeader(col));
+      updateAttribute(header, "aria-colindex", String(col + 1));
     }
 
-    for (let ri = 0; ri < nRows; ri++) {
-      const row = view.rows.start + ri;
-      if (selectedRow === row) this.rowEls[ri]!.setAttribute("aria-selected", "true");
-      else this.rowEls[ri]!.removeAttribute("aria-selected");
-      this.rowEls[ri]!.setAttribute("aria-rowindex", String(row + 2));
-      for (let cj = 0; cj < nCols; cj++) {
-        const col = view.cols[cj]!;
-        const cell = this.cellEls[ri * nCols + cj]!;
-        cell.id = `${this.aria.id}-${row}-${col}`;
-        cell.setAttribute("aria-colindex", String(col + 1));
-        const v = view.values[ri * nCols + cj] ?? null;
-        cell.textContent = v !== null ? String(v) : "";
-        const note = this.noteAt(row, col);
-        if (note) cell.setAttribute("aria-description", `Note: ${note}`);
-        else cell.removeAttribute("aria-description");
-        if (focus && focus.row === row && focus.col === col) {
-          cell.setAttribute("aria-selected", "true");
-        } else if (cell.hasAttribute("aria-selected")) {
-          cell.removeAttribute("aria-selected");
+    for (const [rowIndex, rowElement] of this.rowEls.entries()) {
+      const row = view.rows.start + rowIndex;
+      updateAttribute(rowElement, "aria-selected", selectedRow === row ? "true" : null);
+      updateAttribute(rowElement, "aria-rowindex", String(row + 2));
+
+      for (let columnIndex = 0; columnIndex < nCols; columnIndex++) {
+        const col = view.cols[columnIndex];
+        const cell = this.cellEls[rowIndex * nCols + columnIndex];
+        if (col === undefined || cell === undefined) {
+          throw new Error("ARIA cell has no visible coordinate");
         }
+
+        updateAttribute(cell, "id", `${this.aria.id}-${row}-${col}`);
+        updateAttribute(cell, "aria-colindex", String(col + 1));
+        const value = view.values[rowIndex * nCols + columnIndex] ?? null;
+        updateText(cell, value !== null ? String(value) : "");
+        const note = this.noteAt(row, col);
+        updateAttribute(cell, "aria-description", note ? `Note: ${note}` : null);
+        updateAttribute(
+          cell,
+          "aria-selected",
+          focus && focus.row === row && focus.col === col ? "true" : null,
+        );
       }
     }
   }
