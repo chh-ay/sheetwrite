@@ -596,11 +596,26 @@ pub(super) fn collect_affected_formulas(
             DirtySeeds::Ranges(rects) => {
                 // Small rectangles are cheaper to walk than every formula/read key.
                 const ENUMERATED_RECT_CELLS: u64 = 4096;
-                let is_small = |rect: &DirtyRect| {
+                let area = |rect: &DirtyRect| {
                     (u64::from(rect.row_end - rect.row_start) + 1)
                         .saturating_mul(u64::from(rect.col_end - rect.col_start) + 1)
-                        <= ENUMERATED_RECT_CELLS
                 };
+
+                // Many single-cell writes followed by a bulk write leave many
+                // small rectangles. Walking all of their cells can cost more
+                // than one scan of the registered sources, so the scan takes
+                // every rectangle when the walk would visit more cells.
+                let registered_sources = (sheet.formulas.len() as u64)
+                    .saturating_add(index.exact_dependents.len() as u64)
+                    .saturating_add(index.range_groups.len() as u64);
+                let walked_cells = rects
+                    .iter()
+                    .map(area)
+                    .filter(|&cells| cells <= ENUMERATED_RECT_CELLS)
+                    .fold(0u64, u64::saturating_add);
+                let walks_cells = walked_cells <= registered_sources;
+                let is_small =
+                    |rect: &DirtyRect| walks_cells && area(rect) <= ENUMERATED_RECT_CELLS;
                 for rect in rects.iter().filter(|rect| is_small(rect)) {
                     for row in rect.row_start..=rect.row_end {
                         for col in rect.col_start..=rect.col_end {
