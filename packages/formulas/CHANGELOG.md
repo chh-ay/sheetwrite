@@ -1,5 +1,13 @@
 # @sheetwrite/formulas
 
+## 0.6.1
+
+### Patch Changes
+
+- [#234](https://github.com/chh-ay/sheetwrite/pull/234) [`1ceb09a`](https://github.com/chh-ay/sheetwrite/commit/1ceb09a7567a99292744d8b4fd459ffc0c73b3fb) Thanks [@chh-ay](https://github.com/chh-ay)! - Recalculate faster after many single-cell writes followed by a bulk write.
+
+- [#235](https://github.com/chh-ay/sheetwrite/pull/235) [`3df2d80`](https://github.com/chh-ay/sheetwrite/commit/3df2d80d6b670d41ba5b18954befe281694a2ddd) Thanks [@chh-ay](https://github.com/chh-ay)! - Value edits in a workbook without formulas or pivot tables no longer run the formula recalculation pass. The pass is the largest function of the engine, and the WebAssembly runtime compiled it while the first edits ran, so the first thousands of edits of a data grid were slower than in 0.5.4. Calculated values and edit results do not change.
+
 ## 0.6.0
 
 ### Minor Changes

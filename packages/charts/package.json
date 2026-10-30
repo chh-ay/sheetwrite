@@ -1,6 +1,6 @@
 {
   "name": "@sheetwrite/charts",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "type": "module",
   "description": "Optional live chart views for Sheetwrite.",
   "license": "MIT",
