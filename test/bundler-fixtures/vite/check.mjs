@@ -10,7 +10,13 @@ const packageManifest = JSON.parse(await readFile("package.json", "utf8"));
 const packageLock = JSON.parse(await readFile("package-lock.json", "utf8"));
 const rolesByFile = new Map();
 const kindByFile = new Map();
-const initialRoles = ["core-initial", "react-initial", "svelte-initial", "vue-initial"];
+const initialRoles = [
+  "core-initial",
+  "react-initial",
+  "svelte-initial",
+  "vue-initial",
+  "shell-initial",
+];
 
 async function walk(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -84,6 +90,7 @@ const entryRoles = {
   "worker.html": "worker-loader-initial",
   "xlsx.html": "xlsx-loader-initial",
   "charts.html": "charts-loader-initial",
+  "shell.html": "shell-initial",
 };
 const defaultInitialChunks = new Set();
 const staticGraphsByHtml = new Map();
@@ -135,8 +142,9 @@ for (const key of defaultInitialChunks) {
   }
 }
 
-// Opt-in chrome (the ribbon) loads lazily from the default entries. It must
-// never join an initial graph, or every app would download it again.
+// Opt-in chrome (the ribbon, the toolbar and the command model they share)
+// loads lazily from the default entries, the composable shell included. It
+// must never join an initial graph, or every app would download it again.
 const chromePending = [];
 for (const key of defaultInitialChunks) chromePending.push(...(manifest[key].dynamicImports ?? []));
 const chromeVisited = new Set();
@@ -149,10 +157,20 @@ while (chromePending.length > 0) {
     chromePending.push(...(manifest[key].dynamicImports ?? []));
   }
 }
-const isRibbonModule = (key) => /(?:^|\/)ribbon\/ribbon\.js$/.test(manifest[key].src ?? key);
-if (![...chromeVisited].some(isRibbonModule)) throw new Error("Vite emitted no lazy ribbon chunk");
-if ([...defaultInitialChunks].some(isRibbonModule)) {
-  throw new Error("The ribbon is in an initial chunk; it must load lazily");
+// Class names only the command chrome renders; minifiers keep strings.
+const CHROME_MARKERS = ["sheetwrite-ribbon-", "sheetwrite-command-toolbar"];
+for (const key of defaultInitialChunks) {
+  const code = await chunkSource(key);
+  const marker = CHROME_MARKERS.find((candidate) => code.includes(candidate));
+  if (marker !== undefined) {
+    throw new Error(`Command chrome (${marker}) is in the initial chunk ${manifest[key].file}`);
+  }
+}
+for (const marker of CHROME_MARKERS) {
+  const sources = await Promise.all([...chromeVisited].map(chunkSource));
+  if (!sources.some((code) => code.includes(marker))) {
+    throw new Error(`Vite emitted no lazy chrome chunk containing ${marker}`);
+  }
 }
 
 const emitted = await walk(root);

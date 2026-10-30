@@ -48,7 +48,7 @@ Sheetwrite packages are released together at version 0.6.1. This index is genera
 
 - [Grid](https://www.sheetwrite.dev/docs/features/grid/): Set up the grid, add commands, and control how users select and edit cells.
 - [Grid options and presentation](https://www.sheetwrite.dev/docs/features/grid/options-and-presentation/): Configure a grid with GridOptions and choose spreadsheet or data-grid headers.
-- [Toolbar and ribbon](https://www.sheetwrite.dev/docs/features/grid/toolbar-and-ribbon/): Show the built-in flat toolbar or the Excel-style ribbon, and drive host chrome from command state.
+- [Toolbar and ribbon](https://www.sheetwrite.dev/docs/features/grid/toolbar-and-ribbon/): Show the built-in toolbar or the Excel-style ribbon in a full or compact layout, all rendered from one command model, and drive host chrome from command state.
 - [Selection and keyboard](https://www.sheetwrite.dev/docs/features/grid/selection-and-keyboard/): Read and set the selection, navigate with the keyboard, and rebind or add shortcuts.
 - [Editing and clipboard](https://www.sheetwrite.dev/docs/features/grid/editing-and-clipboard/): Edit cells inline, copy and paste with other spreadsheet apps, and undo or redo changes.
 - [Custom editors](https://www.sheetwrite.dev/docs/features/grid/custom-editors/): Replace the stock cell editor with a host-supplied editor for a column.
@@ -144,7 +144,7 @@ Sheetwrite packages are released together at version 0.6.1. This index is genera
 
 - [API reference](https://www.sheetwrite.dev/docs/api/): Generated reference for every classified Sheetwrite package entry point.
 - [`@sheetwrite/charts`](https://www.sheetwrite.dev/docs/api/charts/): 18 exports across 2 entry points (primary entry point: supported).
-- [`@sheetwrite/core`](https://www.sheetwrite.dev/docs/api/core/): 375 exports across 10 entry points (primary entry point: supported).
+- [`@sheetwrite/core`](https://www.sheetwrite.dev/docs/api/core/): 378 exports across 10 entry points (primary entry point: supported).
 - [`@sheetwrite/formulas`](https://www.sheetwrite.dev/docs/api/formulas/): 17 exports across 2 entry points (primary entry point: internal).
 - [`@sheetwrite/react`](https://www.sheetwrite.dev/docs/api/react/): 19 exports across 2 entry points (primary entry point: supported).
 - [`@sheetwrite/svelte`](https://www.sheetwrite.dev/docs/api/svelte/): 19 exports across 2 entry points (primary entry point: supported).

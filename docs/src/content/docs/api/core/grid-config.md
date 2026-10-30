@@ -32,7 +32,7 @@ const config: GridConfig = {
 - [ContextMenuItem](/docs/api/core/context-menu-item/)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L480"><code>packages/core/src/types/grid.ts#L480</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L514"><code>packages/core/src/types/grid.ts#L514</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -67,19 +67,23 @@ const config: GridConfig = {
 toolbar?: boolean | ToolbarItem[];
 ```
 
+<p class="api-member-doc">Show the built-in toolbar (true), hide it (false), or supply a custom item
+list. The toolbar shows the ribbon's commands on one row, with the rest in
+a &quot;More commands&quot; menu.</p>
 </details>
 
 <details class="api-member" id="grid-config-bold" data-pagefind-weight="1">
-<summary><code>bold</code> <span class="api-member-summary">Show the bold control in the default toolbar (default true).</span></summary>
+<summary><code>bold</code> <span class="api-member-summary">Show Bold, and Underline and Strikethrough with Italic (default true).</span></summary>
 
 ```ts generated
 bold?: boolean;
 ```
 
+<p class="api-member-doc">Show Bold, and Underline and Strikethrough with Italic (default true). See <a href="/docs/api/core/command-flags/"><code>CommandFlags</code></a>.</p>
 </details>
 
 <details class="api-member" id="grid-config-italic" data-pagefind-weight="1">
-<summary><code>italic</code> <span class="api-member-summary">Show the italic control in the default toolbar (default true).</span></summary>
+<summary><code>italic</code> <span class="api-member-summary">Show Italic, and Underline and Strikethrough with Bold (default true).</span></summary>
 
 ```ts generated
 italic?: boolean;
@@ -88,7 +92,7 @@ italic?: boolean;
 </details>
 
 <details class="api-member" id="grid-config-align" data-pagefind-weight="1">
-<summary><code>align</code> <span class="api-member-summary">Show left, center, and right alignment controls (default true).</span></summary>
+<summary><code>align</code> <span class="api-member-summary">Show the horizontal and vertical alignment commands (default true).</span></summary>
 
 ```ts generated
 align?: boolean;
@@ -97,7 +101,7 @@ align?: boolean;
 </details>
 
 <details class="api-member" id="grid-config-text-color" data-pagefind-weight="1">
-<summary><code>textColor</code> <span class="api-member-summary">Show the text-color control in the default toolbar (default true).</span></summary>
+<summary><code>textColor</code> <span class="api-member-summary">Show the Font Color command (default true).</span></summary>
 
 ```ts generated
 textColor?: boolean;
@@ -106,7 +110,7 @@ textColor?: boolean;
 </details>
 
 <details class="api-member" id="grid-config-fill-color" data-pagefind-weight="1">
-<summary><code>fillColor</code> <span class="api-member-summary">Show the fill-color control in the default toolbar (default true).</span></summary>
+<summary><code>fillColor</code> <span class="api-member-summary">Show the Fill Color command (default true).</span></summary>
 
 ```ts generated
 fillColor?: boolean;
@@ -115,7 +119,7 @@ fillColor?: boolean;
 </details>
 
 <details class="api-member" id="grid-config-border" data-pagefind-weight="1">
-<summary><code>border</code> <span class="api-member-summary">Show the border control in the default toolbar (default true).</span></summary>
+<summary><code>border</code> <span class="api-member-summary">Show the Borders command (default true).</span></summary>
 
 ```ts generated
 border?: boolean;
@@ -124,7 +128,7 @@ border?: boolean;
 </details>
 
 <details class="api-member" id="grid-config-clear-format" data-pagefind-weight="1">
-<summary><code>clearFormat</code> <span class="api-member-summary">Show the clear-format control in the default toolbar (default true).</span></summary>
+<summary><code>clearFormat</code> <span class="api-member-summary">Show the Clear command, which holds Clear Formats (default true).</span></summary>
 
 ```ts generated
 clearFormat?: boolean;
@@ -133,7 +137,7 @@ clearFormat?: boolean;
 </details>
 
 <details class="api-member" id="grid-config-merge" data-pagefind-weight="1">
-<summary><code>merge</code> <span class="api-member-summary">Show merge and unmerge controls in the default toolbar (default true).</span></summary>
+<summary><code>merge</code> <span class="api-member-summary">Show the Merge &amp; Center command, which holds Merge and Unmerge (default true).</span></summary>
 
 ```ts generated
 merge?: boolean;
@@ -142,7 +146,7 @@ merge?: boolean;
 </details>
 
 <details class="api-member" id="grid-config-sort" data-pagefind-weight="1">
-<summary><code>sort</code> <span class="api-member-summary">Show ascending and descending sort controls in the default toolbar (default true).</span></summary>
+<summary><code>sort</code> <span class="api-member-summary">Show Sort &amp; Filter and the sort commands (default true).</span></summary>
 
 ```ts generated
 sort?: boolean;
@@ -151,7 +155,7 @@ sort?: boolean;
 </details>
 
 <details class="api-member" id="grid-config-export" data-pagefind-weight="1">
-<summary><code>export</code> <span class="api-member-summary">Show CSV/XLSX export controls in the default toolbar (default false).</span></summary>
+<summary><code>export</code> <span class="api-member-summary">Show the Export CSV and Export XLSX commands (default false).</span></summary>
 
 ```ts generated
 export?: boolean;
@@ -160,15 +164,16 @@ export?: boolean;
 </details>
 
 <details class="api-member" id="grid-config-ribbon" data-pagefind-weight="1">
-<summary><code>ribbon</code> <span class="api-member-summary">Replace the built-in toolbar with an Excel-style ribbon (Home, Insert, Data and View tabs) that narrows its groups as the grid gets narrower.</span></summary>
+<summary><code>ribbon</code> <span class="api-member-summary">Replace the built-in toolbar with an Excel-style ribbon (Home, Insert, Data and View tabs).</span></summary>
 
 ```ts generated
-ribbon?: boolean;
+ribbon?: boolean | RibbonConfig;
 ```
 
 <p class="api-member-doc">Replace the built-in toolbar with an Excel-style ribbon (Home, Insert,
-Data and View tabs) that narrows its groups as the grid gets narrower.
-A custom `toolbar` item list still renders the flat toolbar instead.</p>
+Data and View tabs). Pass an object to choose its initial full, compact
+or automatic layout. A custom `toolbar` item list still renders the
+toolbar instead.</p>
 </details>
 
 <details class="api-member" id="grid-config-icons" data-pagefind-weight="1">
@@ -191,7 +196,7 @@ contextMenu?: boolean | ContextMenuItems;
 </details>
 
 <details class="api-member" id="grid-config-undo" data-pagefind-weight="1">
-<summary><code>undo</code> <span class="api-member-summary">Show undo/redo controls in the built-in toolbar (default true).</span></summary>
+<summary><code>undo</code> <span class="api-member-summary">Show Undo and Redo (default true).</span></summary>
 
 ```ts generated
 undo?: boolean;
@@ -252,7 +257,7 @@ export interface GridConfig {
   merge?: boolean;
   sort?: boolean;
   export?: boolean;
-  ribbon?: boolean;
+  ribbon?: boolean | RibbonConfig;
   icons?: IconOverrides;
   contextMenu?: boolean | ContextMenuItems;
   undo?: boolean;
@@ -283,6 +288,7 @@ export interface GridConfig {
 <p class="api-consumers-label">Public exports naming <code>GridConfig</code></p>
 
 <ul class="api-consumer-list">
+<li><a href="/docs/api/core/command-flags/"><code>CommandFlags</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/grid-options/"><code>GridOptions</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core-adapter/grid-controller/"><code>GridController</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>

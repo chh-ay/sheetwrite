@@ -8,7 +8,7 @@ description: "SpreadsheetShellOptions interface in @sheetwrite/core/shell: Host 
 Host elements and feature options used to create a spreadsheet shell.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/spreadsheet-shell.ts#L65"><code>packages/core/src/shell/spreadsheet-shell.ts#L65</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/spreadsheet-shell.ts#L119"><code>packages/core/src/shell/spreadsheet-shell.ts#L119</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>6</span>
@@ -26,7 +26,7 @@ grid: GridOptions;
 </details>
 
 <details class="api-member" id="spreadsheet-shell-options-toolbar" data-pagefind-weight="1">
-<summary><code>toolbar</code> <span class="api-member-summary">Toolbar items (default: the full built-in action set).</span></summary>
+<summary><code>toolbar</code> <span class="api-member-summary">Toolbar items (default: every command the grid config's flags show, with Export).</span></summary>
 
 ```ts generated
 toolbar?: readonly ToolbarItem[];
@@ -35,10 +35,10 @@ toolbar?: readonly ToolbarItem[];
 </details>
 
 <details class="api-member" id="spreadsheet-shell-options-ribbon" data-pagefind-weight="1">
-<summary><code>ribbon</code> <span class="api-member-summary">Use an Excel-style ribbon instead of the flat toolbar.</span></summary>
+<summary><code>ribbon</code> <span class="api-member-summary">Use an Excel-style ribbon instead of the toolbar; an object sets its layout.</span></summary>
 
 ```ts generated
-ribbon?: boolean;
+ribbon?: boolean | RibbonConfig;
 ```
 
 </details>
@@ -80,7 +80,7 @@ onReady?: (grid: Grid) => void;
 export interface SpreadsheetShellOptions {
   grid: GridOptions;
   toolbar?: readonly ToolbarItem[];
-  ribbon?: boolean;
+  ribbon?: boolean | RibbonConfig;
   onChange?: (event: ChangeEvent) => void;
   onSelectionChange?: (selection: Selection | null) => void;
   onReady?: (grid: Grid) => void;

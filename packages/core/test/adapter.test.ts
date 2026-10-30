@@ -76,7 +76,7 @@ describe("shared adapter option policy", () => {
     }
   });
 
-  it("applies live options to the existing grid and changes its behavior", () => {
+  it("applies live options to the existing grid and changes its behavior", async () => {
     const host = mountHost();
     const workbook = makeWorkbook(3);
     const previous: GridOptions = {
@@ -89,6 +89,8 @@ describe("shared adapter option policy", () => {
     const controller = createGridController(host, previous, {});
     const originalGrid = controller.grid;
     const addr = { sheet: "s1", row: 0, col: 0 };
+    // The toolbar loads lazily; awaiting its module runs the grid's mount first.
+    await import("../src/ribbon/command-toolbar.js");
     expect(host.querySelector(".sheetwrite-toolbar")).not.toBeNull();
 
     const next: GridOptions = {

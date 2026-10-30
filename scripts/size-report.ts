@@ -224,6 +224,7 @@ const requiredBundlerRoles: Record<BundlerEvidence["bundler"], readonly string[]
     "react-initial",
     "vue-initial",
     "svelte-initial",
+    "shell-initial",
     "worker-async",
     "xlsx-async",
     "charts-async",
@@ -409,7 +410,13 @@ export function validateBundlerEvidence(value: unknown): BundlerEvidence {
   if (!assets.some((asset) => asset.kind === "wasm")) {
     throw new Error(`${bundler} is missing a required WASM asset`);
   }
-  const initialRoles = new Set(["core-initial", "react-initial", "vue-initial", "svelte-initial"]);
+  const initialRoles = new Set([
+    "core-initial",
+    "react-initial",
+    "vue-initial",
+    "svelte-initial",
+    "shell-initial",
+  ]);
   for (const asset of assets) {
     if (
       asset.roles.some((role) => ASYNC_ROLES.has(role)) &&

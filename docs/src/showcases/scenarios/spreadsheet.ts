@@ -208,7 +208,7 @@ export function createSpreadsheetScenario(host: HTMLElement): SpreadsheetScenari
   const ready = initSheetwrite().then(() => {
     if (disposed) return;
     shell = createSpreadsheetShell(host, {
-      ribbon: true,
+      ribbon: { mode: "auto" },
       grid: { workbook: salesWorkbook(), theme: siteGridTheme(), config: {} },
     });
     const result = shell.grid.applyTransaction({ patches: salesOperations() });

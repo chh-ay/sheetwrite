@@ -54,7 +54,8 @@ const TRIES = [
   {
     action: "Narrow the window",
     how: "Use the button to switch between a wide and narrow window.",
-    result: "Groups shrink, then fold into dropdowns, as in Excel.",
+    result:
+      "The ribbon turns compact, one row like Excel's simplified ribbon, and groups fold into dropdowns.",
     control: "fold-ribbon",
   },
 ] as const;
@@ -107,7 +108,7 @@ export default function SpreadsheetShowcase() {
           facts={[
             { label: "Chrome", value: "Ribbon, formula bar, tabs" },
             { label: "Workbook", value: "2 sheets, cross-sheet SUMIF" },
-            { label: "Setup", value: "createSpreadsheetShell({ ribbon: true })" },
+            { label: "Setup", value: 'createSpreadsheetShell({ ribbon: { mode: "auto" } })' },
           ]}
         />
         <section aria-label="Live spreadsheet" className="sw-spreadsheet-workspace">

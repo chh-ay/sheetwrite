@@ -94,7 +94,7 @@ export const MOVED_PAGES: Readonly<Record<string, MovedPage>> = {
       events: "/docs/reference/events/",
       "feature-flags": "/docs/features/grid/toolbar-and-ribbon/#feature-flags",
       "grid-instance": "/docs/features/grid/grid-methods/",
-      "gridconfig-toolbar": "/docs/features/grid/toolbar-and-ribbon/#gridconfig-toolbar",
+      "gridconfig-toolbar": "/docs/features/grid/toolbar-and-ribbon/#command-flags",
       gridoptions: "/docs/features/grid/options-and-presentation/#gridoptions",
       "host-owned-command-state":
         "/docs/features/grid/toolbar-and-ribbon/#host-owned-command-state",
@@ -185,7 +185,7 @@ export const MOVED_PAGES: Readonly<Record<string, MovedPage>> = {
       resizing: "/docs/features/grid/resize-merge-and-fill/#resizing",
       "selection-model": "/docs/features/grid/selection-and-keyboard/#selection-model",
       "temporary-highlights": "/docs/features/grid/context-menu/#temporary-highlights",
-      "toolbar-actions": "/docs/features/grid/toolbar-and-ribbon/#toolbar-actions",
+      "toolbar-actions": "/docs/features/grid/toolbar-and-ribbon/#custom-toolbar-items",
       touch: "/docs/features/grid/touch/",
       "undo-and-redo": "/docs/features/grid/editing-and-clipboard/#undo-and-redo",
       "validation-protection-and-notes": "/docs/features/data/validation-protection-and-notes/",
