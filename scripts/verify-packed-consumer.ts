@@ -6,6 +6,7 @@ import { pathToFileURL } from "node:url";
 
 import { chromium } from "@playwright/test";
 
+import { assertPublishedDeclarations } from "./package-dist.js";
 import {
   assertPublishedFilePolicy,
   packBuiltPackages,
@@ -112,7 +113,6 @@ const packageSpecs: PackageSpec[] = [
       "pkg/sheetwrite_wasm.d.ts",
       "pkg/sheetwrite_wasm.js",
       "pkg/sheetwrite_wasm_bg.wasm",
-      "pkg/sheetwrite_wasm_bg.wasm.d.ts",
     ],
   },
   {
@@ -128,7 +128,6 @@ const packageSpecs: PackageSpec[] = [
       "pkg/sheetwrite_wasm.d.ts",
       "pkg/sheetwrite_wasm.js",
       "pkg/sheetwrite_wasm_bg.wasm",
-      "pkg/sheetwrite_wasm_bg.wasm.d.ts",
     ],
   },
   {
@@ -257,6 +256,7 @@ async function assertTarball(
   for (const target of collectExportTargets(packedManifest.exports)) {
     await access(join(packageRoot, target));
   }
+  await assertPublishedDeclarations(packageRoot, [...packedFiles]);
 
   await assertWorkerBundle(packageRoot, packedManifest);
   if (manifest.name === "@sheetwrite/formulas") {

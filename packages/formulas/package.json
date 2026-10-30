@@ -41,8 +41,7 @@
     "pkg/sheetwrite_wasm.js",
     "pkg/sheetwrite_wasm_factory.js",
     "pkg/sheetwrite_wasm.d.ts",
-    "pkg/sheetwrite_wasm_bg.wasm",
-    "pkg/sheetwrite_wasm_bg.wasm.d.ts"
+    "pkg/sheetwrite_wasm_bg.wasm"
   ],
   "publishConfig": {
     "access": "public",

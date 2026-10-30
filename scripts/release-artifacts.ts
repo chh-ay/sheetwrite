@@ -368,7 +368,6 @@ const REQUIRED_PACKAGE_FILES: Readonly<Record<string, readonly string[]>> = {
     "pkg/sheetwrite_wasm.d.ts",
     "pkg/sheetwrite_wasm.js",
     "pkg/sheetwrite_wasm_bg.wasm",
-    "pkg/sheetwrite_wasm_bg.wasm.d.ts",
   ],
   "@sheetwrite/formulas": [
     "README.md",
@@ -381,7 +380,6 @@ const REQUIRED_PACKAGE_FILES: Readonly<Record<string, readonly string[]>> = {
     "pkg/sheetwrite_wasm.d.ts",
     "pkg/sheetwrite_wasm.js",
     "pkg/sheetwrite_wasm_bg.wasm",
-    "pkg/sheetwrite_wasm_bg.wasm.d.ts",
   ],
   "@sheetwrite/core": [
     "README.md",
