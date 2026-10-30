@@ -566,7 +566,10 @@ export class DocumentController {
         const from = this.options.store
           .getWorkbook()
           .sheets.findIndex((sheet) => sheet.id === patch.sheet);
-        return from < 0 ? [] : [{ op: "moveSheet", sheet: patch.sheet, to: from }];
+        if (from < 0) return [];
+        // A move can rewrite the endpoints of 3-D references. Setting their
+        // sources again after moving back restores the text exactly.
+        return [{ op: "moveSheet", sheet: patch.sheet, to: from }, ...this.snapshotSpanFormulas()];
       }
       case "setSheetVisibility": {
         const sheet = this.sheetById(patch.sheet);
@@ -1071,6 +1074,28 @@ export class DocumentController {
       }
     }
 
+    return patches;
+  }
+
+  private snapshotSpanFormulas(): DocumentOp[] {
+    const engine = storeEngine(this.options.store);
+    if (!engine) return [];
+    const patches: DocumentOp[] = [];
+    for (const sheet of this.options.store.getWorkbook().sheets) {
+      const cells = engine.sheetSpanFormulaCells(sheet.id);
+      if (cells.length === 0) continue;
+      const captured = engine.captureCells(sheet.id, cells);
+      for (const [index, cell] of cells.entries()) {
+        const source = captured[index];
+        if (!source) throw new Error("Missing 3-D formula source snapshot");
+        patches.push({
+          op: "set",
+          addr: { sheet: sheet.id, row: cell.row, col: cell.col },
+          value: source.value,
+          style: source.style,
+        });
+      }
+    }
     return patches;
   }
 

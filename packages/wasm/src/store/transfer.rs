@@ -138,6 +138,15 @@ impl CellStore {
             store.sheet_alive.push(input.bool()?);
         }
 
+        // Formulas below are parsed again, and their 3-D references are
+        // placed in this order. Handle order stays implicit, as it was.
+        let order = (0..input.count()?)
+            .map(|_| input.u32())
+            .collect::<TransferResult<Vec<_>>>()?;
+        if order != store.tab_order().as_ref() {
+            store.sheet_order = Some(Box::new(order));
+        }
+
         store.sheet_lookup = read_names(&mut input)?;
         store.sheet_ids = read_names(&mut input)?;
 
@@ -237,6 +246,12 @@ impl CellStore {
             out.bool(alive);
         }
 
+        let order = self.tab_order();
+        out.usize(order.len());
+        for &handle in order.iter() {
+            out.u32(handle);
+        }
+
         write_names(&mut out, &self.sheet_lookup);
         write_names(&mut out, &self.sheet_ids);
         out.usize(self.named_ranges.len());
@@ -332,6 +347,30 @@ mod tests {
         replacement.recompute_changed();
         assert_eq!(replacement.get_cell(0, 0, 1).num(), 100.0);
         assert_eq!(original.get_cell(0, 0, 1).num(), 42.0);
+    }
+
+    #[test]
+    fn memory_transfer_keeps_the_tab_order_of_three_d_references() {
+        let mut original = CellStore::new();
+        for (name, value) in [("First", 1.0), ("Middle", 10.0), ("Last", 100.0)] {
+            let sheet = original.add_sheet(1, 1);
+            original.set_sheet_name(sheet, name, name);
+            original.set_number(sheet, 0, 0, value, 0);
+        }
+        let summary = original.add_sheet(1, 1);
+        original.set_sheet_name(summary, "Summary", "Summary");
+        assert!(original.set_sheet_order(&[0, 2, 1, 3]));
+        original.set_formula(summary, 0, 0, "=SUM(First:Last!A1)", 0);
+        original.recompute_changed();
+        assert_eq!(original.get_cell(summary, 0, 0).num(), 101.0);
+
+        let mut replacement =
+            CellStore::read_memory_state(&original.export_memory_state()).unwrap();
+        replacement.set_number(1, 0, 0, 20.0, 0);
+        replacement.recompute_changed();
+        assert_eq!(replacement.get_cell(summary, 0, 0).num(), 101.0);
+        assert!(replacement.set_sheet_order(&[0, 1, 2, 3]));
+        assert_eq!(replacement.get_cell(summary, 0, 0).num(), 121.0);
     }
 
     #[test]

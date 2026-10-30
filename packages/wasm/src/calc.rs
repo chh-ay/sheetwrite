@@ -206,9 +206,17 @@ pub enum Func {
     Cell,
     Offset,
     Indirect,
+    Areas,
     /// `A1#`: the current spill of the anchor cell. Only `#` after a cell
     /// reference makes it; the name is not in the function table.
     AnchorArray,
+    /// `(A1:B2,D1)`: the union of the references inside parentheses that do
+    /// not belong to a call. Only that comma makes it; the name is not in the
+    /// function table.
+    Union,
+    /// `A1:C3 B2:D4`: the cells that every reference covers. Only a space
+    /// between two references makes it; the name is not in the function table.
+    Intersect,
     #[cfg(feature = "analysis")]
     Analysis(u16),
 }
@@ -274,6 +282,8 @@ macro_rules! define_function_registry {
             match func {
                 $(Func::$variant => $canonical,)+
                 Func::AnchorArray => "ANCHORARRAY",
+                Func::Union => "UNION",
+                Func::Intersect => "INTERSECT",
                 #[cfg(feature = "analysis")]
                 Func::Analysis(id) => crate::eval::analysis::name(id),
             }
@@ -361,6 +371,7 @@ define_function_registry! {
         True => "TRUE";
         Type => "TYPE";
         Year => "YEAR";
+        Areas => "AREAS";
         Clean => "CLEAN";
         Count => "COUNT";
         EDate => "EDATE";
@@ -502,6 +513,29 @@ pub struct RangeFlags {
     pub end: RefFlags,
 }
 
+/// The handle of a 3-D reference endpoint before ingest resolves its name.
+pub(crate) const UNRESOLVED_SHEET: u32 = u32::MAX;
+
+/// `Sheet1:Sheet3!A1:B2`: one range on every sheet from `first` to `last` in
+/// tab order.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SheetSpanRef {
+    pub first: SheetRef,
+    pub last: SheetRef,
+    /// The handles from `first` to `last` in tab order when the span was last
+    /// placed. Reads and evaluation use them without the tab order, and a
+    /// removed endpoint is replaced by its nearest surviving neighbour here.
+    /// Empty until ingest resolves the names.
+    pub sheets: Vec<u32>,
+    pub row_start: u32,
+    pub col_start: u32,
+    pub row_end: u32,
+    pub col_end: u32,
+    pub flags: RangeFlags,
+    /// Written as one cell (`A1`) rather than a range.
+    pub cell: bool,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct NamedRangeRef {
     pub name: String,
@@ -565,6 +599,9 @@ pub enum Ast {
     Range(u32, u32, u32, u32, RangeFlags),
     SheetRange(UnresolvedSheetRef, u32, u32, u32, u32, RangeFlags),
     AbsRange(SheetRef, u32, u32, u32, u32, RangeFlags),
+    /// Boxed: a span holds two sheet names and its handles, which would
+    /// otherwise grow every node of every formula.
+    SheetSpan(Box<SheetSpanRef>),
     InvalidRef,
     Func(Func, Vec<Ast>),
     UnknownFunc(String, Vec<Ast>),
@@ -619,6 +656,13 @@ impl Ast {
             }
             Ast::AbsCell(sheet, ..) | Ast::AbsRange(sheet, ..) => {
                 add_string_memory(&sheet.name, out);
+            }
+            Ast::SheetSpan(span) => {
+                let bytes = std::mem::size_of::<SheetSpanRef>();
+                out.add_payload(bytes, bytes);
+                add_string_memory(&span.first.name, out);
+                add_string_memory(&span.last.name, out);
+                out.add_vec::<u32>(span.sheets.len(), span.sheets.capacity());
             }
             Ast::Func(_, args) => add_ast_vec_memory(args, out),
             Ast::UnknownFunc(name, args) => {
@@ -798,6 +842,8 @@ enum Tok<'a> {
     Error(FormulaError),
     /// The `#` after a cell reference: the whole spill of that anchor.
     Hash,
+    /// Spaces between two references: the intersection operator.
+    Intersect,
 }
 
 /// Error constants a formula can contain. `#REF!` parses as an invalid
@@ -845,15 +891,57 @@ fn quoted_token(
     }
 }
 
-fn tokenize(src: &str) -> Result<Vec<Tok<'_>>, String> {
+/// Whether spaces between `previous` and `rest` are the intersection operator:
+/// they follow a token that can end a reference and precede one that can start
+/// one. Spaces around other operators, after separators and before `)` stay
+/// insignificant. A name followed by spaces and `(` stays a call, as before.
+/// `#REF!` is a reference operand too: a deleted operand serializes as it, and
+/// the formula must parse back to the same intersection.
+fn separates_references(previous: Option<&Tok<'_>>, rest: &str) -> bool {
+    const DELETED_REFERENCE: &str = "#REF!";
+
+    let Some(next) = rest.chars().next() else {
+        return false;
+    };
+    let ends_reference = match previous {
+        Some(Tok::Ident(..)) => next != '(',
+        Some(Tok::RParen | Tok::Structured(_) | Tok::Hash | Tok::Error(FormulaError::Ref)) => true,
+        _ => false,
+    };
+    let starts_reference = next.is_alphabetic()
+        || matches!(next, '$' | '_' | '\\' | '\'' | '(')
+        || rest
+            .get(..DELETED_REFERENCE.len())
+            .is_some_and(|text| text.eq_ignore_ascii_case(DELETED_REFERENCE));
+    ends_reference && starts_reference
+}
+
+/// The tokens of one formula and what the parser may need to look for.
+struct Tokens<'a> {
+    toks: Vec<Tok<'a>>,
+    /// At least one intersection operator.
+    intersections: bool,
+    /// At least one `!`, which every 3-D reference has.
+    sheet_qualifiers: bool,
+}
+
+fn tokenize(src: &str) -> Result<Tokens<'_>, String> {
     let mut toks = Vec::new();
+    let mut intersections = false;
+    let mut sheet_qualifiers = false;
     let bytes = src.as_bytes();
     let mut i = 0;
 
     while i < bytes.len() {
         let c = bytes[i];
         if c.is_ascii_whitespace() {
-            i += 1;
+            while bytes.get(i).is_some_and(u8::is_ascii_whitespace) {
+                i += 1;
+            }
+            if separates_references(toks.last(), &src[i..]) {
+                toks.push(Tok::Intersect);
+                intersections = true;
+            }
         } else if c == b'"' {
             toks.push(Tok::Str(quoted_token(
                 src,
@@ -935,6 +1023,7 @@ fn tokenize(src: &str) -> Result<Vec<Tok<'_>>, String> {
             toks.push(Tok::Ident(Cow::Borrowed(&src[start..i]), false));
         } else if c == b'!' {
             toks.push(Tok::Bang);
+            sheet_qualifiers = true;
             i += 1;
         } else if c == b'<' || c == b'>' || c == b'=' {
             let next = bytes.get(i + 1).copied();
@@ -999,7 +1088,11 @@ fn tokenize(src: &str) -> Result<Vec<Tok<'_>>, String> {
         }
     }
 
-    Ok(toks)
+    Ok(Tokens {
+        toks,
+        intersections,
+        sheet_qualifiers,
+    })
 }
 
 fn parse_structured_ref(raw: String, table_name: Option<String>) -> Result<Ast, String> {
@@ -1039,6 +1132,8 @@ fn parse_structured_ref(raw: String, table_name: Option<String>) -> Result<Ast, 
 
 struct Parser<'a> {
     toks: std::vec::IntoIter<Tok<'a>>,
+    intersections: bool,
+    sheet_qualifiers: bool,
 }
 
 impl<'a> Parser<'a> {
@@ -1171,7 +1266,30 @@ impl<'a> Parser<'a> {
                 Ast::Pos(inner)
             });
         }
-        self.primary_at(depth)
+        // Intersection binds tighter than every operator except `:`. A
+        // formula without the operator keeps the plain call, which the
+        // plain parse path measures faster than a call plus a peek.
+        if !self.intersections {
+            return self.primary_at(depth);
+        }
+        let value = self.primary_at(depth)?;
+        if self.peek() == Some(&Tok::Intersect) {
+            return self.intersection_at(value, depth);
+        }
+        Ok(value)
+    }
+
+    /// The rest of `A1:C3 B2:D4` after its first operand. A chain keeps one
+    /// flat operand list, since the order of intersection does not change
+    /// its cells.
+    #[cold]
+    fn intersection_at(&mut self, first: Ast, depth: usize) -> Result<Ast, String> {
+        let mut operands = vec![first];
+        while self.peek() == Some(&Tok::Intersect) {
+            let _ = self.next();
+            operands.push(self.primary_at(depth)?);
+        }
+        Ok(Ast::Func(Func::Intersect, operands))
     }
 
     fn primary_at(&mut self, depth: usize) -> Result<Ast, String> {
@@ -1181,9 +1299,19 @@ impl<'a> Parser<'a> {
             Some(Tok::Num(n)) => Ok(Ast::Num(n)),
             Some(Tok::Str(value)) => Ok(Ast::Str(value)),
             Some(Tok::LParen) => {
-                let e = self.expr_at(depth + 1)?;
+                let first = self.expr_at(depth + 1)?;
+                let value = if self.peek() == Some(&Tok::Comma) {
+                    let mut areas = vec![first];
+                    while self.peek() == Some(&Tok::Comma) {
+                        let _ = self.next();
+                        areas.push(self.expr_at(depth + 1)?);
+                    }
+                    Ast::Func(Func::Union, areas)
+                } else {
+                    first
+                };
                 match self.next() {
-                    Some(Tok::RParen) => Ok(e),
+                    Some(Tok::RParen) => Ok(value),
                     _ => Err("expected )".into()),
                 }
             }
@@ -1259,6 +1387,22 @@ impl<'a> Parser<'a> {
             return parse_structured_ref(raw, Some(name.into_owned()));
         }
 
+        if self.sheet_qualifiers
+            && self.peek() == Some(&Tok::Colon)
+            && matches!(
+                self.toks.as_slice().get(1..3),
+                Some([Tok::Ident(..), Tok::Bang])
+            )
+        {
+            let _ = self.next();
+            let Some(Tok::Ident(last, last_quoted)) = self.next() else {
+                unreachable!("peeked 3-D reference end");
+            };
+            let _ = self.next();
+            // Excel quotes a span as a whole, so either quoted end quotes both.
+            return self.sheet_span_at(name.into_owned(), last.into_owned(), quoted || last_quoted);
+        }
+
         if let Some(Tok::Bang) = self.peek() {
             let _ = self.next();
             return self.sheet_ref_at(name.into_owned(), quoted);
@@ -1320,6 +1464,14 @@ impl<'a> Parser<'a> {
     }
 
     fn sheet_ref_at(&mut self, sheet_name: String, quoted: bool) -> Result<Ast, String> {
+        // Sheet names cannot contain `:`, so a quoted name with one is the
+        // Excel form of a 3-D reference: `'Sheet 1:Sheet 3'!A1`.
+        if quoted {
+            if let Some((first, last)) = sheet_name.split_once(':') {
+                return self.sheet_span_at(first.to_string(), last.to_string(), true);
+            }
+        }
+
         let Some(Tok::Ident(start, _)) = self.next() else {
             return Err("expected cell after !".into());
         };
@@ -1340,6 +1492,49 @@ impl<'a> Parser<'a> {
         }
 
         Ok(self.spill_suffix(Ast::SheetCell(qualifier, row, col, flags)))
+    }
+
+    /// The cell or range after the `!` of a 3-D reference from sheet `first`
+    /// to sheet `last`.
+    #[cold]
+    fn sheet_span_at(&mut self, first: String, last: String, quoted: bool) -> Result<Ast, String> {
+        let Some(Tok::Ident(start, _)) = self.next() else {
+            return Err("expected cell after !".into());
+        };
+        let (row, col, flags) = parse_a1(&start).ok_or_else(|| format!("bad cell ref: {start}"))?;
+
+        let (cell, (row_start, col_start, row_end, col_end, range_flags)) =
+            if self.peek() == Some(&Tok::Colon) {
+                let _ = self.next();
+                let Some(Tok::Ident(end, _)) = self.next() else {
+                    return Err("expected cell after :".into());
+                };
+                let (end_row, end_col, end_flags) =
+                    parse_a1(&end).ok_or_else(|| format!("bad cell ref: {end}"))?;
+                (
+                    false,
+                    normalize_range(row, col, flags, end_row, end_col, end_flags),
+                )
+            } else {
+                (true, normalize_range(row, col, flags, row, col, flags))
+            };
+
+        let endpoint = |name: String| SheetRef {
+            handle: UNRESOLVED_SHEET,
+            name,
+            quoted,
+        };
+        Ok(Ast::SheetSpan(Box::new(SheetSpanRef {
+            first: endpoint(first),
+            last: endpoint(last),
+            sheets: Vec::new(),
+            row_start,
+            col_start,
+            row_end,
+            col_end,
+            flags: range_flags,
+            cell,
+        })))
     }
 
     /// `A1#` refers to the whole spill of the formula in A1. It is stored as
@@ -1382,9 +1577,11 @@ pub(crate) fn sheet_name_key(name: &str) -> String {
 /// Parse a formula source (with or without a leading `=`) into an AST.
 pub fn parse(src: &str) -> Result<Ast, String> {
     let trimmed = src.trim().strip_prefix('=').unwrap_or(src.trim());
-    let toks = tokenize(trimmed)?;
+    let tokens = tokenize(trimmed)?;
     let mut parser = Parser {
-        toks: toks.into_iter(),
+        toks: tokens.toks.into_iter(),
+        intersections: tokens.intersections,
+        sheet_qualifiers: tokens.sheet_qualifiers,
     };
     let ast = parser.expr()?;
     if parser.peek().is_some() {
@@ -1394,11 +1591,24 @@ pub fn parse(src: &str) -> Result<Ast, String> {
 }
 
 /// Resolve sheet-qualified refs to numeric sheet handles once, at formula ingest.
-pub fn resolve_sheet_refs<F>(ast: Ast, resolve: &F) -> Result<Ast, String>
+/// `place_span` gives a resolved 3-D reference the sheets it spans, and fails
+/// when an endpoint is not in the tab order.
+pub fn resolve_sheet_refs<F, S>(ast: Ast, resolve: &F, place_span: &S) -> Result<Ast, String>
 where
     F: Fn(&str) -> Option<u32>,
+    S: Fn(&mut SheetSpanRef) -> bool,
 {
     match ast {
+        Ast::SheetSpan(mut span) => {
+            for endpoint in [&mut span.first, &mut span.last] {
+                endpoint.handle = resolve(&endpoint.name)
+                    .ok_or_else(|| format!("unknown sheet: {}", endpoint.name))?;
+            }
+            if !place_span(&mut span) {
+                return Err(format!("unknown sheet: {}", span.first.name));
+            }
+            Ok(Ast::SheetSpan(span))
+        }
         Ast::SheetCell(sheet_ref, row, col, flags) => resolve(&sheet_ref.name)
             .map(|handle| {
                 Ast::AbsCell(
@@ -1432,32 +1642,147 @@ where
         Ast::Func(func, args) => {
             let resolved = args
                 .into_iter()
-                .map(|arg| resolve_sheet_refs(arg, resolve))
+                .map(|arg| resolve_sheet_refs(arg, resolve, place_span))
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(Ast::Func(func, resolved))
         }
         Ast::UnknownFunc(name, args) => {
             let resolved = args
                 .into_iter()
-                .map(|arg| resolve_sheet_refs(arg, resolve))
+                .map(|arg| resolve_sheet_refs(arg, resolve, place_span))
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(Ast::UnknownFunc(name, resolved))
         }
         Ast::Bin(op, left, right) => Ok(Ast::Bin(
             op,
-            Box::new(resolve_sheet_refs(*left, resolve)?),
-            Box::new(resolve_sheet_refs(*right, resolve)?),
+            Box::new(resolve_sheet_refs(*left, resolve, place_span)?),
+            Box::new(resolve_sheet_refs(*right, resolve, place_span)?),
         )),
         Ast::Cmp(op, left, right) => Ok(Ast::Cmp(
             op,
-            Box::new(resolve_sheet_refs(*left, resolve)?),
-            Box::new(resolve_sheet_refs(*right, resolve)?),
+            Box::new(resolve_sheet_refs(*left, resolve, place_span)?),
+            Box::new(resolve_sheet_refs(*right, resolve, place_span)?),
         )),
-        Ast::Neg(inner) => Ok(Ast::Neg(Box::new(resolve_sheet_refs(*inner, resolve)?))),
-        Ast::Pos(inner) => Ok(Ast::Pos(Box::new(resolve_sheet_refs(*inner, resolve)?))),
-        Ast::Percent(inner) => Ok(Ast::Percent(Box::new(resolve_sheet_refs(*inner, resolve)?))),
+        Ast::Neg(inner) => Ok(Ast::Neg(Box::new(resolve_sheet_refs(
+            *inner, resolve, place_span,
+        )?))),
+        Ast::Pos(inner) => Ok(Ast::Pos(Box::new(resolve_sheet_refs(
+            *inner, resolve, place_span,
+        )?))),
+        Ast::Percent(inner) => Ok(Ast::Percent(Box::new(resolve_sheet_refs(
+            *inner, resolve, place_span,
+        )?))),
         other => Ok(other),
     }
+}
+
+fn tab_position(order: &[u32], handle: u32) -> Option<usize> {
+    order.iter().position(|&tab| tab == handle)
+}
+
+/// Gives a span with resolved endpoints the sheets between them in tab
+/// order. Endpoints written in reverse tab order are swapped, so `first` is
+/// always the earlier tab. Fails when an endpoint is not in `order`.
+pub(crate) fn place_span(span: &mut SheetSpanRef, order: &[u32]) -> bool {
+    let (Some(mut start), Some(mut end)) = (
+        tab_position(order, span.first.handle),
+        tab_position(order, span.last.handle),
+    ) else {
+        return false;
+    };
+    if start > end {
+        std::mem::swap(&mut span.first, &mut span.last);
+        std::mem::swap(&mut start, &mut end);
+    }
+
+    span.sheets.clear();
+    span.sheets.extend_from_slice(&order[start..=end]);
+    true
+}
+
+pub(crate) fn ast_contains_sheet_span(ast: &Ast) -> bool {
+    match ast {
+        Ast::SheetSpan(_) => true,
+        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => args.iter().any(ast_contains_sheet_span),
+        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+            ast_contains_sheet_span(left) || ast_contains_sheet_span(right)
+        }
+        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => ast_contains_sheet_span(inner),
+        _ => false,
+    }
+}
+
+/// Re-places every 3-D reference in `ast` after tabs were moved, inserted or
+/// removed, as Excel does: removed sheets leave the span, a removed endpoint
+/// gives way to its nearest surviving neighbour inside the span, and an
+/// endpoint moved past the other endpoint leaves the span, so its inner
+/// neighbour becomes the endpoint. A span without surviving sheets becomes
+/// `#REF!`. `names` holds the sheet name of each handle.
+pub(crate) fn refresh_sheet_spans(ast: &mut Ast, order: &[u32], names: &[String]) -> bool {
+    match ast {
+        Ast::SheetSpan(span) => match refresh_span(span, order, names) {
+            Some(changed) => changed,
+            None => {
+                *ast = Ast::InvalidRef;
+                true
+            }
+        },
+        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
+            let mut changed = false;
+            for arg in args {
+                changed |= refresh_sheet_spans(arg, order, names);
+            }
+            changed
+        }
+        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+            let left_changed = refresh_sheet_spans(left, order, names);
+            refresh_sheet_spans(right, order, names) || left_changed
+        }
+        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
+            refresh_sheet_spans(inner, order, names)
+        }
+        _ => false,
+    }
+}
+
+/// Whether `span` changed, or `None` when none of its sheets is left.
+fn refresh_span(span: &mut SheetSpanRef, order: &[u32], names: &[String]) -> Option<bool> {
+    let survivors: Vec<(u32, usize)> = span
+        .sheets
+        .iter()
+        .filter_map(|&handle| tab_position(order, handle).map(|position| (handle, position)))
+        .collect();
+    let mut low = 0;
+    let mut high = survivors.len().checked_sub(1)?;
+
+    // Only one tab moves at a time, so the endpoint that now sits beyond its
+    // own inner neighbour is the one that moved.
+    while survivors[low].1 > survivors[high].1 {
+        if survivors[low].1 > survivors[low + 1].1 {
+            low += 1;
+        } else {
+            high -= 1;
+        }
+    }
+
+    let (first, start) = survivors[low];
+    let (last, end) = survivors[high];
+    let sheets = &order[start..=end];
+    if first == span.first.handle && last == span.last.handle && span.sheets == sheets {
+        return Some(false);
+    }
+
+    for (endpoint, handle) in [(&mut span.first, first), (&mut span.last, last)] {
+        if endpoint.handle != handle {
+            let name = names.get(handle as usize).map_or("", String::as_str);
+            endpoint.handle = handle;
+            endpoint.name = name.to_string();
+            endpoint.quoted = sheet_name_needs_quotes(name);
+        }
+    }
+    span.sheets.clear();
+    span.sheets.extend_from_slice(sheets);
+    Some(true)
 }
 
 /// Resolve workbook/sheet-scoped names after sheet references have stable handles.
@@ -1737,6 +2062,21 @@ fn translate_relative_refs_inner(ast: &mut Ast, row_delta: i64, col_delta: i64) 
             *c1 = next_c1;
             true
         }
+        Ast::SheetSpan(span) => {
+            let (Some(row_start), Some(col_start), Some(row_end), Some(col_end)) = (
+                translated_coordinate(span.row_start, row_delta, span.flags.start.row_abs),
+                translated_coordinate(span.col_start, col_delta, span.flags.start.col_abs),
+                translated_coordinate(span.row_end, row_delta, span.flags.end.row_abs),
+                translated_coordinate(span.col_end, col_delta, span.flags.end.col_abs),
+            ) else {
+                return false;
+            };
+            span.row_start = row_start;
+            span.col_start = col_start;
+            span.row_end = row_end;
+            span.col_end = col_end;
+            true
+        }
         Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
             for arg in args {
                 if !translate_relative_refs_inner(arg, row_delta, col_delta) {
@@ -1968,6 +2308,15 @@ pub(crate) fn rename_sheet_refs(ast: &mut Ast, handle: u32, name: &str) -> bool 
             sheet.quoted = sheet_name_needs_quotes(name);
             changed = true;
         }
+        Ast::SheetSpan(span) => {
+            for endpoint in [&mut span.first, &mut span.last] {
+                if endpoint.handle == handle {
+                    endpoint.name = name.to_string();
+                    endpoint.quoted = sheet_name_needs_quotes(name);
+                    changed = true;
+                }
+            }
+        }
         Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
             for arg in args {
                 changed |= rename_sheet_refs(arg, handle, name);
@@ -2017,6 +2366,8 @@ where
 }
 
 /// Replace every resolved cell/range reference to a removed stable handle with `#REF!`.
+/// 3-D references are left to [`refresh_sheet_spans`]: removing one of their
+/// sheets shrinks the span instead.
 pub(crate) fn invalidate_sheet_refs(ast: &mut Ast, handle: u32) -> bool {
     let invalid = matches!(
         ast,
@@ -2129,6 +2480,26 @@ fn write_ast(ast: &Ast, out: &mut String) {
             out.push(':');
             write_a1(*r1, *c1, flags.end, out);
         }
+        Ast::SheetSpan(span) => {
+            // Excel quotes the whole span once: `'Sheet 1:Sheet 3'!A1`.
+            if span.first.quoted || span.last.quoted {
+                out.push('\'');
+                out.push_str(&span.first.name.replace('\'', "''"));
+                out.push(':');
+                out.push_str(&span.last.name.replace('\'', "''"));
+                out.push('\'');
+            } else {
+                out.push_str(&span.first.name);
+                out.push(':');
+                out.push_str(&span.last.name);
+            }
+            out.push('!');
+            write_a1(span.row_start, span.col_start, span.flags.start, out);
+            if !span.cell {
+                out.push(':');
+                write_a1(span.row_end, span.col_end, span.flags.end, out);
+            }
+        }
         Ast::Missing => {}
         #[cfg(feature = "analysis")]
         Ast::BoundMatrix { .. } => out.push_str("#CALC!"),
@@ -2159,6 +2530,33 @@ fn write_ast(ast: &Ast, out: &mut String) {
             // A deleted anchor writes as #REF!, which has no spill suffix.
             if !matches!(args[0], Ast::InvalidRef) {
                 out.push('#');
+            }
+        }
+        Ast::Func(Func::Union, areas) => {
+            out.push('(');
+            for (index, area) in areas.iter().enumerate() {
+                if index > 0 {
+                    out.push(',');
+                }
+                write_ast(area, out);
+            }
+            out.push(')');
+        }
+        Ast::Func(Func::Intersect, operands) => {
+            for (index, operand) in operands.iter().enumerate() {
+                if index > 0 {
+                    out.push(' ');
+                }
+                // A signed operand needs its own parentheses, or the sign
+                // would apply to the whole intersection when parsed again.
+                let signed = matches!(operand, Ast::Neg(_) | Ast::Pos(_) | Ast::Percent(_));
+                if signed {
+                    out.push('(');
+                }
+                write_ast(operand, out);
+                if signed {
+                    out.push(')');
+                }
             }
         }
         Ast::Func(func, args) => {
@@ -2287,6 +2685,39 @@ fn write_col(mut col: u32, out: &mut String) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reference_operators_serialize_to_text_that_parses_back_to_the_same_tree() {
+        for (source, expected) in [
+            ("=SUM(A1:C3 B2:D4)", "=SUM(A1:C3 B2:D4)"),
+            ("=a1   b2  c3", "=A1 B2 C3"),
+            ("=(-A1) B1", "=(-(A1)) B1"),
+            ("=A1:B2 'Other Sheet'!B1", "=A1:B2 'Other Sheet'!B1"),
+            ("=SUM((A1:A2,C1:C2))", "=SUM((A1:A2,C1:C2))"),
+            ("=INDEX(( A1:B2 , D1 ),1,1,2)", "=INDEX((A1:B2,D1),1,1,2)"),
+            ("=SUM(Sheet1:Sheet3!A1:B2)", "=SUM(Sheet1:Sheet3!A1:B2)"),
+            ("=SUM('My Sheet:Other'!$A$1)", "=SUM('My Sheet:Other'!$A$1)"),
+            ("=SUM('My Sheet':Other!A1)", "=SUM('My Sheet:Other'!A1)"),
+            ("=SUM('O''Brien:Last'!A1)", "=SUM('O''Brien:Last'!A1)"),
+            ("=SUM(A1 + B1)", "=SUM((A1+B1))"),
+            ("=SUM(#REF! B2:D4)", "=SUM(#REF! B2:D4)"),
+            ("=SUM(B2:D4 #ref!)", "=SUM(B2:D4 #REF!)"),
+        ] {
+            let ast = parse(source).unwrap_or_else(|error| panic!("{source}: {error}"));
+            assert_eq!(serialize(&ast), expected, "{source}");
+            assert_eq!(parse(expected).as_ref(), Ok(&ast), "{source}");
+        }
+
+        assert!(matches!(
+            parse("=A1 B1"),
+            Ok(Ast::Func(Func::Intersect, operands)) if operands.len() == 2
+        ));
+        assert!(matches!(parse("=SUM (A1)"), Ok(Ast::Func(Func::Sum, _))));
+        assert!(matches!(
+            parse("=Sheet1:Sheet3!A1"),
+            Ok(Ast::SheetSpan(span)) if span.cell && span.first.name == "Sheet1"
+        ));
+    }
 
     #[test]
     fn spill_references_parse_and_serialize_with_a_hash_suffix() {

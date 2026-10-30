@@ -24,7 +24,7 @@ function classify(
   if (value === null) return { type: "blank" };
   if (typeof value === "number") return { type: "number", value, displayedText };
   if (typeof value === "boolean") return { type: "boolean", value };
-  if (/^#(?:N\/A|REF!|VALUE!|DIV\/0!|NUM!|SPILL!)$/.test(value)) {
+  if (/^#(?:N\/A|REF!|VALUE!|DIV\/0!|NUM!|NULL!|SPILL!)$/.test(value)) {
     return { type: "error", error: value };
   }
   return { type: "string", value };

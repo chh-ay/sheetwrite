@@ -338,7 +338,9 @@ function validateInventory(value: unknown, issues: string[]): InventoryDenominat
     if (
       !isObject(entry) ||
       !INVENTORY_OPERATOR.test(String(entry.canonical)) ||
-      !isNonemptyString(entry.token) ||
+      // The intersection operator token is a single space.
+      typeof entry.token !== "string" ||
+      entry.token.length === 0 ||
       !["prefix", "infix", "postfix"].includes(String(entry.fixity)) ||
       entry.family !== "operator"
     ) {

@@ -142,6 +142,37 @@ store.applyTransaction({
 
 A formula on `summary` resolves the sheet-scoped `Revenue`; formulas on other sheets resolve the workbook definition. Names are case-insensitive, must be formula-safe identifiers, and cannot look like A1 cells or boolean literals. Row/column insertions, removals, and moves rebase their rectangles. Deleting the complete target or its scope removes the definition; formulas then fall back to a workbook definition or evaluate to `#NAME?`.
 
+### Intersection
+
+A space between two references is the intersection operator. `=SUM(A1:C3 B2:D4)` adds the shared cells `B2:C3`. A one-cell intersection in a value position is the value of that cell. At the root of a formula, a larger intersection spills like a range. An empty intersection returns `#NULL!`. References on different sheets also return `#NULL!`. An operand that is not a reference returns `#VALUE!`.
+
+Other spaces are not operators. Spaces around other operators, after commas, before `)`, and between a function name and `(` do not change the formula.
+
+### Union
+
+A comma inside parentheses that are not a function call is the union operator. `=SUM((A1:A2,C1:C2))` adds both ranges, and `=COUNT((A1,B2,C3))` counts three cells. A comma that separates function arguments is not a union.
+
+Functions that read their arguments as a list of values accept a union. Examples are `SUM`, `COUNT`, `COUNTA`, `AVERAGE`, `MAX`, `MIN`, `PRODUCT`, `SMALL`, `LARGE`, `MEDIAN`, `STDEV.S`, `STDEV.P`, `VAR.S` and `VAR.P`. `INDEX(reference, row, [column], [area_num])` returns from area `area_num` of a union. The first area is `1`, which is the default. An `area_num` after the last area returns `#REF!`. `AREAS(reference)` returns the number of areas: the number of union members, or `1` for a cell, range or intersection. A union in other positions returns `#VALUE!`. Examples are `=(A1,B1)`, the table of `VLOOKUP`, and `ROWS`.
+
+### 3-D references
+
+A 3-D reference reads the same cell or range on a span of sheets: `=SUM(Jan:Mar!B2)` or `=SUM(Jan:Mar!B2:C5)`. If a sheet name needs quotes, quote the full span: `='Sheet 1:Sheet 3'!A1`. The span is all sheets from the first endpoint to the last endpoint, in workbook tab order.
+
+These functions accept a 3-D reference: `SUM`, `AVERAGE`, `COUNT`, `COUNTA`, `MAX`, `MIN`, `PRODUCT`, `STDEV.S`, `STDEV.P`, `VAR.S` and `VAR.P`. A 3-D reference in other positions returns `#VALUE!`. On a sheet with a smaller grid, cells outside that grid are blank.
+
+Sheet edits change the span as in Excel:
+
+- A sheet that you insert or move between the endpoints joins the span.
+- A sheet that you move out of the span leaves it.
+- A deleted sheet leaves the span. If it is an endpoint, the endpoint moves to its inner neighbour and the formula text changes.
+- If you move an endpoint past the other endpoint, that sheet leaves the span and its inner neighbour becomes the endpoint. For example, `Sheet2:Sheet6` becomes `Sheet3:Sheet6` when `Sheet2` moves after `Sheet6`.
+- If you rename an endpoint, the formula text changes.
+- If you delete all sheets of the span, the reference returns `#REF!`.
+
+Row and column insertions and deletions on one sheet do not change a 3-D reference.
+
+XLSX import and export keep the Excel formula text of intersections, unions and 3-D references, for example `SUM(Jan:Mar!A1)`, `SUM((A1,B1))` and `SUM(A1:A3 A2:A4)`.
+
 ## Array constants
 
 Both engines accept array constants in braces. Commas separate columns and semicolons separate rows: `={1,2;3,4}` spills into two rows and two columns. `={1,2,3}` is one row; `={1;2;3}` is one column. Normal spill limits and collision rules apply.
@@ -172,7 +203,9 @@ Each element uses the scalar rules for values and errors. An error affects its e
 
 | Precedence, high to low | Operators | Associativity |
 | --- | --- | --- |
-| Reference | `:`, postfix `#` (spill) | — |
+| Range | `:`, postfix `#` (spill) | — |
+| Intersection | space between two references | left |
+| Union | `,` inside parentheses that are not a function call | left |
 | Unary sign | unary `+`, unary `-` | right |
 | Percentage | postfix `%` | left |
 | Exponentiation | `^` | left |
@@ -186,6 +219,9 @@ conventions: `=-2^2` is `4`, `=2^3^2` is `64`, and `=2^-2` is `0.25`. Parenthesi
 when portability to a non-spreadsheet evaluator matters. Percentage divides its operand by
 100 and may repeat (`=50%%` is `0.005`). Concatenation formats numbers, booleans, and blanks
 as spreadsheet text; arithmetic and comparison bind before `&`.
+
+The intersection and union operators apply only to references. See
+[Intersection](#intersection) and [Union](#union).
 
 Comparisons return native booleans. For example, `=IF(A1 >= 100, A1 * 0.9, A1)`.
 
@@ -220,7 +256,7 @@ Text evaluation is host-locale neutral. Function argument separators stay commas
 
 `INDIRECT(text, [a1])` resolves reference text at calculation time. The default `a1=TRUE` accepts A1 notation, such as `=INDIRECT("B"&A1)`. With `FALSE`, it accepts R1C1 notation: `=INDIRECT("R1C2",FALSE)` reads `B1`, and `=INDIRECT("R[-1]C",FALSE)` reads the cell one row above the formula. Sheet-qualified references, defined names and table references are supported. Invalid text, missing targets and external workbook references return `#REF!`; evaluation never opens another workbook.
 
-Both functions return references, so they can feed reference-taking functions such as `ROW`, `SUM` and `FORMULATEXT`; multi-cell formula results spill. They recalculate after each edit, even when the target is chosen at runtime. Runtime dependency cycles return `#CYCLE!`. Existing range and spill limits apply, and reading beyond the loaded sheet returns `#REF!`.
+Both functions return references, so they can feed reference-taking functions such as `ROW`, `AREAS`, `SUM` and `FORMULATEXT`; multi-cell formula results spill. They recalculate after each edit, even when the target is chosen at runtime. Runtime dependency cycles return `#CYCLE!`. Existing range and spill limits apply, and reading beyond the loaded sheet returns `#REF!`.
 
 Fill, copy and structural edits rewrite ordinary reference arguments to `OFFSET`. They do not rewrite text inside `INDIRECT`: `"A1"` remains `"A1"` after a row insertion.
 
@@ -260,7 +296,7 @@ A mismatch or malformed pair list returns `#VALUE!`. Matching result-range error
 
 ## Lookup semantics
 
-- `INDEX(range, row, [column])` uses 1-based indices and returns one scalar. Zero/negative indices return `#VALUE!`; array-return row/column projections are not implemented.
+- `INDEX(range, row, [column], [area_num])` uses 1-based indices and returns one scalar. Zero/negative indices return `#VALUE!`; array-return row/column projections are not implemented. `area_num` selects an area of a union, such as `=INDEX((A1:B2,D1:E2),1,1,2)`; an `area_num` after the last area returns `#REF!`.
 - `MATCH(key, range, 0)` is exact. Match type `1` returns the largest value less than or equal to the key from ascending data. `-1` returns the smallest value greater than or equal to the key from descending data. Invalid ordering returns `#N/A` rather than a plausible wrong row.
 - `VLOOKUP`/`HLOOKUP` use exact matching when the final argument is false. The omitted/true mode uses correctly ordered approximate data and returns the largest value less than or equal to the key.
 - `XLOOKUP` supports exact, next-smaller (`-1`), next-larger (`1`), and wildcard (`2`) match modes; forward/reverse and ordered binary-search modes are accepted. `if_not_found` is optional. If it is omitted—including via an interior empty argument—the result is `#N/A`.

@@ -2,6 +2,7 @@
 
 #[cfg(feature = "analysis")]
 pub(crate) mod analysis;
+mod areas;
 mod array;
 mod criteria;
 mod date;
@@ -51,7 +52,7 @@ use lookup::{
     remember_result, remember_table, result_reuse, table_reuse, CachedList, CachedResult,
     CachedTable, LookupPassGuard, LookupReuse, ReuseEntry, TablePart,
 };
-pub(crate) use matrix::{matrix_resource_stats, reset_matrix_resource_stats};
+pub(crate) use matrix::{intersection_range, matrix_resource_stats, reset_matrix_resource_stats};
 use matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_BYTES};
 pub(crate) use random::RandomSource;
 use range_reader::RangeReader;
@@ -1359,7 +1360,8 @@ impl CellStore {
             | Ast::NamedRange(_)
             | Ast::Range(..)
             | Ast::AbsRange(..)
-            | Ast::SheetRange(..) => Value::Error(FormulaError::Value),
+            | Ast::SheetRange(..)
+            | Ast::SheetSpan(_) => Value::Error(FormulaError::Value),
             Ast::Neg(expr) | Ast::Pos(expr) | Ast::Percent(expr) => {
                 let op = match ast {
                     Ast::Neg(_) => operators::UnaryOp::Neg,
@@ -1454,6 +1456,14 @@ impl CellStore {
 
         if matches!(func, Func::Offset | Func::Indirect) {
             return self.eval_runtime_reference(func, args, sheet, pass, depth);
+        }
+
+        match func {
+            Func::Intersect => return self.eval_intersection(args, sheet, pass, depth),
+            // A union has several areas, and a value position takes one.
+            Func::Union => return Value::Error(FormulaError::Value),
+            Func::Areas => return self.eval_areas(args, sheet, pass, depth),
+            _ => {}
         }
 
         if func == Func::Choose {
@@ -1848,10 +1858,16 @@ impl CellStore {
                     reference.row_end,
                     reference.col,
                 )),
+                Ast::Func(Func::Intersect, operands) => intersection_range(operands, sheet).ok(),
                 _ => None,
             };
             let shape = if let Some(range) = range {
                 match self.eval_range_values(range, pass, depth + 1, &mut values) {
+                    Ok(shape) => shape,
+                    Err(error) => return Value::Error(error),
+                }
+            } else if matches!(arg, Ast::Func(Func::Union, _) | Ast::SheetSpan(_)) {
+                match self.eval_area_values(func, arg, sheet, pass, depth + 1, &mut values) {
                     Ok(shape) => shape,
                     Err(error) => return Value::Error(error),
                 }
@@ -2578,10 +2594,14 @@ impl CellStore {
             |ast: &Ast, pass: &mut EvalPass<'_>| self.eval_ast(ast, sheet, pass, depth + 1);
         match func {
             Func::Index => {
-                if !(2..=3).contains(&args.len()) {
+                if !(2..=4).contains(&args.len()) {
                     return Value::Error(FormulaError::Value);
                 }
-                let matrix = match self.eval_matrix_arg(&args[0], sheet, pass, depth + 1) {
+                let area = match self.index_area(&args[0], args.get(3), sheet, pass, depth + 1) {
+                    Ok(area) => area,
+                    Err(error) => return Value::Error(error),
+                };
+                let matrix = match self.eval_matrix_arg(area, sheet, pass, depth + 1) {
                     Ok(matrix) => matrix,
                     Err(error) => return Value::Error(error),
                 };
@@ -2590,12 +2610,19 @@ impl CellStore {
                     Ok(index) => index,
                     Err(error) => return Value::Error(error),
                 };
-                let (row, col) = if matrix.rows == 1 && args.len() == 2 {
+                // With area_num, an empty column argument is omitted, as when
+                // only the row is given.
+                let col_arg = if args.len() == 4 {
+                    optional_ast(args, 2)
+                } else {
+                    args.get(2)
+                };
+                let (row, col) = if matrix.rows == 1 && col_arg.is_none() {
                     (0, first)
-                } else if matrix.cols == 1 && args.len() == 2 {
+                } else if matrix.cols == 1 && col_arg.is_none() {
                     (first, 0)
                 } else {
-                    let Some(col_arg) = args.get(2) else {
+                    let Some(col_arg) = col_arg else {
                         return Value::Error(FormulaError::Value);
                     };
                     let col = scalar(col_arg, pass);

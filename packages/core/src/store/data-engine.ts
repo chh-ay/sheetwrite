@@ -1342,6 +1342,16 @@ export class StoreDataEngine {
     );
   }
 
+  /** Cells on `sheet` whose formula holds a 3-D reference, which a tab move can rewrite. */
+  sheetSpanFormulaCells(sheet: SheetId): { row: number; col: number }[] {
+    const pairs = this.wasm.sheetSpanFormulaCells(this.handleOf(sheet));
+    const cells: { row: number; col: number }[] = [];
+    for (let index = 0; index + 1 < pairs.length; index += 2) {
+      cells.push({ row: pairs[index] ?? 0, col: pairs[index + 1] ?? 0 });
+    }
+    return cells;
+  }
+
   /** Sources for a whole logical sheet, without reading every resolved cell. */
   captureSheetSources(sheet: SheetId): RangeSourceProjection | null {
     const metadata = this.sheetMeta(sheet);
@@ -2248,6 +2258,7 @@ export class StoreDataEngine {
           return false;
         const [sheet] = this.workbook.sheets.splice(from, 1);
         this.workbook.sheets.splice(patch.to, 0, sheet!);
+        this.syncSheetOrder();
         return true;
       }
       case "setSheetVisibility": {
@@ -2842,6 +2853,7 @@ export class StoreDataEngine {
       if (meta.hidden) sheet.hiddenRows!.add(row);
     }
     this.workbook.sheets.splice(snapshot.order, 0, sheet);
+    this.syncSheetOrder();
     for (const table of sheet.tables ?? []) {
       if (!this.syncTable(table)) return false;
     }
@@ -3299,6 +3311,14 @@ export class StoreDataEngine {
     const handle = this.handleOf(sheet);
     if (!this.wasm.removeSheet(handle)) return false;
     return true;
+  }
+
+  /** Give the engine the tab order, which 3-D references such as `Sheet1:Sheet3!A1` span. */
+  private syncSheetOrder(): void {
+    const order = Uint32Array.from(this.workbook.sheets, (sheet) => this.handleOf(sheet.id));
+    if (!this.wasm.setSheetOrder(order)) {
+      throw new Error("engine sheet handles do not match the workbook tabs");
+    }
   }
 
   /** Bulk-load one rectangular datasource page in one Rust-owned source transaction. */

@@ -5,7 +5,7 @@ description: "Generated, source-linked formula names, signatures, semantics, dia
 
 # Formula function contract
 
-This page is generated from the checked version 1 `sheetwrite.formula-capabilities` inventory. It publishes **100 required-supported target functions**, **62 incumbent functions**, and **145 optional analysis functions** (307 canonical functions total) without maintaining a second name list. Aliases share their canonical function's build availability.
+This page is generated from the checked version 1 `sheetwrite.formula-capabilities` inventory. It publishes **100 required-supported target functions**, **63 incumbent functions**, and **145 optional analysis functions** (308 canonical functions total) without maintaining a second name list. Aliases share their canonical function's build availability.
 
 A function's presence means only the signature and semantic profiles linked in its row. Microsoft Excel documentation supplies the naming/family taxonomy; it is not a blanket Excel claim. Google Sheets and OpenFormula behavior is unverified unless a dialect profile says otherwise.
 
@@ -217,6 +217,7 @@ Taxonomy/source: [Lookup and reference functions](https://support.microsoft.com/
 <tr data-formula-name="ADDRESS" data-engine="default"><td><code>ADDRESS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-address">Signature: <code>address</code></a><br /><a href="#semantics-lookup">Semantics: <code>lookup</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="OFFSET" data-engine="default"><td><code>OFFSET</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-offset">Signature: <code>offset</code></a><br /><a href="#semantics-dynamic-reference">Semantics: <code>dynamic-reference</code></a><br /><a href="#dialect-excel-dynamic-reference">Dialect: <code>excel-dynamic-reference</code></a><br /><a href="#implementation-implemented-dynamic-reference">Implementation: <code>implemented-dynamic-reference</code></a></details></td></tr>
 <tr data-formula-name="INDIRECT" data-engine="default"><td><code>INDIRECT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-indirect">Signature: <code>indirect</code></a><br /><a href="#semantics-dynamic-reference">Semantics: <code>dynamic-reference</code></a><br /><a href="#dialect-excel-dynamic-reference">Dialect: <code>excel-dynamic-reference</code></a><br /><a href="#implementation-implemented-dynamic-reference">Implementation: <code>implemented-dynamic-reference</code></a></details></td></tr>
+<tr data-formula-name="AREAS" data-engine="default"><td><code>AREAS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-required-reference">Signature: <code>required-reference</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-reference-operators">Dialect: <code>excel-reference-operators</code></a><br /><a href="#implementation-implemented-reference-operators">Implementation: <code>implemented-reference-operators</code></a></details></td></tr>
 <tr data-formula-name="FORMULATEXT" data-engine="default"><td><code>FORMULATEXT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-required-reference">Signature: <code>required-reference</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-reference-information">Dialect: <code>excel-reference-information</code></a><br /><a href="#implementation-implemented-reference-information">Implementation: <code>implemented-reference-information</code></a></details></td></tr>
 <tr data-formula-name="HYPERLINK" data-engine="default"><td><code>HYPERLINK</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-hyperlink">Signature: <code>hyperlink</code></a><br /><a href="#semantics-hyperlink-display">Semantics: <code>hyperlink-display</code></a><br /><a href="#dialect-excel-hyperlink-value">Dialect: <code>excel-hyperlink-value</code></a><br /><a href="#implementation-implemented-reference-information">Implementation: <code>implemented-reference-information</code></a></details></td></tr>
 </tbody></table>
@@ -2663,6 +2664,18 @@ Limitations: OFFSET and INDIRECT are volatile and return references. Multi-cell 
 
 </details>
 
+<details id="dialect-excel-reference-operators"><summary>Dialect: excel-reference-operators</summary>
+
+| Dialect | Status |
+| --- | --- |
+| Microsoft Excel | divergent |
+| Google Sheets | unverified |
+| OpenFormula | unverified |
+
+Limitations: A space between two references is the intersection operator. An empty intersection, or references on different sheets, return #NULL!. A non-reference operand returns #VALUE!. Spaces around other operators, after commas, before a closing parenthesis and between a function name and its parenthesis are not operators. A comma inside parentheses that are not a function call is the union operator, as in (A1:A2,C1:C2). Aggregate functions that read their arguments as a list of values accept a union. INDEX picks area area_num of a union, and an area_num past the last area returns #REF!. A union in any other position returns #VALUE!. AREAS counts the areas of a reference: the members of a union, or 1 for a cell, range or intersection. A non-reference argument returns #VALUE!. A 3-D reference such as Sheet1:Sheet3!A1:B2 or 'Sheet 1:Sheet 3'!A1 spans the sheets between its endpoints in workbook tab order. SUM, AVERAGE, COUNT, COUNTA, MAX, MIN, PRODUCT, STDEV.S, STDEV.P, VAR.S and VAR.P accept it; any other position returns #VALUE!. Excel also accepts it in the A-suffixed aggregate functions. A sheet inserted or moved inside the span joins it; a sheet moved out leaves it. Deleting an endpoint moves the endpoint to its inner neighbour; moving an endpoint past the other endpoint drops it; renaming an endpoint rewrites the formula text. Deleting every sheet of the span gives #REF!. Row and column edits do not change a 3-D reference. Cells beyond a smaller sheet's grid read as blank. XLSX import and export keep the Excel formula text of intersections, unions and 3-D references. Google Sheets and OpenFormula results require producer evidence before compatibility is claimed.
+
+</details>
+
 <details id="dialect-excel-reference-information"><summary>Dialect: excel-reference-information</summary>
 
 | Dialect | Status |
@@ -2862,6 +2875,17 @@ Limitations: HYPERLINK returns its display value: the friendly name, or the link
 | Evaluator | implemented<br />[`packages/wasm/src/eval/reference.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/reference.rs)<br />[`packages/wasm/src/eval/dependency.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/dependency.rs) |
 | Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
 | Evidence | source-linked<br />[`packages/wasm/src/tests.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/tests.rs)<br />[`scripts/conformance/formula-evidence.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/conformance/formula-evidence.ts) |
+
+</details>
+
+<details id="implementation-implemented-reference-operators"><summary>Implementation: implemented-reference-operators</summary>
+
+| Layer | Status and source/evidence |
+| --- | --- |
+| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/calc.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/areas.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/areas.rs)<br />[`packages/wasm/src/eval/matrix.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/matrix.rs)<br />[`packages/wasm/src/store.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/store.rs) |
+| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
+| Evidence | source-linked<br />[`packages/wasm/src/tests.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/tests.rs)<br />[`packages/xlsx/test/formula-source-preservation.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/xlsx/test/formula-source-preservation.test.ts)<br />[`scripts/conformance/formula-evidence.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/conformance/formula-evidence.ts) |
 
 </details>
 

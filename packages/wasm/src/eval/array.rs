@@ -12,7 +12,8 @@ use crate::types::{FormulaError, Value};
 use super::expand_let_ast;
 use super::lookup::integer_arg;
 use super::matrix::{
-    optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_CELLS, SPILL_MAX_RECOMPUTE_CELLS,
+    intersection_range, optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_CELLS,
+    SPILL_MAX_RECOMPUTE_CELLS,
 };
 use super::reference::RewriteScope;
 use super::value::{bool_from_value, compare_values, number_from_value};
@@ -33,7 +34,7 @@ fn static_integer(ast: Option<&Ast>) -> Option<i64> {
 
 pub(crate) fn ast_produces_array(ast: &Ast) -> bool {
     match ast {
-        Ast::Func(Func::AnchorArray | Func::Offset | Func::Indirect, _) => true,
+        Ast::Func(Func::AnchorArray | Func::Offset | Func::Indirect | Func::Intersect, _) => true,
         #[cfg(feature = "analysis")]
         Ast::BoundMatrix { .. } => true,
         #[cfg(feature = "analysis")]
@@ -210,6 +211,7 @@ impl CellStore {
             | Ast::AbsRange(..)
             | Ast::NamedRange(..)
             | Ast::Structured(..)
+            | Ast::Func(Func::Intersect, _)
             | Ast::Array { .. } => Some(
                 self.matrix_shape(ast, formula_sheet)
                     .map(|(_, _, cells)| cells),
@@ -334,6 +336,9 @@ impl CellStore {
             Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(..) | Ast::Structured(..) => {
                 self.eval_matrix_arg(ast, sheet, pass, depth + 1)
             }
+            // An empty intersection is #NULL!, which the range path cannot tell.
+            Ast::Func(Func::Intersect, operands) => intersection_range(operands, sheet)
+                .and_then(|_| self.eval_matrix_arg(ast, sheet, pass, depth + 1)),
             Ast::Array { values, .. } => self
                 .matrix_shape(ast, sheet)
                 .map(|(rows, cols, _)| EvalMatrix::new(rows, cols, values.clone())),
@@ -504,7 +509,10 @@ impl CellStore {
             }
             _ => {}
         }
-        let range = range_from_ast(ast, formula_sheet).ok_or(FormulaError::Value)?;
+        let range = match ast {
+            Ast::Func(Func::Intersect, operands) => intersection_range(operands, formula_sheet)?,
+            _ => range_from_ast(ast, formula_sheet).ok_or(FormulaError::Value)?,
+        };
         let data = self
             .sheets
             .get(range.sheet as usize)
