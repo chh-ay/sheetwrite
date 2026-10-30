@@ -8,7 +8,7 @@ description: "InitOutput interface in @sheetwrite/formulas: Result of module ini
 Result of module initialization: the instantiated exports plus the shared linear memory.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/pkg/sheetwrite_wasm.d.ts#L533"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L533</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/pkg/sheetwrite_wasm.d.ts#L548"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L548</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -86,6 +86,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-recompute-volatile"><code>cellstore_recomputeVolatile</code></a>
 <a href="#init-output-cellstore-reference-target"><code>cellstore_referenceTarget</code></a>
 <a href="#init-output-cellstore-references-targeting"><code>cellstore_referencesTargeting</code></a>
+<a href="#init-output-cellstore-register-function"><code>cellstore_registerFunction</code></a>
 <a href="#init-output-cellstore-remap-range-styles"><code>cellstore_remapRangeStyles</code></a>
 <a href="#init-output-cellstore-remove-cols"><code>cellstore_removeCols</code></a>
 <a href="#init-output-cellstore-remove-named-range"><code>cellstore_removeNamedRange</code></a>
@@ -95,6 +96,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-rename-sheet"><code>cellstore_renameSheet</code></a>
 <a href="#init-output-cellstore-reset-formula-matrix-resource-stats"><code>cellstore_resetFormulaMatrixResourceStats</code></a>
 <a href="#init-output-cellstore-reset-query-resource-stats"><code>cellstore_resetQueryResourceStats</code></a>
+<a href="#init-output-cellstore-restore-function"><code>cellstore_restoreFunction</code></a>
 <a href="#init-output-cellstore-restore-range"><code>cellstore_restoreRange</code></a>
 <a href="#init-output-cellstore-row-count"><code>cellstore_rowCount</code></a>
 <a href="#init-output-cellstore-search"><code>cellstore_search</code></a>
@@ -124,6 +126,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-spill-anchor-row"><code>cellstore_spillAnchorRow</code></a>
 <a href="#init-output-cellstore-spill-derived-mask"><code>cellstore_spillDerivedMask</code></a>
 <a href="#init-output-cellstore-string-pool-epoch"><code>cellstore_stringPoolEpoch</code></a>
+<a href="#init-output-cellstore-unregister-function"><code>cellstore_unregisterFunction</code></a>
 <a href="#init-output-cellstore-wasm-committed-bytes"><code>cellstore_wasmCommittedBytes</code></a>
 <a href="#init-output-distinctcolumn-take-kinds"><code>distinctcolumn_takeKinds</code></a>
 <a href="#init-output-distinctcolumn-take-numbers"><code>distinctcolumn_takeNumbers</code></a>
@@ -151,14 +154,15 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-windowview-take-packed"><code>windowview_takePacked</code></a>
 <a href="#init-output-wbindgen-malloc"><code>__wbindgen_malloc</code></a>
 <a href="#init-output-wbindgen-realloc"><code>__wbindgen_realloc</code></a>
+<a href="#init-output-wbindgen-exn-store"><code>__wbindgen_exn_store</code></a>
+<a href="#init-output-externref-table-alloc"><code>__externref_table_alloc</code></a>
 <a href="#init-output-wbindgen-externrefs"><code>__wbindgen_externrefs</code></a>
 <a href="#init-output-wbindgen-free"><code>__wbindgen_free</code></a>
 <a href="#init-output-externref-drop-slice"><code>__externref_drop_slice</code></a>
-<a href="#init-output-externref-table-alloc"><code>__externref_table_alloc</code></a>
 <a href="#init-output-wbindgen-start"><code>__wbindgen_start</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>144</span>
+## Members <span class="api-count" data-pagefind-ignore>148</span>
 
 <div class="api-member-list">
 
@@ -828,6 +832,15 @@ readonly cellstore_referencesTargeting: (a: number, b: number, c: number) => [nu
 
 </details>
 
+<details class="api-member" id="init-output-cellstore-register-function" data-pagefind-weight="1">
+<summary><code>cellstore_registerFunction</code></summary>
+
+```ts generated
+readonly cellstore_registerFunction: (a: number, b: number, c: number, d: any, e: number) => number;
+```
+
+</details>
+
 <details class="api-member" id="init-output-cellstore-remap-range-styles" data-pagefind-weight="1">
 <summary><code>cellstore_remapRangeStyles</code></summary>
 
@@ -905,6 +918,15 @@ readonly cellstore_resetFormulaMatrixResourceStats: (a: number) => void;
 
 ```ts generated
 readonly cellstore_resetQueryResourceStats: (a: number) => void;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-restore-function" data-pagefind-weight="1">
+<summary><code>cellstore_restoreFunction</code></summary>
+
+```ts generated
+readonly cellstore_restoreFunction: (a: number, b: number, c: number, d: any, e: number) => number;
 ```
 
 </details>
@@ -1170,6 +1192,15 @@ readonly cellstore_stringPoolEpoch: (a: number) => number;
 
 </details>
 
+<details class="api-member" id="init-output-cellstore-unregister-function" data-pagefind-weight="1">
+<summary><code>cellstore_unregisterFunction</code></summary>
+
+```ts generated
+readonly cellstore_unregisterFunction: (a: number, b: number, c: number) => number;
+```
+
+</details>
+
 <details class="api-member" id="init-output-cellstore-wasm-committed-bytes" data-pagefind-weight="1">
 <summary><code>cellstore_wasmCommittedBytes</code></summary>
 
@@ -1413,6 +1444,24 @@ readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => num
 
 </details>
 
+<details class="api-member" id="init-output-wbindgen-exn-store" data-pagefind-weight="1">
+<summary><code>__wbindgen_exn_store</code></summary>
+
+```ts generated
+readonly __wbindgen_exn_store: (a: number) => void;
+```
+
+</details>
+
+<details class="api-member" id="init-output-externref-table-alloc" data-pagefind-weight="1">
+<summary><code>__externref_table_alloc</code></summary>
+
+```ts generated
+readonly __externref_table_alloc: () => number;
+```
+
+</details>
+
 <details class="api-member" id="init-output-wbindgen-externrefs" data-pagefind-weight="1">
 <summary><code>__wbindgen_externrefs</code></summary>
 
@@ -1436,15 +1485,6 @@ readonly __wbindgen_free: (a: number, b: number, c: number) => void;
 
 ```ts generated
 readonly __externref_drop_slice: (a: number, b: number) => void;
-```
-
-</details>
-
-<details class="api-member" id="init-output-externref-table-alloc" data-pagefind-weight="1">
-<summary><code>__externref_table_alloc</code></summary>
-
-```ts generated
-readonly __externref_table_alloc: () => number;
 ```
 
 </details>
@@ -1774,6 +1814,13 @@ export interface InitOutput {
     b: number,
     c: number,
   ) => [number, number];
+  readonly cellstore_registerFunction: (
+    a: number,
+    b: number,
+    c: number,
+    d: any,
+    e: number,
+  ) => number;
   readonly cellstore_remapRangeStyles: (
     a: number,
     b: number,
@@ -1816,6 +1863,13 @@ export interface InitOutput {
   ) => number;
   readonly cellstore_resetFormulaMatrixResourceStats: (a: number) => void;
   readonly cellstore_resetQueryResourceStats: (a: number) => void;
+  readonly cellstore_restoreFunction: (
+    a: number,
+    b: number,
+    c: number,
+    d: any,
+    e: number,
+  ) => number;
   readonly cellstore_restoreRange: (
     a: number,
     b: number,
@@ -2094,6 +2148,11 @@ export interface InitOutput {
     f: number,
   ) => [number, number];
   readonly cellstore_stringPoolEpoch: (a: number) => number;
+  readonly cellstore_unregisterFunction: (
+    a: number,
+    b: number,
+    c: number,
+  ) => number;
   readonly cellstore_wasmCommittedBytes: (a: number) => number;
   readonly distinctcolumn_takeKinds: (a: number) => [number, number];
   readonly distinctcolumn_takeNumbers: (a: number) => [number, number];
@@ -2129,10 +2188,11 @@ export interface InitOutput {
     c: number,
     d: number,
   ) => number;
+  readonly __wbindgen_exn_store: (a: number) => void;
+  readonly __externref_table_alloc: () => number;
   readonly __wbindgen_externrefs: WebAssembly.Table;
   readonly __wbindgen_free: (a: number, b: number, c: number) => void;
   readonly __externref_drop_slice: (a: number, b: number) => void;
-  readonly __externref_table_alloc: () => number;
   readonly __wbindgen_start: () => void;
 }
 ```

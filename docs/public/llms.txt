@@ -87,6 +87,7 @@ Sheetwrite packages are released together at version 0.6.0. This index is genera
 - [Iterative calculation](https://www.sheetwrite.dev/docs/features/formulas/iterative-calculation/): Calculate circular references as Excel does: turn on iterative calculation, set the iteration limit and maximum change, and save it in XLSX files.
 - [Lookup, criteria, and financial formulas](https://www.sheetwrite.dev/docs/features/formulas/lookup-criteria-and-financial/): Find values, aggregate matching cells, and calculate cash flows with explicit shape and error rules.
 - [Analysis formulas](https://www.sheetwrite.dev/docs/features/formulas/analysis-formulas/): Summarize, forecast, and clean data with the full formula engine. Worked examples for every function family in @sheetwrite/formulas.
+- [Custom functions](https://www.sheetwrite.dev/docs/features/formulas/custom-functions/): Register synchronous JavaScript functions that formulas can call, with metadata that formula help reads.
 
 ### Analysis
 
@@ -143,7 +144,7 @@ Sheetwrite packages are released together at version 0.6.0. This index is genera
 
 - [API reference](https://www.sheetwrite.dev/docs/api/): Generated reference for every classified Sheetwrite package entry point.
 - [`@sheetwrite/charts`](https://www.sheetwrite.dev/docs/api/charts/): 18 exports across 2 entry points (primary entry point: supported).
-- [`@sheetwrite/core`](https://www.sheetwrite.dev/docs/api/core/): 375 exports across 10 entry points (primary entry point: supported).
+- [`@sheetwrite/core`](https://www.sheetwrite.dev/docs/api/core/): 380 exports across 10 entry points (primary entry point: supported).
 - [`@sheetwrite/formulas`](https://www.sheetwrite.dev/docs/api/formulas/): 17 exports across 2 entry points (primary entry point: internal).
 - [`@sheetwrite/react`](https://www.sheetwrite.dev/docs/api/react/): 19 exports across 2 entry points (primary entry point: supported).
 - [`@sheetwrite/svelte`](https://www.sheetwrite.dev/docs/api/svelte/): 19 exports across 2 entry points (primary entry point: supported).

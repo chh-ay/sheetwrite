@@ -8,7 +8,7 @@ description: "Store interface in @sheetwrite/core: Columnar workbook storage, qu
 Columnar workbook storage, query, transaction, and subscription contract.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/store.ts#L148"><code>packages/core/src/types/store.ts#L148</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/store.ts#L149"><code>packages/core/src/types/store.ts#L149</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -18,6 +18,9 @@ Columnar workbook storage, query, transaction, and subscription contract.
 <a href="#store-get-spill-anchor"><code>getSpillAnchor</code></a>
 <a href="#store-get-ref-target"><code>getRefTarget</code></a>
 <a href="#store-recalculate-volatile"><code>recalculateVolatile</code></a>
+<a href="#store-register-function"><code>registerFunction</code></a>
+<a href="#store-unregister-function"><code>unregisterFunction</code></a>
+<a href="#store-list-functions"><code>listFunctions</code></a>
 <a href="#store-get-visible-window"><code>getVisibleWindow</code></a>
 <a href="#store-get-data-window"><code>getDataWindow</code></a>
 <a href="#store-get-clipboard-window"><code>getClipboardWindow</code></a>
@@ -33,7 +36,7 @@ Columnar workbook storage, query, transaction, and subscription contract.
 <a href="#store-view-row-count"><code>viewRowCount</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>19</span>
+## Members <span class="api-count" data-pagefind-ignore>22</span>
 
 <div class="api-member-list">
 
@@ -95,6 +98,36 @@ recalculateVolatile(now?: Date): void;
 `INDIRECT`) from one captured instant. The supplied Date is interpreted as an absolute UTC instant.
 Edits already recompute volatile formulas and read the clock once per
 recalculation; this call uses `now` instead, until the next edit.</p>
+</details>
+
+<details class="api-member" id="store-register-function" data-pagefind-weight="1">
+<summary><code>registerFunction</code> <span class="api-member-summary">Register a synchronous JavaScript function that formulas can call, then recalculate.</span></summary>
+
+```ts generated
+registerFunction(metadata: FormulaFunctionMetadata, implementation: FormulaFunction): void;
+```
+
+<p class="api-member-doc">Register a synchronous JavaScript function that formulas can call, then
+recalculate. A thrown error or a result that is not a scalar shows `#VALUE!`.</p>
+</details>
+
+<details class="api-member" id="store-unregister-function" data-pagefind-weight="1">
+<summary><code>unregisterFunction</code> <span class="api-member-summary">Remove a host function; formulas that call it show #NAME?.</span></summary>
+
+```ts generated
+unregisterFunction(name: string): boolean;
+```
+
+<p class="api-member-doc">Remove a host function; formulas that call it show `#NAME?`. Returns whether it existed.</p>
+</details>
+
+<details class="api-member" id="store-list-functions" data-pagefind-weight="1">
+<summary><code>listFunctions</code> <span class="api-member-summary">Metadata of the built-in functions of the active engine, then of the host functions.</span></summary>
+
+```ts generated
+listFunctions(): readonly FormulaFunctionMetadata[];
+```
+
 </details>
 
 <details class="api-member" id="store-get-visible-window" data-pagefind-weight="1">
@@ -241,6 +274,12 @@ export interface Store {
   getSpillAnchor(addr: CellAddress): CellAddress | null;
   getRefTarget(addr: CellAddress): CellAddress | null;
   recalculateVolatile(now?: Date): void;
+  registerFunction(
+    metadata: FormulaFunctionMetadata,
+    implementation: FormulaFunction,
+  ): void;
+  unregisterFunction(name: string): boolean;
+  listFunctions(): readonly FormulaFunctionMetadata[];
   getVisibleWindow(
     sheet: SheetId,
     rows: {

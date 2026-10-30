@@ -8,7 +8,7 @@ description: "CellLoadState type in @sheetwrite/core: Datasource loading state f
 Datasource loading state for a resolved cell.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/store.ts#L129"><code>packages/core/src/types/store.ts#L129</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/store.ts#L130"><code>packages/core/src/types/store.ts#L130</code></a></dd></div>
 </dl>
 
 ## Declaration

@@ -78,6 +78,7 @@ import {
   formulaFamilyNavigation,
   loadFormulaContractInventory,
   renderFormulaFunctionPages,
+  renderFunctionMetadata,
 } from "./formula-docs.js";
 import {
   renderFullEngineEvidence,
@@ -3600,6 +3601,10 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
   }
   const files: ExpectedFile[] = [
     ...apiFiles,
+    {
+      path: join(repositoryRoot, "packages/core/src/generated/function-metadata.ts"),
+      content: renderFunctionMetadata(formulaInventory),
+    },
     {
       path: join(contentRoot, "reference/package-entry-points.md"),
       content: renderEntryPointInventory(manifest),

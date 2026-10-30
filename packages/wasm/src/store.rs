@@ -268,6 +268,9 @@ pub struct CellStore {
     pub(crate) strings: StringStorage,
     pub(crate) graph: FormulaGraph,
     pub(crate) conditional_rules: ConditionalRules,
+    /// Host functions of this store. `None` until the host registers one, so
+    /// stores without host functions pay one pointer.
+    pub(crate) custom_functions: Option<Box<crate::eval::custom::CustomFunctions>>,
     loading_page: usize,
     named_ranges: HashMap<(Option<u32>, String), NamedRangeRef>,
     tables: HashMap<String, TableDefinition>,
@@ -367,6 +370,7 @@ impl CellStore {
             strings: StringStorage::new(),
             graph: FormulaGraph::default(),
             conditional_rules: ConditionalRules::default(),
+            custom_functions: None,
             loading_page: 0,
             mutation_revision: 0,
             active_mutation_revision: None,

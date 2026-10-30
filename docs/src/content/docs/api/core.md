@@ -8,7 +8,7 @@ description: "API reference for @sheetwrite/core."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/index.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>375</dd></div>
+<div><dt>Exports</dt><dd>380</dd></div>
 </dl>
 
 Source entry: `packages/core/src/index.ts`
@@ -113,7 +113,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/workbook-table-name-key/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>workbookTableNameKey</code></span><span class="api-symbol-card__desc">Locale-independent key used for table and table-column collision checks.</span></a>
 </div>
 
-### Interfaces <span class="api-count" data-pagefind-ignore>166</span>
+### Interfaces <span class="api-count" data-pagefind-ignore>168</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/boundary-operation-stats/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>BoundaryOperationStats</code></span><span class="api-symbol-card__desc">Fixed-cardinality boundary crossing counters for one operation.</span></a>
@@ -166,6 +166,8 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/delimited-text-resource-limits/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>DelimitedTextResourceLimits</code></span><span class="api-symbol-card__desc">Resource ceilings shared by synchronous CSV and TSV parsing and encoding.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/document-validation-error/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>DocumentValidationError</code></span><span class="api-symbol-card__desc">Path-qualified validation failure for a document operation.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/engine-memory-release-report/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>EngineMemoryReleaseReport</code></span><span class="api-symbol-card__desc">Result of an explicit, all-store engine memory release.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/formula-argument-metadata/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>FormulaArgumentMetadata</code></span><span class="api-symbol-card__desc">Argument documentation used by built-in and host functions.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/formula-function-metadata/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>FormulaFunctionMetadata</code></span><span class="api-symbol-card__desc">One metadata format for built-in and host functions.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/grid/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>Grid</code></span><span class="api-symbol-card__desc">Imperative grid handle for document commands, events, rendering, and teardown.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/grid-actions/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>GridActions</code></span><span class="api-symbol-card__desc">Imperative operations the toolbar and context menu bind to; also exposed as Grid.actions.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/grid-command-state/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>GridCommandState</code></span><span class="api-symbol-card__desc">Observable availability and selection-derived activity for one command.</span></a>
@@ -284,7 +286,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/xlsx-workbook-warning/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>XlsxWorkbookWarning</code></span><span class="api-symbol-card__desc">Structured fidelity warning emitted during XLSX conversion.</span></a>
 </div>
 
-### Types <span class="api-count" data-pagefind-ignore>94</span>
+### Types <span class="api-count" data-pagefind-ignore>97</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/aggregate-op/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>AggregateOp</code></span><span class="api-symbol-card__desc">Column aggregate operation for Grid.aggregate / Store data ops.</span></a>
@@ -319,6 +321,9 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/document-op/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>DocumentOp</code></span><span class="api-symbol-card__desc">Exhaustive serializable operation union for workbook mutations.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/document-rebase-result/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>DocumentRebaseResult</code></span><span class="api-symbol-card__desc">Successful rebased operations or a conservative rebase conflict.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/document-validation-result/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>DocumentValidationResult</code></span><span class="api-symbol-card__desc">Success or structured errors returned by document validation.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/formula-argument/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>FormulaArgument</code></span><span class="api-symbol-card__desc">Ranges use row-major nested arrays.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/formula-function/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>FormulaFunction</code></span><span class="api-symbol-card__desc">A synchronous host function.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/formula-scalar/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>FormulaScalar</code></span><span class="api-symbol-card__desc">A scalar passed to or returned from a synchronous host formula function.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/grid-command-name/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>GridCommandName</code></span><span class="api-symbol-card__desc">Built-in command names accepted by state queries and change events.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/grid-presentation/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>GridPresentation</code></span><span class="api-symbol-card__desc">Header semantics used by the retained canvas and accessibility mirror.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/hyperlink-target/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>HyperlinkTarget</code></span><span class="api-symbol-card__desc">Browser-safe external target or stable workbook-internal range target.</span></a>

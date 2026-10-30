@@ -8,7 +8,7 @@ description: "PivotFields class in @sheetwrite/formulas: The names and types of 
 The names and types of a pivot's source fields, for the field list.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/pkg/sheetwrite_wasm.d.ts#L451"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L451</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/pkg/sheetwrite_wasm.d.ts#L466"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L466</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

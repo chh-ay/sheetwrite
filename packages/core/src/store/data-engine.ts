@@ -96,6 +96,7 @@ import type {
   Workbook,
   WorkbookSnapshot,
 } from "../types/document.js";
+import type { FormulaFunction, FormulaFunctionMetadata } from "../types/formula.js";
 import type {
   PivotDefinition,
   PivotFieldType,
@@ -120,6 +121,7 @@ import {
   validWorkbookTable,
   workbookTableNameKey,
 } from "../workbook-table.js";
+import { HostFunctionRegistry } from "./host-functions.js";
 import { PagedDirtyPreflight } from "./paged-dirty-preflight.js";
 import {
   integerAt,
@@ -455,6 +457,9 @@ export class StoreDataEngine {
   private pageIdleWaiters: Array<() => void> | undefined;
 
   private readonly memoryReleaseListeners = new Set<() => void>();
+
+  /** Host functions; a memory release registers them again on the replacement store. */
+  private readonly hostFunctions = new HostFunctionRegistry();
 
   /** Paged sheets hydrated from a snapshot treat omitted cells as known empty. */
   private readonly authoritativeSnapshotSheets = new Set<SheetId>();
@@ -1450,6 +1455,21 @@ export class StoreDataEngine {
     const milliseconds = now.getTime();
     if (!Number.isFinite(milliseconds)) throw new RangeError("invalid volatile recalculation date");
     this.wasm.recomputeVolatile(dateToSerial(now));
+  }
+
+  /** Registers a host function on the WASM store and recalculates every formula. */
+  registerFunction(metadata: FormulaFunctionMetadata, implementation: FormulaFunction): void {
+    this.hostFunctions.register(this.wasm, metadata, implementation);
+  }
+
+  /** Removes a host function; formulas that call it then show `#NAME?`. */
+  unregisterFunction(name: string): boolean {
+    return this.hostFunctions.unregister(this.wasm, name);
+  }
+
+  /** Built-in functions of the active engine, then the host functions of this store. */
+  listFunctions(): readonly FormulaFunctionMetadata[] {
+    return this.hostFunctions.list();
   }
 
   /** Map a displayed row position to the backing data row under sort/filter. */
@@ -4170,6 +4190,9 @@ export class StoreDataEngine {
       }
 
       // The JS definitions survive the release; the new instance gets them again.
+      // Host functions come first: the pivot pass below can calculate formulas
+      // that call them.
+      this.hostFunctions.restore(replacement);
       for (const sheet of this.workbook.sheets) {
         if (sheet.pivots?.length) this.syncPivots(sheet, replacement);
       }

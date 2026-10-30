@@ -5,6 +5,7 @@ pub(crate) mod analysis;
 mod areas;
 mod array;
 mod criteria;
+pub(crate) mod custom;
 mod date;
 mod dependency;
 mod financial;
@@ -644,9 +645,10 @@ impl CellStore {
     }
 
     /// The edit barrier. Any source change recalculates every volatile formula
-    /// in the workbook, so sheets that hold volatile formulas join the seeds
-    /// even when only another sheet changed. A barrier without changes does
-    /// no work, volatile formulas included.
+    /// in the workbook, host functions registered as volatile included, so
+    /// sheets that hold volatile formulas join the seeds even when only
+    /// another sheet changed. A barrier without changes does no work,
+    /// volatile formulas included.
     pub(crate) fn recompute_changed(&mut self) {
         let mut seeds: Vec<usize> = self
             .sheets
@@ -659,6 +661,11 @@ impl CellStore {
             seeds.extend(self.sheets.iter().enumerate().filter_map(|(sheet, data)| {
                 (data.formulas.has_volatile() && !data.formulas.has_dirty()).then_some(sheet)
             }));
+            for sheet in self.mark_custom_volatile_dirty() {
+                if !seeds.contains(&sheet) {
+                    seeds.push(sheet);
+                }
+            }
         }
 
         self.recompute_seed_sheets(&seeds);
@@ -668,12 +675,17 @@ impl CellStore {
     /// dependents at the instant the host already stored. Pending source
     /// changes of those sheets join the same pass.
     pub(crate) fn recompute_volatile_formulas(&mut self) {
-        let seeds: Vec<usize> = self
+        let mut seeds: Vec<usize> = self
             .sheets
             .iter()
             .enumerate()
             .filter_map(|(sheet, data)| data.formulas.has_volatile().then_some(sheet))
             .collect();
+        for sheet in self.mark_custom_volatile_dirty() {
+            if !seeds.contains(&sheet) {
+                seeds.push(sheet);
+            }
+        }
 
         self.recompute_at_volatile_serial(&seeds);
     }
@@ -1485,9 +1497,10 @@ impl CellStore {
                     value
                 }
             },
-            Ast::Name(_) | Ast::UnresolvedStructured(_) | Ast::UnknownFunc(..) => {
-                Value::Error(FormulaError::Name)
+            Ast::UnknownFunc(name, arguments) => {
+                self.eval_custom_function(name, arguments, sheet, pass, depth + 1)
             }
+            Ast::Name(_) | Ast::UnresolvedStructured(_) => Value::Error(FormulaError::Name),
             Ast::NamedRange(named)
                 if named.row_start == named.row_end && named.col_start == named.col_end =>
             {

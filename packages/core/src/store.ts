@@ -50,6 +50,7 @@ import type {
   WorkbookSnapshot,
   XlsxSourceSnapshot,
 } from "./types/document.js";
+import type { FormulaFunction, FormulaFunctionMetadata } from "./types/formula.js";
 import type { PivotDefinition, PivotResultView, PivotSourceField } from "./types/pivot.js";
 import type {
   CellLoadState,
@@ -368,6 +369,63 @@ export class SheetwriteStore implements Store {
 
   recalculateVolatile(now = new Date()): void {
     this.engine.recomputeVolatile(now);
+    this.notifyRecalculated();
+  }
+
+  /**
+   * Registers a synchronous JavaScript function that formulas in this store
+   * can call, then recalculates every formula. Registering a name again
+   * replaces the function. The function receives each argument as a scalar,
+   * or as row arrays for a block of more than one cell, and returns a number,
+   * text, boolean, or `null` for an empty result. A thrown error or any other
+   * result shows `#VALUE!`. Snapshots keep only the formula text, so register
+   * the function again after you load one.
+   *
+   * @throws {SheetwriteError} `invalid-function` when the name is a built-in
+   * function, a cell reference, or not a function name, or when the metadata
+   * is malformed.
+   * @example
+   * ```ts
+   * import type { SheetwriteStore } from "@sheetwrite/core";
+   *
+   * function addTaxRate(store: SheetwriteStore) {
+   *   store.registerFunction(
+   *     {
+   *       name: "TAXRATE",
+   *       description: "Sales tax rate of a region.",
+   *       arguments: [{ name: "region", types: ["text"] }],
+   *       returnKind: "number",
+   *     },
+   *     (region) => (region === "EU" ? 0.2 : 0.07),
+   *   );
+   * }
+   * ```
+   * @see /docs/features/formulas/custom-functions/
+   */
+  registerFunction(metadata: FormulaFunctionMetadata, implementation: FormulaFunction): void {
+    this.engine.registerFunction(metadata, implementation);
+    this.notifyRecalculated();
+  }
+
+  /** Removes a host function. Formulas that call it show `#NAME?`. Returns whether it existed. */
+  unregisterFunction(name: string): boolean {
+    const removed = this.engine.unregisterFunction(name);
+    if (removed) this.notifyRecalculated();
+
+    return removed;
+  }
+
+  /**
+   * Metadata of every function that formulas in this store can call: the
+   * built-in functions of the active engine, then the host functions of this
+   * store in registration order. Formula help reads this one list.
+   */
+  listFunctions(): readonly FormulaFunctionMetadata[] {
+    return this.engine.listFunctions();
+  }
+
+  /** Calculated values changed without a document edit. */
+  private notifyRecalculated(): void {
     this.epoch += 1;
     const event: ChangeEvent = {
       transaction: { patches: [] },
