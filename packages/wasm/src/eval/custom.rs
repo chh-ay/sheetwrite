@@ -232,104 +232,168 @@ fn calls_volatile_custom(ast: &Ast, functions: &CustomFunctions) -> bool {
     }
 }
 
+/// The JavaScript side decodes arguments and checks results in
+/// `@sheetwrite/core/functions`, so the engine glue that every bundle loads
+/// gains one method and one import, and no conversion helpers.
 #[cfg(target_arch = "wasm32")]
 mod javascript {
     use super::{CellStore, CustomArgument, CustomFunction, FormulaError, Value};
     use std::rc::Rc;
     use wasm_bindgen::prelude::*;
+    use wasm_bindgen::JsCast;
 
-    fn to_js(value: &Value) -> JsValue {
-        match value {
-            Value::Number(number) => JsValue::from_f64(*number),
-            Value::Text(text) => JsValue::from_str(text),
-            Value::Bool(boolean) => JsValue::from_bool(*boolean),
-            Value::Blank => JsValue::NULL,
-            // Errors propagate before the call, so no argument holds one.
-            Value::Error(error) => JsValue::from_str(error.sentinel()),
-        }
+    /// Cell kinds in the flat argument buffers; `@sheetwrite/core/functions`
+    /// reads the same codes.
+    const KIND_BLANK: u8 = 0;
+    const KIND_NUMBER: u8 = 1;
+    const KIND_TEXT: u8 = 2;
+    const KIND_BOOLEAN: u8 = 3;
+
+    #[wasm_bindgen]
+    extern "C" {
+        /// A host function wrapped by `@sheetwrite/core/functions`.
+        type HostCallback;
+
+        /// Calls the wrapper with every argument in flat buffers: `[rows,
+        /// cols]` per argument, then one kind and one number per cell, and
+        /// the text of text cells joined, with the end offset of each. The
+        /// wrapper returns the result as a tagged string: `n` and a number,
+        /// `s` and a text, `b1` or `b0`, `e` for `#VALUE!`, or nothing for an
+        /// empty result.
+        #[wasm_bindgen(method, js_name = call)]
+        fn invoke(
+            this: &HostCallback,
+            context: &JsValue,
+            shapes: &[u32],
+            kinds: &[u8],
+            numbers: &[f64],
+            text: &str,
+            text_ends: &[u32],
+        ) -> Option<String>;
     }
 
-    /// A block of more than one cell becomes nested row arrays; one cell
-    /// becomes its scalar, so `F(A1)` and `F(1)` read the same.
-    fn argument_to_js(argument: &CustomArgument) -> JsValue {
-        let (row_count, col_count) = (argument.rows(), argument.cols());
-        if row_count <= 1 && col_count <= 1 {
-            return argument.values().first().map_or(JsValue::NULL, to_js);
-        }
+    struct FlatArguments {
+        shapes: Vec<u32>,
+        kinds: Vec<u8>,
+        numbers: Vec<f64>,
+        text: String,
+        text_ends: Vec<u32>,
+    }
 
-        let rows = js_sys::Array::new_with_length(row_count as u32);
-        for (index, row) in argument.values().chunks(col_count).enumerate() {
-            let cells = js_sys::Array::new_with_length(col_count as u32);
-            for (column, value) in row.iter().enumerate() {
-                cells.set(column as u32, to_js(value));
+    impl FlatArguments {
+        fn new(arguments: &[CustomArgument]) -> Self {
+            let cells = arguments
+                .iter()
+                .map(|argument| argument.values().len())
+                .sum();
+            let mut flat = Self {
+                shapes: Vec::with_capacity(arguments.len() * 2),
+                kinds: Vec::with_capacity(cells),
+                numbers: Vec::with_capacity(cells),
+                text: String::new(),
+                text_ends: Vec::new(),
+            };
+            for argument in arguments {
+                flat.shapes
+                    .extend([argument.rows() as u32, argument.cols() as u32]);
+                for value in argument.values() {
+                    flat.push(value);
+                }
             }
-            rows.set(index as u32, cells.into());
+
+            flat
         }
 
-        rows.into()
+        fn push(&mut self, value: &Value) {
+            let (kind, number) = match value {
+                Value::Blank => (KIND_BLANK, 0.0),
+                Value::Number(number) => (KIND_NUMBER, *number),
+                Value::Bool(boolean) => (KIND_BOOLEAN, f64::from(u8::from(*boolean))),
+                Value::Text(text) => {
+                    self.push_text(text);
+                    (KIND_TEXT, 0.0)
+                }
+                // Errors propagate before the call, so no argument holds one.
+                Value::Error(error) => {
+                    self.push_text(error.sentinel());
+                    (KIND_TEXT, 0.0)
+                }
+            };
+            self.kinds.push(kind);
+            self.numbers.push(number);
+        }
+
+        fn push_text(&mut self, text: &str) {
+            self.text.push_str(text);
+            // UTF-16 offsets, because the wrapper slices a JavaScript string.
+            let end =
+                self.text_ends.last().copied().unwrap_or(0) + text.encode_utf16().count() as u32;
+            self.text_ends.push(end);
+        }
     }
 
-    /// A thrown error, a promise, or any other non-scalar result is `#VALUE!`,
-    /// so a host function can never stop recalculation.
-    fn value_from_js(result: Result<JsValue, JsValue>) -> Value {
-        let Ok(result) = result else {
-            return Value::Error(FormulaError::Value);
+    /// A tag the wrapper did not write is `#VALUE!`, so no result can stop
+    /// recalculation.
+    fn value_from_tagged(result: Option<String>) -> Value {
+        let Some(result) = result else {
+            return Value::Blank;
         };
 
-        if result.is_null() || result.is_undefined() {
-            Value::Blank
-        } else if let Some(number) = result.as_f64() {
-            Value::number(number)
-        } else if let Some(boolean) = result.as_bool() {
-            Value::Bool(boolean)
-        } else if let Some(text) = result.as_string() {
-            Value::text(text)
-        } else {
-            Value::Error(FormulaError::Value)
+        let (tag, body) = result.split_at(result.chars().next().map_or(0, char::len_utf8));
+        match (tag, body) {
+            ("n", number) => number
+                .parse()
+                .map_or(Value::Error(FormulaError::Value), Value::number),
+            ("s", text) => Value::text(text.to_owned()),
+            ("b", "1") => Value::Bool(true),
+            ("b", "0") => Value::Bool(false),
+            _ => Value::Error(FormulaError::Value),
         }
     }
 
-    fn host_function(implementation: js_sys::Function, volatile: bool) -> CustomFunction {
+    fn host_function(callback: HostCallback, volatile: bool) -> CustomFunction {
         CustomFunction {
             volatile,
             implementation: Rc::new(move |arguments| {
-                let values: js_sys::Array = arguments.iter().map(argument_to_js).collect();
-                value_from_js(implementation.apply(&JsValue::UNDEFINED, &values))
+                let flat = FlatArguments::new(arguments);
+                value_from_tagged(callback.invoke(
+                    &JsValue::UNDEFINED,
+                    &flat.shapes,
+                    &flat.kinds,
+                    &flat.numbers,
+                    &flat.text,
+                    &flat.text_ends,
+                ))
             }),
         }
     }
 
     #[wasm_bindgen]
     impl CellStore {
-        /// Registers a synchronous host function on this store and
-        /// recalculates. Returns `false` when the name cannot be a host
-        /// function name.
-        #[wasm_bindgen(js_name = registerFunction)]
-        pub fn register_function(
+        /// Adds, replaces or removes (`callback` absent) a host function.
+        /// `recalculate` is `false` only for a store that takes over the
+        /// calculated values of another after a memory release. Returns
+        /// `false` when the name cannot be a host function name, or when a
+        /// removed name was not registered. One method keeps the engine glue
+        /// that every bundle loads small.
+        #[wasm_bindgen(js_name = setHostFunction)]
+        pub fn set_host_function(
             &mut self,
             name: &str,
-            implementation: js_sys::Function,
+            callback: Option<js_sys::Function>,
             volatile: bool,
+            recalculate: bool,
         ) -> bool {
-            self.install_custom_function(name, host_function(implementation, volatile))
-        }
+            let Some(callback) = callback else {
+                return self.remove_custom_function(name);
+            };
 
-        /// Registers a host function without recalculating, for a store that
-        /// takes over the calculated values of another after a memory release.
-        #[wasm_bindgen(js_name = restoreFunction)]
-        pub fn restore_function(
-            &mut self,
-            name: &str,
-            implementation: js_sys::Function,
-            volatile: bool,
-        ) -> bool {
-            self.insert_custom_function(name, host_function(implementation, volatile))
-        }
-
-        /// Removes a host function and recalculates its callers to `#NAME?`.
-        #[wasm_bindgen(js_name = unregisterFunction)]
-        pub fn unregister_function(&mut self, name: &str) -> bool {
-            self.remove_custom_function(name)
+            let function = host_function(callback.unchecked_into(), volatile);
+            if recalculate {
+                self.install_custom_function(name, function)
+            } else {
+                self.insert_custom_function(name, function)
+            }
         }
     }
 }

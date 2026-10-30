@@ -146,7 +146,8 @@ describe("host formula functions", () => {
       store.applyTransaction({
         patches: [
           { op: "set", addr: address(0, 0), value: { kind: "literal", value: 1 } },
-          { op: "set", addr: address(1, 0), value: { kind: "literal", value: "two" } },
+          // Text after a non-BMP character checks the UTF-16 text offsets.
+          { op: "set", addr: address(1, 0), value: { kind: "literal", value: "tw😀o" } },
           { op: "set", addr: address(0, 1), value: { kind: "literal", value: true } },
         ],
       });
@@ -161,7 +162,7 @@ describe("host formula functions", () => {
       expect(received.at(-1)).toEqual([
         [
           [1, true],
-          ["two", null],
+          ["tw😀o", null],
         ],
         1,
         null,

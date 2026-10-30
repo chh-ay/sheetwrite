@@ -2,6 +2,7 @@ import { engineFunctionNames } from "../engine.js";
 import { SheetwriteError } from "../errors.js";
 import type { HostFunctionHooks } from "../store/data-engine.js";
 import type { RecomputingCellStore } from "../store/wasm-contract.js";
+import { type HostCall, hostCall } from "./host-call.js";
 import type { FormulaFunction, FormulaFunctionMetadata } from "./types.js";
 
 /** Row flag bits; `scripts/formula-docs.ts` writes the same bits. */
@@ -14,8 +15,8 @@ const FUNCTION_NAME = /^[A-Za-z_][A-Za-z0-9_.]*$/u;
 
 interface HostFunctionEntry {
   readonly metadata: FormulaFunctionMetadata;
-  /** The host's function, wrapped so the store knows when a call is running. */
-  readonly guarded: FormulaFunction;
+  /** The host's function, wrapped for the engine's flat argument buffers. */
+  readonly call: HostCall;
 }
 
 export function invalidFunction(message: string, name: string): SheetwriteError {
@@ -138,8 +139,8 @@ export class HostFunctionRegistry implements HostFunctionHooks {
    */
   adopt(wasm: RecomputingCellStore): void {
     this.wasm = wasm;
-    for (const { metadata, guarded } of this.entries.values()) {
-      if (!wasm.restoreFunction(metadata.name, guarded, metadata.volatile === true)) {
+    for (const { metadata, call } of this.entries.values()) {
+      if (!wasm.setHostFunction(metadata.name, call, metadata.volatile === true, false)) {
         throw invalidFunction(
           "The replacement engine refused a registered function",
           metadata.name,
@@ -154,29 +155,24 @@ export class HostFunctionRegistry implements HostFunctionHooks {
       throw invalidFunction("Function implementation must be a function", frozen.name);
     }
 
-    const guarded: FormulaFunction = (...values) => {
-      this.runningCalls += 1;
-      try {
-        return implementation(...values);
-      } finally {
-        this.runningCalls -= 1;
-      }
-    };
-    if (!this.adopted().registerFunction(frozen.name, guarded, frozen.volatile === true)) {
+    const call = hostCall(implementation, (running) => {
+      this.runningCalls += running ? 1 : -1;
+    });
+    if (!this.adopted().setHostFunction(frozen.name, call, frozen.volatile === true, true)) {
       throw invalidFunction(
         "Function name is a built-in function, a cell reference, or not a function name",
         frozen.name,
       );
     }
 
-    this.entries.set(frozen.name, { metadata: frozen, guarded });
+    this.entries.set(frozen.name, { metadata: frozen, call });
   }
 
   unregister(name: string): boolean {
     const key = name.toUpperCase();
     if (!this.entries.delete(key)) return false;
 
-    return this.adopted().unregisterFunction(key);
+    return this.adopted().setHostFunction(key, undefined, false, true);
   }
 
   /** Host function metadata in registration order. */
