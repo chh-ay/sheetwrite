@@ -37,6 +37,8 @@ function sample(
     heapAfterBytes: 20,
     arrayBuffersBeforeBytes: 5,
     arrayBuffersAfterBytes: 8,
+    heapRetainedBytes: 12,
+    arrayBuffersRetainedBytes: 6,
     inputBytes: 10,
     outputBytes: 20,
     checksum: "a".repeat(64),
@@ -55,6 +57,11 @@ function summary(values: readonly XlsxRawSample[]): XlsxScenarioSummary {
       Math.max(0, entry.heapAfterBytes - entry.heapBeforeBytes) +
       Math.max(0, entry.arrayBuffersAfterBytes - entry.arrayBuffersBeforeBytes),
   );
+  const retained = values.map(
+    (entry) =>
+      Math.max(0, entry.heapRetainedBytes - entry.heapBeforeBytes) +
+      Math.max(0, entry.arrayBuffersRetainedBytes - entry.arrayBuffersBeforeBytes),
+  );
   const rss = values.map((entry) => entry.maxRssBytes);
   return {
     engine: value.engine,
@@ -63,9 +70,13 @@ function summary(values: readonly XlsxRawSample[]): XlsxScenarioSummary {
     durationMs: summarizeFinite(values.map((entry) => entry.durationMs)),
     processWallMs: summarizeFinite(values.map((entry) => entry.processWallMs)),
     maxRssBytes: { ...summarizeFinite(rss), max: Math.max(...rss) },
-    retainedAllocationDeltaBytes: {
+    returnAllocationDeltaBytes: {
       ...summarizeFinite(allocations),
       max: Math.max(...allocations),
+    },
+    retainedAfterGcDeltaBytes: {
+      ...summarizeFinite(retained),
+      max: Math.max(...retained),
     },
   };
 }
@@ -90,7 +101,7 @@ function summaries(samples: readonly XlsxRawSample[]): XlsxScenarioSummary[] {
 function artifact(): XlsxBenchmarkArtifact {
   const samples = SCENARIOS.map(([operation, scenario]) => sample(0, operation, scenario));
   return {
-    protocol: "sheetwrite-xlsx-codec-v1",
+    protocol: "sheetwrite-xlsx-codec-v2",
     mode: "smoke",
     metadata: {
       commit: "test",
@@ -115,7 +126,7 @@ function artifact(): XlsxBenchmarkArtifact {
       arch: "x64",
       cpu: "test",
     },
-    methodology: { timing: "isolated", memory: "VmHWM", allocation: "retained" },
+    methodology: { timing: "isolated", memory: "VmHWM", allocation: "return and post-GC" },
     scenarios: SCENARIOS.map(([operation, scenario]) => `${operation}:${scenario}`),
     samples,
     summaries: summaries(samples),
@@ -177,14 +188,20 @@ describe("XLSX benchmark gate", () => {
 
   it("recomputes summaries from raw samples", () => {
     const value = artifact();
-    expect(() =>
-      validateXlsxBenchmarkArtifact({
-        ...value,
-        summaries: value.summaries.map((entry, index) =>
-          index === 0 ? { ...entry, durationMs: { ...entry.durationMs, median: 0.5 } } : entry,
-        ),
-      }),
-    ).toThrow("summaries do not match raw samples");
+    for (const metric of [
+      "durationMs",
+      "returnAllocationDeltaBytes",
+      "retainedAfterGcDeltaBytes",
+    ] as const) {
+      expect(() =>
+        validateXlsxBenchmarkArtifact({
+          ...value,
+          summaries: value.summaries.map((entry, index) =>
+            index === 0 ? { ...entry, [metric]: { ...entry[metric], median: 0.5 } } : entry,
+          ),
+        }),
+      ).toThrow("summaries do not match raw samples");
+    }
   });
 
   it("rejects wall-time regressions above the old-backend ratio", () => {

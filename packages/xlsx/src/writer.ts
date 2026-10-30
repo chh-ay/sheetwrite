@@ -760,10 +760,12 @@ function* writeSheet(
       processed += 1;
       if ((processed & 4_095) === 0) checkAbort(context);
       xml.append(cellXml(snapshot, sheet, cell, styles, context));
-      yield* xml.drain();
+      const chunk = xml.drain();
+      if (chunk) yield* chunk;
     }
     xml.append("</row>");
-    yield* xml.drain();
+    const chunk = xml.drain();
+    if (chunk) yield* chunk;
   }
   xml.append("</sheetData>");
   if (sheet.sortKeys?.length && sheet.rowCount > 0) {
@@ -936,7 +938,8 @@ function* writeSheet(
   const relationships =
     relationshipEntries.length > 0 ? relationshipsXml(relationshipEntries, context) : undefined;
   xml.append("</worksheet>");
-  yield* xml.drain(true);
+  const chunk = xml.drain(true);
+  if (chunk) yield* chunk;
   return { relationships, comments, vml, tables };
 }
 

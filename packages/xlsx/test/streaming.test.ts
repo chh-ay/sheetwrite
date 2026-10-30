@@ -1,5 +1,5 @@
 import { heapStats } from "bun:jsc";
-import { beforeAll, describe, expect, it } from "bun:test";
+import { beforeAll, describe, expect, it, spyOn } from "bun:test";
 
 import {
   fromXlsxWorkbook,
@@ -19,7 +19,7 @@ import { deflateSync, strToU8, unzipSync } from "fflate";
 import { registerXlsxBackends } from "../src/index.js";
 import { createCodecContext } from "../src/resources.js";
 import { validateStoredEntry, writeZip, ZipReader } from "../src/zip.js";
-import { rawXlsx, worksheet } from "./raw-opc.js";
+import { rawXlsx, rawZip, worksheet } from "./raw-opc.js";
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -379,4 +379,184 @@ describe("ZIP raw entries", () => {
       writeZip([{ name: "x.bin", stored: { ...forged, uncompressedSize: 4 } }], context),
     ).toThrow(/size/);
   });
+
+  it("reports ZIP64 size sentinels as unsupported instead of as resource limits", async () => {
+    const archive = patchEntries(rawZip({ "a.xml": "<a/>" }, 0), (view, central) => {
+      view.setUint32(central + CENTRAL_UNCOMPRESSED_SIZE, ZIP64_SENTINEL, true);
+    });
+    await expect(ZipReader.open(archive, createCodecContext("import"))).rejects.toThrow(
+      "ZIP64 entry is unsupported",
+    );
+  });
+
+  it("rejects a declared over-ratio entry before it reads any local header", async () => {
+    const archive = patchEntries(
+      rawZip({ "a.xml": "<a/>", "b.xml": `<b>${"b".repeat(4_096)}</b>` }),
+      (view, _central, local, index) => {
+        // The first local header is corrupt, and only a later entry is over the ratio.
+        if (index === 0) view.setUint32(local, 0, true);
+      },
+    );
+    await expect(
+      ZipReader.open(
+        archive,
+        createCodecContext("import", { resourceLimits: { maxCompressionRatio: 2 } }),
+      ),
+    ).rejects.toMatchObject({ resource: "maxCompressionRatio" });
+  });
 });
+
+const EOCD_SIGNATURE = 0x06054b50;
+const EOCD_BYTES = 22;
+const CENTRAL_HEADER_BYTES = 46;
+const CENTRAL_UNCOMPRESSED_SIZE = 24;
+const CENTRAL_LOCAL_OFFSET = 42;
+const LOCAL_UNCOMPRESSED_SIZE = 22;
+const ZIP64_SENTINEL = 0xffffffff;
+const ONE_STEP_PARSE_BYTES = 64 * 1024;
+const LETTER_COUNT = 26;
+const LOWERCASE_A = 97;
+
+/** Deterministic lowercase text that deflate cannot shrink much. */
+function letters(length: number): string {
+  let seed = 1;
+  let text = "";
+  for (let index = 0; index < length; index++) {
+    seed = (Math.imul(seed, 1_103_515_245) + 12_345) >>> 0;
+    text += String.fromCharCode(LOWERCASE_A + ((seed >>> 16) % LETTER_COUNT));
+  }
+  return text;
+}
+
+/** Set the uncompressed size in the central and local headers. */
+function declareSize(size: number): (view: DataView, central: number, local: number) => void {
+  return (view, central, local) => {
+    view.setUint32(central + CENTRAL_UNCOMPRESSED_SIZE, size, true);
+    view.setUint32(local + LOCAL_UNCOMPRESSED_SIZE, size, true);
+  };
+}
+
+const SHEET_PART = "xl/worksheets/sheet1.xml";
+const CENTRAL_NAME_LENGTH = 28;
+const SMALL_SHEET_DATA =
+  '<sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>hello</t></is></c><c r="B1"><v>42</v></c></row></sheetData>';
+
+/** A worksheet of exactly `size` bytes; a comment of varied text fills the remaining space. */
+function sizedWorksheet(size: number, body: string): string {
+  const unpadded = worksheet(`${body}<!---->`);
+  const xml = worksheet(`${body}<!--${letters(size - unpadded.length)}-->`);
+  expect(xml.length).toBe(size);
+  return xml;
+}
+
+/** Change the header fields of one named part. */
+function patchPart(
+  source: Uint8Array,
+  name: string,
+  patch: (view: DataView, central: number, local: number) => void,
+): Uint8Array {
+  const nameBytes = strToU8(name);
+  return patchEntries(source, (view, central, local) => {
+    const length = view.getUint16(central + CENTRAL_NAME_LENGTH, true);
+    const entryName = new Uint8Array(view.buffer, central + CENTRAL_HEADER_BYTES, length);
+    if (Buffer.compare(entryName, nameBytes) === 0) patch(view, central, local);
+  });
+}
+
+// Worksheets of 64 KiB or less, by the size that the archive declares, are parsed in one step.
+// The archive controls that size, so each limit must hold on both sides of the boundary.
+describe("worksheet one-step parse boundary", () => {
+  for (const size of [ONE_STEP_PARSE_BYTES, ONE_STEP_PARSE_BYTES + 1]) {
+    describe(`at a declared worksheet size of ${size} bytes`, () => {
+      it("reads the cells on the path that the size selects", async () => {
+        const archive = rawXlsx({ sheets: [{ xml: sizedWorksheet(size, SMALL_SHEET_DATA) }] });
+        const buffered = spyOn(ZipReader.prototype, "read");
+        try {
+          const snapshot = await fromXlsxWorkbook(archive);
+          const cells = JSON.stringify(snapshot.sheets[0]?.cells);
+          expect(cells).toContain('"hello"');
+          expect(cells).toContain("42");
+          const sheetReads = buffered.mock.calls.filter(([part]) => part === SHEET_PART);
+          expect(sheetReads.length).toBe(size > ONE_STEP_PARSE_BYTES ? 0 : 1);
+        } finally {
+          buffered.mockRestore();
+        }
+      });
+
+      it("rejects XML deeper than the limit", async () => {
+        const depth = createCodecContext("import").limits.maxXmlDepth + 1;
+        const body = `${SMALL_SHEET_DATA}${"<a>".repeat(depth)}${"</a>".repeat(depth)}`;
+        const archive = rawXlsx({ sheets: [{ xml: sizedWorksheet(size, body) }] });
+        await expect(fromXlsxWorkbook(archive)).rejects.toMatchObject({ resource: "maxXmlDepth" });
+      });
+
+      it("rejects cell text over the limit", async () => {
+        const textBytes = 2_000;
+        const body = `<sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>${letters(textBytes)}</t></is></c></row></sheetData>`;
+        const archive = rawXlsx({ sheets: [{ xml: sizedWorksheet(size, body) }] });
+        await expect(
+          fromXlsxWorkbook(archive, { resourceLimits: { maxXmlTextBytes: textBytes - 1 } }),
+        ).rejects.toMatchObject({ resource: "maxXmlTextBytes" });
+      });
+
+      it("rejects more elements than the limit", async () => {
+        const rowCount = 100;
+        const rows = Array.from(
+          { length: rowCount },
+          (_, index) => `<row r="${index + 1}"><c r="A${index + 1}"><v>1</v></c></row>`,
+        ).join("");
+        const body = `<sheetData>${rows}</sheetData>`;
+        const archive = rawXlsx({ sheets: [{ xml: sizedWorksheet(size, body) }] });
+        // The other parts of this package have far fewer elements than the limit.
+        await expect(
+          fromXlsxWorkbook(archive, { resourceLimits: { maxXmlElements: rowCount } }),
+        ).rejects.toMatchObject({ resource: "maxXmlElements" });
+      });
+
+      it("rejects a worksheet over the entry size limit", async () => {
+        const archive = rawXlsx({ sheets: [{ xml: sizedWorksheet(size, SMALL_SHEET_DATA) }] });
+        await expect(
+          fromXlsxWorkbook(archive, { resourceLimits: { maxEntryUncompressedBytes: size - 1 } }),
+        ).rejects.toMatchObject({ resource: "maxEntryUncompressedBytes" });
+      });
+
+      it("rejects worksheet data longer or shorter than the declared size", async () => {
+        for (const actual of [size + 1, size - 1]) {
+          const archive = patchPart(
+            rawXlsx({ sheets: [{ xml: sizedWorksheet(actual, SMALL_SHEET_DATA) }] }),
+            SHEET_PART,
+            declareSize(size),
+          );
+          await expect(fromXlsxWorkbook(archive)).rejects.toThrow(
+            actual > size
+              ? `inflated size exceeds declaration for ${SHEET_PART}`
+              : `inflated size mismatch for ${SHEET_PART}`,
+          );
+        }
+      });
+    });
+  }
+});
+
+/** Copy an archive and change the header fields of each entry in central-directory order. */
+function patchEntries(
+  source: Uint8Array,
+  patch: (view: DataView, central: number, local: number, index: number) => void,
+): Uint8Array {
+  const bytes = source.slice();
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let eocd = bytes.byteLength - EOCD_BYTES;
+  while (view.getUint32(eocd, true) !== EOCD_SIGNATURE) eocd--;
+  const count = view.getUint16(eocd + 10, true);
+  let central = view.getUint32(eocd + 16, true);
+
+  for (let index = 0; index < count; index++) {
+    patch(view, central, view.getUint32(central + CENTRAL_LOCAL_OFFSET, true), index);
+    central +=
+      CENTRAL_HEADER_BYTES +
+      view.getUint16(central + 28, true) +
+      view.getUint16(central + 30, true) +
+      view.getUint16(central + 32, true);
+  }
+  return bytes;
+}
