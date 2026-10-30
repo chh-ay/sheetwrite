@@ -1,298 +1,62 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 
-import {
-  type FormulaArgument,
-  type FormulaFunctionMetadata,
-  listFunctions,
-  registerFunction,
-  unregisterFunction,
-} from "../src/functions.js";
-import {
-  initSheetwrite,
-  isSheetwriteError,
-  releaseEngineMemory,
-  SheetwriteStore,
-} from "../src/index.js";
-import { storeEngine } from "../src/store/engine-registry.js";
+import { listFunctions, registerFunction } from "../src/functions.js";
+import { initSheetwrite, isSheetwriteError, SheetwriteStore } from "../src/index.js";
 import { makeWorkbook } from "./fixtures.js";
-
-const address = (row: number, col: number) => ({ sheet: "s1", row, col });
-
-const TAX_RATE: FormulaFunctionMetadata = {
-  name: "TaxRate",
-  description: "Sales tax rate of a region.",
-  arguments: [{ name: "region", types: ["text"] }],
-  returnKind: "number",
-  examples: ['=TAXRATE("EU")'],
-};
-
-const EU_RATE = 0.2;
-const OTHER_RATE = 0.07;
-
-function taxRate(region: FormulaArgument): number {
-  return region === "EU" ? EU_RATE : OTHER_RATE;
-}
-
-function metadata(name: string): FormulaFunctionMetadata {
-  return { name, description: "", arguments: [], returnKind: "any" };
-}
-
-function setFormula(store: SheetwriteStore, row: number, col: number, src: string): void {
-  store.applyTransaction({
-    patches: [{ op: "set", addr: address(row, col), value: { kind: "formula", src } }],
-  });
-}
 
 beforeAll(async () => {
   await initSheetwrite();
 });
 
-describe("host formula functions", () => {
-  it("calculate with their inputs, survive memory release, and leave only formula text in snapshots", async () => {
-    const store = new SheetwriteStore(makeWorkbook(4));
-    try {
-      store.applyTransaction({
-        patches: [{ op: "set", addr: address(0, 0), value: { kind: "literal", value: "EU" } }],
-      });
-      setFormula(store, 0, 1, "=taxrate(A1)*100");
-      expect(store.getCell(address(0, 1)).resolved).toBe("#NAME?");
-
-      let changes = 0;
-      const unsubscribe = store.on("change", () => {
-        changes += 1;
-      });
-      registerFunction(store, TAX_RATE, taxRate);
-      unsubscribe();
-      expect(changes).toBe(1);
-      expect(store.getCell(address(0, 1)).resolved).toBe(EU_RATE * 100);
-
-      await releaseEngineMemory();
-      store.applyTransaction({
-        patches: [{ op: "set", addr: address(0, 0), value: { kind: "literal", value: "US" } }],
-      });
-      expect(store.getCell(address(0, 1)).resolved).toBe(OTHER_RATE * 100);
-
-      const restored = SheetwriteStore.fromSnapshot(store.exportSnapshot());
-      try {
-        expect(restored.getFormula(address(0, 1))).toBe("=taxrate(A1)*100");
-        expect(restored.getCell(address(0, 1)).resolved).toBe("#NAME?");
-      } finally {
-        restored.dispose();
-      }
-
-      expect(unregisterFunction(store, "TAXRATE")).toBe(true);
-      expect(unregisterFunction(store, "TAXRATE")).toBe(false);
-      expect(store.getCell(address(0, 1)).resolved).toBe("#NAME?");
-    } finally {
-      store.dispose();
-    }
-  });
-
-  it("keep calculated values and send no change event across a memory release", async () => {
-    const store = new SheetwriteStore(makeWorkbook(4));
-    try {
-      let draws = 0;
-      registerFunction(store, { ...metadata("DRAW"), volatile: true }, () => {
-        draws += 1;
-        return draws;
-      });
-      registerFunction(store, TAX_RATE, taxRate);
-      setFormula(store, 0, 0, "=DRAW()");
-      setFormula(store, 0, 1, "=NOW()");
-      setFormula(store, 0, 2, '=TAXRATE("EU")');
-      const before = Array.from(
-        store.getVisibleWindow("s1", { start: 0, end: 1 }, [0, 1, 2]).values,
-      );
-      const drawsBefore = draws;
-      let changes = 0;
-      const unsubscribe = store.on("change", () => {
-        changes += 1;
-      });
-
-      await releaseEngineMemory();
-      unsubscribe();
-
-      const after = Array.from(
-        store.getVisibleWindow("s1", { start: 0, end: 1 }, [0, 1, 2]).values,
-      );
-      expect(after).toEqual(before);
-      expect(draws).toBe(drawsBefore);
-      expect(changes).toBe(0);
-
-      // The replacement store still calls the volatile function on the next edit.
-      setFormula(store, 1, 0, "=1");
-      expect(store.getCell(address(0, 0)).resolved).toBe(drawsBefore + 1);
-    } finally {
-      store.dispose();
-    }
-  });
-
-  it("receive blocks as row arrays and turn failures into #VALUE!", () => {
-    const store = new SheetwriteStore(makeWorkbook(4));
-    try {
-      const received: (readonly FormulaArgument[])[] = [];
-      registerFunction(store, metadata("ECHO"), (...values) => {
-        received.push(values);
-        return values.length;
-      });
-      registerFunction(store, metadata("FAIL"), () => {
-        throw new Error("lookup failed");
-      });
-      registerFunction(
-        store,
-        metadata("LATER"),
-        // A JavaScript host can return a promise despite the type; it is not a scalar.
-        () => Promise.resolve(1) as unknown as number,
-      );
-      store.applyTransaction({
-        patches: [
-          { op: "set", addr: address(0, 0), value: { kind: "literal", value: 1 } },
-          // Text after a non-BMP character, then a second text argument,
-          // checks the UTF-16 text offsets.
-          { op: "set", addr: address(1, 0), value: { kind: "literal", value: "tw😀o" } },
-          { op: "set", addr: address(0, 1), value: { kind: "literal", value: true } },
-        ],
-      });
-
-      setFormula(store, 2, 0, "=ECHO(A1:B2,A1,,1/0)");
-      setFormula(store, 2, 1, '=ECHO(A1:B2,A1,,"x")');
-      setFormula(store, 3, 0, "=FAIL()");
-      setFormula(store, 3, 1, "=LATER()");
-
-      expect(store.getCell(address(2, 0)).resolved).toBe("#DIV/0!");
-      expect(store.getCell(address(2, 1)).resolved).toBe(4);
-      expect(received.at(-1)).toEqual([
-        [
-          [1, true],
-          ["tw😀o", null],
-        ],
-        1,
-        null,
-        "x",
-      ]);
-      expect(store.getCell(address(3, 0)).resolved).toBe("#VALUE!");
-      expect(store.getCell(address(3, 1)).resolved).toBe("#VALUE!");
-    } finally {
-      store.dispose();
-    }
-  });
-
-  it("list built-in and host metadata in one list and refuse names that are not free", async () => {
+describe("host formula functions on the default engine", () => {
+  it("refuse registration because only the full engine has the bridge", async () => {
     const store = new SheetwriteStore(makeWorkbook(2));
     try {
-      registerFunction(store, TAX_RATE, taxRate);
-
-      const functions = await listFunctions(store);
-      const names = functions.map((entry) => entry.name);
-      expect(functions.find((entry) => entry.name === "SUM")).toMatchObject({
-        returnKind: expect.any(String),
-        volatile: false,
-      });
-      expect(functions.find((entry) => entry.name === "NOW")?.volatile).toBe(true);
-      // Analysis functions belong to @sheetwrite/formulas, not the default engine.
-      expect(names).not.toContain("REGEXTEST");
-      expect(functions.at(-1)).toMatchObject({
-        name: "TAXRATE",
-        description: TAX_RATE.description,
-        arguments: [{ name: "region", types: ["text"], optional: false, repeating: false }],
-        examples: TAX_RATE.examples,
-        volatile: false,
-      });
-
-      for (const name of ["SUM", "A1", "R1C1", "BAD NAME", ""]) {
-        let failure: unknown;
-        try {
-          registerFunction(store, metadata(name), () => null);
-        } catch (error) {
-          failure = error;
-        }
-        expect(isSheetwriteError(failure) && failure.code).toBe("invalid-function");
-      }
-      expect(await listFunctions(store)).toHaveLength(functions.length);
-    } finally {
-      store.dispose();
-    }
-  });
-
-  it("refuse store reads and changes during a call and leave the store usable and disposable", () => {
-    const store = new SheetwriteStore(makeWorkbook(4));
-    try {
-      const refusals: unknown[] = [];
-      const recordRefusal = (use: () => void): number => {
-        try {
-          use();
-        } catch (error) {
-          refusals.push(error);
-          throw error;
-        }
-        return 1;
-      };
-      registerFunction(store, metadata("PEEK"), () =>
-        recordRefusal(() => store.getCell(address(0, 0))),
-      );
-      registerFunction(store, metadata("POKE"), () =>
-        recordRefusal(() =>
-          store.applyTransaction({
-            patches: [{ op: "set", addr: address(0, 0), value: { kind: "literal", value: 99 } }],
-          }),
-        ),
-      );
-      store.applyTransaction({
-        patches: [{ op: "set", addr: address(0, 0), value: { kind: "literal", value: 5 } }],
-      });
-
-      setFormula(store, 1, 0, "=PEEK()");
-      setFormula(store, 1, 1, "=POKE()");
-
-      expect(store.getCell(address(1, 0)).resolved).toBe("#VALUE!");
-      expect(store.getCell(address(1, 1)).resolved).toBe("#VALUE!");
-      expect(refusals.map((error) => isSheetwriteError(error) && error.code)).toEqual([
-        "blocked",
-        "blocked",
-      ]);
-
-      // The refused change left the document and the engine in step.
-      expect(store.getCell(address(0, 0)).resolved).toBe(5);
-      const restored = SheetwriteStore.fromSnapshot(store.exportSnapshot());
+      let failure: unknown;
       try {
-        expect(restored.getCell(address(0, 0)).resolved).toBe(5);
-      } finally {
-        restored.dispose();
+        registerFunction(
+          store,
+          { name: "TAXRATE", description: "", arguments: [], returnKind: "number" },
+          () => 0.2,
+        );
+      } catch (error) {
+        failure = error;
       }
-      setFormula(store, 2, 0, "=A1*2");
-      expect(store.getCell(address(2, 0)).resolved).toBe(10);
+
+      expect(isSheetwriteError(failure) && failure.code).toBe("optional-backend-unavailable");
+      store.applyTransaction({
+        patches: [
+          {
+            op: "set",
+            addr: { sheet: "s1", row: 0, col: 0 },
+            value: { kind: "formula", src: "=TAXRATE()" },
+          },
+        ],
+      });
+      expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("#NAME?");
+
+      // Built-in metadata needs no bridge, and the refused name is not listed.
+      const names = (await listFunctions(store)).map((entry) => entry.name);
+      expect(names).toContain("SUM");
+      expect(names).not.toContain("REGEXTEST");
+      expect(names).not.toContain("TAXRATE");
     } finally {
       store.dispose();
     }
   });
+});
 
-  it("stay on the live engine store when a memory release aborts", async () => {
-    const store = new SheetwriteStore(makeWorkbook(4));
-    const failing = new SheetwriteStore(makeWorkbook(1));
-    const failingEngine = storeEngine(failing);
-    if (failingEngine === null) throw new Error("store has no engine");
-    const prepare = failingEngine.prepareMemoryRelease.bind(failingEngine);
-    try {
-      registerFunction(store, TAX_RATE, taxRate);
-      // The second store fails after the first one prepared its replacement,
-      // so the release aborts and frees that replacement.
-      failingEngine.prepareMemoryRelease = () => {
-        throw new Error("forced preparation failure");
-      };
+it("run on the full engine in their own process", async () => {
+  // Engine selection is process-wide, so the full-engine contract runs apart
+  // and the default-engine contract above stays independent.
+  const probe = Bun.spawn(
+    [process.execPath, "test", "./packages/core/test/custom-functions.full-engine.ts"],
+    { cwd: new URL("../../..", import.meta.url).pathname, stdout: "pipe", stderr: "pipe" },
+  );
+  const [exitCode, stderr] = await Promise.all([probe.exited, new Response(probe.stderr).text()]);
 
-      await expect(releaseEngineMemory()).rejects.toThrow("preparation failed");
-
-      registerFunction(store, metadata("TWICE"), (value) => Number(value) * 2);
-      setFormula(store, 0, 0, '=TAXRATE("EU")');
-      setFormula(store, 0, 1, "=TWICE(21)");
-      expect(store.getCell(address(0, 0)).resolved).toBe(EU_RATE);
-      expect(store.getCell(address(0, 1)).resolved).toBe(42);
-    } finally {
-      // The disposed engine stays listed until it is collected, so later
-      // releases in the same process must see its real preparation again.
-      failingEngine.prepareMemoryRelease = prepare;
-      failing.dispose();
-      store.dispose();
-    }
+  expect({ exitCode, failures: stderr.match(/^\(fail\).*$/gmu) ?? [] }).toEqual({
+    exitCode: 0,
+    failures: [],
   });
 });

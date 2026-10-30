@@ -5,6 +5,7 @@ pub(crate) mod analysis;
 mod areas;
 mod array;
 mod criteria;
+#[cfg(feature = "host-functions")]
 pub(crate) mod custom;
 mod date;
 mod dependency;
@@ -661,10 +662,9 @@ impl CellStore {
             seeds.extend(self.sheets.iter().enumerate().filter_map(|(sheet, data)| {
                 (data.formulas.has_volatile() && !data.formulas.has_dirty()).then_some(sheet)
             }));
-            for sheet in self.mark_custom_volatile_dirty() {
-                if !seeds.contains(&sheet) {
-                    seeds.push(sheet);
-                }
+            #[cfg(feature = "host-functions")]
+            {
+                seeds = self.with_custom_volatile_seeds(seeds);
             }
         }
 
@@ -675,17 +675,14 @@ impl CellStore {
     /// dependents at the instant the host already stored. Pending source
     /// changes of those sheets join the same pass.
     pub(crate) fn recompute_volatile_formulas(&mut self) {
-        let mut seeds: Vec<usize> = self
+        let seeds: Vec<usize> = self
             .sheets
             .iter()
             .enumerate()
             .filter_map(|(sheet, data)| data.formulas.has_volatile().then_some(sheet))
             .collect();
-        for sheet in self.mark_custom_volatile_dirty() {
-            if !seeds.contains(&sheet) {
-                seeds.push(sheet);
-            }
-        }
+        #[cfg(feature = "host-functions")]
+        let seeds = self.with_custom_volatile_seeds(seeds);
 
         self.recompute_at_volatile_serial(&seeds);
     }
@@ -1497,9 +1494,12 @@ impl CellStore {
                     value
                 }
             },
+            #[cfg(feature = "host-functions")]
             Ast::UnknownFunc(name, arguments) => {
                 self.eval_custom_function(name, arguments, sheet, pass, depth + 1)
             }
+            #[cfg(not(feature = "host-functions"))]
+            Ast::UnknownFunc(..) => Value::Error(FormulaError::Name),
             Ast::Name(_) | Ast::UnresolvedStructured(_) => Value::Error(FormulaError::Name),
             Ast::NamedRange(named)
                 if named.row_start == named.row_end && named.col_start == named.col_end =>

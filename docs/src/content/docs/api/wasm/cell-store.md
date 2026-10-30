@@ -85,7 +85,6 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-set-column-strings-packed"><code>setColumnStringsPacked</code></a>
 <a href="#cell-store-set-conditional-rules"><code>setConditionalRules</code></a>
 <a href="#cell-store-set-formula"><code>setFormula</code></a>
-<a href="#cell-store-set-host-function"><code>setHostFunction</code></a>
 <a href="#cell-store-set-iterative-calculation"><code>setIterativeCalculation</code></a>
 <a href="#cell-store-set-named-range"><code>setNamedRange</code></a>
 <a href="#cell-store-set-number"><code>setNumber</code></a>
@@ -108,7 +107,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-import-memory-state"><code>importMemoryState</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>94</span>
+## Members <span class="api-count" data-pagefind-ignore>93</span>
 
 <div class="api-member-list">
 
@@ -885,21 +884,6 @@ keeps the cached index, so its next recompute visits just the edited
 formula and its dependents instead of every formula in the workbook.</p>
 </details>
 
-<details class="api-member" id="cell-store-set-host-function" data-pagefind-weight="1">
-<summary><code>setHostFunction</code> <span class="api-member-summary">Adds, replaces or removes (callback absent) a host function.</span></summary>
-
-```ts generated
-setHostFunction: (name: string, callback: Function | null | undefined, volatile: boolean, recalculate: boolean) => boolean;
-```
-
-<p class="api-member-doc">Adds, replaces or removes (`callback` absent) a host function.
-`recalculate` is `false` only for a store that takes over the
-calculated values of another after a memory release. Returns
-`false` when the name cannot be a host function name, or when a
-removed name was not registered. One method keeps the engine glue
-that every bundle loads small.</p>
-</details>
-
 <details class="api-member" id="cell-store-set-iterative-calculation" data-pagefind-weight="1">
 <summary><code>setIterativeCalculation</code> <span class="api-member-summary">Turns iterative calculation on or off with Excel's limits: at most maxiterations (1 to 32,767) passes over each circular reference, stopping once no member changes by more than maxchange (finite, not negative).</span></summary>
 
@@ -1415,12 +1399,6 @@ class CellStore {
     src: string,
     style: number,
   ) => number;
-  setHostFunction: (
-    name: string,
-    callback: Function | null | undefined,
-    volatile: boolean,
-    recalculate: boolean,
-  ) => boolean;
   setIterativeCalculation: (
     enabled: boolean,
     max_iterations: number,

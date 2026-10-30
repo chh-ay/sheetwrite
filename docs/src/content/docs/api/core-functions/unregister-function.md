@@ -9,7 +9,7 @@ Removes a host function from `store`. Formulas that call it show `#NAME?`.
 Returns whether the function existed.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/functions.ts#L94"><code>packages/core/src/functions.ts#L94</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/functions.ts#L96"><code>packages/core/src/functions.ts#L96</code></a></dd></div>
 </dl>
 
 ## Declaration

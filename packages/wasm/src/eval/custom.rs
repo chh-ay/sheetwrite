@@ -108,17 +108,16 @@ impl CellStore {
     }
 
     /// Marks the formulas that call a volatile host function as dirty and
-    /// returns their sheets. A formula entry records built-in volatility when
-    /// it is parsed, but host functions can change after that, so this check
-    /// reads the current set. It visits every formula only while a volatile
-    /// host function is registered.
-    pub(super) fn mark_custom_volatile_dirty(&mut self) -> Vec<usize> {
-        let mut marked = Vec::new();
+    /// adds their sheets to `seeds`. A formula entry records built-in
+    /// volatility when it is parsed, but host functions can change after that,
+    /// so this check reads the current set. It visits every formula only while
+    /// a volatile host function is registered.
+    pub(super) fn with_custom_volatile_seeds(&mut self, mut seeds: Vec<usize>) -> Vec<usize> {
         let Some(functions) = self.custom_functions.as_deref() else {
-            return marked;
+            return seeds;
         };
         if !functions.values().any(|function| function.volatile) {
-            return marked;
+            return seeds;
         }
 
         for (index, sheet) in self.sheets.iter_mut().enumerate() {
@@ -135,11 +134,13 @@ impl CellStore {
                 .collect();
             if !keys.is_empty() {
                 sheet.formulas.mark_cells_dirty(keys);
-                marked.push(index);
+                if !seeds.contains(&index) {
+                    seeds.push(index);
+                }
             }
         }
 
-        marked
+        seeds
     }
 
     /// Calls a host function. An error argument propagates without a call,

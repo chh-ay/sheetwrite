@@ -6,8 +6,19 @@ import type { CellStore } from "@sheetwrite/wasm";
  * typecheck here instead of at runtime. Members that only one engine
  * exports are optional, so both engine packages satisfy this contract.
  */
-export type RecomputingCellStore = Omit<CellStore, "setSavedPivots"> &
+export type RecomputingCellStore = Omit<CellStore, "setSavedPivots" | "setHostFunction"> &
   Partial<Pick<CellStore, "setSavedPivots">> & {
+    /**
+     * Full engine only: add, replace or remove (`callback` absent) a host
+     * function; `recalculate` is `false` for a memory-release replacement.
+     */
+    setHostFunction?(
+      name: string,
+      callback: ((...values: never[]) => unknown) | undefined,
+      volatile: boolean,
+      recalculate: boolean,
+    ): boolean;
+
     /** Full engine only: replace every pivot anchored on `sheet` (issue #194 wire format). */
     setPivots?(sheet: number, numbers: Float64Array, strings: string[]): boolean;
 

@@ -39,7 +39,7 @@ function addTaxRate(store: Store) {
 - [/docs/features/formulas/custom-functions/](/docs/features/formulas/custom-functions/)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/functions.ts#L68"><code>packages/core/src/functions.ts#L68</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/functions.ts#L70"><code>packages/core/src/functions.ts#L70</code></a></dd></div>
 </dl>
 
 ## Declaration

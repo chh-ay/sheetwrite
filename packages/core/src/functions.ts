@@ -44,7 +44,9 @@ function registryOf(engine: StoreDataEngine): HostFunctionRegistry | undefined {
  * @throws {SheetwriteError} `invalid-function` when the store is not a
  * `SheetwriteStore`, when the name is a built-in function, a cell reference, or
  * not a function name, or when the metadata is malformed; `blocked` when a
- * host function calls it.
+ * host function calls it; `optional-backend-unavailable` on the default
+ * engine, because only the full engine (`@sheetwrite/formulas`) has host
+ * functions.
  * @example
  * ```ts
  * import type { Store } from "@sheetwrite/core";

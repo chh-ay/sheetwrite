@@ -3,7 +3,7 @@ title: Custom functions
 description: Register synchronous JavaScript functions that formulas can call, with metadata that formula help reads.
 ---
 
-```ts prelude="core" partial="requires an initialized grid with the inputs shown below" title="Register a host function"
+```ts prelude="core" partial="requires a grid initialized with the full engine and the inputs shown below" title="Register a host function"
 import { registerFunction } from "@sheetwrite/core/functions";
 
 registerFunction(
@@ -39,13 +39,14 @@ grid.store.applyTransaction({
 ```ts compile title="Register a host function in a grid"
 import { createGrid, initSheetwrite } from "@sheetwrite/core";
 import { registerFunction } from "@sheetwrite/core/functions";
+import * as formulas from "@sheetwrite/formulas";
 import "@sheetwrite/core/styles.css";
 
 const host = document.querySelector<HTMLElement>("#grid");
 if (host === null) throw new Error("Missing #grid host");
 host.style.height = "320px";
 
-await initSheetwrite();
+await initSheetwrite(undefined, formulas);
 const grid = createGrid(host, {
   workbook: {
     activeSheet: "sheet1",
@@ -83,6 +84,8 @@ grid.store.applyTransaction({
 </details>
 
 ## Registration
+
+Host functions need the full engine. Select it with `initSheetwrite(undefined, formulas)`, where `formulas` is `import * as formulas from "@sheetwrite/formulas"`, before you create the store. On the default engine, `registerFunction` throws a `SheetwriteError` with code `optional-backend-unavailable`, so the default engine binary does not grow.
 
 Import the functions from `@sheetwrite/core/functions`. An application that does not import this entry carries none of its JavaScript.
 

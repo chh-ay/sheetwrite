@@ -105,6 +105,27 @@ export async function builtInFunctions(): Promise<FormulaFunctionMetadata[]> {
   });
 }
 
+type HostFunctionSetter = (
+  name: string,
+  callback: HostCall | undefined,
+  volatile: boolean,
+  recalculate: boolean,
+) => boolean;
+
+/** Only the full engine (`@sheetwrite/formulas`) has the host function bridge. */
+function setterOf(wasm: RecomputingCellStore): HostFunctionSetter {
+  const setHostFunction = wasm.setHostFunction;
+  if (setHostFunction === undefined) {
+    throw new SheetwriteError(
+      "optional-backend-unavailable",
+      "host-function",
+      "Host functions need the full engine: call initSheetwrite(undefined, formulas) with @sheetwrite/formulas",
+    );
+  }
+
+  return setHostFunction.bind(wasm);
+}
+
 /**
  * Host functions of one store. The registry keeps them in JavaScript, because
  * the WASM store that calls them can be replaced when engine memory is
@@ -143,8 +164,11 @@ export class HostFunctionRegistry implements HostFunctionHooks {
    * recalculation would draw new values for volatile formulas.
    */
   restore(wasm: RecomputingCellStore): void {
+    if (this.entries.size === 0) return;
+
+    const setHostFunction = setterOf(wasm);
     for (const { metadata, call } of this.entries.values()) {
-      if (!wasm.setHostFunction(metadata.name, call, metadata.volatile === true, false)) {
+      if (!setHostFunction(metadata.name, call, metadata.volatile === true, false)) {
         throw invalidFunction(
           "The replacement engine refused a registered function",
           metadata.name,
@@ -162,7 +186,7 @@ export class HostFunctionRegistry implements HostFunctionHooks {
     const call = hostCall(implementation, (running) => {
       this.runningCalls += running ? 1 : -1;
     });
-    if (!this.adopted().setHostFunction(frozen.name, call, frozen.volatile === true, true)) {
+    if (!this.adopted()(frozen.name, call, frozen.volatile === true, true)) {
       throw invalidFunction(
         "Function name is a built-in function, a cell reference, or not a function name",
         frozen.name,
@@ -176,7 +200,7 @@ export class HostFunctionRegistry implements HostFunctionHooks {
     const key = name.toUpperCase();
     if (!this.entries.delete(key)) return false;
 
-    return this.adopted().setHostFunction(key, undefined, false, true);
+    return this.adopted()(key, undefined, false, true);
   }
 
   /** Host function metadata in registration order. */
@@ -184,11 +208,11 @@ export class HostFunctionRegistry implements HostFunctionHooks {
     return [...this.entries.values()].map((entry) => entry.metadata);
   }
 
-  private adopted(): RecomputingCellStore {
+  private adopted(): HostFunctionSetter {
     if (this.wasm === undefined) {
       throw new SheetwriteError("unavailable", "host-function", "The registry has no engine");
     }
 
-    return this.wasm;
+    return setterOf(this.wasm);
   }
 }
