@@ -9,7 +9,7 @@ Creates the chart renderer of one grid. The grid disposes it. It lives next
 to `ChartViewProviderFactory` because the chart type domain cannot read `Store`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/store.ts#L29"><code>packages/core/src/types/store.ts#L29</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/store.ts#L28"><code>packages/core/src/types/store.ts#L28</code></a></dd></div>
 </dl>
 
 ## Declaration

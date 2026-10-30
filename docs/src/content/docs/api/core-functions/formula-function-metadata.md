@@ -1,14 +1,14 @@
 ---
-title: "FormulaFunctionMetadata | @sheetwrite/core"
-description: "FormulaFunctionMetadata interface in @sheetwrite/core: One metadata format for built-in and host functions."
+title: "FormulaFunctionMetadata | @sheetwrite/core/functions"
+description: "FormulaFunctionMetadata interface in @sheetwrite/core/functions: One metadata format for built-in and host functions."
 ---
-<!-- api-export:@sheetwrite/core|.|FormulaFunctionMetadata -->
-<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
+<!-- api-export:@sheetwrite/core|./functions|FormulaFunctionMetadata -->
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-functions/">@sheetwrite/core/functions</a><span class="api-status" data-kind="interface">interface</span></div>
 
 One metadata format for built-in and host functions.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/formula.ts#L16"><code>packages/core/src/types/formula.ts#L16</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/functions/types.ts#L16"><code>packages/core/src/functions/types.ts#L16</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>6</span>
@@ -106,7 +106,7 @@ export interface FormulaFunctionMetadata {
 <p class="api-consumers-label">Public exports naming <code>FormulaFunctionMetadata</code></p>
 
 <ul class="api-consumer-list">
-<li><a href="/docs/api/core/sheetwrite-store/"><code>SheetwriteStore</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li><a href="/docs/api/core/store/"><code>Store</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core-functions/list-functions/"><code>listFunctions</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core-functions/register-function/"><code>registerFunction</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>

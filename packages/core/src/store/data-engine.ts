@@ -96,7 +96,6 @@ import type {
   Workbook,
   WorkbookSnapshot,
 } from "../types/document.js";
-import type { FormulaFunction, FormulaFunctionMetadata } from "../types/formula.js";
 import type {
   PivotDefinition,
   PivotFieldType,
@@ -121,7 +120,6 @@ import {
   validWorkbookTable,
   workbookTableNameKey,
 } from "../workbook-table.js";
-import { HostFunctionRegistry } from "./host-functions.js";
 import { PagedDirtyPreflight } from "./paged-dirty-preflight.js";
 import {
   integerAt,
@@ -424,6 +422,14 @@ class PackedTextBuffer {
   }
 }
 
+/** What `@sheetwrite/core/functions` installs on an engine; core only calls it. */
+export interface HostFunctionHooks {
+  /** Throws while a host function runs, so no store call reaches the busy engine. */
+  assertIdle(): void;
+  /** Takes a new WASM store and registers every host function on it without recalculating. */
+  adopt(wasm: RecomputingCellStore): void;
+}
+
 /**
  * Owns the raw workbook/WASM state and returns typed effects to the public
  * transaction facade. It never owns public listeners, epochs, or policy.
@@ -458,8 +464,8 @@ export class StoreDataEngine {
 
   private readonly memoryReleaseListeners = new Set<() => void>();
 
-  /** Host functions; a memory release registers them again on the replacement store. */
-  private readonly hostFunctions = new HostFunctionRegistry();
+  /** Hooks of `@sheetwrite/core/functions`; `undefined` until a host function is registered. */
+  hostFunctions: HostFunctionHooks | undefined;
 
   /** Paged sheets hydrated from a snapshot treat omitted cells as known empty. */
   private readonly authoritativeSnapshotSheets = new Set<SheetId>();
@@ -1457,24 +1463,14 @@ export class StoreDataEngine {
     this.wasm.recomputeVolatile(dateToSerial(now));
   }
 
-  /** Registers a host function on the WASM store and recalculates every formula. */
-  registerFunction(metadata: FormulaFunctionMetadata, implementation: FormulaFunction): void {
-    this.hostFunctions.register(this.wasm, metadata, implementation);
-  }
-
-  /** Removes a host function; formulas that call it then show `#NAME?`. */
-  unregisterFunction(name: string): boolean {
-    return this.hostFunctions.unregister(this.wasm, name);
-  }
-
-  /** Built-in functions of the active engine, then the host functions of this store. */
-  listFunctions(): Promise<readonly FormulaFunctionMetadata[]> {
-    return this.hostFunctions.list();
-  }
-
-  /** Whether recalculation is inside a host function, so the store must not change. */
-  isCallingHostFunction(): boolean {
-    return this.hostFunctions.isCalling;
+  /**
+   * Gives `@sheetwrite/core/functions` the WASM store. Core holds only this
+   * slot, so a bundle that never registers a host function carries no
+   * registry code.
+   */
+  installHostFunctions(hooks: HostFunctionHooks): void {
+    this.hostFunctions = hooks;
+    hooks.adopt(this.wasm);
   }
 
   /** Map a displayed row position to the backing data row under sort/filter. */
@@ -4197,7 +4193,7 @@ export class StoreDataEngine {
       // The JS definitions survive the release; the new instance gets them again.
       // Host functions come first: the pivot pass below can calculate formulas
       // that call them.
-      this.hostFunctions.restore(replacement);
+      this.hostFunctions?.adopt(replacement);
       for (const sheet of this.workbook.sheets) {
         if (sheet.pivots?.length) this.syncPivots(sheet, replacement);
       }

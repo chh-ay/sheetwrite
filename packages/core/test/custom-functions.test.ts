@@ -3,6 +3,11 @@ import { beforeAll, describe, expect, it } from "bun:test";
 import {
   type FormulaArgument,
   type FormulaFunctionMetadata,
+  listFunctions,
+  registerFunction,
+  unregisterFunction,
+} from "../src/functions.js";
+import {
   initSheetwrite,
   isSheetwriteError,
   releaseEngineMemory,
@@ -55,7 +60,7 @@ describe("host formula functions", () => {
       const unsubscribe = store.on("change", () => {
         changes += 1;
       });
-      store.registerFunction(TAX_RATE, taxRate);
+      registerFunction(store, TAX_RATE, taxRate);
       unsubscribe();
       expect(changes).toBe(1);
       expect(store.getCell(address(0, 1)).resolved).toBe(EU_RATE * 100);
@@ -74,8 +79,8 @@ describe("host formula functions", () => {
         restored.dispose();
       }
 
-      expect(store.unregisterFunction("TAXRATE")).toBe(true);
-      expect(store.unregisterFunction("TAXRATE")).toBe(false);
+      expect(unregisterFunction(store, "TAXRATE")).toBe(true);
+      expect(unregisterFunction(store, "TAXRATE")).toBe(false);
       expect(store.getCell(address(0, 1)).resolved).toBe("#NAME?");
     } finally {
       store.dispose();
@@ -86,11 +91,11 @@ describe("host formula functions", () => {
     const store = new SheetwriteStore(makeWorkbook(4));
     try {
       let draws = 0;
-      store.registerFunction({ ...metadata("DRAW"), volatile: true }, () => {
+      registerFunction(store, { ...metadata("DRAW"), volatile: true }, () => {
         draws += 1;
         return draws;
       });
-      store.registerFunction(TAX_RATE, taxRate);
+      registerFunction(store, TAX_RATE, taxRate);
       setFormula(store, 0, 0, "=DRAW()");
       setFormula(store, 0, 1, "=NOW()");
       setFormula(store, 0, 2, '=TAXRATE("EU")');
@@ -125,14 +130,15 @@ describe("host formula functions", () => {
     const store = new SheetwriteStore(makeWorkbook(4));
     try {
       const received: (readonly FormulaArgument[])[] = [];
-      store.registerFunction(metadata("ECHO"), (...values) => {
+      registerFunction(store, metadata("ECHO"), (...values) => {
         received.push(values);
         return values.length;
       });
-      store.registerFunction(metadata("FAIL"), () => {
+      registerFunction(store, metadata("FAIL"), () => {
         throw new Error("lookup failed");
       });
-      store.registerFunction(
+      registerFunction(
+        store,
         metadata("LATER"),
         // A JavaScript host can return a promise despite the type; it is not a scalar.
         () => Promise.resolve(1) as unknown as number,
@@ -170,9 +176,9 @@ describe("host formula functions", () => {
   it("list built-in and host metadata in one list and refuse names that are not free", async () => {
     const store = new SheetwriteStore(makeWorkbook(2));
     try {
-      store.registerFunction(TAX_RATE, taxRate);
+      registerFunction(store, TAX_RATE, taxRate);
 
-      const functions = await store.listFunctions();
+      const functions = await listFunctions(store);
       const names = functions.map((entry) => entry.name);
       expect(functions.find((entry) => entry.name === "SUM")).toMatchObject({
         returnKind: expect.any(String),
@@ -192,13 +198,13 @@ describe("host formula functions", () => {
       for (const name of ["SUM", "A1", "R1C1", "BAD NAME", ""]) {
         let failure: unknown;
         try {
-          store.registerFunction(metadata(name), () => null);
+          registerFunction(store, metadata(name), () => null);
         } catch (error) {
           failure = error;
         }
         expect(isSheetwriteError(failure) && failure.code).toBe("invalid-function");
       }
-      expect(await store.listFunctions()).toHaveLength(functions.length);
+      expect(await listFunctions(store)).toHaveLength(functions.length);
     } finally {
       store.dispose();
     }
@@ -217,10 +223,10 @@ describe("host formula functions", () => {
         }
         return 1;
       };
-      store.registerFunction(metadata("PEEK"), () =>
+      registerFunction(store, metadata("PEEK"), () =>
         recordRefusal(() => store.getCell(address(0, 0))),
       );
-      store.registerFunction(metadata("POKE"), () =>
+      registerFunction(store, metadata("POKE"), () =>
         recordRefusal(() =>
           store.applyTransaction({
             patches: [{ op: "set", addr: address(0, 0), value: { kind: "literal", value: 99 } }],

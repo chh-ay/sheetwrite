@@ -42,9 +42,6 @@ function makeStore(workbook: Workbook): Store {
     getSpillAnchor: () => null,
     getRefTarget: () => null,
     recalculateVolatile: () => {},
-    registerFunction: () => {},
-    unregisterFunction: () => false,
-    listFunctions: () => Promise.resolve([]),
     getVisibleWindow: (sheet, rows, cols) => {
       const size = Math.max(0, (rows.end - rows.start) * cols.length);
       const values: CellScalar[] = new Array(size).fill(null);

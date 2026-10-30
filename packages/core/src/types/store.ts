@@ -11,7 +11,6 @@ import type {
   Workbook,
   WorkbookSnapshot,
 } from "./document.js";
-import type { FormulaFunction, FormulaFunctionMetadata } from "./formula.js";
 import type {
   ApplyTransactionResult,
   ChangeEvent,
@@ -166,18 +165,6 @@ export interface Store {
    * recalculation; this call uses `now` instead, until the next edit.
    */
   recalculateVolatile(now?: Date): void;
-  /**
-   * Register a synchronous JavaScript function that formulas can call, then
-   * recalculate. A thrown error or a result that is not a scalar shows `#VALUE!`.
-   */
-  registerFunction(metadata: FormulaFunctionMetadata, implementation: FormulaFunction): void;
-  /** Remove a host function; formulas that call it show `#NAME?`. Returns whether it existed. */
-  unregisterFunction(name: string): boolean;
-  /**
-   * Metadata of the built-in functions of the active engine, then of the host
-   * functions. The built-in table loads on the first call.
-   */
-  listFunctions(): Promise<readonly FormulaFunctionMetadata[]>;
   /** Bulk read of a visible window; the only read a renderer should use per frame. */
   getVisibleWindow(
     sheet: SheetId,

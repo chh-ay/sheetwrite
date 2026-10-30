@@ -5874,7 +5874,10 @@ Limits of the full engine:
 Source: https://www.sheetwrite.dev/docs/features/formulas/custom-functions/
 
 ```ts
-grid.store.registerFunction(
+import { registerFunction } from "@sheetwrite/core/functions";
+
+registerFunction(
+  grid.store,
   {
     name: "TAXRATE",
     description: "Sales tax rate of a region.",
@@ -5900,6 +5903,7 @@ Full setup
 
 ```ts
 import { createGrid, initSheetwrite } from "@sheetwrite/core";
+import { registerFunction } from "@sheetwrite/core/functions";
 import "@sheetwrite/core/styles.css";
 
 const host = document.querySelector<HTMLElement>("#grid");
@@ -5921,7 +5925,8 @@ const grid = createGrid(host, {
   data: { rowCount: 1, columns: { region: [null], rate: [null] } },
 });
 
-grid.store.registerFunction(
+registerFunction(
+  grid.store,
   {
     name: "TAXRATE",
     description: "Sales tax rate of a region.",
@@ -5942,7 +5947,9 @@ grid.store.applyTransaction({
 
 ## Registration
 
-`store.registerFunction(metadata, implementation)` adds a function to one store and recalculates every formula. Registering the same name again replaces the function. `store.unregisterFunction(name)` removes it, and formulas that call it show `#NAME?`. Names are not case-sensitive.
+Import the functions from `@sheetwrite/core/functions`. An application that does not import this entry carries none of its code.
+
+`registerFunction(store, metadata, implementation)` adds a function to one store and recalculates every formula. Registering the same name again replaces the function. `unregisterFunction(store, name)` removes it, and formulas that call it show `#NAME?`. Names are not case-sensitive.
 
 A name must start with a letter or `_` and contain only letters, digits, `_` and `.`. The store refuses a name that is a built-in function of the active engine or a cell reference, such as `A1` or `R1C1`. A refused name or malformed metadata throws a `SheetwriteError` with code `invalid-function`.
 
@@ -5957,7 +5964,7 @@ The function is synchronous. The engine calls it during recalculation.
 
 The function returns a number, text, boolean, or `null` for an empty result. A thrown error, a promise, or any other value shows `#VALUE!`. A number that is not finite shows `#NUM!`. A failure never stops recalculation.
 
-The function must not read or change the store. The store is busy while it calculates. A read fails, and the formula shows `#VALUE!`. A change, such as `applyTransaction`, throws a `SheetwriteError` with code `blocked` before it changes anything, so the formula shows `#VALUE!` and the document stays as it was. Use the arguments instead.
+The function must not read calculated cells or change the store. The store is busy while it calculates. Reads that need the engine, such as `getCell`, and changes such as `applyTransaction` throw a `SheetwriteError` with code `blocked` before they reach the engine. If the function does not catch it, the formula shows `#VALUE!`. The document stays as it was. Use the arguments instead.
 
 ## Volatility
 
@@ -5969,7 +5976,7 @@ Snapshots, history and collaboration keep only the formula text. A store loaded 
 
 ## Function metadata
 
-`await store.listFunctions()` returns one list of `FormulaFunctionMetadata`: the built-in functions of the active engine, then the host functions of the store in registration order. The table of built-in functions loads on the first call, so an application that never asks for it does not download it. Built-in and host functions use the same fields:
+`await listFunctions(store)` returns one list of `FormulaFunctionMetadata`: the built-in functions of the active engine, then the host functions of the store in registration order. The table of built-in functions loads on the first call, so an application that never asks for it does not download it. Built-in and host functions use the same fields:
 
 | Field | Meaning |
 | --- | --- |
@@ -11508,46 +11515,6 @@ separators, percent/scientific notation, UTC date/time tokens, four-section
 positive/negative/zero/text codes, quoted literals, and backslash escapes.
 `General` formats exactly like an omitted code.
 
-##### `FormulaArgument` — type
-
-```ts
-export type FormulaArgument = FormulaScalar | readonly (readonly FormulaScalar[])[];
-```
-
-Ranges use row-major nested arrays. Scalar expressions use a scalar.
-
-##### `FormulaArgumentMetadata` — interface
-
-```ts
-export interface FormulaArgumentMetadata { readonly name: string; readonly types: readonly string[]; readonly optional?: boolean; readonly repeating?: boolean; }
-```
-
-Argument documentation used by built-in and host functions. Types are descriptive, not coercion rules.
-
-##### `FormulaFunction` — type
-
-```ts
-export type FormulaFunction = (...arguments_: readonly FormulaArgument[]) => FormulaScalar;
-```
-
-A synchronous host function. Promises and other non-scalar results become `#VALUE!`.
-
-##### `FormulaFunctionMetadata` — interface
-
-```ts
-export interface FormulaFunctionMetadata { readonly name: string; readonly description: string; readonly arguments: readonly FormulaArgumentMetadata[]; readonly returnKind: string; readonly examples?: readonly string[]; readonly volatile?: boolean; }
-```
-
-One metadata format for built-in and host functions.
-
-##### `FormulaScalar` — type
-
-```ts
-export type FormulaScalar = number | string | boolean | null;
-```
-
-A scalar passed to or returned from a synchronous host formula function.
-
 ##### `fromCsv` — function
 
 ```ts
@@ -13682,7 +13649,7 @@ Members:
 ##### `SheetwriteStore` — class
 
 ```ts
-class SheetwriteStore implements Store { constructor(workbook: Workbook, data?: ColumnarData, options?: SheetwriteStoreOptions); acknowledgeOperations: (operations: readonly DocumentOp[], storageRevision?: bigint) => void; aggregate: (sheet: SheetId, col: number, op: AggregateOp) => number; applyTransaction: (tx: Transaction, reasonOrOptions?: CommitReason | TransactionApplicationOptions) => ApplyTransactionResult; areColumnsFullyLoaded: (sheet: SheetId, startRow: number, endRow: number, columns: readonly number[]) => boolean; canApplyLocally: (patch: DocumentOp) => boolean; captureRangeHistory: (input: Range) => CompactRangeHistory | null; clearView: (sheet: SheetId) => void; columnFilters: (sheet: SheetId) => ReadonlyMap<number, ColumnFilter>; dataEdge: (sheet: SheetId, row: number, col: number, dRow: number, dCol: number) => number; dataRowAt: (sheet: SheetId, viewRow: number) => number; dispose: () => void; distinctValues: (sheet: SheetId, col: number, limit?: number) => CellScalar[]; ensureColumns: (sheet: SheetId, columns: readonly Column[]) => void; exportSnapshot: () => WorkbookSnapshot; filterBy: (sheet: SheetId, col: number, needle: string) => void; getCell: (addr: CellAddress) => ResolvedCell; getCellLoadState: (addr: CellAddress) => CellLoadState; getClipboardWindow: (sheet: SheetId, viewRows: { start: number; end: number; }, cols: readonly number[]) => ClipboardWindowView; getDataWindow: (sheet: SheetId, rows: { start: number; end: number; }, cols: readonly number[]) => VisibleWindowView; getFormula: (addr: CellAddress) => string | null; getFormulaMatrixResourcePeak: () => TransientResourcePeak; getPagedStats: (sheet: SheetId) => PagedStoreStats; getPivotFields: (sheet: SheetId, id: string) => PivotSourceField[]; getPivotResult: (sheet: SheetId, id: string) => PivotResultView | null; getPivots: (sheet?: SheetId) => PivotDefinition[]; getRangeMutationAllocationStats: () => RangeMutationAllocationStats; getRefTarget: (addr: CellAddress) => CellAddress | null; getRuntimeResourceSnapshot: (operation: RuntimeResourceOperation, phase: RuntimeResourcePhase, runtime?: RuntimeMemoryObservation) => RuntimeResourceSnapshot; getSpillAnchor: (addr: CellAddress) => CellAddress | null; getVisibleWindow: (sheet: SheetId, rows: { start: number; end: number; }, cols: readonly number[]) => VisibleWindowView; getWorkbook: () => Workbook; groupRows: (sheet: SheetId, start: number, end: number) => void; hasView: (sheet: SheetId) => boolean; hiddenRows: (sheet: SheetId) => number[]; hideRows: (sheet: SheetId, rows: readonly number[]) => void; isPaged: (sheet: SheetId) => boolean; isRangeFullyLoaded: (input: Range) => boolean; listFunctions: () => Promise<readonly FormulaFunctionMetadata[]>; loadPage: (sheet: SheetId, start: number, columns: readonly DataSourceColumnBand[], rows: readonly RowData[], protect?: (addr: CellAddress) => boolean) => void; on: (_evt: "change", fn: ChangeListener) => () => void; queryCapability: (sheet: SheetId) => QueryCapability; recalculateVolatile: (now?: Date) => void; registerFunction: (metadata: FormulaFunctionMetadata, implementation: FormulaFunction) => void; removePivot: (id: string, sheet?: SheetId) => ApplyTransactionResult; removeSheetFormulaIdentity: (sheet: SheetId) => boolean; renameSheetFormulaIdentity: (sheet: SheetId, name: string) => boolean; resetFormulaMatrixResourcePeak: () => void; resetRangeMutationAllocationStats: () => void; resetRuntimeResourceAccounting: () => void; rowGroups: (sheet: SheetId) => readonly RowGroup[]; searchCells: (sheet: SheetId, query: string, opts?: { matchCase?: boolean; wholeCell?: boolean; columns?: number[]; }) => CellAddress[]; searchCellsFlat: (sheet: SheetId, query: string, opts?: { matchCase?: boolean; wholeCell?: boolean; columns?: number[]; }) => Uint32Array; setColumnFilter: (sheet: SheetId, col: number, filter: ColumnFilter | null) => void; setDetailedChangeCapture: (enabled: boolean) => void; setGroupCollapsed: (sheet: SheetId, start: number, collapsed: boolean) => void; setPivot: (pivot: PivotDefinition, sheet?: SheetId) => ApplyTransactionResult; setProtectionResolver: (resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode) => void; showRows: (sheet: SheetId, rows?: readonly number[]) => void; sortBy: (sheet: SheetId, col: number, ascending: boolean) => void; sortByMulti: (sheet: SheetId, keys: readonly SortKey[]) => void; ungroupRows: (sheet: SheetId, start: number, end: number) => void; unregisterFunction: (name: string) => boolean; viewRowCount: (sheet: SheetId) => number; viewRowOf: (sheet: SheetId, dataRow: number) => number | null; withResourceOperation: <T>(operation: RuntimeResourceOperation, run: () => T) => T; static fromSnapshot: (input: unknown, options?: SheetwriteStoreOptions) => SheetwriteStore }
+class SheetwriteStore implements Store { constructor(workbook: Workbook, data?: ColumnarData, options?: SheetwriteStoreOptions); acknowledgeOperations: (operations: readonly DocumentOp[], storageRevision?: bigint) => void; aggregate: (sheet: SheetId, col: number, op: AggregateOp) => number; applyTransaction: (tx: Transaction, reasonOrOptions?: CommitReason | TransactionApplicationOptions) => ApplyTransactionResult; areColumnsFullyLoaded: (sheet: SheetId, startRow: number, endRow: number, columns: readonly number[]) => boolean; canApplyLocally: (patch: DocumentOp) => boolean; captureRangeHistory: (input: Range) => CompactRangeHistory | null; clearView: (sheet: SheetId) => void; columnFilters: (sheet: SheetId) => ReadonlyMap<number, ColumnFilter>; dataEdge: (sheet: SheetId, row: number, col: number, dRow: number, dCol: number) => number; dataRowAt: (sheet: SheetId, viewRow: number) => number; dispose: () => void; distinctValues: (sheet: SheetId, col: number, limit?: number) => CellScalar[]; ensureColumns: (sheet: SheetId, columns: readonly Column[]) => void; exportSnapshot: () => WorkbookSnapshot; filterBy: (sheet: SheetId, col: number, needle: string) => void; getCell: (addr: CellAddress) => ResolvedCell; getCellLoadState: (addr: CellAddress) => CellLoadState; getClipboardWindow: (sheet: SheetId, viewRows: { start: number; end: number; }, cols: readonly number[]) => ClipboardWindowView; getDataWindow: (sheet: SheetId, rows: { start: number; end: number; }, cols: readonly number[]) => VisibleWindowView; getFormula: (addr: CellAddress) => string | null; getFormulaMatrixResourcePeak: () => TransientResourcePeak; getPagedStats: (sheet: SheetId) => PagedStoreStats; getPivotFields: (sheet: SheetId, id: string) => PivotSourceField[]; getPivotResult: (sheet: SheetId, id: string) => PivotResultView | null; getPivots: (sheet?: SheetId) => PivotDefinition[]; getRangeMutationAllocationStats: () => RangeMutationAllocationStats; getRefTarget: (addr: CellAddress) => CellAddress | null; getRuntimeResourceSnapshot: (operation: RuntimeResourceOperation, phase: RuntimeResourcePhase, runtime?: RuntimeMemoryObservation) => RuntimeResourceSnapshot; getSpillAnchor: (addr: CellAddress) => CellAddress | null; getVisibleWindow: (sheet: SheetId, rows: { start: number; end: number; }, cols: readonly number[]) => VisibleWindowView; getWorkbook: () => Workbook; groupRows: (sheet: SheetId, start: number, end: number) => void; hasView: (sheet: SheetId) => boolean; hiddenRows: (sheet: SheetId) => number[]; hideRows: (sheet: SheetId, rows: readonly number[]) => void; isPaged: (sheet: SheetId) => boolean; isRangeFullyLoaded: (input: Range) => boolean; loadPage: (sheet: SheetId, start: number, columns: readonly DataSourceColumnBand[], rows: readonly RowData[], protect?: (addr: CellAddress) => boolean) => void; on: (_evt: "change", fn: ChangeListener) => () => void; queryCapability: (sheet: SheetId) => QueryCapability; recalculateVolatile: (now?: Date) => void; removePivot: (id: string, sheet?: SheetId) => ApplyTransactionResult; removeSheetFormulaIdentity: (sheet: SheetId) => boolean; renameSheetFormulaIdentity: (sheet: SheetId, name: string) => boolean; resetFormulaMatrixResourcePeak: () => void; resetRangeMutationAllocationStats: () => void; resetRuntimeResourceAccounting: () => void; rowGroups: (sheet: SheetId) => readonly RowGroup[]; searchCells: (sheet: SheetId, query: string, opts?: { matchCase?: boolean; wholeCell?: boolean; columns?: number[]; }) => CellAddress[]; searchCellsFlat: (sheet: SheetId, query: string, opts?: { matchCase?: boolean; wholeCell?: boolean; columns?: number[]; }) => Uint32Array; setColumnFilter: (sheet: SheetId, col: number, filter: ColumnFilter | null) => void; setDetailedChangeCapture: (enabled: boolean) => void; setGroupCollapsed: (sheet: SheetId, start: number, collapsed: boolean) => void; setPivot: (pivot: PivotDefinition, sheet?: SheetId) => ApplyTransactionResult; setProtectionResolver: (resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode) => void; showRows: (sheet: SheetId, rows?: readonly number[]) => void; sortBy: (sheet: SheetId, col: number, ascending: boolean) => void; sortByMulti: (sheet: SheetId, keys: readonly SortKey[]) => void; ungroupRows: (sheet: SheetId, start: number, end: number) => void; viewRowCount: (sheet: SheetId) => number; viewRowOf: (sheet: SheetId, dataRow: number) => number | null; withResourceOperation: <T>(operation: RuntimeResourceOperation, run: () => T) => T; static fromSnapshot: (input: unknown, options?: SheetwriteStoreOptions) => SheetwriteStore }
 ```
 
 Stable public facade and the sole transaction, epoch, policy, and event barrier.
@@ -13742,41 +13709,11 @@ no pivot with `id`.
 - `getRefTarget` — Plain-reference target at `addr`, or null when the cell is not a ref.
 - `getSpillAnchor` — Owning dynamic-array formula cell, or null when `addr` is not spilled.
 - `getVisibleWindow` — Bulk read of a visible window; the only read a renderer should use per frame.
-- `listFunctions` — Metadata of every function that formulas in this store can call: the
-built-in functions of the active engine, then the host functions of this
-store in registration order. Formula help reads this one list. The
-built-in table loads on the first call, so the result is a promise.
 - `queryCapability` — Explicit partial-data state for paged datasource stores.
 - `recalculateVolatile` — Recompute volatile formulas (`TODAY`, `NOW`, `RAND`, `RANDBETWEEN`, `OFFSET`,
 `INDIRECT`) from one captured instant. The supplied Date is interpreted as an absolute UTC instant.
 Edits already recompute volatile formulas and read the clock once per
 recalculation; this call uses `now` instead, until the next edit.
-- `registerFunction` — Registers a synchronous JavaScript function that formulas in this store
-can call, then recalculates every formula. Registering a name again
-replaces the function. The function receives each argument as a scalar,
-or as row arrays for a block of more than one cell, and returns a number,
-text, boolean, or `null` for an empty result. A thrown error or any other
-result shows `#VALUE!`. The function must not use the store: a read shows
-`#VALUE!`, and a change throws before it changes anything. Snapshots keep
-only the formula text, so register the function again after you load one.
-@example
-```ts
-import type { SheetwriteStore } from "@sheetwrite/core";
-
-function addTaxRate(store: SheetwriteStore) {
- store.registerFunction(
- {
- name: "TAXRATE",
- description: "Sales tax rate of a region.",
- arguments: [{ name: "region", types: ["text"] }],
- returnKind: "number",
- },
- (region) => (region === "EU" ? 0.2 : 0.07),
- );
-}
-```
-@see
-/docs/features/formulas/custom-functions/
 - `removePivot` — Remove a pivot; `sheet` defaults to the sheet that holds it.
 - `setDetailedChangeCapture` — Opt in to per-cell before/after capture for packed and clear operations.
 - `setPivot` — Insert or replace a pivot. `sheet` defaults to the sheet that holds the
@@ -13784,7 +13721,6 @@ pivot's ID, then to the active sheet. The pivot's `savedOutput` is
 removed: saved values do not match a definition the caller changed.
 - `setProtectionResolver` — Configure host-owned protected-range permissions. The resolver is synchronous
 so every local mutation ingress shares one atomic commit barrier.
-- `unregisterFunction` — Removes a host function. Formulas that call it show `#NAME?`. Returns whether it existed.
 - `viewRowCount` — Displayed row count after any active sort/filter view.
 
 ##### `SheetwriteStoreOptions` — interface
@@ -13894,7 +13830,7 @@ One key of a multi-column sort, applied in array order (first = primary).
 ##### `Store` — interface
 
 ```ts
-export interface Store { getWorkbook(): Workbook; getCell(addr: CellAddress): ResolvedCell; getFormula(addr: CellAddress): string | null; getSpillAnchor(addr: CellAddress): CellAddress | null; getRefTarget(addr: CellAddress): CellAddress | null; recalculateVolatile(now?: Date): void; registerFunction(metadata: FormulaFunctionMetadata, implementation: FormulaFunction): void; unregisterFunction(name: string): boolean; listFunctions(): Promise<readonly FormulaFunctionMetadata[]>; getVisibleWindow( sheet: SheetId, rows: { start: number; end: number }, cols: readonly number[], ): VisibleWindowView; getDataWindow?( sheet: SheetId, rows: { start: number; end: number }, cols: readonly number[], ): VisibleWindowView; getClipboardWindow?( sheet: SheetId, viewRows: { start: number; end: number }, cols: readonly number[], ): ClipboardWindowView; ensureColumns(sheet: SheetId, columns: readonly Column[]): void; applyTransaction( tx: Transaction, options?: TransactionApplicationOptions, ): ApplyTransactionResult; setProtectionResolver?(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void; on(evt: "change", fn: (event: ChangeEvent) => void): () => void; setDetailedChangeCapture?(enabled: boolean): void; queryCapability?(sheet: SheetId): QueryCapability; getCellLoadState?(addr: CellAddress): CellLoadState; acknowledgeOperations?(operations: readonly DocumentOp[], storageRevision?: bigint): void; exportSnapshot?(): WorkbookSnapshot; viewRowCount(sheet: SheetId): number; }
+export interface Store { getWorkbook(): Workbook; getCell(addr: CellAddress): ResolvedCell; getFormula(addr: CellAddress): string | null; getSpillAnchor(addr: CellAddress): CellAddress | null; getRefTarget(addr: CellAddress): CellAddress | null; recalculateVolatile(now?: Date): void; getVisibleWindow( sheet: SheetId, rows: { start: number; end: number }, cols: readonly number[], ): VisibleWindowView; getDataWindow?( sheet: SheetId, rows: { start: number; end: number }, cols: readonly number[], ): VisibleWindowView; getClipboardWindow?( sheet: SheetId, viewRows: { start: number; end: number }, cols: readonly number[], ): ClipboardWindowView; ensureColumns(sheet: SheetId, columns: readonly Column[]): void; applyTransaction( tx: Transaction, options?: TransactionApplicationOptions, ): ApplyTransactionResult; setProtectionResolver?(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void; on(evt: "change", fn: (event: ChangeEvent) => void): () => void; setDetailedChangeCapture?(enabled: boolean): void; queryCapability?(sheet: SheetId): QueryCapability; getCellLoadState?(addr: CellAddress): CellLoadState; acknowledgeOperations?(operations: readonly DocumentOp[], storageRevision?: bigint): void; exportSnapshot?(): WorkbookSnapshot; viewRowCount(sheet: SheetId): number; }
 ```
 
 Columnar workbook storage, query, transaction, and subscription contract.
@@ -13920,19 +13856,14 @@ preserves the per-cell Store fallback contract.
 - `getRefTarget` — Plain-reference target at `addr`, or null when the cell is not a ref.
 - `getSpillAnchor` — Owning dynamic-array formula cell, or null when `addr` is not spilled.
 - `getVisibleWindow` — Bulk read of a visible window; the only read a renderer should use per frame.
-- `listFunctions` — Metadata of the built-in functions of the active engine, then of the host
-functions. The built-in table loads on the first call.
 - `queryCapability` — Explicit partial-data state for paged datasource stores.
 - `recalculateVolatile` — Recompute volatile formulas (`TODAY`, `NOW`, `RAND`, `RANDBETWEEN`, `OFFSET`,
 `INDIRECT`) from one captured instant. The supplied Date is interpreted as an absolute UTC instant.
 Edits already recompute volatile formulas and read the clock once per
 recalculation; this call uses `now` instead, until the next edit.
-- `registerFunction` — Register a synchronous JavaScript function that formulas can call, then
-recalculate. A thrown error or a result that is not a scalar shows `#VALUE!`.
 - `setDetailedChangeCapture` — Opt in to per-cell before/after capture for packed and clear operations.
 - `setProtectionResolver` — Configure host-owned protected-range permissions. The resolver is synchronous
 so every local mutation ingress shares one atomic commit barrier.
-- `unregisterFunction` — Remove a host function; formulas that call it show `#NAME?`. Returns whether it existed.
 - `viewRowCount` — Displayed row count after any active sort/filter view.
 
 ##### `STORE_MEMORY_HASH_ESTIMATE_VERSION` — variable
@@ -15469,6 +15400,107 @@ export interface IndexedDbPendingCommitStorageOptions { databaseName?: string; s
 ```
 
 Database and store naming options for durable pending commits.
+
+#### `@sheetwrite/core/functions` — supported
+
+Declaration target: `./dist/functions.d.ts`
+Source entry: `src/functions.ts`
+Page: https://www.sheetwrite.dev/docs/api/core-functions/
+
+##### `FormulaArgument` — type
+
+```ts
+export type FormulaArgument = FormulaScalar | readonly (readonly FormulaScalar[])[];
+```
+
+Ranges use row-major nested arrays. Scalar expressions use a scalar.
+
+##### `FormulaArgumentMetadata` — interface
+
+```ts
+export interface FormulaArgumentMetadata { readonly name: string; readonly types: readonly string[]; readonly optional?: boolean; readonly repeating?: boolean; }
+```
+
+Argument documentation used by built-in and host functions. Types are descriptive, not coercion rules.
+
+##### `FormulaFunction` — type
+
+```ts
+export type FormulaFunction = (...arguments_: readonly FormulaArgument[]) => FormulaScalar;
+```
+
+A synchronous host function. Promises and other non-scalar results become `#VALUE!`.
+
+##### `FormulaFunctionMetadata` — interface
+
+```ts
+export interface FormulaFunctionMetadata { readonly name: string; readonly description: string; readonly arguments: readonly FormulaArgumentMetadata[]; readonly returnKind: string; readonly examples?: readonly string[]; readonly volatile?: boolean; }
+```
+
+One metadata format for built-in and host functions.
+
+##### `FormulaScalar` — type
+
+```ts
+export type FormulaScalar = number | string | boolean | null;
+```
+
+A scalar passed to or returned from a synchronous host formula function.
+
+##### `listFunctions` — function
+
+```ts
+(store: Store): Promise<readonly FormulaFunctionMetadata[]>
+```
+
+Metadata of every function that formulas in `store` can call: the built-in
+functions of the active engine, then the host functions of `store` in
+registration order. Formula help reads this one list. The built-in table
+loads on the first call, so the result is a promise.
+
+##### `registerFunction` — function
+
+```ts
+(store: Store, metadata: FormulaFunctionMetadata, implementation: FormulaFunction): void
+```
+
+Registers a synchronous JavaScript function that formulas in `store` can
+call, then recalculates every formula. Registering a name again replaces the
+function. The function receives each argument as a scalar, or as row arrays
+for a block of more than one cell, and returns a number, text, boolean, or
+`null` for an empty result. A thrown error or any other result shows
+`#VALUE!`. The function must not read calculated cells or change the store:
+calls that need the engine throw a `blocked` error. Snapshots keep only
+formula text, so register the function after loading.
+@example
+```ts
+import type { Store } from "@sheetwrite/core";
+import { registerFunction } from "@sheetwrite/core/functions";
+
+function addTaxRate(store: Store) {
+ registerFunction(
+ store,
+ {
+ name: "TAXRATE",
+ description: "Sales tax rate of a region.",
+ arguments: [{ name: "region", types: ["text"] }],
+ returnKind: "number",
+ },
+ (region) => (region === "EU" ? 0.2 : 0.07),
+ );
+}
+```
+@see
+/docs/features/formulas/custom-functions/
+
+##### `unregisterFunction` — function
+
+```ts
+(store: Store, name: string): boolean
+```
+
+Removes a host function from `store`. Formulas that call it show `#NAME?`.
+Returns whether the function existed.
 
 #### `@sheetwrite/core/icons.json` — asset
 

@@ -8,7 +8,7 @@ description: "ResourceOwnerBytes interface in @sheetwrite/core: Retained logical
 Retained logical payload and allocated capacity attributed to one exclusive owner.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/store.ts#L32"><code>packages/core/src/types/store.ts#L32</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/store.ts#L31"><code>packages/core/src/types/store.ts#L31</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>

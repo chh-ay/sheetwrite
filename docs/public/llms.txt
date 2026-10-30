@@ -145,7 +145,7 @@ Sheetwrite packages are released together at version 0.6.1. This index is genera
 
 - [API reference](https://www.sheetwrite.dev/docs/api/): Generated reference for every classified Sheetwrite package entry point.
 - [`@sheetwrite/charts`](https://www.sheetwrite.dev/docs/api/charts/): 18 exports across 2 entry points (primary entry point: supported).
-- [`@sheetwrite/core`](https://www.sheetwrite.dev/docs/api/core/): 380 exports across 10 entry points (primary entry point: supported).
+- [`@sheetwrite/core`](https://www.sheetwrite.dev/docs/api/core/): 375 exports across 11 entry points (primary entry point: supported).
 - [`@sheetwrite/formulas`](https://www.sheetwrite.dev/docs/api/formulas/): 17 exports across 2 entry points (primary entry point: internal).
 - [`@sheetwrite/react`](https://www.sheetwrite.dev/docs/api/react/): 19 exports across 2 entry points (primary entry point: supported).
 - [`@sheetwrite/svelte`](https://www.sheetwrite.dev/docs/api/svelte/): 19 exports across 2 entry points (primary entry point: supported).

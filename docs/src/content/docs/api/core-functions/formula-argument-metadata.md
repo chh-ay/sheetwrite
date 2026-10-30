@@ -1,14 +1,14 @@
 ---
-title: "FormulaArgumentMetadata | @sheetwrite/core"
-description: "FormulaArgumentMetadata interface in @sheetwrite/core: Argument documentation used by built-in and host functions."
+title: "FormulaArgumentMetadata | @sheetwrite/core/functions"
+description: "FormulaArgumentMetadata interface in @sheetwrite/core/functions: Argument documentation used by built-in and host functions."
 ---
-<!-- api-export:@sheetwrite/core|.|FormulaArgumentMetadata -->
-<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
+<!-- api-export:@sheetwrite/core|./functions|FormulaArgumentMetadata -->
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-functions/">@sheetwrite/core/functions</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Argument documentation used by built-in and host functions. Types are descriptive, not coercion rules.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/formula.ts#L8"><code>packages/core/src/types/formula.ts#L8</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/functions/types.ts#L8"><code>packages/core/src/functions/types.ts#L8</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>
@@ -86,6 +86,6 @@ export interface FormulaArgumentMetadata {
 <p class="api-consumers-label">Public exports naming <code>FormulaArgumentMetadata</code></p>
 
 <ul class="api-consumer-list">
-<li><a href="/docs/api/core/formula-function-metadata/"><code>FormulaFunctionMetadata</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core-functions/formula-function-metadata/"><code>FormulaFunctionMetadata</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>

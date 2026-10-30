@@ -29,7 +29,7 @@ async function total(workbook: Workbook) {
 - [createGrid](/docs/api/core/create-grid/)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/store.ts#L147"><code>packages/core/src/store.ts#L147</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/store.ts#L145"><code>packages/core/src/store.ts#L145</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -71,12 +71,10 @@ async function total(workbook: Workbook) {
 <a href="#sheetwrite-store-hide-rows"><code>hideRows</code></a>
 <a href="#sheetwrite-store-is-paged"><code>isPaged</code></a>
 <a href="#sheetwrite-store-is-range-fully-loaded"><code>isRangeFullyLoaded</code></a>
-<a href="#sheetwrite-store-list-functions"><code>listFunctions</code></a>
 <a href="#sheetwrite-store-load-page"><code>loadPage</code></a>
 <a href="#sheetwrite-store-on"><code>on</code></a>
 <a href="#sheetwrite-store-query-capability"><code>queryCapability</code></a>
 <a href="#sheetwrite-store-recalculate-volatile"><code>recalculateVolatile</code></a>
-<a href="#sheetwrite-store-register-function"><code>registerFunction</code></a>
 <a href="#sheetwrite-store-remove-pivot"><code>removePivot</code></a>
 <a href="#sheetwrite-store-remove-sheet-formula-identity"><code>removeSheetFormulaIdentity</code></a>
 <a href="#sheetwrite-store-rename-sheet-formula-identity"><code>renameSheetFormulaIdentity</code></a>
@@ -95,14 +93,13 @@ async function total(workbook: Workbook) {
 <a href="#sheetwrite-store-sort-by"><code>sortBy</code></a>
 <a href="#sheetwrite-store-sort-by-multi"><code>sortByMulti</code></a>
 <a href="#sheetwrite-store-ungroup-rows"><code>ungroupRows</code></a>
-<a href="#sheetwrite-store-unregister-function"><code>unregisterFunction</code></a>
 <a href="#sheetwrite-store-view-row-count"><code>viewRowCount</code></a>
 <a href="#sheetwrite-store-view-row-of"><code>viewRowOf</code></a>
 <a href="#sheetwrite-store-with-resource-operation"><code>withResourceOperation</code></a>
 <a href="#sheetwrite-store-from-snapshot"><code>fromSnapshot</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>67</span>
+## Members <span class="api-count" data-pagefind-ignore>64</span>
 
 <div class="api-member-list">
 
@@ -480,19 +477,6 @@ isRangeFullyLoaded: (input: Range) => boolean;
 
 </details>
 
-<details class="api-member" id="sheetwrite-store-list-functions" data-pagefind-weight="1">
-<summary><code>listFunctions</code> <span class="api-member-summary">Metadata of every function that formulas in this store can call: the built-in functions of the active engine, then the host functions of this store in registration order.</span></summary>
-
-```ts generated
-listFunctions: () => Promise<readonly FormulaFunctionMetadata[]>;
-```
-
-<p class="api-member-doc">Metadata of every function that formulas in this store can call: the
-built-in functions of the active engine, then the host functions of this
-store in registration order. Formula help reads this one list. The
-built-in table loads on the first call, so the result is a promise.</p>
-</details>
-
 <details class="api-member" id="sheetwrite-store-load-page" data-pagefind-weight="1">
 <summary><code>loadPage</code></summary>
 
@@ -531,46 +515,6 @@ recalculateVolatile: (now?: Date) => void;
 `INDIRECT`) from one captured instant. The supplied Date is interpreted as an absolute UTC instant.
 Edits already recompute volatile formulas and read the clock once per
 recalculation; this call uses `now` instead, until the next edit.</p>
-</details>
-
-<details class="api-member" id="sheetwrite-store-register-function" data-pagefind-weight="1">
-<summary><code>registerFunction</code> <span class="api-member-summary">Registers a synchronous JavaScript function that formulas in this store can call, then recalculates every formula.</span></summary>
-
-```ts generated
-registerFunction: (metadata: FormulaFunctionMetadata, implementation: FormulaFunction) => void;
-```
-
-Registers a synchronous JavaScript function that formulas in this store
-can call, then recalculates every formula. Registering a name again
-replaces the function. The function receives each argument as a scalar,
-or as row arrays for a block of more than one cell, and returns a number,
-text, boolean, or `null` for an empty result. A thrown error or any other
-result shows `#VALUE!`. The function must not use the store: a read shows
-`#VALUE!`, and a change throws before it changes anything. Snapshots keep
-only the formula text, so register the function again after you load one.
-
-### Examples
-
-```ts compile
-import type { SheetwriteStore } from "@sheetwrite/core";
-
-function addTaxRate(store: SheetwriteStore) {
-  store.registerFunction(
-    {
-      name: "TAXRATE",
-      description: "Sales tax rate of a region.",
-      arguments: [{ name: "region", types: ["text"] }],
-      returnKind: "number",
-    },
-    (region) => (region === "EU" ? 0.2 : 0.07),
-  );
-}
-```
-
-### See also
-
-- [/docs/features/formulas/custom-functions/](/docs/features/formulas/custom-functions/)
-
 </details>
 
 <details class="api-member" id="sheetwrite-store-remove-pivot" data-pagefind-weight="1">
@@ -740,16 +684,6 @@ ungroupRows: (sheet: SheetId, start: number, end: number) => void;
 
 </details>
 
-<details class="api-member" id="sheetwrite-store-unregister-function" data-pagefind-weight="1">
-<summary><code>unregisterFunction</code> <span class="api-member-summary">Removes a host function. Formulas that call it show #NAME?.</span></summary>
-
-```ts generated
-unregisterFunction: (name: string) => boolean;
-```
-
-<p class="api-member-doc">Removes a host function. Formulas that call it show `#NAME?`. Returns whether it existed.</p>
-</details>
-
 <details class="api-member" id="sheetwrite-store-view-row-count" data-pagefind-weight="1">
 <summary><code>viewRowCount</code> <span class="api-member-summary">Displayed row count after any active sort/filter view.</span></summary>
 
@@ -882,7 +816,6 @@ class SheetwriteStore implements Store {
   hideRows: (sheet: SheetId, rows: readonly number[]) => void;
   isPaged: (sheet: SheetId) => boolean;
   isRangeFullyLoaded: (input: Range) => boolean;
-  listFunctions: () => Promise<readonly FormulaFunctionMetadata[]>;
   loadPage: (
     sheet: SheetId,
     start: number,
@@ -893,10 +826,6 @@ class SheetwriteStore implements Store {
   on: (_evt: "change", fn: ChangeListener) => () => void;
   queryCapability: (sheet: SheetId) => QueryCapability;
   recalculateVolatile: (now?: Date) => void;
-  registerFunction: (
-    metadata: FormulaFunctionMetadata,
-    implementation: FormulaFunction,
-  ) => void;
   removePivot: (id: string, sheet?: SheetId) => ApplyTransactionResult;
   removeSheetFormulaIdentity: (sheet: SheetId) => boolean;
   renameSheetFormulaIdentity: (sheet: SheetId, name: string) => boolean;
@@ -945,7 +874,6 @@ class SheetwriteStore implements Store {
   sortBy: (sheet: SheetId, col: number, ascending: boolean) => void;
   sortByMulti: (sheet: SheetId, keys: readonly SortKey[]) => void;
   ungroupRows: (sheet: SheetId, start: number, end: number) => void;
-  unregisterFunction: (name: string) => boolean;
   viewRowCount: (sheet: SheetId) => number;
   viewRowOf: (sheet: SheetId, dataRow: number) => number | null;
   withResourceOperation: <T>(

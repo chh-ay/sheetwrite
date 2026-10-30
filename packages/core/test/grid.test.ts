@@ -43,9 +43,6 @@ function makeFakeStore(
     getSpillAnchor: () => null,
     getRefTarget: () => null,
     recalculateVolatile: () => {},
-    registerFunction: () => {},
-    unregisterFunction: () => false,
-    listFunctions: () => Promise.resolve([]),
     getVisibleWindow: (sheet, rows, cols) => {
       hooks.onWindow?.();
       const n = Math.max(0, (rows.end - rows.start) * cols.length);

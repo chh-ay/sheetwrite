@@ -4,7 +4,10 @@ description: Register synchronous JavaScript functions that formulas can call, w
 ---
 
 ```ts prelude="core" partial="requires an initialized grid with the inputs shown below" title="Register a host function"
-grid.store.registerFunction(
+import { registerFunction } from "@sheetwrite/core/functions";
+
+registerFunction(
+  grid.store,
   {
     name: "TAXRATE",
     description: "Sales tax rate of a region.",
@@ -35,6 +38,7 @@ grid.store.applyTransaction({
 
 ```ts compile title="Register a host function in a grid"
 import { createGrid, initSheetwrite } from "@sheetwrite/core";
+import { registerFunction } from "@sheetwrite/core/functions";
 import "@sheetwrite/core/styles.css";
 
 const host = document.querySelector<HTMLElement>("#grid");
@@ -56,7 +60,8 @@ const grid = createGrid(host, {
   data: { rowCount: 1, columns: { region: [null], rate: [null] } },
 });
 
-grid.store.registerFunction(
+registerFunction(
+  grid.store,
   {
     name: "TAXRATE",
     description: "Sales tax rate of a region.",
@@ -79,7 +84,9 @@ grid.store.applyTransaction({
 
 ## Registration
 
-`store.registerFunction(metadata, implementation)` adds a function to one store and recalculates every formula. Registering the same name again replaces the function. `store.unregisterFunction(name)` removes it, and formulas that call it show `#NAME?`. Names are not case-sensitive.
+Import the functions from `@sheetwrite/core/functions`. An application that does not import this entry carries none of its code.
+
+`registerFunction(store, metadata, implementation)` adds a function to one store and recalculates every formula. Registering the same name again replaces the function. `unregisterFunction(store, name)` removes it, and formulas that call it show `#NAME?`. Names are not case-sensitive.
 
 A name must start with a letter or `_` and contain only letters, digits, `_` and `.`. The store refuses a name that is a built-in function of the active engine or a cell reference, such as `A1` or `R1C1`. A refused name or malformed metadata throws a `SheetwriteError` with code `invalid-function`.
 
@@ -94,7 +101,7 @@ The function is synchronous. The engine calls it during recalculation.
 
 The function returns a number, text, boolean, or `null` for an empty result. A thrown error, a promise, or any other value shows `#VALUE!`. A number that is not finite shows `#NUM!`. A failure never stops recalculation.
 
-The function must not read or change the store. The store is busy while it calculates, so every store call from inside the function, a read such as `getCell` or a change such as `applyTransaction`, throws a `SheetwriteError` with code `blocked` before it reaches the engine. If the function does not catch it, the formula shows `#VALUE!`. The document stays as it was. Use the arguments instead.
+The function must not read calculated cells or change the store. The store is busy while it calculates. Reads that need the engine, such as `getCell`, and changes such as `applyTransaction` throw a `SheetwriteError` with code `blocked` before they reach the engine. If the function does not catch it, the formula shows `#VALUE!`. The document stays as it was. Use the arguments instead.
 
 ## Volatility
 
@@ -106,7 +113,7 @@ Snapshots, history and collaboration keep only the formula text. A store loaded 
 
 ## Function metadata
 
-`await store.listFunctions()` returns one list of `FormulaFunctionMetadata`: the built-in functions of the active engine, then the host functions of the store in registration order. The table of built-in functions loads on the first call, so an application that never asks for it does not download it. Built-in and host functions use the same fields:
+`await listFunctions(store)` returns one list of `FormulaFunctionMetadata`: the built-in functions of the active engine, then the host functions of the store in registration order. The table of built-in functions loads on the first call, so an application that never asks for it does not download it. Built-in and host functions use the same fields:
 
 | Field | Meaning |
 | --- | --- |

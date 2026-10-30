@@ -1,14 +1,14 @@
 ---
-title: "FormulaScalar | @sheetwrite/core"
-description: "FormulaScalar type in @sheetwrite/core: A scalar passed to or returned from a synchronous host formula function."
+title: "FormulaScalar | @sheetwrite/core/functions"
+description: "FormulaScalar type in @sheetwrite/core/functions: A scalar passed to or returned from a synchronous host formula function."
 ---
-<!-- api-export:@sheetwrite/core|.|FormulaScalar -->
-<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
+<!-- api-export:@sheetwrite/core|./functions|FormulaScalar -->
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-functions/">@sheetwrite/core/functions</a><span class="api-status" data-kind="type">type</span></div>
 
 A scalar passed to or returned from a synchronous host formula function.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/formula.ts#L2"><code>packages/core/src/types/formula.ts#L2</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/functions/types.ts#L2"><code>packages/core/src/functions/types.ts#L2</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -39,7 +39,7 @@ export type FormulaScalar = number | string | boolean | null;
 <p class="api-consumers-label">Public exports naming <code>FormulaScalar</code></p>
 
 <ul class="api-consumer-list">
-<li><a href="/docs/api/core/formula-argument/"><code>FormulaArgument</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li><a href="/docs/api/core/formula-function/"><code>FormulaFunction</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core-functions/formula-argument/"><code>FormulaArgument</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core-functions/formula-function/"><code>FormulaFunction</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>

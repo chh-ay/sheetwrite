@@ -8,7 +8,7 @@ description: "ChartViewProviderFactory type in @sheetwrite/core: Creates a chart
 Creates a chart provider owned and disposed by one renderer or host.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/store.ts#L23"><code>packages/core/src/types/store.ts#L23</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/store.ts#L22"><code>packages/core/src/types/store.ts#L22</code></a></dd></div>
 </dl>
 
 ## Declaration

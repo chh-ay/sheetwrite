@@ -349,8 +349,10 @@ export function analyzeImportGraph(files: ReadonlyMap<string, string>): ImportGr
     }
 
     const typeDomainName = TYPE_DOMAIN_BY_SOURCE[file];
-    if (typeDomainName !== undefined) {
-      const allowedDependencies = new Set(PUBLIC_TYPE_DOMAINS[typeDomainName]!.dependencies);
+    const typeDomain =
+      typeDomainName === undefined ? undefined : PUBLIC_TYPE_DOMAINS[typeDomainName];
+    if (typeDomain !== undefined) {
+      const allowedDependencies = new Set(typeDomain.dependencies);
       for (const target of imports) {
         const dependencyName = TYPE_DOMAIN_BY_SOURCE[target];
         if (dependencyName !== undefined && !allowedDependencies.has(dependencyName)) {
