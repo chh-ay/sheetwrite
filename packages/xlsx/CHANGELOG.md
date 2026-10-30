@@ -1,5 +1,15 @@
 # @sheetwrite/xlsx
 
+## 0.6.1
+
+### Patch Changes
+
+- [#233](https://github.com/chh-ay/sheetwrite/pull/233) [`724f4ab`](https://github.com/chh-ay/sheetwrite/commit/724f4ab6578cf5e8f324ddaf26e050f3d2d57075) Thanks [@chh-ay](https://github.com/chh-ay)! - Reduce temporary allocations during XLSX export and reject excessive archive expansion before reading local file headers.
+
+- [#233](https://github.com/chh-ay/sheetwrite/pull/233) [`724f4ab`](https://github.com/chh-ay/sheetwrite/commit/724f4ab6578cf5e8f324ddaf26e050f3d2d57075) Thanks [@chh-ay](https://github.com/chh-ay)! - Parse worksheets of 64 KiB or less in one step, so imports and rejects of small workbooks take less time.
+- Updated dependencies [[`c29a25a`](https://github.com/chh-ay/sheetwrite/commit/c29a25a65c4ff01ae32ad89fc6b32dde4798ffde)]:
+  - @sheetwrite/core@0.6.1
+
 ## 0.6.0
 
 ### Minor Changes
