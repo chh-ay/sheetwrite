@@ -6274,6 +6274,31 @@ On a read-only grid you can select a chart, but not change it.
 The grid emits `chart-select` with `{ sheet, id }`, or `null`, when the
 selection changes, and `chart-activate` when Enter is pressed on a chart.
 
+## Charts in XLSX files
+
+With `@sheetwrite/xlsx`, `fromXlsxWorkbook` reads Excel charts into
+`Sheet.charts`, and `toXlsxWorkbook` writes `Sheet.charts` as Excel chart
+parts. Excel and LibreOffice open these files with the charts shown.
+
+| Sheetwrite | Excel chart |
+| --- | --- |
+| `column`, `bar` | Clustered column or bar chart |
+| `line`, `area` | Standard line or area chart |
+| `pie`, `doughnut` | Pie or doughnut chart |
+| `scatter` | Scatter chart |
+| `title`, `axes`, `legend` | Chart title, axis titles, legend position |
+| `series` | Series name, categories (x values in a scatter chart) and values, each one cell range or a name |
+| `anchor` | The top-left cell, its offset and the chart size |
+
+Imported charts read the same cells as the Excel chart, so a cell edit updates
+them. Import keeps an Excel chart that this table cannot hold as an opaque part
+and emits an `unsupported-feature` warning. Examples are 3-D, stacked and
+combination charts, and series that read literal values or several ranges. See
+[Kept parts and round trips](https://www.sheetwrite.dev/docs/import-export/kept-parts-and-round-trips/).
+
+Excel files do not store colors, fonts or styles from Sheetwrite. A chart that
+Sheetwrite exports has Excel's default style.
+
 ## Colors
 
 Series take their colors in order from `--sheetwrite-chart-1` to
@@ -7333,9 +7358,9 @@ const saved = await toXlsxWorkbook(snapshot, options);
 console.log(snapshot.workbook.xlsxSource?.graphs.length ?? 0);
 ```
 
-The saved workbook retains its modelled cells. Eligible charts, pivots, images and macros travel alongside them as opaque package parts, not as flattened cell values.
+The saved workbook retains its modelled cells. Eligible charts, pivots, images and macros travel alongside them as opaque package parts, not as flattened cell values. Charts that the chart model can hold are not kept parts: import reads them into `Sheet.charts`, edits keep them, and export writes them again. See [Charts in XLSX files](https://www.sheetwrite.dev/docs/features/analysis/charts/#charts-in-xlsx-files).
 
-| Operation | Result for an eligible imported chart graph |
+| Operation | Result for a kept chart graph (a chart that the chart model cannot hold) |
 | --- | --- |
 | Open → save, no edits | Original compressed payload retained. |
 | Change a cell → save | Graph dropped; structured warning reports loss. |
@@ -7373,9 +7398,11 @@ The payload is base64-encoded for JSON-safe persistence: about four thirds of it
 | --- | --- |
 | VBA project (`.xlsm`), customXml items, XML maps, data connections, theme, core and custom document properties | Always: they do not read cells. Macro workbooks retain the macro content type. |
 | Images and other drawings without charts, single-cell XML tables | Their sheet still exists and no row or column on it was inserted, removed, moved, resized, hidden or merged. |
-| Charts and pivot tables, with their caches | No cell on any sheet changed, no sheet was renamed or removed, and no defined name changed. |
+| Charts that the chart model cannot hold, and pivot tables, with their caches | No cell on any sheet changed, no sheet was renamed or removed, and no defined name changed. |
 
 Shared parts such as a pivot and its cache form one graph: they are kept or dropped together.
+
+A drawing that holds both charts that Sheetwrite reads and other objects is split. The charts go to `Sheet.charts`, and the kept drawing keeps only the other anchors. On export, Sheetwrite charts go into the sheet's kept drawing, because a worksheet has only one drawing.
 
 ## Drops and warnings
 

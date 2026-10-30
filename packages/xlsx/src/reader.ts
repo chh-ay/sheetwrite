@@ -38,6 +38,7 @@ import {
   validWorkbookTableXmlElement,
 } from "@sheetwrite/core";
 
+import { readCharts } from "./chart-read.js";
 import { formulaContainsExternalReference, spillReferencesFromXlsx } from "./formula.js";
 import { OpcPackage, type OpcRelationship, relationshipTypeMatches } from "./opc.js";
 import { readPivots } from "./pivot.js";
@@ -2595,18 +2596,25 @@ export async function readWorkbook(
     sheets,
   };
   if (metadata) restoreSidecarFields(snapshot, metadata);
+  const sheetParts = sourceReferences.map((reference) => reference.relationship.target);
   const modelledPivotParts = await readPivots(
     packageFile,
-    {
-      snapshot,
-      sheetParts: sourceReferences.map((reference) => reference.relationship.target),
-      metadata,
-      extendSheet,
-    },
+    { snapshot, sheetParts, metadata, extendSheet },
+    context,
+  );
+  const chartParts = await readCharts(
+    packageFile,
+    { snapshot, sheetParts, metadata: metadata ?? undefined, extendSheet },
     context,
   );
   if (readOptions.preserveOpaqueParts !== false)
-    await capturePreserved(packageFile, snapshot, context, modelledPivotParts);
+    await capturePreserved(
+      packageFile,
+      snapshot,
+      context,
+      new Set([...modelledPivotParts, ...chartParts.modelled]),
+      chartParts.replacements,
+    );
   const checked = validateCodecSnapshot(snapshot, context);
   if (!checked.ok) {
     throw new TypeError(

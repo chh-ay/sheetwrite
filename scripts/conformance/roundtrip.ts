@@ -260,6 +260,22 @@ function sheetwriteWorkbook(): WorkbookSnapshot {
             stopIfTrue: true,
           },
         ],
+        charts: [
+          {
+            id: "amount-chart",
+            kind: "column",
+            title: "Amounts",
+            axes: { xTitle: "Row", yTitle: "Amount" },
+            legend: "bottom",
+            anchor: { row: 1, col: 1, offsetX: 4, offsetY: 2, width: 360, height: 240 },
+            series: [
+              {
+                nameRange: { sheet: "data", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
+                values: { sheet: "data", start: { row: 2, col: 0 }, end: { row: 3, col: 0 } },
+              },
+            ],
+          },
+        ],
         cells: [
           {
             startRow: 0,
