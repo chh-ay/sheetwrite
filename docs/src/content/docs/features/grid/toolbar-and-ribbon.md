@@ -109,7 +109,7 @@ Double-click a tab, or use the arrow at the right, to hide the panel and keep on
 
 The compact ribbon shows the selected tab's commands on one row, like Excel's simplified ribbon. It uses the same live controls as the full ribbon, so a value you type in a box and the selected tab stay when you switch.
 
-- The **Compact** button in the tab row switches between the full and the compact layout. It is a toggle button: `aria-pressed` tells screen readers which layout is on.
+- The **Compact** button beside the tab list switches between the full and the compact layout. It is a toggle button: `aria-pressed` tells screen readers which layout is on.
 - `ribbon: { mode: "compact" }` starts compact. `ribbon: { mode: "auto" }` uses compact while the ribbon is narrower than `compactWidth` (default 768 CSS pixels) and full otherwise. When the user picks a layout with the button, the ribbon keeps that layout at every width.
 - Groups that do not fit on the row fold into dropdown buttons, as in the full ribbon.
 
@@ -166,6 +166,8 @@ ribbon.destroy();
 | `flags` | The [command flags](#command-flags) that choose commands. By default every command shows except Export. |
 
 The ribbon and the toolbar style themselves from the same `--sheetwrite-widget-*`, `--sheetwrite-toolbar-*` and `--sheetwrite-menu-*` properties, so light, dark and host themes apply.
+
+`createSpreadsheetShell` loads its toolbar or ribbon lazily too. It reserves the row height until the controls arrive. Importing the shell does not load the command model.
 
 ## Toolbar
 

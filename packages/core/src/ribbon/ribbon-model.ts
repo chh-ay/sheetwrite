@@ -1,7 +1,9 @@
 // The command registry: tabs, groups and commands bound to the public Grid
 // API. Every renderer (full ribbon, compact ribbon, toolbar) reads this list,
-// so a new command and its glyph are added here once. The DOM side
-// (ribbon-controls.ts) never decides behavior, so Excel parity is reviewed here.
+// so a new command is added here once. Add its glyph to scripts/icon-glyphs.ts
+// and run `bun scripts/icon-sheet.ts`; no renderer-specific entry is needed.
+// The DOM side (ribbon-controls.ts) never decides behavior, so Excel parity
+// is reviewed here. The redesign and new commands belong to #272.
 
 import { CHART_KINDS } from "../chart-kinds.js";
 import {
