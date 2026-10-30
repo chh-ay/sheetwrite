@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "479f12b6ac6ef940e17f012216c63fede229c74c83744b20f250437adf26e33a",
+  "sha256": "d71750d7183a08cdc691eda12d1b36b089be6365f2fb5e6d92df466e333513f0",
   "intentionalExports": [
     {
       "package": "@sheetwrite/core",
@@ -320,7 +320,9 @@
         "sheetNameKey",
         "shiftA1Refs",
         "toCsv",
+        "toCsvStream",
         "toTsv",
+        "toTsvStream",
         "toXlsxTable",
         "toXlsxWorkbook",
         "validWorkbookTable",

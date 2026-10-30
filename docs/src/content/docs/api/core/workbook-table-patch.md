@@ -8,7 +8,7 @@ description: "Mutable table fields accepted by the explicit update operation."
 Mutable table fields accepted by the explicit update operation.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/table.ts#L55"><code>packages/core/src/types/table.ts#L55</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/table.ts#L94"><code>packages/core/src/types/table.ts#L94</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -18,10 +18,12 @@ Mutable table fields accepted by the explicit update operation.
 <a href="#workbook-table-patch-header-row"><code>headerRow</code></a>
 <a href="#workbook-table-patch-totals-row"><code>totalsRow</code></a>
 <a href="#workbook-table-patch-style"><code>style</code></a>
+<a href="#workbook-table-patch-auto-filter"><code>autoFilter</code></a>
+<a href="#workbook-table-patch-sort-state"><code>sortState</code></a>
 <a href="#workbook-table-patch-unsupported-features"><code>unsupportedFeatures</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>7</span>
+## Members <span class="api-count" data-pagefind-ignore>9</span>
 
 <div class="api-member-list">
 
@@ -79,6 +81,24 @@ style?: WorkbookTableStyle | null;
 
 </details>
 
+<details class="api-member" id="workbook-table-patch-auto-filter" data-pagefind-weight="1">
+<summary><code>autoFilter</code></summary>
+
+```ts generated
+autoFilter?: WorkbookTableXmlElement | null;
+```
+
+</details>
+
+<details class="api-member" id="workbook-table-patch-sort-state" data-pagefind-weight="1">
+<summary><code>sortState</code></summary>
+
+```ts generated
+sortState?: WorkbookTableXmlElement | null;
+```
+
+</details>
+
 <details class="api-member" id="workbook-table-patch-unsupported-features" data-pagefind-weight="1">
 <summary><code>unsupportedFeatures</code></summary>
 
@@ -102,6 +122,8 @@ export interface WorkbookTablePatch {
   headerRow?: boolean;
   totalsRow?: boolean;
   style?: WorkbookTableStyle | null;
+  autoFilter?: WorkbookTableXmlElement | null;
+  sortState?: WorkbookTableXmlElement | null;
   unsupportedFeatures?: WorkbookTableUnsupportedFeature[];
 }
 ```

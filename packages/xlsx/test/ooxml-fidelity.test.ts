@@ -285,12 +285,14 @@ describe("raw spec-authored OOXML fidelity", () => {
         { styles, theme },
       ),
     );
-    expect(imported.sheets[0]!.cells[0]!.cells[0]!.style).toMatchObject({
+    const style = imported.sheets[0]!.cells[0]!.cells[0]!.style;
+    expect(style).toMatchObject({
       color: "#000000",
       backgroundColor: "#8EA9DB",
-      fontSize: 16,
       border: { left: { color: "#FF0000", width: 1, style: "solid" } },
     });
+    // Font 0 is the workbook default, so its 12pt size is not a per-cell style.
+    expect(style?.fontSize).toBeUndefined();
   });
 
   it("escapes SpreadsheetML control tokens without confusing literal escape text", async () => {

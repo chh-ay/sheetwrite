@@ -23,7 +23,7 @@ export const sheetwriteTableImportBackend: XlsxTableImportBackend = {
   async fromXlsxTable(data, options): Promise<ColumnarData> {
     try {
       const context = createCodecContext("import", options);
-      const snapshot = readWorkbook(data, context);
+      const snapshot = await readWorkbook(data, context, { preserveOpaqueParts: false });
       const sheet = snapshot.sheets[0];
       const columns: Record<string, CellScalar[]> = Object.create(null);
       if (!sheet) return { rowCount: 0, columns };

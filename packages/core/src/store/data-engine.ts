@@ -80,6 +80,7 @@ import type { ChangeEvent } from "../types/transaction.js";
 import {
   assertWorkbookTables,
   DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
+  remapWorkbookTableRuleColumns,
   validWorkbookTable,
   workbookTableNameKey,
 } from "../workbook-table.js";
@@ -2288,6 +2289,14 @@ export class StoreDataEngine {
               : patch.patch.style === undefined
                 ? current.style
                 : patch.patch.style,
+          autoFilter:
+            patch.patch.autoFilter === null
+              ? undefined
+              : (patch.patch.autoFilter ?? current.autoFilter),
+          sortState:
+            patch.patch.sortState === null
+              ? undefined
+              : (patch.patch.sortState ?? current.sortState),
         };
         const existing = this.workbook.sheets.flatMap((candidateSheet) =>
           (candidateSheet.tables ?? []).filter((table) => table.id !== current.id),
@@ -2302,6 +2311,8 @@ export class StoreDataEngine {
         if (!validWorkbookTable(candidate, sheet, existing)) return false;
         const next = structuredClone(candidate);
         if (next.style === undefined) delete next.style;
+        if (next.autoFilter === undefined) delete next.autoFilter;
+        if (next.sortState === undefined) delete next.sortState;
         if (!this.syncTable(next)) return false;
         const tables = [...sheet.tables!];
         tables[index] = next;
@@ -2613,6 +2624,7 @@ export class StoreDataEngine {
     const movedHyperlinks = this.workbook.sheets.map(
       (owner) => [owner.id, owner.hyperlinks?.map(cloneCellHyperlink) ?? []] as const,
     );
+    const movedTables = structuredClone(sheet.tables ?? []);
     const columns = sheet.columns.slice(patch.from, patch.from + patch.count);
     const cells = this.snapshotCells(
       patch.sheet,
@@ -2673,6 +2685,7 @@ export class StoreDataEngine {
         .map((hyperlink) => rebaseHyperlinkAxis(hyperlink, patch.sheet, "column", moveCol))
         .filter((hyperlink): hyperlink is CellHyperlink => hyperlink !== null);
     }
+    this.restoreMovedTables(sheet, movedTables, moveCol);
     this.windowReader.conditionalRulesChanged(patch.sheet);
     for (const original of movedNamedRanges) {
       const span = remapSpan(original.range.start.col, original.range.end.col, (col) =>
@@ -2696,6 +2709,58 @@ export class StoreDataEngine {
       if (!this.syncNamedRange(namedRange)) return false;
     }
     return true;
+  }
+
+  /**
+   * A move runs as remove then add, which drops the moved columns' table
+   * metadata and rebuilds them as new columns. When a table's columns still
+   * form one rectangle after the move, put back its original column objects
+   * (names, totals and calculated-column rules) in moved order and carry its
+   * filter and sort rules with them. A table that would be split, would
+   * overlap another table, or that the engine rejects keeps the remove/add
+   * result, so a move never stops half-applied after its cells moved.
+   */
+  private restoreMovedTables(
+    sheet: Sheet,
+    originals: readonly WorkbookTable[],
+    moveCol: (col: number) => number,
+  ): void {
+    let tables = sheet.tables ?? [];
+    for (const original of originals) {
+      const positions = original.columns.map((_column, offset) =>
+        moveCol(original.range.start.col + offset),
+      );
+      const start = Math.min(...positions);
+      const end = Math.max(...positions);
+      if (end - start + 1 !== positions.length) continue;
+      const columns = original.columns
+        .map((column, offset) => ({ column, position: positions[offset] ?? start }))
+        .sort((left, right) => left.position - right.position)
+        .map(({ column }) => column);
+      const restored: WorkbookTable = {
+        ...original,
+        columns,
+        range: {
+          ...original.range,
+          start: { ...original.range.start, col: start },
+          end: { ...original.range.end, col: end },
+        },
+      };
+      delete restored.autoFilter;
+      delete restored.sortState;
+      Object.assign(restored, remapWorkbookTableRuleColumns(original, moveCol, start, end));
+      const others = this.workbook.sheets
+        .flatMap((owner) => (owner === sheet ? tables : (owner.tables ?? [])))
+        .filter((table) => table.id !== original.id);
+      if (!validWorkbookTable(restored, sheet, others) || !this.syncTable(restored)) continue;
+      const index = tables.findIndex((table) => table.id === original.id);
+      if (index < 0) tables = [...tables, restored];
+      else {
+        tables = tables.slice();
+        tables[index] = restored;
+      }
+    }
+    sheet.tables = tables;
   }
 
   private addSheetSnapshot(
@@ -3017,7 +3082,7 @@ export class StoreDataEngine {
         this.wasm.removeTable(table.id);
         continue;
       }
-      const next = {
+      const next: WorkbookTable = {
         ...table,
         columns,
         range: {
@@ -3026,6 +3091,9 @@ export class StoreDataEngine {
           end: { ...table.range.end, col: span[1] },
         },
       };
+      delete next.autoFilter;
+      delete next.sortState;
+      Object.assign(next, remapWorkbookTableRuleColumns(table, remap, span[0], span[1]));
       tables.push(next);
       this.syncTable(next);
     }

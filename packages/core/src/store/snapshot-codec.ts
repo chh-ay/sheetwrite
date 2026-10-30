@@ -7,7 +7,13 @@ import {
 import { RangeSourceProjection } from "../reference.js";
 import type { CellValue } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
-import type { SheetSnapshot, SnapshotCell, Workbook, WorkbookSnapshot } from "../types/document.js";
+import type {
+  SheetSnapshot,
+  SnapshotCell,
+  Workbook,
+  WorkbookSnapshot,
+  XlsxSourceSnapshot,
+} from "../types/document.js";
 import type { StoreWindowReader } from "./window-reader.js";
 
 export interface DecodedWorkbookSnapshot {
@@ -26,6 +32,7 @@ export function decodeWorkbookSnapshot(
   const workbook: Workbook = {
     activeSheet: snapshot.workbook.activeSheet,
     namedRanges: cloneJsonValue(snapshot.workbook.namedRanges),
+    xlsxSource: snapshot.workbook.xlsxSource,
     sheets: snapshot.sheets.map((source) => {
       const rowHeights = new Map<number, number>();
       const hiddenRows = new Set<number>();
@@ -165,6 +172,8 @@ export class StoreSnapshotCodec {
         ...(this.workbook.namedRanges?.length
           ? { namedRanges: cloneJsonValue(this.workbook.namedRanges) }
           : {}),
+        // Frozen by the store, so every snapshot shares it instead of copying the payloads.
+        ...(this.workbook.xlsxSource ? { xlsxSource: this.workbook.xlsxSource } : {}),
       },
       sheets,
     };
@@ -173,4 +182,29 @@ export class StoreSnapshotCodec {
 
 function cloneJsonValue<T>(value: T): T {
   return value === undefined ? value : (JSON.parse(JSON.stringify(value)) as T);
+}
+
+/**
+ * Freeze retained OOXML graphs so snapshots can share them by reference.
+ * Payload strings are shared, not copied; already frozen parts keep their
+ * identity so the XLSX backend's per-part CRC verification stays cached.
+ */
+export function freezeXlsxSource(source: XlsxSourceSnapshot): XlsxSourceSnapshot {
+  return Object.freeze({
+    parts: Object.freeze(
+      source.parts.map((part) => (Object.isFrozen(part) ? part : Object.freeze({ ...part }))),
+    ),
+    graphs: Object.freeze(
+      source.graphs.map((graph) =>
+        Object.freeze({
+          ...graph,
+          parts: Object.freeze([...graph.parts]),
+          dependencies: Object.freeze(
+            graph.dependencies.map((dependency) => Object.freeze({ ...dependency })),
+          ),
+        }),
+      ),
+    ),
+    ...(source.dropped ? { dropped: Object.freeze([...source.dropped]) } : {}),
+  });
 }

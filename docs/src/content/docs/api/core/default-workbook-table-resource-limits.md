@@ -8,7 +8,7 @@ description: "Independent metadata ceilings enforced before table arrays cross t
 Independent metadata ceilings enforced before table arrays cross the WASM boundary.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/workbook-table.ts#L21"><code>packages/core/src/workbook-table.ts#L21</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/workbook-table.ts#L24"><code>packages/core/src/workbook-table.ts#L24</code></a></dd></div>
 </dl>
 
 ## Declaration

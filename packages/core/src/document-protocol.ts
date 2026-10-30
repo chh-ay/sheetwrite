@@ -33,6 +33,7 @@ import {
   assertWorkbookTables,
   DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
   validWorkbookTable,
+  validWorkbookTableXmlElement,
   workbookTableNameKey,
 } from "./workbook-table.js";
 
@@ -1487,6 +1488,31 @@ function validateWorkbookTableColumnShape(
   requireString(column, "id", path, errors, true);
   requireString(column, "name", path, errors, true);
   optionalString(column, "totalsRowLabel", path, errors);
+  const totalsFunction = ownValue(column, "totalsRowFunction");
+  if (
+    totalsFunction !== undefined &&
+    (typeof totalsFunction !== "string" ||
+      ![
+        "none",
+        "sum",
+        "min",
+        "max",
+        "average",
+        "count",
+        "countNums",
+        "stdDev",
+        "var",
+        "custom",
+      ].includes(totalsFunction))
+  ) {
+    invalid(errors, `${path}.totalsRowFunction`, "Invalid table totals-row function");
+  }
+  for (const key of ["calculatedColumnFormula", "totalsRowFormula"]) {
+    const formula = ownValue(column, key);
+    if (formula !== undefined && !validWorkbookTableXmlElement(formula, key)) {
+      invalid(errors, `${path}.${key}`, "Invalid or oversized table formula metadata");
+    }
+  }
 }
 
 function validateWorkbookTableShape(
@@ -1515,6 +1541,13 @@ function validateWorkbookTableShape(
     const flag = ownValue(table, key);
     if (flag === undefined && partial) continue;
     if (typeof flag !== "boolean") invalid(errors, `${path}.${key}`, `${key} must be a boolean`);
+  }
+  for (const key of ["autoFilter", "sortState"]) {
+    const rule = ownValue(table, key);
+    if (rule === undefined || (partial && rule === null)) continue;
+    if (!validWorkbookTableXmlElement(rule, key)) {
+      invalid(errors, `${path}.${key}`, "Invalid or oversized table rule metadata");
+    }
   }
   const styleValue = ownValue(table, "style");
   if (styleValue !== undefined && styleValue !== null) {
@@ -2441,6 +2474,165 @@ function rangeInSheet(range: Range, sheet: SheetSnapshot): boolean {
   );
 }
 
+/**
+ * Hard ceilings for retained OOXML graphs in a snapshot. The XLSX backend's
+ * configurable `maxPreservedBytes` (64 MiB by default) applies first; these
+ * stop a hostile persisted snapshot before any part is decoded.
+ */
+const MAX_XLSX_SOURCE_COMPRESSED_BYTES = 256 * 1024 * 1024;
+const MAX_XLSX_SOURCE_ENTRIES = 10_000;
+const MAX_XLSX_PART_NAME_LENGTH = 1024;
+const MAX_XLSX_CONTENT_TYPE_LENGTH = 256;
+const BASE64_PATTERN = /^(?:[A-Za-z\d+/]{4})*(?:[A-Za-z\d+/]{2}==|[A-Za-z\d+/]{3}=)?$/;
+const CONTENT_TYPE_PATTERN = /^[a-z\d!#$&^_.+-]+\/[a-z\d!#$&^_.+-]+$/i;
+const RELATIONSHIP_TYPE_PATTERN = /^https?:\/\/[^\s<>"'&]+$/;
+
+const FIRST_PRINTABLE_CHARACTER = 0x20;
+
+/** Package-relative OPC part names only; anything a writer could misinterpret is refused. */
+function safeXlsxPartName(value: unknown): value is string {
+  if (typeof value !== "string" || value.length === 0 || value.length > MAX_XLSX_PART_NAME_LENGTH) {
+    return false;
+  }
+
+  // A char-code scan rejects control characters without a control-character regex.
+  for (let index = 0; index < value.length; index++) {
+    if (value.charCodeAt(index) < FIRST_PRINTABLE_CHARACTER) return false;
+  }
+  return (
+    !/[\\?#%<>&"']/.test(value) &&
+    !value.startsWith("/") &&
+    !/^[a-z][a-z\d+.-]*:/i.test(value) &&
+    value.split("/").every((segment) => segment !== "" && segment !== "." && segment !== "..")
+  );
+}
+
+function validateXlsxSource(value: unknown, errors: DocumentValidationError[]): void {
+  if (value === undefined) return;
+  const path = "workbook.xlsxSource";
+  const source = recordAt(value, path, errors);
+  if (!source) return;
+  const parts = arrayAt(ownValue(source, "parts"), `${path}.parts`, errors);
+  const graphs = arrayAt(ownValue(source, "graphs"), `${path}.graphs`, errors);
+  const dropped = optionalArray(source, "dropped", path, errors);
+  if (
+    dropped &&
+    (dropped.length > MAX_XLSX_SOURCE_ENTRIES || !dropped.every((part) => safeXlsxPartName(part)))
+  ) {
+    invalid(errors, `${path}.dropped`, "dropped must list safe part names");
+  }
+  if (!parts || !graphs) return;
+  if (parts.length > MAX_XLSX_SOURCE_ENTRIES || graphs.length > MAX_XLSX_SOURCE_ENTRIES) {
+    invalid(errors, path, `xlsxSource exceeds ${MAX_XLSX_SOURCE_ENTRIES} parts or graphs`);
+    return;
+  }
+
+  const names = new Set<string>();
+  let compressedBytes = 0;
+  for (let index = 0; index < parts.length; index++) {
+    const partPath = `${path}.parts[${index}]`;
+    const part = recordAt(parts[index], partPath, errors);
+    if (!part) continue;
+    const name = ownValue(part, "name");
+    const contentType = ownValue(part, "contentType");
+    const method = ownValue(part, "method");
+    const crc32 = ownValue(part, "crc32");
+    const size = ownValue(part, "uncompressedSize");
+    const data = ownValue(part, "data");
+    // OPC part names compare case-insensitively.
+    if (!safeXlsxPartName(name) || names.has(name.toLowerCase())) {
+      invalid(errors, `${partPath}.name`, "Part name must be a unique safe OPC name");
+    } else names.add(name.toLowerCase());
+    if (
+      typeof contentType !== "string" ||
+      contentType.length > MAX_XLSX_CONTENT_TYPE_LENGTH ||
+      !CONTENT_TYPE_PATTERN.test(contentType)
+    ) {
+      invalid(errors, `${partPath}.contentType`, "contentType must be a MIME type");
+    }
+    if (method !== 0 && method !== 8)
+      invalid(errors, `${partPath}.method`, "method must be 0 or 8");
+    if (!nonNegativeInteger(crc32) || crc32 > 0xffffffff) {
+      invalid(errors, `${partPath}.crc32`, "crc32 must be an unsigned 32-bit integer");
+    }
+    if (!nonNegativeInteger(size) || size > 0xffffffff) {
+      invalid(errors, `${partPath}.uncompressedSize`, "uncompressedSize must fit ZIP32");
+    }
+    if (typeof data !== "string" || data.length % 4 !== 0) {
+      invalid(errors, `${partPath}.data`, "data must be base64");
+      continue;
+    }
+    compressedBytes += (data.length / 4) * 3;
+    if (compressedBytes > MAX_XLSX_SOURCE_COMPRESSED_BYTES) {
+      invalid(errors, path, "xlsxSource exceeds 256 MiB of compressed data");
+      return;
+    }
+    if (!BASE64_PATTERN.test(data)) invalid(errors, `${partPath}.data`, "data must be base64");
+  }
+
+  for (let index = 0; index < graphs.length; index++) {
+    const graphPath = `${path}.graphs[${index}]`;
+    const graph = recordAt(graphs[index], graphPath, errors);
+    if (!graph) continue;
+    const owner = ownValue(graph, "owner");
+    const type = ownValue(graph, "type");
+    const target = ownValue(graph, "target");
+    const cacheId = ownValue(graph, "cacheId");
+    if (owner !== "root" && owner !== "workbook" && owner !== "sheet") {
+      invalid(errors, `${graphPath}.owner`, "owner must be root, workbook, or sheet");
+    }
+    if (owner === "sheet") requireString(graph, "sheetId", graphPath, errors, true);
+    else if (ownValue(graph, "sheetId") !== undefined) {
+      invalid(errors, `${graphPath}.sheetId`, "Only sheet-owned graphs name a sheet");
+    }
+    if (
+      typeof type !== "string" ||
+      type.length > MAX_XLSX_PART_NAME_LENGTH ||
+      !RELATIONSHIP_TYPE_PATTERN.test(type)
+    ) {
+      invalid(errors, `${graphPath}.type`, "type must be a relationship type URI");
+    }
+    if (cacheId !== undefined && (typeof cacheId !== "string" || !/^\d{1,10}$/.test(cacheId))) {
+      invalid(errors, `${graphPath}.cacheId`, "cacheId must be an unsigned integer string");
+    }
+    const members = arrayAt(ownValue(graph, "parts"), `${graphPath}.parts`, errors);
+    if (
+      !members ||
+      members.length > MAX_XLSX_SOURCE_ENTRIES ||
+      !members.every((name) => safeXlsxPartName(name) && names.has(name.toLowerCase())) ||
+      !safeXlsxPartName(target) ||
+      !members.some((name) => name === target)
+    ) {
+      invalid(errors, `${graphPath}.parts`, "Graph parts must be retained and include target");
+    }
+    const dependencies = arrayAt(
+      ownValue(graph, "dependencies"),
+      `${graphPath}.dependencies`,
+      errors,
+    );
+    if (!dependencies) continue;
+    if (dependencies.length > MAX_XLSX_SOURCE_ENTRIES) {
+      invalid(errors, `${graphPath}.dependencies`, "Too many graph dependencies");
+      continue;
+    }
+    for (let dependencyIndex = 0; dependencyIndex < dependencies.length; dependencyIndex++) {
+      const dependencyPath = `${graphPath}.dependencies[${dependencyIndex}]`;
+      const dependency = recordAt(dependencies[dependencyIndex], dependencyPath, errors);
+      if (!dependency) continue;
+      requireString(dependency, "sheetId", dependencyPath, errors, true);
+      requireString(dependency, "name", dependencyPath, errors, true);
+      const scope = ownValue(dependency, "scope");
+      if (scope !== "layout" && scope !== "values") {
+        invalid(errors, `${dependencyPath}.scope`, "scope must be layout or values");
+      }
+      const digest = ownValue(dependency, "digest");
+      if (typeof digest !== "string" || !/^[\da-f]{16}$/.test(digest)) {
+        invalid(errors, `${dependencyPath}.digest`, "digest must be 16 lowercase hex digits");
+      }
+    }
+  }
+}
+
 function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
   const errors: DocumentValidationError[] = [];
   lastMergeValidationStats = { normalized: 0, nodeVisits: 0, errors: 0 };
@@ -2468,6 +2660,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
   const workbook = recordAt(ownValue(candidate, "workbook"), "workbook", errors);
   if (workbook) {
     requireString(workbook, "activeSheet", "workbook", errors, true);
+    validateXlsxSource(ownValue(workbook, "xlsxSource"), errors);
     const namedRanges = optionalArray(workbook, "namedRanges", "workbook", errors);
     namedRanges?.forEach((entry, index) => {
       validateNamedRangeShape(entry, `workbook.namedRanges[${index}]`, errors);

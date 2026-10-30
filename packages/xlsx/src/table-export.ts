@@ -3,13 +3,12 @@ import type {
   CellStyle,
   Store,
   Workbook,
-  WorkbookSnapshot,
   XlsxTableExportBackend,
   XlsxWorkbookOptions,
 } from "@sheetwrite/core";
 
 import { assertResource, createCodecContext, xlsxFailure } from "./resources.js";
-import { writeWorkbook } from "./writer.js";
+import { streamTable, writeTable } from "./table-stream.js";
 
 /** Implementation-neutral cell in the first-sheet table export model. */
 export interface XlsxModelCell {
@@ -113,86 +112,19 @@ export function buildXlsxModel(
   };
 }
 
-function snapshotFromModel(model: XlsxModel): WorkbookSnapshot {
-  const columnCount = model.columnWidths.length;
-  const cells = model.rows.flatMap((row, rowIndex) =>
-    row.flatMap((cell, colIndex) => {
-      if (!cell) return [];
-      return [
-        {
-          rowOffset: rowIndex,
-          colOffset: colIndex,
-          value: { kind: "literal" as const, value: cell.value },
-          ...(cell.style ? { style: structuredClone(cell.style) } : {}),
-        },
-      ];
-    }),
-  );
-  const merges = model.rows.flatMap((row, rowIndex) =>
-    row.flatMap((cell, colIndex) =>
-      cell && ((cell.rowSpan ?? 1) > 1 || (cell.columnSpan ?? 1) > 1)
-        ? [
-            {
-              r0: rowIndex,
-              c0: colIndex,
-              r1: rowIndex + (cell.rowSpan ?? 1) - 1,
-              c1: colIndex + (cell.columnSpan ?? 1) - 1,
-            },
-          ]
-        : [],
-    ),
-  );
-  const rowMeta: [number, { height: number }][] = model.rowHeights.flatMap((height, row) =>
-    height === undefined ? [] : [[row, { height }]],
-  );
-  return {
-    schemaVersion: 1,
-    workbook: { activeSheet: "table" },
-    sheets: [
-      {
-        id: "table",
-        name: model.sheetName,
-        order: 0,
-        rowCount: model.rows.length,
-        columns: model.columnWidths.map((width, index) => {
-          const numberFormat = model.rows
-            .map((row) => row[index]?.numberFormat)
-            .find((format) => format !== undefined);
-          return {
-            key: `column${index + 1}`,
-            header: `Column ${index + 1}`,
-            width,
-            type: "text" as const,
-            ...(numberFormat ? { numberFormat } : {}),
-          };
-        }),
-        ...(merges.length > 0 ? { merges } : {}),
-        ...(rowMeta.length > 0 ? { rowMeta } : {}),
-        cells:
-          cells.length > 0
-            ? [
-                {
-                  startRow: 0,
-                  startCol: 0,
-                  rowCount: model.rows.length,
-                  colCount: columnCount,
-                  cells,
-                },
-              ]
-            : [],
-      },
-    ],
-  };
-}
-
 /** Default bounded first-sheet table export backend. */
 export const sheetwriteTableExportBackend: XlsxTableExportBackend = {
   name: "sheetwrite-ooxml-table",
   async toXlsxTable(workbook, store, options) {
     try {
-      const model = buildXlsxModel(workbook, store, options);
-      if (!model) return new Uint8Array();
-      return writeWorkbook(snapshotFromModel(model), createCodecContext("export", options));
+      return writeTable(workbook, store, createCodecContext("export", options));
+    } catch (error) {
+      throw xlsxFailure(error, "export", "sheetwrite-ooxml-table");
+    }
+  },
+  async *toXlsxTableStream(workbook, store, options) {
+    try {
+      yield* streamTable(workbook, store, createCodecContext("export", options));
     } catch (error) {
       throw xlsxFailure(error, "export", "sheetwrite-ooxml-table");
     }

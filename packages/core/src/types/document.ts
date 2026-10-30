@@ -111,6 +111,8 @@ export interface Workbook {
   activeSheet: SheetId;
   /** Formula names shared by the workbook or shadowed within a sheet scope. */
   namedRanges?: NamedRangeSnapshot[];
+  /** Opaque OOXML graphs from an imported file; edits drop the graphs that depend on them. */
+  xlsxSource?: XlsxSourceSnapshot;
 }
 
 export interface AddSheetInput {
@@ -360,6 +362,54 @@ export interface SheetSnapshot {
   cells: CellBlock[];
 }
 
+/**
+ * One retained OOXML part, kept as its original compressed ZIP payload so a
+ * save copies it without inflating or recompressing. Runtime copies are frozen.
+ */
+export interface XlsxSourcePart {
+  readonly name: string;
+  readonly contentType: string;
+  readonly method: 0 | 8;
+  readonly crc32: number;
+  readonly uncompressedSize: number;
+  /** Base64 of the compressed payload. */
+  readonly data: string;
+}
+
+/** What an opaque graph reads; any change to it drops the graph on save. */
+export interface XlsxSourceDependency {
+  readonly sheetId: SheetId;
+  /** Sheet name at import; OOXML formulas inside the graph refer to sheets by name. */
+  readonly name: string;
+  /** `layout` graphs (images) only follow row/column structure; `values` graphs (charts, pivots) read cells. */
+  readonly scope: "layout" | "values";
+  /** 64-bit hex fingerprint of the sheet at import, for snapshots edited outside a Store. */
+  readonly digest: string;
+}
+
+/** One relationship from the package, workbook, or a sheet to a retained part graph. */
+export interface XlsxSourceGraph {
+  readonly owner: "root" | "workbook" | "sheet";
+  readonly sheetId?: SheetId;
+  /** OPC relationship type URI. */
+  readonly type: string;
+  /** Relationship target part. */
+  readonly target: string;
+  /** Pivot cache id written into `<pivotCaches>`. */
+  readonly cacheId?: string;
+  /** Every retained part reached from `target`, including `.rels` parts. */
+  readonly parts: readonly string[];
+  readonly dependencies: readonly XlsxSourceDependency[];
+}
+
+/** Bounded, frozen record of the OOXML parts Sheetwrite does not model. */
+export interface XlsxSourceSnapshot {
+  readonly parts: readonly XlsxSourcePart[];
+  readonly graphs: readonly XlsxSourceGraph[];
+  /** Targets of graphs dropped by committed edits; undo does not restore them. */
+  readonly dropped?: readonly string[];
+}
+
 /** Schema-versioned serializable workbook document. */
 export interface WorkbookSnapshot {
   schemaVersion: 1;
@@ -368,6 +418,8 @@ export interface WorkbookSnapshot {
   workbook: {
     activeSheet: SheetId;
     namedRanges?: NamedRangeSnapshot[];
+    /** Opaque OOXML graphs kept for the next XLSX save; never interpreted by Sheetwrite. */
+    xlsxSource?: XlsxSourceSnapshot;
   };
   sheets: SheetSnapshot[];
 }

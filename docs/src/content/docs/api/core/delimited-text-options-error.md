@@ -8,7 +8,7 @@ description: "Stable invalid-option failure for a delimited-text resource ceilin
 Stable invalid-option failure for a delimited-text resource ceiling.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/delimited-text.ts#L71"><code>packages/core/src/delimited-text.ts#L71</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/delimited-text.ts#L73"><code>packages/core/src/delimited-text.ts#L73</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>

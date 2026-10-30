@@ -12,7 +12,7 @@ synchronous API returns one in-memory string and fetches at most
 `maxWriterWindowRows` canonical rows per packed store read.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L86"><code>packages/core/src/export.ts#L86</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L173"><code>packages/core/src/export.ts#L173</code></a></dd></div>
 </dl>
 
 ## Declaration

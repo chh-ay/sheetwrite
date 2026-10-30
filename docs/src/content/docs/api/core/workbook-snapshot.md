@@ -8,7 +8,7 @@ description: "Schema-versioned serializable workbook document."
 Schema-versioned serializable workbook document.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L364"><code>packages/core/src/types/document.ts#L364</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L414"><code>packages/core/src/types/document.ts#L414</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>
@@ -46,7 +46,7 @@ version?: number;
 <summary><code>workbook</code></summary>
 
 ```ts generated
-workbook: { activeSheet: SheetId; namedRanges?: NamedRangeSnapshot[]; };
+workbook: { activeSheet: SheetId; namedRanges?: NamedRangeSnapshot[]; xlsxSource?: XlsxSourceSnapshot; };
 ```
 
 </details>
@@ -74,6 +74,7 @@ export interface WorkbookSnapshot {
   workbook: {
     activeSheet: SheetId;
     namedRanges?: NamedRangeSnapshot[];
+    xlsxSource?: XlsxSourceSnapshot;
   };
   sheets: SheetSnapshot[];
 }
@@ -100,6 +101,7 @@ export interface WorkbookSnapshot {
 <ul class="api-consumer-list">
 <li><a href="/docs/api/core/document-validation-result/"><code>DocumentValidationResult</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/from-xlsx-workbook/"><code>fromXlsxWorkbook</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/from-xlsx-workbook-file/"><code>fromXlsxWorkbookFile</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/memory-persistence-adapter/"><code>MemoryPersistenceAdapter</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/persistence-adapter/"><code>PersistenceAdapter</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
@@ -109,7 +111,6 @@ export interface WorkbookSnapshot {
 <li><a href="/docs/api/core/store/"><code>Store</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/sync-coordinator/"><code>SyncCoordinator</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/sync-coordinator-event/"><code>SyncCoordinatorEvent</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li><a href="/docs/api/core/sync-coordinator-options/"><code>SyncCoordinatorOptions</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li class="api-consumer-more">and 5 more</li>
+<li class="api-consumer-more">and 7 more</li>
 </ul>
 </div>

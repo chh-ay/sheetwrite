@@ -114,12 +114,6 @@ export function assertResource(
   }
 }
 
-export function inputView(data: ArrayBuffer | Uint8Array, context: XlsxCodecContext): Uint8Array {
-  const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
-  assertResource(context, "maxInputBytes", bytes.byteLength);
-  return bytes;
-}
-
 /** Validate a sparse codec snapshot without applying live dense-store allocation ceilings. */
 export function validateCodecSnapshot(input: unknown, context: XlsxCodecContext) {
   return validateWorkbookSnapshot(input, {

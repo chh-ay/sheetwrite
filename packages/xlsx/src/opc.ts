@@ -8,7 +8,7 @@ import {
   xmlAttribute,
   xmlChildren,
 } from "./xml.js";
-import { asciiFold, normalizeDecodedPartName, normalizePartName, ZipArchive } from "./zip.js";
+import { asciiFold, normalizeDecodedPartName, normalizePartName, ZipReader } from "./zip.js";
 
 const TRANSITIONAL_REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const STRICT_REL_NS = "http://purl.oclc.org/ooxml/officeDocument/relationships";
@@ -45,7 +45,7 @@ function relationshipSourcePart(part: string): string {
   return `${match[1] ?? ""}${match[2]}`;
 }
 
-function resolveRelationshipTarget(sourcePart: string, rawTarget: string): string {
+export function resolveRelationshipTarget(sourcePart: string, rawTarget: string): string {
   let decoded: string;
   try {
     decoded = decodeURIComponent(rawTarget);
@@ -115,16 +115,40 @@ function parseRelationships(
 }
 
 export class OpcPackage {
-  readonly archive: ZipArchive;
+  readonly archive: ZipReader;
   readonly contentTypes = new Map<string, string>();
   readonly defaultContentTypes = new Map<string, string>();
   readonly #context: XlsxCodecContext;
   readonly #relationshipCache = new Map<string, readonly OpcRelationship[]>();
+  readonly #resident = new Map<string, Uint8Array>();
 
-  constructor(data: ArrayBuffer | Uint8Array, context: XlsxCodecContext) {
+  private constructor(archive: ZipReader, context: XlsxCodecContext) {
     this.#context = context;
-    this.archive = new ZipArchive(data, context);
-    const root = this.readXml("[Content_Types].xml");
+    this.archive = archive;
+  }
+
+  static async open(
+    input: Blob | ArrayBuffer | Uint8Array,
+    context: XlsxCodecContext,
+  ): Promise<OpcPackage> {
+    const archive = await ZipReader.open(input, context);
+    const packageFile = new OpcPackage(archive, context);
+    packageFile.#initializeTypes(
+      parseXml(await archive.read("[Content_Types].xml"), "[Content_Types].xml", context),
+    );
+    for (const part of archive.entries.keys()) {
+      if (!part.toLowerCase().endsWith(".rels")) continue;
+      const source = relationshipSourcePart(part);
+      packageFile.#relationshipCache.set(
+        asciiFold(source),
+        parseRelationships(parseXml(await archive.read(part), part, context), source, context),
+      );
+    }
+    return packageFile;
+  }
+
+  #initializeTypes(root: XmlElement): void {
+    const context = this.#context;
     assertXmlRoot(root, "Types", [CONTENT_TYPES_NS], "[Content_Types].xml");
     for (const item of root.children) {
       const local = item.name.includes(":")
@@ -152,21 +176,32 @@ export class OpcPackage {
         this.contentTypes.set(foldedName, contentType);
       }
     }
-    for (const part of this.archive.entries.keys()) {
-      if (!part.toLowerCase().endsWith(".rels")) continue;
-      const sourcePart = relationshipSourcePart(part);
-      const relationships = parseRelationships(this.readXml(part), sourcePart, context);
-      this.#relationshipCache.set(asciiFold(sourcePart), relationships);
-    }
   }
 
   read(part: string): Uint8Array {
-    return this.archive.read(normalizePartName(part));
+    const name = normalizePartName(part);
+    const bytes = this.#resident.get(asciiFold(name));
+    if (!bytes)
+      throw new Error(`Sheetwrite: XLSX part ${name} must be loaded before synchronous parsing`);
+    return bytes;
   }
 
   readXml(part: string): XmlElement {
     const name = normalizePartName(part);
-    return parseXml(this.archive.read(name), name, this.#context);
+    return parseXml(this.read(name), name, this.#context);
+  }
+
+  async readBytes(part: string): Promise<Uint8Array> {
+    return this.archive.read(normalizePartName(part));
+  }
+
+  async load(parts: readonly string[]): Promise<void> {
+    for (const part of parts)
+      this.#resident.set(asciiFold(normalizePartName(part)), await this.readBytes(part));
+  }
+
+  release(parts: readonly string[]): void {
+    for (const part of parts) this.#resident.delete(asciiFold(normalizePartName(part)));
   }
 
   relationships(sourcePart: string): readonly OpcRelationship[] {
@@ -174,14 +209,7 @@ export class OpcPackage {
     const key = normalizedSource === "" ? "" : asciiFold(normalizedSource);
     const cached = this.#relationshipCache.get(key);
     if (cached) return cached;
-    const part = relationshipsPart(normalizedSource);
-    if (!this.archive.has(part)) {
-      this.#relationshipCache.set(key, []);
-      return [];
-    }
-    const parsed = parseRelationships(this.readXml(part), normalizedSource, this.#context);
-    this.#relationshipCache.set(key, parsed);
-    return parsed;
+    return [];
   }
 
   relationship(sourcePart: string, id: string): OpcRelationship {
@@ -219,6 +247,7 @@ export interface ContentTypeOverride {
 export function contentTypesXml(
   overrides: readonly ContentTypeOverride[],
   context: XlsxCodecContext,
+  defaults: readonly { extension: string; contentType: string }[] = [],
 ): Uint8Array {
   const xml = new XmlBuffer(context);
   xml.append('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
@@ -227,6 +256,12 @@ export function contentTypesXml(
     '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>',
   );
   xml.append('<Default Extension="xml" ContentType="application/xml"/>');
+  for (const entry of defaults) {
+    if (entry.extension === "rels" || entry.extension === "xml") continue;
+    xml.append(
+      `<Default Extension="${escapeXml(entry.extension)}" ContentType="${escapeXml(entry.contentType)}"/>`,
+    );
+  }
   for (const override of [...overrides].sort((left, right) =>
     left.part.localeCompare(right.part),
   )) {

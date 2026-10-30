@@ -8,7 +8,7 @@ description: "Validate and NFC-normalize an ECMA-compatible structured-reference
 Validate and NFC-normalize an ECMA-compatible structured-reference name.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/workbook-table.ts#L65"><code>packages/core/src/workbook-table.ts#L65</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/workbook-table.ts#L68"><code>packages/core/src/workbook-table.ts#L68</code></a></dd></div>
 </dl>
 
 ## Declaration
