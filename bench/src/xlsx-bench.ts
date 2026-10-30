@@ -15,7 +15,7 @@ const FIXTURE_BYTES = 1_038_346;
 const FIXTURE_SHA256 = "2633e51a4a3caa8d34b2e2147b997c6ebdd0cf514be6e6c60663a0f7659e6e00";
 const GENERATOR_SHA256 = "a00a25851cbb8479a13472ef07ad3a133f8901505ea89da8f967041d4b9f4fb2";
 const BASELINE_COMMIT = "87fadb72397947ea8c6ba576682925c7879579b8";
-const PROTOCOL = "sheetwrite-xlsx-codec-v1";
+const PROTOCOL = "sheetwrite-xlsx-codec-v2";
 const MAX_BASELINE_RATIO = 1.25;
 const MAX_REJECTION_WALL_MS = 1_000;
 const MAX_REJECTION_RSS_BYTES = 256 * 1024 * 1024;
@@ -65,6 +65,8 @@ export interface XlsxRawSample {
   readonly heapAfterBytes: number;
   readonly arrayBuffersBeforeBytes: number;
   readonly arrayBuffersAfterBytes: number;
+  readonly heapRetainedBytes: number;
+  readonly arrayBuffersRetainedBytes: number;
   readonly inputBytes: number;
   readonly outputBytes: number;
   readonly checksum: string;
@@ -85,7 +87,10 @@ export interface XlsxScenarioSummary {
   readonly durationMs: XlsxFiniteSummary;
   readonly processWallMs: XlsxFiniteSummary;
   readonly maxRssBytes: XlsxFiniteSummary & { readonly max: number };
-  readonly retainedAllocationDeltaBytes: XlsxFiniteSummary & {
+  readonly returnAllocationDeltaBytes: XlsxFiniteSummary & {
+    readonly max: number;
+  };
+  readonly retainedAfterGcDeltaBytes: XlsxFiniteSummary & {
     readonly max: number;
   };
 }
@@ -160,7 +165,7 @@ function exactMatrix(expected: readonly string[], actual: readonly string[]): vo
   }
 }
 
-function retainedAllocation(sample: XlsxRawSample): number {
+function returnAllocation(sample: XlsxRawSample): number {
   return (
     Math.max(0, sample.heapAfterBytes - sample.heapBeforeBytes) +
     Math.max(0, sample.arrayBuffersAfterBytes - sample.arrayBuffersBeforeBytes)
@@ -171,7 +176,12 @@ function summaryFor(samples: readonly XlsxRawSample[]): XlsxScenarioSummary {
   const first = samples[0];
   if (!first) throw new Error("cannot summarize an empty XLSX sample");
   const rss = samples.map((sample) => sample.maxRssBytes);
-  const allocated = samples.map(retainedAllocation);
+  const allocated = samples.map(returnAllocation);
+  const retained = samples.map(
+    (sample) =>
+      Math.max(0, sample.heapRetainedBytes - sample.heapBeforeBytes) +
+      Math.max(0, sample.arrayBuffersRetainedBytes - sample.arrayBuffersBeforeBytes),
+  );
   return {
     engine: first.engine,
     operation: first.operation,
@@ -179,9 +189,13 @@ function summaryFor(samples: readonly XlsxRawSample[]): XlsxScenarioSummary {
     durationMs: summarizeFinite(samples.map((sample) => sample.durationMs)),
     processWallMs: summarizeFinite(samples.map((sample) => sample.processWallMs)),
     maxRssBytes: { ...summarizeFinite(rss), max: Math.max(...rss) },
-    retainedAllocationDeltaBytes: {
+    returnAllocationDeltaBytes: {
       ...summarizeFinite(allocated),
       max: Math.max(...allocated),
+    },
+    retainedAfterGcDeltaBytes: {
+      ...summarizeFinite(retained),
+      max: Math.max(...retained),
     },
   };
 }
@@ -350,6 +364,8 @@ export function validateXlsxBenchmarkArtifact(value: unknown): XlsxBenchmarkArti
       "heapAfterBytes",
       "arrayBuffersBeforeBytes",
       "arrayBuffersAfterBytes",
+      "heapRetainedBytes",
+      "arrayBuffersRetainedBytes",
       "inputBytes",
       "outputBytes",
     ] as const) {
@@ -504,7 +520,7 @@ export async function runXlsxBenchmark(options: RunOptions): Promise<XlsxBenchma
       memory:
         "Peak RSS is Linux /proc/self/status VmHWM (or process.resourceUsage maxRSS fallback) from the same fresh worker process; reported gate value is the largest raw peak.",
       allocation:
-        "Retained allocation delta is max(0, heapUsed after-before) plus max(0, arrayBuffers after-before), sampled around the operation after a forced pre-operation GC; it is not represented as peak heap.",
+        "Return allocation delta is max(0, heapUsed after-before) plus max(0, arrayBuffers after-before), with GC only before the operation; it includes uncollected garbage and is not total allocation or peak heap. Retained-after-GC delta uses the same formula after clearing completed operation frames and forcing a second GC; output checksums are retained, but operation results are released.",
     },
     scenarios: [
       ...PERFORMANCE_SCENARIOS.map((scenario) => `${scenario.operation}:${scenario.name}`),

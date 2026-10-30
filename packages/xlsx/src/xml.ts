@@ -736,6 +736,8 @@ export function escapeXml(value: string): string {
     .replaceAll("'", "&apos;");
 }
 
+const XML_OUTPUT_CHUNK_BYTES = 64 * 1024;
+
 /** Incrementally bounds generated XML before joining and UTF-8 encoding it. */
 export class XmlBuffer {
   readonly #parts: string[] = [];
@@ -745,9 +747,10 @@ export class XmlBuffer {
   constructor(private readonly context: XlsxCodecContext) {}
 
   append(value: string): void {
-    this.#bytes += utf8Length(value);
+    const bytes = utf8Length(value);
+    this.#bytes += bytes;
     assertResource(this.context, "maxEntryUncompressedBytes", this.#bytes);
-    this.#pendingBytes += utf8Length(value);
+    this.#pendingBytes += bytes;
     this.#parts.push(value);
   }
 
@@ -758,15 +761,17 @@ export class XmlBuffer {
   }
 
   /** Release completed writer fragments without retaining the full XML part. */
-  *drain(force = false): Generator<Uint8Array> {
-    const chunkBytes = 64 * 1024;
-    if (!force && this.#pendingBytes < chunkBytes) return;
+  drain(force = false): readonly Uint8Array[] | undefined {
+    if (!force && this.#pendingBytes < XML_OUTPUT_CHUNK_BYTES) return;
+
     const encoded = ENCODER.encode(this.#parts.join(""));
     this.#parts.length = 0;
     this.#pendingBytes = 0;
-    for (let offset = 0; offset < encoded.length; offset += chunkBytes) {
-      yield encoded.subarray(offset, offset + chunkBytes);
+    const chunks: Uint8Array[] = [];
+    for (let offset = 0; offset < encoded.length; offset += XML_OUTPUT_CHUNK_BYTES) {
+      chunks.push(encoded.subarray(offset, offset + XML_OUTPUT_CHUNK_BYTES));
     }
+    return chunks;
   }
 
   finish(): Uint8Array {

@@ -1929,7 +1929,11 @@ interface XlsxEvidence {
 
 function validateXlsxArtifact(value: Record<string, unknown>): XlsxEvidence | string {
   const artifact = value as unknown as Partial<XlsxEvidence>;
-  if (artifact.protocol !== "sheetwrite-xlsx-codec-v1" || artifact.mode !== "full") {
+  if (
+    (artifact.protocol !== "sheetwrite-xlsx-codec-v1" &&
+      artifact.protocol !== "sheetwrite-xlsx-codec-v2") ||
+    artifact.mode !== "full"
+  ) {
     return "artifact is not a full-mode XLSX codec capture";
   }
   validateEngineVersions(artifact.metadata?.engineVersions, ["sheetwrite", "exceljs"]);
