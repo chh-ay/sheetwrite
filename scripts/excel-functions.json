@@ -1,0 +1,2158 @@
+{
+  "source": "https://support.microsoft.com/en-us/excel/excel-functions-by-category",
+  "sourceUpdated": "2026-06-25",
+  "retrievedOn": "2026-10-30",
+  "families": [
+    {
+      "title": "Compatibility",
+      "functions": [
+        {
+          "name": "BETADIST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/betadist-function"
+        },
+        {
+          "name": "BETAINV",
+          "url": "https://support.microsoft.com/en-us/excel/functions/betainv-function"
+        },
+        {
+          "name": "BINOMDIST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/binomdist-function"
+        },
+        {
+          "name": "CHIDIST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/chidist-function"
+        },
+        {
+          "name": "CHIINV",
+          "url": "https://support.microsoft.com/en-us/excel/functions/chiinv-function"
+        },
+        {
+          "name": "CHITEST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/chitest-function"
+        },
+        {
+          "name": "CONFIDENCE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/confidence-function"
+        },
+        {
+          "name": "COVAR",
+          "url": "https://support.microsoft.com/en-us/excel/functions/covar-function"
+        },
+        {
+          "name": "CRITBINOM",
+          "url": "https://support.microsoft.com/en-us/excel/functions/critbinom-function"
+        },
+        {
+          "name": "EXPONDIST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/expondist-function"
+        },
+        {
+          "name": "FDIST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/fdist-function"
+        },
+        {
+          "name": "FINV",
+          "url": "https://support.microsoft.com/en-us/excel/functions/finv-function"
+        },
+        {
+          "name": "FTEST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/ftest-function"
+        },
+        {
+          "name": "GAMMADIST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/gammadist-function"
+        },
+        {
+          "name": "GAMMAINV",
+          "url": "https://support.microsoft.com/en-us/excel/functions/gammainv-function"
+        },
+        {
+          "name": "HYPGEOMDIST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/hypgeomdist-function"
+        },
+        {
+          "name": "LOGINV",
+          "url": "https://support.microsoft.com/en-us/excel/functions/loginv-function"
+        },
+        {
+          "name": "LOGNORMDIST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/lognormdist-function"
+        },
+        {
+          "name": "MODE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/mode-function"
+        },
+        {
+          "name": "NEGBINOMDIST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/negbinomdist-function"
+        },
+        {
+          "name": "NORMDIST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/normdist-function"
+        },
+        {
+          "name": "NORMINV",
+          "url": "https://support.microsoft.com/en-us/excel/functions/norminv-function"
+        },
+        {
+          "name": "NORMSDIST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/normsdist-function"
+        },
+        {
+          "name": "NORMSINV",
+          "url": "https://support.microsoft.com/en-us/excel/functions/normsinv-function"
+        },
+        {
+          "name": "PERCENTILE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/percentile-function"
+        },
+        {
+          "name": "PERCENTRANK",
+          "url": "https://support.microsoft.com/en-us/excel/functions/percentrank-function"
+        },
+        {
+          "name": "POISSON",
+          "url": "https://support.microsoft.com/en-us/excel/functions/poisson-function"
+        },
+        {
+          "name": "QUARTILE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/quartile-function"
+        },
+        {
+          "name": "RANK",
+          "url": "https://support.microsoft.com/en-us/excel/functions/rank-function"
+        },
+        {
+          "name": "STDEV",
+          "url": "https://support.microsoft.com/en-us/excel/functions/stdev-function"
+        },
+        {
+          "name": "STDEVP",
+          "url": "https://support.microsoft.com/en-us/excel/functions/stdevp-function"
+        },
+        {
+          "name": "TDIST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/tdist-function"
+        },
+        {
+          "name": "TINV",
+          "url": "https://support.microsoft.com/en-us/excel/functions/tinv-function"
+        },
+        {
+          "name": "TTEST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/ttest-function"
+        },
+        {
+          "name": "VAR",
+          "url": "https://support.microsoft.com/en-us/excel/functions/var-function"
+        },
+        {
+          "name": "VARP",
+          "url": "https://support.microsoft.com/en-us/excel/functions/varp-function"
+        },
+        {
+          "name": "WEIBULL",
+          "url": "https://support.microsoft.com/en-us/excel/functions/weibull-function"
+        },
+        {
+          "name": "ZTEST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/ztest-function"
+        }
+      ]
+    },
+    {
+      "title": "Cubes",
+      "functions": [
+        {
+          "name": "CUBEKPIMEMBER",
+          "url": "https://support.microsoft.com/en-us/excel/functions/cubekpimember-function"
+        },
+        {
+          "name": "CUBEMEMBER",
+          "url": "https://support.microsoft.com/en-us/excel/functions/cubemember-function"
+        },
+        {
+          "name": "CUBEMEMBERPROPERTY",
+          "url": "https://support.microsoft.com/en-us/excel/functions/cubememberproperty-function"
+        },
+        {
+          "name": "CUBERANKEDMEMBER",
+          "url": "https://support.microsoft.com/en-us/excel/functions/cuberankedmember-function"
+        },
+        {
+          "name": "CUBESET",
+          "url": "https://support.microsoft.com/en-us/excel/functions/cubeset-function"
+        },
+        {
+          "name": "CUBESETCOUNT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/cubesetcount-function"
+        },
+        {
+          "name": "CUBEVALUE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/cubevalue-function"
+        }
+      ]
+    },
+    {
+      "title": "Database functions",
+      "functions": [
+        {
+          "name": "DAVERAGE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/daverage-function"
+        },
+        {
+          "name": "DCOUNT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/dcount-function"
+        },
+        {
+          "name": "DCOUNTA",
+          "url": "https://support.microsoft.com/en-us/excel/functions/dcounta-function"
+        },
+        {
+          "name": "DGET",
+          "url": "https://support.microsoft.com/en-us/excel/functions/dget-function"
+        },
+        {
+          "name": "DMAX",
+          "url": "https://support.microsoft.com/en-us/excel/functions/dmax-function"
+        },
+        {
+          "name": "DMIN",
+          "url": "https://support.microsoft.com/en-us/excel/functions/dmin-function"
+        },
+        {
+          "name": "DPRODUCT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/dproduct-function"
+        },
+        {
+          "name": "DSTDEV",
+          "url": "https://support.microsoft.com/en-us/excel/functions/dstdev-function"
+        },
+        {
+          "name": "DSTDEVP",
+          "url": "https://support.microsoft.com/en-us/excel/functions/dstdevp-function"
+        },
+        {
+          "name": "DSUM",
+          "url": "https://support.microsoft.com/en-us/excel/functions/dsum-function"
+        },
+        {
+          "name": "DVAR",
+          "url": "https://support.microsoft.com/en-us/excel/functions/dvar-function"
+        },
+        {
+          "name": "DVARP",
+          "url": "https://support.microsoft.com/en-us/excel/functions/dvarp-function"
+        }
+      ]
+    },
+    {
+      "title": "Date and time functions",
+      "functions": [
+        {
+          "name": "DATE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/date-function"
+        },
+        {
+          "name": "DATEDIF",
+          "url": "https://support.microsoft.com/en-us/excel/functions/datedif-function"
+        },
+        {
+          "name": "DATEVALUE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/datevalue-function"
+        },
+        {
+          "name": "DAY",
+          "url": "https://support.microsoft.com/en-us/excel/functions/day-function"
+        },
+        {
+          "name": "DAYS",
+          "url": "https://support.microsoft.com/en-us/excel/functions/days-function"
+        },
+        {
+          "name": "DAYS360",
+          "url": "https://support.microsoft.com/en-us/excel/functions/days360-function"
+        },
+        {
+          "name": "EDATE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/edate-function"
+        },
+        {
+          "name": "EOMONTH",
+          "url": "https://support.microsoft.com/en-us/excel/functions/eomonth-function"
+        },
+        {
+          "name": "HOUR",
+          "url": "https://support.microsoft.com/en-us/excel/functions/hour-function"
+        },
+        {
+          "name": "ISOWEEKNUM",
+          "url": "https://support.microsoft.com/en-us/excel/functions/isoweeknum-function"
+        },
+        {
+          "name": "MINUTE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/minute-function"
+        },
+        {
+          "name": "MONTH",
+          "url": "https://support.microsoft.com/en-us/excel/functions/month-function"
+        },
+        {
+          "name": "NETWORKDAYS",
+          "url": "https://support.microsoft.com/en-us/excel/functions/networkdays-function"
+        },
+        {
+          "name": "NETWORKDAYS.INTL",
+          "url": "https://support.microsoft.com/en-us/excel/functions/networkdays-intl-function"
+        },
+        {
+          "name": "NOW",
+          "url": "https://support.microsoft.com/en-us/excel/functions/now-function"
+        },
+        {
+          "name": "SECOND",
+          "url": "https://support.microsoft.com/en-us/excel/functions/second-function"
+        },
+        {
+          "name": "TIME",
+          "url": "https://support.microsoft.com/en-us/excel/functions/time-function"
+        },
+        {
+          "name": "TIMEVALUE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/timevalue-function"
+        },
+        {
+          "name": "TODAY",
+          "url": "https://support.microsoft.com/en-us/excel/functions/today-function"
+        },
+        {
+          "name": "WEEKDAY",
+          "url": "https://support.microsoft.com/en-us/excel/functions/weekday-function"
+        },
+        {
+          "name": "WEEKNUM",
+          "url": "https://support.microsoft.com/en-us/excel/functions/weeknum-function"
+        },
+        {
+          "name": "WORKDAY",
+          "url": "https://support.microsoft.com/en-us/excel/functions/workday-function"
+        },
+        {
+          "name": "WORKDAY.INTL",
+          "url": "https://support.microsoft.com/en-us/excel/functions/workday-intl-function"
+        },
+        {
+          "name": "YEAR",
+          "url": "https://support.microsoft.com/en-us/excel/functions/year-function"
+        },
+        {
+          "name": "YEARFRAC",
+          "url": "https://support.microsoft.com/en-us/excel/functions/yearfrac-function"
+        }
+      ]
+    },
+    {
+      "title": "Engineering functions",
+      "functions": [
+        {
+          "name": "BESSELI",
+          "url": "https://support.microsoft.com/en-us/excel/functions/besseli-function"
+        },
+        {
+          "name": "BESSELJ",
+          "url": "https://support.microsoft.com/en-us/excel/functions/besselj-function"
+        },
+        {
+          "name": "BESSELK",
+          "url": "https://support.microsoft.com/en-us/excel/functions/besselk-function"
+        },
+        {
+          "name": "BESSELY",
+          "url": "https://support.microsoft.com/en-us/excel/functions/bessely-function"
+        },
+        {
+          "name": "BIN2DEC",
+          "url": "https://support.microsoft.com/en-us/excel/functions/bin2dec-function"
+        },
+        {
+          "name": "BIN2HEX",
+          "url": "https://support.microsoft.com/en-us/excel/functions/bin2hex-function"
+        },
+        {
+          "name": "BIN2OCT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/bin2oct-function"
+        },
+        {
+          "name": "BITAND",
+          "url": "https://support.microsoft.com/en-us/excel/functions/bitand-function"
+        },
+        {
+          "name": "BITLSHIFT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/bitlshift-function"
+        },
+        {
+          "name": "BITOR",
+          "url": "https://support.microsoft.com/en-us/excel/functions/bitor-function"
+        },
+        {
+          "name": "BITRSHIFT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/bitrshift-function"
+        },
+        {
+          "name": "BITXOR",
+          "url": "https://support.microsoft.com/en-us/excel/functions/bitxor-function"
+        },
+        {
+          "name": "COMPLEX",
+          "url": "https://support.microsoft.com/en-us/excel/functions/complex-function"
+        },
+        {
+          "name": "CONVERT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/convert-function"
+        },
+        {
+          "name": "DEC2BIN",
+          "url": "https://support.microsoft.com/en-us/excel/functions/dec2bin-function"
+        },
+        {
+          "name": "DEC2HEX",
+          "url": "https://support.microsoft.com/en-us/excel/functions/dec2hex-function"
+        },
+        {
+          "name": "DEC2OCT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/dec2oct-function"
+        },
+        {
+          "name": "DELTA",
+          "url": "https://support.microsoft.com/en-us/excel/functions/delta-function"
+        },
+        {
+          "name": "ERF",
+          "url": "https://support.microsoft.com/en-us/excel/functions/erf-function"
+        },
+        {
+          "name": "ERF.PRECISE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/erf-precise-function"
+        },
+        {
+          "name": "ERFC",
+          "url": "https://support.microsoft.com/en-us/excel/functions/erfc-function"
+        },
+        {
+          "name": "ERFC.PRECISE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/erfc-precise-function"
+        },
+        {
+          "name": "GESTEP",
+          "url": "https://support.microsoft.com/en-us/excel/functions/gestep-function"
+        },
+        {
+          "name": "HEX2BIN",
+          "url": "https://support.microsoft.com/en-us/excel/functions/hex2bin-function"
+        },
+        {
+          "name": "HEX2DEC",
+          "url": "https://support.microsoft.com/en-us/excel/functions/hex2dec-function"
+        },
+        {
+          "name": "HEX2OCT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/hex2oct-function"
+        },
+        {
+          "name": "IMABS",
+          "url": "https://support.microsoft.com/en-us/excel/functions/imabs-function"
+        },
+        {
+          "name": "IMAGINARY",
+          "url": "https://support.microsoft.com/en-us/excel/functions/imaginary-function"
+        },
+        {
+          "name": "IMARGUMENT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/imargument-function"
+        },
+        {
+          "name": "IMCONJUGATE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/imconjugate-function"
+        },
+        {
+          "name": "IMCOS",
+          "url": "https://support.microsoft.com/en-us/excel/functions/imcos-function"
+        },
+        {
+          "name": "IMCOSH",
+          "url": "https://support.microsoft.com/en-us/excel/functions/imcosh-function"
+        },
+        {
+          "name": "IMCOT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/imcot-function"
+        },
+        {
+          "name": "IMCSC",
+          "url": "https://support.microsoft.com/en-us/excel/functions/imcsc-function"
+        },
+        {
+          "name": "IMCSCH",
+          "url": "https://support.microsoft.com/en-us/excel/functions/imcsch-function"
+        },
+        {
+          "name": "IMDIV",
+          "url": "https://support.microsoft.com/en-us/excel/functions/imdiv-function"
+        },
+        {
+          "name": "IMEXP",
+          "url": "https://support.microsoft.com/en-us/excel/functions/imexp-function"
+        },
+        {
+          "name": "IMLN",
+          "url": "https://support.microsoft.com/en-us/excel/functions/imln-function"
+        },
+        {
+          "name": "IMLOG10",
+          "url": "https://support.microsoft.com/en-us/excel/functions/imlog10-function"
+        },
+        {
+          "name": "IMLOG2",
+          "url": "https://support.microsoft.com/en-us/excel/functions/imlog2-function"
+        },
+        {
+          "name": "IMPOWER",
+          "url": "https://support.microsoft.com/en-us/excel/functions/impower-function"
+        },
+        {
+          "name": "IMPRODUCT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/improduct-function"
+        },
+        {
+          "name": "IMREAL",
+          "url": "https://support.microsoft.com/en-us/excel/functions/imreal-function"
+        },
+        {
+          "name": "IMSEC",
+          "url": "https://support.microsoft.com/en-us/excel/functions/imsec-function"
+        },
+        {
+          "name": "IMSECH",
+          "url": "https://support.microsoft.com/en-us/excel/functions/imsech-function"
+        },
+        {
+          "name": "IMSIN",
+          "url": "https://support.microsoft.com/en-us/excel/functions/imsin-function"
+        },
+        {
+          "name": "IMSINH",
+          "url": "https://support.microsoft.com/en-us/excel/functions/imsinh-function"
+        },
+        {
+          "name": "IMSQRT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/imsqrt-function"
+        },
+        {
+          "name": "IMSUB",
+          "url": "https://support.microsoft.com/en-us/excel/functions/imsub-function"
+        },
+        {
+          "name": "IMSUM",
+          "url": "https://support.microsoft.com/en-us/excel/functions/imsum-function"
+        },
+        {
+          "name": "IMTAN",
+          "url": "https://support.microsoft.com/en-us/excel/functions/imtan-function"
+        },
+        {
+          "name": "OCT2BIN",
+          "url": "https://support.microsoft.com/en-us/excel/functions/oct2bin-function"
+        },
+        {
+          "name": "OCT2DEC",
+          "url": "https://support.microsoft.com/en-us/excel/functions/oct2dec-function"
+        },
+        {
+          "name": "OCT2HEX",
+          "url": "https://support.microsoft.com/en-us/excel/functions/oct2hex-function"
+        }
+      ]
+    },
+    {
+      "title": "Financial functions",
+      "functions": [
+        {
+          "name": "ACCRINT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/accrint-function"
+        },
+        {
+          "name": "ACCRINTM",
+          "url": "https://support.microsoft.com/en-us/excel/functions/accrintm-function"
+        },
+        {
+          "name": "AMORDEGRC",
+          "url": "https://support.microsoft.com/en-us/excel/functions/amordegrc-function"
+        },
+        {
+          "name": "AMORLINC",
+          "url": "https://support.microsoft.com/en-us/excel/functions/amorlinc-function"
+        },
+        {
+          "name": "COUPDAYBS",
+          "url": "https://support.microsoft.com/en-us/excel/functions/coupdaybs-function"
+        },
+        {
+          "name": "COUPDAYS",
+          "url": "https://support.microsoft.com/en-us/excel/functions/coupdays-function"
+        },
+        {
+          "name": "COUPDAYSNC",
+          "url": "https://support.microsoft.com/en-us/excel/functions/coupdaysnc-function"
+        },
+        {
+          "name": "COUPNCD",
+          "url": "https://support.microsoft.com/en-us/excel/functions/coupncd-function"
+        },
+        {
+          "name": "COUPNUM",
+          "url": "https://support.microsoft.com/en-us/excel/functions/coupnum-function"
+        },
+        {
+          "name": "COUPPCD",
+          "url": "https://support.microsoft.com/en-us/excel/functions/couppcd-function"
+        },
+        {
+          "name": "CUMIPMT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/cumipmt-function"
+        },
+        {
+          "name": "CUMPRINC",
+          "url": "https://support.microsoft.com/en-us/excel/functions/cumprinc-function"
+        },
+        {
+          "name": "DB",
+          "url": "https://support.microsoft.com/en-us/excel/functions/db-function"
+        },
+        {
+          "name": "DDB",
+          "url": "https://support.microsoft.com/en-us/excel/functions/ddb-function"
+        },
+        {
+          "name": "DISC",
+          "url": "https://support.microsoft.com/en-us/excel/functions/disc-function"
+        },
+        {
+          "name": "DOLLARDE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/dollarde-function"
+        },
+        {
+          "name": "DOLLARFR",
+          "url": "https://support.microsoft.com/en-us/excel/functions/dollarfr-function"
+        },
+        {
+          "name": "DURATION",
+          "url": "https://support.microsoft.com/en-us/excel/functions/duration-function"
+        },
+        {
+          "name": "EFFECT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/effect-function"
+        },
+        {
+          "name": "FV",
+          "url": "https://support.microsoft.com/en-us/excel/functions/fv-function"
+        },
+        {
+          "name": "FVSCHEDULE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/fvschedule-function"
+        },
+        {
+          "name": "INTRATE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/intrate-function"
+        },
+        {
+          "name": "IPMT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/ipmt-function"
+        },
+        {
+          "name": "IRR",
+          "url": "https://support.microsoft.com/en-us/excel/functions/irr-function"
+        },
+        {
+          "name": "ISPMT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/ispmt-function"
+        },
+        {
+          "name": "MDURATION",
+          "url": "https://support.microsoft.com/en-us/excel/functions/mduration-function"
+        },
+        {
+          "name": "MIRR",
+          "url": "https://support.microsoft.com/en-us/excel/functions/mirr-function"
+        },
+        {
+          "name": "NOMINAL",
+          "url": "https://support.microsoft.com/en-us/excel/functions/nominal-function"
+        },
+        {
+          "name": "NPER",
+          "url": "https://support.microsoft.com/en-us/excel/functions/nper-function"
+        },
+        {
+          "name": "NPV",
+          "url": "https://support.microsoft.com/en-us/excel/functions/npv-function"
+        },
+        {
+          "name": "ODDFPRICE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/oddfprice-function"
+        },
+        {
+          "name": "ODDFYIELD",
+          "url": "https://support.microsoft.com/en-us/excel/functions/oddfyield-function"
+        },
+        {
+          "name": "ODDLPRICE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/oddlprice-function"
+        },
+        {
+          "name": "ODDLYIELD",
+          "url": "https://support.microsoft.com/en-us/excel/functions/oddlyield-function"
+        },
+        {
+          "name": "PDURATION",
+          "url": "https://support.microsoft.com/en-us/excel/functions/pduration-function"
+        },
+        {
+          "name": "PMT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/pmt-function"
+        },
+        {
+          "name": "PPMT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/ppmt-function"
+        },
+        {
+          "name": "PRICE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/price-function"
+        },
+        {
+          "name": "PRICEDISC",
+          "url": "https://support.microsoft.com/en-us/excel/functions/pricedisc-function"
+        },
+        {
+          "name": "PRICEMAT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/pricemat-function"
+        },
+        {
+          "name": "PV",
+          "url": "https://support.microsoft.com/en-us/excel/functions/pv-function"
+        },
+        {
+          "name": "RATE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/rate-function"
+        },
+        {
+          "name": "RECEIVED",
+          "url": "https://support.microsoft.com/en-us/excel/functions/received-function"
+        },
+        {
+          "name": "RRI",
+          "url": "https://support.microsoft.com/en-us/excel/functions/rri-function"
+        },
+        {
+          "name": "SLN",
+          "url": "https://support.microsoft.com/en-us/excel/functions/sln-function"
+        },
+        {
+          "name": "SYD",
+          "url": "https://support.microsoft.com/en-us/excel/functions/syd-function"
+        },
+        {
+          "name": "TBILLEQ",
+          "url": "https://support.microsoft.com/en-us/excel/functions/tbilleq-function"
+        },
+        {
+          "name": "TBILLPRICE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/tbillprice-function"
+        },
+        {
+          "name": "TBILLYIELD",
+          "url": "https://support.microsoft.com/en-us/excel/functions/tbillyield-function"
+        },
+        {
+          "name": "VDB",
+          "url": "https://support.microsoft.com/en-us/excel/functions/vdb-function"
+        },
+        {
+          "name": "XIRR",
+          "url": "https://support.microsoft.com/en-us/excel/functions/xirr-function"
+        },
+        {
+          "name": "XNPV",
+          "url": "https://support.microsoft.com/en-us/excel/functions/xnpv-function"
+        },
+        {
+          "name": "YIELD",
+          "url": "https://support.microsoft.com/en-us/excel/functions/yield-function"
+        },
+        {
+          "name": "YIELDDISC",
+          "url": "https://support.microsoft.com/en-us/excel/functions/yielddisc-function"
+        },
+        {
+          "name": "YIELDMAT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/yieldmat-function"
+        }
+      ]
+    },
+    {
+      "title": "Information functions",
+      "functions": [
+        {
+          "name": "CELL",
+          "url": "https://support.microsoft.com/en-us/excel/functions/cell-function"
+        },
+        {
+          "name": "ERROR.TYPE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/error-type-function"
+        },
+        {
+          "name": "INFO",
+          "url": "https://support.microsoft.com/en-us/excel/functions/info-function"
+        },
+        {
+          "name": "ISBLANK",
+          "url": "https://support.microsoft.com/en-us/excel/is-functions"
+        },
+        {
+          "name": "ISERR",
+          "url": "https://support.microsoft.com/en-us/excel/is-functions"
+        },
+        {
+          "name": "ISERROR",
+          "url": "https://support.microsoft.com/en-us/excel/is-functions"
+        },
+        {
+          "name": "ISEVEN",
+          "url": "https://support.microsoft.com/en-us/excel/functions/iseven-function"
+        },
+        {
+          "name": "ISFORMULA",
+          "url": "https://support.microsoft.com/en-us/excel/functions/isformula-function"
+        },
+        {
+          "name": "ISLOGICAL",
+          "url": "https://support.microsoft.com/en-us/excel/is-functions"
+        },
+        {
+          "name": "ISNA",
+          "url": "https://support.microsoft.com/en-us/excel/is-functions"
+        },
+        {
+          "name": "ISNONTEXT",
+          "url": "https://support.microsoft.com/en-us/excel/is-functions"
+        },
+        {
+          "name": "ISNUMBER",
+          "url": "https://support.microsoft.com/en-us/excel/is-functions"
+        },
+        {
+          "name": "ISODD",
+          "url": "https://support.microsoft.com/en-us/excel/is-functions"
+        },
+        {
+          "name": "ISOMITTED",
+          "url": "https://support.microsoft.com/en-us/excel/functions/isomitted-function"
+        },
+        {
+          "name": "ISREF",
+          "url": "https://support.microsoft.com/en-us/excel/is-functions"
+        },
+        {
+          "name": "ISTEXT",
+          "url": "https://support.microsoft.com/en-us/excel/is-functions"
+        },
+        {
+          "name": "N",
+          "url": "https://support.microsoft.com/en-us/excel/functions/n-function"
+        },
+        {
+          "name": "NA",
+          "url": "https://support.microsoft.com/en-us/excel/functions/na-function"
+        },
+        {
+          "name": "SHEET",
+          "url": "https://support.microsoft.com/en-us/excel/functions/sheet-function"
+        },
+        {
+          "name": "SHEETS",
+          "url": "https://support.microsoft.com/en-us/excel/functions/sheets-function"
+        },
+        {
+          "name": "STOCKHISTORY",
+          "url": "https://support.microsoft.com/en-us/excel/functions/stockhistory-function"
+        },
+        {
+          "name": "TYPE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/type-function"
+        }
+      ]
+    },
+    {
+      "title": "Logical functions",
+      "functions": [
+        {
+          "name": "AND",
+          "url": "https://support.microsoft.com/en-us/excel/functions/and-function"
+        },
+        {
+          "name": "BYCOL",
+          "url": "https://support.microsoft.com/en-us/excel/functions/bycol-function"
+        },
+        {
+          "name": "BYROW",
+          "url": "https://support.microsoft.com/en-us/excel/functions/byrow-function"
+        },
+        {
+          "name": "FALSE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/false-function"
+        },
+        {
+          "name": "IF",
+          "url": "https://support.microsoft.com/en-us/excel/functions/if-function"
+        },
+        {
+          "name": "IFERROR",
+          "url": "https://support.microsoft.com/en-us/excel/functions/iferror-function"
+        },
+        {
+          "name": "IFNA",
+          "url": "https://support.microsoft.com/en-us/excel/functions/ifna-function"
+        },
+        {
+          "name": "IFS",
+          "url": "https://support.microsoft.com/en-us/excel/functions/ifs-function"
+        },
+        {
+          "name": "LAMBDA",
+          "url": "https://support.microsoft.com/en-us/excel/functions/lambda-function"
+        },
+        {
+          "name": "LET",
+          "url": "https://support.microsoft.com/en-us/excel/functions/let-function"
+        },
+        {
+          "name": "MAKEARRAY",
+          "url": "https://support.microsoft.com/en-us/excel/functions/makearray-function"
+        },
+        {
+          "name": "MAP",
+          "url": "https://support.microsoft.com/en-us/excel/functions/map-function"
+        },
+        {
+          "name": "NOT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/not-function"
+        },
+        {
+          "name": "OR",
+          "url": "https://support.microsoft.com/en-us/excel/functions/or-function"
+        },
+        {
+          "name": "REDUCE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/reduce-function"
+        },
+        {
+          "name": "SCAN",
+          "url": "https://support.microsoft.com/en-us/excel/functions/scan-function"
+        },
+        {
+          "name": "SWITCH",
+          "url": "https://support.microsoft.com/en-us/excel/functions/switch-function"
+        },
+        {
+          "name": "TRUE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/true-function"
+        },
+        {
+          "name": "XOR",
+          "url": "https://support.microsoft.com/en-us/excel/functions/xor-function"
+        }
+      ]
+    },
+    {
+      "title": "Lookup and reference functions",
+      "functions": [
+        {
+          "name": "ADDRESS",
+          "url": "https://support.microsoft.com/en-us/excel/functions/address-function"
+        },
+        {
+          "name": "AREAS",
+          "url": "https://support.microsoft.com/en-us/excel/functions/areas-function"
+        },
+        {
+          "name": "CHOOSE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/choose-function"
+        },
+        {
+          "name": "CHOOSECOLS",
+          "url": "https://support.microsoft.com/en-us/excel/functions/choosecols-function"
+        },
+        {
+          "name": "CHOOSEROWS",
+          "url": "https://support.microsoft.com/en-us/excel/functions/chooserows-function"
+        },
+        {
+          "name": "COLUMN",
+          "url": "https://support.microsoft.com/en-us/excel/functions/column-function"
+        },
+        {
+          "name": "COLUMNS",
+          "url": "https://support.microsoft.com/en-us/excel/functions/columns-function"
+        },
+        {
+          "name": "DROP",
+          "url": "https://support.microsoft.com/en-us/excel/functions/drop-function"
+        },
+        {
+          "name": "EXPAND",
+          "url": "https://support.microsoft.com/en-us/excel/functions/expand-function"
+        },
+        {
+          "name": "FILTER",
+          "url": "https://support.microsoft.com/en-us/excel/functions/filter-function"
+        },
+        {
+          "name": "FORMULATEXT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/formulatext-function"
+        },
+        {
+          "name": "GETPIVOTDATA",
+          "url": "https://support.microsoft.com/en-us/excel/functions/getpivotdata-function"
+        },
+        {
+          "name": "GROUPBY",
+          "url": "https://support.microsoft.com/en-us/excel/functions/groupby-function"
+        },
+        {
+          "name": "HLOOKUP",
+          "url": "https://support.microsoft.com/en-us/excel/functions/hlookup-function"
+        },
+        {
+          "name": "HSTACK",
+          "url": "https://support.microsoft.com/en-us/excel/functions/hstack-function"
+        },
+        {
+          "name": "HYPERLINK",
+          "url": "https://support.microsoft.com/en-us/excel/functions/hyperlink-function"
+        },
+        {
+          "name": "IMAGE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/image-function"
+        },
+        {
+          "name": "INDEX",
+          "url": "https://support.microsoft.com/en-us/excel/functions/index-function"
+        },
+        {
+          "name": "INDIRECT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/indirect-function"
+        },
+        {
+          "name": "LOOKUP",
+          "url": "https://support.microsoft.com/en-us/excel/functions/lookup-function"
+        },
+        {
+          "name": "MATCH",
+          "url": "https://support.microsoft.com/en-us/excel/functions/match-function"
+        },
+        {
+          "name": "OFFSET",
+          "url": "https://support.microsoft.com/en-us/excel/functions/offset-function"
+        },
+        {
+          "name": "PIVOTBY",
+          "url": "https://support.microsoft.com/en-us/excel/functions/pivotby-function"
+        },
+        {
+          "name": "ROW",
+          "url": "https://support.microsoft.com/en-us/excel/functions/row-function"
+        },
+        {
+          "name": "ROWS",
+          "url": "https://support.microsoft.com/en-us/excel/functions/rows-function"
+        },
+        {
+          "name": "RTD",
+          "url": "https://support.microsoft.com/en-us/excel/functions/rtd-function"
+        },
+        {
+          "name": "SORT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/sort-function"
+        },
+        {
+          "name": "SORTBY",
+          "url": "https://support.microsoft.com/en-us/excel/functions/sortby-function"
+        },
+        {
+          "name": "TAKE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/take-function"
+        },
+        {
+          "name": "TOCOL",
+          "url": "https://support.microsoft.com/en-us/excel/functions/tocol-function"
+        },
+        {
+          "name": "TOROW",
+          "url": "https://support.microsoft.com/en-us/excel/functions/torow-function"
+        },
+        {
+          "name": "TRANSPOSE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/transpose-function"
+        },
+        {
+          "name": "TRIMRANGE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/trimrange-function"
+        },
+        {
+          "name": "UNIQUE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/unique-function"
+        },
+        {
+          "name": "VLOOKUP",
+          "url": "https://support.microsoft.com/en-us/excel/functions/vlookup-function"
+        },
+        {
+          "name": "VSTACK",
+          "url": "https://support.microsoft.com/en-us/excel/functions/vstack-function"
+        },
+        {
+          "name": "WRAPCOLS",
+          "url": "https://support.microsoft.com/en-us/excel/functions/wrapcols-function"
+        },
+        {
+          "name": "WRAPROWS",
+          "url": "https://support.microsoft.com/en-us/excel/functions/wraprows-function"
+        },
+        {
+          "name": "XLOOKUP",
+          "url": "https://support.microsoft.com/en-us/excel/functions/xlookup-function"
+        },
+        {
+          "name": "XMATCH",
+          "url": "https://support.microsoft.com/en-us/excel/functions/xmatch-function"
+        }
+      ]
+    },
+    {
+      "title": "Math and trigonometry functions",
+      "functions": [
+        {
+          "name": "ABS",
+          "url": "https://support.microsoft.com/en-us/excel/functions/abs-function"
+        },
+        {
+          "name": "ACOS",
+          "url": "https://support.microsoft.com/en-us/excel/functions/acos-function"
+        },
+        {
+          "name": "ACOSH",
+          "url": "https://support.microsoft.com/en-us/excel/functions/acosh-function"
+        },
+        {
+          "name": "ACOT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/acot-function"
+        },
+        {
+          "name": "ACOTH",
+          "url": "https://support.microsoft.com/en-us/excel/functions/acoth-function"
+        },
+        {
+          "name": "AGGREGATE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/aggregate-function"
+        },
+        {
+          "name": "ARABIC",
+          "url": "https://support.microsoft.com/en-us/excel/functions/arabic-function"
+        },
+        {
+          "name": "ASIN",
+          "url": "https://support.microsoft.com/en-us/excel/functions/asin-function"
+        },
+        {
+          "name": "ASINH",
+          "url": "https://support.microsoft.com/en-us/excel/functions/asinh-function"
+        },
+        {
+          "name": "ATAN",
+          "url": "https://support.microsoft.com/en-us/excel/functions/atan-function"
+        },
+        {
+          "name": "ATAN2",
+          "url": "https://support.microsoft.com/en-us/excel/functions/atan2-function"
+        },
+        {
+          "name": "ATANH",
+          "url": "https://support.microsoft.com/en-us/excel/functions/atanh-function"
+        },
+        {
+          "name": "BASE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/base-function"
+        },
+        {
+          "name": "CEILING",
+          "url": "https://support.microsoft.com/en-us/excel/functions/ceiling-function"
+        },
+        {
+          "name": "CEILING.MATH",
+          "url": "https://support.microsoft.com/en-us/excel/functions/ceiling-math-function"
+        },
+        {
+          "name": "CEILING.PRECISE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/ceiling-precise-function"
+        },
+        {
+          "name": "COMBIN",
+          "url": "https://support.microsoft.com/en-us/excel/functions/combin-function"
+        },
+        {
+          "name": "COMBINA",
+          "url": "https://support.microsoft.com/en-us/excel/functions/combina-function"
+        },
+        {
+          "name": "COS",
+          "url": "https://support.microsoft.com/en-us/excel/functions/cos-function"
+        },
+        {
+          "name": "COSH",
+          "url": "https://support.microsoft.com/en-us/excel/functions/cosh-function"
+        },
+        {
+          "name": "COT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/cot-function"
+        },
+        {
+          "name": "COTH",
+          "url": "https://support.microsoft.com/en-us/excel/functions/coth-function"
+        },
+        {
+          "name": "CSC",
+          "url": "https://support.microsoft.com/en-us/excel/functions/csc-function"
+        },
+        {
+          "name": "CSCH",
+          "url": "https://support.microsoft.com/en-us/excel/functions/csch-function"
+        },
+        {
+          "name": "DECIMAL",
+          "url": "https://support.microsoft.com/en-us/excel/functions/decimal-function"
+        },
+        {
+          "name": "DEGREES",
+          "url": "https://support.microsoft.com/en-us/excel/functions/degrees-function"
+        },
+        {
+          "name": "EVEN",
+          "url": "https://support.microsoft.com/en-us/excel/functions/even-function"
+        },
+        {
+          "name": "EXP",
+          "url": "https://support.microsoft.com/en-us/excel/functions/exp-function"
+        },
+        {
+          "name": "FACT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/fact-function"
+        },
+        {
+          "name": "FACTDOUBLE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/factdouble-function"
+        },
+        {
+          "name": "FLOOR",
+          "url": "https://support.microsoft.com/en-us/excel/functions/floor-function"
+        },
+        {
+          "name": "FLOOR.MATH",
+          "url": "https://support.microsoft.com/en-us/excel/functions/floor-math-function"
+        },
+        {
+          "name": "FLOOR.PRECISE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/floor-precise-function"
+        },
+        {
+          "name": "GCD",
+          "url": "https://support.microsoft.com/en-us/excel/functions/gcd-function"
+        },
+        {
+          "name": "INT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/int-function"
+        },
+        {
+          "name": "ISO.CEILING",
+          "url": "https://support.microsoft.com/en-us/excel/functions/iso-ceiling-function"
+        },
+        {
+          "name": "LCM",
+          "url": "https://support.microsoft.com/en-us/excel/functions/lcm-function"
+        },
+        {
+          "name": "LN",
+          "url": "https://support.microsoft.com/en-us/excel/functions/ln-function"
+        },
+        {
+          "name": "LOG",
+          "url": "https://support.microsoft.com/en-us/excel/functions/log-function"
+        },
+        {
+          "name": "LOG10",
+          "url": "https://support.microsoft.com/en-us/excel/functions/log10-function"
+        },
+        {
+          "name": "MDETERM",
+          "url": "https://support.microsoft.com/en-us/excel/functions/mdeterm-function"
+        },
+        {
+          "name": "MINVERSE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/minverse-function"
+        },
+        {
+          "name": "MMULT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/mmult-function"
+        },
+        {
+          "name": "MOD",
+          "url": "https://support.microsoft.com/en-us/excel/functions/mod-function"
+        },
+        {
+          "name": "MROUND",
+          "url": "https://support.microsoft.com/en-us/excel/functions/mround-function"
+        },
+        {
+          "name": "MULTINOMIAL",
+          "url": "https://support.microsoft.com/en-us/excel/functions/multinomial-function"
+        },
+        {
+          "name": "MUNIT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/munit-function"
+        },
+        {
+          "name": "ODD",
+          "url": "https://support.microsoft.com/en-us/excel/functions/odd-function"
+        },
+        {
+          "name": "PERCENTOF",
+          "url": "https://support.microsoft.com/en-us/excel/functions/percentof-function"
+        },
+        {
+          "name": "PI",
+          "url": "https://support.microsoft.com/en-us/excel/functions/pi-function"
+        },
+        {
+          "name": "POWER",
+          "url": "https://support.microsoft.com/en-us/excel/functions/power-function"
+        },
+        {
+          "name": "PRODUCT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/product-function"
+        },
+        {
+          "name": "QUOTIENT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/quotient-function"
+        },
+        {
+          "name": "RADIANS",
+          "url": "https://support.microsoft.com/en-us/excel/functions/radians-function"
+        },
+        {
+          "name": "RAND",
+          "url": "https://support.microsoft.com/en-us/excel/functions/rand-function"
+        },
+        {
+          "name": "RANDARRAY",
+          "url": "https://support.microsoft.com/en-us/excel/functions/randarray-function"
+        },
+        {
+          "name": "RANDBETWEEN",
+          "url": "https://support.microsoft.com/en-us/excel/functions/randbetween-function"
+        },
+        {
+          "name": "ROMAN",
+          "url": "https://support.microsoft.com/en-us/excel/functions/roman-function"
+        },
+        {
+          "name": "ROUND",
+          "url": "https://support.microsoft.com/en-us/excel/functions/round-function"
+        },
+        {
+          "name": "ROUNDDOWN",
+          "url": "https://support.microsoft.com/en-us/excel/functions/rounddown-function"
+        },
+        {
+          "name": "ROUNDUP",
+          "url": "https://support.microsoft.com/en-us/excel/functions/roundup-function"
+        },
+        {
+          "name": "SEC",
+          "url": "https://support.microsoft.com/en-us/excel/functions/sec-function"
+        },
+        {
+          "name": "SECH",
+          "url": "https://support.microsoft.com/en-us/excel/functions/sech-function"
+        },
+        {
+          "name": "SEQUENCE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/sequence-function"
+        },
+        {
+          "name": "SERIESSUM",
+          "url": "https://support.microsoft.com/en-us/excel/functions/seriessum-function"
+        },
+        {
+          "name": "SIGN",
+          "url": "https://support.microsoft.com/en-us/excel/functions/sign-function"
+        },
+        {
+          "name": "SIN",
+          "url": "https://support.microsoft.com/en-us/excel/functions/sin-function"
+        },
+        {
+          "name": "SINH",
+          "url": "https://support.microsoft.com/en-us/excel/functions/sinh-function"
+        },
+        {
+          "name": "SQRT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/sqrt-function"
+        },
+        {
+          "name": "SQRTPI",
+          "url": "https://support.microsoft.com/en-us/excel/functions/sqrtpi-function"
+        },
+        {
+          "name": "SUBTOTAL",
+          "url": "https://support.microsoft.com/en-us/excel/functions/subtotal-function"
+        },
+        {
+          "name": "SUM",
+          "url": "https://support.microsoft.com/en-us/excel/functions/sum-function"
+        },
+        {
+          "name": "SUMIF",
+          "url": "https://support.microsoft.com/en-us/excel/functions/sumif-function"
+        },
+        {
+          "name": "SUMIFS",
+          "url": "https://support.microsoft.com/en-us/excel/functions/sumifs-function"
+        },
+        {
+          "name": "SUMPRODUCT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/sumproduct-function"
+        },
+        {
+          "name": "SUMSQ",
+          "url": "https://support.microsoft.com/en-us/excel/functions/sumsq-function"
+        },
+        {
+          "name": "SUMX2MY2",
+          "url": "https://support.microsoft.com/en-us/excel/functions/sumx2my2-function"
+        },
+        {
+          "name": "SUMX2PY2",
+          "url": "https://support.microsoft.com/en-us/excel/functions/sumx2py2-function"
+        },
+        {
+          "name": "SUMXMY2",
+          "url": "https://support.microsoft.com/en-us/excel/functions/sumxmy2-function"
+        },
+        {
+          "name": "TAN",
+          "url": "https://support.microsoft.com/en-us/excel/functions/tan-function"
+        },
+        {
+          "name": "TANH",
+          "url": "https://support.microsoft.com/en-us/excel/functions/tanh-function"
+        },
+        {
+          "name": "TRUNC",
+          "url": "https://support.microsoft.com/en-us/excel/functions/trunc-function"
+        }
+      ]
+    },
+    {
+      "title": "Statistical functions",
+      "functions": [
+        {
+          "name": "AVEDEV",
+          "url": "https://support.microsoft.com/en-us/excel/functions/avedev-function"
+        },
+        {
+          "name": "AVERAGE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/average-function"
+        },
+        {
+          "name": "AVERAGEA",
+          "url": "https://support.microsoft.com/en-us/excel/functions/averagea-function"
+        },
+        {
+          "name": "AVERAGEIF",
+          "url": "https://support.microsoft.com/en-us/excel/functions/averageif-function"
+        },
+        {
+          "name": "AVERAGEIFS",
+          "url": "https://support.microsoft.com/en-us/excel/functions/averageifs-function"
+        },
+        {
+          "name": "BETA.DIST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/beta-dist-function"
+        },
+        {
+          "name": "BETA.INV",
+          "url": "https://support.microsoft.com/en-us/excel/functions/beta-inv-function"
+        },
+        {
+          "name": "BINOM.DIST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/binom-dist-function"
+        },
+        {
+          "name": "BINOM.DIST.RANGE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/binom-dist-range-function"
+        },
+        {
+          "name": "BINOM.INV",
+          "url": "https://support.microsoft.com/en-us/excel/functions/binom-inv-function"
+        },
+        {
+          "name": "CHISQ.DIST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/chisq-dist-function"
+        },
+        {
+          "name": "CHISQ.DIST.RT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/chisq-dist-rt-function"
+        },
+        {
+          "name": "CHISQ.INV",
+          "url": "https://support.microsoft.com/en-us/excel/functions/chisq-inv-function"
+        },
+        {
+          "name": "CHISQ.INV.RT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/chisq-inv-rt-function"
+        },
+        {
+          "name": "CHISQ.TEST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/chisq-test-function"
+        },
+        {
+          "name": "CONFIDENCE.NORM",
+          "url": "https://support.microsoft.com/en-us/excel/functions/confidence-norm-function"
+        },
+        {
+          "name": "CONFIDENCE.T",
+          "url": "https://support.microsoft.com/en-us/excel/functions/confidence-t-function"
+        },
+        {
+          "name": "CORREL",
+          "url": "https://support.microsoft.com/en-us/excel/functions/correl-function"
+        },
+        {
+          "name": "COUNT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/count-function"
+        },
+        {
+          "name": "COUNTA",
+          "url": "https://support.microsoft.com/en-us/excel/functions/counta-function"
+        },
+        {
+          "name": "COUNTBLANK",
+          "url": "https://support.microsoft.com/en-us/excel/functions/countblank-function"
+        },
+        {
+          "name": "COUNTIF",
+          "url": "https://support.microsoft.com/en-us/excel/get-started/use-the-countif-function-in-microsoft-excel"
+        },
+        {
+          "name": "COUNTIFS",
+          "url": "https://support.microsoft.com/en-us/excel/functions/countifs-function"
+        },
+        {
+          "name": "COVARIANCE.P",
+          "url": "https://support.microsoft.com/en-us/excel/functions/covariance-p-function"
+        },
+        {
+          "name": "COVARIANCE.S",
+          "url": "https://support.microsoft.com/en-us/excel/functions/covariance-s-function"
+        },
+        {
+          "name": "DEVSQ",
+          "url": "https://support.microsoft.com/en-us/excel/functions/devsq-function"
+        },
+        {
+          "name": "EXPON.DIST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/expon-dist-function"
+        },
+        {
+          "name": "F.DIST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/f-dist-function"
+        },
+        {
+          "name": "F.DIST.RT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/f-dist-rt-function"
+        },
+        {
+          "name": "F.INV",
+          "url": "https://support.microsoft.com/en-us/excel/functions/f-inv-function"
+        },
+        {
+          "name": "F.INV.RT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/f-inv-rt-function"
+        },
+        {
+          "name": "F.TEST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/f-test-function"
+        },
+        {
+          "name": "FISHER",
+          "url": "https://support.microsoft.com/en-us/excel/functions/fisher-function"
+        },
+        {
+          "name": "FISHERINV",
+          "url": "https://support.microsoft.com/en-us/excel/functions/fisherinv-function"
+        },
+        {
+          "name": "FORECAST",
+          "url": "https://support.microsoft.com/en-us/excel/forecast-and-forecast-linear-functions"
+        },
+        {
+          "name": "FORECAST.ETS",
+          "url": "https://support.microsoft.com/en-us/excel/forecasting-functions-reference#_forecast.ets"
+        },
+        {
+          "name": "FORECAST.ETS.CONFINT",
+          "url": "https://support.microsoft.com/en-us/excel/forecasting-functions-reference#_forecast.ets.confint"
+        },
+        {
+          "name": "FORECAST.ETS.SEASONALITY",
+          "url": "https://support.microsoft.com/en-us/excel/forecasting-functions-reference#_forecast.ets.seasonality"
+        },
+        {
+          "name": "FORECAST.ETS.STAT",
+          "url": "https://support.microsoft.com/en-us/excel/forecasting-functions-reference#_forecast.ets.stat"
+        },
+        {
+          "name": "FORECAST.LINEAR",
+          "url": "https://support.microsoft.com/en-us/excel/forecasting-functions-reference#_forecast.linear"
+        },
+        {
+          "name": "FREQUENCY",
+          "url": "https://support.microsoft.com/en-us/excel/functions/frequency-function"
+        },
+        {
+          "name": "GAMMA",
+          "url": "https://support.microsoft.com/en-us/excel/functions/gamma-function"
+        },
+        {
+          "name": "GAMMA.DIST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/gamma-dist-function"
+        },
+        {
+          "name": "GAMMA.INV",
+          "url": "https://support.microsoft.com/en-us/excel/functions/gamma-inv-function"
+        },
+        {
+          "name": "GAMMALN",
+          "url": "https://support.microsoft.com/en-us/excel/functions/gammaln-function"
+        },
+        {
+          "name": "GAMMALN.PRECISE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/gammaln-precise-function"
+        },
+        {
+          "name": "GAUSS",
+          "url": "https://support.microsoft.com/en-us/excel/functions/gauss-function"
+        },
+        {
+          "name": "GEOMEAN",
+          "url": "https://support.microsoft.com/en-us/excel/functions/geomean-function"
+        },
+        {
+          "name": "GROWTH",
+          "url": "https://support.microsoft.com/en-us/excel/functions/growth-function"
+        },
+        {
+          "name": "HARMEAN",
+          "url": "https://support.microsoft.com/en-us/excel/functions/harmean-function"
+        },
+        {
+          "name": "HYPGEOM.DIST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/hypgeom-dist-function"
+        },
+        {
+          "name": "INTERCEPT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/intercept-function"
+        },
+        {
+          "name": "KURT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/kurt-function"
+        },
+        {
+          "name": "LARGE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/large-function"
+        },
+        {
+          "name": "LINEST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/linest-function"
+        },
+        {
+          "name": "LOGEST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/logest-function"
+        },
+        {
+          "name": "LOGNORM.DIST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/lognorm-dist-function"
+        },
+        {
+          "name": "LOGNORM.INV",
+          "url": "https://support.microsoft.com/en-us/excel/functions/lognorm-inv-function"
+        },
+        {
+          "name": "MAX",
+          "url": "https://support.microsoft.com/en-us/excel/functions/max-function"
+        },
+        {
+          "name": "MAXA",
+          "url": "https://support.microsoft.com/en-us/excel/functions/maxa-function"
+        },
+        {
+          "name": "MAXIFS",
+          "url": "https://support.microsoft.com/en-us/excel/functions/maxifs-function"
+        },
+        {
+          "name": "MEDIAN",
+          "url": "https://support.microsoft.com/en-us/excel/functions/median-function"
+        },
+        {
+          "name": "MIN",
+          "url": "https://support.microsoft.com/en-us/excel/functions/min-function"
+        },
+        {
+          "name": "MINA",
+          "url": "https://support.microsoft.com/en-us/excel/functions/mina-function"
+        },
+        {
+          "name": "MINIFS",
+          "url": "https://support.microsoft.com/en-us/excel/functions/minifs-function"
+        },
+        {
+          "name": "MODE.MULT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/mode-mult-function"
+        },
+        {
+          "name": "MODE.SNGL",
+          "url": "https://support.microsoft.com/en-us/excel/functions/mode-sngl-function"
+        },
+        {
+          "name": "NEGBINOM.DIST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/negbinom-dist-function"
+        },
+        {
+          "name": "NORM.DIST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/norm-dist-function"
+        },
+        {
+          "name": "NORM.INV",
+          "url": "https://support.microsoft.com/en-us/excel/functions/norm-inv-function"
+        },
+        {
+          "name": "NORM.S.DIST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/norm-s-dist-function"
+        },
+        {
+          "name": "NORM.S.INV",
+          "url": "https://support.microsoft.com/en-us/excel/functions/norm-s-inv-function"
+        },
+        {
+          "name": "PEARSON",
+          "url": "https://support.microsoft.com/en-us/excel/functions/pearson-function"
+        },
+        {
+          "name": "PERCENTILE.EXC",
+          "url": "https://support.microsoft.com/en-us/excel/functions/percentile-exc-function"
+        },
+        {
+          "name": "PERCENTILE.INC",
+          "url": "https://support.microsoft.com/en-us/excel/functions/percentile-inc-function"
+        },
+        {
+          "name": "PERCENTRANK.EXC",
+          "url": "https://support.microsoft.com/en-us/excel/functions/percentrank-exc-function"
+        },
+        {
+          "name": "PERCENTRANK.INC",
+          "url": "https://support.microsoft.com/en-us/excel/functions/percentrank-inc-function"
+        },
+        {
+          "name": "PERMUT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/permut-function"
+        },
+        {
+          "name": "PERMUTATIONA",
+          "url": "https://support.microsoft.com/en-us/excel/functions/permutationa-function"
+        },
+        {
+          "name": "PHI",
+          "url": "https://support.microsoft.com/en-us/excel/functions/phi-function"
+        },
+        {
+          "name": "POISSON.DIST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/poisson-dist-function"
+        },
+        {
+          "name": "PROB",
+          "url": "https://support.microsoft.com/en-us/excel/functions/prob-function"
+        },
+        {
+          "name": "QUARTILE.EXC",
+          "url": "https://support.microsoft.com/en-us/excel/functions/quartile-exc-function"
+        },
+        {
+          "name": "QUARTILE.INC",
+          "url": "https://support.microsoft.com/en-us/excel/functions/quartile-inc-function"
+        },
+        {
+          "name": "RANK.AVG",
+          "url": "https://support.microsoft.com/en-us/excel/functions/rank-avg-function"
+        },
+        {
+          "name": "RANK.EQ",
+          "url": "https://support.microsoft.com/en-us/excel/functions/rank-eq-function"
+        },
+        {
+          "name": "RSQ",
+          "url": "https://support.microsoft.com/en-us/excel/functions/rsq-function"
+        },
+        {
+          "name": "SKEW",
+          "url": "https://support.microsoft.com/en-us/excel/functions/skew-function"
+        },
+        {
+          "name": "SKEW.P",
+          "url": "https://support.microsoft.com/en-us/excel/functions/skew-p-function"
+        },
+        {
+          "name": "SLOPE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/slope-function"
+        },
+        {
+          "name": "SMALL",
+          "url": "https://support.microsoft.com/en-us/excel/functions/small-function"
+        },
+        {
+          "name": "STANDARDIZE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/standardize-function"
+        },
+        {
+          "name": "STDEV.P",
+          "url": "https://support.microsoft.com/en-us/excel/functions/stdev-p-function"
+        },
+        {
+          "name": "STDEV.S",
+          "url": "https://support.microsoft.com/en-us/excel/functions/stdev-s-function"
+        },
+        {
+          "name": "STDEVA",
+          "url": "https://support.microsoft.com/en-us/excel/functions/stdeva-function"
+        },
+        {
+          "name": "STDEVPA",
+          "url": "https://support.microsoft.com/en-us/excel/functions/stdevpa-function"
+        },
+        {
+          "name": "STEYX",
+          "url": "https://support.microsoft.com/en-us/excel/functions/steyx-function"
+        },
+        {
+          "name": "T.DIST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/t-dist-function"
+        },
+        {
+          "name": "T.DIST.2T",
+          "url": "https://support.microsoft.com/en-us/excel/functions/t-dist-2t-function"
+        },
+        {
+          "name": "T.DIST.RT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/t-dist-rt-function"
+        },
+        {
+          "name": "T.INV",
+          "url": "https://support.microsoft.com/en-us/excel/functions/t-inv-function"
+        },
+        {
+          "name": "T.INV.2T",
+          "url": "https://support.microsoft.com/en-us/excel/functions/t-inv-2t-function"
+        },
+        {
+          "name": "T.TEST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/t-test-function"
+        },
+        {
+          "name": "TREND",
+          "url": "https://support.microsoft.com/en-us/excel/functions/trend-function"
+        },
+        {
+          "name": "TRIMMEAN",
+          "url": "https://support.microsoft.com/en-us/excel/functions/trimmean-function"
+        },
+        {
+          "name": "VAR.P",
+          "url": "https://support.microsoft.com/en-us/excel/functions/var-p-function"
+        },
+        {
+          "name": "VAR.S",
+          "url": "https://support.microsoft.com/en-us/excel/functions/var-s-function"
+        },
+        {
+          "name": "VARA",
+          "url": "https://support.microsoft.com/en-us/excel/functions/vara-function"
+        },
+        {
+          "name": "VARPA",
+          "url": "https://support.microsoft.com/en-us/excel/functions/varpa-function"
+        },
+        {
+          "name": "WEIBULL.DIST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/weibull-dist-function"
+        },
+        {
+          "name": "Z.TEST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/z-test-function"
+        }
+      ]
+    },
+    {
+      "title": "Text functions",
+      "functions": [
+        {
+          "name": "ARRAYTOTEXT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/arraytotext-function"
+        },
+        {
+          "name": "ASC",
+          "url": "https://support.microsoft.com/en-us/excel/functions/asc-function"
+        },
+        {
+          "name": "BAHTTEXT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/bahttext-function"
+        },
+        {
+          "name": "CHAR",
+          "url": "https://support.microsoft.com/en-us/excel/functions/char-function"
+        },
+        {
+          "name": "CLEAN",
+          "url": "https://support.microsoft.com/en-us/excel/functions/clean-function"
+        },
+        {
+          "name": "CODE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/code-function"
+        },
+        {
+          "name": "CONCAT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/concat-function"
+        },
+        {
+          "name": "CONCATENATE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/concatenate-function"
+        },
+        {
+          "name": "DBCS",
+          "url": "https://support.microsoft.com/en-us/excel/functions/dbcs-function"
+        },
+        {
+          "name": "DETECTLANGUAGE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/detectlanguage-function"
+        },
+        {
+          "name": "DOLLAR",
+          "url": "https://support.microsoft.com/en-us/excel/functions/dollar-function"
+        },
+        {
+          "name": "EXACT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/exact-function"
+        },
+        {
+          "name": "FIND",
+          "url": "https://support.microsoft.com/en-us/topic/c7912941-af2a-4bdf-a553-d0d89b0a0628"
+        },
+        {
+          "name": "FINDB",
+          "url": "https://support.microsoft.com/en-us/topic/c7912941-af2a-4bdf-a553-d0d89b0a0628"
+        },
+        {
+          "name": "FIXED",
+          "url": "https://support.microsoft.com/en-us/excel/functions/fixed-function"
+        },
+        {
+          "name": "LEFT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/left-function"
+        },
+        {
+          "name": "LEFTB",
+          "url": "https://support.microsoft.com/en-us/excel/functions/left-function"
+        },
+        {
+          "name": "LEN",
+          "url": "https://support.microsoft.com/en-us/excel/functions/len-function"
+        },
+        {
+          "name": "LENB",
+          "url": "https://support.microsoft.com/en-us/excel/functions/len-function"
+        },
+        {
+          "name": "LOWER",
+          "url": "https://support.microsoft.com/en-us/excel/functions/lower-function"
+        },
+        {
+          "name": "MID",
+          "url": "https://support.microsoft.com/en-us/excel/functions/mid-function"
+        },
+        {
+          "name": "MIDB",
+          "url": "https://support.microsoft.com/en-us/excel/functions/mid-function"
+        },
+        {
+          "name": "NUMBERVALUE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/numbervalue-function"
+        },
+        {
+          "name": "PHONETIC",
+          "url": "https://support.microsoft.com/en-us/excel/functions/phonetic-function"
+        },
+        {
+          "name": "PROPER",
+          "url": "https://support.microsoft.com/en-us/excel/functions/proper-function"
+        },
+        {
+          "name": "REGEXEXTRACT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/regexextract-function"
+        },
+        {
+          "name": "REGEXREPLACE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/regexreplace-function"
+        },
+        {
+          "name": "REGEXTEST",
+          "url": "https://support.microsoft.com/en-us/excel/functions/regextest-function"
+        },
+        {
+          "name": "REPLACE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/replace-function"
+        },
+        {
+          "name": "REPLACEB",
+          "url": "https://support.microsoft.com/en-us/excel/functions/replace-function"
+        },
+        {
+          "name": "REPT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/rept-function"
+        },
+        {
+          "name": "RIGHT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/right-function"
+        },
+        {
+          "name": "RIGHTB",
+          "url": "https://support.microsoft.com/en-us/excel/functions/right-function"
+        },
+        {
+          "name": "SEARCH",
+          "url": "https://support.microsoft.com/en-us/excel/functions/search-function"
+        },
+        {
+          "name": "SEARCHB",
+          "url": "https://support.microsoft.com/en-us/excel/functions/search-function"
+        },
+        {
+          "name": "SUBSTITUTE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/substitute-function"
+        },
+        {
+          "name": "T",
+          "url": "https://support.microsoft.com/en-us/excel/functions/t-function"
+        },
+        {
+          "name": "TEXT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/text-function"
+        },
+        {
+          "name": "TEXTAFTER",
+          "url": "https://support.microsoft.com/en-us/excel/functions/textafter-function"
+        },
+        {
+          "name": "TEXTBEFORE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/textbefore-function"
+        },
+        {
+          "name": "TEXTJOIN",
+          "url": "https://support.microsoft.com/en-us/excel/functions/textjoin-function"
+        },
+        {
+          "name": "TEXTSPLIT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/textsplit-function"
+        },
+        {
+          "name": "TRANSLATE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/translate-function"
+        },
+        {
+          "name": "TRIM",
+          "url": "https://support.microsoft.com/en-us/excel/functions/trim-function"
+        },
+        {
+          "name": "UNICHAR",
+          "url": "https://support.microsoft.com/en-us/excel/functions/unichar-function"
+        },
+        {
+          "name": "UNICODE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/unicode-function"
+        },
+        {
+          "name": "UPPER",
+          "url": "https://support.microsoft.com/en-us/excel/functions/upper-function"
+        },
+        {
+          "name": "VALUE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/value-function"
+        },
+        {
+          "name": "VALUETOTEXT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/valuetotext-function"
+        }
+      ]
+    },
+    {
+      "title": "User defined functions that are installed with add-ins",
+      "functions": [
+        {
+          "name": "CALL",
+          "url": "https://support.microsoft.com/en-us/excel/functions/call-function"
+        },
+        {
+          "name": "EUROCONVERT",
+          "url": "https://support.microsoft.com/en-us/excel/functions/euroconvert-function"
+        },
+        {
+          "name": "REGISTER.ID",
+          "url": "https://support.microsoft.com/en-us/excel/functions/register-id-function"
+        }
+      ]
+    },
+    {
+      "title": "Web functions",
+      "functions": [
+        {
+          "name": "ENCODEURL",
+          "url": "https://support.microsoft.com/en-us/excel/functions/encodeurl-function"
+        },
+        {
+          "name": "FILTERXML",
+          "url": "https://support.microsoft.com/en-us/excel/functions/filterxml-function"
+        },
+        {
+          "name": "WEBSERVICE",
+          "url": "https://support.microsoft.com/en-us/excel/functions/webservice-function"
+        }
+      ]
+    }
+  ],
+  "notes": "Names and links only; availability is derived from the engine registries. Featured rows are excluded. Duplicate names use their non-compatibility category. Compound text-function rows are split. Source labels are normalized from their function links where the label is truncated: \"function\" to ISOMITTED and \"RANDARRA\" to RANDARRAY."
+}
