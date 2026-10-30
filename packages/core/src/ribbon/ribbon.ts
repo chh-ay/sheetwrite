@@ -5,6 +5,7 @@
 
 import { actionFeedbackFor } from "../action-feedback.js";
 import { COMMAND_ICONS } from "../command-icons.js";
+import { fontShorthandParts } from "../format-presets.js";
 import type { Grid } from "../types/grid.js";
 import {
   renderControl,
@@ -18,13 +19,24 @@ import {
   type RibbonFitGroup,
   type RibbonFitStep,
 } from "./ribbon-fit.js";
-import { RIBBON_TABS, type RibbonGroupSpec, type RibbonTabSpec } from "./ribbon-model.js";
+import { RIBBON_PANEL_HEIGHT, RIBBON_TAB_ROW_HEIGHT } from "./ribbon-metrics.js";
+import {
+  RIBBON_TABS,
+  type RibbonFocus,
+  type RibbonGroupSpec,
+  type RibbonTabSpec,
+} from "./ribbon-model.js";
 import { RibbonPopup } from "./ribbon-popup.js";
 
-/** Tab row height in CSS pixels. Keep in step with `.sheetwrite-ribbon-tabs`. */
-const TAB_ROW_HEIGHT = 30;
-/** Group panel height in CSS pixels. Keep in step with `.sheetwrite-ribbon-panel`. */
-const PANEL_HEIGHT = 92;
+/** One style read and one theme-font parse, shared by every value box. */
+function readFocus(grid: Grid): RibbonFocus {
+  const themeFont = fontShorthandParts(grid.getTheme().font);
+  return {
+    style: grid.getFocusCellStyle(),
+    themeFontFamily: themeFont.family,
+    themeFontPx: themeFont.px,
+  };
+}
 
 export interface RibbonOptions {
   /** Called after the ribbon is minimized to its tab row or expanded again. */
@@ -79,6 +91,7 @@ export class Ribbon {
     this.context = {
       grid,
       popup: this.popup,
+      focus: () => readFocus(grid),
       focusGrid,
       run: (key, command, control) => {
         const feedback = actionFeedbackFor(grid);
@@ -123,7 +136,7 @@ export class Ribbon {
 
   /** Height the owner reserves above the grid. */
   get height(): number {
-    return TAB_ROW_HEIGHT + (this.minimized ? 0 : PANEL_HEIGHT);
+    return RIBBON_TAB_ROW_HEIGHT + (this.minimized ? 0 : RIBBON_PANEL_HEIGHT);
   }
 
   destroy(): void {
@@ -290,8 +303,18 @@ export class Ribbon {
     if (panel !== undefined && !this.minimized) this.refreshPanel(panel, states);
   }
 
-  private refreshPanel(panel: PanelView, states: RibbonCommandStates): void {
-    for (const control of panel.controls) control.refresh(states);
+  private refreshPanel(panel: PanelView, state: RibbonCommandStates): void {
+    // Read on first use: tabs without value boxes never pay for the style read.
+    const grid = this.grid;
+    let focus: RibbonFocus | undefined;
+    const snapshot = {
+      state,
+      get focus(): RibbonFocus {
+        focus ??= readFocus(grid);
+        return focus;
+      },
+    };
+    for (const control of panel.controls) control.refresh(snapshot);
   }
 
   private setMinimized(minimized: boolean): void {

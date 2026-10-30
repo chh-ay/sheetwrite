@@ -110,6 +110,26 @@ while (dynamicPending.length > 0) {
 }
 if (dynamicVisited.size === 0) throw new Error("Vite emitted no lazy XLSX chunk");
 
+// Opt-in chrome (the ribbon) loads lazily from the default entries. It must
+// never join an initial graph, or every app would download it again.
+const chromePending = [];
+for (const key of defaultInitialChunks) chromePending.push(...(manifest[key].dynamicImports ?? []));
+const chromeVisited = new Set();
+while (chromePending.length > 0) {
+  for (const key of staticGraph(chromePending.pop())) {
+    if (chromeVisited.has(key) || dynamicVisited.has(key) || defaultInitialChunks.has(key))
+      continue;
+    chromeVisited.add(key);
+    addChunk(key, "chrome-async");
+    chromePending.push(...(manifest[key].dynamicImports ?? []));
+  }
+}
+const isRibbonModule = (key) => /(?:^|\/)ribbon\/ribbon\.js$/.test(manifest[key].src ?? key);
+if (![...chromeVisited].some(isRibbonModule)) throw new Error("Vite emitted no lazy ribbon chunk");
+if ([...defaultInitialChunks].some(isRibbonModule)) {
+  throw new Error("The ribbon is in an initial chunk; it must load lazily");
+}
+
 const emitted = await walk(root);
 const publicFiles = emitted
   .map((path) => relative(root, path).replaceAll("\\", "/"))

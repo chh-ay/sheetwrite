@@ -75,6 +75,7 @@ function comparableEvidence(bundler: "next" | "vite", overrides: Record<string, 
           "svelte-initial",
           "worker-async",
           "xlsx-async",
+          "chrome-async",
         ];
   const assets = roles.map((role) => ({
     path: `dist/${role}.js`,
@@ -141,6 +142,12 @@ describe("manifest ownership", () => {
       roles: ["worker-async"],
     },
     {
+      path: "dist/worker-ribbon-hash.js",
+      kind: "javascript",
+      owner: "chrome-async",
+      roles: ["chrome-async"],
+    },
+    {
       path: "dist/runtime-any-hash.wasm",
       kind: "wasm",
       owner: "core-initial",
@@ -166,6 +173,18 @@ describe("manifest ownership", () => {
           complete[0],
           { ...complete[1], roles: ["core-initial", "worker-async"] },
           complete[2],
+          complete[3],
+        ]),
+      ),
+    ).toThrow("leaked into an initial entry");
+    // The lazy ribbon chunk is held to the same rule as the worker.
+    expect(() =>
+      validateBundlerEvidence(
+        evidence([
+          complete[0],
+          complete[1],
+          { ...complete[2], roles: ["chrome-async", "core-initial"] },
+          complete[3],
         ]),
       ),
     ).toThrow("leaked into an initial entry");
