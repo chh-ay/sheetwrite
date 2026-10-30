@@ -288,7 +288,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L586",
+              "source": "src/types/grid.ts#L588",
               "jsDocTags": [],
               "documentation": "View-aware editable snapshot of one cell, for hosts building a detached\nformula bar or cell inspector. `address` is the translated *data* address —\nthe correct target for `Grid.applyTransaction` even under an active\nsort/filter view — while the `(row, col)` inputs of\n{@link Grid.getCellInput} are active-sheet view coordinates.",
               "memberDocs": [
@@ -1514,7 +1514,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L660",
+              "source": "src/types/grid.ts#L662",
               "jsDocTags": [
                 "example",
                 "see"
@@ -1999,7 +1999,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L606",
+              "source": "src/types/grid.ts#L608",
               "jsDocTags": [],
               "documentation": "Payload map for events emitted by a Grid.",
               "memberDocs": [
@@ -2109,7 +2109,7 @@
                 },
                 {
                   "name": "workerUrl",
-                  "documentation": "URL of the worker renderer module (`renderer: \"worker\"`), as served to the\nBROWSER — the platform `Worker` constructor does not consult package\nexports, so a bare specifier like `new URL(\"@sheetwrite/core/worker\",\nimport.meta.url)` is NOT reliable. Either copy\n`@sheetwrite/core/dist/worker.js` to your public assets and pass its URL\nstring (works everywhere), or use your bundler's dependency-worker import\nif it has one (see `/docs/guides/worker-rendering/`). If omitted or the worker\ncan't be constructed, the grid falls back to the main-thread canvas\nrenderer and emits `renderer-fallback` once."
+                  "documentation": "URL of the worker renderer module (`renderer: \"worker\"`), as served to the\nBROWSER. Usually not needed: by default the grid creates its worker as\n`new Worker(new URL(\"./worker.js\", import.meta.url))`, which bundlers such\nas Vite build together with the worker's imports. Pass a URL when there\nis no bundler, or when yours copies the file instead of building it, for\nexample a copy of `@sheetwrite/core/dist/` in your public assets (see\n`/docs/guides/worker-rendering/`). A bare specifier like\n`new URL(\"@sheetwrite/core/worker\", import.meta.url)` is NOT reliable: the\nplatform `Worker` constructor does not consult package exports. If the\nworker can't be constructed or fails to load, the grid falls back to the\nmain-thread canvas renderer and emits `renderer-fallback` once."
                 }
               ]
             },
@@ -3049,7 +3049,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L572",
+              "source": "src/types/grid.ts#L574",
               "jsDocTags": [],
               "documentation": "Replacement count and refreshed search state returned by replace-all.",
               "memberDocs": [
@@ -3663,7 +3663,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L550",
+              "source": "src/types/grid.ts#L552",
               "jsDocTags": [],
               "documentation": "Case, whole-cell, sheet, and column constraints for grid search.",
               "memberDocs": [
@@ -3692,7 +3692,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L562",
+              "source": "src/types/grid.ts#L564",
               "jsDocTags": [],
               "documentation": "Ordered matches and active index produced by a grid search.",
               "memberDocs": [
@@ -3890,7 +3890,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L596",
+              "source": "src/types/grid.ts#L598",
               "jsDocTags": [],
               "documentation": "Actionable transaction outcome for a stable sheet lifecycle target.",
               "memberDocs": []
@@ -7647,7 +7647,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L531",
+              "source": "../core/dist/types/grid.d.ts#L533",
               "jsDocTags": [
                 "example",
                 "see"
@@ -8453,7 +8453,7 @@
                 },
                 {
                   "name": "workerUrl",
-                  "documentation": "URL of the worker renderer module (`renderer: \"worker\"`), as served to the\nBROWSER — the platform `Worker` constructor does not consult package\nexports, so a bare specifier like `new URL(\"@sheetwrite/core/worker\",\nimport.meta.url)` is NOT reliable. Either copy\n`@sheetwrite/core/dist/worker.js` to your public assets and pass its URL\nstring (works everywhere), or use your bundler's dependency-worker import\nif it has one (see `/docs/guides/worker-rendering/`). If omitted or the worker\ncan't be constructed, the grid falls back to the main-thread canvas\nrenderer and emits `renderer-fallback` once."
+                  "documentation": "URL of the worker renderer module (`renderer: \"worker\"`), as served to the\nBROWSER. Usually not needed: by default the grid creates its worker as\n`new Worker(new URL(\"./worker.js\", import.meta.url))`, which bundlers such\nas Vite build together with the worker's imports. Pass a URL when there\nis no bundler, or when yours copies the file instead of building it, for\nexample a copy of `@sheetwrite/core/dist/` in your public assets (see\n`/docs/guides/worker-rendering/`). A bare specifier like\n`new URL(\"@sheetwrite/core/worker\", import.meta.url)` is NOT reliable: the\nplatform `Worker` constructor does not consult package exports. If the\nworker can't be constructed or fails to load, the grid falls back to the\nmain-thread canvas renderer and emits `renderer-fallback` once."
                 }
               ]
             },
@@ -8606,7 +8606,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L531",
+              "source": "../core/dist/types/grid.d.ts#L533",
               "jsDocTags": [
                 "example",
                 "see"
@@ -9551,7 +9551,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L531",
+              "source": "../core/dist/types/grid.d.ts#L533",
               "jsDocTags": [
                 "example",
                 "see"

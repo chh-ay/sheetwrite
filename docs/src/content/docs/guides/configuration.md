@@ -21,7 +21,7 @@ type CreateGrid = (host: HTMLElement, opts: GridOptions) => Grid;
 | `datasource` | `DataSource` | `undefined` | Lazy, paged async source; rows fetched per visible window. |
 | `datasourceStorage` | `DataSourceStorageOptions` | `{ mode: "dense" }` | Use `{ mode: "paged", chunkRows?, cacheBytes? }` for allocation-lazy datasource storage. |
 | `renderer` | `"canvas" \| "worker"` | `"canvas"` | `"worker"` paints off-thread via OffscreenCanvas, falling back to canvas. See [Worker rendering](/docs/guides/worker-rendering/). |
-| `workerUrl` | `string \| URL` | `undefined` | Browser-fetchable module URL, e.g. `"/sheetwrite/worker.js"` after copying the package `dist/`; Vite can import `@sheetwrite/core/worker?worker&url`. See [Worker rendering](/docs/guides/worker-rendering/). |
+| `workerUrl` | `string \| URL` | `undefined` | Usually not needed: bundlers such as Vite build the default worker. Pass a browser-fetchable module URL without a bundler, e.g. `"/sheetwrite/worker.js"` after copying the package `dist/`. See [Worker rendering](/docs/guides/worker-rendering/). |
 | `theme` | `Partial<Theme>` | `undefined` | Overrides merged over `DEFAULT_THEME` and any `--sheetwrite-*` CSS vars. See [Styling](/docs/guides/styling/). |
 | `readOnly` | `boolean` | `false` | When `true`, all mutating interactions (edit, clear, fill, paste, restyle) are disabled and the host gets `aria-readonly="true"`. |
 | `protectionResolver` | `ProtectionResolver` | `undefined` | Host callback for protected local mutations; no resolver means deny. Client-side UX policy only, never server authorization. |

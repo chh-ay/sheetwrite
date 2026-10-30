@@ -119,6 +119,18 @@ const workerFiles = publicFiles.filter((path) => /(?:^|\/)recipe-worker-[^/]*\.j
 if (workerFiles.length !== 1)
   throw new Error(`Expected one Vite Worker chunk, got ${workerFiles.length}`);
 addFile(workerFiles[0], "worker-async");
+
+// Core's own default worker (`renderer: "worker"` with no `workerUrl`) must be
+// bundled, not copied: a copied worker keeps relative imports that do not
+// exist beside it, so it fails to load and the grid falls back.
+const defaultWorkers = publicFiles.filter((path) => /(?:^|\/)assets\/worker-[^/]*\.js$/.test(path));
+if (defaultWorkers.length !== 1) {
+  throw new Error(`Expected one bundled core default worker, got ${defaultWorkers.length}`);
+}
+const defaultWorker = await readFile(resolve(root, defaultWorkers[0]), "utf8");
+if (/\bfrom\s*["']\.{1,2}\/|\bimport\s*\(\s*["']\.{1,2}\//.test(defaultWorker)) {
+  throw new Error(`Core default worker ${defaultWorkers[0]} was copied, not bundled`);
+}
 const wasmFiles = publicFiles.filter((path) => path.endsWith(".wasm"));
 if (wasmFiles.length !== 1)
   throw new Error(`Expected one Vite WASM asset, got ${wasmFiles.length}`);

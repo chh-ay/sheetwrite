@@ -1611,7 +1611,7 @@ type CreateGrid = (host: HTMLElement, opts: GridOptions) => Grid;
 | `datasource` | `DataSource` | `undefined` | Lazy, paged async source; rows fetched per visible window. |
 | `datasourceStorage` | `DataSourceStorageOptions` | `{ mode: "dense" }` | Use `{ mode: "paged", chunkRows?, cacheBytes? }` for allocation-lazy datasource storage. |
 | `renderer` | `"canvas" \| "worker"` | `"canvas"` | `"worker"` paints off-thread via OffscreenCanvas, falling back to canvas. See [Worker rendering](https://sheetwrite.vercel.app/docs/guides/worker-rendering/). |
-| `workerUrl` | `string \| URL` | `undefined` | Browser-fetchable module URL, e.g. `"/sheetwrite/worker.js"` after copying the package `dist/`; Vite can import `@sheetwrite/core/worker?worker&url`. See [Worker rendering](https://sheetwrite.vercel.app/docs/guides/worker-rendering/). |
+| `workerUrl` | `string \| URL` | `undefined` | Usually not needed: bundlers such as Vite build the default worker. Pass a browser-fetchable module URL without a bundler, e.g. `"/sheetwrite/worker.js"` after copying the package `dist/`. See [Worker rendering](https://sheetwrite.vercel.app/docs/guides/worker-rendering/). |
 | `theme` | `Partial<Theme>` | `undefined` | Overrides merged over `DEFAULT_THEME` and any `--sheetwrite-*` CSS vars. See [Styling](https://sheetwrite.vercel.app/docs/guides/styling/). |
 | `readOnly` | `boolean` | `false` | When `true`, all mutating interactions (edit, clear, fill, paste, restyle) are disabled and the host gets `aria-readonly="true"`. |
 | `protectionResolver` | `ProtectionResolver` | `undefined` | Host callback for protected local mutations; no resolver means deny. Client-side UX policy only, never server authorization. |
@@ -3811,8 +3811,21 @@ Worker with an OffscreenCanvas — same `Renderer` contract, drop-in.
 
 ## Enabling it
 
-Set `renderer: "worker"` and point `workerUrl` at the worker module **as the
-browser will fetch it**. The worker entry ships at
+Set `renderer: "worker"`. With a bundler that understands module workers, that
+is all: Sheetwrite creates its worker as
+`new Worker(new URL("./worker.js", import.meta.url), { type: "module" })`, the
+pattern bundlers look for, so the bundler builds the worker with its imports.
+Vite does this, verified by the fixture build in `test/bundler-fixtures/vite`
+(`bun run verify:bundlers`). webpack 5 and Parcel recognize the same pattern;
+check with the steps under [Verify it actually started](#verify-it-actually-started).
+
+```ts
+const grid = createGrid(host, { workbook, datasource, renderer: "worker" });
+```
+
+Pass `workerUrl` when the default cannot work: no bundler, or a bundler that
+copies the file instead of building it. It must be the worker module's URL
+**as the browser will fetch it**. The worker entry ships at
 `@sheetwrite/core/dist/worker.js` (export subpath `@sheetwrite/core/worker`),
 but the platform `Worker`/`URL` constructors do not consult package exports —
 `new URL("@sheetwrite/core/worker", import.meta.url)` treats the bare
@@ -3851,14 +3864,7 @@ verified by the fixture build in `test/bundler-fixtures/vite`
 import workerUrl from "@sheetwrite/core/worker?worker&url";
 ```
 
-webpack 5 / Next.js have no equivalent URL-returning dependency-worker import
-(webpack only bundles a worker graph for a literal
-`new Worker(new URL(...))` expression, which Sheetwrite constructs internally)
-— use the public-copy recipe above there.
-
-`workerUrl` accepts a `string | URL`. If you omit it, the worker renderer
-resolves `./worker.js` relative to its own module — that only works when your
-bundler preserves module URLs (it usually does not after bundling to one file).
+`workerUrl` accepts a `string | URL`.
 
 ## Verify it actually started
 
@@ -6838,14 +6844,16 @@ every submitted operation; this resolver is not an authentication boundary.
 - `transactionResourceLimits` — Overrides inclusive operation-count and encoded-byte ceilings for every atomic mutation.
 - `workbook` — Live workbook schema adopted by the store and updated by document operations.
 - `workerUrl` — URL of the worker renderer module (`renderer: "worker"`), as served to the
-BROWSER — the platform `Worker` constructor does not consult package
-exports, so a bare specifier like `new URL("@sheetwrite/core/worker",
-import.meta.url)` is NOT reliable. Either copy
-`@sheetwrite/core/dist/worker.js` to your public assets and pass its URL
-string (works everywhere), or use your bundler's dependency-worker import
-if it has one (see `/docs/guides/worker-rendering/`). If omitted or the worker
-can't be constructed, the grid falls back to the main-thread canvas
-renderer and emits `renderer-fallback` once.
+BROWSER. Usually not needed: by default the grid creates its worker as
+`new Worker(new URL("./worker.js", import.meta.url))`, which bundlers such
+as Vite build together with the worker's imports. Pass a URL when there
+is no bundler, or when yours copies the file instead of building it, for
+example a copy of `@sheetwrite/core/dist/` in your public assets (see
+`/docs/guides/worker-rendering/`). A bare specifier like
+`new URL("@sheetwrite/core/worker", import.meta.url)` is NOT reliable: the
+platform `Worker` constructor does not consult package exports. If the
+worker can't be constructed or fails to load, the grid falls back to the
+main-thread canvas renderer and emits `renderer-fallback` once.
 
 ##### `GridPresentation` — type
 
@@ -10921,14 +10929,16 @@ every submitted operation; this resolver is not an authentication boundary.
 - `wasmSource` — Explicit source passed to process-wide WASM initialization; concurrent initialization is first-source-wins.
 - `workbook` — Live workbook schema adopted by the store and updated by document operations.
 - `workerUrl` — URL of the worker renderer module (`renderer: "worker"`), as served to the
-BROWSER — the platform `Worker` constructor does not consult package
-exports, so a bare specifier like `new URL("@sheetwrite/core/worker",
-import.meta.url)` is NOT reliable. Either copy
-`@sheetwrite/core/dist/worker.js` to your public assets and pass its URL
-string (works everywhere), or use your bundler's dependency-worker import
-if it has one (see `/docs/guides/worker-rendering/`). If omitted or the worker
-can't be constructed, the grid falls back to the main-thread canvas
-renderer and emits `renderer-fallback` once.
+BROWSER. Usually not needed: by default the grid creates its worker as
+`new Worker(new URL("./worker.js", import.meta.url))`, which bundlers such
+as Vite build together with the worker's imports. Pass a URL when there
+is no bundler, or when yours copies the file instead of building it, for
+example a copy of `@sheetwrite/core/dist/` in your public assets (see
+`/docs/guides/worker-rendering/`). A bare specifier like
+`new URL("@sheetwrite/core/worker", import.meta.url)` is NOT reliable: the
+platform `Worker` constructor does not consult package exports. If the
+worker can't be constructed or fails to load, the grid falls back to the
+main-thread canvas renderer and emits `renderer-fallback` once.
 
 ##### `SheetwriteProps` — type
 
