@@ -4292,6 +4292,31 @@ fn a_spill_that_reads_a_later_one_cell_spill_sees_its_new_value() {
     assert_close(number(&store, sheet, 0, 1), 2.0);
 }
 
+/// A workbook without formulas or pivot tables has nothing to calculate, so an
+/// edit barrier ends without the formula pass. The pass is the largest
+/// function of the engine: a WebAssembly runtime that sees it run on every
+/// value edit compiles it while the host edits a data grid.
+#[test]
+fn a_value_edit_in_a_formula_free_workbook_skips_the_formula_pass() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(2, 2);
+    store.set_number(sheet, 0, 0, 1.0, 0);
+    store.commit_sources();
+    store.set_number(sheet, 0, 0, 2.0, 0);
+    store.commit_sources();
+    assert_eq!(store.formula_passes, 0);
+    assert_close(number(&store, sheet, 0, 0), 2.0);
+
+    // One formula makes the next value edit run the pass again.
+    store.set_formula(sheet, 0, 1, "=A1*10", 0);
+    store.commit_sources();
+    let passes = store.formula_passes;
+    store.set_number(sheet, 0, 0, 3.0, 0);
+    store.commit_sources();
+    assert_eq!(store.formula_passes, passes + 1);
+    assert_close(number(&store, sheet, 0, 1), 30.0);
+}
+
 /// Volatile formulas (RAND, RANDBETWEEN, NOW, TODAY) recalculate with their
 /// dependents at every edit barrier, as in Excel; every other formula
 /// recalculates only when something it reads changed.

@@ -296,6 +296,10 @@ pub struct CellStore {
     /// summed over passes. Tests read it to bound that check's work.
     #[cfg(test)]
     pub(crate) stale_reader_visits: usize,
+    /// Calls of the formula pass, summed. Tests read it to show which edit
+    /// barriers skip the pass, which no value can show.
+    #[cfg(test)]
+    pub(crate) formula_passes: usize,
 }
 
 /// Cell order of the flat input arrays of a packed block write.
@@ -377,6 +381,8 @@ impl CellStore {
             recomputed_formulas: 0,
             #[cfg(test)]
             stale_reader_visits: 0,
+            #[cfg(test)]
+            formula_passes: 0,
         }
     }
 
