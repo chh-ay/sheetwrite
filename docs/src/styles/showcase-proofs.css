@@ -379,7 +379,7 @@
   );
 }
 
-/* ---------- shared demo primitives (dark stage) ---------- */
+/* ---------- shared demo primitives (demo stage) ---------- */
 
 /* Button hierarchy: primary (the one commit action), secondary (default,
    bordered), quiet (fault-injection and lifecycle tools), danger (reset). */

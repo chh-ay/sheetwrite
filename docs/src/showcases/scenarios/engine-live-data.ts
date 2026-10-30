@@ -77,15 +77,13 @@ const SUMMED_KEYS_BY_PRODUCT: Readonly<Record<number, readonly string[]>> = {
   4: ["trainingPlaces"],
 };
 
-const BANNER_ROW_STYLE = {
+/** A solid teal band with white text: canvas cell styles are fixed 6-digit hex
+ * colors, so the band must read on both the light and the dark grid. White on
+ * this teal is about 6:1. */
+const SUMMARY_ROW_STYLE = {
   bold: true,
-  backgroundColor: "#152b31",
-  color: "#dcefe9",
-} as const;
-const TOTAL_ROW_STYLE = {
-  bold: true,
-  backgroundColor: "#152b31",
-  color: "#c5eadc",
+  backgroundColor: "#1f6f5c",
+  color: "#ffffff",
 } as const;
 
 /** Twelve monthly records followed by their formula-backed annual total. */
@@ -271,7 +269,7 @@ export function engineLiveRow(row: number, columns?: readonly EngineColumnBand[]
     completeRow = Object.fromEntries(
       FORECAST_COLUMNS.map((column) => [
         column.key,
-        { value: { kind: "literal", value: column.header }, style: BANNER_ROW_STYLE },
+        { value: { kind: "literal", value: column.header }, style: SUMMARY_ROW_STYLE },
       ]),
     );
   } else if (row === ENGINE_LIVE_ROWS - 1) {
@@ -286,7 +284,7 @@ export function engineLiveRow(row: number, columns?: readonly EngineColumnBand[]
     completeRow = Object.fromEntries(
       FORECAST_COLUMNS.map((column) => [
         column.key,
-        { value: asCellValue(end[column.key]), style: BANNER_ROW_STYLE },
+        { value: asCellValue(end[column.key]), style: SUMMARY_ROW_STYLE },
       ]),
     );
   } else {
@@ -323,7 +321,7 @@ export function engineLiveRow(row: number, columns?: readonly EngineColumnBand[]
       completeRow = Object.fromEntries(
         FORECAST_COLUMNS.map((column) => [
           column.key,
-          { value: asCellValue(total[column.key]), style: TOTAL_ROW_STYLE },
+          { value: asCellValue(total[column.key]), style: SUMMARY_ROW_STYLE },
         ]),
       );
     } else {

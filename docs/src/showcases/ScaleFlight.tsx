@@ -2,6 +2,7 @@ import { cellA1, type Grid } from "@sheetwrite/core";
 import { useEffect, useRef, useState } from "react";
 
 import { formatBytes } from "../lib/format.js";
+import { observeSiteTheme } from "../lib/site-theme.js";
 import {
   type DatasourceTile,
   FEED_SHEET,
@@ -406,6 +407,9 @@ interface ScaleMinimapProps {
 function ScaleMinimap({ tiles, window: view, onJump }: Readonly<ScaleMinimapProps>) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const seenRef = useRef(new Map<number, DatasourceTile & { residence: string }>());
+  // Canvas colors are resolved at draw time, so a theme change must redraw.
+  const [themeRevision, setThemeRevision] = useState(0);
+  useEffect(() => observeSiteTheme(() => setThemeRevision((revision) => revision + 1)), []);
 
   for (const tile of tiles) seenRef.current.set(tile.id, tile);
 
@@ -474,7 +478,7 @@ function ScaleMinimap({ tiles, window: view, onJump }: Readonly<ScaleMinimapProp
     context.globalAlpha = 1;
     context.lineWidth = 2;
     context.strokeRect(markerX - markerHalf, markerY - markerHalf, markerHalf * 2, markerHalf * 2);
-  }, [tiles, view.firstRow, view.lastRow, view.firstColumn, view.lastColumn]);
+  }, [tiles, view.firstRow, view.lastRow, view.firstColumn, view.lastColumn, themeRevision]);
 
   // Clicking is a pointer shortcut only, so it is attached outside the
   // accessibility tree; the jump form and sliders are the keyboard path.
