@@ -168,6 +168,7 @@ These pages are generated from checked inventories and evidence. Their tables ar
 - [Render performance](https://www.sheetwrite.dev/docs/performance/render/): Scroll, edit, and interaction timings of the live grid, measured against Handsontable.
 - [XLSX codec performance](https://www.sheetwrite.dev/docs/performance/xlsx-codec/): Import and export time and peak memory for XLSX files.
 - [Detailed compatibility results](https://www.sheetwrite.dev/docs/reference/compatibility-results/): Checked formula, workbook, clipboard, and XLSX examples with exact sources and limits.
+- [Excel function coverage](https://www.sheetwrite.dev/docs/reference/excel-function-coverage/): Every function in the pinned Microsoft Excel catalog, with full and lite engine availability and known differences.
 - [Formula function contract](https://www.sheetwrite.dev/docs/reference/formula-functions/): Generated, source-linked formula names, signatures, semantics, dialect status, and unsupported boundaries.
 - [Dynamic array functions](https://www.sheetwrite.dev/docs/reference/formula-functions/array/): Every dynamic array formula function, its engine build, and its signature, semantic, dialect, and implementation profiles.
 - [Database functions](https://www.sheetwrite.dev/docs/reference/formula-functions/database/): Every database formula function, its engine build, and its signature, semantic, dialect, and implementation profiles.
