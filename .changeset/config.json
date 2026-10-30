@@ -8,6 +8,7 @@
       "@sheetwrite/formulas",
       "@sheetwrite/core",
       "@sheetwrite/xlsx",
+      "@sheetwrite/charts",
       "@sheetwrite/react",
       "@sheetwrite/vue",
       "@sheetwrite/svelte"

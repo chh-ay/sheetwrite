@@ -63,6 +63,9 @@ const changelogs: Readonly<Record<string, string>> = {
     "Minor Changes": [dependencyUpdate],
     "Patch Changes": [provenance],
   }),
+  "@sheetwrite/charts": changelog("@sheetwrite/charts", {
+    "Patch Changes": [provenance, dependencyUpdate],
+  }),
   "@sheetwrite/react": changelog("@sheetwrite/react", {
     "Patch Changes": [
       pivots,
@@ -122,7 +125,7 @@ const expectedNotes = `## All packages
 
 ---
 
-**Release notes:** https://sheetwrite.vercel.app/docs/releases/0.5.4/
+**Release notes:** https://www.sheetwrite.dev/docs/releases/0.5.4/
 
 **Changes since 0.5.3:** https://github.com/chh-ay/sheetwrite/compare/@sheetwrite/core@0.5.3...v0.5.4
 `;
