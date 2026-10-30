@@ -146,19 +146,20 @@ describe("host formula functions", () => {
       store.applyTransaction({
         patches: [
           { op: "set", addr: address(0, 0), value: { kind: "literal", value: 1 } },
-          // Text after a non-BMP character checks the UTF-16 text offsets.
+          // Text after a non-BMP character, then a second text argument,
+          // checks the UTF-16 text offsets.
           { op: "set", addr: address(1, 0), value: { kind: "literal", value: "tw😀o" } },
           { op: "set", addr: address(0, 1), value: { kind: "literal", value: true } },
         ],
       });
 
       setFormula(store, 2, 0, "=ECHO(A1:B2,A1,,1/0)");
-      setFormula(store, 2, 1, "=ECHO(A1:B2,A1,)");
+      setFormula(store, 2, 1, '=ECHO(A1:B2,A1,,"x")');
       setFormula(store, 3, 0, "=FAIL()");
       setFormula(store, 3, 1, "=LATER()");
 
       expect(store.getCell(address(2, 0)).resolved).toBe("#DIV/0!");
-      expect(store.getCell(address(2, 1)).resolved).toBe(3);
+      expect(store.getCell(address(2, 1)).resolved).toBe(4);
       expect(received.at(-1)).toEqual([
         [
           [1, true],
@@ -166,6 +167,7 @@ describe("host formula functions", () => {
         ],
         1,
         null,
+        "x",
       ]);
       expect(store.getCell(address(3, 0)).resolved).toBe("#VALUE!");
       expect(store.getCell(address(3, 1)).resolved).toBe("#VALUE!");
