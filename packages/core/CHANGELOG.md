@@ -1,5 +1,126 @@
 # @sheetwrite/core
 
+## 0.6.0
+
+### Minor Changes
+
+- 81e45e3: Add three cell style fields: `fontFamily` (with the theme font as fallback), `verticalAlign` (`top`, `middle` or `bottom`), and a per-cell `numberFormat` that overrides the column's format; `General` opts a cell out of it. Paint, column auto-fit, snapshots, clipboard and hyperlink styles all honor them, and `isCellFontFamily` exposes the font-name rule. XLSX import and export round-trip all three: a column that mixes number formats keeps each cell's format instead of dropping them, and only fonts other than the workbook default become a cell `fontFamily`.
+- 92dcd37: Show and edit cell notes in the grid, as in Excel. Rest the pointer on a cell with a note to see the note in a card (`.sheetwrite-note`). `grid.actions.editNote()` and Shift+F2 (the new rebindable `editNote` keyboard action) open a note editor (`.sheetwrite-note-editor`) on the focus cell: Ctrl or Cmd+Enter or leaving the editor saves the note as one undoable step, empty text removes it, and Escape cancels. `grid.actions.deleteNote()` removes the focus cell's note. The context menu accepts the new `editNote` and `deleteNote` actions.
+- d99f762: Add charts to the workbook document. A sheet can hold up to 100 charts in `Sheet.charts`. Snapshots keep the charts in their array order. Each chart is a column, bar, line, area, pie, doughnut or scatter chart. It has up to 32 series, and each series reads cell ranges on any sheet. Use the `setChart` and `removeChart` operations to create, change, move and delete charts. These operations work with undo, sync and snapshots.
+  
+  Row and column inserts, deletes and moves update chart ranges and anchors. A deleted range becomes `#REF!`. Removing a sheet turns the ranges on it into `#REF!`. Renaming a sheet changes nothing.
+  
+  `resolveChartView(store, sheet, id)` returns the chart data as plain values: series names, numbers, categories and number formats. It reads at most 10,000 points per range (`MAX_CHART_POINTS`) and marks a longer range as `truncated`. `subscribeChartChanges(store, listener)` calls the listener once per commit with the charts whose data changed. Edits outside every chart range do not call it. Workbooks without charts do not change in speed or memory.
+  
+  `openChartViews(store)` returns live chart views from the registered chart package. When no package is registered, it throws a `SheetwriteError` with code `optional-backend-unavailable` and operation `chart-view`. Install `@sheetwrite/charts` and import `@sheetwrite/charts/register`. Other packages can register with `setChartViewProviderFactory`.
+- b159a35: Show charts over the cells. Each chart floats at its anchor and follows scroll, zoom, row and column sizes, hidden rows and columns, and frozen panes. Click a chart to select it; drag it or its handles to move or resize it; use the arrow keys to move it by a pixel (Shift: by a cell), Delete to remove it, Enter to open its panel and Escape to return to the grid. Each change is one undo step. New `Grid` methods: `getCharts(sheet?)`, `setChart(chart, sheet?)` and `removeChart(id, sheet?)` return the transaction result, and `selectChart(id, sheet?)` selects a chart; new events `chart-select` and `chart-activate`. Hosts that draw charts themselves register a `ChartRenderer` with `setChartRendererFactory`. Without a renderer, a chart shows as a frame with its title. Series colors come from `--sheetwrite-chart-1` to `--sheetwrite-chart-8`.
+- b159a35: Reach charts and pivot tables from the ribbon and the context menus. **Insert › Chart** is a split button: the face inserts a column chart, and its menu inserts any of the seven kinds, each with its own glyph. Right-click a chart (or press Shift+F10 or the ContextMenu key on it) for **Edit chart** and **Delete chart**; a read-only grid offers only Edit chart. Right-click a cell of a pivot table's output for **PivotTable Fields**, which opens its field list. The new context-menu action `pivotFields` and `grid.actions.showPivotFields()` do the same from host menus and code. `ContextMenu`'s glyphs follow `config.icons` overrides as before.
+- b159a35: Insert and edit charts and pivot tables from the ribbon. **Insert › Chart** makes a chart from the selection and opens the chart panel (kind, ranges, titles, legend). **Insert › PivotTable** asks for a destination and opens the field list, where fields move between Rows, Columns, Values and Filters by drag or by keyboard; selecting a cell in a pivot's output opens it again. The panels open beside the grid with `grid.openPanel()`, which hosts can also use for their own panels. Each change is one undo step. With the default engine, Insert › PivotTable is disabled and says that pivot tables need the full engine. The panel code loads on first use.
+- 92dcd37: The toolbar, ribbon, ribbon menus and context menu now draw their command icons from one icon sheet, shipped as `@sheetwrite/core/icons.svg` with its layout in `@sheetwrite/core/icons.json`. The icons follow the text color, so they suit light, dark and High Contrast themes.
+  
+  Replace icons by glyph name with the new `icons` option (`GridConfig.icons`, type `IconOverrides`). `IconName` and `ICON_NAMES` list the glyph names. To replace the whole set, set the CSS variable `--sheetwrite-icon-sheet` to your own sheet with the same layout.
+  
+  The default sheet is an inline `data:` URL. If your Content Security Policy blocks `data:` images, serve `@sheetwrite/core/icons.svg` from your site and set `--sheetwrite-icon-sheet: url("/path/to/icons.svg")`.
+- 92dcd37: The built-in context menu is shorter and grouped. Cut, Copy and Paste come first, then Insert, Delete and Clear contents, then Row and Column, then Merge, then the note. Insert, Delete, Row, Column and Merge open submenus. Each row shows its command icon.
+  
+  The menu now works from the keyboard. It takes focus when it opens: Up and Down move, Home and End jump, Enter or Space runs a row, Right opens a submenu, Left or Escape closes it, and focus returns to the grid when the menu closes.
+  
+  Custom menus can use the same features. `ContextMenuItem.items` makes a row open a submenu, and `ContextMenuItem.icon` sets its glyph. Built-in actions have default icons, and `config.icons` overrides apply. Rows without an `id` now get `data-context-menu-item` set to their action name.
+- b6f333c: Add saved pivot definitions and the `getPivots`, `setPivot`, `removePivot`, `getPivotFields`, and `getPivotResult` methods on grids and stores. Validate definitions before changes. Keep pivots in snapshots, undo history, collaboration, and engine memory transfers.
+  
+  Use the full engine to calculate pivot output. The default engine shows Excel's saved pivot values as read-only calculated output that formulas can read. It reports `saved`, or `unavailable` when no saved values exist. Both engines keep the same saved output in snapshots and collaboration. A `setPivot` call removes saved values. Refuse local writes into pivot output. Row and column edits update sources and anchors; deleting an anchor moves it to the first remaining cell. Undo restores the previous definition and output.
+- 9dc3ab1: Add reference-valued `OFFSET(reference, rows, cols, [height], [width])` and `INDIRECT(text, [a1])` in both engines and formula autocomplete. Their results can feed reference-taking functions, `LAMBDA`, `MAP` and the other array helpers, or spill multiple cells; a one-cell result is a plain value, not a spill. Both functions are volatile and recalculate with their dependents after every source-changing edit; runtime dependency cycles return `#CYCLE!`.
+  
+  `OFFSET` inherits omitted dimensions from its source reference and requires positive height and width. Out-of-grid bounds return `#REF!`; nonpositive dimensions, nonnumeric offsets or a non-reference first argument return `#VALUE!`. `INDIRECT` accepts A1 or R1C1 notation, including relative R1C1 coordinates, sheet-qualified references, defined names and table references. Invalid targets and external workbook references return `#REF!`. Reference text is not rewritten by fill, copy or structural edits. Existing sheet, range and spill limits still apply.
+  
+  OFFSET and INDIRECT are volatile, as in Excel. The engine does not record the cells they read as graph edges. Each edit recalculates them again, so a moved or edited target always shows. Workbooks without these functions do not pay this cost. `recompute(sheet)` on a sheet with volatile formulas also recalculates the volatile formulas on every other sheet, because Excel recalculates volatile functions for the whole workbook. A reference to another sheet then stays current.
+- 03ad409: Add an opt-in Excel-style ribbon (`config.ribbon: true`, or `createRibbon` and `ribbon: true` in the shell) with Home, Insert, Data and View tabs. Groups shrink, then fold into dropdowns, as the grid narrows, and the panel can be hidden to its tab row.
+  
+  New `GridActions`: `setBorders` (Excel border presets that keep each cell's other sides), `setFontFamily`, `setFontSize`, `stepFontSize`, `setVerticalAlign`, `toggleWrap`, `setNumberFormat`, `stepDecimals`, `mergeAndCenter`, `clearAll`, `autoSum`, `find` and `freezePanes`. `setTextColor` and `setFillColor` now accept `null` for Automatic and No Fill. New `Grid.getFocusCellStyle()`, and command state for `alignTop`, `alignMiddle`, `alignBottom` and `wrap`.
+- 0b5cc2d: Add iterative calculation for circular references, as in Excel. The new `setCalculation` document operation sets `{ iterate, maxIterations, maxChange }`. The defaults are the Excel defaults: off, 100 iterations, and a maximum change of 0.001. When iteration is off, a circular reference shows `#CYCLE!`, as before. When it is on, the engine calculates each circular reference again until no value changes by more than `maxChange`, or until `maxIterations` passes are done. A cycle that does not settle keeps the values of its last pass. Formulas that read a cycle calculate once, after it settles. `OFFSET`, `INDIRECT` and volatile functions work inside a cycle, and a cycle that only `OFFSET` or `INDIRECT` closes also iterates.
+  
+  The setting is undoable and is part of the workbook snapshot as `workbook.calculation`. Snapshots of workbooks with the default setting do not change. XLSX import reads `iterate`, `iterateCount` and `iterateDelta` from `<calcPr>`, and export writes them. The WASM `CellStore` has the new `setIterativeCalculation` method. Core exports `CalculationSettings`, `DEFAULT_MAX_ITERATIONS`, `DEFAULT_MAX_CHANGE` and `MAX_ITERATIONS`.
+  
+  The engine finds circular references once per recalculation, only when the dependency check finds a cycle, so workbooks without one do no extra work.
+- c56a350: The shell's name box selects ranges as Excel's does: type `B2:D9` (or `$B$2:$D$9`) and press Enter. Single cells work as before.
+- 0f36fda: Add the Excel reference operators. A space between two references is the intersection operator: `=SUM(A1:C3 B2:D4)` adds the cells that both ranges cover. When the references share no cell, or are on different sheets, the result is `#NULL!`. Spaces around other operators, after commas and before `)` do not change.
+  
+  A comma inside parentheses that are not a function call is the union operator: `=SUM((A1:A2,C1:C2))`. `SUM`, `COUNT`, `AVERAGE`, `MAX`, `MIN`, `SMALL`, `LARGE` and the other functions that read lists of values accept a union. `INDEX` has the optional `area_num` argument, which selects one area of a union. The new `AREAS` function counts the areas of a reference. A union in a position that needs one range, such as a `VLOOKUP` table, returns `#VALUE!`.
+  
+  A 3-D reference such as `=SUM(Jan:Mar!B2)` or `=SUM('Jan:Q1 Close'!A1:B2)` reads the same cells on every sheet from the first to the last sheet in tab order. `SUM`, `AVERAGE`, `COUNT`, `COUNTA`, `MAX`, `MIN`, `PRODUCT`, `STDEV.S`, `STDEV.P`, `VAR.S` and `VAR.P` accept 3-D references; other positions return `#VALUE!`. When you insert, move or delete a sheet inside the span, the result changes as in Excel. When you delete or move an endpoint sheet, the formula moves to the nearest sheet inside the span. A rename keeps the formula valid. When every sheet of the span is deleted, the reference becomes `#REF!`. Row and column edits on one sheet do not change a 3-D reference.
+  
+  The three operators record only the cells they read, so an edit recalculates only the formulas that it can change. A tab move updates the dependencies of the affected formulas only. When a tab move rewrites a 3-D reference, undo restores the original formula text. XLSX import and export keep these formulas as Excel text. The WASM `CellStore` has the new `setSheetOrder` and `sheetSpanFormulaCells` methods; core calls them when tabs are added, moved or restored.
+- c56a350: Add `Grid.summarizeSelection()`: Count, Sum, Average, Min and Max over the selected cells the user can see (rows a filter hides are left out), read in bounded chunks between frames and cancellable with an `AbortSignal`. The shell's status line now shows Excel's Average, Count and Sum next to the selection size.
+- bcfe991: Add `RAND` and `RANDBETWEEN`, and make volatile formulas recalculate after each edit. `RAND`, `RANDBETWEEN`, `TODAY` and `NOW`, and the formulas that read them, now recalculate in every transaction that changes a cell, as in Excel. Before, they recalculated only when the host called `recalculateVolatile`. A transaction without cell changes recalculates nothing. Workbooks without volatile formulas do no extra work, and the extra work of an edit grows only with the number of volatile formulas and their dependents.
+  
+  `RANDBETWEEN(bottom, top)` rounds `bottom` up and `top` down. It returns `#NUM!` for an empty interval and `#VALUE!` for a bound that is not a number.
+  
+  Add `FORMULATEXT`, `ISFORMULA`, `HYPERLINK` and `CELL`. `FORMULATEXT` returns the formula of a cell, or `#N/A` when the cell holds no formula. `HYPERLINK` returns its friendly name, or the link when there is no friendly name; the grid does not open the link. `CELL` supports the info types `address`, `col`, `contents`, `row` and `type`; other info types return `#VALUE!`. Formula autocomplete offers all six functions.
+- 5308206: Opening and saving an XLSX file now keeps the parts Sheetwrite does not model: charts, pivot tables, images, VBA projects, customXml, XML maps, data connections, themes and document properties. They are kept as their original compressed bytes in the new `WorkbookSnapshot.workbook.xlsxSource` and written back unchanged. Charts and pivots are dropped with a warning once a cell changes, images once their sheet's rows or columns move, and VBA and customXml always survive. The new `maxPreservedBytes` resource limit (64 MiB by default) bounds the kept data.
+  
+  Table autofilter rules, sort state, calculated-column formulas and totals-row functions now round-trip through XLSX.
+  
+  New streaming functions `toCsvStream`, `toTsvStream`, `toXlsxTableStream` and `toXlsxWorkbookStream` return a `ReadableStream<Uint8Array>`, and `fromXlsxWorkbookFile` imports a `Blob` without buffering every part. The existing functions are unchanged.
+  
+  Import no longer writes the workbook's default font size onto every cell; only cells with a different size get a `fontSize` style.
+
+### Patch Changes
+
+- cbcf0b8: `renderer: "worker"` now works without `workerUrl` in bundled apps. The grid creates its worker with the exact `new Worker(new URL("./worker.js", import.meta.url))` expression bundlers look for, so Vite (and other bundlers that recognize it) build the worker with its imports instead of copying a file whose imports are missing, which made the grid fall back to the main-thread renderer.
+- 8d70aae: Package READMEs and API doc comments link to the restructured documentation pages.
+- 286ac93: Wrapped text lays out 2.5–3.3× faster in the browser (painting and row auto-fit). Each line's break is now found by searching prefix widths instead of measuring every growing prefix.
+  
+  Wrapped lines no longer break inside an emoji sequence (such as 👨‍👩‍👧‍👦), a flag or a letter with combining marks: breaks fall between graphemes. Plain Latin text wraps exactly as before.
+- ec8e0ee: Skip repaint work for edits that cannot change what the grid shows. On a sheet without formulas, a plain value edit outside the painted window or on another sheet no longer re-reads the visible window, rebuilds the search-match and note indexes, or rewrites the accessibility mirror. An active search now also picks up matches that a value edit adds or removes, without scrolling.
+  
+  Sheets with formulas or references conservatively rescan an active search after an edit, including edits to off-screen inputs or other sheets. This preserves matches whose computed text changes; it can cost more than the old behavior, which left those matches stale.
+- ec8e0ee: Large undo restores the saved range directly from its packed engine snapshot instead of decoding and re-applying a JSON block, and the restore payload sent to listeners and sync is measured once instead of being walked at every layer. In local runs, undo of a 1,000,000-cell clear was 2–6× faster and the memory it added during undo fell from about 310 MiB to about 190 MiB. Undo history now also drops its oldest entries once retained range snapshots pass 256 MiB (about twenty million-cell clears); the newest entry always stays undoable. `restoreRange` now applies the same source, reference and dirty-capacity rules as a packed block write, so a local undo and its replay on another peer give the same state.
+  
+  The 256 MiB policy uses engine-reported snapshot payload bytes, not total retained process memory. It excludes cloned formula ASTs and JavaScript patch/redo payloads, which remain bounded only by the 200-entry limit.
+  
+  Formula-free packed writes and restores select their source-free cell loop once per range, avoiding repeated formula-map checks and kind normalization during large imports.
+- 78665d3: The ribbon now loads as its own chunk when `config.ribbon` (or the shell's `ribbon: true`) asks for it, so grids without a ribbon no longer download it: about 25 KB less minified JavaScript for every `createGrid` app. The grid reserves the ribbon's height while it loads, so nothing moves when it arrives.
+- 60590f9: Keep workbook layout and link text stable when another spreadsheet app saves an XLSX file.
+  
+  Import cells with no XLSX vertical alignment at the bottom, as Excel shows them. Import centered cells with the Sheetwrite default alignment. Export the Sheetwrite default as centered alignment. This changes how imported Excel cells with no alignment setting appear.
+  
+  Use the OOXML column width conversion. Keep automatic row heights automatic. Use cell text when a hyperlink has no display text. Export hyperlink colors and underlines in cell styles so other apps can keep them.
+  
+  Native fixture widths now match what Excel shows. Remove the old extra 5 pixels. The changed widths, in pixels, are: 19 → 14, 25 → 20, 26 → 21, 40 → 35, 44 → 39, 52 → 47, 53 → 48, 60 → 55, 64 → 59, 78 → 73, 85 → 80, 86 → 81, 94 → 89, 107 → 102, 114 → 109, 116 → 111, 119 → 114, 132 → 127, 154 → 149, 156 → 151, 162 → 157, and 171 → 166.
+  
+  Keep explicit cell font colors and underline settings when a hyperlink has no style. Use the default link look only for font properties the cell does not set.
+- c0f9c00: Reconcile displayed rows, selection, and scrolling before change listeners run when transactions, remote operations, or undo/redo change filters, sorting, hidden rows, or row groups, including structural edits that clear a query. Keep filtered row geometry bounded when row heights change or a sheet is activated.
+- 92dcd37: The ribbon's View › Zoom group is one stepper, Zoom Out, the zoom percent and Zoom In. Select the percent to return to 100%; at 100% it is disabled. Its accessible name starts with the shown percent, for example "120%, zoom to 100%", so voice control can target it by its visible text.
+  
+  The find and replace bar uses one field style for both fields, with its own focus ring, and shows the match count inside the find field. The Previous, Next and Close buttons have accessible names, and the replace-all button reads "Replace all".
+  
+  Several command icons are clearer at 16 px: row, column, freeze and merge icons no longer draw a full frame, vertical alignment uses arrows, and Comma Style shows ",00".
+- 3bdb073: The packages are smaller to install. The code is not minified and stays readable.
+  
+  - `@sheetwrite/core` is 1.83 MB → 1.55 MB unpacked (387 KB → 350 KB packed), with 214 → 157 files.
+  - The packages publish only the type declarations that their entry points use. Core no longer ships 57 internal declaration files (117 KB), and `@sheetwrite/xlsx` no longer ships 8. You cannot import these files through the package `exports`, so no types change.
+  - The published JavaScript uses 2-space indentation instead of 4. This saves 155 KB in core and 20 KB in `@sheetwrite/xlsx`.
+  - `@sheetwrite/wasm` and `@sheetwrite/formulas` no longer publish `pkg/sheetwrite_wasm_bg.wasm.d.ts` (14 KB each). No entry point refers to it, and `sheetwrite_wasm.d.ts` has the same types.
+- ec8e0ee: Make each local commit cost the same at any offline queue depth. `SyncCoordinator` no longer walks every pending commit to pick a base version or report its state, so 10,000 queued edits no longer slow the next one down.
+- bcfe991: `TODAY` and `NOW` now read the clock once in each recalculation, as in Excel. Every `TODAY` and `NOW` in one recalculation uses the same time. Before, they used only the time from the last `recalculateVolatile` call. `recalculateVolatile(date)` still uses the time you give it, until the next edit.
+- 2984b0b: XLSX import now builds the snapshot cells while it reads the worksheet rows, so each cell has one representation in memory instead of two. Restoring Sheetwrite sidecar fields now indexes only the sidecar cells, not all cells. Snapshot validation now finds duplicate cells with sorted numeric keys instead of a set of text keys, builds cell paths only for cells that fail, and counts the bytes of integers without making text. Validation results are the same. On generated 200,000 × 8 and 1,000,000 × 8 workbooks, over seven interleaved rounds for each side, the median import peak RSS went from 1,095 MiB to 800 MiB and from 5,061 MiB to 3,352 MiB (buffered). With `fromXlsxWorkbookFile`, it went from 1,112 MiB to 779 MiB and from 4,475 MiB to 3,336 MiB. The highest candidate run was lower than the median baseline run in all four cases, and the median import time decreased by about 20%.
+- Updated dependencies [34bdcba]
+- Updated dependencies [34bdcba]
+- Updated dependencies [8d70aae]
+- Updated dependencies [9dc3ab1]
+- Updated dependencies [34bdcba]
+- Updated dependencies [b6f333c]
+- Updated dependencies [0b5cc2d]
+- Updated dependencies [ec8e0ee]
+- Updated dependencies [34bdcba]
+- Updated dependencies [0f36fda]
+- Updated dependencies [957b82f]
+- Updated dependencies [3bdb073]
+- Updated dependencies [bcfe991]
+- Updated dependencies [bcfe991]
+- Updated dependencies [064fe74]
+  - @sheetwrite/wasm@0.6.0
+
 ## 0.5.4
 
 ### Patch Changes

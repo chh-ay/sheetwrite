@@ -101,14 +101,14 @@
     },
     "packages/charts": {
       "name": "@sheetwrite/charts",
-      "version": "0.5.4",
+      "version": "0.6.0",
       "dependencies": {
         "@sheetwrite/core": "workspace:*",
       },
     },
     "packages/core": {
       "name": "@sheetwrite/core",
-      "version": "0.5.4",
+      "version": "0.6.0",
       "dependencies": {
         "@sheetwrite/wasm": "workspace:*",
         "fflate": "0.8.3",
@@ -116,11 +116,11 @@
     },
     "packages/formulas": {
       "name": "@sheetwrite/formulas",
-      "version": "0.5.4",
+      "version": "0.6.0",
     },
     "packages/react": {
       "name": "@sheetwrite/react",
-      "version": "0.5.4",
+      "version": "0.6.0",
       "dependencies": {
         "@sheetwrite/core": "workspace:*",
       },
@@ -130,7 +130,7 @@
     },
     "packages/svelte": {
       "name": "@sheetwrite/svelte",
-      "version": "0.5.4",
+      "version": "0.6.0",
       "dependencies": {
         "@sheetwrite/core": "workspace:*",
       },
@@ -144,7 +144,7 @@
     },
     "packages/vue": {
       "name": "@sheetwrite/vue",
-      "version": "0.5.4",
+      "version": "0.6.0",
       "dependencies": {
         "@sheetwrite/core": "workspace:*",
       },
@@ -154,11 +154,11 @@
     },
     "packages/wasm": {
       "name": "@sheetwrite/wasm",
-      "version": "0.5.4",
+      "version": "0.6.0",
     },
     "packages/xlsx": {
       "name": "@sheetwrite/xlsx",
-      "version": "0.5.4",
+      "version": "0.6.0",
       "dependencies": {
         "@sheetwrite/core": "workspace:*",
         "fflate": "0.8.3",
