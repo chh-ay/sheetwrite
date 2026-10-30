@@ -37,6 +37,66 @@ function mountHost(): HTMLDivElement {
   return host;
 }
 
+it("edits boolean cells using spreadsheet text", () => {
+  const workbook = makeWorkbook(3);
+  const store = new SheetwriteStore(workbook);
+  store.applyTransaction({
+    patches: [
+      {
+        op: "set",
+        addr: { sheet: "s1", row: 0, col: 0 },
+        value: { kind: "literal", value: true },
+      },
+    ],
+  });
+  const host = mountHost();
+  const grid = new GridImpl(host, { workbook }, store);
+  grid.beginEdit(0, 0);
+
+  expect(host.querySelector<HTMLTextAreaElement>("textarea.sheetwrite-editor")?.value).toBe("TRUE");
+  grid.destroy();
+  store.dispose();
+});
+
+it("removes grid DOM when disposing its owned store fails", () => {
+  const host = mountHost();
+  const grid = new GridImpl(host, { workbook: makeWorkbook(3) });
+  const store = grid.store;
+  if (!(store instanceof SheetwriteStore)) throw new Error("owned store missing");
+  const dispose = store.dispose.bind(store);
+  store.dispose = () => {
+    dispose();
+    throw new Error("dispose failed");
+  };
+
+  expect(() => grid.destroy()).toThrow("dispose failed");
+  expect(host.childElementCount).toBe(0);
+  expect(host.classList.contains("sheetwrite")).toBe(false);
+  expect(() => grid.destroy()).not.toThrow();
+});
+
+it("updates aria-rowcount when rows are inserted", () => {
+  const requestFrame = globalThis.requestAnimationFrame;
+  // Paint at once, so the test reads the state that the next frame shows.
+  globalThis.requestAnimationFrame = (callback: FrameRequestCallback): number => {
+    callback(0);
+    return 0;
+  };
+  const workbook = makeWorkbook(3);
+  const store = new SheetwriteStore(workbook);
+  const host = mountHost();
+  const grid = new GridImpl(host, { workbook }, store);
+  try {
+    grid.applyTransaction({ patches: [{ op: "addRows", sheet: "s1", at: 0, count: 2 }] });
+
+    expect(host.getAttribute("aria-rowcount")).toBe("6");
+  } finally {
+    globalThis.requestAnimationFrame = requestFrame;
+    grid.destroy();
+    store.dispose();
+  }
+});
+
 function headers(host: HTMLElement): string[] {
   return [...host.querySelectorAll<HTMLElement>('[role="columnheader"]')].map(
     (header) => header.textContent ?? "",

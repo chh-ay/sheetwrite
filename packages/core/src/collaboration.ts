@@ -127,25 +127,25 @@ export class PresenceCoordinator {
 
   async publishNow(): Promise<void> {
     if (this.destroyed) return;
-    const privacy = this.options.privacy;
-    const actor: PresenceActor = {
-      id: this.options.actor.id,
-      ...(privacy?.shareDisplayName === false || !this.options.actor.displayName
-        ? {}
-        : { displayName: this.options.actor.displayName }),
-      ...(this.options.actor.color ? { color: this.options.actor.color } : {}),
-    };
-    const sheet = this.activeSheet();
-    const message: PresenceMessage = {
-      actor,
-      activeSheet: sheet.id,
-      selections:
-        privacy?.shareSelection === false
-          ? []
-          : selectionRanges(this.grid.getSelection(), sheet).slice(0, this.maxRanges),
-      sentAt: this.now(),
-    };
     try {
+      const privacy = this.options.privacy;
+      const actor: PresenceActor = {
+        id: this.options.actor.id,
+        ...(privacy?.shareDisplayName === false || !this.options.actor.displayName
+          ? {}
+          : { displayName: this.options.actor.displayName }),
+        ...(this.options.actor.color ? { color: this.options.actor.color } : {}),
+      };
+      const sheet = this.activeSheet();
+      const message: PresenceMessage = {
+        actor,
+        activeSheet: sheet.id,
+        selections:
+          privacy?.shareSelection === false
+            ? []
+            : selectionRanges(this.grid.getSelection(), sheet).slice(0, this.maxRanges),
+        sentAt: this.now(),
+      };
       await this.transport.publish(clonePresenceMessage(message), this.abortController.signal);
       if (!this.destroyed) this.emit({ type: "published", message: clonePresenceMessage(message) });
     } catch (error) {
@@ -358,6 +358,7 @@ export class RevisionCoordinator {
         signal: this.abortController.signal,
       });
       if (response.status === "conflict") {
+        validateAdapterVersion(response.currentVersion);
         this.version = Math.max(this.version, response.currentVersion);
         this.emit({
           type: "conflict",
@@ -366,6 +367,7 @@ export class RevisionCoordinator {
         });
         return response;
       }
+      validateAdapterVersion(response.version);
       this.version = Math.max(this.version, response.version);
       if (response.status === "applied") {
         this.emit({ type: "restored", targetVersion, version: response.version });
@@ -537,7 +539,7 @@ export class CommentCoordinator {
         this.abortController.signal,
       );
       if (this.destroyed) return this.commentThreads();
-      validateCommentVersion(result.version);
+      validateAdapterVersion(result.version);
       const next = new Map<string, CommentThread>();
       for (const input of result.threads) {
         const thread = validateCommentThread(input, this.options.documentId);
@@ -601,13 +603,13 @@ export class CommentCoordinator {
       });
       if (this.destroyed) return response;
       if (response.status === "conflict") {
-        validateCommentVersion(response.currentVersion);
+        validateAdapterVersion(response.currentVersion);
         this.version = Math.max(this.version, response.currentVersion);
         this.emit({ type: "conflict", currentVersion: this.version });
         return response;
       }
 
-      validateCommentVersion(response.version);
+      validateAdapterVersion(response.version);
       if (response.status === "applied") {
         const thread = validateCommentThread(response.thread, this.options.documentId);
         if (thread.id !== mutation.threadId) {
@@ -755,9 +757,9 @@ function clonePresenceMessage(message: PresenceMessage): PresenceMessage {
   return cloneJsonValue(message);
 }
 
-function validateCommentVersion(version: number): void {
+function validateAdapterVersion(version: number): void {
   if (!Number.isSafeInteger(version) || version < 0) {
-    throw new Error("Comment adapter returned an invalid version");
+    throw new Error("Collaboration adapter returned an invalid version");
   }
 }
 

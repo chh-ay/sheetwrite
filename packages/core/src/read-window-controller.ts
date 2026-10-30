@@ -434,6 +434,8 @@ export class ReadWindowController {
     this.lastPaintZoom = zoom;
 
     if (refreshData) this.options.ariaMirror.bumpVersion();
+    // Inserts, deletes, filters and sheet switches all change the displayed rows.
+    this.options.ariaMirror.setRowCount(this.options.store.viewRowCount(activeSheet));
     this.options.ariaMirror.update(view);
     this.options.overlayPainter.paint(contentTop, scrollLeft, clientWidth, clientHeight);
     this.options.repositionEditor(contentTop, scrollLeft);

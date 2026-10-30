@@ -98,6 +98,14 @@ export class AriaMirror {
     this.bumpVersion();
   }
 
+  /** Displayed data rows; the header row adds one to `aria-rowcount`. */
+  setRowCount(count: number): void {
+    const value = String(count + 1);
+    if (this.host.getAttribute("aria-rowcount") !== value) {
+      this.host.setAttribute("aria-rowcount", value);
+    }
+  }
+
   update(view: VisibleWindowView): void {
     const focus = this.focusCell();
     const focusId = focus ? `${this.aria.id}-${focus.row}-${focus.col}` : "";

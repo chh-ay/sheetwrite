@@ -15,6 +15,14 @@ export function hasControlCharacters(value: string): boolean {
   return false;
 }
 
+/**
+ * Order strings by UTF-16 code unit. Persisted and canonical orders use this
+ * instead of `localeCompare`, whose result depends on the runtime locale.
+ */
+export function compareCodeUnits(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 /** Own enumerable data properties of a plain object restricted to `allowed`; null otherwise. */
 export function dataProperties(
   value: unknown,

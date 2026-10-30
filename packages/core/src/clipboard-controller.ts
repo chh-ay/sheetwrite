@@ -66,6 +66,12 @@ function escapeHtml(value: string): string {
     .replaceAll('"', "&quot;");
 }
 
+function parseExternalInput(source: string, type: Sheet["columns"][number]["type"]): CellValue {
+  const parsed = parseCellInput(source, type);
+
+  return parsed.kind === "formula" ? { kind: "literal", value: `'${parsed.src}` } : parsed;
+}
+
 function clipboardHtml(snapshot: ClipboardSnapshot): string {
   let html = "<table><tbody>";
   for (const row of snapshot.cells) {
@@ -75,10 +81,17 @@ function clipboardHtml(snapshot: ClipboardSnapshot): string {
       const css: string[] = [];
       if (style.bold) css.push("font-weight:bold");
       if (style.italic) css.push("font-style:italic");
-      if (style.underline) css.push("text-decoration:underline");
-      if (style.strikethrough) css.push("text-decoration:line-through");
-      if (style.color) css.push(`color:${style.color}`);
-      if (style.backgroundColor) css.push(`background-color:${style.backgroundColor}`);
+      const decoration = [
+        ...(style.underline ? ["underline"] : []),
+        ...(style.strikethrough ? ["line-through"] : []),
+      ];
+      if (decoration.length > 0) css.push(`text-decoration:${decoration.join(" ")}`);
+      const color = style.color ? safeCssColor(style.color) : undefined;
+      const backgroundColor = style.backgroundColor
+        ? safeCssColor(style.backgroundColor)
+        : undefined;
+      if (color) css.push(`color:${color}`);
+      if (backgroundColor) css.push(`background-color:${backgroundColor}`);
       if (style.align) css.push(`text-align:${style.align}`);
       if (style.verticalAlign) css.push(`vertical-align:${style.verticalAlign}`);
       // The family is validated to need no escaping beyond its quotes.
@@ -629,10 +642,7 @@ export class ClipboardController {
           source = cell.value.value as string;
         }
         return {
-          value: parseCellInput(
-            neutralizeInjection(source),
-            sheet.columns[targetCol]?.type ?? "text",
-          ),
+          value: parseExternalInput(source, sheet.columns[targetCol]?.type ?? "text"),
           style: cell.style,
         };
       },
@@ -656,10 +666,7 @@ export class ClipboardController {
           source = cell.value.value as string;
         }
         return {
-          value: parseCellInput(
-            neutralizeInjection(source),
-            sheet.columns[targetCol]?.type ?? "text",
-          ),
+          value: parseExternalInput(source, sheet.columns[targetCol]?.type ?? "text"),
           style: cell.style,
         };
       },
@@ -676,10 +683,7 @@ export class ClipboardController {
       grid.length,
       (r) => grid[r]!.length,
       (r, c, targetCol): CellWrite => ({
-        value: parseCellInput(
-          neutralizeInjection(grid[r]![c]!),
-          sheet.columns[targetCol]?.type ?? "text",
-        ),
+        value: parseExternalInput(grid[r]?.[c] ?? "", sheet.columns[targetCol]?.type ?? "text"),
       }),
     );
   }
