@@ -22,6 +22,10 @@ env:
   WASM_PACK_VERSION: "0.15.0"
   CARGO_AUDIT_VERSION: "0.22.2"
   CARGO_LLVM_COV_VERSION: "0.8.7"
+  # Pull requests restore caches but never save them: a pull request's cache can only be
+  # restored by that same pull request, so saving there fills the 10 GB budget and evicts
+  # the develop caches every branch shares.
+  SAVE_CACHE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/develop' }}
 
 jobs:
   preflight:
@@ -46,7 +50,8 @@ jobs:
         with:
           bun-version: ${{ env.BUN_VERSION }}
       - name: Cache Bun downloads
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        id: bun-downloads
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
@@ -78,7 +83,8 @@ jobs:
       - name: JavaScript dependency audit
         run: bun run audit:js
       - name: Cache cargo-audit
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        id: cargo-audit
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             ~/.cargo/bin/cargo-audit
@@ -94,6 +100,21 @@ jobs:
         run: bun run lint:rust
       - name: Lint
         run: bun run lint
+      - name: Save Bun downloads cache
+        if: env.SAVE_CACHE == 'true' && steps.bun-downloads.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ steps.bun-downloads.outputs.cache-primary-key }}
+      - name: Save cargo-audit cache
+        if: env.SAVE_CACHE == 'true' && steps.cargo-audit.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cargo/bin/cargo-audit
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ steps.cargo-audit.outputs.cache-primary-key }}
 
   unit-coverage:
     name: Unit Tests & Coverage
@@ -112,12 +133,14 @@ jobs:
         with:
           bun-version: ${{ env.BUN_VERSION }}
       - name: Cache Bun downloads
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        id: bun-downloads
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
       - name: Cache Rust coverage compilation
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        id: rust-coverage-compilation
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             packages/wasm/target
@@ -127,7 +150,8 @@ jobs:
           restore-keys: |
             coverage-target-${{ runner.os }}-${{ runner.arch }}-${{ env.RUST_VERSION }}-${{ env.CARGO_LLVM_COV_VERSION }}-
       - name: Cache release verification tools
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        id: release-verification-tools
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             ~/.cargo/bin/cargo-audit
@@ -142,7 +166,8 @@ jobs:
       # `bench:verify` launches Chromium only; Firefox and WebKit are exercised
       # separately by `browser-smoke`.
       - name: Cache Chromium
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        id: chromium
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-chromium-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
@@ -181,6 +206,35 @@ jobs:
             test-results/
             coverage/
           if-no-files-found: warn
+      - name: Save Bun downloads cache
+        if: env.SAVE_CACHE == 'true' && steps.bun-downloads.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ steps.bun-downloads.outputs.cache-primary-key }}
+      - name: Save Rust coverage compilation cache
+        if: env.SAVE_CACHE == 'true' && steps.rust-coverage-compilation.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            packages/wasm/target
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ steps.rust-coverage-compilation.outputs.cache-primary-key }}
+      - name: Save release verification tools cache
+        if: env.SAVE_CACHE == 'true' && steps.release-verification-tools.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cargo/bin/cargo-audit
+            ~/.cargo/bin/cargo-llvm-cov
+          key: ${{ steps.release-verification-tools.outputs.cache-primary-key }}
+      - name: Save Chromium cache
+        if: env.SAVE_CACHE == 'true' && steps.chromium.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.chromium.outputs.cache-primary-key }}
 
   artifact-build:
     name: Canonical Artifacts
@@ -202,12 +256,14 @@ jobs:
         with:
           bun-version: ${{ env.BUN_VERSION }}
       - name: Cache Bun downloads
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        id: bun-downloads
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
       - name: Cache Rust and WASM compilation
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        id: rust-and-wasm-compilation
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             packages/wasm/target
@@ -219,7 +275,8 @@ jobs:
           restore-keys: |
             wasm-target-v2-${{ runner.os }}-${{ runner.arch }}-${{ env.RUST_VERSION }}-${{ env.WASM_PACK_VERSION }}-
       - name: Cache release verification tools
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        id: release-verification-tools
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             ~/.cargo/bin/cargo-audit
@@ -251,6 +308,31 @@ jobs:
           path: test-results/release-artifacts/
           if-no-files-found: error
           retention-days: 7
+      - name: Save Bun downloads cache
+        if: env.SAVE_CACHE == 'true' && steps.bun-downloads.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ steps.bun-downloads.outputs.cache-primary-key }}
+      - name: Save Rust and WASM compilation cache
+        if: env.SAVE_CACHE == 'true' && steps.rust-and-wasm-compilation.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            packages/wasm/target
+            packages/wasm/pkg
+            packages/formulas/pkg
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ steps.rust-and-wasm-compilation.outputs.cache-primary-key }}
+      - name: Save release verification tools cache
+        if: env.SAVE_CACHE == 'true' && steps.release-verification-tools.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cargo/bin/cargo-audit
+            ~/.cargo/bin/cargo-llvm-cov
+          key: ${{ steps.release-verification-tools.outputs.cache-primary-key }}
 
   packed-consumers:
     name: Packed Consumers
@@ -271,14 +353,16 @@ jobs:
         with:
           bun-version: ${{ env.BUN_VERSION }}
       - name: Cache Bun downloads
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        id: bun-downloads
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Cache Chromium
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        id: chromium
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-chromium-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
@@ -297,6 +381,18 @@ jobs:
           bun run release:verify-artifacts -- --input test-results/release-artifacts
       - name: Test locked packed consumers
         run: bun run verify:packed -- --artifacts test-results/release-artifacts --locked
+      - name: Save Bun downloads cache
+        if: env.SAVE_CACHE == 'true' && steps.bun-downloads.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ steps.bun-downloads.outputs.cache-primary-key }}
+      - name: Save Chromium cache
+        if: env.SAVE_CACHE == 'true' && steps.chromium.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.chromium.outputs.cache-primary-key }}
 
   bundler-consumers:
     name: Bundler Consumers
@@ -317,14 +413,16 @@ jobs:
         with:
           bun-version: ${{ env.BUN_VERSION }}
       - name: Cache Bun downloads
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        id: bun-downloads
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Cache Chromium
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        id: chromium
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-chromium-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
@@ -343,6 +441,18 @@ jobs:
           bun run release:verify-artifacts -- --input test-results/release-artifacts
       - name: Test locked bundler consumers
         run: bun run verify:bundlers -- --artifacts test-results/release-artifacts --locked
+      - name: Save Bun downloads cache
+        if: env.SAVE_CACHE == 'true' && steps.bun-downloads.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ steps.bun-downloads.outputs.cache-primary-key }}
+      - name: Save Chromium cache
+        if: env.SAVE_CACHE == 'true' && steps.chromium.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.chromium.outputs.cache-primary-key }}
 
   delivery-size:
     name: Delivery Size
@@ -363,14 +473,16 @@ jobs:
         with:
           bun-version: ${{ env.BUN_VERSION }}
       - name: Cache Bun downloads
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        id: bun-downloads
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Cache Chromium
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        id: chromium
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-chromium-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
@@ -396,6 +508,18 @@ jobs:
           path: scripts/size-report.json
           if-no-files-found: error
           retention-days: 7
+      - name: Save Bun downloads cache
+        if: env.SAVE_CACHE == 'true' && steps.bun-downloads.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ steps.bun-downloads.outputs.cache-primary-key }}
+      - name: Save Chromium cache
+        if: env.SAVE_CACHE == 'true' && steps.chromium.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.chromium.outputs.cache-primary-key }}
 
   docs-build:
     name: Production Docs
@@ -415,7 +539,8 @@ jobs:
         with:
           bun-version: ${{ env.BUN_VERSION }}
       - name: Cache Bun downloads
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        id: bun-downloads
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
@@ -452,6 +577,12 @@ jobs:
           if-no-files-found: error
           include-hidden-files: true
           retention-days: 7
+      - name: Save Bun downloads cache
+        if: env.SAVE_CACHE == 'true' && steps.bun-downloads.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ steps.bun-downloads.outputs.cache-primary-key }}
 
   browser-smoke:
     name: Browser Smoke (${{ matrix.shard }}/3)
@@ -479,7 +610,8 @@ jobs:
           echo "$HOME/.bun-npm/node_modules/.bin" >> "$GITHUB_PATH"
           test "$("$HOME/.bun-npm/node_modules/.bin/bun" --version)" = "$BUN_VERSION"
       - name: Cache Bun downloads
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        id: bun-downloads
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
@@ -503,6 +635,12 @@ jobs:
             test-results/playwright/
             playwright-report/
           if-no-files-found: warn
+      - name: Save Bun downloads cache
+        if: env.SAVE_CACHE == 'true' && steps.bun-downloads.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ steps.bun-downloads.outputs.cache-primary-key }}
 
 
 
