@@ -284,7 +284,7 @@ Limitations: Available only in @sheetwrite/formulas. Named ranges are supported,
 
 | Dialect | Status |
 | --- | --- |
-| Microsoft Excel | documented |
+| Microsoft Excel | divergent |
 | Google Sheets | unverified |
 | OpenFormula | unverified |
 

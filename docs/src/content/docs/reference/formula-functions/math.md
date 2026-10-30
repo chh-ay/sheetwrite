@@ -27,7 +27,7 @@ This page lists the 52 functions of the math and trigonometry family. Taxonomy/s
 <tr data-formula-name="RAND" data-engine="default"><td><code>RAND</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-zero">Signature: <code>zero</code></a><br /><a href="#semantics-volatile-random">Semantics: <code>volatile-random</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-random">Implementation: <code>implemented-random</code></a></details></td></tr>
 <tr data-formula-name="RANDBETWEEN" data-engine="default"><td><code>RANDBETWEEN</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-random-between">Signature: <code>random-between</code></a><br /><a href="#semantics-volatile-random">Semantics: <code>volatile-random</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-random">Implementation: <code>implemented-random</code></a></details></td></tr>
 <tr data-formula-name="SUMIF" data-engine="default"><td><code>SUMIF</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-sumif">Signature: <code>sumif</code></a><br /><a href="#semantics-criteria">Semantics: <code>criteria</code></a><br /><a href="#dialect-excel-criteria-range">Dialect: <code>excel-criteria-range</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
-<tr data-formula-name="SUMIFS" data-engine="default"><td><code>SUMIFS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-sumifs">Signature: <code>sumifs</code></a><br /><a href="#semantics-criteria">Semantics: <code>criteria</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="SUMIFS" data-engine="default"><td><code>SUMIFS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-sumifs">Signature: <code>sumifs</code></a><br /><a href="#semantics-criteria">Semantics: <code>criteria</code></a><br /><a href="#dialect-excel-criteria-mixed-types">Dialect: <code>excel-criteria-mixed-types</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="PRODUCT" data-engine="default"><td><code>PRODUCT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="SUMPRODUCT" data-engine="default"><td><code>SUMPRODUCT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="POWER" data-engine="default"><td><code>POWER</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-binary-number">Signature: <code>binary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
@@ -44,7 +44,7 @@ This page lists the 52 functions of the math and trigonometry family. Taxonomy/s
 <tr data-formula-name="GCD" data-engine="default"><td><code>GCD</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="LCM" data-engine="default"><td><code>LCM</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="SUBTOTAL" data-engine="default"><td><code>SUBTOTAL</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-subtotal">Signature: <code>subtotal</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-subtotal-visible">Dialect: <code>excel-subtotal-visible</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
-<tr data-formula-name="AGGREGATE" data-engine="full"><td><code>AGGREGATE</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-aggregate">Signature: <code>aggregate</code></a><br /><a href="#semantics-analysis-math">Semantics: <code>analysis-math</code></a><br /><a href="#dialect-analysis-math">Dialect: <code>analysis-math</code></a><br /><a href="#implementation-analysis-math">Implementation: <code>analysis-math</code></a></details></td></tr>
+<tr data-formula-name="AGGREGATE" data-engine="full"><td><code>AGGREGATE</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-aggregate">Signature: <code>aggregate</code></a><br /><a href="#semantics-analysis-math">Semantics: <code>analysis-math</code></a><br /><a href="#dialect-analysis-aggregate">Dialect: <code>analysis-aggregate</code></a><br /><a href="#implementation-analysis-math">Implementation: <code>analysis-math</code></a></details></td></tr>
 <tr data-formula-name="CEILING.MATH" data-engine="full"><td><code>CEILING.MATH</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-round-math">Signature: <code>round-math</code></a><br /><a href="#semantics-analysis-math">Semantics: <code>analysis-math</code></a><br /><a href="#dialect-analysis-math">Dialect: <code>analysis-math</code></a><br /><a href="#implementation-analysis-math">Implementation: <code>analysis-math</code></a></details></td></tr>
 <tr data-formula-name="COMBIN" data-engine="full"><td><code>COMBIN</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-binary-number">Signature: <code>binary-number</code></a><br /><a href="#semantics-analysis-math">Semantics: <code>analysis-math</code></a><br /><a href="#dialect-analysis-math">Dialect: <code>analysis-math</code></a><br /><a href="#implementation-analysis-math">Implementation: <code>analysis-math</code></a></details></td></tr>
 <tr data-formula-name="COMBINA" data-engine="full"><td><code>COMBINA</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-binary-number">Signature: <code>binary-number</code></a><br /><a href="#semantics-analysis-math">Semantics: <code>analysis-math</code></a><br /><a href="#dialect-analysis-math">Dialect: <code>analysis-math</code></a><br /><a href="#implementation-analysis-math">Implementation: <code>analysis-math</code></a></details></td></tr>
@@ -416,6 +416,18 @@ Limitations: A not-equal criterion does not match a value of a different type. W
 
 </details>
 
+<details id="dialect-excel-criteria-mixed-types"><summary>Dialect: excel-criteria-mixed-types</summary>
+
+| Dialect | Status |
+| --- | --- |
+| Microsoft Excel | divergent |
+| Google Sheets | unverified |
+| OpenFormula | unverified |
+
+Limitations: A not-equal criterion does not match a value of a different type. With 5, "x" and a blank cell, "<>" selects only the text cell; Excel selects both nonblank cells, as in =COUNTIF(A1:A3,"<>") (#246).
+
+</details>
+
 <details id="dialect-excel-subtotal-visible"><summary>Dialect: excel-subtotal-visible</summary>
 
 | Dialect | Status |
@@ -428,6 +440,18 @@ Limitations: Only function codes 1 to 11 are accepted. Codes 101 to 111, which i
 
 </details>
 
+<details id="dialect-analysis-aggregate"><summary>Dialect: analysis-aggregate</summary>
+
+| Dialect | Status |
+| --- | --- |
+| Microsoft Excel | divergent |
+| Google Sheets | unverified |
+| OpenFormula | unverified |
+
+Limitations: Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?. Hidden rows are not part of the engine model. AGGREGATE row visibility options therefore have no effect.
+
+</details>
+
 <details id="dialect-analysis-math"><summary>Dialect: analysis-math</summary>
 
 | Dialect | Status |
@@ -436,7 +460,7 @@ Limitations: Only function codes 1 to 11 are accepted. Codes 101 to 111, which i
 | Google Sheets | unverified |
 | OpenFormula | unverified |
 
-Limitations: Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?. Hidden rows are not part of the engine model. AGGREGATE row visibility options therefore have no effect. Matrix functions use engine resource limits.
+Limitations: Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?. Matrix functions use engine resource limits.
 
 </details>
 

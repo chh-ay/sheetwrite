@@ -4919,7 +4919,7 @@
       ]
     },
     "analysis-distributions": {
-      "excel": "documented",
+      "excel": "divergent",
       "googleSheets": "unverified",
       "openFormula": "unverified",
       "divergences": [
@@ -4950,20 +4950,30 @@
       "openFormula": "unverified",
       "divergences": [
         "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?.",
-        "Hidden rows are not part of the engine model. AGGREGATE row visibility options therefore have no effect. Matrix functions use engine resource limits."
+        "Matrix functions use engine resource limits."
       ]
     },
-    "analysis-database": {
-      "excel": "documented",
+    "analysis-aggregate": {
+      "excel": "divergent",
       "googleSheets": "unverified",
       "openFormula": "unverified",
       "divergences": [
         "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?.",
-        "Database criteria use header names, AND across columns, and OR across rows. Custom formula predicates under headers that are not database fields are not supported."
+        "Hidden rows are not part of the engine model. AGGREGATE row visibility options therefore have no effect."
+      ]
+    },
+    "analysis-database": {
+      "excel": "divergent",
+      "googleSheets": "unverified",
+      "openFormula": "unverified",
+      "divergences": [
+        "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?.",
+        "Database criteria use header names, AND across columns, and OR across rows. Custom formula predicates under headers that are not database fields are not supported.",
+        "A not-equal criterion does not match a value of a different type, so \"<>\" skips numbers in a field that Excel counts as nonblank (#246)."
       ]
     },
     "analysis-lambda": {
-      "excel": "documented",
+      "excel": "divergent",
       "googleSheets": "unverified",
       "openFormula": "unverified",
       "divergences": [
@@ -4972,7 +4982,7 @@
       ]
     },
     "analysis-groupby": {
-      "excel": "documented",
+      "excel": "divergent",
       "googleSheets": "unverified",
       "openFormula": "unverified",
       "divergences": [
@@ -5034,7 +5044,7 @@
       "googleSheets": "unverified",
       "openFormula": "unverified",
       "divergences": [
-        "A not-equal criterion does not match a value of a different type. With 5, \"x\" and a blank cell, =COUNTIF(A1:A3,\"<>\") counts only the text cell; Excel counts both nonblank cells (#246)."
+        "A not-equal criterion does not match a value of a different type. With 5, \"x\" and a blank cell, \"<>\" selects only the text cell; Excel selects both nonblank cells, as in =COUNTIF(A1:A3,\"<>\") (#246)."
       ]
     },
     "excel-criteria-range": {
@@ -6417,7 +6427,7 @@
       "contractStatus": "supported",
       "signature": "criteria-many",
       "semantics": "criteria",
-      "dialects": "excel-documented",
+      "dialects": "excel-criteria-mixed-types",
       "implementation": "implemented-assisted",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
@@ -6441,7 +6451,7 @@
       "contractStatus": "supported",
       "signature": "sumifs",
       "semantics": "criteria",
-      "dialects": "excel-documented",
+      "dialects": "excel-criteria-mixed-types",
       "implementation": "implemented-assisted",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
@@ -6465,7 +6475,7 @@
       "contractStatus": "supported",
       "signature": "sumifs",
       "semantics": "criteria",
-      "dialects": "excel-documented",
+      "dialects": "excel-criteria-mixed-types",
       "implementation": "implemented-assisted",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
@@ -7317,7 +7327,7 @@
       "contractStatus": "required-supported",
       "signature": "sumifs",
       "semantics": "criteria",
-      "dialects": "excel-documented",
+      "dialects": "excel-criteria-mixed-types",
       "implementation": "implemented-assisted",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
@@ -7329,7 +7339,7 @@
       "contractStatus": "required-supported",
       "signature": "sumifs",
       "semantics": "criteria",
-      "dialects": "excel-documented",
+      "dialects": "excel-criteria-mixed-types",
       "implementation": "implemented-assisted",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
@@ -8817,7 +8827,7 @@
       "contractStatus": "supported",
       "signature": "aggregate",
       "semantics": "analysis-math",
-      "dialects": "analysis-math",
+      "dialects": "analysis-aggregate",
       "implementation": "analysis-math",
       "version": 1,
       "builds": ["@sheetwrite/formulas"]

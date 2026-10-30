@@ -28,11 +28,11 @@ describe("Excel function coverage", () => {
     const inventory = await loadFormulaContractInventory(ROOT);
     const page = renderExcelCoveragePage(
       inventory,
-      catalog(["SUM", "FORECAST", "REGEXTEST", "CELL", "CUBEVALUE"]),
+      catalog(["SUM", "FORECAST", "REGEXTEST", "CELL", "SIN", "CUBEVALUE"]),
     );
     const rows = page.content.split("\n").filter((line) => line.startsWith("| [`"));
 
-    expect(rows).toHaveLength(5);
+    expect(rows).toHaveLength(6);
     expect(rows.find((row) => row.startsWith("| [`SUM`]"))).toContain("| Supported | Supported |");
     const forecast = rows.find((row) => row.startsWith("| [`FORECAST`]"));
     expect(forecast).toContain("| Supported | Not supported |");
@@ -44,11 +44,14 @@ describe("Excel function coverage", () => {
     const cell = rows.find((row) => row.startsWith("| [`CELL`]"));
     expect(cell).toContain("| Partly supported | Partly supported |");
     expect(cell).toContain("Other info types return #VALUE!");
-    expect(rows.find((row) => row.startsWith("| [`CUBEVALUE`]"))).toContain(
+    expect(rows.find((row) => row.startsWith("| [`SIN`]"))).toContain(
       "| Not supported | Not supported | Not registered in either engine.",
     );
+    expect(rows.find((row) => row.startsWith("| [`CUBEVALUE`]"))).toContain(
+      "| Not supported | Not supported | Unsupported by design: OLAP cube members",
+    );
     expect(page.content).toContain(
-      "**2 supported**, **2 partly supported**, and **1 not supported**",
+      "**2 supported**, **2 partly supported**, and **2 not supported**",
     );
   });
 

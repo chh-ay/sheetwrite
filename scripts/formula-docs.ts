@@ -507,18 +507,11 @@ export function formulaFamilyNavigation(
 interface ExcelCoverageContext {
   readonly byName: ReadonlyMap<string, FormulaRecord>;
   readonly dialects: Record<string, JsonObject>;
+  /** Contract scope text for names that are unsupported by design. */
+  readonly exclusions: ReadonlyMap<string, string>;
   readonly seen: Set<string>;
   readonly summary: { supported: number; partial: number; missing: number };
 }
-
-// These documented profiles also state a known Excel limitation. Numerical
-// resource ceilings alone do not make every implemented function partial.
-const PARTIAL_EXCEL_PROFILES: Readonly<Record<string, true>> = {
-  "analysis-distributions": true,
-  "analysis-database": true,
-  "analysis-lambda": true,
-  "analysis-groupby": true,
-};
 
 function excelDifference(
   formula: FormulaRecord,
@@ -527,10 +520,7 @@ function excelDifference(
   readonly partial: boolean;
   readonly notes: readonly string[];
 } {
-  const partial =
-    dialect.excel === "divergent" ||
-    PARTIAL_EXCEL_PROFILES[formula.dialects] === true ||
-    formula.canonical === "AGGREGATE";
+  const partial = dialect.excel === "divergent";
   const notes = stringArray(dialect.divergences, `${formula.dialects}.divergences`)
     .filter((note) => !note.startsWith("Google Sheets and OpenFormula"))
     .map((note) => note.replace(/^Available only[^.]*\.\s*/u, ""))
@@ -557,7 +547,12 @@ function renderExcelCoverageRow(value: unknown, context: ExcelCoverageContext): 
   const formula = context.byName.get(name);
   if (formula === undefined) {
     context.summary.missing++;
-    return `| [\`${name}\`](${url}) | Not supported | Not supported | Not registered in either engine. |`;
+    const exclusion = context.exclusions.get(name);
+    const note =
+      exclusion === undefined
+        ? "Not registered in either engine."
+        : `Unsupported by design: ${exclusion}`;
+    return `| [\`${name}\`](${url}) | Not supported | Not supported | ${cell(note)} |`;
   }
 
   const dialect = context.dialects[formula.dialects];
@@ -596,6 +591,20 @@ function renderExcelCoverageFamilies(
   });
 }
 
+function unsupportedExamples(value: unknown): Map<string, string> {
+  if (!Array.isArray(value)) throw new Error("unsupportedCategories must be an array");
+
+  return new Map(
+    value.flatMap((entry, index) => {
+      const category = object(entry, `unsupportedCategories[${index}]`);
+      const scope = string(category.scope, `unsupportedCategories[${index}].scope`);
+      return stringArray(category.examples, `unsupportedCategories[${index}].examples`).map(
+        (name) => [name, scope] as const,
+      );
+    }),
+  );
+}
+
 /**
  * Compare Microsoft's pinned names with the registry-checked contract.
  * The catalog has no availability flags that could drift from the engine.
@@ -616,6 +625,7 @@ export function renderExcelCoveragePage(
       ),
     ),
     dialects: recordMap(inventory.dialectProfiles, "dialectProfiles"),
+    exclusions: unsupportedExamples(inventory.unsupportedCategories),
     seen: new Set<string>(),
     summary: { supported: 0, partial: 0, missing: 0 },
   };
@@ -638,8 +648,8 @@ export function renderExcelCoveragePage(
       "",
       "- **Full engine** is `@sheetwrite/formulas`. **Lite engine** is the default `@sheetwrite/wasm` package. Importing the full package alone does not select it; see [engine builds](/docs/reference/formula-functions/#engine-builds).",
       "- **Supported** means registered and implemented within the linked Sheetwrite signature and semantic contract. It does not mean complete Excel parity, array broadcasting for every scalar function, unlimited numerical precision, or reviewed external results.",
-      "- **Partly supported** means implemented with a known Excel difference. The row states the difference. Shared resource limits are documented in the [bounded evaluation contract](/docs/reference/formula-functions/#bounded-evaluation-contract).",
-      "- **Not supported** means not registered in that engine; the call evaluates to `#NAME?`. A function that is only in the full engine is not a broken lite implementation.",
+      "- **Partly supported** means implemented with a known Excel difference, marked as divergent in the formula contract. The row states the difference. Shared resource limits are documented in the [bounded evaluation contract](/docs/reference/formula-functions/#bounded-evaluation-contract).",
+      "- **Not supported** means not registered in that engine; the call evaluates to `#NAME?`. A function that is only in the full engine is not a broken lite implementation. **Unsupported by design** marks a name that the contract's [unsupported categories](/docs/reference/formula-functions/#unsupported-categories) exclude on purpose; other missing names are open gaps.",
       "- Availability and aliases come from the formula contract, checked against the Rust parser registry and the full engine's analysis registries every time this page is generated or checked. The Microsoft catalog stores names, categories and source links only.",
       "- To refresh the baseline, update `scripts/excel-functions.json` from the linked Microsoft catalog. Keep one row per name, split compound names, omit the featured-function duplicates, and prefer a function's current category over its compatibility duplicate. Run `bun run docs:generate`, then `bun run docs:check`.",
       "- Reviewed external workbook results are separate from registry coverage; see [compatibility results](/docs/reference/compatibility-results/).",
