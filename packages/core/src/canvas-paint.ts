@@ -1,5 +1,11 @@
 import { formatNumber } from "./number-format.js";
-import type { CellAlign, CellBorder, CellScalar, CellStyle } from "./types/cell.js";
+import type {
+  CellAlign,
+  CellBorder,
+  CellScalar,
+  CellStyle,
+  CellVerticalAlign,
+} from "./types/cell.js";
 import type { CellRenderer, RenderLayout, Theme, Viewport } from "./types/render.js";
 import type { VisibleWindowView } from "./types/store.js";
 
@@ -9,6 +15,9 @@ const FONT_PX_RE = /(\d+(?:\.\d+)?)px/;
 const FONT_WEIGHT_TOKEN_RE = /^(?:normal|bold|bolder|lighter|[1-9]\d{0,2}|1000)$/;
 const FONT_STYLE_TOKEN_RE = /^(?:normal|italic|oblique)$/;
 const FONT_ANGLE_TOKEN_RE = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:deg|grad|rad|turn)$/;
+
+/** Gap between a top- or bottom-aligned text block and the cell edge, unzoomed. */
+const VERTICAL_TEXT_PAD = 2;
 
 /** Shared empty style; skips a per-cell `{}` allocation on the render hot path. */
 const EMPTY_STYLE: CellStyle = {};
@@ -99,19 +108,42 @@ function columnEdges(layout: RenderLayout): number[] {
   return colX;
 }
 
+/**
+ * Put `family` in front of the font string's family list. The theme families
+ * stay as fallbacks, so a family the browser lacks renders in the theme font.
+ * `family` is validated (see cell-style-fields.ts) to need only quoting.
+ */
+function withFontFamily(font: string, family: string): string {
+  const sizeMatch = FONT_PX_RE.exec(font);
+  if (!sizeMatch || sizeMatch.index === undefined) return font;
+  const fromSize = font.slice(sizeMatch.index);
+  const sizeToken = /^\S+/.exec(fromSize)?.[0] ?? fromSize;
+  const themeFamilies = fromSize.slice(sizeToken.length).trim();
+  const families = themeFamilies ? `"${family}", ${themeFamilies}` : `"${family}"`;
+  return `${font.slice(0, sizeMatch.index)}${sizeToken} ${families}`;
+}
+
 /** Resolve the canvas font from the theme and cell style. */
 export function fontFor(
   theme: Theme,
-  style: Pick<CellStyle, "bold" | "italic" | "fontSize">,
+  style: Pick<CellStyle, "bold" | "italic" | "fontSize" | "fontFamily">,
   zoom = 1,
   cache?: Map<string, string>,
 ): string {
-  if (!style.bold && !style.italic && style.fontSize === undefined) return theme.font;
+  if (
+    !style.bold &&
+    !style.italic &&
+    style.fontSize === undefined &&
+    style.fontFamily === undefined
+  ) {
+    return theme.font;
+  }
   const size = style.fontSize === undefined ? undefined : style.fontSize * zoom;
-  const key = `${style.italic ? 1 : 0}:${style.bold ? 1 : 0}:${size ?? ""}`;
+  const key = `${style.italic ? 1 : 0}:${style.bold ? 1 : 0}:${size ?? ""}:${style.fontFamily ?? ""}`;
   const cached = cache?.get(key);
   if (cached !== undefined) return cached;
-  const base = size === undefined ? theme.font : theme.font.replace(FONT_PX_RE, `${size}px`);
+  const sized = size === undefined ? theme.font : theme.font.replace(FONT_PX_RE, `${size}px`);
+  const base = style.fontFamily === undefined ? sized : withFontFamily(sized, style.fontFamily);
   const sizeMatch = FONT_PX_RE.exec(base);
   if (!sizeMatch || sizeMatch.index === undefined) return base;
   const prefix = base.slice(0, sizeMatch.index).trim().split(/\s+/).filter(Boolean);
@@ -141,12 +173,43 @@ export function fontFor(
   return font;
 }
 
+/** First probe length for a paragraph's first line; later lines start from the previous line's length. */
+const FIRST_LINE_GUESS = 16;
+const WHITESPACE = /\s/;
+/**
+ * Below U+0300 every code unit is a whole grapheme. From there on, combining
+ * marks, surrogate pairs, ZWJ sequences and Indic clusters span several.
+ */
+const MAY_HAVE_CLUSTERS = /[\u0300-\uffff]/;
+let graphemeSegmenter: Intl.Segmenter | undefined;
+
+/** End offset of each grapheme, or null when every code unit is one. */
+function graphemeEnds(paragraph: string): number[] | null {
+  if (!MAY_HAVE_CLUSTERS.test(paragraph)) return null;
+  graphemeSegmenter ??= new Intl.Segmenter(undefined, { granularity: "grapheme" });
+  const ends: number[] = [];
+  for (const { index, segment } of graphemeSegmenter.segment(paragraph)) {
+    ends.push(index + segment.length);
+  }
+  return ends;
+}
+
 /**
  * Wrapped-only line layout; the ordinary single-line path never calls this.
  * `maxLines` bounds the work for cells whose block cannot fit: the caller only
  * draws lines that fit the cell height, so generating more than
  * `floor(height / lineHeight) + 1` lines cannot change the pixels. A result
  * whose length reaches `maxLines` therefore means "more lines exist".
+ *
+ * Lines break between graphemes, never inside an emoji or a cluster. Inside
+ * a cluster a prefix can be wider than the whole (a half-built ZWJ sequence),
+ * but across graphemes width grows with length, so each break is found by
+ * search instead of measuring every prefix, which made a line of L characters
+ * cost L measurements of growing strings. Joining scripts such as Arabic can
+ * shrink slightly when a letter takes its final form; there the search may
+ * pick a different break than a scan would, but every line it picks fits.
+ * The search gallops forward from the previous line's length, then bisects,
+ * so measured text stays close to one line long however long the paragraph is.
  */
 function layoutTextLinesInto(
   ctx: Ctx,
@@ -156,27 +219,71 @@ function layoutTextLinesInto(
   lines: string[],
 ): string[] {
   const limit = Math.max(1, maxLines);
+
   for (const paragraph of text.split("\n")) {
     if (lines.length >= limit) break;
     if (paragraph === "") {
       lines.push("");
       continue;
     }
+
+    // Break units: graphemes, or plain code units when they coincide (no allocation).
+    const ends = graphemeEnds(paragraph);
+    const count = ends === null ? paragraph.length : ends.length;
+    const endOf = (unit: number): number => (ends === null ? unit + 1 : (ends[unit] ?? 0));
+
+    let first = 0;
     let start = 0;
-    while (start < paragraph.length && lines.length < limit) {
-      let end = start;
-      let lastBreak = -1;
-      while (end < paragraph.length) {
-        const next = end + 1;
-        if (/\s/.test(paragraph[end]!)) lastBreak = next;
-        if (ctx.measureText(paragraph.slice(start, next)).width > width) {
-          if (end === start) end = next;
-          else if (lastBreak > start) end = lastBreak;
+    let guess = FIRST_LINE_GUESS;
+    const overflows = (unit: number): boolean =>
+      ctx.measureText(paragraph.slice(start, endOf(unit))).width > width;
+
+    while (first < count && lines.length < limit) {
+      // Gallop: grow the probe until it overflows or the paragraph ends.
+      let fits = first - 1;
+      let over = -1;
+      for (let step = guess; ; step *= 2) {
+        const probe = Math.min(count - 1, fits + step);
+        if (overflows(probe)) {
+          over = probe;
           break;
         }
-        end = next;
+        fits = probe;
+        if (probe === count - 1) break;
       }
+      if (over === -1) {
+        lines.push(paragraph.slice(start));
+        break;
+      }
+
+      // Bisect for the first unit that does not fit.
+      let low = fits + 1;
+      let high = over;
+      while (low < high) {
+        const mid = (low + high) >>> 1;
+        if (overflows(mid)) high = mid;
+        else low = mid + 1;
+      }
+      const overflowUnit = low;
+
+      // A first unit too wide for the cell still gets a line of its own.
+      // Otherwise break after the last whitespace up to the overflowing unit
+      // (it may be that whitespace), or mid-word just before it.
+      let last = first;
+      if (overflowUnit > first) {
+        last = overflowUnit - 1;
+        for (let unit = overflowUnit; unit >= first; unit--) {
+          if (WHITESPACE.test(paragraph[endOf(unit) - 1] ?? "")) {
+            last = unit;
+            break;
+          }
+        }
+      }
+
+      const end = endOf(last);
       lines.push(paragraph.slice(start, end));
+      guess = last - first + 1;
+      first = last + 1;
       start = end;
     }
   }
@@ -186,6 +293,26 @@ function layoutTextLinesInto(
 /** Full wrapped layout for callers that need every line, such as auto row height. */
 export function layoutTextLines(ctx: Ctx, text: string, width: number): string[] {
   return layoutTextLinesInto(ctx, text, width, Number.POSITIVE_INFINITY, []);
+}
+
+/**
+ * Top edge of a text block `blockHeight` tall inside a cell at `y` of height
+ * `h`. A block taller than the cell is top-anchored whatever the alignment, so
+ * its first lines stay readable.
+ */
+function textBlockTop(
+  verticalAlign: CellVerticalAlign | undefined,
+  y: number,
+  h: number,
+  blockHeight: number,
+  zoom: number,
+): number {
+  const free = h - blockHeight;
+  if (free <= 0) return y;
+  const pad = Math.min(VERTICAL_TEXT_PAD * zoom, free / 2);
+  if (verticalAlign === "top") return y + pad;
+  if (verticalAlign === "bottom") return y + free - pad;
+  return y + free / 2;
 }
 
 /**
@@ -728,7 +855,7 @@ function paintCell(
         ? "TRUE"
         : "FALSE"
       : numeric
-        ? formatNumber(value, column?.numberFormat, column?.numberLocale)
+        ? formatNumber(value, effective.numberFormat ?? column?.numberFormat, column?.numberLocale)
         : value;
   const availableTextWidth = Math.max(0, w - CELL_PAD * 2);
   if (numeric) {
@@ -751,17 +878,18 @@ function paintCell(
     effective.fontSize === undefined
       ? Number.parseFloat(FONT_PX_RE.exec(theme.font)?.[1] ?? "") || 12
       : effective.fontSize * (layout.zoom ?? 1);
+  const zoom = layout.zoom ?? 1;
+  const lineHeight = fontPx * 1.2;
   ctx.save();
   if (effective.wrap && !numeric) {
     clipCell(ctx, x, y, w, h);
-    const lineHeight = fontPx * 1.2;
     // The draw loop below never paints a line whose band starts past the cell,
     // and a block taller than the cell is top-anchored either way, so laying
     // out one line past the last drawable one changes no pixel.
     const maxLines = Math.floor(h / lineHeight) + 1;
     const lines = layoutTextLinesInto(ctx, text, availableTextWidth, maxLines, []);
     const blockHeight = lines.length * lineHeight;
-    const firstCy = y + (h - Math.min(h, blockHeight)) / 2 + lineHeight / 2;
+    const firstCy = textBlockTop(effective.verticalAlign, y, h, blockHeight, zoom) + lineHeight / 2;
     for (let line = 0; line < lines.length; line++) {
       const cy = firstCy + line * lineHeight;
       if (cy - lineHeight / 2 >= y + h) break;
@@ -787,7 +915,11 @@ function paintCell(
       }
     }
 
-    const cy = y + h / 2;
+    // Unset or "middle" keeps the exact centered baseline for existing sheets.
+    const cy =
+      effective.verticalAlign === undefined || effective.verticalAlign === "middle"
+        ? y + h / 2
+        : textBlockTop(effective.verticalAlign, y, h, lineHeight, zoom) + lineHeight / 2;
     clipCell(ctx, textClipX, y, textClipW, h);
     fillAlignedText(ctx, text, align, x, w, cy);
     if (effective.underline || effective.strikethrough) {

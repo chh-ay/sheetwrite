@@ -276,9 +276,9 @@ function captureStoreOnlyProbe(args: readonly string[]): void {
         {
           id: "dependency-index",
           kind: "dependency-cycle",
-          owner: "store::CellStore::dep_index",
+          owner: "graph::FormulaGraph::index",
           dependency: "eval::DepIndex",
-          reason: "recalculation dependency state is owned directly by CellStore",
+          reason: "recalculation dependency state is owned by the store's formula graph",
         },
       ]
     : [];

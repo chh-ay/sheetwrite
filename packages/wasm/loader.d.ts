@@ -2,6 +2,19 @@ import type * as WasmExports from "./pkg/sheetwrite_wasm.js";
 
 export * from "./pkg/sheetwrite_wasm.js";
 
+/** Store shared by default and full providers; only the default provider installs saved output. */
+type ProviderCellStore = Omit<WasmExports.CellStore, "setSavedPivots"> &
+  Partial<Pick<WasmExports.CellStore, "setSavedPivots">>;
+
+type ProviderCellStoreConstructor = Omit<
+  typeof WasmExports.CellStore,
+  "prototype" | "importMemoryState"
+> & {
+  new (): ProviderCellStore;
+  readonly prototype: ProviderCellStore;
+  importMemoryState(bytes: Uint8Array): ProviderCellStore;
+};
+
 /** Sources accepted by asynchronous initialization: a fetchable URL/request/response, raw module bytes, or a precompiled `WebAssembly.Module`. */
 export type { InitInput } from "./pkg/sheetwrite_wasm.js";
 
@@ -34,7 +47,12 @@ export declare function load(
 export declare function isLoaded(): boolean;
 
 /** Engine objects and caches owned by one independently collectible WASM instance. */
-export type EngineInstance = Omit<typeof WasmExports, "default"> & {
+export type EngineInstance = Omit<typeof WasmExports, "default" | "CellStore" | "initSync"> & {
+  initSync(
+    ...args: Parameters<typeof WasmExports.initSync>
+  ): Omit<WasmExports.InitOutput, "cellstore_setSavedPivots"> &
+    Partial<Pick<WasmExports.InitOutput, "cellstore_setSavedPivots">>;
+  CellStore: ProviderCellStoreConstructor;
   getModule(): WebAssembly.Module;
 
   getMemory(): WebAssembly.Memory;

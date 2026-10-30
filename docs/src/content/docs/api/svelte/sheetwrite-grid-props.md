@@ -1,6 +1,6 @@
 ---
 title: "SheetwriteGridProps | @sheetwrite/svelte"
-description: "Advanced Svelte adapter props with inferred host row identity."
+description: "SheetwriteGridProps interface in @sheetwrite/svelte: Advanced Svelte adapter props with inferred host row identity."
 ---
 <!-- api-export:@sheetwrite/svelte|.|SheetwriteGridProps -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="interface">interface</span></div>

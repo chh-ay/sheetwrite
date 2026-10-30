@@ -1,6 +1,6 @@
 ---
 title: "CellStyle | @sheetwrite/core"
-description: "Serializable formatting applied to a cell or used as a column default."
+description: "CellStyle interface in @sheetwrite/core: Serializable formatting applied to a cell or used as a column default."
 ---
 <!-- api-export:@sheetwrite/core|.|CellStyle -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -8,7 +8,7 @@ description: "Serializable formatting applied to a cell or used as a column defa
 Serializable formatting applied to a cell or used as a column default.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/cell.ts#L27"><code>packages/core/src/types/cell.ts#L27</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/cell.ts#L30"><code>packages/core/src/types/cell.ts#L30</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -17,14 +17,17 @@ Serializable formatting applied to a cell or used as a column default.
 <a href="#cell-style-underline"><code>underline</code></a>
 <a href="#cell-style-strikethrough"><code>strikethrough</code></a>
 <a href="#cell-style-font-size"><code>fontSize</code></a>
+<a href="#cell-style-font-family"><code>fontFamily</code></a>
 <a href="#cell-style-color"><code>color</code></a>
 <a href="#cell-style-background-color"><code>backgroundColor</code></a>
 <a href="#cell-style-align"><code>align</code></a>
+<a href="#cell-style-vertical-align"><code>verticalAlign</code></a>
+<a href="#cell-style-number-format"><code>numberFormat</code></a>
 <a href="#cell-style-wrap"><code>wrap</code></a>
 <a href="#cell-style-border"><code>border</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>10</span>
+## Members <span class="api-count" data-pagefind-ignore>13</span>
 
 <div class="api-member-list">
 
@@ -73,6 +76,18 @@ fontSize?: number;
 
 </details>
 
+<details class="api-member" id="cell-style-font-family" data-pagefind-weight="1">
+<summary><code>fontFamily</code> <span class="api-member-summary">Font family name, e.g. &quot;Calibri&quot;.</span></summary>
+
+```ts generated
+fontFamily?: string;
+```
+
+<p class="api-member-doc">Font family name, e.g. &quot;Calibri&quot;. The theme font family stays the fallback,
+so a font the browser lacks renders in the theme font. Letters, digits,
+spaces, `.`, `_` and `-` only; at most 128 characters.</p>
+</details>
+
 <details class="api-member" id="cell-style-color" data-pagefind-weight="1">
 <summary><code>color</code> <span class="api-member-summary">hex color, e.g. &quot;#111111&quot;</span></summary>
 
@@ -98,6 +113,26 @@ backgroundColor?: string;
 align?: CellAlign;
 ```
 
+</details>
+
+<details class="api-member" id="cell-style-vertical-align" data-pagefind-weight="1">
+<summary><code>verticalAlign</code> <span class="api-member-summary">Vertical placement of cell text; omitted keeps text centered.</span></summary>
+
+```ts generated
+verticalAlign?: CellVerticalAlign;
+```
+
+</details>
+
+<details class="api-member" id="cell-style-number-format" data-pagefind-weight="1">
+<summary><code>numberFormat</code> <span class="api-member-summary">Excel number-format code for this cell, e.g.</span></summary>
+
+```ts generated
+numberFormat?: string;
+```
+
+<p class="api-member-doc">Excel number-format code for this cell, e.g. &quot;0.00%&quot;. Overrides the
+column's `numberFormat`; at most 255 characters.</p>
 </details>
 
 <details class="api-member" id="cell-style-wrap" data-pagefind-weight="1">
@@ -131,9 +166,12 @@ export interface CellStyle {
   underline?: boolean;
   strikethrough?: boolean;
   fontSize?: number;
+  fontFamily?: string;
   color?: string;
   backgroundColor?: string;
   align?: CellAlign;
+  verticalAlign?: CellVerticalAlign;
+  numberFormat?: string;
   wrap?: boolean;
   border?: CellBorders;
 }
@@ -148,6 +186,7 @@ export interface CellStyle {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
@@ -170,6 +209,6 @@ export interface CellStyle {
 <li><a href="/docs/api/core/resolved-cell/"><code>ResolvedCell</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/sanitize-hyperlink-style/"><code>sanitizeHyperlinkStyle</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/snapshot-cell/"><code>SnapshotCell</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li class="api-consumer-more">and 9 more</li>
+<li class="api-consumer-more">and 10 more</li>
 </ul>
 </div>

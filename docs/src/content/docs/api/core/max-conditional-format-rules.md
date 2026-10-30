@@ -1,6 +1,6 @@
 ---
 title: "MAX_CONDITIONAL_FORMAT_RULES | @sheetwrite/core"
-description: "Maximum ordered conditional-format rules admitted per worksheet and encoded in one u32 match mask."
+description: "MAX_CONDITIONAL_FORMAT_RULES variable in @sheetwrite/core: Maximum ordered conditional-format rules admitted per worksheet and encoded in one u32 match mask."
 ---
 <!-- api-export:@sheetwrite/core|.|MAX_CONDITIONAL_FORMAT_RULES -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="variable">variable</span></div>
@@ -28,6 +28,7 @@ const MAX_CONDITIONAL_FORMAT_RULES: 32
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

@@ -5,14 +5,19 @@ import { ArchitectureScene } from "../components/landing/ArchitectureScene.js";
 import { CodeTabs } from "../components/landing/CodeTabs.js";
 import { FeatureGlyph, type FeatureGlyphKind } from "../components/landing/FeatureGlyph.js";
 import { GridGlow } from "../components/landing/GridGlow.js";
-import { HeroScene } from "../components/landing/HeroScene.js";
+import { HeroApp } from "../components/landing/HeroApp.js";
 import { StoryReel } from "../components/landing/StoryReel.js";
 import { useScenePlayback } from "../components/landing/useScenePlayback.js";
 import { PackageCommand } from "../components/PackageCommand.js";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import landingBench from "../generated/landing-bench.json";
 import { opensFreshDocument } from "../lib/navigation.js";
-import { LATEST_RELEASE } from "../lib/releases.js";
+import {
+  LATEST_HIGHLIGHTED_RELEASE,
+  LATEST_RELEASE,
+  minorVersion,
+  releaseHref,
+} from "../lib/releases.js";
 import { pageMeta } from "../lib/seo.js";
 
 import landingStylesheet from "../styles/landing.css?url";
@@ -37,21 +42,37 @@ interface LandingBenchSize {
   handsontableIncomplete: number;
 }
 
-interface LandingBenchData {
-  available: boolean;
-  capture?: {
+interface LandingEvidence {
+  capture: {
     commit: string;
     timestamp: string;
     browser: string;
     rounds: number;
     engineVersions: { sheetwrite: string; handsontable: string };
   };
-  heroStats?: {
+  heroStats: {
     millionRowScenarios: number;
     millionRowMedianMs: number;
     millionRowHeapMb: number;
   };
-  sizes?: LandingBenchSize[];
+  sizes: LandingBenchSize[];
+}
+
+interface LandingBenchData extends Partial<LandingEvidence> {
+  available: boolean;
+  /** Brotli-compressed downloads; absent when the size report or engine artifact is incomplete. */
+  downloads?: {
+    coreFirstLoadBrotliBytes: number;
+    defaultEngineBrotliBytes: number;
+    fullEngineBrotliBytes: number;
+  };
+}
+
+const BYTES_PER_KIB = 1024;
+
+/** Whole kibibytes, the unit the size reports in the docs use. */
+function kib(bytes: number): string {
+  return `${Math.round(bytes / BYTES_PER_KIB)} KiB`;
 }
 
 interface Feature {
@@ -62,6 +83,20 @@ interface Feature {
 }
 
 const FEATURES: readonly Feature[] = [
+  {
+    kind: "spreadsheet",
+    label: "Spreadsheet app",
+    href: "/showcases/spreadsheet/",
+    summary:
+      "An Excel-style ribbon, name box, formula bar and sheet tabs around the Grid. Every command is a public API call.",
+  },
+  {
+    kind: "analysis",
+    label: "Charts & pivot tables",
+    href: "/showcases/analysis/",
+    summary:
+      "Pivot your data and chart any range. Edit a source cell and the pivot and its chart update in place.",
+  },
   {
     kind: "scale",
     label: "Performance & scale",
@@ -106,11 +141,11 @@ const FEATURES: readonly Feature[] = [
   },
 ];
 
-const RELEASE_NOTES = [
-  "Array arithmetic and spill references in both engines",
-  "Large undo through compressed restores and atomic sync batches",
-  "Host-owned rows with stable IDs and per-record deltas",
-  "Faster formula kernels, bulk loading, and streamed CSV and XLSX imports",
+/** The rows that the landing snippets show, beside the code. */
+const SAMPLE_ROWS = [
+  ["Notebook", 12],
+  ["Pen", 4],
+  ["Folder", 9],
 ] as const;
 
 function fmtRows(rows: number): string {
@@ -124,7 +159,7 @@ function ratioWidth(ratio: number, scaleMax: number): string {
   return `${Math.min(100, Math.max(pct, 3)).toFixed(1)}%`;
 }
 
-function BenchmarkBars({ evidence }: Readonly<{ evidence: Required<LandingBenchData> }>) {
+function BenchmarkBars({ evidence }: Readonly<{ evidence: LandingEvidence }>) {
   const { ref } = useScenePlayback<HTMLDivElement>();
   const scaleMax = Math.max(...evidence.sizes.map((entry) => entry.medianRatio)) * 1.25;
   return (
@@ -205,11 +240,12 @@ function FeatureCards() {
 
 function Landing() {
   const bench = landingBench as LandingBenchData;
-  const evidence =
+  const evidence: LandingEvidence | undefined =
     bench.available && bench.sizes && bench.heroStats && bench.capture
-      ? { available: true, sizes: bench.sizes, heroStats: bench.heroStats, capture: bench.capture }
+      ? { sizes: bench.sizes, heroStats: bench.heroStats, capture: bench.capture }
       : undefined;
   const millionRow = evidence?.sizes.find((entry) => entry.size === 1_000_000);
+  const { downloads } = bench;
   return (
     <div className="sw-landing">
       <GridGlow />
@@ -219,13 +255,17 @@ function Landing() {
         <section aria-labelledby="landing-title" className="sw-lp-hero">
           <div className="sw-lp-hero__copy">
             <p className="sw-lp-eyebrow">
-              Open source · MIT · v{corePackage.version} · Rust/WASM engine
+              Open source · MIT · v{corePackage.version}
+              <span className="sw-lp-eyebrow__extra"> · Rust/WASM engine</span>
             </p>
             <h1 id="landing-title">The spreadsheet engine for your web app.</h1>
             <p className="sw-lp-hero__lede">
-              A real calculation engine and a canvas Grid in your page. Edit, recalculate, and page
-              through a billion cells. Your application keeps the data, the UI, and the server.
+              A real calculation engine and a canvas Grid in your page, with the ribbon, charts and
+              pivot tables of a spreadsheet app. Your application keeps the data, the UI, and the
+              server.
             </p>
+          </div>
+          <div className="sw-lp-hero__start">
             <div className="sw-lp-actions">
               <Link
                 className="sw-lp-button"
@@ -242,7 +282,7 @@ function Landing() {
               <PackageCommand packages="@sheetwrite/core" />
             </div>
           </div>
-          <HeroScene />
+          <HeroApp />
         </section>
 
         {evidence ? (
@@ -262,10 +302,12 @@ function Landing() {
                 <dt>1,000,000,000</dt>
                 <dd>addressable cells in the performance example</dd>
               </div>
-              <div>
-                <dt>4</dt>
-                <dd>adapters: Vanilla, React, Vue, Svelte</dd>
-              </div>
+              {downloads ? (
+                <div>
+                  <dt>{kib(downloads.coreFirstLoadBrotliBytes)}</dt>
+                  <dd>first load with the default engine, Brotli, in a Vite app</dd>
+                </div>
+              ) : null}
             </dl>
             <a href="#benchmarks">How we measured →</a>
           </section>
@@ -327,11 +369,35 @@ function Landing() {
             </Link>
           </header>
           <CodeTabs />
+          <figure className="sw-lp-result">
+            <table aria-label="The Grid the snippet renders">
+              <thead>
+                <tr>
+                  <th aria-hidden="true" />
+                  <th scope="col">Product</th>
+                  <th scope="col">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {SAMPLE_ROWS.map(([product, amount], index) => (
+                  <tr key={product}>
+                    <th scope="row">{index + 1}</th>
+                    <td>{product}</td>
+                    <td>{amount}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <figcaption>
+              What every tab renders, with these rows. You can edit cells, undo, redo, copy and
+              paste.
+            </figcaption>
+          </figure>
         </section>
 
         <section aria-labelledby="landing-engine" className="sw-lp-section sw-lp-engines">
           <header className="sw-lp-head">
-            <p className="sw-lp-eyebrow">New in {corePackage.version.replace(/\.\d+$/, "")}</p>
+            <p className="sw-lp-eyebrow">Formula engines</p>
             <h2 id="landing-engine">Pick the formula engine that fits your download budget.</h2>
           </header>
           <div className="sw-lp-engines__choices">
@@ -341,6 +407,11 @@ function Landing() {
               <p>
                 Included by the core package. The standard function set and the smaller download.
               </p>
+              {downloads ? (
+                <p className="sw-lp-engines__size">
+                  <b>{kib(downloads.defaultEngineBrotliBytes)}</b> WASM, Brotli
+                </p>
+              ) : null}
               <code>await initSheetwrite();</code>
             </article>
             <article data-variant="full">
@@ -350,19 +421,27 @@ function Landing() {
                 The same engine with the analysis families: grouping, pivots, LAMBDA, statistics,
                 regression, finance, regex, and matrices.
               </p>
+              {downloads ? (
+                <p className="sw-lp-engines__size">
+                  <b>{kib(downloads.fullEngineBrotliBytes)}</b> WASM, Brotli
+                </p>
+              ) : null}
               <code>await initSheetwrite(undefined, formulas);</code>
             </article>
-            <ul aria-label="Also in this release">
-              {RELEASE_NOTES.map((note) => (
-                <li key={note}>{note}</li>
-              ))}
-              <li>
-                <Link to="/docs/$/" params={{ _splat: `releases/${LATEST_RELEASE.version}` }}>
-                  Read what is new and the upgrade checklist →
-                </Link>
-              </li>
-            </ul>
           </div>
+          {LATEST_HIGHLIGHTED_RELEASE !== undefined ? (
+            <aside aria-labelledby="landing-new" className="sw-lp-new">
+              <h3 id="landing-new">New in {minorVersion(LATEST_HIGHLIGHTED_RELEASE.version)}</h3>
+              <ul>
+                {LATEST_HIGHLIGHTED_RELEASE.highlights.map((highlight) => (
+                  <li key={highlight}>{highlight}</li>
+                ))}
+              </ul>
+              <Link to={releaseHref(LATEST_HIGHLIGHTED_RELEASE.version)}>
+                Read what is new and the upgrade checklist →
+              </Link>
+            </aside>
+          ) : null}
         </section>
 
         <section aria-labelledby="landing-bench" className="sw-lp-section" id="benchmarks">
@@ -385,11 +464,7 @@ function Landing() {
               <code>bun run docs:generate</code> to publish measured numbers here.
             </p>
           )}
-          <Link
-            className="sw-lp-more"
-            to="/docs/$/"
-            params={{ _splat: "guides/performance-resources" }}
-          >
+          <Link className="sw-lp-more" to="/docs/$/" params={{ _splat: "performance" }}>
             See the full method and every result →
           </Link>
         </section>
@@ -432,9 +507,7 @@ function Landing() {
               <Link to="/docs/$/" params={{ _splat: "start/first-grid" }}>
                 First grid
               </Link>
-              <Link to="/docs/$/" params={{ _splat: `releases/${LATEST_RELEASE.version}` }}>
-                What's new
-              </Link>
+              <Link to={releaseHref(LATEST_RELEASE.version)}>What's new</Link>
             </div>
             <div>
               <p className="sw-landing-footer__title">Frameworks</p>
@@ -449,7 +522,7 @@ function Landing() {
               <Link to="/docs/$/" params={{ _splat: "reference/formula-functions" }}>
                 Formula functions
               </Link>
-              <Link to="/docs/$/" params={{ _splat: "guides/performance-resources" }}>
+              <Link to="/docs/$/" params={{ _splat: "performance" }}>
                 Benchmarks
               </Link>
             </div>

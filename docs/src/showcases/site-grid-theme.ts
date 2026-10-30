@@ -19,7 +19,11 @@ function siteGridTheme(parent: HTMLElement = document.body): Partial<Theme> {
   const mix = (name: string, amount: number): string =>
     resolveColor(`color-mix(in srgb, var(${name}) ${amount}%, transparent)`);
   probe.style.font = "500 13px var(--sw-font-body)";
-  const font = getComputedStyle(probe).font;
+  // Built from longhands: Chromium returns "" for the `font` shorthand when a
+  // longhand cannot be serialized (forced-colors mode), which left the grid
+  // and the ribbon's font boxes without a font.
+  const probeStyle = getComputedStyle(probe);
+  const font = `${probeStyle.fontWeight} ${probeStyle.fontSize} ${probeStyle.fontFamily}`;
   const theme: Partial<Theme> = {
     bg: token("--sw-surface-1"),
     fg: token("--sw-fg"),

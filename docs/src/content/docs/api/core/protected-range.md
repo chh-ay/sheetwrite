@@ -1,6 +1,6 @@
 ---
 title: "ProtectedRange | @sheetwrite/core"
-description: "Serializable client UX policy."
+description: "ProtectedRange interface in @sheetwrite/core: Serializable client UX policy."
 ---
 <!-- api-export:@sheetwrite/core|.|ProtectedRange -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -8,7 +8,7 @@ description: "Serializable client UX policy."
 Serializable client UX policy. A host resolver decides whether a local mutation may proceed.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L184"><code>packages/core/src/types/document.ts#L184</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L208"><code>packages/core/src/types/document.ts#L208</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>
@@ -75,6 +75,7 @@ export interface ProtectedRange {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

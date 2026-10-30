@@ -36,10 +36,10 @@ pub(super) fn write_formula(out: &mut Writer, entry: &FormulaEntry, sheet: u32) 
     }
 
     out.bool(entry.ast.is_some());
-    out.error(entry.error);
-    out.bool(entry.volatile);
-    out.bool(entry.has_spill_refs);
-    out.bool(entry.produces_array);
+    out.error(entry.source_error());
+    out.bool(entry.volatile());
+    out.bool(entry.has_spill_refs());
+    out.bool(entry.produces_array());
     out.usize(entry.reads.cells.len());
 
     for key in &entry.reads.cells {
@@ -94,10 +94,10 @@ impl CellStore {
             entry.ast = None;
         }
 
-        entry.error = input.error()?;
-        entry.volatile = input.bool()?;
-        entry.has_spill_refs = input.bool()?;
-        entry.produces_array = input.bool()?;
+        entry.set_source_error(input.error()?);
+        entry.set_volatile(input.bool()?);
+        entry.set_has_spill_refs(input.bool()?);
+        entry.set_produces_array(input.bool()?);
 
         let cells = (0..input.count()?)
             .map(|_| {
@@ -136,6 +136,15 @@ impl CellStore {
         for _ in 0..input.count()? {
             store.sheet_names.push(input.text()?);
             store.sheet_alive.push(input.bool()?);
+        }
+
+        // Formulas below are parsed again, and their 3-D references are
+        // placed in this order. Handle order stays implicit, as it was.
+        let order = (0..input.count()?)
+            .map(|_| input.u32())
+            .collect::<TransferResult<Vec<_>>>()?;
+        if order != store.tab_order().as_ref() {
+            store.sheet_order = Some(Box::new(order));
         }
 
         store.sheet_lookup = read_names(&mut input)?;
@@ -188,10 +197,18 @@ impl CellStore {
             store.tables.insert(key, table);
         }
 
-        store.formula_epoch = input.u64()?;
+        store.graph = FormulaGraph::read_transfer(&mut input)?;
         store.mutation_revision = input.u64()?;
         store.volatile_serial = f64::from_bits(input.u64()?);
+        store.random = RandomSource::from_state(input.u64()?);
         store.spill_owner_cell_limit = input.usize()?;
+        if input.bool()? {
+            let max_iterations = input.u32()?;
+            let max_change = f64::from_bits(input.u64()?);
+            let limits = IterationLimits::new(max_iterations, max_change)
+                .ok_or("invalid transferred iteration limits")?;
+            store.iteration = Some(Box::new(limits));
+        }
 
         let sheets = input.count()?;
 
@@ -236,6 +253,12 @@ impl CellStore {
             out.bool(alive);
         }
 
+        let order = self.tab_order();
+        out.usize(order.len());
+        for &handle in order.iter() {
+            out.u32(handle);
+        }
+
         write_names(&mut out, &self.sheet_lookup);
         write_names(&mut out, &self.sheet_ids);
         out.usize(self.named_ranges.len());
@@ -276,15 +299,21 @@ impl CellStore {
             }
         }
 
-        out.u64(self.formula_epoch);
+        self.graph.write_transfer(&mut out);
         out.u64(self.mutation_revision);
         out.u64(self.volatile_serial.to_bits());
+        out.u64(self.random.state());
         out.usize(self.spill_owner_cell_limit);
+        out.bool(self.iteration.is_some());
+        if let Some(limits) = &self.iteration {
+            out.u32(limits.max_iterations());
+            out.u64(limits.max_change().to_bits());
+        }
         out.usize(self.sheets.len());
         for (sheet, data) in self.sheets.iter().enumerate() {
             data.write_transfer(&mut out);
             out.usize(data.formulas.len());
-            for (&(row, col), entry) in &data.formulas {
+            for ((row, col), entry) in data.formulas.iter() {
                 out.u32(row);
                 out.u32(col);
                 write_formula(&mut out, entry, sheet as u32);
@@ -305,6 +334,50 @@ impl CellStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "analysis")]
+    #[test]
+    fn pivot_memory_transfer_rebuilds_from_resent_definition_without_formula_sources() {
+        use crate::store::tests::{PivotPayload, SUM};
+
+        const KEY: usize = 0;
+        const VALUE: usize = 1;
+        let mut original = CellStore::new();
+        let source = original.add_sheet(2, 10);
+        let output = original.add_sheet(4, 10);
+        original.set_string(source, 0, KEY, "Key", 0);
+        original.set_string(source, 0, VALUE, "Value", 0);
+        original.set_string(source, 1, KEY, "A", 0);
+        original.set_number(source, 1, VALUE, 7.0, 0);
+        let definition = PivotPayload {
+            source,
+            last_row: 1,
+            last_col: VALUE,
+            rows: &[KEY],
+            value_field: VALUE,
+            aggregations: &[SUM],
+            ..PivotPayload::default()
+        }
+        .numbers();
+        assert!(original.set_pivots(output, &definition, vec!["pivot".into()]));
+        original.recompute_changed();
+        assert_eq!(original.get_cell(output, 1, 1).num(), 7.0);
+
+        let bytes = original.export_memory_state();
+        let mut replacement = CellStore::read_memory_state(&bytes).expect("same-build transfer");
+
+        assert!(replacement.sheets[output].formulas.is_empty());
+        assert_eq!(replacement.formula_source(output, 0, 0), None);
+
+        assert!(replacement.set_pivots(output, &definition, vec!["pivot".into()]));
+        replacement.recompute_changed();
+        assert_eq!(replacement.get_cell(output, 1, 1).num(), 7.0);
+
+        replacement.set_number(source, 1, VALUE, 11.0, 0);
+        replacement.recompute_changed();
+
+        assert_eq!(replacement.get_cell(output, 1, 1).num(), 11.0);
+    }
 
     #[test]
     fn memory_transfer_preserves_cached_results_and_rebuilds_dependencies() {
@@ -330,6 +403,94 @@ mod tests {
         replacement.recompute_changed();
         assert_eq!(replacement.get_cell(0, 0, 1).num(), 100.0);
         assert_eq!(original.get_cell(0, 0, 1).num(), 42.0);
+    }
+
+    #[test]
+    fn memory_transfer_keeps_the_tab_order_of_three_d_references() {
+        let mut original = CellStore::new();
+        for (name, value) in [("First", 1.0), ("Middle", 10.0), ("Last", 100.0)] {
+            let sheet = original.add_sheet(1, 1);
+            original.set_sheet_name(sheet, name, name);
+            original.set_number(sheet, 0, 0, value, 0);
+        }
+        let summary = original.add_sheet(1, 1);
+        original.set_sheet_name(summary, "Summary", "Summary");
+        assert!(original.set_sheet_order(&[0, 2, 1, 3]));
+        original.set_formula(summary, 0, 0, "=SUM(First:Last!A1)", 0);
+        original.recompute_changed();
+        assert_eq!(original.get_cell(summary, 0, 0).num(), 101.0);
+
+        let mut replacement =
+            CellStore::read_memory_state(&original.export_memory_state()).unwrap();
+        replacement.set_number(1, 0, 0, 20.0, 0);
+        replacement.recompute_changed();
+        assert_eq!(replacement.get_cell(summary, 0, 0).num(), 101.0);
+        assert!(replacement.set_sheet_order(&[0, 1, 2, 3]));
+        assert_eq!(replacement.get_cell(summary, 0, 0).num(), 121.0);
+    }
+
+    #[test]
+    fn memory_transfer_continues_the_random_sequence_and_volatile_set() {
+        let mut original = CellStore::new();
+        original.add_sheet(2, 1);
+        original.set_formula(0, 0, 1, "=RAND()", 0);
+        original.recompute_changed();
+        let cached_draw = original.get_cell(0, 0, 1).num();
+
+        let bytes = original.export_memory_state();
+        let mut replacement = CellStore::read_memory_state(&bytes).unwrap();
+        for store in [&mut original, &mut replacement] {
+            store.set_number(0, 0, 0, 1.0, 0);
+            store.recompute_changed();
+        }
+
+        let next_draw = original.get_cell(0, 0, 1).num();
+        assert_ne!(next_draw, cached_draw);
+        assert_eq!(
+            replacement.get_cell(0, 0, 1).num().to_bits(),
+            next_draw.to_bits()
+        );
+    }
+
+    #[test]
+    fn memory_transfer_keeps_iterative_calculation() {
+        let mut original = CellStore::new();
+        original.add_sheet(2, 1);
+        original.set_number(0, 0, 1, 1.0, 0);
+        original.set_formula(0, 0, 0, "=A1+B1", 0);
+        assert!(original.set_iterative_calculation(true, 3, 0.0));
+        assert_eq!(original.get_cell(0, 0, 0).num(), 3.0);
+
+        let mut replacement =
+            CellStore::read_memory_state(&original.export_memory_state()).unwrap();
+        replacement.set_number(0, 0, 1, 2.0, 0);
+        replacement.recompute_changed();
+        assert_eq!(replacement.get_cell(0, 0, 0).num(), 9.0);
+    }
+
+    #[test]
+    fn memory_transfer_preserves_pending_rectangle_dirty_state() {
+        const EDIT_ROWS: usize = 5000;
+        let mut original = CellStore::new();
+        original.add_sheet(3, EDIT_ROWS + 1);
+        original.set_formula(0, 0, 1, "=SUM(A1:A5000)", 0);
+        original.set_formula(0, 0, 2, "=\"survivor\"", 0);
+        original.recompute_changed();
+        original.set_column_numbers(0, 0, 0, &vec![1.0; EDIT_ROWS], 0);
+
+        let mut replacement =
+            CellStore::read_memory_state(&original.export_memory_state()).unwrap();
+
+        assert_eq!(
+            replacement.get_cell(0, 0, 2).string().as_deref(),
+            Some("survivor")
+        );
+        replacement.recompute_changed();
+        assert_eq!(replacement.get_cell(0, 0, 1).num(), EDIT_ROWS as f64);
+        assert_eq!(
+            replacement.get_cell(0, 0, 2).string().as_deref(),
+            Some("survivor")
+        );
     }
 
     #[test]

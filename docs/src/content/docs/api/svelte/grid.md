@@ -1,13 +1,13 @@
 ---
 title: "Grid | @sheetwrite/svelte"
-description: "Imperative grid handle for document commands, events, rendering, and teardown."
+description: "Grid interface in @sheetwrite/svelte: Imperative grid handle for document commands, events, rendering, and teardown."
 ---
 <!-- api-export:@sheetwrite/svelte|.|Grid -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Imperative grid handle for document commands, events, rendering, and teardown.
 
-### Examples
+## Examples
 
 ```ts compile
 import type { Grid } from "@sheetwrite/core";
@@ -22,13 +22,13 @@ function updateTotal(grid: Grid) {
 }
 ```
 
-### See also
+## See also
 
 - [createGrid](/docs/api/core/create-grid/)
 - [Grid.applyTransaction](/docs/api/svelte/grid/#grid-apply-transaction)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/types/grid.d.ts#L487"><code>packages/core/dist/types/grid.d.ts#L487</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/types/grid.d.ts#L599"><code>packages/core/dist/types/grid.d.ts#L599</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -36,6 +36,8 @@ function updateTotal(grid: Grid) {
 <a href="#grid-actions"><code>actions</code></a>
 <a href="#grid-get-runtime-resource-snapshot"><code>getRuntimeResourceSnapshot</code></a>
 <a href="#grid-get-command-state"><code>getCommandState</code></a>
+<a href="#grid-get-focus-cell-style"><code>getFocusCellStyle</code></a>
+<a href="#grid-summarize-selection"><code>summarizeSelection</code></a>
 <a href="#grid-set-active-sheet"><code>setActiveSheet</code></a>
 <a href="#grid-scroll-to-cell"><code>scrollToCell</code></a>
 <a href="#grid-get-cell-at-point"><code>getCellAtPoint</code></a>
@@ -101,6 +103,16 @@ function updateTotal(grid: Grid) {
 <a href="#grid-remove-validation-rule"><code>removeValidationRule</code></a>
 <a href="#grid-set-protected-range"><code>setProtectedRange</code></a>
 <a href="#grid-remove-protected-range"><code>removeProtectedRange</code></a>
+<a href="#grid-get-pivots"><code>getPivots</code></a>
+<a href="#grid-set-pivot"><code>setPivot</code></a>
+<a href="#grid-remove-pivot"><code>removePivot</code></a>
+<a href="#grid-get-pivot-fields"><code>getPivotFields</code></a>
+<a href="#grid-get-pivot-result"><code>getPivotResult</code></a>
+<a href="#grid-get-charts"><code>getCharts</code></a>
+<a href="#grid-set-chart"><code>setChart</code></a>
+<a href="#grid-remove-chart"><code>removeChart</code></a>
+<a href="#grid-select-chart"><code>selectChart</code></a>
+<a href="#grid-open-panel"><code>openPanel</code></a>
 <a href="#grid-set-protection-resolver"><code>setProtectionResolver</code></a>
 <a href="#grid-set-note"><code>setNote</code></a>
 <a href="#grid-get-note"><code>getNote</code></a>
@@ -124,7 +136,7 @@ function updateTotal(grid: Grid) {
 <a href="#grid-destroy"><code>destroy</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>90</span>
+## Members <span class="api-count" data-pagefind-ignore>102</span>
 
 <div class="api-member-list">
 
@@ -162,6 +174,30 @@ getRuntimeResourceSnapshot(operation: RuntimeResourceOperation, phase: RuntimeRe
 getCommandState(command: GridCommandName): GridCommandState;
 ```
 
+</details>
+
+<details class="api-member" id="grid-get-focus-cell-style" data-pagefind-weight="1">
+<summary><code>getFocusCellStyle</code> <span class="api-member-summary">Effective style of the focus cell: its own style over its column's cellStyle.</span></summary>
+
+```ts generated
+getFocusCellStyle(): CellStyle;
+```
+
+<p class="api-member-doc">Effective style of the focus cell: its own style over its column's
+`cellStyle`. Empty when nothing is selected.</p>
+</details>
+
+<details class="api-member" id="grid-summarize-selection" data-pagefind-weight="1">
+<summary><code>summarizeSelection</code> <span class="api-member-summary">Totals for the current selection, for a status bar.</span></summary>
+
+```ts generated
+summarizeSelection(signal?: AbortSignal): Promise<SelectionSummary | null>;
+```
+
+<p class="api-member-doc">Totals for the current selection, for a status bar. Large selections are
+read in chunks between frames, so the page stays responsive; abort
+`signal` to stop early, which rejects with the signal's reason. Resolves
+null when nothing is selected.</p>
 </details>
 
 <details class="api-member" id="grid-set-active-sheet" data-pagefind-weight="1">
@@ -897,6 +933,111 @@ removeProtectedRange(id: string): ApplyTransactionResult;
 
 </details>
 
+<details class="api-member" id="grid-get-pivots" data-pagefind-weight="1">
+<summary><code>getPivots</code> <span class="api-member-summary">Clones of the pivot definitions on sheet, or on every sheet; no engine is needed.</span></summary>
+
+```ts generated
+getPivots(sheet?: SheetId): PivotDefinition[];
+```
+
+</details>
+
+<details class="api-member" id="grid-set-pivot" data-pagefind-weight="1">
+<summary><code>setPivot</code> <span class="api-member-summary">Insert or replace a pivot as one undo entry.</span></summary>
+
+```ts generated
+setPivot(pivot: PivotDefinition, sheet?: SheetId): ApplyTransactionResult;
+```
+
+<p class="api-member-doc">Insert or replace a pivot as one undo entry. `sheet` defaults to the sheet
+that holds the pivot's ID, then to the active sheet. The pivot's
+`savedOutput` is removed, because it does not match a changed definition.</p>
+</details>
+
+<details class="api-member" id="grid-remove-pivot" data-pagefind-weight="1">
+<summary><code>removePivot</code> <span class="api-member-summary">Remove a pivot from sheet (default: the sheet that holds it) as one undo entry.</span></summary>
+
+```ts generated
+removePivot(id: string, sheet?: SheetId): ApplyTransactionResult;
+```
+
+</details>
+
+<details class="api-member" id="grid-get-pivot-fields" data-pagefind-weight="1">
+<summary><code>getPivotFields</code> <span class="api-member-summary">Source fields for the field list; empty on the default engine.</span></summary>
+
+```ts generated
+getPivotFields(sheet: SheetId, id: string): PivotSourceField[];
+```
+
+</details>
+
+<details class="api-member" id="grid-get-pivot-result" data-pagefind-weight="1">
+<summary><code>getPivotResult</code> <span class="api-member-summary">Plain-JSON output of one pivot.</span></summary>
+
+```ts generated
+getPivotResult(sheet: SheetId, id: string): PivotResultView | null;
+```
+
+<p class="api-member-doc">Plain-JSON output of one pivot. The default engine reports the saved
+output (`saved`), or `unavailable` without one. Null when `sheet` holds
+no pivot with `id`.</p>
+</details>
+
+<details class="api-member" id="grid-get-charts" data-pagefind-weight="1">
+<summary><code>getCharts</code> <span class="api-member-summary">Clones of the chart definitions on sheet (default: the active sheet).</span></summary>
+
+```ts generated
+getCharts(sheet?: SheetId): readonly ChartDefinition[];
+```
+
+</details>
+
+<details class="api-member" id="grid-set-chart" data-pagefind-weight="1">
+<summary><code>setChart</code> <span class="api-member-summary">Insert or replace the chart with chart.id as one undo entry.</span></summary>
+
+```ts generated
+setChart(chart: ChartDefinition, sheet?: SheetId): ApplyTransactionResult;
+```
+
+<p class="api-member-doc">Insert or replace the chart with `chart.id` as one undo entry. `sheet`
+defaults to the active sheet; chart IDs are unique only within a sheet.</p>
+</details>
+
+<details class="api-member" id="grid-remove-chart" data-pagefind-weight="1">
+<summary><code>removeChart</code> <span class="api-member-summary">Remove a chart from sheet (default: the first sheet that holds it) as one undo entry.</span></summary>
+
+```ts generated
+removeChart(id: string, sheet?: SheetId): ApplyTransactionResult;
+```
+
+</details>
+
+<details class="api-member" id="grid-select-chart" data-pagefind-weight="1">
+<summary><code>selectChart</code> <span class="api-member-summary">Select the chart object id on sheet (default: the active sheet), or deselect with null.</span></summary>
+
+```ts generated
+selectChart(id: string | null, sheet?: SheetId): void;
+```
+
+<p class="api-member-doc">Select the chart object `id` on `sheet` (default: the active sheet), or
+deselect with `null`. Selecting a chart on another sheet activates that
+sheet first. Emits `chart-select`.</p>
+</details>
+
+<details class="api-member" id="grid-open-panel" data-pagefind-weight="1">
+<summary><code>openPanel</code> <span class="api-member-summary">Show panel on the grid's right edge and shrink the cells to make room; null closes the open panel.</span></summary>
+
+```ts generated
+openPanel(panel: GridPanel | null): void;
+```
+
+<p class="api-member-doc">Show `panel` on the grid's right edge and shrink the cells to make room;
+`null` closes the open panel. One panel shows at a time: opening a panel
+closes the previous one. Escape and the close button close it and return
+focus to the grid.</p>
+</details>
+
 <details class="api-member" id="grid-set-protection-resolver" data-pagefind-weight="1">
 <summary><code>setProtectionResolver</code></summary>
 
@@ -1117,6 +1258,8 @@ export interface Grid {
     runtime?: RuntimeMemoryObservation,
   ): RuntimeResourceSnapshot;
   getCommandState(command: GridCommandName): GridCommandState;
+  getFocusCellStyle(): CellStyle;
+  summarizeSelection(signal?: AbortSignal): Promise<SelectionSummary | null>;
   setActiveSheet(id: SheetId): void;
   scrollToCell(addr: CellAddress): void;
   getCellAtPoint(clientX: number, clientY: number): CellAddress | null;
@@ -1188,6 +1331,16 @@ export interface Grid {
   removeValidationRule(id: string): ApplyTransactionResult;
   setProtectedRange(protectedRange: ProtectedRange): ApplyTransactionResult;
   removeProtectedRange(id: string): ApplyTransactionResult;
+  getPivots(sheet?: SheetId): PivotDefinition[];
+  setPivot(pivot: PivotDefinition, sheet?: SheetId): ApplyTransactionResult;
+  removePivot(id: string, sheet?: SheetId): ApplyTransactionResult;
+  getPivotFields(sheet: SheetId, id: string): PivotSourceField[];
+  getPivotResult(sheet: SheetId, id: string): PivotResultView | null;
+  getCharts(sheet?: SheetId): readonly ChartDefinition[];
+  setChart(chart: ChartDefinition, sheet?: SheetId): ApplyTransactionResult;
+  removeChart(id: string, sheet?: SheetId): ApplyTransactionResult;
+  selectChart(id: string | null, sheet?: SheetId): void;
+  openPanel(panel: GridPanel | null): void;
   setProtectionResolver(
     resolver: ProtectionResolver | undefined,
     mode?: MutationPolicyMode,
@@ -1255,8 +1408,8 @@ export interface Grid {
 <li><a href="/docs/api/core/sync-coordinator/"><code>SyncCoordinator</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/toolbar-item/"><code>ToolbarItem</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/to-xlsx-workbook/"><code>toXlsxWorkbook</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/to-xlsx-workbook-stream/"><code>toXlsxWorkbookStream</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core-adapter/grid-controller/"><code>GridController</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li><a href="/docs/api/core-adapter/grid-publication-adapter/"><code>GridPublicationAdapter</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li class="api-consumer-more">and 17 more</li>
+<li class="api-consumer-more">and 19 more</li>
 </ul>
 </div>

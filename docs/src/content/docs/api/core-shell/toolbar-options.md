@@ -1,6 +1,6 @@
 ---
 title: "ToolbarOptions | @sheetwrite/core/shell"
-description: "Host element and configuration used to create the built-in toolbar."
+description: "ToolbarOptions interface in @sheetwrite/core/shell: Host element and configuration used to create the built-in toolbar."
 ---
 <!-- api-export:@sheetwrite/core|./shell|ToolbarOptions -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-shell/">@sheetwrite/core/shell</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -25,10 +25,10 @@ items?: readonly ToolbarItem[];
 </details>
 
 <details class="api-member" id="toolbar-options-icons" data-pagefind-weight="1">
-<summary><code>icons</code> <span class="api-member-summary">Per-action icon overrides, exactly like GridConfig.icons.</span></summary>
+<summary><code>icons</code> <span class="api-member-summary">Per-glyph icon overrides, exactly like GridConfig.icons.</span></summary>
 
 ```ts generated
-icons?: Partial<Record<ToolbarActionName, ToolbarIcon>>;
+icons?: IconOverrides;
 ```
 
 </details>
@@ -51,7 +51,7 @@ label?: string;
 ```ts generated
 export interface ToolbarOptions {
   items?: readonly ToolbarItem[];
-  icons?: Partial<Record<ToolbarActionName, ToolbarIcon>>;
+  icons?: IconOverrides;
   label?: string;
 }
 ```
@@ -65,6 +65,7 @@ export interface ToolbarOptions {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

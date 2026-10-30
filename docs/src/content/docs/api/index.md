@@ -4,15 +4,27 @@ description: "Generated reference for every classified Sheetwrite package entry 
 ---
 The package `exports` maps define this inventory. Supported, internal, asset, and testing-only entry points are classified explicitly; generated pages use declaration signatures and source JSDoc.
 
+## @sheetwrite/charts
+
+<table class="api-entry-table">
+<thead><tr><th>Entry point</th><th>Classification</th><th>Symbols</th></tr></thead>
+<tbody>
+<tr><td><a href="/docs/api/charts/"><code>@sheetwrite/charts</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>18</td></tr>
+<tr><td><a href="/docs/api/charts-register/"><code>@sheetwrite/charts/register</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>1</td></tr>
+</tbody>
+</table>
+
 ## @sheetwrite/core
 
 <table class="api-entry-table">
 <thead><tr><th>Entry point</th><th>Classification</th><th>Symbols</th></tr></thead>
 <tbody>
-<tr><td><a href="/docs/api/core/"><code>@sheetwrite/core</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>322</td></tr>
+<tr><td><a href="/docs/api/core/"><code>@sheetwrite/core</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>375</td></tr>
 <tr><td><a href="/docs/api/core-adapter/"><code>@sheetwrite/core/adapter</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>55</td></tr>
 <tr><td><a href="/docs/api/core-browser/"><code>@sheetwrite/core/browser</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>4</td></tr>
-<tr><td><a href="/docs/api/core-shell/"><code>@sheetwrite/core/shell</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>13</td></tr>
+<tr><td><a href="/docs/api/core-icons-json/"><code>@sheetwrite/core/icons.json</code></a></td><td><span class="api-status" data-status="asset">asset</span></td><td>0</td></tr>
+<tr><td><a href="/docs/api/core-icons-svg/"><code>@sheetwrite/core/icons.svg</code></a></td><td><span class="api-status" data-status="asset">asset</span></td><td>0</td></tr>
+<tr><td><a href="/docs/api/core-shell/"><code>@sheetwrite/core/shell</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>15</td></tr>
 <tr><td><a href="/docs/api/core-shell-css/"><code>@sheetwrite/core/shell.css</code></a></td><td><span class="api-status" data-status="asset">asset</span></td><td>0</td></tr>
 <tr><td><a href="/docs/api/core-styles-css/"><code>@sheetwrite/core/styles.css</code></a></td><td><span class="api-status" data-status="asset">asset</span></td><td>0</td></tr>
 <tr><td><a href="/docs/api/core-testing/"><code>@sheetwrite/core/testing</code></a></td><td><span class="api-status" data-status="test-only">test-only</span></td><td>4</td></tr>
@@ -25,7 +37,7 @@ The package `exports` maps define this inventory. Supported, internal, asset, an
 <table class="api-entry-table">
 <thead><tr><th>Entry point</th><th>Classification</th><th>Symbols</th></tr></thead>
 <tbody>
-<tr><td><a href="/docs/api/formulas/"><code>@sheetwrite/formulas</code></a></td><td><span class="api-status" data-status="internal">internal</span></td><td>16</td></tr>
+<tr><td><a href="/docs/api/formulas/"><code>@sheetwrite/formulas</code></a></td><td><span class="api-status" data-status="internal">internal</span></td><td>17</td></tr>
 <tr><td><a href="/docs/api/formulas-wasm/"><code>@sheetwrite/formulas/wasm</code></a></td><td><span class="api-status" data-status="asset">asset</span></td><td>0</td></tr>
 </tbody>
 </table>

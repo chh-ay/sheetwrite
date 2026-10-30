@@ -1,6 +1,6 @@
 ---
 title: "DocumentValidationResult | @sheetwrite/core"
-description: "Success or structured errors returned by document validation."
+description: "DocumentValidationResult type in @sheetwrite/core: Success or structured errors returned by document validation."
 ---
 <!-- api-export:@sheetwrite/core|.|DocumentValidationResult -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
@@ -8,7 +8,7 @@ description: "Success or structured errors returned by document validation."
 Success or structured errors returned by document validation.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L357"><code>packages/core/src/document-protocol.ts#L357</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L428"><code>packages/core/src/document-protocol.ts#L428</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>2</span>
@@ -56,6 +56,7 @@ export type DocumentValidationResult =
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

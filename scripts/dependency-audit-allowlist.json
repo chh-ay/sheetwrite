@@ -5,5 +5,13 @@
     "allowanceRequirements": ["advisory", "package", "owner", "rationale", "expires"],
     "maximumAllowanceDays": 90
   },
-  "allowlist": []
+  "allowlist": [
+    {
+      "advisory": "GHSA-GCQX-W48M-W2H4",
+      "package": "deepmerge",
+      "owner": "chh-ay",
+      "rationale": "No patched release exists (every deepmerge 4.2.0-4.3.1 is affected). The only dependent is @sveltejs/vite-plugin-svelte, a build-time dev dependency of the docs site and the Vite bundler fixture. It merges plugin options written in this repository, never user input, and no published Sheetwrite package ships it. Recheck for a patched deepmerge or plugin release before expiry.",
+      "expires": "2027-01-25"
+    }
+  ]
 }

@@ -161,7 +161,7 @@ fn push_data(
             let row = range.row_start + (index / matrix.cols) as u32;
             let col = range.col_start + (index % matrix.cols) as u32;
             formulas
-                .get(&(row, col))
+                .get((row, col))
                 .and_then(|formula| formula.ast.as_ref())
                 .is_some_and(contains_subtotal)
         });

@@ -1,6 +1,6 @@
 ---
 title: "isLoaded | @sheetwrite/formulas"
-description: "Whether the WASM module has finished initializing."
+description: "isLoaded function in @sheetwrite/formulas: Whether the WASM module has finished initializing."
 ---
 <!-- api-export:@sheetwrite/formulas|.|isLoaded -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/formulas/">@sheetwrite/formulas</a><span class="api-status" data-kind="function">function</span></div>

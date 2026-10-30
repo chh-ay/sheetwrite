@@ -43,4 +43,4 @@ Validate untrusted JSON with the snapshot validator before hydration. `SnapshotV
 - [`Grid.applyTransaction`](/docs/api/core/grid/#applytransaction)
 - [`ApplyTransactionResult`](/docs/api/core/apply-transaction-result/)
 - [`WorkbookSnapshot`](/docs/api/core/workbook-snapshot/)
-- [Persistence and recovery](/docs/guides/persistence/)
+- [Persistence and recovery](/docs/features/data/persistence/)

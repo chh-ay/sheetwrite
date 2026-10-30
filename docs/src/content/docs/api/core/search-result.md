@@ -1,6 +1,6 @@
 ---
 title: "SearchResult | @sheetwrite/core"
-description: "Ordered matches and active index produced by a grid search."
+description: "SearchResult interface in @sheetwrite/core: Ordered matches and active index produced by a grid search."
 ---
 <!-- api-export:@sheetwrite/core|.|SearchResult -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -8,7 +8,7 @@ description: "Ordered matches and active index produced by a grid search."
 Ordered matches and active index produced by a grid search.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L504"><code>packages/core/src/types/grid.ts#L504</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L633"><code>packages/core/src/types/grid.ts#L633</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>
@@ -65,6 +65,7 @@ export interface SearchResult {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

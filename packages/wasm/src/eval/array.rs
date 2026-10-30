@@ -12,8 +12,10 @@ use crate::types::{FormulaError, Value};
 use super::expand_let_ast;
 use super::lookup::integer_arg;
 use super::matrix::{
-    optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_CELLS, SPILL_MAX_RECOMPUTE_CELLS,
+    intersection_range, optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_CELLS,
+    SPILL_MAX_RECOMPUTE_CELLS,
 };
+use super::reference::RewriteScope;
 use super::value::{bool_from_value, compare_values, number_from_value};
 use super::{with_let_slots, EvalPass};
 
@@ -32,7 +34,7 @@ fn static_integer(ast: Option<&Ast>) -> Option<i64> {
 
 pub(crate) fn ast_produces_array(ast: &Ast) -> bool {
     match ast {
-        Ast::Func(Func::AnchorArray, _) => true,
+        Ast::Func(Func::AnchorArray | Func::Offset | Func::Indirect | Func::Intersect, _) => true,
         #[cfg(feature = "analysis")]
         Ast::BoundMatrix { .. } => true,
         #[cfg(feature = "analysis")]
@@ -109,10 +111,13 @@ fn transformed_axis_bound(size: usize, requested: i64, drop: bool) -> Result<usi
     }
 }
 
+/// Spill-budget cells charged before a runtime reference is evaluated.
+const RUNTIME_REFERENCE_PRECHARGE: usize = 1;
+
 impl CellStore {
     /// The range that the anchor of `A1#` spills into now, or `#REF!` when
     /// the anchor holds no spill.
-    fn spill_reference(&self, args: &[Ast], formula_sheet: usize) -> Ast {
+    pub(super) fn spill_reference(&self, args: &[Ast], formula_sheet: usize) -> Ast {
         let (sheet, row, col) = match args {
             [Ast::Cell(row, col, _)] => (formula_sheet, *row, *col),
             [Ast::AbsCell(sheet, row, col, _)] => (sheet.handle as usize, *row, *col),
@@ -121,7 +126,7 @@ impl CellStore {
         let Some(range) = self
             .sheets
             .get(sheet)
-            .and_then(|data| data.installed_spill((row, col)))
+            .and_then(|data| data.spill.installed((row, col)))
         else {
             return Ast::InvalidRef;
         };
@@ -140,41 +145,15 @@ impl CellStore {
         )
     }
 
-    /// A copy of `ast` in which every `A1#` is the range that its anchor
-    /// spills into now. Range functions such as SUMIF, INDEX and ROWS then
-    /// accept spill references without special handling.
-    pub(super) fn resolve_spill_refs(&self, ast: &Ast, sheet: usize) -> Ast {
-        let mut resolved = ast.clone();
-        self.replace_spill_refs(&mut resolved, sheet);
-        resolved
-    }
-
-    fn replace_spill_refs(&self, ast: &mut Ast, sheet: usize) {
-        match ast {
-            Ast::Func(Func::AnchorArray, args) => *ast = self.spill_reference(args, sheet),
-            Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
-                for arg in args {
-                    self.replace_spill_refs(arg, sheet);
-                }
-            }
-            Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-                self.replace_spill_refs(left, sheet);
-                self.replace_spill_refs(right, sheet);
-            }
-            Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
-                self.replace_spill_refs(inner, sheet);
-            }
-            Ast::LetSlot { expression, .. } => self.replace_spill_refs(expression, sheet),
-            _ => {}
-        }
-    }
-
     pub(super) fn dynamic_array_bound(
         &self,
         ast: &Ast,
         formula_sheet: usize,
     ) -> Option<Result<usize, FormulaError>> {
         match ast {
+            // The shape is known only after evaluation, so the pending loop
+            // charges the spill budget with the evaluated size instead.
+            Ast::Func(Func::Offset | Func::Indirect, _) => Some(Ok(RUNTIME_REFERENCE_PRECHARGE)),
             Ast::Bin(_, _, _) | Ast::Cmp(_, _, _) | Ast::Neg(_) | Ast::Pos(_) | Ast::Percent(_)
                 if ast_produces_array(ast) =>
             {
@@ -182,7 +161,13 @@ impl CellStore {
                     self.matrix_shape(ast, formula_sheet)
                         .map(|shape| shape.2)
                         .or_else(|error| {
-                            if error == FormulaError::Value {
+                            // An operator over a runtime reference gets its
+                            // shape only after evaluation, which charges it.
+                            if error == FormulaError::Value
+                                && super::reference::ast_contains_runtime_ref(ast)
+                            {
+                                Ok(RUNTIME_REFERENCE_PRECHARGE)
+                            } else if error == FormulaError::Value {
                                 Ok(SPILL_MAX_CELLS)
                             } else {
                                 Err(error)
@@ -203,8 +188,12 @@ impl CellStore {
             }
             #[cfg(feature = "analysis")]
             Ast::UnknownFunc(name, args) if name == super::analysis::lambda::CALL => {
-                ast_produces_array(ast)
-                    .then(|| super::analysis::lambda::bound(self, name, args, formula_sheet))
+                ast_produces_array(ast).then(|| {
+                    runtime_reference_bound(
+                        ast,
+                        super::analysis::lambda::bound(self, name, args, formula_sheet),
+                    )
+                })
             }
             #[cfg(feature = "analysis")]
             Ast::Func(Func::Analysis(id), args) => {
@@ -213,12 +202,16 @@ impl CellStore {
                 if !(hooks.produces_array)(name, args) {
                     return None;
                 }
-                Some((hooks.bound)(self, name, args, formula_sheet))
+                Some(runtime_reference_bound(
+                    ast,
+                    (hooks.bound)(self, name, args, formula_sheet),
+                ))
             }
             Ast::Range(..)
             | Ast::AbsRange(..)
             | Ast::NamedRange(..)
             | Ast::Structured(..)
+            | Ast::Func(Func::Intersect, _)
             | Ast::Array { .. } => Some(
                 self.matrix_shape(ast, formula_sheet)
                     .map(|(_, _, cells)| cells),
@@ -316,6 +309,9 @@ impl CellStore {
                 let range = self.spill_reference(args, sheet);
                 return self.eval_dynamic_array(&range, sheet, pass, depth);
             }
+            Ast::Func(func @ (Func::Offset | Func::Indirect), args) => {
+                self.eval_runtime_reference_matrix(*func, args, sheet, pass, depth + 1)
+            }
             Ast::InvalidRef => Err(FormulaError::Ref),
             #[cfg(feature = "analysis")]
             Ast::BoundMatrix { rows, cols, values } => {
@@ -340,6 +336,9 @@ impl CellStore {
             Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(..) | Ast::Structured(..) => {
                 self.eval_matrix_arg(ast, sheet, pass, depth + 1)
             }
+            // An empty intersection is #NULL!, which the range path cannot tell.
+            Ast::Func(Func::Intersect, operands) => intersection_range(operands, sheet)
+                .and_then(|_| self.eval_matrix_arg(ast, sheet, pass, depth + 1)),
             Ast::Array { values, .. } => self
                 .matrix_shape(ast, sheet)
                 .map(|(rows, cols, _)| EvalMatrix::new(rows, cols, values.clone())),
@@ -352,6 +351,14 @@ impl CellStore {
                     Err(error) => return Some(Err(error)),
                 };
                 return with_let_slots(slots, || {
+                    let expanded = self.resolve_let_runtime_refs(
+                        args,
+                        expanded,
+                        sheet,
+                        pass,
+                        depth + 1,
+                        RewriteScope::Root,
+                    );
                     self.eval_dynamic_array(&expanded, sheet, pass, depth + 1)
                 });
             }
@@ -502,20 +509,23 @@ impl CellStore {
             }
             _ => {}
         }
-        let range = range_from_ast(ast, formula_sheet).ok_or(FormulaError::Value)?;
+        let range = match ast {
+            Ast::Func(Func::Intersect, operands) => intersection_range(operands, formula_sheet)?,
+            _ => range_from_ast(ast, formula_sheet).ok_or(FormulaError::Value)?,
+        };
         let data = self
             .sheets
             .get(range.sheet as usize)
             .ok_or(FormulaError::Ref)?;
-        if data.row_count == 0
-            || data.n_cols == 0
-            || range.row_start as usize >= data.row_count
-            || range.col_start as usize >= data.n_cols
+        if data.cells.row_count() == 0
+            || data.cells.n_cols() == 0
+            || range.row_start as usize >= data.cells.row_count()
+            || range.col_start as usize >= data.cells.n_cols()
         {
             return Err(FormulaError::Ref);
         }
-        let row_end = (range.row_end as usize).min(data.row_count - 1);
-        let col_end = (range.col_end as usize).min(data.n_cols - 1);
+        let row_end = (range.row_end as usize).min(data.cells.row_count() - 1);
+        let col_end = (range.col_end as usize).min(data.cells.n_cols() - 1);
         let rows = row_end - range.row_start as usize + 1;
         let cols = col_end - range.col_start as usize + 1;
         let cells = EvalMatrix::validate_shape(rows, cols, 1, 0)?;
@@ -1048,6 +1058,23 @@ pub(super) fn dynamic_recompute_within_limit(total: usize, next: usize) -> Optio
     total
         .checked_add(next)
         .filter(|sum| *sum <= SPILL_MAX_RECOMPUTE_CELLS)
+}
+
+/// A LAMBDA body or array helper argument that calls OFFSET or INDIRECT has
+/// no shape before evaluation, so a shape query reports `#VALUE!`. Such a
+/// formula is charged like a bare runtime reference: a precharge now, and
+/// whatever its result holds beyond it once the pending loop evaluates it.
+#[cfg(feature = "analysis")]
+fn runtime_reference_bound(
+    ast: &Ast,
+    bound: Result<usize, FormulaError>,
+) -> Result<usize, FormulaError> {
+    match bound {
+        Err(FormulaError::Value) if super::reference::ast_contains_runtime_ref(ast) => {
+            Ok(RUNTIME_REFERENCE_PRECHARGE)
+        }
+        bound => bound,
+    }
 }
 
 fn matrix_item_hash(matrix: &EvalMatrix, item: usize, by_col: bool) -> u64 {

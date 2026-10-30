@@ -1,6 +1,7 @@
 import "./dom-setup.js";
 import { heapStats } from "bun:jsc";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
@@ -10,7 +11,7 @@ import type * as Wasm from "@sheetwrite/wasm";
 import type * as Core from "../../packages/core/src/index.js";
 import type { CompactRangeHistory } from "../../packages/core/src/store/data-engine.js";
 
-// One bench-run slot gives children the same affinity without concurrent samples.
+// Pin the parent to one idle core; children inherit that affinity and run one at a time.
 // Runtime-selected modules isolate initialization across compared worktrees.
 interface MemoryObservation {
   wasmBytes: number;
@@ -34,6 +35,11 @@ const root = resolve(values.root);
 const engineName = values.engine;
 if (engineName !== "wasm" && engineName !== "formulas")
   throw new Error("Expected wasm or formulas");
+
+/** Artifacts name a checkout by commit, so they never record a machine path. */
+function checkoutCommit(checkout: string): string {
+  return execFileSync("git", ["rev-parse", "HEAD"], { cwd: checkout, encoding: "utf8" }).trim();
+}
 
 const metrics = ["edit", "read", "ingest", "recalculation"] as const;
 
@@ -279,8 +285,8 @@ async function compare(baseline: string) {
   });
 
   return {
-    baseline,
-    changed: root,
+    baseline: checkoutCommit(baseline),
+    changed: checkoutCommit(root),
     engine: engineName,
     warmups: WARMUPS,
     samples: SAMPLES,
@@ -538,7 +544,7 @@ async function memory() {
 
     return {
       engine: engineName,
-      root,
+      root: checkoutCommit(root),
       jsHeapMeasurement: "bun:jsc heapStats().heapSize - extraMemorySize after full GC",
       observations,
     };

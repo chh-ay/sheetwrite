@@ -83,7 +83,7 @@ declare global {
 }
 
 const description =
-  "Executable spreadsheet interoperability: XLSX round-trips, committed independent fixtures, CSV/TSV, structured fidelity warnings, resource limits, and the optional package boundary — all running the real published APIs in your browser.";
+  "XLSX round-trips, independent fixture files, CSV/TSV, fidelity warnings and resource limits, all running Sheetwrite's published APIs in your browser.";
 
 export const Route = createFileRoute("/showcases/interoperability")({
   head: () => ({
@@ -98,7 +98,7 @@ export const Route = createFileRoute("/showcases/interoperability")({
 
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
-/** Canvas colors come from the dark stage's shared demo tokens. */
+/** Canvas colors come from the stage's shared demo tokens, which follow the page theme. */
 const CANVAS_THEME: Partial<Theme> = { rowHeight: 36 };
 const COMPATIBILITY_RESULTS = compatibilityResultsData as unknown as CompatibilityResults;
 const COMPATIBILITY_PAGE_SIZE = 20;
@@ -958,7 +958,7 @@ function InteroperabilityRoute() {
             <>
               A real editable Grid sits in the exchange path: load source bytes, make a change, then
               export, re-import, and inspect the fidelity result beside the workbook.{" "}
-              <Link to="/docs/$/" params={{ _splat: "guides/xlsx-export" }}>
+              <Link to="/docs/$/" params={{ _splat: "import-export/xlsx-export" }}>
                 XLSX interchange guide →
               </Link>
             </>
@@ -1314,7 +1314,7 @@ function InteroperabilityRoute() {
           </section>
           <div className="sw-si-release-lab">
             <div>
-              <p className="sw-si-release-label">NEW IN 0.5.0 · STREAMED IMPORT</p>
+              <p className="sw-si-release-label">STREAMED IMPORT</p>
               <h3>Put 200,000 sales records through the CSV importer.</h3>
               <p>
                 Records go straight into typed columns. XLSX imports also stream rows and shared
@@ -1402,9 +1402,7 @@ function InteroperabilityRoute() {
           )}
           {roundTrip && roundTrip.formulaExamples.length > 0 && (
             <details className="sw-si-source-proof" open data-testid="interop-spill-proof">
-              <summary>
-                New in 0.5.0: array constants and spill references survived the exchange
-              </summary>
+              <summary>Array constants and spill references survived the exchange</summary>
               <p>
                 Excel stores <code>A1#</code> as <code>_xlfn.ANCHORARRAY(A1)</code>. Each row shows
                 the same formula as a grid source, as the text inside the exported .xlsx file, and
@@ -1848,7 +1846,7 @@ function InteroperabilityRoute() {
               <h2 id="fixtures-title">Committed independent fixtures</h2>
               <p>
                 Bytes produced by other software, committed with full provenance, and hashed in your
-                browser before use — load any of them into the workbench above.
+                browser before use. Load any of them into the workbench above.
               </p>
               <div className="sw-si-provenance">
                 <strong>Checked provenance manifest</strong>
@@ -1965,7 +1963,7 @@ function InteroperabilityRoute() {
               <h2 id="warnings-title">Fidelity warnings, not silent loss</h2>
               <p>
                 Every import and export reports what it could not preserve as structured{" "}
-                <code>XlsxWorkbookWarning</code> records — coded, per sheet, per cell.{" "}
+                <code>XlsxWorkbookWarning</code> records, coded per sheet and per cell.{" "}
                 <Link to="/docs/$/" params={{ _splat: "api/core/xlsx-workbook-warning" }}>
                   Warning codes →
                 </Link>
@@ -1973,8 +1971,8 @@ function InteroperabilityRoute() {
               <div className="sw-si-panel sw-si-warnings" data-testid="interop-warnings">
                 {warningLog === null ? (
                   <p className="sw-si-empty">
-                    No interchange operation has run yet. Run the round-trip or import a fixture —
-                    warnings from that operation land here with their codes.
+                    No interchange operation has run yet. Run the round-trip or import a fixture,
+                    and the warnings from that operation land here with their codes.
                   </p>
                 ) : warningLog.warnings.length === 0 ? (
                   <p className="sw-si-empty" data-testid="interop-warnings-none">
@@ -2266,7 +2264,7 @@ function InteroperabilityRoute() {
                                 </>
                               ) : (
                                 <span className="sw-si-verdict" data-state="accepted">
-                                  NOT REJECTED — this is a bug
+                                  Not rejected: this is a bug
                                 </span>
                               )}
                             </td>
@@ -2332,7 +2330,7 @@ function InteroperabilityRoute() {
             <div className="sw-si-disclosure__body">
               <h2 id="isolation-title">The XLSX codec is an optional package</h2>
               <p>
-                <code>@sheetwrite/core</code> ships no XLSX implementation — workbook interchange
+                <code>@sheetwrite/core</code> ships no XLSX implementation. Workbook interchange
                 throws a typed error until a host registers a backend. This page loads{" "}
                 <code>@sheetwrite/xlsx/register</code> lazily on the first XLSX action; CSV/TSV
                 interchange needs no optional package at all.

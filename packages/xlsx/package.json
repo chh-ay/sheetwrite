@@ -9,7 +9,7 @@
     "url": "git+https://github.com/chh-ay/sheetwrite.git",
     "directory": "packages/xlsx"
   },
-  "homepage": "https://sheetwrite.vercel.app/",
+  "homepage": "https://www.sheetwrite.dev/",
   "bugs": {
     "url": "https://github.com/chh-ay/sheetwrite/issues"
   },
@@ -44,7 +44,7 @@
     "provenance": true
   },
   "scripts": {
-    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && bun ../../scripts/package-dist.ts .",
     "prepublishOnly": "bun run build",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },

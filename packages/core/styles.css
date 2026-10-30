@@ -179,12 +179,14 @@
    !important; and because the tokens are seeded on the grid root (an ancestor),
    `.sheetwrite-find { --sheetwrite-widget-bg: … }` wins too. */
 
-/* Find / replace bar */
+/* Find / replace bar: two rows of one field and its buttons. Both fields share
+   one bordered style with their own focus ring, so host page styles cannot
+   make them differ. The match count sits inside the find field. */
 .sheetwrite-find {
   flex-direction: column;
   align-items: stretch;
   gap: 6px;
-  padding: 6px 8px;
+  padding: 8px;
   border: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
   border-radius: 8px;
   background: var(--sheetwrite-widget-bg, var(--sheetwrite-bg, #ffffff));
@@ -199,17 +201,21 @@
 .sheetwrite-find-replace-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+}
+
+.sheetwrite-find-field {
+  position: relative;
+  display: inline-flex;
 }
 
 .sheetwrite-find-input,
 .sheetwrite-find-replace-input {
-  width: 220px;
-  height: 28px;
+  width: 240px;
+  height: 30px;
   padding: 0 8px;
-  border: none;
-  border-bottom: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
-  border-radius: 0;
+  border: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #dddddd));
+  border-radius: 6px;
   background: var(--sheetwrite-widget-bg, var(--sheetwrite-bg, #ffffff));
   color: var(--sheetwrite-widget-fg, var(--sheetwrite-fg, #111111));
   font: inherit;
@@ -217,37 +223,82 @@
   box-sizing: border-box;
 }
 
+/* Room for "12 of 340" inside the find field. */
+.sheetwrite-find-input {
+  padding-right: 76px;
+}
+
+.sheetwrite-find-input:focus,
+.sheetwrite-find-replace-input:focus {
+  border-color: var(--sheetwrite-widget-accent, #2563eb);
+  box-shadow: 0 0 0 2px var(--sheetwrite-widget-selection, var(--sheetwrite-selection, #2563eb33));
+}
+
 .sheetwrite-find-count {
-  min-width: 72px;
-  text-align: right;
-  opacity: 0.72;
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  color: var(--sheetwrite-widget-muted, #6b7280);
+  font-size: 0.9em;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  pointer-events: none;
+  transform: translateY(-50%);
 }
 
 .sheetwrite-find-btn {
   border: none;
   background: transparent;
-  color: var(--sheetwrite-widget-accent, var(--sheetwrite-header-fg, #6b4a1f));
+  color: var(--sheetwrite-widget-fg, var(--sheetwrite-fg, #111111));
   font: inherit;
   line-height: 1;
   cursor: pointer;
 }
 
 .sheetwrite-find-btn:hover {
-  background: var(--sheetwrite-widget-selection, var(--sheetwrite-selection, #2563eb22));
+  background: var(--sheetwrite-menu-hover, var(--sheetwrite-grid-line, #eeeeee));
+}
+
+.sheetwrite-find-btn:focus-visible {
+  outline: 2px solid var(--sheetwrite-widget-accent, #2563eb);
+  outline-offset: 1px;
 }
 
 .sheetwrite-find-icon-btn {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   padding: 0;
-  border-radius: 50%;
+  border-radius: 6px;
+  color: var(--sheetwrite-widget-muted, #6b7280);
+}
+
+.sheetwrite-find-icon-btn:hover {
+  color: var(--sheetwrite-widget-fg, var(--sheetwrite-fg, #111111));
+}
+
+/* The divider before Close. It is drawn here, not as a DOM node, because it is
+   only cosmetic. The margin plus the row gap leaves 6px on each side of it. */
+.sheetwrite-find-close {
+  position: relative;
+  margin-left: 9px;
+}
+
+.sheetwrite-find-close::before {
+  content: "";
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: -7px;
+  width: 1px;
+  background: var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
 }
 
 .sheetwrite-find-text-btn {
-  height: 28px;
-  padding: 0 10px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #dddddd));
   border-radius: 6px;
+  font-weight: 500;
 }
 
 /* Toolbar */
@@ -276,7 +327,7 @@
   font: inherit;
 }
 
-.sheetwrite-tb-button > svg {
+.sheetwrite-tb-button > :is(svg, .sheetwrite-icon) {
   display: block;
   width: 16px;
   height: 16px;
@@ -300,12 +351,987 @@
   background: var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
 }
 
-/* Context menu */
-.sheetwrite-context-menu {
-  min-width: 160px;
-  padding: 4px 0;
+/* Ribbon (config.ribbon / createRibbon). Groups set data-size to large,
+   medium, small or collapsed as the ribbon narrows (see ribbon-fit.ts). The
+   tab row and panel heights are mirrored in ribbon.ts for the grid's layout. */
+.sheetwrite-ribbon {
+  --sheetwrite-ribbon-hover: var(--sheetwrite-menu-hover, var(--sheetwrite-grid-line, #eeeeee));
+  --sheetwrite-ribbon-pressed: var(--sheetwrite-widget-selection, #2563eb22);
+  --sheetwrite-ribbon-line: var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
+  border-bottom: 1px solid var(--sheetwrite-ribbon-line);
+  background: var(--sheetwrite-toolbar-bg, var(--sheetwrite-header-bg, #f4ede1));
+  color: var(--sheetwrite-toolbar-fg, var(--sheetwrite-header-fg, #6b4a1f));
+  font: var(--sheetwrite-widget-font, 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
+  box-sizing: border-box;
+  user-select: none;
+}
+
+.sheetwrite-ribbon :focus-visible {
+  outline: 2px solid var(--sheetwrite-widget-accent, #2563eb);
+  outline-offset: -2px;
+}
+
+.sheetwrite-ribbon-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 30px;
+  padding: 0 6px;
+  box-sizing: border-box;
+}
+
+.sheetwrite-ribbon-tab,
+.sheetwrite-ribbon-minimize {
+  height: 26px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 4px 4px 0 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.sheetwrite-ribbon-tab:hover,
+.sheetwrite-ribbon-minimize:hover {
+  background: var(--sheetwrite-ribbon-hover);
+}
+
+.sheetwrite-ribbon-tab[aria-selected="true"] {
+  background: var(--sheetwrite-widget-bg, #ffffff);
+  color: var(--sheetwrite-widget-fg, #111111);
+  font-weight: 600;
+  box-shadow: inset 0 -2px var(--sheetwrite-widget-accent, #2563eb);
+}
+
+.sheetwrite-ribbon[data-minimized="true"] .sheetwrite-ribbon-tab[aria-selected="true"] {
+  background: transparent;
+  color: inherit;
+}
+
+.sheetwrite-ribbon-minimize {
+  margin-left: auto;
+  padding: 0 8px;
+}
+
+.sheetwrite-ribbon-minimize::before {
+  content: "";
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-top: 1.5px solid currentColor;
+  border-left: 1.5px solid currentColor;
+  transform: translateY(2px) rotate(45deg);
+}
+
+.sheetwrite-ribbon-minimize[aria-expanded="false"]::before {
+  transform: translateY(-2px) rotate(225deg);
+}
+
+.sheetwrite-ribbon-panel {
+  display: flex;
+  height: 92px;
+  padding: 4px 4px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: var(--sheetwrite-widget-bg, #ffffff);
+  color: var(--sheetwrite-widget-fg, #111111);
+  box-sizing: border-box;
+}
+
+.sheetwrite-ribbon-panel[hidden] {
+  display: none;
+}
+
+.sheetwrite-ribbon-group {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  flex: none;
+  padding: 0 6px;
+  border-right: 1px solid var(--sheetwrite-ribbon-line);
+}
+
+.sheetwrite-ribbon-group-label {
+  padding: 2px 0;
+  color: var(--sheetwrite-widget-muted, #6b7280);
+  font-size: 11px;
+  line-height: 14px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Flow groups: small controls stack three high; large ones span all three. */
+.sheetwrite-ribbon-group-body[data-layout="flow"] {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(3, 24px);
+  align-content: start;
+  gap: 0 2px;
+}
+
+.sheetwrite-ribbon-group-body[data-layout="rows"] {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+
+.sheetwrite-ribbon-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* Qualified by the group so it outranks the later `.sheetwrite-ribbon-button`. */
+.sheetwrite-ribbon-group > .sheetwrite-ribbon-group-button,
+.sheetwrite-ribbon-group[data-size="collapsed"] > .sheetwrite-ribbon-group-body {
+  display: none;
+}
+
+.sheetwrite-ribbon-group[data-size="collapsed"] > .sheetwrite-ribbon-group-button {
+  display: inline-flex;
+}
+
+.sheetwrite-ribbon-button,
+.sheetwrite-ribbon-split-arrow,
+.sheetwrite-ribbon-combo-arrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  min-width: 24px;
+  padding: 0 4px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+:is(.sheetwrite-ribbon-button, .sheetwrite-ribbon-split-arrow):hover:not(:disabled) {
+  background: var(--sheetwrite-ribbon-hover);
+}
+
+.sheetwrite-ribbon-button[aria-pressed="true"],
+.sheetwrite-ribbon-button[aria-expanded="true"],
+.sheetwrite-ribbon-split-arrow[aria-expanded="true"] {
+  border-color: var(--sheetwrite-ribbon-line);
+  background: var(--sheetwrite-ribbon-pressed);
+}
+
+.sheetwrite-ribbon-button[aria-pressed="mixed"] {
+  border-style: dashed;
+  border-color: var(--sheetwrite-ribbon-line);
+}
+
+.sheetwrite-ribbon :disabled {
+  opacity: var(--sheetwrite-menu-disabled-opacity, 0.45);
+  cursor: default;
+}
+
+.sheetwrite-ribbon-icon > :is(svg, .sheetwrite-icon) {
+  display: block;
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+}
+
+/* Labels show beside small buttons in flow groups, never in dense rows. */
+.sheetwrite-ribbon-row .sheetwrite-ribbon-label,
+.sheetwrite-ribbon-group[data-size="small"] .sheetwrite-ribbon-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+:is(.sheetwrite-ribbon-button, .sheetwrite-ribbon-split)[data-large] {
+  grid-row: span 3;
+}
+
+.sheetwrite-ribbon-button[data-large] {
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 2px;
+  height: 72px;
+  min-width: 44px;
+  max-width: 72px;
+  padding: 4px;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.15;
+}
+
+.sheetwrite-ribbon-button[data-large] > .sheetwrite-ribbon-icon > :is(svg, .sheetwrite-icon) {
+  --sheetwrite-icon-size: 32px;
+  width: 32px;
+  height: 32px;
+}
+
+/* Medium: large buttons fall back to a small icon with the label beside it. */
+.sheetwrite-ribbon-group[data-size="medium"]
+  :is(.sheetwrite-ribbon-button, .sheetwrite-ribbon-split)[data-large],
+.sheetwrite-ribbon-group[data-size="small"]
+  :is(.sheetwrite-ribbon-button, .sheetwrite-ribbon-split)[data-large] {
+  grid-row: auto;
+}
+
+.sheetwrite-ribbon-group:is([data-size="medium"], [data-size="small"])
+  .sheetwrite-ribbon-button[data-large] {
+  flex-direction: row;
+  gap: 4px;
+  height: 24px;
+  max-width: none;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
+.sheetwrite-ribbon-group:is([data-size="medium"], [data-size="small"])
+  .sheetwrite-ribbon-button[data-large]
+  > .sheetwrite-ribbon-icon
+  > :is(svg, .sheetwrite-icon) {
+  --sheetwrite-icon-size: 16px;
+  width: 16px;
+  height: 16px;
+}
+
+.sheetwrite-ribbon-caret {
+  flex: none;
+  width: 0;
+  height: 0;
+  border-top: 4px solid currentColor;
+  border-right: 3.5px solid transparent;
+  border-left: 3.5px solid transparent;
+}
+
+.sheetwrite-ribbon-split {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.sheetwrite-ribbon-split > .sheetwrite-ribbon-button {
+  position: relative;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.sheetwrite-ribbon-split-arrow {
+  min-width: 14px;
+  padding: 0 2px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.sheetwrite-ribbon-split[data-large] {
+  flex-direction: column;
+}
+
+.sheetwrite-ribbon-split[data-large] > .sheetwrite-ribbon-button {
+  height: 54px;
+  border-radius: 4px 4px 0 0;
+}
+
+.sheetwrite-ribbon-split[data-large] > .sheetwrite-ribbon-split-arrow {
+  justify-content: center;
+  height: 18px;
+  border-radius: 0 0 4px 4px;
+}
+
+.sheetwrite-ribbon-group:is([data-size="medium"], [data-size="small"])
+  .sheetwrite-ribbon-split[data-large] {
+  flex-direction: row;
+}
+
+.sheetwrite-ribbon-group:is([data-size="medium"], [data-size="small"])
+  .sheetwrite-ribbon-split[data-large]
+  > :is(.sheetwrite-ribbon-button, .sheetwrite-ribbon-split-arrow) {
+  height: 24px;
+}
+
+.sheetwrite-ribbon-color-bar {
+  position: absolute;
+  right: 4px;
+  bottom: 2px;
+  left: 4px;
+  height: 3px;
+}
+
+.sheetwrite-ribbon-combo {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  border: 1px solid var(--sheetwrite-ribbon-line);
+  border-radius: 4px;
+  background: var(--sheetwrite-widget-bg, #ffffff);
+  box-sizing: border-box;
+}
+
+.sheetwrite-ribbon-combo-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 4px;
+  border: none;
+  background: transparent;
+  color: var(--sheetwrite-widget-fg, #111111);
+  font: inherit;
+  outline-offset: -2px;
+}
+
+.sheetwrite-ribbon-combo-input[aria-invalid="true"] {
+  outline: 2px solid var(--sheetwrite-widget-error, #b42318);
+}
+
+.sheetwrite-ribbon-combo-arrow {
+  min-width: 16px;
+  height: 100%;
+  padding: 0 4px;
+  border-radius: 0 3px 3px 0;
+}
+
+/* One stepper, [−] [percent] [+], sized like the font combos beside it. */
+.sheetwrite-ribbon-zoom {
+  display: inline-flex;
+  align-items: stretch;
+  align-self: center;
+  height: 24px;
+  grid-row: span 3;
+  overflow: hidden;
+  border: 1px solid var(--sheetwrite-ribbon-line);
+  border-radius: 4px;
+  background: var(--sheetwrite-widget-bg, #ffffff);
+  box-sizing: border-box;
+}
+
+.sheetwrite-ribbon-zoom > .sheetwrite-ribbon-zoom-step {
+  width: 26px;
+  height: auto;
+  padding: 0;
+  border-radius: 0;
+  justify-content: center;
+}
+
+.sheetwrite-ribbon-zoom-readout {
+  min-width: 48px;
+  padding: 0 6px;
+  border: 0;
+  border-inline: 1px solid var(--sheetwrite-ribbon-line);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  cursor: pointer;
+}
+
+.sheetwrite-ribbon-zoom-readout:hover:not(:disabled) {
+  background: var(--sheetwrite-ribbon-hover);
+}
+
+/* At 100% the reset has nothing to do, but it still shows the current zoom, so
+   it keeps the normal text color instead of the browser's disabled gray. */
+.sheetwrite-ribbon-zoom-readout:disabled {
+  color: inherit;
+  cursor: default;
+  opacity: 1;
+}
+
+/* High Contrast paints disabled button text GrayText; the readout is a value. */
+@media (forced-colors: active) {
+  .sheetwrite-ribbon-zoom-readout:disabled {
+    color: CanvasText;
+  }
+}
+
+/* Cell notes (src/note-popover.ts): the hover card and the editor share one
+   look. Both are position: fixed under the grid host, so the widget variables
+   reach them and overflow cannot clip them. The amber edge matches the corner
+   mark the canvas paints on a noted cell. */
+.sheetwrite-note,
+.sheetwrite-note-editor {
+  z-index: 1001;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: 240px;
+  margin: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
+  border-left: 3px solid var(--sheetwrite-note-accent, #f59e0b);
+  border-radius: 4px;
+  background: var(--sheetwrite-widget-bg, var(--sheetwrite-bg, #ffffff));
+  color: var(--sheetwrite-widget-fg, var(--sheetwrite-fg, #111111));
+  font: var(--sheetwrite-widget-font, 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
+  box-shadow: var(--sheetwrite-menu-shadow, 0 6px 20px rgba(0, 0, 0, 0.18));
+}
+
+.sheetwrite-note {
+  max-height: 240px;
+  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.sheetwrite-note-editor {
+  width: 240px;
+  height: 120px;
+  resize: both;
+  outline: none;
+}
+
+.sheetwrite-note-editor:focus-visible {
+  border-color: var(--sheetwrite-selection-border, #2563eb);
+}
+
+@media (forced-colors: active) {
+  .sheetwrite-note,
+  .sheetwrite-note-editor {
+    border-color: CanvasText;
+  }
+
+  .sheetwrite-note-editor:focus-visible {
+    outline: 2px solid Highlight;
+  }
+}
+
+/* Popups live under the grid host so the widget variables reach them;
+   ribbon-popup.ts makes them position: fixed so overflow cannot clip them. */
+.sheetwrite-ribbon-popup {
+  z-index: 1001;
+  max-height: min(60vh, 420px);
+  padding: 4px;
+  overflow: auto;
   border: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
   border-radius: 6px;
+  background: var(--sheetwrite-widget-bg, #ffffff);
+  color: var(--sheetwrite-widget-fg, #111111);
+  font: var(--sheetwrite-widget-font, 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
+  box-shadow: var(--sheetwrite-menu-shadow, 0 6px 20px rgba(0, 0, 0, 0.18));
+  box-sizing: border-box;
+  user-select: none;
+}
+
+.sheetwrite-ribbon-menu,
+.sheetwrite-ribbon-listbox {
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+}
+
+.sheetwrite-ribbon-menu-item,
+.sheetwrite-ribbon-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.sheetwrite-ribbon-option {
+  padding: 4px 10px;
+}
+
+:is(.sheetwrite-ribbon-menu-item, .sheetwrite-ribbon-option):is(:hover, :focus) {
+  outline: none;
+  background: var(--sheetwrite-menu-hover, #eeeeee);
+}
+
+.sheetwrite-ribbon-option[aria-selected="true"] {
+  background: var(--sheetwrite-widget-selection, #2563eb22);
+}
+
+.sheetwrite-ribbon-menu-item > .sheetwrite-ribbon-icon > :is(svg, .sheetwrite-icon) {
+  width: 16px;
+  height: 16px;
+}
+
+.sheetwrite-ribbon-palette {
+  display: grid;
+  gap: 4px;
+  width: 212px;
+}
+
+.sheetwrite-ribbon-palette-heading {
+  padding: 4px 2px 0;
+  color: var(--sheetwrite-widget-muted, #6b7280);
+  font-size: 11px;
+}
+
+.sheetwrite-ribbon-palette-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 18px);
+  gap: 3px;
+  padding: 0 2px;
+}
+
+.sheetwrite-ribbon-swatch {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid rgb(0 0 0 / 18%);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.sheetwrite-ribbon-swatch:is(:hover, :focus) {
+  outline: 2px solid var(--sheetwrite-widget-accent, #2563eb);
+  outline-offset: 1px;
+}
+
+.sheetwrite-ribbon-palette input[type="color"] {
+  width: 28px;
+  height: 20px;
+  margin-left: auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.sheetwrite-ribbon-form {
+  display: grid;
+  gap: 12px;
+  width: 280px;
+  padding: 10px 12px 12px;
+  box-sizing: border-box;
+}
+
+.sheetwrite-ribbon-form label {
+  display: grid;
+  gap: 4px;
+}
+
+/* A field the current choice does not use reads as off, label included. */
+.sheetwrite-ribbon-form label:has(> .sheetwrite-ribbon-field:disabled) {
+  color: var(--sheetwrite-widget-muted, #6b7280);
+}
+
+.sheetwrite-ribbon-field {
+  width: 100%;
+  min-height: 28px;
+  padding: 4px 6px;
+  border: 1px solid var(--sheetwrite-widget-border, #d0d0d0);
+  border-radius: 4px;
+  background: var(--sheetwrite-widget-bg, #ffffff);
+  color: inherit;
+  font: inherit;
+  box-sizing: border-box;
+  user-select: text;
+}
+
+.sheetwrite-ribbon-field::placeholder {
+  color: var(--sheetwrite-widget-muted, #6b7280);
+}
+
+.sheetwrite-ribbon-field:focus {
+  border-color: var(--sheetwrite-widget-accent, #2563eb);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--sheetwrite-widget-selection, #2563eb33);
+}
+
+.sheetwrite-ribbon-field:disabled {
+  background: var(--sheetwrite-menu-hover, #f3f4f6);
+  cursor: not-allowed;
+}
+
+textarea.sheetwrite-ribbon-field {
+  min-height: 72px;
+  resize: vertical;
+}
+
+.sheetwrite-ribbon-form-error {
+  margin: 0;
+  color: var(--sheetwrite-widget-error, #b42318);
+}
+
+/* The form's one action: the accent border and weight mark it as the default
+   in any theme, with no fill colour that could lose contrast on dark ones. */
+.sheetwrite-ribbon-form-button {
+  justify-self: end;
+  min-width: 72px;
+  height: 28px;
+  padding: 0 14px;
+  border: 1px solid var(--sheetwrite-widget-accent, #2563eb);
+  border-radius: 4px;
+  background: var(--sheetwrite-widget-selection, #2563eb22);
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sheetwrite-ribbon-form-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--sheetwrite-widget-accent, #2563eb) 24%, transparent);
+}
+
+/* Disabled while the optional panel code loads after OK. */
+.sheetwrite-ribbon-form-button:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+/* A collapsed group's controls, lent to the popup, render at full size. */
+.sheetwrite-ribbon-group-popup > .sheetwrite-ribbon-group-body {
+  min-height: 72px;
+}
+
+/* The placement choice of Insert › PivotTable: radios in a borderless group. */
+.sheetwrite-ribbon-choices {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.sheetwrite-ribbon-choices legend {
+  margin-bottom: 8px;
+  padding: 0;
+  font-weight: 600;
+}
+
+/* The row pads out by 4px and pulls back by the same, so the radios stay
+   aligned with the legend while the focus ring has room around the text. */
+.sheetwrite-ribbon-choices label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 -4px;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.sheetwrite-ribbon-choices input[type="radio"] {
+  margin: 0;
+  accent-color: var(--sheetwrite-widget-accent, #2563eb);
+}
+
+/* Focus rings the whole option row. A native radio ignores border-radius, so
+   a ring on the radio itself (ours or a host page's) draws a square. */
+.sheetwrite-ribbon-choices input[type="radio"]:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.sheetwrite-ribbon-choices label:has(> input:focus-visible) {
+  outline: 2px solid var(--sheetwrite-widget-accent, #2563eb);
+  outline-offset: 2px;
+}
+
+/* Side panel (Chart panel, pivot field list), docked to the grid's right edge
+   inside .sheetwrite-panel-host. It uses the ribbon's type scale: 13px body,
+   11px muted headings, 28px controls, 4px radii. */
+.sheetwrite-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  border-left: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
+  background: var(--sheetwrite-widget-bg, #ffffff);
+  color: var(--sheetwrite-widget-fg, #111111);
+  font: var(--sheetwrite-widget-font, 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
+  box-sizing: border-box;
+}
+
+.sheetwrite-panel :focus-visible {
+  outline: 2px solid var(--sheetwrite-widget-accent, #2563eb);
+  outline-offset: -2px;
+}
+
+.sheetwrite-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 6px 0 12px;
+  border-bottom: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
+  background: var(--sheetwrite-toolbar-bg, var(--sheetwrite-header-bg, #f4ede1));
+  color: var(--sheetwrite-toolbar-fg, var(--sheetwrite-header-fg, #6b4a1f));
+  flex: none;
+}
+
+.sheetwrite-panel-title {
+  flex: 1;
+  margin: 0;
+  overflow: hidden;
+  font-size: inherit;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheetwrite-panel-close {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* A drawn ×, so the close button needs no glyph from the icon sheet. */
+.sheetwrite-panel-close::before {
+  content: "\00d7";
+  font-size: 18px;
+  line-height: 28px;
+}
+
+.sheetwrite-panel-close:hover,
+.sheetwrite-panel-menu-item:hover,
+.sheetwrite-panel-kind:hover {
+  background: var(--sheetwrite-menu-hover, var(--sheetwrite-grid-line, #eeeeee));
+}
+
+.sheetwrite-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 12px 12px;
+}
+
+.sheetwrite-panel-section {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.sheetwrite-panel-section[hidden] {
+  display: none;
+}
+
+.sheetwrite-panel-heading {
+  margin: 4px 0 0;
+  color: var(--sheetwrite-widget-muted, #6b7280);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.sheetwrite-panel-field {
+  display: grid;
+  gap: 4px;
+}
+
+.sheetwrite-panel-label {
+  padding: 0;
+  color: var(--sheetwrite-widget-muted, #6b7280);
+  font-size: 11px;
+}
+
+.sheetwrite-panel-control {
+  min-width: 0;
+  height: 28px;
+  padding: 4px 6px;
+  border: 1px solid var(--sheetwrite-widget-border, #d0d0d0);
+  border-radius: 4px;
+  background: var(--sheetwrite-widget-bg, #ffffff);
+  color: inherit;
+  font: inherit;
+  box-sizing: border-box;
+}
+
+.sheetwrite-panel-control[aria-invalid="true"] {
+  border-color: var(--sheetwrite-widget-error, #b42318);
+}
+
+.sheetwrite-panel-error {
+  color: var(--sheetwrite-widget-error, #b42318);
+  font-size: 11px;
+}
+
+.sheetwrite-panel-note {
+  margin: 0 0 8px;
+  color: var(--sheetwrite-widget-muted, #6b7280);
+}
+
+.sheetwrite-panel-note[role="alert"] {
+  color: var(--sheetwrite-widget-error, #b42318);
+}
+
+.sheetwrite-panel-kinds {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+.sheetwrite-panel-kind {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 2px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.sheetwrite-panel-kind[aria-checked="true"] {
+  border-color: var(--sheetwrite-widget-accent, #2563eb);
+  background: var(--sheetwrite-widget-selection, #2563eb22);
+}
+
+.sheetwrite-panel-icon > :is(svg, .sheetwrite-icon) {
+  --sheetwrite-icon-size: 24px;
+  width: 24px;
+  height: 24px;
+}
+
+.sheetwrite-panel-series {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 6px 8px 8px;
+  border: 1px solid var(--sheetwrite-widget-border, #d0d0d0);
+  border-radius: 4px;
+}
+
+.sheetwrite-panel-fields,
+.sheetwrite-panel-area {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 4px;
+  border: 1px solid var(--sheetwrite-widget-border, #d0d0d0);
+  border-radius: 4px;
+  list-style: none;
+}
+
+.sheetwrite-panel-area {
+  min-height: 36px;
+}
+
+.sheetwrite-panel-field-item,
+.sheetwrite-panel-area-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 4px;
+  border-radius: 4px;
+  cursor: grab;
+}
+
+.sheetwrite-panel-field-item[data-used] .sheetwrite-panel-field-name {
+  font-weight: 600;
+}
+
+.sheetwrite-panel-field-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheetwrite-panel-badge {
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--sheetwrite-menu-hover, var(--sheetwrite-grid-line, #eeeeee));
+  color: var(--sheetwrite-widget-muted, #6b7280);
+  font-size: 11px;
+}
+
+.sheetwrite-panel-area-empty {
+  padding: 6px 4px;
+  color: var(--sheetwrite-widget-muted, #6b7280);
+  font-size: 11px;
+}
+
+.sheetwrite-panel-area-item > .sheetwrite-panel-control,
+.sheetwrite-panel-filter {
+  flex-basis: 100%;
+}
+
+.sheetwrite-panel-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+}
+
+.sheetwrite-panel-menu-anchor {
+  position: relative;
+}
+
+.sheetwrite-panel-menu-button {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* A drawn chevron, so the menu button needs no glyph from the icon sheet. */
+.sheetwrite-panel-menu-button::before {
+  content: "\25be";
+}
+
+.sheetwrite-panel-menu {
+  position: absolute;
+  z-index: 1;
+  top: 100%;
+  right: 0;
+  display: grid;
+  min-width: 160px;
+  padding: 4px;
+  border: 1px solid var(--sheetwrite-widget-border, #d0d0d0);
+  border-radius: 6px;
+  background: var(--sheetwrite-widget-bg, #ffffff);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 15%);
+}
+
+.sheetwrite-panel-menu-item {
+  height: 28px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sheetwrite-panel-menu-item[aria-disabled="true"] {
+  color: var(--sheetwrite-widget-muted, #6b7280);
+  cursor: default;
+}
+
+.sheetwrite-panel-menu-item:focus-visible {
+  background: var(--sheetwrite-widget-selection, #2563eb22);
+}
+
+/* Context menu: icon column, label, then shortcut or submenu chevron. Rows are
+   inset with rounded highlights; hover and keyboard focus look the same. */
+.sheetwrite-context-menu {
+  min-width: 200px;
+  /* Keep in sync with MENU_PADDING_PX in src/context-menu.ts. */
+  padding: 4px;
+  border: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
+  border-radius: 8px;
   background: var(--sheetwrite-widget-bg, var(--sheetwrite-bg, #ffffff));
   color: var(--sheetwrite-widget-fg, var(--sheetwrite-fg, #111111));
   font: var(--sheetwrite-widget-font, 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
@@ -315,19 +1341,37 @@
   z-index: 1000;
 }
 
+/* A submenu stacks above the menu that opened it. */
+.sheetwrite-context-menu-sub {
+  z-index: 1001;
+}
+
 .sheetwrite-context-menu-item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  padding: 5px 14px;
+  gap: 10px;
+  min-height: 28px;
+  padding: 0 10px 0 8px;
+  border-radius: 5px;
   cursor: pointer;
   white-space: nowrap;
   background: transparent;
+  outline: none;
 }
 
-.sheetwrite-context-menu-item:hover:not(.sheetwrite-context-menu-item-disabled) {
+.sheetwrite-context-menu-item:is(:hover, :focus-visible, :focus):not(
+    .sheetwrite-context-menu-item-disabled
+  ),
+.sheetwrite-context-menu-item[aria-expanded="true"] {
   background: var(--sheetwrite-menu-hover, var(--sheetwrite-grid-line, #eeeeee));
+}
+
+/* High Contrast drops backgrounds; an outline keeps the active row visible. */
+@media (forced-colors: active) {
+  .sheetwrite-context-menu-item:is(:focus, [aria-expanded="true"]) {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
 }
 
 .sheetwrite-context-menu-item-disabled {
@@ -335,14 +1379,40 @@
   opacity: var(--sheetwrite-menu-disabled-opacity, 0.5);
 }
 
+.sheetwrite-context-menu-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--sheetwrite-widget-muted, #6b7280);
+}
+
+.sheetwrite-context-menu-label {
+  flex: 1;
+}
+
 .sheetwrite-context-menu-shortcut {
+  margin-left: 24px;
   color: var(--sheetwrite-widget-muted, #6b7280);
   font-size: 0.9em;
 }
 
+/* Submenu chevron, drawn with borders so it follows the text color. */
+.sheetwrite-context-menu-arrow {
+  width: 6px;
+  height: 6px;
+  margin: 0 2px 0 24px;
+  border-top: 1.5px solid currentColor;
+  border-right: 1.5px solid currentColor;
+  opacity: 0.6;
+  transform: rotate(45deg);
+}
+
 .sheetwrite-context-menu-sep {
   height: 1px;
-  margin: 4px 0;
+  margin: 4px 6px;
   background: var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
 }
 
@@ -650,3 +1720,435 @@
     transition: none;
   }
 }
+
+/* Chart series colors. Each one has at least 3:1 contrast against the
+   default surface of its theme (WCAG 1.4.11). Hosts may override them. */
+.sheetwrite {
+  --sheetwrite-chart-1: #1f6fd1;
+  --sheetwrite-chart-2: #c2410c;
+  --sheetwrite-chart-3: #15803d;
+  --sheetwrite-chart-4: #b91c1c;
+  --sheetwrite-chart-5: #7c3aed;
+  --sheetwrite-chart-6: #0e7490;
+  --sheetwrite-chart-7: #a16207;
+  --sheetwrite-chart-8: #be185d;
+}
+
+[data-theme="dark"] .sheetwrite,
+.dark .sheetwrite {
+  --sheetwrite-chart-1: #60a5fa;
+  --sheetwrite-chart-2: #fb923c;
+  --sheetwrite-chart-3: #4ade80;
+  --sheetwrite-chart-4: #f87171;
+  --sheetwrite-chart-5: #a78bfa;
+  --sheetwrite-chart-6: #22d3ee;
+  --sheetwrite-chart-7: #facc15;
+  --sheetwrite-chart-8: #f472b6;
+}
+
+/* Floating objects (charts) over the cells. */
+.sheetwrite-object {
+  box-sizing: border-box;
+  border: 1px solid var(--sheetwrite-grid-line);
+  background: var(--sheetwrite-bg);
+  color: var(--sheetwrite-fg);
+  cursor: move;
+  outline: none;
+  touch-action: none;
+}
+
+.sheetwrite-object-layer[data-readonly="true"] .sheetwrite-object {
+  cursor: default;
+}
+
+.sheetwrite-object-selected {
+  outline: 2px solid var(--sheetwrite-selection-border);
+  outline-offset: 1px;
+}
+
+.sheetwrite-object-host {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.sheetwrite-object-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 8px;
+  box-sizing: border-box;
+  overflow: hidden;
+  font: var(--sheetwrite-font);
+  font-weight: 600;
+  text-align: center;
+}
+
+.sheetwrite-object-handle {
+  position: absolute;
+  display: none;
+  width: 8px;
+  height: 8px;
+  box-sizing: border-box;
+  border: 1px solid var(--sheetwrite-selection-border);
+  background: var(--sheetwrite-bg);
+}
+
+.sheetwrite-object-selected .sheetwrite-object-handle {
+  display: block;
+}
+
+.sheetwrite-object-layer[data-readonly="true"] .sheetwrite-object-handle {
+  display: none;
+}
+
+.sheetwrite-object-handle[data-handle^="n"] {
+  top: -4px;
+}
+
+.sheetwrite-object-handle[data-handle^="s"] {
+  bottom: -4px;
+}
+
+.sheetwrite-object-handle:is([data-handle="n"], [data-handle="s"]) {
+  left: calc(50% - 4px);
+  cursor: ns-resize;
+}
+
+.sheetwrite-object-handle:is([data-handle="e"], [data-handle="w"]) {
+  top: calc(50% - 4px);
+  cursor: ew-resize;
+}
+
+.sheetwrite-object-handle[data-handle$="w"] {
+  left: -4px;
+}
+
+.sheetwrite-object-handle[data-handle$="e"] {
+  right: -4px;
+}
+
+.sheetwrite-object-handle:is([data-handle="nw"], [data-handle="se"]) {
+  cursor: nwse-resize;
+}
+
+.sheetwrite-object-handle:is([data-handle="ne"], [data-handle="sw"]) {
+  cursor: nesw-resize;
+}
+
+/* @generated icon-sheet: start (bun scripts/icon-sheet.ts) */
+/* Command icons: one sheet, cropped per glyph. Set --sheetwrite-icon-size on the
+   icon or any ancestor to scale it. Under a Content Security Policy that blocks
+   data: images, set --sheetwrite-icon-sheet to url() of the shipped
+   @sheetwrite/core/icons.svg. */
+.sheetwrite-icon {
+  --sheetwrite-icon-sheet-default: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='576' height='576' viewBox='0 0 576 576' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cg id='undo' transform='translate(0 0)'%3E%3Cpath d='M9 6 4.5 10.5 9 15'/%3E%3Cpath d='M4.5 10.5H14a5 5 0 0 1 0 10h-3'/%3E%3C/g%3E%3Cg id='redo' transform='translate(36 0)'%3E%3Cpath d='M15 6l4.5 4.5L15 15'/%3E%3Cpath d='M19.5 10.5H10a5 5 0 0 0 0 10h3'/%3E%3C/g%3E%3Cg id='paste' transform='translate(72 0)'%3E%3Cpath d='M9 4.5H6.5A1.5 1.5 0 0 0 5 6v13.5A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H15'/%3E%3Cpath d='M9.5 3h5a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.5.5h-5a.5.5 0 0 1-.5-.5v-2a.5.5 0 0 1 .5-.5Z'/%3E%3Cpath d='M8.5 11h7M8.5 14.5h7M8.5 18h4'/%3E%3C/g%3E%3Cg id='cut' transform='translate(108 0)'%3E%3Cpath d='M9 17.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Z'/%3E%3Cpath d='M20 17.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Z'/%3E%3Cpath d='M8 15.4 16.5 3.5'/%3E%3Cpath d='M16 15.4 7.5 3.5'/%3E%3C/g%3E%3Cg id='copy' transform='translate(144 0)'%3E%3Cpath d='M9.5 8h9A1.5 1.5 0 0 1 20 9.5v10a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 8 19.5v-10A1.5 1.5 0 0 1 9.5 8Z'/%3E%3Cpath d='M16 5.5v-1A1.5 1.5 0 0 0 14.5 3h-9A1.5 1.5 0 0 0 4 4.5v10A1.5 1.5 0 0 0 5.5 16H8'/%3E%3C/g%3E%3Cg id='find' transform='translate(180 0)'%3E%3Cpath d='M16.5 10.5a6 6 0 1 1-12 0 6 6 0 0 1 12 0Z'/%3E%3Cpath d='m15 15 5.5 5.5'/%3E%3C/g%3E%3Cg id='zoomIn' transform='translate(216 0)'%3E%3Cpath d='M16.5 10.5a6 6 0 1 1-12 0 6 6 0 0 1 12 0Z'/%3E%3Cpath d='m15 15 5.5 5.5'/%3E%3Cpath d='M7.5 10.5h6M10.5 7.5v6'/%3E%3C/g%3E%3Cg id='zoomOut' transform='translate(252 0)'%3E%3Cpath d='M16.5 10.5a6 6 0 1 1-12 0 6 6 0 0 1 12 0Z'/%3E%3Cpath d='m15 15 5.5 5.5'/%3E%3Cpath d='M7.5 10.5h6'/%3E%3C/g%3E%3Cg id='autoSum' transform='translate(288 0)'%3E%3Cpath d='M18 5H6l6.5 7L6 19h12'/%3E%3C/g%3E%3Cg id='clear' transform='translate(324 0)'%3E%3Cpath d='M4 15.5a1.5 1.5 0 0 1 0-2.1L8.5 9l6.5 6.5-4.4 4.5H8.5Z' fill='%23000' fill-opacity='0.24' stroke='none'/%3E%3Cpath d='M8.5 20 4 15.5a1.5 1.5 0 0 1 0-2.1L12.9 4.5a1.5 1.5 0 0 1 2.1 0l4.5 4.5a1.5 1.5 0 0 1 0 2.1L10.6 20Z'/%3E%3Cpath d='M8.5 20H20'/%3E%3Cpath d='M8.5 9 15 15.5'/%3E%3C/g%3E%3Cg id='bold' transform='translate(0 36)'%3E%3Cpath d='M7 4.5h6.25a3.75 3.75 0 0 1 0 7.5H7Z' stroke-width='2.6'/%3E%3Cpath d='M7 12h7.25a3.75 3.75 0 0 1 0 7.5H7Z' stroke-width='2.6'/%3E%3C/g%3E%3Cg id='italic' transform='translate(36 36)'%3E%3Cpath d='M10 4.5h8M6 19.5h8M14 4.5l-4 15'/%3E%3C/g%3E%3Cg id='underline' transform='translate(72 36)'%3E%3Cpath d='M7 4v6.5a5 5 0 0 0 10 0V4'/%3E%3Cpath d='M5 20.5h14'/%3E%3C/g%3E%3Cg id='strikethrough' transform='translate(108 36)'%3E%3Cpath d='M4 12h16'/%3E%3Cpath d='M16.5 7.5C15.9 5.7 14.1 4.5 12 4.5c-2.6 0-4.5 1.6-4.5 3.6 0 1.4.9 2.4 2.5 3'/%3E%3Cpath d='M8 16.5c.6 1.8 2.4 3 4.5 3 2.6 0 4.5-1.6 4.5-3.6 0-.6-.1-1.1-.4-1.6'/%3E%3C/g%3E%3Cg id='textColor' transform='translate(144 36)'%3E%3Cpath d='M6.5 17 12 4l5.5 13'/%3E%3Cpath d='M8.4 12.5h7.2'/%3E%3C/g%3E%3Cg id='fillColor' transform='translate(180 36)'%3E%3Cpath d='M5 11.5h13l-6.5 6.5Z' fill='%23000' fill-opacity='0.24' stroke='none'/%3E%3Cpath d='M5 11.5 11.5 5l6.5 6.5-6.5 6.5Z'/%3E%3Cpath d='M9 2.5 11.5 5'/%3E%3Cpath d='M19.5 15c.8 1.1 1.5 2.1 1.5 2.9a1.5 1.5 0 0 1-3 0c0-.8.7-1.8 1.5-2.9Z'/%3E%3C/g%3E%3Cg id='fontGrow' transform='translate(216 36)'%3E%3Cpath d='M3 19 8 6l5 13'/%3E%3Cpath d='M4.9 14.5h6.2'/%3E%3Cpath d='m15.5 8 3-3 3 3'/%3E%3C/g%3E%3Cg id='fontShrink' transform='translate(252 36)'%3E%3Cpath d='M3 19 8 6l5 13'/%3E%3Cpath d='M4.9 14.5h6.2'/%3E%3Cpath d='m15.5 5 3 3 3-3'/%3E%3C/g%3E%3Cg id='clearFormat' transform='translate(288 36)'%3E%3Cpath d='M5 5h10'/%3E%3Cpath d='M10 5v14'/%3E%3Cpath d='m14 14 6 6'/%3E%3Cpath d='m20 14-6 6'/%3E%3C/g%3E%3Cg id='separator' transform='translate(324 36)'%3E%3Cpath d='M12 4v16'/%3E%3C/g%3E%3Cg id='alignLeft' transform='translate(0 72)'%3E%3Cpath d='M4 6h16M4 10h10M4 14h16M4 18h10'/%3E%3C/g%3E%3Cg id='alignCenter' transform='translate(36 72)'%3E%3Cpath d='M4 6h16M7 10h10M4 14h16M7 18h10'/%3E%3C/g%3E%3Cg id='alignRight' transform='translate(72 72)'%3E%3Cpath d='M4 6h16M10 10h10M4 14h16M10 18h10'/%3E%3C/g%3E%3Cg id='alignTop' transform='translate(108 72)'%3E%3Cpath d='M4 4h16'/%3E%3Cpath d='M12 20V8'/%3E%3Cpath d='m8 12 4-4 4 4'/%3E%3C/g%3E%3Cg id='alignMiddle' transform='translate(144 72)'%3E%3Cpath d='M4 12h16'/%3E%3Cpath d='M12 3v5.5m-3-3 3 3 3-3'/%3E%3Cpath d='M12 21v-5.5m-3 3 3-3 3 3'/%3E%3C/g%3E%3Cg id='alignBottom' transform='translate(180 72)'%3E%3Cpath d='M4 20h16'/%3E%3Cpath d='M12 4v12'/%3E%3Cpath d='m8 12 4 4 4-4'/%3E%3C/g%3E%3Cg id='wrap' transform='translate(216 72)'%3E%3Cpath d='M4 6h16'/%3E%3Cpath d='M4 12h12.5a3.5 3.5 0 0 1 0 7H12'/%3E%3Cpath d='m14 17-2 2 2 2'/%3E%3Cpath d='M4 18h4'/%3E%3C/g%3E%3Cg id='merge' transform='translate(252 72)'%3E%3Cpath d='M7 5H4.5A1.5 1.5 0 0 0 3 6.5v11A1.5 1.5 0 0 0 4.5 19H7M17 5h2.5A1.5 1.5 0 0 1 21 6.5v11a1.5 1.5 0 0 1-1.5 1.5H17'/%3E%3Cpath d='M6.5 12h4m-2-2 2 2-2 2'/%3E%3Cpath d='M17.5 12h-4m2-2-2 2 2 2'/%3E%3C/g%3E%3Cg id='unmerge' transform='translate(288 72)'%3E%3Cpath d='M7 5H4.5A1.5 1.5 0 0 0 3 6.5v11A1.5 1.5 0 0 0 4.5 19H7M17 5h2.5A1.5 1.5 0 0 1 21 6.5v11a1.5 1.5 0 0 1-1.5 1.5H17'/%3E%3Cpath d='M12 5v14' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M10.5 12h-4m2-2-2 2 2 2'/%3E%3Cpath d='M13.5 12h4m-2-2 2 2-2 2'/%3E%3C/g%3E%3Cg id='mergeAndCenter' transform='translate(324 72)'%3E%3Cpath d='M7 5H4.5A1.5 1.5 0 0 0 3 6.5v11A1.5 1.5 0 0 0 4.5 19H7M17 5h2.5A1.5 1.5 0 0 1 21 6.5v11a1.5 1.5 0 0 1-1.5 1.5H17'/%3E%3Cpath d='M8.5 9h7M7 12.5h10M9.5 16h5'/%3E%3C/g%3E%3Cg id='border' transform='translate(0 108)'%3E%3Cpath d='M4 4h16v16H4Z'/%3E%3Cpath d='M12 4v16M4 12h16'/%3E%3C/g%3E%3Cg id='borderAll' transform='translate(36 108)'%3E%3Cpath d='M4 4h16v16H4Z'/%3E%3Cpath d='M12 4v16M4 12h16'/%3E%3C/g%3E%3Cg id='borderOutside' transform='translate(72 108)'%3E%3Cpath d='M4 4h16v16H4Z'/%3E%3Cpath d='M12 4v16M4 12h16' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3C/g%3E%3Cg id='borderThickOutside' transform='translate(108 108)'%3E%3Cpath d='M4 4h16v16H4Z' stroke-width='2.6'/%3E%3Cpath d='M12 4v16M4 12h16' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3C/g%3E%3Cg id='borderTop' transform='translate(144 108)'%3E%3Cpath d='M4 4h16v16H4Z' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M12 4v16M4 12h16' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M4 4h16'/%3E%3C/g%3E%3Cg id='borderBottom' transform='translate(180 108)'%3E%3Cpath d='M4 4h16v16H4Z' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M12 4v16M4 12h16' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M4 20h16'/%3E%3C/g%3E%3Cg id='borderLeft' transform='translate(216 108)'%3E%3Cpath d='M4 4h16v16H4Z' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M12 4v16M4 12h16' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M4 4v16'/%3E%3C/g%3E%3Cg id='borderRight' transform='translate(252 108)'%3E%3Cpath d='M4 4h16v16H4Z' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M12 4v16M4 12h16' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M20 4v16'/%3E%3C/g%3E%3Cg id='borderNone' transform='translate(288 108)'%3E%3Cpath d='M4 4h16v16H4Z' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M12 4v16M4 12h16' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3C/g%3E%3Cg id='currency' transform='translate(0 144)'%3E%3Cpath d='M12 3.5v17'/%3E%3Cpath d='M16.5 7.5c-.6-1.4-2.3-2.5-4.5-2.5-2.5 0-4.3 1.4-4.3 3.3 0 4.3 9 2.4 9 7 0 1.9-1.9 3.2-4.7 3.2-2.3 0-4.1-1.1-4.8-2.6'/%3E%3C/g%3E%3Cg id='percent' transform='translate(36 144)'%3E%3Cpath d='M18.5 5.5l-13 13'/%3E%3Cpath d='M9.2 7a2.2 2.2 0 1 1-4.4 0 2.2 2.2 0 0 1 4.4 0Z'/%3E%3Cpath d='M19.2 17a2.2 2.2 0 1 1-4.4 0 2.2 2.2 0 0 1 4.4 0Z'/%3E%3C/g%3E%3Cg id='comma' transform='translate(72 144)'%3E%3Cpath d='M6 13h.01' stroke-width='2.6'/%3E%3Cpath d='M7 13.3c0 1.4-.7 2.5-2 3.2'/%3E%3Cpath d='M13.5 10.5a2 2.6 0 0 1-4 0 2 2.6 0 0 1 4 0Z'/%3E%3Cpath d='M19.5 10.5a2 2.6 0 0 1-4 0 2 2.6 0 0 1 4 0Z'/%3E%3C/g%3E%3Cg id='decimalIncrease' transform='translate(108 144)'%3E%3Cpath d='M4.5 13h.01' stroke-width='2.6'/%3E%3Cpath d='M10.5 10.5a2 2.6 0 0 1-4 0 2 2.6 0 0 1 4 0Z'/%3E%3Cpath d='M16.5 10.5a2 2.6 0 0 1-4 0 2 2.6 0 0 1 4 0Z'/%3E%3Cpath d='M5 19h14m-3-2.5 3 2.5-3 2.5'/%3E%3C/g%3E%3Cg id='decimalDecrease' transform='translate(144 144)'%3E%3Cpath d='M4.5 13h.01' stroke-width='2.6'/%3E%3Cpath d='M10.5 10.5a2 2.6 0 0 1-4 0 2 2.6 0 0 1 4 0Z'/%3E%3Cpath d='M19 19H5m3-2.5L5 19l3 2.5'/%3E%3C/g%3E%3Cg id='hyperlink' transform='translate(180 144)'%3E%3Cpath d='M10 14a4 4 0 0 0 5.66.34l3-3a4 4 0 0 0-5.66-5.66l-1.7 1.7'/%3E%3Cpath d='M14 10a4 4 0 0 0-5.66-.34l-3 3a4 4 0 0 0 5.66 5.66l1.7-1.7'/%3E%3C/g%3E%3Cg id='note' transform='translate(216 144)'%3E%3Cpath d='M14 20v-4.5a1.5 1.5 0 0 1 1.5-1.5H20Z' fill='%23000' fill-opacity='0.24' stroke='none'/%3E%3Cpath d='M5.5 4h13A1.5 1.5 0 0 1 20 5.5V14l-6 6H5.5A1.5 1.5 0 0 1 4 18.5v-13A1.5 1.5 0 0 1 5.5 4Z'/%3E%3Cpath d='M14 20v-4.5a1.5 1.5 0 0 1 1.5-1.5H20'/%3E%3Cpath d='M8 9h8M8 12.5h5'/%3E%3C/g%3E%3Cg id='exportCsv' transform='translate(252 144)'%3E%3Cpath d='M6.5 3H14l4.5 4.5v12A1.5 1.5 0 0 1 17 21H6.5A1.5 1.5 0 0 1 5 19.5v-15A1.5 1.5 0 0 1 6.5 3Z'/%3E%3Cpath d='M14 3v4.5h4.5'/%3E%3Cpath d='M8 12h7M8 15h7M8 18h4'/%3E%3C/g%3E%3Cg id='exportXlsx' transform='translate(288 144)'%3E%3Cpath d='M6.5 3H14l4.5 4.5v12A1.5 1.5 0 0 1 17 21H6.5A1.5 1.5 0 0 1 5 19.5v-15A1.5 1.5 0 0 1 6.5 3Z'/%3E%3Cpath d='M14 3v4.5h4.5'/%3E%3Cpath d='M8 11h7v7H8Z' fill='%23000' fill-opacity='0.24' stroke='none'/%3E%3Cpath d='M8 11h7v7H8ZM11.5 11v7M8 14.5h7'/%3E%3C/g%3E%3Cg id='insert' transform='translate(0 180)'%3E%3Cpath d='M3 5h12M3 19h12' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M3 9.5h12v5H3Z' fill='%23000' fill-opacity='0.24' stroke='none'/%3E%3Cpath d='M3 9.5h12M3 14.5h12'/%3E%3Cpath d='M19 9.5v5M16.5 12h5'/%3E%3C/g%3E%3Cg id='delete' transform='translate(36 180)'%3E%3Cpath d='M3 5h12M3 19h12' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M3 9.5h12v5H3Z' fill='%23000' fill-opacity='0.24' stroke='none'/%3E%3Cpath d='M3 9.5h12M3 14.5h12'/%3E%3Cpath d='m16.5 9.5 5 5m0-5-5 5'/%3E%3C/g%3E%3Cg id='format' transform='translate(72 180)'%3E%3Cpath d='M4 4v16M20 4v16'/%3E%3Cpath d='M7.5 12h9'/%3E%3Cpath d='m10 9.5-2.5 2.5 2.5 2.5'/%3E%3Cpath d='m14 9.5 2.5 2.5-2.5 2.5'/%3E%3C/g%3E%3Cg id='hideRows' transform='translate(108 180)'%3E%3Cpath d='M3 4h18M3 20h18' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M3 10.8h18v2.4H3Z' fill='%23000' fill-opacity='0.24' stroke='none'/%3E%3Cpath d='M3 10.8h18M3 13.2h18'/%3E%3Cpath d='M12 5.5v3.3m-1.8-1.8 1.8 1.8 1.8-1.8'/%3E%3Cpath d='M12 18.5v-3.3m-1.8 1.8 1.8-1.8 1.8 1.8'/%3E%3C/g%3E%3Cg id='unhideRows' transform='translate(144 180)'%3E%3Cpath d='M3 4h18M3 20h18' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M3 10.8h18v2.4H3Z' fill='%23000' fill-opacity='0.24' stroke='none'/%3E%3Cpath d='M3 10.8h18M3 13.2h18'/%3E%3Cpath d='M12 8.8V5.5m-1.8 1.8L12 5.5l1.8 1.8'/%3E%3Cpath d='M12 15.2v3.3m-1.8-1.8 1.8 1.8 1.8-1.8'/%3E%3C/g%3E%3Cg id='hideColumns' transform='translate(180 180)'%3E%3Cpath d='M4 3v18M20 3v18' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M10.8 3h2.4v18h-2.4Z' fill='%23000' fill-opacity='0.24' stroke='none'/%3E%3Cpath d='M10.8 3v18M13.2 3v18'/%3E%3Cpath d='M5.5 12h3.3m-1.8-1.8 1.8 1.8-1.8 1.8'/%3E%3Cpath d='M18.5 12h-3.3m1.8-1.8-1.8 1.8 1.8 1.8'/%3E%3C/g%3E%3Cg id='unhideColumns' transform='translate(216 180)'%3E%3Cpath d='M4 3v18M20 3v18' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M10.8 3h2.4v18h-2.4Z' fill='%23000' fill-opacity='0.24' stroke='none'/%3E%3Cpath d='M10.8 3v18M13.2 3v18'/%3E%3Cpath d='M8.8 12H5.5m1.8-1.8L5.5 12l1.8 1.8'/%3E%3Cpath d='M15.2 12h3.3m-1.8-1.8 1.8 1.8-1.8 1.8'/%3E%3C/g%3E%3Cg id='freeze' transform='translate(252 180)'%3E%3Cpath d='M3 3h18v18H3Z' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M3 3h18v5.5H3Z' fill='%23000' fill-opacity='0.24' stroke='none'/%3E%3Cpath d='M3 8.5h5.5V21H3Z' fill='%23000' fill-opacity='0.24' stroke='none'/%3E%3Cpath d='M3 8.5h18M8.5 8.5V21' stroke-width='2.6'/%3E%3C/g%3E%3Cg id='groupRows' transform='translate(288 180)'%3E%3Cpath d='M10 6h10M10 12h10M10 18h10'/%3E%3Cpath d='M7.5 6H5v12h2.5'/%3E%3Cpath d='M5 12H3'/%3E%3C/g%3E%3Cg id='ungroupRows' transform='translate(324 180)'%3E%3Cpath d='M10 6h10M10 12h10M10 18h10'/%3E%3Cpath d='M7.5 6H5v12h2.5' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='m2.5 10.5 3 3m0-3-3 3'/%3E%3C/g%3E%3Cg id='sortAsc' transform='translate(0 216)'%3E%3Cpath d='M6 4v16m-3-3 3 3 3-3'/%3E%3Cpath d='M12.5 11 15 4.5l2.5 6.5M13.3 9h3.4'/%3E%3Cpath d='M12.5 13.5h5l-5 6h5'/%3E%3C/g%3E%3Cg id='sortDesc' transform='translate(36 216)'%3E%3Cpath d='M6 4v16m-3-3 3 3 3-3'/%3E%3Cpath d='M12.5 4.5h5l-5 6h5'/%3E%3Cpath d='M12.5 20 15 13.5l2.5 6.5M13.3 18h3.4'/%3E%3C/g%3E%3Cg id='sortFilter' transform='translate(72 216)'%3E%3Cpath d='M4 5h16l-6 7.5V19l-4 2v-8.5Z'/%3E%3C/g%3E%3Cg id='clearFilter' transform='translate(108 216)'%3E%3Cpath d='M3 5h12l-4.5 5.5v6.5l-3 1.5v-8Z'/%3E%3Cpath d='m15.5 14.5 5 5m0-5-5 5'/%3E%3C/g%3E%3Cg id='chart' transform='translate(0 252)'%3E%3Cpath d='M4 4v16h16'/%3E%3Cpath d='M7 12h2.5v8H7ZM11.5 7H14v13h-2.5ZM16 10h2.5v10H16Z' fill='%23000' fill-opacity='0.24' stroke='none'/%3E%3Cpath d='M7 20v-8h2.5v8M11.5 20V7H14v13M16 20V10h2.5v10'/%3E%3C/g%3E%3Cg id='chartColumn' transform='translate(36 252)'%3E%3Cpath d='M4 4v16h16'/%3E%3Cpath d='M7 12h2.5v8H7ZM11.5 7H14v13h-2.5ZM16 10h2.5v10H16Z' fill='%23000' fill-opacity='0.24' stroke='none'/%3E%3Cpath d='M7 20v-8h2.5v8M11.5 20V7H14v13M16 20V10h2.5v10'/%3E%3C/g%3E%3Cg id='chartBar' transform='translate(72 252)'%3E%3Cpath d='M4 4v16h16'/%3E%3Cpath d='M4 6h9v2.5H4ZM4 10.75h13v2.5H4ZM4 15.5h6V18H4Z' fill='%23000' fill-opacity='0.24' stroke='none'/%3E%3Cpath d='M4 6h9v2.5H4M4 10.75h13v2.5H4M4 15.5h6V18H4'/%3E%3C/g%3E%3Cg id='chartLine' transform='translate(108 252)'%3E%3Cpath d='M4 4v16h16'/%3E%3Cpath d='m7 15.5 4-5 3.5 3L19 7'/%3E%3C/g%3E%3Cg id='chartArea' transform='translate(144 252)'%3E%3Cpath d='M4 4v16h16'/%3E%3Cpath d='M4 20v-5l4.5-5 4 3.5L20 8v12Z' fill='%23000' fill-opacity='0.24' stroke='none'/%3E%3Cpath d='m4 15 4.5-5 4 3.5L20 8'/%3E%3C/g%3E%3Cg id='chartPie' transform='translate(180 252)'%3E%3Cpath d='M20 12a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z'/%3E%3Cpath d='M12 4a8 8 0 0 1 8 8h-8Z' fill='%23000' fill-opacity='0.24' stroke='none'/%3E%3Cpath d='M12 4v8h8'/%3E%3C/g%3E%3Cg id='chartDoughnut' transform='translate(216 252)'%3E%3Cpath d='M20 12a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z'/%3E%3Cpath d='M15.5 12a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0Z'/%3E%3Cpath d='M12 4a8 8 0 0 1 8 8h-4.5A3.5 3.5 0 0 0 12 8.5Z' fill='%23000' fill-opacity='0.24' stroke='none'/%3E%3Cpath d='M12 4v4.5M15.5 12H20'/%3E%3C/g%3E%3Cg id='chartScatter' transform='translate(252 252)'%3E%3Cpath d='M4 4v16h16'/%3E%3Cpath d='M8 15.5h.01M11 11.5h.01M14 13.5h.01M16.5 8.5h.01M19 10.5h.01' stroke-width='2.6'/%3E%3C/g%3E%3Cg id='pivotTable' transform='translate(288 252)'%3E%3Cpath d='M9 4h11v5H9ZM4 9h5v11H4Z' fill='%23000' fill-opacity='0.24' stroke='none'/%3E%3Cpath d='M4 4h16v16H4Z'/%3E%3Cpath d='M4 9h16M9 4v16'/%3E%3Cpath d='M17 11.5V13a4 4 0 0 1-4 4h-1.5'/%3E%3Cpath d='m13.5 15-2 2 2 2'/%3E%3C/g%3E%3C/svg%3E");
+  display: block;
+  flex: none;
+  width: var(--sheetwrite-icon-size, 16px);
+  height: var(--sheetwrite-icon-size, 16px);
+  background-color: currentColor;
+  -webkit-mask: var(--sheetwrite-icon-sheet, var(--sheetwrite-icon-sheet-default)) no-repeat;
+  mask: var(--sheetwrite-icon-sheet, var(--sheetwrite-icon-sheet-default)) no-repeat;
+  -webkit-mask-size: calc(var(--sheetwrite-icon-size, 16px) * 24)
+    calc(var(--sheetwrite-icon-size, 16px) * 24);
+  mask-size: calc(var(--sheetwrite-icon-size, 16px) * 24)
+    calc(var(--sheetwrite-icon-size, 16px) * 24);
+  -webkit-mask-position: calc(var(--sheetwrite-icon-size, 16px) * var(--sheetwrite-icon-x, 0))
+    calc(var(--sheetwrite-icon-size, 16px) * var(--sheetwrite-icon-y, 0));
+  mask-position: calc(var(--sheetwrite-icon-size, 16px) * var(--sheetwrite-icon-x, 0))
+    calc(var(--sheetwrite-icon-size, 16px) * var(--sheetwrite-icon-y, 0));
+}
+/* High Contrast replaces background colours; keep the glyph in the text colour. */
+@media (forced-colors: active) {
+  .sheetwrite-icon {
+    forced-color-adjust: none;
+    background-color: CanvasText;
+  }
+}
+.sheetwrite-icon[data-icon="undo"] {
+  --sheetwrite-icon-x: 0;
+  --sheetwrite-icon-y: 0;
+}
+.sheetwrite-icon[data-icon="redo"] {
+  --sheetwrite-icon-x: -1.5;
+  --sheetwrite-icon-y: 0;
+}
+.sheetwrite-icon[data-icon="paste"] {
+  --sheetwrite-icon-x: -3;
+  --sheetwrite-icon-y: 0;
+}
+.sheetwrite-icon[data-icon="cut"] {
+  --sheetwrite-icon-x: -4.5;
+  --sheetwrite-icon-y: 0;
+}
+.sheetwrite-icon[data-icon="copy"] {
+  --sheetwrite-icon-x: -6;
+  --sheetwrite-icon-y: 0;
+}
+.sheetwrite-icon[data-icon="find"] {
+  --sheetwrite-icon-x: -7.5;
+  --sheetwrite-icon-y: 0;
+}
+.sheetwrite-icon[data-icon="zoomIn"] {
+  --sheetwrite-icon-x: -9;
+  --sheetwrite-icon-y: 0;
+}
+.sheetwrite-icon[data-icon="zoomOut"] {
+  --sheetwrite-icon-x: -10.5;
+  --sheetwrite-icon-y: 0;
+}
+.sheetwrite-icon[data-icon="autoSum"] {
+  --sheetwrite-icon-x: -12;
+  --sheetwrite-icon-y: 0;
+}
+.sheetwrite-icon[data-icon="clear"] {
+  --sheetwrite-icon-x: -13.5;
+  --sheetwrite-icon-y: 0;
+}
+.sheetwrite-icon[data-icon="bold"] {
+  --sheetwrite-icon-x: 0;
+  --sheetwrite-icon-y: -1.5;
+}
+.sheetwrite-icon[data-icon="italic"] {
+  --sheetwrite-icon-x: -1.5;
+  --sheetwrite-icon-y: -1.5;
+}
+.sheetwrite-icon[data-icon="underline"] {
+  --sheetwrite-icon-x: -3;
+  --sheetwrite-icon-y: -1.5;
+}
+.sheetwrite-icon[data-icon="strikethrough"] {
+  --sheetwrite-icon-x: -4.5;
+  --sheetwrite-icon-y: -1.5;
+}
+.sheetwrite-icon[data-icon="textColor"] {
+  --sheetwrite-icon-x: -6;
+  --sheetwrite-icon-y: -1.5;
+}
+.sheetwrite-icon[data-icon="fillColor"] {
+  --sheetwrite-icon-x: -7.5;
+  --sheetwrite-icon-y: -1.5;
+}
+.sheetwrite-icon[data-icon="fontGrow"] {
+  --sheetwrite-icon-x: -9;
+  --sheetwrite-icon-y: -1.5;
+}
+.sheetwrite-icon[data-icon="fontShrink"] {
+  --sheetwrite-icon-x: -10.5;
+  --sheetwrite-icon-y: -1.5;
+}
+.sheetwrite-icon[data-icon="clearFormat"] {
+  --sheetwrite-icon-x: -12;
+  --sheetwrite-icon-y: -1.5;
+}
+.sheetwrite-icon[data-icon="separator"] {
+  --sheetwrite-icon-x: -13.5;
+  --sheetwrite-icon-y: -1.5;
+}
+.sheetwrite-icon[data-icon="alignLeft"] {
+  --sheetwrite-icon-x: 0;
+  --sheetwrite-icon-y: -3;
+}
+.sheetwrite-icon[data-icon="alignCenter"] {
+  --sheetwrite-icon-x: -1.5;
+  --sheetwrite-icon-y: -3;
+}
+.sheetwrite-icon[data-icon="alignRight"] {
+  --sheetwrite-icon-x: -3;
+  --sheetwrite-icon-y: -3;
+}
+.sheetwrite-icon[data-icon="alignTop"] {
+  --sheetwrite-icon-x: -4.5;
+  --sheetwrite-icon-y: -3;
+}
+.sheetwrite-icon[data-icon="alignMiddle"] {
+  --sheetwrite-icon-x: -6;
+  --sheetwrite-icon-y: -3;
+}
+.sheetwrite-icon[data-icon="alignBottom"] {
+  --sheetwrite-icon-x: -7.5;
+  --sheetwrite-icon-y: -3;
+}
+.sheetwrite-icon[data-icon="wrap"] {
+  --sheetwrite-icon-x: -9;
+  --sheetwrite-icon-y: -3;
+}
+.sheetwrite-icon[data-icon="merge"] {
+  --sheetwrite-icon-x: -10.5;
+  --sheetwrite-icon-y: -3;
+}
+.sheetwrite-icon[data-icon="unmerge"] {
+  --sheetwrite-icon-x: -12;
+  --sheetwrite-icon-y: -3;
+}
+.sheetwrite-icon[data-icon="mergeAndCenter"] {
+  --sheetwrite-icon-x: -13.5;
+  --sheetwrite-icon-y: -3;
+}
+.sheetwrite-icon[data-icon="border"] {
+  --sheetwrite-icon-x: 0;
+  --sheetwrite-icon-y: -4.5;
+}
+.sheetwrite-icon[data-icon="borderAll"] {
+  --sheetwrite-icon-x: -1.5;
+  --sheetwrite-icon-y: -4.5;
+}
+.sheetwrite-icon[data-icon="borderOutside"] {
+  --sheetwrite-icon-x: -3;
+  --sheetwrite-icon-y: -4.5;
+}
+.sheetwrite-icon[data-icon="borderThickOutside"] {
+  --sheetwrite-icon-x: -4.5;
+  --sheetwrite-icon-y: -4.5;
+}
+.sheetwrite-icon[data-icon="borderTop"] {
+  --sheetwrite-icon-x: -6;
+  --sheetwrite-icon-y: -4.5;
+}
+.sheetwrite-icon[data-icon="borderBottom"] {
+  --sheetwrite-icon-x: -7.5;
+  --sheetwrite-icon-y: -4.5;
+}
+.sheetwrite-icon[data-icon="borderLeft"] {
+  --sheetwrite-icon-x: -9;
+  --sheetwrite-icon-y: -4.5;
+}
+.sheetwrite-icon[data-icon="borderRight"] {
+  --sheetwrite-icon-x: -10.5;
+  --sheetwrite-icon-y: -4.5;
+}
+.sheetwrite-icon[data-icon="borderNone"] {
+  --sheetwrite-icon-x: -12;
+  --sheetwrite-icon-y: -4.5;
+}
+.sheetwrite-icon[data-icon="currency"] {
+  --sheetwrite-icon-x: 0;
+  --sheetwrite-icon-y: -6;
+}
+.sheetwrite-icon[data-icon="percent"] {
+  --sheetwrite-icon-x: -1.5;
+  --sheetwrite-icon-y: -6;
+}
+.sheetwrite-icon[data-icon="comma"] {
+  --sheetwrite-icon-x: -3;
+  --sheetwrite-icon-y: -6;
+}
+.sheetwrite-icon[data-icon="decimalIncrease"] {
+  --sheetwrite-icon-x: -4.5;
+  --sheetwrite-icon-y: -6;
+}
+.sheetwrite-icon[data-icon="decimalDecrease"] {
+  --sheetwrite-icon-x: -6;
+  --sheetwrite-icon-y: -6;
+}
+.sheetwrite-icon[data-icon="hyperlink"] {
+  --sheetwrite-icon-x: -7.5;
+  --sheetwrite-icon-y: -6;
+}
+.sheetwrite-icon[data-icon="note"] {
+  --sheetwrite-icon-x: -9;
+  --sheetwrite-icon-y: -6;
+}
+.sheetwrite-icon[data-icon="exportCsv"] {
+  --sheetwrite-icon-x: -10.5;
+  --sheetwrite-icon-y: -6;
+}
+.sheetwrite-icon[data-icon="exportXlsx"] {
+  --sheetwrite-icon-x: -12;
+  --sheetwrite-icon-y: -6;
+}
+.sheetwrite-icon[data-icon="insert"] {
+  --sheetwrite-icon-x: 0;
+  --sheetwrite-icon-y: -7.5;
+}
+.sheetwrite-icon[data-icon="delete"] {
+  --sheetwrite-icon-x: -1.5;
+  --sheetwrite-icon-y: -7.5;
+}
+.sheetwrite-icon[data-icon="format"] {
+  --sheetwrite-icon-x: -3;
+  --sheetwrite-icon-y: -7.5;
+}
+.sheetwrite-icon[data-icon="hideRows"] {
+  --sheetwrite-icon-x: -4.5;
+  --sheetwrite-icon-y: -7.5;
+}
+.sheetwrite-icon[data-icon="unhideRows"] {
+  --sheetwrite-icon-x: -6;
+  --sheetwrite-icon-y: -7.5;
+}
+.sheetwrite-icon[data-icon="hideColumns"] {
+  --sheetwrite-icon-x: -7.5;
+  --sheetwrite-icon-y: -7.5;
+}
+.sheetwrite-icon[data-icon="unhideColumns"] {
+  --sheetwrite-icon-x: -9;
+  --sheetwrite-icon-y: -7.5;
+}
+.sheetwrite-icon[data-icon="freeze"] {
+  --sheetwrite-icon-x: -10.5;
+  --sheetwrite-icon-y: -7.5;
+}
+.sheetwrite-icon[data-icon="groupRows"] {
+  --sheetwrite-icon-x: -12;
+  --sheetwrite-icon-y: -7.5;
+}
+.sheetwrite-icon[data-icon="ungroupRows"] {
+  --sheetwrite-icon-x: -13.5;
+  --sheetwrite-icon-y: -7.5;
+}
+.sheetwrite-icon[data-icon="sortAsc"] {
+  --sheetwrite-icon-x: 0;
+  --sheetwrite-icon-y: -9;
+}
+.sheetwrite-icon[data-icon="sortDesc"] {
+  --sheetwrite-icon-x: -1.5;
+  --sheetwrite-icon-y: -9;
+}
+.sheetwrite-icon[data-icon="sortFilter"] {
+  --sheetwrite-icon-x: -3;
+  --sheetwrite-icon-y: -9;
+}
+.sheetwrite-icon[data-icon="clearFilter"] {
+  --sheetwrite-icon-x: -4.5;
+  --sheetwrite-icon-y: -9;
+}
+.sheetwrite-icon[data-icon="chart"] {
+  --sheetwrite-icon-x: 0;
+  --sheetwrite-icon-y: -10.5;
+}
+.sheetwrite-icon[data-icon="chartColumn"] {
+  --sheetwrite-icon-x: -1.5;
+  --sheetwrite-icon-y: -10.5;
+}
+.sheetwrite-icon[data-icon="chartBar"] {
+  --sheetwrite-icon-x: -3;
+  --sheetwrite-icon-y: -10.5;
+}
+.sheetwrite-icon[data-icon="chartLine"] {
+  --sheetwrite-icon-x: -4.5;
+  --sheetwrite-icon-y: -10.5;
+}
+.sheetwrite-icon[data-icon="chartArea"] {
+  --sheetwrite-icon-x: -6;
+  --sheetwrite-icon-y: -10.5;
+}
+.sheetwrite-icon[data-icon="chartPie"] {
+  --sheetwrite-icon-x: -7.5;
+  --sheetwrite-icon-y: -10.5;
+}
+.sheetwrite-icon[data-icon="chartDoughnut"] {
+  --sheetwrite-icon-x: -9;
+  --sheetwrite-icon-y: -10.5;
+}
+.sheetwrite-icon[data-icon="chartScatter"] {
+  --sheetwrite-icon-x: -10.5;
+  --sheetwrite-icon-y: -10.5;
+}
+.sheetwrite-icon[data-icon="pivotTable"] {
+  --sheetwrite-icon-x: -12;
+  --sheetwrite-icon-y: -10.5;
+}
+/* @generated icon-sheet: end */

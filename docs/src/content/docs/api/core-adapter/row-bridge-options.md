@@ -1,6 +1,6 @@
 ---
 title: "RowBridgeOptions | @sheetwrite/core/adapter"
-description: "Options for the framework-neutral, opt-in row bridge."
+description: "RowBridgeOptions interface in @sheetwrite/core/adapter: Options for the framework-neutral, opt-in row bridge."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|RowBridgeOptions -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -100,6 +100,7 @@ export interface RowBridgeOptions<
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

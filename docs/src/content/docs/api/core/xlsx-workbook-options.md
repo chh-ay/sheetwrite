@@ -1,6 +1,6 @@
 ---
 title: "XlsxWorkbookOptions | @sheetwrite/core"
-description: "Shared options passed to every registered table and workbook XLSX backend."
+description: "XlsxWorkbookOptions interface in @sheetwrite/core: Shared options passed to every registered table and workbook XLSX backend."
 ---
 <!-- api-export:@sheetwrite/core|.|XlsxWorkbookOptions -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -8,7 +8,7 @@ description: "Shared options passed to every registered table and workbook XLSX 
 Shared options passed to every registered table and workbook XLSX backend.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L452"><code>packages/core/src/export.ts#L452</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L544"><code>packages/core/src/export.ts#L544</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>
@@ -75,6 +75,7 @@ export interface XlsxWorkbookOptions {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
@@ -87,8 +88,11 @@ export interface XlsxWorkbookOptions {
 <ul class="api-consumer-list">
 <li><a href="/docs/api/core/from-xlsx-table/"><code>fromXlsxTable</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/from-xlsx-workbook/"><code>fromXlsxWorkbook</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/from-xlsx-workbook-file/"><code>fromXlsxWorkbookFile</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/to-xlsx-table/"><code>toXlsxTable</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/to-xlsx-table-stream/"><code>toXlsxTableStream</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/to-xlsx-workbook/"><code>toXlsxWorkbook</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/to-xlsx-workbook-stream/"><code>toXlsxWorkbookStream</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/xlsx-table-export-backend/"><code>XlsxTableExportBackend</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/xlsx-table-import-backend/"><code>XlsxTableImportBackend</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/xlsx-workbook-backend/"><code>XlsxWorkbookBackend</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>

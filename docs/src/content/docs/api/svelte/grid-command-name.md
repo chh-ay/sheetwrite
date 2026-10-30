@@ -1,6 +1,6 @@
 ---
 title: "GridCommandName | @sheetwrite/svelte"
-description: "Built-in command names accepted by state queries and change events."
+description: "GridCommandName type in @sheetwrite/svelte: Built-in command names accepted by state queries and change events."
 ---
 <!-- api-export:@sheetwrite/svelte|.|GridCommandName -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="type">type</span></div>
@@ -8,7 +8,7 @@ description: "Built-in command names accepted by state queries and change events
 Built-in command names accepted by state queries and change events.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/types/grid.d.ts#L110"><code>packages/core/dist/types/grid.d.ts#L110</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/types/grid.d.ts#L179"><code>packages/core/dist/types/grid.d.ts#L179</code></a></dd></div>
 </dl>
 
 ## Declaration

@@ -1,6 +1,6 @@
 ---
 title: "SHEETWRITE_ERROR_OPERATIONS | @sheetwrite/core"
-description: "Stable operations at which a consumer-visible failure can surface."
+description: "SHEETWRITE_ERROR_OPERATIONS variable in @sheetwrite/core: Stable operations at which a consumer-visible failure can surface."
 ---
 <!-- api-export:@sheetwrite/core|.|SHEETWRITE_ERROR_OPERATIONS -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="variable">variable</span></div>
@@ -40,6 +40,7 @@ const SHEETWRITE_ERROR_OPERATIONS: readonly [
   "query",
   "hyperlink-activate",
   "keyboard-configure",
+  "chart-view",
 ]
 ```
 
@@ -52,6 +53,7 @@ const SHEETWRITE_ERROR_OPERATIONS: readonly [
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

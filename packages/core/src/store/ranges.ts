@@ -319,6 +319,7 @@ export function patchSheetId(patch: DocumentOp): SheetId | null {
       return patch.table.range.sheet;
     case "setNamedRange":
     case "removeNamedRange":
+    case "setCalculation":
       return null;
     case "addSheet":
       return patch.sheet.id;
@@ -333,6 +334,25 @@ export function cellRange(addr: CellAddress): Range {
     start: { row: addr.row, col: addr.col },
     end: { row: addr.row, col: addr.col },
   };
+}
+
+/**
+ * The cells whose contents `patch` writes, which pivot output may own; null
+ * for operations that write no cell contents, such as a style-only clear.
+ */
+export function pivotWrittenRange(patch: DocumentOp): Range | null {
+  switch (patch.op) {
+    case "set":
+      return cellRange(patch.addr);
+    case "setRange":
+    case "setBlock":
+    case "restoreBlock":
+      return patch.range;
+    case "clearRange":
+      return patch.contents === false ? null : patch.range;
+    default:
+      return null;
+  }
 }
 
 export function fullSheetRange(sheet: Sheet): Range {

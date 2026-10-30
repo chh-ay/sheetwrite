@@ -21,13 +21,7 @@
   gap: 1rem;
   align-items: center;
   padding: 1.25rem 1.5rem;
-  background:
-    radial-gradient(
-      35rem 15rem at 100% 0,
-      color-mix(in srgb, var(--sw-demo-accent) 12%, transparent),
-      transparent
-    ),
-    var(--sw-demo-surface);
+  background: var(--sw-demo-surface);
 }
 .host-row-stage__bar p,
 .host-row-panel header p {

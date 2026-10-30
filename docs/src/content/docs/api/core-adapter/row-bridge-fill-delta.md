@@ -1,6 +1,6 @@
 ---
 title: "RowBridgeFillDelta | @sheetwrite/core/adapter"
-description: "A fill-series transaction effect."
+description: "RowBridgeFillDelta interface in @sheetwrite/core/adapter: A fill-series transaction effect."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|RowBridgeFillDelta -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -148,6 +148,7 @@ export interface RowBridgeFillDelta<Id extends RowBridgeId = RowBridgeId> {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

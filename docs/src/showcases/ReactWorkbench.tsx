@@ -152,10 +152,6 @@ export default function ReactWorkbench() {
             {bench.generation === 0 ? "Connecting" : "React synced"}
           </span>
         </header>
-        <div className="sw-workbench-release">
-          <strong>New in 0.5.0</strong> · Toolbar colour swatches follow the live theme. Sheet tabs
-          keep page scroll steady.
-        </div>
 
         <div className="sw-rwb-editrow" role="toolbar" aria-label="Editing controls">
           <span className="sw-rwb-editrow__label">Change selected cell</span>

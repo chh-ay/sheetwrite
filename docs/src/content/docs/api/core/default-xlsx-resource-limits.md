@@ -1,6 +1,6 @@
 ---
 title: "DEFAULT_XLSX_RESOURCE_LIMITS | @sheetwrite/core"
-description: "Codec defaults combine SpreadsheetML worksheet dimensions with independent ZIP/XML and aggregate-work ceilings for untrusted in-memory conversion."
+description: "DEFAULT_XLSX_RESOURCE_LIMITS variable in @sheetwrite/core: Codec defaults combine SpreadsheetML worksheet dimensions with independent ZIP/XML and…"
 ---
 <!-- api-export:@sheetwrite/core|.|DEFAULT_XLSX_RESOURCE_LIMITS -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="variable">variable</span></div>
@@ -9,7 +9,7 @@ Codec defaults combine SpreadsheetML worksheet dimensions with independent
 ZIP/XML and aggregate-work ceilings for untrusted in-memory conversion.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L274"><code>packages/core/src/export.ts#L274</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L344"><code>packages/core/src/export.ts#L344</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -29,6 +29,7 @@ const DEFAULT_XLSX_RESOURCE_LIMITS: Readonly<XlsxResourceLimits>
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

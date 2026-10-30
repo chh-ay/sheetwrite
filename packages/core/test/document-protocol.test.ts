@@ -103,7 +103,13 @@ function richSnapshot(): WorkbookSnapshot {
                 rowOffset: 1,
                 colOffset: 1,
                 value: { kind: "formula", src: "=SUM(B1:B1)" },
-                style: { bold: true, fontSize: 18 },
+                style: {
+                  bold: true,
+                  fontSize: 18,
+                  fontFamily: "Calibri Light",
+                  verticalAlign: "top",
+                  numberFormat: "0.00%",
+                },
               },
               { rowOffset: 0, colOffset: 0, value: { kind: "literal", value: "title" } },
             ],
@@ -220,7 +226,13 @@ describe("workbook document protocol", () => {
     ]);
     expect(result.value.sheets[0]?.cells[0]?.cells[1]).toMatchObject({
       value: { kind: "formula", src: "=SUM(B1:B1)" },
-      style: { bold: true, fontSize: 18 },
+      style: {
+        bold: true,
+        fontSize: 18,
+        fontFamily: "Calibri Light",
+        verticalAlign: "top",
+        numberFormat: "0.00%",
+      },
     });
     expect(result.value).not.toHaveProperty("selection");
     expect(result.value).not.toHaveProperty("scrollTop");
@@ -312,6 +324,23 @@ describe("workbook document protocol", () => {
       {
         value: withFirstCell({ style: { bold: "yes" } }),
         path: "sheets[0].cells[0].cells[0].style.bold",
+      },
+      {
+        // Families land inside a canvas font string; quotes and separators would inject.
+        value: withFirstCell({ style: { fontFamily: 'Arial"; color: red' } }),
+        path: "sheets[0].cells[0].cells[0].style.fontFamily",
+      },
+      {
+        value: withFirstCell({ style: { fontFamily: "Arial, serif" } }),
+        path: "sheets[0].cells[0].cells[0].style.fontFamily",
+      },
+      {
+        value: withFirstCell({ style: { verticalAlign: "center" } }),
+        path: "sheets[0].cells[0].cells[0].style.verticalAlign",
+      },
+      {
+        value: withFirstCell({ style: { numberFormat: "0".repeat(256) } }),
+        path: "sheets[0].cells[0].cells[0].style.numberFormat",
       },
       {
         value: withFirstSheet({
@@ -534,6 +563,42 @@ describe("workbook document protocol", () => {
     expect(missingScopeResult.ok).toBe(false);
     if (missingScopeResult.ok) throw new Error("missing scope unexpectedly accepted");
     expect(missingScopeResult.errors.map((error) => error.code)).toContain("missing-reference");
+  });
+
+  it("accepts Excel's iteration limits and rejects anything the engine would refuse", () => {
+    const boundaries = [
+      { iterate: true, maxIterations: 1, maxChange: 0 },
+      { iterate: false, maxIterations: 32_767, maxChange: 1e300 },
+    ];
+    for (const calculation of boundaries) {
+      expect(validateWorkbookSnapshot(withWorkbook({ calculation })).ok).toBe(true);
+      expect(validateDocumentOperationShape({ op: "setCalculation", calculation })).toEqual([]);
+    }
+
+    const valid = { iterate: true, maxIterations: 100, maxChange: 0.001 };
+    const invalid: Array<[field: string, value: unknown]> = [
+      ["iterate", "1"],
+      ["iterate", undefined],
+      ["maxIterations", 0],
+      ["maxIterations", 32_768],
+      ["maxIterations", 1.5],
+      ["maxIterations", "100"],
+      ["maxChange", -0.001],
+      ["maxChange", Number.POSITIVE_INFINITY],
+      ["maxChange", Number.NaN],
+    ];
+    for (const [field, value] of invalid) {
+      const calculation = { ...valid, [field]: value };
+      const snapshot = validateWorkbookSnapshot(withWorkbook({ calculation }));
+      expect(snapshot.ok).toBe(false);
+      if (snapshot.ok) throw new Error(`calculation.${field} = ${String(value)} accepted`);
+      expect(snapshot.errors.map((error) => error.path)).toEqual([`workbook.calculation.${field}`]);
+      expect(
+        validateDocumentOperationShape({ op: "setCalculation", calculation }).map(
+          (error) => error.path,
+        ),
+      ).toEqual([`operation.calculation.${field}`]);
+    }
   });
 
   it("enforces every snapshot resource boundary before normalization", () => {

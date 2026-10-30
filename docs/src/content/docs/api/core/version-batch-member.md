@@ -1,6 +1,6 @@
 ---
 title: "VersionBatchMember | @sheetwrite/core"
-description: "Position of one server version inside an atomic multi-version batch."
+description: "VersionBatchMember interface in @sheetwrite/core: Position of one server version inside an atomic multi-version batch."
 ---
 <!-- api-export:@sheetwrite/core|.|VersionBatchMember -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -55,6 +55,7 @@ export interface VersionBatchMember {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

@@ -1,4 +1,9 @@
 use super::*;
+use crate::cells::{
+    checked_dense_cell_count, encode_num, payload_is_str, DEFAULT_MAX_PAGED_DIRTY_CELLS,
+    MAX_DENSE_CELLS,
+};
+use crate::memory::{StoreMemoryStats, SPILL_OWNERS};
 
 fn assert_close(actual: f64, expected: f64) {
     assert!(
@@ -108,7 +113,10 @@ fn sheet_noops_dense_limits_and_paged_load_state_preserve_invariants() {
     assert_eq!(checked_dense_cell_count(usize::MAX, 2), None);
     assert!(SheetData::try_new(usize::MAX, 2).is_err());
     let at_limit = SheetData::try_new(1, MAX_DENSE_CELLS).expect("limit must be accepted");
-    assert_eq!(at_limit.kind.len(), MAX_DENSE_CELLS);
+    assert_eq!(
+        at_limit.cells.source_kind_at(MAX_DENSE_CELLS - 1),
+        KIND_EMPTY
+    );
     drop(at_limit);
 
     let mut bounded_store = CellStore::new();
@@ -116,35 +124,36 @@ fn sheet_noops_dense_limits_and_paged_load_state_preserve_invariants() {
     assert!(bounded_store.sheets.is_empty());
     let mut dense = SheetData::new(2, 2);
     put_number(&mut dense, 1, 1, 9.0);
-    dense.resize_rows(2);
+    dense.cells.resize_rows(2);
     dense.insert_rows(0, 1, 0);
     dense.delete_rows(0, 2, 1);
     dense.delete_rows(0, 0, 0);
     dense.insert_cols(0, 1, 0);
     dense.delete_cols(0, 2, 1);
     dense.delete_cols(0, 0, 0);
-    assert_close(dense.num_at(dense.idx(1, 1)), 9.0);
+    assert_close(dense.cells.num_at(dense.cells.idx(1, 1)), 9.0);
 
-    dense.dirty_cells.extend((0..5_000).map(|row| (row, 0)));
-    dense.clear_dirty();
-    assert!(dense.dirty_cells.is_empty());
+    dense.formulas.clear_dirty();
+    dense
+        .formulas
+        .mark_cells_dirty((0..5_000).map(|row| (row, 0)));
+    dense.formulas.clear_dirty();
+    assert!(!dense.formulas.has_dirty());
 
     let mut paged = SheetData::new_paged(2, 2, 1, 0, DEFAULT_MAX_PAGED_DIRTY_CELLS);
-    assert!(!paged.is_fully_loaded());
-    assert!(!paged.range_fully_loaded(0, 0, 1, 1));
+    assert!(!paged.cells.is_fully_loaded());
+    assert!(!paged.cells.range_fully_loaded(0, 0, 1, 1));
     for col in 0..2 {
         for row in 0..2 {
             assert!(paged.write_cell(row, col, KIND_EMPTY, 0, 0, Some(1)));
         }
     }
-    assert!(paged.is_fully_loaded());
-    assert!(paged.range_fully_loaded(0, 0, 1, 1));
-    assert!(paged.is_cell_dirty(1, 1));
-    paged.mark_range_clean(0, 2, 0, 2);
-    assert!(!paged.is_cell_dirty(1, 1));
-    paged.pin_range(1, 1, &[0]);
-    paged.pin_range(0, 2, &[0, 1]);
-    assert_eq!(paged.paged_stats().map(|stats| stats.1), Some(4));
+    assert!(paged.cells.is_fully_loaded());
+    assert!(paged.cells.range_fully_loaded(0, 0, 1, 1));
+    assert!(paged.cells.is_cell_dirty(1, 1));
+    paged.cells.mark_range_clean(0, 2, 0, 2);
+    assert!(!paged.cells.is_cell_dirty(1, 1));
+    assert_eq!(paged.cells.paged_stats().map(|stats| stats.1), Some(4));
 }
 
 #[test]
@@ -310,7 +319,9 @@ fn spill_ownership_budget_is_store_wide_atomic_and_released() {
 
     store.clear_cell(first, 0, 1, 0);
     store.recompute(first);
-    assert_eq!(store.sheets[first].spill_owners.capacity(), 0);
+    let mut stats = StoreMemoryStats::default();
+    store.sheets[first].add_memory_stats(&mut stats);
+    assert_eq!(stats.owners[SPILL_OWNERS].allocated_bytes, 0);
     store.set_number(second, 0, 0, 1.0, 0);
     store.recompute(second);
     assert_eq!(
@@ -793,8 +804,8 @@ fn rename_sheet_rewrites_canonical_sources_and_quoting_without_changing_handles(
         store.formula_source(summary, 0, 0).as_deref(),
         Some("=('O''Brien'!A1+1)")
     );
-    assert!(store.is_sheet_alive(source));
-    assert!(store.is_sheet_alive(summary));
+    assert!(store.sheet_alive[source]);
+    assert!(store.sheet_alive[summary]);
 }
 
 #[test]
@@ -819,8 +830,8 @@ fn remove_sheet_tombstones_handle_and_invalidates_transitive_formula_dependencie
     );
     assert_eq!(string(&store, summary, 0, 0).as_deref(), Some("#REF!"));
     assert_eq!(string(&store, summary, 0, 1).as_deref(), Some("#REF!"));
-    assert!(!store.is_sheet_alive(source));
-    assert!(store.is_sheet_alive(summary));
+    assert!(!store.sheet_alive[source]);
+    assert!(store.sheet_alive[summary]);
     assert_eq!(store.row_count(source), 0);
 
     let replacement = store.add_sheet(1, 1);
@@ -830,7 +841,7 @@ fn remove_sheet_tombstones_handle_and_invalidates_transitive_formula_dependencie
     );
     assert_eq!(string(&store, summary, 0, 2).as_deref(), Some("#REF!"));
     assert_eq!(replacement, 2);
-    assert!(store.is_sheet_alive(replacement));
+    assert!(store.sheet_alive[replacement]);
     assert!(!store.remove_sheet(source));
 }
 
@@ -885,7 +896,6 @@ fn public_api_bounds_checks_do_not_panic() {
         store.remove_cols(99, 0, 1);
         store.set_sheet_name(99, "missing", "Missing");
         store.mark_range_clean(99, 0, 1, 0, 1);
-        store.pin_range(99, 0, 1, &[0]);
         store.set_bool(99, 0, 0, true, 0);
         store.set_conditional_rules(99, &[], &[], &[], Vec::new(), &[]);
         store.commit_sources();
@@ -900,8 +910,6 @@ fn public_api_bounds_checks_do_not_panic() {
         assert!(!store.range_fully_loaded(99, 0, 0, 0, 0));
         assert_eq!(store.row_count(99), 0);
         assert_eq!(store.col_count(99), 0);
-        assert_eq!(store.style_id_at(99, 0, 0), 0);
-        assert_eq!(store.style_id_at(sheet, 9, 9), 0);
         assert_ne!(
             store.set_block_packed(
                 99,
@@ -952,6 +960,46 @@ fn public_api_bounds_checks_do_not_panic() {
 }
 
 #[test]
+fn skipped_and_unloaded_window_cells_have_no_style() {
+    let styled_id = 7;
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(1, 1);
+    store.set_number(sheet, 0, 0, 1.0, styled_id);
+    let windows = [
+        store.get_window(sheet, 0, 1, &[0, 1]),
+        store.get_window_rows(sheet, &[0, 9], &[0, 1]),
+    ];
+    for window in windows {
+        let decoded = decode_window(window);
+        let styles: Vec<u32> = decoded
+            .style_index
+            .iter()
+            .map(|&slot| decoded.style_dict[slot as usize])
+            .collect();
+        assert_eq!(styles[0], styled_id);
+        assert!(styles[1..].iter().all(|&style| style == 0));
+    }
+
+    let paged = store.add_paged_sheet(2, 1, 4, 1_000_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
+    store.set_number(paged, 0, 0, 1.0, styled_id);
+    for window in [
+        store.get_window(paged, 0, 1, &[0, 1]),
+        store.get_window_rows(paged, &[0], &[0, 1]),
+    ] {
+        let decoded = decode_window(window);
+        assert_eq!(
+            decoded.style_dict[decoded.style_index[0] as usize],
+            styled_id
+        );
+        assert_eq!(decoded.style_dict[decoded.style_index[1] as usize], 0);
+        assert_eq!(
+            decoded.strings[decoded.string_index[1] as usize],
+            "#LOADING!"
+        );
+    }
+}
+
+#[test]
 fn window_view_uses_error_strings_and_consuming_reads() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(2, 2);
@@ -968,8 +1016,12 @@ fn window_view_uses_error_strings_and_consuming_reads() {
 
     assert_eq!(view.kinds, vec![KIND_STRING, KIND_STRING, KIND_EMPTY]);
     assert_eq!(view.numbers, vec![0.0, 0.0, 0.0]);
-    assert_eq!(view.style_index, vec![0, 1, 0]);
-    assert_eq!(view.style_dict, vec![7, 9]);
+    let styles: Vec<u32> = view
+        .style_index
+        .iter()
+        .map(|&index| view.style_dict[index as usize])
+        .collect();
+    assert_eq!(styles, vec![7, 9, 0]);
     assert_eq!(pooled[0], "hello");
     assert_eq!(view.strings[view.string_index[1] as usize], "#DIV/0!");
 
@@ -1190,11 +1242,12 @@ fn nan_box_canonicalizes_hostile_string_tag_patterns() {
         let value = f64::from_bits(bits);
         assert!(value.is_nan());
         put_number(&mut sheet, row, 0, value);
-        let index = sheet.idx(row, 0);
-        assert_eq!(sheet.payload[index], encode_num(f64::NAN));
-        assert!(!payload_is_str(sheet.payload[index]));
-        assert_eq!(sheet.str_id_at(index), NO_STRING);
-        assert!(sheet.num_at(index).is_nan());
+        let index = sheet.cells.idx(row, 0);
+        let payload = sheet.cells.source_payload_at(index);
+        assert_eq!(payload, encode_num(f64::NAN));
+        assert!(!payload_is_str(payload));
+        assert_eq!(sheet.cells.str_id_at(index), NO_STRING);
+        assert!(sheet.cells.num_at(index).is_nan());
     }
 }
 
@@ -1262,6 +1315,18 @@ fn conditional_formula_rules_shift_relative_refs_stop_and_follow_dependency_edit
     store.recompute(sheet);
     let changed_dependency = decode_window(store.get_window(sheet, 0, 3, &[2]));
     assert_eq!(changed_dependency.cond_matches, vec![2, 2, 1]);
+}
+
+#[test]
+fn paged_aggregate_counts_loaded_formula_before_first_recompute() {
+    let mut store = CellStore::new();
+    let sheet = store.add_paged_sheet(1, 2, 1, 0, DEFAULT_MAX_PAGED_DIRTY_CELLS);
+    store.set_formula(sheet, 0, 0, "=7", 0);
+    assert_close(store.aggregate(sheet, 0, 4), 1.0);
+    assert_close(store.aggregate(sheet, 0, 0), 0.0);
+    store.recompute(sheet);
+    assert_close(store.aggregate(sheet, 0, 4), 1.0);
+    assert_close(store.aggregate(sheet, 0, 0), 7.0);
 }
 
 #[test]
@@ -1343,9 +1408,9 @@ fn opaque_range_snapshot_round_trip_preserves_cell_behavior() {
         .expect("formula source should be available before capture");
     let text_before = string(&store, sheet, 2, 1);
     let styles_before = [
-        store.style_id_at(sheet, 0, 0),
-        store.style_id_at(sheet, 1, 0),
-        store.style_id_at(sheet, 2, 1),
+        store.get_cell(sheet, 0, 0).style(),
+        store.get_cell(sheet, 1, 0).style(),
+        store.get_cell(sheet, 2, 1).style(),
     ];
 
     let snapshot = store.capture_range(sheet, 0, 0, 3, 2).unwrap();
@@ -1384,9 +1449,9 @@ fn opaque_range_snapshot_round_trip_preserves_cell_behavior() {
     assert_eq!(string(&store, sheet, 2, 1), text_before);
     assert_eq!(
         [
-            store.style_id_at(sheet, 0, 0),
-            store.style_id_at(sheet, 1, 0),
-            store.style_id_at(sheet, 2, 1),
+            store.get_cell(sheet, 0, 0).style(),
+            store.get_cell(sheet, 1, 0).style(),
+            store.get_cell(sheet, 2, 1).style(),
         ],
         styles_before
     );
@@ -1394,7 +1459,157 @@ fn opaque_range_snapshot_round_trip_preserves_cell_behavior() {
     store.set_number(sheet, 0, 0, 8.0, styles_before[0]);
     store.recompute(sheet);
     assert_close(number(&store, sheet, 1, 0), 9.0);
-    assert_eq!(store.style_id_at(sheet, 1, 0), styles_before[1]);
+    assert_eq!(store.get_cell(sheet, 1, 0).style(), styles_before[1]);
+}
+
+#[test]
+fn scoped_clear_preserves_unrelated_calculated_values_and_recomputes_readers() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(4, 3);
+    store.set_number(sheet, 0, 0, 5.0, 7);
+    store.set_formula(sheet, 0, 1, "=A1+1", 9);
+    store.set_formula(sheet, 0, 2, "=\"survivor\"", 0);
+    store.set_formula(sheet, 1, 2, "=SEQUENCE(2,1,10)", 0);
+    store.recompute(sheet);
+
+    assert!(store.clear_range(sheet, 0, 0, 0, 0, false, true));
+    assert_close(number(&store, sheet, 0, 1), 6.0);
+    assert_eq!(store.get_cell(sheet, 0, 0).style(), 0);
+    assert!(store.clear_range(sheet, 0, 0, 0, 0, true, false));
+    assert_eq!(string(&store, sheet, 0, 2).as_deref(), Some("survivor"));
+    assert_close(number(&store, sheet, 2, 2), 11.0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 0, 1), 1.0);
+
+    assert!(store.clear_range(sheet, 1, 2, 1, 2, true, false));
+    store.recompute(sheet);
+    assert_eq!(store.get_cell(sheet, 2, 2).kind(), KIND_EMPTY);
+}
+
+#[test]
+fn rectangle_writes_preserve_unrelated_results_and_recompute_registered_readers() {
+    const EDIT_ROWS: usize = 5000;
+    for write_kind in 0..6 {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(8, EDIT_ROWS + 4);
+        let other = store.add_sheet(2, 2);
+        store.set_sheet_name(sheet, "source", "Source");
+        store.set_number(sheet, 0, 0, 5.0, 0);
+        store.set_number(sheet, EDIT_ROWS - 1, 0, 7.0, 0);
+        store.set_formula(sheet, 0, 1, "=A1+1", 0);
+        store.set_formula(sheet, 1, 1, "=SUM(A1:A5000)", 0);
+        store.set_formula(sheet, 0, 2, "=\"survivor\"", 0);
+        store.set_formula(sheet, 1, 2, "=SEQUENCE(2,1,10)", 0);
+        store.set_formula(other, 0, 0, "=Source!A5000+2", 0);
+        store.set_formula(other, 1, 0, "=Source!B2+3", 0);
+        store.commit_sources();
+
+        // A prior scalar edit must survive the Cells -> Ranges transition.
+        store.set_number(sheet, EDIT_ROWS + 1, 3, 8.0, 0);
+        store.set_formula(sheet, EDIT_ROWS + 1, 4, "=D5002+1", 0);
+        let expected_source = match write_kind {
+            0 => {
+                assert!(store.clear_range(sheet, 0, 0, EDIT_ROWS - 1, 0, true, false));
+                0.0
+            }
+            1 => {
+                store.set_column_numbers(sheet, 0, 0, &vec![2.0; EDIT_ROWS], 0);
+                2.0
+            }
+            2 => {
+                store.set_column_strings(sheet, 0, 0, vec!["2".into(); EDIT_ROWS], 0);
+                2.0
+            }
+            3 => {
+                store.set_column_strings_packed(
+                    sheet,
+                    0,
+                    0,
+                    "2".repeat(EDIT_ROWS),
+                    &vec![1; EDIT_ROWS],
+                    0,
+                );
+                2.0
+            }
+            4 | 5 => {
+                let kinds = vec![KIND_NUMBER; EDIT_ROWS];
+                let numbers = vec![2.0; EDIT_ROWS];
+                let styles = vec![0; EDIT_ROWS];
+                let status = if write_kind == 4 {
+                    store.set_block_packed(
+                        sheet,
+                        0,
+                        0,
+                        EDIT_ROWS,
+                        1,
+                        &kinds,
+                        &numbers,
+                        b"",
+                        &[0],
+                        &styles,
+                        &[],
+                        vec![],
+                        &[],
+                        &[],
+                    )
+                } else {
+                    store.set_column_block_packed(
+                        sheet,
+                        0,
+                        0,
+                        EDIT_ROWS,
+                        1,
+                        &kinds,
+                        &numbers,
+                        b"",
+                        &[0],
+                        &styles,
+                        &[],
+                        vec![],
+                        &[],
+                        &[],
+                    )
+                };
+                assert_eq!(status, 0);
+                2.0
+            }
+            _ => unreachable!(),
+        };
+
+        assert_eq!(string(&store, sheet, 0, 2).as_deref(), Some("survivor"));
+        assert_close(number(&store, sheet, 2, 2), 11.0);
+        store.commit_sources();
+        assert_close(number(&store, sheet, 0, 1), expected_source + 1.0);
+        // SUM ignores strings, whereas arithmetic coerces numeric text.
+        let expected_sum = if matches!(write_kind, 2 | 3) {
+            0.0
+        } else {
+            expected_source * EDIT_ROWS as f64
+        };
+        assert_close(number(&store, sheet, 1, 1), expected_sum);
+        assert_close(number(&store, other, 0, 0), expected_source + 2.0);
+        assert_close(number(&store, other, 1, 0), expected_sum + 3.0);
+        assert_close(number(&store, sheet, EDIT_ROWS + 1, 4), 9.0);
+        assert_eq!(string(&store, sheet, 0, 2).as_deref(), Some("survivor"));
+        assert_close(number(&store, sheet, 2, 2), 11.0);
+    }
+}
+
+#[test]
+fn rectangle_clear_releases_attempted_spill_without_disturbing_other_spills() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(4, 6000);
+    store.set_number(sheet, 4999, 0, 1.0, 0);
+    store.set_formula(sheet, 0, 0, "=SEQUENCE(5000)", 0);
+    store.set_formula(sheet, 0, 2, "=SEQUENCE(2,1,20)", 0);
+    store.commit_sources();
+    assert_eq!(string(&store, sheet, 0, 0).as_deref(), Some("#SPILL!"));
+
+    assert!(store.clear_range(sheet, 1, 0, 5000, 0, true, false));
+    assert_close(number(&store, sheet, 1, 2), 21.0);
+    store.commit_sources();
+    assert_close(number(&store, sheet, 4999, 0), 5000.0);
+    assert_close(number(&store, sheet, 1, 2), 21.0);
 }
 
 #[test]
@@ -1586,14 +1801,13 @@ fn paged_sheet_allocates_lazily_and_evicts_only_clean_chunks() {
 }
 
 #[test]
-fn explicit_viewport_and_mapped_read_pins_have_independent_lifetimes() {
+fn viewport_and_mapped_read_pins_have_independent_lifetimes() {
     let mut store = CellStore::new();
     let sheet = store.add_paged_sheet(1, 32, 4, 64, DEFAULT_MAX_PAGED_DIRTY_CELLS);
-    store.pin_range(sheet, 0, 1, &[0]);
     store.pin_viewport_bands(sheet, &[4, 5, 0, 1]);
     store.pin_read_window(sheet, 0, 1, &[8], &[0]);
     store.begin_page_load();
-    for row in [0, 4, 8] {
+    for row in [4, 8] {
         store.set_column_numbers(sheet, 0, row, &[row as f64 + 1.0], 0);
     }
     store.commit_sources();
@@ -1602,23 +1816,14 @@ fn explicit_viewport_and_mapped_read_pins_have_independent_lifetimes() {
     store.begin_page_load();
     store.set_column_numbers(sheet, 0, 12, &[13.0], 0);
     store.commit_sources();
-    assert_close(number(&store, sheet, 0, 0), 1.0);
     assert_close(number(&store, sheet, 4, 0), 5.0);
     assert_eq!(store.cell_state(sheet, 8, 0), 0);
 
     store.pin_viewport_bands(sheet, &[]);
-    store.pin_range(sheet, 0, 0, &[]);
     store.begin_page_load();
     store.set_column_numbers(sheet, 0, 16, &[17.0], 0);
     store.commit_sources();
-    assert_close(number(&store, sheet, 0, 0), 1.0);
     assert_eq!(store.cell_state(sheet, 4, 0), 0);
-
-    store.pin_range(sheet, 0, 1, &[]);
-    store.begin_page_load();
-    store.set_column_numbers(sheet, 0, 20, &[21.0], 0);
-    store.commit_sources();
-    assert_eq!(store.cell_state(sheet, 0, 0), 0);
 }
 
 #[test]
@@ -3337,7 +3542,7 @@ mod formula_dependency_epoch {
         assert_close(number(&store, sheet, 0, 2), 12.0);
         assert_close(number(&store, sheet, 1, 2), 24.0);
 
-        let epoch_before = store.formula_epoch;
+        let epoch_before = store.graph.epoch();
         assert_eq!(
             store.set_sparse_block(
                 sheet,
@@ -3358,7 +3563,8 @@ mod formula_dependency_epoch {
             0,
         );
         assert_eq!(
-            store.formula_epoch, epoch_before,
+            store.graph.epoch(),
+            epoch_before,
             "a constant-only rewrite must keep the cached dependency index"
         );
         store.recompute(sheet);
@@ -3374,7 +3580,7 @@ mod formula_dependency_epoch {
     }
 
     #[test]
-    fn formula_rewrite_with_new_reads_rebuilds_dependents() {
+    fn formula_rewrite_with_new_reads_patches_the_dependency_index() {
         let mut store = CellStore::new();
         let sheet = store.add_sheet(3, 2);
         store.set_number(sheet, 0, 0, 1.0, 0);
@@ -3383,11 +3589,12 @@ mod formula_dependency_epoch {
         store.recompute(sheet);
         assert_close(number(&store, sheet, 0, 2), 1.0);
 
-        let epoch_before = store.formula_epoch;
+        let epoch_before = store.graph.epoch();
         store.set_formula(sheet, 0, 2, "=B1", 0);
-        assert!(
-            store.formula_epoch > epoch_before,
-            "a changed read set must invalidate the dependency index"
+        assert_eq!(
+            store.graph.epoch(),
+            epoch_before,
+            "a changed read set must patch the dependency index, not rebuild it"
         );
         store.recompute(sheet);
         assert_close(number(&store, sheet, 0, 2), 2.0);
@@ -3422,9 +3629,9 @@ mod formula_dependency_epoch {
 
         // Array to a different array with the same reads and shape: the index
         // survives the rewrite and the spill is re-materialized.
-        let epoch_before = store.formula_epoch;
+        let epoch_before = store.graph.epoch();
         store.set_formula(sheet, 0, 2, "=SORT(A1:A3)", 0);
-        assert_eq!(store.formula_epoch, epoch_before);
+        assert_eq!(store.graph.epoch(), epoch_before);
         store.recompute(sheet);
         assert_eq!(
             [0, 1, 2].map(|row| number(&store, sheet, row, 2)),
@@ -3569,8 +3776,8 @@ mod formula_dependency_epoch {
                 let incremental = snapshot_cells(&store, sheet, ROWS, COLS);
                 // Drop every cache and dirty the whole sheet: the next pass
                 // must produce the same values from scratch.
-                store.dep_index = None;
-                store.sheets[sheet].all_dirty = true;
+                store.graph.invalidate();
+                store.sheets[sheet].formulas.mark_all_dirty();
                 store.recompute(sheet);
                 assert_eq!(
                     snapshot_cells(&store, sheet, ROWS, COLS),
@@ -4094,4 +4301,1582 @@ fn a_spill_that_reads_a_later_one_cell_spill_sees_its_new_value() {
     store.set_number(sheet, 0, 9, 2.0, 0);
     store.recompute(sheet);
     assert_close(number(&store, sheet, 0, 1), 2.0);
+}
+
+/// Volatile formulas (RAND, RANDBETWEEN, NOW, TODAY) recalculate with their
+/// dependents at every edit barrier, as in Excel; every other formula
+/// recalculates only when something it reads changed.
+mod volatile_recalculation {
+    use super::*;
+
+    /// Formulas the recompute passes selected since the previous call.
+    fn recomputed_since(store: &CellStore, mark: &mut usize) -> usize {
+        let selected = store.recomputed_formulas - *mark;
+        *mark = store.recomputed_formulas;
+        selected
+    }
+
+    #[test]
+    fn an_unrelated_edit_recalculates_only_volatile_formulas_and_their_dependents() {
+        const INPUT_ROWS: usize = 100;
+        let mut store = CellStore::new();
+        let report = store.add_sheet(2, 2);
+        let inputs = store.add_sheet(2, INPUT_ROWS);
+        for row in 0..INPUT_ROWS {
+            store.set_number(inputs, row, 0, row as f64, 0);
+            store.set_formula(inputs, row, 1, &format!("=A{}+1", row + 1), 0);
+        }
+        store.commit_sources();
+        let mut mark = store.recomputed_formulas;
+
+        store.set_number(inputs, 0, 0, 10.0, 0);
+        store.commit_sources();
+        assert_eq!(recomputed_since(&store, &mut mark), 1);
+        assert_close(number(&store, inputs, 0, 1), 11.0);
+
+        store.set_formula(report, 0, 0, "=RAND()", 0);
+        store.set_formula(report, 0, 1, "=A1*10", 0);
+        store.set_formula(report, 1, 0, "=NOW()", 0);
+        store.set_formula(report, 1, 1, "=A2+1", 0);
+        store.commit_sources();
+        recomputed_since(&store, &mut mark);
+        let first_draw = number(&store, report, 0, 0);
+
+        // An edit on another sheet adds the four volatile cells and their
+        // dependents to its own dependent, and nothing else.
+        store.set_number(inputs, 0, 0, 20.0, 0);
+        store.commit_sources();
+        assert_eq!(recomputed_since(&store, &mut mark), 1 + 4);
+        let second_draw = number(&store, report, 0, 0);
+        assert_ne!(first_draw, second_draw);
+        assert_close(number(&store, report, 0, 1), second_draw * 10.0);
+        assert_close(number(&store, inputs, 0, 1), 21.0);
+
+        store.commit_sources();
+        assert_eq!(recomputed_since(&store, &mut mark), 0);
+        assert_eq!(number(&store, report, 0, 0), second_draw);
+
+        store.set_number(report, 0, 0, 0.5, 0);
+        store.set_formula(report, 1, 0, "=1", 0);
+        store.commit_sources();
+        // Removing the last volatile formula frees the sheet's volatile set.
+        assert!(!store.sheets[report].formulas.has_volatile());
+        recomputed_since(&store, &mut mark);
+        store.set_number(inputs, 0, 0, 30.0, 0);
+        store.commit_sources();
+        assert_eq!(recomputed_since(&store, &mut mark), 1);
+    }
+
+    const FIRST_INSTANT: f64 = 46_000.25;
+    const SECOND_INSTANT: f64 = 46_001.75;
+    const HOST_INSTANT: f64 = 40_000.5;
+
+    /// Clock reads by the fixed clocks below. The override is per thread,
+    /// so parallel tests cannot disturb the count.
+    static CLOCK_READS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+    fn first_clock() -> f64 {
+        CLOCK_READS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        FIRST_INSTANT
+    }
+
+    fn second_clock() -> f64 {
+        CLOCK_READS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        SECOND_INSTANT
+    }
+
+    fn clock_reads() -> usize {
+        CLOCK_READS.swap(0, std::sync::atomic::Ordering::Relaxed)
+    }
+
+    #[test]
+    fn now_and_today_read_the_clock_once_per_recalculation_pass() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(5, 1);
+        crate::eval::set_test_clock(Some(first_clock));
+        store.set_formula(sheet, 0, 0, "=NOW()", 0);
+        store.set_formula(sheet, 0, 1, "=NOW()", 0);
+        store.set_formula(sheet, 0, 2, "=TODAY()", 0);
+        store.set_formula(sheet, 0, 3, "=A1-B1", 0);
+        store.commit_sources();
+
+        assert_eq!(clock_reads(), 1);
+        assert_close(number(&store, sheet, 0, 0), FIRST_INSTANT);
+        assert_close(number(&store, sheet, 0, 2), FIRST_INSTANT.floor());
+        assert_close(number(&store, sheet, 0, 3), 0.0);
+
+        crate::eval::set_test_clock(Some(second_clock));
+        store.commit_sources();
+        assert_eq!(clock_reads(), 0);
+        assert_close(number(&store, sheet, 0, 0), FIRST_INSTANT);
+
+        store.set_number(sheet, 0, 4, 1.0, 0);
+        store.commit_sources();
+        assert_eq!(clock_reads(), 1);
+        assert_close(number(&store, sheet, 0, 1), SECOND_INSTANT);
+        assert_close(number(&store, sheet, 0, 2), SECOND_INSTANT.floor());
+
+        // The host barrier supplies the instant itself.
+        store.recompute_volatile(HOST_INSTANT);
+        assert_eq!(clock_reads(), 0);
+        assert_close(number(&store, sheet, 0, 0), HOST_INSTANT);
+        crate::eval::set_test_clock(None);
+    }
+
+    #[test]
+    fn moved_volatile_formulas_keep_recalculating_at_their_new_cells() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 2);
+        store.set_formula(sheet, 0, 0, "=RAND()", 0);
+        store.commit_sources();
+
+        store.insert_cols(sheet, 0, 1);
+        store.commit_sources();
+        let moved_draw = number(&store, sheet, 0, 1);
+        store.set_number(sheet, 1, 3, 1.0, 0);
+        store.commit_sources();
+
+        assert_ne!(number(&store, sheet, 0, 1), moved_draw);
+        assert_eq!(store.get_cell(sheet, 0, 0).kind(), KIND_EMPTY);
+    }
+
+    #[test]
+    fn rand_and_randbetween_draw_inside_their_bounds_and_reject_invalid_ones() {
+        const DRAWS: usize = 200;
+        const EDIT_COL: usize = 12;
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(13, 1);
+        let errors = [
+            (3, "=RANDBETWEEN(-3.5,-3.2)", "#NUM!"),
+            (4, "=RANDBETWEEN(5,1)", "#NUM!"),
+            (5, "=RANDBETWEEN(\"a\",2)", "#VALUE!"),
+            (6, "=RANDBETWEEN(1)", "#VALUE!"),
+            (7, "=RAND(1)", "#VALUE!"),
+            (8, "=RANDBETWEEN(1/0,2)", "#DIV/0!"),
+            (9, "=RANDBETWEEN(1,NA())", "#N/A"),
+            (10, "=RANDBETWEEN(A1:A1,2)", "#VALUE!"),
+            (11, "=RANDBETWEEN(\"\",5)", "#VALUE!"),
+        ];
+        store.set_formula(sheet, 0, 0, "=RAND()", 0);
+        store.set_formula(sheet, 0, 1, "=RANDBETWEEN(1,6)", 0);
+        store.set_formula(sheet, 0, 2, "=RANDBETWEEN(2.2,3)", 0);
+        for (col, formula, _) in errors {
+            store.set_formula(sheet, 0, col, formula, 0);
+        }
+
+        let mut faces = [false; 6];
+        for draw in 0..DRAWS {
+            store.set_number(sheet, 0, EDIT_COL, draw as f64, 0);
+            store.commit_sources();
+
+            let unit = number(&store, sheet, 0, 0);
+            assert!((0.0..1.0).contains(&unit), "RAND() = {unit}");
+            let face = number(&store, sheet, 0, 1);
+            assert!(face.fract() == 0.0 && (1.0..=6.0).contains(&face), "{face}");
+            faces[face as usize - 1] = true;
+            assert_close(number(&store, sheet, 0, 2), 3.0);
+        }
+
+        assert_eq!(faces, [true; 6]);
+        for (col, formula, expected) in errors {
+            assert_eq!(
+                string(&store, sheet, 0, col).as_deref(),
+                Some(expected),
+                "{formula}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_volatile_spill_that_comes_back_unchanged_does_not_recalculate_its_readers() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(6, 2);
+        store.set_number(sheet, 0, 0, 7.0, 0);
+        store.set_number(sheet, 0, 1, 8.0, 0);
+        // C1 spills A1:B1 into C1:D1; F1 reads the spilled D1.
+        store.set_formula(sheet, 0, 2, "=OFFSET($A$1,0,0,1,2)", 0);
+        store.set_formula(sheet, 0, 5, "=D1*2", 0);
+        store.commit_sources();
+        let mut mark = store.recomputed_formulas;
+
+        // OFFSET is volatile, so an unrelated edit evaluates it again. Its
+        // spill holds the same values, so F1 is not selected.
+        store.set_number(sheet, 1, 4, 1.0, 0);
+        store.commit_sources();
+        assert_eq!(recomputed_since(&store, &mut mark), 1);
+        assert_close(number(&store, sheet, 0, 5), 16.0);
+
+        // A changed spilled value still reaches its reader.
+        store.set_number(sheet, 0, 1, 9.0, 0);
+        store.commit_sources();
+        assert_close(number(&store, sheet, 0, 3), 9.0);
+        assert_close(number(&store, sheet, 0, 5), 18.0);
+    }
+}
+
+/// FORMULATEXT, ISFORMULA, HYPERLINK and CELL describe a referenced cell or
+/// return a display value.
+mod cell_information {
+    use super::*;
+
+    fn bool_at(store: &CellStore, sheet: usize, col: usize) -> bool {
+        assert_eq!(store.get_cell(sheet, 0, col).kind(), KIND_BOOL, "col {col}");
+        number(store, sheet, 0, col) != 0.0
+    }
+
+    #[test]
+    fn information_functions_read_formula_sources_and_cell_facts() {
+        let mut store = CellStore::new();
+        let data = store.add_sheet(2, 4);
+        store.set_sheet_name(data, "data", "Data");
+        let main = store.add_sheet(32, 3);
+        store.set_sheet_name(main, "main", "Main");
+        store.set_number(data, 0, 0, 5.0, 0);
+        store.set_formula(data, 1, 0, "=A1*2", 0);
+        store.set_string(data, 2, 0, "label", 0);
+
+        let texts = [
+            (0, "=FORMULATEXT(Data!A2)", "=A1*2"),
+            (1, "=FORMULATEXT(Data!A1)", "#N/A"),
+            (2, "=FORMULATEXT(Data!A4)", "#N/A"),
+            (3, "=FORMULATEXT(1)", "#VALUE!"),
+            (4, "=FORMULATEXT(1/0)", "#DIV/0!"),
+            (5, "=FORMULATEXT(Data!A2:A3)", "=A1*2"),
+            // The reference is a dependency, so a self-reference is a cycle.
+            (6, "=FORMULATEXT(G1)", "#CYCLE!"),
+            (7, "=ISFORMULA(\"A1\")", "#VALUE!"),
+            (
+                8,
+                "=HYPERLINK(\"https://example.com\")",
+                "https://example.com",
+            ),
+            (9, "=HYPERLINK(\"https://example.com\",\"Docs\")", "Docs"),
+            (10, "=HYPERLINK(1/0,\"Docs\")", "#DIV/0!"),
+            (11, "=HYPERLINK()", "#VALUE!"),
+            (12, "=CELL(\"address\",Data!B3)", "'Data'!$B$3"),
+            (13, "=CELL(\"Address\",B3)", "$B$3"),
+            (14, "=CELL(\"type\",Data!A3)", "l"),
+            (15, "=CELL(\"type\",Data!A4)", "b"),
+            (16, "=CELL(\"type\",Data!A1)", "v"),
+            (17, "=CELL(\"format\",Data!A1)", "#VALUE!"),
+            (18, "=CELL(1,A1)", "#VALUE!"),
+            (19, "=CELL(\"bogus\",A1)", "#VALUE!"),
+            (29, "=CELL(\" row\",A1)", "#VALUE!"),
+        ];
+        let numbers = [
+            (20, "=HYPERLINK(\"https://example.com\",Data!A1)", 5.0),
+            (21, "=CELL(\"row\",Data!B3)", 3.0),
+            (22, "=CELL(\"col\",Data!B3)", 2.0),
+            (23, "=CELL(\"contents\",Data!A2)", 10.0),
+            (24, "=CELL(\"col\")", 25.0),
+        ];
+        let bools = [
+            (25, "=ISFORMULA(Data!A2)", true),
+            (26, "=ISFORMULA(Data!A1)", false),
+            (27, "=ISFORMULA(Data!A4)", false),
+            (28, "=ISFORMULA(Data!A2:A3)", true),
+        ];
+        for (col, formula, _) in texts {
+            store.set_formula(main, 0, col, formula, 0);
+        }
+        for (col, formula, _) in numbers {
+            store.set_formula(main, 0, col, formula, 0);
+        }
+        for (col, formula, _) in bools {
+            store.set_formula(main, 0, col, formula, 0);
+        }
+        store.commit_sources();
+
+        for (col, formula, expected) in texts {
+            assert_eq!(
+                string(&store, main, 0, col).as_deref(),
+                Some(expected),
+                "{formula}"
+            );
+        }
+        for (col, _, expected) in numbers {
+            assert_close(number(&store, main, 0, col), expected);
+        }
+        for (col, formula, expected) in bools {
+            assert_eq!(bool_at(&store, main, col), expected, "{formula}");
+        }
+    }
+
+    #[test]
+    fn formula_checks_follow_a_referenced_cell_that_becomes_a_formula() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(3, 1);
+        store.set_number(sheet, 0, 0, 5.0, 0);
+        store.set_formula(sheet, 0, 1, "=ISFORMULA(A1)", 0);
+        store.set_formula(sheet, 0, 2, "=FORMULATEXT(A1)", 0);
+        store.commit_sources();
+        assert!(!bool_at(&store, sheet, 1));
+        assert_eq!(string(&store, sheet, 0, 2).as_deref(), Some("#N/A"));
+
+        store.set_formula(sheet, 0, 0, "=2+3", 0);
+        store.commit_sources();
+
+        assert!(bool_at(&store, sheet, 1));
+        assert_eq!(string(&store, sheet, 0, 2).as_deref(), Some("=2+3"));
+    }
+}
+
+#[test]
+fn offset_indirect_values_preserve_reference_shapes_in_sums_and_spills() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(14, 12);
+    for (row, value) in [1.0, 2.0, 3.0].into_iter().enumerate() {
+        store.set_number(sheet, row, 0, value, 0);
+        store.set_number(sheet, row, 1, value * 10.0, 0);
+    }
+    store.set_number(sheet, 0, 9, 2.0, 0);
+    let scalar_cases = [
+        ("=OFFSET(A1,1,1)", 20.0),
+        ("=SUM(OFFSET(A1:B2,1,0))", 55.0),
+        ("=SUM(OFFSET(A1,1,1,2,1))", 50.0),
+        ("=SUM(INDIRECT(\"A1:B3\"))", 66.0),
+        ("=SUM(OFFSET(INDIRECT(\"A1:B2\"),1,0))", 55.0),
+        ("=SUM(INDIRECT(\"$A$1:$A$3\",TRUE))", 6.0),
+        ("=SUM(OFFSET(OFFSET(A1,1,0),0,1))", 20.0),
+        ("=SUM(LET(anchor,A1,OFFSET(anchor,1,1)))", 20.0),
+        ("=LET(address,\"B2\",INDIRECT(address))", 20.0),
+        ("=(OFFSET(A1,1,1)=20)+1", 2.0),
+        ("=INDIRECT(\"B2\")+1", 21.0),
+        ("=LET(v,INDIRECT(\"B2\"),v)", 20.0),
+        ("=LET(x,1,OFFSET(A1,1,1)+x)", 21.0),
+    ];
+    for (col, (formula, _)) in scalar_cases.iter().enumerate() {
+        store.set_formula(sheet, 8, col, formula, 0);
+    }
+    store.set_formula(sheet, 0, 3, "=OFFSET(A1,0,0,J1,2)", 0);
+    store.set_formula(sheet, 0, 6, "=INDIRECT(\"A1:B3\")", 0);
+    store.set_formula(sheet, 9, 0, "=SUM(D1#)", 0);
+    store.recompute(sheet);
+    for (col, (formula, expected)) in scalar_cases.iter().enumerate() {
+        assert_eq!(number(&store, sheet, 8, col), *expected, "{formula}");
+    }
+    assert_eq!(
+        [(0, 3), (0, 4), (1, 3), (1, 4)].map(|(row, col)| number(&store, sheet, row, col)),
+        [1.0, 10.0, 2.0, 20.0]
+    );
+    assert_eq!(
+        [(0, 6), (0, 7), (1, 6), (1, 7), (2, 6), (2, 7)]
+            .map(|(row, col)| number(&store, sheet, row, col)),
+        [1.0, 10.0, 2.0, 20.0, 3.0, 30.0]
+    );
+    assert_close(number(&store, sheet, 9, 0), 33.0);
+
+    store.set_number(sheet, 0, 9, 3.0, 0);
+    store.set_number(sheet, 2, 1, 40.0, 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 2, 4), 40.0);
+    assert_close(number(&store, sheet, 2, 7), 40.0);
+    assert_close(number(&store, sheet, 9, 0), 76.0);
+    store.set_number(sheet, 0, 9, 1.0, 0);
+    store.recompute(sheet);
+    assert_eq!(store.get_cell(sheet, 1, 3).kind(), KIND_EMPTY);
+    assert_eq!(store.get_cell(sheet, 2, 4).kind(), KIND_EMPTY);
+    assert_close(number(&store, sheet, 9, 0), 11.0);
+}
+
+#[test]
+fn offset_indirect_a1_and_r1c1_resolve_absolute_relative_and_quoted_sheet_addresses() {
+    let mut store = CellStore::new();
+    let source = store.add_sheet(4, 4);
+    let report = store.add_sheet(12, 8);
+    store.set_sheet_name(source, "source", "O'Brien Data");
+    store.set_number(source, 0, 0, 5.0, 0);
+    store.set_number(source, 1, 0, 7.0, 0);
+    store.set_number(source, 1, 1, 19.0, 0);
+    store.set_number(report, 1, 0, 17.0, 0);
+    let cases = [
+        ("=INDIRECT(\"'O''Brien Data'!$B$2\")", 19.0),
+        ("=INDIRECT(\"'O''Brien Data'!R2C2\",FALSE)", 19.0),
+        ("=SUM(INDIRECT(\"'O''Brien Data'!R1C1:R2C1\",FALSE))", 12.0),
+        ("=INDIRECT(\"R[-2]C[-3]\",FALSE)", 17.0),
+        ("=INDIRECT(\"R2C[-4]\",FALSE)", 17.0),
+        ("=INDIRECT(\"R[-2]C1\",FALSE)", 17.0),
+        ("=OFFSET('O''Brien Data'!B2,-1,-1)", 5.0),
+    ];
+    for (col, (formula, _)) in cases.iter().enumerate() {
+        store.set_formula(report, 3, col, formula, 0);
+    }
+    store.recompute(report);
+    for (col, (formula, expected)) in cases.iter().enumerate() {
+        assert_eq!(number(&store, report, 3, col), *expected, "{formula}");
+    }
+}
+
+#[test]
+fn offset_indirect_names_and_tables_resolve_in_the_calling_sheet_scope() {
+    let mut store = CellStore::new();
+    let source = store.add_sheet(4, 6);
+    let report = store.add_sheet(8, 4);
+    store.set_sheet_name(source, "source", "Source Sheet");
+    for (row, value) in [10.0, 20.0, 30.0].into_iter().enumerate() {
+        store.set_number(source, row + 1, 0, value, 0);
+        store.set_number(source, row + 1, 1, value * 2.0, 0);
+    }
+    assert!(store.set_named_range("Values", -1, source, 1, 0, 3, 0));
+    assert!(store.set_named_range("Values", report as i32, source, 1, 1, 3, 1));
+    assert!(store.set_table(
+        "sales-id",
+        "Sales",
+        source,
+        0,
+        0,
+        3,
+        1,
+        true,
+        false,
+        vec!["amount-id".into(), "double-id".into()],
+        vec!["Amount".into(), "Double".into()],
+    ));
+    store.set_formula(source, 0, 3, "=SUM(INDIRECT(\"Values\"))", 0);
+    let cases = [
+        ("=SUM(INDIRECT(\"Values\"))", 120.0),
+        ("=SUM(OFFSET(Values,0,-1))", 60.0),
+        ("=SUM(INDIRECT(\"Sales[Amount]\"))", 60.0),
+        ("=SUM(OFFSET(Sales[Amount],0,1))", 120.0),
+        ("=SUM(INDIRECT(\"Values\",FALSE))", 120.0),
+        ("=SUM(INDIRECT(\"'Source Sheet'!Values\"))", 60.0),
+    ];
+    for (col, (formula, _)) in cases.iter().enumerate() {
+        store.set_formula(report, 0, col, formula, 0);
+    }
+    store.recompute(report);
+    store.recompute(source);
+    assert_close(number(&store, source, 0, 3), 60.0);
+    for (col, (formula, expected)) in cases.iter().enumerate() {
+        assert_eq!(number(&store, report, 0, col), *expected, "{formula}");
+    }
+    store.set_number(source, 2, 0, 25.0, 0);
+    store.set_number(source, 2, 1, 50.0, 0);
+    store.recompute(report);
+    assert_eq!(
+        [0, 1, 2, 3, 4, 5].map(|col| number(&store, report, 0, col)),
+        [130.0, 65.0, 65.0, 130.0, 130.0, 65.0]
+    );
+}
+
+#[test]
+fn offset_indirect_errors_reject_invalid_references_and_propagate_input_errors() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(4, 24);
+    let cases = [
+        ("=OFFSET(A1,-1,0)", "#REF!"),
+        ("=OFFSET(A1,0,-1)", "#REF!"),
+        ("=OFFSET(A1,0,0,0,1)", "#VALUE!"),
+        ("=OFFSET(A1,0,0,1,-1)", "#VALUE!"),
+        ("=OFFSET(42,0,0)", "#VALUE!"),
+        ("=OFFSET(A1,\"bad\",0)", "#VALUE!"),
+        ("=OFFSET(A1,1/0,0)", "#DIV/0!"),
+        ("=OFFSET(A1,1048576,0)", "#REF!"),
+        ("=INDIRECT(\"not a reference\")", "#REF!"),
+        ("=INDIRECT(\"Missing!A1\")", "#REF!"),
+        ("=INDIRECT(\"A0\")", "#REF!"),
+        ("=INDIRECT(\"XFE1\")", "#REF!"),
+        ("=INDIRECT(\"R0C1\",FALSE)", "#REF!"),
+        ("=INDIRECT(\"R[-99]C1\",FALSE)", "#REF!"),
+        ("=INDIRECT(\"A1+1\")", "#REF!"),
+        ("=INDIRECT(1/0)", "#DIV/0!"),
+        ("=INDIRECT(\"A1\",1/0)", "#DIV/0!"),
+        ("=INDIRECT(\"=A1\")", "#REF!"),
+        ("=INDIRECT(\" A1\")", "#REF!"),
+        ("=INDIRECT(\"((A1))\")", "#REF!"),
+        ("=ROWS(OFFSET(A1,-1,0))", "#REF!"),
+        ("=COLUMNS(INDIRECT(\"bad\"))", "#REF!"),
+        ("=ROWS(OFFSET(A1,0,0,0,1))", "#VALUE!"),
+        ("=ROW(OFFSET(A1,-1,0))", "#REF!"),
+    ];
+    for (row, (formula, _)) in cases.iter().enumerate() {
+        store.set_formula(sheet, row, 3, formula, 0);
+    }
+    store.recompute(sheet);
+    for (row, (formula, expected)) in cases.iter().enumerate() {
+        assert_eq!(
+            string(&store, sheet, row, 3).as_deref(),
+            Some(*expected),
+            "{formula}"
+        );
+    }
+}
+
+#[test]
+fn offset_indirect_dynamic_target_edits_refresh_values_and_downstream_dependents() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(8, 4);
+    store.set_string(sheet, 0, 0, "B1", 0);
+    store.set_number(sheet, 1, 0, 0.0, 0);
+    store.set_number(sheet, 0, 1, 5.0, 0);
+    store.set_number(sheet, 1, 1, 11.0, 0);
+    store.set_number(sheet, 0, 2, 9.0, 0);
+    store.set_formula(sheet, 0, 3, "=INDIRECT(A1)", 0);
+    store.set_formula(sheet, 0, 4, "=OFFSET(B1,A2,0)", 0);
+    store.set_formula(sheet, 0, 5, "=D1+E1", 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 0, 5), 10.0);
+    store.set_number(sheet, 0, 1, 7.0, 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 0, 5), 14.0);
+
+    store.set_string(sheet, 0, 0, "C1", 0);
+    store.set_number(sheet, 1, 0, 1.0, 0);
+    store.recompute(sheet);
+    assert_eq!(
+        [3, 4, 5].map(|col| number(&store, sheet, 0, col)),
+        [9.0, 11.0, 20.0]
+    );
+    store.set_number(sheet, 0, 1, 100.0, 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 0, 5), 20.0);
+    store.set_number(sheet, 0, 2, 13.0, 0);
+    store.set_number(sheet, 1, 1, 17.0, 0);
+    store.recompute(sheet);
+    assert_eq!(
+        [3, 4, 5].map(|col| number(&store, sheet, 0, col)),
+        [13.0, 17.0, 30.0]
+    );
+}
+
+#[test]
+fn offset_indirect_structural_edits_rebase_references_but_not_address_text() {
+    for edit_rows in [true, false] {
+        let mut store = CellStore::new();
+        let source = store.add_sheet(5, 5);
+        let report = store.add_sheet(2, 2);
+        store.set_sheet_name(source, "source", "Source");
+        store.set_number(source, 1, 1, 10.0, 0);
+        store.set_number(source, 2, 1, 30.0, 0);
+        store.set_number(source, 1, 2, 20.0, 0);
+        store.set_formula(report, 0, 0, "=OFFSET(Source!B2,0,0)", 0);
+        store.set_formula(report, 0, 1, "=INDIRECT(\"Source!B2\")", 0);
+        store.recompute(report);
+        assert_close(number(&store, report, 0, 0), 10.0);
+        assert_close(number(&store, report, 0, 1), 10.0);
+        if edit_rows {
+            store.add_rows(source, 1, 1);
+        } else {
+            store.insert_cols(source, 1, 1);
+        }
+        store.recompute(report);
+        assert_close(number(&store, report, 0, 0), 10.0);
+        assert_close(number(&store, report, 0, 1), 0.0);
+        if edit_rows {
+            store.remove_rows(source, 1, 1);
+        } else {
+            store.remove_cols(source, 1, 1);
+        }
+        store.recompute(report);
+        assert_close(number(&store, report, 0, 0), 10.0);
+        assert_close(number(&store, report, 0, 1), 10.0);
+        if edit_rows {
+            store.remove_rows(source, 1, 1);
+        } else {
+            store.remove_cols(source, 1, 1);
+        }
+        store.recompute(report);
+        assert_eq!(string(&store, report, 0, 0).as_deref(), Some("#REF!"));
+        assert_close(
+            number(&store, report, 0, 1),
+            if edit_rows { 30.0 } else { 20.0 },
+        );
+    }
+}
+
+#[test]
+fn offset_indirect_runtime_self_cycles_fail_and_recover_when_the_target_changes() {
+    for (formula, initial_target, recovered_target) in [
+        ("=INDIRECT(C1)", "A1", "B1"),
+        ("=SUM(INDIRECT(C1))", "A1:A2", "B1:B2"),
+    ] {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 4);
+        store.set_number(sheet, 0, 1, 7.0, 0);
+        store.set_string(sheet, 0, 2, initial_target, 0);
+        store.set_formula(sheet, 0, 0, formula, 0);
+        store.recompute(sheet);
+        assert_eq!(string(&store, sheet, 0, 0).as_deref(), Some("#CYCLE!"));
+        store.set_string(sheet, 0, 2, recovered_target, 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 0), 7.0);
+    }
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(4, 4);
+    store.set_number(sheet, 0, 1, 7.0, 0);
+    store.set_number(sheet, 0, 2, -1.0, 0);
+    store.set_formula(sheet, 0, 0, "=OFFSET(B1,0,C1)", 0);
+    store.recompute(sheet);
+    assert_eq!(string(&store, sheet, 0, 0).as_deref(), Some("#CYCLE!"));
+    store.set_number(sheet, 0, 2, 0.0, 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 0, 0), 7.0);
+}
+
+#[test]
+fn offset_indirect_runtime_mutual_cycles_propagate_and_recover() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(5, 4);
+    store.set_formula(sheet, 0, 0, "=INDIRECT(\"B1\")", 0);
+    store.set_formula(sheet, 0, 1, "=OFFSET(C1,0,-2)", 0);
+    store.set_formula(sheet, 0, 3, "=A1+1", 0);
+    store.recompute(sheet);
+    for col in [0, 1, 3] {
+        assert_eq!(string(&store, sheet, 0, col).as_deref(), Some("#CYCLE!"));
+    }
+    store.set_number(sheet, 0, 1, 7.0, 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 0, 0), 7.0);
+    assert_close(number(&store, sheet, 0, 3), 8.0);
+}
+
+#[test]
+fn offset_indirect_spill_obstructions_preserve_sources_and_clear_on_retry() {
+    for formula in ["=OFFSET(A1,0,0,2,1)", "=INDIRECT(\"A1:A2\")"] {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 4);
+        store.set_number(sheet, 0, 0, 5.0, 0);
+        store.set_number(sheet, 1, 0, 9.0, 0);
+        store.set_number(sheet, 1, 2, 99.0, 0);
+        store.set_formula(sheet, 0, 2, formula, 0);
+        store.recompute(sheet);
+        assert_eq!(string(&store, sheet, 0, 2).as_deref(), Some("#SPILL!"));
+        assert_close(number(&store, sheet, 1, 2), 99.0);
+        assert_close(number(&store, sheet, 1, 0), 9.0);
+        store.clear_cell(sheet, 1, 2, 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 5.0);
+        assert_close(number(&store, sheet, 1, 2), 9.0);
+        assert_eq!(store.formula_source(sheet, 0, 2).as_deref(), Some(formula));
+    }
+}
+
+#[test]
+fn offset_indirect_runtime_cycles_across_sheets_recover_after_source_edits() {
+    let mut store = CellStore::new();
+    let first = store.add_sheet(3, 3);
+    let second = store.add_sheet(3, 3);
+    store.set_sheet_name(first, "first", "First");
+    store.set_sheet_name(second, "second", "Second");
+    store.set_formula(first, 0, 0, "=INDIRECT(\"Second!A1\")", 0);
+    store.set_formula(second, 0, 0, "=OFFSET(First!B1,0,-1)", 0);
+    store.recompute(first);
+    store.recompute(second);
+    assert_eq!(string(&store, first, 0, 0).as_deref(), Some("#CYCLE!"));
+    assert_eq!(string(&store, second, 0, 0).as_deref(), Some("#CYCLE!"));
+    store.set_number(second, 0, 0, 13.0, 0);
+    store.recompute(first);
+    assert_close(number(&store, first, 0, 0), 13.0);
+}
+
+/// Excel's default iterative calculation limits.
+const EXCEL_MAX_ITERATIONS: u32 = 100;
+const EXCEL_MAX_CHANGE: f64 = 0.001;
+
+#[test]
+fn iterative_calculation_converges_a_self_reference_and_off_restores_cycle_errors() {
+    // A spill anywhere in the workbook sends the pass through the spill loop.
+    for with_spill in [false, true] {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(3, 2);
+        if with_spill {
+            store.set_formula(sheet, 0, 2, "=SEQUENCE(2)", 0);
+        }
+        store.set_formula(sheet, 0, 0, "=A1/2+1", 0);
+        store.recompute(sheet);
+        assert_eq!(string(&store, sheet, 0, 0).as_deref(), Some("#CYCLE!"));
+
+        // x = x/2 + 1 settles at 2; sweeps stop at the first step of at most
+        // the maximum change, which is also the remaining distance.
+        assert!(store.set_iterative_calculation(true, EXCEL_MAX_ITERATIONS, EXCEL_MAX_CHANGE));
+        let settled = number(&store, sheet, 0, 0);
+        assert!((settled - 2.0).abs() <= EXCEL_MAX_CHANGE, "got {settled}");
+
+        assert!(store.set_iterative_calculation(false, EXCEL_MAX_ITERATIONS, EXCEL_MAX_CHANGE));
+        assert_eq!(string(&store, sheet, 0, 0).as_deref(), Some("#CYCLE!"));
+    }
+}
+
+#[test]
+fn iterative_calculation_matches_closed_forms_for_interest_and_newton_steps() {
+    const PRINCIPAL: f64 = 1000.0;
+    const RATE: f64 = 0.1;
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(4, 2);
+    store.set_number(sheet, 0, 0, PRINCIPAL, 0);
+    store.set_number(sheet, 0, 1, RATE, 0);
+    // Interest charged on a balance that includes it:
+    // interest = rate * (principal + interest) = rate * principal / (1 - rate).
+    store.set_formula(sheet, 0, 2, "=B1*D1", 0);
+    store.set_formula(sheet, 0, 3, "=A1+C1", 0);
+    // Newton's method for the square root of 2, stepping from its own value.
+    store.set_formula(sheet, 1, 0, "=IF(A2=0,1,A2-(A2^2-2)/(2*A2))", 0);
+
+    assert!(store.set_iterative_calculation(true, EXCEL_MAX_ITERATIONS, 1e-12));
+    assert_close(number(&store, sheet, 0, 2), RATE * PRINCIPAL / (1.0 - RATE));
+    assert_close(number(&store, sheet, 0, 3), PRINCIPAL / (1.0 - RATE));
+    assert_close(number(&store, sheet, 1, 0), 2f64.sqrt());
+}
+
+#[test]
+fn iterative_calculation_keeps_the_last_values_of_a_cycle_that_does_not_converge() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(2, 1);
+    store.set_number(sheet, 0, 1, 1.0, 0);
+    store.set_formula(sheet, 0, 0, "=A1+B1", 0);
+
+    // Excel's running total: every calculation runs all iterations from the
+    // cell's own last value.
+    assert!(store.set_iterative_calculation(true, EXCEL_MAX_ITERATIONS, EXCEL_MAX_CHANGE));
+    assert_close(number(&store, sheet, 0, 0), 100.0);
+    store.set_number(sheet, 0, 1, 2.0, 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 0, 0), 300.0);
+}
+
+#[test]
+fn iterative_calculation_evaluates_formulas_behind_a_cycle_once_after_it_settles() {
+    const SWEEPS: u32 = 10;
+    for formula in ["=A1+1", "=INDIRECT(\"A1\")+1"] {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(3, 1);
+        store.set_formula(sheet, 0, 0, formula, 0);
+        store.set_formula(sheet, 0, 1, "=A1*2", 0);
+        store.set_formula(sheet, 0, 2, "=B1+1", 0);
+
+        crate::eval::FORMULA_EVALUATIONS.with(|count| count.set(0));
+        assert!(store.set_iterative_calculation(true, SWEEPS, 0.0));
+        let evaluations = crate::eval::FORMULA_EVALUATIONS.with(|count| count.get());
+
+        assert_close(number(&store, sheet, 0, 0), 10.0);
+        assert_close(number(&store, sheet, 0, 1), 20.0);
+        assert_close(number(&store, sheet, 0, 2), 21.0);
+        assert_eq!(evaluations, SWEEPS as usize + 2, "{formula}");
+    }
+}
+
+#[test]
+fn iterative_calculation_settles_cycles_through_runtime_references_and_volatile_calls() {
+    // Each row settles at 2: two cells closed only by runtime references, a
+    // static self-reference read again through OFFSET, and a volatile member.
+    let rows: [(&str, &str); 3] = [
+        ("=INDIRECT(\"B1\")/2+1", "=OFFSET(C1,0,-2)"),
+        ("=OFFSET(A2,0,0)/2+1", "=A2"),
+        ("=A3/2+1+NOW()*0", "=A3"),
+    ];
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(3, rows.len());
+    for (row, (first, second)) in rows.iter().enumerate() {
+        store.set_formula(sheet, row, 0, first, 0);
+        store.set_formula(sheet, row, 1, second, 0);
+    }
+    store.recompute(sheet);
+    for row in 0..rows.len() {
+        assert_eq!(string(&store, sheet, row, 0).as_deref(), Some("#CYCLE!"));
+    }
+
+    assert!(store.set_iterative_calculation(true, EXCEL_MAX_ITERATIONS, 1e-9));
+    for row in 0..rows.len() {
+        for col in [0, 1] {
+            let settled = number(&store, sheet, row, col);
+            assert!(
+                (settled - 2.0).abs() < 1e-6,
+                "row {row} column {col}: {settled}"
+            );
+        }
+    }
+}
+
+#[test]
+fn iterative_calculation_joins_runtime_readers_back_into_a_static_component() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(3, 1);
+    store.set_formula(sheet, 0, 0, "=A1/4+INDIRECT(\"B1\")/4+1", 0);
+    store.set_formula(sheet, 0, 1, "=A1", 0);
+    store.set_formula(sheet, 0, 2, "=B1*2", 0);
+
+    assert!(store.set_iterative_calculation(true, EXCEL_MAX_ITERATIONS, 1e-12));
+    assert_close(number(&store, sheet, 0, 0), 2.0);
+    assert_close(number(&store, sheet, 0, 1), 2.0);
+    assert_close(number(&store, sheet, 0, 2), 4.0);
+}
+
+#[test]
+fn iterative_calculation_settles_inputs_before_installing_downstream_spills() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(3, 2);
+    store.set_formula(sheet, 0, 0, "=IF(A1<2,A1+1,A1)", 0);
+    store.set_formula(sheet, 0, 1, "=SEQUENCE(A1)", 0);
+    store.set_formula(sheet, 0, 2, "=SUM(B1:B2)", 0);
+
+    assert!(store.set_iterative_calculation(true, EXCEL_MAX_ITERATIONS, EXCEL_MAX_CHANGE));
+    assert_close(number(&store, sheet, 0, 0), 2.0);
+    assert_close(number(&store, sheet, 0, 1), 1.0);
+    assert_close(number(&store, sheet, 1, 1), 2.0);
+    assert_close(number(&store, sheet, 0, 2), 3.0);
+}
+
+#[test]
+fn iterative_calculation_sweeps_a_long_cycle_without_deep_recursion() {
+    const MEMBERS: usize = 10_000;
+    const MAX_CHANGE: f64 = 1e-6;
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(1, MEMBERS);
+    store.set_formula(sheet, 0, 0, &format!("=A{MEMBERS}/2+1"), 0);
+    for row in 1..MEMBERS {
+        store.set_formula(sheet, row, 0, &format!("=A{row}"), 0);
+    }
+
+    assert!(store.set_iterative_calculation(true, EXCEL_MAX_ITERATIONS, MAX_CHANGE));
+    for row in [0, MEMBERS - 1] {
+        let settled = number(&store, sheet, row, 0);
+        assert!((settled - 2.0).abs() <= MAX_CHANGE, "row {row}: {settled}");
+    }
+}
+
+#[test]
+fn iterative_calculation_rejects_limits_excel_does_not_accept() {
+    let mut store = CellStore::new();
+    for (iterations, change) in [
+        (0, EXCEL_MAX_CHANGE),
+        (32_768, EXCEL_MAX_CHANGE),
+        (EXCEL_MAX_ITERATIONS, -0.5),
+        (EXCEL_MAX_ITERATIONS, f64::NAN),
+        (EXCEL_MAX_ITERATIONS, f64::INFINITY),
+    ] {
+        assert!(!store.set_iterative_calculation(true, iterations, change));
+    }
+    assert!(store.set_iterative_calculation(true, 32_767, 0.0));
+}
+
+#[test]
+fn offset_indirect_scalar_contexts_and_reference_consumers_use_resolved_cells() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(8, 8);
+    store.set_number(sheet, 0, 0, 5.0, 0);
+    store.set_number(sheet, 0, 1, 0.0, 0);
+    store.set_string(sheet, 0, 2, "A1", 0);
+    let numeric_cases = [
+        ("=IFERROR(INDIRECT(\"A1\"),0)", 5.0),
+        ("=LET(v,INDIRECT(\"A1\"),IF(v>0,v,0))", 5.0),
+        ("=INDIRECT(INDIRECT(\"C1\"))", 5.0),
+        ("=OFFSET(A1,INDIRECT(\"B1\"),0)", 5.0),
+        ("=ROWS(OFFSET(A1,0,0,3,2))", 3.0),
+    ];
+    for (row, (formula, _)) in numeric_cases.iter().enumerate() {
+        store.set_formula(sheet, row + 1, 4, formula, 0);
+    }
+    store.set_formula(sheet, 1, 5, "=ISERROR(OFFSET(A1,0,0))", 0);
+    store.set_formula(sheet, 2, 5, "=IF(INDIRECT(\"A1\")>0,\"y\",\"n\")", 0);
+    store.recompute(sheet);
+    for (row, (formula, expected)) in numeric_cases.iter().enumerate() {
+        assert_eq!(number(&store, sheet, row + 1, 4), *expected, "{formula}");
+    }
+    assert_eq!(store.get_cell(sheet, 1, 5).kind(), KIND_BOOL);
+    assert_close(number(&store, sheet, 1, 5), 0.0);
+    assert_eq!(string(&store, sheet, 2, 5).as_deref(), Some("y"));
+
+    #[cfg(feature = "analysis")]
+    {
+        let lambda_cases = [
+            ("=LAMBDA(r,OFFSET(A1,r,0))(0)", 5.0),
+            ("=LAMBDA(address,INDIRECT(address))(\"A1\")", 5.0),
+            ("=SUM(MAP({0;0},LAMBDA(r,OFFSET(A1,r,0))))", 10.0),
+        ];
+        for (row, (formula, _)) in lambda_cases.iter().enumerate() {
+            store.set_formula(sheet, row + 1, 6, formula, 0);
+        }
+
+        // Array helpers over a runtime reference spill its evaluated shape:
+        // A1:A2 is {5;0} and A1:B2 is {5,0;0,0}.
+        let spill_cases = [
+            ("=MAP(OFFSET(A1,0,0,2),LAMBDA(x,x*2))", [10.0, 0.0]),
+            ("=BYROW(OFFSET(A1,0,0,2,2),LAMBDA(r,SUM(r)))", [5.0, 0.0]),
+        ];
+        for (index, (formula, _)) in spill_cases.iter().enumerate() {
+            store.set_formula(sheet, 1 + index * 2, 7, formula, 0);
+        }
+
+        store.recompute(sheet);
+        for (row, (formula, expected)) in lambda_cases.iter().enumerate() {
+            assert_eq!(number(&store, sheet, row + 1, 6), *expected, "{formula}");
+        }
+        for (index, (formula, expected)) in spill_cases.iter().enumerate() {
+            let anchor = 1 + index * 2;
+            assert_eq!(number(&store, sheet, anchor, 7), expected[0], "{formula}");
+            assert_eq!(
+                number(&store, sheet, anchor + 1, 7),
+                expected[1],
+                "{formula}"
+            );
+        }
+    }
+}
+
+#[test]
+fn offset_indirect_let_scopes_and_runtime_spill_readers_follow_current_values() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(24, 20);
+    store.set_number(sheet, 0, 0, 5.0, 0);
+    store.set_formula(sheet, 1, 0, "=LET(x,RAND(),SUM(OFFSET(A1,0,0))+x-x)", 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 1, 0), 5.0);
+
+    store.set_number(sheet, 0, 0, 10.0, 0);
+    store.set_formula(sheet, 0, 2, "=LET(n,5,n+SUM(OFFSET(A1,0,0)))", 0);
+    store.set_formula(sheet, 0, 23, "=LET(a,1,b,C1,SEQUENCE(a+b))", 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 1, 0), 10.0);
+    assert_close(number(&store, sheet, 0, 2), 15.0);
+    assert_close(number(&store, sheet, 15, 23), 16.0);
+    assert_eq!(store.get_cell(sheet, 16, 23).kind(), KIND_EMPTY);
+
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(4, 4);
+    store.set_formula(sheet, 0, 0, "=INDIRECT(\"C1:C3\")", 0);
+    store.set_formula(sheet, 0, 2, "=SEQUENCE(3)", 0);
+    store.recompute(sheet);
+    assert_eq!(
+        [0, 1, 2].map(|row| number(&store, sheet, row, 0)),
+        [1.0, 2.0, 3.0]
+    );
+    store.set_formula(sheet, 0, 2, "=SEQUENCE(3,1,10)", 0);
+    store.recompute(sheet);
+    assert_eq!(
+        [0, 1, 2].map(|row| number(&store, sheet, row, 0)),
+        [10.0, 11.0, 12.0]
+    );
+}
+
+#[test]
+fn offset_indirect_one_cell_results_are_values_outside_the_spill_owner_budget() {
+    const OWNER_LIMIT: usize = 2;
+    const FORMULAS: usize = 6;
+
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(3, FORMULAS);
+    store.set_spill_owner_limit_for_test(OWNER_LIMIT);
+    store.set_number(sheet, 0, 0, 7.0, 0);
+    store.set_number(sheet, 1, 0, 3.0, 0);
+    for row in 0..FORMULAS {
+        let formula = if row % 2 == 0 {
+            "=OFFSET($A$1,0,0)"
+        } else {
+            "=INDIRECT(\"A1\")"
+        };
+        store.set_formula(sheet, row, 1, formula, 0);
+    }
+    // A real two-cell spill still fits the owner budget beside them.
+    store.set_formula(sheet, 0, 2, "=OFFSET($A$1,0,0,2,1)", 0);
+    store.recompute(sheet);
+
+    for row in 0..FORMULAS {
+        assert_eq!(number(&store, sheet, row, 1), 7.0, "row {row}");
+    }
+    assert_eq!(number(&store, sheet, 0, 2), 7.0);
+    assert_eq!(number(&store, sheet, 1, 2), 3.0);
+}
+
+#[cfg(feature = "analysis")]
+#[test]
+fn offset_indirect_merged_reads_do_not_report_a_false_cycle() {
+    // More reads than one anchor keeps apart, so they merge into A2:C301,
+    // which covers column B without reading it.
+    const READS: usize = 300;
+
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(5, READS + 2);
+    store.set_formula(
+        sheet,
+        0,
+        4,
+        "=MAP(SEQUENCE(300),LAMBDA(i,OFFSET($A$1,i,MOD(i,2)*2)+RAND()))",
+        0,
+    );
+    // Spills into column B and reads the MAP, whose values change on every
+    // evaluation: only the merged range makes the MAP look like its reader.
+    store.set_formula(sheet, 1, 1, "=E1#*1", 0);
+    store.recompute(sheet);
+
+    for row in [0, READS / 2, READS - 1] {
+        for (reader_row, col) in [(row, 4), (row + 1, 1)] {
+            assert_eq!(string(&store, sheet, reader_row, col), None);
+        }
+        let map_value = number(&store, sheet, row, 4);
+        assert!((0.0..1.0).contains(&map_value), "E{}: {map_value}", row + 1);
+        assert_eq!(number(&store, sheet, row + 1, 1), map_value, "B{}", row + 2);
+    }
+}
+
+#[test]
+fn offset_indirect_stale_reader_check_grows_with_readers_not_their_product() {
+    // Volatile two-cell spills on two sheets. Each reads the row between
+    // two spills: inside the area of all changed spills, but meeting none.
+    const SPILLS: usize = 2_000;
+    const ROWS: usize = SPILLS * 2;
+    // Work per read is a few index nodes per tree level.
+    const STEPS_PER_READ_LEVEL: usize = 4;
+
+    let mut store = CellStore::new();
+    let sheets = [store.add_sheet(6, ROWS), store.add_sheet(6, ROWS)];
+    for sheet in sheets {
+        for index in 0..SPILLS {
+            store.set_formula(sheet, index * 2, 0, "=OFFSET(B2,0,0,1,2)+RAND()", 0);
+        }
+    }
+    // D1 reads the last spill of the first sheet, which is installed after
+    // it. Only its runtime read links them, so the check must find that one
+    // change among all of them.
+    let last = ROWS - 2;
+    store.set_formula(
+        sheets[0],
+        0,
+        3,
+        &format!("=INDIRECT(\"B{0}:C{0}\")", last + 1),
+        0,
+    );
+    store.commit_sources();
+
+    let before = store.stale_reader_visits;
+    store.set_number(sheets[0], 1, 5, 1.0, 0);
+    store.commit_sources();
+    let steps = store.stale_reader_visits - before;
+
+    let changes = SPILLS * sheets.len();
+    let levels = changes.next_power_of_two().trailing_zeros() as usize + 1;
+    let bound = STEPS_PER_READ_LEVEL * (changes + 1) * levels;
+    assert!(steps <= bound, "{steps} steps, bound {bound}");
+    assert_eq!(
+        number(&store, sheets[0], 0, 3),
+        number(&store, sheets[0], last, 1)
+    );
+}
+
+#[test]
+fn offset_indirect_sheet_rename_and_removal_refresh_text_addresses() {
+    let mut store = CellStore::new();
+    let data = store.add_sheet(1, 1);
+    let report = store.add_sheet(2, 1);
+    store.set_sheet_name(data, "data", "Data");
+    store.set_sheet_name(report, "report", "Report");
+    store.set_number(data, 0, 0, 7.0, 0);
+    store.set_formula(report, 0, 0, "=INDIRECT(\"Data!A1\")", 0);
+    store.set_formula(report, 0, 1, "=INDIRECT(\"New!A1\")", 0);
+    store.recompute(report);
+    assert_close(number(&store, report, 0, 0), 7.0);
+    assert_eq!(string(&store, report, 0, 1).as_deref(), Some("#REF!"));
+
+    assert!(store.rename_sheet(data, "data", "New"));
+    assert_eq!(string(&store, report, 0, 0).as_deref(), Some("#REF!"));
+    assert_close(number(&store, report, 0, 1), 7.0);
+
+    assert!(store.remove_sheet(data));
+    assert_eq!(string(&store, report, 0, 1).as_deref(), Some("#REF!"));
+}
+
+#[test]
+fn offset_indirect_spills_with_evaluated_shapes_share_the_spill_budget_by_size() {
+    // Shapes known only after evaluation must not charge the whole spill
+    // budget each, or a few rows of them would turn into #NUM!.
+    let patterns = [
+        "=LET(h,2,OFFSET($A$1,0,0,h,1))",
+        "=LET(a,ADDRESS(1,1)&\":\"&ADDRESS(2,1),INDIRECT(a))",
+        "=LET(n,COUNTA($A$1:$A$2),OFFSET($A$1,0,0,n,1))",
+        "=LET(r,OFFSET($A$1,0,0,2,1),r*1)",
+    ];
+    for pattern in patterns {
+        for rows in [2, 3] {
+            let mut store = CellStore::new();
+            let sheet = store.add_sheet(rows + 1, rows * 3 + 1);
+            store.set_number(sheet, 0, 0, 4.0, 0);
+            store.set_number(sheet, 1, 0, 6.0, 0);
+            let anchors: Vec<usize> = (0..rows).map(|index| 2 + index * 3).collect();
+            for (col, &row) in anchors.iter().enumerate() {
+                store.set_formula(sheet, row, col + 1, pattern, 0);
+            }
+            store.recompute(sheet);
+            for (col, &row) in anchors.iter().enumerate() {
+                assert_eq!(
+                    [row, row + 1].map(|row| number(&store, sheet, row, col + 1)),
+                    [4.0, 6.0],
+                    "{pattern} with {rows} anchors"
+                );
+            }
+        }
+    }
+}
+
+/// The reference operators: intersection (space), union (comma inside
+/// parentheses) and 3-D references across a span of sheet tabs.
+mod reference_operators {
+    use super::*;
+
+    fn recomputed_since(store: &CellStore, mark: &mut usize) -> usize {
+        let selected = store.recomputed_formulas - *mark;
+        *mark = store.recomputed_formulas;
+        selected
+    }
+
+    /// A1:E4 hold `10 * row + column`, both counted from 1: B2 is 22.
+    fn grid_sheet(store: &mut CellStore, formula_rows: usize) -> usize {
+        let sheet = store.add_sheet(7, 4.max(formula_rows));
+        for row in 0..4 {
+            for col in 0..5 {
+                store.set_number(sheet, row, col, ((row + 1) * 10 + col + 1) as f64, 0);
+            }
+        }
+        sheet
+    }
+
+    fn assert_results(store: &CellStore, sheet: usize, col: usize, cases: &[(&str, &str)]) {
+        for (row, (formula, expected)) in cases.iter().enumerate() {
+            let actual = match string(store, sheet, row, col) {
+                Some(text) => text,
+                None => number(store, sheet, row, col).to_string(),
+            };
+            assert_eq!(&actual, expected, "{formula}");
+        }
+    }
+
+    fn set_formulas(store: &mut CellStore, sheet: usize, col: usize, cases: &[(&str, &str)]) {
+        for (row, (formula, _)) in cases.iter().enumerate() {
+            store.set_formula(sheet, row, col, formula, 0);
+        }
+        store.recompute(sheet);
+    }
+
+    #[test]
+    fn a_space_between_references_intersects_them_and_other_spaces_stay_insignificant() {
+        let cases = [
+            ("=SUM(A1:C3 B2:D4)", "110"),
+            ("=A1:C3 C3:D4", "33"),
+            ("=SUM(A1:C3 B1:D4 C2:C9)", "56"),
+            ("=ROWS(A1:C3 B2:D4)", "2"),
+            ("=SUM(A1:A2 C1:C2)", "#NULL!"),
+            ("=A1:B2 C3:D4", "#NULL!"),
+            ("=SUM(A1:C3 \"x\")", "#VALUE!"),
+            ("=SUM( A1:A2 , B1 )", "44"),
+            ("= A1 + B1 ", "23"),
+            ("=IF( A1 > 5 , \"big\" , \"small\" )", "big"),
+            ("=SUM (A1:A2)", "32"),
+        ];
+        let mut store = CellStore::new();
+        let sheet = grid_sheet(&mut store, cases.len());
+        set_formulas(&mut store, sheet, 6, &cases);
+        assert_results(&store, sheet, 6, &cases);
+        assert_eq!(
+            store.formula_source(sheet, 0, 6).as_deref(),
+            Some("=SUM(A1:C3 B2:D4)")
+        );
+    }
+
+    #[test]
+    fn an_intersection_reads_only_the_shared_cells() {
+        let mut store = CellStore::new();
+        let sheet = grid_sheet(&mut store, 4);
+        store.set_formula(sheet, 0, 6, "=SUM(A1:C3 B2:D4)", 0);
+        store.commit_sources();
+        let mut mark = store.recomputed_formulas;
+
+        // A1 is inside A1:C3 but outside the intersection B2:C3.
+        store.set_number(sheet, 0, 0, 1000.0, 0);
+        store.commit_sources();
+        assert_eq!(recomputed_since(&store, &mut mark), 0);
+
+        store.set_number(sheet, 1, 1, 1022.0, 0);
+        store.commit_sources();
+        assert_eq!(recomputed_since(&store, &mut mark), 1);
+        assert_close(number(&store, sheet, 0, 6), 1110.0);
+    }
+
+    #[test]
+    fn an_intersection_with_a_deleted_operand_parses_back_as_ref_error() {
+        let mut store = CellStore::new();
+        let data = store.add_sheet(4, 4);
+        store.set_sheet_name(data, "Data", "Data");
+        let main = grid_sheet(&mut store, 4);
+        store.set_sheet_name(main, "Main", "Main");
+        store.set_formula(main, 0, 6, "=SUM(Data!A1:C3 B2:D4)", 0);
+        store.recompute(main);
+
+        assert!(store.remove_sheet(data));
+        let source = store.formula_source(main, 0, 6).unwrap_or_default();
+        assert_eq!(source, "=SUM(#REF! B2:D4)");
+
+        // A reload parses the stored text again.
+        store.set_formula(main, 0, 6, &source, 0);
+        store.recompute(main);
+        assert_eq!(string(&store, main, 0, 6).as_deref(), Some("#REF!"));
+    }
+
+    #[test]
+    fn a_comma_inside_parentheses_unites_references_for_the_functions_that_take_them() {
+        let cases = [
+            ("=SUM((A1:A2,C1:C2))", "68"),
+            ("=SUM(A1:A2,C1:C2)", "68"),
+            ("=COUNT((A1,B2,C3))", "3"),
+            ("=INDEX((A1:B2,D1:E2),1,1,2)", "14"),
+            ("=INDEX((A1:B2,D1:E2),2,2)", "22"),
+            ("=INDEX((A1:B2,D1:E2),1,1,3)", "#REF!"),
+            ("=INDEX(A1:B2,1,1,2)", "#REF!"),
+            ("=AREAS((A1:B2,D1:E2,E4))", "3"),
+            ("=AREAS(A1:C3 B2:D4)", "1"),
+            ("=AREAS(A1:G20)", "1"),
+            ("=SMALL((A1:A2,C1:C2),2)", "13"),
+            ("=LARGE((A1:A2,C1:C2),1)", "23"),
+            ("=(A1,B1)", "#VALUE!"),
+            ("=VLOOKUP(11,(A1:B2,D1:E2),2)", "#VALUE!"),
+            ("=ROWS((A1:A2,C1:C2))", "#VALUE!"),
+            ("=SUM((A1,1))", "#VALUE!"),
+            ("=SUMPRODUCT((A1:A2,C1:C2))", "#VALUE!"),
+            ("=CORREL((A1:A2,C1:C2),A1:B2)", "#VALUE!"),
+        ];
+        let mut store = CellStore::new();
+        let sheet = grid_sheet(&mut store, cases.len());
+        set_formulas(&mut store, sheet, 6, &cases);
+        assert_results(&store, sheet, 6, &cases);
+
+        store.set_number(sheet, 1, 2, 100.0, 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 6), 145.0);
+        assert_eq!(
+            store.formula_source(sheet, 0, 6).as_deref(),
+            Some("=SUM((A1:A2,C1:C2))")
+        );
+    }
+
+    /// Sheets First, Middle and Last hold 1, 10 and 100 in A1; Summary is
+    /// the fourth tab.
+    fn span_workbook() -> (CellStore, [usize; 4]) {
+        let mut store = CellStore::new();
+        let mut sheets = [0; 4];
+        for (index, (name, value)) in [("First", 1.0), ("Middle", 10.0), ("Last", 100.0)]
+            .into_iter()
+            .enumerate()
+        {
+            sheets[index] = store.add_sheet(2, 2);
+            store.set_sheet_name(sheets[index], name, name);
+            store.set_number(sheets[index], 0, 0, value, 0);
+        }
+        sheets[3] = store.add_sheet(3, 3);
+        store.set_sheet_name(sheets[3], "Summary", "Summary");
+        (store, sheets)
+    }
+
+    fn order(handles: &[usize]) -> Vec<u32> {
+        handles.iter().map(|&handle| handle as u32).collect()
+    }
+
+    #[test]
+    fn a_three_d_reference_aggregates_the_same_cells_on_every_sheet_of_the_span() {
+        let (mut store, [_, middle, last, summary]) = span_workbook();
+        let cases = [
+            ("=SUM(First:Last!A1)", "111"),
+            ("=COUNT(First:Last!A1:B2)", "3"),
+            ("=MAX('First:Last'!A1)", "100"),
+            ("=AVERAGE(Last:First!A1)", "37"),
+            ("=VLOOKUP(1,First:Last!A1:B2,1)", "#VALUE!"),
+            ("=First:Last!A1", "#VALUE!"),
+            ("=SUM(First:Missing!A1)", "#REF!"),
+        ];
+        for (row, (formula, _)) in cases.iter().enumerate() {
+            store.set_formula(summary, row % 3, row / 3, formula, 0);
+        }
+        store.recompute(summary);
+        for (row, (formula, expected)) in cases.iter().enumerate() {
+            let (row, col) = (row % 3, row / 3);
+            let actual = string(&store, summary, row, col)
+                .unwrap_or_else(|| number(&store, summary, row, col).to_string());
+            assert_eq!(&actual, expected, "{formula}");
+        }
+
+        store.set_number(middle, 0, 0, 20.0, 0);
+        store.recompute(middle);
+        assert_close(number(&store, summary, 0, 0), 121.0);
+
+        assert!(store.rename_sheet(last, "Last", "Last Tab"));
+        assert_eq!(
+            store.formula_source(summary, 0, 0).as_deref(),
+            Some("=SUM('First:Last Tab'!A1)")
+        );
+        assert_close(number(&store, summary, 0, 0), 121.0);
+    }
+
+    #[test]
+    fn inserting_moving_and_removing_tabs_inside_a_span_patches_its_dependencies() {
+        let (mut store, [first, middle, last, summary]) = span_workbook();
+        store.set_formula(summary, 0, 0, "=SUM(First:Last!A1)", 0);
+        store.commit_sources();
+        assert_close(number(&store, summary, 0, 0), 111.0);
+
+        let inserted = store.add_sheet(2, 2);
+        store.set_sheet_name(inserted, "Inserted", "Inserted");
+        store.set_number(inserted, 0, 0, 1000.0, 0);
+        store.commit_sources();
+        assert_close(number(&store, summary, 0, 0), 111.0);
+
+        let epoch = store.graph.epoch();
+        assert!(store.set_sheet_order(&order(&[first, inserted, middle, last, summary])));
+        assert_eq!(store.graph.epoch(), epoch, "a tab move patches the index");
+        assert_close(number(&store, summary, 0, 0), 1111.0);
+
+        // The new reads are in the index: an edit on the inserted tab reaches
+        // the formula without any rebuild.
+        store.set_number(inserted, 0, 0, 2000.0, 0);
+        store.commit_sources();
+        assert_close(number(&store, summary, 0, 0), 2111.0);
+
+        assert!(store.set_sheet_order(&order(&[first, inserted, last, summary, middle])));
+        assert_close(number(&store, summary, 0, 0), 2101.0);
+        store.set_number(middle, 0, 0, 5000.0, 0);
+        store.commit_sources();
+        assert_close(number(&store, summary, 0, 0), 2101.0);
+
+        assert!(store.remove_sheet(inserted));
+        assert_close(number(&store, summary, 0, 0), 101.0);
+        assert_eq!(
+            store.formula_source(summary, 0, 0).as_deref(),
+            Some("=SUM(First:Last!A1)")
+        );
+
+        assert!(!store.set_sheet_order(&order(&[first, last, summary])));
+        assert!(!store.set_sheet_order(&order(&[first, last, summary, middle, middle])));
+        assert!(!store.set_sheet_order(&order(&[first, last, summary, inserted])));
+    }
+
+    #[test]
+    fn moving_or_removing_an_endpoint_moves_the_span_edge_as_excel_does() {
+        let (mut store, [first, middle, last, summary]) = span_workbook();
+        store.set_formula(summary, 0, 0, "=SUM(First:Last!A1)", 0);
+        store.set_formula(summary, 1, 0, "=SUM(First:Middle!A1)", 0);
+        store.commit_sources();
+        // Summary moves out of the way first; it never enters a span, which
+        // would make the formulas read themselves.
+        assert!(store.set_sheet_order(&order(&[summary, first, middle, last])));
+        assert_close(number(&store, summary, 0, 0), 111.0);
+
+        // Moving the first endpoint past the last one drops it: its inner
+        // neighbour becomes the endpoint.
+        assert!(store.set_sheet_order(&order(&[summary, middle, last, first])));
+        let source = |store: &CellStore, row| store.formula_source(summary, row, 0);
+        assert_eq!(source(&store, 0).as_deref(), Some("=SUM(Middle:Last!A1)"));
+        assert_close(number(&store, summary, 0, 0), 110.0);
+        assert_eq!(source(&store, 1).as_deref(), Some("=SUM(Middle:Middle!A1)"));
+        assert_close(number(&store, summary, 1, 0), 10.0);
+
+        // Moving an endpoint outward widens the span over the tab it passes.
+        assert!(store.set_sheet_order(&order(&[summary, middle, first, last])));
+        assert_eq!(source(&store, 0).as_deref(), Some("=SUM(Middle:Last!A1)"));
+        assert_close(number(&store, summary, 0, 0), 111.0);
+
+        // Removing an endpoint gives way to its inner neighbour.
+        assert!(store.remove_sheet(last));
+        assert_eq!(source(&store, 0).as_deref(), Some("=SUM(Middle:First!A1)"));
+        assert_close(number(&store, summary, 0, 0), 11.0);
+
+        // Removing every sheet of a span leaves #REF!.
+        assert!(store.remove_sheet(middle));
+        assert_eq!(source(&store, 0).as_deref(), Some("=SUM(First:First!A1)"));
+        assert_close(number(&store, summary, 0, 0), 1.0);
+        assert_eq!(source(&store, 1).as_deref(), Some("=SUM(#REF!)"));
+        assert_eq!(string(&store, summary, 1, 0).as_deref(), Some("#REF!"));
+    }
+}
+
+/// The dense column scans in `filterRows`, `dataEdgeOrdered`, `rangeStyleIds`
+/// and `aggregate` classify literals from the raw kind byte. These tests put
+/// formula results and calculated spill cells in the same column, so the
+/// branches that resolve a calculated slot are covered too.
+mod dense_reader_fast_paths {
+    use super::*;
+
+    const ROWS: usize = 14;
+    const SPILL_ANCHOR_ROW: usize = 7;
+    const SPILL_CHILD_ROWS: [usize; 2] = [8, 9];
+    const BLANK_ROWS: [usize; 3] = [3, 12, 13];
+
+    /// Column A: a literal of each kind, formulas with number, text, error
+    /// and boolean results, and `=SEQUENCE(3)`, whose rows 8 and 9 are
+    /// calculated cells with no source. Every written cell has its own style.
+    fn formula_column() -> (CellStore, usize) {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(2, ROWS);
+        store.set_number(sheet, 0, 0, 5.0, 1);
+        store.set_string(sheet, 1, 0, "Needle 7", 2);
+        store.set_bool(sheet, 2, 0, true, 3);
+        store.set_formula(sheet, 4, 0, "=2+3", 4);
+        store.set_formula(sheet, 5, 0, "=\"needle\"", 5);
+        store.set_formula(sheet, 6, 0, "=1/0", 6);
+        store.set_formula(sheet, SPILL_ANCHOR_ROW, 0, "=SEQUENCE(3)", 7);
+        store.set_formula(sheet, 10, 0, "=12345", 8);
+        store.set_formula(sheet, 11, 0, "=TRUE", 9);
+        store.recompute(sheet);
+
+        for (row, value) in SPILL_CHILD_ROWS.into_iter().zip([2.0, 3.0]) {
+            assert_close(store.get_cell(sheet, row, 0).num(), value);
+        }
+        (store, sheet)
+    }
+
+    #[test]
+    fn filter_rows_matches_formula_results_and_spilled_values() {
+        let (store, sheet) = formula_column();
+        let cases: [(&str, &[u32]); 6] = [
+            ("needle", &[1, 5]),
+            ("5", &[0, 4, 10]),
+            ("2", &[8, 10]),
+            ("3", &[9, 10]),
+            ("true", &[2, 11]),
+            ("#div/0", &[6]),
+        ];
+        for (needle, rows) in cases {
+            assert_eq!(
+                store.filter_rows(sheet, 0, needle),
+                rows,
+                "needle {needle:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn data_edge_ordered_treats_formula_and_spilled_cells_as_data() {
+        let (store, sheet) = formula_column();
+        // View order puts blank row 3 first and blank row 12 after the literals.
+        let order: Vec<u32> = [3, 0, 1, 2, 12, 4, 5, 6, 7, 8, 9, 10, 11, 13]
+            .into_iter()
+            .collect();
+        let last_view = (order.len() - 1) as u32;
+        let cases = [
+            (0, 1, 1),
+            (1, 1, 3),
+            (3, 1, 5),
+            (5, 1, 12),
+            (12, 1, last_view),
+            (12, -1, 5),
+            (5, -1, 3),
+        ];
+        for (view, step, expected) in cases {
+            assert_eq!(
+                store.data_edge_ordered(sheet, &order, view, 0, step, 0),
+                expected,
+                "from view {view} by {step}"
+            );
+        }
+    }
+
+    #[test]
+    fn range_style_ids_match_get_cell_styles_with_formulas_and_spills() {
+        let (store, sheet) = formula_column();
+        let ranges = [(0, ROWS - 1), (4, 6), (SPILL_ANCHOR_ROW, 9), (2, 3)];
+        for (first, last) in ranges {
+            let mut expected: Vec<u32> = (first..=last)
+                .map(|row| store.get_cell(sheet, row, 0).style())
+                .collect();
+            expected.sort_unstable();
+            expected.dedup();
+            assert_eq!(
+                store.range_style_ids(sheet, first, 0, last, 0),
+                expected,
+                "rows {first}..={last}"
+            );
+        }
+    }
+
+    #[test]
+    fn aggregate_counts_number_formulas_and_skips_text_and_error_results() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(1, ROWS);
+        store.set_number(sheet, 0, 0, 5.0, 0);
+        store.set_string(sheet, 1, 0, "Needle 7", 0);
+        store.set_bool(sheet, 2, 0, true, 0);
+        store.set_formula(sheet, 4, 0, "=2+3", 0);
+        store.set_formula(sheet, 5, 0, "=\"needle\"", 0);
+        store.set_formula(sheet, 6, 0, "=1/0", 0);
+        store.set_formula(sheet, 10, 0, "=12345", 0);
+        store.recompute(sheet);
+        for row in BLANK_ROWS {
+            assert_eq!(store.get_cell(sheet, row, 0).kind(), KIND_EMPTY);
+        }
+
+        assert_close(store.aggregate(sheet, 0, 0), 12_355.0);
+        assert_close(store.aggregate(sheet, 0, 1), 12_355.0 / 3.0);
+        assert_close(store.aggregate(sheet, 0, 2), 5.0);
+        assert_close(store.aggregate(sheet, 0, 3), 12_345.0);
+        assert_close(store.aggregate(sheet, 0, 4), 3.0);
+    }
+}
+
+/// One column aggregate must give the same result on dense and paged
+/// storage. Paged storage follows Excel: logical and blank formula results
+/// are ignored, and spilled values count.
+mod aggregate_storage_parity {
+    use super::*;
+
+    const ROWS: usize = 8;
+    const COLS: usize = 2;
+    const PAGE_ROWS: usize = 4;
+    /// Large enough that no loaded page is evicted during a test.
+    const PAGE_BYTE_BUDGET: usize = 1_000_000;
+    const OPS: std::ops::RangeInclusive<u8> = 0..=4;
+
+    /// The same column A on a dense and a paged sheet: a number literal and
+    /// one formula, recomputed.
+    fn dense_and_paged(formula: &str) -> [(CellStore, usize); 2] {
+        let mut dense = CellStore::new();
+        let dense_sheet = dense.add_sheet(COLS, ROWS);
+        let mut paged = CellStore::new();
+        let paged_sheet = paged.add_paged_sheet(
+            COLS,
+            ROWS,
+            PAGE_ROWS,
+            PAGE_BYTE_BUDGET,
+            DEFAULT_MAX_PAGED_DIRTY_CELLS,
+        );
+
+        // Load every page as blank first: an unloaded paged cell reads as
+        // #LOADING!, which would hide the spill.
+        paged.begin_page_load();
+        for col in 0..COLS {
+            for row in 0..ROWS {
+                paged.clear_cell(paged_sheet, row, col, 0);
+            }
+        }
+        paged.commit_sources();
+
+        for (store, sheet) in [(&mut dense, dense_sheet), (&mut paged, paged_sheet)] {
+            store.set_number(sheet, 0, 0, 4.0, 0);
+            store.set_formula(sheet, 1, 0, formula, 0);
+            store.recompute(sheet);
+        }
+        [(dense, dense_sheet), (paged, paged_sheet)]
+    }
+
+    fn assert_dense_matches_paged(formula: &str, expected: [f64; 5]) {
+        let [(dense, dense_sheet), (paged, paged_sheet)] = dense_and_paged(formula);
+        for (op, expected) in OPS.zip(expected) {
+            let dense_value = dense.aggregate(dense_sheet, 0, op);
+            let paged_value = paged.aggregate(paged_sheet, 0, op);
+            assert_eq!(
+                dense_value.to_bits(),
+                paged_value.to_bits(),
+                "{formula} op {op}: dense {dense_value}, paged {paged_value}"
+            );
+            assert_close(dense_value, expected);
+        }
+    }
+
+    #[test]
+    fn a_formula_returning_true_is_ignored() {
+        assert_dense_matches_paged("=TRUE", [4.0, 4.0, 4.0, 4.0, 1.0]);
+    }
+
+    #[test]
+    fn a_formula_returning_a_blank_is_ignored() {
+        assert_dense_matches_paged("=B1", [4.0, 4.0, 4.0, 4.0, 1.0]);
+    }
+
+    #[test]
+    fn spilled_values_count() {
+        assert_dense_matches_paged("=SEQUENCE(3)", [10.0, 2.5, 1.0, 4.0, 4.0]);
+    }
 }

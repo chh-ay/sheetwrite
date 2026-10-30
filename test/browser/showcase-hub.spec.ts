@@ -87,16 +87,17 @@ test("hub links every showcase, filters accessibly, and never clips a card", asy
     .poll(async () =>
       (await launchers.evaluateAll((links) => links.map((link) => link.dataset.owner))).sort(),
     )
-    .toEqual(["database", "host-rows", "performance"]);
+    .toEqual(["data-tools", "database", "host-rows", "performance"]);
 
   await workbookFilter.click();
   await expect(workbookFilter).toHaveAttribute("aria-pressed", "true");
-  await expect(launchers).toHaveCount(1);
-  await expect(launchers).toHaveAttribute("data-owner", "interoperability");
+  expect(
+    (await launchers.evaluateAll((links) => links.map((link) => link.dataset.owner))).sort(),
+  ).toEqual(["formatting", "interoperability", "spreadsheet"]);
   await page.getByRole("button", { name: "Formulas", exact: true }).click();
   expect(
     (await launchers.evaluateAll((links) => links.map((link) => link.dataset.owner))).sort(),
-  ).toEqual(["engine", "formulas"]);
+  ).toEqual(["analysis", "engine", "formulas"]);
   await allFilter.click();
   await expect(launchers).toHaveCount(owners.length);
 

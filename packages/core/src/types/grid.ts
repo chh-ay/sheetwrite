@@ -3,6 +3,7 @@
 
 import type { SheetwriteError } from "../errors.js";
 import type { ResolvedHyperlinkTarget } from "../hyperlink.js";
+import type { IconName } from "../icons/icon-names.js";
 import type {
   RuntimeMemoryObservation,
   RuntimeResourceOperation,
@@ -16,9 +17,11 @@ import type {
   CellScalar,
   CellStyle,
   CellValue,
+  CellVerticalAlign,
   Column,
   ConditionalFormatRule,
 } from "./cell.js";
+import type { ChartDefinition, ChartRef } from "./chart.js";
 import type {
   CellAddress,
   HighlightRange,
@@ -49,6 +52,7 @@ import type {
   Workbook,
   WorkbookSnapshot,
 } from "./document.js";
+import type { PivotDefinition, PivotResultView, PivotSourceField } from "./pivot.js";
 import type { CellRenderer, Theme } from "./render.js";
 import type { Store } from "./store.js";
 import type {
@@ -58,6 +62,20 @@ import type {
   RemoteOperationOptions,
   TransactionResourceLimits,
 } from "./transaction.js";
+
+/** One side panel that `Grid.openPanel` shows on the grid's right edge. */
+export interface GridPanel {
+  /** Text in the panel header; it also names the panel for assistive technology. */
+  title: string;
+  /** Fill `body`, then return a function that releases what `render` set up. */
+  render(body: HTMLElement): () => void;
+  /**
+   * Move keyboard focus into the panel when it opens. Default `true`. Use
+   * `false` for a panel that opens on cell selection, so arrow keys keep moving
+   * the cell cursor.
+   */
+  focus?: boolean;
+}
 
 /** Selection movement applied after a successful editor commit. */
 export type CellEditorNavigation = "down" | "right" | "left" | "none";
@@ -123,9 +141,45 @@ export interface GridActions {
   toggleUnderline(): void;
   toggleStrikethrough(): void;
   setAlign(align: CellAlign): void;
-  setTextColor(color: string): void;
-  setFillColor(color: string): void;
+  /** Set the selection's text color; null returns it to automatic (the theme color). */
+  setTextColor(color: string | null): void;
+  /** Set the selection's fill; null removes it (Excel's "No Fill"). */
+  setFillColor(color: string | null): void;
   toggleBorder(): void;
+  /**
+   * Apply an Excel border preset to the selection. Edge presets (`top`,
+   * `bottom`, `left`, `right`, `outside`, `thickOutside`) touch only the
+   * selection's outer cells and keep each cell's other sides.
+   */
+  setBorders(preset: BorderPreset): void;
+  /** Set the selection's font family; null returns it to the column/theme font. */
+  setFontFamily(family: string | null): void;
+  /** Set the selection's font size in CSS pixels; null returns it to the default. */
+  setFontSize(size: number | null): void;
+  /** Step the focus cell's font size to the next larger (1) or smaller (-1) standard size. */
+  stepFontSize(direction: 1 | -1): void;
+  setVerticalAlign(align: CellVerticalAlign): void;
+  toggleWrap(): void;
+  /** Set the selection's number format; null returns it to the column's format. */
+  setNumberFormat(code: string | null): void;
+  /** Show one more (1) or one fewer (-1) decimal place than the focus cell does. */
+  stepDecimals(direction: 1 | -1): void;
+  /** Merge the selection and center its text, as one undoable step. */
+  mergeAndCenter(): void;
+  /** Clear the selection's contents and formatting, as one undoable step. */
+  clearAll(): void;
+  /**
+   * Put `=SUM(...)` in the focus cell over the contiguous numbers directly
+   * above it, or to its left when there are none above.
+   */
+  autoSum(): void;
+  /** Open the built-in find bar when it is enabled. */
+  find(): void;
+  /**
+   * Freeze rows above and columns left of the focus cell in view coordinates.
+   * Does nothing without a selection; focusing A1 unfreezes both axes.
+   */
+  freezePanes(): void;
   clearFormat(): void;
   merge(): void;
   unmerge(): void;
@@ -159,6 +213,23 @@ export interface GridActions {
    * rejects; a failure emits `export-error`.
    */
   exportXlsx(filename?: string): Promise<void>;
+  /**
+   * Open the note editor on the focus cell, with its note or empty for a new
+   * one. Ctrl or Cmd+Enter and leaving the editor save; Escape cancels. Does
+   * nothing on a read-only grid.
+   */
+  editNote(): void;
+  /**
+   * Remove the focus cell's note as one undoable step. Does nothing when it has
+   * none. Does nothing on a read-only grid.
+   */
+  deleteNote(): void;
+  /**
+   * Open the field list of the pivot table whose output holds the focus cell.
+   * Does nothing when the focus cell is outside every pivot. Does nothing on a
+   * read-only grid.
+   */
+  showPivotFields(): void;
   undo(): void;
   redo(): void;
 }
@@ -172,6 +243,10 @@ export type ToolbarActionName =
   | "alignLeft"
   | "alignCenter"
   | "alignRight"
+  | "alignTop"
+  | "alignMiddle"
+  | "alignBottom"
+  | "wrap"
   | "textColor"
   | "fillColor"
   | "border"
@@ -200,8 +275,46 @@ export interface GridCommandStateChangeEvent {
   readonly states: Readonly<Record<GridCommandName, GridCommandState>>;
 }
 
+/**
+ * Totals over the selected cells the user can see, like Excel's status bar.
+ * Rows a filter hides are left out. Overlapping ranges count once per range,
+ * as in Excel.
+ */
+export interface SelectionSummary {
+  /** Cells that hold any value, including text and errors. */
+  readonly count: number;
+  /** Cells that hold a number (dates are numbers too). */
+  readonly numericCount: number;
+  readonly sum: number;
+  /** Mean of the numeric cells; null when there are none. */
+  readonly average: number | null;
+  readonly min: number | null;
+  readonly max: number | null;
+}
+
+/** Excel border presets accepted by {@link GridActions.setBorders}. */
+export type BorderPreset =
+  | "all"
+  | "outside"
+  | "thickOutside"
+  | "top"
+  | "bottom"
+  | "left"
+  | "right"
+  | "none";
+
 /** Text, DOM node, or node factory used as toolbar icon content. */
 export type ToolbarIcon = string | Node | (() => Node);
+
+/**
+ * Per-glyph icon overrides, keyed by the names on the command icon sheet
+ * (`ICON_NAMES`). One override applies wherever the glyph shows: the flat
+ * toolbar, the ribbon and ribbon menus, and the context menu. Strings render
+ * as plain text; DOM nodes and node factories support SVG or HTML icons. To
+ * replace every glyph at once, set the `--sheetwrite-icon-sheet` CSS property
+ * to a sheet drawn on the layout in `@sheetwrite/core/icons.json`.
+ */
+export type IconOverrides = Partial<Record<IconName, ToolbarIcon>>;
 
 /** Built-in, separator, or custom callback item in the grid toolbar. */
 export interface ToolbarItem {
@@ -241,6 +354,9 @@ export type ContextMenuActionName =
   | "clearFilter"
   | "exportCsv"
   | "exportXlsx"
+  | "editNote"
+  | "deleteNote"
+  | "pivotFields"
   | "separator";
 
 /** Cell and viewport coordinates resolved for one bundled context-menu opening. */
@@ -280,7 +396,8 @@ export type KeyboardAction =
   | "redo"
   | "find"
   | "replace"
-  | "clearContents";
+  | "clearContents"
+  | "editNote";
 
 /** Overrides replace all default keys for an action; null disables that action's keys. */
 export interface KeyboardOptions {
@@ -326,6 +443,10 @@ export interface ContextMenuItem {
   visible?: boolean | ((context: ContextMenuContext) => boolean);
   /** Static or context-aware disabled state. */
   disabled?: boolean | ((context: ContextMenuContext) => boolean);
+  /** Glyph shown before the label. Built-in actions have one by default; `config.icons` overrides apply. */
+  icon?: IconName;
+  /** Rows of a submenu. The row opens it on click, hover or the Right Arrow key and runs nothing itself. */
+  items?: readonly ContextMenuItem[];
 }
 
 /** Static rows or a context-aware factory evaluated each time the menu opens. */
@@ -379,8 +500,14 @@ export interface GridConfig {
   sort?: boolean;
   /** Show CSV/XLSX export controls in the default toolbar (default false). */
   export?: boolean;
-  /** Override built-in toolbar icons by action name. Strings render as plain text; DOM nodes/factories support SVG/HTML icons. */
-  icons?: Partial<Record<ToolbarActionName, ToolbarIcon>>;
+  /**
+   * Replace the built-in toolbar with an Excel-style ribbon (Home, Insert,
+   * Data and View tabs) that narrows its groups as the grid gets narrower.
+   * A custom `toolbar` item list still renders the flat toolbar instead.
+   */
+  ribbon?: boolean;
+  /** Replace built-in command icons by glyph name, in the toolbar, ribbon, ribbon menus and context menu. See {@link IconOverrides}. */
+  icons?: IconOverrides;
   /** Built-in menu, disabled menu, static rows, or a request-aware row factory. */
   contextMenu?: boolean | ContextMenuItems;
   /** Show undo/redo controls in the built-in toolbar (default true). */
@@ -433,14 +560,16 @@ export interface GridOptions {
   renderer?: "canvas" | "worker";
   /**
    * URL of the worker renderer module (`renderer: "worker"`), as served to the
-   * BROWSER — the platform `Worker` constructor does not consult package
-   * exports, so a bare specifier like `new URL("@sheetwrite/core/worker",
-   * import.meta.url)` is NOT reliable. Either copy
-   * `@sheetwrite/core/dist/worker.js` to your public assets and pass its URL
-   * string (works everywhere), or use your bundler's dependency-worker import
-   * if it has one (see `/docs/guides/worker-rendering/`). If omitted or the worker
-   * can't be constructed, the grid falls back to the main-thread canvas
-   * renderer and emits `renderer-fallback` once.
+   * BROWSER. Usually not needed: by default the grid creates its worker as
+   * `new Worker(new URL("./worker.js", import.meta.url))`, which bundlers such
+   * as Vite build together with the worker's imports. Pass a URL when there
+   * is no bundler, or when yours copies the file instead of building it, for
+   * example a copy of `@sheetwrite/core/dist/` in your public assets (see
+   * `/docs/features/worker-rendering/`). A bare specifier like
+   * `new URL("@sheetwrite/core/worker", import.meta.url)` is NOT reliable: the
+   * platform `Worker` constructor does not consult package exports. If the
+   * worker can't be constructed or fails to load, the grid falls back to the
+   * main-thread canvas renderer and emits `renderer-fallback` once.
    */
   workerUrl?: string | URL;
   /**
@@ -578,6 +707,10 @@ export interface GridEvents {
   };
   /** Built-in toolbar/context-menu export failed after its action was dispatched. */
   "export-error": { format: "csv" | "xlsx"; error: SheetwriteError };
+  /** A chart object on the active sheet was selected; `null` when no object is selected. */
+  "chart-select": ChartRef | null;
+  /** The user pressed Enter on a selected chart, for example to open its editor. */
+  "chart-activate": ChartRef;
 }
 
 /**
@@ -611,6 +744,18 @@ export interface Grid {
   ): RuntimeResourceSnapshot;
   /** Query undo/redo availability and formatting active/mixed/disabled state. */
   getCommandState(command: GridCommandName): GridCommandState;
+  /**
+   * Effective style of the focus cell: its own style over its column's
+   * `cellStyle`. Empty when nothing is selected.
+   */
+  getFocusCellStyle(): CellStyle;
+  /**
+   * Totals for the current selection, for a status bar. Large selections are
+   * read in chunks between frames, so the page stays responsive; abort
+   * `signal` to stop early, which rejects with the signal's reason. Resolves
+   * null when nothing is selected.
+   */
+  summarizeSelection(signal?: AbortSignal): Promise<SelectionSummary | null>;
   setActiveSheet(id: SheetId): void;
   scrollToCell(addr: CellAddress): void;
   /**
@@ -857,6 +1002,46 @@ export interface Grid {
   removeValidationRule(id: string): ApplyTransactionResult;
   setProtectedRange(protectedRange: ProtectedRange): ApplyTransactionResult;
   removeProtectedRange(id: string): ApplyTransactionResult;
+  /** Clones of the pivot definitions on `sheet`, or on every sheet; no engine is needed. */
+  getPivots(sheet?: SheetId): PivotDefinition[];
+  /**
+   * Insert or replace a pivot as one undo entry. `sheet` defaults to the sheet
+   * that holds the pivot's ID, then to the active sheet. The pivot's
+   * `savedOutput` is removed, because it does not match a changed definition.
+   */
+  setPivot(pivot: PivotDefinition, sheet?: SheetId): ApplyTransactionResult;
+  /** Remove a pivot from `sheet` (default: the sheet that holds it) as one undo entry. */
+  removePivot(id: string, sheet?: SheetId): ApplyTransactionResult;
+  /** Source fields for the field list; empty on the default engine. */
+  getPivotFields(sheet: SheetId, id: string): PivotSourceField[];
+  /**
+   * Plain-JSON output of one pivot. The default engine reports the saved
+   * output (`saved`), or `unavailable` without one. Null when `sheet` holds
+   * no pivot with `id`.
+   */
+  getPivotResult(sheet: SheetId, id: string): PivotResultView | null;
+  /** Clones of the chart definitions on `sheet` (default: the active sheet). */
+  getCharts(sheet?: SheetId): readonly ChartDefinition[];
+  /**
+   * Insert or replace the chart with `chart.id` as one undo entry. `sheet`
+   * defaults to the active sheet; chart IDs are unique only within a sheet.
+   */
+  setChart(chart: ChartDefinition, sheet?: SheetId): ApplyTransactionResult;
+  /** Remove a chart from `sheet` (default: the first sheet that holds it) as one undo entry. */
+  removeChart(id: string, sheet?: SheetId): ApplyTransactionResult;
+  /**
+   * Select the chart object `id` on `sheet` (default: the active sheet), or
+   * deselect with `null`. Selecting a chart on another sheet activates that
+   * sheet first. Emits `chart-select`.
+   */
+  selectChart(id: string | null, sheet?: SheetId): void;
+  /**
+   * Show `panel` on the grid's right edge and shrink the cells to make room;
+   * `null` closes the open panel. One panel shows at a time: opening a panel
+   * closes the previous one. Escape and the close button close it and return
+   * focus to the grid.
+   */
+  openPanel(panel: GridPanel | null): void;
   setProtectionResolver(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void;
   setNote(addr: CellAddress, text: string | null): ApplyTransactionResult;
   getNote(addr: CellAddress): string | null;

@@ -1,6 +1,6 @@
 ---
 title: "Store | @sheetwrite/core"
-description: "Columnar workbook storage, query, transaction, and subscription contract."
+description: "Store interface in @sheetwrite/core: Columnar workbook storage, query, transaction, and subscription contract."
 ---
 <!-- api-export:@sheetwrite/core|.|Store -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -8,7 +8,7 @@ description: "Columnar workbook storage, query, transaction, and subscription co
 Columnar workbook storage, query, transaction, and subscription contract.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/store.ts#L138"><code>packages/core/src/types/store.ts#L138</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/store.ts#L148"><code>packages/core/src/types/store.ts#L148</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -85,14 +85,16 @@ getRefTarget(addr: CellAddress): CellAddress | null;
 </details>
 
 <details class="api-member" id="store-recalculate-volatile" data-pagefind-weight="1">
-<summary><code>recalculateVolatile</code> <span class="api-member-summary">Recompute volatile formulas (TODAY/NOW) from one captured instant.</span></summary>
+<summary><code>recalculateVolatile</code> <span class="api-member-summary">Recompute volatile formulas (TODAY, NOW, RAND, RANDBETWEEN, OFFSET, INDIRECT) from one captured instant.</span></summary>
 
 ```ts generated
 recalculateVolatile(now?: Date): void;
 ```
 
-<p class="api-member-doc">Recompute volatile formulas (`TODAY`/`NOW`) from one captured instant.
-The supplied Date is interpreted as an absolute UTC instant.</p>
+<p class="api-member-doc">Recompute volatile formulas (`TODAY`, `NOW`, `RAND`, `RANDBETWEEN`, `OFFSET`,
+`INDIRECT`) from one captured instant. The supplied Date is interpreted as an absolute UTC instant.
+Edits already recompute volatile formulas and read the clock once per
+recalculation; this call uses `now` instead, until the next edit.</p>
 </details>
 
 <details class="api-member" id="store-get-visible-window" data-pagefind-weight="1">
@@ -294,6 +296,7 @@ export interface Store {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
@@ -304,15 +307,18 @@ export interface Store {
 <p class="api-consumers-label">Public exports naming <code>Store</code></p>
 
 <ul class="api-consumer-list">
+<li><a href="/docs/api/charts/create-chart-renderer/"><code>createChartRenderer</code></a><span class="api-consumer-kind">@sheetwrite/charts</span></li>
+<li><a href="/docs/api/charts/create-chart-view-cache/"><code>createChartViewCache</code></a><span class="api-consumer-kind">@sheetwrite/charts</span></li>
+<li><a href="/docs/api/core/chart-renderer-factory/"><code>ChartRendererFactory</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/chart-view-provider-factory/"><code>ChartViewProviderFactory</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/open-chart-views/"><code>openChartViews</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/resolve-chart-view/"><code>resolveChartView</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/sheetwrite-store/"><code>SheetwriteStore</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/subscribe-chart-changes/"><code>subscribeChartChanges</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/to-csv/"><code>toCsv</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/to-csv-stream/"><code>toCsvStream</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/to-tsv/"><code>toTsv</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li><a href="/docs/api/core/to-xlsx-table/"><code>toXlsxTable</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li><a href="/docs/api/core/xlsx-table-export-backend/"><code>XlsxTableExportBackend</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li><a href="/docs/api/react/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/react</span></li>
-<li><a href="/docs/api/svelte/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/svelte</span></li>
-<li><a href="/docs/api/vue/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
-<li><a href="/docs/api/xlsx/build-xlsx-model/"><code>buildXlsxModel</code></a><span class="api-consumer-kind">@sheetwrite/xlsx</span></li>
+<li class="api-consumer-more">and 8 more</li>
 </ul>
 </div>

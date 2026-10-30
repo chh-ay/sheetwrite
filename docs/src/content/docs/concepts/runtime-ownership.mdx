@@ -19,10 +19,12 @@ use up to four clipped windows.
 `GridImpl` is the composition root rather than the owner of every subsystem.
 `DocumentController` owns document commits and history, `DatasourceController`
 owns paged request generations and cancellation, `GeometryLayoutController`
-owns row/column indexes and frozen-window mapping, and `RenderCoordinator` is
-the sole animation-frame and paint-cache owner. Interaction-specific controllers
-remain separate. These are internal ownership boundaries; the public API stays
-the `Grid` and `Store` contracts.
+owns row/column indexes and frozen-window mapping, and `ReadWindowController` is
+the sole animation-frame and paint-cache owner. The grid's store-change path
+reconciles displayed rows, selection, and scrolling before notifying change
+listeners, including transaction, remote, and history commits. Interaction-specific
+controllers remain separate. These are internal ownership boundaries; the public
+API stays the `Grid` and `Store` contracts.
 
 ## Canvas rendering and the WASM columnar store
 
@@ -38,7 +40,7 @@ Because the engine is columnar and WASM-resident:
   cells in one UTF-8 buffer instead of one string per cell crossing into WASM.
 - The render hot path is a single bulk read, not N cell lookups.
 - The same snapshot can be transferred to a worker for off-thread painting (see
-  [Worker rendering](/docs/guides/worker-rendering/)).
+  [Worker rendering](/docs/features/worker-rendering/)).
 
 The same engine calculates formulas. The default build is `@sheetwrite/wasm`, and
 the optional full build `@sheetwrite/formulas` adds the analysis functions. See
@@ -110,113 +112,16 @@ interface StoreContract {
 ```
 
 
-## Document protocol and storage transactions
+## Documents and operations
 
-`WorkbookSnapshot` is the versioned, JSON-safe authoritative document. Schema 1
-contains sheet order and identity, stable column keys, literal/formula/reference
-cell inputs, sparse styles and row metadata, merges, frozen panes, conditional
-formats, validation rules, protected ranges, notes, row groups, hidden document
-metadata, filters, sort keys, and named ranges. Formula source is authoritative;
-resolved values are derived caches and are not serialized.
+The versioned `WorkbookSnapshot` stores authoritative inputs. `DocumentOp`
+transactions change those inputs; local grid operations enter history and
+remote operations do not echo into outgoing synchronization. Selection, scrolling,
+and renderer choice remain session state.
 
-`DocumentOp` is the exhaustive plain-data mutation vocabulary for that document.
-Cells, ranges, rows/columns, merges, row metadata, frozen panes, conditional
-formats, validation, protection, notes, row groups, named ranges, and sheet
-lifecycle operations use the same store reducer and change-event shape. Local
-operations submitted through `Grid` enter grid undo/redo history;
-`SyncCoordinator` observes each non-empty local transaction and owns its durable
-mutation-ID record. Direct `Store.applyTransaction` calls deliberately bypass
-grid read-only/history policy. Remote operations remain observable with
-`source: "remote"` but enter neither local history nor outgoing synchronization.
+See [Documents and operations](/docs/concepts/documents-and-operations/) for
+the document protocol, storage transactions, and cell value shapes.
 
-```ts prelude="architecture" partial="requires surrounding host state" title="Partial example"
-const checked = validateWorkbookSnapshot(JSON.parse(payload));
-if (!checked.ok) throw new Error(checked.errors[0]?.message);
-
-const outcome = grid.store.applyTransaction({
-  patches: [
-    {
-      op: "set",
-      addr,
-      value: { kind: "literal", value: "authoritative input" },
-      style: { backgroundColor: "#fde68a" },
-    },
-  ],
-});
-```
-
-Snapshot hydration is a separate, validated path: it creates every sheet handle,
-bulk-loads literal runs, installs formula/reference/style exceptions, then
-recomputes after the complete graph exists. It emits no user event, dirty patch,
-or undo entry. Export uses one bulk data-order read per sheet, ignores local
-sort/filter views and conditional render styles, and emits deterministic sparse
-blocks.
-
-```ts prelude="collaboration" partial="requires surrounding host state" title="Partial example"
-const saved = await adapter.load(documentId, signal);
-const grid = createGridFromSnapshot(host, saved);
-const sync = new SyncCoordinator(grid, adapter, {
-  documentId,
-  serverVersion: saved.version ?? 0,
-});
-
-await sync.ready();
-const unsubscribeRemote = sync.subscribe(remoteOperationSource);
-await sync.sendNext(); // host chooses send/retry timing
-```
-
-Each local grid transaction becomes one immutable `PendingCommit` with a stable
-`clientMutationId` and explicit `baseVersion`. Records move from `pending` to
-`sending`; an applied or duplicate response acknowledges store dirty state and
-removes only the matching ID. Transport failure returns that record to `pending`,
-so retry sends the same ID. A conflict remains `conflicted` with its local
-operations intact and exposes server operations or a snapshot; Sheetwrite does
-not silently merge ambiguous structural edits. See
-[Offline and collaboration](/docs/guides/collaboration/) for durable storage, recovery,
-presence, comments, revisions, and the conservative rebase gate.
-
-Remote operations must arrive at exactly `serverVersion + 1`. Older versions and
-known mutation echoes are idempotently ignored; a gap emits `reload-required`
-instead of guessing. Canonical server operations apply with source `remote`, so
-they repaint/recompute without entering the outgoing queue.
-
-Document state does **not** include selection, scroll position, editor/caret
-state, search results, temporary highlights, renderer choice, read-only policy,
-or local zoom. Those are session state. `Workbook.activeSheet` remains document
-metadata in schema 1.
-
-Validation and protection run at the shared local transaction boundary, not only
-inside the inline editor. Validation policies can reject atomically, apply with a
-warning, or allow input. Protected ranges deny local writes unless the host's
-`ProtectionResolver` allows them; the default is deny. `atomic` mode rejects a
-transaction containing any denied operation, while `partial` mode filters denied
-operations and reports them in `rejections`. Protection is client UX policy, not
-server authorization. Remote operations intentionally bypass local protection.
-
-Applied storage transactions emit `change` with the filtered transaction,
-per-cell rollback data, accumulated dirty patches, epoch, commit reason, and an
-explicit `source` (`local` or `remote`). Remote operations still update formulas
-and rendering, but do not re-enter outgoing persistence. Conflicts and no-ops
-return explicit outcomes rather than throwing.
-
-Sheet IDs remain stable across rename and reorder. Renaming rewrites canonical
-cross-sheet formula source while preserving the stable formula-engine handle.
-Removing a referenced sheet rewrites dependents to `#REF!`; undo restores the
-sheet snapshot, formulas, styles, metadata, and dependencies. Removing the active
-sheet selects the nearest surviving sheet. The final sheet cannot be removed.
-All public document actions, including custom calls through `grid.actions`, are
-no-ops when the grid is read-only.
-
-### Cell values
-
-A cell value is one of three shapes:
-
-```ts prelude="architecture" partial="requires surrounding host state" title="Partial example"
-type CellValue =
-  | { kind: "literal"; value: string | number | boolean | null }
-  | { kind: "ref"; target: CellAddress } // a plain cross-reference
-  | { kind: "formula"; src: string }; // authoritative source; "=" is optional at storage
-```
 
 ## Headers: letters vs. field names
 
@@ -255,5 +160,5 @@ provide a title row.
 
 ## See also
 
-- [Configuration](/docs/guides/configuration/) for the option and method reference.
-- [Data operations](/docs/guides/data-operations/) for sort/filter views built on the same window read.
+- [Configuration](/docs/features/grid/options-and-presentation/) for the option and method reference.
+- [Data operations](/docs/features/data/data-operations/) for sort/filter views built on the same window read.

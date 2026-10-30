@@ -13,11 +13,13 @@ import type {
   Sheet,
   Workbook,
 } from "../types/document.js";
+import type { PivotDefinition } from "../types/pivot.js";
 import {
   cellRange,
   fullSheetRange,
   normalizedRange,
   patchSheetId,
+  pivotWrittenRange,
   rangeContains,
   rangesIntersect,
 } from "./ranges.js";
@@ -28,9 +30,15 @@ export interface MutationPolicyResult {
   readonly rejections: MutationIssue[];
 }
 
+/** Rendered pivot output rectangles on one sheet. */
+export type PivotOutputProvider = (sheet: SheetId) => ReadonlyArray<{ id: string; range: Range }>;
+
 /** Pure policy evaluation over workbook metadata; storage and events stay outside this owner. */
 export class StoreMutationPolicy {
-  constructor(private readonly workbook: Workbook) {}
+  constructor(
+    private readonly workbook: Workbook,
+    private readonly pivotOutputs: PivotOutputProvider = () => [],
+  ) {}
 
   evaluate(
     patches: readonly DocumentOp[],
@@ -43,6 +51,16 @@ export class StoreMutationPolicy {
     const rejections: MutationIssue[] = [];
     const rulesBySheet = new Map<SheetId, DataValidationRule[]>();
     const protectionsBySheet = new Map<SheetId, ProtectedRange[]>();
+    let pivotsBySheet: Map<SheetId, PivotDefinition[]> | undefined;
+    const pivotsFor = (sheet: SheetId): PivotDefinition[] => {
+      pivotsBySheet ??= new Map();
+      let pivots = pivotsBySheet.get(sheet);
+      if (!pivots) {
+        pivots = [...(this.sheet(sheet)?.pivots ?? [])];
+        pivotsBySheet.set(sheet, pivots);
+      }
+      return pivots;
+    };
 
     const rulesFor = (sheet: SheetId): DataValidationRule[] => {
       let rules = rulesBySheet.get(sheet);
@@ -64,6 +82,15 @@ export class StoreMutationPolicy {
       }
       return ranges;
     };
+    const outputsBySheet = new Map<SheetId, ReadonlyArray<{ id: string; range: Range }>>();
+    const pivotOutputsFor = (sheet: SheetId): ReadonlyArray<{ id: string; range: Range }> => {
+      let outputs = outputsBySheet.get(sheet);
+      if (!outputs) {
+        outputs = this.pivotOutputs(sheet);
+        outputsBySheet.set(sheet, outputs);
+      }
+      return outputs;
+    };
 
     for (let operationIndex = 0; operationIndex < patches.length; operationIndex++) {
       const patch = patches[operationIndex]!;
@@ -79,6 +106,14 @@ export class StoreMutationPolicy {
             resolver,
           ),
           ...this.validationIssues(patch, operationIndex, rulesFor(sheetId)),
+          ...this.pivotOutputIssues(
+            patch,
+            operationIndex,
+            commitReason,
+            sheetId,
+            pivotOutputsFor,
+            pivotsFor,
+          ),
         );
       }
       warnings.push(...patchIssues.filter((issue) => issue.severity === "warning"));
@@ -109,6 +144,15 @@ export class StoreMutationPolicy {
           patch.sheet,
           protectionsFor(patch.sheet).filter((range) => range.id !== patch.id),
         );
+      } else if (patch.op === "setPivot") {
+        const pivots = pivotsFor(patch.sheet);
+        const index = pivots.findIndex((pivot) => pivot.id === patch.pivot.id);
+        if (index < 0) pivots.push(patch.pivot);
+        else pivots[index] = patch.pivot;
+      } else if (patch.op === "removePivot") {
+        const pivots = pivotsFor(patch.sheet);
+        const index = pivots.findIndex((pivot) => pivot.id === patch.id);
+        if (index >= 0) pivots.splice(index, 1);
       }
     }
 
@@ -117,6 +161,46 @@ export class StoreMutationPolicy {
       warnings,
       rejections,
     };
+  }
+
+  /**
+   * Pivot output is derived, so a local value write into it is refused. Undo
+   * and redo replay recorded history and stay exempt; the engine then shows
+   * the collision as #SPILL!.
+   */
+  private pivotOutputIssues(
+    patch: DocumentOp,
+    operationIndex: number,
+    commitReason: CommitReason,
+    sheetId: SheetId,
+    outputsFor: (sheet: SheetId) => ReadonlyArray<{ id: string; range: Range }>,
+    pivotsFor: (sheet: SheetId) => readonly PivotDefinition[],
+  ): MutationIssue[] {
+    if (commitReason === "undo" || commitReason === "redo") return [];
+    if (patch.op !== "setPivot" && !this.sheet(sheetId)?.pivots?.length) return [];
+
+    const pivots = pivotsFor(sheetId);
+    if (patch.op === "setPivot") {
+      const pivot = pivots.find(
+        (candidate) =>
+          candidate.id !== patch.pivot.id &&
+          candidate.anchor.row === patch.pivot.anchor.row &&
+          candidate.anchor.col === patch.pivot.anchor.col,
+      );
+      if (!pivot) return [];
+      const anchor = cellRange({ sheet: sheetId, ...pivot.anchor });
+      return [pivotOutputIssue(pivot.id, anchor, operationIndex)];
+    }
+
+    const written = pivotWrittenRange(patch);
+    if (!written) return [];
+
+    // Outputs were read before the batch; one an earlier patch removed no longer blocks.
+    const blocked = outputsFor(sheetId).find(
+      (output) =>
+        rangesIntersect(output.range, written) && pivots.some((pivot) => pivot.id === output.id),
+    );
+    return blocked ? [pivotOutputIssue(blocked.id, blocked.range, operationIndex)] : [];
   }
 
   private protectionIssues(
@@ -243,6 +327,12 @@ export class StoreMutationPolicy {
       case "removeProtectedRange":
       case "setNamedRange":
       case "removeNamedRange":
+      case "setCalculation":
+      case "setPivot":
+      case "removePivot":
+      // A chart only reads its sources, so protection and validation never apply.
+      case "setChart":
+      case "removeChart":
         return [];
       default: {
         const unclassified: never = patch;
@@ -490,4 +580,15 @@ function validationMessage(rule: DataValidationRule): string {
     case "checkbox":
       return "Value must be a valid checkbox state";
   }
+}
+
+function pivotOutputIssue(pivotId: string, range: Range, operationIndex: number): MutationIssue {
+  return {
+    kind: "pivot-output",
+    severity: "error",
+    pivotId,
+    range,
+    operationIndex,
+    message: `Pivot table "${pivotId}" owns these cells`,
+  };
 }

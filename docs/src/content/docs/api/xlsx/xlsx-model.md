@@ -1,6 +1,6 @@
 ---
 title: "XlsxModel | @sheetwrite/xlsx"
-description: "Implementation-neutral first-sheet table export model."
+description: "XlsxModel interface in @sheetwrite/xlsx: Implementation-neutral first-sheet table export model."
 ---
 <!-- api-export:@sheetwrite/xlsx|.|XlsxModel -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/xlsx/">@sheetwrite/xlsx</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -8,7 +8,7 @@ description: "Implementation-neutral first-sheet table export model."
 Implementation-neutral first-sheet table export model.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/xlsx/src/table-export.ts#L24"><code>packages/xlsx/src/table-export.ts#L24</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/xlsx/src/table-export.ts#L23"><code>packages/xlsx/src/table-export.ts#L23</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>

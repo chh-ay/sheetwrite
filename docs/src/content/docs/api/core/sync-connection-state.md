@@ -1,6 +1,6 @@
 ---
 title: "SyncConnectionState | @sheetwrite/core"
-description: "Host-controlled online state reported by synchronization."
+description: "SyncConnectionState type in @sheetwrite/core: Host-controlled online state reported by synchronization."
 ---
 <!-- api-export:@sheetwrite/core|.|SyncConnectionState -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
@@ -8,7 +8,7 @@ description: "Host-controlled online state reported by synchronization."
 Host-controlled online state reported by synchronization.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L68"><code>packages/core/src/sync.ts#L68</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L69"><code>packages/core/src/sync.ts#L69</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -29,6 +29,7 @@ export type SyncConnectionState =
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

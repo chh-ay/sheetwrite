@@ -1,13 +1,13 @@
 ---
 title: "SheetwriteStore | @sheetwrite/core"
-description: "Stable public facade and the sole transaction, epoch, policy, and event barrier."
+description: "SheetwriteStore class in @sheetwrite/core: Stable public facade and the sole transaction, epoch, policy, and event barrier."
 ---
 <!-- api-export:@sheetwrite/core|.|SheetwriteStore -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="class">class</span></div>
 
 Stable public facade and the sole transaction, epoch, policy, and event barrier.
 
-### Examples
+## Examples
 
 ```ts compile
 import { initSheetwrite, SheetwriteStore, type Workbook } from "@sheetwrite/core";
@@ -23,13 +23,13 @@ async function total(workbook: Workbook) {
 }
 ```
 
-### See also
+## See also
 
 - Store.aggregate
 - [createGrid](/docs/api/core/create-grid/)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/store.ts#L126"><code>packages/core/src/store.ts#L126</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/store.ts#L145"><code>packages/core/src/store.ts#L145</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -56,6 +56,9 @@ async function total(workbook: Workbook) {
 <a href="#sheetwrite-store-get-formula"><code>getFormula</code></a>
 <a href="#sheetwrite-store-get-formula-matrix-resource-peak"><code>getFormulaMatrixResourcePeak</code></a>
 <a href="#sheetwrite-store-get-paged-stats"><code>getPagedStats</code></a>
+<a href="#sheetwrite-store-get-pivot-fields"><code>getPivotFields</code></a>
+<a href="#sheetwrite-store-get-pivot-result"><code>getPivotResult</code></a>
+<a href="#sheetwrite-store-get-pivots"><code>getPivots</code></a>
 <a href="#sheetwrite-store-get-range-mutation-allocation-stats"><code>getRangeMutationAllocationStats</code></a>
 <a href="#sheetwrite-store-get-ref-target"><code>getRefTarget</code></a>
 <a href="#sheetwrite-store-get-runtime-resource-snapshot"><code>getRuntimeResourceSnapshot</code></a>
@@ -72,6 +75,7 @@ async function total(workbook: Workbook) {
 <a href="#sheetwrite-store-on"><code>on</code></a>
 <a href="#sheetwrite-store-query-capability"><code>queryCapability</code></a>
 <a href="#sheetwrite-store-recalculate-volatile"><code>recalculateVolatile</code></a>
+<a href="#sheetwrite-store-remove-pivot"><code>removePivot</code></a>
 <a href="#sheetwrite-store-remove-sheet-formula-identity"><code>removeSheetFormulaIdentity</code></a>
 <a href="#sheetwrite-store-rename-sheet-formula-identity"><code>renameSheetFormulaIdentity</code></a>
 <a href="#sheetwrite-store-reset-formula-matrix-resource-peak"><code>resetFormulaMatrixResourcePeak</code></a>
@@ -83,6 +87,7 @@ async function total(workbook: Workbook) {
 <a href="#sheetwrite-store-set-column-filter"><code>setColumnFilter</code></a>
 <a href="#sheetwrite-store-set-detailed-change-capture"><code>setDetailedChangeCapture</code></a>
 <a href="#sheetwrite-store-set-group-collapsed"><code>setGroupCollapsed</code></a>
+<a href="#sheetwrite-store-set-pivot"><code>setPivot</code></a>
 <a href="#sheetwrite-store-set-protection-resolver"><code>setProtectionResolver</code></a>
 <a href="#sheetwrite-store-show-rows"><code>showRows</code></a>
 <a href="#sheetwrite-store-sort-by"><code>sortBy</code></a>
@@ -94,7 +99,7 @@ async function total(workbook: Workbook) {
 <a href="#sheetwrite-store-from-snapshot"><code>fromSnapshot</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>59</span>
+## Members <span class="api-count" data-pagefind-ignore>64</span>
 
 <div class="api-member-list">
 
@@ -334,6 +339,36 @@ getPagedStats: (sheet: SheetId) => PagedStoreStats;
 
 </details>
 
+<details class="api-member" id="sheetwrite-store-get-pivot-fields" data-pagefind-weight="1">
+<summary><code>getPivotFields</code> <span class="api-member-summary">Source fields of one pivot; empty on the default engine or for an unknown pivot.</span></summary>
+
+```ts generated
+getPivotFields: (sheet: SheetId, id: string) => PivotSourceField[];
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-store-get-pivot-result" data-pagefind-weight="1">
+<summary><code>getPivotResult</code> <span class="api-member-summary">Plain-JSON output of one pivot.</span></summary>
+
+```ts generated
+getPivotResult: (sheet: SheetId, id: string) => PivotResultView | null;
+```
+
+<p class="api-member-doc">Plain-JSON output of one pivot. The default engine reports the saved
+output (`saved`), or `unavailable` without one. Null when `sheet` holds
+no pivot with `id`.</p>
+</details>
+
+<details class="api-member" id="sheetwrite-store-get-pivots" data-pagefind-weight="1">
+<summary><code>getPivots</code> <span class="api-member-summary">Clones of the pivot definitions on sheet, or on every sheet; readable without the engine.</span></summary>
+
+```ts generated
+getPivots: (sheet?: SheetId) => PivotDefinition[];
+```
+
+</details>
+
 <details class="api-member" id="sheetwrite-store-get-range-mutation-allocation-stats" data-pagefind-weight="1">
 <summary><code>getRangeMutationAllocationStats</code></summary>
 
@@ -470,14 +505,25 @@ queryCapability: (sheet: SheetId) => QueryCapability;
 </details>
 
 <details class="api-member" id="sheetwrite-store-recalculate-volatile" data-pagefind-weight="1">
-<summary><code>recalculateVolatile</code> <span class="api-member-summary">Recompute volatile formulas (TODAY/NOW) from one captured instant.</span></summary>
+<summary><code>recalculateVolatile</code> <span class="api-member-summary">Recompute volatile formulas (TODAY, NOW, RAND, RANDBETWEEN, OFFSET, INDIRECT) from one captured instant.</span></summary>
 
 ```ts generated
 recalculateVolatile: (now?: Date) => void;
 ```
 
-<p class="api-member-doc">Recompute volatile formulas (`TODAY`/`NOW`) from one captured instant.
-The supplied Date is interpreted as an absolute UTC instant.</p>
+<p class="api-member-doc">Recompute volatile formulas (`TODAY`, `NOW`, `RAND`, `RANDBETWEEN`, `OFFSET`,
+`INDIRECT`) from one captured instant. The supplied Date is interpreted as an absolute UTC instant.
+Edits already recompute volatile formulas and read the clock once per
+recalculation; this call uses `now` instead, until the next edit.</p>
+</details>
+
+<details class="api-member" id="sheetwrite-store-remove-pivot" data-pagefind-weight="1">
+<summary><code>removePivot</code> <span class="api-member-summary">Remove a pivot; sheet defaults to the sheet that holds it.</span></summary>
+
+```ts generated
+removePivot: (id: string, sheet?: SheetId) => ApplyTransactionResult;
+```
+
 </details>
 
 <details class="api-member" id="sheetwrite-store-remove-sheet-formula-identity" data-pagefind-weight="1">
@@ -577,6 +623,18 @@ setDetailedChangeCapture: (enabled: boolean) => void;
 setGroupCollapsed: (sheet: SheetId, start: number, collapsed: boolean) => void;
 ```
 
+</details>
+
+<details class="api-member" id="sheetwrite-store-set-pivot" data-pagefind-weight="1">
+<summary><code>setPivot</code> <span class="api-member-summary">Insert or replace a pivot.</span></summary>
+
+```ts generated
+setPivot: (pivot: PivotDefinition, sheet?: SheetId) => ApplyTransactionResult;
+```
+
+<p class="api-member-doc">Insert or replace a pivot. `sheet` defaults to the sheet that holds the
+pivot's ID, then to the active sheet. The pivot's `savedOutput` is
+removed: saved values do not match a definition the caller changed.</p>
 </details>
 
 <details class="api-member" id="sheetwrite-store-set-protection-resolver" data-pagefind-weight="1">
@@ -732,6 +790,9 @@ class SheetwriteStore implements Store {
   getFormula: (addr: CellAddress) => string | null;
   getFormulaMatrixResourcePeak: () => TransientResourcePeak;
   getPagedStats: (sheet: SheetId) => PagedStoreStats;
+  getPivotFields: (sheet: SheetId, id: string) => PivotSourceField[];
+  getPivotResult: (sheet: SheetId, id: string) => PivotResultView | null;
+  getPivots: (sheet?: SheetId) => PivotDefinition[];
   getRangeMutationAllocationStats: () => RangeMutationAllocationStats;
   getRefTarget: (addr: CellAddress) => CellAddress | null;
   getRuntimeResourceSnapshot: (
@@ -765,6 +826,7 @@ class SheetwriteStore implements Store {
   on: (_evt: "change", fn: ChangeListener) => () => void;
   queryCapability: (sheet: SheetId) => QueryCapability;
   recalculateVolatile: (now?: Date) => void;
+  removePivot: (id: string, sheet?: SheetId) => ApplyTransactionResult;
   removeSheetFormulaIdentity: (sheet: SheetId) => boolean;
   renameSheetFormulaIdentity: (sheet: SheetId, name: string) => boolean;
   resetFormulaMatrixResourcePeak: () => void;
@@ -800,6 +862,10 @@ class SheetwriteStore implements Store {
     start: number,
     collapsed: boolean,
   ) => void;
+  setPivot: (
+    pivot: PivotDefinition,
+    sheet?: SheetId,
+  ) => ApplyTransactionResult;
   setProtectionResolver: (
     resolver: ProtectionResolver | undefined,
     mode?: MutationPolicyMode,
@@ -830,6 +896,7 @@ class SheetwriteStore implements Store {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

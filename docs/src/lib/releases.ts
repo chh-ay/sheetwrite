@@ -10,6 +10,8 @@ interface Release {
   readonly date: string;
   /** One line for the sidebar card and the release list. */
   readonly summary: string;
+  /** The changes a minor release leads with; the landing lists the newest set. */
+  readonly highlights?: readonly string[];
 }
 
 const RELEASES: readonly [Release, ...Release[]] = [
@@ -37,6 +39,12 @@ const RELEASES: readonly [Release, ...Release[]] = [
     version: "0.5.0",
     date: "2026-10-17",
     summary: "Full formula engine, spill references, large undo and conflict recovery.",
+    highlights: [
+      "Array arithmetic and spill references in both engines",
+      "Large undo through compressed restores and atomic sync batches",
+      "Host-owned rows with stable IDs and per-record deltas",
+      "Faster formula kernels, bulk loading, and streamed CSV and XLSX imports",
+    ],
   },
 ];
 
@@ -52,10 +60,24 @@ function releaseDate(release: Release): string {
 
 const LATEST_RELEASE = RELEASES[0];
 
+/**
+ * The newest release that lists highlights. Patch releases have none, so the
+ * landing keeps naming the minor release until the next one ships.
+ */
+const LATEST_HIGHLIGHTED_RELEASE = RELEASES.find(
+  (release): release is Release & { highlights: readonly string[] } =>
+    release.highlights !== undefined,
+);
+
 const RELEASES_HREF: string = "/docs/releases/";
 
 function releaseHref(version: string): string {
   return `${RELEASES_HREF}${version}/`;
+}
+
+/** The major and minor version; patch releases share the same feature set. */
+function minorVersion(version: string): string {
+  return version.replace(/\.\d+$/, "");
 }
 
 interface ReleaseContext {
@@ -76,9 +98,11 @@ function releaseContext(activeHref: string | undefined): ReleaseContext | undefi
 }
 
 export {
+  LATEST_HIGHLIGHTED_RELEASE,
   LATEST_RELEASE,
   RELEASES,
   RELEASES_HREF,
+  minorVersion,
   releaseContext,
   releaseDate,
   releaseHref,

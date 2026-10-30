@@ -37,6 +37,12 @@ Use `height={500}` for a fixed host or `fill` to occupy an already-sized ancesto
 
 The component initializes WASM on client mount. `fallback` renders inside the stable host while initialization is pending or after an initialization failure. `onInitializationError(error)` observes failures. `wasmSource` is the advanced explicit-source escape hatch.
 
+## New in 0.6.0
+
+- Enable the opt-in ribbon with `config={{ ribbon: true }}`. It loads only when requested. See [Toolbar and ribbon](https://www.sheetwrite.dev/docs/features/grid/toolbar-and-ribbon/).
+- Use the ready `Grid` and `grid.summarizeSelection(signal?)` for a custom status bar. The core shell shows Average, Count and Sum. See [Status bar](https://www.sheetwrite.dev/docs/features/grid/status-bar/).
+- Core adds packed large undo and sync commits that do not scan the pending queue. Both formula engines add volatile functions, reference operators and iterative calculation. See [Editing and clipboard](https://www.sheetwrite.dev/docs/features/grid/editing-and-clipboard/), [Collaboration](https://www.sheetwrite.dev/docs/features/collaboration/) and [Choose an engine](https://www.sheetwrite.dev/docs/start/choose-an-engine/).
+
 ## Advanced component
 
 ```tsx
@@ -69,9 +75,13 @@ first-source warning.
 
 Grid events use collision-free names: `onGridChange`, `onViewportChange`, `onSelectionChange`, `onEditBegin`, `onEditCommit`, `onSearch`, `onCommandStateChange`, `onActiveSheetChange`, `onMutationRejected`, `onRendererFallback`, `onDatasourceError`, and `onExportError`. Native host `onChange` and `onScroll` remain ordinary DOM handlers.
 
-For vanilla/preload control, import `initSheetwrite()` and `createGrid()` from `@sheetwrite/core`. See [installation](https://sheetwrite.vercel.app/docs/start/installation/), [React integration](https://sheetwrite.vercel.app/docs/frameworks/react/), and [collaboration](https://sheetwrite.vercel.app/docs/guides/collaboration/).
+For vanilla/preload control, import `initSheetwrite()` and `createGrid()` from `@sheetwrite/core`. See [installation](https://www.sheetwrite.dev/docs/start/installation/), [React tutorial](https://www.sheetwrite.dev/docs/tutorials/excel-in-react/), and [collaboration](https://www.sheetwrite.dev/docs/features/collaboration/).
 
 XLSX is not installed by this adapter. If the toolbar configuration enables
 XLSX export, install `@sheetwrite/xlsx` and import
 `@sheetwrite/xlsx/register` before the action (or lazily inside its handler).
 CSV/TSV require no optional package.
+
+For workbook streaming and kept XLSX parts, use the registered core workbook
+APIs. See [Large files and streaming](https://www.sheetwrite.dev/docs/import-export/large-files-and-streaming/)
+and [Kept parts and round trips](https://www.sheetwrite.dev/docs/import-export/kept-parts-and-round-trips/).

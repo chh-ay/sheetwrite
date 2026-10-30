@@ -1,6 +1,6 @@
 ---
 title: "ContextMenuItems | @sheetwrite/core"
-description: "Static rows or a context-aware factory evaluated each time the menu opens."
+description: "ContextMenuItems type in @sheetwrite/core: Static rows or a context-aware factory evaluated each time the menu opens."
 ---
 <!-- api-export:@sheetwrite/core|.|ContextMenuItems -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
@@ -8,7 +8,7 @@ description: "Static rows or a context-aware factory evaluated each time the men
 Static rows or a context-aware factory evaluated each time the menu opens.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L332"><code>packages/core/src/types/grid.ts#L332</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L453"><code>packages/core/src/types/grid.ts#L453</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -30,6 +30,7 @@ export type ContextMenuItems =
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

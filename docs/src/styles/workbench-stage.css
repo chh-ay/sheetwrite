@@ -37,13 +37,7 @@
   align-items: center;
   padding: 1rem 1.25rem;
   min-height: 4.5rem;
-  background:
-    radial-gradient(
-      30rem 12rem at 90% -30%,
-      color-mix(in srgb, var(--sw-workbench-accent) 18%, transparent),
-      transparent
-    ),
-    var(--sw-stage-bg);
+  background: var(--sw-stage-bg);
   color: var(--sw-stage-fg);
 }
 .sw-workbench-stage
@@ -101,17 +95,6 @@
 .sw-workbench-stage .sw-demo-button {
   min-height: 2rem;
   height: 2rem;
-}
-.sw-workbench-release {
-  margin: 0;
-  padding: 0.6rem 1rem;
-  border-block: 1px solid var(--sw-border);
-  font-size: var(--sw-type-xs);
-  color: var(--sw-fg-muted);
-  background: var(--sw-surface-2);
-}
-.sw-workbench-release strong {
-  color: var(--sw-accent-strong);
 }
 @media (max-width: 42rem) {
   .sw-workbench-stage

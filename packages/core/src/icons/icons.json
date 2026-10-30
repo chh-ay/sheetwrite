@@ -1,0 +1,293 @@
+{
+  "version": 1,
+  "cell": 24,
+  "pitch": 36,
+  "columns": 16,
+  "rows": 16,
+  "icons": {
+    "undo": {
+      "column": 0,
+      "row": 0
+    },
+    "redo": {
+      "column": 1,
+      "row": 0
+    },
+    "paste": {
+      "column": 2,
+      "row": 0
+    },
+    "cut": {
+      "column": 3,
+      "row": 0
+    },
+    "copy": {
+      "column": 4,
+      "row": 0
+    },
+    "find": {
+      "column": 5,
+      "row": 0
+    },
+    "zoomIn": {
+      "column": 6,
+      "row": 0
+    },
+    "zoomOut": {
+      "column": 7,
+      "row": 0
+    },
+    "autoSum": {
+      "column": 8,
+      "row": 0
+    },
+    "clear": {
+      "column": 9,
+      "row": 0
+    },
+    "bold": {
+      "column": 0,
+      "row": 1
+    },
+    "italic": {
+      "column": 1,
+      "row": 1
+    },
+    "underline": {
+      "column": 2,
+      "row": 1
+    },
+    "strikethrough": {
+      "column": 3,
+      "row": 1
+    },
+    "textColor": {
+      "column": 4,
+      "row": 1
+    },
+    "fillColor": {
+      "column": 5,
+      "row": 1
+    },
+    "fontGrow": {
+      "column": 6,
+      "row": 1
+    },
+    "fontShrink": {
+      "column": 7,
+      "row": 1
+    },
+    "clearFormat": {
+      "column": 8,
+      "row": 1
+    },
+    "separator": {
+      "column": 9,
+      "row": 1
+    },
+    "alignLeft": {
+      "column": 0,
+      "row": 2
+    },
+    "alignCenter": {
+      "column": 1,
+      "row": 2
+    },
+    "alignRight": {
+      "column": 2,
+      "row": 2
+    },
+    "alignTop": {
+      "column": 3,
+      "row": 2
+    },
+    "alignMiddle": {
+      "column": 4,
+      "row": 2
+    },
+    "alignBottom": {
+      "column": 5,
+      "row": 2
+    },
+    "wrap": {
+      "column": 6,
+      "row": 2
+    },
+    "merge": {
+      "column": 7,
+      "row": 2
+    },
+    "unmerge": {
+      "column": 8,
+      "row": 2
+    },
+    "mergeAndCenter": {
+      "column": 9,
+      "row": 2
+    },
+    "border": {
+      "column": 0,
+      "row": 3
+    },
+    "borderAll": {
+      "column": 1,
+      "row": 3
+    },
+    "borderOutside": {
+      "column": 2,
+      "row": 3
+    },
+    "borderThickOutside": {
+      "column": 3,
+      "row": 3
+    },
+    "borderTop": {
+      "column": 4,
+      "row": 3
+    },
+    "borderBottom": {
+      "column": 5,
+      "row": 3
+    },
+    "borderLeft": {
+      "column": 6,
+      "row": 3
+    },
+    "borderRight": {
+      "column": 7,
+      "row": 3
+    },
+    "borderNone": {
+      "column": 8,
+      "row": 3
+    },
+    "currency": {
+      "column": 0,
+      "row": 4
+    },
+    "percent": {
+      "column": 1,
+      "row": 4
+    },
+    "comma": {
+      "column": 2,
+      "row": 4
+    },
+    "decimalIncrease": {
+      "column": 3,
+      "row": 4
+    },
+    "decimalDecrease": {
+      "column": 4,
+      "row": 4
+    },
+    "hyperlink": {
+      "column": 5,
+      "row": 4
+    },
+    "note": {
+      "column": 6,
+      "row": 4
+    },
+    "exportCsv": {
+      "column": 7,
+      "row": 4
+    },
+    "exportXlsx": {
+      "column": 8,
+      "row": 4
+    },
+    "insert": {
+      "column": 0,
+      "row": 5
+    },
+    "delete": {
+      "column": 1,
+      "row": 5
+    },
+    "format": {
+      "column": 2,
+      "row": 5
+    },
+    "hideRows": {
+      "column": 3,
+      "row": 5
+    },
+    "unhideRows": {
+      "column": 4,
+      "row": 5
+    },
+    "hideColumns": {
+      "column": 5,
+      "row": 5
+    },
+    "unhideColumns": {
+      "column": 6,
+      "row": 5
+    },
+    "freeze": {
+      "column": 7,
+      "row": 5
+    },
+    "groupRows": {
+      "column": 8,
+      "row": 5
+    },
+    "ungroupRows": {
+      "column": 9,
+      "row": 5
+    },
+    "sortAsc": {
+      "column": 0,
+      "row": 6
+    },
+    "sortDesc": {
+      "column": 1,
+      "row": 6
+    },
+    "sortFilter": {
+      "column": 2,
+      "row": 6
+    },
+    "clearFilter": {
+      "column": 3,
+      "row": 6
+    },
+    "chart": {
+      "column": 0,
+      "row": 7
+    },
+    "chartColumn": {
+      "column": 1,
+      "row": 7
+    },
+    "chartBar": {
+      "column": 2,
+      "row": 7
+    },
+    "chartLine": {
+      "column": 3,
+      "row": 7
+    },
+    "chartArea": {
+      "column": 4,
+      "row": 7
+    },
+    "chartPie": {
+      "column": 5,
+      "row": 7
+    },
+    "chartDoughnut": {
+      "column": 6,
+      "row": 7
+    },
+    "chartScatter": {
+      "column": 7,
+      "row": 7
+    },
+    "pivotTable": {
+      "column": 8,
+      "row": 7
+    }
+  }
+}

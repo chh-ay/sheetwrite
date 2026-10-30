@@ -1,6 +1,6 @@
 ---
 title: "rebaseDocumentOperations | @sheetwrite/core"
-description: "Conservative server-ordered rebase for pending offline work."
+description: "rebaseDocumentOperations function in @sheetwrite/core: Conservative server-ordered rebase for pending offline work."
 ---
 <!-- api-export:@sheetwrite/core|.|rebaseDocumentOperations -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
@@ -17,7 +17,7 @@ operation is therefore carried forward through the local sequence: before it
 is compared with local operation k, it is moved past local operations 0..k-1.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/rebase.ts#L56"><code>packages/core/src/rebase.ts#L56</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/rebase.ts#L59"><code>packages/core/src/rebase.ts#L59</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -40,6 +40,7 @@ function rebaseDocumentOperations(
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

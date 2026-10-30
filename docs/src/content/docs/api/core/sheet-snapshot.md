@@ -1,6 +1,6 @@
 ---
 title: "SheetSnapshot | @sheetwrite/core"
-description: "Serializable complete state for one workbook sheet."
+description: "SheetSnapshot interface in @sheetwrite/core: Serializable complete state for one workbook sheet."
 ---
 <!-- api-export:@sheetwrite/core|.|SheetSnapshot -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -8,7 +8,7 @@ description: "Serializable complete state for one workbook sheet."
 Serializable complete state for one workbook sheet.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L338"><code>packages/core/src/types/document.ts#L338</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L371"><code>packages/core/src/types/document.ts#L371</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -31,10 +31,12 @@ Serializable complete state for one workbook sheet.
 <a href="#sheet-snapshot-filters"><code>filters</code></a>
 <a href="#sheet-snapshot-row-groups"><code>rowGroups</code></a>
 <a href="#sheet-snapshot-tables"><code>tables</code></a>
+<a href="#sheet-snapshot-charts"><code>charts</code></a>
+<a href="#sheet-snapshot-pivots"><code>pivots</code></a>
 <a href="#sheet-snapshot-cells"><code>cells</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>20</span>
+## Members <span class="api-count" data-pagefind-ignore>22</span>
 
 <div class="api-member-list">
 
@@ -209,6 +211,24 @@ tables?: WorkbookTable[];
 
 </details>
 
+<details class="api-member" id="sheet-snapshot-charts" data-pagefind-weight="1">
+<summary><code>charts</code></summary>
+
+```ts generated
+charts?: ChartDefinition[];
+```
+
+</details>
+
+<details class="api-member" id="sheet-snapshot-pivots" data-pagefind-weight="1">
+<summary><code>pivots</code> <span class="api-member-summary">Pivot tables anchored on this sheet.</span></summary>
+
+```ts generated
+pivots?: PivotDefinition[];
+```
+
+</details>
+
 <details class="api-member" id="sheet-snapshot-cells" data-pagefind-weight="1">
 <summary><code>cells</code></summary>
 
@@ -245,6 +265,8 @@ export interface SheetSnapshot {
   filters?: Array<[col: number, filter: ColumnFilter]>;
   rowGroups?: RowGroup[];
   tables?: WorkbookTable[];
+  charts?: ChartDefinition[];
+  pivots?: PivotDefinition[];
   cells: CellBlock[];
 }
 ```
@@ -258,6 +280,7 @@ export interface SheetSnapshot {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

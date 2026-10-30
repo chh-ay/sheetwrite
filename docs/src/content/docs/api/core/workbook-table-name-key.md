@@ -1,6 +1,6 @@
 ---
 title: "workbookTableNameKey | @sheetwrite/core"
-description: "Locale-independent key used for table and table-column collision checks."
+description: "workbookTableNameKey function in @sheetwrite/core: Locale-independent key used for table and table-column collision checks."
 ---
 <!-- api-export:@sheetwrite/core|.|workbookTableNameKey -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
@@ -8,7 +8,7 @@ description: "Locale-independent key used for table and table-column collision c
 Locale-independent key used for table and table-column collision checks.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/workbook-table.ts#L60"><code>packages/core/src/workbook-table.ts#L60</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/workbook-table.ts#L63"><code>packages/core/src/workbook-table.ts#L63</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -28,6 +28,7 @@ function workbookTableNameKey(name: string): string
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

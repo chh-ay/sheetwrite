@@ -1,12 +1,11 @@
 import { cellA1, rangeA1, shiftA1Refs } from "./a1.js";
-import { cellScalarToText, parseCellInput } from "./cell-input.js";
+import { cellDisplayText, cellScalarToText, parseCellInput } from "./cell-input.js";
 import { ContextMenu } from "./context-menu.js";
 import { CustomEditorController } from "./custom-editor.js";
 import { EditController, type EditNavigate } from "./editor.js";
 import { detectFillSeries, type FillSeries, type FillSourceCell } from "./fill-series.js";
 import type { FindBar } from "./find-bar.js";
 import type { Keymap } from "./keymap.js";
-import { formatNumber } from "./number-format.js";
 import { autofitColumnWidth, MIN_COLUMN_WIDTH, MIN_ROW_HEIGHT, resizeTargetAt } from "./resize.js";
 import type { CellRef, SelectionModel, SelRect } from "./selection.js";
 import type { SheetwriteStore } from "./store.js";
@@ -15,7 +14,14 @@ import type { CellValue } from "./types/cell.js";
 import type { CellAddress, HighlightRange, SheetId } from "./types/coordinates.js";
 import type { CommitReason, DocumentOp, Sheet, SnapshotCell } from "./types/document.js";
 import type { KeyboardOptions } from "./types/grid.js";
-import type { CellEditor, CellEditorRect, Grid, GridConfig, GridEvents } from "./types/grid.js";
+import type {
+  CellEditor,
+  CellEditorRect,
+  ContextMenuItem,
+  Grid,
+  GridConfig,
+  GridEvents,
+} from "./types/grid.js";
 import type { Theme } from "./types/render.js";
 import type { Store } from "./types/store.js";
 import type { ApplyTransactionResult } from "./types/transaction.js";
@@ -106,6 +112,8 @@ interface InteractionDependencies {
   paste: () => void;
   pasteValues: () => void;
   commit: (patches: DocumentOp[], reason: CommitReason) => ApplyTransactionResult;
+  /** Runs before a cell editor opens; hides the note card that would cover it. */
+  onEditStart: () => void;
   readOnly: () => boolean;
 }
 
@@ -162,6 +170,17 @@ export class InteractionSessions {
             this.deps.grid.actions,
             this.deps.grid,
           );
+  }
+
+  /**
+   * Open the context menu with `items` at a point, for a menu that belongs to
+   * an object, not a cell. Returns false when the host turned menus off.
+   */
+  openMenu(items: readonly ContextMenuItem[], clientX: number, clientY: number): boolean {
+    if (!this.contextMenu) return false;
+
+    this.contextMenu.open({ cell: null, clientX, clientY }, items);
+    return true;
   }
 
   private readonly onContextMenu = (e: MouseEvent): void => {
@@ -291,6 +310,7 @@ export class InteractionSessions {
     const contentTop = this.deps.contentTop();
 
     this.cancelPointer();
+    this.deps.onEditStart();
     this.cancelEditor();
     const generation = ++this.generation;
     this.editingAddress = dataAddr;
@@ -745,11 +765,14 @@ export class InteractionSessions {
     const texts: string[] = [];
     for (let i = 0; i < values.length; i++) {
       const value = values[i] ?? null;
-      if (value === null) texts.push("");
-      else if (typeof value === "number")
-        texts.push(formatNumber(value, column.numberFormat, column.numberLocale));
-      else if (typeof value === "boolean") texts.push(value ? "TRUE" : "FALSE");
-      else texts.push(value);
+      const cellFormat = view.styles[view.styleIds[i] ?? 0]?.numberFormat;
+      texts.push(
+        cellDisplayText(
+          value,
+          cellFormat ?? column.cellStyle?.numberFormat ?? column.numberFormat,
+          column.numberLocale,
+        ),
+      );
     }
 
     const width = autofitColumnWidth((text) => this.measureText(text), texts, column.header);
@@ -850,6 +873,9 @@ export class InteractionSessions {
           break;
         case "clearContents":
           this.deps.clearSelection();
+          break;
+        case "editNote":
+          this.deps.grid.actions.editNote();
           break;
       }
       return;

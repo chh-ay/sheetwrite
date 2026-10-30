@@ -129,6 +129,16 @@ export interface KnownDivergence {
   alternate: ConformanceResult;
 }
 
+/**
+ * Iterative calculation a circular-reference case turns on. Producers apply it
+ * to the whole capture workbook, so every case that sets it uses the same value.
+ */
+export interface CaseCalculation {
+  iterate: true;
+  maxIterations: number;
+  maxChange: number;
+}
+
 export interface ConformanceCase {
   id: string;
   area: "formula" | "mutation" | "workbook" | "xlsx";
@@ -154,6 +164,7 @@ export interface ConformanceCase {
   formula?: string;
   target?: string;
   operations?: Array<Record<string, unknown>>;
+  calculation?: CaseCalculation;
   expected: ConformanceResult;
   observations: ConformanceObservation[];
   knownDivergence?: KnownDivergence;

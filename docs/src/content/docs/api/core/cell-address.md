@@ -1,6 +1,6 @@
 ---
 title: "CellAddress | @sheetwrite/core"
-description: "Zero-based address of one cell on a stable sheet ID."
+description: "CellAddress interface in @sheetwrite/core: Zero-based address of one cell on a stable sheet ID."
 ---
 <!-- api-export:@sheetwrite/core|.|CellAddress -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -65,6 +65,7 @@ export interface CellAddress {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
@@ -87,6 +88,6 @@ export interface CellAddress {
 <li><a href="/docs/api/core/grid-events/"><code>GridEvents</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/hyperlink-at/"><code>hyperlinkAt</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/mutation-issue/"><code>MutationIssue</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li class="api-consumer-more">and 12 more</li>
+<li class="api-consumer-more">and 13 more</li>
 </ul>
 </div>

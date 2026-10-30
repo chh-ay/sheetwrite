@@ -1,13 +1,13 @@
 ---
 title: "ContextMenuItem | @sheetwrite/core"
-description: "Built-in, separator, or custom callback row in the right-click menu."
+description: "ContextMenuItem interface in @sheetwrite/core: Built-in, separator, or custom callback row in the right-click menu."
 ---
 <!-- api-export:@sheetwrite/core|.|ContextMenuItem -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Built-in, separator, or custom callback row in the right-click menu.
 
-### Examples
+## Examples
 
 ```ts compile
 import type { ContextMenuItem, GridConfig } from "@sheetwrite/core";
@@ -20,13 +20,13 @@ const total: ContextMenuItem = {
 const config: GridConfig = { contextMenu: [total, { action: "separator" }, { action: "copy" }] };
 ```
 
-### See also
+## See also
 
 - [ContextMenuItems](/docs/api/core/context-menu-items/)
 - [GridConfig.contextMenu](/docs/api/core/grid-config/#grid-config-context-menu)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L307"><code>packages/core/src/types/grid.ts#L307</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L424"><code>packages/core/src/types/grid.ts#L424</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -37,9 +37,11 @@ const config: GridConfig = { contextMenu: [total, { action: "separator" }, { act
 <a href="#context-menu-item-shortcut"><code>shortcut</code></a>
 <a href="#context-menu-item-visible"><code>visible</code></a>
 <a href="#context-menu-item-disabled"><code>disabled</code></a>
+<a href="#context-menu-item-icon"><code>icon</code></a>
+<a href="#context-menu-item-items"><code>items</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>7</span>
+## Members <span class="api-count" data-pagefind-ignore>9</span>
 
 <div class="api-member-list">
 
@@ -113,6 +115,25 @@ disabled?: boolean | ((context: ContextMenuContext) => boolean);
 ```
 
 </details>
+
+<details class="api-member" id="context-menu-item-icon" data-pagefind-weight="1">
+<summary><code>icon</code> <span class="api-member-summary">Glyph shown before the label.</span></summary>
+
+```ts generated
+icon?: IconName;
+```
+
+<p class="api-member-doc">Glyph shown before the label. Built-in actions have one by default; `config.icons` overrides apply.</p>
+</details>
+
+<details class="api-member" id="context-menu-item-items" data-pagefind-weight="1">
+<summary><code>items</code> <span class="api-member-summary">Rows of a submenu. The row opens it on click, hover or the Right Arrow key and runs nothing itself.</span></summary>
+
+```ts generated
+items?: readonly ContextMenuItem[];
+```
+
+</details>
 </div>
 
 ## Declaration
@@ -129,6 +150,8 @@ export interface ContextMenuItem {
   shortcut?: KeyboardAction | KeyShortcut;
   visible?: boolean | ((context: ContextMenuContext) => boolean);
   disabled?: boolean | ((context: ContextMenuContext) => boolean);
+  icon?: IconName;
+  items?: readonly ContextMenuItem[];
 }
 ```
 
@@ -141,6 +164,7 @@ export interface ContextMenuItem {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

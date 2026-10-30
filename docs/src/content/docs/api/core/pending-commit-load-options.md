@@ -1,6 +1,6 @@
 ---
 title: "PendingCommitLoadOptions | @sheetwrite/core"
-description: "Mandatory bounds for one durable pending-commit restore."
+description: "PendingCommitLoadOptions interface in @sheetwrite/core: Mandatory bounds for one durable pending-commit restore."
 ---
 <!-- api-export:@sheetwrite/core|.|PendingCommitLoadOptions -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -8,7 +8,7 @@ description: "Mandatory bounds for one durable pending-commit restore."
 Mandatory bounds for one durable pending-commit restore.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L40"><code>packages/core/src/sync.ts#L40</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L41"><code>packages/core/src/sync.ts#L41</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>
@@ -75,6 +75,7 @@ export interface PendingCommitLoadOptions {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

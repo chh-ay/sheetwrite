@@ -83,6 +83,7 @@ const entryRoles = {
   "vue.html": "vue-initial",
   "worker.html": "worker-loader-initial",
   "xlsx.html": "xlsx-loader-initial",
+  "charts.html": "charts-loader-initial",
 };
 const defaultInitialChunks = new Set();
 const staticGraphsByHtml = new Map();
@@ -95,20 +96,64 @@ for (const [html, role] of Object.entries(entryRoles)) {
   }
 }
 
-const xlsxStatic = staticGraph(findEntry("xlsx.html"));
-const dynamicPending = [];
-for (const key of xlsxStatic) dynamicPending.push(...(manifest[key].dynamicImports ?? []));
-const dynamicVisited = new Set();
-while (dynamicPending.length > 0) {
-  const rootKey = dynamicPending.pop();
-  for (const key of staticGraph(rootKey)) {
-    if (dynamicVisited.has(key)) continue;
-    dynamicVisited.add(key);
-    if (!defaultInitialChunks.has(key)) addChunk(key, "xlsx-async");
-    dynamicPending.push(...(manifest[key].dynamicImports ?? []));
+/** Classify every chunk reachable through the dynamic imports of one lazy-loader entry. */
+function classifyLazyChunks(html, role) {
+  const pending = [];
+  for (const key of staticGraph(findEntry(html)))
+    pending.push(...(manifest[key].dynamicImports ?? []));
+  const visited = new Set();
+  while (pending.length > 0) {
+    const rootKey = pending.pop();
+    for (const key of staticGraph(rootKey)) {
+      if (visited.has(key)) continue;
+      visited.add(key);
+      if (!defaultInitialChunks.has(key)) addChunk(key, role);
+      pending.push(...(manifest[key].dynamicImports ?? []));
+    }
+  }
+  return visited;
+}
+
+const xlsxChunks = classifyLazyChunks("xlsx.html", "xlsx-async");
+if (xlsxChunks.size === 0) throw new Error("Vite emitted no lazy XLSX chunk");
+const chartsChunks = classifyLazyChunks("charts.html", "charts-async");
+if (chartsChunks.size === 0) throw new Error("Vite emitted no lazy charts chunk");
+// Chunks already classified as optional-package code; the chrome walk below skips them.
+const optionalPackageChunks = new Set([...xlsxChunks, ...chartsChunks]);
+
+// Minifiers rename `createChartViewCache`, but keep this error text from the
+// charts view cache. It must be in the lazy charts chunk and in no initial chunk.
+const CHARTS_CODE_MARKER = "chart view cache was disposed";
+const chunkSource = (key) => readFile(resolve(root, manifest[key].file), "utf8");
+const chartsSources = await Promise.all([...chartsChunks].map(chunkSource));
+if (!chartsSources.some((source) => source.includes(CHARTS_CODE_MARKER))) {
+  throw new Error("The lazy charts chunk does not contain the charts view cache");
+}
+for (const key of defaultInitialChunks) {
+  if ((await chunkSource(key)).includes(CHARTS_CODE_MARKER)) {
+    throw new Error(`Charts code is in the initial chunk ${manifest[key].file}`);
   }
 }
-if (dynamicVisited.size === 0) throw new Error("Vite emitted no lazy XLSX chunk");
+
+// Opt-in chrome (the ribbon) loads lazily from the default entries. It must
+// never join an initial graph, or every app would download it again.
+const chromePending = [];
+for (const key of defaultInitialChunks) chromePending.push(...(manifest[key].dynamicImports ?? []));
+const chromeVisited = new Set();
+while (chromePending.length > 0) {
+  for (const key of staticGraph(chromePending.pop())) {
+    if (chromeVisited.has(key) || optionalPackageChunks.has(key) || defaultInitialChunks.has(key))
+      continue;
+    chromeVisited.add(key);
+    addChunk(key, "chrome-async");
+    chromePending.push(...(manifest[key].dynamicImports ?? []));
+  }
+}
+const isRibbonModule = (key) => /(?:^|\/)ribbon\/ribbon\.js$/.test(manifest[key].src ?? key);
+if (![...chromeVisited].some(isRibbonModule)) throw new Error("Vite emitted no lazy ribbon chunk");
+if ([...defaultInitialChunks].some(isRibbonModule)) {
+  throw new Error("The ribbon is in an initial chunk; it must load lazily");
+}
 
 const emitted = await walk(root);
 const publicFiles = emitted
@@ -119,6 +164,18 @@ const workerFiles = publicFiles.filter((path) => /(?:^|\/)recipe-worker-[^/]*\.j
 if (workerFiles.length !== 1)
   throw new Error(`Expected one Vite Worker chunk, got ${workerFiles.length}`);
 addFile(workerFiles[0], "worker-async");
+
+// Core's own default worker (`renderer: "worker"` with no `workerUrl`) must be
+// bundled, not copied: a copied worker keeps relative imports that do not
+// exist beside it, so it fails to load and the grid falls back.
+const defaultWorkers = publicFiles.filter((path) => /(?:^|\/)assets\/worker-[^/]*\.js$/.test(path));
+if (defaultWorkers.length !== 1) {
+  throw new Error(`Expected one bundled core default worker, got ${defaultWorkers.length}`);
+}
+const defaultWorker = await readFile(resolve(root, defaultWorkers[0]), "utf8");
+if (/\bfrom\s*["']\.{1,2}\/|\bimport\s*\(\s*["']\.{1,2}\//.test(defaultWorker)) {
+  throw new Error(`Core default worker ${defaultWorkers[0]} was copied, not bundled`);
+}
 const wasmFiles = publicFiles.filter((path) => path.endsWith(".wasm"));
 if (wasmFiles.length !== 1)
   throw new Error(`Expected one Vite WASM asset, got ${wasmFiles.length}`);

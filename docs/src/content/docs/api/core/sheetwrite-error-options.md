@@ -1,6 +1,6 @@
 ---
 title: "SheetwriteErrorOptions | @sheetwrite/core"
-description: "Optional cause, diagnostic context, and boundary-known retryability."
+description: "SheetwriteErrorOptions interface in @sheetwrite/core: Optional cause, diagnostic context, and boundary-known retryability."
 ---
 <!-- api-export:@sheetwrite/core|.|SheetwriteErrorOptions -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -8,7 +8,7 @@ description: "Optional cause, diagnostic context, and boundary-known retryabilit
 Optional cause, diagnostic context, and boundary-known retryability.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/errors.ts#L112"><code>packages/core/src/errors.ts#L112</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/errors.ts#L113"><code>packages/core/src/errors.ts#L113</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>
@@ -55,6 +55,7 @@ export interface SheetwriteErrorOptions extends ErrorOptions {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://sheetwrite.vercel.app/schemas/conformance-v1.json",
+  "$id": "https://www.sheetwrite.dev/schemas/conformance-v1.json",
   "title": "Sheetwrite original-evidence compatibility test set",
   "type": "object",
   "required": ["protocol", "license", "cases"],
@@ -201,6 +201,16 @@
           }
         },
         "numberFormat": { "type": "string", "minLength": 1 },
+        "calculation": {
+          "type": "object",
+          "required": ["iterate", "maxIterations", "maxChange"],
+          "additionalProperties": false,
+          "properties": {
+            "iterate": { "const": true },
+            "maxIterations": { "type": "integer", "minimum": 1, "maximum": 32767 },
+            "maxChange": { "type": "number", "minimum": 0 }
+          }
+        },
         "formula": { "type": "string", "pattern": "^=" },
         "target": { "type": "string", "pattern": "^[A-Z]+[1-9][0-9]*$" },
         "operations": { "type": "array", "minItems": 1, "items": { "type": "object" } },

@@ -1,6 +1,6 @@
 ---
 title: "DataSourceCapabilities | @sheetwrite/core"
-description: "Declares whether a source can load only the requested column runs."
+description: "DataSourceCapabilities interface in @sheetwrite/core: Declares whether a source can load only the requested column runs."
 ---
 <!-- api-export:@sheetwrite/core|.|DataSourceCapabilities -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -55,6 +55,7 @@ export interface DataSourceCapabilities {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

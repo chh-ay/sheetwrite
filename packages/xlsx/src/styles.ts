@@ -1,4 +1,5 @@
-import type { CellBorder, CellStyle } from "@sheetwrite/core";
+import type { CellBorder, CellStyle, CellVerticalAlign } from "@sheetwrite/core";
+import { isCellFontFamily } from "@sheetwrite/core";
 
 import { assertResource, emitWarning, type XlsxCodecContext } from "./resources.js";
 import {
@@ -124,6 +125,7 @@ interface FontRecord {
   readonly underline?: boolean;
   readonly strikethrough?: boolean;
   readonly fontSize?: number;
+  readonly fontFamily?: string;
   readonly color?: string;
 }
 
@@ -318,9 +320,11 @@ function canonicalStyle(style: CellStyle | undefined): CellStyle | undefined {
     ...(style.underline !== undefined ? { underline: style.underline } : {}),
     ...(style.strikethrough !== undefined ? { strikethrough: style.strikethrough } : {}),
     ...(style.fontSize !== undefined ? { fontSize: style.fontSize } : {}),
+    ...(style.fontFamily !== undefined ? { fontFamily: style.fontFamily } : {}),
     ...(style.color !== undefined ? { color: style.color } : {}),
     ...(style.backgroundColor !== undefined ? { backgroundColor: style.backgroundColor } : {}),
     ...(style.align !== undefined ? { align: style.align } : {}),
+    ...(style.verticalAlign !== undefined ? { verticalAlign: style.verticalAlign } : {}),
     ...(style.wrap !== undefined ? { wrap: style.wrap } : {}),
     ...(orderedBorder && Object.keys(orderedBorder).length > 0 ? { border: orderedBorder } : {}),
   };
@@ -374,15 +378,65 @@ function dateNumberFormat(format: string | undefined): boolean {
   return hasElapsedTime || /[ymdhis]/.test(stripped);
 }
 
-function fontXml(font: FontRecord): string {
+/** XLSX spells the centered vertical alignment `center`; cell styles say `middle`. */
+const XLSX_VERTICAL: Readonly<Record<CellVerticalAlign, string>> = {
+  top: "top",
+  middle: "center",
+  bottom: "bottom",
+};
+
+function hasAlignment(style: CellStyle): boolean {
+  return style.align !== undefined || style.verticalAlign !== undefined || style.wrap !== undefined;
+}
+
+function alignmentXml(style: CellStyle | undefined, differential = false): string {
+  // Ordinary cells default to center in Sheetwrite, but bottom in OOXML.
+  // A differential style instead leaves unspecified fields untouched.
+  const vertical = differential
+    ? style?.verticalAlign && XLSX_VERTICAL[style.verticalAlign]
+    : style?.verticalAlign === "bottom"
+      ? undefined
+      : XLSX_VERTICAL[style?.verticalAlign ?? "middle"];
+  return `<alignment${style?.align ? ` horizontal="${style.align}"` : ""}${vertical ? ` vertical="${vertical}"` : ""}${style?.wrap ? ' wrapText="1"' : ""}/>`;
+}
+
+/** Alignment fields of a cell or differential style from its `<alignment>` element. */
+function importedAlignment(alignment: XmlElement | undefined, differential = false): CellStyle {
+  const style: CellStyle = differential ? {} : { verticalAlign: "bottom" };
+  if (!alignment) return style;
+  const horizontal = xmlAttribute(alignment, "horizontal");
+  if (horizontal === "left" || horizontal === "center" || horizontal === "right") {
+    style.align = horizontal;
+  }
+  const vertical = xmlAttribute(alignment, "vertical");
+  if (vertical === "top" || vertical === "bottom") style.verticalAlign = vertical;
+  else if (vertical === "center") {
+    if (differential) style.verticalAlign = "middle";
+    else delete style.verticalAlign;
+  }
+  if (xmlBoolean(xmlAttribute(alignment, "wrapText"))) style.wrap = true;
+  return style;
+}
+// Column widths use the seven-pixel maximum digit width of Calibri 11pt.
+// An unnamed font lets producers choose a different metric and resize columns.
+const DEFAULT_CELL_FONT: FontRecord = {
+  fontFamily: "Calibri",
+  fontSize: (11 * 96) / 72,
+};
+
+function fontXml(font: FontRecord, defaults?: FontRecord): string {
   let xml = "<font>";
   if (font.bold) xml += "<b/>";
   if (font.italic) xml += "<i/>";
   if (font.underline) xml += "<u/>";
   if (font.strikethrough) xml += "<strike/>";
-  if (font.fontSize !== undefined) xml += `<sz val="${(font.fontSize * 72) / 96}"/>`;
+  const fontSize = font.fontSize ?? defaults?.fontSize;
+  if (fontSize !== undefined) xml += `<sz val="${(fontSize * 72) / 96}"/>`;
   const color = argb(font.color);
   if (color) xml += `<color rgb="${color}"/>`;
+  // Validated cell families need no escaping; XML-escape anyway as the boundary rule.
+  const fontFamily = font.fontFamily ?? defaults?.fontFamily;
+  if (fontFamily !== undefined) xml += `<name val="${escapeXml(fontFamily)}"/>`;
   return `${xml}</font>`;
 }
 
@@ -400,6 +454,7 @@ function styleFont(style: CellStyle | undefined): FontRecord {
     ...(style?.underline ? { underline: true } : {}),
     ...(style?.strikethrough ? { strikethrough: true } : {}),
     ...(style?.fontSize !== undefined ? { fontSize: style.fontSize } : {}),
+    ...(style?.fontFamily !== undefined ? { fontFamily: style.fontFamily } : {}),
     ...(argb(style?.color) ? { color: style!.color } : {}),
   };
 }
@@ -425,9 +480,7 @@ function differentialXml(style: CellStyle): string {
   if (Object.keys(border).length > 0) {
     xml += `<border>${borderSideXml("left", border.left)}${borderSideXml("right", border.right)}${borderSideXml("top", border.top)}${borderSideXml("bottom", border.bottom)}</border>`;
   }
-  if (style.align !== undefined || style.wrap !== undefined) {
-    xml += `<alignment${style.align ? ` horizontal="${style.align}"` : ""}${style.wrap ? ' wrapText="1"' : ""}/>`;
-  }
+  if (hasAlignment(style)) xml += alignmentXml(style, true);
   return `${xml}</dxf>`;
 }
 
@@ -563,7 +616,7 @@ export class StylesRegistry {
       xml.append("</numFmts>");
     }
     xml.append(`<fonts count="${fonts.length}">`);
-    for (const font of fonts) xml.append(fontXml(font));
+    for (const font of fonts) xml.append(fontXml(font, DEFAULT_CELL_FONT));
     xml.append("</fonts>");
     xml.append(
       `<fills count="${fills.length}"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>`,
@@ -583,19 +636,16 @@ export class StylesRegistry {
     }
     xml.append("</borders>");
     xml.append(
-      '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>',
+      '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" applyAlignment="1"><alignment vertical="center"/></xf></cellStyleXfs>',
     );
     xml.append(`<cellXfs count="${xfs.length}">`);
     for (const xf of xfs) {
       const alignment = xf.alignment;
-      const hasAlignment = alignment?.align !== undefined || alignment?.wrap !== undefined;
+      // Include xf0: otherwise unstyled Sheetwrite cells render bottom-aligned.
       xml.append(
-        `<xf numFmtId="${xf.numFmtId}" fontId="${xf.fontId}" fillId="${xf.fillId}" borderId="${xf.borderId}" xfId="0"${xf.numFmtId ? ' applyNumberFormat="1"' : ""}${xf.fontId ? ' applyFont="1"' : ""}${xf.fillId > 1 ? ' applyFill="1"' : ""}${xf.borderId ? ' applyBorder="1"' : ""}${hasAlignment ? ' applyAlignment="1"' : ""}>`,
+        `<xf numFmtId="${xf.numFmtId}" fontId="${xf.fontId}" fillId="${xf.fillId}" borderId="${xf.borderId}" xfId="0"${xf.numFmtId ? ' applyNumberFormat="1"' : ""}${xf.fontId ? ' applyFont="1"' : ""}${xf.fillId > 1 ? ' applyFill="1"' : ""}${xf.borderId ? ' applyBorder="1"' : ""} applyAlignment="1">`,
       );
-      if (hasAlignment)
-        xml.append(
-          `<alignment${alignment?.align ? ` horizontal="${alignment.align}"` : ""}${alignment?.wrap ? ' wrapText="1"' : ""}/>`,
-        );
+      xml.append(alignmentXml(alignment));
       xml.append("</xf>");
     }
     xml.append("</cellXfs>");
@@ -700,11 +750,7 @@ function parsedDifferentialStyle(
     }
   }
   const alignment = xmlChild(dxf, "alignment");
-  const horizontal = alignment ? xmlAttribute(alignment, "horizontal") : undefined;
-  if (horizontal === "left" || horizontal === "center" || horizontal === "right") {
-    style.align = horizontal;
-  }
-  if (alignment && xmlBoolean(xmlAttribute(alignment, "wrapText"))) style.wrap = true;
+  Object.assign(style, importedAlignment(alignment, true));
   return style;
 }
 
@@ -720,7 +766,7 @@ export class ParsedStyles {
     themePart = "xl/theme/theme1.xml",
   ) {
     if (!root) {
-      this.#styles = [{ date: false }];
+      this.#styles = [{ date: false, style: { verticalAlign: "bottom" } }];
       this.#differentials = [];
       return;
     }
@@ -747,6 +793,17 @@ export class ParsedStyles {
       xmlChild(root, "fonts") ?? { attributes: {}, children: [], name: "", text: "" },
       "font",
     );
+    // Every XLSX font names a family and size, usually the workbook default.
+    // Only a different family or size becomes a cell style, so ordinary text
+    // keeps the grid's theme font.
+    const defaultNameElement = fonts[0] ? xmlChild(fonts[0], "name") : undefined;
+    const defaultFontName = defaultNameElement
+      ? xmlAttribute(defaultNameElement, "val")
+      : undefined;
+    const defaultSizeElement = fonts[0] ? xmlChild(fonts[0], "sz") : undefined;
+    const defaultFontSize = defaultSizeElement
+      ? Number(xmlAttribute(defaultSizeElement, "val"))
+      : undefined;
     const fills = xmlChildren(
       xmlChild(root, "fills") ?? { attributes: {}, children: [], name: "", text: "" },
       "fill",
@@ -824,9 +881,25 @@ export class ParsedStyles {
           "val",
         ),
       );
-      if (Number.isFinite(size) && size > 0) style.fontSize = (size * 96) / 72;
+      if (Number.isFinite(size) && size > 0 && size !== defaultFontSize) {
+        style.fontSize = (size * 96) / 72;
+      }
       const fontColor = resolvedColor(xmlChild(font, "color"), theme, context, colorWarnings, part);
       if (fontColor) style.color = fontColor;
+      const nameElement = xmlChild(font, "name");
+      const fontName = nameElement ? xmlAttribute(nameElement, "val") : undefined;
+      if (fontName !== undefined && fontName !== defaultFontName) {
+        if (isCellFontFamily(fontName)) {
+          style.fontFamily = fontName;
+        } else if (!colorWarnings.has(`font-name:${fontId}`)) {
+          colorWarnings.add(`font-name:${fontId}`);
+          emitWarning(context, {
+            code: "format-loss",
+            message: `Font "${fontName.slice(0, 64)}" cannot be represented and was dropped`,
+            part,
+          });
+        }
+      }
 
       if (fillId > 1) {
         const fill = fills[fillId]!;
@@ -887,12 +960,7 @@ export class ParsedStyles {
         if (parsed.bottom) style.border.bottom = parsed.bottom;
         if (parsed.left) style.border.left = parsed.left;
       }
-      const alignment = xmlChild(xf, "alignment");
-      const horizontal = alignment ? xmlAttribute(alignment, "horizontal") : undefined;
-      if (horizontal === "left" || horizontal === "center" || horizontal === "right") {
-        style.align = horizontal;
-      }
-      if (alignment && xmlBoolean(xmlAttribute(alignment, "wrapText"))) style.wrap = true;
+      Object.assign(style, importedAlignment(xmlChild(xf, "alignment")));
       const numberFormat = formats.get(numFmtId);
       return {
         ...(Object.keys(style).length > 0 ? { style } : {}),
@@ -903,7 +971,9 @@ export class ParsedStyles {
     this.#differentials = differentials.map((dxf) =>
       parsedDifferentialStyle(dxf, theme, context, colorWarnings, part),
     );
-    if (this.#styles.length === 0) this.#styles.push({ date: false });
+    if (this.#styles.length === 0) {
+      this.#styles.push({ date: false, style: { verticalAlign: "bottom" } });
+    }
   }
 
   at(index: number): ParsedCellStyle {

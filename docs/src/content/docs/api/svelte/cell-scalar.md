@@ -1,6 +1,6 @@
 ---
 title: "CellScalar | @sheetwrite/svelte"
-description: "A scalar that can be displayed directly."
+description: "CellScalar type in @sheetwrite/svelte: A scalar that can be displayed directly."
 ---
 <!-- api-export:@sheetwrite/svelte|.|CellScalar -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="type">type</span></div>
@@ -8,7 +8,7 @@ description: "A scalar that can be displayed directly."
 A scalar that can be displayed directly.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/types/cell.d.ts#L97"><code>packages/core/dist/types/cell.d.ts#L97</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/types/cell.d.ts#L112"><code>packages/core/dist/types/cell.d.ts#L112</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -45,6 +45,6 @@ export type CellScalar = string | number | boolean | null;
 <li><a href="/docs/api/core/data-validation-condition/"><code>DataValidationCondition</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/packed-cell-block/"><code>PackedCellBlock</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li class="api-consumer-more">and 34 more</li>
+<li class="api-consumer-more">and 37 more</li>
 </ul>
 </div>

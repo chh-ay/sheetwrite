@@ -1,6 +1,6 @@
 ---
 title: "RowBridgeId | @sheetwrite/svelte"
-description: "A stable host identity for one data-space row."
+description: "RowBridgeId type in @sheetwrite/svelte: A stable host identity for one data-space row."
 ---
 <!-- api-export:@sheetwrite/svelte|.|RowBridgeId -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="type">type</span></div>

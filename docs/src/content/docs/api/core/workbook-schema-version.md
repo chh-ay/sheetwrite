@@ -1,6 +1,6 @@
 ---
 title: "WORKBOOK_SCHEMA_VERSION | @sheetwrite/core"
-description: "Current workbook snapshot schema version accepted by Sheetwrite."
+description: "WORKBOOK_SCHEMA_VERSION variable in @sheetwrite/core: Current workbook snapshot schema version accepted by Sheetwrite."
 ---
 <!-- api-export:@sheetwrite/core|.|WORKBOOK_SCHEMA_VERSION -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="variable">variable</span></div>
@@ -8,7 +8,7 @@ description: "Current workbook snapshot schema version accepted by Sheetwrite."
 Current workbook snapshot schema version accepted by Sheetwrite.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L33"><code>packages/core/src/document-protocol.ts#L33</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L54"><code>packages/core/src/document-protocol.ts#L54</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -28,6 +28,7 @@ const WORKBOOK_SCHEMA_VERSION: 1
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

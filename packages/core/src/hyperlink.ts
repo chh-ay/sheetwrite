@@ -1,6 +1,13 @@
+import { isCellFontFamily, isCellVerticalAlign } from "./cell-style-fields.js";
 import { SheetwriteError } from "./errors.js";
+import {
+  dataProperties,
+  hasControlCharacters,
+  NUL_CHARACTER,
+  sanitizeRange,
+} from "./plain-data.js";
 import type { CellBorder, CellHyperlink, CellStyle, HyperlinkTarget } from "./types/cell.js";
-import type { CellAddress, Range } from "./types/coordinates.js";
+import type { CellAddress } from "./types/coordinates.js";
 import type { Workbook } from "./types/document.js";
 
 /** Renderer/codec ceiling for one sheet's hyperlink metadata. */
@@ -13,15 +20,6 @@ export const MAX_HYPERLINK_TARGET_LENGTH = 2_048;
 export const MAX_HYPERLINK_DISPLAY_LENGTH = 32_767;
 
 const ENCODED_CONTROL_CHARACTERS = /%(?:0[0-9a-f]|1[0-9a-f]|7f)/iu;
-const NUL_CHARACTER = String.fromCharCode(0);
-
-function hasControlCharacters(value: string): boolean {
-  for (let index = 0; index < value.length; index += 1) {
-    const code = value.charCodeAt(index);
-    if (code <= 0x1f || code === 0x7f) return true;
-  }
-  return false;
-}
 
 const STYLE_KEYS = new Set([
   "bold",
@@ -29,9 +27,11 @@ const STYLE_KEYS = new Set([
   "underline",
   "strikethrough",
   "fontSize",
+  "fontFamily",
   "color",
   "backgroundColor",
   "align",
+  "verticalAlign",
   "wrap",
   "border",
 ]);
@@ -39,31 +39,6 @@ const BORDER_SIDES = new Set(["all", "top", "right", "bottom", "left"]);
 const BORDER_KEYS = new Set(["color", "width", "style"]);
 const HYPERLINK_KEYS = new Set(["id", "range", "target", "display", "style"]);
 const TARGET_KEYS = new Set(["kind", "url", "range"]);
-const RANGE_KEYS = new Set(["sheet", "start", "end"]);
-const COORDINATE_KEYS = new Set(["row", "col"]);
-
-function dataProperties(
-  value: unknown,
-  allowed: ReadonlySet<string>,
-): Record<string, unknown> | null {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
-  const properties: Record<string, unknown> = Object.create(null);
-  let count = 0;
-  try {
-    const prototype = Object.getPrototypeOf(value);
-    if (prototype !== Object.prototype && prototype !== null) return null;
-    for (const key in value) {
-      if (!Object.hasOwn(value, key) || !allowed.has(key) || ++count > allowed.size) return null;
-      const descriptor = Object.getOwnPropertyDescriptor(value, key);
-      if (!descriptor || !("value" in descriptor)) return null;
-      properties[key] = descriptor.value;
-    }
-    if (Object.getOwnPropertySymbols(value).length > 0) return null;
-    return properties;
-  } catch {
-    return null;
-  }
-}
 
 /** Validate, but never activate or fetch, an external hyperlink target. */
 export function isSafeExternalHyperlink(url: string): boolean {
@@ -103,33 +78,6 @@ export function isValidHyperlinkId(id: string): boolean {
     id === id.trim() &&
     !hasControlCharacters(id)
   );
-}
-
-function validCoordinate(value: unknown): value is number {
-  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
-}
-
-function sanitizeRange(value: unknown): Range | null {
-  const range = dataProperties(value, RANGE_KEYS);
-  const start = dataProperties(range?.start, COORDINATE_KEYS);
-  const end = dataProperties(range?.end, COORDINATE_KEYS);
-  if (
-    typeof range?.sheet !== "string" ||
-    range.sheet.length === 0 ||
-    !start ||
-    !end ||
-    !validCoordinate(start.row) ||
-    !validCoordinate(start.col) ||
-    !validCoordinate(end.row) ||
-    !validCoordinate(end.col)
-  ) {
-    return null;
-  }
-  return {
-    sheet: range.sheet,
-    start: { row: Math.min(start.row, end.row), col: Math.min(start.col, end.col) },
-    end: { row: Math.max(start.row, end.row), col: Math.max(start.col, end.col) },
-  };
 }
 
 function sanitizeColor(value: unknown): string | undefined | null {
@@ -200,6 +148,14 @@ export function sanitizeHyperlinkStyle(value: unknown): CellStyle | null {
     return null;
   }
   if (style.align !== undefined) result.align = style.align;
+  if (style.fontFamily !== undefined) {
+    if (typeof style.fontFamily !== "string" || !isCellFontFamily(style.fontFamily)) return null;
+    result.fontFamily = style.fontFamily;
+  }
+  if (style.verticalAlign !== undefined) {
+    if (!isCellVerticalAlign(style.verticalAlign)) return null;
+    result.verticalAlign = style.verticalAlign;
+  }
   if (style.border !== undefined) {
     const borders = dataProperties(style.border, BORDER_SIDES);
     if (!borders) return null;

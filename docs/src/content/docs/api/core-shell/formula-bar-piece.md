@@ -1,6 +1,6 @@
 ---
 title: "FormulaBarPiece | @sheetwrite/core/shell"
-description: "A formula bar piece; setReadOnly blocks commits without unmounting."
+description: "FormulaBarPiece interface in @sheetwrite/core/shell: A formula bar piece; setReadOnly blocks commits without unmounting."
 ---
 <!-- api-export:@sheetwrite/core|./shell|FormulaBarPiece -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-shell/">@sheetwrite/core/shell</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -8,7 +8,7 @@ description: "A formula bar piece; setReadOnly blocks commits without unmounting
 A formula bar piece; `setReadOnly` blocks commits without unmounting.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/formula-controls.ts#L122"><code>packages/core/src/shell/formula-controls.ts#L122</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/formula-controls.ts#L138"><code>packages/core/src/shell/formula-controls.ts#L138</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>
@@ -65,6 +65,7 @@ export interface FormulaBarPiece {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

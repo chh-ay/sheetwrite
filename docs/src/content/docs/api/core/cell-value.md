@@ -1,6 +1,6 @@
 ---
 title: "CellValue | @sheetwrite/core"
-description: "A cell's persisted input: a literal, a cross-reference, or a formula."
+description: "CellValue type in @sheetwrite/core: A cell's persisted input: a literal, a cross-reference, or a formula."
 ---
 <!-- api-export:@sheetwrite/core|.|CellValue -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
@@ -10,7 +10,7 @@ References resolve through the store's reference graph; formulas resolve in
 the WASM calculation engine.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/cell.ts#L101"><code>packages/core/src/types/cell.ts#L101</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/cell.ts#L117"><code>packages/core/src/types/cell.ts#L117</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>3</span>
@@ -69,6 +69,7 @@ export type CellValue =
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

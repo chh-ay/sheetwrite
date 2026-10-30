@@ -1,6 +1,6 @@
 ---
 title: "parseDateInput | @sheetwrite/core"
-description: "Parse a user-typed date string into a serial, or null when it is not a date."
+description: "parseDateInput function in @sheetwrite/core: Parse a user-typed date string into a serial, or null when it is not a date."
 ---
 <!-- api-export:@sheetwrite/core|.|parseDateInput -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
@@ -40,6 +40,7 @@ function parseDateInput(raw: string): number | null
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

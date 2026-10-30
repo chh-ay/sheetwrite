@@ -129,7 +129,9 @@ function richSnapshot(): WorkbookSnapshot {
 
 describe("snapshot persistence boundary", () => {
   it("round-trips a rich workbook deterministically without hydration events", () => {
-    const store = SheetwriteStore.fromSnapshot(JSON.parse(JSON.stringify(richSnapshot())));
+    const source = richSnapshot();
+    source.workbook.calculation = { iterate: true, maxIterations: 50, maxChange: 0.01 };
+    const store = SheetwriteStore.fromSnapshot(JSON.parse(JSON.stringify(source)));
 
     expect(store.getWorkbook().activeSheet).toBe("summary");
     expect(store.getWorkbook().sheets.map((sheet) => sheet.id)).toEqual(["source", "summary"]);
@@ -156,9 +158,26 @@ describe("snapshot persistence boundary", () => {
       merges: [{ r0: 1, c0: 0, r1: 1, c1: 1 }],
       rowGroups: [{ start: 2, end: 3, collapsed: true }],
     });
+    expect(first.workbook.calculation).toEqual({
+      iterate: true,
+      maxIterations: 50,
+      maxChange: 0.01,
+    });
 
     const restored = SheetwriteStore.fromSnapshot(JSON.parse(bytes));
     expect(JSON.stringify(restored.exportSnapshot())).toBe(bytes);
+
+    // Back at the defaults, the field disappears so such snapshots stay byte-identical.
+    restored.applyTransaction({
+      patches: [
+        {
+          op: "setCalculation",
+          calculation: { iterate: false, maxIterations: 100, maxChange: 0.001 },
+        },
+      ],
+    });
+    expect(restored.getWorkbook().calculation).toBeUndefined();
+    expect("calculation" in restored.exportSnapshot().workbook).toBe(false);
     store.dispose();
     restored.dispose();
   });

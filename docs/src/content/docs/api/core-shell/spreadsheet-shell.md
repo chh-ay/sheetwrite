@@ -1,6 +1,6 @@
 ---
 title: "SpreadsheetShell | @sheetwrite/core/shell"
-description: "Disposable controller for the framework-neutral spreadsheet shell."
+description: "SpreadsheetShell interface in @sheetwrite/core/shell: Disposable controller for the framework-neutral spreadsheet shell."
 ---
 <!-- api-export:@sheetwrite/core|./shell|SpreadsheetShell -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-shell/">@sheetwrite/core/shell</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -8,7 +8,7 @@ description: "Disposable controller for the framework-neutral spreadsheet shell.
 Disposable controller for the framework-neutral spreadsheet shell.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/spreadsheet-shell.ts#L33"><code>packages/core/src/shell/spreadsheet-shell.ts#L33</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/spreadsheet-shell.ts#L79"><code>packages/core/src/shell/spreadsheet-shell.ts#L79</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -115,6 +115,7 @@ export interface SpreadsheetShell {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

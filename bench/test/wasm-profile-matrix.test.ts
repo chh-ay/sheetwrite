@@ -105,7 +105,7 @@ function fixture() {
         {
           id: "dependency-index",
           kind: "dependency-cycle",
-          owner: "store::CellStore::dep_index",
+          owner: "graph::FormulaGraph::index",
           dependency: "eval::DepIndex",
           reason: "dependency state crosses the boundary",
         },

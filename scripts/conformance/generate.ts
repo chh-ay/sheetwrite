@@ -84,11 +84,14 @@ const BASE_INPUTS: FormulaInputs = [
   { cell: "B2", value: 2 },
   { cell: "B3", value: 3 },
 ];
+// A probe that reads a base cell receives the base inputs.
+const BASE_INPUT_REFERENCE = /[AB][1-3](?::[AB][1-3])?/;
 
 const ARGUMENTS_BY_SIGNATURE: Record<string, string> = {
   address: "1,2",
   "array-unary": "A1:B2",
   "binary-number": "4,2",
+  "cell-info": '"row",A1',
   choose: '2,"a","b"',
   "choose-axis": "A1:B3,1",
   "criteria-many": 'A1:A3,">1"',
@@ -98,10 +101,12 @@ const ARGUMENTS_BY_SIGNATURE: Record<string, string> = {
   "date-three": "2020,1,2",
   filter: "A1:A3,B1:B3>2",
   "find-search": '"a","cat"',
+  hyperlink: '"https://example.com","Docs"',
   if: "TRUE,1,0",
   "if-error": "1,0",
   ifs: "TRUE,1",
   index: "A1:B3,1,1",
+  indirect: '"A1"',
   irr: "A1:A3",
   "left-right": '"abc",1',
   let: "x,1,x",
@@ -112,16 +117,19 @@ const ARGUMENTS_BY_SIGNATURE: Record<string, string> = {
   networkdays: "DATE(2020,1,1),DATE(2020,1,3)",
   npv: "0.1,A1:A3",
   "number-value": '"1.5",".",","',
+  offset: "A1,1,1",
   "optional-reference": "A1",
   "optional-variadic-values": "1,2,3",
   "pair-arrays": "A1:A3,B1:B3",
   percentile: "A1:A3,0.5",
   "period-payment": "0.1,1,10,1000",
   "pv-fv-pmt": "0.1,10,-100",
+  "random-between": "1,6",
   rank: "60,A1:A3,0",
   rate: "1,0,-100,110",
   "repeat-text": '"a",2',
   replace: '"abc",2,1,"x"',
+  "required-reference": "A1",
   round: "1.25,1",
   sequence: "2,2",
   sort: "A1:A3",
@@ -171,6 +179,30 @@ const OPERATOR_ASSERTIONS: Readonly<Record<string, readonly [string, string]>> =
   percent: ["50%=0.5", "25%=0.25"],
   "unary-plus": ["+2=2", "+7=7"],
   "unary-minus": ["-2=-2", "-7=-7"],
+  intersection: ["SUM(A1:B2 B1:B3)=3", "A1:B3 A2=60"],
+  union: ["SUM((A1:A2,B1))=-39", "COUNT((A1,B2,B3))=3"],
+};
+
+// The generic operator probe writes `C1<token>1`, which a reference operator
+// rejects because 1 is not a reference. These operators state each category
+// with reference operands instead.
+const CATEGORY_ASSERTIONS_BY_OPERATOR: Readonly<
+  Record<string, Partial<Record<Exclude<SemanticCategory, "mutation" | "normal">, string>>>
+> = {
+  intersection: {
+    empty: "AND(ISBLANK(C1:D1 C1),SUM(C1:D2 C1:C2)=0)",
+    mixed: 'AND(COUNTA(C1:D1 C1:C2)=1,SUM(C1:D1 C1:C2)=0,C1:D1 C1="2")',
+    error: "AND(ISERR(C1:C2 D1:D2),ISERROR(SUM(C1:C2 D1:D2)),ISERROR(C1:C2 OFFSET(C1,1/0,0)))",
+    boundary: "AND(C1:XFD1 C1:C1048576=0,ROWS(C1:C1048576 A1:XFD1)=1)",
+    "range-array": "AND(SUM(C1:C2 C1:D2)=3,ROWS(C1:C2 C1:D9)=2)",
+  },
+  union: {
+    empty: "AND(COUNT((C1,C2))=0,SUM((C1,C2))=0)",
+    mixed: "AND(SUM((C1,C2))=0,COUNTA((C1,C2))=1)",
+    error: "AND(ISERROR(SUM((C1,1/0))),ISERROR((C1,C2)),ISERROR(INDEX((C1,C2),1,1,3)))",
+    boundary: "AND(AREAS((C1,C1))=2,INDEX((D1,C1),1,1,2)=0,SUM((C1,C1))=0)",
+    "range-array": "AND(SUM((C1:C2,C1))=4,AREAS((C1:C2,C1:C2))=2)",
+  },
 };
 
 const CATEGORY_ASSERTIONS_BY_FUNCTION: Readonly<
@@ -214,7 +246,57 @@ const CATEGORY_ASSERTIONS_BY_FUNCTION: Readonly<
   ROWS: { boundary: "ROWS(C1)=1" },
   COLUMN: { boundary: "COLUMN(C1)=3" },
   COLUMNS: { boundary: "COLUMNS(C1)=1" },
+  OFFSET: {
+    empty: "OFFSET(A1,C1,1)=1",
+    mixed: "OFFSET(A1,C1,1)=3",
+    error:
+      'AND(ISERROR(OFFSET(A1,1/0,0)),ISERROR(OFFSET(A1,-1,0)),ISERROR(OFFSET(A1,0,0,0)),ISERROR(OFFSET(1,0,0)),ISERROR(OFFSET(A1,"bad",0)))',
+    boundary: "OFFSET(A1,C1,C1)=-100",
+    "range-array": "SUM(OFFSET(C1:C2,0,0))=3",
+  },
+  INDIRECT: {
+    empty: "ISERROR(INDIRECT(C1))",
+    mixed: 'INDIRECT("B"&C1)=2',
+    error:
+      'AND(ISERROR(INDIRECT("not a reference")),ISERROR(INDIRECT("A0")),ISERROR(INDIRECT("[missing.xlsx]Sheet1!A1")),ISERROR(INDIRECT(1/0)))',
+    boundary: 'INDIRECT("R1C1",FALSE)=-100',
+    "range-array": 'SUM(INDIRECT("B1:B"&SUM(C1:C2)))=6',
+  },
+  AREAS: {
+    empty: "AREAS(C1)=1",
+    mixed: "AREAS((C1,C2))=2",
+    error: "AND(ISERROR(AREAS(1/0)),ISERROR(AREAS(1)))",
+    boundary: "AREAS(C1:C1048576)=1",
+    "range-array": "AREAS((C1:C2,C1:C2,C1))=3",
+  },
   T: { "range-array": "TYPE(T(C1:C2))=16" },
+  // Random results cannot equal a baseline call, so each category pins an
+  // interval with one integer instead.
+  RANDBETWEEN: {
+    empty: "RANDBETWEEN(C1,0)=0",
+    mixed: "RANDBETWEEN(C1,2)=2",
+    boundary: "RANDBETWEEN(C1,C1)=0",
+  },
+  // FORMULATEXT and ISFORMULA describe the referenced cell, never its value,
+  // and corpus inputs are literals.
+  FORMULATEXT: {
+    empty: "ISNA(FORMULATEXT(C1))",
+    mixed: "ISNA(FORMULATEXT(C1))",
+    boundary: "ISNA(FORMULATEXT(C1))",
+    "range-array": "ISNA(FORMULATEXT(C1:C2))",
+  },
+  ISFORMULA: {
+    empty: "ISFORMULA(C1)=FALSE",
+    mixed: "ISFORMULA(C1)=FALSE",
+    boundary: "ISFORMULA(C1)=FALSE",
+    "range-array": "ISFORMULA(C1:C2)=FALSE",
+  },
+  CELL: {
+    empty: 'CELL("type",C1)="b"',
+    mixed: 'CELL("type",C1)="l"',
+    boundary: 'CELL("contents",C1)=0',
+    "range-array": 'CELL("row",C1:C2)=1',
+  },
 };
 
 const DIRECT_ERROR_EXPECTATIONS: Readonly<
@@ -328,7 +410,7 @@ export function supportedInventorySubjects(inventory: FormulaInventory): Invento
       }),
       assertions: authoredAssertions(entry.canonical),
       argumentsSource,
-      inputs: /[AB][1-3](?::[AB][1-3])?/.test(
+      inputs: BASE_INPUT_REFERENCE.test(
         `${argumentsSource},${authoredAssertions(entry.canonical).join(",")}`,
       )
         ? BASE_INPUTS
@@ -358,7 +440,7 @@ export function supportedInventorySubjects(inventory: FormulaInventory): Invento
       assertions,
       argumentsSource: "",
       operator: entry,
-      inputs: [],
+      inputs: BASE_INPUT_REFERENCE.test(assertions.join(",")) ? BASE_INPUTS : [],
     };
   });
   return [...functions, ...operators];
@@ -439,7 +521,7 @@ function categoryFormula(
   const directOverride =
     subject.subject.kind === "function"
       ? CATEGORY_ASSERTIONS_BY_FUNCTION[subject.subject.name]?.[category]
-      : undefined;
+      : CATEGORY_ASSERTIONS_BY_OPERATOR[subject.subject.name]?.[category];
   let property = directOverride;
   if (!property && subject.subject.kind === "operator") {
     const operator = subject.operator!;
@@ -852,6 +934,138 @@ function canaryCases(inventory: FormulaInventory): ConformanceCase[] {
   ];
 }
 
+/** Classic circular references that converge under iterative calculation. */
+function circularReferenceCases(inventory: FormulaInventory): ConformanceCase[] {
+  const subjects = new Map(
+    supportedInventorySubjects(inventory).map((entry) => [
+      `${entry.subject.kind}:${entry.subject.name}`,
+      entry,
+    ]),
+  );
+  const subject = (kind: FormulaSubject["kind"], name: string): InventorySubject => {
+    const value = subjects.get(`${kind}:${name}`);
+    if (!value) throw new Error(`Subject ${kind}:${name} is absent from the typed inventory`);
+    return value;
+  };
+  const add = subject("operator", "add");
+  const ifFunction = subject("function", "IF");
+  const circularSource = sourceWithChecksum({
+    title: "Remove or allow a circular reference in Excel",
+    section: "Change the number of times Excel iterates formulas",
+    url: "https://support.microsoft.com/en-us/office/remove-or-allow-a-circular-reference-in-excel-8540bd0f-6e97-4483-bcf7-1b49cd50d123",
+    license: SPEC_LICENSE,
+    authorship: "spec-derived",
+  });
+  // A tight maximum change leaves every converged result within the case
+  // tolerance, however many recalculations a producer runs before reading.
+  const iterative = { iterate: true, maxIterations: 100, maxChange: 1e-9 } as const;
+  const multiply = subject("operator", "multiply");
+  return [
+    finalizedCase({
+      id: "formula.iterative.running-total",
+      area: "formula",
+      dialect: "shared",
+      category: "normal",
+      family: ifFunction.family,
+      kind: "formula",
+      subject: ifFunction.subject,
+      source: circularSource,
+      evidence: {
+        kind: "property",
+        basis: "documented-semantics",
+        oracle:
+          "A self-referencing running total adds one per iteration and stops adding at 100. It reaches 100 within the configured 100 iterations.",
+      },
+      tolerance: { kind: "exact" },
+      inputs: [],
+      formula: "=IF(A1<100,A1+1,A1)",
+      target: "A1",
+      calculation: iterative,
+      expected: { type: "number", value: 100 },
+      observations: [],
+    }),
+    finalizedCase({
+      id: "formula.iterative.fixed-point",
+      area: "formula",
+      dialect: "shared",
+      category: "normal",
+      family: add.family,
+      kind: "formula",
+      subject: add.subject,
+      source: circularSource,
+      evidence: {
+        kind: "property",
+        basis: "documented-semantics",
+        oracle: "Iterating x = x/2 + 1 from any start converges to its fixed point 2.",
+      },
+      tolerance: { kind: "absolute", value: 1e-6 },
+      inputs: [],
+      formula: "=A1/2+1",
+      target: "A1",
+      calculation: iterative,
+      expected: { type: "number", value: 2, tolerance: { kind: "absolute", value: 1e-6 } },
+      observations: [],
+    }),
+    finalizedCase({
+      id: "formula.iterative.interest-on-balance",
+      area: "formula",
+      dialect: "shared",
+      category: "normal",
+      family: multiply.family,
+      kind: "formula",
+      subject: multiply.subject,
+      source: circularSource,
+      evidence: {
+        kind: "property",
+        basis: "documented-semantics",
+        oracle:
+          "Interest charged on a balance that includes it, i = r(p + i), has the closed form i = rp / (1 - r) = 100 / 0.9.",
+      },
+      tolerance: { kind: "absolute", value: 1e-6 },
+      inputs: [
+        { cell: "A1", value: 1000 },
+        { cell: "B1", value: 0.1 },
+      ],
+      formula: "=B1*(A1+C1)",
+      target: "C1",
+      calculation: iterative,
+      expected: {
+        type: "number",
+        value: 100 / 0.9,
+        tolerance: { kind: "absolute", value: 1e-6 },
+      },
+      observations: [],
+    }),
+    finalizedCase({
+      id: "formula.iterative.newton-square-root",
+      area: "formula",
+      dialect: "shared",
+      category: "normal",
+      family: ifFunction.family,
+      kind: "formula",
+      subject: ifFunction.subject,
+      source: circularSource,
+      evidence: {
+        kind: "property",
+        basis: "documented-semantics",
+        oracle:
+          "Newton steps x - (x^2 - 2) / 2x on the cell's own value converge to the square root of 2.",
+      },
+      tolerance: { kind: "absolute", value: 1e-9 },
+      inputs: [],
+      formula: "=IF(A1=0,1,A1-(A1^2-2)/(2*A1))",
+      target: "A1",
+      calculation: iterative,
+      expected: {
+        type: "number",
+        value: Math.SQRT2,
+        tolerance: { kind: "absolute", value: 1e-9 },
+      },
+      observations: [],
+    }),
+  ];
+}
+
 export function supportedNamesChecksum(inventory: FormulaInventory): string {
   const names = supportedInventorySubjects(inventory)
     .map(({ subject }) => `${subject.kind}:${subject.name}`)
@@ -866,16 +1080,17 @@ export function generateConformanceEvidence(inventory: FormulaInventory): {
   const canaries = canaryCases(inventory);
   const formulaCanaries = canaries.filter((entry) => entry.area === "formula").length;
   const workbookCanaries = canaries.filter((entry) => entry.area === "workbook").length;
+  const circular = circularReferenceCases(inventory);
   const generatedFormulas = generatedFormulaCases(
     inventory,
-    REQUIRED_COUNTS.formula - formulaCanaries,
+    REQUIRED_COUNTS.formula - formulaCanaries - circular.length,
   );
   const mutations = generatedMutationCases(REQUIRED_COUNTS.mutation);
   const workbooks = generatedWorkbookCases(REQUIRED_COUNTS.workbook - workbookCanaries);
   const corpus: ConformanceCorpus = {
     protocol: 1,
     license: "MIT; original vectors derived independently from cited public specifications",
-    cases: [...canaries, ...generatedFormulas, ...mutations, ...workbooks],
+    cases: [...canaries, ...circular, ...generatedFormulas, ...mutations, ...workbooks],
   };
   const operationShapes = corpus.cases
     .filter((entry) => entry.area === "mutation" || entry.area === "workbook")

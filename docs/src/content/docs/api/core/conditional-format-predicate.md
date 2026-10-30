@@ -1,6 +1,6 @@
 ---
 title: "ConditionalFormatPredicate | @sheetwrite/core"
-description: "Predicate used to decide whether a conditional format applies."
+description: "ConditionalFormatPredicate type in @sheetwrite/core: Predicate used to decide whether a conditional format applies."
 ---
 <!-- api-export:@sheetwrite/core|.|ConditionalFormatPredicate -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
@@ -8,7 +8,7 @@ description: "Predicate used to decide whether a conditional format applies."
 Predicate used to decide whether a conditional format applies.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/cell.ts#L68"><code>packages/core/src/types/cell.ts#L68</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/cell.ts#L84"><code>packages/core/src/types/cell.ts#L84</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>5</span>
@@ -90,6 +90,7 @@ export type ConditionalFormatPredicate =
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

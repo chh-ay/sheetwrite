@@ -1,6 +1,6 @@
 ---
 title: "WorkbookTableNameValidationResult | @sheetwrite/core"
-description: "Result of validating and NFC-normalizing a workbook table name."
+description: "WorkbookTableNameValidationResult type in @sheetwrite/core: Result of validating and NFC-normalizing a workbook table name."
 ---
 <!-- api-export:@sheetwrite/core|.|WorkbookTableNameValidationResult -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
@@ -8,7 +8,7 @@ description: "Result of validating and NFC-normalizing a workbook table name."
 Result of validating and NFC-normalizing a workbook table name.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/workbook-table.ts#L40"><code>packages/core/src/workbook-table.ts#L40</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/workbook-table.ts#L43"><code>packages/core/src/workbook-table.ts#L43</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>2</span>
@@ -56,6 +56,7 @@ export type WorkbookTableNameValidationResult =
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

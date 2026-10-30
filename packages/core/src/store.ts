@@ -1,4 +1,5 @@
 import { atomicBatchLimits, isAtomicBatch } from "./atomic-batch.js";
+import { chartSourceRanges } from "./chart-definition.js";
 import {
   assertWorkbookAllocationLimits,
   DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
@@ -10,6 +11,7 @@ import {
   takeAdmittedTransactionResources,
   validateDocumentOperationShape,
 } from "./document-protocol.js";
+import { clonePivots, pivotOwner, withoutSavedOutput } from "./pivot.js";
 import type {
   RuntimeMemoryObservation,
   RuntimeResourceOperation,
@@ -28,7 +30,7 @@ import {
 import { registerStoreEngine } from "./store/engine-registry.js";
 import { StoreMutationPolicy } from "./store/mutation-policy.js";
 import { addRowGroup, collapseRowGroup, patchSheetId, removeRowGroup } from "./store/ranges.js";
-import { decodeWorkbookSnapshot } from "./store/snapshot-codec.js";
+import { decodeWorkbookSnapshot, freezeXlsxSource } from "./store/snapshot-codec.js";
 import { setTransactionStorageRevision } from "./transaction-admission.js";
 import { preparedRestore, TransactionPreparation } from "./transaction-preparation.js";
 import type { CellScalar, Column } from "./types/cell.js";
@@ -46,7 +48,9 @@ import type {
   SortKey,
   Workbook,
   WorkbookSnapshot,
+  XlsxSourceSnapshot,
 } from "./types/document.js";
+import type { PivotDefinition, PivotResultView, PivotSourceField } from "./types/pivot.js";
 import type {
   CellLoadState,
   ClipboardWindowView,
@@ -63,6 +67,7 @@ import type {
   TransactionApplicationOptions,
   TransactionResourceLimits,
 } from "./types/transaction.js";
+import { admitStoreXlsxSource } from "./xlsx-source.js";
 
 export type { CompactRangeHistory, RangeMutationAllocationStats };
 export { IncompleteDataError };
@@ -88,6 +93,20 @@ const SHEET_LIFECYCLE_MESSAGES: Readonly<Record<SheetLifecycleIssueCode, string>
   "invalid-position": "Sheet position is out of bounds",
   "last-visible-sheet": "Workbook must retain at least one visible sheet",
 };
+
+/** Edits that move or resize cells, and so the anchors of retained OOXML drawings. */
+const XLSX_LAYOUT_OPS: ReadonlySet<DocumentOp["op"]> = new Set([
+  "addRows",
+  "removeRows",
+  "moveRows",
+  "addColumns",
+  "removeColumns",
+  "moveColumns",
+  "setColumn",
+  "setRowMeta",
+  "addMerge",
+  "removeMerge",
+]);
 
 function isSnapshotAllocationFailure(error: unknown): boolean {
   if (error instanceof SnapshotResourceError || error instanceof RangeError) return true;
@@ -135,7 +154,13 @@ export class SheetwriteStore implements Store {
   private documentId?: string;
   private documentVersion?: number;
 
-  constructor(workbook: Workbook, data?: ColumnarData, options: SheetwriteStoreOptions = {}) {
+  constructor(
+    private readonly workbook: Workbook,
+    data?: ColumnarData,
+    options: SheetwriteStoreOptions = {},
+  ) {
+    // Frozen once here so exported snapshots share the payloads instead of copying them.
+    if (workbook.xlsxSource) workbook.xlsxSource = freezeXlsxSource(workbook.xlsxSource);
     this.transactionResourceLimits = resolveTransactionResourceLimits(
       options.transactionResourceLimits,
     );
@@ -161,7 +186,7 @@ export class SheetwriteStore implements Store {
         { cause: error },
       );
     }
-    this.policy = new StoreMutationPolicy(workbook);
+    this.policy = new StoreMutationPolicy(workbook, (sheet) => this.engine.pivotOutputs(sheet));
     this.protectionResolver = options.protectionResolver;
     this.mutationPolicy = options.mutationPolicy ?? "atomic";
     registerStoreEngine(this, this.engine);
@@ -180,6 +205,13 @@ export class SheetwriteStore implements Store {
       store.documentVersion = snapshot.version;
       store.epoch = snapshot.version ?? 0;
       store.engine.hydrateSnapshot(snapshot);
+      if (workbook.xlsxSource) {
+        const admitted = admitStoreXlsxSource(store, {
+          ...snapshot,
+          workbook: { ...snapshot.workbook, xlsxSource: workbook.xlsxSource },
+        });
+        workbook.xlsxSource = admitted ? freezeXlsxSource(admitted) : undefined;
+      }
       return store;
     } catch (error) {
       store?.dispose();
@@ -202,6 +234,47 @@ export class SheetwriteStore implements Store {
   ): void {
     this.protectionResolver = resolver;
     this.mutationPolicy = mode;
+  }
+
+  /** Clones of the pivot definitions on `sheet`, or on every sheet; readable without the engine. */
+  getPivots(sheet?: SheetId): PivotDefinition[] {
+    return clonePivots(this.engine.getWorkbook().sheets, sheet);
+  }
+
+  /**
+   * Insert or replace a pivot. `sheet` defaults to the sheet that holds the
+   * pivot's ID, then to the active sheet. The pivot's `savedOutput` is
+   * removed: saved values do not match a definition the caller changed.
+   */
+  setPivot(pivot: PivotDefinition, sheet?: SheetId): ApplyTransactionResult {
+    const sheets = this.engine.getWorkbook().sheets;
+    const owner =
+      sheet ?? pivotOwner(sheets, pivot.id)?.id ?? this.engine.getWorkbook().activeSheet;
+    return this.applyTransaction(
+      { patches: [{ op: "setPivot", sheet: owner, pivot: withoutSavedOutput(pivot) }] },
+      "api",
+    );
+  }
+
+  /** Remove a pivot; `sheet` defaults to the sheet that holds it. */
+  removePivot(id: string, sheet?: SheetId): ApplyTransactionResult {
+    const owner = sheet ?? pivotOwner(this.engine.getWorkbook().sheets, id)?.id;
+    if (owner === undefined) return { status: "noop", epoch: this.epoch, reason: "out-of-bounds" };
+    return this.applyTransaction({ patches: [{ op: "removePivot", sheet: owner, id }] }, "api");
+  }
+
+  /** Source fields of one pivot; empty on the default engine or for an unknown pivot. */
+  getPivotFields(sheet: SheetId, id: string): PivotSourceField[] {
+    return this.engine.getPivotFields(sheet, id);
+  }
+
+  /**
+   * Plain-JSON output of one pivot. The default engine reports the saved
+   * output (`saved`), or `unavailable` without one. Null when `sheet` holds
+   * no pivot with `id`.
+   */
+  getPivotResult(sheet: SheetId, id: string): PivotResultView | null {
+    return this.engine.getPivotResult(sheet, id);
   }
 
   getRangeMutationAllocationStats(): RangeMutationAllocationStats {
@@ -519,11 +592,13 @@ export class SheetwriteStore implements Store {
       const limits = isAtomicBatch(tx.patches)
         ? atomicBatchLimits(this.transactionResourceLimits)
         : this.transactionResourceLimits;
-      const resourceValidation = resolveTransactionResourceValidation(
+      const admittedResources = takeAdmittedTransactionResources(tx);
+      const resourceResolution = resolveTransactionResourceValidation(
         tx.patches,
         limits,
-        takeAdmittedTransactionResources(tx),
-      ).result;
+        admittedResources,
+      );
+      const resourceValidation = resourceResolution.result;
       if (!resourceValidation.ok) {
         return { status: "rejected", epoch: this.epoch, issues: [resourceValidation.issue] };
       }
@@ -589,6 +664,10 @@ export class SheetwriteStore implements Store {
         source === "remote" && options.localReplay !== true,
         hasListeners,
         this.detailedChangeCapture,
+        admittedResources !== undefined &&
+          resourceResolution.admitted === admittedResources &&
+          !this.protectionResolver,
+        source === "remote" || commitReason === "undo" || commitReason === "redo",
       );
       if (effects.appliedPatches.length === 0) {
         return {
@@ -598,6 +677,8 @@ export class SheetwriteStore implements Store {
         };
       }
 
+      const xlsxSource = this.workbook.xlsxSource;
+      if (xlsxSource) this.invalidateXlsxGraphs(xlsxSource, effects.appliedPatches);
       this.epoch += 1;
       const transaction =
         effects.appliedPatches.length === effectiveTx.patches.length
@@ -632,6 +713,58 @@ export class SheetwriteStore implements Store {
     } finally {
       preparation.dispose();
     }
+  }
+
+  /**
+   * Drop retained OOXML graphs that a committed edit may have made stale. Costs
+   * O(patches + graphs) and never reads cells; undo cannot restore a dropped
+   * graph because the original package is not kept.
+   */
+  private invalidateXlsxGraphs(source: XlsxSourceSnapshot, patches: readonly DocumentOp[]): void {
+    const valuesTouched = new Set<SheetId>();
+    const layoutTouched = new Set<SheetId>();
+    for (const patch of patches) {
+      // A native chart reads cells but changes neither values nor layout, so retained
+      // drawings and charts stay valid beside it.
+      if (patch.op === "setChart" || patch.op === "removeChart") continue;
+      if (
+        patch.op === "setNamedRange" ||
+        patch.op === "removeNamedRange" ||
+        patch.op === "setCalculation"
+      ) {
+        // A chart or pivot may read through a defined name, whose target is not tracked,
+        // and a calculation change can move any formula result.
+        for (const sheet of this.workbook.sheets) valuesTouched.add(sheet.id);
+        continue;
+      }
+      const sheet = patchSheetId(patch);
+      if (sheet === null) continue;
+      valuesTouched.add(sheet);
+      if (XLSX_LAYOUT_OPS.has(patch.op)) layoutTouched.add(sheet);
+    }
+
+    const live = new Map(this.workbook.sheets.map((sheet) => [sheet.id, sheet.name]));
+    const dropped = new Set(source.dropped);
+    const graphs = source.graphs.filter((graph) => {
+      const valid =
+        (graph.sheetId === undefined || live.has(graph.sheetId)) &&
+        graph.dependencies.every((dependency) =>
+          dependency.scope === "values"
+            ? live.get(dependency.sheetId) === dependency.name &&
+              !valuesTouched.has(dependency.sheetId)
+            : live.has(dependency.sheetId) && !layoutTouched.has(dependency.sheetId),
+        );
+      if (!valid) dropped.add(graph.target);
+      return valid;
+    });
+    if (graphs.length === source.graphs.length) return;
+
+    const members = new Set(graphs.flatMap((graph) => graph.parts));
+    this.workbook.xlsxSource = freezeXlsxSource({
+      parts: source.parts.filter((part) => members.has(part.name)),
+      graphs,
+      dropped: [...dropped],
+    });
   }
 
   on(_evt: "change", fn: ChangeListener): () => void {
@@ -738,6 +871,9 @@ export class SheetwriteStore implements Store {
           requiredSheets.push(entry.range.sheet);
         }
         for (const note of operation.sheet.notes ?? []) requiredSheets.push(note.addr.sheet);
+        for (const chart of operation.sheet.charts ?? []) {
+          for (const range of chartSourceRanges(chart)) requiredSheets.push(range.sheet);
+        }
       } else {
         const primarySheet = patchSheetId(operation);
         if (lifecycle === null && primarySheet !== null) requiredSheets.push(primarySheet);
@@ -775,6 +911,14 @@ export class SheetwriteStore implements Store {
           for (const rule of operation.patch.conditionalFormats ?? []) {
             requiredSheets.push(rule.range.sheet);
           }
+        } else if (operation.op === "setChart") {
+          for (const range of chartSourceRanges(operation.chart)) requiredSheets.push(range.sheet);
+        } else if (
+          operation.op === "setPivot" &&
+          !operation.pivot.source.invalid &&
+          "range" in operation.pivot.source
+        ) {
+          requiredSheets.push(operation.pivot.source.range.sheet);
         }
       }
       const missingSheet = requiredSheets.find(

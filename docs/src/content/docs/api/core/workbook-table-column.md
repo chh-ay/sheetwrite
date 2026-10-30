@@ -1,6 +1,6 @@
 ---
 title: "WorkbookTableColumn | @sheetwrite/core"
-description: "Stable identity and display metadata for one ordered table column."
+description: "WorkbookTableColumn interface in @sheetwrite/core: Stable identity and display metadata for one ordered table column."
 ---
 <!-- api-export:@sheetwrite/core|.|WorkbookTableColumn -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -8,10 +8,10 @@ description: "Stable identity and display metadata for one ordered table column.
 Stable identity and display metadata for one ordered table column.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/table.ts#L7"><code>packages/core/src/types/table.ts#L7</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/table.ts#L36"><code>packages/core/src/types/table.ts#L36</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>3</span>
+## Members <span class="api-count" data-pagefind-ignore>6</span>
 
 <div class="api-member-list">
 
@@ -42,6 +42,33 @@ totalsRowLabel?: string;
 
 <p class="api-member-doc">Optional text written in the totals row. Formula cells remain authoritative cell sources.</p>
 </details>
+
+<details class="api-member" id="workbook-table-column-totals-row-function" data-pagefind-weight="1">
+<summary><code>totalsRowFunction</code> <span class="api-member-summary">Persisted rule; existing totals-row cells remain authoritative cell sources.</span></summary>
+
+```ts generated
+totalsRowFunction?: WorkbookTableTotalsFunction;
+```
+
+</details>
+
+<details class="api-member" id="workbook-table-column-totals-row-formula" data-pagefind-weight="1">
+<summary><code>totalsRowFormula</code> <span class="api-member-summary">OOXML formula text (without =), including its optional array attribute.</span></summary>
+
+```ts generated
+totalsRowFormula?: WorkbookTableXmlElement;
+```
+
+</details>
+
+<details class="api-member" id="workbook-table-column-calculated-column-formula" data-pagefind-weight="1">
+<summary><code>calculatedColumnFormula</code> <span class="api-member-summary">Rule Excel fills into new rows; existing data cells remain authoritative.</span></summary>
+
+```ts generated
+calculatedColumnFormula?: WorkbookTableXmlElement;
+```
+
+</details>
 </div>
 
 ## Declaration
@@ -54,6 +81,9 @@ export interface WorkbookTableColumn {
   id: string;
   name: string;
   totalsRowLabel?: string;
+  totalsRowFunction?: WorkbookTableTotalsFunction;
+  totalsRowFormula?: WorkbookTableXmlElement;
+  calculatedColumnFormula?: WorkbookTableXmlElement;
 }
 ```
 
@@ -66,6 +96,7 @@ export interface WorkbookTableColumn {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

@@ -1,6 +1,6 @@
 ---
 title: "CommentAdapter | @sheetwrite/core"
-description: "Host persistence contract for versioned comment threads."
+description: "CommentAdapter interface in @sheetwrite/core: Host persistence contract for versioned comment threads."
 ---
 <!-- api-export:@sheetwrite/core|.|CommentAdapter -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -74,6 +74,7 @@ export interface CommentAdapter {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

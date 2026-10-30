@@ -1,6 +1,6 @@
 ---
 title: "BoundaryDirection | @sheetwrite/core"
-description: "Direction of a measured JS/WASM boundary crossing."
+description: "BoundaryDirection type in @sheetwrite/core: Direction of a measured JS/WASM boundary crossing."
 ---
 <!-- api-export:@sheetwrite/core|.|BoundaryDirection -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
@@ -28,6 +28,7 @@ export type BoundaryDirection = "js-to-wasm" | "wasm-to-js";
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

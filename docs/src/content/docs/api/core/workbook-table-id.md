@@ -1,6 +1,6 @@
 ---
 title: "WorkbookTableId | @sheetwrite/core"
-description: "Stable identity for a workbook table."
+description: "WorkbookTableId type in @sheetwrite/core: Stable identity for a workbook table."
 ---
 <!-- api-export:@sheetwrite/core|.|WorkbookTableId -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
@@ -8,7 +8,7 @@ description: "Stable identity for a workbook table."
 Stable identity for a workbook table. Names may change; IDs never do.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/table.ts#L4"><code>packages/core/src/types/table.ts#L4</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/table.ts#L5"><code>packages/core/src/types/table.ts#L5</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -28,6 +28,7 @@ export type WorkbookTableId = string;
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
@@ -38,6 +39,7 @@ export type WorkbookTableId = string;
 <p class="api-consumers-label">Public exports naming <code>WorkbookTableId</code></p>
 
 <ul class="api-consumer-list">
+<li><a href="/docs/api/core/pivot-source/"><code>PivotSource</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/workbook-table/"><code>WorkbookTable</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>

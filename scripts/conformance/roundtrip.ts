@@ -4,14 +4,19 @@ import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
+import {
+  DEFAULT_MAX_CHANGE,
+  DEFAULT_MAX_ITERATIONS,
+} from "../../packages/core/src/document-protocol.js";
 import type { XlsxWorkbookWarning } from "../../packages/core/src/export.js";
-import type { WorkbookSnapshot } from "../../packages/core/src/types/document.js";
+import type { WorkbookSnapshot, XlsxSourceGraph } from "../../packages/core/src/types/document.js";
 import { sheetwriteWorkbookBackend } from "../../packages/xlsx/src/workbook.js";
 import { canonicalJson } from "./normalize.js";
 
 const MAX_ROUNDTRIP_BYTES = 16 * 1024 * 1024;
 const ROUNDTRIP_OUTPUT = "test-results/conformance/libreoffice-workbook-roundtrips.json";
 const LIBREOFFICE_FIXTURE = "packages/xlsx/test/fixtures/libreoffice-rich.xlsx";
+const LIBREOFFICE_DEFAULT_MAX_CHANGE = 0.0001;
 
 export interface WorkbookRoundtripResaver {
   readonly producer: "libreoffice";
@@ -28,6 +33,7 @@ export interface WorkbookRoundtripChain {
   readonly producerBytes: number;
   readonly importWarnings: readonly XlsxWorkbookWarning[];
   readonly differences: readonly string[];
+  readonly knownProducerDifferences: readonly string[];
   readonly status: "pass" | "divergent";
 }
 
@@ -68,11 +74,15 @@ function sortedRanges<T extends Parameters<typeof rangeKey>[0]>(
 
 /** Normalized semantic state compared independently from ZIP/XML byte identity. */
 export function workbookFeatureState(snapshot: WorkbookSnapshot): unknown {
+  // Preserved XLSX parts are opaque producer bytes, so a resave by another
+  // application changes or adds them by design. Their loss is checked
+  // separately by `retainedGraphLosses`, which allows additions.
+  const { xlsxSource: _preservedParts, ...workbook } = snapshot.workbook;
   return {
     schemaVersion: snapshot.schemaVersion,
     documentId: snapshot.documentId,
     version: snapshot.version,
-    workbook: snapshot.workbook,
+    workbook,
     sheets: [...snapshot.sheets]
       .sort((left, right) => left.order - right.order)
       .map((sheet) => {
@@ -80,23 +90,43 @@ export function workbookFeatureState(snapshot: WorkbookSnapshot): unknown {
         const columns = sheet.columns.map(({ visible, ...column }) =>
           visible === true ? column : { ...column, visible },
         );
+        const comparableCells = cells.flatMap((block) =>
+          block.cells.map((cell) => ({
+            row: block.startRow + cell.rowOffset,
+            col: block.startCol + cell.colOffset,
+            value: cell.value,
+            ...(cell.style === undefined ? {} : { style: cell.style }),
+          })),
+        );
+        const hyperlinks = sheet.hyperlinks?.map(({ id: _generatedId, style, ...link }) => {
+          // Relationship ids are import-local identities, not workbook behavior.
+          // LibreOffice stores link presentation in cell fonts instead of link
+          // metadata. Compare that presentation, never discard a missing style.
+          // WindowReader.mergeHyperlinkStyles gives explicit cell fonts priority
+          // over link defaults, so this move preserves the painted result.
+          if (style === undefined) return link;
+          const r0 = Math.min(link.range.start.row, link.range.end.row);
+          const r1 = Math.max(link.range.start.row, link.range.end.row);
+          const c0 = Math.min(link.range.start.col, link.range.end.col);
+          const c1 = Math.max(link.range.start.col, link.range.end.col);
+          let covered = 0;
+          for (const cell of comparableCells) {
+            if (cell.row < r0 || cell.row > r1 || cell.col < c0 || cell.col > c1) continue;
+            cell.style = { ...cell.style, ...style };
+            covered += 1;
+          }
+          return covered === (r1 - r0 + 1) * (c1 - c0 + 1) ? link : { ...link, style };
+        });
         return {
           ...metadata,
           visibility: sheet.visibility ?? "visible",
           columns,
           tables: sortedRanges(sheet.tables),
-          hyperlinks: sortedRanges(sheet.hyperlinks),
+          hyperlinks: sortedRanges(hyperlinks),
           conditionalFormats: sortedRanges(sheet.conditionalFormats),
-          cells: cells
-            .flatMap((block) =>
-              block.cells.map((cell) => ({
-                row: block.startRow + cell.rowOffset,
-                col: block.startCol + cell.colOffset,
-                value: cell.value,
-                ...(cell.style === undefined ? {} : { style: cell.style }),
-              })),
-            )
-            .sort((left, right) => left.row - right.row || left.col - right.col),
+          cells: comparableCells.sort(
+            (left, right) => left.row - right.row || left.col - right.col,
+          ),
         };
       }),
   };
@@ -113,6 +143,40 @@ function normalized(value: unknown): unknown {
     return result;
   }
   return value;
+}
+
+/** Kind of a retained graph: who links to it and through which relationship. */
+function retainedGraphKind(graph: XlsxSourceGraph): string {
+  return `${graph.owner}${graph.sheetId === undefined ? "" : `:${graph.sheetId}`} ${graph.type}`;
+}
+
+/**
+ * Retained graphs (charts, pivots, drawings, …) the round trip lost, as a
+ * count per kind. Producers rename parts and add graphs of their own (a
+ * theme, document properties), so no graph identity is stable across them;
+ * this proves only that no kind lost members. A dropped chart replaced by a
+ * different chart on the same owner still passes.
+ */
+export function retainedGraphLosses(
+  expected: WorkbookSnapshot,
+  actual: WorkbookSnapshot,
+): string[] {
+  const remaining = new Map<string, number>();
+  for (const graph of expected.workbook.xlsxSource?.graphs ?? []) {
+    const kind = retainedGraphKind(graph);
+    remaining.set(kind, (remaining.get(kind) ?? 0) + 1);
+  }
+  for (const graph of actual.workbook.xlsxSource?.graphs ?? []) {
+    const kind = retainedGraphKind(graph);
+    const count = remaining.get(kind);
+    if (count !== undefined) remaining.set(kind, count - 1);
+  }
+
+  const losses: string[] = [];
+  for (const [kind, count] of remaining) {
+    if (count > 0) losses.push(`$workbook.xlsxSource.graphs: ${count} retained ${kind} lost`);
+  }
+  return losses;
 }
 
 export function structuralDifferences(expected: unknown, actual: unknown): string[] {
@@ -150,7 +214,7 @@ function sheetwriteWorkbook(): WorkbookSnapshot {
         id: "data",
         name: "Data",
         order: 0,
-        rowCount: 4,
+        rowCount: 5,
         columns: [
           { key: "amount", header: "Amount", width: 100, type: "number" },
           { key: "result", header: "Result", width: 140, type: "text" },
@@ -159,7 +223,7 @@ function sheetwriteWorkbook(): WorkbookSnapshot {
           {
             id: "sales-table",
             name: "Sales",
-            range: { sheet: "data", start: { row: 0, col: 0 }, end: { row: 3, col: 0 } },
+            range: { sheet: "data", start: { row: 0, col: 0 }, end: { row: 4, col: 0 } },
             columns: [{ id: "amount-column", name: "Amount", totalsRowLabel: "Total" }],
             headerRow: true,
             totalsRow: true,
@@ -190,7 +254,7 @@ function sheetwriteWorkbook(): WorkbookSnapshot {
         ],
         conditionalFormats: [
           {
-            range: { sheet: "data", start: { row: 0, col: 1 }, end: { row: 3, col: 1 } },
+            range: { sheet: "data", start: { row: 0, col: 1 }, end: { row: 4, col: 1 } },
             when: { kind: "formula", source: '=A1<>""' },
             style: { backgroundColor: "#ABCDEF", bold: true },
             stopIfTrue: true,
@@ -200,7 +264,7 @@ function sheetwriteWorkbook(): WorkbookSnapshot {
           {
             startRow: 0,
             startCol: 0,
-            rowCount: 4,
+            rowCount: 5,
             colCount: 2,
             cells: [
               { rowOffset: 0, colOffset: 0, value: { kind: "literal", value: "Amount" } },
@@ -209,10 +273,14 @@ function sheetwriteWorkbook(): WorkbookSnapshot {
                 colOffset: 1,
                 value: { kind: "formula", src: "=SUM(Sales[Amount])" },
               },
-              { rowOffset: 1, colOffset: 0, value: { kind: "literal", value: 10 } },
+              // Excel shows hyperlink text from the cell value; a separate
+              // display attribute cannot make numeric 10 display as "Report".
+              { rowOffset: 1, colOffset: 0, value: { kind: "literal", value: "Report" } },
               { rowOffset: 1, colOffset: 1, value: { kind: "literal", value: "Summary" } },
               { rowOffset: 2, colOffset: 0, value: { kind: "literal", value: 20 } },
-              { rowOffset: 3, colOffset: 0, value: { kind: "literal", value: "Total" } },
+              // Keep both numeric amounts inside the table's data body.
+              { rowOffset: 3, colOffset: 0, value: { kind: "literal", value: 10 } },
+              { rowOffset: 4, colOffset: 0, value: { kind: "literal", value: "Total" } },
             ],
           },
         ],
@@ -264,9 +332,36 @@ async function chain(
 ): Promise<WorkbookRoundtripChain> {
   const producerBytes = bounded(await resaver.resave(input, id), `${id} producer output`);
   const imported = await importWorkbook(producerBytes);
-  const differences = structuralDifferences(
-    workbookFeatureState(expected),
-    workbookFeatureState(imported.snapshot),
+  const differences = [
+    ...structuralDifferences(
+      workbookFeatureState(expected),
+      workbookFeatureState(imported.snapshot),
+    ),
+    ...retainedGraphLosses(expected, imported.snapshot),
+  ];
+  // LibreOffice substitutes its own inactive default threshold for Excel's
+  // default. Record that exact rewrite; custom limits and enabled iteration
+  // remain strict even when the producer would treat them as inactive.
+  const originalCalculation = expected.workbook.calculation;
+  const importedCalculation = imported.snapshot.workbook.calculation;
+  const defaultIterationRewrite =
+    (originalCalculation === undefined ||
+      (!originalCalculation.iterate &&
+        originalCalculation.maxIterations === DEFAULT_MAX_ITERATIONS &&
+        originalCalculation.maxChange === DEFAULT_MAX_CHANGE)) &&
+    importedCalculation?.iterate === false &&
+    importedCalculation.maxIterations === DEFAULT_MAX_ITERATIONS &&
+    importedCalculation.maxChange === LIBREOFFICE_DEFAULT_MAX_CHANGE;
+  const knownProducerDifferences = differences.filter(
+    (difference) =>
+      /^\$workbook\.sheets\[\d+\]\.conditionalFormats\[\d+\]\.stopIfTrue: true != undefined$/.test(
+        difference,
+      ) ||
+      (defaultIterationRewrite &&
+        /^\$workbook\.workbook\.calculation(?:\.(?:maxIterations|maxChange))?:/.test(difference)),
+  );
+  const unexpectedDifferences = differences.filter(
+    (difference) => !knownProducerDifferences.includes(difference),
   );
   return {
     id,
@@ -276,8 +371,9 @@ async function chain(
     producerSha256: sha256(producerBytes),
     producerBytes: producerBytes.byteLength,
     importWarnings: [...initialWarnings, ...imported.warnings],
-    differences,
-    status: differences.length === 0 ? "pass" : "divergent",
+    differences: unexpectedDifferences,
+    knownProducerDifferences,
+    status: unexpectedDifferences.length === 0 ? "pass" : "divergent",
   };
 }
 

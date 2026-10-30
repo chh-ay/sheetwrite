@@ -1,6 +1,6 @@
 ---
 title: "XlsxWorkbookWarning | @sheetwrite/core"
-description: "Structured fidelity warning emitted during XLSX conversion."
+description: "XlsxWorkbookWarning interface in @sheetwrite/core: Structured fidelity warning emitted during XLSX conversion."
 ---
 <!-- api-export:@sheetwrite/core|.|XlsxWorkbookWarning -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -8,7 +8,7 @@ description: "Structured fidelity warning emitted during XLSX conversion."
 Structured fidelity warning emitted during XLSX conversion.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L433"><code>packages/core/src/export.ts#L433</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L525"><code>packages/core/src/export.ts#L525</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>
@@ -95,6 +95,7 @@ export interface XlsxWorkbookWarning {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

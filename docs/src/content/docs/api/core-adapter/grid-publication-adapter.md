@@ -1,6 +1,6 @@
 ---
 title: "GridPublicationAdapter | @sheetwrite/core/adapter"
-description: "Inbound hooks implemented by framework adapters for scheduling and imperative-handle publication."
+description: "GridPublicationAdapter interface in @sheetwrite/core/adapter: Inbound hooks implemented by framework adapters for scheduling and imperative-handle publication."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|GridPublicationAdapter -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -68,6 +68,7 @@ export interface GridPublicationAdapter {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

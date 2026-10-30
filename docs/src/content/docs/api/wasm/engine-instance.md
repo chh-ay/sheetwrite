@@ -1,6 +1,6 @@
 ---
 title: "EngineInstance | @sheetwrite/wasm"
-description: "Engine objects and caches owned by one independently collectible WASM instance."
+description: "EngineInstance type in @sheetwrite/wasm: Engine objects and caches owned by one independently collectible WASM instance."
 ---
 <!-- api-export:@sheetwrite/wasm|.|EngineInstance -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/wasm/">@sheetwrite/wasm</a><span class="api-status" data-kind="type">type</span></div>
@@ -8,7 +8,7 @@ description: "Engine objects and caches owned by one independently collectible W
 Engine objects and caches owned by one independently collectible WASM instance.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/loader.d.ts#L37"><code>packages/wasm/loader.d.ts#L37</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/loader.d.ts#L50"><code>packages/wasm/loader.d.ts#L50</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -16,7 +16,15 @@ Engine objects and caches owned by one independently collectible WASM instance.
 <div class="api-declaration-open" data-pagefind-ignore>
 
 ```ts generated
-export type EngineInstance = Omit<typeof WasmExports, "default"> & {
+export type EngineInstance = Omit<
+  typeof WasmExports,
+  "default" | "CellStore" | "initSync"
+> & {
+  initSync(
+    ...args: Parameters<typeof WasmExports.initSync>
+  ): Omit<WasmExports.InitOutput, "cellstore_setSavedPivots"> &
+    Partial<Pick<WasmExports.InitOutput, "cellstore_setSavedPivots">>;
+  CellStore: ProviderCellStoreConstructor;
   getModule(): WebAssembly.Module;
   getMemory(): WebAssembly.Memory;
   retire(): void;
@@ -40,6 +48,7 @@ export type EngineInstance = Omit<typeof WasmExports, "default"> & {
 <p class="api-consumers-label">Public exports naming <code>EngineInstance</code></p>
 
 <ul class="api-consumer-list">
+<li><a href="/docs/api/core/sheetwrite-engine/"><code>SheetwriteEngine</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/formulas/create-engine/"><code>createEngine</code></a><span class="api-consumer-kind">@sheetwrite/formulas</span></li>
 <li><a href="/docs/api/wasm/create-engine/"><code>createEngine</code></a><span class="api-consumer-kind">@sheetwrite/wasm</span></li>
 </ul>

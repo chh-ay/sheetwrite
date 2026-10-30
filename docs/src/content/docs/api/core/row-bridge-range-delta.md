@@ -1,6 +1,6 @@
 ---
 title: "RowBridgeRangeDelta | @sheetwrite/core"
-description: "A setRange/setBlock/restoreBlock effect expanded to its exact changed cells."
+description: "RowBridgeRangeDelta interface in @sheetwrite/core: A setRange/setBlock/restoreBlock effect expanded to its exact changed cells."
 ---
 <!-- api-export:@sheetwrite/core|.|RowBridgeRangeDelta -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -148,6 +148,7 @@ export interface RowBridgeRangeDelta<Id extends RowBridgeId = RowBridgeId> {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

@@ -88,6 +88,15 @@ a script nobody will run.
   own builds; readable package files keep stack traces and debugging in
   `node_modules` useful. The size report measures the packed files;
   `size-history.json` records published releases, not unreleased measurements.
+- **Package assembly has one owner: `release-artifacts.ts`.** Packed-consumer
+  verification, delivery-size measurement, and bundler fixtures use its release
+  file selection and manifest policy, even without `--artifacts`. To pack
+  already-built workspace outputs without rebuilding or checking release tools
+  and git cleanliness, run
+  `bun scripts/release-artifacts.ts pack --output <empty-directory>`.
+  This writes tarballs only; release preparation additionally builds, checks the
+  toolchain/tree, and writes the canonical manifest. Existing `--artifacts`
+  inputs continue to consume and verify those canonical tarballs.
 
 - **`docs:generate` owns `docs/src/generated/*`, the API pages, and
   `docs/public/llms*.txt`**. Never hand-edit its output. `docs:check` rejects

@@ -1,6 +1,6 @@
 ---
 title: "buildXlsxModel | @sheetwrite/xlsx"
-description: "Build the active-sheet table model used by the bounded OOXML writer."
+description: "buildXlsxModel function in @sheetwrite/xlsx: Build the active-sheet table model used by the bounded OOXML writer."
 ---
 <!-- api-export:@sheetwrite/xlsx|.|buildXlsxModel -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/xlsx/">@sheetwrite/xlsx</a><span class="api-status" data-kind="function">function</span></div>
@@ -8,7 +8,7 @@ description: "Build the active-sheet table model used by the bounded OOXML write
 Build the active-sheet table model used by the bounded OOXML writer.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/xlsx/src/table-export.ts#L32"><code>packages/xlsx/src/table-export.ts#L32</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/xlsx/src/table-export.ts#L31"><code>packages/xlsx/src/table-export.ts#L31</code></a></dd></div>
 </dl>
 
 ## Declaration

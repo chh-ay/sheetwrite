@@ -1,6 +1,6 @@
 ---
 title: "HyperlinkTarget | @sheetwrite/core"
-description: "Browser-safe external target or stable workbook-internal range target."
+description: "HyperlinkTarget type in @sheetwrite/core: Browser-safe external target or stable workbook-internal range target."
 ---
 <!-- api-export:@sheetwrite/core|.|HyperlinkTarget -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
@@ -8,7 +8,7 @@ description: "Browser-safe external target or stable workbook-internal range tar
 Browser-safe external target or stable workbook-internal range target.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/cell.ts#L51"><code>packages/core/src/types/cell.ts#L51</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/cell.ts#L67"><code>packages/core/src/types/cell.ts#L67</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>2</span>
@@ -56,6 +56,7 @@ export type HyperlinkTarget =
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

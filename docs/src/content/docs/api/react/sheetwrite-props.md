@@ -1,6 +1,6 @@
 ---
 title: "SheetwriteProps | @sheetwrite/react"
-description: "Simple framework adapter props for columns and default row objects."
+description: "SheetwriteProps type in @sheetwrite/react: Simple framework adapter props for columns and default row objects."
 ---
 <!-- api-export:@sheetwrite/react|.|SheetwriteProps -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/react/">@sheetwrite/react</a><span class="api-status" data-kind="type">type</span></div>

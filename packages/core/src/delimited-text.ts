@@ -21,6 +21,8 @@ export interface DelimitedTextResourceLimits {
 export interface DelimitedTextOptions {
   /** Positive safe-integer overrides merged over `DEFAULT_DELIMITED_TEXT_RESOURCE_LIMITS`. */
   resourceLimits?: Partial<DelimitedTextResourceLimits>;
+  /** Abort between bounded encode chunks or store windows. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -439,20 +441,27 @@ function planEncodedField(
   return { text, quote, quoteCount, bytes };
 }
 
-/**
- * Encode raw string rows with CRLF record separators. The returned value is a
- * single in-memory string; iterable rows let callers fetch backing store windows
- * incrementally rather than materializing the entire logical grid first.
- */
-export function encodeDelimitedText(
+function abortDelimited(options: DelimitedTextOptions, operation: DelimitedTextOperation): void {
+  if (!options.signal?.aborted) return;
+  throw new SheetwriteError(
+    "aborted",
+    `delimited-${operation}`,
+    "Sheetwrite: delimited-text operation aborted",
+    {
+      cause: options.signal.reason,
+    },
+  );
+}
+
+/** Enforce every row ceiling before any encoded byte of that row is emitted. */
+function* plannedRows(
   rows: Iterable<readonly string[]>,
   delimiter: "," | "\t",
   options: DelimitedTextOptions = {},
   config: { bom?: boolean; operation?: DelimitedTextOperation } = {},
-): string {
+): Generator<readonly EncodedFieldPlan[]> {
   const limits = resolveDelimitedTextResourceLimits(options);
   const operation = config.operation ?? "encode";
-  const lines: string[] = [];
   let outputBytes = config.bom ? 3 : 0;
   let rowCount = 0;
   let cells = 0;
@@ -461,6 +470,7 @@ export function encodeDelimitedText(
   }
 
   for (const row of rows) {
+    abortDelimited(options, operation);
     const nextRows = rowCount + 1;
     if (nextRows > limits.maxRows) {
       failResource("maxRows", limits.maxRows, nextRows, operation);
@@ -497,17 +507,76 @@ export function encodeDelimitedText(
       );
     }
 
-    const encodedFields: string[] = new Array(plans.length);
-    for (let column = 0; column < plans.length; column++) {
-      const plan = plans[column]!;
-      encodedFields[column] = plan.quote ? `"${plan.text.replaceAll('"', '""')}"` : plan.text;
-    }
-    lines.push(encodedFields.join(delimiter));
+    yield plans;
     outputBytes += required;
     rowCount = nextRows;
     cells = nextCells;
   }
+}
 
+const FIELD_CHUNK_CHARACTERS = 16 * 1024;
+
+/** Pull-driven encoder output: one string per row; only oversized fields are sliced. */
+export function* encodeDelimitedTextChunks(
+  rows: Iterable<readonly string[]>,
+  delimiter: "," | "\t",
+  options: DelimitedTextOptions = {},
+  config: { bom?: boolean; operation?: DelimitedTextOperation } = {},
+): Generator<string> {
+  const operation = config.operation ?? "encode";
+  let first = true;
+  for (const plans of plannedRows(rows, delimiter, options, config)) {
+    const separator = first ? (config.bom ? "\ufeff" : "") : "\r\n";
+    first = false;
+    if (plans.every((plan) => plan.text.length <= FIELD_CHUNK_CHARACTERS)) {
+      yield (
+        separator +
+          plans
+            .map((plan) => (plan.quote ? `"${plan.text.replaceAll('"', '""')}"` : plan.text))
+            .join(delimiter)
+      );
+      continue;
+    }
+    yield separator;
+    for (let column = 0; column < plans.length; column++) {
+      const plan = plans[column];
+      if (!plan) throw new Error("Sheetwrite: missing delimited field plan");
+      if (column > 0) yield delimiter;
+      if (plan.quote) yield '"';
+      for (let offset = 0; offset < plan.text.length;) {
+        abortDelimited(options, operation);
+        let end = Math.min(plan.text.length, offset + FIELD_CHUNK_CHARACTERS);
+        const last = plan.text.charCodeAt(end - 1);
+        if (end < plan.text.length && last >= 0xd800 && last <= 0xdbff) end--;
+        const fragment = plan.text.slice(offset, end);
+        yield plan.quote ? fragment.replaceAll('"', '""') : fragment;
+        offset = end;
+      }
+      if (plan.quote) yield '"';
+    }
+  }
+  if (first && config.bom) yield "\ufeff";
+}
+
+/**
+ * Encode raw string rows with CRLF record separators. The returned value is a
+ * single in-memory string; iterable rows let callers fetch backing store windows
+ * incrementally rather than materializing the entire logical grid first.
+ */
+export function encodeDelimitedText(
+  rows: Iterable<readonly string[]>,
+  delimiter: "," | "\t",
+  options: DelimitedTextOptions = {},
+  config: { bom?: boolean; operation?: DelimitedTextOperation } = {},
+): string {
+  const lines: string[] = [];
+  for (const plans of plannedRows(rows, delimiter, options, config)) {
+    lines.push(
+      plans
+        .map((plan) => (plan.quote ? `"${plan.text.replaceAll('"', '""')}"` : plan.text))
+        .join(delimiter),
+    );
+  }
   const body = lines.join("\r\n");
   return config.bom ? `\ufeff${body}` : body;
 }

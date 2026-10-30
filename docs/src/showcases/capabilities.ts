@@ -16,11 +16,15 @@ export type CapabilityOwnerId =
   | "svelte"
   | "database"
   | "interoperability"
+  | "formatting"
   | "engine"
   | "formulas"
   | "performance"
   | "collaboration"
-  | "host-rows";
+  | "data-tools"
+  | "host-rows"
+  | "spreadsheet"
+  | "analysis";
 
 export type CapabilityArea =
   | "editing"
@@ -129,6 +133,15 @@ export const CAPABILITY_OWNERS: readonly CapabilityOwner[] = [
     kind: "capability",
   },
   {
+    id: "formatting",
+    label: "Formatting & number formats",
+    href: "/showcases/formatting/",
+    routeFile: "docs/src/routes/showcases.formatting.tsx",
+    responsibility:
+      "Live budget typography, alignment, borders, fills, mixed per-cell number formats, conditional formatting, and XLSX style fidelity.",
+    kind: "capability",
+  },
+  {
     id: "engine",
     label: "Live engine view",
     href: "/showcases/engine/",
@@ -143,7 +156,7 @@ export const CAPABILITY_OWNERS: readonly CapabilityOwner[] = [
     href: "/showcases/formulas/",
     routeFile: "docs/src/routes/showcases.formulas.tsx",
     responsibility:
-      "Full formula engine: grouping and pivot tables, dynamic arrays, statistics, regression, LAMBDA helpers, regex, and spill references over a live ledger.",
+      "Full formula engine: GROUPBY and PIVOTBY grouping, dynamic arrays, statistics, regression, LAMBDA helpers, regex, and spill references over a live ledger.",
     kind: "capability",
   },
   {
@@ -173,6 +186,33 @@ export const CAPABILITY_OWNERS: readonly CapabilityOwner[] = [
       "Host entity store as the source of truth: stable row IDs across sort, filter, insert and delete, edit deltas per record, host write policy, bulk lead import.",
     kind: "capability",
   },
+  {
+    id: "data-tools",
+    label: "Data tools",
+    href: "/showcases/data-tools/",
+    routeFile: "docs/src/routes/showcases.data-tools.tsx",
+    responsibility:
+      "Dispatch operations: multi-key sort, composed column filters, validation, protected ranges, row groups and visibility with live Grid receipts.",
+    kind: "capability",
+  },
+  {
+    id: "spreadsheet",
+    label: "Spreadsheet app",
+    href: "/showcases/spreadsheet/",
+    routeFile: "docs/src/routes/showcases.spreadsheet.tsx",
+    responsibility:
+      "The composable shell as a complete app: Excel-style ribbon, name box, formula bar, sheet tabs and status around one grid, with ribbon folding at narrow widths.",
+    kind: "capability",
+  },
+  {
+    id: "analysis",
+    label: "Analysis",
+    href: "/showcases/analysis/",
+    routeFile: "docs/src/routes/showcases.analysis.tsx",
+    responsibility:
+      "Pivot tables and live charts over two years of orders: a pivot by month and region, a chart over its output, and the side panel that edits both.",
+    kind: "capability",
+  },
 ];
 
 const ENGINE_SCENARIO = "docs/src/showcases/scenarios/engine.ts";
@@ -185,6 +225,8 @@ const INTEROP_SCENARIO = "docs/src/showcases/scenarios/interoperability.ts";
 const SCALE_SCENARIO = "docs/src/showcases/scenarios/scale.ts";
 const DATABASE_PROTOCOL = "docs/src/showcases/showcase-database.ts";
 const COLLABORATION_PROTOCOL = "docs/src/showcases/collaboration-protocol.ts";
+const ANALYSIS_SCENARIO = "docs/src/showcases/scenarios/analysis.ts";
+const ORDERS_STORY = "docs/src/showcases/scenarios/orders-story.ts";
 
 const VANILLA_SPEC = "test/browser/vanilla-workbench.spec.ts";
 const REACT_SPEC = "test/browser/react-workbench.spec.ts";
@@ -197,6 +239,7 @@ const FORMULAS_SPEC = "test/browser/showcase-formulas.spec.ts";
 const DATABASE_COLLAB_SPEC = "test/browser/database-collaboration.spec.ts";
 const LIFECYCLE_SPEC = "test/browser/framework-lifecycle.spec.ts";
 const HOST_ROWS_SPEC = "test/browser/host-owned-rows.spec.ts";
+const ANALYSIS_SPEC = "test/browser/showcase-analysis.spec.ts";
 
 const HOST_CHROME_BOUNDARY =
   "Product chrome beyond the shell pieces (menus, dialogs, app framing) is host-owned.";
@@ -353,7 +396,7 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
   },
   {
     id: "formulas.dynamic-arrays",
-    title: "Grouping, pivots & dynamic arrays",
+    title: "Grouping formulas & dynamic arrays",
     area: "modeling",
     primary: "formulas",
     interaction:
@@ -363,6 +406,36 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     testPath: FORMULAS_SPEC,
     sharedModules: [FORMULAS_SCENARIO],
     boundary: "Spills stop at the sheet edge and at occupied cells, which show #SPILL!.",
+  },
+  {
+    id: "modeling.pivot-tables",
+    title: "Pivot tables",
+    area: "modeling",
+    primary: "analysis",
+    interaction:
+      "Edit an order and the pivot's month and region totals update in place; move fields between Rows, Columns, Values and Filters in the field list.",
+    scope: "browser",
+    accessibility:
+      "Every field can be moved with its actions menu from the keyboard; areas and fields have names that say where each field is.",
+    testPath: ANALYSIS_SPEC,
+    sharedModules: [ANALYSIS_SCENARIO, ORDERS_STORY],
+    boundary:
+      "Pivot tables need the full engine (@sheetwrite/formulas); filters keep the values they list.",
+  },
+  {
+    id: "modeling.charts",
+    title: "Live charts",
+    area: "modeling",
+    primary: "analysis",
+    interaction:
+      "A line chart reads the pivot output and redraws after an edit; select it to move, resize or delete it, or insert a chart from a selection.",
+    scope: "browser",
+    accessibility:
+      "A chart is an image named by its title and kind, with its series listed; selected charts move with the arrow keys.",
+    testPath: ANALYSIS_SPEC,
+    sharedModules: [ANALYSIS_SCENARIO, ORDERS_STORY],
+    boundary:
+      "Charts draw through the optional @sheetwrite/charts package; without it, a frame shows the title.",
   },
   {
     id: "formulas.lambda",
@@ -440,7 +513,7 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     accessibility: "Validation outcomes surface as visible, readable text near the edit.",
     testPath: VUE_SPEC,
     sharedModules: [BUSINESS_SCENARIO],
-    boundary: "Rules are client UX policy — server-side enforcement is host-owned.",
+    boundary: "Rules are client UX policy. Server-side enforcement is host-owned.",
   },
   {
     id: "data.protection",
@@ -452,7 +525,37 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     accessibility: "Denied edits produce visible feedback rather than silent failure.",
     testPath: VUE_SPEC,
     sharedModules: [BUSINESS_SCENARIO],
-    boundary: "Protection is client UX policy, never server authorization — that is host-owned.",
+    boundary: "Protection is client UX policy, never server authorization. That is host-owned.",
+  },
+  {
+    id: "data.operations-workflow",
+    title: "Composed dispatch data tools",
+    area: "modeling",
+    primary: "data-tools",
+    interaction:
+      "Compose multi-key sort and two column filters; collapse groups, hide/unhide rows and columns, then inspect mutation receipts for reject, warn and role-gated edits.",
+    scope: "browser",
+    accessibility:
+      "Native labeled controls, visible row counts, stored-value receipts and an accessible event log.",
+    testPath: "test/browser/showcase-data-tools.spec.ts",
+    sharedModules: ["docs/src/showcases/scenarios/data-tools.ts"],
+    boundary:
+      "In-memory client view and UX policy only; backend query execution and authorization remain host-owned.",
+  },
+  {
+    id: "workflow.ribbon",
+    title: "Excel-style ribbon",
+    area: "workflow",
+    primary: "spreadsheet",
+    interaction:
+      "Format and edit a two-sheet workbook from the ribbon's Home, Insert, Data and View tabs; narrow the window to watch groups shrink and fold into dropdowns.",
+    scope: "browser",
+    accessibility:
+      "Tab list with arrow-key navigation, labeled groups, aria-pressed toggles, keyboard menus and lists, and Escape back to the grid.",
+    testPath: "test/browser/showcase-spreadsheet.spec.ts",
+    sharedModules: ["docs/src/showcases/scenarios/spreadsheet.ts"],
+    boundary:
+      "Commands act through grid.actions; a host that wants different chrome builds its own on the same API.",
   },
   {
     id: "annotations.notes",
@@ -482,12 +585,16 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     id: "formatting.cell-styles",
     title: "Cell styles & number formats",
     area: "workflow",
-    primary: "vue",
-    interaction: "Bold, fills, currency number formats, and conditional formats paint live.",
+    primary: "formatting",
+    secondary: [
+      { owner: "vue", reason: "Supplier workflow uses currency and conditional styles." },
+    ],
+    interaction:
+      "Change live budget styles and mixed number formats, then export and re-import XLSX to compare their fidelity.",
     scope: "browser",
     accessibility: "Style never encodes the only copy of information; values stay readable.",
-    testPath: VUE_SPEC,
-    sharedModules: [BUSINESS_SCENARIO],
+    testPath: "test/browser/showcase-formatting.spec.ts",
+    sharedModules: ["docs/src/showcases/scenarios/formatting.ts"],
     boundary: "Theming beyond the documented Theme contract is host-owned CSS.",
   },
   {
@@ -614,7 +721,7 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     title: "WASM boundary crossings",
     area: "scale",
     primary: "performance",
-    interaction: "Inspect crossing counts per interaction — bulk windows, not per-cell chatter.",
+    interaction: "Inspect crossing counts per interaction: bulk windows, not per-cell chatter.",
     scope: "browser",
     accessibility: "Instrumentation renders as accessible text counters.",
     testPath: PERFORMANCE_SPEC,
@@ -631,8 +738,7 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     accessibility: "Benchmark bars carry text equivalents; log-scale is explained in prose.",
     testPath: PERFORMANCE_SPEC,
     sharedModules: [SCALE_SCENARIO],
-    boundary:
-      "Numbers come from the checked-in benchmark protocol only — measured, never promised.",
+    boundary: "Numbers come from the checked-in benchmark protocol only: measured, never promised.",
   },
 
   {
@@ -673,7 +779,7 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     testPath: INTEROP_SPEC,
     sharedModules: [INTEROP_SCENARIO],
     boundary:
-      "Delimited text carries values only — styles, formulas-as-formulas, and merges do not survive.",
+      "Delimited text carries values only. Styles, formulas-as-formulas, and merges do not survive.",
   },
   {
     id: "io.fidelity-loss-warnings",

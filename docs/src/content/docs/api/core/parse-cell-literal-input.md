@@ -1,6 +1,6 @@
 ---
 title: "parseCellLiteralInput | @sheetwrite/core"
-description: "Parse imported text as a literal using the same boolean, number, date, and currency rules as parseCellInput."
+description: "parseCellLiteralInput function in @sheetwrite/core: Parse imported text as a literal using the same boolean, number, date, and currency rules as parseCellInput."
 ---
 <!-- api-export:@sheetwrite/core|.|parseCellLiteralInput -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
@@ -11,7 +11,7 @@ currency rules as [`parseCellInput`](/docs/api/core/parse-cell-input/). Unlike i
 date serial so delimited export/import preserves numeric dates.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/cell-input.ts#L77"><code>packages/core/src/cell-input.ts#L77</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/cell-input.ts#L89"><code>packages/core/src/cell-input.ts#L89</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -34,6 +34,7 @@ function parseCellLiteralInput(
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

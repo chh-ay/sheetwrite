@@ -1,6 +1,6 @@
 ---
 title: "emptyStoreMemoryStats | @sheetwrite/core"
-description: "Construct a zero-owner store report when no WASM store is available."
+description: "emptyStoreMemoryStats function in @sheetwrite/core: Construct a zero-owner store report when no WASM store is available."
 ---
 <!-- api-export:@sheetwrite/core|.|emptyStoreMemoryStats -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
@@ -30,6 +30,7 @@ function emptyStoreMemoryStats(
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

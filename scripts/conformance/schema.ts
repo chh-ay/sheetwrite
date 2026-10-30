@@ -78,6 +78,7 @@ const CASE_KEYS = [
   "numberFormat",
   "target",
   "operations",
+  "calculation",
   "expected",
   "observations",
   "knownDivergence",
@@ -135,6 +136,9 @@ const MANIFEST_COUNT_KEYS = [
 ] as const;
 const MINIMUM_KEYS = ["formula", "mutation", "workbook"] as const;
 const OPERATION_KEYS = ["op"] as const;
+const CALCULATION_KEYS = ["iterate", "maxIterations", "maxChange"] as const;
+/** Excel accepts 1 to 32,767 iterations. */
+const MAX_CASE_ITERATIONS = 32_767;
 const EMPTY_ARTIFACTS = new Set<string>();
 
 function functionInvocationContains(formula: string, name: string, marker: string): boolean {
@@ -338,7 +342,9 @@ function validateInventory(value: unknown, issues: string[]): InventoryDenominat
     if (
       !isObject(entry) ||
       !INVENTORY_OPERATOR.test(String(entry.canonical)) ||
-      !isNonemptyString(entry.token) ||
+      // The intersection operator token is a single space.
+      typeof entry.token !== "string" ||
+      entry.token.length === 0 ||
       !["prefix", "infix", "postfix"].includes(String(entry.fixity)) ||
       entry.family !== "operator"
     ) {
@@ -611,6 +617,33 @@ function validateManifest(
   }
 }
 
+/**
+ * Validates a case's iterative calculation and returns its canonical form, which
+ * every case of the corpus must share because producers set it per workbook.
+ */
+function validateCaseCalculation(value: unknown, path: string, issues: string[]): string {
+  if (!isObject(value)) {
+    issues.push(`${path}: expected object`);
+    return "";
+  }
+
+  rejectUnknownKeys(value, CALCULATION_KEYS, path, issues);
+  if (value.iterate !== true) issues.push(`${path}.iterate: expected true`);
+  const { maxIterations, maxChange } = value;
+  if (
+    typeof maxIterations !== "number" ||
+    !Number.isInteger(maxIterations) ||
+    maxIterations < 1 ||
+    maxIterations > MAX_CASE_ITERATIONS
+  ) {
+    issues.push(`${path}.maxIterations: expected an integer from 1 to ${MAX_CASE_ITERATIONS}`);
+  }
+  if (typeof maxChange !== "number" || !Number.isFinite(maxChange) || maxChange < 0) {
+    issues.push(`${path}.maxChange: expected a finite number of at least 0`);
+  }
+  return canonicalJson(value);
+}
+
 /** Validate corpus structure, independent evidence, immutable checksums, and inventory-derived coverage. */
 export function validateCorpus(
   value: unknown,
@@ -632,6 +665,7 @@ export function validateCorpus(
   const operatorCategories = new Map<string, Set<string>>();
   const subjectCategoryFormulas = new Map<string, Set<string>>();
   const categories = new Set<string>();
+  const calculations = new Set<string>();
   const operationShapes = {
     mutation: new Set<string>(),
     workbook: new Set<string>(),
@@ -677,6 +711,9 @@ export function validateCorpus(
     if (entry.localCanary === true) counts.localCanary += 1;
     else if (entry.localCanary !== undefined)
       issues.push(`${path}.localCanary: expected true or absent`);
+    if (entry.calculation !== undefined && entry.kind !== "formula") {
+      issues.push(`${path}.calculation: only formula cases set iterative calculation`);
+    }
 
     if (entry.kind === "formula") {
       counts.formula += 1;
@@ -691,6 +728,9 @@ export function validateCorpus(
         issues.push(`${path}.target: invalid A1 cell`);
       }
       if (!Array.isArray(entry.inputs)) issues.push(`${path}.inputs: required`);
+      if (entry.calculation !== undefined) {
+        calculations.add(validateCaseCalculation(entry.calculation, `${path}.calculation`, issues));
+      }
       if (Array.isArray(entry.inputs)) {
         const inputCells = new Set<string>();
         entry.inputs.forEach((input, inputIndex) => {
@@ -910,6 +950,9 @@ export function validateCorpus(
       });
     }
   });
+  if (calculations.size > 1) {
+    issues.push("cases.calculation: every case must share one iterative calculation setting");
+  }
 
   if (counts.formula < REQUIRED_COUNTS.formula) {
     issues.push(

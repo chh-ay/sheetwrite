@@ -13,8 +13,8 @@
   .sw-si-page {
     --sw-si-grid-block-size: clamp(30rem, 60dvh, 36rem);
     --sw-si-split-block-size: clamp(27rem, calc(100dvh - (var(--sw-header-height) * 2)), 46rem);
-    /* The demo danger colour is tuned for the dark instrument; as text on the
-       light page surfaces it mixes toward the theme's strong foreground. */
+    /* As text on page surfaces, the demo danger colour mixes toward the theme's
+       strong foreground. */
     --sw-si-danger: color-mix(in srgb, var(--sw-demo-danger) 68%, var(--sw-fg-strong));
     display: flex;
     width: calc(100% - 2 * var(--sw-page-inset));
@@ -368,7 +368,7 @@
     flex: 1;
   }
 
-  /* ── Workbench: one dark instrument ── */
+  /* ── Workbench: one instrument in the demo palette ── */
 
   .sw-si-workbench {
     --sw-surface-0: var(--sw-demo-deep);
@@ -383,11 +383,11 @@
     --sw-accent: var(--sw-demo-accent);
     --sw-accent-strong: var(--sw-demo-accent-strong);
     --sw-accent-ink: var(--sw-demo-ink);
-    /* The light-theme soft/raised tokens would leave pale chips with pale text on
-       the dark instrument; keep them in the demo palette. */
+    /* Keep soft and raised tokens in the demo palette so chips and their text
+       match the workbench surface rather than the page. */
     --sw-accent-soft: color-mix(in srgb, var(--sw-demo-accent) 18%, transparent);
     --sw-surface-3: var(--sw-demo-border-strong);
-    /* Danger text sits on the dark instrument here, so it keeps the demo pink. */
+    /* Danger text sits on the workbench surface, so it uses the demo colour. */
     --sw-si-danger: var(--sw-demo-danger);
     --sheetwrite-font: 500 13px / 1.4 var(--sw-font-body);
     --sheetwrite-bg: var(--sw-surface-1);
@@ -479,13 +479,7 @@
     grid-area: ledger;
     min-width: 0;
     padding: 1.25rem 1.5rem 1rem;
-    background:
-      radial-gradient(
-        40rem 12rem at 95% 0%,
-        color-mix(in srgb, var(--sw-demo-accent) 12%, transparent),
-        transparent 75%
-      ),
-      var(--sw-demo-surface);
+    background: var(--sw-demo-surface);
     border-bottom: 1px solid var(--sw-demo-border);
   }
 
@@ -2415,9 +2409,9 @@
    Core declares its canvas palette on .sheetwrite itself and overrides it again
    for [data-theme="dark"], so the workbench palette only takes effect when it
    is declared on that same element with higher specificity than either rule.
-   The grid therefore keeps the workbench's dark instrument look in both page
-   themes, and the sheet-tab tokens core derives from the resolved theme (and
-   writes inline on the tab bar) follow it. */
+   The grid therefore follows the workbench's demo tokens in both page themes,
+   and the sheet-tab tokens core derives from the resolved theme (and writes
+   inline on the tab bar) follow it. */
 .sw-si-workbench .sw-si-stage .sw-si-grid {
   --sheetwrite-font: 500 13px / 1.4 var(--sw-font-body);
   --sheetwrite-bg: var(--sw-demo-surface);

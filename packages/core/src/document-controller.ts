@@ -4,15 +4,18 @@ import {
   markAtomicBatch,
   splitOversizedBlocks,
 } from "./atomic-batch.js";
+import { chartTouchesSheet, cloneChartDefinition } from "./chart-definition.js";
 import {
   type AdmittedTransactionResources,
   admitTransactionResources,
+  DEFAULT_CALCULATION_SETTINGS,
   DEFAULT_TRANSACTION_RESOURCE_LIMITS,
   resolveTransactionResourceValidation,
   validateTransactionResources,
   withAdmittedTransactionResources,
 } from "./document-protocol.js";
 import {
+  type AxisResize,
   type HistoryAction,
   type HistoryPart,
   type HistoryResourceStats,
@@ -20,11 +23,16 @@ import {
   UndoManager,
 } from "./history.js";
 import { cloneCellHyperlink } from "./hyperlink.js";
-import { encodeRestoreBlock, estimateRestoreBlockBytes } from "./restore-block.js";
+import { clonePivot, planPivotEdit, pivotRewrites } from "./pivot.js";
+import {
+  encodeRestoreBlock,
+  encodeMeasuredRestoreBlock,
+  estimateRestoreBlockBytes,
+} from "./restore-block.js";
 import type { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
 import type { GridTransactionAdmissionDecision } from "./transaction-admission.js";
-import { TransactionPreparation } from "./transaction-preparation.js";
+import { preparedHistoryBlock, TransactionPreparation } from "./transaction-preparation.js";
 import type { CellValue, Column } from "./types/cell.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "./types/coordinates.js";
 import type {
@@ -113,7 +121,7 @@ export class DocumentController {
     // Undo entries hold addresses from before this change: a remote row or
     // column insert or delete moves them exactly as a local one does.
     if (outcome.status === "applied") {
-      for (const patch of outcome.transaction.patches) this.rebaseHistoryFor(patch);
+      this.rebaseHistoryFor(outcome.transaction.patches);
     }
 
     return outcome;
@@ -223,7 +231,9 @@ export class DocumentController {
 
       // Custom stores without an engine retain their scalar snapshot contract.
       for (const patch of patches) {
-        if (!inverseByPatch.has(patch)) inverseByPatch.set(patch, this.inversePatch(patch));
+        if (!inverseByPatch.has(patch)) {
+          inverseByPatch.set(patch, [...this.inversePatch(patch), ...this.pivotRestores(patch)]);
+        }
       }
 
       outcome = this.storeApply(patches, reason, admittedPatches);
@@ -279,7 +289,7 @@ export class DocumentController {
       }
     }
 
-    for (const patch of applied) this.rebaseHistoryFor(patch);
+    this.rebaseHistoryFor(applied);
     this.history.push(inverse, applied);
 
     return outcome;
@@ -436,11 +446,17 @@ export class DocumentController {
               }
             : null;
         const compact = range ? this.compactHistoryPart(range) : null;
+        const charts = this.chartRestores(patch.sheet, { includeOwned: true });
         return compact
-          ? [{ op: "addRows", sheet: patch.sheet, at: patch.at, count: patch.count }, compact]
+          ? [
+              { op: "addRows", sheet: patch.sheet, at: patch.at, count: patch.count },
+              compact,
+              ...charts,
+            ]
           : [
               { op: "addRows", sheet: patch.sheet, at: patch.at, count: patch.count },
               ...this.snapshotRows(patch.sheet, patch.at, patch.count),
+              ...charts,
             ];
       }
       case "moveRows":
@@ -452,6 +468,8 @@ export class DocumentController {
             count: patch.count,
             to: patch.from,
           },
+          // A partly moved source range does not map back exactly.
+          ...this.chartRestores(patch.sheet, { includeOwned: true }),
         ];
       case "addColumns":
         return [
@@ -473,6 +491,7 @@ export class DocumentController {
               }
             : null;
         const compact = range ? this.compactHistoryPart(range) : null;
+        const charts = this.chartRestores(patch.sheet, { includeOwned: true });
         return compact
           ? [
               {
@@ -482,6 +501,7 @@ export class DocumentController {
                 columns: this.snapshotColumns(patch.sheet, patch.at, patch.count),
               },
               compact,
+              ...charts,
             ]
           : [
               {
@@ -491,6 +511,7 @@ export class DocumentController {
                 columns: this.snapshotColumns(patch.sheet, patch.at, patch.count),
               },
               ...this.snapshotColumnCells(patch.sheet, patch.at, patch.count),
+              ...charts,
             ];
       }
       case "moveColumns":
@@ -502,6 +523,8 @@ export class DocumentController {
             count: patch.count,
             to: patch.from,
           },
+          // A partly moved source range does not map back exactly.
+          ...this.chartRestores(patch.sheet, { includeOwned: true }),
         ];
       case "setColumn": {
         const sheet = this.sheetById(patch.sheet);
@@ -543,9 +566,11 @@ export class DocumentController {
       case "removeSheet": {
         const snapshot = this.snapshotSheet(patch.sheet);
         if (!snapshot) return [];
+        // The snapshot carries the sheet's own charts; other sheets' charts need theirs back.
         const restore: DocumentOp[] = [
           { op: "addSheet", sheet: snapshot },
           ...this.snapshotExternalFormulaAndRefs(patch.sheet),
+          ...this.chartRestores(patch.sheet, { includeOwned: false }),
         ];
         for (const namedRange of this.options.store.getWorkbook().namedRanges ?? []) {
           if (namedRange.range.sheet === patch.sheet || namedRange.scope === patch.sheet) {
@@ -562,7 +587,10 @@ export class DocumentController {
         const from = this.options.store
           .getWorkbook()
           .sheets.findIndex((sheet) => sheet.id === patch.sheet);
-        return from < 0 ? [] : [{ op: "moveSheet", sheet: patch.sheet, to: from }];
+        if (from < 0) return [];
+        // A move can rewrite the endpoints of 3-D references. Setting their
+        // sources again after moving back restores the text exactly.
+        return [{ op: "moveSheet", sheet: patch.sheet, to: from }, ...this.snapshotSpanFormulas()];
       }
       case "setSheetVisibility": {
         const sheet = this.sheetById(patch.sheet);
@@ -597,6 +625,12 @@ export class DocumentController {
         if (patch.patch.totalsRow !== undefined) previous.totalsRow = table.totalsRow;
         if (patch.patch.style !== undefined) {
           previous.style = table.style ? structuredClone(table.style) : null;
+        }
+        if (patch.patch.autoFilter !== undefined) {
+          previous.autoFilter = structuredClone(table.autoFilter ?? null);
+        }
+        if (patch.patch.sortState !== undefined) {
+          previous.sortState = structuredClone(table.sortState ?? null);
         }
         if (patch.patch.unsupportedFeatures !== undefined) {
           previous.unsupportedFeatures = structuredClone(table.unsupportedFeatures ?? []);
@@ -662,6 +696,22 @@ export class DocumentController {
         );
         return previous
           ? [{ op: "setHyperlink", sheet: patch.sheet, hyperlink: cloneCellHyperlink(previous) }]
+          : [];
+      }
+      case "setChart": {
+        const previous = this.sheetById(patch.sheet)?.charts?.find(
+          (chart) => chart.id === patch.chart.id,
+        );
+        return previous
+          ? [{ op: "setChart", sheet: patch.sheet, chart: cloneChartDefinition(previous) }]
+          : [{ op: "removeChart", sheet: patch.sheet, id: patch.chart.id }];
+      }
+      case "removeChart": {
+        const previous = this.sheetById(patch.sheet)?.charts?.find(
+          (chart) => chart.id === patch.id,
+        );
+        return previous
+          ? [{ op: "setChart", sheet: patch.sheet, chart: cloneChartDefinition(previous) }]
           : [];
       }
       case "setValidationRule": {
@@ -747,7 +797,47 @@ export class DocumentController {
           );
         return previous ? [{ op: "setNamedRange", namedRange: { ...previous } }] : [];
       }
+      case "setCalculation": {
+        // Absent settings are the defaults, which undo must restore explicitly.
+        const previous =
+          this.options.store.getWorkbook().calculation ?? DEFAULT_CALCULATION_SETTINGS;
+        return [{ op: "setCalculation", calculation: { ...previous } }];
+      }
+      case "setPivot": {
+        const sheet = this.sheetById(patch.sheet);
+        // A sheet created in this batch is removed by the addSheet inverse,
+        // with all its pivots. A later removePivot would target a missing sheet.
+        if (!sheet) return [];
+        const previous = sheet.pivots?.find((pivot) => pivot.id === patch.pivot.id);
+        return previous
+          ? [{ op: "setPivot", sheet: patch.sheet, pivot: clonePivot(previous) }]
+          : [{ op: "removePivot", sheet: patch.sheet, id: patch.pivot.id }];
+      }
+      case "removePivot": {
+        const previous = this.sheetById(patch.sheet)?.pivots?.find(
+          (pivot) => pivot.id === patch.id,
+        );
+        return previous
+          ? [{ op: "setPivot", sheet: patch.sheet, pivot: clonePivot(previous) }]
+          : [];
+      }
     }
+  }
+
+  /**
+   * Pivots an edit rewrites, restored with their definitions from before it.
+   * They follow the structural inverse, so anchors and sources are back in
+   * bounds when the restore is validated. The store applies the same plan.
+   */
+  private pivotRestores(patch: DocumentOp): DocumentOp[] {
+    const sheets = this.options.store.getWorkbook().sheets;
+    const plan = planPivotEdit(patch, sheets);
+    if (!plan) return [];
+    return pivotRewrites(sheets, plan).map((rewrite) => ({
+      op: "setPivot",
+      sheet: rewrite.owner,
+      pivot: clonePivot(rewrite.before),
+    }));
   }
 
   private compactHistoryPart(range: Range): HistoryPart | null {
@@ -757,7 +847,7 @@ export class DocumentController {
       kind: "rangeSnapshot",
       range: snapshot.range,
       byteLength: snapshot.byteLength,
-      toPatch: (target) => snapshot.toDocumentOp(target),
+      toPatch: (target, preparation) => snapshot.toDocumentOp(target, preparation),
       dispose: () => snapshot.dispose(),
     };
   }
@@ -946,6 +1036,29 @@ export class DocumentController {
     return this.snapshotSetBatch(sheet, patches);
   }
 
+  /**
+   * Pre-edit definitions of every chart a structural edit of `sheet` may rewrite,
+   * set back after the structure is restored so undo returns them exactly.
+   * `includeOwned` false skips charts anchored on `sheet`, which its snapshot carries.
+   */
+  private chartRestores(
+    sheet: SheetId,
+    { includeOwned }: { includeOwned: boolean },
+  ): readonly DocumentOp[] {
+    const restores: DocumentOp[] = [];
+    for (const owner of this.options.store.getWorkbook().sheets) {
+      const charts = owner.charts;
+      if (!charts || (!includeOwned && owner.id === sheet)) continue;
+
+      for (const chart of charts) {
+        if (chartTouchesSheet(chart, owner.id, sheet)) {
+          restores.push({ op: "setChart", sheet: owner.id, chart: cloneChartDefinition(chart) });
+        }
+      }
+    }
+    return restores;
+  }
+
   private snapshotSheet(id: SheetId): SheetSnapshot | null {
     const sheet = this.sheetById(id);
     if (!sheet) return null;
@@ -998,6 +1111,8 @@ export class DocumentController {
       filters: structuredClone(sheet.filters),
       rowGroups: sheet.rowGroups?.map((group) => ({ ...group })),
       tables: structuredClone(sheet.tables),
+      charts: sheet.charts?.map(cloneChartDefinition),
+      pivots: sheet.pivots?.map(clonePivot),
       cells:
         cells.length === 0
           ? []
@@ -1064,20 +1179,56 @@ export class DocumentController {
     return patches;
   }
 
-  private rebaseHistoryFor(patch: DocumentOp): void {
-    switch (patch.op) {
-      case "addRows":
-        this.history.rebaseRows(patch.sheet, patch.at, patch.count);
-        break;
-      case "removeRows":
-        this.history.rebaseRows(patch.sheet, patch.at, -patch.count);
-        break;
-      case "addColumns":
-        this.history.rebaseCols(patch.sheet, patch.at, patch.columns.length);
-        break;
-      case "removeColumns":
-        this.history.rebaseCols(patch.sheet, patch.at, -patch.count);
-        break;
+  private snapshotSpanFormulas(): DocumentOp[] {
+    const engine = storeEngine(this.options.store);
+    if (!engine) return [];
+    const patches: DocumentOp[] = [];
+    for (const sheet of this.options.store.getWorkbook().sheets) {
+      const cells = engine.sheetSpanFormulaCells(sheet.id);
+      if (cells.length === 0) continue;
+      const captured = engine.captureCells(sheet.id, cells);
+      for (const [index, cell] of cells.entries()) {
+        const source = captured[index];
+        if (!source) throw new Error("Missing 3-D formula source snapshot");
+        patches.push({
+          op: "set",
+          addr: { sheet: sheet.id, row: cell.row, col: cell.col },
+          value: source.value,
+          style: source.style,
+        });
+      }
+    }
+    return patches;
+  }
+
+  /**
+   * Rebase undo history past the row and column edits of one applied
+   * transaction. A deleted pivot anchor falls back inside the sheet as it stood
+   * right after its own edit, and later edits in the batch may resize the sheet
+   * again, so each edit's extent is recovered from the final one.
+   */
+  private rebaseHistoryFor(patches: readonly DocumentOp[]): void {
+    const extents = new Map<SheetId, { row: number; col: number }>();
+    for (const patch of patches) {
+      const edit = axisResize(patch);
+      if (!edit) continue;
+
+      let extent = extents.get(edit.sheet);
+      if (!extent) {
+        const sheet = this.sheetById(edit.sheet);
+        extent = { row: sheet?.rowCount ?? 0, col: sheet?.columns.length ?? 0 };
+        extents.set(edit.sheet, extent);
+      }
+      extent[edit.axis] -= edit.delta;
+    }
+
+    for (const patch of patches) {
+      const edit = axisResize(patch);
+      const extent = edit && extents.get(edit.sheet);
+      if (!edit || !extent) continue;
+
+      extent[edit.axis] += edit.delta;
+      this.history.rebaseAxis(edit, extent[edit.axis]);
     }
   }
 
@@ -1085,13 +1236,12 @@ export class DocumentController {
     action: HistoryAction,
     reason: "undo" | "redo",
   ): ApplyTransactionResult | null {
-    const patches = materializeHistoryAction(action);
-    if (patches.length === 0) return null;
-
     this.applyingHistory = true;
     let outcome: ApplyTransactionResult;
     const preparation = new TransactionPreparation();
     try {
+      const patches = materializeHistoryAction(action, preparation);
+      if (patches.length === 0) return null;
       const fitted = this.fitHistoryPatches(patches, preparation);
       outcome = this.commit(fitted.patches, reason, fitted.admitted);
     } finally {
@@ -1099,7 +1249,7 @@ export class DocumentController {
       this.applyingHistory = false;
     }
     if (outcome.status !== "applied") return outcome;
-    for (const patch of outcome.transaction.patches) this.rebaseHistoryFor(patch);
+    this.rebaseHistoryFor(outcome.transaction.patches);
     this.options.onHistoryApplied();
     return outcome;
   }
@@ -1122,7 +1272,27 @@ export class DocumentController {
     admitted?: AdmittedTransactionResources;
   } {
     const limits = this.transactionResourceLimits;
-    const resources = validateTransactionResources(patches, limits);
+    const encodedBytes = preparation.measure(patches);
+    const resources =
+      patches.length <= limits.maxOperations && encodedBytes <= limits.maxEncodedBytes
+        ? { ok: true as const, operationCount: patches.length, encodedBytes }
+        : {
+            ok: false as const,
+            issue: {
+              kind: "resource-limit" as const,
+              severity: "error" as const,
+              resource:
+                patches.length > limits.maxOperations
+                  ? ("operations" as const)
+                  : ("encoded-bytes" as const),
+              actual: patches.length > limits.maxOperations ? patches.length : encodedBytes,
+              max:
+                patches.length > limits.maxOperations
+                  ? limits.maxOperations
+                  : limits.maxEncodedBytes,
+              message: "History restore exceeds the transaction resource limits",
+            },
+          };
     if (resources.ok) {
       return { patches, admitted: admitTransactionResources(patches, limits, resources) };
     }
@@ -1131,7 +1301,10 @@ export class DocumentController {
       const compact = patches.map((patch) => {
         if (patch.op !== "setBlock") return patch;
         try {
-          const operation = encodeRestoreBlock(patch.range, patch.block);
+          const measured = preparedHistoryBlock(patch.block);
+          const operation = measured
+            ? encodeMeasuredRestoreBlock(patch.range, patch.block, measured.blockBytes)
+            : encodeRestoreBlock(patch.range, patch.block);
           preparation.seed(operation, patch.block);
           return operation;
         } catch (error) {
@@ -1203,6 +1376,22 @@ function exceedsTransactionLimit(issue: MutationIssue): boolean {
       issue.resource === "encoded-bytes" ||
       issue.resource === "batch-versions")
   );
+}
+
+/** The row or column count change `patch` makes; null for any other operation. */
+function axisResize(patch: DocumentOp): AxisResize | null {
+  switch (patch.op) {
+    case "addRows":
+      return { sheet: patch.sheet, axis: "row", at: patch.at, delta: patch.count };
+    case "removeRows":
+      return { sheet: patch.sheet, axis: "row", at: patch.at, delta: -patch.count };
+    case "addColumns":
+      return { sheet: patch.sheet, axis: "col", at: patch.at, delta: patch.columns.length };
+    case "removeColumns":
+      return { sheet: patch.sheet, axis: "col", at: patch.at, delta: -patch.count };
+    default:
+      return null;
+  }
 }
 
 function previousColumnPatch(column: Column, changed: Partial<Column>): Partial<Column> {

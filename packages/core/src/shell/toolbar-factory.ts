@@ -3,15 +3,15 @@
 // (role, label, roving focus) without duplicating any action binding.
 
 import { defaultToolbarItems, renderToolbarItems } from "../toolbar.js";
-import type { Grid, ToolbarActionName, ToolbarIcon, ToolbarItem } from "../types/grid.js";
+import type { Grid, IconOverrides, ToolbarItem } from "../types/grid.js";
 import type { ShellPiece } from "./formula-controls.js";
 
 /** Host element and configuration used to create the built-in toolbar. */
 export interface ToolbarOptions {
   /** Items to render; defaults to the full built-in action set. */
   items?: readonly ToolbarItem[];
-  /** Per-action icon overrides, exactly like `GridConfig.icons`. */
-  icons?: Partial<Record<ToolbarActionName, ToolbarIcon>>;
+  /** Per-glyph icon overrides, exactly like `GridConfig.icons`. */
+  icons?: IconOverrides;
   /** Accessible toolbar label (default "Spreadsheet formatting"). */
   label?: string;
 }

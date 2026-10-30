@@ -10,8 +10,10 @@ import {
   documentComponentForSplat,
   normalizeDocumentHref,
 } from "../lib/content.js";
+import { forwardedHeading, MOVED_PAGES, movedPageTarget } from "../lib/moved-pages.js";
+import { breadcrumbsFor } from "../lib/navigation.js";
 import { revealAnchoredMember } from "../lib/reveal-anchor.ts";
-import { pageMeta } from "../lib/seo.js";
+import { documentStructuredData, pageMeta, pageTitle } from "../lib/seo.js";
 
 /** Documentation content renders its site links through the router. */
 const DOCUMENT_COMPONENTS: DocumentComponents = {
@@ -22,37 +24,99 @@ const DOCUMENT_COMPONENTS: DocumentComponents = {
 
 export const Route = createFileRoute("/docs/$")({
   loader: async ({ params }) => {
+    const href = normalizeDocumentHref(params._splat);
+    const moved = MOVED_PAGES[href];
+    if (moved !== undefined) {
+      return {
+        title: "Page moved",
+        description: "This page has a new address.",
+        moved: href,
+        href,
+      };
+    }
     // Dynamic import: the docs page index ships with docs routes, not every page.
     const { documentForSplat } = await import("../lib/content.js");
     const document = await documentForSplat(params._splat);
     if (document === undefined) throw notFound();
-    return { title: document.title, description: document.description };
+    return { title: document.title, description: document.description, moved: undefined, href };
   },
-  head: ({ loaderData }) => ({
-    meta: pageMeta(
-      `${loaderData?.title ?? "Documentation"} — Sheetwrite`,
-      loaderData?.description ?? "Sheetwrite documentation.",
-    ),
-  }),
+  head: ({ loaderData }) => {
+    const title = loaderData?.title ?? "Documentation";
+    const description = loaderData?.description ?? "Sheetwrite documentation.";
+
+    // An old address must not compete with its new page in search results.
+    if (loaderData === undefined || loaderData.moved !== undefined) {
+      return {
+        meta: [
+          ...pageMeta(pageTitle(title), description),
+          { name: "robots", content: "noindex, follow" },
+        ],
+      };
+    }
+
+    const structuredData = documentStructuredData({
+      title,
+      description,
+      href: loaderData.href,
+      trail: breadcrumbsFor(loaderData.href, title),
+    });
+    return {
+      meta: [
+        ...pageMeta(pageTitle(title), description),
+        { property: "og:type", content: "article" },
+      ],
+      scripts: [{ type: "application/ld+json", children: structuredData }],
+    };
+  },
   component: DocumentRoute,
   notFoundComponent: DocumentNotFound,
 });
 
+/**
+ * Deployed servers answer an old address with a 308 redirect (see
+ * scripts/prepare-docs-deployment.ts). The dev server and client-side
+ * navigation reach this route instead: it forwards the old address and its
+ * fragment to the page that holds that heading now. The page has no
+ * `data-pagefind-body`, so search never lists it.
+ */
+function MovedDocument({ from }: Readonly<{ from: string }>) {
+  const target = MOVED_PAGES[from]?.to ?? "/docs/";
+  useEffect(() => {
+    window.location.replace(movedPageTarget(from, window.location.hash) ?? target);
+  }, [from, target]);
+  return (
+    <main className="sw-document" id="main-content">
+      <h1>Page moved</h1>
+      <p>
+        This page has a new address: <a href={target}>{target}</a>.
+      </p>
+    </main>
+  );
+}
+
 function DocumentRoute() {
   const params = Route.useParams();
+  const activeHref = normalizeDocumentHref(params._splat);
   // SPA navigations (pushState) never fire hashchange; reveal per location.
   const href = useLocation({ select: (location) => location.href });
   useEffect(() => {
     void href;
+    // An old URL redirects here with its old #fragment; send that heading on.
+    const forwarded = forwardedHeading(activeHref, window.location.hash);
+    if (forwarded !== undefined) {
+      window.location.replace(forwarded);
+      return;
+    }
     revealAnchoredMember();
-  }, [href]);
+  }, [href, activeHref]);
   const metadata = Route.useLoaderData();
   const Content = documentComponentForSplat(params._splat);
+  if (metadata.moved !== undefined) return <MovedDocument from={metadata.moved} />;
   if (Content === undefined) return <DocumentNotFound />;
 
   return (
     <DocsShell
-      activeHref={normalizeDocumentHref(params._splat)}
+      activeHref={activeHref}
       description={metadata.description}
       reserveOutline
       title={metadata.title}

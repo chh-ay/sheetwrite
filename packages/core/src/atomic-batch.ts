@@ -1,4 +1,5 @@
 import { boundedJsonByteLength, JsonByteLengthError } from "./errors.js";
+import { preparedHistoryBlock } from "./transaction-preparation.js";
 import type { CellStyle } from "./types/cell.js";
 import type { CellAddress, Range } from "./types/coordinates.js";
 import type { DocumentOp, PackedCellBlock } from "./types/document.js";
@@ -75,6 +76,17 @@ export function measureOperationBytes(operations: readonly DocumentOp[], limit: 
   let total = ARRAY_ENVELOPE_BYTES;
   for (let index = 0; index < operations.length; index++) {
     const separator = index > 0 ? 1 : 0;
+    const operation = operations[index];
+    // Undo blocks are measured once when the engine builds them; walking their
+    // million-value arrays again here would repeat the dominant undo cost.
+    const history =
+      operation?.op === "setBlock" ? preparedHistoryBlock(operation.block) : undefined;
+    if (history) {
+      sizes[index] = history.operationBytes;
+      total += separator + history.operationBytes;
+      continue;
+    }
+
     try {
       sizes[index] = boundedJsonByteLength(operations[index], limit - total - separator, {
         omitUndefinedProperties: true,

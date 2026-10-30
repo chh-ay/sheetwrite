@@ -1,6 +1,6 @@
 ---
 title: "SyncCoordinator | @sheetwrite/core"
-description: "Deterministic, transport-neutral optimistic sync."
+description: "SyncCoordinator class in @sheetwrite/core: Deterministic, transport-neutral optimistic sync."
 ---
 <!-- api-export:@sheetwrite/core|.|SyncCoordinator -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="class">class</span></div>
@@ -9,7 +9,7 @@ Deterministic, transport-neutral optimistic sync. Local rendering is never
 blocked: changes queue immediately, while hosts explicitly call `sendNext`
 or `retry` to perform network work.
 
-### Examples
+## Examples
 
 ```ts compile
 import { SyncCoordinator, type Grid, type PersistenceAdapter } from "@sheetwrite/core";
@@ -22,13 +22,13 @@ async function connect(grid: Grid, adapter: PersistenceAdapter, documentId: stri
 }
 ```
 
-### See also
+## See also
 
 - [PersistenceAdapter](/docs/api/core/persistence-adapter/)
 - [SyncCoordinator.recoverConflict](/docs/api/core/sync-coordinator/#sync-coordinator-recover-conflict)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L325"><code>packages/core/src/sync.ts#L325</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L326"><code>packages/core/src/sync.ts#L326</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -308,6 +308,7 @@ class SyncCoordinator {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

@@ -93,7 +93,10 @@ describe("pinned external XLSX behavioral vectors", () => {
       { kind: "literal", value: "漢字" },
       { kind: "literal", value: "Hello,\nWorld!" },
     ]);
-    expect(imported.sheets[0]!.cells[0]!.cells[2]!.style).toEqual({ bold: true });
+    expect(imported.sheets[0]?.cells[0]?.cells[2]?.style).toEqual({
+      bold: true,
+      verticalAlign: "bottom",
+    });
     expect(capture.warnings).toEqual([
       expect.objectContaining({ code: "rich-text", part: "xl/sharedStrings.xml" }),
       expect.objectContaining({ code: "rich-text" }),
@@ -200,15 +203,15 @@ describe("pinned external XLSX behavioral vectors", () => {
         cellStyle: column.cellStyle,
       })),
     ).toEqual([
-      { width: 89, visible: false, cellStyle: { bold: true } },
-      { width: 89, visible: false, cellStyle: { bold: true } },
+      { width: 84, visible: false, cellStyle: { bold: true, verticalAlign: "bottom" } },
+      { width: 84, visible: false, cellStyle: { bold: true, verticalAlign: "bottom" } },
     ]);
     expect(imported.sheets[0]!.rowMeta).toEqual([[0, { height: 32, hidden: true }]]);
     expect(imported.sheets[0]!.rowGroups).toEqual([{ start: 0, end: 1, collapsed: true }]);
     expect(imported.sheets[0]!.cells[0]!.cells.map((cell) => cell.style)).toEqual([
-      { bold: true },
-      { italic: true },
-      { bold: true },
+      { bold: true, verticalAlign: "bottom" },
+      { italic: true, verticalAlign: "bottom" },
+      { bold: true, verticalAlign: "bottom" },
     ]);
     expect(capture.warnings).toEqual([expect.objectContaining({ code: "unsupported-feature" })]);
   });

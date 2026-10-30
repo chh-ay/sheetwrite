@@ -12,6 +12,7 @@ import { releaseEngineMemory } from "../src/index.js";
 import { encodeRestoreBlock } from "../src/restore-block.js";
 import { IncompleteDataError, SheetwriteStore } from "../src/store.js";
 import type {
+  CellStyle,
   ChangeEvent,
   DocumentOp,
   Transaction,
@@ -1046,6 +1047,29 @@ describe("stable formula sheet identity", () => {
 });
 
 describe("range-native mutations", () => {
+  it("keeps styles that differ only in font family, vertical alignment, or number format apart", () => {
+    const store = new SheetwriteStore(makeWorkbook(4));
+    const styles: CellStyle[] = [
+      { numberFormat: "0.0%" },
+      { numberFormat: "0.00" },
+      { fontFamily: "Calibri" },
+      { fontFamily: "Georgia" },
+      { verticalAlign: "top" },
+      { verticalAlign: "bottom" },
+    ];
+    const addressOf = (index: number) => ({ sheet: "s1", row: index % 4, col: index >> 2 });
+    store.applyTransaction({
+      patches: styles.map((style, index) => ({
+        op: "set" as const,
+        addr: addressOf(index),
+        value: { kind: "literal" as const, value: 1 },
+        style,
+      })),
+    });
+
+    expect(styles.map((_, index) => store.getCell(addressOf(index)).style)).toEqual(styles);
+  });
+
   it("applies a typed block with formula, reference, and interned style exceptions", () => {
     const store = new SheetwriteStore(makeWorkbook(4));
     const events: ChangeEvent[] = [];

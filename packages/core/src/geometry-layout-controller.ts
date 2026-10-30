@@ -96,7 +96,10 @@ export class GeometryLayoutController {
     assertGeometryDimensions(sheet.rowCount, sheet.columns.length);
     this.visibleColumnIndices = visibleColumns(sheet);
     this.columnIndex = buildColumnIndex(sheet, this.visibleColumnIndices, options.zoom());
-    this.rowIndex = this.createRowIndex(sheet, sheet.rowCount);
+    this.rowIndex = this.createRowIndex(
+      sheet,
+      options.loadable?.viewRowCount(options.activeSheet()) ?? sheet.rowCount,
+    );
     this.scrollScale = new ScaledScroll(
       this.rowIndex.totalHeight + options.theme().headerHeight,
       viewportHeight,
@@ -371,7 +374,10 @@ export class GeometryLayoutController {
     return { rowTops, rowHeights };
   }
 
-  rebuildRows(rowCount = this.options.sheet().rowCount): void {
+  rebuildRows(
+    rowCount = this.options.loadable?.viewRowCount(this.options.activeSheet()) ??
+      this.options.sheet().rowCount,
+  ): void {
     const sheet = this.options.sheet();
     assertGeometryDimensions(rowCount, sheet.columns.length);
     this.rowIndex = this.createRowIndex(sheet, rowCount);

@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
 import type { Workbook } from "@sheetwrite/core";
@@ -20,7 +21,7 @@ const { getEngine } = (await import(
 await initSheetwrite(readFileSync(`${root}/packages/wasm/pkg/sheetwrite_wasm_bg.wasm`));
 const selectedEngine = getEngine();
 const engineResolution = {
-  checkout: root,
+  commit: execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(),
   matchesSelectedCheckout: true,
   hasPoolEpoch: "stringPoolEpoch" in selectedEngine.CellStore.prototype,
 };

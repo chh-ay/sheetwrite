@@ -1,6 +1,6 @@
 ---
 title: "CellEditorContext | @sheetwrite/vue"
-description: "Immutable state and guarded completion callbacks for one mounted editor."
+description: "CellEditorContext interface in @sheetwrite/vue: Immutable state and guarded completion callbacks for one mounted editor."
 ---
 <!-- api-export:@sheetwrite/vue|.|CellEditorContext -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/vue/">@sheetwrite/vue</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -8,7 +8,7 @@ description: "Immutable state and guarded completion callbacks for one mounted e
 Immutable state and guarded completion callbacks for one mounted editor.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/types/grid.d.ts#L21"><code>packages/core/dist/types/grid.d.ts#L21</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/types/grid.d.ts#L37"><code>packages/core/dist/types/grid.d.ts#L37</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>

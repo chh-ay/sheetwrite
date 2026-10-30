@@ -1,6 +1,6 @@
 ---
 title: "DistinctColumn | @sheetwrite/wasm"
-description: "Distinct-value scan result for one column: parallel kind/number/text arrays whose buffers are surrendered once through the take accessors."
+description: "DistinctColumn class in @sheetwrite/wasm: Distinct-value scan result for one column: parallel kind/number/text arrays whose buffers are surrendered once…"
 ---
 <!-- api-export:@sheetwrite/wasm|.|DistinctColumn -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/wasm/">@sheetwrite/wasm</a><span class="api-status" data-kind="class">class</span></div>
@@ -9,7 +9,7 @@ Distinct-value scan result for one column: parallel kind/number/text
 arrays whose buffers are surrendered once through the `take*` accessors.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L412"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L412</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L420"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L420</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>

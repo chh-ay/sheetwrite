@@ -1,13 +1,16 @@
-import { describe, expect, it } from "bun:test";
+import { beforeAll, describe, expect, it } from "bun:test";
 
 import {
   blitVerticalScroll,
   fontFor,
   getMergeIndexResourceStatsForTest,
+  layoutTextLines,
   paintFrame,
   resetMergeIndexResourceStatsForTest,
 } from "../src/canvas-paint.js";
 import { dateToSerial } from "../src/date-serial.js";
+import { initSheetwrite } from "../src/grid.js";
+import { SheetwriteStore } from "../src/store.js";
 import type { CellStyle, RenderLayout, Theme, Viewport, VisibleWindowView } from "../src/types.js";
 
 // jsdom/happy-dom has no 2D canvas context, so paint against a recording stub
@@ -42,6 +45,10 @@ interface LineSegment {
   x1: number;
   y1: number;
 }
+interface StrokeCall {
+  style: string;
+  segments: LineSegment[];
+}
 
 interface ClipRectCall {
   x: number;
@@ -61,6 +68,7 @@ interface RecordingCtx {
   fillTexts: FillTextCall[];
   clipRects: ClipRectCall[];
   segments: LineSegment[];
+  strokes: StrokeCall[];
   [op: string]: unknown;
 }
 
@@ -76,6 +84,7 @@ function makeRecordingCtx(): RecordingCtx {
     fillTexts: [],
     clipRects: [],
     segments: [],
+    strokes: [],
   };
 
   // Capture the live `fillStyle` at call time, since it mutates between draws.
@@ -97,6 +106,7 @@ function makeRecordingCtx(): RecordingCtx {
     });
   };
   let segmentStart: MoveToCall | undefined;
+  let pathStart = 0;
   ctx.moveTo = (x: number, y: number) => {
     segmentStart = { x, y };
   };
@@ -126,8 +136,14 @@ function makeRecordingCtx(): RecordingCtx {
   ctx.restore = () => {
     activeClips = savedClips.pop() ?? [];
   };
+  ctx.beginPath = () => {
+    pathStart = ctx.segments.length;
+  };
+  ctx.stroke = () => {
+    ctx.strokes.push({ style: ctx.strokeStyle, segments: ctx.segments.slice(pathStart) });
+  };
 
-  for (const op of ["setTransform", "beginPath", "stroke", "setLineDash"]) {
+  for (const op of ["setTransform", "setLineDash"]) {
     ctx[op] = () => {};
   }
 
@@ -137,6 +153,60 @@ function makeRecordingCtx(): RecordingCtx {
 // Custom (function) renderers are never exercised here; `paintFrame` takes a
 // `ReadonlyMap`, so an empty map (not a lookup record) is the right shape.
 const NO_RENDERERS = new Map<string, never>();
+
+beforeAll(async () => {
+  await initSheetwrite();
+});
+
+it("paints virtual columns without borrowing the first real cell's fill or borders", () => {
+  const columnWidth = 100;
+  const storedColumnCount = 5;
+  const paintedColumnCount = 7;
+  const fill = "#ffc000";
+  const border = "#123456";
+  const columns = Array.from({ length: paintedColumnCount }, (_, col) => ({
+    key: `c${col}`,
+    header: `C${col}`,
+    type: "text" as const,
+    width: columnWidth,
+  }));
+  const workbook = {
+    activeSheet: "s1",
+    sheets: [
+      { id: "s1", name: "Sheet", rowCount: 3, columns: columns.slice(0, storedColumnCount) },
+    ],
+  };
+  const store = new SheetwriteStore(workbook);
+  store.applyTransaction({
+    patches: [
+      {
+        op: "setRangeStyle",
+        range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
+        style: { backgroundColor: fill, border: { all: { color: border, width: 1 } } },
+      },
+    ],
+  });
+  const view = store.getVisibleWindow(
+    "s1",
+    { start: 0, end: 3 },
+    columns.map((_, col) => col),
+  );
+  const ctx = render(view, makeLayout(columns), {
+    width: paintedColumnCount * columnWidth,
+    height: HEADER_HEIGHT + 3 * ROW_HEIGHT,
+    scrollTop: 0,
+    scrollLeft: 0,
+  });
+
+  expect(ctx.fillRects.filter((rect) => rect.fillStyle === fill)).toEqual([
+    { x: 0, y: HEADER_HEIGHT, w: columnWidth, h: ROW_HEIGHT, fillStyle: fill },
+  ]);
+  const borderLines = ctx.strokes
+    .filter((stroke) => stroke.style === border)
+    .flatMap((stroke) => stroke.segments);
+  expect(borderLines).toHaveLength(4);
+  expect(borderLines.every((line) => line.x0 <= columnWidth && line.x1 <= columnWidth)).toBe(true);
+});
 
 const ROW_HEIGHT = 24;
 const HEADER_HEIGHT = 20;
@@ -220,6 +290,16 @@ describe("fontFor", () => {
       'italic bold 13px "Inter Variable", sans-serif',
     );
   });
+
+  it("puts a cell font family first and keeps the theme families as fallbacks", () => {
+    const theme = makeTheme({ font: 'normal 450 13px "Inter Variable", sans-serif' });
+    expect(fontFor(theme, { fontFamily: "Calibri" })).toBe(
+      '450 13px "Calibri", "Inter Variable", sans-serif',
+    );
+    expect(fontFor(theme, { fontFamily: "Times New Roman", bold: true, fontSize: 16 })).toBe(
+      'bold 16px "Times New Roman", "Inter Variable", sans-serif',
+    );
+  });
 });
 
 describe("paintFrame number formats", () => {
@@ -241,6 +321,57 @@ describe("paintFrame number formats", () => {
     expect(ctx.fillTexts.filter((call) => call.y > HEADER_HEIGHT).map((call) => call.text)).toEqual(
       ["-$246"],
     );
+  });
+
+  it("lets a cell number format override the column, and General opt out of it", () => {
+    const layout = makeLayout([
+      { key: "amount", header: "Amount", width: 150, type: "number", numberFormat: "$#,##0" },
+    ]);
+    const view: VisibleWindowView = {
+      sheet: "s1",
+      stringPoolEpoch: 0,
+      rows: { start: 0, end: 3 },
+      cols: [0],
+      values: [0.5, 0.5, 0.5],
+      styleIds: Uint32Array.from([0, 1, 2]),
+      styles: [{}, { numberFormat: "0.0%" }, { numberFormat: "General" }],
+    };
+
+    const ctx = render(view, layout, UNIFORM_VIEWPORT);
+    expect(ctx.fillTexts.filter((call) => call.y > HEADER_HEIGHT).map((call) => call.text)).toEqual(
+      ["$1", "50.0%", "0.5"],
+    );
+  });
+});
+
+describe("paintFrame vertical alignment", () => {
+  // Row 0 of GEOMETRY_VIEWPORT is 40px tall, so the placements differ visibly.
+  const ROW_TOP = HEADER_HEIGHT;
+  const ROW_HEIGHT_0 = 40;
+
+  function firstRowTextY(style: CellStyle): number {
+    const layout = makeLayout([{ key: "a", header: "A", width: 100, type: "text" }]);
+    const view = makeView(Uint32Array.from([1, 0, 0]), [{}, style], [0]);
+    (view.values as string[])[1] = "";
+    (view.values as string[])[2] = "";
+    const call = render(view, layout, GEOMETRY_VIEWPORT).fillTexts.find(
+      (text) => text.y > HEADER_HEIGHT,
+    );
+    if (!call) throw new Error("Expected the first row's text");
+    return call.y;
+  }
+
+  it("keeps unset and middle text centered, and moves top and bottom to the edges", () => {
+    const center = ROW_TOP + ROW_HEIGHT_0 / 2;
+    expect(firstRowTextY({})).toBe(center);
+    expect(firstRowTextY({ verticalAlign: "middle" })).toBe(center);
+
+    const top = firstRowTextY({ verticalAlign: "top" });
+    const bottom = firstRowTextY({ verticalAlign: "bottom" });
+    expect(top).toBeLessThan(center);
+    expect(bottom).toBeGreaterThan(center);
+    // Symmetric padding: both edges sit the same distance from the center.
+    expect(center - top).toBeCloseTo(bottom - center, 6);
   });
 });
 
@@ -436,6 +567,32 @@ describe("paintFrame column styles", () => {
 
     expect(ctx.fillTexts.some((call) => call.text === "#")).toBe(true);
     expect(ctx.fillTexts.some((call) => call.text === "12345")).toBe(false);
+  });
+});
+
+describe("layoutTextLines", () => {
+  // One width unit per character, so expected breaks can be worked out by hand.
+  const monospace = {
+    measureText: (text: string) => ({ width: text.length }),
+  } as unknown as Parameters<typeof layoutTextLines>[0];
+
+  it.each([
+    ["breaks after the last whitespace", "aa bb cc", 4, ["aa ", "bb ", "cc"]],
+    ["keeps a whitespace that overflows on its line", "aa bb cc", 5, ["aa bb ", "cc"]],
+    ["breaks a word with no whitespace mid-word", "abcdef", 4, ["abcd", "ef"]],
+    ["gives a too-wide first character its own line", "ab", 0.5, ["a", "b"]],
+    ["keeps empty paragraphs", "a\n\nb", 4, ["a", "", "b"]],
+    [
+      "wraps a long paragraph line by line",
+      "word ".repeat(6).trim(),
+      12,
+      ["word word ", "word word ", "word word"],
+    ],
+    // The fake measure counts code units, so a cluster is wider than the cell.
+    ["keeps an emoji ZWJ sequence whole", "ab 👨‍👩‍👧‍👦 cd", 4, ["ab ", "👨‍👩‍👧‍👦", " cd"]],
+    ["keeps a combining mark with its letter", "cafe\u0301s", 4, ["caf", "e\u0301s"]],
+  ])("%s", (_, text, width, expected) => {
+    expect(layoutTextLines(monospace, text, width)).toEqual(expected);
   });
 });
 

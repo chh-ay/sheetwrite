@@ -1,0 +1,328 @@
+import formulaHeadingTargets from "../generated/formula-heading-targets.json" with { type: "json" };
+
+/** Pages that keep their address but move some headings to topic pages. */
+export const MOVED_HEADINGS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  "/docs/reference/formula-functions/": formulaHeadingTargets,
+  "/docs/concepts/runtime-ownership/": {
+    "document-protocol-and-storage-transactions":
+      "/docs/concepts/documents-and-operations/#document-protocol-and-storage-transactions",
+    "cell-values": "/docs/concepts/documents-and-operations/#cell-values",
+  },
+};
+
+/**
+ * Documentation pages that moved to a new URL. The server answers each old
+ * URL with a permanent redirect to `to`. A server never sees the `#fragment`,
+ * and a browser keeps it across the redirect, so `anchors` lets the new page
+ * forward an old heading link to the page that holds that heading now. Every
+ * heading of the old page is listed; `docs:check` proves each target page and
+ * anchor exists.
+ */
+export interface MovedPage {
+  readonly to: string;
+  readonly anchors: Readonly<Record<string, string>>;
+}
+
+export const MOVED_PAGES: Readonly<Record<string, MovedPage>> = {
+  "/docs/guides/accessibility/": {
+    to: "/docs/features/accessibility/",
+    anchors: {
+      "limitation-the-mirror-reflects-the-visible-window":
+        "/docs/features/accessibility/#limitation-the-mirror-reflects-the-visible-window",
+      "the-host-grid": "/docs/features/accessibility/#the-host-grid",
+      "the-sr-only-mirror": "/docs/features/accessibility/#the-sr-only-mirror",
+    },
+  },
+  "/docs/guides/analysis-formulas/": {
+    to: "/docs/features/formulas/analysis-formulas/",
+    anchors: {
+      "clean-text-split-extract-and-regex":
+        "/docs/features/formulas/analysis-formulas/#clean-text-split-extract-and-regex",
+      "describe-statistics-and-ranking":
+        "/docs/features/formulas/analysis-formulas/#describe-statistics-and-ranking",
+      "estimate-risk-distributions":
+        "/docs/features/formulas/analysis-formulas/#estimate-risk-distributions",
+      "forecast-regression": "/docs/features/formulas/analysis-formulas/#forecast-regression",
+      limits: "/docs/features/formulas/analysis-formulas/#limits",
+      matrices: "/docs/features/formulas/analysis-formulas/#matrices",
+      "plan-money-finance": "/docs/features/formulas/analysis-formulas/#plan-money-finance",
+      "query-tables-database-functions":
+        "/docs/features/formulas/analysis-formulas/#query-tables-database-functions",
+      "reshape-arrays": "/docs/features/formulas/analysis-formulas/#reshape-arrays",
+      "schedule-working-days-and-dates":
+        "/docs/features/formulas/analysis-formulas/#schedule-working-days-and-dates",
+      "select-the-engine": "/docs/features/formulas/analysis-formulas/#select-the-engine",
+      "summarize-groupby-pivotby-percentof":
+        "/docs/features/formulas/analysis-formulas/#summarize-groupby-pivotby-percentof",
+      "the-example-data": "/docs/features/formulas/analysis-formulas/#the-example-data",
+      "your-own-functions-lambda-map-reduce-scan-byrow":
+        "/docs/features/formulas/analysis-formulas/#your-own-functions-lambda-map-reduce-scan-byrow",
+    },
+  },
+  "/docs/guides/collaboration/": {
+    to: "/docs/features/collaboration/",
+    anchors: {
+      comments: "/docs/features/collaboration/#comments",
+      "concurrent-structural-editing-decision":
+        "/docs/features/collaboration/#concurrent-structural-editing-decision",
+      "conflict-and-snapshot-reload": "/docs/features/collaboration/#conflict-and-snapshot-reload",
+      "database-neutral-server-model":
+        "/docs/features/collaboration/#database-neutral-server-model",
+      "durable-pending-commits": "/docs/features/collaboration/#durable-pending-commits",
+      "large-undo-and-atomic-batches":
+        "/docs/features/collaboration/#large-undo-and-atomic-batches",
+      "load-mount-queue-and-acknowledge":
+        "/docs/features/collaboration/#load-mount-queue-and-acknowledge",
+      presence: "/docs/features/collaboration/#presence",
+      "remote-operations-and-version-gaps":
+        "/docs/features/collaboration/#remote-operations-and-version-gaps",
+      revisions: "/docs/features/collaboration/#revisions",
+    },
+  },
+  "/docs/guides/configuration/": {
+    to: "/docs/features/grid/options-and-presentation/",
+    anchors: {
+      "cells-that-visible-formulas-read":
+        "/docs/features/data/datasources/#cells-that-visible-formulas-read",
+      "context-menu-items": "/docs/features/grid/context-menu/#menu-items",
+      "datasource-pages": "/docs/features/data/datasources/#requests-and-pages",
+      "document-and-sheets": "/docs/features/grid/grid-methods/#document-and-sheets",
+      events: "/docs/reference/events/",
+      "feature-flags": "/docs/features/grid/toolbar-and-ribbon/#feature-flags",
+      "grid-instance": "/docs/features/grid/grid-methods/",
+      "gridconfig-toolbar": "/docs/features/grid/toolbar-and-ribbon/#gridconfig-toolbar",
+      gridoptions: "/docs/features/grid/options-and-presentation/#gridoptions",
+      "host-owned-command-state":
+        "/docs/features/grid/toolbar-and-ribbon/#host-owned-command-state",
+      "host-supplied-editors": "/docs/features/grid/custom-editors/",
+      "layout-and-appearance": "/docs/features/grid/grid-methods/#layout-and-appearance",
+      lifecycle: "/docs/features/grid/grid-methods/#lifecycle",
+      ribbon: "/docs/features/grid/toolbar-and-ribbon/#ribbon",
+      search: "/docs/features/grid/search/",
+      "selection-editing-and-search":
+        "/docs/features/grid/grid-methods/#selection-editing-and-search",
+      "serializable-documents": "/docs/features/data/persistence/#serializable-documents",
+      "spreadsheet-and-data-grid-presentation":
+        "/docs/features/grid/options-and-presentation/#spreadsheet-and-data-grid-presentation",
+      "views-sort-filter-hide-and-group":
+        "/docs/features/grid/grid-methods/#views-sort-filter-hide-and-group",
+    },
+  },
+  "/docs/guides/data-operations/": {
+    to: "/docs/features/data/data-operations/",
+    anchors: {
+      aggregate: "/docs/features/data/data-operations/#aggregate",
+      "display-views": "/docs/features/data/data-operations/#display-views",
+      export: "/docs/import-export/xlsx-export/#errors-and-built-in-actions",
+      "frozen-panes-and-zoom": "/docs/features/data/data-operations/#frozen-panes-and-zoom",
+      "see-also": "/docs/features/data/data-operations/#see-also",
+      "standalone-importexport-functions":
+        "/docs/import-export/xlsx-import/#choose-an-import-contract",
+      "xlsx-backends": "/docs/import-export/xlsx-export/#xlsx-backends",
+      "xlsx-compatibility": "/docs/import-export/xlsx-export/#workbook-interchange",
+    },
+  },
+  "/docs/guides/formulas/": {
+    to: "/docs/features/formulas/authoring-and-references/",
+    anchors: {
+      "3-d-references": "/docs/features/formulas/operators/#3-d-references",
+      "array-arithmetic": "/docs/features/formulas/dynamic-arrays-and-spills/#array-arithmetic",
+      "array-constants": "/docs/features/formulas/dynamic-arrays-and-spills/#array-constants",
+      "authoring-formulas": "/docs/features/formulas/authoring-and-references/#authoring-formulas",
+      "cell-information-functions":
+        "/docs/features/formulas/authoring-and-references/#cell-information-functions",
+      "criteria-semantics-and-shapes":
+        "/docs/features/formulas/lookup-criteria-and-financial/#criteria-semantics-and-shapes",
+      "datetime-semantics": "/docs/features/formulas/authoring-and-references/#datetime-semantics",
+      "dynamic-arrays-and-spills":
+        "/docs/features/formulas/dynamic-arrays-and-spills/#dynamic-arrays-and-spills",
+      "dynamic-references": "/docs/features/formulas/offset-and-indirect/#dynamic-references",
+      "financial-functions":
+        "/docs/features/formulas/lookup-criteria-and-financial/#financial-functions",
+      "full-formula-engine": "/docs/features/formulas/analysis-formulas/#full-formula-engine",
+      intersection: "/docs/features/formulas/operators/#intersection",
+      "let-bindings": "/docs/features/formulas/authoring-and-references/#let-bindings",
+      "lookup-semantics": "/docs/features/formulas/lookup-criteria-and-financial/#lookup-semantics",
+      operators: "/docs/features/formulas/operators/#precedence",
+      "performance-evidence":
+        "/docs/features/formulas/authoring-and-references/#performance-evidence",
+      "point-mode-and-reference-rewriting":
+        "/docs/features/formulas/authoring-and-references/#point-mode-and-reference-rewriting",
+      "references-ranges-and-named-ranges":
+        "/docs/features/formulas/authoring-and-references/#references-ranges-and-named-ranges",
+      "scalars-coercion-and-errors":
+        "/docs/features/formulas/authoring-and-references/#scalars-coercion-and-errors",
+      "spill-references": "/docs/features/formulas/dynamic-arrays-and-spills/#spill-references",
+      "sumproduct-and-subtotal":
+        "/docs/features/formulas/lookup-criteria-and-financial/#sumproduct-and-subtotal",
+      "supported-formulas": "/docs/features/formulas/authoring-and-references/#supported-formulas",
+      union: "/docs/features/formulas/operators/#union",
+      "unsupported-categories":
+        "/docs/features/formulas/authoring-and-references/#unsupported-categories",
+    },
+  },
+  "/docs/guides/host-owned-rows/": {
+    to: "/docs/features/data/host-owned-rows/",
+    anchors: {},
+  },
+  "/docs/guides/interaction/": {
+    to: "/docs/features/grid/selection-and-keyboard/",
+    anchors: {
+      "add-a-shortcut-for-your-own-command":
+        "/docs/features/grid/selection-and-keyboard/#add-a-shortcut-for-your-own-command",
+      "clipboard-interoperability":
+        "/docs/features/grid/editing-and-clipboard/#clipboard-interoperability",
+      "context-menu": "/docs/features/grid/context-menu/",
+      "drag-to-fill": "/docs/features/grid/resize-merge-and-fill/#drag-to-fill",
+      "inline-editing": "/docs/features/grid/editing-and-clipboard/#inline-editing",
+      "keyboard-navigation": "/docs/features/grid/selection-and-keyboard/#keyboard-navigation",
+      "merged-cells": "/docs/features/grid/resize-merge-and-fill/#merged-cells",
+      "rebind-an-action": "/docs/features/grid/selection-and-keyboard/#rebind-an-action",
+      resizing: "/docs/features/grid/resize-merge-and-fill/#resizing",
+      "selection-model": "/docs/features/grid/selection-and-keyboard/#selection-model",
+      "temporary-highlights": "/docs/features/grid/context-menu/#temporary-highlights",
+      "toolbar-actions": "/docs/features/grid/toolbar-and-ribbon/#toolbar-actions",
+      touch: "/docs/features/grid/touch/",
+      "undo-and-redo": "/docs/features/grid/editing-and-clipboard/#undo-and-redo",
+      "validation-protection-and-notes": "/docs/features/data/validation-protection-and-notes/",
+    },
+  },
+  "/docs/guides/iterative-calculation/": {
+    to: "/docs/features/formulas/iterative-calculation/",
+    anchors: {
+      examples: "/docs/features/formulas/iterative-calculation/#examples",
+      "how-a-cycle-calculates":
+        "/docs/features/formulas/iterative-calculation/#how-a-cycle-calculates",
+      limits: "/docs/features/formulas/iterative-calculation/#limits",
+      "snapshots-and-xlsx-files":
+        "/docs/features/formulas/iterative-calculation/#snapshots-and-xlsx-files",
+      "turn-it-on": "/docs/features/formulas/iterative-calculation/#turn-it-on",
+    },
+  },
+  "/docs/guides/performance-resources/": {
+    to: "/docs/performance/",
+    anchors: {
+      "analysis-workloads": "/docs/performance/formula-engine/#analysis-workloads",
+      "bench-data-1000": "/docs/performance/data-engine/#bench-data-1000",
+      "bench-data-10000": "/docs/performance/data-engine/#bench-data-10000",
+      "bench-metric-memory": "/docs/performance/render/#bench-metric-memory",
+      "bench-metric-speed": "/docs/performance/render/#bench-metric-speed",
+      "bench-size-1000": "/docs/performance/render/#bench-size-1000",
+      "bench-size-10000": "/docs/performance/render/#bench-size-10000",
+      "bench-size-100000": "/docs/performance/render/#bench-size-100000",
+      "bench-size-1000000": "/docs/performance/render/#bench-size-1000000",
+      capture: "/docs/performance/benchmark-protocol/#capture",
+      "choose-a-formula-engine": "/docs/performance/formula-engine/#choose-a-formula-engine",
+      "core-write-path": "/docs/performance/core-write-path/",
+      "correctness-checkpoints": "/docs/performance/core-write-path/#correctness-checkpoints",
+      counters: "/docs/performance/core-write-path/#counters",
+      "data-engine-benchmark": "/docs/performance/data-engine/",
+      "delivery-size": "/docs/performance/delivery-size/",
+      "formula-engine-benchmark": "/docs/performance/formula-engine/",
+      "matched-local-regression-check":
+        "/docs/performance/benchmark-protocol/#matched-local-regression-check",
+      "operation-time": "/docs/performance/xlsx-codec/#operation-time",
+      "peak-resident-memory": "/docs/performance/xlsx-codec/#peak-resident-memory",
+      "release-retained-engine-memory": "/docs/performance/memory/#release-retained-engine-memory",
+      "render-benchmark": "/docs/performance/render/",
+      "runtime-resource-ownership": "/docs/performance/memory/#runtime-resource-ownership",
+      samples: "/docs/performance/core-write-path/#samples",
+      scale: "/docs/performance/core-write-path/#scale",
+      "xlsx-codec-benchmark": "/docs/performance/xlsx-codec/",
+    },
+  },
+  "/docs/guides/persistence/": {
+    to: "/docs/features/data/persistence/",
+    anchors: {
+      "large-undo": "/docs/features/data/persistence/#large-undo",
+      "see-also": "/docs/features/data/persistence/#see-also",
+      "what-your-host-implements": "/docs/features/data/persistence/#what-your-host-implements",
+    },
+  },
+  "/docs/guides/styling/": {
+    to: "/docs/features/formatting/styles/",
+    anchors: {
+      borders: "/docs/features/formatting/styles/#borders",
+      cellstyle: "/docs/features/formatting/styles/#cellstyle",
+      "css-custom-properties--the-stylesheet":
+        "/docs/features/formatting/styles/#css-custom-properties-and-the-stylesheet",
+      "number-formats": "/docs/features/formatting/number-formats/",
+      "resolution-order": "/docs/features/formatting/styles/#resolution-order",
+      "see-also": "/docs/features/formatting/styles/#see-also",
+      theme: "/docs/features/formatting/styles/#theme",
+      "widget-and-context-menu-styling":
+        "/docs/features/formatting/styles/#widget-and-context-menu-styling",
+    },
+  },
+  "/docs/guides/worker-rendering/": {
+    to: "/docs/features/worker-rendering/",
+    anchors: {
+      "automatic-fallback": "/docs/features/worker-rendering/#automatic-fallback",
+      "enabling-it": "/docs/features/worker-rendering/#enabling-it",
+      "how-it-works": "/docs/features/worker-rendering/#how-it-works",
+      "limitation-no-custom-renderers":
+        "/docs/features/worker-rendering/#limitation-no-custom-renderers",
+      "raw-string-ids-and-epochs": "/docs/features/worker-rendering/#raw-string-ids-and-epochs",
+      "see-also": "/docs/features/worker-rendering/#see-also",
+      "verify-it-actually-started": "/docs/features/worker-rendering/#verify-it-actually-started",
+    },
+  },
+  "/docs/guides/xlsx-export/": {
+    to: "/docs/import-export/xlsx-export/",
+    anchors: {
+      "parts-sheetwrite-does-not-model":
+        "/docs/import-export/kept-parts-and-round-trips/#parts-sheetwrite-does-not-model",
+      "resource-limits": "/docs/import-export/large-files-and-streaming/#resource-limits",
+      streaming: "/docs/import-export/large-files-and-streaming/#streaming-functions",
+      "table-interchange": "/docs/import-export/xlsx-export/#table-interchange",
+      "workbook-interchange": "/docs/import-export/xlsx-export/#workbook-interchange",
+    },
+  },
+  "/docs/reference/events-errors/": {
+    to: "/docs/concepts/error-handling/",
+    anchors: {
+      "event-direction": "/docs/reference/events/#event-direction",
+      "recovery-by-boundary": "/docs/concepts/error-handling/#recovery-by-boundary",
+      "stable-failure-envelope": "/docs/concepts/error-handling/#stable-failure-envelope",
+      "typed-error-index": "/docs/concepts/error-handling/#typed-error-index",
+    },
+  },
+};
+
+function anchorOf(hash: string): string {
+  return decodeURIComponent(hash.replace(/^#/, ""));
+}
+
+/** The URL that replaces an old page and fragment, or undefined for a page that did not move. */
+export function movedPageTarget(
+  href: string,
+  hash = "",
+  movedPages: Readonly<Record<string, MovedPage>> = MOVED_PAGES,
+): string | undefined {
+  const page = movedPages[href];
+  if (page === undefined) return undefined;
+  const anchor = anchorOf(hash);
+  if (anchor.length === 0) return page.to;
+  return page.anchors[anchor] ?? `${page.to}#${anchor}`;
+}
+
+/**
+ * After a redirect, the new page receives the old fragment. When that heading
+ * now lives on another page, this returns that page; otherwise undefined.
+ */
+export function forwardedHeading(
+  href: string,
+  hash: string,
+  movedPages: Readonly<Record<string, MovedPage>> = MOVED_PAGES,
+): string | undefined {
+  const anchor = anchorOf(hash);
+  if (anchor.length === 0) return undefined;
+  const movedHeading = MOVED_HEADINGS[href]?.[anchor];
+  if (movedHeading !== undefined) return movedHeading;
+  for (const page of Object.values(movedPages)) {
+    if (page.to !== href) continue;
+    const target = page.anchors[anchor];
+    if (target !== undefined && !target.startsWith(`${href}#`)) return target;
+  }
+  return undefined;
+}

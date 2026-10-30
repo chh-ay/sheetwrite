@@ -1,6 +1,6 @@
 ---
 title: "getGridResetReason | @sheetwrite/core/adapter"
-description: "Returns the first reset-sensitive adapter input that changed, if any."
+description: "getGridResetReason function in @sheetwrite/core/adapter: Returns the first reset-sensitive adapter input that changed, if any."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|getGridResetReason -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="function">function</span></div>
@@ -31,6 +31,7 @@ function getGridResetReason(
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

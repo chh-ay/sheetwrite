@@ -25,6 +25,7 @@ const TYPESCRIPT_ROOTS = [
   "packages/vue/src",
   "packages/svelte/src",
   "packages/xlsx/src",
+  "packages/charts/src",
 ] as const;
 const TYPESCRIPT_EXTENSIONS = new Set([".ts", ".tsx", ".svelte"]);
 const TYPESCRIPT_TEST_ROOTS = [
@@ -33,6 +34,7 @@ const TYPESCRIPT_TEST_ROOTS = [
   "packages/vue/test",
   "packages/svelte/test",
   "packages/xlsx/test",
+  "packages/charts/test",
 ] as const;
 
 async function filesRecursively(root: string): Promise<string[]> {

@@ -1,6 +1,6 @@
 ---
 title: "MAX_HYPERLINK_ID_LENGTH | @sheetwrite/core"
-description: "Serialized identifier ceiling; IDs remain stable across history and snapshots."
+description: "MAX_HYPERLINK_ID_LENGTH variable in @sheetwrite/core: Serialized identifier ceiling; IDs remain stable across history and snapshots."
 ---
 <!-- api-export:@sheetwrite/core|.|MAX_HYPERLINK_ID_LENGTH -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="variable">variable</span></div>
@@ -8,7 +8,7 @@ description: "Serialized identifier ceiling; IDs remain stable across history an
 Serialized identifier ceiling; IDs remain stable across history and snapshots.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/hyperlink.ts#L9"><code>packages/core/src/hyperlink.ts#L9</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/hyperlink.ts#L16"><code>packages/core/src/hyperlink.ts#L16</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -28,6 +28,7 @@ const MAX_HYPERLINK_ID_LENGTH: 128
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

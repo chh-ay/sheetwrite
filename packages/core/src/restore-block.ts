@@ -45,6 +45,19 @@ export function encodeRestoreBlock(range: Range, block: PackedCellBlock): Restor
     }
     throw new Error("Invalid restore block JSON", { cause: error });
   }
+  return encodeMeasuredRestoreBlock(range, block, undefined);
+}
+
+/** Internal engine path: the snapshot builder already measured its plain scalar arrays. */
+export function encodeMeasuredRestoreBlock(
+  range: Range,
+  block: PackedCellBlock,
+  decodedBytes: number | undefined,
+): RestoreBlock {
+  assertCellLimit(block);
+  if (decodedBytes !== undefined && decodedBytes > MAX_RESTORE_BLOCK_DECODED_BYTES) {
+    throw new RangeError("Restore block exceeds the decoded byte limit");
+  }
   const bytes = new TextEncoder().encode(JSON.stringify(block));
   if (bytes.length > MAX_RESTORE_BLOCK_DECODED_BYTES) {
     throw new RangeError("Restore block exceeds the decoded byte limit");

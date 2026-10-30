@@ -1,6 +1,6 @@
 ---
 title: "ContextMenuContext | @sheetwrite/core"
-description: "Cell and viewport coordinates resolved for one bundled context-menu opening."
+description: "ContextMenuContext interface in @sheetwrite/core: Cell and viewport coordinates resolved for one bundled context-menu opening."
 ---
 <!-- api-export:@sheetwrite/core|.|ContextMenuContext -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -8,7 +8,7 @@ description: "Cell and viewport coordinates resolved for one bundled context-men
 Cell and viewport coordinates resolved for one bundled context-menu opening.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L247"><code>packages/core/src/types/grid.ts#L247</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L363"><code>packages/core/src/types/grid.ts#L363</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>
@@ -65,6 +65,7 @@ export interface ContextMenuContext {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

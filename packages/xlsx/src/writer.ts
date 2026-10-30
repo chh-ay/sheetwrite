@@ -5,11 +5,21 @@ import type {
   SheetSnapshot,
   SnapshotCell,
   WorkbookSnapshot,
+  WorkbookTableXmlElement,
 } from "@sheetwrite/core";
-import { colToA1, rangeA1, sheetNameKey, validateSheetName } from "@sheetwrite/core";
+import {
+  colToA1,
+  DEFAULT_MAX_CHANGE,
+  DEFAULT_MAX_ITERATIONS,
+  labelToCol,
+  rangeA1,
+  sheetNameKey,
+  validateSheetName,
+} from "@sheetwrite/core";
 
 import { formulaContainsExternalReference, spillReferencesToXlsx } from "./formula.js";
 import { type ContentTypeOverride, contentTypesXml, relationshipsXml } from "./opc.js";
+import { preparePivots } from "./pivot.js";
 import {
   assertResource,
   checkAbort,
@@ -19,7 +29,7 @@ import {
 } from "./resources.js";
 import { StylesRegistry } from "./styles.js";
 import { encodeXstring, escapeXml, XmlBuffer } from "./xml.js";
-import { writeZip } from "./zip.js";
+import { writeZip, zipChunks, type ZipPart } from "./zip.js";
 
 const MAIN_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
@@ -42,14 +52,13 @@ const META_MARKER = "sheetwrite-workbook-metadata-v1";
 const META_STEM = "__sheetwrite_meta__";
 const META_CHUNK = 30_000;
 
-interface AbsoluteCell {
+export interface AbsoluteCell {
   readonly row: number;
   readonly col: number;
   readonly source: SnapshotCell;
 }
 
 interface SheetWriteResult {
-  readonly xml: Uint8Array;
   readonly relationships?: Uint8Array;
   readonly comments?: Uint8Array;
   readonly vml?: Uint8Array;
@@ -57,6 +66,37 @@ interface SheetWriteResult {
     readonly part: string;
     readonly xml: Uint8Array;
   }[];
+}
+
+type ExtraRelationship = {
+  readonly type: string;
+  readonly target: string;
+  readonly external?: boolean;
+};
+
+export type WorkbookWriteHookResolver = (
+  validated: WorkbookSnapshot,
+) => WorkbookWriteHook | undefined;
+
+export interface WorkbookWriteHook {
+  readonly rootRelationships?: readonly ExtraRelationship[];
+  readonly workbookRelationships?: readonly ExtraRelationship[];
+  readonly contentTypeOverrides?: readonly ContentTypeOverride[];
+  readonly contentTypeDefaults?: readonly { extension: string; contentType: string }[];
+  /** `<pivotCache>` elements for `workbookRelationships`; the writer wraps them in `<pivotCaches>`. */
+  workbookXml?(ids: readonly string[]): { pivotCaches?: readonly string[] };
+  sheet?(
+    sheet: SheetSnapshot,
+    part: { sheetNumber: number; name: string },
+  ):
+    | {
+        relationships?: readonly ExtraRelationship[];
+        beforeLegacyDrawing?(ids: readonly string[]): string;
+      }
+    | undefined;
+  /** Rows are sorted, unique, and consumed only once; used by store-backed table export. */
+  cellRows?(sheet: SheetSnapshot): Iterable<{ row: number; cells: readonly AbsoluteCell[] }>;
+  parts?(): Iterable<ZipPart>;
 }
 
 function quotedSheet(name: string): string {
@@ -86,13 +126,30 @@ function hasExactBorderWidth(style: CellStyle | undefined): boolean {
   );
 }
 
-function metadataSnapshot(snapshot: WorkbookSnapshot): WorkbookSnapshot {
+/**
+ * Workbook metadata for the hidden sheet. The saved output of a native pivot
+ * is left out: the worksheet holds it as the pivot's rendered cells.
+ */
+function metadataSnapshot(
+  snapshot: WorkbookSnapshot,
+  nativePivots: ReadonlySet<string>,
+): WorkbookSnapshot {
+  const { xlsxSource: _source, ...workbook } = snapshot.workbook;
   return {
     ...snapshot,
-    workbook: { ...snapshot.workbook },
+    workbook,
     sheets: snapshot.sheets.map((sheet) => ({
       ...sheet,
       columns: sheet.columns.map((column) => ({ ...column })),
+      ...(sheet.pivots
+        ? {
+            pivots: sheet.pivots.map((pivot) => {
+              if (!pivot.savedOutput || !nativePivots.has(pivot.id)) return pivot;
+              const { savedOutput: _saved, ...definition } = pivot;
+              return definition;
+            }),
+          }
+        : {}),
       cells: sheet.cells.flatMap((block) => {
         const preserved = block.cells
           .filter((cell) => cell.value.kind === "ref" || hasExactBorderWidth(cell.style))
@@ -307,7 +364,7 @@ function cellXml(
   const mergedStyle: CellStyle = { ...column.cellStyle, ...cell.source.style };
   const styleId = styles.register(
     Object.keys(mergedStyle).length > 0 ? mergedStyle : undefined,
-    column.numberFormat,
+    mergedStyle.numberFormat ?? column.numberFormat,
   );
   const reference = `${colToA1(cell.col)}${cell.row + 1}`;
   const styleAttribute = styleId ? ` s="${styleId}"` : "";
@@ -373,11 +430,104 @@ function commentsVml(sheet: SheetSnapshot, context: XlsxCodecContext): Uint8Arra
   return xml.finish();
 }
 
+function appendTableRule(
+  xml: XmlBuffer,
+  rule: WorkbookTableXmlElement,
+  styles: StylesRegistry,
+): void {
+  xml.append(`<${rule.name}`);
+  for (const [name, value] of Object.entries(rule.attributes)) {
+    xml.append(` ${name}="${escapeXml(value)}"`);
+  }
+  if (rule.differentialStyle) {
+    xml.append(` dxfId="${styles.registerDifferential(rule.differentialStyle)}"`);
+  }
+  xml.append(">");
+  xml.append(escapeXml(rule.text));
+  for (const child of rule.children) appendTableRule(xml, child, styles);
+  xml.append(`</${rule.name}>`);
+}
+
+type WrittenTable = NonNullable<SheetSnapshot["tables"]>[number];
+
+/**
+ * Re-anchor stored autofilter and sort references to the table's current
+ * rectangle. Row and column edits move `table.range` but not these strings,
+ * and Excel repairs a table whose filter or sort ref disagrees with its own.
+ * Returns null when a column rule no longer falls inside the table.
+ */
+function anchoredTableRule(
+  rule: WorkbookTableXmlElement,
+  table: WrittenTable,
+): WorkbookTableXmlElement | null {
+  const c0 = table.range.start.col;
+  const c1 = table.range.end.col;
+  const firstData = table.range.start.row + (table.headerRow ? 1 : 0);
+  const lastData = table.range.end.row - (table.totalsRow ? 1 : 0);
+  const rows = (from: number): string => `${from + 1}`;
+  const span = (left: number, right: number, top: number): string =>
+    `${colToA1(left)}${rows(top)}:${colToA1(right)}${rows(lastData)}`;
+  if (rule.name === "autoFilter") {
+    const children: WorkbookTableXmlElement[] = [];
+    for (const child of rule.children) {
+      if (child.name === "filterColumn") {
+        const colId = Number(child.attributes.colId);
+        if (!Number.isSafeInteger(colId) || colId < 0 || colId > c1 - c0) return null;
+        children.push(child);
+        continue;
+      }
+      const anchored = anchoredTableRule(child, table);
+      if (!anchored) return null;
+      children.push(anchored);
+    }
+    return {
+      ...rule,
+      attributes: { ...rule.attributes, ref: span(c0, c1, table.range.start.row) },
+      children,
+    };
+  }
+  if (rule.name !== "sortState") return rule;
+  if (lastData < firstData) return null;
+  const children: WorkbookTableXmlElement[] = [];
+  for (const condition of rule.children) {
+    const match = /^\$?([A-Za-z]{1,3})\$?\d*(?::\$?([A-Za-z]{1,3})\$?\d*)?$/u.exec(
+      condition.attributes.ref ?? "",
+    );
+    const left = match?.[1];
+    if (!left) return null;
+    const start = labelToCol(left.toUpperCase());
+    const end = labelToCol((match[2] ?? left).toUpperCase());
+    if (start < c0 || end > c1 || end < start) return null;
+    children.push({
+      ...condition,
+      attributes: { ...condition.attributes, ref: span(start, end, firstData) },
+    });
+  }
+  return { ...rule, attributes: { ...rule.attributes, ref: span(c0, c1, firstData) }, children };
+}
+
+function appendAnchoredTableRule(
+  xml: XmlBuffer,
+  rule: WorkbookTableXmlElement | undefined,
+  table: WrittenTable,
+  styles: StylesRegistry,
+  warn: (message: string) => void,
+): void {
+  if (!rule) return;
+  const anchored = anchoredTableRule(rule, table);
+  if (anchored) appendTableRule(xml, anchored, styles);
+  else
+    warn(
+      `Workbook table ${table.name} ${rule.name} no longer matches the table columns and was not emitted`,
+    );
+}
+
 function tableXml(
   table: NonNullable<SheetSnapshot["tables"]>[number],
   nativeId: number,
   sheetName: string,
   context: XlsxCodecContext,
+  styles: StylesRegistry,
 ): Uint8Array {
   const ref = `${colToA1(table.range.start.col)}${table.range.start.row + 1}:${colToA1(table.range.end.col)}${table.range.end.row + 1}`;
   const xml = new XmlBuffer(context);
@@ -385,12 +535,32 @@ function tableXml(
   xml.append(
     `<table xmlns="${MAIN_NS}" id="${nativeId}" name="${escapeXml(encodeXstring(table.name))}" displayName="${escapeXml(encodeXstring(table.name))}" ref="${ref}" headerRowCount="${table.headerRow ? 1 : 0}" totalsRowCount="${table.totalsRow ? 1 : 0}">`,
   );
+  const warnRuleLoss = (message: string): void => {
+    emitWarning(context, { code: "unsupported-feature", message, sheet: sheetName });
+  };
+  appendAnchoredTableRule(xml, table.autoFilter, table, styles, warnRuleLoss);
+  appendAnchoredTableRule(xml, table.sortState, table, styles, warnRuleLoss);
   xml.append(`<tableColumns count="${table.columns.length}">`);
-  for (let index = 0; index < table.columns.length; index++) {
-    const column = table.columns[index]!;
+  for (const [index, column] of table.columns.entries()) {
+    const externalTotals =
+      column.totalsRowFormula !== undefined &&
+      formulaContainsExternalReference(column.totalsRowFormula.text);
     xml.append(
-      `<tableColumn id="${index + 1}" name="${escapeXml(encodeXstring(column.name))}"${column.totalsRowLabel !== undefined ? ` totalsRowLabel="${escapeXml(encodeXstring(column.totalsRowLabel))}"` : ""}/>`,
+      `<tableColumn id="${index + 1}" name="${escapeXml(encodeXstring(column.name))}"${column.totalsRowLabel !== undefined ? ` totalsRowLabel="${escapeXml(encodeXstring(column.totalsRowLabel))}"` : ""}${column.totalsRowFunction !== undefined && !externalTotals ? ` totalsRowFunction="${escapeXml(column.totalsRowFunction)}"` : ""}>`,
     );
+    for (const formula of [column.calculatedColumnFormula, column.totalsRowFormula]) {
+      if (!formula) continue;
+      if (formulaContainsExternalReference(formula.text)) {
+        emitWarning(context, {
+          code: "external-formula",
+          message: `External-data ${formula.name} on table ${table.name} was not emitted`,
+          sheet: sheetName,
+        });
+      } else {
+        appendTableRule(xml, formula, styles);
+      }
+    }
+    xml.append("</tableColumn>");
   }
   xml.append("</tableColumns>");
   if (table.style?.name) {
@@ -415,14 +585,85 @@ function tableXml(
   return xml.finish();
 }
 
-function writeSheet(
+function hyperlinkRowStyles(
+  sheet: SheetSnapshot,
+): (row: number, cells: readonly AbsoluteCell[]) => readonly AbsoluteCell[] {
+  const pending = (sheet.hyperlinks ?? [])
+    .map((hyperlink, index) => ({
+      hyperlink,
+      index,
+      style: hyperlink.style,
+    }))
+    .sort((left, right) => left.hyperlink.range.start.row - right.hyperlink.range.start.row);
+  let next = 0;
+  let active: typeof pending = [];
+  return (row, cells) => {
+    active = active.filter(({ hyperlink }) => hyperlink.range.end.row >= row);
+    let added = false;
+    while (next < pending.length) {
+      const entry = pending[next];
+      if (!entry || entry.hyperlink.range.start.row > row) break;
+      next += 1;
+      if (entry.hyperlink.range.end.row < row) continue;
+      active.push(entry);
+      added = true;
+    }
+    // Preserve the same last-link-wins overlay order as the workbook renderer.
+    if (added) active.sort((left, right) => left.index - right.index);
+    if (active.length === 0 || cells.length === 0) return cells;
+    const overlays = new Map<number, AbsoluteCell>();
+    for (const { hyperlink, style } of active) {
+      let low = 0;
+      let high = cells.length;
+      while (low < high) {
+        const middle = Math.floor((low + high) / 2);
+        const cell = cells[middle];
+        if (cell && cell.col < hyperlink.range.start.col) low = middle + 1;
+        else high = middle;
+      }
+      for (let index = low; index < cells.length; index++) {
+        const cell = overlays.get(index) ?? cells[index];
+        if (!cell || cell.col > hyperlink.range.end.col) break;
+        overlays.set(index, {
+          ...cell,
+          source: {
+            ...cell.source,
+            style: {
+              color: "#0563C1",
+              underline: true,
+              ...sheet.columns[cell.col]?.cellStyle,
+              ...cell.source.style,
+              ...style,
+            },
+          },
+        });
+      }
+    }
+    return overlays.size === 0 ? cells : cells.map((cell, index) => overlays.get(index) ?? cell);
+  };
+}
+
+function* hyperlinkStyledRows(
+  sheet: SheetSnapshot,
+  rows: Iterable<{ row: number; cells: readonly AbsoluteCell[] }>,
+): Generator<{ row: number; cells: readonly AbsoluteCell[] }> {
+  const applyStyles = hyperlinkRowStyles(sheet);
+  for (const { row, cells } of rows) yield { row, cells: applyStyles(row, cells) };
+}
+
+const MAXIMUM_DIGIT_WIDTH_PX = 7;
+const COLUMN_WIDTH_FRACTIONS = 256;
+
+function* writeSheet(
   snapshot: WorkbookSnapshot,
   sheet: SheetSnapshot,
   styles: StylesRegistry,
   context: XlsxCodecContext,
   sheetNumber: number,
   tableStartId: number,
-): SheetWriteResult {
+  hook?: WorkbookWriteHook,
+  pivotRelationships: readonly ExtraRelationship[] = [],
+): Generator<Uint8Array, SheetWriteResult> {
   const byRow = new Map<number, AbsoluteCell[]>();
   for (const block of sheet.cells) {
     for (const source of block.cells) {
@@ -483,8 +724,14 @@ function writeSheet(
     xml.append("<cols>");
     for (let index = 0; index < sheet.columns.length; index++) {
       const column = sheet.columns[index]!;
-      const width = Math.max(1, Math.round(((column.width - 5) / 7) * 100) / 100);
-      const styleId = styles.register(column.cellStyle, column.numberFormat);
+      // The stored character width includes OOXML's five-pixel padding.
+      const width =
+        Math.floor((column.width / MAXIMUM_DIGIT_WIDTH_PX) * COLUMN_WIDTH_FRACTIONS) /
+        COLUMN_WIDTH_FRACTIONS;
+      const styleId = styles.register(
+        column.cellStyle,
+        column.cellStyle?.numberFormat ?? column.numberFormat,
+      );
       xml.append(
         `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"${column.visible === false ? ' hidden="1"' : ""}${styleId ? ` style="${styleId}"` : ""}/>`,
       );
@@ -493,19 +740,30 @@ function writeSheet(
   }
   xml.append("<sheetData>");
   let processed = 0;
-  for (const row of [...rows].sort((left, right) => left - right)) {
+  const sourceRows =
+    hook?.cellRows?.(sheet) ??
+    [...rows]
+      .sort((left, right) => left - right)
+      .map((row) => ({
+        row,
+        cells: (byRow.get(row) ?? []).sort((left, right) => left.col - right.col),
+      }));
+  const styledRows = sheet.hyperlinks?.length ? hyperlinkStyledRows(sheet, sourceRows) : sourceRows;
+  for (const { row, cells } of styledRows) {
     const meta = rowMetadata.get(row);
     const hidden = meta?.hidden || collapsedOutlineRows.has(row);
     const outlineLevel = outlineLevels.get(row);
     xml.append(
       `<row r="${row + 1}"${meta?.height !== undefined ? ` ht="${(meta.height * 72) / 96}" customHeight="1"` : ""}${hidden ? ' hidden="1"' : ""}${outlineLevel ? ` outlineLevel="${outlineLevel}"` : ""}${collapsedSummaries.has(row) ? ' collapsed="1"' : ""}>`,
     );
-    for (const cell of (byRow.get(row) ?? []).sort((left, right) => left.col - right.col)) {
+    for (const cell of cells) {
       processed += 1;
       if ((processed & 4_095) === 0) checkAbort(context);
       xml.append(cellXml(snapshot, sheet, cell, styles, context));
+      yield* xml.drain();
     }
     xml.append("</row>");
+    yield* xml.drain();
   }
   xml.append("</sheetData>");
   if (sheet.sortKeys?.length && sheet.rowCount > 0) {
@@ -637,6 +895,20 @@ function writeSheet(
   if (hyperlinkElements.length > 0) {
     xml.append(`<hyperlinks>${hyperlinkElements.join("")}</hyperlinks>`);
   }
+  const sheetHook = hook?.sheet?.(sheet, {
+    sheetNumber,
+    name: `xl/worksheets/sheet${sheetNumber}.xml`,
+  });
+  const extraIds = (sheetHook?.relationships ?? []).map((relationship) => {
+    const id = `rId${nextRelationshipId++}`;
+    relationshipEntries.push({ ...relationship, id });
+    return id;
+  });
+  // Pivot tables have no worksheet element; Excel finds them through relationships.
+  for (const relationship of pivotRelationships) {
+    relationshipEntries.push({ ...relationship, id: `rId${nextRelationshipId++}` });
+  }
+  xml.append(sheetHook?.beforeLegacyDrawing?.(extraIds) ?? "");
   if (legacyDrawingId) xml.append(`<legacyDrawing r:id="${legacyDrawingId}"/>`);
   nextRelationshipId = Math.max(nextRelationshipId, 3);
   const tableRelationshipIds: string[] = [];
@@ -651,7 +923,7 @@ function writeSheet(
     });
     return {
       part: `xl/tables/table${nativeId}.xml`,
-      xml: tableXml(table, nativeId, sheet.name, context),
+      xml: tableXml(table, nativeId, sheet.name, context, styles),
     };
   });
   if (tables.length > 0) {
@@ -664,11 +936,16 @@ function writeSheet(
   const relationships =
     relationshipEntries.length > 0 ? relationshipsXml(relationshipEntries, context) : undefined;
   xml.append("</worksheet>");
-  return { xml: xml.finish(), relationships, comments, vml, tables };
+  yield* xml.drain(true);
+  return { relationships, comments, vml, tables };
 }
 
-function metadataSheetXml(snapshot: WorkbookSnapshot, context: XlsxCodecContext): Uint8Array {
-  const json = JSON.stringify(canonicalJsonValue(metadataSnapshot(snapshot)));
+function metadataSheetXml(
+  snapshot: WorkbookSnapshot,
+  nativePivots: ReadonlySet<string>,
+  context: XlsxCodecContext,
+): Uint8Array {
+  const json = JSON.stringify(canonicalJsonValue(metadataSnapshot(snapshot, nativePivots)));
   const chunks = [META_MARKER];
   let chunkParts: string[] = [];
   let chunkBytes = 0;
@@ -715,6 +992,7 @@ function workbookXml(
   ordered: readonly SheetSnapshot[],
   metadataName: string,
   context: XlsxCodecContext,
+  pivotCaches: readonly string[],
 ): Uint8Array {
   const xml = new XmlBuffer(context);
   xml.append('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
@@ -766,12 +1044,37 @@ function workbookXml(
     }
     xml.append("</definedNames>");
   }
-  xml.append('<calcPr fullCalcOnLoad="1" forceFullCalc="1"/></workbook>');
+  xml.append(`<calcPr fullCalcOnLoad="1"${iterationAttributes(snapshot)} forceFullCalc="1"/>`);
+  // CT_Workbook places `<pivotCaches>` directly after `<calcPr>`.
+  if (pivotCaches.length > 0) xml.append(`<pivotCaches>${pivotCaches.join("")}</pivotCaches>`);
+  xml.append("</workbook>");
   return xml.finish();
 }
 
-/** Write a deterministic, bounded OOXML workbook package. */
-export function writeWorkbook(snapshot: WorkbookSnapshot, context: XlsxCodecContext): Uint8Array {
+/**
+ * `<calcPr>` iteration attributes. Limits are written even while iteration is
+ * off so a later "Enable iterative calculation" in Excel keeps them; default
+ * workbooks write none, which Excel reads as the same defaults.
+ */
+function iterationAttributes(snapshot: WorkbookSnapshot): string {
+  const calculation = snapshot.workbook.calculation;
+  if (
+    !calculation ||
+    (!calculation.iterate &&
+      calculation.maxIterations === DEFAULT_MAX_ITERATIONS &&
+      calculation.maxChange === DEFAULT_MAX_CHANGE)
+  ) {
+    return "";
+  }
+  return `${calculation.iterate ? ' iterate="1"' : ""} iterateCount="${calculation.maxIterations}" iterateDelta="${calculation.maxChange}"`;
+}
+
+/** Yield worksheet data before constructing later parts, bounded by the XML/ZIP chunk windows. */
+function* writeWorkbookParts(
+  snapshot: WorkbookSnapshot,
+  context: XlsxCodecContext,
+  resolveHook?: WorkbookWriteHookResolver,
+): Generator<ZipPart> {
   preflightSnapshot(snapshot, context);
   if (snapshot.sheets.length === 0)
     throw new RangeError("Sheetwrite: XLSX export requires at least one sheet");
@@ -783,10 +1086,11 @@ export function writeWorkbook(snapshot: WorkbookSnapshot, context: XlsxCodecCont
     );
   }
   snapshot = checked.value;
+  const hook = resolveHook?.(snapshot);
   const ordered = [...snapshot.sheets].sort((left, right) => left.order - right.order);
+  const pivots = preparePivots(snapshot, ordered, context);
   const metadataName = metadataSheetName(snapshot);
   const styles = new StylesRegistry(context);
-  const parts = new Map<string, Uint8Array>();
   const overrides: ContentTypeOverride[] = [
     { part: "xl/workbook.xml", contentType: WORKBOOK_CONTENT },
     { part: "xl/styles.xml", contentType: STYLES_CONTENT },
@@ -797,8 +1101,24 @@ export function writeWorkbook(snapshot: WorkbookSnapshot, context: XlsxCodecCont
     checkAbort(context);
     const number = index + 1;
     const part = `xl/worksheets/sheet${number}.xml`;
-    const result = writeSheet(snapshot, ordered[index]!, styles, context, number, nextTableId);
-    parts.set(part, result.xml);
+    const sheet = ordered[index];
+    if (!sheet) throw new TypeError("Sheetwrite: missing ordered export worksheet");
+    let result: SheetWriteResult | undefined;
+    const sheetTableId = nextTableId;
+    function* chunks(exportSheet: SheetSnapshot): Generator<Uint8Array> {
+      result = yield* writeSheet(
+        snapshot,
+        exportSheet,
+        styles,
+        context,
+        number,
+        sheetTableId,
+        hook,
+        pivots?.sheetRelationships(exportSheet.id),
+      );
+    }
+    yield { name: part, data: chunks(pivots ? pivots.withSavedOutput(sheet) : sheet) };
+    if (!result) throw new Error(`Sheetwrite: worksheet ${part} was not consumed before advancing`);
     overrides.push({ part, contentType: WORKSHEET_CONTENT });
     workbookRelationships.push({
       id: `rId${number}`,
@@ -806,23 +1126,28 @@ export function writeWorkbook(snapshot: WorkbookSnapshot, context: XlsxCodecCont
       target: `worksheets/sheet${number}.xml`,
     });
     if (result.relationships) {
-      parts.set(`xl/worksheets/_rels/sheet${number}.xml.rels`, result.relationships);
+      yield { name: `xl/worksheets/_rels/sheet${number}.xml.rels`, data: result.relationships };
     }
     if (result.comments && result.vml) {
-      parts.set(`xl/comments${number}.xml`, result.comments);
-      parts.set(`xl/drawings/vmlDrawing${number}.vml`, result.vml);
+      yield { name: `xl/comments${number}.xml`, data: result.comments };
+      yield { name: `xl/drawings/vmlDrawing${number}.vml`, data: result.vml };
       overrides.push({ part: `xl/comments${number}.xml`, contentType: COMMENTS_CONTENT });
       overrides.push({ part: `xl/drawings/vmlDrawing${number}.vml`, contentType: VML_CONTENT });
     }
     for (const table of result.tables) {
-      parts.set(table.part, table.xml);
+      yield { name: table.part, data: table.xml };
       overrides.push({ part: table.part, contentType: TABLE_CONTENT });
     }
     nextTableId += result.tables.length;
   }
+  for (const part of pivots?.parts ?? []) yield part;
+  overrides.push(...(pivots?.overrides ?? []));
   const metadataNumber = ordered.length + 1;
   const metadataPart = `xl/worksheets/sheet${metadataNumber}.xml`;
-  parts.set(metadataPart, metadataSheetXml(snapshot, context));
+  yield {
+    name: metadataPart,
+    data: metadataSheetXml(snapshot, pivots?.nativeIds ?? new Set(), context),
+  };
   overrides.push({ part: metadataPart, contentType: WORKSHEET_CONTENT });
   workbookRelationships.push({
     id: `rId${metadataNumber}`,
@@ -834,16 +1159,63 @@ export function writeWorkbook(snapshot: WorkbookSnapshot, context: XlsxCodecCont
     type: STYLES_REL,
     target: "styles.xml",
   });
-  parts.set("xl/styles.xml", styles.toXml());
-  parts.set("xl/workbook.xml", workbookXml(snapshot, ordered, metadataName, context));
-  parts.set("xl/_rels/workbook.xml.rels", relationshipsXml(workbookRelationships, context));
-  parts.set(
-    "_rels/.rels",
-    relationshipsXml(
-      [{ id: "rId1", type: OFFICE_DOCUMENT_REL, target: "xl/workbook.xml" }],
+  const extraIds = (hook?.workbookRelationships ?? []).map((relationship, index) => {
+    const id = `rId${metadataNumber + 2 + index}`;
+    workbookRelationships.push({ ...relationship, id });
+    return id;
+  });
+  const pivotIds = (pivots?.workbookRelationships ?? []).map((relationship, index) => {
+    const id = `rId${metadataNumber + 2 + extraIds.length + index}`;
+    workbookRelationships.push({ ...relationship, id });
+    return id;
+  });
+  const pivotCaches = [
+    ...(hook?.workbookXml?.(extraIds).pivotCaches ?? []),
+    ...(pivots?.pivotCaches(pivotIds) ?? []),
+  ];
+  yield { name: "xl/styles.xml", data: styles.toXml() };
+  yield {
+    name: "xl/workbook.xml",
+    data: workbookXml(snapshot, ordered, metadataName, context, pivotCaches),
+  };
+  yield {
+    name: "xl/_rels/workbook.xml.rels",
+    data: relationshipsXml(workbookRelationships, context),
+  };
+  yield {
+    name: "_rels/.rels",
+    data: relationshipsXml(
+      [
+        { id: "rId1", type: OFFICE_DOCUMENT_REL, target: "xl/workbook.xml" },
+        ...(hook?.rootRelationships ?? []).map((relationship, index) => ({
+          ...relationship,
+          id: `rId${index + 2}`,
+        })),
+      ],
       context,
     ),
-  );
-  parts.set("[Content_Types].xml", contentTypesXml(overrides, context));
-  return writeZip(parts, context);
+  };
+  const overrideMap = new Map(overrides.map((override) => [override.part, override]));
+  for (const override of hook?.contentTypeOverrides ?? []) overrideMap.set(override.part, override);
+  yield {
+    name: "[Content_Types].xml",
+    data: contentTypesXml([...overrideMap.values()], context, hook?.contentTypeDefaults),
+  };
+  yield* hook?.parts?.() ?? [];
+}
+
+export function writeWorkbook(
+  snapshot: WorkbookSnapshot,
+  context: XlsxCodecContext,
+  hook?: WorkbookWriteHookResolver,
+): Uint8Array {
+  return writeZip(writeWorkbookParts(snapshot, context, hook), context);
+}
+
+export function streamWorkbook(
+  snapshot: WorkbookSnapshot,
+  context: XlsxCodecContext,
+  hook?: WorkbookWriteHookResolver,
+): Generator<Uint8Array> {
+  return zipChunks(writeWorkbookParts(snapshot, context, hook), context);
 }

@@ -27,16 +27,14 @@
     box-shadow: 0 0.5rem 2rem color-mix(in srgb, var(--sw-fg-strong) 10%, transparent);
   }
 
-  /* The bar is the same dark instrument as the billion-cell flight deck. */
+  /* The bar shares the billion-cell flight deck's demo palette. */
   .sw-fx-bar {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 1rem 2rem;
     align-items: center;
     padding: 1.25rem 1.5rem;
-    background:
-      radial-gradient(50rem 14rem at 90% -30%, rgb(52 211 153 / 16%), transparent 70%),
-      var(--sw-demo-surface);
+    background: var(--sw-demo-surface);
     color: var(--sw-demo-fg);
   }
 

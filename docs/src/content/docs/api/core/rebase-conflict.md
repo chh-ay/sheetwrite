@@ -1,6 +1,6 @@
 ---
 title: "RebaseConflict | @sheetwrite/core"
-description: "Reason and affected operations for an unsafe document rebase."
+description: "RebaseConflict interface in @sheetwrite/core: Reason and affected operations for an unsafe document rebase."
 ---
 <!-- api-export:@sheetwrite/core|.|RebaseConflict -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -8,7 +8,7 @@ description: "Reason and affected operations for an unsafe document rebase."
 Reason and affected operations for an unsafe document rebase.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/rebase.ts#L17"><code>packages/core/src/rebase.ts#L17</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/rebase.ts#L20"><code>packages/core/src/rebase.ts#L20</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>
@@ -75,6 +75,7 @@ export interface RebaseConflict {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

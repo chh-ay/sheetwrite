@@ -18,13 +18,17 @@ import { Route as VueRouteImport } from './routes/vue'
 import { Route as DocsIndexRouteImport } from './routes/docs.index'
 import { Route as DocsSplatRouteImport } from './routes/docs.$'
 import { Route as ShowcasesIndexRouteImport } from './routes/showcases.index'
+import { Route as ShowcasesAnalysisRouteImport } from './routes/showcases.analysis'
 import { Route as ShowcasesCollaborationRouteImport } from './routes/showcases.collaboration'
+import { Route as ShowcasesDataToolsRouteImport } from './routes/showcases.data-tools'
 import { Route as ShowcasesDatabaseRouteImport } from './routes/showcases.database'
 import { Route as ShowcasesEngineRouteImport } from './routes/showcases.engine'
+import { Route as ShowcasesFormattingRouteImport } from './routes/showcases.formatting'
 import { Route as ShowcasesFormulasRouteImport } from './routes/showcases.formulas'
 import { Route as ShowcasesHostRowsRouteImport } from './routes/showcases.host-rows'
 import { Route as ShowcasesInteroperabilityRouteImport } from './routes/showcases.interoperability'
 import { Route as ShowcasesPerformanceRouteImport } from './routes/showcases.performance'
+import { Route as ShowcasesSpreadsheetRouteImport } from './routes/showcases.spreadsheet'
 import { Route as TestCollaborationRouteImport } from './routes/test.collaboration'
 import { Route as TestFormulasEngineRouteImport } from './routes/test.formulas-engine'
 import { Route as TestPrefetchRouteImport } from './routes/test.prefetch'
@@ -78,9 +82,19 @@ const ShowcasesIndexRoute = ShowcasesIndexRouteImport.update({
   path: '/showcases/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ShowcasesAnalysisRoute = ShowcasesAnalysisRouteImport.update({
+  id: '/showcases/analysis',
+  path: '/showcases/analysis',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ShowcasesCollaborationRoute = ShowcasesCollaborationRouteImport.update({
   id: '/showcases/collaboration',
   path: '/showcases/collaboration',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShowcasesDataToolsRoute = ShowcasesDataToolsRouteImport.update({
+  id: '/showcases/data-tools',
+  path: '/showcases/data-tools',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShowcasesDatabaseRoute = ShowcasesDatabaseRouteImport.update({
@@ -91,6 +105,11 @@ const ShowcasesDatabaseRoute = ShowcasesDatabaseRouteImport.update({
 const ShowcasesEngineRoute = ShowcasesEngineRouteImport.update({
   id: '/showcases/engine',
   path: '/showcases/engine',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShowcasesFormattingRoute = ShowcasesFormattingRouteImport.update({
+  id: '/showcases/formatting',
+  path: '/showcases/formatting',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShowcasesFormulasRoute = ShowcasesFormulasRouteImport.update({
@@ -112,6 +131,11 @@ const ShowcasesInteroperabilityRoute =
 const ShowcasesPerformanceRoute = ShowcasesPerformanceRouteImport.update({
   id: '/showcases/performance',
   path: '/showcases/performance',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShowcasesSpreadsheetRoute = ShowcasesSpreadsheetRouteImport.update({
+  id: '/showcases/spreadsheet',
+  path: '/showcases/spreadsheet',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TestCollaborationRoute = TestCollaborationRouteImport.update({
@@ -159,13 +183,17 @@ export interface FileRoutesByFullPath {
   '/vanilla': typeof VanillaRoute
   '/vue': typeof VueRoute
   '/docs/$': typeof DocsSplatRoute
+  '/showcases/analysis': typeof ShowcasesAnalysisRoute
   '/showcases/collaboration': typeof ShowcasesCollaborationRoute
+  '/showcases/data-tools': typeof ShowcasesDataToolsRoute
   '/showcases/database': typeof ShowcasesDatabaseRoute
   '/showcases/engine': typeof ShowcasesEngineRoute
+  '/showcases/formatting': typeof ShowcasesFormattingRoute
   '/showcases/formulas': typeof ShowcasesFormulasRoute
   '/showcases/host-rows': typeof ShowcasesHostRowsRoute
   '/showcases/interoperability': typeof ShowcasesInteroperabilityRoute
   '/showcases/performance': typeof ShowcasesPerformanceRoute
+  '/showcases/spreadsheet': typeof ShowcasesSpreadsheetRoute
   '/test/collaboration': typeof TestCollaborationRoute
   '/test/formulas-engine': typeof TestFormulasEngineRoute
   '/test/prefetch': typeof TestPrefetchRoute
@@ -184,13 +212,17 @@ export interface FileRoutesByTo {
   '/vanilla': typeof VanillaRoute
   '/vue': typeof VueRoute
   '/docs/$': typeof DocsSplatRoute
+  '/showcases/analysis': typeof ShowcasesAnalysisRoute
   '/showcases/collaboration': typeof ShowcasesCollaborationRoute
+  '/showcases/data-tools': typeof ShowcasesDataToolsRoute
   '/showcases/database': typeof ShowcasesDatabaseRoute
   '/showcases/engine': typeof ShowcasesEngineRoute
+  '/showcases/formatting': typeof ShowcasesFormattingRoute
   '/showcases/formulas': typeof ShowcasesFormulasRoute
   '/showcases/host-rows': typeof ShowcasesHostRowsRoute
   '/showcases/interoperability': typeof ShowcasesInteroperabilityRoute
   '/showcases/performance': typeof ShowcasesPerformanceRoute
+  '/showcases/spreadsheet': typeof ShowcasesSpreadsheetRoute
   '/test/collaboration': typeof TestCollaborationRoute
   '/test/formulas-engine': typeof TestFormulasEngineRoute
   '/test/prefetch': typeof TestPrefetchRoute
@@ -210,13 +242,17 @@ export interface FileRoutesById {
   '/vanilla': typeof VanillaRoute
   '/vue': typeof VueRoute
   '/docs/$': typeof DocsSplatRoute
+  '/showcases/analysis': typeof ShowcasesAnalysisRoute
   '/showcases/collaboration': typeof ShowcasesCollaborationRoute
+  '/showcases/data-tools': typeof ShowcasesDataToolsRoute
   '/showcases/database': typeof ShowcasesDatabaseRoute
   '/showcases/engine': typeof ShowcasesEngineRoute
+  '/showcases/formatting': typeof ShowcasesFormattingRoute
   '/showcases/formulas': typeof ShowcasesFormulasRoute
   '/showcases/host-rows': typeof ShowcasesHostRowsRoute
   '/showcases/interoperability': typeof ShowcasesInteroperabilityRoute
   '/showcases/performance': typeof ShowcasesPerformanceRoute
+  '/showcases/spreadsheet': typeof ShowcasesSpreadsheetRoute
   '/test/collaboration': typeof TestCollaborationRoute
   '/test/formulas-engine': typeof TestFormulasEngineRoute
   '/test/prefetch': typeof TestPrefetchRoute
@@ -237,13 +273,17 @@ export interface FileRouteTypes {
     | '/vanilla'
     | '/vue'
     | '/docs/$'
+    | '/showcases/analysis'
     | '/showcases/collaboration'
+    | '/showcases/data-tools'
     | '/showcases/database'
     | '/showcases/engine'
+    | '/showcases/formatting'
     | '/showcases/formulas'
     | '/showcases/host-rows'
     | '/showcases/interoperability'
     | '/showcases/performance'
+    | '/showcases/spreadsheet'
     | '/test/collaboration'
     | '/test/formulas-engine'
     | '/test/prefetch'
@@ -262,13 +302,17 @@ export interface FileRouteTypes {
     | '/vanilla'
     | '/vue'
     | '/docs/$'
+    | '/showcases/analysis'
     | '/showcases/collaboration'
+    | '/showcases/data-tools'
     | '/showcases/database'
     | '/showcases/engine'
+    | '/showcases/formatting'
     | '/showcases/formulas'
     | '/showcases/host-rows'
     | '/showcases/interoperability'
     | '/showcases/performance'
+    | '/showcases/spreadsheet'
     | '/test/collaboration'
     | '/test/formulas-engine'
     | '/test/prefetch'
@@ -287,13 +331,17 @@ export interface FileRouteTypes {
     | '/vanilla'
     | '/vue'
     | '/docs/$'
+    | '/showcases/analysis'
     | '/showcases/collaboration'
+    | '/showcases/data-tools'
     | '/showcases/database'
     | '/showcases/engine'
+    | '/showcases/formatting'
     | '/showcases/formulas'
     | '/showcases/host-rows'
     | '/showcases/interoperability'
     | '/showcases/performance'
+    | '/showcases/spreadsheet'
     | '/test/collaboration'
     | '/test/formulas-engine'
     | '/test/prefetch'
@@ -313,13 +361,17 @@ export interface RootRouteChildren {
   VanillaRoute: typeof VanillaRoute
   VueRoute: typeof VueRoute
   DocsSplatRoute: typeof DocsSplatRoute
+  ShowcasesAnalysisRoute: typeof ShowcasesAnalysisRoute
   ShowcasesCollaborationRoute: typeof ShowcasesCollaborationRoute
+  ShowcasesDataToolsRoute: typeof ShowcasesDataToolsRoute
   ShowcasesDatabaseRoute: typeof ShowcasesDatabaseRoute
   ShowcasesEngineRoute: typeof ShowcasesEngineRoute
+  ShowcasesFormattingRoute: typeof ShowcasesFormattingRoute
   ShowcasesFormulasRoute: typeof ShowcasesFormulasRoute
   ShowcasesHostRowsRoute: typeof ShowcasesHostRowsRoute
   ShowcasesInteroperabilityRoute: typeof ShowcasesInteroperabilityRoute
   ShowcasesPerformanceRoute: typeof ShowcasesPerformanceRoute
+  ShowcasesSpreadsheetRoute: typeof ShowcasesSpreadsheetRoute
   TestCollaborationRoute: typeof TestCollaborationRoute
   TestFormulasEngineRoute: typeof TestFormulasEngineRoute
   TestPrefetchRoute: typeof TestPrefetchRoute
@@ -396,11 +448,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShowcasesIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/showcases/analysis': {
+      id: '/showcases/analysis'
+      path: '/showcases/analysis'
+      fullPath: '/showcases/analysis'
+      preLoaderRoute: typeof ShowcasesAnalysisRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/showcases/collaboration': {
       id: '/showcases/collaboration'
       path: '/showcases/collaboration'
       fullPath: '/showcases/collaboration'
       preLoaderRoute: typeof ShowcasesCollaborationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/showcases/data-tools': {
+      id: '/showcases/data-tools'
+      path: '/showcases/data-tools'
+      fullPath: '/showcases/data-tools'
+      preLoaderRoute: typeof ShowcasesDataToolsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/showcases/database': {
@@ -415,6 +481,13 @@ declare module '@tanstack/react-router' {
       path: '/showcases/engine'
       fullPath: '/showcases/engine'
       preLoaderRoute: typeof ShowcasesEngineRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/showcases/formatting': {
+      id: '/showcases/formatting'
+      path: '/showcases/formatting'
+      fullPath: '/showcases/formatting'
+      preLoaderRoute: typeof ShowcasesFormattingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/showcases/formulas': {
@@ -443,6 +516,13 @@ declare module '@tanstack/react-router' {
       path: '/showcases/performance'
       fullPath: '/showcases/performance'
       preLoaderRoute: typeof ShowcasesPerformanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/showcases/spreadsheet': {
+      id: '/showcases/spreadsheet'
+      path: '/showcases/spreadsheet'
+      fullPath: '/showcases/spreadsheet'
+      preLoaderRoute: typeof ShowcasesSpreadsheetRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/test/collaboration': {
@@ -505,13 +585,17 @@ const rootRouteChildren: RootRouteChildren = {
   VanillaRoute: VanillaRoute,
   VueRoute: VueRoute,
   DocsSplatRoute: DocsSplatRoute,
+  ShowcasesAnalysisRoute: ShowcasesAnalysisRoute,
   ShowcasesCollaborationRoute: ShowcasesCollaborationRoute,
+  ShowcasesDataToolsRoute: ShowcasesDataToolsRoute,
   ShowcasesDatabaseRoute: ShowcasesDatabaseRoute,
   ShowcasesEngineRoute: ShowcasesEngineRoute,
+  ShowcasesFormattingRoute: ShowcasesFormattingRoute,
   ShowcasesFormulasRoute: ShowcasesFormulasRoute,
   ShowcasesHostRowsRoute: ShowcasesHostRowsRoute,
   ShowcasesInteroperabilityRoute: ShowcasesInteroperabilityRoute,
   ShowcasesPerformanceRoute: ShowcasesPerformanceRoute,
+  ShowcasesSpreadsheetRoute: ShowcasesSpreadsheetRoute,
   TestCollaborationRoute: TestCollaborationRoute,
   TestFormulasEngineRoute: TestFormulasEngineRoute,
   TestPrefetchRoute: TestPrefetchRoute,

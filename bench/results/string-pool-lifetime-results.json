@@ -5,19 +5,19 @@
   "engineIsolationProof": {
     "method": "After default initSheetwrite(), require getEngine().CellStore === the CellStore imported from STRING_POOL_CHECKOUT/packages/wasm/loader-node.mjs; reject mismatches before any sample",
     "baseline": {
-      "checkout": "/home/vvin/learn/sheetwrite-wt/adapter-lifetime-base",
+      "commit": "4997890d32b0f0c0c92ac0fa30e6038b80943447",
       "matchesSelectedCheckout": true,
       "hasPoolEpoch": false
     },
     "candidate": {
-      "checkout": "/home/vvin/learn/sheetwrite-wt/string-pool/",
+      "commit": "bc7bc53e34f443e379a991a55bace9e93b2669af",
       "matchesSelectedCheckout": true,
       "hasPoolEpoch": true
     },
     "interpretation": "Both execution-level default-loader probes selected their own checkout and different engine interfaces. These subsequent diagnostic executions are not additional matched performance rounds."
   },
   "methodology": {
-    "execution": "Exclusive quiet.lock, user systemd scope MemoryMax=6G/MemorySwapMax=1G, CPU 4, sequential fresh Bun processes",
+    "execution": "Exclusive machine lock, user systemd scope MemoryMax=6G/MemorySwapMax=1G, CPU 4, sequential fresh Bun processes",
     "samplesPerProcess": 7,
     "discardedWarmupSamples": 1,
     "aaRounds": 3,

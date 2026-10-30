@@ -1,6 +1,6 @@
 ---
 title: "KeyboardAction | @sheetwrite/core"
-description: "Built-in actions that can be rebound without replacing navigation."
+description: "KeyboardAction type in @sheetwrite/core: Built-in actions that can be rebound without replacing navigation."
 ---
 <!-- api-export:@sheetwrite/core|.|KeyboardAction -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
@@ -8,7 +8,7 @@ description: "Built-in actions that can be rebound without replacing navigation.
 Built-in actions that can be rebound without replacing navigation.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L274"><code>packages/core/src/types/grid.ts#L274</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L390"><code>packages/core/src/types/grid.ts#L390</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -25,7 +25,8 @@ export type KeyboardAction =
   | "redo"
   | "find"
   | "replace"
-  | "clearContents";
+  | "clearContents"
+  | "editNote";
 ```
 
 </div>
@@ -37,6 +38,7 @@ export type KeyboardAction =
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

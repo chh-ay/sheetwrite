@@ -1,6 +1,6 @@
 ---
 title: "Transaction | @sheetwrite/core"
-description: "Low-level Store transaction."
+description: "Transaction interface in @sheetwrite/core: Low-level Store transaction."
 ---
 <!-- api-export:@sheetwrite/core|.|Transaction -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -11,7 +11,7 @@ concurrency at the storage boundary.
 Calling `Store.applyTransaction` bypasses Grid read-only checks and Grid
 undo/redo history. Host-driven edits should use `Grid.applyTransaction`.
 
-### Examples
+## Examples
 
 ```ts compile
 import type { Store, SheetId, Transaction } from "@sheetwrite/core";
@@ -24,7 +24,7 @@ function setAmount(store: Store, sheet: SheetId) {
 }
 ```
 
-### See also
+## See also
 
 - [Grid.applyTransaction](/docs/api/core/grid/#grid-apply-transaction)
 
@@ -76,6 +76,7 @@ export interface Transaction {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

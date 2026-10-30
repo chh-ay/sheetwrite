@@ -1,6 +1,6 @@
 ---
 title: "CellNote | @sheetwrite/core"
-description: "Serializable plain-text note anchored to a cell."
+description: "CellNote interface in @sheetwrite/core: Serializable plain-text note anchored to a cell."
 ---
 <!-- api-export:@sheetwrite/core|.|CellNote -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -8,7 +8,7 @@ description: "Serializable plain-text note anchored to a cell."
 Serializable plain-text note anchored to a cell.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L192"><code>packages/core/src/types/document.ts#L192</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L216"><code>packages/core/src/types/document.ts#L216</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>
@@ -55,6 +55,7 @@ export interface CellNote {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

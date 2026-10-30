@@ -1,6 +1,6 @@
 ---
 title: "WorkerAcknowledgement | @sheetwrite/core/worker"
-description: "Lifecycle and frame acknowledgements posted back to the sender."
+description: "WorkerAcknowledgement type in @sheetwrite/core/worker: Lifecycle and frame acknowledgements posted back to the sender."
 ---
 <!-- api-export:@sheetwrite/core|./worker|WorkerAcknowledgement -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-worker/">@sheetwrite/core/worker</a><span class="api-status" data-kind="type">type</span></div>
@@ -65,6 +65,7 @@ export type WorkerAcknowledgement =
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

@@ -1,6 +1,6 @@
 ---
 title: "Workbook | @sheetwrite/core"
-description: "Live workbook schema containing ordered sheets and the active sheet ID."
+description: "Workbook interface in @sheetwrite/core: Live workbook schema containing ordered sheets and the active sheet ID."
 ---
 <!-- api-export:@sheetwrite/core|.|Workbook -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -8,10 +8,10 @@ description: "Live workbook schema containing ordered sheets and the active shee
 Live workbook schema containing ordered sheets and the active sheet ID.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L107"><code>packages/core/src/types/document.ts#L107</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L127"><code>packages/core/src/types/document.ts#L127</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>3</span>
+## Members <span class="api-count" data-pagefind-ignore>5</span>
 
 <div class="api-member-list">
 
@@ -41,6 +41,24 @@ namedRanges?: NamedRangeSnapshot[];
 ```
 
 </details>
+
+<details class="api-member" id="workbook-xlsx-source" data-pagefind-weight="1">
+<summary><code>xlsxSource</code> <span class="api-member-summary">Opaque OOXML graphs from an imported file; edits drop the graphs that depend on them.</span></summary>
+
+```ts generated
+xlsxSource?: XlsxSourceSnapshot;
+```
+
+</details>
+
+<details class="api-member" id="workbook-calculation" data-pagefind-weight="1">
+<summary><code>calculation</code> <span class="api-member-summary">Iterative calculation options; absent means the defaults.</span></summary>
+
+```ts generated
+calculation?: CalculationSettings;
+```
+
+</details>
 </div>
 
 ## Declaration
@@ -53,6 +71,8 @@ export interface Workbook {
   sheets: Sheet[];
   activeSheet: SheetId;
   namedRanges?: NamedRangeSnapshot[];
+  xlsxSource?: XlsxSourceSnapshot;
+  calculation?: CalculationSettings;
 }
 ```
 
@@ -65,6 +85,7 @@ export interface Workbook {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
@@ -81,6 +102,7 @@ export interface Workbook {
 <li><a href="/docs/api/core/sheetwrite-store/"><code>SheetwriteStore</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/store/"><code>Store</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/to-xlsx-table/"><code>toXlsxTable</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/to-xlsx-table-stream/"><code>toXlsxTableStream</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/xlsx-table-export-backend/"><code>XlsxTableExportBackend</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core-adapter/simple-grid-input/"><code>SimpleGridInput</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/react/sheetwrite-grid-props/"><code>SheetwriteGridProps</code></a><span class="api-consumer-kind">@sheetwrite/react</span></li>

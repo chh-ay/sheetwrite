@@ -1,4 +1,4 @@
-import type { ColumnarData, Workbook } from "../src/types.js";
+import type { ColumnarData, Range, Sheet, Workbook } from "../src/types.js";
 
 export function makeWorkbook(rowCount = 50): Workbook {
   return {
@@ -29,4 +29,19 @@ export function makeColumnarData(rowCount = 50): ColumnarData {
     city[r] = cities[r % cities.length]!;
   }
   return { rowCount, columns: { name, amount, city } };
+}
+
+export function sheet(id: string, rowCount = 10): Sheet {
+  const columns = ["a", "b", "c", "d"].map((key) => ({
+    key,
+    header: key,
+    width: 80,
+    type: "number" as const,
+  }));
+
+  return { id, name: id, rowCount, columns };
+}
+
+export function range(sheetId: string, r0: number, c0: number, r1: number, c1: number): Range {
+  return { sheet: sheetId, start: { row: r0, col: c0 }, end: { row: r1, col: c1 } };
 }

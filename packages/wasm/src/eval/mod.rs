@@ -2,31 +2,36 @@
 
 #[cfg(feature = "analysis")]
 pub(crate) mod analysis;
+mod areas;
 mod array;
 mod criteria;
 mod date;
 mod dependency;
 mod financial;
 mod functions;
+mod info;
+mod iteration;
 mod lookup;
 mod math;
 mod matrix;
 mod operators;
+mod random;
 mod range_reader;
+mod reference;
 mod statistics;
 mod text;
 mod value;
 
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
 use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use crate::calc::{Ast, Func};
-use crate::sheet::{
-    encode_num, encode_str_id, formula_error_with_entry, payload_num, payload_str_id,
-    spill_ownership_within_budget, SheetData, SpillRange,
-};
+use crate::cells::{encode_num, encode_str_id, payload_num, payload_str_id, DenseSourceRun};
+use crate::graph::DirtySeeds;
+use crate::sheet::{formula_error_with_entry, SheetData};
+use crate::spill::{spill_ownership_within_budget, SpillRange};
 use crate::store::CellStore;
 use crate::types::{
     cell_key, string_from_pool_ref, AbsCellKey, CellRange, EvalResult, FormulaError, StringStorage,
@@ -37,19 +42,27 @@ use crate::types::{
 pub(crate) use array::ast_produces_array;
 use array::dynamic_recompute_within_limit;
 use criteria::{aggregate_if, extreme_if, Criterion, IfExtreme, IfSum};
-pub(crate) use dependency::DepIndex;
+use date::host_clock_serial;
+#[cfg(test)]
+pub(crate) use date::set_test_clock;
+pub(crate) use dependency::{build_dep_index, DepIndex};
 use dependency::{
-    build_dep_index, collect_affected_formulas, direct_readers, seed_dependency_depth_errors,
+    collect_affected_formulas, direct_readers, seed_additional_depth_errors,
+    seed_dependency_depth_errors,
 };
 use functions::{apply_func, treats_cell_as_reference, FuncAccumulator, ReductionFold};
+pub(crate) use iteration::IterationLimits;
+use iteration::IterationPassGuard;
 use lookup::{
     find_match_index_indexed, integer_arg, list_reuse, positive_index, remember_list,
     remember_result, remember_table, result_reuse, table_reuse, CachedList, CachedResult,
     CachedTable, LookupPassGuard, LookupReuse, ReuseEntry, TablePart,
 };
-pub(crate) use matrix::{matrix_resource_stats, reset_matrix_resource_stats};
+pub(crate) use matrix::{intersection_range, matrix_resource_stats, reset_matrix_resource_stats};
 use matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_BYTES};
+pub(crate) use random::RandomSource;
 use range_reader::RangeReader;
+use reference::{finish_runtime_reads, start_runtime_reads, RewriteScope, RuntimeReads};
 use value::{
     aggregate_number, bool_from_value, cached_formula_value, compare_values, text_from_value,
 };
@@ -59,12 +72,19 @@ const LET_EXPANDED_NODE_LIMIT: usize = 16_384;
 
 thread_local! {
     static FORMULA_ORIGINS: RefCell<Vec<(u32, u32)>> = const { RefCell::new(Vec::new()) };
-    static RANGE_SUM_CACHE: RefCell<HashMap<CellRange, EvalResult>> =
-        RefCell::new(HashMap::new());
+    static RANGE_SUM_CACHE: RefCell<FxHashMap<CellRange, EvalResult>> =
+        RefCell::new(FxHashMap::default());
     /// Values of the LET bindings of the evaluation in progress, indexed by
     /// the slots of its expanded expression. Empty while no LET is running,
     /// which leaves a slot use to evaluate its expression directly.
     static LET_SLOT_VALUES: RefCell<Vec<Option<EvalResult>>> = const { RefCell::new(Vec::new()) };
+}
+
+#[cfg(test)]
+thread_local! {
+    /// Formula evaluations on this thread. Tests read it to count how often a
+    /// formula ran, which no value can show.
+    pub(crate) static FORMULA_EVALUATIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
 /// Runs `evaluate` with one empty slot per binding of a LET expansion and
@@ -114,9 +134,9 @@ fn current_formula_origin() -> Option<(u32, u32)> {
 /// pass recomputes, the results computed so far, and the formulas on the
 /// current evaluation path, which detect cycles.
 pub(crate) struct EvalPass<'a> {
-    pub(crate) affected: &'a HashSet<AbsCellKey>,
-    pub(crate) memo: &'a mut HashMap<AbsCellKey, EvalResult>,
-    pub(crate) visiting: &'a mut HashSet<AbsCellKey>,
+    pub(crate) affected: &'a FxHashSet<AbsCellKey>,
+    pub(crate) memo: &'a mut FxHashMap<AbsCellKey, EvalResult>,
+    pub(crate) visiting: &'a mut FxHashSet<AbsCellKey>,
 }
 
 fn literal_cell_value(strings: &StringStorage, kind: u8, payload: u64) -> Value {
@@ -130,29 +150,79 @@ fn literal_cell_value(strings: &StringStorage, kind: u8, payload: u64) -> Value 
     }
 }
 
+/// The calculated-slot encoding of a result value; text joins the pool.
+pub(crate) fn calculated_slot(strings: &mut StringStorage, value: &Value) -> (u8, u64) {
+    match value {
+        Value::Number(number) => (KIND_NUMBER, encode_num(*number)),
+        Value::Text(text) => (KIND_STRING, encode_str_id(strings.intern(text))),
+        Value::Bool(value) => (KIND_BOOL, encode_num(f64::from(*value))),
+        Value::Blank => (KIND_EMPTY, 0),
+        Value::Error(error) => (KIND_FORMULA, error.slot() as u64),
+    }
+}
+
+/// A cell's value as a formula reads it between passes: its literal source,
+/// or the stored result of its formula or of the spill that covers it.
+#[cfg(feature = "analysis")]
+pub(crate) fn settled_cell_value(
+    sheet: &SheetData,
+    strings: &StringStorage,
+    row: usize,
+    col: usize,
+) -> Value {
+    if !sheet.cells.contains_cell(row, col) {
+        return Value::Error(FormulaError::Ref);
+    }
+    if !sheet.cells.is_loaded(row, col) {
+        return Value::Error(FormulaError::Loading);
+    }
+
+    let index = sheet.cells.idx(row, col);
+    let source_kind = sheet.cells.source_kind_at(index);
+    let (kind, payload) = if source_kind == KIND_EMPTY {
+        sheet
+            .cells
+            .calculated_cell_at(index)
+            .unwrap_or((KIND_EMPTY, 0))
+    } else {
+        (source_kind, sheet.cells.source_payload_at(index))
+    };
+    if kind != KIND_FORMULA {
+        return literal_cell_value(strings, kind, payload);
+    }
+
+    if let Some(key) = cell_key(row, col) {
+        if let Some(entry) = sheet.formulas.get(key) {
+            let error = formula_error_with_entry(sheet, key, Some(entry));
+            return cached_formula_value(sheet, strings, index, error);
+        }
+    }
+    match sheet.cells.calculated_error_at(index) {
+        Some(error) => Value::Error(error),
+        None => Value::number(sheet.cells.num_at(index)),
+    }
+}
+
+/// Dense literal reads use one whole-grid source run; paged sources go through
+/// `eval_at`, which owns their load-state checks.
 #[derive(Clone, Copy)]
 struct LiteralSources<'a> {
-    kinds: &'a [u8],
-    payloads: &'a [u64],
+    sources: DenseSourceRun<'a>,
 }
 
 impl<'a> LiteralSources<'a> {
     fn new(sheet: &'a SheetData, depth: usize) -> Option<Self> {
-        (!sheet.is_paged() && depth < FORMULA_RECURSION_LIMIT).then_some(Self {
-            kinds: &sheet.kind,
-            payloads: &sheet.payload,
-        })
+        if depth >= FORMULA_RECURSION_LIMIT {
+            return None;
+        }
+
+        sheet.cells.dense_sources().map(|sources| Self { sources })
     }
 
     #[inline]
     fn value_at(self, strings: &StringStorage, index: usize) -> Option<Value> {
-        let kind = self.kinds[index];
-        match kind {
-            KIND_NUMBER | KIND_STRING | KIND_BOOL => {
-                Some(literal_cell_value(strings, kind, self.payloads[index]))
-            }
-            _ => None,
-        }
+        let (kind, payload) = self.sources.literal(index)?;
+        Some(literal_cell_value(strings, kind, payload))
     }
 }
 
@@ -394,6 +464,178 @@ struct SpillChange {
     sheet: usize,
     sequence: usize,
     cells: Vec<(u32, u32)>,
+    /// How many leading `cells` are spill output. The rest is the anchor,
+    /// which a reader evaluates on demand, so runtime readers ignore it.
+    output_cells: usize,
+}
+
+/// The bounding range of some cells of one sheet, or `None` without cells.
+fn cells_bounds(sheet: usize, cells: &[(u32, u32)]) -> Option<CellRange> {
+    let (&(row, col), rest) = cells.split_first()?;
+    let first = CellRange::new(sheet as u32, row, col, row, col);
+    Some(rest.iter().fold(first, |bounds, &(row, col)| {
+        range_union(bounds, CellRange::new(sheet as u32, row, col, row, col))
+    }))
+}
+
+/// The bounding range of two ranges on the same sheet.
+fn range_union(left: CellRange, right: CellRange) -> CellRange {
+    CellRange::new(
+        left.sheet,
+        left.row_start.min(right.row_start),
+        left.col_start.min(right.col_start),
+        left.row_end.max(right.row_end),
+        left.col_end.max(right.col_end),
+    )
+}
+
+fn ranges_intersect(left: CellRange, right: CellRange) -> bool {
+    left.sheet == right.sheet
+        && left.row_start <= right.row_end
+        && right.row_start <= left.row_end
+        && left.col_start <= right.col_end
+        && right.col_start <= left.col_end
+}
+
+/// One bounding range per sheet that covers every range of `ranges`.
+fn sheet_envelopes(ranges: impl IntoIterator<Item = CellRange>) -> Vec<CellRange> {
+    let mut envelopes: Vec<CellRange> = Vec::new();
+    for range in ranges {
+        match envelopes
+            .iter_mut()
+            .find(|envelope| envelope.sheet == range.sheet)
+        {
+            Some(envelope) => *envelope = range_union(*envelope, range),
+            None => envelopes.push(range),
+        }
+    }
+    envelopes
+}
+
+/// A formula that may have read a spill output changed after it was
+/// evaluated.
+struct StaleReader {
+    reader: AbsCellKey,
+    /// The sequence of the latest such change.
+    changed_at: usize,
+    /// Only merged runtime reads cover the change, so the reader may not
+    /// have read it.
+    approximate: bool,
+}
+
+/// The spill outputs changed in one round, sorted by sheet and first row,
+/// with a max tree over their last rows. A read visits only outputs whose
+/// row band meets its own, so checking n readers against m changes costs
+/// about (n + k) log m for k row-overlapping pairs instead of n * m.
+struct ChangedOutputs {
+    outputs: Vec<(CellRange, usize)>,
+    /// Node `i` holds the largest last row below it; its children are `2i`
+    /// and `2i + 1`, and leaf `leaves + k` is output `k`.
+    last_rows: Vec<u32>,
+    leaves: usize,
+    /// Tree nodes the reads visited. Tests read it to bound the check's
+    /// work, which no value can show.
+    #[cfg(test)]
+    visited: std::cell::Cell<usize>,
+}
+
+impl ChangedOutputs {
+    fn new(changes: &[SpillChange]) -> Self {
+        let mut outputs: Vec<(CellRange, usize)> = changes
+            .iter()
+            .filter_map(|change| {
+                let bounds = cells_bounds(change.sheet, &change.cells[..change.output_cells])?;
+                Some((bounds, change.sequence))
+            })
+            .collect();
+        outputs.sort_unstable_by_key(|(bounds, _)| (bounds.sheet, bounds.row_start));
+
+        let leaves = outputs.len().next_power_of_two();
+        let mut last_rows = vec![0; leaves * 2];
+        for (index, (bounds, _)) in outputs.iter().enumerate() {
+            last_rows[leaves + index] = bounds.row_end;
+        }
+        for node in (1..leaves).rev() {
+            last_rows[node] = last_rows[2 * node].max(last_rows[2 * node + 1]);
+        }
+
+        Self {
+            outputs,
+            last_rows,
+            leaves,
+            #[cfg(test)]
+            visited: std::cell::Cell::new(0),
+        }
+    }
+
+    /// The latest change among the outputs that meet `read`.
+    fn latest_meeting(&self, read: CellRange) -> Option<usize> {
+        // Outputs of the read's sheet that start at or above its last row;
+        // the tree then skips those that end above its first row.
+        let first = self
+            .outputs
+            .partition_point(|(bounds, _)| bounds.sheet < read.sheet);
+        let end = self.outputs.partition_point(|(bounds, _)| {
+            (bounds.sheet, bounds.row_start) <= (read.sheet, read.row_end)
+        });
+
+        let mut latest = None;
+        if first < end {
+            self.visit(1, (0, self.leaves), (first, end), read, &mut latest);
+        }
+        latest
+    }
+
+    fn visit(
+        &self,
+        node: usize,
+        (start, stop): (usize, usize),
+        (first, end): (usize, usize),
+        read: CellRange,
+        latest: &mut Option<usize>,
+    ) {
+        if stop <= first || end <= start || self.last_rows[node] < read.row_start {
+            return;
+        }
+
+        #[cfg(test)]
+        self.visited.set(self.visited.get() + 1);
+
+        if stop - start == 1 {
+            let (bounds, sequence) = self.outputs[start];
+            if ranges_intersect(read, bounds) {
+                *latest = (*latest).max(Some(sequence));
+            }
+            return;
+        }
+
+        let middle = start + (stop - start) / 2;
+        self.visit(2 * node, (start, middle), (first, end), read, latest);
+        self.visit(2 * node + 1, (middle, stop), (first, end), read, latest);
+    }
+}
+
+/// Runtime readers whose recorded reads meet a spill output changed in this
+/// round, each with the latest such change.
+fn stale_runtime_readers(
+    readers: &FxHashMap<AbsCellKey, RuntimeReads>,
+    outputs: &ChangedOutputs,
+) -> Vec<StaleReader> {
+    readers
+        .iter()
+        .filter_map(|(&reader, reads)| {
+            reads
+                .ranges
+                .iter()
+                .filter_map(|&read| outputs.latest_meeting(read))
+                .max()
+                .map(|changed_at| StaleReader {
+                    reader,
+                    changed_at,
+                    approximate: reads.merged,
+                })
+        })
+        .collect()
 }
 
 impl CellStore {
@@ -401,128 +643,173 @@ impl CellStore {
         self.recompute_seed_sheets(&[sheet]);
     }
 
+    /// The edit barrier. Any source change recalculates every volatile formula
+    /// in the workbook, so sheets that hold volatile formulas join the seeds
+    /// even when only another sheet changed. A barrier without changes does
+    /// no work, volatile formulas included.
     pub(crate) fn recompute_changed(&mut self) {
-        let seeds: Vec<usize> = self
+        let mut seeds: Vec<usize> = self
             .sheets
             .iter()
             .enumerate()
-            .filter_map(|(sheet, data)| {
-                (!data.dirty_cells.is_empty() || data.all_dirty).then_some(sheet)
-            })
+            .filter_map(|(sheet, data)| data.formulas.has_dirty().then_some(sheet))
             .collect();
+
+        if !seeds.is_empty() {
+            seeds.extend(self.sheets.iter().enumerate().filter_map(|(sheet, data)| {
+                (data.formulas.has_volatile() && !data.formulas.has_dirty()).then_some(sheet)
+            }));
+        }
 
         self.recompute_seed_sheets(&seeds);
     }
 
-    fn recompute_seed_sheets(&mut self, seeds: &[usize]) {
+    /// The host clock barrier: recalculates every volatile formula and its
+    /// dependents at the instant the host already stored. Pending source
+    /// changes of those sheets join the same pass.
+    pub(crate) fn recompute_volatile_formulas(&mut self) {
+        let seeds: Vec<usize> = self
+            .sheets
+            .iter()
+            .enumerate()
+            .filter_map(|(sheet, data)| data.formulas.has_volatile().then_some(sheet))
+            .collect();
+
+        self.recompute_at_volatile_serial(&seeds);
+    }
+
+    /// Every other recalculation reads the clock once, as Excel does, so all
+    /// NOW and TODAY formulas of one pass see the same instant. A pass without
+    /// volatile formulas never reads it.
+    pub(crate) fn recompute_seed_sheets(&mut self, seeds: &[usize]) {
+        let has_volatile = seeds.iter().any(|&sheet| {
+            self.sheets
+                .get(sheet)
+                .is_some_and(|data| data.formulas.has_volatile())
+        });
+        if has_volatile {
+            let serial = host_clock_serial();
+            if serial.is_finite() {
+                self.volatile_serial = serial;
+            }
+
+            // Runtime references can reach another volatile sheet without a
+            // static graph edge. Evaluate both in one pass to expose cycles.
+            let mut volatile_seeds = seeds.to_vec();
+            volatile_seeds.extend(self.sheets.iter().enumerate().filter_map(|(sheet, data)| {
+                (data.formulas.has_volatile() && !seeds.contains(&sheet)).then_some(sheet)
+            }));
+            self.recompute_at_volatile_serial(&volatile_seeds);
+            return;
+        }
+
+        self.recompute_at_volatile_serial(seeds);
+    }
+
+    /// Recalculates the formulas of `seeds`, then the pivot tables whose
+    /// sources or outputs the pass changed (the default engine places saved
+    /// output). A workbook without pivots skips the pivot step entirely.
+    fn recompute_at_volatile_serial(&mut self, seeds: &[usize]) {
+        self.recompute_formulas(seeds);
+
+        if self.pivots.is_some() {
+            self.settle_pivots();
+        }
+    }
+
+    /// Ends a pass for `sheets`. The pivot step first records which source
+    /// rows and output blockers the pass changed, because finishing clears
+    /// the dirty seeds.
+    fn finish_recompute<I>(&mut self, sheets: I, affected: Option<&FxHashSet<AbsCellKey>>)
+    where
+        I: IntoIterator<Item = usize> + Clone,
+    {
+        if self.pivots.is_some() {
+            self.capture_pivot_changes(sheets.clone(), affected);
+        }
+
+        for sheet in sheets {
+            if let Some(data) = self.sheets.get_mut(sheet) {
+                data.finish_recompute();
+            }
+        }
+    }
+
+    /// Recalculates the formulas that the dirty cells of the `seeds` sheets
+    /// affect. It does not settle pivot tables, which is why the pivot settle
+    /// loops call it between their own steps.
+    pub(crate) fn recompute_formulas(&mut self, seeds: &[usize]) {
         if seeds.is_empty() {
             return;
         }
 
         RANGE_SUM_CACHE.with(|cache| cache.borrow_mut().clear());
         let _lookup_pass = LookupPassGuard::begin();
+        let _iteration_pass = IterationPassGuard::begin(self.iteration.is_some());
 
         if self.sheets.iter().all(|sheet| sheet.formulas.is_empty()) {
-            for &sheet in seeds {
-                if let Some(data) = self.sheets.get_mut(sheet) {
-                    data.finish_recompute();
-                }
-            }
-
+            self.finish_recompute(seeds.iter().copied(), None);
             return;
         }
 
-        let dep_index_stale = self
-            .dep_index
-            .as_ref()
-            .is_none_or(|index| index.epoch != self.formula_epoch);
-
-        if dep_index_stale {
-            self.dep_index = Some(build_dep_index(&self.sheets, self.formula_epoch));
-        }
-
-        let Some(index) = self.dep_index.as_ref() else {
-            return;
-        };
-
-        let mut affected = HashSet::new();
+        let index = self.graph.ensure_index(&self.sheets);
+        let mut affected = FxHashSet::default();
 
         for &sheet in seeds {
             affected.extend(collect_affected_formulas(&self.sheets, sheet, index));
             let data = &self.sheets[sheet];
 
-            if data.spill_ranges.is_empty() {
-                continue;
-            }
-
-            if data.all_dirty {
-                affected.extend(
-                    data.spill_ranges
-                        .keys()
-                        .map(|&anchor| AbsCellKey::from_local(sheet, anchor)),
-                );
-                continue;
-            }
-
-            // A dirty cell that lands inside a spilled range invalidates that
-            // anchor, so scan the dirty cells once and mark every range they
-            // fall inside, rather than rescanning the whole dirty set for each
-            // range. Stop as soon as every range has been hit.
-            let mut hit = vec![false; data.spill_ranges.len()];
-            let mut unhit_ranges = hit.len();
-
-            for &cell in &data.dirty_cells {
-                for (range_index, (_, range)) in data.spill_ranges.iter().enumerate() {
-                    if !hit[range_index] && range.contains(cell) {
-                        hit[range_index] = true;
-                        unhit_ranges -= 1;
-                    }
-                }
-
-                if unhit_ranges == 0 {
-                    break;
-                }
-            }
-
-            for (range_index, (&anchor, _)) in data.spill_ranges.iter().enumerate() {
-                if hit[range_index] {
+            // A dirty cell inside a spilled range invalidates that anchor.
+            match data.formulas.dirty_seeds() {
+                DirtySeeds::All => affected.extend(
+                    data.spill
+                        .anchors()
+                        .map(|anchor| AbsCellKey::from_local(sheet, anchor)),
+                ),
+                DirtySeeds::Cells(cells) => data.spill.for_each_anchor_covering(cells, |anchor| {
                     affected.insert(AbsCellKey::from_local(sheet, anchor));
+                }),
+                DirtySeeds::Ranges(rects) => {
+                    data.spill.for_each_anchor_intersecting(rects, |anchor| {
+                        affected.insert(AbsCellKey::from_local(sheet, anchor));
+                    })
                 }
             }
+        }
+
+        #[cfg(test)]
+        let selected_by_seeds = affected.len();
+        #[cfg(test)]
+        {
+            self.recomputed_formulas += selected_by_seeds;
         }
 
         if affected.is_empty() {
-            for &sheet in seeds {
-                if let Some(data) = self.sheets.get_mut(sheet) {
-                    data.finish_recompute();
-                }
-            }
-
+            self.finish_recompute(seeds.iter().copied(), None);
             return;
         }
 
-        let mut memo: HashMap<AbsCellKey, EvalResult> = HashMap::with_capacity(affected.len());
+        let mut memo: FxHashMap<AbsCellKey, EvalResult> =
+            FxHashMap::with_capacity_and_hasher(affected.len(), Default::default());
 
-        if let Some(index) = self.dep_index.as_ref() {
-            seed_dependency_depth_errors(&self.sheets, &affected, index, &mut memo);
-        }
+        let found_cycle = self.graph.index().is_some_and(|index| {
+            seed_dependency_depth_errors(&self.sheets, &affected, index, &mut memo)
+        });
 
-        let mut visiting: HashSet<AbsCellKey> = HashSet::new();
-        let mut processed_arrays: HashSet<AbsCellKey> = HashSet::new();
+        let mut visiting: FxHashSet<AbsCellKey> = FxHashSet::default();
+        let mut processed_arrays: FxHashSet<AbsCellKey> = FxHashSet::default();
 
         if self
-            .dep_index
-            .as_ref()
-            .is_some_and(|index| !index.has_dynamic_arrays)
+            .graph
+            .index()
+            .is_some_and(|index| !index.has_dynamic_arrays())
         {
             let mut pass = EvalPass {
                 affected: &affected,
                 memo: &mut memo,
                 visiting: &mut visiting,
             };
-            for key in &affected {
-                let _ = self.eval_formula_cell(*key, &mut pass, 0);
-            }
+            self.evaluate_pass(&mut pass, found_cycle);
 
             for key in &affected {
                 if let Some(result) = pass.memo.remove(key) {
@@ -530,14 +817,21 @@ impl CellStore {
                 }
             }
 
-            for &sheet in seeds {
-                self.sheets[sheet].finish_recompute();
-            }
+            self.finish_recompute(seeds.iter().copied(), Some(&affected));
 
             return;
         }
 
-        let mut seeded_sheets: HashSet<usize> = seeds.iter().copied().collect();
+        if let Some(limits) = self.iteration.as_deref().copied().filter(|_| found_cycle) {
+            let mut pass = EvalPass {
+                affected: &affected,
+                memo: &mut memo,
+                visiting: &mut visiting,
+            };
+            self.settle_circular_references(&mut pass, limits, false);
+        }
+
+        let mut seeded_sheets: FxHashSet<usize> = seeds.iter().copied().collect();
         let mut spill_work = 0usize;
 
         // Spills are evaluated in cell order, so a spill can read another
@@ -546,9 +840,17 @@ impl CellStore {
         // next pass evaluates them again. A reader that keeps coming back
         // reads its own output through other spills: that is a cycle.
         let mut sequence = 0usize;
-        let mut evaluated_at: HashMap<AbsCellKey, usize> = HashMap::new();
-        let mut requeued: HashMap<AbsCellKey, usize> = HashMap::new();
-        let mut cyclic: HashSet<AbsCellKey> = HashSet::new();
+        let mut evaluated_at: FxHashMap<AbsCellKey, usize> = FxHashMap::default();
+        let mut requeued: FxHashMap<AbsCellKey, usize> = FxHashMap::default();
+        // Requeues caused only by merged runtime reads cannot prove a cycle;
+        // they are capped per reader instead.
+        let mut approximately_requeued: FxHashMap<AbsCellKey, usize> = FxHashMap::default();
+        let mut approximate_requeues = 0usize;
+        let mut cyclic: FxHashSet<AbsCellKey> = FxHashSet::default();
+        // Ranges that OFFSET and INDIRECT resolved to in each anchor's last
+        // evaluation of this pass. The graph does not list them, so a spill
+        // change inside one makes that anchor stale. Dropped with the pass.
+        let mut runtime_readers: FxHashMap<AbsCellKey, RuntimeReads> = FxHashMap::default();
 
         loop {
             let mut pending: Vec<(AbsCellKey, Ast, bool)> = affected
@@ -559,16 +861,16 @@ impl CellStore {
                         .sheets
                         .get(key.sheet as usize)?
                         .formulas
-                        .get(&key.local())?;
+                        .get(key.local())?;
 
-                    if !entry.produces_array {
+                    if !entry.produces_array() {
                         return None;
                     }
 
                     let ast = entry.ast.as_ref()?;
                     self.dynamic_array_bound(ast, key.sheet as usize)
                         .is_some()
-                        .then(|| (key, ast.clone(), entry.has_spill_refs))
+                        .then(|| (key, ast.clone(), entry.has_spill_refs()))
                 })
                 .collect();
 
@@ -578,58 +880,38 @@ impl CellStore {
 
             pending.sort_unstable_by_key(|(key, ..)| (key.sheet, key.row, key.col));
 
-            let mut changed_sheets = HashSet::new();
+            let mut changed_sheets = FxHashSet::default();
             let mut spill_changes: Vec<SpillChange> = Vec::new();
 
             for (key, ast, has_spill_refs) in pending {
-                // Spill references read the spills installed so far in this pass.
-                let ast = if has_spill_refs {
-                    self.resolve_spill_refs(&ast, key.sheet as usize)
-                } else {
-                    ast
-                };
-
                 processed_arrays.insert(key);
                 sequence += 1;
                 evaluated_at.insert(key, sequence);
 
                 let local = key.local();
                 let output_sheet = key.sheet as usize;
-                let vacated_range = self.sheets[output_sheet].installed_spill(local);
-                let cleared = self.sheets[output_sheet].clear_spill(local);
-
-                if !cleared.is_empty() {
-                    spill_changes.push(SpillChange {
-                        sheet: output_sheet,
-                        sequence,
-                        cells: cleared.clone(),
-                    });
-                    self.sheets[output_sheet].dirty_cells.extend(cleared);
-                    changed_sheets.insert(output_sheet);
-                    seeded_sheets.insert(output_sheet);
-                }
-
-                if let Some(vacated) = vacated_range {
-                    let collision_dependents: Vec<AbsCellKey> = self.sheets[output_sheet]
-                        .spill_ranges
-                        .iter()
-                        .filter(|&(&anchor, &attempt)| {
-                            anchor != local && attempt.intersects(vacated)
-                        })
-                        .map(|(&anchor, &_attempt)| AbsCellKey::from_local(output_sheet, anchor))
-                        .collect();
-
-                    for dependent in collision_dependents {
-                        affected.insert(dependent);
-                        processed_arrays.remove(&dependent);
-                    }
-                }
+                let data = &mut self.sheets[output_sheet];
+                let vacated_range = data.spill.installed(local);
+                let vacated = data.spill.clear_keeping_values(local, &mut data.cells);
 
                 memo.remove(&key);
                 let mut pass = EvalPass {
                     affected: &affected,
                     memo: &mut memo,
                     visiting: &mut visiting,
+                };
+                let _origin = FormulaOriginGuard::push(local);
+                pass.visiting.insert(key);
+                if self.iteration.is_some() {
+                    iteration::enter_runtime_formula(key);
+                }
+                #[cfg(test)]
+                FORMULA_EVALUATIONS.with(|count| count.set(count.get() + 1));
+                let enclosing_reads = has_spill_refs.then(start_runtime_reads);
+                let ast = if has_spill_refs {
+                    self.resolve_spill_refs(&ast, output_sheet, &mut pass, 0)
+                } else {
+                    ast
                 };
 
                 let evaluated = match self.dynamic_array_bound(&ast, output_sheet) {
@@ -638,8 +920,36 @@ impl CellStore {
                         Some(total) => {
                             spill_work = total;
                             let _origin = FormulaOriginGuard::push(local);
-                            self.eval_dynamic_array(&ast, output_sheet, &mut pass, 0)
-                                .unwrap_or(Err(FormulaError::Value))
+                            // A LET that resolves to one cell leaves no array
+                            // expression; its scalar value is the result.
+                            let evaluated =
+                                match self.eval_dynamic_array(&ast, output_sheet, &mut pass, 0) {
+                                    Some(result) => result,
+                                    None if has_spill_refs => {
+                                        match self.eval_ast(&ast, output_sheet, &mut pass, 0) {
+                                            Value::Error(error) => Err(error),
+                                            value => Ok(EvalMatrix::new(1, 1, vec![value])),
+                                        }
+                                    }
+                                    None => Err(FormulaError::Value),
+                                };
+
+                            // A bound is an upper limit except for shapes known
+                            // only after evaluation (OFFSET, INDIRECT); charge
+                            // whatever the result holds beyond it. An overrun
+                            // spends the whole budget, so later formulas of the
+                            // pass fail before reading their ranges.
+                            evaluated.and_then(|matrix| {
+                                let excess = matrix.values.len().saturating_sub(bound);
+                                match dynamic_recompute_within_limit(spill_work, excess) {
+                                    Some(total) => spill_work = total,
+                                    None => {
+                                        spill_work = usize::MAX;
+                                        return Err(FormulaError::Num);
+                                    }
+                                }
+                                Ok(matrix)
+                            })
                         }
                         None => Err(FormulaError::Num),
                     },
@@ -648,17 +958,96 @@ impl CellStore {
                     // Keep the scalar expression's error instead of replacing it.
                     None => match self.eval_ast(&ast, output_sheet, &mut pass, 0) {
                         Value::Error(error) => Err(error),
+                        // A runtime reference that resolved to one cell can
+                        // leave a scalar expression; its value is the result.
+                        value if has_spill_refs => Ok(EvalMatrix::new(1, 1, vec![value])),
                         _ => Err(FormulaError::Value),
                     },
                 };
+                pass.visiting.remove(&key);
+                if let Some(enclosing) = enclosing_reads {
+                    let reads = finish_runtime_reads(enclosing);
+                    if reads.ranges.is_empty() {
+                        runtime_readers.remove(&key);
+                    } else {
+                        runtime_readers.insert(key, reads);
+                    }
+                }
 
-                let changed = self.install_spill_result(key, evaluated, pass.memo);
+                let mut changed = match evaluated {
+                    // A reference that resolved to one cell is a plain value,
+                    // as in Excel: it owns no spill cell and spends none of
+                    // the spill-owner budget.
+                    Ok(matrix) if has_spill_refs && matrix.values.len() == 1 => {
+                        let data = &mut self.sheets[output_sheet];
+                        if data.spill.attempt(local).is_some() {
+                            data.spill.forget(local, &mut data.cells);
+                        }
+                        pass.memo.insert(key, matrix.into_first());
+                        Vec::new()
+                    }
+                    evaluated => self.install_spill_result(key, evaluated, pass.memo),
+                };
+                if self.iteration.is_some() {
+                    if let Some(value) = self.finish_runtime_formula(key, &mut pass) {
+                        pass.memo.insert(key, value);
+                    }
+                }
 
                 // Formulas that use `A1#` read only the anchor cell. The anchor
                 // counts as changed when its spill range or spilled cells
                 // changed. A new anchor value alone needs no notice: a reader
                 // evaluates the anchor formula on demand when it reads it.
-                let installed_range = self.sheets[output_sheet].installed_spill(local);
+                let installed_range = self.sheets[output_sheet].spill.installed(local);
+
+                // Attempts blocked by the vacated range may spill now. A spill
+                // that comes back over the same range blocks them exactly as
+                // before, and a one-cell spill vacates only its anchor, which
+                // keeps its formula; skipping the scan then keeps recalculating
+                // many volatile spills (OFFSET, INDIRECT) linear.
+                if let Some(vacated) = vacated_range
+                    .filter(|range| installed_range != Some(*range) && !range.is_anchor_only())
+                {
+                    let colliding = self.sheets[output_sheet]
+                        .spill
+                        .anchors_colliding_with(local, vacated);
+
+                    for anchor in colliding {
+                        let dependent = AbsCellKey::from_local(output_sheet, anchor);
+                        affected.insert(dependent);
+                        processed_arrays.remove(&dependent);
+                    }
+                }
+
+                // A spill that comes back over the same cells reports only the
+                // cells whose value changed. Otherwise every vacated cell
+                // changed too, before the new spill was installed.
+                let reinstalled = installed_range == vacated_range
+                    && vacated.len() == changed.len()
+                    && vacated
+                        .iter()
+                        .zip(&changed)
+                        .all(|((vacated_cell, _), cell)| vacated_cell == cell);
+                if reinstalled {
+                    let cells = &self.sheets[output_sheet].cells;
+                    let mut previous = vacated.iter().map(|&(_, value)| value);
+                    changed.retain(|&(row, col)| {
+                        let current =
+                            cells.calculated_cell_at(cells.idx(row as usize, col as usize));
+                        previous.next().flatten() != current
+                    });
+                } else if !vacated.is_empty() {
+                    let cleared: Vec<(u32, u32)> = vacated.iter().map(|&(cell, _)| cell).collect();
+                    spill_changes.push(SpillChange {
+                        sheet: output_sheet,
+                        sequence,
+                        output_cells: cleared.len(),
+                        cells: cleared.clone(),
+                    });
+                    self.sheets[output_sheet].formulas.mark_cells_dirty(cleared);
+                    changed_sheets.insert(output_sheet);
+                    seeded_sheets.insert(output_sheet);
+                }
 
                 if installed_range != vacated_range || !changed.is_empty() {
                     let mut cells = changed.clone();
@@ -667,17 +1056,18 @@ impl CellStore {
                         sheet: output_sheet,
                         sequence,
                         cells,
+                        output_cells: changed.len(),
                     });
                 }
 
                 if !changed.is_empty() {
-                    self.sheets[output_sheet].dirty_cells.extend(changed);
+                    self.sheets[output_sheet].formulas.mark_cells_dirty(changed);
                     changed_sheets.insert(output_sheet);
                     seeded_sheets.insert(output_sheet);
                 }
             }
 
-            let Some(index) = self.dep_index.as_ref() else {
+            let Some(index) = self.graph.index() else {
                 return;
             };
 
@@ -689,44 +1079,86 @@ impl CellStore {
                 ));
             }
 
+            let mut stale_readers = Vec::new();
+            if !runtime_readers.is_empty() {
+                let outputs = ChangedOutputs::new(&spill_changes);
+                stale_readers.extend(stale_runtime_readers(&runtime_readers, &outputs));
+                #[cfg(test)]
+                {
+                    self.stale_reader_visits += outputs.visited.get();
+                }
+            }
             for change in spill_changes {
-                for reader in direct_readers(index, change.sheet, &change.cells) {
-                    let is_stale = evaluated_at
-                        .get(&reader)
-                        .is_some_and(|&evaluated| evaluated < change.sequence);
+                stale_readers.extend(
+                    direct_readers(index, change.sheet, &change.cells)
+                        .into_iter()
+                        .map(|reader| StaleReader {
+                            reader,
+                            changed_at: change.sequence,
+                            approximate: false,
+                        }),
+                );
+            }
 
-                    if !is_stale || cyclic.contains(&reader) {
+            for stale in stale_readers {
+                let reader = stale.reader;
+                let is_stale = evaluated_at
+                    .get(&reader)
+                    .is_some_and(|&evaluated| evaluated < stale.changed_at);
+
+                if !is_stale || cyclic.contains(&reader) || !processed_arrays.contains(&reader) {
+                    continue;
+                }
+
+                if stale.approximate {
+                    let count = approximately_requeued.entry(reader).or_insert(0);
+                    if *count >= affected.len() {
                         continue;
                     }
-
+                    *count += 1;
+                    approximate_requeues += 1;
+                } else {
                     let count = requeued.entry(reader).or_insert(0);
                     *count += 1;
 
                     // Without a cycle, a reader comes back at most once per
-                    // spill in front of it.
-                    if *count > affected.len() {
+                    // spill in front of it, plus once per approximate
+                    // requeue, whose new output it may read.
+                    if *count > affected.len() + approximate_requeues {
                         cyclic.insert(reader);
                     }
-
-                    processed_arrays.remove(&reader);
                 }
+
+                processed_arrays.remove(&reader);
             }
 
-            seed_dependency_depth_errors(&self.sheets, &affected, index, &mut memo);
+            if self.iteration.is_some() {
+                seed_additional_depth_errors(&self.sheets, &affected, index, &mut memo);
+            } else {
+                seed_dependency_depth_errors(&self.sheets, &affected, index, &mut memo);
+            }
         }
 
-        if let Some(index) = self.dep_index.as_ref() {
-            seed_dependency_depth_errors(&self.sheets, &affected, index, &mut memo);
+        #[cfg(test)]
+        {
+            // Spill changes select the formulas that read them.
+            self.recomputed_formulas += affected.len() - selected_by_seeds;
         }
+
+        let found_cycle = self.graph.index().is_some_and(|index| {
+            if self.iteration.is_some() {
+                seed_additional_depth_errors(&self.sheets, &affected, index, &mut memo)
+            } else {
+                seed_dependency_depth_errors(&self.sheets, &affected, index, &mut memo)
+            }
+        });
 
         let mut pass = EvalPass {
             affected: &affected,
             memo: &mut memo,
             visiting: &mut visiting,
         };
-        for key in &affected {
-            let _ = self.eval_formula_cell(*key, &mut pass, 0);
-        }
+        self.evaluate_pass(&mut pass, found_cycle);
 
         for key in &affected {
             if let Some(result) = pass.memo.remove(key) {
@@ -734,145 +1166,63 @@ impl CellStore {
             }
         }
 
-        for seeded_sheet in seeded_sheets {
-            self.sheets[seeded_sheet].finish_recompute();
-        }
-    }
-
-    fn spill_collision(&self, sheet: usize, range: SpillRange) -> Result<(), FormulaError> {
-        let Some(data) = self.sheets.get(sheet) else {
-            return Err(FormulaError::Ref);
-        };
-
-        if range.row_end as usize >= data.row_count || range.col_end as usize >= data.n_cols {
-            return Err(FormulaError::Spill);
-        }
-
-        if data.spill_blockers.iter().any(|blocker| {
-            let row_start = blocker.row_start.max(range.anchor.0);
-            let col_start = blocker.col_start.max(range.anchor.1);
-            let row_end = blocker.row_end.min(range.row_end);
-            let col_end = blocker.col_end.min(range.col_end);
-
-            row_start <= row_end
-                && col_start <= col_end
-                && !(row_start == range.anchor.0
-                    && row_end == range.anchor.0
-                    && col_start == range.anchor.1
-                    && col_end == range.anchor.1)
-        }) {
-            return Err(FormulaError::Spill);
-        }
-
-        for row in range.anchor.0..=range.row_end {
-            for col in range.anchor.1..=range.col_end {
-                let cell = (row, col);
-
-                if cell == range.anchor {
-                    continue;
-                }
-
-                if !data.is_loaded(row as usize, col as usize) {
-                    return Err(FormulaError::Loading);
-                }
-
-                let index = data.idx(row as usize, col as usize);
-                if data.spill_owners.contains_key(&cell)
-                    || data.formulas.contains_key(&cell)
-                    || data.source_kind_at(index) != KIND_EMPTY
-                {
-                    return Err(FormulaError::Spill);
-                }
-            }
-        }
-        Ok(())
+        self.finish_recompute(seeded_sheets.iter().copied(), Some(&affected));
     }
 
     fn install_spill_result(
         &mut self,
         key: AbsCellKey,
         result: Result<EvalMatrix, FormulaError>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
+        memo: &mut FxHashMap<AbsCellKey, EvalResult>,
     ) -> Vec<(u32, u32)> {
         let sheet = key.sheet as usize;
         let local = key.local();
         let matrix = match result {
             Ok(matrix) => matrix,
             Err(error) => {
-                self.sheets[sheet].spill_ranges.remove(&local);
-                self.sheets[sheet].compact_spill_metadata();
+                let data = &mut self.sheets[sheet];
+                data.spill.forget(local, &mut data.cells);
                 memo.insert(key, Value::Error(error));
                 return Vec::new();
             }
         };
         let Some(range) = SpillRange::new(local, matrix.rows, matrix.cols) else {
-            self.sheets[sheet].spill_ranges.remove(&local);
-            self.sheets[sheet].compact_spill_metadata();
+            let data = &mut self.sheets[sheet];
+            data.spill.forget(local, &mut data.cells);
             memo.insert(key, Value::Error(FormulaError::Num));
             return Vec::new();
         };
-        self.sheets[sheet].spill_ranges.insert(local, range);
-        if let Err(error) = self.spill_collision(sheet, range) {
-            self.sheets[sheet].compact_spill_metadata();
+        let data = &mut self.sheets[sheet];
+        if let Err(error) = data.spill.admit(range, &mut data.cells, &data.formulas) {
             memo.insert(key, Value::Error(error));
             return Vec::new();
         }
 
         let current_owner_cells = self.sheets.iter().try_fold(0usize, |total, data| {
-            total.checked_add(data.spill_owners.len())
+            total.checked_add(data.spill.owner_count())
         });
         let within_budget = current_owner_cells
             .and_then(|total| total.checked_add(matrix.values.len()))
             .is_some_and(|owners| {
                 owners <= self.spill_owner_cell_limit && spill_ownership_within_budget(owners)
             });
+        let data = &mut self.sheets[sheet];
         if !within_budget {
-            self.sheets[sheet].compact_spill_metadata();
+            data.spill.compact(&mut data.cells);
             memo.insert(key, Value::Error(FormulaError::Num));
             return Vec::new();
         }
-        let data = &mut self.sheets[sheet];
-        if data.spill_owners.try_reserve(matrix.values.len()).is_err()
-            || !data.reserve_derived(matrix.values.len())
-        {
-            data.compact_spill_metadata();
+        if !data.spill.reserve(matrix.values.len(), &mut data.cells) {
             memo.insert(key, Value::Error(FormulaError::Num));
             return Vec::new();
         }
 
         let first = matrix.values.first().cloned().unwrap_or(Value::Blank);
         memo.insert(key, first);
-        let mut changed = Vec::with_capacity(matrix.values.len().saturating_sub(1));
-        for row_offset in 0..matrix.rows {
-            for col_offset in 0..matrix.cols {
-                let cell = (local.0 + row_offset as u32, local.1 + col_offset as u32);
-                self.sheets[sheet].spill_owners.insert(cell, local);
-                if cell == local {
-                    continue;
-                }
-                let value = &matrix.values[row_offset * matrix.cols + col_offset];
-                let interned = match value {
-                    Value::Text(text) => Some(self.intern(text)),
-                    _ => None,
-                };
-                let data = &mut self.sheets[sheet];
-                let index = data.idx(cell.0 as usize, cell.1 as usize);
-                let (kind, payload) = match value {
-                    Value::Number(number) => (KIND_NUMBER, encode_num(*number)),
-                    Value::Text(_) => (
-                        KIND_STRING,
-                        encode_str_id(interned.expect("interned spill text")),
-                    ),
-                    Value::Bool(value) => (KIND_BOOL, encode_num(f64::from(*value))),
-                    Value::Blank => (KIND_EMPTY, 0),
-                    Value::Error(error) => (KIND_FORMULA, error.slot() as u64),
-                };
-                data.set_derived(index, kind, payload);
-                changed.push(cell);
-            }
-        }
-        self.sheets[sheet].compact_spill_metadata();
-        changed
+        let strings = &mut self.strings;
+        data.spill.install(range, &mut data.cells, |offset| {
+            calculated_slot(strings, &matrix.values[offset])
+        })
     }
 
     fn store_formula_result(&mut self, key: AbsCellKey, result: EvalResult) {
@@ -886,12 +1236,12 @@ impl CellStore {
         };
 
         let (row, col) = key.local();
-        if !data.contains_cell(row as usize, col as usize) {
+        if !data.cells.contains_cell(row as usize, col as usize) {
             return;
         }
 
-        let index = data.idx(row as usize, col as usize);
-        if !data.formulas.contains_key(&key.local()) {
+        let index = data.cells.idx(row as usize, col as usize);
+        if !data.formulas.contains(key.local()) {
             return;
         }
 
@@ -904,7 +1254,7 @@ impl CellStore {
         };
 
         assert!(
-            data.set_derived(index, kind, payload),
+            data.cells.set_derived(index, kind, payload),
             "calculated overlay allocation failed"
         );
     }
@@ -924,33 +1274,33 @@ impl CellStore {
         let Some(s) = self.sheets.get(sheet) else {
             return Value::Error(FormulaError::Ref);
         };
-        if !s.contains_cell(row, col) {
+        if !s.cells.contains_cell(row, col) {
             return Value::Error(FormulaError::Ref);
         }
 
-        if !s.is_loaded(row, col) {
+        if !s.cells.is_loaded(row, col) {
             return Value::Error(FormulaError::Loading);
         }
 
-        let i = s.idx(row, col);
+        let i = s.cells.idx(row, col);
         // Literal sources cannot be shadowed by calculated output. Decode their
         // payload directly instead of resolving the overlay a second time.
-        let source_kind = s.source_kind_at(i);
+        let source_kind = s.cells.source_kind_at(i);
         let (kind, payload) = if source_kind == KIND_EMPTY {
-            s.calculated_cell_at(i).unwrap_or((KIND_EMPTY, 0))
+            s.cells.calculated_cell_at(i).unwrap_or((KIND_EMPTY, 0))
         } else {
-            (source_kind, s.source_payload_at(i))
+            (source_kind, s.cells.source_payload_at(i))
         };
 
         // Literal range scans avoid per-cell formula and calculated-error lookups.
         if kind != KIND_FORMULA {
-            debug_assert!(cell_key(row, col).is_none_or(|key| { !s.formulas.contains_key(&key) }));
+            debug_assert!(cell_key(row, col).is_none_or(|key| { !s.formulas.contains(key) }));
             return literal_cell_value(&self.strings, kind, payload);
         }
 
         if let Some(key) = cell_key(row, col) {
             let abs_key = AbsCellKey::from_local(sheet, key);
-            if let Some(entry) = s.formulas.get(&key) {
+            if let Some(entry) = s.formulas.get(key) {
                 if pass.affected.contains(&abs_key) {
                     return self.eval_formula_cell(abs_key, pass, depth + 1);
                 }
@@ -962,13 +1312,13 @@ impl CellStore {
                     formula_error_with_entry(s, key, Some(entry)),
                 );
             }
-            if let Some(error) = s.calculated_error_at(i) {
+            if let Some(error) = s.cells.calculated_error_at(i) {
                 return Value::Error(error);
             }
         }
 
         // A `KIND_FORMULA` cell without a formula entry keeps its last number.
-        Value::number(s.num_at(i))
+        Value::number(s.cells.num_at(i))
     }
 
     pub(crate) fn eval_formula_cell(
@@ -981,33 +1331,61 @@ impl CellStore {
             return Value::Error(FormulaError::Num);
         }
         if let Some(result) = pass.memo.get(&key) {
+            if self.iteration.is_some() {
+                iteration::record_iteration_read(key);
+            }
             return result.clone();
         }
         if !pass.visiting.insert(key) {
-            return Value::Error(FormulaError::Cycle);
+            return self.back_edge_value(key);
         }
+
+        if self.iteration.is_some() {
+            iteration::enter_runtime_formula(key);
+        }
+        let result = self.eval_formula_body(key, pass, depth);
+        pass.visiting.remove(&key);
+        pass.memo.insert(key, result.clone());
+        if self.iteration.is_some() {
+            self.finish_runtime_formula(key, pass).unwrap_or(result)
+        } else {
+            result
+        }
+    }
+
+    /// Evaluates the formula at `key` without consulting or filling the memo.
+    fn eval_formula_body(
+        &self,
+        key: AbsCellKey,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> EvalResult {
+        #[cfg(test)]
+        FORMULA_EVALUATIONS.with(|count| count.set(count.get() + 1));
 
         let sheet = key.sheet as usize;
         let local = key.local();
-        let result = match self.sheets.get(sheet).and_then(|s| s.formulas.get(&local)) {
+        match self.sheets.get(sheet).and_then(|s| s.formulas.get(local)) {
             Some(entry) => match &entry.ast {
                 Some(ast) => {
                     let _origin = FormulaOriginGuard::push(local);
-                    if entry.has_spill_refs {
-                        let resolved = self.resolve_spill_refs(ast, sheet);
-                        self.eval_ast(&resolved, sheet, pass, depth + 1)
+                    if entry.has_spill_refs() {
+                        let resolved = self.resolve_spill_refs(ast, sheet, pass, depth + 1);
+                        if range_from_ast(&resolved, sheet).is_some() {
+                            self.eval_matrix_arg(&resolved, sheet, pass, depth + 1)
+                                .map(EvalMatrix::into_first)
+                                .unwrap_or_else(Value::Error)
+                        } else {
+                            self.eval_ast(&resolved, sheet, pass, depth + 1)
+                        }
                     } else {
                         self.eval_ast(ast, sheet, pass, depth + 1)
                     }
                 }
-                None => Value::Error(entry.error.unwrap_or(FormulaError::Value)),
+                None => Value::Error(entry.source_error().unwrap_or(FormulaError::Value)),
             },
             None => Value::Number(0.0),
-        };
-
-        pass.visiting.remove(&key);
-        pass.memo.insert(key, result.clone());
-        result
+        }
     }
 
     /// Evaluate a parsed conditional-format expression at one target cell.
@@ -1019,10 +1397,10 @@ impl CellStore {
         sheet: usize,
         row: u32,
         col: u32,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut HashSet<AbsCellKey>,
+        memo: &mut FxHashMap<AbsCellKey, EvalResult>,
+        visiting: &mut FxHashSet<AbsCellKey>,
     ) -> EvalResult {
-        let affected = HashSet::new();
+        let affected = FxHashSet::default();
         let mut pass = EvalPass {
             affected: &affected,
             memo,
@@ -1106,7 +1484,8 @@ impl CellStore {
             | Ast::NamedRange(_)
             | Ast::Range(..)
             | Ast::AbsRange(..)
-            | Ast::SheetRange(..) => Value::Error(FormulaError::Value),
+            | Ast::SheetRange(..)
+            | Ast::SheetSpan(_) => Value::Error(FormulaError::Value),
             Ast::Neg(expr) | Ast::Pos(expr) | Ast::Percent(expr) => {
                 let op = match ast {
                     Ast::Neg(_) => operators::UnaryOp::Neg,
@@ -1184,11 +1563,31 @@ impl CellStore {
 
         if func == Func::Let {
             return match expand_let_ast(args) {
-                Ok((expanded, slots)) => {
-                    with_let_slots(slots, || self.eval_ast(&expanded, sheet, pass, depth + 1))
-                }
+                Ok((expanded, slots)) => with_let_slots(slots, || {
+                    let expanded = self.resolve_let_runtime_refs(
+                        args,
+                        expanded,
+                        sheet,
+                        pass,
+                        depth + 1,
+                        RewriteScope::Nested,
+                    );
+                    self.eval_ast(&expanded, sheet, pass, depth + 1)
+                }),
                 Err(error) => Value::Error(error),
             };
+        }
+
+        if matches!(func, Func::Offset | Func::Indirect) {
+            return self.eval_runtime_reference(func, args, sheet, pass, depth);
+        }
+
+        match func {
+            Func::Intersect => return self.eval_intersection(args, sheet, pass, depth),
+            // A union has several areas, and a value position takes one.
+            Func::Union => return Value::Error(FormulaError::Value),
+            Func::Areas => return self.eval_areas(args, sheet, pass, depth),
+            _ => {}
         }
 
         if func == Func::Choose {
@@ -1219,8 +1618,16 @@ impl CellStore {
                 return Value::Error(FormulaError::Value);
             }
             let coordinate = if let Some(reference) = args.first() {
-                let Some(range) = range_from_ast(reference, sheet) else {
-                    return Value::Error(FormulaError::Value);
+                let range = match (range_from_ast(reference, sheet), reference) {
+                    (Some(range), _) => range,
+                    (None, Ast::Func(func @ (Func::Offset | Func::Indirect), args)) => {
+                        match self.runtime_range(*func, args, sheet, pass, depth + 1) {
+                            Ok(range) => range,
+                            Err(error) => return Value::Error(error),
+                        }
+                    }
+                    (None, Ast::InvalidRef) => return Value::Error(FormulaError::Ref),
+                    (None, _) => return Value::Error(FormulaError::Value),
                 };
                 if func == Func::Row {
                     range.row_start
@@ -1454,6 +1861,17 @@ impl CellStore {
             });
         }
 
+        if matches!(func, Func::Rand | Func::RandBetween) {
+            return self.eval_random_func(func == Func::RandBetween, args, sheet, pass, depth + 1);
+        }
+
+        if matches!(
+            func,
+            Func::FormulaText | Func::IsFormula | Func::Hyperlink | Func::Cell
+        ) {
+            return self.eval_info_func(func, args, sheet, pass, depth + 1);
+        }
+
         if matches!(
             func,
             Func::CountIf
@@ -1564,10 +1982,16 @@ impl CellStore {
                     reference.row_end,
                     reference.col,
                 )),
+                Ast::Func(Func::Intersect, operands) => intersection_range(operands, sheet).ok(),
                 _ => None,
             };
             let shape = if let Some(range) = range {
                 match self.eval_range_values(range, pass, depth + 1, &mut values) {
+                    Ok(shape) => shape,
+                    Err(error) => return Value::Error(error),
+                }
+            } else if matches!(arg, Ast::Func(Func::Union, _) | Ast::SheetSpan(_)) {
+                match self.eval_area_values(func, arg, sheet, pass, depth + 1, &mut values) {
                     Ok(shape) => shape,
                     Err(error) => return Value::Error(error),
                 }
@@ -1653,17 +2077,17 @@ impl CellStore {
         let Some(data) = self.sheets.get(sheet) else {
             return Err(FormulaError::Ref);
         };
-        if data.row_count == 0
-            || data.n_cols == 0
-            || range.row_start as usize >= data.row_count
-            || range.col_start as usize >= data.n_cols
+        if data.cells.row_count() == 0
+            || data.cells.n_cols() == 0
+            || range.row_start as usize >= data.cells.row_count()
+            || range.col_start as usize >= data.cells.n_cols()
         {
             return Err(FormulaError::Ref);
         }
         let row_start = range.row_start as usize;
         let col_start = range.col_start as usize;
-        let row_end = (range.row_end as usize).min(data.row_count - 1);
-        let col_end = (range.col_end as usize).min(data.n_cols - 1);
+        let row_end = (range.row_end as usize).min(data.cells.row_count() - 1);
+        let col_end = (range.col_end as usize).min(data.cells.n_cols() - 1);
         let rows = row_end - row_start + 1;
         let cols = col_end - col_start + 1;
         let total = EvalMatrix::validate_shape(rows, cols, 1, 0)?;
@@ -1672,9 +2096,11 @@ impl CellStore {
             .ok_or(FormulaError::Num)?;
         for row in row_start..=row_end {
             for col in col_start..=col_end {
-                let index = data.idx(row, col);
-                if matches!(data.kind_at(index), KIND_STRING | KIND_FORMULA) {
-                    if let Some(text) = string_from_pool_ref(&self.strings, data.str_id_at(index)) {
+                let index = data.cells.idx(row, col);
+                if matches!(data.cells.kind_at(index), KIND_STRING | KIND_FORMULA) {
+                    if let Some(text) =
+                        string_from_pool_ref(&self.strings, data.cells.str_id_at(index))
+                    {
                         payload_bytes = payload_bytes
                             .checked_add(text.len())
                             .ok_or(FormulaError::Num)?;
@@ -1689,10 +2115,10 @@ impl CellStore {
         let literals = LiteralSources::new(data, depth);
         for row in row_start..=row_end {
             for col in col_start..=col_end {
-                if !data.is_loaded(row, col) {
+                if !data.cells.is_loaded(row, col) {
                     return Err(FormulaError::Loading);
                 }
-                let index = data.idx(row, col);
+                let index = data.cells.idx(row, col);
                 let value = literals
                     .and_then(|sources| sources.value_at(&self.strings, index))
                     .unwrap_or_else(|| self.eval_at(sheet, row, col, pass, depth + 1));
@@ -2260,19 +2686,19 @@ impl CellStore {
         let Some(data) = self.sheets.get(range.sheet as usize) else {
             return false;
         };
-        if data.is_paged() {
+        if data.cells.is_paged() {
             return false;
         }
-        let has_spills = !data.spill_owners.is_empty();
-        let row_end = (range.row_end as usize).min(data.row_count.saturating_sub(1));
-        let col_end = (range.col_end as usize).min(data.n_cols.saturating_sub(1));
+        let has_spills = data.spill.has_owners();
+        let row_end = (range.row_end as usize).min(data.cells.row_count().saturating_sub(1));
+        let col_end = (range.col_end as usize).min(data.cells.n_cols().saturating_sub(1));
         for col in range.col_start as usize..=col_end {
             for row in range.row_start as usize..=row_end {
-                let index = data.idx(row, col);
-                if data.kind_at(index) == KIND_FORMULA {
+                let index = data.cells.idx(row, col);
+                if data.cells.kind_at(index) == KIND_FORMULA {
                     return false;
                 }
-                if has_spills && data.spill_owner((row as u32, col as u32)).is_some() {
+                if has_spills && data.spill.owner((row as u32, col as u32)).is_some() {
                     return false;
                 }
             }
@@ -2292,10 +2718,14 @@ impl CellStore {
             |ast: &Ast, pass: &mut EvalPass<'_>| self.eval_ast(ast, sheet, pass, depth + 1);
         match func {
             Func::Index => {
-                if !(2..=3).contains(&args.len()) {
+                if !(2..=4).contains(&args.len()) {
                     return Value::Error(FormulaError::Value);
                 }
-                let matrix = match self.eval_matrix_arg(&args[0], sheet, pass, depth + 1) {
+                let area = match self.index_area(&args[0], args.get(3), sheet, pass, depth + 1) {
+                    Ok(area) => area,
+                    Err(error) => return Value::Error(error),
+                };
+                let matrix = match self.eval_matrix_arg(area, sheet, pass, depth + 1) {
                     Ok(matrix) => matrix,
                     Err(error) => return Value::Error(error),
                 };
@@ -2304,12 +2734,19 @@ impl CellStore {
                     Ok(index) => index,
                     Err(error) => return Value::Error(error),
                 };
-                let (row, col) = if matrix.rows == 1 && args.len() == 2 {
+                // With area_num, an empty column argument is omitted, as when
+                // only the row is given.
+                let col_arg = if args.len() == 4 {
+                    optional_ast(args, 2)
+                } else {
+                    args.get(2)
+                };
+                let (row, col) = if matrix.rows == 1 && col_arg.is_none() {
                     (0, first)
-                } else if matrix.cols == 1 && args.len() == 2 {
+                } else if matrix.cols == 1 && col_arg.is_none() {
                     (first, 0)
                 } else {
-                    let Some(col_arg) = args.get(2) else {
+                    let Some(col_arg) = col_arg else {
                         return Value::Error(FormulaError::Value);
                     };
                     let col = scalar(col_arg, pass);
@@ -2503,17 +2940,17 @@ impl CellStore {
         let Some(data) = self.sheets.get(sheet) else {
             return Value::Error(FormulaError::Ref);
         };
-        if data.row_count == 0
-            || data.n_cols == 0
-            || range.row_start as usize >= data.row_count
-            || range.col_start as usize >= data.n_cols
+        if data.cells.row_count() == 0
+            || data.cells.n_cols() == 0
+            || range.row_start as usize >= data.cells.row_count()
+            || range.col_start as usize >= data.cells.n_cols()
         {
             return Value::Error(FormulaError::Ref);
         }
         let row_start = range.row_start as usize;
         let col_start = range.col_start as usize;
-        let row_end = (range.row_end as usize).min(data.row_count - 1);
-        let col_end = (range.col_end as usize).min(data.n_cols - 1);
+        let row_end = (range.row_end as usize).min(data.cells.row_count() - 1);
+        let col_end = (range.col_end as usize).min(data.cells.n_cols() - 1);
         let total = (row_end - row_start + 1) as u64 * (col_end - col_start + 1) as u64;
         if total > RANGE_CELL_LIMIT {
             return Value::Error(FormulaError::Num);
@@ -2524,32 +2961,37 @@ impl CellStore {
 
         let mut sum: f64 = 0.0;
         let mut cacheable = true;
-        let has_spill_cells = !data.spill_owners.is_empty();
+        let has_spill_cells = data.spill.has_owners();
         let literals = LiteralSources::new(data, depth);
         for row in row_start..=row_end {
             for col in col_start..=col_end {
-                if !data.is_loaded(row, col) {
+                if !data.cells.is_loaded(row, col) {
                     return Value::Error(FormulaError::Loading);
                 }
-                let index = data.idx(row, col);
-                let kind = data.kind_at(index);
-                // A sum over formula cells or spilled output can change without a
-                // write to this range, so only plain values are cached.
-                if cacheable
-                    && (kind == KIND_FORMULA
-                        || (has_spill_cells
-                            && data.spill_owner((row as u32, col as u32)).is_some()))
-                {
-                    cacheable = false;
-                }
+                let index = data.cells.idx(row, col);
+                // Literal sources are never formulas or owned spill output, so
+                // only non-literal cells need the resolved kind and the
+                // cacheability checks.
                 let value = if let Some(value) =
                     literals.and_then(|sources| sources.value_at(&self.strings, index))
                 {
                     value
-                } else if kind == KIND_EMPTY {
-                    Value::Blank
                 } else {
-                    self.eval_at(sheet, row, col, pass, depth + 1)
+                    let kind = data.cells.kind_at(index);
+                    // A sum over formula cells or spilled output can change
+                    // without a write to this range, so only plain values are cached.
+                    if cacheable
+                        && (kind == KIND_FORMULA
+                            || (has_spill_cells
+                                && data.spill.owner((row as u32, col as u32)).is_some()))
+                    {
+                        cacheable = false;
+                    }
+                    if kind == KIND_EMPTY {
+                        Value::Blank
+                    } else {
+                        self.eval_at(sheet, row, col, pass, depth + 1)
+                    }
                 };
                 match aggregate_number(&value, true) {
                     Ok(Some(number)) => sum += number,
@@ -2586,18 +3028,18 @@ impl CellStore {
         let Some(s) = self.sheets.get(sheet) else {
             return Err(FormulaError::Ref);
         };
-        if s.row_count == 0
-            || s.n_cols == 0
-            || range.row_start as usize >= s.row_count
-            || range.col_start as usize >= s.n_cols
+        if s.cells.row_count() == 0
+            || s.cells.n_cols() == 0
+            || range.row_start as usize >= s.cells.row_count()
+            || range.col_start as usize >= s.cells.n_cols()
         {
             return Err(FormulaError::Ref);
         }
 
         let row_start = range.row_start as usize;
         let col_start = range.col_start as usize;
-        let row_end = (range.row_end as usize).min(s.row_count - 1);
-        let col_end = (range.col_end as usize).min(s.n_cols - 1);
+        let row_end = (range.row_end as usize).min(s.cells.row_count() - 1);
+        let col_end = (range.col_end as usize).min(s.cells.n_cols() - 1);
 
         let row_len = row_end - row_start + 1;
         let col_len = col_end - col_start + 1;
@@ -2611,15 +3053,15 @@ impl CellStore {
 
         for row in row_start..=row_end {
             for col in col_start..=col_end {
-                if !s.is_loaded(row, col) {
+                if !s.cells.is_loaded(row, col) {
                     return Err(FormulaError::Loading);
                 }
-                let i = s.idx(row, col);
+                let i = s.cells.idx(row, col);
                 let value = if let Some(value) =
                     literals.and_then(|sources| sources.value_at(&self.strings, i))
                 {
                     value
-                } else if s.kind_at(i) == KIND_EMPTY {
+                } else if s.cells.kind_at(i) == KIND_EMPTY {
                     Value::Blank
                 } else {
                     self.eval_at(sheet, row, col, pass, depth + 1)

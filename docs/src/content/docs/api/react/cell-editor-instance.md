@@ -1,6 +1,6 @@
 ---
 title: "CellEditorInstance | @sheetwrite/react"
-description: "Retained lifecycle returned by a custom editor's mount method."
+description: "CellEditorInstance interface in @sheetwrite/react: Retained lifecycle returned by a custom editor's mount method."
 ---
 <!-- api-export:@sheetwrite/react|.|CellEditorInstance -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/react/">@sheetwrite/react</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -8,7 +8,7 @@ description: "Retained lifecycle returned by a custom editor's mount method."
 Retained lifecycle returned by a custom editor's mount method.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/types/grid.d.ts#L36"><code>packages/core/dist/types/grid.d.ts#L36</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/types/grid.d.ts#L52"><code>packages/core/dist/types/grid.d.ts#L52</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>

@@ -1,6 +1,6 @@
 ---
 title: "createSimpleGridInput | @sheetwrite/core/adapter"
-description: "Converts simple columns and row objects into canonical workbook and columnar input."
+description: "createSimpleGridInput function in @sheetwrite/core/adapter: Converts simple columns and row objects into canonical workbook and columnar input."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|createSimpleGridInput -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="function">function</span></div>
@@ -30,6 +30,7 @@ function createSimpleGridInput<
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

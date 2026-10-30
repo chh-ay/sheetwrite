@@ -13,13 +13,7 @@
   position: relative;
   isolation: isolate;
   min-height: 100vh;
-  background:
-    radial-gradient(
-      ellipse at 85% 0%,
-      color-mix(in srgb, var(--sw-accent) 9%, transparent),
-      transparent 45rem
-    ),
-    var(--sw-surface-0);
+  background: var(--sw-surface-0);
   color: var(--sw-fg);
 }
 
@@ -30,12 +24,8 @@
   z-index: -1;
   height: 56rem;
   background:
-    linear-gradient(color-mix(in srgb, var(--sw-border) 55%, transparent) 1px, transparent 1px),
-    linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--sw-border) 55%, transparent) 1px,
-      transparent 1px
-    );
+    linear-gradient(var(--sw-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--sw-grid-line) 1px, transparent 1px);
   background-size: 4rem 4rem;
   content: "";
   mask-image: radial-gradient(ellipse 80% 70% at 50% 0%, #000 30%, transparent 100%);
@@ -188,9 +178,8 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Desktop, all examples: three featured capability cards (a third of the row),
-   then four capability cards and four adapters (a quarter each). Filtered
-   views keep thirds. Two columns on tablets and one on small screens. */
+/* Desktop: capability cards in thirds (nine make three full rows) and the
+   four adapters in a row of four. Tablets use pairs; small screens stack. */
 .sw-hub-scenes {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
@@ -207,8 +196,7 @@
   grid-column: span 4;
 }
 
-.sw-hub-scenes > li[data-kind="framework"],
-.sw-hub-scenes[data-group="all"] > li[data-kind="capability"]:nth-child(n + 4) {
+.sw-hub-scenes > li[data-kind="framework"] {
   grid-column: span 3;
 }
 
@@ -257,7 +245,7 @@
 }
 
 .sw-hub-launch[data-owner="engine"] {
-  --sw-hub-accent: #a78bfa;
+  --sw-hub-accent: var(--sw-type-keyword);
 }
 
 .sw-hub-launch[data-owner="vue"] {
@@ -315,13 +303,7 @@
   gap: 0.5rem;
   padding: 1.5rem 1.25rem 3rem;
   border-bottom: 0;
-  background:
-    radial-gradient(
-      ellipse at 50% 15%,
-      color-mix(in srgb, var(--sw-hub-accent) 9%, transparent),
-      transparent 85%
-    ),
-    var(--sw-surface-0);
+  background: var(--sw-surface-0);
   color: var(--sw-demo-fg);
 }
 
@@ -673,22 +655,352 @@
   text-align: right;
 }
 
-/* Engine trace: one public event per line. */
-.sw-hub-trace {
+/* Engine waterfall: stage labels beside bars that start where the last ended. */
+.sw-hub-waterfall {
   display: grid;
-  gap: 0.3rem;
+  width: 100%;
+  gap: 0.45rem;
 }
 
-.sw-hub-trace code {
+.sw-hub-waterfall > span {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.sw-hub-waterfall i {
   color: var(--sw-demo-fg-soft);
-  font: 500 0.72rem / 1.4 var(--sw-font-mono);
+  font: 500 0.75rem / 1.2 var(--sw-font-body);
+  font-style: normal;
 }
 
-.sw-hub-trace i {
-  display: inline-block;
-  min-width: 5.5rem;
+.sw-hub-waterfall b {
+  display: flex;
+  height: 0.6rem;
+  border-radius: 0.2rem;
+  background: color-mix(in srgb, var(--sw-demo-border) 60%, transparent);
+}
+
+.sw-hub-waterfall s {
+  display: block;
+  height: 100%;
+  border-radius: 0.2rem;
+  background: var(--sw-hub-accent);
+}
+
+/* Host rows: ID chips that stay with their records while the bars sort. */
+.sw-hub-records {
+  display: grid;
+  width: 100%;
+  gap: 0.4rem;
+}
+
+.sw-hub-records > span {
+  display: grid;
+  grid-template-columns: 3.25rem minmax(0, 1fr);
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.sw-hub-records code {
+  padding: 0.1rem 0.4rem;
+  border: 1px solid color-mix(in srgb, var(--sw-hub-accent) 55%, transparent);
+  border-radius: 999px;
   color: var(--sw-hub-accent-ink);
+  font: 600 0.75rem / 1.3 var(--sw-font-mono);
+  text-align: center;
+}
+
+.sw-hub-records b {
+  height: 0.6rem;
+  border-radius: 0.2rem;
+  background: color-mix(in srgb, var(--sw-hub-accent) 35%, transparent);
+}
+
+.sw-hub-records [data-edited] code {
+  background: color-mix(in srgb, var(--sw-hub-accent) 20%, transparent);
+}
+
+.sw-hub-records [data-edited] b {
+  background: var(--sw-hub-accent);
+}
+
+/* Formatting: a three-row budget with real formatting differences. */
+.sw-hub-budget {
+  display: grid;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--sw-demo-border);
+  border-radius: 0.3rem;
+  font: 500 0.75rem / 1.2 var(--sw-font-body);
+  font-variant-numeric: tabular-nums;
+}
+
+.sw-hub-budget > span {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 0.8fr);
+  border-top: 1px solid var(--sw-demo-border);
+}
+
+.sw-hub-budget > span:first-child {
+  border-top: 0;
+}
+
+.sw-hub-budget i {
+  padding: 0.3rem 0.5rem;
+  color: var(--sw-demo-fg-soft);
   font-style: normal;
+}
+
+.sw-hub-budget i + i {
+  text-align: right;
+}
+
+.sw-hub-budget [data-tone="head"] {
+  background: color-mix(in srgb, var(--sw-hub-accent) 22%, transparent);
+}
+
+.sw-hub-budget [data-tone="head"] i {
+  color: var(--sw-fg-strong);
+  font-weight: 650;
+}
+
+.sw-hub-budget [data-tone="negative"] i + i {
+  background: color-mix(in srgb, var(--sw-demo-danger) 14%, transparent);
+  color: var(--sw-demo-danger);
+}
+
+.sw-hub-budget [data-tone="total"] i {
+  color: var(--sw-fg-strong);
+  font-weight: 700;
+}
+
+.sw-hub-budget [data-tone="total"] i:first-child {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+/* Data tools: a filtered header, then cells that show each rule's outcome. */
+.sw-hub-rules {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: center;
+  width: 100%;
+}
+
+.sw-hub-rules__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1.75rem);
+  gap: 3px;
+}
+
+.sw-hub-rules__grid i,
+.sw-hub-rules__grid b {
+  height: 1rem;
+  border-radius: 2px;
+}
+
+.sw-hub-rules__grid i {
+  background: color-mix(in srgb, var(--sw-demo-fg) 16%, transparent);
+}
+
+/* The filtered column: a funnel mark drawn as a small accent triangle. */
+.sw-hub-rules__grid i[data-filtered] {
+  background:
+    linear-gradient(to bottom right, transparent 50%, var(--sw-hub-accent) 50%) right 2px bottom
+      2px / 0.5rem 0.5rem no-repeat,
+    color-mix(in srgb, var(--sw-hub-accent) 28%, transparent);
+}
+
+.sw-hub-rules__grid b {
+  background: color-mix(in srgb, var(--sw-demo-fg) 7%, transparent);
+}
+
+.sw-hub-rules__grid b[data-state="reject"] {
+  outline: 2px solid var(--sw-demo-danger);
+  outline-offset: -2px;
+}
+
+.sw-hub-rules__grid b[data-state="warn"] {
+  background: color-mix(in srgb, var(--sw-demo-warn) 45%, transparent);
+}
+
+.sw-hub-rules__grid b[data-state="lock"] {
+  background: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--sw-demo-fg) 22%, transparent) 0 2px,
+    transparent 2px 5px
+  );
+}
+
+.sw-hub-rules__legend {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.sw-hub-rules__legend span {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+  color: var(--sw-demo-fg-soft);
+  font: 500 0.75rem / 1.2 var(--sw-font-body);
+}
+
+.sw-hub-rules__legend span::before {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 2px;
+  content: "";
+}
+
+.sw-hub-rules__legend [data-state="reject"]::before {
+  outline: 2px solid var(--sw-demo-danger);
+  outline-offset: -2px;
+}
+
+.sw-hub-rules__legend [data-state="warn"]::before {
+  background: color-mix(in srgb, var(--sw-demo-warn) 45%, transparent);
+}
+
+.sw-hub-rules__legend [data-state="lock"]::before {
+  background: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--sw-demo-fg) 30%, transparent) 0 2px,
+    transparent 2px 4px
+  );
+}
+
+/* Analysis: a pivot in miniature, and the line chart drawn from the same numbers. */
+.sw-hub-analysis {
+  display: grid;
+  /* The table keeps the width its labels need; the chart takes what is left. */
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 1rem;
+  align-items: center;
+  width: 100%;
+}
+
+/* Each row is its own grid, so fixed widths keep the columns aligned across rows. */
+.sw-hub-analysis__pivot > span {
+  grid-template-columns: 3.5rem 4.75rem 3.5rem;
+}
+
+.sw-hub-analysis__pivot i {
+  padding-inline: 0.4rem;
+}
+
+.sw-hub-analysis__chart {
+  width: 100%;
+  height: auto;
+  border-bottom: 1px solid var(--sw-demo-border-strong);
+  border-left: 1px solid var(--sw-demo-border-strong);
+}
+
+.sw-hub-analysis__chart polyline {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  /* The chart scales with the card; the line keeps its weight. */
+  vector-effect: non-scaling-stroke;
+}
+
+.sw-hub-analysis__chart [data-series="1"] {
+  stroke: var(--sw-hub-accent);
+}
+
+/* EMEA carries the dip, so it takes the same color as the dip row in the pivot. */
+.sw-hub-analysis__chart [data-series="2"] {
+  stroke: var(--sw-demo-danger);
+}
+
+/* The app showcase leads the hub at full width: preview beside the copy. */
+.sw-hub-scenes > li[data-owner="spreadsheet"] {
+  grid-column: 1 / -1;
+}
+
+.sw-hub-scenes > li[data-owner="spreadsheet"] > .sw-hub-launch {
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  /* At least the other previews' height; taller when the copy wraps. */
+  grid-template-rows: minmax(12rem, auto);
+}
+
+/* Miniature ribbon: a tab row, labeled groups, then a formula bar. */
+.sw-hub-ribbon {
+  display: grid;
+  gap: 0.4rem;
+  font: 500 0.72rem / 1.2 var(--sw-font-body);
+}
+
+.sw-hub-ribbon__tabs {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.sw-hub-ribbon__tabs i {
+  padding-bottom: 0.2rem;
+  color: var(--sw-demo-muted);
+  font-style: normal;
+}
+
+.sw-hub-ribbon__tabs i[data-selected="true"] {
+  border-bottom: 2px solid var(--sw-hub-accent);
+  color: var(--sw-fg-strong);
+  font-weight: 600;
+}
+
+.sw-hub-ribbon__groups {
+  display: flex;
+  gap: 1px;
+  padding: 0.4rem;
+  border: 1px solid var(--sw-demo-border);
+  border-radius: 0.4rem;
+  background: var(--sw-demo-surface);
+}
+
+.sw-hub-ribbon__groups > span {
+  display: grid;
+  flex: 1;
+  justify-items: center;
+  gap: 0.3rem;
+  padding-inline: 0.35rem;
+  border-right: 1px solid var(--sw-demo-border);
+}
+
+.sw-hub-ribbon__groups > span:last-child {
+  border-right: 0;
+}
+
+.sw-hub-ribbon__groups b {
+  width: 100%;
+  height: 1.4rem;
+  border-radius: 0.25rem;
+  background: color-mix(in srgb, var(--sw-hub-accent) 16%, transparent);
+}
+
+.sw-hub-ribbon__groups small {
+  color: var(--sw-demo-muted);
+  font-size: 0.62rem;
+}
+
+.sw-hub-ribbon__formula {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.sw-hub-ribbon__formula code {
+  padding: 0.2rem 0.45rem;
+  border: 1px solid var(--sw-demo-border);
+  border-radius: 0.25rem;
+  background: var(--sw-demo-surface);
+  color: var(--sw-demo-fg-soft);
+  font: 500 0.7rem / 1.4 var(--sw-font-mono);
+}
+
+.sw-hub-ribbon__formula code:last-child {
+  flex: 1;
 }
 
 @media (hover: hover) {
@@ -701,27 +1013,8 @@
 
 @media (max-width: 79.999rem) {
   .sw-hub-scenes > li,
-  .sw-hub-scenes > li[data-kind="framework"],
-  .sw-hub-scenes[data-group="all"] > li[data-kind="capability"]:nth-child(n + 4) {
+  .sw-hub-scenes > li[data-kind="framework"] {
     grid-column: span 6;
-  }
-
-  /* Seven capability cards: the last one takes the full row on tablets. */
-  .sw-hub-scenes[data-group="all"] > li[data-kind="capability"]:nth-child(7) {
-    grid-column: 1 / -1;
-  }
-}
-
-/* On tablets the full-row seventh card lays its preview beside its text. */
-@media (min-width: 40rem) and (max-width: 79.999rem) {
-  .sw-hub-scenes[data-group="all"] > li[data-kind="capability"]:nth-child(7) .sw-hub-launch {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: minmax(12rem, auto);
-  }
-
-  .sw-hub-scenes[data-group="all"] > li[data-kind="capability"]:nth-child(7) .sw-hub-launch__body {
-    border-top: 0;
-    border-left: 1px solid color-mix(in srgb, var(--sw-hub-accent) 40%, var(--sw-border));
   }
 }
 
@@ -735,6 +1028,13 @@
   }
 }
 
+@media (max-width: 51.999rem) {
+  .sw-hub-scenes > li[data-owner="spreadsheet"] > .sw-hub-launch {
+    grid-template-columns: 1fr;
+    grid-template-rows: 12rem 1fr;
+  }
+}
+
 @media (max-width: 39.999rem) {
   .sw-hub {
     padding-top: 1rem;
@@ -742,7 +1042,7 @@
 
   .sw-hub-scenes > li,
   .sw-hub-scenes > li[data-kind="framework"],
-  .sw-hub-scenes[data-group="all"] > li[data-kind="capability"]:nth-child(n + 4) {
+  .sw-hub-scenes[data-group="all"] > li[data-kind="capability"] {
     grid-column: 1 / -1;
   }
 

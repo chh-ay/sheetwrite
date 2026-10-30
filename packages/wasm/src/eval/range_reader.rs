@@ -9,15 +9,20 @@
 
 use super::{EvalPass, LiteralSources};
 
-use crate::derived::{DerivedOverlay, DERIVED_CHUNK_CELLS};
+use crate::cells::CellRun;
 use crate::sheet::SheetData;
 use crate::store::CellStore;
-use crate::types::{CellRange, FormulaError, Value, KIND_EMPTY, RANGE_CELL_LIMIT};
+use crate::types::{CellRange, FormulaError, Value, KIND_EMPTY, KIND_FORMULA, RANGE_CELL_LIMIT};
+
+// Wide criteria ranges can coexist in one formula. Cap each paged reader's
+// scratch cache instead of multiplying a full CellRun by workbook width.
+const MAX_CACHED_COLUMN_RUNS: usize = 64;
 
 /// A one-pass cursor over a rectangle of cells in row-major order.
 pub(crate) struct RangeReader<'a> {
     store: &'a CellStore,
     data: &'a SheetData,
+    /// Present when dense literal sources may bypass `eval_at`.
     literals: Option<LiteralSources<'a>>,
     sheet: usize,
     row: usize,
@@ -28,11 +33,11 @@ pub(crate) struct RangeReader<'a> {
     col_end: usize,
     depth: usize,
 
-    // Criteria folds require row-major scalar delivery. Per-column runs avoid
-    // repeating directory reads while preserving that order, including blank runs.
-    // Single-row and short-sheet walks share one run instead of a wide cache.
-    calculated_chunks: Vec<(usize, Option<&'a [u64]>)>,
-    calculated_chunk: (usize, Option<&'a [u64]>),
+    // Paged criteria folds deliver row-major values while reusing each source
+    // page across rows. Dense sources are already resident contiguous slices
+    // and never need this width-sized cache.
+    column_runs: Vec<Option<CellRun<'a>>>,
+    shared_run: Option<CellRun<'a>>,
 }
 
 impl<'a> RangeReader<'a> {
@@ -49,18 +54,18 @@ impl<'a> RangeReader<'a> {
             return Err(FormulaError::Ref);
         };
 
-        if data.row_count == 0
-            || data.n_cols == 0
-            || range.row_start as usize >= data.row_count
-            || range.col_start as usize >= data.n_cols
+        if data.cells.row_count() == 0
+            || data.cells.n_cols() == 0
+            || range.row_start as usize >= data.cells.row_count()
+            || range.col_start as usize >= data.cells.n_cols()
         {
             return Err(FormulaError::Ref);
         }
 
         let row_start = range.row_start as usize;
         let col_start = range.col_start as usize;
-        let row_end = (range.row_end as usize).min(data.row_count - 1);
-        let col_end = (range.col_end as usize).min(data.n_cols - 1);
+        let row_end = (range.row_end as usize).min(data.cells.row_count() - 1);
+        let col_end = (range.col_end as usize).min(data.cells.n_cols() - 1);
         let rows = row_end - row_start + 1;
         let cols = col_end - col_start + 1;
 
@@ -80,8 +85,8 @@ impl<'a> RangeReader<'a> {
             col_start,
             col_end,
             depth,
-            calculated_chunks: Vec::new(),
-            calculated_chunk: (usize::MAX, None),
+            column_runs: Vec::new(),
+            shared_run: None,
         })
     }
 
@@ -119,52 +124,44 @@ impl<'a> RangeReader<'a> {
             return Ok(None);
         }
 
-        if !self.data.is_loaded(self.row, self.col) {
-            return Err(FormulaError::Loading);
-        }
-
-        let index = self.data.idx(self.row, self.col);
-        let value = if let Some(value) = self
-            .literals
-            .and_then(|sources| sources.value_at(&self.store.strings, index))
-        {
-            value
-        } else if !self.data.is_paged() && self.data.source_kind_at(index) == KIND_EMPTY {
-            let (chunk_index, chunk) = if self.col_start == self.col_end
-                || self.row_start == self.row_end
-                || self.data.row_count < DERIVED_CHUNK_CELLS
+        let index = self.data.cells.idx(self.row, self.col);
+        let value = if !self.data.cells.is_paged() {
+            if let Some(value) = self
+                .literals
+                .and_then(|sources| sources.value_at(&self.store.strings, index))
             {
-                &mut self.calculated_chunk
+                value
+            } else if self.data.cells.source_kind_at(index) != KIND_EMPTY {
+                self.store
+                    .eval_at(self.sheet, self.row, self.col, pass, self.depth + 1)
             } else {
-                if self.calculated_chunks.is_empty() {
-                    self.calculated_chunks
-                        .resize(self.col_end - self.col_start + 1, (usize::MAX, None));
+                // Spill output shares the dense source slot, so this read is
+                // direct even when the source is empty.
+                match self
+                    .data
+                    .cells
+                    .calculated_cell_at(index)
+                    .unwrap_or((KIND_EMPTY, 0))
+                {
+                    (KIND_FORMULA, payload) => Value::Error(
+                        FormulaError::from_slot(payload).unwrap_or(FormulaError::Value),
+                    ),
+                    (kind, payload) => {
+                        super::literal_cell_value(&self.store.strings, kind, payload)
+                    }
                 }
-
-                &mut self.calculated_chunks[self.col - self.col_start]
-            };
-
-            if *chunk_index != index / DERIVED_CHUNK_CELLS {
-                *chunk_index = index / DERIVED_CHUNK_CELLS;
-                *chunk = self.data.calculated_chunk_at(index);
             }
-
-            match chunk.and_then(|values| {
-                DerivedOverlay::decode_present(values[index % DERIVED_CHUNK_CELLS])
-            }) {
-                Some((crate::types::KIND_FORMULA, payload)) => {
-                    Value::Error(FormulaError::from_slot(payload).unwrap_or(FormulaError::Value))
-                }
-                Some((kind, payload)) => {
-                    super::literal_cell_value(&self.store.strings, kind, payload)
-                }
-                None => Value::Blank,
-            }
-        } else if self.data.kind_at(index) == KIND_EMPTY {
-            Value::Blank
         } else {
-            self.store
-                .eval_at(self.sheet, self.row, self.col, pass, self.depth + 1)
+            let run = self.run_at(index);
+            if !run.is_loaded(index) {
+                return Err(FormulaError::Loading);
+            }
+            if run.source(index).0 == KIND_EMPTY && run.resolved(index).0 == KIND_EMPTY {
+                Value::Blank
+            } else {
+                self.store
+                    .eval_at(self.sheet, self.row, self.col, pass, self.depth + 1)
+            }
         };
 
         self.col += 1;
@@ -176,11 +173,39 @@ impl<'a> RangeReader<'a> {
 
         Ok(Some(value))
     }
+
+    fn run_at(&mut self, index: usize) -> CellRun<'a> {
+        // Runs end at column boundaries, so only a multi-row, multi-column walk
+        // needs one cached run per column.
+        let shares_run = self.col_start == self.col_end
+            || self.row_start == self.row_end
+            || self.col_end - self.col_start + 1 > MAX_CACHED_COLUMN_RUNS;
+        let cached = if shares_run {
+            &mut self.shared_run
+        } else {
+            if self.column_runs.is_empty() {
+                self.column_runs
+                    .resize(self.col_end - self.col_start + 1, None);
+            }
+
+            &mut self.column_runs[self.col - self.col_start]
+        };
+
+        match *cached {
+            Some(run) if run.contains(index) => run,
+            _ => {
+                let column_end = self.data.cells.idx(self.row_end, self.col) + 1;
+                let run = self.data.cells.run(index, column_end);
+                *cached = Some(run);
+                run
+            }
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::{HashMap, HashSet};
+    use rustc_hash::{FxHashMap, FxHashSet};
 
     use super::RangeReader;
     use crate::eval::functions::FuncAccumulator;
@@ -190,9 +215,9 @@ mod tests {
 
     /// The list-building path's row-major values, used as the reference.
     fn listed_values(store: &CellStore, range: CellRange) -> Result<Vec<Value>, FormulaError> {
-        let affected = HashSet::new();
-        let mut memo = HashMap::new();
-        let mut visiting = HashSet::new();
+        let affected = FxHashSet::default();
+        let mut memo = FxHashMap::default();
+        let mut visiting = FxHashSet::default();
         let mut pass = EvalPass {
             affected: &affected,
             memo: &mut memo,
@@ -209,9 +234,9 @@ mod tests {
 
     /// The streaming path's row-major values, stopping at the first error.
     fn streamed_values(store: &CellStore, range: CellRange) -> Result<Vec<Value>, FormulaError> {
-        let affected = HashSet::new();
-        let mut memo = HashMap::new();
-        let mut visiting = HashSet::new();
+        let affected = FxHashSet::default();
+        let mut memo = FxHashMap::default();
+        let mut visiting = FxHashSet::default();
         let mut pass = EvalPass {
             affected: &affected,
             memo: &mut memo,
@@ -225,13 +250,96 @@ mod tests {
         Ok(values)
     }
 
+    #[test]
+    fn dense_wide_streams_need_no_per_column_run_allocation() {
+        const COLUMNS: usize = 4096;
+        const ROWS: usize = 2;
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(COLUMNS, ROWS);
+        store.set_number(sheet, 0, 0, 7.0, 0);
+        store.set_formula(sheet, 1, COLUMNS - 1, "=9", 0);
+        store.recompute(sheet);
+
+        let affected = FxHashSet::default();
+        let mut memo = FxHashMap::default();
+        let mut visiting = FxHashSet::default();
+        let mut pass = EvalPass {
+            affected: &affected,
+            memo: &mut memo,
+            visiting: &mut visiting,
+        };
+        let range = CellRange::new(sheet as u32, 0, 0, 1, (COLUMNS - 1) as u32);
+        let mut reader = RangeReader::new(&store, range, 0).unwrap();
+        let mut count = 0;
+        let mut sum = 0.0;
+        while let Some(value) = reader.next(&mut pass).unwrap() {
+            count += 1;
+            if let Value::Number(number) = value {
+                sum += number;
+            }
+        }
+        assert_eq!(count, ROWS * COLUMNS);
+        assert_eq!(sum, 16.0);
+        assert_eq!(
+            reader.column_runs.capacity(),
+            0,
+            "dense streams must not allocate a page cache proportional to width"
+        );
+    }
+
+    #[test]
+    fn wide_paged_streams_bound_cache_and_preserve_loading() {
+        const COLUMNS: usize = super::MAX_CACHED_COLUMN_RUNS + 1;
+        const ROWS: usize = 2;
+        let mut store = CellStore::new();
+        let sheet = store.add_paged_sheet(COLUMNS + 1, ROWS, ROWS, 0, ROWS * COLUMNS);
+        for col in 0..COLUMNS {
+            store.set_column_numbers(sheet, col, 0, &[0.0; ROWS], 0);
+        }
+        store.set_number(sheet, 0, 0, 7.0, 0);
+        store.set_formula(sheet, 1, COLUMNS - 1, "=9", 0);
+        store.recompute(sheet);
+
+        let affected = FxHashSet::default();
+        let mut memo = FxHashMap::default();
+        let mut visiting = FxHashSet::default();
+        let mut pass = EvalPass {
+            affected: &affected,
+            memo: &mut memo,
+            visiting: &mut visiting,
+        };
+        let range = CellRange::new(sheet as u32, 0, 0, 1, (COLUMNS - 1) as u32);
+        let mut reader = RangeReader::new(&store, range, 0).unwrap();
+        let mut count = 0;
+        let mut sum = 0.0;
+        while let Some(value) = reader.next(&mut pass).unwrap() {
+            count += 1;
+            if let Value::Number(number) = value {
+                sum += number;
+            }
+        }
+        assert_eq!(count, ROWS * COLUMNS);
+        assert_eq!(sum, 16.0);
+        assert!(reader.column_runs.capacity() <= super::MAX_CACHED_COLUMN_RUNS);
+
+        // Extending the same multirow walk into one unknown column must still
+        // stop at its first unloaded cell, not report a cached blank.
+        let range = CellRange::new(sheet as u32, 0, 0, 1, COLUMNS as u32);
+        let mut reader = RangeReader::new(&store, range, 0).unwrap();
+        for _ in 0..COLUMNS {
+            assert!(reader.next(&mut pass).unwrap().is_some());
+        }
+        assert!(matches!(reader.next(&mut pass), Err(FormulaError::Loading)));
+        assert!(reader.column_runs.capacity() <= super::MAX_CACHED_COLUMN_RUNS);
+    }
+
     fn streamed_values_allowing_errors(
         store: &CellStore,
         range: CellRange,
     ) -> Result<Vec<Value>, FormulaError> {
-        let affected = HashSet::new();
-        let mut memo = HashMap::new();
-        let mut visiting = HashSet::new();
+        let affected = FxHashSet::default();
+        let mut memo = FxHashMap::default();
+        let mut visiting = FxHashSet::default();
         let mut pass = EvalPass {
             affected: &affected,
             memo: &mut memo,
@@ -337,7 +445,9 @@ mod tests {
     fn streaming_stops_on_a_cell_that_is_not_loaded() {
         let mut store = CellStore::new();
         let sheet = store.add_paged_sheet(2, 8, 4, 0, 0);
-        store.hydrate_page_numbers(sheet, 0, 0, &[1.0, 2.0, 3.0, 4.0], 0, &[]);
+        store.begin_page_load();
+        store.set_column_numbers(sheet, 0, 0, &[1.0, 2.0, 3.0, 4.0], 0);
+        store.commit_sources();
         let loaded = range(sheet, 0, 0, 3, 0);
         assert_eq!(
             streamed_values(&store, loaded),

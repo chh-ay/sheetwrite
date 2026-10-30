@@ -1,4 +1,5 @@
 import type {
+  CalculationSettings,
   CellHyperlink,
   CellScalar,
   CellStyle,
@@ -14,10 +15,14 @@ import type {
   SnapshotCell,
   WorkbookSnapshot,
   WorkbookTable,
+  WorkbookTableTotalsFunction,
   WorkbookTableUnsupportedFeature,
+  WorkbookTableXmlElement,
 } from "@sheetwrite/core";
 import {
   colToA1,
+  DEFAULT_MAX_CHANGE,
+  DEFAULT_MAX_ITERATIONS,
   DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
   dateToSerial,
   isSafeExternalHyperlink,
@@ -26,13 +31,17 @@ import {
   MAX_CONDITIONAL_FORMAT_RULES,
   MAX_HYPERLINK_DISPLAY_LENGTH,
   MAX_HYPERLINKS_PER_SHEET,
+  MAX_ITERATIONS,
   sheetNameKey,
   validateSheetName,
   validateWorkbookTableName,
+  validWorkbookTableXmlElement,
 } from "@sheetwrite/core";
 
 import { formulaContainsExternalReference, spillReferencesFromXlsx } from "./formula.js";
 import { OpcPackage, type OpcRelationship, relationshipTypeMatches } from "./opc.js";
+import { readPivots } from "./pivot.js";
+import { capturePreserved, isRetainedRelationship } from "./preservation.js";
 import {
   assertResource,
   checkAbort,
@@ -45,6 +54,7 @@ import {
   assertXmlRoot,
   decodeXstring,
   parseXml,
+  parseXmlChunks,
   type XmlElement,
   xmlAttribute,
   xmlBoolean,
@@ -57,35 +67,55 @@ import { normalizePartName } from "./zip.js";
 
 const META_MARKER = "sheetwrite-workbook-metadata-v1";
 const META_STEM = "__sheetwrite_meta__";
-/** Matches a `cols` start tag with an optional namespace prefix. */
-const COLUMN_STYLES_TAG = /<(?:[\w.-]+:)?cols[\s/>]/g;
-
-/**
- * True when a worksheet-level `cols` element follows the streamed sheet data.
- * The tree reader applies such styles to rows already read, so the streaming
- * path steps aside and keeps the tree for that document.
- */
-function hasColumnStylesAfter(xml: string, startOffset: number): boolean {
-  COLUMN_STYLES_TAG.lastIndex = startOffset;
-  return COLUMN_STYLES_TAG.test(xml);
-}
 const MAIN_NAMESPACES = [
   "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
   "http://purl.oclc.org/ooxml/spreadsheetml/main",
 ] as const;
 
-interface ParsedCell {
-  readonly row: number;
-  readonly col: number;
-  value: CellValue | null;
-  /**
-   * Shared with every cell of the same style record and never mutated; the
-   * snapshot builder gives each output cell its own copy.
-   */
-  readonly style?: CellStyle;
-  readonly styleRecord: ParsedCellStyle;
+/** Columns' style records and numeric literals, gathered as rows stream past. */
+interface ColumnCells {
+  readonly styleIndices: Set<number>;
+  hasNumericValue: boolean;
+}
+
+/** A shared-formula cell whose master may follow it in the worksheet. */
+interface PendingSharedFormula {
+  readonly cell: SnapshotCell;
+  readonly index: string;
   readonly address: string;
-  readonly sharedFormula?: string;
+}
+
+const INITIAL_STYLE_INDEX_CAPACITY = 1_024;
+
+/**
+ * Style record index of each parsed cell, in cell order. The cell's own style
+ * copy waits for its column's default format, which needs every row; four
+ * bytes per cell keep that wait far below a second record per cell.
+ */
+class CellStyleIndices {
+  #values = new Uint32Array(INITIAL_STYLE_INDEX_CAPACITY);
+  #length = 0;
+
+  clear(): void {
+    this.#values = new Uint32Array(INITIAL_STYLE_INDEX_CAPACITY);
+    this.#length = 0;
+  }
+
+  push(styleIndex: number): void {
+    if (this.#length === this.#values.length) {
+      const grown = new Uint32Array(this.#values.length * 2);
+      grown.set(this.#values);
+      this.#values = grown;
+    }
+    this.#values[this.#length++] = styleIndex;
+  }
+
+  at(cellIndex: number): number {
+    if (cellIndex >= this.#length) {
+      throw new RangeError(`Sheetwrite: XLSX cell ${cellIndex} has no recorded style`);
+    }
+    return this.#values[cellIndex] ?? 0;
+  }
 }
 
 interface ParsedValidation {
@@ -112,7 +142,13 @@ interface ParsedSheet {
   readonly name: string;
   readonly state: string | undefined;
   readonly part: string;
-  readonly cells: ParsedCell[];
+  /**
+   * Output cells, built while rows stream so no second per-cell record is
+   * resident; offsets are sheet coordinates and styles are attached later.
+   */
+  readonly cells: SnapshotCell[];
+  readonly cellStyles: CellStyleIndices;
+  readonly columnCells: ReadonlyMap<number, ColumnCells>;
   readonly rowCount: number;
   readonly columnCount: number;
   readonly conditionalFormats: ConditionalFormatRule[];
@@ -322,8 +358,7 @@ function parseSharedStrings(
   const root = parseXml(packageFile.read(name), name, context, {
     parent: "sst",
     parentIsRoot: true,
-    shouldStream: (_xml, _startOffset, rootElement) =>
-      xmlRootMatches(rootElement, "sst", MAIN_NAMESPACES),
+    shouldStream: (rootElement) => xmlRootMatches(rootElement, "sst", MAIN_NAMESPACES),
     // The tree path reads only `si` children; other children are skipped alike.
     child: (item) => {
       if (xmlLocalName(item.name) === "si") processItem(item);
@@ -886,6 +921,23 @@ function parseComments(
   return { comments, present: true };
 }
 
+const MAXIMUM_DIGIT_WIDTH_PX = 7;
+const COLUMN_WIDTH_FRACTIONS = 256;
+
+function columnWidthPixels(width: number): number {
+  // CT_Col width already includes the five pixels of padding. ECMA-376's
+  // half-digit rounding is truncated before converting character units to pixels.
+  return Math.max(
+    1,
+    Math.floor(
+      ((COLUMN_WIDTH_FRACTIONS * width +
+        Math.floor(COLUMN_WIDTH_FRACTIONS / 2 / MAXIMUM_DIGIT_WIDTH_PX)) /
+        COLUMN_WIDTH_FRACTIONS) *
+        MAXIMUM_DIGIT_WIDTH_PX,
+    ),
+  );
+}
+
 function parseColumns(
   root: XmlElement,
   styles: ParsedStyles,
@@ -918,8 +970,7 @@ function parseColumns(
       return readerFailure("column width is invalid");
     }
     const styleText = xmlAttribute(element, "style");
-    const style =
-      styleText === undefined ? undefined : styles.at(parseUnsigned(styleText, "column style"));
+    const style = styles.at(styleText === undefined ? 0 : parseUnsigned(styleText, "column style"));
     const type: Column["type"] | undefined = style?.date
       ? "date"
       : style?.numberFormat
@@ -929,11 +980,11 @@ function parseColumns(
         : undefined;
     for (let index = min - 1; index < max; index++) {
       columns.set(index, {
-        ...(widthChars !== undefined ? { width: Math.max(1, Math.round(widthChars * 7 + 5)) } : {}),
+        ...(widthChars !== undefined ? { width: columnWidthPixels(widthChars) } : {}),
         ...(xmlAttribute(element, "hidden") !== undefined
           ? { visible: !xmlBoolean(xmlAttribute(element, "hidden")) }
           : {}),
-        ...(style?.style ? { cellStyle: structuredClone(style.style) } : {}),
+        cellStyle: structuredClone(style.style ?? {}),
         ...(style?.numberFormat ? { numberFormat: style.numberFormat } : {}),
         ...(type ? { type } : {}),
       });
@@ -942,12 +993,74 @@ function parseColumns(
   return columns;
 }
 
+const MAX_TABLE_RULE_DEPTH = 8;
+const MAX_TABLE_RULE_NODES = 16_384;
+const TABLE_TOTALS_FUNCTIONS: readonly WorkbookTableTotalsFunction[] = [
+  "none",
+  "sum",
+  "min",
+  "max",
+  "average",
+  "count",
+  "countNums",
+  "stdDev",
+  "var",
+  "custom",
+];
+
+/**
+ * Copy one table rule tree, resolving `dxfId` into its differential style.
+ * Returns null for a rule that cannot be kept (too deep, too large, or a
+ * missing style), so the caller drops only that rule instead of the workbook.
+ */
+function tableRuleMetadata(
+  element: XmlElement,
+  styles: ParsedStyles,
+  budget: { remaining: number },
+  depth = 0,
+): WorkbookTableXmlElement | null {
+  if (depth > MAX_TABLE_RULE_DEPTH || --budget.remaining < 0) return null;
+  const attributes: Record<string, string> = {};
+  let differentialStyle: CellStyle | undefined;
+  for (const [name, value] of Object.entries(element.attributes)) {
+    // Prefixed attributes (xmlns, xr:uid revision ids, other mc:Ignorable
+    // namespaces) carry no rule meaning and are not part of the persisted subset.
+    if (name === "xmlns" || name.includes(":")) continue;
+    if (name !== "dxfId") {
+      attributes[name] = value;
+      continue;
+    }
+    const index = Number(value);
+    if (!Number.isSafeInteger(index) || index < 0) return null;
+    try {
+      differentialStyle = styles.differentialAt(index);
+    } catch (error) {
+      if (error instanceof TypeError) return null;
+      throw error;
+    }
+  }
+  const children: WorkbookTableXmlElement[] = [];
+  for (const child of element.children) {
+    const copied = tableRuleMetadata(child, styles, budget, depth + 1);
+    if (!copied) return null;
+    children.push(copied);
+  }
+  return {
+    name: xmlLocalName(element.name),
+    attributes,
+    text: element.text,
+    children,
+    ...(differentialStyle ? { differentialStyle } : {}),
+  };
+}
+
 function parseTables(
   packageFile: OpcPackage,
   worksheetRoot: XmlElement,
   relationships: readonly OpcRelationship[],
   sheetName: string,
   context: XlsxCodecContext,
+  styles: ParsedStyles,
 ): ParsedSheet["tables"] {
   const collection = xmlChild(worksheetRoot, "tableParts");
   if (!collection) return [];
@@ -1014,19 +1127,62 @@ function parseTables(
     if (columnElements.length !== declaredCount || parsed.c1 - parsed.c0 + 1 !== declaredCount) {
       return readerFailure(`table ${nameResult.name} column count does not match its range`);
     }
+    const unsupported = new Set<WorkbookTableUnsupportedFeature>();
+    // One budget per table, matching the aggregate limit core validation applies.
+    const copyBudget = { remaining: MAX_TABLE_RULE_NODES };
+    const validationBudget = { nodes: 0, characters: 0 };
+    const readRule = (
+      element: XmlElement | undefined,
+      feature: WorkbookTableUnsupportedFeature,
+    ): WorkbookTableXmlElement | undefined => {
+      if (!element) return undefined;
+      const name = xmlLocalName(element.name);
+      const rule = tableRuleMetadata(element, styles, copyBudget);
+      if (
+        !rule ||
+        (name.endsWith("Formula") && formulaContainsExternalReference(decodeXstring(rule.text))) ||
+        !validWorkbookTableXmlElement(rule, name, validationBudget)
+      ) {
+        unsupported.add(feature);
+        emitWarning(context, {
+          code: "unsupported-feature",
+          message: `Invalid, oversized, external-data or unsupported ${name} rule on table ${nameResult.name} was dropped`,
+          sheet: sheetName,
+          part: relationship.target,
+        });
+        return undefined;
+      }
+      return rule;
+    };
     const columns = columnElements.map((column, index) => {
       const id = parseUnsigned(xmlAttribute(column, "id"), "table column id");
       const name = xmlAttribute(column, "name");
       if (id < 1 || !name) return readerFailure(`table column ${index + 1} is invalid`);
+      const totalsRowLabel = xmlAttribute(column, "totalsRowLabel");
+      const calculatedColumnFormula = readRule(
+        xmlChild(column, "calculatedColumnFormula"),
+        "calculated-columns",
+      );
+      const totalsRowFormula = readRule(xmlChild(column, "totalsRowFormula"), "totals-functions");
+      const rawTotalsFunction = xmlAttribute(column, "totalsRowFunction");
+      const totalsRowFunction = TABLE_TOTALS_FUNCTIONS.find(
+        (candidate) => candidate === rawTotalsFunction,
+      );
+      if (rawTotalsFunction !== undefined && totalsRowFunction === undefined) {
+        return readerFailure(`table column ${index + 1} has an invalid totals-row function`);
+      }
       return {
         id: `xlsx-table-${nativeId}-column-${id}`,
         name: decodeXstring(name),
-        ...(xmlAttribute(column, "totalsRowLabel") !== undefined
-          ? { totalsRowLabel: decodeXstring(xmlAttribute(column, "totalsRowLabel")!) }
+        ...(totalsRowLabel !== undefined ? { totalsRowLabel: decodeXstring(totalsRowLabel) } : {}),
+        ...(calculatedColumnFormula ? { calculatedColumnFormula } : {}),
+        ...(totalsRowFormula ? { totalsRowFormula } : {}),
+        ...(totalsRowFunction !== undefined &&
+        !(xmlChild(column, "totalsRowFormula") && !totalsRowFormula)
+          ? { totalsRowFunction }
           : {}),
       };
     });
-    const unsupported = new Set<WorkbookTableUnsupportedFeature>();
     const markUnsupported = (feature: WorkbookTableUnsupportedFeature, detail: string): void => {
       if (unsupported.has(feature)) return;
       unsupported.add(feature);
@@ -1037,28 +1193,10 @@ function parseTables(
         part: relationship.target,
       });
     };
-    const autoFilter = xmlChild(root, "autoFilter");
-    if (autoFilter) markUnsupported("auto-filter", "Excel table autoFilter");
-    if (xmlChild(autoFilter ?? root, "sortState")) {
-      markUnsupported("sort-state", "Excel table sortState");
-    }
-    if (
-      columnElements.some(
-        (column) =>
-          xmlChild(column, "calculatedColumnFormula") !== undefined ||
-          xmlChild(column, "calculatedColumnFormulaArray") !== undefined,
-      )
-    ) {
-      markUnsupported("calculated-columns", "Excel table calculated columns");
-    }
-    if (
-      columnElements.some(
-        (column) =>
-          xmlAttribute(column, "totalsRowFunction") !== undefined ||
-          xmlChild(column, "totalsRowFormula") !== undefined,
-      )
-    ) {
-      markUnsupported("totals-functions", "Excel table totals functions");
+    const autoFilter = readRule(xmlChild(root, "autoFilter"), "auto-filter");
+    const sortState = readRule(xmlChild(root, "sortState"), "sort-state");
+    if (columnElements.some((column) => xmlChild(column, "calculatedColumnFormulaArray"))) {
+      markUnsupported("calculated-columns", "Non-standard Excel table calculated-column arrays");
     }
     if (xmlAttribute(root, "connectionId") !== undefined) {
       markUnsupported("external-data", "Excel table external-data binding");
@@ -1082,6 +1220,8 @@ function parseTables(
       columns,
       headerRow,
       totalsRow,
+      ...(autoFilter ? { autoFilter } : {}),
+      ...(sortState ? { sortState } : {}),
       ...(styleElement
         ? {
             style: {
@@ -1099,7 +1239,12 @@ function parseTables(
   return tables;
 }
 
-function parseSheet(
+/**
+ * Rows are streamed from the inflated worksheet; only cells and the small
+ * non-row tree stay resident. `columnSource` is set for the second pass over a
+ * worksheet whose `cols` follow its rows, whose row warnings were already sent.
+ */
+async function parseSheet(
   packageFile: OpcPackage,
   reference: WorkbookSheetReference,
   styles: ParsedStyles,
@@ -1107,9 +1252,13 @@ function parseSheet(
   context: XlsxCodecContext,
   usage: ReaderResourceUsage,
   date1904: boolean,
-): ParsedSheet {
+  columnSource?: XmlElement,
+): Promise<ParsedSheet> {
   const target = reference.relationship.target;
-  const cells: ParsedCell[] = [];
+  const cells: SnapshotCell[] = [];
+  const cellStyles = new CellStyleIndices();
+  const columnCells = new Map<number, ColumnCells>();
+  const pendingSharedFormulas: PendingSharedFormula[] = [];
   const sharedMasters = new Map<
     string,
     { formula: string; row: number; col: number; authoritative: boolean }
@@ -1123,11 +1272,18 @@ function parseSheet(
   let internalMetadata = false;
   const inheritedColumnStyles = new Map<number, string>();
   let columnStylesRead = false;
+  let columnsPrecedeRows = false;
+  const cellsBeforeSheet = usage.cells;
+  const rowContext: XlsxCodecContext =
+    columnSource && context.options
+      ? { ...context, options: { ...context.options, onWarning: undefined } }
+      : context;
 
   const readColumnStyles = (root: XmlElement): void => {
     if (columnStylesRead) return;
     columnStylesRead = true;
     const columnCollection = xmlChild(root, "cols");
+    columnsPrecedeRows = columnCollection !== undefined;
     for (const columnElement of columnCollection ? xmlChildren(columnCollection, "col") : []) {
       const style = xmlAttribute(columnElement, "style");
       if (style === undefined) continue;
@@ -1138,8 +1294,10 @@ function parseSheet(
       for (let index = min - 1; index < max; index++) inheritedColumnStyles.set(index, style);
     }
   };
+  if (columnSource) readColumnStyles(columnSource);
 
   const processRow = (rowElement: XmlElement, root: XmlElement): void => {
+    if (!columnStylesRead) assertXmlRoot(root, "worksheet", MAIN_NAMESPACES, target);
     readColumnStyles(root);
     const row =
       xmlAttribute(rowElement, "r") === undefined
@@ -1150,6 +1308,10 @@ function parseSheet(
     inferredRow = row + 1;
     maxRow = Math.max(maxRow, row);
     const heightPoints = Number(xmlAttribute(rowElement, "ht"));
+    const hasFixedHeight =
+      xmlBoolean(xmlAttribute(rowElement, "customHeight")) &&
+      Number.isFinite(heightPoints) &&
+      heightPoints > 0;
     const hidden = xmlBoolean(xmlAttribute(rowElement, "hidden"));
     const outlineLevel = Number(xmlAttribute(rowElement, "outlineLevel") ?? 0);
     if (!Number.isInteger(outlineLevel) || outlineLevel < 0 || outlineLevel > 7) {
@@ -1157,13 +1319,11 @@ function parseSheet(
     }
     if (outlineLevel > 0) outlineLevels.set(row, outlineLevel);
     if (xmlBoolean(xmlAttribute(rowElement, "collapsed"))) collapsedRows.add(row);
-    if ((Number.isFinite(heightPoints) && heightPoints > 0) || hidden) {
+    if (hasFixedHeight || hidden) {
       rowMeta.push([
         row,
         {
-          ...(Number.isFinite(heightPoints) && heightPoints > 0
-            ? { height: (heightPoints * 96) / 72 }
-            : {}),
+          ...(hasFixedHeight ? { height: (heightPoints * 96) / 72 } : {}),
           ...(hidden ? { hidden: true } : {}),
         },
       ]);
@@ -1202,7 +1362,7 @@ function parseSheet(
           }
           value = null;
         } else if (formulaType !== "normal") {
-          emitWarning(context, {
+          emitWarning(rowContext, {
             code: "unsupported-feature",
             message: `Excel ${formulaType} formula was neutralized because its range semantics are unsupported`,
             sheet: reference.name,
@@ -1210,7 +1370,7 @@ function parseSheet(
           });
           value = formulaText ? { kind: "literal", value: `=${formulaText}` } : null;
         } else if (formulaContainsExternalReference(formulaText)) {
-          emitWarning(context, {
+          emitWarning(rowContext, {
             code: "external-formula",
             message: "External-data formula was neutralized as inert text",
             sheet: reference.name,
@@ -1226,7 +1386,7 @@ function parseSheet(
           xmlAttribute(cellElement, "t"),
           sharedStrings,
           styleRecord,
-          context,
+          rowContext,
           reference.name,
           addressText,
           date1904,
@@ -1247,56 +1407,88 @@ function parseSheet(
           usage.cells += 1;
           assertResource(context, "maxCells", usage.cells);
         }
-        cells.push({
-          ...address,
-          value,
-          style: styleRecord.style,
-          styleRecord,
-          address: addressText,
-          sharedFormula,
-        });
+        const cell: SnapshotCell = {
+          rowOffset: address.row,
+          colOffset: address.col,
+          value: value ?? { kind: "literal", value: null },
+        };
+        cells.push(cell);
+        cellStyles.push(styleIndex);
+        let column = columnCells.get(address.col);
+        if (!column) {
+          column = { styleIndices: new Set(), hasNumericValue: false };
+          columnCells.set(address.col, column);
+        }
+        column.styleIndices.add(styleIndex);
+        if (value?.kind === "literal" && typeof value.value === "number") {
+          column.hasNumericValue = true;
+        }
+        if (sharedFormula) {
+          pendingSharedFormulas.push({ cell, index: sharedFormula, address: addressText });
+        }
       }
     }
   };
 
   const part = normalizePartName(target);
-  const root = parseXml(packageFile.read(part), part, context, {
+  const root = await parseXmlChunks(packageFile.archive.chunks(part), part, context, {
     parent: "sheetData",
     parentIsRoot: false,
-    shouldStream: (xml, startOffset, rootElement) =>
-      xmlRootMatches(rootElement, "worksheet", MAIN_NAMESPACES) &&
-      !hasColumnStylesAfter(xml, startOffset),
-    // The tree path reads only `row` children; other children are skipped alike.
+    // The tree path read only `row` children; other children are skipped alike.
     child: (rowElement, rootElement) => {
       if (xmlLocalName(rowElement.name) === "row") processRow(rowElement, rootElement);
     },
   });
   assertXmlRoot(root, "worksheet", MAIN_NAMESPACES, target);
-  const sheetData = xmlChild(root, "sheetData");
-  for (const rowElement of sheetData ? xmlChildren(sheetData, "row") : []) {
-    processRow(rowElement, root);
+  const lateColumns = xmlChild(root, "cols");
+  if (
+    columnStylesRead &&
+    !columnsPrecedeRows &&
+    lateColumns &&
+    xmlChildren(lateColumns, "col").some((column) => xmlAttribute(column, "style") !== undefined)
+  ) {
+    // Column styles apply to every row, including rows already streamed; a
+    // second streamed pass is cheaper than retaining the worksheet document.
+    usage.cells = cellsBeforeSheet;
+    // This frame stays alive until the second pass returns; drop its cells so
+    // the worksheet is not resident twice.
+    cells.length = 0;
+    cellStyles.clear();
+    columnCells.clear();
+    pendingSharedFormulas.length = 0;
+    sharedMasters.clear();
+    return parseSheet(
+      packageFile,
+      reference,
+      styles,
+      sharedStrings,
+      context,
+      usage,
+      date1904,
+      root,
+    );
   }
   readColumnStyles(root);
-  for (const cell of cells) {
-    if (!cell.sharedFormula) continue;
-    const master = sharedMasters.get(cell.sharedFormula);
+  for (const pending of pendingSharedFormulas) {
+    const master = sharedMasters.get(pending.index);
     if (!master) {
-      return readerFailure(`shared formula ${cell.sharedFormula} at ${cell.address} has no master`);
+      return readerFailure(`shared formula ${pending.index} at ${pending.address} has no master`);
     }
+    const { rowOffset: row, colOffset: col } = pending.cell;
     const formula =
-      cell.row === master.row && cell.col === master.col
+      row === master.row && col === master.col
         ? master.formula
-        : translateFormula(master.formula, master.row, master.col, cell.row, cell.col);
+        : translateFormula(master.formula, master.row, master.col, row, col);
     if (formulaContainsExternalReference(formula)) {
       emitWarning(context, {
         code: "external-formula",
         message: "External shared formula was neutralized as inert text",
         sheet: reference.name,
-        cell: cell.address,
+        cell: pending.address,
       });
-      cell.value = { kind: "literal", value: `=${formula}` };
+      pending.cell.value = { kind: "literal", value: `=${formula}` };
     } else {
-      cell.value = { kind: "formula", src: `=${formula}` };
+      pending.cell.value = { kind: "formula", src: `=${formula}` };
     }
   }
   const dimension = xmlAttribute(
@@ -1406,6 +1598,27 @@ function parseSheet(
   const relationships = packageFile.relationships(reference.relationship.target);
   const hyperlinkCollection = xmlChild(root, "hyperlinks");
   const hyperlinks = parseHyperlinks(hyperlinkCollection, relationships, reference.name, context);
+  let missingDisplays: Map<string, number[]> | undefined;
+  for (const [index, hyperlink] of hyperlinks.entries()) {
+    if (hyperlink.display !== undefined) continue;
+    missingDisplays ??= new Map();
+    const key = `${hyperlink.range.start.row}:${hyperlink.range.start.col}`;
+    const indices = missingDisplays.get(key) ?? [];
+    indices.push(index);
+    missingDisplays.set(key, indices);
+  }
+  if (missingDisplays) {
+    for (const cell of cells) {
+      const indices = missingDisplays.get(`${cell.rowOffset}:${cell.colOffset}`);
+      if (!indices || cell.value.kind !== "literal" || cell.value.value === null) continue;
+      const display = String(cell.value.value);
+      if (display.length > MAX_HYPERLINK_DISPLAY_LENGTH) continue;
+      for (const index of indices) {
+        const hyperlink = hyperlinks[index];
+        if (hyperlink) hyperlinks[index] = { ...hyperlink, display };
+      }
+    }
+  }
   for (const hyperlink of hyperlinks) {
     maxRow = Math.max(maxRow, hyperlink.range.end.row);
     maxCol = Math.max(maxCol, hyperlink.range.end.col);
@@ -1432,12 +1645,13 @@ function parseSheet(
     relationships,
     context,
   );
-  const tables = parseTables(packageFile, root, relationships, reference.name, context);
+  const tables = parseTables(packageFile, root, relationships, reference.name, context, styles);
   for (const relationship of relationships) {
     if (
       ["comments", "vmlDrawing", "hyperlink", "table"].some((kind) =>
         relationshipTypeMatches(relationship.type, kind),
-      )
+      ) ||
+      isRetainedRelationship("sheet", relationship.type)
     ) {
       continue;
     }
@@ -1457,6 +1671,8 @@ function parseSheet(
     state: reference.state,
     part: reference.relationship.target,
     cells,
+    cellStyles,
+    columnCells,
     rowCount: Math.max(0, maxRow + 1),
     columnCount: Math.max(1, maxCol + 1),
     columns,
@@ -1491,13 +1707,13 @@ function parseSheet(
 function metadataFromSheet(sheet: ParsedSheet, context: XlsxCodecContext): WorkbookSnapshot | null {
   if (!sheet.name.startsWith(META_STEM)) return null;
   const ordered = sheet.cells
-    .filter((cell) => cell.col === 0)
-    .sort((left, right) => left.row - right.row);
+    .filter((cell) => cell.colOffset === 0)
+    .sort((left, right) => left.rowOffset - right.rowOffset);
   const marker = ordered[0]?.value;
   if (marker?.kind !== "literal" || marker.value !== META_MARKER) return null;
   let json = "";
   for (const cell of ordered.slice(1)) {
-    if (cell.value?.kind === "literal" && typeof cell.value.value === "string")
+    if (cell.value.kind === "literal" && typeof cell.value.value === "string")
       json += cell.value.value;
   }
   try {
@@ -1517,37 +1733,28 @@ function metadataFromSheet(sheet: ParsedSheet, context: XlsxCodecContext): Workb
 
 function columnFromParsed(
   sheet: ParsedSheet,
+  styles: ParsedStyles,
   col: number,
   key: string,
-  context: XlsxCodecContext,
 ): Column {
   const definition = sheet.columns.get(col);
   const formats = new Set<string>();
   const semanticTypes = new Set<Column["type"]>();
-  let hasNumericValue = false;
-  for (const cell of sheet.cells) {
-    if (cell.col !== col) continue;
-    if (cell.styleRecord.numberFormat) formats.add(cell.styleRecord.numberFormat);
-    if (cell.styleRecord.date) semanticTypes.add("date");
-    else if (cell.styleRecord.numberFormat) {
-      semanticTypes.add(
-        /[$€£¥]|currency/i.test(cell.styleRecord.numberFormat) ? "currency" : "number",
-      );
-    }
-    if (cell.value?.kind === "literal" && typeof cell.value.value === "number") {
-      hasNumericValue = true;
+  const cells = sheet.columnCells.get(col);
+  for (const styleIndex of cells?.styleIndices ?? []) {
+    const record = styles.at(styleIndex);
+    if (record.numberFormat) formats.add(record.numberFormat);
+    if (record.date) semanticTypes.add("date");
+    else if (record.numberFormat) {
+      semanticTypes.add(/[$€£¥]|currency/i.test(record.numberFormat) ? "currency" : "number");
     }
   }
+  const hasNumericValue = cells?.hasNumericValue === true;
   if (definition?.type) semanticTypes.add(definition.type);
   if (definition?.numberFormat) formats.add(definition.numberFormat);
+  // A column default is chosen only when every formatted cell agrees; cells
+  // that differ keep their own format (see the snapshot cell mapping below).
   const mixed = semanticTypes.size > 1 || formats.size > 1;
-  if (mixed) {
-    emitWarning(context, {
-      code: "format-loss",
-      message: `Mixed cell number formats in column ${colToA1(col)} were reduced to a neutral numeric column default`,
-      sheet: sheet.name,
-    });
-  }
   const onlyType = semanticTypes.values().next().value as Column["type"] | undefined;
   const numberFormat = mixed
     ? undefined
@@ -1555,15 +1762,36 @@ function columnFromParsed(
   const type: Column["type"] = mixed
     ? "number"
     : (definition?.type ?? onlyType ?? (hasNumericValue ? "number" : "text"));
+  const defaultStyle = definition?.cellStyle ?? styles.at(0).style;
   return {
     key,
     header: colToA1(col),
     width: definition?.width ?? 75,
     type,
     ...(numberFormat ? { numberFormat } : {}),
-    ...(definition?.cellStyle ? { cellStyle: structuredClone(definition.cellStyle) } : {}),
+    ...(defaultStyle && Object.keys(defaultStyle).length > 0
+      ? { cellStyle: structuredClone(defaultStyle) }
+      : {}),
     ...(definition?.visible === false ? { visible: false } : {}),
   };
+}
+
+/**
+ * The number format a cell must carry itself because its column default would
+ * render it differently: its own code, or `General` for an unformatted number
+ * in a formatted column. Text literals ignore number formats, so they never
+ * need an override.
+ */
+function cellNumberFormatOverride(
+  record: ParsedCellStyle,
+  value: CellValue,
+  columnFormat: string | undefined,
+): string | undefined {
+  const own = record.numberFormat;
+  if (own === columnFormat) return undefined;
+  if (own !== undefined) return own;
+  if (value.kind === "literal" && typeof value.value !== "number") return undefined;
+  return "General";
 }
 
 function restoreSidecarFields(snapshot: WorkbookSnapshot, metadata: WorkbookSnapshot): void {
@@ -1573,16 +1801,23 @@ function restoreSidecarFields(snapshot: WorkbookSnapshot, metadata: WorkbookSnap
         (candidate) => sheetNameKey(candidate.name) === sheetNameKey(sheet.name),
       ) ?? metadata.sheets.find((candidate) => candidate.order === sheet.order);
     if (!meta || sheet.cells.length === 0) continue;
-    const cells = sheet.cells[0]!.cells;
-    const byOffset = new Map(
-      cells.map((cell) => [cell.rowOffset * sheet.columns.length + cell.colOffset, cell]),
-    );
+    // Index the sidecar, which holds only the cells it restores, so the sheet's
+    // cells are scanned once instead of indexed.
+    const sidecarCells = new Map<number, SnapshotCell[]>();
     for (const block of meta.cells) {
       for (const sidecar of block.cells) {
         const row = block.startRow + sidecar.rowOffset;
         const col = block.startCol + sidecar.colOffset;
-        const existing = byOffset.get(row * sheet.columns.length + col);
-        if (!existing) continue;
+        const offset = row * sheet.columns.length + col;
+        const restored = sidecarCells.get(offset);
+        if (restored) restored.push(sidecar);
+        else sidecarCells.set(offset, [sidecar]);
+      }
+    }
+    if (sidecarCells.size === 0) continue;
+    for (const existing of sheet.cells[0]?.cells ?? []) {
+      const offset = existing.rowOffset * sheet.columns.length + existing.colOffset;
+      for (const sidecar of sidecarCells.get(offset) ?? []) {
         if (sidecar.value.kind === "ref" && existing.value.kind === "formula") {
           const reference = sidecar.value;
           const target = snapshot.sheets.find(
@@ -1701,6 +1936,32 @@ function reconcileHyperlinks(
   });
 }
 
+/**
+ * Iterative calculation options from `<calcPr>`, or `undefined` when they are
+ * the ECMA defaults. Unreadable counts and deltas fall back to the defaults, and
+ * counts beyond Excel's range are clamped into it, so a damaged attribute never
+ * rejects the file.
+ */
+function workbookCalculation(workbookRoot: XmlElement): CalculationSettings | undefined {
+  const calcPr = xmlChild(workbookRoot, "calcPr");
+  if (!calcPr) return undefined;
+
+  const iterate = xmlBoolean(xmlAttribute(calcPr, "iterate"));
+
+  const count = Number(xmlAttribute(calcPr, "iterateCount") ?? DEFAULT_MAX_ITERATIONS);
+  const maxIterations = Number.isInteger(count)
+    ? Math.min(Math.max(count, 1), MAX_ITERATIONS)
+    : DEFAULT_MAX_ITERATIONS;
+
+  const delta = Number(xmlAttribute(calcPr, "iterateDelta") ?? DEFAULT_MAX_CHANGE);
+  const maxChange = Number.isFinite(delta) && delta >= 0 ? delta : DEFAULT_MAX_CHANGE;
+
+  if (!iterate && maxIterations === DEFAULT_MAX_ITERATIONS && maxChange === DEFAULT_MAX_CHANGE) {
+    return undefined;
+  }
+  return { iterate, maxIterations, maxChange };
+}
+
 function externalNamedRanges(
   workbookRoot: XmlElement,
   sheetIds: ReadonlyMap<string, string>,
@@ -1783,14 +2044,39 @@ function externalNamedRanges(
   return ranges.length > 0 ? ranges : undefined;
 }
 
+/** Grow `sheet` so that `row` and `col` lie inside it; references may point past the cells. */
+function extendSheet(sheet: SheetSnapshot, row: number, col: number): void {
+  sheet.rowCount = Math.max(sheet.rowCount, row + 1);
+  if (sheet.columns.length <= col) {
+    const keys = new Set(sheet.columns.map((column) => column.key));
+    while (sheet.columns.length <= col) {
+      const index = sheet.columns.length;
+      const stem = `column${index + 1}`;
+      let key = stem;
+      let suffix = 2;
+      while (keys.has(key)) key = `${stem}_${suffix++}`;
+      keys.add(key);
+      sheet.columns.push({ key, header: colToA1(index), width: 75, type: "text" });
+    }
+  }
+  const block = sheet.cells[0];
+  if (block) {
+    block.rowCount = Math.max(block.rowCount, sheet.rowCount);
+    block.colCount = Math.max(block.colCount, sheet.columns.length);
+  }
+}
+
 /** Read a preflighted OOXML workbook into Sheetwrite's implementation-neutral snapshot. */
-export function readWorkbook(
-  data: ArrayBuffer | Uint8Array,
+export async function readWorkbook(
+  data: Blob | ArrayBuffer | Uint8Array,
   context: XlsxCodecContext,
-): WorkbookSnapshot {
-  const packageFile = new OpcPackage(data, context);
+  readOptions: { readonly preserveOpaqueParts?: boolean } = {},
+): Promise<WorkbookSnapshot> {
+  const packageFile = await OpcPackage.open(data, context);
   const workbookPart = packageFile.officeDocumentPart();
+  await packageFile.load([workbookPart]);
   const workbookRoot = packageFile.readXml(workbookPart);
+  packageFile.release([workbookPart]);
   assertXmlRoot(workbookRoot, "workbook", MAIN_NAMESPACES, workbookPart);
   const date1904 = xmlBoolean(
     xmlAttribute(xmlChild(workbookRoot, "workbookPr") ?? workbookRoot, "date1904"),
@@ -1809,27 +2095,25 @@ export function readWorkbook(
   )?.target;
   for (const relationship of workbookRelationships) {
     if (
-      ["worksheet", "styles", "sharedStrings", "theme", "vbaProject"].some((kind) =>
+      relationship.external ||
+      ["worksheet", "styles", "sharedStrings", "theme"].some((kind) =>
         relationshipTypeMatches(relationship.type, kind),
-      )
+      ) ||
+      isRetainedRelationship("workbook", relationship.type)
     ) {
       continue;
     }
-    if (relationshipTypeMatches(relationship.type, "externalLink")) {
-      emitWarning(context, {
-        code: "external-relationship",
-        message: "External-link workbook graph was dropped",
-        part: relationship.target,
-      });
-    } else if (!relationship.external) {
-      const kind = relationship.type.slice(relationship.type.lastIndexOf("/") + 1);
-      emitWarning(context, {
-        code: "unsupported-feature",
-        message: `Unsupported workbook relationship ${kind} was dropped`,
-        part: relationship.target,
-      });
-    }
+    const externalLink = relationshipTypeMatches(relationship.type, "externalLink");
+    emitWarning(context, {
+      code: externalLink ? "external-relationship" : "unsupported-feature",
+      message: externalLink
+        ? "External-link workbook graph was dropped"
+        : `Unsupported workbook relationship ${relationship.type.slice(relationship.type.lastIndexOf("/") + 1)} was dropped`,
+      part: relationship.target,
+    });
   }
+  const styleParts = [stylesPart, themePart].filter((part): part is string => part !== undefined);
+  await packageFile.load(styleParts);
   const styles = new ParsedStyles(
     stylesPart ? packageFile.readXml(stylesPart) : undefined,
     context,
@@ -1837,7 +2121,10 @@ export function readWorkbook(
     stylesPart ?? "xl/styles.xml",
     themePart ?? "xl/theme/theme1.xml",
   );
+  packageFile.release(styleParts);
+  if (sharedStringsPart) await packageFile.load([sharedStringsPart]);
   const sharedStrings = parseSharedStrings(packageFile, sharedStringsPart, context);
+  if (sharedStringsPart) packageFile.release([sharedStringsPart]);
   const sheetCollection = xmlChild(workbookRoot, "sheets");
   if (!sheetCollection) return readerFailure("workbook has no sheet collection");
   const references: WorkbookSheetReference[] = [];
@@ -1876,10 +2163,28 @@ export function readWorkbook(
   ).length;
   assertResource(context, "maxSheets", references.length - Math.min(1, metadataCandidates));
   const usage: ReaderResourceUsage = { cells: 0, merges: 0 };
-  const parsedSheets = references.map((reference) => {
+  const parsedSheets: ParsedSheet[] = [];
+  for (const reference of references) {
     checkAbort(context);
-    return parseSheet(packageFile, reference, styles, sharedStrings, context, usage, date1904);
-  });
+    const worksheetPart = reference.relationship.target;
+    // The worksheet itself is streamed by parseSheet; only its small parts are loaded.
+    const parts = packageFile
+      .relationships(worksheetPart)
+      .filter(
+        (relationship) =>
+          !relationship.external &&
+          ["comments", "table"].some((kind) => relationshipTypeMatches(relationship.type, kind)),
+      )
+      .map((relationship) => relationship.target);
+    await packageFile.load(parts);
+    try {
+      parsedSheets.push(
+        await parseSheet(packageFile, reference, styles, sharedStrings, context, usage, date1904),
+      );
+    } finally {
+      packageFile.release(parts);
+    }
+  }
   let metadata: WorkbookSnapshot | null = null;
   let metadataIndex = -1;
   for (let index = 0; index < parsedSheets.length; index++) {
@@ -1963,20 +2268,33 @@ export function readWorkbook(
       let suffix = 2;
       while (keys.has(key)) key = `${preferredKey}_${suffix++}`;
       keys.add(key);
-      const nativeColumn = columnFromParsed(source, col, key, context);
+      const nativeColumn = columnFromParsed(source, styles, col, key);
       if (!metaColumn) {
         columns.push(nativeColumn);
         continue;
       }
       const column = structuredClone(metaColumn);
+      if (nativeColumn.cellStyle) column.cellStyle = nativeColumn.cellStyle;
+      else delete column.cellStyle;
       const definition = source.columns.get(col);
       if (definition) {
-        for (const property of ["width", "visible", "cellStyle", "numberFormat", "type"] as const) {
+        for (const property of ["width", "visible", "numberFormat", "type"] as const) {
           const value = definition[property];
+          // Preserve subpixel Sheetwrite widths only while the native column
+          // still represents the metadata width; native edits remain authoritative.
+          if (
+            property === "width" &&
+            value ===
+              columnWidthPixels(
+                Math.floor((metaColumn.width / MAXIMUM_DIGIT_WIDTH_PX) * COLUMN_WIDTH_FRACTIONS) /
+                  COLUMN_WIDTH_FRACTIONS,
+              )
+          )
+            continue;
           if (value !== undefined) Object.assign(column, { [property]: structuredClone(value) });
         }
       }
-      if (source.cells.some((cell) => cell.col === col)) {
+      if (source.columnCells.has(col)) {
         column.type = nativeColumn.type;
         if (nativeColumn.numberFormat) column.numberFormat = nativeColumn.numberFormat;
         else delete column.numberFormat;
@@ -1989,13 +2307,31 @@ export function readWorkbook(
       source.tables.reduce((maximum, table) => Math.max(maximum, table.range.end.row + 1), 0),
     );
     assertResource(context, "maxRowsPerSheet", rowCount);
-    const snapshotCells: SnapshotCell[] = source.cells.map((cell) => ({
-      rowOffset: cell.row,
-      colOffset: cell.col,
-      value: cell.value ?? { kind: "literal", value: null },
+    // The parsed cells become the snapshot's cells: each gets its own style copy
+    // now that every column default is known, and no second array is built.
+    const snapshotCells = source.cells;
+    for (let index = 0; index < snapshotCells.length; index++) {
+      const cell = snapshotCells[index];
+      if (!cell) continue;
+      const record = styles.at(source.cellStyles.at(index));
       // Parsed styles are typed `CellStyle`, and the copy keeps their shape.
-      ...(cell.style ? { style: copyStyleData(cell.style) as CellStyle } : {}),
-    }));
+      let style = record.style ? (copyStyleData(record.style) as CellStyle) : undefined;
+      // Native center is normally unset, but must override an inherited bottom.
+      if (
+        style?.verticalAlign === undefined &&
+        columns[cell.colOffset]?.cellStyle?.verticalAlign === "bottom"
+      ) {
+        style ??= {};
+        style.verticalAlign = "middle";
+      }
+      const numberFormat = cellNumberFormatOverride(
+        record,
+        cell.value,
+        columns[cell.colOffset]?.numberFormat,
+      );
+      const cellStyle = numberFormat ? { ...style, numberFormat } : style;
+      if (cellStyle) cell.style = cellStyle;
+    }
     const nativeValidations = source.validations.map((validation, index) => {
       const sidecar = meta?.validationRules?.[index];
       const sameBlankDefault =
@@ -2193,11 +2529,6 @@ export function readWorkbook(
       }
     }
   }
-  if ([...packageFile.archive.entries.keys()].some((name) => /vbaProject\.bin$/i.test(name)))
-    emitWarning(context, {
-      code: "unsupported-feature",
-      message: "VBA macros are not represented by WorkbookSnapshot and were dropped",
-    });
   const workbookViews = xmlChildren(
     xmlChild(workbookRoot, "bookViews") ?? workbookRoot,
     "workbookView",
@@ -2240,31 +2571,9 @@ export function readWorkbook(
   }
   for (const namedRange of namedRanges ?? []) {
     const sheet = sheets.find((candidate) => candidate.id === namedRange.range.sheet);
-    if (!sheet) continue;
-    sheet.rowCount = Math.max(sheet.rowCount, namedRange.range.end.row + 1);
-    if (sheet.columns.length <= namedRange.range.end.col) {
-      const keys = new Set(sheet.columns.map((column) => column.key));
-      while (sheet.columns.length <= namedRange.range.end.col) {
-        const col = sheet.columns.length;
-        const stem = `column${col + 1}`;
-        let key = stem;
-        let suffix = 2;
-        while (keys.has(key)) key = `${stem}_${suffix++}`;
-        keys.add(key);
-        sheet.columns.push({
-          key,
-          header: colToA1(col),
-          width: 75,
-          type: "text",
-        });
-      }
-    }
-    const block = sheet.cells[0];
-    if (block) {
-      block.rowCount = Math.max(block.rowCount, sheet.rowCount);
-      block.colCount = Math.max(block.colCount, sheet.columns.length);
-    }
+    if (sheet) extendSheet(sheet, namedRange.range.end.row, namedRange.range.end.col);
   }
+  const calculation = workbookCalculation(workbookRoot);
   const snapshot: WorkbookSnapshot = {
     schemaVersion: 1,
     ...(metadata?.documentId ? { documentId: metadata.documentId } : {}),
@@ -2272,10 +2581,23 @@ export function readWorkbook(
     workbook: {
       activeSheet,
       ...(namedRanges?.length ? { namedRanges: structuredClone(namedRanges) } : {}),
+      ...(calculation ? { calculation } : {}),
     },
     sheets,
   };
   if (metadata) restoreSidecarFields(snapshot, metadata);
+  const modelledPivotParts = await readPivots(
+    packageFile,
+    {
+      snapshot,
+      sheetParts: sourceReferences.map((reference) => reference.relationship.target),
+      metadata,
+      extendSheet,
+    },
+    context,
+  );
+  if (readOptions.preserveOpaqueParts !== false)
+    await capturePreserved(packageFile, snapshot, context, modelledPivotParts);
   const checked = validateCodecSnapshot(snapshot, context);
   if (!checked.ok) {
     throw new TypeError(

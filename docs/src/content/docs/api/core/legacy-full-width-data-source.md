@@ -1,6 +1,6 @@
 ---
 title: "legacyFullWidthDataSource | @sheetwrite/core"
-description: "Adapts a row loader to protocol 2; full-width loading is horizontally non-scalable."
+description: "legacyFullWidthDataSource function in @sheetwrite/core: Adapts a row loader to protocol 2; full-width loading is horizontally non-scalable."
 ---
 <!-- api-export:@sheetwrite/core|.|legacyFullWidthDataSource -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
@@ -30,6 +30,7 @@ function legacyFullWidthDataSource(
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

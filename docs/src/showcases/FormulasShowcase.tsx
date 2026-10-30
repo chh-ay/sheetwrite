@@ -1,11 +1,12 @@
 import { cellA1 } from "@sheetwrite/core";
-import { createGrid, type Grid, initSheetwrite } from "@sheetwrite/core";
+import { createGrid, type Grid } from "@sheetwrite/core";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import { functionCount } from "../generated/formula-summary.json";
 import { errorText } from "../lib/errors.js";
+import { initFullEngine, whenStylesReady } from "../lib/full-engine.js";
 import { observeSiteTheme } from "../lib/site-theme.js";
 import { CapabilityHero } from "./CapabilityHero.js";
 import {
@@ -32,53 +33,12 @@ declare global {
   }
 }
 
-/** One full-page reload is allowed when an earlier page already selected the default engine. */
-const ENGINE_RELOAD_KEY = "sheetwrite:formulas-engine-reload";
-
-/** Core's one engine-selection conflict; wrapped errors keep the original as `cause`. */
-function isEngineConflict(error: unknown): boolean {
-  for (let current = error; current instanceof Error; current = current.cause) {
-    if (current.message.includes("the engine cannot change")) return true;
-  }
-  return false;
-}
-
 type GridState = "loading" | "ready" | "error";
 
 interface Recalc {
   label: string;
   cells: number;
   ms: number;
-}
-
-/**
- * The route stylesheet can land after this page mounts, and the engine reads
- * its theme — and seeds the palette of its menus and find bar — from the host's
- * CSS variables at construction. Resolve once every pending stylesheet has
- * applied, so the first paint uses the site palette instead of engine defaults.
- */
-function whenStylesReady(): Promise<void> {
-  const pending = Array.from(
-    document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]'),
-  ).filter((link) => link.sheet === null);
-  if (pending.length === 0) return Promise.resolve();
-  const applied = Promise.all(
-    pending.map(
-      (link) =>
-        new Promise<void>((resolve) => {
-          if (link.sheet !== null) {
-            resolve();
-            return;
-          }
-          const done = () => resolve();
-          link.addEventListener("load", done, { once: true });
-          link.addEventListener("error", done, { once: true });
-        }),
-    ),
-  ).then(() => undefined);
-  // A stylesheet that never settles must not hold the Grid back.
-  const cap = new Promise<void>((resolve) => window.setTimeout(resolve, 3_000));
-  return Promise.race([applied, cap]);
 }
 
 function describeResult(grid: Grid, row: number, col: number): string {
@@ -109,21 +69,7 @@ export default function FormulasShowcase() {
     const unsubscribes: Array<() => void> = [];
 
     void (async () => {
-      const formulas = await import("@sheetwrite/formulas");
-      try {
-        await initSheetwrite(undefined, formulas);
-      } catch (cause) {
-        // Each page selects one engine. After client navigation from a page
-        // that loaded the default engine, start this page fresh, one time.
-        // Other failures (a missing WASM file, for example) are shown as errors.
-        if (isEngineConflict(cause) && !sessionStorage.getItem(ENGINE_RELOAD_KEY)) {
-          sessionStorage.setItem(ENGINE_RELOAD_KEY, "1");
-          location.reload();
-          return;
-        }
-        throw cause;
-      }
-      sessionStorage.removeItem(ENGINE_RELOAD_KEY);
+      if (!(await initFullEngine())) return;
       if (disposed) return;
       await whenStylesReady();
       if (disposed) return;

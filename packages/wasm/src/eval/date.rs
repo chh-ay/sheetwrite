@@ -15,6 +15,42 @@ const MIN_SUPPORTED_SERIAL: i64 = -693_960;
 const MAX_DATE_SERIAL: i64 = 2_958_465;
 const MAX_DATE_SCAN: usize = MAX_DATE_SERIAL as usize + 1;
 const MAX_TIME_COMPONENT: i64 = 32_767;
+const MILLISECONDS_PER_DAY: f64 = (SECONDS_PER_DAY * 1_000) as f64;
+
+#[cfg(test)]
+thread_local! {
+    /// Tests install a fixed clock here instead of waiting on real time.
+    /// Production builds have no override and no cost.
+    static TEST_CLOCK: std::cell::Cell<Option<fn() -> f64>> = const { std::cell::Cell::new(None) };
+}
+
+/// Replaces the host clock on this thread; `None` restores it.
+#[cfg(test)]
+pub(crate) fn set_test_clock(clock: Option<fn() -> f64>) {
+    TEST_CLOCK.with(|slot| slot.set(clock));
+}
+
+/// The host's current instant as a UTC serial, the conversion the TypeScript
+/// store uses for `recalculateVolatile`, so both clocks agree to the
+/// millisecond in every host timezone.
+#[cfg(target_arch = "wasm32")]
+pub(super) fn host_clock_serial() -> f64 {
+    js_sys::Date::now() / MILLISECONDS_PER_DAY + UNIX_EPOCH_SERIAL as f64
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(super) fn host_clock_serial() -> f64 {
+    #[cfg(test)]
+    if let Some(clock) = TEST_CLOCK.with(std::cell::Cell::get) {
+        return clock();
+    }
+
+    // A clock set before 1970 reads as the Unix epoch.
+    let milliseconds = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.as_millis());
+    milliseconds as f64 / MILLISECONDS_PER_DAY + UNIX_EPOCH_SERIAL as f64
+}
 
 fn days_from_civil(mut year: i64, month: i64, day: i64) -> i64 {
     year -= i64::from(month <= 2);

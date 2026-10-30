@@ -1,6 +1,6 @@
 ---
 title: "GridControllerHandlers | @sheetwrite/core/adapter"
-description: "Event callbacks a host (a framework adapter, or any plain app) hangs off a grid's lifecycle."
+description: "GridControllerHandlers interface in @sheetwrite/core/adapter: Event callbacks a host (a framework adapter, or any plain app) hangs off a grid's lifecycle."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|GridControllerHandlers -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -189,6 +189,7 @@ export interface GridControllerHandlers<
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

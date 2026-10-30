@@ -1,6 +1,6 @@
 ---
 title: "GridResetReason | @sheetwrite/core/adapter"
-description: "Reset-sensitive input change that requires an adapter to replace its Grid."
+description: "GridResetReason type in @sheetwrite/core/adapter: Reset-sensitive input change that requires an adapter to replace its Grid."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|GridResetReason -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="type">type</span></div>
@@ -28,6 +28,7 @@ export type GridResetReason = "input-reset" | "renderer-reset";
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

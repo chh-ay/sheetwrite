@@ -1,6 +1,6 @@
 ---
 title: "RowBridgeCell | @sheetwrite/core/adapter"
-description: "A cell effect with semantic column and host row identity."
+description: "RowBridgeCell interface in @sheetwrite/core/adapter: A cell effect with semantic column and host row identity."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|RowBridgeCell -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -115,6 +115,7 @@ export interface RowBridgeCell<Id extends RowBridgeId = RowBridgeId> {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

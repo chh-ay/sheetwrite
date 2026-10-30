@@ -2,14 +2,22 @@ import { describe, expect, it } from "bun:test";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
+import { SITE_URL } from "../docs/src/lib/seo.js";
 import {
   ADAPTER_DOC_CONTRACT,
   adapterContractIssues,
   documentationLinkRoutes,
   landingBenchPayload,
+  landingDownloads,
+  movedPageIssues,
+  PERFORMANCE_PAGES,
+  renderCompatibilityResults,
   renderEntryPage,
   renderSymbolPage,
   runCompletionSummary,
+  splitPerformancePages,
+  symbolDescription,
+  unresolvedSiteLinks,
 } from "./docs.js";
 import type { ApiEntryPoint, ApiExport, ApiPackage, PublicApiManifest } from "./public-api.js";
 import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
@@ -134,6 +142,12 @@ describe("documentation generation", () => {
     expect(page).toContain("```ts compile\nconst count = 2;\n```");
     expect(page).toContain("[Commit reasons](/docs/api/core/commit-reason/)");
     expect(page).toContain("[https://example.com/guide](https://example.com/guide)");
+    // The symbol's own sections sit under the page title (H2); a member's sit
+    // under Members (H3). Neither may skip a heading level.
+    const summary = page.slice(0, page.indexOf("## Members"));
+    expect(summary).toMatch(/^## Examples$/m);
+    expect(summary).toMatch(/^## See also$/m);
+    expect(summary).not.toMatch(/^### /m);
     const member =
       /<details class="api-member" id="grid-apply-transaction"[\s\S]*?<\/details>/.exec(
         page,
@@ -149,16 +163,24 @@ describe("documentation generation", () => {
 
   it("keeps published package README links valid outside the monorepo", async () => {
     const root = resolve(import.meta.dir, "..");
+    const allowed = [`${SITE_URL}/`, "https://github.com/chh-ay/sheetwrite/"];
     for (const name of PUBLISHABLE_PACKAGE_ORDER) {
       const directory = name.slice("@sheetwrite/".length);
       const readme = await readFile(resolve(root, "packages", directory, "README.md"), "utf8");
       const links = [...readme.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)].map((match) => match[1]!);
       for (const link of links) {
-        expect(link).toMatch(
-          /^https:\/\/(?:sheetwrite\.vercel\.app\/|github\.com\/chh-ay\/sheetwrite\/)/,
-        );
+        // The link is in the compared value, so a failure names it.
+        expect({ link, allowed: allowed.some((prefix) => link.startsWith(prefix)) }).toEqual({
+          link,
+          allowed: true,
+        });
       }
     }
+  });
+
+  it("leaves the page title as the compatibility results page's only H1", () => {
+    // The docs shell renders the frontmatter title as the H1.
+    expect(renderCompatibilityResults()).not.toMatch(/^# /m);
   });
 
   it("never double-counts failed runs in the completion summary", () => {
@@ -260,6 +282,188 @@ describe("documentation generation", () => {
     });
     expect(JSON.parse(none).available).toBe(false);
     expect(none).not.toContain("null");
+  });
+
+  const viteFirstLoad = (javascript: number, wasm: number, css: number) => ({
+    "bundler.vite.coreInitial.javascript.brotliBytes": { actual: javascript },
+    "bundler.vite.coreInitial.wasm.brotliBytes": { actual: wasm },
+    "bundler.vite.coreInitial.css.brotliBytes": { actual: css },
+  });
+  const engineWasm = (defaultBytes: number, fullBytes: number) => [
+    { engine: "default", wasm: { brotliBytes: defaultBytes } },
+    { engine: "full", wasm: { brotliBytes: fullBytes } },
+  ];
+
+  it("reports the first-load download and both engine sizes, or nothing when one is unknown", () => {
+    expect(landingDownloads(viteFirstLoad(130, 256, 2), engineWasm(250, 340))).toEqual({
+      coreFirstLoadBrotliBytes: 388,
+      defaultEngineBrotliBytes: 250,
+      fullEngineBrotliBytes: 340,
+    });
+
+    // A partial report would understate the download, so the landing shows none.
+    const { "bundler.vite.coreInitial.css.brotliBytes": _css, ...noCss } = viteFirstLoad(1, 1, 1);
+    expect(landingDownloads(noCss, engineWasm(250, 340))).toBeUndefined();
+    expect(
+      landingDownloads(viteFirstLoad(130, 256, 2), engineWasm(250, 340).slice(0, 1)),
+    ).toBeUndefined();
+    expect(
+      landingDownloads(viteFirstLoad(130, Number.NaN, 2), engineWasm(250, 340)),
+    ).toBeUndefined();
+  });
+
+  it("publishes download sizes even when no benchmark capture is available", () => {
+    const downloads = {
+      coreFirstLoadBrotliBytes: 388,
+      defaultEngineBrotliBytes: 250,
+      fullEngineBrotliBytes: 340,
+    };
+    const missing = {
+      available: false as const,
+      reason: "not captured",
+      source: "x",
+      reproduction: "x",
+    };
+    expect(JSON.parse(landingBenchPayload(missing, downloads))).toEqual({
+      available: false,
+      reason: "not captured",
+      downloads,
+    });
+    expect(JSON.parse(landingBenchPayload(missing))).not.toHaveProperty("downloads");
+  });
+});
+
+describe("API symbol search descriptions", () => {
+  it("names the symbol, its kind and package, so re-exports from two packages differ", () => {
+    const summary = "Chart families that the document model supports.";
+    const core = symbolDescription("ChartKind", "type", "@sheetwrite/core", summary);
+    const charts = symbolDescription("ChartKind", "type", "@sheetwrite/charts", summary);
+
+    expect(core).toBe(`ChartKind type in @sheetwrite/core: ${summary}`);
+    expect(core).not.toBe(charts);
+  });
+
+  it("clips a long summary on a word, within what search results show", () => {
+    const long = symbolDescription(
+      "Grid",
+      "interface",
+      "@sheetwrite/core",
+      `The imperative grid handle. ${"It reads, edits and renders a workbook. ".repeat(8)}`,
+    );
+
+    expect(long.length).toBeLessThanOrEqual(160);
+    expect(long.endsWith("…")).toBe(true);
+    expect(long).not.toMatch(/\s…$/);
+  });
+});
+
+describe("moved pages and site links", () => {
+  const contentRoot = resolve(import.meta.dir, "../docs/src/content/docs");
+  const documents = [
+    { path: `${contentRoot}/features/grid/search.md`, content: "## Replace\n\nText.\n" },
+    { path: `${contentRoot}/guides/kept.md`, content: "Kept.\n" },
+  ];
+  const moved = {
+    "/docs/guides/old/": {
+      to: "/docs/features/grid/search/",
+      anchors: { replace: "/docs/features/grid/search/#replace" },
+    },
+  };
+
+  it("accepts a moved page whose targets exist", () => {
+    expect(movedPageIssues(moved, documents)).toEqual([]);
+  });
+
+  it("rejects a missing target heading and an old page that keeps its content", () => {
+    const broken = {
+      "/docs/guides/kept/": {
+        to: "/docs/features/grid/search/",
+        anchors: { gone: "/docs/features/grid/search/#gone" },
+      },
+    };
+    expect(movedPageIssues(broken, documents)).toEqual([
+      "moved page still has content: /docs/guides/kept/",
+      "moved page /docs/guides/kept/#gone forwards to a missing target: /docs/features/grid/search/#gone",
+    ]);
+  });
+
+  it("rejects a moved heading that is still on its page or forwards nowhere", () => {
+    const headings = {
+      "/docs/features/grid/search/": {
+        replace: "/docs/guides/kept/",
+        gone: "/docs/guides/kept/#missing",
+      },
+    };
+    expect(movedPageIssues({}, documents, headings)).toEqual([
+      "moved heading is still on its page: /docs/features/grid/search/#replace",
+      "moved heading /docs/features/grid/search/#gone forwards to a missing target: /docs/guides/kept/#missing",
+    ]);
+  });
+
+  it("rejects site links to moved, missing, or anchorless targets", () => {
+    const links = [
+      { source: "README.md", link: "/docs/guides/old/" },
+      { source: "README.md", link: "/docs/missing/" },
+      { source: "README.md", link: "/docs/features/grid/search/#nope" },
+      { source: "README.md", link: "/docs/features/grid/search/#replace" },
+    ];
+    expect(unresolvedSiteLinks(links, documents, moved)).toEqual([
+      "README.md links moved page /docs/guides/old/; link /docs/features/grid/search/ instead",
+      "README.md links missing page /docs/missing/",
+      "README.md links missing anchor /docs/features/grid/search/#nope",
+    ]);
+  });
+});
+
+describe("performance pages", () => {
+  const evidence = PERFORMANCE_PAGES.flatMap((page) => page.sections)
+    .map((heading) => `## ${heading}\n\n${heading} body.\n`)
+    .join("\n");
+
+  it("publishes every evidence section on the page that lists it", () => {
+    const pages = new Map(
+      splitPerformancePages(evidence).map((page) => [page.route, page.content]),
+    );
+    expect(pages.get("performance/render.md")).toContain("Render benchmark body.");
+    // A one-section page takes its heading from its title.
+    expect(pages.get("performance/render.md")).not.toContain("## Render benchmark");
+    const memory = pages.get("performance/memory.md") ?? "";
+    expect(memory).toContain("## Release retained engine memory");
+    expect(memory).toContain("## Runtime resource ownership");
+    expect(pages.get("performance/index.md")).toContain("](/docs/performance/memory/)");
+  });
+
+  it("lifts a one-section page's headings to sit right under its title", () => {
+    const fenced = "```md\n### Not a heading\n<h4>Literal</h4>\n```\n";
+    const nested = evidence
+      .replace("Render benchmark body.\n", `### Scale\n\n<h4>Card</h4>\n\n#### Detail\n\n${fenced}`)
+      .replace("Runtime resource ownership body.\n", "### Owners\n");
+    const pages = new Map(splitPerformancePages(nested).map((page) => [page.route, page.content]));
+
+    const render = pages.get("performance/render.md") ?? "";
+    expect(render).toMatch(/^## Scale$/m);
+    expect(render).toContain("<h3>Card</h3>");
+    expect(render).toMatch(/^### Detail$/m);
+    // Code shows its text as written.
+    expect(render).toContain(fenced);
+    // A page with several sections keeps their H2s, so nothing moves.
+    expect(pages.get("performance/memory.md")).toMatch(/^### Owners$/m);
+  });
+
+  it("rejects a section that no page lists", () => {
+    expect(() => splitPerformancePages(`${evidence}\n## New benchmark\n\nBody.\n`)).toThrow(
+      "performance section has no page: New benchmark",
+    );
+  });
+
+  it("tells the reader when a page has no evidence yet", () => {
+    const pages = new Map(
+      splitPerformancePages("## Delivery size\n\nSizes.\n").map((page) => [
+        page.route,
+        page.content,
+      ]),
+    );
+    expect(pages.get("performance/xlsx-codec.md")).toContain("no validated evidence yet");
   });
 });
 describe("adapter documentation contract", () => {

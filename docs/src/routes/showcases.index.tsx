@@ -14,7 +14,7 @@ export const Route = createFileRoute("/showcases/")({
   head: () => ({
     meta: pageMeta(
       "Showcases — evaluate Sheetwrite by feature",
-      "Every public Sheetwrite feature with its owning live example: editing, formulas, validation, million-row scale, XLSX/CSV exchange, IndexedDB persistence, offline sync, and collaboration.",
+      "Live examples of every Sheetwrite feature: editing, formulas, pivot tables and charts, million-row scale, XLSX/CSV, offline sync and collaboration.",
     ),
     links: [{ rel: "stylesheet", href: hubStylesheet }],
   }),
@@ -23,18 +23,19 @@ export const Route = createFileRoute("/showcases/")({
 
 const OWNER_BY_ID = new Map(CAPABILITY_OWNERS.map((owner) => [owner.id, owner]));
 
-/**
- * Seven capability owners: three featured cards on the first desktop row, four
- * on the second, then the four adapters.
- */
+/** The featured app card, capability launch cards, then the four framework adapters. */
 const SCENE_ORDER = [
+  "spreadsheet",
+  "analysis",
   "performance",
   "formulas",
   "collaboration",
   "database",
   "host-rows",
   "interoperability",
+  "formatting",
   "engine",
+  "data-tools",
 ] as const satisfies readonly CapabilityOwnerId[];
 
 type SceneOwnerId = (typeof SCENE_ORDER)[number];
@@ -46,8 +47,13 @@ const SCENE_SUMMARY: Readonly<Record<SceneOwnerId, string>> = {
   database: "IndexedDB snapshots, commits, compaction, and reload recovery.",
   "host-rows": "Your store owns the rows. Sort, filter and edit; every delta names the record.",
   interoperability: "XLSX and delimited exchange with fixture-backed fidelity warnings.",
+  formatting: "A styled P&L, mixed number formats, and a live XLSX fidelity check.",
   collaboration: "Sequencing, reconnects, conflicts, and recovery across two clients.",
   engine: "A 50,000-row forecast with every public engine event traced beside it.",
+  "data-tools": "Sort, filter and organize 4,800 orders; exercise validation and protection.",
+  spreadsheet:
+    "An Excel-style ribbon, formula bar and sheet tabs around one grid. Narrow it and watch the groups fold.",
+  analysis: "A pivot table and a live chart over two years of orders. Edit an order and both move.",
 };
 
 /** Real import and mount line per first-party adapter. */
@@ -90,8 +96,11 @@ const HUB_GROUPS: readonly { id: HubGroup; label: string }[] = [
 
 function ownerGroup(owner: (typeof CAPABILITY_OWNERS)[number]): Exclude<HubGroup, "all"> {
   if (owner.kind === "framework") return "framework";
-  if (owner.id === "formulas" || owner.id === "engine") return "formulas";
-  if (owner.id === "interoperability") return "workbook";
+  if (owner.id === "formulas" || owner.id === "engine" || owner.id === "analysis")
+    return "formulas";
+  if (owner.id === "interoperability" || owner.id === "formatting" || owner.id === "spreadsheet") {
+    return "workbook";
+  }
   if (owner.id === "collaboration") return "collaboration";
   return "data";
 }
@@ -256,54 +265,233 @@ function FormulasScene() {
   );
 }
 
-/** Engine events streaming beside a Grid. */
+/** One change traced like a profiler waterfall: each stage starts where the last ends. */
+const ENGINE_STAGES = [
+  { label: "Page", width: 18 },
+  { label: "Recalc", width: 34 },
+  { label: "Paint", width: 22 },
+  { label: "Host ack", width: 26 },
+] as const;
+
 function EngineScene() {
+  let start = 0;
+
   return (
     <span aria-hidden="true" className="sw-hub-scene sw-hub-scene--engine">
-      <span className="sw-hub-trace">
-        <code>
-          <i>datasource</i> rows 31–45 · 0.1 ms
-        </code>
-        <code>
-          <i>formula</i> C2 810 → 900
-        </code>
-        <code>
-          <i>drawing</i> canvas · 270 cells
-        </code>
-        <code>
-          <i>host-save</i> acknowledged
-        </code>
+      <span className="sw-hub-waterfall">
+        {ENGINE_STAGES.map((stage) => {
+          const offset = start;
+
+          start += stage.width;
+
+          return (
+            <span key={stage.label}>
+              <i>{stage.label}</i>
+              <b>
+                <s style={{ marginLeft: `${offset}%`, width: `${stage.width}%` }} />
+              </b>
+            </span>
+          );
+        })}
       </span>
-      <span className="sw-hub-scene__caption">public events · paged forecast</span>
+      <span className="sw-hub-scene__caption">one edit, traced from page to host</span>
     </span>
   );
 }
 
-/** Host-owned rows: the view moves, the record IDs stay. */
+/** Records sorted by ARR; every record keeps its ID, and the edited one is marked. */
+const HOST_ROWS = [
+  { id: "#003", share: 92, edited: true },
+  { id: "#005", share: 78, edited: false },
+  { id: "#001", share: 60, edited: false },
+  { id: "#004", share: 41, edited: false },
+] as const;
+
 function HostRowsScene() {
   return (
     <span aria-hidden="true" className="sw-hub-scene sw-hub-scene--host-rows">
-      <span className="sw-hub-trace">
-        <code>
-          <i>sort</i> ARR desc · IDs kept
-        </code>
-        <code>
-          <i>edit</i> account-003 ARR → 225,000
-        </code>
-        <code>
-          <i>delta</i> 1 record · host store
-        </code>
-        <code>
-          <i>import</i> 10,000 leads · unique IDs
-        </code>
+      <span className="sw-hub-records">
+        {HOST_ROWS.map((row) => (
+          <span data-edited={row.edited || undefined} key={row.id}>
+            <code>{row.id}</code>
+            <b style={{ width: `${row.share}%` }} />
+          </span>
+        ))}
       </span>
-      <span className="sw-hub-scene__caption">stable row IDs · host write policy</span>
+      <span className="sw-hub-scene__caption">sorted by ARR, every ID kept</span>
+    </span>
+  );
+}
+
+/** A budget in miniature: header fill, currency, red negatives, a ruled total. */
+const FORMATTED_ROWS = [
+  { label: "Revenue", plan: "$84,250", delta: "6.2%", tone: undefined },
+  { label: "Cloud", plan: "($12,600)", delta: "−12.3%", tone: "negative" },
+  { label: "Profit", plan: "$28,850", delta: "14.9%", tone: "total" },
+] as const;
+
+function FormattingScene() {
+  return (
+    <span aria-hidden="true" className="sw-hub-scene sw-hub-scene--formatting">
+      <span className="sw-hub-budget">
+        <span data-tone="head">
+          <i>Budget line</i>
+          <i>Plan</i>
+          <i>Δ</i>
+        </span>
+        {FORMATTED_ROWS.map((row) => (
+          <span data-tone={row.tone} key={row.label}>
+            <i>{row.label}</i>
+            <i>{row.plan}</i>
+            <i>{row.delta}</i>
+          </span>
+        ))}
+      </span>
+      <span className="sw-hub-scene__caption">number formats and styles that survive XLSX</span>
+    </span>
+  );
+}
+
+/**
+ * A pivot in miniature beside the chart drawn from it: two regions over four
+ * months, with the same EMEA dip in the table and in the line.
+ */
+const ANALYSIS_MONTHS = [
+  { month: "Jan", americas: 84, emea: 61 },
+  { month: "Feb", americas: 80, emea: 58 },
+  { month: "Mar", americas: 90, emea: 41, dip: true },
+  { month: "Apr", americas: 92, emea: 47 },
+] as const;
+const ANALYSIS_CHART = { width: 120, height: 64, top: 100, inset: 6 } as const;
+
+/** SVG points for one region's line, scaled to the scene chart. */
+function analysisLine(region: "americas" | "emea"): string {
+  const { width, height, top, inset } = ANALYSIS_CHART;
+  const step = (width - 2 * inset) / (ANALYSIS_MONTHS.length - 1);
+
+  return ANALYSIS_MONTHS.map(
+    (row, index) =>
+      `${inset + index * step},${height - inset - (row[region] / top) * (height - 2 * inset)}`,
+  ).join(" ");
+}
+
+function AnalysisScene() {
+  const { width, height } = ANALYSIS_CHART;
+
+  return (
+    <span aria-hidden="true" className="sw-hub-scene sw-hub-scene--analysis">
+      <span className="sw-hub-analysis">
+        <span className="sw-hub-budget sw-hub-analysis__pivot">
+          <span data-tone="head">
+            <i>Month</i>
+            <i>Americas</i>
+            <i>EMEA</i>
+          </span>
+          {ANALYSIS_MONTHS.map((row) => (
+            <span data-tone={"dip" in row ? "negative" : undefined} key={row.month}>
+              <i>{row.month}</i>
+              <i>{row.americas}k</i>
+              <i>{row.emea}k</i>
+            </span>
+          ))}
+        </span>
+        <svg className="sw-hub-analysis__chart" viewBox={`0 0 ${width} ${height}`}>
+          <polyline data-series="1" points={analysisLine("americas")} />
+          <polyline data-series="2" points={analysisLine("emea")} />
+        </svg>
+      </span>
+      <span className="sw-hub-scene__caption">one edit moves the pivot and the chart</span>
+    </span>
+  );
+}
+
+/** A filtered column over a mini grid: one rejected, one warned and one locked cell. */
+const DATA_TOOL_ROW_COUNT = 4;
+const DATA_TOOL_COLUMN_COUNT = 4;
+const DATA_TOOL_FILTERED_COLUMN = 1;
+const DATA_TOOL_COLUMNS = Array.from({ length: DATA_TOOL_COLUMN_COUNT }, (_, index) => index);
+const DATA_TOOL_CELLS = Array.from(
+  { length: DATA_TOOL_ROW_COUNT * DATA_TOOL_COLUMN_COUNT },
+  (_, index) => index,
+);
+const DATA_TOOL_STATES: Readonly<Record<number, "reject" | "warn" | "lock">> = {
+  5: "reject",
+  10: "warn",
+  12: "lock",
+};
+
+function DataToolsScene() {
+  return (
+    <span aria-hidden="true" className="sw-hub-scene sw-hub-scene--data-tools">
+      <span className="sw-hub-rules">
+        <span className="sw-hub-rules__grid">
+          {DATA_TOOL_COLUMNS.map((column) => (
+            <i
+              data-filtered={column === DATA_TOOL_FILTERED_COLUMN || undefined}
+              key={`head-${column}`}
+            />
+          ))}
+          {DATA_TOOL_CELLS.map((cell) => (
+            <b data-state={DATA_TOOL_STATES[cell]} key={cell} />
+          ))}
+        </span>
+        <span className="sw-hub-rules__legend">
+          <span data-state="reject">rejected</span>
+          <span data-state="warn">warned</span>
+          <span data-state="lock">locked</span>
+        </span>
+      </span>
+      <span className="sw-hub-scene__caption">rules that hold under any sort or filter</span>
+    </span>
+  );
+}
+
+const RIBBON_SCENE_TABS = ["Home", "Insert", "Data", "View"] as const;
+const RIBBON_SCENE_GROUPS = [
+  "Clipboard",
+  "Font",
+  "Alignment",
+  "Number",
+  "Cells",
+  "Editing",
+] as const;
+
+/** A miniature ribbon: tab row over labeled groups, Home selected. */
+function SpreadsheetScene() {
+  return (
+    <span aria-hidden="true" className="sw-hub-scene sw-hub-scene--spreadsheet">
+      <span className="sw-hub-ribbon">
+        <span className="sw-hub-ribbon__tabs">
+          {RIBBON_SCENE_TABS.map((tab) => (
+            <i data-selected={tab === "Home"} key={tab}>
+              {tab}
+            </i>
+          ))}
+        </span>
+        <span className="sw-hub-ribbon__groups">
+          {RIBBON_SCENE_GROUPS.map((group) => (
+            <span key={group}>
+              <b />
+              <small>{group}</small>
+            </span>
+          ))}
+        </span>
+        <span className="sw-hub-ribbon__formula">
+          <code>G50</code>
+          <code>=SUM(G2:G49)</code>
+        </span>
+      </span>
+      <span className="sw-hub-scene__caption">ribbon · formula bar · tabs · folds when narrow</span>
     </span>
   );
 }
 
 function CapabilityScene({ id, medianMs }: Readonly<{ id: SceneOwnerId; medianMs?: number }>) {
   switch (id) {
+    case "spreadsheet":
+      return <SpreadsheetScene />;
+    case "analysis":
+      return <AnalysisScene />;
     case "performance":
       return <PerformanceScene medianMs={medianMs} />;
     case "formulas":
@@ -314,10 +502,14 @@ function CapabilityScene({ id, medianMs }: Readonly<{ id: SceneOwnerId; medianMs
       return <HostRowsScene />;
     case "interoperability":
       return <InteroperabilityScene />;
+    case "formatting":
+      return <FormattingScene />;
     case "collaboration":
       return <CollaborationScene />;
     case "engine":
       return <EngineScene />;
+    case "data-tools":
+      return <DataToolsScene />;
   }
 }
 

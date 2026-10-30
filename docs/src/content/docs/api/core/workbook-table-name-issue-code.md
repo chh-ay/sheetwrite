@@ -1,6 +1,6 @@
 ---
 title: "WorkbookTableNameIssueCode | @sheetwrite/core"
-description: "Stable reason code returned when a workbook table name is rejected."
+description: "WorkbookTableNameIssueCode type in @sheetwrite/core: Stable reason code returned when a workbook table name is rejected."
 ---
 <!-- api-export:@sheetwrite/core|.|WorkbookTableNameIssueCode -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
@@ -8,7 +8,7 @@ description: "Stable reason code returned when a workbook table name is rejected
 Stable reason code returned when a workbook table name is rejected.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/workbook-table.ts#L32"><code>packages/core/src/workbook-table.ts#L32</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/workbook-table.ts#L35"><code>packages/core/src/workbook-table.ts#L35</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -33,6 +33,7 @@ export type WorkbookTableNameIssueCode =
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

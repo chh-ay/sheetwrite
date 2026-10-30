@@ -1,0 +1,263 @@
+.sw-data-frame {
+  background: var(--sw-demo-deep);
+  color: var(--sw-demo-fg);
+  min-height: 100vh;
+}
+/* Same page inset as every other capability showcase. */
+.sw-data {
+  width: calc(100% - 2 * var(--sw-page-inset));
+  margin-inline: auto;
+  padding-block: 2rem 4rem;
+}
+.sw-data-workspace {
+  border: 1px solid var(--sw-demo-border);
+  border-radius: 1rem;
+  background: var(--sw-demo-surface);
+  overflow: hidden;
+  box-shadow: var(--sw-demo-shadow);
+}
+.sw-data-controls,
+.sw-data-organize {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1.25rem;
+}
+.sw-data-controls h2,
+.sw-data-panel h2 {
+  margin: 0.35rem 0 0.75rem;
+  color: var(--sw-demo-fg-strong);
+  font-size: 1.25rem;
+  font-weight: 650;
+}
+.sw-data-controls label {
+  display: grid;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--sw-demo-muted);
+}
+.sw-data button:not(.sw-demo-select__trigger),
+.sw-data input {
+  min-height: 2.5rem;
+  border: 1px solid var(--sw-demo-border-strong);
+  border-radius: 0.4rem;
+  background: var(--sw-demo-raised);
+  color: var(--sw-demo-fg);
+  padding: 0.5rem 0.75rem;
+  font: inherit;
+}
+.sw-data button:not(.sw-demo-select__trigger) {
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+.sw-data button:not(.sw-demo-select__trigger):hover {
+  border-color: var(--sw-demo-accent);
+}
+.sw-data button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.sw-data :is(button, input):focus-visible {
+  outline: 2px solid var(--sw-demo-accent);
+  outline-offset: 3px;
+}
+.sw-data-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: space-between;
+  padding: 0.8rem 1.25rem;
+  border-top: 1px solid var(--sw-demo-border);
+  background: var(--sw-demo-panel);
+  font-size: 0.85rem;
+}
+.sw-data-status strong {
+  color: var(--sw-demo-accent-strong);
+}
+.sw-data-columns {
+  flex-basis: 100%;
+  color: var(--sw-demo-muted);
+  font-size: 0.75rem;
+}
+.sw-data-grid {
+  height: 440px;
+  width: 100%;
+}
+.sw-data-organize {
+  align-items: center;
+  border-top: 1px solid var(--sw-demo-border);
+  font-size: 0.8rem;
+}
+.sw-data-organize small {
+  color: var(--sw-demo-muted);
+}
+.sw-data-lower {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin: 1.5rem 0;
+}
+.sw-data-panel {
+  min-width: 0;
+  padding: 1.5rem;
+  border: 1px solid var(--sw-demo-border);
+  border-radius: 0.75rem;
+  background: var(--sw-demo-panel);
+}
+.sw-data-panel p {
+  color: var(--sw-demo-muted);
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+/* One row per guarded column: the rule, the probe, and what the Grid did. */
+.sw-data-rules {
+  display: grid;
+  gap: 0;
+  margin: 1.25rem 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--sw-demo-border);
+}
+.sw-data-rules li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  padding: 0.9rem 0;
+  border-bottom: 1px solid var(--sw-demo-border);
+}
+.sw-data-rule {
+  display: grid;
+  gap: 0.2rem;
+}
+.sw-data-rule strong {
+  color: var(--sw-demo-fg-strong);
+  font-size: 0.95rem;
+}
+.sw-data-rule span {
+  color: var(--sw-demo-muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+.sw-data-rules button {
+  white-space: nowrap;
+}
+.sw-data-result {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  color: var(--sw-demo-muted);
+  font-size: 0.85rem;
+}
+/* A dot in the outcome colour; the words carry the meaning. */
+.sw-data-result::before {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex: none;
+  border-radius: 50%;
+  background: var(--sw-demo-border-strong);
+  content: "";
+}
+.sw-data-result[data-outcome="saved"] {
+  color: var(--sw-demo-fg);
+}
+.sw-data-result[data-outcome="saved"]::before {
+  background: var(--sw-demo-accent);
+}
+.sw-data-result[data-outcome="warned"] {
+  color: var(--sw-demo-fg);
+}
+.sw-data-result[data-outcome="warned"]::before {
+  background: var(--sw-demo-warn);
+}
+.sw-data-result[data-outcome="rejected"] {
+  color: var(--sw-demo-fg);
+}
+.sw-data-result[data-outcome="rejected"]::before {
+  background: var(--sw-demo-danger);
+}
+
+/* Two-way role switch: the pressed button is the role the resolver sees. */
+.sw-data-role {
+  margin-bottom: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.sw-data-role span {
+  margin-right: 0.25rem;
+  color: var(--sw-demo-muted);
+  font-size: 0.85rem;
+}
+.sw-data-role button[aria-pressed="true"] {
+  border-color: var(--sw-demo-accent);
+  background: color-mix(in srgb, var(--sw-demo-accent) 16%, var(--sw-demo-raised));
+  color: var(--sw-demo-fg-strong);
+}
+
+.sw-data-events {
+  max-height: 22rem;
+  margin: 1.25rem 0 0;
+  overflow: auto;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--sw-demo-border);
+}
+.sw-data-events li {
+  display: grid;
+  grid-template-columns: 0.5rem minmax(0, 1fr);
+  gap: 0.15rem 0.75rem;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--sw-demo-border);
+}
+.sw-data-events li::before {
+  grid-row: 1 / 3;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-top: 0.45rem;
+  border-radius: 50%;
+  background: var(--sw-demo-border-strong);
+  content: "";
+}
+.sw-data-events li[data-tone="ok"]::before {
+  background: var(--sw-demo-accent);
+}
+.sw-data-events li[data-tone="warn"]::before {
+  background: var(--sw-demo-warn);
+}
+.sw-data-events li[data-tone="reject"]::before {
+  background: var(--sw-demo-danger);
+}
+.sw-data-events span {
+  color: var(--sw-demo-fg);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.sw-data-events code {
+  color: var(--sw-demo-dim);
+  font: 0.75rem / 1.4 var(--sw-font-mono);
+}
+.sw-data-note {
+  font-size: 0.8rem;
+  line-height: 1.7;
+  color: var(--sw-demo-muted);
+}
+@media (max-width: 760px) {
+  .sw-data-lower {
+    grid-template-columns: 1fr;
+  }
+  .sw-data-controls label {
+    flex: 1 1 100%;
+  }
+  .sw-data-controls input,
+  .sw-data-region,
+  .sw-data-region .sw-demo-select__trigger {
+    width: 100%;
+  }
+  .sw-data-grid {
+    height: 360px;
+  }
+}

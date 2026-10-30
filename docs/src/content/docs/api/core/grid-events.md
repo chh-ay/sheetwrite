@@ -1,6 +1,6 @@
 ---
 title: "GridEvents | @sheetwrite/core"
-description: "Payload map for events emitted by a Grid."
+description: "GridEvents interface in @sheetwrite/core: Payload map for events emitted by a Grid."
 ---
 <!-- api-export:@sheetwrite/core|.|GridEvents -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -8,7 +8,7 @@ description: "Payload map for events emitted by a Grid."
 Payload map for events emitted by a Grid.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L548"><code>packages/core/src/types/grid.ts#L548</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L677"><code>packages/core/src/types/grid.ts#L677</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -26,9 +26,11 @@ Payload map for events emitted by a Grid.
 <a href="#grid-events-renderer-fallback"><code>renderer-fallback</code></a>
 <a href="#grid-events-datasource-error"><code>datasource-error</code></a>
 <a href="#grid-events-export-error"><code>export-error</code></a>
+<a href="#grid-events-chart-select"><code>chart-select</code></a>
+<a href="#grid-events-chart-activate"><code>chart-activate</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>14</span>
+## Members <span class="api-count" data-pagefind-ignore>16</span>
 
 <div class="api-member-list">
 
@@ -158,6 +160,24 @@ search: SearchResult;
 ```
 
 </details>
+
+<details class="api-member" id="grid-events-chart-select" data-pagefind-weight="1">
+<summary><code>chart-select</code> <span class="api-member-summary">A chart object on the active sheet was selected; null when no object is selected.</span></summary>
+
+```ts generated
+"chart-select": ChartRef | null;
+```
+
+</details>
+
+<details class="api-member" id="grid-events-chart-activate" data-pagefind-weight="1">
+<summary><code>chart-activate</code> <span class="api-member-summary">The user pressed Enter on a selected chart, for example to open its editor.</span></summary>
+
+```ts generated
+"chart-activate": ChartRef;
+```
+
+</details>
 </div>
 
 ## Declaration
@@ -210,6 +230,8 @@ export interface GridEvents {
     format: "csv" | "xlsx";
     error: SheetwriteError;
   };
+  "chart-select": ChartRef | null;
+  "chart-activate": ChartRef;
 }
 ```
 
@@ -222,6 +244,7 @@ export interface GridEvents {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

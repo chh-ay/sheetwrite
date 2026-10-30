@@ -24,7 +24,7 @@ function classify(
   if (value === null) return { type: "blank" };
   if (typeof value === "number") return { type: "number", value, displayedText };
   if (typeof value === "boolean") return { type: "boolean", value };
-  if (/^#(?:N\/A|REF!|VALUE!|DIV\/0!|NUM!|SPILL!)$/.test(value)) {
+  if (/^#(?:N\/A|REF!|VALUE!|DIV\/0!|NUM!|NULL!|SPILL!)$/.test(value)) {
     return { type: "error", error: value };
   }
   return { type: "string", value };
@@ -513,11 +513,16 @@ export async function runSheetwriteCase(entry: ConformanceCase): Promise<Conform
       };
     }
 
-    const patches: DocumentOp[] = (entry.inputs ?? []).map((input) => ({
-      op: "set",
-      addr: { sheet: "oracle", ...a1(input.cell) },
-      value: { kind: "literal", value: input.value },
-    }));
+    const patches: DocumentOp[] = entry.calculation
+      ? [{ op: "setCalculation", calculation: { ...entry.calculation } }]
+      : [];
+    for (const input of entry.inputs ?? []) {
+      patches.push({
+        op: "set",
+        addr: { sheet: "oracle", ...a1(input.cell) },
+        value: { kind: "literal", value: input.value },
+      });
+    }
     patches.push({
       op: "set",
       addr: { sheet: "oracle", ...a1(entry.target!) },

@@ -9,7 +9,7 @@ import {
   prepareMergeIndex,
 } from "./canvas-paint.js";
 import { CanvasRenderer } from "./canvas-renderer.js";
-import { cellScalarToText } from "./cell-input.js";
+import { cellDisplayText, cellScalarToText } from "./cell-input.js";
 import { ClipboardController } from "./clipboard-controller.js";
 import { DatasourceController } from "./datasource-controller.js";
 import { DocumentController } from "./document-controller.js";
@@ -29,13 +29,18 @@ import {
 import { normalizeSheetwriteError, SheetwriteError } from "./errors.js";
 import { downloadBytes, toCsv, toXlsxTable } from "./export.js";
 import { FindBar } from "./find-bar.js";
+import { stepFontSizePx, stepNumberFormatDecimals } from "./format-presets.js";
 import { GeometryLayoutController } from "./geometry-layout-controller.js";
 import { hyperlinkAt, resolveHyperlinkTarget, sanitizeCellHyperlink } from "./hyperlink.js";
 import { InteractionSessions } from "./interaction-sessions.js";
 import { Keymap } from "./keymap.js";
 import { MutationRevisionIndex, type MutationRevisionStats } from "./mutation-revision-index.js";
+import { type NoteCell, NotePopover } from "./note-popover.js";
+import { ObjectLayer } from "./object-layer.js";
 import { OverlayPainter } from "./overlay-painter.js";
-import { ReadWindowController } from "./read-window-controller.js";
+import { attachPanelTriggers, showPivotFields } from "./panels/panel-loader.js";
+import { clonePivots, pivotOwner, uncomputedPivotResult, withoutSavedOutput } from "./pivot.js";
+import { type PaintedCells, ReadWindowController } from "./read-window-controller.js";
 import {
   createRuntimeResourceSnapshot,
   type RuntimeMemoryObservation,
@@ -43,10 +48,13 @@ import {
   type RuntimeResourcePhase,
   type RuntimeResourceSnapshot,
 } from "./resource-accounting.js";
+import { RIBBON_EXPANDED_HEIGHT } from "./ribbon/ribbon-metrics.js";
+import type { Ribbon } from "./ribbon/ribbon.js";
 import { SearchController } from "./search-controller.js";
 import { type CellRef, SelectionModel, type SelRect } from "./selection.js";
 import { sheetNameKey, validateSheetName } from "./sheet-name.js";
 import { SheetTabs } from "./sheet-tabs.js";
+import { mountSidePanel } from "./side-panel.js";
 import { IncompleteDataError, SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
 import {
@@ -66,6 +74,7 @@ import type {
   Column,
   ConditionalFormatRule,
 } from "./types/cell.js";
+import type { ChartDefinition, ChartRef } from "./types/chart.js";
 import type {
   CellAddress,
   HighlightRange,
@@ -90,7 +99,7 @@ import type {
   SortKey,
   WorkbookSnapshot,
 } from "./types/document.js";
-import type { KeyboardAction, KeyboardOptions } from "./types/grid.js";
+import type { ContextMenuItem, KeyboardAction, KeyboardOptions } from "./types/grid.js";
 import type {
   CellEditor,
   CellInputSnapshot,
@@ -101,12 +110,15 @@ import type {
   GridConfig,
   GridEvents,
   GridOptions,
+  GridPanel,
   GridPresentation,
   ReplaceResult,
   SearchOptions,
   SearchResult,
+  SelectionSummary,
   SheetLifecycleResult,
 } from "./types/grid.js";
+import type { PivotDefinition, PivotResultView, PivotSourceField } from "./types/pivot.js";
 import type { CellRenderer, Renderer, Theme } from "./types/render.js";
 import type { Store, VisibleWindowView } from "./types/store.js";
 import type {
@@ -157,6 +169,8 @@ export function measureMaxElementHeight(
 const DEFAULT_OVERSCAN = 6;
 /** Width of synthesized workbook and presentation-padding columns, in CSS pixels. */
 const DEFAULT_COL_WIDTH = 100;
+/** Width of the side panel, in CSS pixels; the cells give up this much room while it is open. */
+const PANEL_WIDTH = 320;
 const GRID_COMMANDS: readonly GridCommandName[] = [
   "bold",
   "italic",
@@ -165,6 +179,10 @@ const GRID_COMMANDS: readonly GridCommandName[] = [
   "alignLeft",
   "alignCenter",
   "alignRight",
+  "alignTop",
+  "alignMiddle",
+  "alignBottom",
+  "wrap",
   "textColor",
   "fillColor",
   "border",
@@ -186,10 +204,20 @@ const COMMAND_STATE_ACTIVITY_COMMANDS: readonly GridCommandName[] = [
   "alignLeft",
   "alignCenter",
   "alignRight",
+  "alignTop",
+  "alignMiddle",
+  "alignBottom",
+  "wrap",
   "border",
 ];
 /** Bound synchronous command-state work; larger uniform selections report mixed conservatively. */
 const COMMAND_STATE_CELL_LIMIT = 4_096;
+
+/**
+ * Cells read per store call when summarizing a selection: about a frame's
+ * work (measured ~10 ms for 64k cells), so huge selections yield between reads.
+ */
+const SUMMARY_CELLS_PER_READ = 65_536;
 
 function isFormattingCommand(command: GridCommandName): boolean {
   return (
@@ -200,6 +228,10 @@ function isFormattingCommand(command: GridCommandName): boolean {
     command === "alignLeft" ||
     command === "alignCenter" ||
     command === "alignRight" ||
+    command === "alignTop" ||
+    command === "alignMiddle" ||
+    command === "alignBottom" ||
+    command === "wrap" ||
     command === "textColor" ||
     command === "fillColor" ||
     command === "border" ||
@@ -232,6 +264,14 @@ function formattingCommandActive(
       return effectiveStyleValue(cell, column, "align") === "center";
     case "alignRight":
       return effectiveStyleValue(cell, column, "align") === "right";
+    case "alignTop":
+      return effectiveStyleValue(cell, column, "verticalAlign") === "top";
+    case "alignMiddle":
+      return (effectiveStyleValue(cell, column, "verticalAlign") ?? "middle") === "middle";
+    case "alignBottom":
+      return effectiveStyleValue(cell, column, "verticalAlign") === "bottom";
+    case "wrap":
+      return effectiveStyleValue(cell, column, "wrap") === true;
     case "border":
       return effectiveStyleValue(cell, column, "border") !== undefined;
     default:
@@ -302,7 +342,7 @@ function adaptiveRowHeaderWidth(theme: Theme, dataRowCount: number): number {
  *
  * await initSheetwrite(undefined, formulas);
  * ```
- * @see /docs/guides/formulas/
+ * @see /docs/start/choose-an-engine/
  * @see createGrid
  */
 export async function initSheetwrite(
@@ -425,6 +465,8 @@ export class GridImpl implements Grid {
   private readonly domOverlay: DomOverlay;
   private readonly readWindows: ReadWindowController;
   private overscan: number;
+  private displayedHiddenRows: Set<number>;
+  private displayedHasView: boolean;
   private readonly transactionResourceLimits: Readonly<TransactionResourceLimits>;
   private readOnly: boolean;
   private maxElementHeight = MAX_ELEMENT_HEIGHT_FALLBACK;
@@ -437,7 +479,11 @@ export class GridImpl implements Grid {
   private zoom = 1;
   private baseTheme: Theme;
   private toolbar: Toolbar | null = null;
+  private ribbon: Ribbon | null = null;
+  /** Bumped whenever chrome is rebuilt, so a ribbon chunk that loads late is dropped. */
+  private chromeGeneration = 0;
   private findBar: FindBar | null = null;
+  private readonly notes: NotePopover;
   private readonly actionFeedback: ActionFeedback;
   private config: GridConfig | undefined;
   private readonly presentation: GridPresentation;
@@ -461,6 +507,8 @@ export class GridImpl implements Grid {
     "mutation-rejected": new Set(),
     "export-error": new Set(),
     "theme-change": new Set(),
+    "chart-select": new Set(),
+    "chart-activate": new Set(),
   };
 
   /** Which renderer actually constructed; set by `createRenderer`. */
@@ -477,6 +525,9 @@ export class GridImpl implements Grid {
   private readonly mutationRevisions = new MutationRevisionIndex();
   private destroyed = false;
   private storeEpoch = 0;
+  private windowContentRevision = 0;
+  private sourceSheet: SheetId | null = null;
+  private sheetHasSources = true;
   private autoFitGeneration = 0;
   private autoFitFrame = 0;
   private autoFitActive = false;
@@ -501,6 +552,14 @@ export class GridImpl implements Grid {
   };
   private readonly onScroll = () => this.scheduleRender();
   private readonly disposeStore: () => void;
+  private readonly objectLayer: ObjectLayer;
+  private readonly panelHost: HTMLDivElement;
+  /** Cleanup of the open side panel; `null` while no panel is open. */
+  private panelDispose: (() => void) | null = null;
+  /** The cell selection last emitted, to tell a real move from a re-emit. */
+  private lastSelectionKey = "";
+  /** Detaches the chart and pivot panel controller once its chunk has loaded. */
+  private disposePanels: (() => void) | null = null;
 
   constructor(
     host: HTMLElement,
@@ -560,6 +619,8 @@ export class GridImpl implements Grid {
           workbook.sheets.find((sheet) => (sheet.visibility ?? "visible") === "visible")?.id ??
           requestedActive);
     this.sessionSheets = workbook.sheets.map(({ id, visibility }) => ({ id, visibility }));
+    this.displayedHiddenRows = new Set(this.sheet().hiddenRows);
+    this.displayedHasView = this.loadable?.hasView(this.activeSheet) ?? false;
     this.theme = this.withAdaptiveGutter(
       this.baseTheme,
       workbook.sheets.find((sheet) => sheet.id === this.activeSheet)?.rowCount ?? 0,
@@ -628,6 +689,7 @@ export class GridImpl implements Grid {
         retainRevision: (revision) => this.mutationRevisions.retainRevision(revision),
         onRowsLoaded: () => {
           this.storeEpoch += 1;
+          this.windowContentRevision += 1;
           this.scheduleRender();
         },
         onError: (request, error) => {
@@ -709,10 +771,7 @@ export class GridImpl implements Grid {
     this.actionFeedback = attachActionFeedback(this, host);
 
     const config = this.config;
-    if (config && config.toolbar !== false) {
-      this.toolbar = new Toolbar(host, config, this.theme, this);
-      this.toolbarHeight = Toolbar.height;
-    }
+    this.createToolbar(config);
 
     if (config?.find !== false) {
       this.findBar = new FindBar(host, this.theme, this, this.readOnly);
@@ -730,6 +789,13 @@ export class GridImpl implements Grid {
     this.sizer.className = "sheetwrite-sizer";
     this.scroller.appendChild(this.sizer);
     this.viewportEl.appendChild(this.scroller);
+
+    // The side panel docks on the right edge, between the ribbon and the tab bar.
+    this.panelHost = document.createElement("div");
+    this.panelHost.className = "sheetwrite-panel-host";
+    this.panelHost.hidden = true;
+    this.panelHost.style.cssText = `position:absolute;right:0;width:${PANEL_WIDTH}px;top:${this.toolbarHeight}px;bottom:${this.tabBarHeight}px;`;
+    host.appendChild(this.panelHost);
 
     this.renderer = this.createRenderer(opts, this.viewportEl);
     this.renderer.setRenderers(this.customRenderers);
@@ -810,8 +876,39 @@ export class GridImpl implements Grid {
       pasteValues: () => void this.clipboard.pasteValues(),
       commit: (patches, reason) => this.document.commit(patches, reason),
       readOnly: () => this.readOnly,
+      onEditStart: () => this.notes.hideCard(),
     });
     this.interactions.configureMenu(config, this.theme);
+
+    this.notes = new NotePopover({
+      host,
+      scroller: this.scroller,
+      theme: this.baseTheme,
+      cellAt: (clientX, clientY) => {
+        // The row header column is not a cell, though hit-testing clamps it to the first one.
+        const left = this.viewportEl.getBoundingClientRect().left;
+        if (clientX - left < this.theme.rowHeaderWidth) return null;
+
+        const cell = this.interactions.cellAtPointer(clientX, clientY);
+        return cell ? this.noteCell(cell.row, cell.col) : null;
+      },
+      noteAt: (address) => this.getNote(address),
+      cellRect: (cell) => {
+        const viewport = this.viewportEl.getBoundingClientRect();
+        const rect = this.screenRect(
+          cell.row,
+          cell.col,
+          this.geometry.toContent(this.scroller.scrollTop),
+          this.scroller.scrollLeft,
+        );
+        const left = viewport.left + rect.x;
+        const top = viewport.top + rect.y;
+        return { left, top, right: left + rect.w, bottom: top + rect.h };
+      },
+      editorLabel: (cell) => `Note for ${this.columnHeader(cell.col)}, row ${cell.row + 1}`,
+      commit: (address, text) => this.setNote(address, text),
+      returnFocus: () => this.host.focus(),
+    });
 
     this.overlayPainter = new OverlayPainter(this.viewportEl, {
       theme: () => this.theme,
@@ -848,6 +945,37 @@ export class GridImpl implements Grid {
     this.domOverlay.setRenderers(this.customRenderers);
     this.domOverlay.setTheme(this.theme);
 
+    this.objectLayer = new ObjectLayer({
+      viewport: this.viewportEl,
+      scroller: this.scroller,
+      store: this.store,
+      geometry: this.geometry,
+      activeSheet: () => this.activeSheet,
+      charts: () => this.sheetById(this.activeSheet)?.charts ?? [],
+      theme: () => this.theme,
+      zoom: () => this.zoom,
+      readOnly: () => this.readOnly,
+      setChart: (chart) => this.setChart(chart, this.activeSheet),
+      removeChart: (id) => this.removeChart(id, this.activeSheet),
+      focusGrid: () => this.host.focus(),
+      onSelect: (chart) => {
+        for (const fn of this.listeners["chart-select"]) fn(chart);
+      },
+      onActivate: (chart) => {
+        for (const fn of this.listeners["chart-activate"]) fn(chart);
+      },
+      onContextMenu: (chart, clientX, clientY) =>
+        this.interactions.openMenu(this.chartMenuItems(chart), clientX, clientY),
+      isHistoryShortcut: (event) => {
+        const action = this.keymap.action(event);
+        return action === "undo" || action === "redo";
+      },
+    });
+    this.objectLayer.sync();
+    // The grid emits no selection at construction; start from the real one so
+    // the first re-emit (an undo, say) does not count as a move.
+    this.lastSelectionKey = JSON.stringify(this.getSelection());
+
     this.ariaMirror = new AriaMirror({
       host,
       scroller: this.scroller,
@@ -877,7 +1005,7 @@ export class GridImpl implements Grid {
       theme: () => this.theme,
       overscan: () => this.overscan,
       zoom: () => this.zoom,
-      storeEpoch: () => this.storeEpoch,
+      storeEpoch: () => this.windowContentRevision,
       viewportHeight: () => this.viewportH(),
       viewportWidth: () => this.viewportEl.clientWidth,
       datasourceColumnCount: () => this.sheetById(this.activeSheet)?.columns.length ?? 0,
@@ -896,7 +1024,14 @@ export class GridImpl implements Grid {
       if (this.autoFitActive) this.cancelAutoFit();
       this.mutationRevisions.record(event.transaction.patches, this.storeEpoch);
       this.activeSheetCache = null;
+      // Presence learned during this change describes the state after it, which
+      // cannot vouch for cells it just stopped computing (e.g. a removed spill).
+      const presenceKnown = this.sourceSheet === this.activeSheet;
+      const windowChanged = this.transactionAffectsWindow(event.transaction.patches);
+      if (windowChanged) this.windowContentRevision += 1;
+      let geometryChanged = false;
       let shouldRebuildRows = false;
+      let shouldReconcileView = false;
       let shouldRebuildColumns = false;
       let shouldApplyLayout = false;
       let sheetsChanged = false;
@@ -904,6 +1039,33 @@ export class GridImpl implements Grid {
       const sessionSheets = this.sessionSheets.map((sheet) => ({ ...sheet }));
       let sessionActive = this.activeSheet;
       for (const patch of event.transaction.patches) {
+        if ("sheet" in patch && patch.sheet === this.activeSheet) {
+          if (
+            patch.op !== "setValidationRule" &&
+            patch.op !== "removeValidationRule" &&
+            patch.op !== "setHyperlink" &&
+            patch.op !== "removeHyperlink" &&
+            patch.op !== "setProtectedRange" &&
+            patch.op !== "removeProtectedRange" &&
+            patch.op !== "setChart" &&
+            patch.op !== "removeChart"
+          ) {
+            geometryChanged = true;
+          }
+          if (
+            patch.op === "setSheetMeta" &&
+            (patch.patch.sortKeys !== undefined ||
+              patch.patch.filters !== undefined ||
+              patch.patch.rowGroups !== undefined)
+          ) {
+            shouldReconcileView = true;
+          } else if (patch.op === "setRowMeta") {
+            const hidden = this.sheet().hiddenRows?.has(patch.row) ?? false;
+            if (hidden !== this.displayedHiddenRows.has(patch.row)) shouldReconcileView = true;
+            if (hidden) this.displayedHiddenRows.add(patch.row);
+            else this.displayedHiddenRows.delete(patch.row);
+          }
+        }
         if (
           (patch.op === "addRows" ||
             patch.op === "removeRows" ||
@@ -914,26 +1076,36 @@ export class GridImpl implements Grid {
           patch.sheet === this.activeSheet
         ) {
           shouldResetDatasource = true;
+          // Structure edits can clear query state as well as shift columns/rows.
+          // Keep the previous view state: the store has already removed that query.
+          shouldReconcileView ||=
+            this.displayedHasView || (this.loadable?.hasView(this.activeSheet) ?? false);
         }
         if (
-          patch.op === "addRows" ||
-          patch.op === "removeRows" ||
-          patch.op === "moveRows" ||
-          (patch.op === "setRowMeta" && patch.sheet === this.activeSheet) ||
-          (patch.op === "setSheetMeta" && patch.patch.rowGroups !== undefined)
+          "sheet" in patch &&
+          patch.sheet === this.activeSheet &&
+          (patch.op === "addRows" ||
+            patch.op === "removeRows" ||
+            patch.op === "moveRows" ||
+            patch.op === "setRowMeta" ||
+            (patch.op === "setSheetMeta" && patch.patch.rowGroups !== undefined))
         ) {
           shouldRebuildRows = true;
         } else if (
-          patch.op === "addColumns" ||
-          patch.op === "removeColumns" ||
-          patch.op === "moveColumns" ||
-          (patch.op === "setColumn" &&
-            patch.sheet === this.activeSheet &&
-            ("width" in patch.patch || "visible" in patch.patch))
+          "sheet" in patch &&
+          patch.sheet === this.activeSheet &&
+          (patch.op === "addColumns" ||
+            patch.op === "removeColumns" ||
+            patch.op === "moveColumns" ||
+            (patch.op === "setColumn" && ("width" in patch.patch || "visible" in patch.patch)))
         ) {
           shouldRebuildColumns = true;
         }
-        if (patch.op === "addMerge" || patch.op === "removeMerge" || patch.op === "setSheetMeta") {
+        if (
+          "sheet" in patch &&
+          patch.sheet === this.activeSheet &&
+          (patch.op === "addMerge" || patch.op === "removeMerge" || patch.op === "setSheetMeta")
+        ) {
           shouldApplyLayout = true;
         }
         if (
@@ -984,22 +1156,53 @@ export class GridImpl implements Grid {
       }
       if (sessionActive !== this.activeSheet) this.setActiveSheet(sessionActive);
       this.sessionSheets = sheets.map(({ id, visibility }) => ({ id, visibility }));
+      this.displayedHasView = this.loadable?.hasView(this.activeSheet) ?? false;
       if (shouldResetDatasource) {
         this.datasourceController.reset(this.sheet().rowCount);
         this.mutationRevisions.clear();
+        this.displayedHiddenRows = new Set(this.sheet().hiddenRows);
       }
-      this.interactions.reconcile(
-        shouldResetDatasource
-          ? "structure"
-          : shouldRebuildRows || shouldRebuildColumns || shouldApplyLayout
-            ? "view"
-            : "value",
-      );
-      if (shouldRebuildRows) this.rebuildIndex();
+      const change = shouldResetDatasource
+        ? "structure"
+        : shouldReconcileView || shouldRebuildRows || shouldRebuildColumns || shouldApplyLayout
+          ? "view"
+          : "value";
+      this.interactions.reconcile(change);
+
+      // A note edit holds a data address that a structure change moves; geometry
+      // changes move the shown card away from its cell.
+      if (change === "structure") this.notes.dismiss();
+      else if (change === "view") this.notes.hideCard();
+
+      if (shouldRebuildRows || shouldReconcileView) this.rebuildIndex();
       if (shouldRebuildColumns) this.rebuildColumnIndex();
       if (shouldRebuildColumns || shouldApplyLayout) this.applyLayout();
+      if (geometryChanged) this.readWindows.invalidateData();
+      this.searchController.refreshAfterChange(
+        event.transaction.patches,
+        this.activeSheet,
+        presenceKnown && !this.sheetHasSources,
+      );
+      if (shouldReconcileView) {
+        // Selection uses view-row positions: remote/history permutations must reset
+        // it and scroll just like named actions, before change listeners run.
+        this.selection.clear();
+        this.selection.setBounds(this.geometry.rowCount, this.firstCol(), this.lastCol());
+        this.emitSelection();
+        this.scroller.scrollTop = 0;
+        this.readWindows.invalidateData();
+      }
       if (sheetsChanged) this.renderTabs();
-      this.ariaMirror.bumpVersion();
+      if (
+        event.transaction.patches.some(
+          (patch) => patch.op === "setNote" && patch.addr.sheet === this.activeSheet,
+        )
+      ) {
+        this.ariaMirror.bumpVersion();
+        this.notes.refresh();
+      }
+      // Chart edits, undo and sheet changes all arrive here.
+      this.objectLayer.sync();
       this.scheduleRender();
       for (const fn of this.listeners.change) fn(event);
       this.queueCommandStateChange();
@@ -1012,7 +1215,109 @@ export class GridImpl implements Grid {
       this.resizeObserver.observe(host);
     }
     this.armResolutionListener();
+    this.attachPanels();
     this.render();
+  }
+
+  /** Listen for first use without fetching the panel chunk on ordinary grids. */
+  private attachPanels(): void {
+    if (this.presentation !== "spreadsheet") return;
+    this.disposePanels = attachPanelTriggers(this, this.config?.icons);
+  }
+
+  private refreshSourcePresence(): void {
+    const engine = storeEngine(this.store);
+    this.sourceSheet = this.activeSheet;
+    if (!engine || engine.isPaged(this.activeSheet)) {
+      this.sheetHasSources = true;
+      return;
+    }
+    const sources = engine.captureSheetSources(this.activeSheet);
+    this.sheetHasSources =
+      !sources || sources.formulaOffsets.length > 0 || sources.referenceOffsets.length > 0;
+  }
+
+  private transactionAffectsWindow(patches: readonly DocumentOp[]): boolean {
+    // The handler runs before a removed or hidden active sheet is replaced, so
+    // the old sheet may be gone; the sheet switch repaints everything anyway.
+    const sheet = this.sheetById(this.activeSheet);
+    if (!sheet) return true;
+    // Presence is read after the first change on each sheet, so that change may
+    // have removed the last formula (and its spill); repaint it conservatively.
+    if (this.sourceSheet !== this.activeSheet) {
+      this.refreshSourcePresence();
+      return true;
+    }
+    let affectsWindow = false;
+    const engine = storeEngine(this.store);
+    // A source-free active sheet cannot receive computed values from another
+    // cell or sheet. Formula/ref presence is sticky until a sheet switch, so
+    // removing a spill anchor still refreshes its former children. Unknown
+    // stores, paged loads, conditional formats, validation and merge anchors
+    // stay conservative: their displayed result may depend on off-window data.
+    const dependentDisplay = Boolean(
+      this.sheetHasSources ||
+      !engine ||
+      engine.isPaged(this.activeSheet) ||
+      sheet.conditionalFormats?.length ||
+      sheet.validationRules?.length ||
+      sheet.merges?.length ||
+      sheet.pivots?.length,
+    );
+    let painted: PaintedCells | null = null;
+    for (const patch of patches) {
+      let range: Range | CellAddress;
+      switch (patch.op) {
+        case "set":
+          if (
+            patch.addr.sheet === this.activeSheet &&
+            (patch.value.kind === "formula" || patch.value.kind === "ref")
+          )
+            this.sheetHasSources = true;
+          range = patch.addr;
+          break;
+        case "setRange":
+          if (
+            patch.range.sheet === this.activeSheet &&
+            patch.cells.some((cell) => cell.value.kind === "formula" || cell.value.kind === "ref")
+          )
+            this.sheetHasSources = true;
+          range = patch.range;
+          break;
+        case "setBlock":
+          if (
+            patch.range.sheet === this.activeSheet &&
+            (patch.block.formulas?.length || patch.block.refs?.length)
+          )
+            this.sheetHasSources = true;
+          range = patch.range;
+          break;
+        case "restoreBlock":
+          if (patch.range.sheet === this.activeSheet) this.sheetHasSources = true;
+          range = patch.range;
+          break;
+        case "setRangeStyle":
+        case "clearRange":
+          range = patch.range;
+          break;
+        case "setNote":
+          continue;
+        default:
+          affectsWindow = true;
+          continue;
+      }
+      if (affectsWindow || dependentDisplay || this.sheetHasSources) {
+        affectsWindow = true;
+        continue;
+      }
+      // Large off-screen batches pay for one window snapshot, not one per patch.
+      painted ??= this.readWindows.paintedCells();
+      affectsWindow =
+        "start" in range
+          ? painted.intersects(range.sheet, range.start, range.end)
+          : painted.intersects(range.sheet, range, range);
+    }
+    return affectsWindow;
   }
 
   private createRenderer(opts: GridOptions, host: HTMLElement): Renderer {
@@ -1247,7 +1552,7 @@ export class GridImpl implements Grid {
       columns,
       rowHeight: this.theme.rowHeight,
       headerHeight: this.theme.headerHeight,
-      totalRows: sheet.rowCount,
+      totalRows: this.geometry.rowCount,
       zoom: this.zoom,
       merges: this.loadable?.hasView(this.activeSheet) ? [] : (sheet.merges ?? []),
 
@@ -1255,7 +1560,7 @@ export class GridImpl implements Grid {
     };
     this.renderer.setLayout(layout);
     this.domOverlay.setLayout(layout);
-    this.selection.setBounds(sheet.rowCount, this.firstCol(), this.lastCol());
+    this.selection.setBounds(this.geometry.rowCount, this.firstCol(), this.lastCol());
     this.syncSizer();
   }
 
@@ -1278,8 +1583,10 @@ export class GridImpl implements Grid {
   }
 
   private rebuildIndex(): void {
-    this.geometry.rebuildRows();
-    this.datasourceController.resize(this.geometry.rowCount);
+    this.geometry.rebuildRows(
+      this.loadable?.viewRowCount(this.activeSheet) ?? this.sheet().rowCount,
+    );
+    this.datasourceController.resize(this.sheet().rowCount);
     // Row-count changes can grow the row-number gutter (e.g. crossing 1M rows).
     const adjusted = this.withAdaptiveGutter(this.theme, this.sheet().rowCount);
     if (adjusted !== this.theme) {
@@ -1328,6 +1635,18 @@ export class GridImpl implements Grid {
 
   private repositionEditor(contentTop: number, scrollLeft: number): void {
     this.interactions.reposition(contentTop, scrollLeft);
+    this.notes.reposition();
+    this.objectLayer.place(contentTop, scrollLeft);
+  }
+
+  /** A view cell, resolved to its merge anchor, with the data address its note lives at. */
+  private noteCell(row: number, col: number): NoteCell {
+    const anchor = this.anchorCell(row, col);
+    return {
+      row: anchor.row,
+      col: anchor.col,
+      address: { sheet: this.activeSheet, row: this.toDataRow(anchor.row), col: anchor.col },
+    };
   }
 
   beginEdit(row: number, col: number, initial?: string, selectAll = false): void {
@@ -1396,10 +1715,17 @@ export class GridImpl implements Grid {
 
   private emitSelection(): void {
     this.ariaMirror.bumpVersion();
-    if (this.listeners.selection.size > 0) {
-      const selection = this.getSelection();
-      for (const listener of this.listeners.selection) listener({ selection });
+    const selection = this.getSelection();
+
+    // One thing is selected at a time: a new cell selection, by any route,
+    // deselects the chart. Undo re-emits an unchanged selection and must keep it.
+    const selectionKey = JSON.stringify(selection);
+    if (selectionKey !== this.lastSelectionKey) {
+      this.lastSelectionKey = selectionKey;
+      this.objectLayer.select(null);
     }
+
+    for (const listener of this.listeners.selection) listener({ selection });
     this.emitCommandStateChange();
   }
 
@@ -1572,7 +1898,12 @@ export class GridImpl implements Grid {
         const style = column.cellStyle ? { ...column.cellStyle, ...cellStyle } : cellStyle;
         context.font = fontFor(this.baseTheme, style);
         let width = widths[targetOffset + columnIndex]!;
-        for (const line of cellScalarToText(value).split("\n")) {
+        const text = cellDisplayText(
+          value,
+          style.numberFormat ?? column.numberFormat,
+          column.numberLocale,
+        );
+        for (const line of text.split("\n")) {
           width = Math.max(width, context.measureText(line).width + 12);
         }
         widths[targetOffset + columnIndex] = width;
@@ -1873,20 +2204,24 @@ export class GridImpl implements Grid {
       return;
 
     this.interactions.reconcile("sheet");
+    this.notes.dismiss();
     this.cancelAutoFit();
     this.domOverlay.reset();
     this.mutationRevisions.clear();
     this.activeSheet = id;
     this.activeSheetCache = null;
     const sheet = this.sheet();
+    this.displayedHiddenRows = new Set(sheet.hiddenRows);
+    this.displayedHasView = this.loadable?.hasView(id) ?? false;
 
     this.rebuildColumnIndex();
-    this.geometry.rebuildRows();
-    this.selection = new SelectionModel(sheet.rowCount, this.firstCol(), this.lastCol());
+    this.geometry.rebuildRows(this.loadable?.viewRowCount(id) ?? sheet.rowCount);
+    this.selection = new SelectionModel(this.geometry.rowCount, this.firstCol(), this.lastCol());
     this.datasourceController.reset(sheet.rowCount);
     this.scroller.scrollTop = 0;
     this.scroller.scrollLeft = 0;
 
+    this.objectLayer.sync();
     this.applyLayout();
     this.renderTabs();
     for (const fn of this.listeners["active-sheet"]) fn({ sheet: id });
@@ -2000,20 +2335,84 @@ export class GridImpl implements Grid {
   }
 
   /**
-   * The built-in toolbar, find bar, and context menu read their palette from
-   * custom properties seeded on the grid root when they are created. Seed them
-   * again from the new base theme so a theme switch (for example to dark)
-   * repaints the widgets too, not only the canvas.
+   * The built-in widgets (toolbar, find bar, context menu, note card) read
+   * their palette from custom properties seeded on the grid root when they are
+   * created. The note card always exists, so seed them again from the new base
+   * theme so a theme switch (for example to dark) repaints the widgets too, not
+   * only the canvas.
    */
   private reseedWidgetTheme(): void {
-    if (!this.toolbar && !this.findBar && this.config?.contextMenu === false) return;
     seedWidgetTheme(this.host, this.baseTheme);
+  }
+
+  private createToolbar(config: GridConfig | undefined): void {
+    this.chromeGeneration += 1;
+    if (!config || config.toolbar === false) return;
+    if (config.ribbon !== true || Array.isArray(config.toolbar)) {
+      this.toolbar = new Toolbar(this.host, config, this.baseTheme, this);
+      this.toolbarHeight = Toolbar.height;
+      return;
+    }
+
+    // The ribbon is opt-in and sizable, so it loads as its own chunk: grids
+    // without it never download it. Its height is reserved now, so the grid
+    // does not move when it arrives.
+    this.toolbarHeight = RIBBON_EXPANDED_HEIGHT;
+    const generation = this.chromeGeneration;
+    const current = () => generation === this.chromeGeneration && !this.destroyed;
+    void import("./ribbon/ribbon.js").then(
+      ({ Ribbon }) => {
+        if (current()) this.mountRibbon(Ribbon);
+      },
+      (error: unknown) => {
+        if (!current()) return;
+        // Keep the grid usable with the flat toolbar, and still report why.
+        this.toolbar = new Toolbar(this.host, config, this.baseTheme, this);
+        this.setToolbarHeight(Toolbar.height);
+        throw error;
+      },
+    );
+  }
+
+  private mountRibbon(RibbonClass: typeof Ribbon): void {
+    // The grid owns widget theming: seed now, reseed on every theme change.
+    seedWidgetTheme(this.host, this.baseTheme);
+    const icons = this.config?.icons;
+    const ribbon = new RibbonClass(this.host, this, {
+      onHeightChange: (height) => this.setToolbarHeight(height),
+      ...(icons === undefined ? {} : { icons }),
+    });
+
+    // Grid layout offsets the viewport by the ribbon's height, so chrome must leave normal flow.
+    const el = ribbon.element;
+    el.style.position = "absolute";
+    el.style.top = "0";
+    el.style.left = "0";
+    el.style.right = "0";
+    // First in the host, as in Excel: keyboard users reach the ribbon before
+    // the grid, whatever was mounted while its chunk loaded.
+    this.host.prepend(el);
+    this.ribbon = ribbon;
+    if (ribbon.height !== this.toolbarHeight) this.setToolbarHeight(ribbon.height);
+  }
+
+  private setToolbarHeight(height: number): void {
+    this.toolbarHeight = height;
+    this.viewportEl.style.top = `${height}px`;
+    this.panelHost.style.top = `${height}px`;
+    this.applyLayout();
+    this.render();
   }
 
   private emitThemeChange(): void {
     const listeners = this.listeners["theme-change"];
     if (listeners.size === 0) return;
-    for (const fn of listeners) fn({ theme: { ...this.baseTheme } });
+    for (const fn of listeners)
+      fn({
+        theme: {
+          ...this.baseTheme,
+        },
+      });
   }
 
   getEffectiveTheme(): Theme {
@@ -2028,6 +2427,7 @@ export class GridImpl implements Grid {
     if (readOnly) {
       this.cancelAutoFit();
       this.interactions.reconcile("read-only");
+      this.notes.dismiss();
     }
     if (readOnly) this.host.setAttribute("aria-readonly", "true");
     else this.host.removeAttribute("aria-readonly");
@@ -2038,6 +2438,8 @@ export class GridImpl implements Grid {
         ? null
         : new FindBar(this.host, this.baseTheme, this, this.readOnly);
     this.emitCommandStateChange();
+    // Object handles show only while the grid can be edited.
+    this.scheduleRender();
   }
 
   setConfig(config: GridConfig | undefined): void {
@@ -2064,12 +2466,11 @@ export class GridImpl implements Grid {
       typeof keyboard === "function" ? (event: KeyboardEvent) => keyboard(event, this) : keyboard;
 
     this.toolbar?.destroy();
+    this.ribbon?.destroy();
+    this.ribbon = null;
     this.toolbar = null;
     this.toolbarHeight = 0;
-    if (config && config.toolbar !== false) {
-      this.toolbar = new Toolbar(this.host, config, this.baseTheme, this);
-      this.toolbarHeight = Toolbar.height;
-    }
+    this.createToolbar(config);
 
     this.interactions.configureMenu(config, this.baseTheme);
 
@@ -2086,6 +2487,8 @@ export class GridImpl implements Grid {
 
     this.viewportEl.style.top = `${this.toolbarHeight}px`;
     this.viewportEl.style.bottom = `${this.tabBarHeight}px`;
+    this.panelHost.style.top = `${this.toolbarHeight}px`;
+    this.panelHost.style.bottom = `${this.tabBarHeight}px`;
     this.applyLayout();
     this.render();
     this.emitCommandStateChange();
@@ -2141,6 +2544,7 @@ export class GridImpl implements Grid {
     if (next === this.zoom) return;
     this.zoom = next;
     this.applyZoomedTheme();
+    this.notes.hideCard();
   }
 
   getZoom(): number {
@@ -2405,6 +2809,117 @@ export class GridImpl implements Grid {
     );
   }
 
+  getPivots(sheet?: SheetId): PivotDefinition[] {
+    return clonePivots(this.store.getWorkbook().sheets, sheet);
+  }
+
+  setPivot(pivot: PivotDefinition, sheet?: SheetId): ApplyTransactionResult {
+    const owner = sheet ?? pivotOwner(this.store.getWorkbook().sheets, pivot.id)?.id;
+    // Saved values do not match a definition the caller changed.
+    const changed = withoutSavedOutput(structuredClone(pivot));
+    return this.document.commit(
+      [{ op: "setPivot", sheet: owner ?? this.activeSheet, pivot: changed }],
+      "api",
+    );
+  }
+
+  removePivot(id: string, sheet?: SheetId): ApplyTransactionResult {
+    const owner = sheet ?? pivotOwner(this.store.getWorkbook().sheets, id)?.id ?? this.activeSheet;
+    return this.document.commit([{ op: "removePivot", sheet: owner, id }], "api");
+  }
+
+  getPivotFields(sheet: SheetId, id: string): PivotSourceField[] {
+    return storeEngine(this.store)?.getPivotFields(sheet, id) ?? [];
+  }
+
+  getPivotResult(sheet: SheetId, id: string): PivotResultView | null {
+    const engine = storeEngine(this.store);
+    if (engine) return engine.getPivotResult(sheet, id);
+
+    // A custom store has no pivot engine; its definitions still read normally.
+    const pivot = this.store
+      .getWorkbook()
+      .sheets.find((candidate) => candidate.id === sheet)
+      ?.pivots?.find((candidate) => candidate.id === id);
+    return pivot ? uncomputedPivotResult(sheet, pivot) : null;
+  }
+
+  getCharts(sheet: SheetId = this.activeSheet): readonly ChartDefinition[] {
+    return structuredClone(this.sheetById(sheet)?.charts ?? []);
+  }
+
+  setChart(chart: ChartDefinition, sheet: SheetId = this.activeSheet): ApplyTransactionResult {
+    return this.document.commit([{ op: "setChart", sheet, chart: structuredClone(chart) }], "api");
+  }
+
+  removeChart(id: string, sheet?: SheetId): ApplyTransactionResult {
+    const owner =
+      sheet ??
+      this.store
+        .getWorkbook()
+        .sheets.find((candidate) => candidate.charts?.some((chart) => chart.id === id))?.id ??
+      this.activeSheet;
+    return this.document.commit([{ op: "removeChart", sheet: owner, id }], "api");
+  }
+
+  selectChart(id: string | null, sheet: SheetId = this.activeSheet): void {
+    if (id !== null && sheet !== this.activeSheet) this.setActiveSheet(sheet);
+    // Charts on other sheets are never selected, so there is nothing to deselect there.
+    if (sheet === this.activeSheet) this.objectLayer.select(id);
+  }
+
+  /**
+   * A chart's right-click menu. Edit chart does what Enter does; a read-only
+   * grid can open the chart's panel but not delete the chart.
+   */
+  private chartMenuItems(chart: ChartRef): ContextMenuItem[] {
+    return [
+      {
+        id: "editChart",
+        label: "Edit chart",
+        icon: "chart",
+        onClick: () => {
+          for (const fn of this.listeners["chart-activate"]) fn(chart);
+        },
+      },
+      { action: "separator" },
+      {
+        id: "deleteChart",
+        label: "Delete chart",
+        icon: "delete",
+        visible: () => !this.readOnly,
+        onClick: () => {
+          this.removeChart(chart.id, chart.sheet);
+          // The menu would hand focus back to the chart it opened on, which no
+          // longer exists; whether its frame is gone yet depends on timing.
+          // Focus the grid so Ctrl+Z, arrows and typing keep working.
+          this.host.focus({ preventScroll: true });
+        },
+      },
+    ];
+  }
+
+  openPanel(panel: GridPanel | null): void {
+    const wasOpen = this.panelDispose !== null;
+    const hadFocus = this.panelHost.contains(document.activeElement);
+    this.panelDispose?.();
+    this.panelDispose = null;
+
+    const isOpen = panel !== null;
+    // The panel focuses its first control while it mounts; a hidden host refuses focus.
+    this.panelHost.hidden = !isOpen;
+    if (panel) {
+      this.panelDispose = mountSidePanel(this.panelHost, panel, () => this.openPanel(null));
+    }
+    if (isOpen !== wasOpen) {
+      this.viewportEl.style.right = isOpen ? `${PANEL_WIDTH}px` : "0px";
+      this.syncSizer();
+      this.render();
+    }
+    // Escape and the close button leave focus in a removed panel; give it back to the grid.
+    if (!isOpen && hadFocus) this.host.focus();
+  }
+
   setProtectionResolver(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void {
     this.store.setProtectionResolver?.(resolver, mode);
   }
@@ -2437,11 +2952,31 @@ export class GridImpl implements Grid {
   }
 
   private materializeVirtualColumns(patches: DocumentOp[]): DocumentOp[] {
-    const maxColumnBySheet = new Map<SheetId, number>();
+    // A write is measured against the width its sheet has when it runs, so
+    // column inserts and deletes earlier in the batch count. Undoing a
+    // trailing column delete restores cells right after re-adding the columns.
+    const widthBySheet = new Map<SheetId, number>();
+    const missingBySheet = new Map<SheetId, number>();
+    const widthOf = (sheetId: SheetId): number | null => {
+      const width = widthBySheet.get(sheetId);
+      if (width !== undefined) return width;
+
+      const stored = this.store.getWorkbook().sheets.find((sheet) => sheet.id === sheetId);
+      if (!stored) return null;
+      widthBySheet.set(sheetId, stored.columns.length);
+      return stored.columns.length;
+    };
+
     for (const patch of patches) {
       let sheet: SheetId | null = null;
       let col = -1;
-      if (patch.op === "set") {
+      if (patch.op === "addColumns" || patch.op === "removeColumns") {
+        const width = widthOf(patch.sheet);
+        if (width !== null) {
+          const delta = patch.op === "addColumns" ? patch.columns.length : -patch.count;
+          widthBySheet.set(patch.sheet, width + delta);
+        }
+      } else if (patch.op === "set") {
         sheet = patch.addr.sheet;
         col = patch.addr.col;
       } else if (
@@ -2460,18 +2995,20 @@ export class GridImpl implements Grid {
         sheet = patch.sheet;
         col = Math.max(patch.merge.c0, patch.merge.c1);
       }
-      if (sheet !== null) {
-        maxColumnBySheet.set(sheet, Math.max(maxColumnBySheet.get(sheet) ?? -1, col));
-      }
+      if (sheet === null) continue;
+
+      const width = widthOf(sheet);
+      if (width === null) continue;
+      missingBySheet.set(sheet, Math.max(missingBySheet.get(sheet) ?? 0, col + 1 - width));
     }
 
     const additions: DocumentOp[] = [];
-    for (const [sheetId, maxColumn] of maxColumnBySheet) {
+    for (const [sheetId, missing] of missingBySheet) {
       const stored = this.store.getWorkbook().sheets.find((sheet) => sheet.id === sheetId);
-      if (!stored || maxColumn < stored.columns.length) continue;
+      if (!stored || missing <= 0) continue;
       const used = new Set(stored.columns.map((column) => column.key));
       const columns: Column[] = [];
-      for (let col = stored.columns.length; col <= maxColumn; col++) {
+      for (let col = stored.columns.length; col < stored.columns.length + missing; col++) {
         const base = `col_${col}`;
         let key = base;
         let suffix = 1;
@@ -2491,8 +3028,51 @@ export class GridImpl implements Grid {
       toggleUnderline: () => this.styleActions.toggleStyle("underline"),
       toggleStrikethrough: () => this.styleActions.toggleStyle("strikethrough"),
       setAlign: (align) => this.styleActions.applyStyle({ align }),
-      setTextColor: (color) => this.styleActions.applyStyle({ color }),
-      setFillColor: (color) => this.styleActions.applyStyle({ backgroundColor: color }),
+      setTextColor: (color) => this.styleActions.applyStyle({ color: color ?? undefined }),
+      setFillColor: (color) =>
+        this.styleActions.applyStyle({ backgroundColor: color ?? undefined }),
+      setFontFamily: (family) => this.styleActions.applyStyle({ fontFamily: family ?? undefined }),
+      setFontSize: (px) => this.styleActions.applyStyle({ fontSize: px ?? undefined }),
+      stepFontSize: (direction) => {
+        const defaultFontSize = 13;
+        const themeFontSize =
+          Number.parseFloat(/(\d+(?:\.\d+)?)px/.exec(this.baseTheme.font)?.[1] ?? "") ||
+          defaultFontSize;
+        this.styleActions.applyStyle({
+          fontSize: stepFontSizePx(this.getFocusCellStyle().fontSize ?? themeFontSize, direction),
+        });
+      },
+      setVerticalAlign: (verticalAlign) => this.styleActions.applyStyle({ verticalAlign }),
+      toggleWrap: () => this.styleActions.applyStyle({ wrap: !this.getFocusCellStyle().wrap }),
+      setNumberFormat: (code) => this.styleActions.applyStyle({ numberFormat: code ?? undefined }),
+      stepDecimals: (direction) => {
+        const focus = this.selection.focusCell;
+        if (!focus) return;
+        const column = this.sheet().columns[focus.col];
+        const value = this.store.getCell({
+          sheet: this.activeSheet,
+          row: this.toDataRow(focus.row),
+          col: focus.col,
+        }).resolved;
+        const numberFormat = stepNumberFormatDecimals(
+          this.getFocusCellStyle().numberFormat ?? column?.numberFormat,
+          direction,
+          typeof value === "number" ? value : undefined,
+          column?.numberLocale,
+        );
+        if (numberFormat === undefined) return;
+
+        this.styleActions.applyStyle({ numberFormat });
+      },
+      setBorders: (preset) => this.styleActions.setBorders(preset),
+      mergeAndCenter: () => this.styleActions.mergeSelection(true),
+      clearAll: () => this.styleActions.clearAll(),
+      autoSum: () => this.autoSum(),
+      find: () => this.findBar?.open(),
+      freezePanes: () => {
+        const focus = this.selection.focusCell;
+        if (focus) this.setFrozen(focus.row, focus.col);
+      },
       toggleBorder: () => this.styleActions.toggleBorder(),
       clearFormat: () => this.styleActions.applyStyle(null),
       merge: () => this.styleActions.mergeSelection(),
@@ -2566,9 +3146,174 @@ export class GridImpl implements Grid {
         this.exportXlsx(filename ?? "sheetwrite.xlsx").catch((error: unknown) => {
           this.emitExportError(error, "xlsx");
         }),
+      editNote: () => {
+        // Same gate as the cell editor: do not open an editor whose save must fail.
+        const focus = this.selection.focusCell;
+        if (this.readOnly || !focus) return;
+
+        const cell = this.noteCell(focus.row, focus.col);
+        this.scrollToCell({ sheet: this.activeSheet, row: cell.row, col: cell.col });
+        this.notes.edit(cell);
+      },
+      deleteNote: () => {
+        const focus = this.selection.focusCell;
+        if (this.readOnly || !focus) return;
+
+        const { address } = this.noteCell(focus.row, focus.col);
+        if (this.getNote(address) !== null) this.setNote(address, null);
+      },
+      showPivotFields: () => {
+        // The field list edits the pivot, so a read-only grid does not open it.
+        if (this.readOnly) return;
+
+        showPivotFields(this);
+      },
       undo: () => this.undo(),
       redo: () => this.redo(),
     };
+  }
+
+  getFocusCellStyle(): CellStyle {
+    const focus = this.selection.focusCell;
+    if (!focus) return {};
+    const anchor = this.anchorCell(focus.row, focus.col);
+    const cell = this.store.getCell({
+      sheet: this.activeSheet,
+      row: this.toDataRow(anchor.row),
+      col: anchor.col,
+    });
+    return { ...this.sheet().columns[anchor.col]?.cellStyle, ...cell.style };
+  }
+
+  async summarizeSelection(signal?: AbortSignal): Promise<SelectionSummary | null> {
+    signal?.throwIfAborted();
+    if (this.selection.isEmpty) return null;
+
+    // The selection and the active sheet can change while chunks yield, so
+    // the whole run works from a copy of both.
+    const rects: SelRect[] = [];
+    this.selection.forEachRect((rect) => rects.push({ ...rect }));
+    const sheet = this.activeSheet;
+    const columnCount = this.sheet().columns.length;
+
+    let count = 0;
+    let numericCount = 0;
+    let sum = 0;
+    let min = Infinity;
+    let max = -Infinity;
+    let readSinceYield = 0;
+
+    for (const rect of rects) {
+      // Whole-row selections extend past the last column; nothing lives there.
+      const lastCol = Math.min(rect.c1, columnCount - 1);
+      if (lastCol < rect.c0) continue;
+
+      const cols: number[] = [];
+      for (let col = rect.c0; col <= lastCol; col++) cols.push(col);
+      const rowsPerRead = Math.max(1, Math.floor(SUMMARY_CELLS_PER_READ / cols.length));
+
+      for (let start = rect.r0; start <= rect.r1; start += rowsPerRead) {
+        // Small selections finish in one turn. Larger ones give the page a
+        // turn after each frame's worth of reading, then stop if aborted.
+        if (readSinceYield >= SUMMARY_CELLS_PER_READ) {
+          readSinceYield = 0;
+          const pause = Promise.withResolvers<void>();
+          setTimeout(pause.resolve, 0);
+          await pause.promise;
+          signal?.throwIfAborted();
+        }
+
+        // View rows: the store maps them through sort and filter, so rows a
+        // filter hides are never read, as in Excel's status bar.
+        const end = Math.min(rect.r1 + 1, start + rowsPerRead);
+        const { values } = this.store.getVisibleWindow(sheet, { start, end }, cols);
+        readSinceYield += values.length;
+
+        // Tallied inline: a helper call per cell would cost millions of calls
+        // on a whole-sheet selection.
+        for (let index = 0; index < values.length; index++) {
+          const value = values[index];
+          if (value === null || value === undefined || value === "") continue;
+          count += 1;
+
+          if (typeof value !== "number") continue;
+          numericCount += 1;
+          sum += value;
+          if (value < min) min = value;
+          if (value > max) max = value;
+        }
+      }
+    }
+
+    const hasNumbers = numericCount > 0;
+    return {
+      count,
+      numericCount,
+      sum,
+      average: hasNumbers ? sum / numericCount : null,
+      min: hasNumbers ? min : null,
+      max: hasNumbers ? max : null,
+    };
+  }
+
+  private autoSum(): void {
+    const focus = this.selection.focusCell;
+    if (this.readOnly || !focus) return;
+    const row = this.toDataRow(focus.row);
+    const col = focus.col;
+    const chunkCells = 4_096;
+    const numericStart = (vertical: boolean): number => {
+      let end = vertical ? row : col;
+      const origin = end;
+      while (end > 0) {
+        const start = Math.max(0, end - chunkCells);
+        const columns = vertical
+          ? [col]
+          : Array.from({ length: end - start }, (_, index) => start + index);
+        const window = this.store.getDataWindow?.(
+          this.activeSheet,
+          vertical ? { start, end } : { start: row, end: row + 1 },
+          columns,
+        );
+        let values: ArrayLike<CellScalar>;
+        if (window) values = window.values;
+        else {
+          const coordinates =
+            columns.length === 1 && vertical
+              ? Array.from({ length: end - start }, (_, index) => ({ row: start + index, col }))
+              : columns.map((column) => ({ row, col: column }));
+          const engine = storeEngine(this.store);
+          // Custom stores without canonical windows retain their scalar data-address contract.
+          const cells = engine
+            ? engine.captureResolvedCells(this.activeSheet, coordinates)
+            : coordinates.map((coordinate) =>
+                this.store.getCell({ sheet: this.activeSheet, ...coordinate }),
+              );
+          values = cells.map((cell) => cell.resolved);
+        }
+        for (let index = values.length - 1; index >= 0; index--) {
+          if (typeof values[index] !== "number") return start + index + 1;
+        }
+        end = start;
+      }
+      return origin === 0 ? origin : end;
+    };
+    const firstRow = numericStart(true);
+    const vertical = firstRow < row;
+    const firstCol = vertical ? col : numericStart(false);
+    if (!vertical && firstCol === col) return;
+    const start = `${colToA1(firstCol)}${(vertical ? firstRow : row) + 1}`;
+    const end = `${colToA1(vertical ? col : col - 1)}${(vertical ? row - 1 : row) + 1}`;
+    this.document.commit(
+      [
+        {
+          op: "set",
+          addr: { sheet: this.activeSheet, row, col },
+          value: { kind: "formula", src: `=SUM(${start}:${end})` },
+        },
+      ],
+      "edit-enter",
+    );
   }
 
   getCommandState(command: GridCommandName): GridCommandState {
@@ -2713,7 +3458,7 @@ export class GridImpl implements Grid {
   }
 
   clearView(): void {
-    const outcome = this.document.commit(
+    this.document.commit(
       [
         {
           op: "setSheetMeta",
@@ -2723,7 +3468,6 @@ export class GridImpl implements Grid {
       ],
       "structure",
     );
-    if (outcome.status === "applied") this.applyView();
   }
 
   sortByMulti(keys: readonly SortKey[]): void {
@@ -2741,7 +3485,6 @@ export class GridImpl implements Grid {
       ],
       "structure",
     );
-    if (outcome.status === "applied") this.applyView();
     return outcome;
   }
 
@@ -2749,7 +3492,7 @@ export class GridImpl implements Grid {
     const filters = new Map(this.sheet().filters ?? []);
     if (filter === null) filters.delete(col);
     else filters.set(col, structuredClone(filter));
-    const outcome = this.document.commit(
+    this.document.commit(
       [
         {
           op: "setSheetMeta",
@@ -2759,7 +3502,6 @@ export class GridImpl implements Grid {
       ],
       "structure",
     );
-    if (outcome.status === "applied") this.applyView();
   }
 
   getColumnFilters(): ReadonlyMap<number, ColumnFilter> {
@@ -2783,7 +3525,6 @@ export class GridImpl implements Grid {
       });
     }
     this.document.commit(patches, "structure");
-    this.applyView();
   }
 
   showRows(rows?: readonly number[]): void {
@@ -2800,7 +3541,6 @@ export class GridImpl implements Grid {
       });
     }
     this.document.commit(patches, "structure");
-    this.applyView();
   }
 
   hiddenRows(): readonly number[] {
@@ -2850,7 +3590,6 @@ export class GridImpl implements Grid {
       [{ op: "setSheetMeta", sheet: this.activeSheet, patch: { rowGroups: groups } }],
       "structure",
     );
-    this.applyView();
   }
 
   ungroupRows(start: number, end: number): void {
@@ -2859,7 +3598,6 @@ export class GridImpl implements Grid {
       [{ op: "setSheetMeta", sheet: this.activeSheet, patch: { rowGroups: groups } }],
       "structure",
     );
-    this.applyView();
   }
 
   setGroupCollapsed(start: number, collapsed: boolean): void {
@@ -2868,7 +3606,6 @@ export class GridImpl implements Grid {
       [{ op: "setSheetMeta", sheet: this.activeSheet, patch: { rowGroups: groups } }],
       "structure",
     );
-    this.applyView();
   }
 
   rowGroups(): readonly RowGroup[] {
@@ -2928,24 +3665,6 @@ export class GridImpl implements Grid {
     );
   }
 
-  private applyView(): void {
-    const count = this.loadable
-      ? this.loadable.viewRowCount(this.activeSheet)
-      : this.sheet().rowCount;
-    this.interactions.reconcile("view");
-    this.geometry.rebuildRows(count);
-    this.selection.clear();
-    this.selection.setBounds(count, this.firstCol(), this.lastCol());
-    this.emitSelection();
-    this.scroller.scrollTop = 0;
-    // The view permutation lives outside the store, so it must invalidate the
-    // data signature itself — a view change with an identical window/scroll
-    // (e.g. sorting while already at the top) would otherwise reuse stale rows.
-    this.readWindows.invalidateData();
-    this.syncSizer();
-    this.render();
-  }
-
   /**
    * A resolution query stops being useful after it changes, so replace it with
    * one matching the current display. This catches DPR-only changes that do not
@@ -2974,6 +3693,8 @@ export class GridImpl implements Grid {
     this.mutationRevisions.clear();
     this.readWindows.destroy();
     this.interactions.destroy();
+    this.notes.destroy();
+    this.objectLayer.destroy();
     this.scroller.removeEventListener("scroll", this.onScroll);
     this.resizeObserver?.disconnect();
     this.resolutionMediaQuery?.removeEventListener("change", this.onResolutionChange);
@@ -3002,8 +3723,12 @@ export class GridImpl implements Grid {
     cleanup(() => this.sheetTabs?.destroy());
     cleanup(() => this.tabBar?.remove());
     cleanup(() => this.toolbar?.destroy());
+    cleanup(() => this.ribbon?.destroy());
     cleanup(() => this.findBar?.destroy());
     cleanup(() => this.actionFeedback.destroy());
+    cleanup(() => this.panelDispose?.());
+    cleanup(() => this.disposePanels?.());
+    cleanup(() => this.panelHost.remove());
     cleanup(() => this.viewportEl.remove());
     cleanup(() => this.ariaMirror.destroy());
     cleanup(() => this.host.classList.remove("sheetwrite"));

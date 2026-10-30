@@ -1,6 +1,6 @@
 ---
 title: "WorkbookTableStyle | @sheetwrite/core"
-description: "Bounded native subset of ECMA-376 table style information."
+description: "WorkbookTableStyle interface in @sheetwrite/core: Bounded native subset of ECMA-376 table style information."
 ---
 <!-- api-export:@sheetwrite/core|.|WorkbookTableStyle -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -8,7 +8,7 @@ description: "Bounded native subset of ECMA-376 table style information."
 Bounded native subset of ECMA-376 table style information.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/table.ts#L16"><code>packages/core/src/types/table.ts#L16</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/table.ts#L51"><code>packages/core/src/types/table.ts#L51</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>
@@ -85,6 +85,7 @@ export interface WorkbookTableStyle {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

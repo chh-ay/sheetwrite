@@ -1,13 +1,13 @@
 ---
 title: "SheetwriteGrid | @sheetwrite/react"
-description: "Advanced framework component with inferred row-bridge identity."
+description: "SheetwriteGrid variable in @sheetwrite/react: Advanced framework component with inferred row-bridge identity."
 ---
 <!-- api-export:@sheetwrite/react|.|SheetwriteGrid -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/react/">@sheetwrite/react</a><span class="api-status" data-kind="variable">variable</span></div>
 
 Advanced framework component with inferred row-bridge identity.
 
-### Examples
+## Examples
 
 ```tsx compile
 import { SheetwriteGrid } from "@sheetwrite/react";
@@ -18,7 +18,7 @@ export function WorkbookView({ workbook }: { workbook: Workbook }) {
 }
 ```
 
-### See also
+## See also
 
 - [Sheetwrite](/docs/api/react/sheetwrite/)
 - [/docs/frameworks/react/](/docs/frameworks/react/)

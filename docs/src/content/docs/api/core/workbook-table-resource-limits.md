@@ -1,6 +1,6 @@
 ---
 title: "WorkbookTableResourceLimits | @sheetwrite/core"
-description: "Resource ceilings for canonical workbook-table metadata and identifiers."
+description: "WorkbookTableResourceLimits interface in @sheetwrite/core: Resource ceilings for canonical workbook-table metadata and identifiers."
 ---
 <!-- api-export:@sheetwrite/core|.|WorkbookTableResourceLimits -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -8,7 +8,7 @@ description: "Resource ceilings for canonical workbook-table metadata and identi
 Resource ceilings for canonical workbook-table metadata and identifiers.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/workbook-table.ts#L11"><code>packages/core/src/workbook-table.ts#L11</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/workbook-table.ts#L14"><code>packages/core/src/workbook-table.ts#L14</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>6</span>
@@ -95,6 +95,7 @@ export interface WorkbookTableResourceLimits {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

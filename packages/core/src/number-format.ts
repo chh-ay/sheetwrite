@@ -527,12 +527,17 @@ function formatScientific(value: number, decimals: number, exponentDigits: numbe
   return `${mantissa}E${sign}${String(Math.abs(exponent)).padStart(exponentDigits, "0")}`;
 }
 
+/** Excel's explicit "no format" code; a cell can carry it to opt out of its column's format. */
+const GENERAL_CODE_RE = /^general$/i;
+
 /**
  * Deterministic Excel-style number/date formatter. Supports explicit locale
  * separators, percent/scientific notation, UTC date/time tokens, four-section
  * positive/negative/zero/text codes, quoted literals, and backslash escapes.
+ * `General` formats exactly like an omitted code.
  */
-export function formatNumber(value: number | string, code?: string, locale = "en-US"): string {
+export function formatNumber(value: number | string, format?: string, locale = "en-US"): string {
+  const code = format !== undefined && GENERAL_CODE_RE.test(format) ? undefined : format;
   if (typeof value === "string") {
     if (!code) return value;
     const textSection = compileFormat(code).sections[3];

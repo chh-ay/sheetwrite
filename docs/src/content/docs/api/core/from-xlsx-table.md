@@ -1,6 +1,6 @@
 ---
 title: "fromXlsxTable | @sheetwrite/core"
-description: "Parse the first sheet of .xlsx bytes into ColumnarData."
+description: "fromXlsxTable function in @sheetwrite/core: Parse the first sheet of .xlsx bytes into ColumnarData."
 ---
 <!-- api-export:@sheetwrite/core|.|fromXlsxTable -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
@@ -10,7 +10,7 @@ row is treated as the header and its cell text becomes each column's key.
 Numbers stay numbers, date cells use the date-serial convention, strings are
 verbatim, and empty cells become `null`.
 
-### Examples
+## Examples
 
 ```ts compile
 import { registerXlsxBackends } from "@sheetwrite/xlsx";
@@ -22,12 +22,12 @@ async function openTable(file: File) {
 }
 ```
 
-### See also
+## See also
 
 - [toXlsxTable](/docs/api/core/to-xlsx-table/)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L416"><code>packages/core/src/export.ts#L416</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L508"><code>packages/core/src/export.ts#L508</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -50,6 +50,7 @@ function fromXlsxTable(
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

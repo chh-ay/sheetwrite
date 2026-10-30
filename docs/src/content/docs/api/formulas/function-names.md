@@ -1,6 +1,6 @@
 ---
 title: "functionNames | @sheetwrite/formulas"
-description: "Names accepted by the full engine, including aliases."
+description: "functionNames function in @sheetwrite/formulas: Names accepted by the full engine, including aliases."
 ---
 <!-- api-export:@sheetwrite/formulas|.|functionNames -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/formulas/">@sheetwrite/formulas</a><span class="api-status" data-kind="function">function</span></div>
@@ -8,7 +8,7 @@ description: "Names accepted by the full engine, including aliases."
 Names accepted by the full engine, including aliases.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/pkg/sheetwrite_wasm.d.ts#L496"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L496</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/pkg/sheetwrite_wasm.d.ts#L529"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L529</code></a></dd></div>
 </dl>
 
 ## Declaration

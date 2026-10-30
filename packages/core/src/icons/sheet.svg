@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="576" height="576" viewBox="0 0 576 576" fill="none" stroke="#000" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+  <g id="undo" transform="translate(0 0)"><path d="M9 6 4.5 10.5 9 15"/><path d="M4.5 10.5H14a5 5 0 0 1 0 10h-3"/></g>
+  <g id="redo" transform="translate(36 0)"><path d="M15 6l4.5 4.5L15 15"/><path d="M19.5 10.5H10a5 5 0 0 0 0 10h3"/></g>
+  <g id="paste" transform="translate(72 0)"><path d="M9 4.5H6.5A1.5 1.5 0 0 0 5 6v13.5A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H15"/><path d="M9.5 3h5a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.5.5h-5a.5.5 0 0 1-.5-.5v-2a.5.5 0 0 1 .5-.5Z"/><path d="M8.5 11h7M8.5 14.5h7M8.5 18h4"/></g>
+  <g id="cut" transform="translate(108 0)"><path d="M9 17.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Z"/><path d="M20 17.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Z"/><path d="M8 15.4 16.5 3.5"/><path d="M16 15.4 7.5 3.5"/></g>
+  <g id="copy" transform="translate(144 0)"><path d="M9.5 8h9A1.5 1.5 0 0 1 20 9.5v10a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 8 19.5v-10A1.5 1.5 0 0 1 9.5 8Z"/><path d="M16 5.5v-1A1.5 1.5 0 0 0 14.5 3h-9A1.5 1.5 0 0 0 4 4.5v10A1.5 1.5 0 0 0 5.5 16H8"/></g>
+  <g id="find" transform="translate(180 0)"><path d="M16.5 10.5a6 6 0 1 1-12 0 6 6 0 0 1 12 0Z"/><path d="m15 15 5.5 5.5"/></g>
+  <g id="zoomIn" transform="translate(216 0)"><path d="M16.5 10.5a6 6 0 1 1-12 0 6 6 0 0 1 12 0Z"/><path d="m15 15 5.5 5.5"/><path d="M7.5 10.5h6M10.5 7.5v6"/></g>
+  <g id="zoomOut" transform="translate(252 0)"><path d="M16.5 10.5a6 6 0 1 1-12 0 6 6 0 0 1 12 0Z"/><path d="m15 15 5.5 5.5"/><path d="M7.5 10.5h6"/></g>
+  <g id="autoSum" transform="translate(288 0)"><path d="M18 5H6l6.5 7L6 19h12"/></g>
+  <g id="clear" transform="translate(324 0)"><path d="M4 15.5a1.5 1.5 0 0 1 0-2.1L8.5 9l6.5 6.5-4.4 4.5H8.5Z" fill="#000" fill-opacity="0.24" stroke="none"/><path d="M8.5 20 4 15.5a1.5 1.5 0 0 1 0-2.1L12.9 4.5a1.5 1.5 0 0 1 2.1 0l4.5 4.5a1.5 1.5 0 0 1 0 2.1L10.6 20Z"/><path d="M8.5 20H20"/><path d="M8.5 9 15 15.5"/></g>
+  <g id="bold" transform="translate(0 36)"><path d="M7 4.5h6.25a3.75 3.75 0 0 1 0 7.5H7Z" stroke-width="2.6"/><path d="M7 12h7.25a3.75 3.75 0 0 1 0 7.5H7Z" stroke-width="2.6"/></g>
+  <g id="italic" transform="translate(36 36)"><path d="M10 4.5h8M6 19.5h8M14 4.5l-4 15"/></g>
+  <g id="underline" transform="translate(72 36)"><path d="M7 4v6.5a5 5 0 0 0 10 0V4"/><path d="M5 20.5h14"/></g>
+  <g id="strikethrough" transform="translate(108 36)"><path d="M4 12h16"/><path d="M16.5 7.5C15.9 5.7 14.1 4.5 12 4.5c-2.6 0-4.5 1.6-4.5 3.6 0 1.4.9 2.4 2.5 3"/><path d="M8 16.5c.6 1.8 2.4 3 4.5 3 2.6 0 4.5-1.6 4.5-3.6 0-.6-.1-1.1-.4-1.6"/></g>
+  <g id="textColor" transform="translate(144 36)"><path d="M6.5 17 12 4l5.5 13"/><path d="M8.4 12.5h7.2"/></g>
+  <g id="fillColor" transform="translate(180 36)"><path d="M5 11.5h13l-6.5 6.5Z" fill="#000" fill-opacity="0.24" stroke="none"/><path d="M5 11.5 11.5 5l6.5 6.5-6.5 6.5Z"/><path d="M9 2.5 11.5 5"/><path d="M19.5 15c.8 1.1 1.5 2.1 1.5 2.9a1.5 1.5 0 0 1-3 0c0-.8.7-1.8 1.5-2.9Z"/></g>
+  <g id="fontGrow" transform="translate(216 36)"><path d="M3 19 8 6l5 13"/><path d="M4.9 14.5h6.2"/><path d="m15.5 8 3-3 3 3"/></g>
+  <g id="fontShrink" transform="translate(252 36)"><path d="M3 19 8 6l5 13"/><path d="M4.9 14.5h6.2"/><path d="m15.5 5 3 3 3-3"/></g>
+  <g id="clearFormat" transform="translate(288 36)"><path d="M5 5h10"/><path d="M10 5v14"/><path d="m14 14 6 6"/><path d="m20 14-6 6"/></g>
+  <g id="separator" transform="translate(324 36)"><path d="M12 4v16"/></g>
+  <g id="alignLeft" transform="translate(0 72)"><path d="M4 6h16M4 10h10M4 14h16M4 18h10"/></g>
+  <g id="alignCenter" transform="translate(36 72)"><path d="M4 6h16M7 10h10M4 14h16M7 18h10"/></g>
+  <g id="alignRight" transform="translate(72 72)"><path d="M4 6h16M10 10h10M4 14h16M10 18h10"/></g>
+  <g id="alignTop" transform="translate(108 72)"><path d="M4 4h16"/><path d="M12 20V8"/><path d="m8 12 4-4 4 4"/></g>
+  <g id="alignMiddle" transform="translate(144 72)"><path d="M4 12h16"/><path d="M12 3v5.5m-3-3 3 3 3-3"/><path d="M12 21v-5.5m-3 3 3-3 3 3"/></g>
+  <g id="alignBottom" transform="translate(180 72)"><path d="M4 20h16"/><path d="M12 4v12"/><path d="m8 12 4 4 4-4"/></g>
+  <g id="wrap" transform="translate(216 72)"><path d="M4 6h16"/><path d="M4 12h12.5a3.5 3.5 0 0 1 0 7H12"/><path d="m14 17-2 2 2 2"/><path d="M4 18h4"/></g>
+  <g id="merge" transform="translate(252 72)"><path d="M7 5H4.5A1.5 1.5 0 0 0 3 6.5v11A1.5 1.5 0 0 0 4.5 19H7M17 5h2.5A1.5 1.5 0 0 1 21 6.5v11a1.5 1.5 0 0 1-1.5 1.5H17"/><path d="M6.5 12h4m-2-2 2 2-2 2"/><path d="M17.5 12h-4m2-2-2 2 2 2"/></g>
+  <g id="unmerge" transform="translate(288 72)"><path d="M7 5H4.5A1.5 1.5 0 0 0 3 6.5v11A1.5 1.5 0 0 0 4.5 19H7M17 5h2.5A1.5 1.5 0 0 1 21 6.5v11a1.5 1.5 0 0 1-1.5 1.5H17"/><path d="M12 5v14" stroke-dasharray="1.6 2.4" stroke-opacity="0.5"/><path d="M10.5 12h-4m2-2-2 2 2 2"/><path d="M13.5 12h4m-2-2 2 2-2 2"/></g>
+  <g id="mergeAndCenter" transform="translate(324 72)"><path d="M7 5H4.5A1.5 1.5 0 0 0 3 6.5v11A1.5 1.5 0 0 0 4.5 19H7M17 5h2.5A1.5 1.5 0 0 1 21 6.5v11a1.5 1.5 0 0 1-1.5 1.5H17"/><path d="M8.5 9h7M7 12.5h10M9.5 16h5"/></g>
+  <g id="border" transform="translate(0 108)"><path d="M4 4h16v16H4Z"/><path d="M12 4v16M4 12h16"/></g>
+  <g id="borderAll" transform="translate(36 108)"><path d="M4 4h16v16H4Z"/><path d="M12 4v16M4 12h16"/></g>
+  <g id="borderOutside" transform="translate(72 108)"><path d="M4 4h16v16H4Z"/><path d="M12 4v16M4 12h16" stroke-dasharray="1.6 2.4" stroke-opacity="0.5"/></g>
+  <g id="borderThickOutside" transform="translate(108 108)"><path d="M4 4h16v16H4Z" stroke-width="2.6"/><path d="M12 4v16M4 12h16" stroke-dasharray="1.6 2.4" stroke-opacity="0.5"/></g>
+  <g id="borderTop" transform="translate(144 108)"><path d="M4 4h16v16H4Z" stroke-dasharray="1.6 2.4" stroke-opacity="0.5"/><path d="M12 4v16M4 12h16" stroke-dasharray="1.6 2.4" stroke-opacity="0.5"/><path d="M4 4h16"/></g>
+  <g id="borderBottom" transform="translate(180 108)"><path d="M4 4h16v16H4Z" stroke-dasharray="1.6 2.4" stroke-opacity="0.5"/><path d="M12 4v16M4 12h16" stroke-dasharray="1.6 2.4" stroke-opacity="0.5"/><path d="M4 20h16"/></g>
+  <g id="borderLeft" transform="translate(216 108)"><path d="M4 4h16v16H4Z" stroke-dasharray="1.6 2.4" stroke-opacity="0.5"/><path d="M12 4v16M4 12h16" stroke-dasharray="1.6 2.4" stroke-opacity="0.5"/><path d="M4 4v16"/></g>
+  <g id="borderRight" transform="translate(252 108)"><path d="M4 4h16v16H4Z" stroke-dasharray="1.6 2.4" stroke-opacity="0.5"/><path d="M12 4v16M4 12h16" stroke-dasharray="1.6 2.4" stroke-opacity="0.5"/><path d="M20 4v16"/></g>
+  <g id="borderNone" transform="translate(288 108)"><path d="M4 4h16v16H4Z" stroke-dasharray="1.6 2.4" stroke-opacity="0.5"/><path d="M12 4v16M4 12h16" stroke-dasharray="1.6 2.4" stroke-opacity="0.5"/></g>
+  <g id="currency" transform="translate(0 144)"><path d="M12 3.5v17"/><path d="M16.5 7.5c-.6-1.4-2.3-2.5-4.5-2.5-2.5 0-4.3 1.4-4.3 3.3 0 4.3 9 2.4 9 7 0 1.9-1.9 3.2-4.7 3.2-2.3 0-4.1-1.1-4.8-2.6"/></g>
+  <g id="percent" transform="translate(36 144)"><path d="M18.5 5.5l-13 13"/><path d="M9.2 7a2.2 2.2 0 1 1-4.4 0 2.2 2.2 0 0 1 4.4 0Z"/><path d="M19.2 17a2.2 2.2 0 1 1-4.4 0 2.2 2.2 0 0 1 4.4 0Z"/></g>
+  <g id="comma" transform="translate(72 144)"><path d="M6 13h.01" stroke-width="2.6"/><path d="M7 13.3c0 1.4-.7 2.5-2 3.2"/><path d="M13.5 10.5a2 2.6 0 0 1-4 0 2 2.6 0 0 1 4 0Z"/><path d="M19.5 10.5a2 2.6 0 0 1-4 0 2 2.6 0 0 1 4 0Z"/></g>
+  <g id="decimalIncrease" transform="translate(108 144)"><path d="M4.5 13h.01" stroke-width="2.6"/><path d="M10.5 10.5a2 2.6 0 0 1-4 0 2 2.6 0 0 1 4 0Z"/><path d="M16.5 10.5a2 2.6 0 0 1-4 0 2 2.6 0 0 1 4 0Z"/><path d="M5 19h14m-3-2.5 3 2.5-3 2.5"/></g>
+  <g id="decimalDecrease" transform="translate(144 144)"><path d="M4.5 13h.01" stroke-width="2.6"/><path d="M10.5 10.5a2 2.6 0 0 1-4 0 2 2.6 0 0 1 4 0Z"/><path d="M19 19H5m3-2.5L5 19l3 2.5"/></g>
+  <g id="hyperlink" transform="translate(180 144)"><path d="M10 14a4 4 0 0 0 5.66.34l3-3a4 4 0 0 0-5.66-5.66l-1.7 1.7"/><path d="M14 10a4 4 0 0 0-5.66-.34l-3 3a4 4 0 0 0 5.66 5.66l1.7-1.7"/></g>
+  <g id="note" transform="translate(216 144)"><path d="M14 20v-4.5a1.5 1.5 0 0 1 1.5-1.5H20Z" fill="#000" fill-opacity="0.24" stroke="none"/><path d="M5.5 4h13A1.5 1.5 0 0 1 20 5.5V14l-6 6H5.5A1.5 1.5 0 0 1 4 18.5v-13A1.5 1.5 0 0 1 5.5 4Z"/><path d="M14 20v-4.5a1.5 1.5 0 0 1 1.5-1.5H20"/><path d="M8 9h8M8 12.5h5"/></g>
+  <g id="exportCsv" transform="translate(252 144)"><path d="M6.5 3H14l4.5 4.5v12A1.5 1.5 0 0 1 17 21H6.5A1.5 1.5 0 0 1 5 19.5v-15A1.5 1.5 0 0 1 6.5 3Z"/><path d="M14 3v4.5h4.5"/><path d="M8 12h7M8 15h7M8 18h4"/></g>
+  <g id="exportXlsx" transform="translate(288 144)"><path d="M6.5 3H14l4.5 4.5v12A1.5 1.5 0 0 1 17 21H6.5A1.5 1.5 0 0 1 5 19.5v-15A1.5 1.5 0 0 1 6.5 3Z"/><path d="M14 3v4.5h4.5"/><path d="M8 11h7v7H8Z" fill="#000" fill-opacity="0.24" stroke="none"/><path d="M8 11h7v7H8ZM11.5 11v7M8 14.5h7"/></g>
+  <g id="insert" transform="translate(0 180)"><path d="M3 5h12M3 19h12" stroke-dasharray="1.6 2.4" stroke-opacity="0.5"/><path d="M3 9.5h12v5H3Z" fill="#000" fill-opacity="0.24" stroke="none"/><path d="M3 9.5h12M3 14.5h12"/><path d="M19 9.5v5M16.5 12h5"/></g>
+  <g id="delete" transform="translate(36 180)"><path d="M3 5h12M3 19h12" stroke-dasharray="1.6 2.4" stroke-opacity="0.5"/><path d="M3 9.5h12v5H3Z" fill="#000" fill-opacity="0.24" stroke="none"/><path d="M3 9.5h12M3 14.5h12"/><path d="m16.5 9.5 5 5m0-5-5 5"/></g>
+  <g id="format" transform="translate(72 180)"><path d="M4 4v16M20 4v16"/><path d="M7.5 12h9"/><path d="m10 9.5-2.5 2.5 2.5 2.5"/><path d="m14 9.5 2.5 2.5-2.5 2.5"/></g>
+  <g id="hideRows" transform="translate(108 180)"><path d="M3 4h18M3 20h18" stroke-dasharray="1.6 2.4" stroke-opacity="0.5"/><path d="M3 10.8h18v2.4H3Z" fill="#000" fill-opacity="0.24" stroke="none"/><path d="M3 10.8h18M3 13.2h18"/><path d="M12 5.5v3.3m-1.8-1.8 1.8 1.8 1.8-1.8"/><path d="M12 18.5v-3.3m-1.8 1.8 1.8-1.8 1.8 1.8"/></g>
+  <g id="unhideRows" transform="translate(144 180)"><path d="M3 4h18M3 20h18" stroke-dasharray="1.6 2.4" stroke-opacity="0.5"/><path d="M3 10.8h18v2.4H3Z" fill="#000" fill-opacity="0.24" stroke="none"/><path d="M3 10.8h18M3 13.2h18"/><path d="M12 8.8V5.5m-1.8 1.8L12 5.5l1.8 1.8"/><path d="M12 15.2v3.3m-1.8-1.8 1.8 1.8 1.8-1.8"/></g>
+  <g id="hideColumns" transform="translate(180 180)"><path d="M4 3v18M20 3v18" stroke-dasharray="1.6 2.4" stroke-opacity="0.5"/><path d="M10.8 3h2.4v18h-2.4Z" fill="#000" fill-opacity="0.24" stroke="none"/><path d="M10.8 3v18M13.2 3v18"/><path d="M5.5 12h3.3m-1.8-1.8 1.8 1.8-1.8 1.8"/><path d="M18.5 12h-3.3m1.8-1.8-1.8 1.8 1.8 1.8"/></g>
+  <g id="unhideColumns" transform="translate(216 180)"><path d="M4 3v18M20 3v18" stroke-dasharray="1.6 2.4" stroke-opacity="0.5"/><path d="M10.8 3h2.4v18h-2.4Z" fill="#000" fill-opacity="0.24" stroke="none"/><path d="M10.8 3v18M13.2 3v18"/><path d="M8.8 12H5.5m1.8-1.8L5.5 12l1.8 1.8"/><path d="M15.2 12h3.3m-1.8-1.8 1.8 1.8-1.8 1.8"/></g>
+  <g id="freeze" transform="translate(252 180)"><path d="M3 3h18v18H3Z" stroke-dasharray="1.6 2.4" stroke-opacity="0.5"/><path d="M3 3h18v5.5H3Z" fill="#000" fill-opacity="0.24" stroke="none"/><path d="M3 8.5h5.5V21H3Z" fill="#000" fill-opacity="0.24" stroke="none"/><path d="M3 8.5h18M8.5 8.5V21" stroke-width="2.6"/></g>
+  <g id="groupRows" transform="translate(288 180)"><path d="M10 6h10M10 12h10M10 18h10"/><path d="M7.5 6H5v12h2.5"/><path d="M5 12H3"/></g>
+  <g id="ungroupRows" transform="translate(324 180)"><path d="M10 6h10M10 12h10M10 18h10"/><path d="M7.5 6H5v12h2.5" stroke-dasharray="1.6 2.4" stroke-opacity="0.5"/><path d="m2.5 10.5 3 3m0-3-3 3"/></g>
+  <g id="sortAsc" transform="translate(0 216)"><path d="M6 4v16m-3-3 3 3 3-3"/><path d="M12.5 11 15 4.5l2.5 6.5M13.3 9h3.4"/><path d="M12.5 13.5h5l-5 6h5"/></g>
+  <g id="sortDesc" transform="translate(36 216)"><path d="M6 4v16m-3-3 3 3 3-3"/><path d="M12.5 4.5h5l-5 6h5"/><path d="M12.5 20 15 13.5l2.5 6.5M13.3 18h3.4"/></g>
+  <g id="sortFilter" transform="translate(72 216)"><path d="M4 5h16l-6 7.5V19l-4 2v-8.5Z"/></g>
+  <g id="clearFilter" transform="translate(108 216)"><path d="M3 5h12l-4.5 5.5v6.5l-3 1.5v-8Z"/><path d="m15.5 14.5 5 5m0-5-5 5"/></g>
+  <g id="chart" transform="translate(0 252)"><path d="M4 4v16h16"/><path d="M7 12h2.5v8H7ZM11.5 7H14v13h-2.5ZM16 10h2.5v10H16Z" fill="#000" fill-opacity="0.24" stroke="none"/><path d="M7 20v-8h2.5v8M11.5 20V7H14v13M16 20V10h2.5v10"/></g>
+  <g id="chartColumn" transform="translate(36 252)"><path d="M4 4v16h16"/><path d="M7 12h2.5v8H7ZM11.5 7H14v13h-2.5ZM16 10h2.5v10H16Z" fill="#000" fill-opacity="0.24" stroke="none"/><path d="M7 20v-8h2.5v8M11.5 20V7H14v13M16 20V10h2.5v10"/></g>
+  <g id="chartBar" transform="translate(72 252)"><path d="M4 4v16h16"/><path d="M4 6h9v2.5H4ZM4 10.75h13v2.5H4ZM4 15.5h6V18H4Z" fill="#000" fill-opacity="0.24" stroke="none"/><path d="M4 6h9v2.5H4M4 10.75h13v2.5H4M4 15.5h6V18H4"/></g>
+  <g id="chartLine" transform="translate(108 252)"><path d="M4 4v16h16"/><path d="m7 15.5 4-5 3.5 3L19 7"/></g>
+  <g id="chartArea" transform="translate(144 252)"><path d="M4 4v16h16"/><path d="M4 20v-5l4.5-5 4 3.5L20 8v12Z" fill="#000" fill-opacity="0.24" stroke="none"/><path d="m4 15 4.5-5 4 3.5L20 8"/></g>
+  <g id="chartPie" transform="translate(180 252)"><path d="M20 12a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"/><path d="M12 4a8 8 0 0 1 8 8h-8Z" fill="#000" fill-opacity="0.24" stroke="none"/><path d="M12 4v8h8"/></g>
+  <g id="chartDoughnut" transform="translate(216 252)"><path d="M20 12a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"/><path d="M15.5 12a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0Z"/><path d="M12 4a8 8 0 0 1 8 8h-4.5A3.5 3.5 0 0 0 12 8.5Z" fill="#000" fill-opacity="0.24" stroke="none"/><path d="M12 4v4.5M15.5 12H20"/></g>
+  <g id="chartScatter" transform="translate(252 252)"><path d="M4 4v16h16"/><path d="M8 15.5h.01M11 11.5h.01M14 13.5h.01M16.5 8.5h.01M19 10.5h.01" stroke-width="2.6"/></g>
+  <g id="pivotTable" transform="translate(288 252)"><path d="M9 4h11v5H9ZM4 9h5v11H4Z" fill="#000" fill-opacity="0.24" stroke="none"/><path d="M4 4h16v16H4Z"/><path d="M4 9h16M9 4v16"/><path d="M17 11.5V13a4 4 0 0 1-4 4h-1.5"/><path d="m13.5 15-2 2 2 2"/></g>
+</svg>

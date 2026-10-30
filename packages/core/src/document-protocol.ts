@@ -1,4 +1,17 @@
 import {
+  isCellFontFamily,
+  isCellNumberFormat,
+  isCellVerticalAlign,
+  MAX_FONT_FAMILY_LENGTH,
+  MAX_NUMBER_FORMAT_LENGTH,
+} from "./cell-style-fields.js";
+import {
+  MAX_CHART_SERIES,
+  MAX_CHARTS_PER_SHEET,
+  sanitizeChartDefinition,
+  validSheetCharts,
+} from "./chart-definition.js";
+import {
   MAX_CONDITIONAL_FORMAT_FORMULA_LENGTH,
   MAX_CONDITIONAL_FORMAT_RULES,
 } from "./conditional-format.js";
@@ -11,9 +24,16 @@ import {
   MAX_HYPERLINK_DISPLAY_LENGTH,
   MAX_HYPERLINKS_PER_SHEET,
 } from "./hyperlink.js";
+import {
+  clonePivot,
+  MAX_PIVOTS_PER_WORKBOOK,
+  validatePivotReferences,
+  validatePivotShape,
+} from "./pivot.js";
 import { preparedRestore } from "./transaction-preparation.js";
 import type { MergeRange, Range } from "./types/coordinates.js";
 import type {
+  CalculationSettings,
   DocumentOp,
   MutationIssue,
   SheetSnapshot,
@@ -26,11 +46,62 @@ import {
   assertWorkbookTables,
   DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
   validWorkbookTable,
+  validWorkbookTableXmlElement,
   workbookTableNameKey,
 } from "./workbook-table.js";
 
 /** Current workbook snapshot schema version accepted by Sheetwrite. */
 export const WORKBOOK_SCHEMA_VERSION = 1 as const;
+
+/** Excel's iteration count for a new workbook. */
+export const DEFAULT_MAX_ITERATIONS = 100;
+
+/** Excel's convergence threshold for a new workbook. */
+export const DEFAULT_MAX_CHANGE = 0.001;
+
+/** Largest iteration count Excel accepts. */
+export const MAX_ITERATIONS = 32_767;
+
+/** Settings of a workbook that has never touched iterative calculation. */
+export const DEFAULT_CALCULATION_SETTINGS: Readonly<CalculationSettings> = Object.freeze({
+  iterate: false,
+  maxIterations: DEFAULT_MAX_ITERATIONS,
+  maxChange: DEFAULT_MAX_CHANGE,
+});
+
+/** Limits the engine accepts; anything else would be rejected by `setIterativeCalculation`. */
+export function isValidCalculationSettings(settings: CalculationSettings): boolean {
+  return (
+    typeof settings.iterate === "boolean" &&
+    Number.isInteger(settings.maxIterations) &&
+    settings.maxIterations >= 1 &&
+    settings.maxIterations <= MAX_ITERATIONS &&
+    Number.isFinite(settings.maxChange) &&
+    settings.maxChange >= 0
+  );
+}
+
+/**
+ * Detached copy of non-default settings, or `undefined` for the defaults, so
+ * workbooks that never enable iteration keep byte-identical snapshots.
+ */
+export function storedCalculationSettings(
+  settings: CalculationSettings | undefined,
+): CalculationSettings | undefined {
+  if (
+    settings === undefined ||
+    (settings.iterate === DEFAULT_CALCULATION_SETTINGS.iterate &&
+      settings.maxIterations === DEFAULT_CALCULATION_SETTINGS.maxIterations &&
+      settings.maxChange === DEFAULT_CALCULATION_SETTINGS.maxChange)
+  ) {
+    return undefined;
+  }
+  return {
+    iterate: settings.iterate,
+    maxIterations: settings.maxIterations,
+    maxChange: settings.maxChange,
+  };
+}
 
 /**
  * Inclusive defaults for every atomic document transaction accepted by a
@@ -418,6 +489,8 @@ const SHEET_METADATA_ARRAY_KEYS = [
   "filters",
   "rowGroups",
   "tables",
+  "charts",
+  "pivots",
   "cells",
 ] as const;
 
@@ -491,6 +564,33 @@ function consumeJsonString(state: JsonInspectionState, value: string): boolean {
   return true;
 }
 
+/** `String(n)` spells an integer below 10^21 as plain digits, and exponent notation from there. */
+const PLAIN_INTEGER_DIGITS = 21;
+const DECIMAL_BASE = 10;
+/** Exact doubles 10^0 … 10^21, so each digit costs one compare. */
+const POWERS_OF_TEN = Float64Array.from(
+  { length: PLAIN_INTEGER_DIGITS + 1 },
+  (_unused, exponent) => DECIMAL_BASE ** exponent,
+);
+
+/**
+ * Length of a finite number's JSON text. Integers, the common cell value, are
+ * measured against exact powers of ten instead of allocating their text.
+ */
+function jsonNumberLength(value: number): number {
+  const magnitude = Math.abs(value);
+  if (!Number.isInteger(value) || magnitude >= (POWERS_OF_TEN[PLAIN_INTEGER_DIGITS] ?? 0)) {
+    return String(value).length;
+  }
+  // -0 is written "0", and `value < 0` is false for it.
+  let length = value < 0 ? 2 : 1;
+  for (let digits = 1; digits < PLAIN_INTEGER_DIGITS; digits++) {
+    if (magnitude < (POWERS_OF_TEN[digits] ?? 0)) break;
+    length += 1;
+  }
+  return length;
+}
+
 function serializedLimitIssue(path: string, maxBytes: number): JsonSafetyIssue {
   return {
     path,
@@ -535,8 +635,7 @@ function findJsonSafetyIssue(
         message: "Numbers must be finite",
       };
     }
-    const serialized = Object.is(value, -0) ? "0" : String(value);
-    return consumeBytes(state, serialized.length)
+    return consumeBytes(state, jsonNumberLength(value))
       ? undefined
       : serializedLimitIssue(jsonPath(segments), state.maxBytes);
   }
@@ -888,6 +987,10 @@ export function assertWorkbookAllocationLimits(
         sheet.conditionalFormats!.length,
       );
     }
+    const chartCount = sheet.charts?.length ?? 0;
+    if (chartCount > MAX_CHARTS_PER_SHEET) {
+      throw new SnapshotResourceError("maxMetadataEntries", MAX_CHARTS_PER_SHEET, chartCount);
+    }
   }
 
   let denseCells = 0;
@@ -942,7 +1045,11 @@ export function assertWorkbookAllocationLimits(
       (sheet.filters?.length ?? 0) +
       (sheet.rowGroups?.length ?? 0) +
       (sheet.tables?.length ?? 0) +
-      (sheet.tables?.reduce((count, table) => count + table.columns.length, 0) ?? 0);
+      (sheet.tables?.reduce((count, table) => count + table.columns.length, 0) ?? 0) +
+      (sheet.charts?.length ?? 0) +
+      (sheet.pivots?.length ?? 0) +
+      (sheet.pivots?.reduce((count, pivot) => count + (pivot.savedOutput?.cells.length ?? 0), 0) ??
+        0);
     if (metadataEntries > limits.maxMetadataEntries) {
       throw new SnapshotResourceError(
         "maxMetadataEntries",
@@ -1087,6 +1194,32 @@ function validateCellStyle(value: unknown, path: string, errors: DocumentValidat
   if (align !== undefined && !["left", "center", "right"].includes(String(align))) {
     invalid(errors, `${path}.align`, "align must be left, center, or right");
   }
+  const verticalAlign = ownValue(style, "verticalAlign");
+  if (verticalAlign !== undefined && !isCellVerticalAlign(verticalAlign)) {
+    invalid(errors, `${path}.verticalAlign`, "verticalAlign must be top, middle, or bottom");
+  }
+  const fontFamily = ownValue(style, "fontFamily");
+  if (
+    fontFamily !== undefined &&
+    (typeof fontFamily !== "string" || !isCellFontFamily(fontFamily))
+  ) {
+    invalid(
+      errors,
+      `${path}.fontFamily`,
+      `fontFamily must be 1-${MAX_FONT_FAMILY_LENGTH} letters, digits, spaces, ".", "_" or "-"`,
+    );
+  }
+  const numberFormat = ownValue(style, "numberFormat");
+  if (
+    numberFormat !== undefined &&
+    (typeof numberFormat !== "string" || !isCellNumberFormat(numberFormat))
+  ) {
+    invalid(
+      errors,
+      `${path}.numberFormat`,
+      `numberFormat must be 1-${MAX_NUMBER_FORMAT_LENGTH} characters without control characters`,
+    );
+  }
   const borders = ownValue(style, "border");
   if (borders !== undefined) {
     const borderRecord = recordAt(borders, `${path}.border`, errors);
@@ -1206,6 +1339,31 @@ function validateConditionalPredicate(
     }
   } else {
     invalid(errors, `${path}.kind`, "Conditional format predicate kind is invalid");
+  }
+}
+
+function validateChartShape(value: unknown, path: string, errors: DocumentValidationError[]): void {
+  const chart = recordAt(value, path, errors);
+  if (!chart) return;
+
+  // A series count over the bound is a resource rejection, not a malformed value.
+  const series = ownValue(chart, "series");
+  if (Array.isArray(series) && series.length > MAX_CHART_SERIES) {
+    invalid(
+      errors,
+      `${path}.series`,
+      `Chart series limit ${MAX_CHART_SERIES} exceeded`,
+      "resource-limit",
+    );
+    return;
+  }
+
+  if (!sanitizeChartDefinition(chart)) {
+    invalid(
+      errors,
+      path,
+      "Chart must have a valid ID, kind, anchor, bounded text, and series ranges or #REF!",
+    );
   }
 }
 
@@ -1454,6 +1612,31 @@ function validateWorkbookTableColumnShape(
   requireString(column, "id", path, errors, true);
   requireString(column, "name", path, errors, true);
   optionalString(column, "totalsRowLabel", path, errors);
+  const totalsFunction = ownValue(column, "totalsRowFunction");
+  if (
+    totalsFunction !== undefined &&
+    (typeof totalsFunction !== "string" ||
+      ![
+        "none",
+        "sum",
+        "min",
+        "max",
+        "average",
+        "count",
+        "countNums",
+        "stdDev",
+        "var",
+        "custom",
+      ].includes(totalsFunction))
+  ) {
+    invalid(errors, `${path}.totalsRowFunction`, "Invalid table totals-row function");
+  }
+  for (const key of ["calculatedColumnFormula", "totalsRowFormula"]) {
+    const formula = ownValue(column, key);
+    if (formula !== undefined && !validWorkbookTableXmlElement(formula, key)) {
+      invalid(errors, `${path}.${key}`, "Invalid or oversized table formula metadata");
+    }
+  }
 }
 
 function validateWorkbookTableShape(
@@ -1482,6 +1665,13 @@ function validateWorkbookTableShape(
     const flag = ownValue(table, key);
     if (flag === undefined && partial) continue;
     if (typeof flag !== "boolean") invalid(errors, `${path}.${key}`, `${key} must be a boolean`);
+  }
+  for (const key of ["autoFilter", "sortState"]) {
+    const rule = ownValue(table, key);
+    if (rule === undefined || (partial && rule === null)) continue;
+    if (!validWorkbookTableXmlElement(rule, key)) {
+      invalid(errors, `${path}.${key}`, "Invalid or oversized table rule metadata");
+    }
   }
   const styleValue = ownValue(table, "style");
   if (styleValue !== undefined && styleValue !== null) {
@@ -1659,6 +1849,24 @@ function validateSheetShape(value: unknown, path: string, errors: DocumentValida
     validateWorkbookTableShape(table, `${path}.tables[${index}]`, errors);
   });
 
+  const charts = optionalArray(sheet, "charts", path, errors);
+  if (charts && charts.length > MAX_CHARTS_PER_SHEET) {
+    invalid(
+      errors,
+      `${path}.charts`,
+      `Chart limit ${MAX_CHARTS_PER_SHEET} exceeded`,
+      "resource-limit",
+    );
+  } else {
+    charts?.forEach((chart, index) => {
+      validateChartShape(chart, `${path}.charts[${index}]`, errors);
+    });
+  }
+  const pivots = optionalArray(sheet, "pivots", path, errors);
+  pivots?.forEach((pivot, index) => {
+    validatePivotShape(pivot, `${path}.pivots[${index}]`, errors);
+  });
+
   const blocks = arrayAt(ownValue(sheet, "cells"), `${path}.cells`, errors);
   blocks?.forEach((entry, blockIndex) => {
     const blockPath = `${path}.cells[${blockIndex}]`;
@@ -1672,14 +1880,14 @@ function validateSheetShape(value: unknown, path: string, errors: DocumentValida
     }
     const cells = arrayAt(ownValue(block, "cells"), `${blockPath}.cells`, errors);
     cells?.forEach((cellEntry, cellIndex) => {
-      const cellPath = `${blockPath}.cells[${cellIndex}]`;
-      const cell = recordAt(cellEntry, cellPath, errors);
-      if (!cell) return;
-      requireNonNegativeInteger(cell, "rowOffset", cellPath, errors);
-      requireNonNegativeInteger(cell, "colOffset", cellPath, errors);
-      validateCellValueShape(ownValue(cell, "value"), `${cellPath}.value`, errors);
-      const style = ownValue(cell, "style");
-      if (style !== undefined) validateCellStyle(style, `${cellPath}.style`, errors);
+      // Paths are read only by recorded errors, and almost every cell is valid,
+      // so a cell's three path strings are built only to report the errors a
+      // path-free pass already found.
+      const errorCount = errors.length;
+      validateCellShape(cellEntry, "", errors);
+      if (errors.length === errorCount) return;
+      errors.length = errorCount;
+      validateCellShape(cellEntry, `${blockPath}.cells[${cellIndex}]`, errors);
     });
   });
 }
@@ -1692,11 +1900,7 @@ function validateOperationSheetId(
   requireString(operation, "sheet", path, errors, true);
 }
 
-function validateOperationCell(
-  entry: unknown,
-  path: string,
-  errors: DocumentValidationError[],
-): void {
+function validateCellShape(entry: unknown, path: string, errors: DocumentValidationError[]): void {
   const cell = recordAt(entry, path, errors);
   if (!cell) return;
   requireNonNegativeInteger(cell, "rowOffset", path, errors);
@@ -1758,6 +1962,38 @@ function validateProtectedRangeShape(
   validateRangeShape(ownValue(protectedRange, "range"), `${path}.range`, errors);
   optionalString(protectedRange, "label", path, errors);
   optionalString(protectedRange, "permissionKey", path, errors);
+}
+
+function validateCalculationShape(
+  value: unknown,
+  path: string,
+  errors: DocumentValidationError[],
+): void {
+  const calculation = recordAt(value, path, errors);
+  if (!calculation) return;
+
+  if (typeof ownValue(calculation, "iterate") !== "boolean") {
+    invalid(errors, `${path}.iterate`, "iterate must be a boolean");
+  }
+
+  const maxIterations = ownValue(calculation, "maxIterations");
+  if (
+    typeof maxIterations !== "number" ||
+    !Number.isInteger(maxIterations) ||
+    maxIterations < 1 ||
+    maxIterations > MAX_ITERATIONS
+  ) {
+    invalid(
+      errors,
+      `${path}.maxIterations`,
+      `maxIterations must be an integer from 1 to ${MAX_ITERATIONS}`,
+    );
+  }
+
+  const maxChange = ownValue(calculation, "maxChange");
+  if (!finiteNumber(maxChange) || maxChange < 0) {
+    invalid(errors, `${path}.maxChange`, "maxChange must be a finite number >= 0");
+  }
 }
 
 function validateNamedRangeShape(
@@ -1853,7 +2089,7 @@ export function validateDocumentOperationShape(
       validateRangeShape(ownValue(operation, "range"), `${path}.range`, errors);
       const cells = arrayAt(ownValue(operation, "cells"), `${path}.cells`, errors);
       cells?.forEach((cell, index) => {
-        validateOperationCell(cell, `${path}.cells[${index}]`, errors);
+        validateCellShape(cell, `${path}.cells[${index}]`, errors);
       });
       break;
     }
@@ -2200,6 +2436,22 @@ export function validateDocumentOperationShape(
       requireString(operation, "name", path, errors, true);
       optionalString(operation, "scope", path, errors);
       break;
+    case "setCalculation":
+      validateCalculationShape(ownValue(operation, "calculation"), `${path}.calculation`, errors);
+      break;
+    case "setChart":
+      validateOperationSheetId(operation, path, errors);
+      validateChartShape(ownValue(operation, "chart"), `${path}.chart`, errors);
+      break;
+    case "setPivot":
+      validateOperationSheetId(operation, path, errors);
+      validatePivotShape(ownValue(operation, "pivot"), `${path}.pivot`, errors);
+      break;
+    case "removeChart":
+    case "removePivot":
+      validateOperationSheetId(operation, path, errors);
+      requireString(operation, "id", path, errors, true);
+      break;
     default: {
       const unsupported: never = operationKind;
       invalid(errors, `${path}.op`, `Document operation kind ${String(unsupported)} is invalid`);
@@ -2408,6 +2660,250 @@ function rangeInSheet(range: Range, sheet: SheetSnapshot): boolean {
   );
 }
 
+/**
+ * Hard ceilings for retained OOXML graphs in a snapshot. The XLSX backend's
+ * configurable `maxPreservedBytes` (64 MiB by default) applies first; these
+ * stop a hostile persisted snapshot before any part is decoded.
+ */
+const MAX_XLSX_SOURCE_COMPRESSED_BYTES = 256 * 1024 * 1024;
+const MAX_XLSX_SOURCE_ENTRIES = 10_000;
+const MAX_XLSX_PART_NAME_LENGTH = 1024;
+const MAX_XLSX_CONTENT_TYPE_LENGTH = 256;
+const BASE64_PATTERN = /^(?:[A-Za-z\d+/]{4})*(?:[A-Za-z\d+/]{2}==|[A-Za-z\d+/]{3}=)?$/;
+const CONTENT_TYPE_PATTERN = /^[a-z\d!#$&^_.+-]+\/[a-z\d!#$&^_.+-]+$/i;
+const RELATIONSHIP_TYPE_PATTERN = /^https?:\/\/[^\s<>"'&]+$/;
+
+const FIRST_PRINTABLE_CHARACTER = 0x20;
+
+/** Package-relative OPC part names only; anything a writer could misinterpret is refused. */
+function safeXlsxPartName(value: unknown): value is string {
+  if (typeof value !== "string" || value.length === 0 || value.length > MAX_XLSX_PART_NAME_LENGTH) {
+    return false;
+  }
+
+  // A char-code scan rejects control characters without a control-character regex.
+  for (let index = 0; index < value.length; index++) {
+    if (value.charCodeAt(index) < FIRST_PRINTABLE_CHARACTER) return false;
+  }
+  return (
+    !/[\\?#%<>&"']/.test(value) &&
+    !value.startsWith("/") &&
+    !/^[a-z][a-z\d+.-]*:/i.test(value) &&
+    value.split("/").every((segment) => segment !== "" && segment !== "." && segment !== "..")
+  );
+}
+
+function validateXlsxSource(value: unknown, errors: DocumentValidationError[]): void {
+  if (value === undefined) return;
+  const path = "workbook.xlsxSource";
+  const source = recordAt(value, path, errors);
+  if (!source) return;
+  const parts = arrayAt(ownValue(source, "parts"), `${path}.parts`, errors);
+  const graphs = arrayAt(ownValue(source, "graphs"), `${path}.graphs`, errors);
+  const dropped = optionalArray(source, "dropped", path, errors);
+  if (
+    dropped &&
+    (dropped.length > MAX_XLSX_SOURCE_ENTRIES || !dropped.every((part) => safeXlsxPartName(part)))
+  ) {
+    invalid(errors, `${path}.dropped`, "dropped must list safe part names");
+  }
+  if (!parts || !graphs) return;
+  if (parts.length > MAX_XLSX_SOURCE_ENTRIES || graphs.length > MAX_XLSX_SOURCE_ENTRIES) {
+    invalid(errors, path, `xlsxSource exceeds ${MAX_XLSX_SOURCE_ENTRIES} parts or graphs`);
+    return;
+  }
+
+  const names = new Set<string>();
+  let compressedBytes = 0;
+  for (let index = 0; index < parts.length; index++) {
+    const partPath = `${path}.parts[${index}]`;
+    const part = recordAt(parts[index], partPath, errors);
+    if (!part) continue;
+    const name = ownValue(part, "name");
+    const contentType = ownValue(part, "contentType");
+    const method = ownValue(part, "method");
+    const crc32 = ownValue(part, "crc32");
+    const size = ownValue(part, "uncompressedSize");
+    const data = ownValue(part, "data");
+    // OPC part names compare case-insensitively.
+    if (!safeXlsxPartName(name) || names.has(name.toLowerCase())) {
+      invalid(errors, `${partPath}.name`, "Part name must be a unique safe OPC name");
+    } else names.add(name.toLowerCase());
+    if (
+      typeof contentType !== "string" ||
+      contentType.length > MAX_XLSX_CONTENT_TYPE_LENGTH ||
+      !CONTENT_TYPE_PATTERN.test(contentType)
+    ) {
+      invalid(errors, `${partPath}.contentType`, "contentType must be a MIME type");
+    }
+    if (method !== 0 && method !== 8)
+      invalid(errors, `${partPath}.method`, "method must be 0 or 8");
+    if (!nonNegativeInteger(crc32) || crc32 > 0xffffffff) {
+      invalid(errors, `${partPath}.crc32`, "crc32 must be an unsigned 32-bit integer");
+    }
+    if (!nonNegativeInteger(size) || size > 0xffffffff) {
+      invalid(errors, `${partPath}.uncompressedSize`, "uncompressedSize must fit ZIP32");
+    }
+    if (typeof data !== "string" || data.length % 4 !== 0) {
+      invalid(errors, `${partPath}.data`, "data must be base64");
+      continue;
+    }
+    compressedBytes += (data.length / 4) * 3;
+    if (compressedBytes > MAX_XLSX_SOURCE_COMPRESSED_BYTES) {
+      invalid(errors, path, "xlsxSource exceeds 256 MiB of compressed data");
+      return;
+    }
+    if (!BASE64_PATTERN.test(data)) invalid(errors, `${partPath}.data`, "data must be base64");
+  }
+
+  for (let index = 0; index < graphs.length; index++) {
+    const graphPath = `${path}.graphs[${index}]`;
+    const graph = recordAt(graphs[index], graphPath, errors);
+    if (!graph) continue;
+    const owner = ownValue(graph, "owner");
+    const type = ownValue(graph, "type");
+    const target = ownValue(graph, "target");
+    const cacheId = ownValue(graph, "cacheId");
+    if (owner !== "root" && owner !== "workbook" && owner !== "sheet") {
+      invalid(errors, `${graphPath}.owner`, "owner must be root, workbook, or sheet");
+    }
+    if (owner === "sheet") requireString(graph, "sheetId", graphPath, errors, true);
+    else if (ownValue(graph, "sheetId") !== undefined) {
+      invalid(errors, `${graphPath}.sheetId`, "Only sheet-owned graphs name a sheet");
+    }
+    if (
+      typeof type !== "string" ||
+      type.length > MAX_XLSX_PART_NAME_LENGTH ||
+      !RELATIONSHIP_TYPE_PATTERN.test(type)
+    ) {
+      invalid(errors, `${graphPath}.type`, "type must be a relationship type URI");
+    }
+    if (cacheId !== undefined && (typeof cacheId !== "string" || !/^\d{1,10}$/.test(cacheId))) {
+      invalid(errors, `${graphPath}.cacheId`, "cacheId must be an unsigned integer string");
+    }
+    const members = arrayAt(ownValue(graph, "parts"), `${graphPath}.parts`, errors);
+    if (
+      !members ||
+      members.length > MAX_XLSX_SOURCE_ENTRIES ||
+      !members.every((name) => safeXlsxPartName(name) && names.has(name.toLowerCase())) ||
+      !safeXlsxPartName(target) ||
+      !members.some((name) => name === target)
+    ) {
+      invalid(errors, `${graphPath}.parts`, "Graph parts must be retained and include target");
+    }
+    const dependencies = arrayAt(
+      ownValue(graph, "dependencies"),
+      `${graphPath}.dependencies`,
+      errors,
+    );
+    if (!dependencies) continue;
+    if (dependencies.length > MAX_XLSX_SOURCE_ENTRIES) {
+      invalid(errors, `${graphPath}.dependencies`, "Too many graph dependencies");
+      continue;
+    }
+    for (let dependencyIndex = 0; dependencyIndex < dependencies.length; dependencyIndex++) {
+      const dependencyPath = `${graphPath}.dependencies[${dependencyIndex}]`;
+      const dependency = recordAt(dependencies[dependencyIndex], dependencyPath, errors);
+      if (!dependency) continue;
+      requireString(dependency, "sheetId", dependencyPath, errors, true);
+      requireString(dependency, "name", dependencyPath, errors, true);
+      const scope = ownValue(dependency, "scope");
+      if (scope !== "layout" && scope !== "values") {
+        invalid(errors, `${dependencyPath}.scope`, "scope must be layout or values");
+      }
+      const digest = ownValue(dependency, "digest");
+      if (typeof digest !== "string" || !/^[\da-f]{16}$/.test(digest)) {
+        invalid(errors, `${dependencyPath}.digest`, "digest must be 16 lowercase hex digits");
+      }
+    }
+  }
+}
+
+function cellBlockInSheet(block: SheetSnapshot["cells"][number], sheet: SheetSnapshot): boolean {
+  return (
+    block.startRow <= sheet.rowCount &&
+    block.rowCount <= sheet.rowCount - block.startRow &&
+    block.startCol <= sheet.columns.length &&
+    block.colCount <= sheet.columns.length - block.startCol
+  );
+}
+
+/**
+ * Whether two in-bounds cells share an address. A sorted 8-byte key per cell
+ * replaces a Set entry per cell, which cost about 100 bytes each and made
+ * validating a large snapshot allocate as much as the snapshot itself.
+ * In-bounds cells have col < columns.length, so row * width + col is unique
+ * and, under the logical-cell limit, exact as a double.
+ */
+function hasDuplicateCellAddress(sheet: SheetSnapshot): boolean {
+  const width = sheet.columns.length;
+  let cellCount = 0;
+  for (const block of sheet.cells) cellCount += block.cells.length;
+  const keys = new Float64Array(cellCount);
+  let keyCount = 0;
+  for (const block of sheet.cells) {
+    if (!cellBlockInSheet(block, sheet)) continue;
+    for (const cell of block.cells) {
+      if (cell.rowOffset >= block.rowCount || cell.colOffset >= block.colCount) continue;
+      keys[keyCount++] =
+        (block.startRow + cell.rowOffset) * width + block.startCol + cell.colOffset;
+    }
+  }
+  const sorted = keys.subarray(0, keyCount).sort();
+  for (let index = 1; index < sorted.length; index++) {
+    if (sorted[index] === sorted[index - 1]) return true;
+  }
+  return false;
+}
+
+/**
+ * Pivot references may point at any sheet or table, including ones listed
+ * later, so they are checked after every sheet and table is known.
+ */
+function validateSnapshotPivots(
+  sheets: readonly SheetSnapshot[],
+  tables: readonly WorkbookTable[],
+  errors: DocumentValidationError[],
+): void {
+  const sheetSizes = new Map(
+    sheets.map((sheet) => [sheet.id, { rows: sheet.rowCount, cols: sheet.columns.length }]),
+  );
+  const tableWidths = new Map(tables.map((table) => [table.id, table.columns.length]));
+  const scope = {
+    sheetSize: (id: string) => sheetSizes.get(id),
+    tableWidth: (id: string) => tableWidths.get(id),
+  };
+  const ids = new Set<string>();
+
+  for (let sheetIndex = 0; sheetIndex < sheets.length; sheetIndex++) {
+    const sheet = sheets[sheetIndex];
+    if (!sheet?.pivots) continue;
+    const ownerSize = { rows: sheet.rowCount, cols: sheet.columns.length };
+    for (let index = 0; index < sheet.pivots.length; index++) {
+      const pivot = sheet.pivots[index];
+      if (!pivot) continue;
+      const path = `sheets[${sheetIndex}].pivots[${index}]`;
+      if (ids.has(pivot.id)) {
+        errors.push({
+          path: `${path}.id`,
+          code: "duplicate-id",
+          message: "Pivot IDs must be unique in the workbook",
+        });
+      }
+      ids.add(pivot.id);
+      if (ids.size > MAX_PIVOTS_PER_WORKBOOK) {
+        errors.push({
+          path,
+          code: "resource-limit",
+          message: `Workbook pivot limit ${MAX_PIVOTS_PER_WORKBOOK} exceeded`,
+        });
+        return;
+      }
+      validatePivotReferences(pivot, ownerSize, scope, path, errors);
+    }
+  }
+}
+
 function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
   const errors: DocumentValidationError[] = [];
   lastMergeValidationStats = { normalized: 0, nodeVisits: 0, errors: 0 };
@@ -2435,10 +2931,15 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
   const workbook = recordAt(ownValue(candidate, "workbook"), "workbook", errors);
   if (workbook) {
     requireString(workbook, "activeSheet", "workbook", errors, true);
+    validateXlsxSource(ownValue(workbook, "xlsxSource"), errors);
     const namedRanges = optionalArray(workbook, "namedRanges", "workbook", errors);
     namedRanges?.forEach((entry, index) => {
       validateNamedRangeShape(entry, `workbook.namedRanges[${index}]`, errors);
     });
+    const calculation = ownValue(workbook, "calculation");
+    if (calculation !== undefined) {
+      validateCalculationShape(calculation, "workbook.calculation", errors);
+    }
   }
 
   const sheets = arrayAt(ownValue(candidate, "sheets"), "sheets", errors);
@@ -2505,29 +3006,38 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
       );
     }
 
-    const occupied = new Set<string>();
+    // Only a sheet with a duplicate address pays for the Set that names each
+    // duplicate in cell order.
+    const occupied = hasDuplicateCellAddress(sheet) ? new Set<number>() : undefined;
+    const sheetWidth = sheet.columns.length;
     for (let blockIndex = 0; blockIndex < sheet.cells.length; blockIndex++) {
       const block = sheet.cells[blockIndex]!;
       const blockPath = `${path}.cells[${blockIndex}]`;
-      const blockInBounds =
-        block.startRow <= sheet.rowCount &&
-        block.rowCount <= sheet.rowCount - block.startRow &&
-        block.startCol <= sheet.columns.length &&
-        block.colCount <= sheet.columns.length - block.startCol;
+      const blockInBounds = cellBlockInSheet(block, sheet);
       if (!blockInBounds) {
         invalid(errors, blockPath, "Cell block lies outside the sheet", "out-of-bounds");
       }
       for (let cellIndex = 0; cellIndex < block.cells.length; cellIndex++) {
         const cell = block.cells[cellIndex]!;
-        const cellPath = `${blockPath}.cells[${cellIndex}]`;
         if (cell.rowOffset >= block.rowCount || cell.colOffset >= block.colCount) {
-          invalid(errors, cellPath, "Cell offset lies outside its block", "out-of-bounds");
+          invalid(
+            errors,
+            `${blockPath}.cells[${cellIndex}]`,
+            "Cell offset lies outside its block",
+            "out-of-bounds",
+          );
           continue;
         }
-        if (!blockInBounds) continue;
-        const key = `${block.startRow + cell.rowOffset}:${block.startCol + cell.colOffset}`;
+        if (!blockInBounds || !occupied) continue;
+        const key =
+          (block.startRow + cell.rowOffset) * sheetWidth + block.startCol + cell.colOffset;
         if (occupied.has(key)) {
-          invalid(errors, cellPath, "A snapshot cell may appear only once", "duplicate-id");
+          invalid(
+            errors,
+            `${blockPath}.cells[${cellIndex}]`,
+            "A snapshot cell may appear only once",
+            "duplicate-id",
+          );
         }
         occupied.add(key);
       }
@@ -2756,6 +3266,10 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
             .sort((a, b) => a.id.localeCompare(b.id))
             .map((table) => structuredClone(table))
         : undefined,
+      charts: sheet.charts?.map((chart) => structuredClone(chart)),
+      pivots: sheet.pivots
+        ? [...sheet.pivots].sort((a, b) => a.id.localeCompare(b.id)).map(clonePivot)
+        : undefined,
       cells: sheet.cells.map((block) => ({
         ...block,
         cells: [...block.cells].sort(
@@ -2772,6 +3286,8 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
     if (normalizedSheet.filters === undefined) delete normalizedSheet.filters;
     if (normalizedSheet.rowMeta === undefined) delete normalizedSheet.rowMeta;
     if (normalizedSheet.tables === undefined) delete normalizedSheet.tables;
+    if (normalizedSheet.charts === undefined) delete normalizedSheet.charts;
+    if (normalizedSheet.pivots === undefined) delete normalizedSheet.pivots;
     normalizedSheets.push(normalizedSheet);
   }
 
@@ -2826,6 +3342,16 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
         );
       }
     }
+
+    // Chart sources may read other sheets, so bounds are checked once every sheet is known.
+    if (sheet.charts && !validSheetCharts(sheet.charts, sheet, validated.sheets)) {
+      invalid(
+        errors,
+        `sheets[${sheetIndex}].charts`,
+        "Charts must have unique IDs, an in-sheet anchor, and sources inside existing sheets",
+        "out-of-bounds",
+      );
+    }
   }
 
   const namedRangeIds = new Set<string>();
@@ -2869,6 +3395,8 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
       invalid(errors, `${namedPath}.range`, "Named range lies outside the sheet", "out-of-bounds");
     }
   }
+
+  validateSnapshotPivots(validated.sheets, acceptedTables, errors);
 
   if (errors.length > 0) return { ok: false, errors };
   return {
@@ -2957,6 +3485,10 @@ export function documentOpTarget(operation: DocumentOp): string {
     case "removeProtectedRange":
     case "updateTable":
     case "removeTable":
+    case "setChart":
+    case "removeChart":
+    case "setPivot":
+    case "removePivot":
       return operation.sheet;
     case "addSheet":
       return operation.sheet.id;
@@ -2964,6 +3496,8 @@ export function documentOpTarget(operation: DocumentOp): string {
       return operation.namedRange.name;
     case "removeNamedRange":
       return operation.name;
+    case "setCalculation":
+      return "calculation";
     default: {
       const exhaustive: never = operation;
       return exhaustive;

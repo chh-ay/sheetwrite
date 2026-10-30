@@ -1,6 +1,6 @@
 ---
 title: "RUNTIME_RESOURCE_SCHEMA_VERSION | @sheetwrite/core"
-description: "Stable protocol for runtime ownership and operation-cost reports."
+description: "RUNTIME_RESOURCE_SCHEMA_VERSION variable in @sheetwrite/core: Stable protocol for runtime ownership and operation-cost reports."
 ---
 <!-- api-export:@sheetwrite/core|.|RUNTIME_RESOURCE_SCHEMA_VERSION -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="variable">variable</span></div>
@@ -28,6 +28,7 @@ const RUNTIME_RESOURCE_SCHEMA_VERSION: 2
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

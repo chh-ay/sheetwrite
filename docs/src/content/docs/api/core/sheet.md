@@ -1,6 +1,6 @@
 ---
 title: "Sheet | @sheetwrite/core"
-description: "Workbook sheet schema used when creating a live grid."
+description: "Sheet interface in @sheetwrite/core: Workbook sheet schema used when creating a live grid."
 ---
 <!-- api-export:@sheetwrite/core|.|Sheet -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -8,7 +8,7 @@ description: "Workbook sheet schema used when creating a live grid."
 Workbook sheet schema used when creating a live grid.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L41"><code>packages/core/src/types/document.ts#L41</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L43"><code>packages/core/src/types/document.ts#L43</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -31,9 +31,11 @@ Workbook sheet schema used when creating a live grid.
 <a href="#sheet-frozen-rows"><code>frozenRows</code></a>
 <a href="#sheet-frozen-cols"><code>frozenCols</code></a>
 <a href="#sheet-tables"><code>tables</code></a>
+<a href="#sheet-charts"><code>charts</code></a>
+<a href="#sheet-pivots"><code>pivots</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>19</span>
+## Members <span class="api-count" data-pagefind-ignore>21</span>
 
 <div class="api-member-list">
 
@@ -207,6 +209,24 @@ tables?: WorkbookTable[];
 ```
 
 </details>
+
+<details class="api-member" id="sheet-charts" data-pagefind-weight="1">
+<summary><code>charts</code> <span class="api-member-summary">Charts anchored to this sheet; series sources use stable sheet IDs.</span></summary>
+
+```ts generated
+charts?: ChartDefinition[];
+```
+
+</details>
+
+<details class="api-member" id="sheet-pivots" data-pagefind-weight="1">
+<summary><code>pivots</code> <span class="api-member-summary">Pivot tables anchored on this sheet; IDs are unique in the workbook.</span></summary>
+
+```ts generated
+pivots?: PivotDefinition[];
+```
+
+</details>
 </div>
 
 ## Declaration
@@ -235,6 +255,8 @@ export interface Sheet {
   frozenRows?: number;
   frozenCols?: number;
   tables?: WorkbookTable[];
+  charts?: ChartDefinition[];
+  pivots?: PivotDefinition[];
 }
 ```
 
@@ -247,6 +269,7 @@ export interface Sheet {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
@@ -259,6 +282,7 @@ export interface Sheet {
 <ul class="api-consumer-list">
 <li><a href="/docs/api/core/assert-workbook-tables/"><code>assertWorkbookTables</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/to-csv/"><code>toCsv</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/to-csv-stream/"><code>toCsvStream</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/valid-workbook-table/"><code>validWorkbookTable</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/workbook/"><code>Workbook</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>

@@ -14,6 +14,6 @@ test("hover see-also tags link guide paths and API names", async () => {
     code: 'import { initSheetwrite } from "@sheetwrite/core";\nawait initSheetwrite();',
   });
   const hrefs = selectAll("a", rendered.renderedGroupAst).map((link) => link.properties.href);
-  expect(hrefs).toContain("/docs/guides/formulas/");
+  expect(hrefs).toContain("/docs/start/choose-an-engine/");
   expect(hrefs).toContain("/docs/api/core/create-grid/");
 });

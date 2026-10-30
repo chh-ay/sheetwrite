@@ -1,13 +1,13 @@
 ---
 title: "GridOptions | @sheetwrite/core"
-description: "Workbook, data, rendering, policy, and built-in UI options used to create a Grid."
+description: "GridOptions interface in @sheetwrite/core: Workbook, data, rendering, policy, and built-in UI options used to create a Grid."
 ---
 <!-- api-export:@sheetwrite/core|.|GridOptions -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Workbook, data, rendering, policy, and built-in UI options used to create a Grid.
 
-### Examples
+## Examples
 
 ```ts compile
 import type { GridOptions } from "@sheetwrite/core";
@@ -22,13 +22,13 @@ const options: GridOptions = {
 };
 ```
 
-### See also
+## See also
 
 - [createGrid](/docs/api/core/create-grid/)
 - [GridConfig](/docs/api/core/grid-config/)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L423"><code>packages/core/src/types/grid.ts#L423</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L550"><code>packages/core/src/types/grid.ts#L550</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -102,21 +102,23 @@ renderer?: "canvas" | "worker";
 </details>
 
 <details class="api-member" id="grid-options-worker-url" data-pagefind-weight="1">
-<summary><code>workerUrl</code> <span class="api-member-summary">URL of the worker renderer module (renderer: &quot;worker&quot;), as served to the BROWSER — the platform Worker constructor does not consult package exports, so a bare specifier like new URL(&quot;@sheetwrite/core/worker&quot;,…</span></summary>
+<summary><code>workerUrl</code> <span class="api-member-summary">URL of the worker renderer module (renderer: &quot;worker&quot;), as served to the BROWSER.</span></summary>
 
 ```ts generated
 workerUrl?: string | URL;
 ```
 
 <p class="api-member-doc">URL of the worker renderer module (`renderer: &quot;worker&quot;`), as served to the
-BROWSER — the platform `Worker` constructor does not consult package
-exports, so a bare specifier like `new URL(&quot;@sheetwrite/core/worker&quot;,
-import.meta.url)` is NOT reliable. Either copy
-`@sheetwrite/core/dist/worker.js` to your public assets and pass its URL
-string (works everywhere), or use your bundler's dependency-worker import
-if it has one (see `/docs/guides/worker-rendering/`). If omitted or the worker
-can't be constructed, the grid falls back to the main-thread canvas
-renderer and emits `renderer-fallback` once.</p>
+BROWSER. Usually not needed: by default the grid creates its worker as
+`new Worker(new URL(&quot;./worker.js&quot;, import.meta.url))`, which bundlers such
+as Vite build together with the worker's imports. Pass a URL when there
+is no bundler, or when yours copies the file instead of building it, for
+example a copy of `@sheetwrite/core/dist/` in your public assets (see
+`/docs/features/worker-rendering/`). A bare specifier like
+`new URL(&quot;@sheetwrite/core/worker&quot;, import.meta.url)` is NOT reliable: the
+platform `Worker` constructor does not consult package exports. If the
+worker can't be constructed or fails to load, the grid falls back to the
+main-thread canvas renderer and emits `renderer-fallback` once.</p>
 </details>
 
 <details class="api-member" id="grid-options-presentation" data-pagefind-weight="1">
@@ -279,6 +281,7 @@ export interface GridOptions {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

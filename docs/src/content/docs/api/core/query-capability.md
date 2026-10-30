@@ -1,6 +1,6 @@
 ---
 title: "QueryCapability | @sheetwrite/core"
-description: "Whether a query is complete for the currently loaded datasource pages."
+description: "QueryCapability type in @sheetwrite/core: Whether a query is complete for the currently loaded datasource pages."
 ---
 <!-- api-export:@sheetwrite/core|.|QueryCapability -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
@@ -8,7 +8,7 @@ description: "Whether a query is complete for the currently loaded datasource pa
 Whether a query is complete for the currently loaded datasource pages.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/store.ts#L133"><code>packages/core/src/types/store.ts#L133</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/store.ts#L143"><code>packages/core/src/types/store.ts#L143</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>2</span>
@@ -60,6 +60,7 @@ export type QueryCapability =
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

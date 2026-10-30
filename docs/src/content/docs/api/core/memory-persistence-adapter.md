@@ -1,6 +1,6 @@
 ---
 title: "MemoryPersistenceAdapter | @sheetwrite/core"
-description: "Executable database-neutral reference adapter for tests, demos, and local workflows."
+description: "MemoryPersistenceAdapter class in @sheetwrite/core: Executable database-neutral reference adapter for tests, demos, and local workflows."
 ---
 <!-- api-export:@sheetwrite/core|.|MemoryPersistenceAdapter -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="class">class</span></div>
@@ -82,6 +82,7 @@ class MemoryPersistenceAdapter implements PersistenceAdapter {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

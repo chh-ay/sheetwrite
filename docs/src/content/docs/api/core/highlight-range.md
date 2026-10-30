@@ -1,6 +1,6 @@
 ---
 title: "HighlightRange | @sheetwrite/core"
-description: "A highlight target: a range plus an optional per-range color override."
+description: "HighlightRange interface in @sheetwrite/core: A highlight target: a range plus an optional per-range color override."
 ---
 <!-- api-export:@sheetwrite/core|.|HighlightRange -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -81,6 +81,7 @@ export interface HighlightRange {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

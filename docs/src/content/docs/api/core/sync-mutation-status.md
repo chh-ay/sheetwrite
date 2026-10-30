@@ -1,6 +1,6 @@
 ---
 title: "SyncMutationStatus | @sheetwrite/core"
-description: "Lifecycle state of one local mutation in the synchronization queue."
+description: "SyncMutationStatus type in @sheetwrite/core: Lifecycle state of one local mutation in the synchronization queue."
 ---
 <!-- api-export:@sheetwrite/core|.|SyncMutationStatus -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
@@ -29,6 +29,7 @@ export type SyncMutationStatus =
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

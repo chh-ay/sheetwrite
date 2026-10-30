@@ -1,6 +1,6 @@
 ---
 title: "ShellPiece | @sheetwrite/core/shell"
-description: "A mounted shell piece: its root element plus an idempotent teardown."
+description: "ShellPiece interface in @sheetwrite/core/shell: A mounted shell piece: its root element plus an idempotent teardown."
 ---
 <!-- api-export:@sheetwrite/core|./shell|ShellPiece -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-shell/">@sheetwrite/core/shell</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -55,6 +55,7 @@ export interface ShellPiece {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
@@ -66,6 +67,7 @@ export interface ShellPiece {
 
 <ul class="api-consumer-list">
 <li><a href="/docs/api/core-shell/create-name-box/"><code>createNameBox</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core-shell/create-ribbon/"><code>createRibbon</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core-shell/create-selection-status/"><code>createSelectionStatus</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core-shell/create-toolbar/"><code>createToolbar</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>

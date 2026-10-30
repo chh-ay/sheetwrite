@@ -2,6 +2,7 @@
 // No runtime values live here.
 
 import type { CellScalar, CellStyle, Column } from "./cell.js";
+import type { ChartRenderer, ChartViewProvider } from "./chart.js";
 import type { CellAddress, SheetId } from "./coordinates.js";
 import type {
   DocumentOp,
@@ -16,6 +17,15 @@ import type {
   Transaction,
   TransactionApplicationOptions,
 } from "./transaction.js";
+
+/** Creates a chart provider owned and disposed by one renderer or host. */
+export type ChartViewProviderFactory = (store: Store) => ChartViewProvider;
+
+/**
+ * Creates the chart renderer of one grid. The grid disposes it. It lives next
+ * to `ChartViewProviderFactory` because the chart type domain cannot read `Store`.
+ */
+export type ChartRendererFactory = (store: Store) => ChartRenderer;
 
 /** Retained logical payload and allocated capacity attributed to one exclusive owner. */
 export interface ResourceOwnerBytes {
@@ -149,8 +159,10 @@ export interface Store {
   /** Plain-reference target at `addr`, or null when the cell is not a ref. */
   getRefTarget(addr: CellAddress): CellAddress | null;
   /**
-   * Recompute volatile formulas (`TODAY`/`NOW`) from one captured instant.
-   * The supplied Date is interpreted as an absolute UTC instant.
+   * Recompute volatile formulas (`TODAY`, `NOW`, `RAND`, `RANDBETWEEN`, `OFFSET`,
+   * `INDIRECT`) from one captured instant. The supplied Date is interpreted as an absolute UTC instant.
+   * Edits already recompute volatile formulas and read the clock once per
+   * recalculation; this call uses `now` instead, until the next edit.
    */
   recalculateVolatile(now?: Date): void;
   /** Bulk read of a visible window; the only read a renderer should use per frame. */

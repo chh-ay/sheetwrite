@@ -1,6 +1,6 @@
 ---
 title: "WindowView | @sheetwrite/wasm"
-description: "A bulk window of resolved cells, row-major over nrows x ncols."
+description: "WindowView class in @sheetwrite/wasm: A bulk window of resolved cells, row-major over nrows x ncols."
 ---
 <!-- api-export:@sheetwrite/wasm|.|WindowView -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/wasm/">@sheetwrite/wasm</a><span class="api-status" data-kind="class">class</span></div>
@@ -8,7 +8,7 @@ description: "A bulk window of resolved cells, row-major over nrows x ncols."
 A bulk window of resolved cells, row-major over `n_rows x n_cols`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L475"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L475</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L482"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L482</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>6</span>

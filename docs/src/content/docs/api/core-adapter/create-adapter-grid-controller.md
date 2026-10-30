@@ -1,6 +1,6 @@
 ---
 title: "createAdapterGridController | @sheetwrite/core/adapter"
-description: "Owns initialization, replacement, publication, and retirement for framework adapters."
+description: "createAdapterGridController function in @sheetwrite/core/adapter: Owns initialization, replacement, publication, and retirement for framework adapters."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|createAdapterGridController -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="function">function</span></div>
@@ -33,6 +33,7 @@ function createAdapterGridController<
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

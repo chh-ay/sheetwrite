@@ -1,6 +1,6 @@
 ---
 title: "RowBridgeProjection | @sheetwrite/core/adapter"
-description: "Result of projection or reconciliation."
+description: "RowBridgeProjection interface in @sheetwrite/core/adapter: Result of projection or reconciliation."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|RowBridgeProjection -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -8,7 +8,7 @@ description: "Result of projection or reconciliation."
 Result of projection or reconciliation.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L202"><code>packages/core/src/row-bridge.ts#L202</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L205"><code>packages/core/src/row-bridge.ts#L205</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>
@@ -65,6 +65,7 @@ export interface RowBridgeProjection<Id extends RowBridgeId = RowBridgeId> {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

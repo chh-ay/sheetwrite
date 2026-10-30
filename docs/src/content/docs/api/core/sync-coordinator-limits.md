@@ -1,6 +1,6 @@
 ---
 title: "SyncCoordinatorLimits | @sheetwrite/core"
-description: "Resource ceilings applied independently to remote collaboration input and local durability."
+description: "SyncCoordinatorLimits interface in @sheetwrite/core: Resource ceilings applied independently to remote collaboration input and local durability."
 ---
 <!-- api-export:@sheetwrite/core|.|SyncCoordinatorLimits -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -8,7 +8,7 @@ description: "Resource ceilings applied independently to remote collaboration in
 Resource ceilings applied independently to remote collaboration input and local durability.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L122"><code>packages/core/src/sync.ts#L122</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L123"><code>packages/core/src/sync.ts#L123</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -186,6 +186,7 @@ export interface SyncCoordinatorLimits {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

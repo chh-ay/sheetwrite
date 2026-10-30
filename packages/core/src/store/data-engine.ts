@@ -2,8 +2,19 @@ import type { CellSnapshot, EngineInstance, RangeSnapshot } from "@sheetwrite/wa
 
 import { remapFormulaA1Refs } from "../a1.js";
 import { parseCellLiteralInput } from "../cell-input.js";
+import {
+  assertWorkbookCharts,
+  type ChartAxisEdit,
+  chartFitsSheets,
+  invalidateChartSheet,
+  MAX_CHARTS_PER_SHEET,
+  rebaseChartAxis,
+  sanitizeChartDefinition,
+  sheetChartsFit,
+} from "../chart-definition.js";
 import { validConditionalRules } from "../conditional-format.js";
 import { dateToSerial } from "../date-serial.js";
+import { isValidCalculationSettings, storedCalculationSettings } from "../document-protocol.js";
 import { ENGINE_LOAD_HINT, getEngine, isEngineLoaded as isLoaded } from "../engine.js";
 import { SheetwriteError } from "../errors.js";
 import {
@@ -11,6 +22,22 @@ import {
   MAX_HYPERLINKS_PER_SHEET,
   sanitizeCellHyperlink,
 } from "../hyperlink.js";
+import {
+  applyPivotRewrites,
+  clonePivot,
+  encodePivotPayload,
+  encodeSavedPivotPayload,
+  MAX_PIVOTS_PER_WORKBOOK,
+  type PivotIssue,
+  pivotOwner,
+  pivotRewrites,
+  planPivotEdit,
+  savedOutputRange,
+  sheetPivotScope,
+  uncomputedPivotResult,
+  validatePivotReferences,
+  validatePivotShape,
+} from "../pivot.js";
 import {
   consumeSourceSnapshot,
   type RangeSourceProjection,
@@ -32,6 +59,7 @@ import { restoreBlockFacts } from "../restore-block.js";
 import { canAddSheetSnapshot } from "../sheet-lifecycle.js";
 import { validateSheetName } from "../sheet-name.js";
 import { StyleDictionary } from "../style-dictionary.js";
+import { preparedHistoryBlock, type TransactionPreparation } from "../transaction-preparation.js";
 import type {
   CellFormat,
   CellHyperlink,
@@ -41,6 +69,7 @@ import type {
   Column,
   ConditionalFormatRule,
 } from "../types/cell.js";
+import type { ChartDefinition } from "../types/chart.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "../types/coordinates.js";
 import type {
   AggregateOp,
@@ -50,6 +79,7 @@ import type {
   RowData,
 } from "../types/data.js";
 import type {
+  CalculationSettings,
   ColumnFilter,
   DataValidationRule,
   DocumentOp,
@@ -67,6 +97,12 @@ import type {
   WorkbookSnapshot,
 } from "../types/document.js";
 import type {
+  PivotDefinition,
+  PivotFieldType,
+  PivotResultView,
+  PivotSourceField,
+} from "../types/pivot.js";
+import type {
   CellLoadState,
   ClipboardWindowView,
   PagedStoreStats,
@@ -80,6 +116,7 @@ import type { ChangeEvent } from "../types/transaction.js";
 import {
   assertWorkbookTables,
   DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
+  remapWorkbookTableRuleColumns,
   validWorkbookTable,
   workbookTableNameKey,
 } from "../workbook-table.js";
@@ -92,7 +129,9 @@ import {
   normalizedRange,
   normalizeMerge,
   patchSheetId,
+  pivotWrittenRange,
   positiveCount,
+  rangesIntersect,
   rebaseRangeCols,
   rebaseRangeRows,
   remapSpan,
@@ -117,6 +156,59 @@ import { KIND_BOOL, KIND_FORMULA, KIND_NUMBER, KIND_STRING } from "./wire-tags.j
 
 const AGG_OP: Record<AggregateOp, number> = { sum: 0, avg: 1, min: 2, max: 3, count: 4 };
 
+/** Engine field-type codes, indexed by code. */
+const PIVOT_FIELD_TYPES: readonly PivotFieldType[] = [
+  "blank",
+  "number",
+  "text",
+  "boolean",
+  "mixed",
+];
+
+/** `pivotStatus` values per pivot: error, row, col, rows, cols, headerRows, labelCols. */
+const PIVOT_STATUS_STRIDE = 7;
+
+/** Error sentinels by engine `FormulaError` slot; `pivotStatus` sends slot + 1. */
+const PIVOT_ERRORS: readonly string[] = [
+  "#CYCLE!",
+  "#DIV/0!",
+  "#REF!",
+  "#NUM!",
+  "#VALUE!",
+  "#NAME?",
+  "#N/A",
+  "#SPILL!",
+  "#CALC!",
+  "#LOADING!",
+  "#NULL!",
+];
+
+interface PivotStatusRecord {
+  /** 0 when the output rendered; otherwise the anchor shows an error. */
+  readonly error: number;
+  readonly row: number;
+  readonly col: number;
+  readonly rows: number;
+  readonly cols: number;
+  readonly headerRows: number;
+  readonly labelCols: number;
+}
+
+function pivotStatusAt(status: Uint32Array, index: number): PivotStatusRecord | null {
+  const base = index * PIVOT_STATUS_STRIDE;
+  if (base + PIVOT_STATUS_STRIDE > status.length) return null;
+  const at = (offset: number): number => status[base + offset] ?? 0;
+  return {
+    error: at(0),
+    row: at(1),
+    col: at(2),
+    rows: at(3),
+    cols: at(4),
+    headerRows: at(5),
+    labelCols: at(6),
+  };
+}
+
 /** Rows per allocation-lazy chunk; this matches the store engine's native default. */
 const DEFAULT_PAGED_CHUNK_ROWS = 4_096;
 /** Per-sheet budget for clean, unpinned chunks; dirty or visible chunks stay resident. */
@@ -130,7 +222,10 @@ export interface CompactRangeHistory {
   readonly resource: RangeSnapshot;
   readonly byteLength: number;
   readonly refs: ReadonlyArray<[offset: number, target: CellAddress]>;
-  toDocumentOp(range: Range): Extract<DocumentOp, { op: "setBlock" }>;
+  toDocumentOp(
+    range: Range,
+    preparation?: TransactionPreparation,
+  ): Extract<DocumentOp, { op: "setBlock" }>;
   dispose(): void;
 }
 
@@ -347,6 +442,8 @@ export class StoreDataEngine {
   private disposed = false;
   private committedBytesAfterDispose: number | null = null;
   private readonly spillBlockersDirty = new Set<SheetId>();
+  /** Sheets whose pivots must be sent to the engine before the mutation commits. */
+  private readonly pivotSheetsDirty = new Set<SheetId>();
 
   private readonly rangeHistory = new Map<
     CompactRangeHistory,
@@ -397,9 +494,10 @@ export class StoreDataEngine {
       DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
       (workbook.namedRanges ?? []).map((range) => range.name),
     );
+    assertWorkbookCharts(workbook.sheets);
     this.workbook = workbook;
     this.storageOptions = options;
-    this.wasm = new (getEngine().CellStore)() as RecomputingCellStore;
+    this.wasm = new (getEngine().CellStore)();
     this.boundaryAccounting.record("startup", "js-to-wasm", 0, "scalar");
     this.view = new StoreViewState(this.wasm, workbook, this.handles);
     this.windowReader = new StoreWindowReader(this.wasm, workbook, this.handles, this.styles);
@@ -444,8 +542,22 @@ export class StoreDataEngine {
         throw new Error(`invalid named range: ${namedRange.name}`);
       }
     }
+    this.loadPivots();
+
+    // Before any cell is loaded, so formulas compute once under the stored limits.
+    // Defaults need no engine call and are dropped to keep snapshots unchanged.
+    const calculation = storedCalculationSettings(workbook.calculation);
+    if (calculation === undefined) delete workbook.calculation;
+    else if (this.syncCalculation(calculation)) workbook.calculation = calculation;
+    else {
+      this.wasm.free();
+      throw new Error("invalid calculation settings");
+    }
+
     if (data) {
       this.withResourceOperation("ingest", () => this.loadColumnar(workbook.activeSheet, data));
+    } else if (workbook.sheets.some((sheet) => sheet.pivots?.length)) {
+      this.wasm.commitSources();
     }
     this.resourceOperation = null;
   }
@@ -608,6 +720,88 @@ export class StoreDataEngine {
     this.spillBlockersDirty.clear();
   }
 
+  /** Validate every loaded pivot against the whole workbook, then install them. */
+  private loadPivots(): void {
+    const ids = new Set<string>();
+    for (const sheet of this.workbook.sheets) {
+      for (const [index, pivot] of (sheet.pivots ?? []).entries()) {
+        const issues = this.pivotIssues(pivot, sheet, this.workbook.sheets);
+        if (ids.has(pivot.id) || ids.size >= MAX_PIVOTS_PER_WORKBOOK || issues.length > 0) {
+          this.wasm.free();
+          const reason = issues[0]?.message ?? "Pivot IDs must be unique within the limit";
+          throw new Error(`invalid pivot ${sheet.id}.pivots[${index}]: ${reason}`);
+        }
+        ids.add(pivot.id);
+      }
+      if (sheet.pivots?.length) this.syncPivots(sheet);
+    }
+  }
+
+  private pivotIssues(pivot: unknown, owner: Sheet, sheets: readonly Sheet[]): PivotIssue[] {
+    const issues: PivotIssue[] = [];
+    validatePivotShape(pivot, "pivot", issues);
+    if (issues.length > 0) return issues;
+
+    // Shape validation above proves the definition schema.
+    validatePivotReferences(
+      pivot as PivotDefinition,
+      { rows: owner.rowCount, cols: owner.columns.length },
+      sheetPivotScope(sheets),
+      "pivot",
+      issues,
+    );
+    return issues;
+  }
+
+  /** The full engine gets every definition; the default engine only saved output. */
+  private syncPivots(sheet: Sheet, wasm: RecomputingCellStore = this.wasm): void {
+    const pivots = sheet.pivots ?? [];
+    if (!wasm.setPivots) {
+      if (!wasm.setSavedPivots) {
+        if (pivots.some((pivot) => pivot.savedOutput !== undefined)) {
+          throw new Error("Engine cannot install saved pivot output");
+        }
+        return;
+      }
+      const saved = encodeSavedPivotPayload(pivots);
+      this.boundaryAccounting.record(
+        this.resourceOperation ?? "edit",
+        "js-to-wasm",
+        saved.layout.byteLength +
+          saved.kinds.byteLength +
+          saved.numbers.byteLength +
+          saved.textLengths.byteLength,
+        "bulk",
+      );
+      const handle = this.handleOf(sheet.id);
+      const { layout, kinds, numbers, text, textLengths } = saved;
+      if (!wasm.setSavedPivots(handle, layout, kinds, numbers, text, textLengths)) {
+        throw new RangeError(`saved pivot payload rejected for sheet: ${sheet.id}`);
+      }
+      return;
+    }
+
+    const payload = encodePivotPayload(pivots, (id) => this.handles.get(id));
+    this.boundaryAccounting.record(
+      this.resourceOperation ?? "edit",
+      "js-to-wasm",
+      payload.numbers.byteLength,
+      "bulk",
+    );
+    if (!wasm.setPivots(this.handleOf(sheet.id), payload.numbers, payload.strings)) {
+      throw new RangeError(`pivot payload rejected for sheet: ${sheet.id}`);
+    }
+  }
+
+  /** Runs inside the mutation, so the engine renders pivots at the commit barrier. */
+  private flushPivots(): void {
+    for (const sheetId of this.pivotSheetsDirty) {
+      const sheet = this.workbook.sheets.find((candidate) => candidate.id === sheetId);
+      if (sheet) this.syncPivots(sheet);
+    }
+    this.pivotSheetsDirty.clear();
+  }
+
   private spillAnchor(addr: CellAddress): CellAddress | null {
     const handle = this.handleOf(addr.sheet);
     const row = this.wasm.spillAnchorRow(handle, addr.row, addr.col);
@@ -707,6 +901,20 @@ export class StoreDataEngine {
       names.add(workbookTableNameKey(name));
       return { id, name };
     });
+  }
+
+  /**
+   * Hand settings to the engine. Checked here first because the binding
+   * truncates a fractional or out-of-range count to u32 instead of refusing it.
+   */
+  private syncCalculation(calculation: CalculationSettings): boolean {
+    if (!isValidCalculationSettings(calculation)) return false;
+
+    return this.wasm.setIterativeCalculation(
+      calculation.iterate,
+      calculation.maxIterations,
+      calculation.maxChange,
+    );
   }
 
   private syncNamedRange(namedRange: NamedRangeSnapshot): boolean {
@@ -976,12 +1184,14 @@ export class StoreDataEngine {
       },
 
       refs,
-      toDocumentOp: (target) => {
+      toDocumentOp: (target, preparation) => {
         if (disposed) throw new Error("history range snapshot already disposed");
         this.rangeMutationStats.historyMaterializations += 1;
         const kindsColumnMajor = resource.kinds();
         const numbersColumnMajor = this.wasm.snapshotNumbers(resource);
-        const textsColumnMajor = this.wasm.snapshotTexts(resource);
+        const textsColumnMajor = kindsColumnMajor.includes(KIND_STRING)
+          ? this.wasm.snapshotTexts(resource)
+          : undefined;
         const stylesColumnMajor = resource.styleIds();
         const values: CellScalar[] = new Array(rows * cols);
         const styleIds: number[] = new Array(rows * cols);
@@ -993,7 +1203,7 @@ export class StoreDataEngine {
             const offset = row * cols + col;
             const kind = kindsColumnMajor[source]!;
             const number = numbersColumnMajor[source]!;
-            const text = textsColumnMajor[source]!;
+            const text = textsColumnMajor?.[source] ?? "";
             values[offset] =
               kind === KIND_NUMBER
                 ? number
@@ -1021,7 +1231,27 @@ export class StoreDataEngine {
           styleTable,
           styleIds,
         };
-        return { op: "setBlock", range: target, block };
+        const operation: Extract<DocumentOp, { op: "setBlock" }> = {
+          op: "setBlock",
+          range: target,
+          block,
+        };
+        preparation?.seedHistory(operation, (bounds) => {
+          if (disposed) throw new Error("history range snapshot already disposed");
+          if (
+            bounds.end.row - bounds.start.row + 1 !== rows ||
+            bounds.end.col - bounds.start.col + 1 !== cols
+          )
+            return false;
+          this.noteRangeMutationFfi();
+          return this.wasm.restoreRange(
+            this.handleOf(bounds.sheet),
+            bounds.start.row,
+            bounds.start.col,
+            resource,
+          );
+        });
+        return operation;
       },
       dispose: () => {
         if (disposed) return;
@@ -1046,6 +1276,145 @@ export class StoreDataEngine {
 
   getWorkbook(): Workbook {
     return this.workbook;
+  }
+
+  private pivotCount(): number {
+    let count = 0;
+    for (const sheet of this.workbook.sheets) count += sheet.pivots?.length ?? 0;
+    return count;
+  }
+
+  /** Status record of the pivot at `index` on `sheet`, or null without engine support. */
+  private pivotStatusRecord(sheet: SheetId, index: number): PivotStatusRecord | null {
+    if (!this.wasm.pivotStatus) return null;
+    return pivotStatusAt(this.wasm.pivotStatus(this.handleOf(sheet)), index);
+  }
+
+  /**
+   * Rendered output rectangles of the pivots on `sheet`. The default engine
+   * has no `pivotStatus`, so the rectangle comes from the anchor and
+   * `savedOutput`, and counts only while the engine shows it: a blocked
+   * saved output owns no cells, so the user can clear its blocker.
+   */
+  pivotOutputs(sheet: SheetId): Array<{ id: string; range: Range }> {
+    const pivots = this.workbook.sheets.find((candidate) => candidate.id === sheet)?.pivots;
+    if (!pivots?.length) return [];
+    if (!this.wasm.pivotStatus) return this.savedPivotOutputs(sheet, pivots);
+
+    const status = this.wasm.pivotStatus(this.handleOf(sheet));
+    const outputs: Array<{ id: string; range: Range }> = [];
+    for (const [index, pivot] of pivots.entries()) {
+      const record = pivotStatusAt(status, index);
+      if (!record || record.rows === 0 || record.cols === 0) continue;
+      outputs.push({
+        id: pivot.id,
+        range: {
+          sheet,
+          start: { row: record.row, col: record.col },
+          end: { row: record.row + record.rows - 1, col: record.col + record.cols - 1 },
+        },
+      });
+    }
+    return outputs;
+  }
+
+  private savedPivotOutputs(
+    sheet: SheetId,
+    pivots: readonly PivotDefinition[],
+  ): Array<{ id: string; range: Range }> {
+    const outputs: Array<{ id: string; range: Range }> = [];
+    for (const pivot of pivots) {
+      const range = savedOutputRange(sheet, pivot);
+      if (!range) continue;
+      // An installed output owns its anchor; a blocked one does not.
+      const owner = this.spillAnchor({ sheet, row: range.start.row, col: range.start.col });
+      if (owner && owner.row === range.start.row && owner.col === range.start.col) {
+        outputs.push({ id: pivot.id, range });
+      }
+    }
+    return outputs;
+  }
+
+  /**
+   * Plain view of one pivot's output: one status call and one bulk read.
+   * Null when `sheet` holds no pivot with `id`.
+   */
+  getPivotResult(sheet: SheetId, id: string): PivotResultView | null {
+    const pivots = this.workbook.sheets.find((candidate) => candidate.id === sheet)?.pivots ?? [];
+    const index = pivots.findIndex((pivot) => pivot.id === id);
+    const pivot = pivots[index];
+    if (!pivot) return null;
+
+    const record = this.pivotStatusRecord(sheet, index);
+    if (!record) {
+      const result = uncomputedPivotResult(sheet, pivot);
+      if (!pivot.savedOutput) return result;
+      const owner = this.spillAnchor({ sheet, ...pivot.anchor });
+      if (owner && owner.row === pivot.anchor.row && owner.col === pivot.anchor.col) return result;
+      return { ...result, status: "error", error: "#SPILL!", rows: 0, cols: 0, cells: [] };
+    }
+
+    if (record.error !== 0) {
+      // An anchor that holds a source keeps it, so the code names the error, not the cell.
+      return {
+        status: "error",
+        error: PIVOT_ERRORS[record.error - 1] ?? "#VALUE!",
+        anchor: { sheet, row: record.row, col: record.col },
+        rows: 0,
+        cols: 0,
+        headerRows: 0,
+        labelCols: 0,
+        cells: [],
+      };
+    }
+
+    const cols = Array.from({ length: record.cols }, (_, offset) => record.col + offset);
+    const window = this.getDataWindow(
+      sheet,
+      { start: record.row, end: record.row + record.rows },
+      cols,
+    );
+    const cells = Array.from(window.values);
+    return {
+      status: "ok",
+      anchor: { sheet, row: record.row, col: record.col },
+      rows: record.rows,
+      cols: record.cols,
+      headerRows: record.headerRows,
+      labelCols: record.labelCols,
+      cells,
+    };
+  }
+
+  /**
+   * Whether the loaded engine computes pivots. The full engine does; the
+   * default engine only shows saved output. The ribbon needs this before any
+   * pivot exists, and `getPivotFields` cannot tell the engines apart without one.
+   */
+  get computesPivots(): boolean {
+    return this.wasm.pivotFields !== undefined;
+  }
+
+  /** Source fields of one pivot; empty on the default engine or for an unknown pivot. */
+  getPivotFields(sheet: SheetId, id: string): PivotSourceField[] {
+    const index =
+      this.workbook.sheets
+        .find((candidate) => candidate.id === sheet)
+        ?.pivots?.findIndex((pivot) => pivot.id === id) ?? -1;
+    if (index < 0 || !this.wasm.pivotFields) return [];
+
+    const list = this.wasm.pivotFields(this.handleOf(sheet), index);
+    try {
+      const names = list.names();
+      const types = list.types();
+      return names.map((header, field) => ({
+        index: field,
+        header,
+        type: PIVOT_FIELD_TYPES[types[field] ?? 0] ?? "mixed",
+      }));
+    } finally {
+      list.free();
+    }
   }
 
   private rawCell(addr: CellAddress): ResolvedCell {
@@ -1174,6 +1543,47 @@ export class StoreDataEngine {
         refs.length * 4 +
         spillDerived.length,
     };
+  }
+
+  /**
+   * Whether any cell in the rectangle takes its value from elsewhere: a formula,
+   * a cross-reference, a spill child or pivot output. Chart tracking calls it
+   * once per series range when its index is rebuilt, never per edit: the source
+   * capture walks every formula on the sheet. Callers clip the range to the
+   * sheet first.
+   */
+  chartSourcesComputed(range: Range): boolean {
+    const bounds = normalizedRange(range);
+
+    // The engine writes pivot output with no document op on its cells. The output
+    // grows down and right from the anchor like a spill, so a pivot anchored at or
+    // above-left of the range end can reach it. This model test is cheap, so do it first.
+    const pivots = this.workbook.sheets.find((sheet) => sheet.id === bounds.sheet)?.pivots ?? [];
+    const pivotReaches = pivots.some(
+      (pivot) => pivot.anchor.row <= bounds.end.row && pivot.anchor.col <= bounds.end.col,
+    );
+    if (pivotReaches) return true;
+
+    // Spill children carry no source of their own, so the source capture cannot see them.
+    if (this.hasSpillChildren(range)) return true;
+
+    // Include anchors above and left: an existing spill may grow into this range
+    // after a precedent changes. This conservatively follows those formulas too.
+    // Not `captureSourceProjection`: that one counts toward range-mutation statistics.
+    const snapshot = this.wasm.captureSources(
+      this.handleOf(bounds.sheet),
+      0,
+      0,
+      bounds.end.row + 1,
+      bounds.end.col + 1,
+    );
+    if (!snapshot) return false;
+
+    try {
+      return snapshot.formulaOffsets().length > 0 || snapshot.referenceOffsets().length > 0;
+    } finally {
+      snapshot.free();
+    }
   }
 
   aggregate(sheet: SheetId, col: number, op: AggregateOp): number {
@@ -1313,6 +1723,16 @@ export class StoreDataEngine {
     return cells.sort(
       (left, right) => left.rowOffset - right.rowOffset || left.colOffset - right.colOffset,
     );
+  }
+
+  /** Cells on `sheet` whose formula holds a 3-D reference, which a tab move can rewrite. */
+  sheetSpanFormulaCells(sheet: SheetId): { row: number; col: number }[] {
+    const pairs = this.wasm.sheetSpanFormulaCells(this.handleOf(sheet));
+    const cells: { row: number; col: number }[] = [];
+    for (let index = 0; index + 1 < pairs.length; index += 2) {
+      cells.push({ row: pairs[index] ?? 0, col: pairs[index + 1] ?? 0 });
+    }
+    return cells;
   }
 
   /** Sources for a whole logical sheet, without reading every resolved cell. */
@@ -1642,12 +2062,57 @@ export class StoreDataEngine {
     );
   }
 
+  /**
+   * Peer operations and history may restore a source that blocks derived
+   * output. Uninstall only the pivots whose output a replayed write touches;
+   * `flushPivots` reinstalls them at the barrier. The engine keeps the caches
+   * of unchanged definitions, so other pivots on the sheet are not rebuilt.
+   */
+  private releaseReplayedPivotOutputs(patches: readonly DocumentOp[]): void {
+    // One status call per sheet, not per patch; null marks a sheet without pivots.
+    const outputsBySheet = new Map<SheetId, Array<{ id: string; range: Range }> | null>();
+    const releasedBySheet = new Map<SheetId, Set<string>>();
+    for (const patch of patches) {
+      const sheetId = patchSheetId(patch);
+      if (sheetId === null) continue;
+      let outputs = outputsBySheet.get(sheetId);
+      if (outputs === undefined) {
+        const sheet = this.workbook.sheets.find((candidate) => candidate.id === sheetId);
+        outputs = sheet?.pivots?.length ? this.pivotOutputs(sheetId) : null;
+        outputsBySheet.set(sheetId, outputs);
+      }
+      if (!outputs?.length) continue;
+
+      const written = pivotWrittenRange(patch);
+      if (!written) continue;
+      for (const output of outputs) {
+        if (!rangesIntersect(output.range, written)) continue;
+        let released = releasedBySheet.get(sheetId);
+        if (!released) {
+          released = new Set();
+          releasedBySheet.set(sheetId, released);
+        }
+        released.add(output.id);
+      }
+    }
+
+    for (const [sheetId, released] of releasedBySheet) {
+      const sheet = this.workbook.sheets.find((candidate) => candidate.id === sheetId);
+      if (!sheet) continue;
+      const kept = (sheet.pivots ?? []).filter((pivot) => !released.has(pivot.id));
+      this.syncPivots({ ...sheet, pivots: kept });
+      this.pivotSheetsDirty.add(sheetId);
+    }
+  }
+
   /** Apply raw patches once; remote loads suppress paged dirty tracking. */
   applyPatches(
     patches: readonly DocumentOp[],
     remoteLoad: boolean,
     captureChanges: boolean,
     captureDetailedChanges = false,
+    trustedHistory = false,
+    replayPivotSources = false,
   ): StoreDataEngineEffects {
     const changes: ChangeEvent["changes"] | null = captureChanges ? [] : null;
     const appliedPatches: DocumentOp[] = [];
@@ -1659,8 +2124,16 @@ export class StoreDataEngine {
 
     if (remoteLoad) this.wasm.beginPageLoad();
     try {
+      if (replayPivotSources) this.releaseReplayedPivotOutputs(patches);
       for (const patch of patches) {
-        if (!this.applyPatch(patch, changes, captureDetailedChanges)) continue;
+        // Planned before the edit, from the same rule the undo inverse uses.
+        const pivotPlan = planPivotEdit(patch, this.workbook.sheets);
+        const rewrites = pivotPlan ? pivotRewrites(this.workbook.sheets, pivotPlan) : [];
+        if (!this.applyPatch(patch, changes, captureDetailedChanges, trustedHistory)) continue;
+        if (rewrites.length > 0) {
+          applyPivotRewrites(this.workbook.sheets, rewrites);
+          for (const rewrite of rewrites) this.pivotSheetsDirty.add(rewrite.owner);
+        }
         appliedPatches.push(patch);
 
         if (patch.op === "set" || patch.op === "setNote") touchedSheets.add(patch.addr.sheet);
@@ -1677,6 +2150,7 @@ export class StoreDataEngine {
         } else if (
           patch.op !== "setNamedRange" &&
           patch.op !== "removeNamedRange" &&
+          patch.op !== "setCalculation" &&
           patch.op !== "removeSheet"
         ) {
           touchedSheets.add(patch.op === "addSheet" ? patch.sheet.id : patch.sheet);
@@ -1698,6 +2172,7 @@ export class StoreDataEngine {
         for (const touched of touchedSheets) this.spillBlockersDirty.add(touched);
       }
       this.flushSpillBlockers();
+      this.flushPivots();
       if (appliedPatches.length === 0) return { appliedPatches, changes, storageRevision };
       this.rangeMutationStats.documentOperations += appliedPatches.length;
       this.rangeMutationStats.jsPatchObjects += appliedPatches.length;
@@ -1712,6 +2187,7 @@ export class StoreDataEngine {
     patch: DocumentOp,
     changes: ChangeEvent["changes"] | null,
     captureDetailedChanges = false,
+    trustedHistory = false,
   ): boolean {
     switch (patch.op) {
       case "set": {
@@ -1844,7 +2320,8 @@ export class StoreDataEngine {
           changes && captureDetailedChanges
             ? this.captureBlockBeforeCells(bounds, rows, cols)
             : null;
-        const applied = this.writePackedBlock(bounds, block);
+        const history = trustedHistory ? preparedHistoryBlock(block) : undefined;
+        const applied = history ? history.restore(bounds) : this.writePackedBlock(bounds, block);
         if (!applied || !changes || !beforeCells) return applied;
         const formulas = new Map(block.formulas ?? []);
         const refs = new Map(block.refs ?? []);
@@ -1960,6 +2437,13 @@ export class StoreDataEngine {
         this.wasm.addRows(this.handleOf(patch.sheet), patch.at, patch.count);
         meta.rowCount += patch.count;
         this.rebaseSheetRows(patch.sheet, (row) => (row >= patch.at ? row + patch.count : row));
+        this.rebaseCharts({
+          kind: "insert",
+          sheet: patch.sheet,
+          axis: "row",
+          at: patch.at,
+          count: patch.count,
+        });
         return true;
       }
       case "removeRows": {
@@ -1976,6 +2460,14 @@ export class StoreDataEngine {
         this.rebaseSheetRows(patch.sheet, (row) =>
           row < patch.at ? row : row < patch.at + patch.count ? null : row - patch.count,
         );
+        this.rebaseCharts({
+          kind: "delete",
+          sheet: patch.sheet,
+          axis: "row",
+          at: patch.at,
+          count: patch.count,
+          remaining: meta.rowCount,
+        });
         return true;
       }
       case "moveRows":
@@ -1997,6 +2489,13 @@ export class StoreDataEngine {
           (col) => (col >= patch.at ? col + patch.columns.length : col),
           { at: patch.at, delta: patch.columns.length, inserted: patch.columns },
         );
+        this.rebaseCharts({
+          kind: "insert",
+          sheet: patch.sheet,
+          axis: "column",
+          at: patch.at,
+          count: patch.columns.length,
+        });
         return true;
       }
       case "removeColumns": {
@@ -2016,6 +2515,14 @@ export class StoreDataEngine {
           (col) => (col < patch.at ? col : col < patch.at + patch.count ? null : col - patch.count),
           { at: patch.at, delta: -patch.count },
         );
+        this.rebaseCharts({
+          kind: "delete",
+          sheet: patch.sheet,
+          axis: "column",
+          at: patch.at,
+          count: patch.count,
+          remaining: meta.columns.length,
+        });
         return true;
       }
       case "moveColumns":
@@ -2096,6 +2603,31 @@ export class StoreDataEngine {
         if (!links.some((hyperlink) => hyperlink.id === patch.id)) return false;
         sheet.hyperlinks = links.filter((hyperlink) => hyperlink.id !== patch.id);
         this.view.metadataChanged(patch.sheet);
+        return true;
+      }
+      case "setChart": {
+        const sheet = this.sheetMeta(patch.sheet);
+        const chart = sanitizeChartDefinition(patch.chart);
+        if (!chart || !chartFitsSheets(chart, sheet, this.workbook.sheets)) return false;
+
+        // Chart lists are replaced, never mutated, so captured definitions stay exact for undo.
+        const charts = sheet.charts ?? [];
+        const index = charts.findIndex((candidate) => candidate.id === chart.id);
+        if (index < 0) {
+          if (charts.length >= MAX_CHARTS_PER_SHEET) return false;
+          sheet.charts = [...charts, chart];
+        } else {
+          const next = [...charts];
+          next[index] = chart;
+          sheet.charts = next;
+        }
+        return true;
+      }
+      case "removeChart": {
+        const sheet = this.sheetMeta(patch.sheet);
+        const charts = sheet.charts ?? [];
+        if (!charts.some((chart) => chart.id === patch.id)) return false;
+        sheet.charts = charts.filter((chart) => chart.id !== patch.id);
         return true;
       }
       case "setValidationRule": {
@@ -2218,6 +2750,7 @@ export class StoreDataEngine {
           return false;
         const [sheet] = this.workbook.sheets.splice(from, 1);
         this.workbook.sheets.splice(patch.to, 0, sheet!);
+        this.syncSheetOrder();
         return true;
       }
       case "setSheetVisibility": {
@@ -2288,6 +2821,14 @@ export class StoreDataEngine {
               : patch.patch.style === undefined
                 ? current.style
                 : patch.patch.style,
+          autoFilter:
+            patch.patch.autoFilter === null
+              ? undefined
+              : (patch.patch.autoFilter ?? current.autoFilter),
+          sortState:
+            patch.patch.sortState === null
+              ? undefined
+              : (patch.patch.sortState ?? current.sortState),
         };
         const existing = this.workbook.sheets.flatMap((candidateSheet) =>
           (candidateSheet.tables ?? []).filter((table) => table.id !== current.id),
@@ -2302,6 +2843,8 @@ export class StoreDataEngine {
         if (!validWorkbookTable(candidate, sheet, existing)) return false;
         const next = structuredClone(candidate);
         if (next.style === undefined) delete next.style;
+        if (next.autoFilter === undefined) delete next.autoFilter;
+        if (next.sortState === undefined) delete next.sortState;
         if (!this.syncTable(next)) return false;
         const tables = [...sheet.tables!];
         tables[index] = next;
@@ -2313,6 +2856,32 @@ export class StoreDataEngine {
         const index = sheet?.tables?.findIndex((table) => table.id === patch.tableId) ?? -1;
         if (!sheet || index < 0 || !this.wasm.removeTable(patch.tableId)) return false;
         sheet.tables = [...sheet.tables!.slice(0, index), ...sheet.tables!.slice(index + 1)];
+        return true;
+      }
+      case "setPivot": {
+        const sheet = this.workbook.sheets.find((candidate) => candidate.id === patch.sheet);
+        if (!sheet || this.pivotIssues(patch.pivot, sheet, this.workbook.sheets).length > 0) {
+          return false;
+        }
+        const owner = pivotOwner(this.workbook.sheets, patch.pivot.id);
+        if (owner && owner !== sheet) return false;
+        if (!owner && this.pivotCount() >= MAX_PIVOTS_PER_WORKBOOK) return false;
+
+        const pivot = clonePivot(patch.pivot);
+        const pivots = sheet.pivots ?? [];
+        sheet.pivots = owner
+          ? pivots.map((current) => (current.id === pivot.id ? pivot : current))
+          : [...pivots, pivot];
+        this.pivotSheetsDirty.add(sheet.id);
+        return true;
+      }
+      case "removePivot": {
+        const sheet = this.workbook.sheets.find((candidate) => candidate.id === patch.sheet);
+        if (!sheet?.pivots?.some((pivot) => pivot.id === patch.id)) return false;
+        sheet.pivots = sheet.pivots.filter((pivot) => pivot.id !== patch.id);
+        // Free the output now, not at the barrier: a later write in the same
+        // batch may target the cells, and the engine refuses writes into output.
+        this.syncPivots(sheet);
         return true;
       }
       case "setSheetMeta": {
@@ -2418,6 +2987,11 @@ export class StoreDataEngine {
         );
         return true;
       }
+      case "setCalculation": {
+        if (!this.syncCalculation(patch.calculation)) return false;
+        this.workbook.calculation = storedCalculationSettings(patch.calculation);
+        return true;
+      }
     }
   }
 
@@ -2430,7 +3004,18 @@ export class StoreDataEngine {
   ): Array<Extract<DocumentOp, { op: "set" }>> {
     const rows = rowEnd - rowStart;
     const cols = colEnd - colStart;
-    const sources = this.captureSourceProjection(sheet, rowStart, colStart, rows, cols);
+    this.noteRangeMutationFfi();
+    const snapshot = this.wasm.captureSources(this.handleOf(sheet), rowStart, colStart, rows, cols);
+    const derived = snapshot?.spillDerived();
+    const sources = snapshot ? consumeSourceSnapshot(snapshot, this.sheetIdsByHandle) : null;
+    // Only outputs crossing the moved rectangle need a per-cell ownership check.
+    const outputs = this.pivotOutputs(sheet).filter(
+      ({ range }) =>
+        range.start.row < rowEnd &&
+        range.end.row >= rowStart &&
+        range.start.col < colEnd &&
+        range.end.col >= colStart,
+    );
     const columns = Array.from({ length: cols }, (_, offset) => colStart + offset);
     const window = this.windowReader.read(
       sheet,
@@ -2447,11 +3032,21 @@ export class StoreDataEngine {
         const style = window.styles[window.styleIds[offset] ?? 0] ?? {};
         const formula = sources?.formulaAt(offset);
         const target = sources?.referenceAt(offset);
+        const pivotDerived = outputs.some(
+          ({ range }) =>
+            row >= range.start.row &&
+            row <= range.end.row &&
+            col >= range.start.col &&
+            col <= range.end.col,
+        );
         const value: CellValue = formula
           ? { kind: "formula", src: formula }
           : target
             ? { kind: "ref", target }
-            : { kind: "literal", value: window.values[offset] ?? null };
+            : {
+                kind: "literal",
+                value: derived?.[offset] || pivotDerived ? null : (window.values[offset] ?? null),
+              };
         if (value.kind === "literal" && value.value === null && Object.keys(style).length === 0) {
           continue;
         }
@@ -2486,6 +3081,7 @@ export class StoreDataEngine {
     const movedHyperlinks = this.workbook.sheets.map(
       (owner) => [owner.id, owner.hyperlinks?.map(cloneCellHyperlink) ?? []] as const,
     );
+    const movedCharts = this.captureCharts();
     const cells = this.snapshotCells(
       patch.sheet,
       patch.from,
@@ -2563,6 +3159,14 @@ export class StoreDataEngine {
         .map((hyperlink) => rebaseHyperlinkAxis(hyperlink, patch.sheet, "row", moveRow))
         .filter((hyperlink): hyperlink is CellHyperlink => hyperlink !== null);
     }
+    this.restoreMovedCharts(movedCharts, {
+      kind: "move",
+      sheet: patch.sheet,
+      axis: "row",
+      from: patch.from,
+      count: patch.count,
+      to: patch.to,
+    });
     this.windowReader.conditionalRulesChanged(patch.sheet);
     for (const original of movedNamedRanges) {
       const span = remapSpan(original.range.start.row, original.range.end.row, (row) =>
@@ -2613,6 +3217,8 @@ export class StoreDataEngine {
     const movedHyperlinks = this.workbook.sheets.map(
       (owner) => [owner.id, owner.hyperlinks?.map(cloneCellHyperlink) ?? []] as const,
     );
+    const movedTables = structuredClone(sheet.tables ?? []);
+    const movedCharts = this.captureCharts();
     const columns = sheet.columns.slice(patch.from, patch.from + patch.count);
     const cells = this.snapshotCells(
       patch.sheet,
@@ -2673,6 +3279,15 @@ export class StoreDataEngine {
         .map((hyperlink) => rebaseHyperlinkAxis(hyperlink, patch.sheet, "column", moveCol))
         .filter((hyperlink): hyperlink is CellHyperlink => hyperlink !== null);
     }
+    this.restoreMovedTables(sheet, movedTables, moveCol);
+    this.restoreMovedCharts(movedCharts, {
+      kind: "move",
+      sheet: patch.sheet,
+      axis: "column",
+      from: patch.from,
+      count: patch.count,
+      to: patch.to,
+    });
     this.windowReader.conditionalRulesChanged(patch.sheet);
     for (const original of movedNamedRanges) {
       const span = remapSpan(original.range.start.col, original.range.end.col, (col) =>
@@ -2696,6 +3311,110 @@ export class StoreDataEngine {
       if (!this.syncNamedRange(namedRange)) return false;
     }
     return true;
+  }
+
+  /**
+   * A move runs as remove then add, which drops the moved columns' table
+   * metadata and rebuilds them as new columns. When a table's columns still
+   * form one rectangle after the move, put back its original column objects
+   * (names, totals and calculated-column rules) in moved order and carry its
+   * filter and sort rules with them. A table that would be split, would
+   * overlap another table, or that the engine rejects keeps the remove/add
+   * result, so a move never stops half-applied after its cells moved.
+   */
+  private restoreMovedTables(
+    sheet: Sheet,
+    originals: readonly WorkbookTable[],
+    moveCol: (col: number) => number,
+  ): void {
+    let tables = sheet.tables ?? [];
+    for (const original of originals) {
+      const positions = original.columns.map((_column, offset) =>
+        moveCol(original.range.start.col + offset),
+      );
+      const start = Math.min(...positions);
+      const end = Math.max(...positions);
+      if (end - start + 1 !== positions.length) continue;
+      const columns = original.columns
+        .map((column, offset) => ({ column, position: positions[offset] ?? start }))
+        .sort((left, right) => left.position - right.position)
+        .map(({ column }) => column);
+      const restored: WorkbookTable = {
+        ...original,
+        columns,
+        range: {
+          ...original.range,
+          start: { ...original.range.start, col: start },
+          end: { ...original.range.end, col: end },
+        },
+      };
+      delete restored.autoFilter;
+      delete restored.sortState;
+      Object.assign(restored, remapWorkbookTableRuleColumns(original, moveCol, start, end));
+      const others = this.workbook.sheets
+        .flatMap((owner) => (owner === sheet ? tables : (owner.tables ?? [])))
+        .filter((table) => table.id !== original.id);
+      if (!validWorkbookTable(restored, sheet, others) || !this.syncTable(restored)) continue;
+      const index = tables.findIndex((table) => table.id === original.id);
+      if (index < 0) tables = [...tables, restored];
+      else {
+        tables = tables.slice();
+        tables[index] = restored;
+      }
+    }
+    sheet.tables = tables;
+  }
+
+  /** Keep chart list identity until a rewrite changes at least one definition. */
+  private rewriteCharts(map: (chart: ChartDefinition, ownerId: SheetId) => ChartDefinition): void {
+    for (const owner of this.workbook.sheets) {
+      const charts = owner.charts;
+      if (!charts) continue;
+
+      let next: ChartDefinition[] | null = null;
+      for (let index = 0; index < charts.length; index++) {
+        const chart = charts[index];
+        if (chart === undefined) continue;
+
+        const rewritten = map(chart, owner.id);
+        if (rewritten === chart) continue;
+
+        next ??= charts.slice();
+        next[index] = rewritten;
+      }
+
+      if (next) owner.charts = next;
+    }
+  }
+
+  /** Rewrite every chart that is anchored on, or reads from, the edited sheet. */
+  private rebaseCharts(edit: ChartAxisEdit): void {
+    this.rewriteCharts((chart, ownerId) => rebaseChartAxis(chart, ownerId, edit));
+  }
+
+  /**
+   * The live chart lists before a move. A move runs as remove then add, which
+   * would turn sources inside the moved block into `#REF!`; the lists are
+   * replaced rather than mutated, so these references keep the pre-move state.
+   */
+  private captureCharts(): Map<Sheet, readonly ChartDefinition[]> | null {
+    let captured: Map<Sheet, readonly ChartDefinition[]> | null = null;
+    for (const owner of this.workbook.sheets) {
+      if (!owner.charts?.length) continue;
+      captured ??= new Map();
+      captured.set(owner, owner.charts);
+    }
+    return captured;
+  }
+
+  private restoreMovedCharts(
+    originals: ReadonlyMap<Sheet, readonly ChartDefinition[]> | null,
+    edit: Extract<ChartAxisEdit, { kind: "move" }>,
+  ): void {
+    if (!originals) return;
+    for (const [owner, charts] of originals) {
+      owner.charts = charts.map((chart) => rebaseChartAxis(chart, owner.id, edit));
+    }
   }
 
   private addSheetSnapshot(
@@ -2730,6 +3449,18 @@ export class StoreDataEngine {
       rowHeights: new Map(),
       hiddenRows: new Set(),
     };
+    // Charts may read sheets already present, so bounds are checked against every tab.
+    if (snapshot.charts) {
+      const charts: ChartDefinition[] = [];
+      for (const source of snapshot.charts) {
+        const chart = sanitizeChartDefinition(source);
+        if (!chart) return false;
+        charts.push(chart);
+      }
+      if (!sheetChartsFit(charts, sheet, [...this.workbook.sheets, sheet])) return false;
+
+      sheet.charts = charts;
+    }
     try {
       assertWorkbookTables(
         [...this.workbook.sheets, sheet],
@@ -2738,6 +3469,23 @@ export class StoreDataEngine {
       );
     } catch {
       return false;
+    }
+    if (snapshot.pivots?.length) {
+      const sheets = [...this.workbook.sheets, sheet];
+      if (this.pivotCount() + snapshot.pivots.length > MAX_PIVOTS_PER_WORKBOOK) return false;
+      const ids = new Set<string>();
+      for (const pivot of snapshot.pivots) {
+        if (
+          ids.has(pivot.id) ||
+          pivotOwner(this.workbook.sheets, pivot.id) ||
+          this.pivotIssues(pivot, sheet, sheets).length > 0
+        ) {
+          return false;
+        }
+        ids.add(pivot.id);
+      }
+      sheet.pivots = snapshot.pivots.map(clonePivot);
+      this.pivotSheetsDirty.add(sheet.id);
     }
     const handle = this.allocateSheet(snapshot.columns.length, snapshot.rowCount);
     this.wasm.setSheetName(handle, snapshot.id, name.name);
@@ -2748,6 +3496,7 @@ export class StoreDataEngine {
       if (meta.hidden) sheet.hiddenRows!.add(row);
     }
     this.workbook.sheets.splice(snapshot.order, 0, sheet);
+    this.syncSheetOrder();
     for (const table of sheet.tables ?? []) {
       if (!this.syncTable(table)) return false;
     }
@@ -2809,6 +3558,10 @@ export class StoreDataEngine {
           hyperlink.target.kind !== "internal" || hyperlink.target.range.sheet !== sheetId,
       );
     }
+
+    // A chart keeps a source on a removed sheet as an explicit `#REF!`.
+    this.rewriteCharts((chart) => invalidateChartSheet(chart, sheetId));
+
     return true;
   }
 
@@ -3017,7 +3770,7 @@ export class StoreDataEngine {
         this.wasm.removeTable(table.id);
         continue;
       }
-      const next = {
+      const next: WorkbookTable = {
         ...table,
         columns,
         range: {
@@ -3026,6 +3779,9 @@ export class StoreDataEngine {
           end: { ...table.range.end, col: span[1] },
         },
       };
+      delete next.autoFilter;
+      delete next.sortState;
+      Object.assign(next, remapWorkbookTableRuleColumns(table, remap, span[0], span[1]));
       tables.push(next);
       this.syncTable(next);
     }
@@ -3202,6 +3958,14 @@ export class StoreDataEngine {
     const handle = this.handleOf(sheet);
     if (!this.wasm.removeSheet(handle)) return false;
     return true;
+  }
+
+  /** Give the engine the tab order, which 3-D references such as `Sheet1:Sheet3!A1` span. */
+  private syncSheetOrder(): void {
+    const order = Uint32Array.from(this.workbook.sheets, (sheet) => this.handleOf(sheet.id));
+    if (!this.wasm.setSheetOrder(order)) {
+      throw new Error("engine sheet handles do not match the workbook tabs");
+    }
   }
 
   /** Bulk-load one rectangular datasource page in one Rust-owned source transaction. */
@@ -3386,9 +4150,7 @@ export class StoreDataEngine {
   prepareMemoryRelease(instance: EngineInstance): PreparedEngineMemoryRelease | null {
     if (this.disposed) return null;
 
-    const replacement = instance.CellStore.importMemoryState(
-      this.wasm.exportMemoryState(),
-    ) as RecomputingCellStore;
+    const replacement = instance.CellStore.importMemoryState(this.wasm.exportMemoryState());
     const history: Array<{
       replacement: RangeSnapshot;
       replace(resource: RangeSnapshot): void;
@@ -3406,6 +4168,14 @@ export class StoreDataEngine {
           replace: owner.replace,
         });
       }
+
+      // The JS definitions survive the release; the new instance gets them again.
+      for (const sheet of this.workbook.sheets) {
+        if (sheet.pivots?.length) this.syncPivots(sheet, replacement);
+      }
+      // Installing definitions marks pivots dirty; finish calculation before the
+      // replacement becomes observable, without changing no-pivot transfers.
+      if (this.workbook.sheets.some((sheet) => sheet.pivots?.length)) replacement.commitSources();
     } catch (cause) {
       for (const snapshot of history) snapshot.replacement.free();
       replacement.free();

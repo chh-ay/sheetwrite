@@ -1,6 +1,6 @@
 ---
 title: "gridSizeStyle | @sheetwrite/core/adapter"
-description: "Converts adapter size props into a host element style object."
+description: "gridSizeStyle function in @sheetwrite/core/adapter: Converts adapter size props into a host element style object."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|gridSizeStyle -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="function">function</span></div>
@@ -30,6 +30,7 @@ function gridSizeStyle(
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

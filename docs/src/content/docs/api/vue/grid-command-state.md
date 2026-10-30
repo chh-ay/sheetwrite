@@ -1,6 +1,6 @@
 ---
 title: "GridCommandState | @sheetwrite/vue"
-description: "Observable availability and selection-derived activity for one command."
+description: "GridCommandState interface in @sheetwrite/vue: Observable availability and selection-derived activity for one command."
 ---
 <!-- api-export:@sheetwrite/vue|.|GridCommandState -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/vue/">@sheetwrite/vue</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -8,7 +8,7 @@ description: "Observable availability and selection-derived activity for one com
 Observable availability and selection-derived activity for one command.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/types/grid.d.ts#L112"><code>packages/core/dist/types/grid.d.ts#L112</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/types/grid.d.ts#L181"><code>packages/core/dist/types/grid.d.ts#L181</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

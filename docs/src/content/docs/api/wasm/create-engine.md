@@ -1,6 +1,6 @@
 ---
 title: "createEngine | @sheetwrite/wasm"
-description: "Initialize a fresh engine; a compiled module can be reused without retaining its memory."
+description: "createEngine function in @sheetwrite/wasm: Initialize a fresh engine; a compiled module can be reused without retaining its memory."
 ---
 <!-- api-export:@sheetwrite/wasm|.|createEngine -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/wasm/">@sheetwrite/wasm</a><span class="api-status" data-kind="function">function</span></div>
@@ -8,7 +8,7 @@ description: "Initialize a fresh engine; a compiled module can be reused without
 Initialize a fresh engine; a compiled module can be reused without retaining its memory.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/loader.d.ts#L49"><code>packages/wasm/loader.d.ts#L49</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/loader.d.ts#L67"><code>packages/wasm/loader.d.ts#L67</code></a></dd></div>
 </dl>
 
 ## Declaration

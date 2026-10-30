@@ -1,6 +1,6 @@
 ---
 title: "IndexedDbPendingCommitStorageOptions | @sheetwrite/core/browser"
-description: "Database and store naming options for durable pending commits."
+description: "IndexedDbPendingCommitStorageOptions interface in @sheetwrite/core/browser: Database and store naming options for durable pending commits."
 ---
 <!-- api-export:@sheetwrite/core|./browser|IndexedDbPendingCommitStorageOptions -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-browser/">@sheetwrite/core/browser</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -55,6 +55,7 @@ export interface IndexedDbPendingCommitStorageOptions {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

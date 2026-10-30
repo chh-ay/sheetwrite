@@ -1,7 +1,7 @@
 //! Matrix values and AST-to-range conversion helpers.
 
-use crate::calc::Ast;
-use crate::types::{CellRange, Value};
+use crate::calc::{Ast, Func};
+use crate::types::{CellRange, FormulaError, Value};
 use std::cell::Cell;
 use std::mem::size_of;
 
@@ -168,7 +168,56 @@ pub(super) fn range_from_ast(ast: &Ast, formula_sheet: usize) -> Option<CellRang
             reference.row_end,
             reference.col,
         )),
+        Ast::Func(Func::Intersect, operands) => intersection_range(operands, formula_sheet).ok(),
         _ => None,
+    }
+}
+
+/// The cells every operand of an intersection covers. Every operand must be
+/// a single-area reference: anything else is `#VALUE!` (`#REF!` for a deleted
+/// reference). References that share no cell, or sit on different sheets,
+/// are `#NULL!`.
+pub(crate) fn intersection_range(
+    operands: &[Ast],
+    formula_sheet: usize,
+) -> Result<CellRange, FormulaError> {
+    let mut common: Option<CellRange> = None;
+    let mut empty = false;
+
+    // Every operand is checked before an empty result is reported, so a
+    // non-reference operand stays #VALUE! wherever it sits.
+    for operand in operands {
+        let Some(range) = range_from_ast(operand, formula_sheet) else {
+            return Err(match operand {
+                Ast::InvalidRef => FormulaError::Ref,
+                _ => FormulaError::Value,
+            });
+        };
+        let Some(current) = common else {
+            common = Some(range);
+            continue;
+        };
+        let overlap = CellRange::new(
+            range.sheet,
+            current.row_start.max(range.row_start),
+            current.col_start.max(range.col_start),
+            current.row_end.min(range.row_end),
+            current.col_end.min(range.col_end),
+        );
+        if current.sheet != range.sheet
+            || overlap.row_start > overlap.row_end
+            || overlap.col_start > overlap.col_end
+        {
+            empty = true;
+        } else {
+            common = Some(overlap);
+        }
+    }
+
+    match common {
+        Some(_) if empty => Err(FormulaError::Null),
+        Some(range) => Ok(range),
+        None => Err(FormulaError::Value),
     }
 }
 

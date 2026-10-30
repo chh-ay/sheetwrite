@@ -19,6 +19,9 @@ import remarkMdxFrontmatter from "remark-mdx-frontmatter";
 import { defineConfig, type Plugin } from "vite";
 
 import { dedupeCodePopovers } from "./src/lib/dedupe-code-popovers.ts";
+import { renderGridResults } from "./src/lib/grid-result.ts";
+import { renderSectionCards } from "./src/lib/section-cards.ts";
+import { SITE_URL } from "./src/lib/seo.ts";
 import { sheetwriteCodeHovers } from "./src/lib/sheetwrite-code-hovers.ts";
 
 interface HastNode {
@@ -125,7 +128,7 @@ function visualizeReleaseResults() {
   };
 }
 
-/** Keeps code focus client-owned and removes copy controls from API signatures. */
+/** Removes copy controls from API signatures and lets code keep hydration-safe markup. */
 function markResponsiveCodeBlocks() {
   return (tree: HastNode): void => {
     const visit = (node: HastNode, insideApiSignature = false): void => {
@@ -145,15 +148,10 @@ function markResponsiveCodeBlocks() {
         node.children = node.children.filter(
           (child) =>
             !(
-              (apiSignature &&
-                String(child.properties?.className ?? "")
-                  .split(/[ ,]+/)
-                  .includes("copy")) ||
-              (child.tagName === "script" &&
-                child.children?.some(
-                  (content) =>
-                    content.type === "text" && content.value?.includes("tabindex-js-module"),
-                ))
+              apiSignature &&
+              String(child.properties?.className ?? "")
+                .split(/[ ,]+/)
+                .includes("copy")
             ),
         );
         for (const child of node.children) visit(child, apiSignature);
@@ -258,23 +256,46 @@ function sharedExpressiveCodeRenderer(): Promise<RehypeExpressiveCodeRenderer> {
 
 const EXPRESSIVE_CODE_STYLES_ID = "virtual:expressive-code.css";
 const RESOLVED_EXPRESSIVE_CODE_STYLES_ID = "/__sheetwrite-expressive-code.css";
+const EXPRESSIVE_CODE_SCRIPTS_ID = "virtual:expressive-code-scripts";
+const RESOLVED_EXPRESSIVE_CODE_SCRIPTS_ID = "\0sheetwrite-expressive-code-scripts.js";
+/** The tabindex module would make code focusable; the site owns code focus. */
+const OWNED_BY_SITE_MODULE = "tabindex-js-module";
 
 /**
- * Expressive Code would inline the same base and theme stylesheet into the
- * first code block of every page, in its HTML and its hydration chunk. Pages
- * render code with empty page styles instead; the root links this module once,
- * so the stylesheet is downloaded once and cached across the site.
+ * Expressive Code would inline the same page assets into the first code block
+ * of every page, in its HTML and its hydration chunk. Pages render code
+ * without them; the root loads them once instead:
+ *
+ * - The stylesheet, so it is downloaded once and cached across the site.
+ * - The scripts (the copy button), as a function the root runs after
+ *   hydration. A `<script>` in page content is inert when React renders it
+ *   on a client-side navigation, and React reports it as an error. The
+ *   modules observe the document, so one run serves every later page.
  */
-function expressiveCodeStyles(): Plugin {
+function expressiveCodeAssets(): Plugin {
   return {
-    name: "sheetwrite:expressive-code-styles",
+    name: "sheetwrite:expressive-code-assets",
     resolveId(id) {
-      return id === EXPRESSIVE_CODE_STYLES_ID ? RESOLVED_EXPRESSIVE_CODE_STYLES_ID : undefined;
+      if (id === EXPRESSIVE_CODE_STYLES_ID) return RESOLVED_EXPRESSIVE_CODE_STYLES_ID;
+      if (id === EXPRESSIVE_CODE_SCRIPTS_ID) return RESOLVED_EXPRESSIVE_CODE_SCRIPTS_ID;
+      return undefined;
     },
     async load(id) {
-      if (id !== RESOLVED_EXPRESSIVE_CODE_STYLES_ID) return undefined;
-      const { baseStyles, themeStyles } = await sharedExpressiveCodeRenderer();
-      return `${baseStyles}\n${themeStyles}`;
+      if (id === RESOLVED_EXPRESSIVE_CODE_STYLES_ID) {
+        const { baseStyles, themeStyles } = await sharedExpressiveCodeRenderer();
+        return `${baseStyles}\n${themeStyles}`;
+      }
+      if (id !== RESOLVED_EXPRESSIVE_CODE_SCRIPTS_ID) return undefined;
+      const { jsModules } = await sharedExpressiveCodeRenderer();
+      const modules = jsModules.filter((code) => !code.includes(OWNED_BY_SITE_MODULE));
+      return [
+        "let installed = false;",
+        "export function installExpressiveCodeScripts() {",
+        "  if (installed) return;",
+        "  installed = true;",
+        ...modules,
+        "}",
+      ].join("\n");
     },
   };
 }
@@ -300,11 +321,17 @@ export default defineConfig({
                 ...(await sharedExpressiveCodeRenderer()),
                 baseStyles: "",
                 themeStyles: "",
+                jsModules: [],
               }),
             },
           ],
           // Raw HTML re-parse must run after Expressive Code: it drops fence `data.meta`.
           [rehypeRaw, { passThrough: nodeTypes }],
+          renderGridResults,
+          [
+            renderSectionCards,
+            { contentRoot: new URL("./src/content/docs/", import.meta.url).pathname },
+          ],
           hydrateFormulaReference,
           visualizeReleaseResults,
           dedupeCodePopovers,
@@ -317,7 +344,7 @@ export default defineConfig({
       }),
       enforce: "pre",
     },
-    expressiveCodeStyles(),
+    expressiveCodeAssets(),
     tailwindcss(),
     tanstackStart({
       pages: [
@@ -359,7 +386,7 @@ export default defineConfig({
       },
       sitemap: {
         enabled: true,
-        host: "https://sheetwrite.vercel.app",
+        host: SITE_URL,
       },
     }),
     vue(),

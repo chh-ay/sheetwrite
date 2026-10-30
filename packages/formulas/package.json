@@ -9,7 +9,7 @@
     "url": "git+https://github.com/chh-ay/sheetwrite.git",
     "directory": "packages/formulas"
   },
-  "homepage": "https://sheetwrite.vercel.app/",
+  "homepage": "https://www.sheetwrite.dev/",
   "bugs": {
     "url": "https://github.com/chh-ay/sheetwrite/issues"
   },
@@ -41,8 +41,7 @@
     "pkg/sheetwrite_wasm.js",
     "pkg/sheetwrite_wasm_factory.js",
     "pkg/sheetwrite_wasm.d.ts",
-    "pkg/sheetwrite_wasm_bg.wasm",
-    "pkg/sheetwrite_wasm_bg.wasm.d.ts"
+    "pkg/sheetwrite_wasm_bg.wasm"
   ],
   "publishConfig": {
     "access": "public",

@@ -1,6 +1,6 @@
 ---
 title: "DEFAULT_SIMPLE_COLUMN_WIDTH | @sheetwrite/core/adapter"
-description: "Default pixel width assigned to simple adapter columns."
+description: "DEFAULT_SIMPLE_COLUMN_WIDTH variable in @sheetwrite/core/adapter: Default pixel width assigned to simple adapter columns."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|DEFAULT_SIMPLE_COLUMN_WIDTH -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="variable">variable</span></div>
@@ -28,6 +28,7 @@ const DEFAULT_SIMPLE_COLUMN_WIDTH: 120
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

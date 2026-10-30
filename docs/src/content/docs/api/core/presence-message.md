@@ -1,6 +1,6 @@
 ---
 title: "PresenceMessage | @sheetwrite/core"
-description: "Ephemeral collaborator selection and activity update."
+description: "PresenceMessage interface in @sheetwrite/core: Ephemeral collaborator selection and activity update."
 ---
 <!-- api-export:@sheetwrite/core|.|PresenceMessage -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -75,6 +75,7 @@ export interface PresenceMessage {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

@@ -1,6 +1,6 @@
 ---
 title: "GridConfig | @sheetwrite/core"
-description: "Toolbar / feature configuration."
+description: "GridConfig interface in @sheetwrite/core: Toolbar / feature configuration."
 ---
 <!-- api-export:@sheetwrite/core|.|GridConfig -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -8,7 +8,7 @@ description: "Toolbar / feature configuration."
 Toolbar / feature configuration. When `config` is set the built-in toolbar is
 shown; control flags default to `true` except the opt-in `export` flag.
 
-### Examples
+## Examples
 
 ```ts compile
 import type { GridConfig } from "@sheetwrite/core";
@@ -26,13 +26,13 @@ const config: GridConfig = {
 };
 ```
 
-### See also
+## See also
 
 - [Grid.setConfig](/docs/api/core/grid/#grid-set-config)
 - [ContextMenuItem](/docs/api/core/context-menu-item/)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L359"><code>packages/core/src/types/grid.ts#L359</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L480"><code>packages/core/src/types/grid.ts#L480</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -47,6 +47,7 @@ const config: GridConfig = {
 <a href="#grid-config-merge"><code>merge</code></a>
 <a href="#grid-config-sort"><code>sort</code></a>
 <a href="#grid-config-export"><code>export</code></a>
+<a href="#grid-config-ribbon"><code>ribbon</code></a>
 <a href="#grid-config-icons"><code>icons</code></a>
 <a href="#grid-config-context-menu"><code>contextMenu</code></a>
 <a href="#grid-config-undo"><code>undo</code></a>
@@ -55,7 +56,7 @@ const config: GridConfig = {
 <a href="#grid-config-keyboard"><code>keyboard</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>17</span>
+## Members <span class="api-count" data-pagefind-ignore>18</span>
 
 <div class="api-member-list">
 
@@ -158,14 +159,26 @@ export?: boolean;
 
 </details>
 
-<details class="api-member" id="grid-config-icons" data-pagefind-weight="1">
-<summary><code>icons</code> <span class="api-member-summary">Override built-in toolbar icons by action name.</span></summary>
+<details class="api-member" id="grid-config-ribbon" data-pagefind-weight="1">
+<summary><code>ribbon</code> <span class="api-member-summary">Replace the built-in toolbar with an Excel-style ribbon (Home, Insert, Data and View tabs) that narrows its groups as the grid gets narrower.</span></summary>
 
 ```ts generated
-icons?: Partial<Record<ToolbarActionName, ToolbarIcon>>;
+ribbon?: boolean;
 ```
 
-<p class="api-member-doc">Override built-in toolbar icons by action name. Strings render as plain text; DOM nodes/factories support SVG/HTML icons.</p>
+<p class="api-member-doc">Replace the built-in toolbar with an Excel-style ribbon (Home, Insert,
+Data and View tabs) that narrows its groups as the grid gets narrower.
+A custom `toolbar` item list still renders the flat toolbar instead.</p>
+</details>
+
+<details class="api-member" id="grid-config-icons" data-pagefind-weight="1">
+<summary><code>icons</code> <span class="api-member-summary">Replace built-in command icons by glyph name, in the toolbar, ribbon, ribbon menus and context menu.</span></summary>
+
+```ts generated
+icons?: IconOverrides;
+```
+
+<p class="api-member-doc">Replace built-in command icons by glyph name, in the toolbar, ribbon, ribbon menus and context menu. See <a href="/docs/api/core/icon-overrides/"><code>IconOverrides</code></a>.</p>
 </details>
 
 <details class="api-member" id="grid-config-context-menu" data-pagefind-weight="1">
@@ -239,7 +252,8 @@ export interface GridConfig {
   merge?: boolean;
   sort?: boolean;
   export?: boolean;
-  icons?: Partial<Record<ToolbarActionName, ToolbarIcon>>;
+  ribbon?: boolean;
+  icons?: IconOverrides;
   contextMenu?: boolean | ContextMenuItems;
   undo?: boolean;
   find?: boolean;
@@ -258,6 +272,7 @@ export interface GridConfig {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

@@ -436,19 +436,26 @@ describe("workbook OOXML fidelity", () => {
     const styles = stylesXml(
       '<fonts count="2"><font/><font><b/></font></fonts><fills count="1"><fill><patternFill patternType="none"/></fill></fills><borders count="1"><border/></borders><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0"/></cellXfs>',
     );
+    const warnings: string[] = [];
     const imported = await fromXlsxWorkbook(
       rawXlsx({
         styles,
         sheets: [
           {
             xml: worksheet(
-              '<dimension ref="A1"/><sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData><cols><col min="1" max="1" style="1"/></cols>',
+              '<dimension ref="A1"/><sheetData><row r="1"><c r="A1"><v>1</v></c><c r="B1" t="e"><v>#N/A</v></c></row></sheetData><cols><col min="1" max="1" style="1"/></cols>',
             ),
           },
         ],
       }),
+      { onWarning: (warning) => warnings.push(warning.code) },
     );
-    expect(imported.sheets[0]!.cells[0]!.cells[0]!.style).toEqual({ bold: true });
+    expect(imported.sheets[0]?.cells[0]?.cells[0]?.style).toEqual({
+      bold: true,
+      verticalAlign: "bottom",
+    });
+    // Rows read before the late styles are styled again without reporting their warnings twice.
+    expect(warnings).toEqual(["unsupported-cell-value"]);
   });
 });
 

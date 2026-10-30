@@ -1,6 +1,6 @@
 ---
 title: "setXlsxTableImportBackend | @sheetwrite/core"
-description: "Registers the optional table XLSX import implementation used by core."
+description: "setXlsxTableImportBackend function in @sheetwrite/core: Registers the optional table XLSX import implementation used by core."
 ---
 <!-- api-export:@sheetwrite/core|.|setXlsxTableImportBackend -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
@@ -8,7 +8,7 @@ description: "Registers the optional table XLSX import implementation used by co
 Registers the optional table XLSX import implementation used by core.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L394"><code>packages/core/src/export.ts#L394</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L486"><code>packages/core/src/export.ts#L486</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -30,6 +30,7 @@ function setXlsxTableImportBackend(
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

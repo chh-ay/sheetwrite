@@ -1,6 +1,6 @@
 ---
 title: "shiftA1Refs | @sheetwrite/core"
-description: "Shift relative A1 references in a formula by (dRow, dCol) — used when a formula is filled into other cells."
+description: "shiftA1Refs function in @sheetwrite/core: Shift relative A1 references in a formula by (dRow, dCol) — used when a formula is filled into other cells."
 ---
 <!-- api-export:@sheetwrite/core|.|shiftA1Refs -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
@@ -30,6 +30,7 @@ function shiftA1Refs(src: string, dRow: number, dCol: number): string
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

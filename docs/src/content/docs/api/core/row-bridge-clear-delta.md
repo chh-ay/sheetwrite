@@ -1,6 +1,6 @@
 ---
 title: "RowBridgeClearDelta | @sheetwrite/core"
-description: "A clearRange effect expanded to its exact changed cells."
+description: "RowBridgeClearDelta interface in @sheetwrite/core: A clearRange effect expanded to its exact changed cells."
 ---
 <!-- api-export:@sheetwrite/core|.|RowBridgeClearDelta -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -148,6 +148,7 @@ export interface RowBridgeClearDelta<Id extends RowBridgeId = RowBridgeId> {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

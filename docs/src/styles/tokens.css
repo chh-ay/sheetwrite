@@ -4,22 +4,30 @@
 @import "@fontsource/jetbrains-mono/400.css";
 @import "@fontsource/jetbrains-mono/600.css";
 
+/* Colours are mixed in OKLCH (a blue-navy neutral at hue 258, a green accent at
+   hue 163) and written as hex because the canvas grid reads them through
+   computed styles. Dark: a deep navy ground, not near-black; body text about
+   14:1; a vivid accent kept for the primary action, links and focus, never
+   for large fills. Field edges meet 3:1. */
 :root {
   color-scheme: light;
-  --sw-accent: #047857;
-  --sw-accent-strong: #065f46;
-  --sw-accent-soft: #d1fae5;
-  --sw-accent-ink: #ffffff;
-  --sw-surface-0: #f7f8fa;
-  --sw-surface-1: #ffffff;
-  --sw-surface-2: #f0f2f5;
-  --sw-surface-3: #e4e8ee;
-  --sw-fg: #1b2435;
-  --sw-fg-strong: #0b1220;
-  --sw-fg-muted: #5e6879;
-  --sw-fg-dim: #626d7d;
-  --sw-border: #d9dee7;
-  --sw-border-strong: #c2cad6;
+  --sw-accent: #007f53;
+  --sw-accent-strong: #006540;
+  --sw-accent-soft: #d7f7e7;
+  --sw-accent-ink: #f7fefa;
+  --sw-surface-0: #f5f8fc;
+  --sw-surface-1: #fdfeff;
+  --sw-surface-2: #ecf0f6;
+  --sw-surface-3: #e0e5ed;
+  --sw-fg: #202938;
+  --sw-fg-strong: #0c1626;
+  --sw-fg-muted: #525b69;
+  --sw-fg-dim: #5b6471;
+  --sw-border: #d8dde4;
+  --sw-border-strong: #c1c8d2;
+  /* Background grid lines: about 1.2:1 on surface-0, visible but quieter than
+     any content border. */
+  --sw-grid-line: #dfe5ed;
   --sw-shadow: 0 1.2rem 3rem rgb(15 23 42 / 10%);
   --sw-font-body: "Inter Variable", Inter, system-ui, sans-serif;
   --sw-font-display: "Space Grotesk Variable", "Space Grotesk", system-ui, sans-serif;
@@ -39,37 +47,39 @@
   --font-sans: var(--sw-font-body);
   --font-display: var(--sw-font-display);
   --font-mono: var(--sw-font-mono);
-  --sw-type-xs: 0.72rem;
+  --sw-type-xs: 0.75rem;
   --sw-type-sm: 0.84rem;
   --sw-type-base: 1rem;
   --color-fw-react: #61dafb;
   --color-fw-vue: #42b883;
   --color-fw-svelte: #ff5a1f;
-  --sw-demo-surface: #09101c;
-  --sw-demo-raised: #0d1727;
-  --sw-demo-deep: #080e18;
-  --sw-demo-panel: #0b1422;
-  --sw-demo-border: #22314a;
-  --sw-demo-border-strong: #2d405f;
-  --sw-demo-fg: #dce5f3;
-  --sw-demo-fg-strong: #f4f7fb;
-  --sw-demo-fg-soft: #b9c7dc;
-  --sw-demo-muted: #91a4c1;
-  --sw-demo-dim: #60708b;
-  --sw-demo-dimmer: #55657e;
-  --sw-demo-ink: #06100c;
-  --sw-demo-accent: #34d399;
-  --sw-demo-shadow: 0 2rem 6rem rgb(0 0 0 / 32%);
-  --sw-demo-popup-shadow: 0 1rem 2.5rem rgb(0 0 0 / 45%);
-  --sw-demo-accent-strong: #6ee7b7;
-  --sw-demo-react-accent: #58c4dc;
-  --sw-demo-react-accent-strong: #8bd8e8;
-  --sw-demo-vue-accent: #42b883;
-  --sw-demo-vue-accent-strong: #75d0aa;
-  --sw-demo-svelte-accent: #e7653d;
-  --sw-demo-svelte-accent-strong: #ff8a68;
-  --sw-demo-warn: #fbbf24;
-  --sw-demo-danger: #fb7185;
+  /* Demo surfaces follow the page theme. Accents are darker in light mode so
+     accent text and white on-accent ink both clear AA contrast on white. */
+  --sw-demo-surface: #fdfeff;
+  --sw-demo-raised: #ecf0f6;
+  --sw-demo-deep: #f5f8fc;
+  --sw-demo-panel: #fdfeff;
+  --sw-demo-border: #d8dde4;
+  --sw-demo-border-strong: #c1c8d2;
+  --sw-demo-fg: #202938;
+  --sw-demo-fg-strong: #0c1626;
+  --sw-demo-fg-soft: #202938;
+  --sw-demo-muted: #525b69;
+  --sw-demo-dim: #5b6471;
+  --sw-demo-dimmer: #5b6471;
+  --sw-demo-ink: #f7fefa;
+  --sw-demo-accent: #007f53;
+  --sw-demo-shadow: 0 1.5rem 4rem rgb(15 23 42 / 10%);
+  --sw-demo-popup-shadow: 0 1rem 2.5rem rgb(15 23 42 / 16%);
+  --sw-demo-accent-strong: #006540;
+  --sw-demo-react-accent: #0e7490;
+  --sw-demo-react-accent-strong: #155e75;
+  --sw-demo-vue-accent: #2f855a;
+  --sw-demo-vue-accent-strong: #276749;
+  --sw-demo-svelte-accent: #c2410c;
+  --sw-demo-svelte-accent-strong: #9a3412;
+  --sw-demo-warn: #b45309;
+  --sw-demo-danger: #be123c;
   --sw-demo-space-1: 0.25rem;
   --sw-demo-space-2: 0.5rem;
   --sw-demo-space-3: 0.75rem;
@@ -91,24 +101,30 @@
   --sw-motion-decelerate: cubic-bezier(0.16, 1, 0.3, 1);
   --sw-motion-accelerate: cubic-bezier(0.4, 0, 1, 1);
   --sw-motion-stagger: 60ms;
+  /* Overlays and masks. The mask colour is alpha only: masks read opacity, not hue. */
+  --sw-mask-opaque: #000;
+  --sw-backdrop: rgb(19 26 35 / 45%);
+  --sw-popover-shadow: 0 1.25rem 3rem rgb(19 26 35 / 18%), 0 2px 8px rgb(19 26 35 / 8%);
+  --sw-field-edge: #79818c;
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --sw-accent: #34d399;
-  --sw-accent-strong: #6ee7b7;
-  --sw-accent-soft: #0b3b2f;
-  --sw-accent-ink: #06100c;
-  --sw-surface-0: #080b12;
-  --sw-surface-1: #0d121d;
-  --sw-surface-2: #121a28;
-  --sw-surface-3: #192438;
-  --sw-fg: #dce3ee;
-  --sw-fg-strong: #f8fafc;
-  --sw-fg-muted: #98a5b8;
-  --sw-fg-dim: #7f8ca3;
-  --sw-border: #263248;
-  --sw-border-strong: #35445f;
+  --sw-accent: #3bd99e;
+  --sw-accent-strong: #80eaba;
+  --sw-accent-soft: #063725;
+  --sw-accent-ink: #03190f;
+  --sw-surface-0: #0a111b;
+  --sw-surface-1: #101723;
+  --sw-surface-2: #17202d;
+  --sw-surface-3: #212b39;
+  --sw-fg: #dae0e9;
+  --sw-fg-strong: #f0f4f9;
+  --sw-fg-muted: #a9b2bf;
+  --sw-fg-dim: #9aa4b2;
+  --sw-border: #273140;
+  --sw-border-strong: #394455;
+  --sw-grid-line: #1a2331;
   --sw-shadow: 0 1.5rem 4rem rgb(0 0 0 / 40%);
   --sw-type-keyword: #c4b5fd;
   --sw-type-name: #7dd3fc;
@@ -117,6 +133,34 @@
   --sw-state-requested: #60a5fa;
   --sw-state-pending: #fbbf24;
   --sw-state-error: #fb7185;
+  --sw-demo-surface: #101723;
+  --sw-demo-raised: #17202d;
+  --sw-demo-deep: #0a111b;
+  --sw-demo-panel: #101723;
+  --sw-demo-border: #273140;
+  --sw-demo-border-strong: #394455;
+  --sw-demo-fg: #dae0e9;
+  --sw-demo-fg-strong: #f0f4f9;
+  --sw-demo-fg-soft: #dae0e9;
+  --sw-demo-muted: #a9b2bf;
+  --sw-demo-dim: #9aa4b2;
+  --sw-demo-dimmer: #9aa4b2;
+  --sw-demo-ink: #03190f;
+  --sw-demo-accent: #3bd99e;
+  --sw-demo-shadow: 0 2rem 6rem rgb(0 0 0 / 32%);
+  --sw-demo-popup-shadow: 0 1rem 2.5rem rgb(0 0 0 / 45%);
+  --sw-demo-accent-strong: #80eaba;
+  --sw-demo-react-accent: #58c4dc;
+  --sw-demo-react-accent-strong: #8bd8e8;
+  --sw-demo-vue-accent: #42b883;
+  --sw-demo-vue-accent-strong: #75d0aa;
+  --sw-demo-svelte-accent: #e7653d;
+  --sw-demo-svelte-accent-strong: #ff8a68;
+  --sw-demo-warn: #fbbf24;
+  --sw-demo-danger: #fb7185;
+  --sw-backdrop: rgb(10 12 16 / 62%);
+  --sw-popover-shadow: 0 1.5rem 3.5rem rgb(5 7 10 / 50%), 0 2px 8px rgb(5 7 10 / 35%);
+  --sw-field-edge: #6a7586;
 }
 
 @media (prefers-reduced-motion: reduce) {

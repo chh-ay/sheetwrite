@@ -1,11 +1,11 @@
-import type { SourceSnapshot } from "@sheetwrite/wasm";
+import type { SourceSnapshot, WindowView } from "@sheetwrite/wasm";
 
 import type { StyleDictionary } from "../style-dictionary.js";
 import type { CellScalar, CellStyle, ConditionalFormatRule } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
 import type { Workbook } from "../types/document.js";
 import type { ResourceOwnerBytes, VisibleWindowView } from "../types/store.js";
-import type { ConsumingWindowView, RecomputingCellStore } from "./wasm-contract.js";
+import type { RecomputingCellStore } from "./wasm-contract.js";
 import { KIND_BOOL, KIND_EMPTY, KIND_NUMBER, KIND_STRING, NO_STRING } from "./wire-tags.js";
 
 const EMPTY_COND_MATCHES = new Uint32Array(0);
@@ -15,6 +15,7 @@ const STRING_CACHE_CAP = 65_536;
 const WINDOW_SCRATCH_MAX_REUSE = 65_536;
 const CONDITIONAL_MASK_BITS = Uint32Array.BYTES_PER_ELEMENT * 8;
 const UTF8_DECODER = new TextDecoder();
+const DEFAULT_HYPERLINK_STYLE: CellStyle = { color: "#0563C1", underline: true };
 
 const WINDOW_PACKED_MAGIC = 0x3157_4e53;
 const WINDOW_PACKED_VERSION = 1;
@@ -396,17 +397,17 @@ export class StoreWindowReader {
       );
     }
 
-    let view: ConsumingWindowView;
+    let view: WindowView;
     let expectedRows: number;
 
     if (dataRows) {
       expectedRows = dataRows.length;
       ffiInputBytes += dataRows.byteLength;
       ffiLargestTransferBytes = Math.max(ffiLargestTransferBytes, dataRows.byteLength);
-      view = this.wasm.getWindowRows(handle, dataRows, colsU32) as ConsumingWindowView;
+      view = this.wasm.getWindowRows(handle, dataRows, colsU32);
     } else {
       expectedRows = Math.max(0, rows.end - rows.start);
-      view = this.wasm.getWindow(handle, rows.start, rows.end, colsU32) as ConsumingWindowView;
+      view = this.wasm.getWindow(handle, rows.start, rows.end, colsU32);
     }
 
     ffiCalls += 1;
@@ -592,7 +593,7 @@ export class StoreWindowReader {
       startRow,
       startRow + rows,
       this.colsU32For(cols),
-    ) as ConsumingWindowView;
+    );
     let decoded: DecodedPackedWindow;
     let strings: string[];
     let stringPoolEpoch: number;
@@ -840,12 +841,7 @@ export class StoreWindowReader {
       const r1 = Math.max(hyperlink.range.start.row, hyperlink.range.end.row);
       const c0 = Math.min(hyperlink.range.start.col, hyperlink.range.end.col);
       const c1 = Math.max(hyperlink.range.start.col, hyperlink.range.end.col);
-      const linkStyle: CellStyle = {
-        color: "#0563C1",
-        underline: true,
-        ...hyperlink.style,
-      };
-      const styleKey = JSON.stringify(linkStyle);
+      const styleKey = JSON.stringify(hyperlink.style);
       for (let rowIndex = 0; rowIndex < rowCount; rowIndex++) {
         const dataRow = order?.[rows.start + rowIndex] ?? rows.start + rowIndex;
         if (dataRow < r0 || dataRow > r1) continue;
@@ -857,7 +853,13 @@ export class StoreWindowReader {
           let merged = mergedIds.get(key);
           if (merged === undefined) {
             merged = styles.length;
-            styles.push({ ...(styles[base] ?? {}), ...linkStyle });
+            // Native XLSX hyperlink fonts can live on the cell, not the link.
+            // Defaults must not erase those explicit font properties.
+            styles.push({
+              ...DEFAULT_HYPERLINK_STYLE,
+              ...styles[base],
+              ...hyperlink.style,
+            });
             mergedIds.set(key, merged);
           }
           styleIds[offset] = merged;

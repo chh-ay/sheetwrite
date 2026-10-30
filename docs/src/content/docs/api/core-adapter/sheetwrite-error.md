@@ -1,6 +1,6 @@
 ---
 title: "SheetwriteError | @sheetwrite/core/adapter"
-description: "Canonical envelope for thrown and callback-delivered Sheetwrite failures."
+description: "SheetwriteError class in @sheetwrite/core/adapter: Canonical envelope for thrown and callback-delivered Sheetwrite failures."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|SheetwriteError -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="class">class</span></div>
@@ -8,7 +8,7 @@ description: "Canonical envelope for thrown and callback-delivered Sheetwrite fa
 Canonical envelope for thrown and callback-delivered Sheetwrite failures.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/errors.ts#L285"><code>packages/core/src/errors.ts#L285</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/errors.ts#L286"><code>packages/core/src/errors.ts#L286</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -157,6 +157,7 @@ class SheetwriteError extends Error implements SheetwriteErrorEnvelope {
   context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined;
   name: string;
   operation:
+    | "chart-view"
     | "comments"
     | "create-grid"
     | "datasource-request"
@@ -194,6 +195,7 @@ class SheetwriteError extends Error implements SheetwriteErrorEnvelope {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

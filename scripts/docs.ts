@@ -20,6 +20,8 @@ import {
 import { API, type Diagnostic, type Project } from "typescript/unstable/async";
 
 import { validateEngineVersions } from "../bench/src/engine-versions.js";
+import { MOVED_HEADINGS, MOVED_PAGES, type MovedPage } from "../docs/src/lib/moved-pages.js";
+import { DOCS_NAVIGATION, navigationPages } from "../docs/src/lib/navigation.js";
 import {
   collectFenceHovers,
   formatDeclaration,
@@ -71,7 +73,11 @@ import {
   readableText,
   shortHash,
 } from "./evidence-format.js";
-import { loadFormulaContractInventory, renderFormulaFunctionContract } from "./formula-docs.js";
+import {
+  formulaFamilyNavigation,
+  loadFormulaContractInventory,
+  renderFormulaFunctionPages,
+} from "./formula-docs.js";
 import {
   renderFullEngineEvidence,
   validateFullEngineArtifact,
@@ -87,7 +93,9 @@ import {
 import {
   formatMetricDelta,
   formatMetricDisplay,
+  type Metric,
   type SizeHistory,
+  type SizeReport,
   validateSizeHistory,
 } from "./size-report.js";
 
@@ -101,18 +109,19 @@ export const MIGRATION_ROUTES = {
   "docs/README.md": "/docs/start/installation/",
   "docs/getting-started.md": "/docs/start/installation/",
   "docs/concepts.md": "/docs/concepts/runtime-ownership/",
-  "docs/configuration.md": "/docs/guides/configuration/",
+  "docs/configuration.md": "/docs/features/grid/options-and-presentation/",
   "docs/framework-integration.md": "/docs/frameworks/lifecycle/",
-  "docs/interaction.md": "/docs/guides/interaction/",
-  "docs/data-operations.md": "/docs/guides/data-operations/",
-  "docs/formulas.md": "/docs/guides/formulas/",
-  "docs/collaboration.md": "/docs/guides/collaboration/",
-  "docs/worker-rendering.md": "/docs/guides/worker-rendering/",
-  "docs/styling.md": "/docs/guides/styling/",
-  "docs/accessibility.md": "/docs/guides/accessibility/",
+  "docs/interaction.md": "/docs/features/grid/selection-and-keyboard/",
+  "docs/data-operations.md": "/docs/features/data/data-operations/",
+  "docs/formulas.md": "/docs/features/formulas/authoring-and-references/",
+  "docs/collaboration.md": "/docs/features/collaboration/",
+  "docs/worker-rendering.md": "/docs/features/worker-rendering/",
+  "docs/styling.md": "/docs/features/formatting/styles/",
+  "docs/accessibility.md": "/docs/features/accessibility/",
 } as const;
 
 const PACKAGE_DIRECTORIES: Readonly<Record<string, string>> = {
+  "@sheetwrite/charts": "packages/charts",
   "@sheetwrite/core": "packages/core",
   "@sheetwrite/formulas": "packages/formulas",
   "@sheetwrite/react": "packages/react",
@@ -518,13 +527,21 @@ export function unresolvedDocumentationLinks(manifest: PublicApiManifest): strin
   return issues;
 }
 
+/**
+ * JSDoc body, examples and related links. `headingLevel` places the Examples
+ * and See also headings one level below whatever holds the text: 2 for a
+ * symbol page's opening summary (under the page title), 3 for a member's
+ * documentation (under Members), so heading levels never skip.
+ */
 function documentationSections(
   documentation: string,
   pkg: ApiPackage,
   entry: ApiEntryPoint,
   item: ApiExport,
   routes: DocumentationLinkRoutes,
+  headingLevel: 2 | 3,
 ): string {
+  const heading = "#".repeat(headingLevel);
   const sections = documentation.split(/(?:^|\n)@(example|see)\b\s*\n?/);
   const body = [sections[0]?.trim() ?? ""];
   const examples: string[] = [];
@@ -542,8 +559,8 @@ function documentationSections(
       related.push(route === undefined ? `- ${value}` : `- [${label}](${route})`);
     }
   }
-  if (examples.length > 0) body.push("### Examples", ...examples);
-  if (related.length > 0) body.push("### See also", related.join("\n"));
+  if (examples.length > 0) body.push(`${heading} Examples`, ...examples);
+  if (related.length > 0) body.push(`${heading} See also`, related.join("\n"));
   return body.join("\n\n");
 }
 
@@ -553,10 +570,11 @@ function documentationMarkdown(
   item: ApiExport,
   routes: DocumentationLinkRoutes = new Map(),
   source = item.documentation,
+  headingLevel: 2 | 3 = 3,
 ): string {
   const documentation =
     source.trim() || "Source summary unavailable; docs:check rejects this omission.";
-  return documentationSections(documentation, pkg, entry, item, routes).replace(
+  return documentationSections(documentation, pkg, entry, item, routes, headingLevel).replace(
     /\{@link\s+([^\s|}]+)(?:\s*\|\s*([^}]+))?\}/g,
     (_match, target: string, label: string | undefined) => {
       const text = label?.trim() || target;
@@ -596,6 +614,28 @@ function compactSummary(markdown: string): string {
   if (plain.length <= 220) return plain;
   const clipped = plain.slice(0, 217);
   return `${clipped.slice(0, clipped.lastIndexOf(" "))}…`;
+}
+
+/** Search results show about this many characters of a description. */
+const SEARCH_DESCRIPTION_MAX = 160;
+
+/**
+ * The search and social description of one API symbol page: the symbol, its
+ * kind and its package, then the JSDoc summary. The lead keeps a type that
+ * two packages re-export from sharing one description. A long result is
+ * clipped on a word; a short one stays short, as its JSDoc is.
+ */
+export function symbolDescription(
+  name: string,
+  kind: string,
+  packageLabel: string,
+  summary: string,
+): string {
+  const text = `${name} ${kind} in ${packageLabel}: ${summary}`;
+  if (text.length <= SEARCH_DESCRIPTION_MAX) return text;
+
+  const clipped = text.slice(0, SEARCH_DESCRIPTION_MAX - 1);
+  return `${clipped.slice(0, clipped.lastIndexOf(" ")).replace(/[,;:]$/, "")}…`;
 }
 
 const KIND_LABELS: Readonly<Record<string, string>> = {
@@ -1149,11 +1189,11 @@ export async function renderSymbolPage(
 ): Promise<string> {
   const label = entryLabel(pkg, entry);
   const source = packageSourcePath(pkg.name, item.source);
-  const summary = documentationMarkdown(pkg, entry, item, routes);
-  const description = compactSummary(summary);
+  const summary = documentationMarkdown(pkg, entry, item, routes, item.documentation, 2);
   const declaration = parseableDeclaration(item);
   await prepareDeclarationShapes([declaration]);
   const shape = declarationShape(declaration);
+  const description = symbolDescription(item.name, item.kind, label, compactSummary(summary));
   const aliases = await unionAliasIndex(pkg, entry, routes);
   const body = [
     frontmatter(`${item.name} | ${label}`, description).trimEnd(),
@@ -1322,10 +1362,22 @@ function renderEntryPointInventory(manifest: PublicApiManifest): string {
 function renderMovedGuides(): string {
   const lines = [
     frontmatter(
-      "Moved guides",
-      "Where each former repository guide now lives in the documentation site.",
+      "Moved pages",
+      "Where each moved documentation page and each former repository guide lives now.",
     ).trimEnd(),
-    "Each guide now has a page in the docs site. Choose its new home below.",
+    "Old addresses keep working: each one opens its new page. A link to a heading of an old page opens the page that holds that heading now.",
+    "",
+    "## Moved documentation pages",
+    "",
+    "| Old address | New address |",
+    "| --- | --- |",
+    ...Object.entries(MOVED_PAGES).map(
+      ([oldRoute, page]) => `| \`${oldRoute}\` | [${page.to}](${page.to}) |`,
+    ),
+    "",
+    "## Former repository guides",
+    "",
+    "Each guide that was a file in the repository has a page in the docs site.",
     "",
     '<div class="sw-next-links sw-moved-guides">',
   ];
@@ -1341,6 +1393,137 @@ function renderMovedGuides(): string {
   }
   lines.push("</div>");
   return `${lines.join("\n")}\n`;
+}
+
+/**
+ * Every moved page must forward to a page and heading that exist, and must not
+ * also keep its own content (the old address would then never forward).
+ */
+export function movedPageIssues(
+  movedPages: Readonly<Record<string, MovedPage>>,
+  documents: readonly MarkdownDocument[],
+  movedHeadings: Readonly<Record<string, Readonly<Record<string, string>>>> = {},
+): string[] {
+  const failures: string[] = [];
+  const anchorsOf = (route: string): Set<string> | undefined => {
+    const path = contentPathForRoute(route, documents);
+    const document = documents.find((item) => item.path === path);
+    return document === undefined ? undefined : headingAnchors(document.content);
+  };
+  const resolves = (link: string): boolean => {
+    const [route = "", fragment] = link.split("#", 2);
+    const anchors = anchorsOf(route);
+    if (anchors === undefined) return false;
+    return fragment === undefined || anchors.has(fragment);
+  };
+  for (const [oldRoute, page] of Object.entries(movedPages)) {
+    if (contentPathForRoute(oldRoute, documents) !== undefined) {
+      failures.push(`moved page still has content: ${oldRoute}`);
+    }
+    if (!resolves(page.to))
+      failures.push(`moved page ${oldRoute} forwards to a missing page: ${page.to}`);
+    for (const [anchor, target] of Object.entries(page.anchors)) {
+      if (!resolves(target)) {
+        failures.push(`moved page ${oldRoute}#${anchor} forwards to a missing target: ${target}`);
+      }
+    }
+  }
+  // A heading that left a page which kept its address: the heading must be
+  // gone from that page, or forwarding would take readers away from it.
+  for (const [route, headings] of Object.entries(movedHeadings)) {
+    const kept = anchorsOf(route);
+    if (kept === undefined) {
+      failures.push(`moved headings name a missing page: ${route}`);
+      continue;
+    }
+    for (const [anchor, target] of Object.entries(headings)) {
+      if (kept.has(anchor)) failures.push(`moved heading is still on its page: ${route}#${anchor}`);
+      if (!resolves(target)) {
+        failures.push(`moved heading ${route}#${anchor} forwards to a missing target: ${target}`);
+      }
+    }
+  }
+  return failures;
+}
+
+interface SiteLink {
+  readonly source: string;
+  readonly link: string;
+}
+
+/**
+ * Docs links that the Markdown check does not see must also resolve: they name
+ * a page that exists (not an old moved address) and, with a fragment, a
+ * heading on that page.
+ */
+export function unresolvedSiteLinks(
+  links: readonly SiteLink[],
+  documents: readonly MarkdownDocument[],
+  movedPages: Readonly<Record<string, MovedPage>> = MOVED_PAGES,
+): string[] {
+  const failures: string[] = [];
+  for (const { source, link } of links) {
+    const [route = "", fragment] = link.split("#", 2);
+    if (route === "/docs/") continue;
+    if (movedPages[route] !== undefined) {
+      failures.push(`${source} links moved page ${link}; link ${movedPages[route]?.to} instead`);
+      continue;
+    }
+    const path = contentPathForRoute(route, documents);
+    if (path === undefined) {
+      failures.push(`${source} links missing page ${link}`);
+      continue;
+    }
+    const document = documents.find((item) => item.path === path);
+    if (fragment !== undefined && fragment.length > 0 && document !== undefined) {
+      if (!headingAnchors(document.content).has(fragment)) {
+        failures.push(`${source} links missing anchor ${link}`);
+      }
+    }
+  }
+  return failures;
+}
+
+async function routeComponentFiles(directory: string): Promise<string[]> {
+  const files: string[] = [];
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) files.push(...(await routeComponentFiles(path)));
+    else if (/\.tsx?$/.test(entry.name)) files.push(path);
+  }
+  return files;
+}
+
+/** README files, the sidebar, and site components all link docs pages. */
+async function siteLinkIssues(documents: readonly MarkdownDocument[]): Promise<string[]> {
+  const links: SiteLink[] = [];
+  for (const readme of await readReadmes()) {
+    const source = posix(relative(repositoryRoot, readme.path));
+    for (const match of readme.content.matchAll(
+      /https:\/\/sheetwrite\.vercel\.app(\/docs\/[^\s)"'<>`]*)/g,
+    )) {
+      links.push({ source, link: match[1] ?? "" });
+    }
+  }
+  for (const page of navigationPages(DOCS_NAVIGATION.flatMap((section) => section.items))) {
+    if (page.href.startsWith("/docs/")) {
+      links.push({ source: "docs/src/lib/navigation.ts", link: page.href });
+    }
+  }
+  for (const path of await routeComponentFiles(join(repositoryRoot, "docs/src"))) {
+    const source = posix(relative(repositoryRoot, path));
+    // The moved-page map names old addresses on purpose.
+    if (source === "docs/src/lib/moved-pages.ts") continue;
+    const content = await readFile(path, "utf8");
+    for (const match of content.matchAll(/_splat: "([^"]+)"/g)) {
+      links.push({ source, link: `/docs/${match[1]}/` });
+    }
+    // Any whole string literal that names a docs page: href, to, guideHref, and data tables.
+    for (const match of content.matchAll(/["'`](\/docs\/[a-z0-9/#.-]+)["'`]/g)) {
+      links.push({ source, link: match[1] ?? "" });
+    }
+  }
+  return unresolvedSiteLinks(links, documents);
 }
 
 interface EvidenceState {
@@ -1416,23 +1599,78 @@ function captureMetaOf(value: Record<string, unknown>): CaptureMeta | undefined 
  * missing or invalid the landing renders a "run the protocol" placeholder.
  */
 async function renderLandingBench(): Promise<string> {
+  const sizeReport = JSON.parse(
+    await readFile(join(repositoryRoot, "scripts/size-report.json"), "utf8"),
+  ) as Pick<SizeReport, "metrics">;
+  const fullEngine = await loadEvidence(
+    "bench/results/full-engine-results.json",
+    "bun run --filter @sheetwrite/bench bench:formula:engines",
+    validateFullEngineArtifact,
+  );
   return landingBenchPayload(
     await loadEvidence(
       "bench/results/render-scale.json",
       "bun run --filter @sheetwrite/bench bench:render:scale",
       validateRenderArtifact,
     ),
+    "evidence" in fullEngine
+      ? landingDownloads(sizeReport.metrics, fullEngine.evidence.engines)
+      : undefined,
   );
+}
+
+/** Download sizes on the landing page, Brotli-compressed as browsers fetch them. */
+export interface LandingDownloads {
+  /** JavaScript, WASM and CSS of `@sheetwrite/core` in a Vite production build. */
+  coreFirstLoadBrotliBytes: number;
+  defaultEngineBrotliBytes: number;
+  fullEngineBrotliBytes: number;
+}
+
+const CORE_FIRST_LOAD_METRICS = ["javascript", "wasm", "css"].map(
+  (kind) => `bundler.vite.coreInitial.${kind}.brotliBytes`,
+);
+
+/** A size the landing can show: present and a finite number of bytes. */
+function isKnownBytes(value: number | undefined): value is number {
+  return value !== undefined && Number.isFinite(value);
+}
+
+/**
+ * Reads the landing download sizes from the size report and the engine
+ * artifact. Any missing or non-finite part yields `undefined`: a partial sum
+ * would understate the download.
+ */
+export function landingDownloads(
+  metrics: Readonly<Record<string, Pick<Metric, "actual">>>,
+  engines: ReadonlyArray<{ engine: string; wasm: { brotliBytes: number } }>,
+): LandingDownloads | undefined {
+  const firstLoad = CORE_FIRST_LOAD_METRICS.map((key) => metrics[key]?.actual);
+  const defaultEngine = engines.find((entry) => entry.engine === "default")?.wasm.brotliBytes;
+  const fullEngine = engines.find((entry) => entry.engine === "full")?.wasm.brotliBytes;
+
+  if (!firstLoad.every(isKnownBytes) || !isKnownBytes(defaultEngine) || !isKnownBytes(fullEngine)) {
+    return undefined;
+  }
+
+  return {
+    coreFirstLoadBrotliBytes: firstLoad.reduce((sum, bytes) => sum + bytes, 0),
+    defaultEngineBrotliBytes: defaultEngine,
+    fullEngineBrotliBytes: fullEngine,
+  };
 }
 
 /** Pure payload builder, exported so the finite/fallback contract is testable. */
 export function landingBenchPayload(
   scale: { evidence: ValidatedRenderEvidence; source: string } | EvidenceState,
+  downloads?: LandingDownloads,
 ): string {
   const round1 = (value: number): number => Math.round(value * 10) / 10;
-  if (!("evidence" in scale)) {
-    return `${JSON.stringify({ available: false, reason: scale.reason }, null, 2)}\n`;
-  }
+  // Download sizes do not depend on the benchmark, so both payloads carry them.
+  const downloadsField = downloads ? { downloads } : {};
+  const unavailable = (reason: string): string =>
+    `${JSON.stringify({ available: false, reason, ...downloadsField }, null, 2)}\n`;
+  if (!("evidence" in scale)) return unavailable(scale.reason);
   const { evidence } = scale;
   const mid = (values: number[]): number => {
     const sorted = [...values].sort((a, b) => a - b);
@@ -1503,11 +1741,7 @@ export function landingBenchPayload(
   // structurally valid artifact with no comparable pairs must fall back to
   // the "run the protocol" placeholder, not render null.
   if (sizes.length === 0 || displayed.some((value) => !Number.isFinite(value))) {
-    return `${JSON.stringify(
-      { available: false, reason: "artifact has no full-round engine pairs to compare" },
-      null,
-      2,
-    )}\n`;
+    return unavailable("artifact has no full-round engine pairs to compare");
   }
   const payload = {
     available: true,
@@ -1520,6 +1754,7 @@ export function landingBenchPayload(
     },
     heroStats,
     sizes,
+    ...downloadsField,
   };
   return `${JSON.stringify(payload, null, 2)}\n`;
 }
@@ -2293,7 +2528,7 @@ function renderCorePathsSection(evidence: CorePathsEvidence, source: string): st
         ],
         ["Raw artifact", `<code>${html(source)}</code>`],
       ]),
-      "#### Scale",
+      "### Scale",
       "",
       "| Parameter | Value |",
       "| --- | ---: |",
@@ -2301,7 +2536,7 @@ function renderCorePathsSection(evidence: CorePathsEvidence, source: string): st
         ([name, value]) => `| \`${name}\` | ${formatCount(value)} |`,
       ),
       "",
-      "#### Samples",
+      "### Samples",
       "",
       "| Scenario | Samples |",
       "| --- | ---: |",
@@ -2315,7 +2550,7 @@ function renderCorePathsSection(evidence: CorePathsEvidence, source: string): st
       ...(counters.length === 0
         ? []
         : [
-            "#### Counters",
+            "### Counters",
             "",
             "Non-time evidence recorded by the same runs.",
             "",
@@ -2324,7 +2559,7 @@ function renderCorePathsSection(evidence: CorePathsEvidence, source: string): st
             ...counters,
             "",
           ]),
-      "#### Correctness checkpoints",
+      "### Correctness checkpoints",
       "",
       "| Scenario | Checkpoint |",
       "| --- | --- |",
@@ -2418,11 +2653,11 @@ function renderXlsxSection(evidence: XlsxEvidence, source: string): string[] {
           `Current and baseline are the same codec at different commits, measured in the same session. Baseline commit: ${shortHash(baselineCommit)}.`,
           "",
         ]),
-    "#### Operation time",
+    "### Operation time",
     "",
     ...benchScaleFigure("operation", measurementGroups("time")),
     "",
-    "#### Peak resident memory",
+    "### Peak resident memory",
     "",
     ...benchScaleFigure("operation", measurementGroups("memory"), "memory"),
     "",
@@ -2438,7 +2673,164 @@ function renderXlsxSection(evidence: XlsxEvidence, source: string): string[] {
   ];
 }
 
-export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Promise<string> {
+/** One generated performance page: its route under `/docs/performance/` and its sections. */
+interface PerformancePage {
+  readonly slug: string;
+  readonly title: string;
+  readonly description: string;
+  /** `##` headings of the evidence text that this page publishes, in order. */
+  readonly sections: readonly string[];
+}
+
+/** The Performance section of the docs: one page per benchmark area. */
+export const PERFORMANCE_PAGES: readonly PerformancePage[] = [
+  {
+    slug: "render",
+    title: "Render performance",
+    description:
+      "Scroll, edit, and interaction timings of the live grid, measured against Handsontable.",
+    sections: ["Render benchmark"],
+  },
+  {
+    slug: "data-engine",
+    title: "Data engine performance",
+    description:
+      "Ingest, window read, edit, sort, filter, and aggregate timings of the data store.",
+    sections: ["Data engine benchmark"],
+  },
+  {
+    slug: "core-write-path",
+    title: "Core write path",
+    description: "Timings of store and document writes at production sizes.",
+    sections: ["Core write path"],
+  },
+  {
+    slug: "formula-engine",
+    title: "Formula engine performance",
+    description:
+      "Recalculation timings by dependency shape, and how the two engine builds compare.",
+    sections: ["Formula engine benchmark"],
+  },
+  {
+    slug: "xlsx-codec",
+    title: "XLSX codec performance",
+    description: "Import and export time and peak memory for XLSX files.",
+    sections: ["XLSX codec benchmark"],
+  },
+  {
+    slug: "delivery-size",
+    title: "Delivery size",
+    description: "Published package sizes for each Sheetwrite release.",
+    sections: ["Delivery size"],
+  },
+  {
+    slug: "memory",
+    title: "Memory",
+    description: "Release retained engine memory, and read which owner holds each byte.",
+    sections: ["Release retained engine memory", "Runtime resource ownership"],
+  },
+  {
+    slug: "benchmark-protocol",
+    title: "Benchmark protocol",
+    description: "How the evidence is captured, and how to check a change for a timing regression.",
+    sections: ["Capture", "Matched local regression check", "Pending local evidence"],
+  },
+];
+
+const PERFORMANCE_INTRO =
+  "Every number in this section comes from a validated local protocol artifact captured on a clean tree; nothing is published from an unvalidated or protocol-mismatched artifact. Every expected cell carries either a validated timing or its recorded failure - a run that did not complete is shown as a failure, never converted into a timing.";
+
+/** A Markdown code fence line: up to 3 spaces, then 3 or more backticks or tildes. */
+const CODE_FENCE = /^ {0,3}(`{3,}|~{3,})/;
+
+/**
+ * Moves every heading below H2 up one level, in Markdown and in raw HTML. A
+ * section never holds another H2, so nothing reaches the page's H1. Fenced
+ * code is left as written: it shows text, not headings.
+ */
+function liftHeadings(markdown: string): string {
+  let fence: string | undefined;
+  return markdown
+    .split("\n")
+    .map((line) => {
+      const marker = CODE_FENCE.exec(line)?.[1];
+      if (fence === undefined && marker !== undefined) {
+        fence = marker;
+        return line;
+      }
+      if (fence !== undefined) {
+        // A fence closes on the same character, at least as long as it opened.
+        if (marker !== undefined && marker[0] === fence[0] && marker.length >= fence.length) {
+          fence = undefined;
+        }
+        return line;
+      }
+      return line
+        .replace(/^#(#{2,6} )/, "$1")
+        .replace(
+          /<(\/?)h([3-6])\b/g,
+          (_, slash: string, level: string) => `<${slash}h${Number(level) - 1}`,
+        );
+    })
+    .join("\n");
+}
+
+/**
+ * Splits the evidence text into the Performance pages. Each `##` section goes
+ * to the page that lists it; a section no page lists is an error, so a new
+ * benchmark can never drop out of the docs. A page whose evidence is pending
+ * says so instead of rendering empty.
+ */
+export function splitPerformancePages(
+  evidence: string,
+): Array<{ readonly route: string; readonly content: string }> {
+  const sections = new Map<string, string>();
+  for (const part of evidence.split(/^(?=## )/m)) {
+    if (!part.startsWith("## ")) continue;
+    const newline = part.indexOf("\n");
+    const heading = part.slice(3, newline === -1 ? undefined : newline).trim();
+    if (!PERFORMANCE_PAGES.some((page) => page.sections.includes(heading))) {
+      throw new Error(`performance section has no page: ${heading}`);
+    }
+    sections.set(heading, part.trimEnd());
+  }
+  const pages = PERFORMANCE_PAGES.map((page) => {
+    const present = page.sections.flatMap((heading) => {
+      const section = sections.get(heading);
+      return section === undefined ? [] : [section];
+    });
+    // A one-section page takes its heading from the page title, so the
+    // section's own headings move up a level to sit right under it.
+    const body =
+      present.length === 0
+        ? "This benchmark has no validated evidence yet. See [Pending local evidence](/docs/performance/benchmark-protocol/#pending-local-evidence)."
+        : page.sections.length === 1
+          ? liftHeadings((present[0] ?? "").replace(/^## [^\n]*\n+/, ""))
+          : present.join("\n\n");
+    return {
+      route: `performance/${page.slug}.md`,
+      content: `${frontmatter(page.title, page.description)}${body}\n`,
+    };
+  });
+  const overview = [
+    frontmatter(
+      "Performance",
+      "Benchmark and package-size evidence for Sheetwrite, one page per area.",
+    ).trimEnd(),
+    PERFORMANCE_INTRO,
+    "",
+    "Each page shows the results first, then the method and the command that reproduces them.",
+    "",
+    ...PERFORMANCE_PAGES.map(
+      (page) => `- [${page.title}](/docs/performance/${page.slug}/): ${page.description}`,
+    ),
+    "",
+  ].join("\n");
+  return [{ route: "performance/index.md", content: overview }, ...pages];
+}
+
+/** Every benchmark and delivery section as `##` Markdown; `splitPerformancePages` publishes it. */
+export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Promise<string> {
   const scale = await loadEvidence(
     "bench/results/render-scale.json",
     "bun run --filter @sheetwrite/bench bench:render:scale",
@@ -2496,16 +2888,7 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
       JSON.parse(await readFile(resolve(repositoryRoot, "scripts/size-history.json"), "utf8")),
     );
   const pending: EvidenceState[] = [];
-  const lines = [
-    frontmatter(
-      "Performance and delivery evidence",
-      "Freshness-gated benchmark and package-size evidence for Sheetwrite.",
-    ).trimEnd(),
-    "Every number on this page comes from a validated local protocol artifact captured on a clean tree; nothing is published from an unvalidated or protocol-mismatched artifact. Every expected cell carries either a validated timing or its recorded failure - a run that did not complete is shown as a failure, never converted into a timing. Results come first; the capture, the regression method, and the memory API follow them.",
-    "",
-    "## Render benchmark",
-    "",
-  ];
+  const lines = ["## Render benchmark", ""];
   // Readers come for results; the method and API notes follow every benchmark.
   const methodLines = [
     "## Release retained engine memory",
@@ -2592,7 +2975,7 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
     "",
     "String collection reclaims obsolete pool text and densely remaps surviving IDs. Automatic collection runs only at committed edit transaction barriers, never during painting or page loading, when dead arena/span storage exceeds 256 KiB and the surviving arena/span storage. Growth-based backoff avoids repeatedly scanning unchanged live data. Bulk clears and sheet removal request a new threshold check at the next commit.",
     "",
-    "`compactStringStorage()` explicitly collects unreachable text and trims growth slack outside an active mutation/page load. Raw IDs are valid only within `stringPoolEpoch()`; retain the epoch with projections and invalidate caches on a change, as described in the [worker rendering guide](/docs/guides/worker-rendering/#raw-string-ids-and-epochs). History snapshots own captured text. Persist resolved values, not pool IDs. Reclaimed Rust ownership does not imply that WebAssembly committed linear memory shrinks.",
+    "`compactStringStorage()` explicitly collects unreachable text and trims growth slack outside an active mutation/page load. Raw IDs are valid only within `stringPoolEpoch()`; retain the epoch with projections and invalidate caches on a change, as described in the [worker rendering guide](/docs/features/worker-rendering/#raw-string-ids-and-epochs). History snapshots own captured text. Persist resolved values, not pool IDs. Reclaimed Rust ownership does not imply that WebAssembly committed linear memory shrinks.",
     "",
     "Reproduce and validate the full owner/operation matrix with:",
     "",
@@ -2919,8 +3302,6 @@ export function renderCompatibilityResults(
     'description: "Checked formula, workbook, clipboard, and XLSX examples with exact sources and limits."',
     "---",
     "",
-    "# Detailed compatibility results",
-    "",
     "This page is generated from checked examples and evidence records. It states only what each named result proves; it is not a percentage or a blanket Excel, Google Sheets, LibreOffice, or OpenFormula compatibility claim.",
     "",
     "Result labels distinguish **evaluated** formulas or structures, **preserved** source or metadata, deliberately **flattened** interchange, explicit **warning** boundaries, and **unsupported** behavior.",
@@ -3086,6 +3467,7 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     formatVersion: 2,
     generatedBy: "scripts/docs.ts",
     movedGuideRoutes: MIGRATION_ROUTES,
+    movedPages: MOVED_PAGES,
     requiredSearchTerms: REQUIRED_SEARCH_TERMS,
     entryPointCount: manifest.packages.reduce((count, pkg) => count + pkg.entryPoints.length, 0),
     exportCount,
@@ -3126,6 +3508,31 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     }
   }
 
+  const formulaPages = renderFormulaFunctionPages(formulaInventory);
+  // An old overview heading forwards only when exactly one family page holds it;
+  // shared headings ("Signature profiles") stay on the overview.
+  const formulaHeadingTargets: Record<string, string> = {};
+  const overviewAnchors = headingAnchors(
+    formulaPages.find((page) => page.route === "reference/formula-functions.md")?.content ?? "",
+  );
+  const holders = new Map<string, string[]>();
+  for (const page of formulaPages) {
+    if (page.route === "reference/formula-functions.md") continue;
+    const href = `/docs/${page.route.replace(/\.md$/, "/")}`;
+    for (const heading of headingAnchors(page.content)) {
+      if (overviewAnchors.has(heading)) continue;
+      holders.set(heading, [...(holders.get(heading) ?? []), `${href}#${heading}`]);
+    }
+  }
+  for (const [heading, targets] of holders) {
+    if (targets.length === 1 && targets[0] !== undefined)
+      formulaHeadingTargets[heading] = targets[0];
+  }
+  // The old single-page table used a heading for each family's title.
+  for (const family of formulaFamilyNavigation(formulaPages)) {
+    const oldHeading = [...headingAnchors(`### ${family.label}`)][0];
+    if (oldHeading !== undefined) formulaHeadingTargets[oldHeading] = family.href;
+  }
   const files: ExpectedFile[] = [
     ...apiFiles,
     {
@@ -3140,9 +3547,14 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
       path: join(contentRoot, "reference/compatibility-results.md"),
       content: renderCompatibilityResults(),
     },
+    ...formulaPages.map((page) => ({ path: join(contentRoot, page.route), content: page.content })),
     {
-      path: join(contentRoot, "reference/formula-functions.md"),
-      content: renderFormulaFunctionContract(formulaInventory),
+      path: join(generatedDataRoot, "formula-nav.json"),
+      content: stableJson(formulaFamilyNavigation(formulaPages)),
+    },
+    {
+      path: join(generatedDataRoot, "formula-heading-targets.json"),
+      content: stableJson(formulaHeadingTargets),
     },
     {
       path: join(generatedDataRoot, "formula-summary.json"),
@@ -3163,10 +3575,10 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
       path: join(generatedDataRoot, "compatibility-results.json"),
       content: stableJson(publishedCompatibilityResults),
     },
-    {
-      path: join(contentRoot, "guides/performance-resources.md"),
-      content: await renderEvidencePage(),
-    },
+    ...splitPerformancePages(await renderEvidenceText()).map((page) => ({
+      path: join(contentRoot, page.route),
+      content: page.content,
+    })),
     { path: generatedManifestPath, content: stableJson(manifest) },
     { path: docsContractPath, content: stableJson(contract) },
     {
@@ -3389,12 +3801,14 @@ const SNIPPET_COMPILER_OPTIONS = {
   moduleResolution: "bundler",
   noEmit: true,
   paths: {
+    "@sheetwrite/charts": ["../packages/charts/dist/index.d.ts"],
     "@sheetwrite/core": ["../packages/core/dist/index.d.ts"],
     "@sheetwrite/core/*": ["../packages/core/dist/*"],
     "@sheetwrite/react": ["../packages/react/dist/index.d.ts"],
     "@sheetwrite/svelte": ["../packages/svelte/src/index.ts"],
     "@sheetwrite/vue": ["../packages/vue/dist/index.d.ts"],
     "@sheetwrite/xlsx": ["../packages/xlsx/dist/index.d.ts"],
+    "@sheetwrite/xlsx/register": ["../packages/xlsx/dist/register.d.ts"],
   },
   skipLibCheck: false,
   strict: true,
@@ -3661,6 +4075,8 @@ async function checkDocs(
       failures.push(`migration route has no page: ${route}`);
     }
   }
+  failures.push(...movedPageIssues(MOVED_PAGES, documents, MOVED_HEADINGS));
+  failures.push(...(await siteLinkIssues(documents)));
   failures.push(...(await validateMarkdown(documents, manifest)));
   failures.push(...(await unresolvedCssTokens(join(repositoryRoot, "docs/src"))));
   failures.push(...adapterContractIssues(manifest));
@@ -3825,6 +4241,7 @@ const REQUIRED_API_EXAMPLES: Readonly<Record<string, readonly string[]>> = {
   "@sheetwrite/vue": ["Sheetwrite", "SheetwriteGrid"],
   "@sheetwrite/svelte": ["Sheetwrite", "SheetwriteGrid"],
   "@sheetwrite/xlsx": ["registerXlsxBackends"],
+  "@sheetwrite/charts": ["createChartViewCache", "registerChartsBackend"],
   "@sheetwrite/wasm": ["load"],
   "@sheetwrite/formulas": ["load"],
 };

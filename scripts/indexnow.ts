@@ -1,7 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
-const SITE_URL = "https://sheetwrite.vercel.app";
+import { SITE_URL } from "../docs/src/lib/seo.js";
+
 const SITE_HOST = new URL(SITE_URL).host;
 const MAX_URLS = 10_000;
 

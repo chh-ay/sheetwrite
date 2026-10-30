@@ -1,6 +1,6 @@
 ---
 title: "SourceSnapshot | @sheetwrite/formulas"
-description: "Compact serializable projection of persisted derived-cell sources and spill identity in one range."
+description: "SourceSnapshot class in @sheetwrite/formulas: Compact serializable projection of persisted derived-cell sources and spill identity in one range."
 ---
 <!-- api-export:@sheetwrite/formulas|.|SourceSnapshot -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/formulas/">@sheetwrite/formulas</a><span class="api-status" data-kind="class">class</span></div>
@@ -10,31 +10,12 @@ identity in one range. Offsets are row-major and sorted; reference targets
 are packed `[sheet_handle, row, col]` triples.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/pkg/sheetwrite_wasm.d.ts#L460"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L460</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/pkg/sheetwrite_wasm.d.ts#L494"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L494</code></a></dd></div>
 </dl>
 
-<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
-<a href="#source-snapshot-byte-length"><code>byteLength</code></a>
-<a href="#source-snapshot-formula-offsets"><code>formulaOffsets</code></a>
-<a href="#source-snapshot-formula-sources"><code>formulaSources</code></a>
-<a href="#source-snapshot-free"><code>free</code></a>
-<a href="#source-snapshot-reference-offsets"><code>referenceOffsets</code></a>
-<a href="#source-snapshot-reference-targets"><code>referenceTargets</code></a>
-<a href="#source-snapshot-spill-derived"><code>spillDerived</code></a>
-</nav>
-
-## Members <span class="api-count" data-pagefind-ignore>7</span>
+## Members <span class="api-count" data-pagefind-ignore>6</span>
 
 <div class="api-member-list">
-
-<details class="api-member" id="source-snapshot-byte-length" data-pagefind-weight="1">
-<summary><code>byteLength</code></summary>
-
-```ts generated
-byteLength: () => number;
-```
-
-</details>
 
 <details class="api-member" id="source-snapshot-formula-offsets" data-pagefind-weight="1">
 <summary><code>formulaOffsets</code></summary>
@@ -98,7 +79,6 @@ spillDerived: () => Uint8Array
 
 ```ts generated
 class SourceSnapshot {
-  byteLength: () => number;
   formulaOffsets: () => Uint32Array;
   formulaSources: () => string[];
   free: () => void;

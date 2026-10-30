@@ -9,7 +9,9 @@ import type {
   Column,
   ConditionalFormatRule,
 } from "./cell.js";
+import type { ChartDefinition } from "./chart.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "./coordinates.js";
+import type { PivotDefinition } from "./pivot.js";
 import type { WorkbookTable, WorkbookTablePatch } from "./table.js";
 
 /** Stable reason codes returned by worksheet-name validation. */
@@ -77,6 +79,11 @@ export interface Sheet {
   frozenCols?: number;
   /** Native workbook tables anchored to this stable worksheet identity. */
   tables?: WorkbookTable[];
+  /** Charts anchored to this sheet; series sources use stable sheet IDs. */
+  charts?: ChartDefinition[];
+
+  /** Pivot tables anchored on this sheet; IDs are unique in the workbook. */
+  pivots?: PivotDefinition[];
 }
 
 /** One key of a multi-column sort, applied in array order (first = primary). */
@@ -103,6 +110,19 @@ export interface RowGroup {
   collapsed: boolean;
 }
 
+/**
+ * Workbook calculation options, mirroring Excel's "Enable iterative calculation".
+ * A workbook without this record uses the defaults.
+ */
+export interface CalculationSettings {
+  /** Recalculate circular references iteratively instead of showing `#CYCLE!`; Excel default `false`. */
+  iterate: boolean;
+  /** Most passes over each circular reference; an integer from 1 to 32,767, Excel default 100. */
+  maxIterations: number;
+  /** Iteration stops once no value changes by more than this; finite and >= 0, Excel default 0.001. */
+  maxChange: number;
+}
+
 /** Live workbook schema containing ordered sheets and the active sheet ID. */
 export interface Workbook {
   /** Sheets in display/tab order. */
@@ -111,6 +131,10 @@ export interface Workbook {
   activeSheet: SheetId;
   /** Formula names shared by the workbook or shadowed within a sheet scope. */
   namedRanges?: NamedRangeSnapshot[];
+  /** Opaque OOXML graphs from an imported file; edits drop the graphs that depend on them. */
+  xlsxSource?: XlsxSourceSnapshot;
+  /** Iterative calculation options; absent means the defaults. */
+  calculation?: CalculationSettings;
 }
 
 export interface AddSheetInput {
@@ -295,6 +319,15 @@ export type MutationIssue =
       sheet?: SheetId;
       operationIndex: number;
       message: string;
+    }
+  /** A local write into cells a pivot table's output owns. */
+  | {
+      kind: "pivot-output";
+      severity: "error";
+      pivotId: string;
+      range: Range;
+      operationIndex: number;
+      message: string;
     };
 
 /** Persistent display and grouping metadata for one document row. */
@@ -357,7 +390,58 @@ export interface SheetSnapshot {
   filters?: Array<[col: number, filter: ColumnFilter]>;
   rowGroups?: RowGroup[];
   tables?: WorkbookTable[];
+  charts?: ChartDefinition[];
+  /** Pivot tables anchored on this sheet. */
+  pivots?: PivotDefinition[];
   cells: CellBlock[];
+}
+
+/**
+ * One retained OOXML part, kept as its original compressed ZIP payload so a
+ * save copies it without inflating or recompressing. Runtime copies are frozen.
+ */
+export interface XlsxSourcePart {
+  readonly name: string;
+  readonly contentType: string;
+  readonly method: 0 | 8;
+  readonly crc32: number;
+  readonly uncompressedSize: number;
+  /** Base64 of the compressed payload. */
+  readonly data: string;
+}
+
+/** What an opaque graph reads; any change to it drops the graph on save. */
+export interface XlsxSourceDependency {
+  readonly sheetId: SheetId;
+  /** Sheet name at import; OOXML formulas inside the graph refer to sheets by name. */
+  readonly name: string;
+  /** `layout` graphs (images) only follow row/column structure; `values` graphs (charts, pivots) read cells. */
+  readonly scope: "layout" | "values";
+  /** 64-bit hex fingerprint of the sheet at import, for snapshots edited outside a Store. */
+  readonly digest: string;
+}
+
+/** One relationship from the package, workbook, or a sheet to a retained part graph. */
+export interface XlsxSourceGraph {
+  readonly owner: "root" | "workbook" | "sheet";
+  readonly sheetId?: SheetId;
+  /** OPC relationship type URI. */
+  readonly type: string;
+  /** Relationship target part. */
+  readonly target: string;
+  /** Pivot cache id written into `<pivotCaches>`. */
+  readonly cacheId?: string;
+  /** Every retained part reached from `target`, including `.rels` parts. */
+  readonly parts: readonly string[];
+  readonly dependencies: readonly XlsxSourceDependency[];
+}
+
+/** Bounded, frozen record of the OOXML parts Sheetwrite does not model. */
+export interface XlsxSourceSnapshot {
+  readonly parts: readonly XlsxSourcePart[];
+  readonly graphs: readonly XlsxSourceGraph[];
+  /** Targets of graphs dropped by committed edits; undo does not restore them. */
+  readonly dropped?: readonly string[];
 }
 
 /** Schema-versioned serializable workbook document. */
@@ -368,6 +452,10 @@ export interface WorkbookSnapshot {
   workbook: {
     activeSheet: SheetId;
     namedRanges?: NamedRangeSnapshot[];
+    /** Opaque OOXML graphs kept for the next XLSX save; never interpreted by Sheetwrite. */
+    xlsxSource?: XlsxSourceSnapshot;
+    /** Iterative calculation options; omitted when every field has its default. */
+    calculation?: CalculationSettings;
   };
   sheets: SheetSnapshot[];
 }
@@ -424,4 +512,11 @@ export type DocumentOp =
   | { op: "removeProtectedRange"; sheet: SheetId; id: string }
   | { op: "setNote"; addr: CellAddress; text: string | null }
   | { op: "setNamedRange"; namedRange: NamedRangeSnapshot }
-  | { op: "removeNamedRange"; name: string; scope?: SheetId };
+  | { op: "removeNamedRange"; name: string; scope?: SheetId }
+  | { op: "setCalculation"; calculation: CalculationSettings }
+  | { op: "setChart"; sheet: SheetId; chart: ChartDefinition }
+  | { op: "removeChart"; sheet: SheetId; id: string }
+
+  /** Insert or replace the pivot with `pivot.id` on `sheet`. */
+  | { op: "setPivot"; sheet: SheetId; pivot: PivotDefinition }
+  | { op: "removePivot"; sheet: SheetId; id: string };

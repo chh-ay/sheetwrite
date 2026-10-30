@@ -1,6 +1,6 @@
 ---
 title: "initSync | @sheetwrite/formulas"
-description: "Instantiates the given module, which can either be bytes or a precompiled WebAssembly.Module."
+description: "initSync function in @sheetwrite/formulas: Instantiates the given module, which can either be bytes or a precompiled WebAssembly.Module."
 ---
 <!-- api-export:@sheetwrite/formulas|.|initSync -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/formulas/">@sheetwrite/formulas</a><span class="api-status" data-kind="function">function</span></div>
@@ -9,7 +9,7 @@ Instantiates the given `module`, which can either be bytes or
 a precompiled `WebAssembly.Module`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/pkg/sheetwrite_wasm.d.ts#L659"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L659</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/pkg/sheetwrite_wasm.d.ts#L690"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L690</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -41,6 +41,6 @@ function initSync(
 <p class="api-consumers-label">Public exports naming <code>initSync</code></p>
 
 <ul class="api-consumer-list">
-<li>None.</li>
+<li><a href="/docs/api/wasm/engine-instance/"><code>EngineInstance</code></a><span class="api-consumer-kind">@sheetwrite/wasm</span></li>
 </ul>
 </div>

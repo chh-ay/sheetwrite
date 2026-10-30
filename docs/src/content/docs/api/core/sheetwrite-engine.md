@@ -1,6 +1,6 @@
 ---
 title: "SheetwriteEngine | @sheetwrite/core"
-description: "A complete engine module from @sheetwrite/wasm or @sheetwrite/formulas."
+description: "SheetwriteEngine interface in @sheetwrite/core: A complete engine module from @sheetwrite/wasm or @sheetwrite/formulas."
 ---
 <!-- api-export:@sheetwrite/core|.|SheetwriteEngine -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -19,7 +19,7 @@ A complete engine module from `@sheetwrite/wasm` or `@sheetwrite/formulas`.
 <summary><code>CellStore</code></summary>
 
 ```ts generated
-CellStore: typeof defaultEngine.CellStore;
+CellStore: defaultEngine.EngineInstance["CellStore"];
 ```
 
 </details>
@@ -68,7 +68,7 @@ functionNames?: () => string[];
 
 ```ts generated
 export interface SheetwriteEngine {
-  CellStore: typeof defaultEngine.CellStore;
+  CellStore: defaultEngine.EngineInstance["CellStore"];
   load: typeof defaultEngine.load;
   isLoaded: typeof defaultEngine.isLoaded;
   createEngine: typeof defaultEngine.createEngine;
@@ -85,6 +85,7 @@ export interface SheetwriteEngine {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

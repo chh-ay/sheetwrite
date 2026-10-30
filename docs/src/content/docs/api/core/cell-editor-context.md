@@ -1,6 +1,6 @@
 ---
 title: "CellEditorContext | @sheetwrite/core"
-description: "Immutable state and guarded completion callbacks for one mounted editor."
+description: "CellEditorContext interface in @sheetwrite/core: Immutable state and guarded completion callbacks for one mounted editor."
 ---
 <!-- api-export:@sheetwrite/core|.|CellEditorContext -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -8,7 +8,7 @@ description: "Immutable state and guarded completion callbacks for one mounted e
 Immutable state and guarded completion callbacks for one mounted editor.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L74"><code>packages/core/src/types/grid.ts#L74</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L92"><code>packages/core/src/types/grid.ts#L92</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -170,6 +170,7 @@ export interface CellEditorContext {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

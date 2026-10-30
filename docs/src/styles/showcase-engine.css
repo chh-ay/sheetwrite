@@ -19,7 +19,7 @@
   padding: calc(var(--sw-demo-space-4) * 2) 0 calc(var(--sw-demo-space-4) * 4);
 }
 
-/* The stage is one dark instrument: the Grid theme is dark, so is everything around it. */
+/* The stage is one instrument in the demo palette, which follows the page theme. */
 .sw-engine-stage {
   --sw-accent: var(--sw-demo-accent);
   --sw-accent-ink: var(--sw-demo-ink);
@@ -58,9 +58,7 @@
   align-items: center;
   padding: calc(var(--sw-demo-space-4) * 1.25) calc(var(--sw-demo-space-4) * 1.5);
   border-bottom: 1px solid var(--sw-demo-border);
-  background:
-    radial-gradient(52rem 16rem at 88% -30%, rgb(52 211 153 / 16%), transparent 70%),
-    var(--sw-demo-surface);
+  background: var(--sw-demo-surface);
 }
 
 .sw-engine-stage__intro {
@@ -140,9 +138,9 @@
 /* Step colours: the bar segment and the dot beside its row share one hue. */
 .sw-engine-run {
   --step-1: var(--sw-demo-accent);
-  --step-2: #60a5fa;
-  --step-3: #f59e0b;
-  --step-4: #c084fc;
+  --step-2: var(--sw-state-requested);
+  --step-3: var(--sw-state-pending);
+  --step-4: var(--sw-type-keyword);
 }
 
 .sw-engine-run__bar {
@@ -297,6 +295,22 @@
 .sw-engine-grid {
   height: var(--sw-engine-grid-height);
   min-height: 24rem;
+}
+
+/* The canvas palette lives on the grid root itself, with higher specificity
+   than core's `.sheetwrite` and `[data-theme="dark"] .sheetwrite` rules, so the
+   ledger follows the demo tokens in both page themes. */
+.sw-engine-stage .sw-engine-grid-panel .sw-engine-grid {
+  --sheetwrite-bg: var(--sw-demo-surface);
+  --sheetwrite-fg: var(--sw-demo-fg);
+  --sheetwrite-grid-line: var(--sw-demo-border);
+  --sheetwrite-header-bg: var(--sw-demo-raised);
+  --sheetwrite-header-fg: var(--sw-demo-muted);
+  --sheetwrite-selection: color-mix(in srgb, var(--sw-demo-accent) 18%, transparent);
+  --sheetwrite-selection-border: var(--sw-demo-accent);
+  --sheetwrite-search-match: color-mix(in srgb, var(--sw-demo-warn) 24%, transparent);
+  --sheetwrite-search-active: var(--sw-demo-warn);
+  --sheetwrite-highlight: color-mix(in srgb, var(--sw-state-requested) 24%, transparent);
 }
 
 .sw-engine-facts {

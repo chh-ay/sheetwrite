@@ -3,8 +3,6 @@ title: "Detailed compatibility results"
 description: "Checked formula, workbook, clipboard, and XLSX examples with exact sources and limits."
 ---
 
-# Detailed compatibility results
-
 This page is generated from checked examples and evidence records. It states only what each named result proves; it is not a percentage or a blanket Excel, Google Sheets, LibreOffice, or OpenFormula compatibility claim.
 
 Result labels distinguish **evaluated** formulas or structures, **preserved** source or metadata, deliberately **flattened** interchange, explicit **warning** boundaries, and **unsupported** behavior.
@@ -46,7 +44,7 @@ Result labels distinguish **evaluated** formulas or structures, **preserved** so
 <div><dt>Result</dt><dd>evaluated</dd></div>
 <div><dt>Import</dt><dd>Recognized formulas evaluate; unknown dynamic-array syntax remains preserved source with an explicit formula error.</dd></div>
 <div><dt>Export</dt><dd>Anchor formula source is exported; derived spill cells are not serialized as invented formulas.</dd></div>
-<div><dt>Known boundary</dt><dd>No implicit-intersection operator or general Excel/Sheets dynamic-array family is claimed. Multi-key SORTBY, reshaping, and LAMBDA helpers need the full engine; the default engine returns #NAME? for them.</dd></div>
+<div><dt>Known boundary</dt><dd>The implicit-intersection operator (@) is not supported and returns #VALUE!. The space intersection operator between references is supported. No general Excel/Sheets dynamic-array family is claimed. Multi-key SORTBY, reshaping, and LAMBDA helpers need the full engine; the default engine returns #NAME? for them.</dd></div>
 <div><dt>Evidence</dt><dd>2 checked evidence records</dd></div>
 </dl>
 <a href="/showcases/interoperability/?compatibility=formula.dynamic-arrays">Open the checked interactive result</a>
@@ -109,7 +107,7 @@ Result labels distinguish **evaluated** formulas or structures, **preserved** so
 <div><dt>Result</dt><dd>evaluated</dd></div>
 <div><dt>Import</dt><dd>Native same-workbook references map to stable worksheet IDs.</dd></div>
 <div><dt>Export</dt><dd>References are rendered using the current canonical sheet name and quoting rules.</dd></div>
-<div><dt>Known boundary</dt><dd>External workbook links and 3-D references are unsupported.</dd></div>
+<div><dt>Known boundary</dt><dd>External workbook links are unsupported. 3-D references are accepted only by SUM, AVERAGE, COUNT, COUNTA, MAX, MIN, PRODUCT, STDEV.S, STDEV.P, VAR.S and VAR.P; other positions return #VALUE!. Excel also accepts them in the A-suffixed aggregate functions.</dd></div>
 <div><dt>Evidence</dt><dd>2 checked evidence records</dd></div>
 </dl>
 <a href="/showcases/interoperability/?compatibility=reference.cross-sheet-stable-id">Open the checked interactive result</a>

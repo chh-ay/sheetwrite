@@ -1,6 +1,6 @@
 ---
 title: "AggregateOp | @sheetwrite/core"
-description: "Column aggregate operation for Grid.aggregate / Store data ops."
+description: "AggregateOp type in @sheetwrite/core: Column aggregate operation for Grid.aggregate / Store data ops."
 ---
 <!-- api-export:@sheetwrite/core|.|AggregateOp -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
@@ -28,6 +28,7 @@ export type AggregateOp = "sum" | "avg" | "min" | "max" | "count";
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

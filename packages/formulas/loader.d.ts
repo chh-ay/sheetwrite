@@ -25,7 +25,7 @@ export type { SyncInitInput } from "./pkg/sheetwrite_wasm.js";
  *
  * await initSheetwrite(undefined, formulas);
  * ```
- * @see /docs/guides/formulas/
+ * @see /docs/start/choose-an-engine/
  */
 export declare function load(
  source?: BufferSource | URL | string | Request | WebAssembly.Module,

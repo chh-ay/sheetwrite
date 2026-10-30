@@ -7,7 +7,7 @@ import VanillaWorkbench from "../showcases/VanillaWorkbench.js";
 import vanillaStylesheet from "../styles/vanilla-workbench.css?url";
 
 const description =
-  "Edit a revenue pipeline with the core Grid API. Switch the renderer, load rows from a paged source, and import or export a workbook. The host state shows each Grid generation.";
+  "Edit a revenue pipeline with the core Grid API: switch the renderer, load rows from a paged source, and import or export a workbook.";
 
 /** Construction-bound options are deep-linkable; defaults stay out of the URL. */
 interface VanillaSearch {
@@ -42,7 +42,7 @@ function VanillaWorkbenchRoute() {
         {
           title: "Explicit lifecycle",
           detail:
-            "createWorkbench and destroy() bound every generation — no listeners, chrome, or canvas survive teardown.",
+            "createWorkbench and destroy() bound every generation: no listeners, chrome, or canvas survive teardown.",
         },
         {
           title: "Construction-bound truth",
@@ -57,7 +57,7 @@ function VanillaWorkbenchRoute() {
         {
           title: "Honest Worker fallback",
           detail:
-            "A failed Worker boot emits renderer-fallback and keeps painting on the main thread — requested vs. active is always visible.",
+            "A failed Worker boot emits renderer-fallback and keeps painting on the main thread. Requested and active renderers are always visible.",
         },
       ]}
       prompt="Edit a Close date cell, switch Main thread to Web Worker, then destroy and create the Grid. Host state shows each ownership boundary."

@@ -1,6 +1,6 @@
 ---
 title: "DEFAULT_TRANSACTION_RESOURCE_LIMITS | @sheetwrite/core"
-description: "Inclusive defaults for every atomic document transaction accepted by a Store or Grid."
+description: "DEFAULT_TRANSACTION_RESOURCE_LIMITS variable in @sheetwrite/core: Inclusive defaults for every atomic document transaction accepted by a Store or Grid."
 ---
 <!-- api-export:@sheetwrite/core|.|DEFAULT_TRANSACTION_RESOURCE_LIMITS -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="variable">variable</span></div>
@@ -10,7 +10,7 @@ Store or Grid. The count bounds object-heavy validation and dispatch; the
 exact UTF-8 JSON size bounds hostile or accidentally oversized payloads.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L40"><code>packages/core/src/document-protocol.ts#L40</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L111"><code>packages/core/src/document-protocol.ts#L111</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -30,6 +30,7 @@ const DEFAULT_TRANSACTION_RESOURCE_LIMITS: Readonly<TransactionResourceLimits>
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

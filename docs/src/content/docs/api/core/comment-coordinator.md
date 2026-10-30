@@ -1,6 +1,6 @@
 ---
 title: "CommentCoordinator | @sheetwrite/core"
-description: "Transport/auth-neutral comment state with server-owned author and timestamp fields."
+description: "CommentCoordinator class in @sheetwrite/core: Transport/auth-neutral comment state with server-owned author and timestamp fields."
 ---
 <!-- api-export:@sheetwrite/core|.|CommentCoordinator -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="class">class</span></div>
@@ -166,6 +166,7 @@ class CommentCoordinator {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

@@ -169,7 +169,20 @@ export async function loadFormulaContractInventory(
   return JSON.parse(await readFile(resolve(root, path), "utf8"));
 }
 
-export function renderFormulaFunctionContract(inventoryValue: unknown): string {
+/** One generated formula reference page, relative to the docs content root. */
+export interface FormulaReferencePage {
+  readonly route: string;
+  readonly content: string;
+}
+
+const FORMULA_FUNCTIONS_ROUTE = "/docs/reference/formula-functions/";
+
+/**
+ * The formula function reference: an overview with the engine, limits and
+ * unsupported categories, and one page per function family. A family page
+ * carries only the contract profiles its own functions use.
+ */
+export function renderFormulaFunctionPages(inventoryValue: unknown): FormulaReferencePage[] {
   const inventory = object(inventoryValue, "formula inventory");
   const contract = string(inventory.contract, "contract");
   if (contract !== "sheetwrite.formula-capabilities") {
@@ -227,68 +240,117 @@ export function renderFormulaFunctionContract(inventoryValue: unknown): string {
     }
   }
 
-  const lines = [
+  // A family with no functions has nothing to publish.
+  const publishedFamilies = Object.entries(families).flatMap(([familyId, family]) => {
+    const familyFunctions = functions.filter((formula) => formula.family === familyId);
+    if (familyFunctions.length === 0) return [];
+    const sourceId = string(family.source, `families.${familyId}.source`);
+    const source = sources[sourceId];
+    if (!source) throw new Error(`families.${familyId} has unknown source ${sourceId}`);
+    return [
+      {
+        id: familyId,
+        title: string(family.title, `families.${familyId}.title`),
+        section: string(family.section, `families.${familyId}.section`),
+        sourceUrl: string(source.link, `sources.${sourceId}.link`),
+        functions: familyFunctions,
+      },
+    ];
+  });
+  const familyRoute = (id: string): string => `${FORMULA_FUNCTIONS_ROUTE}${anchor(id)}/`;
+
+  const overview = [
     "---",
     'title: "Formula function contract"',
     'description: "Generated, source-linked formula names, signatures, semantics, dialect status, and unsupported boundaries."',
     "---",
     "",
-    "# Formula function contract",
-    "",
     `This page is generated from the checked version ${inventory.version} \`${contract}\` inventory. It publishes **${required.length} required-supported target functions**, **${incumbent.length} incumbent functions**, and **${extension.length} optional analysis functions** (${functions.length} canonical functions total) without maintaining a second name list. Aliases share their canonical function's build availability.`,
     "",
     "A function's presence means only the signature and semantic profiles linked in its row. Microsoft Excel documentation supplies the naming/family taxonomy; it is not a blanket Excel claim. Google Sheets and OpenFormula behavior is unverified unless a dialect profile says otherwise.",
     "",
+    "## Functions by family",
+    "",
+    "Each family has its own page with the engine build and the contract profiles of every function.",
+    "",
+    "| Family | Functions | Full engine only | Names |",
+    "| --- | ---: | ---: | --- |",
+    ...publishedFamilies.map((family) => {
+      const fullOnly = family.functions.filter(
+        (formula) => !formula.builds.includes("@sheetwrite/wasm"),
+      ).length;
+      const names = family.functions.map((formula) => `\`${formula.canonical}\``).join(", ");
+      return `| [${cell(family.title)}](${familyRoute(family.id)}) | ${family.functions.length} | ${fullOnly} | ${names} |`;
+    }),
+    "",
     "## Engine builds",
     "",
-    "<details>",
-    "<summary>Choose and initialize an engine</summary>",
-    "",
     "- `@sheetwrite/wasm` is the default engine. The Engine column shows `Default + full` for a function in both engines and `Full only` for a function in `@sheetwrite/formulas` only.",
-    '- `@sheetwrite/formulas` is the full engine. It adds the analysis families marked below: distributions and statistics, regression, finance, dates, text and regex, database, math and matrices, reshaping, LAMBDA helpers, and grouping. Select it before creating any stores: `import * as formulas from "@sheetwrite/formulas"; await initSheetwrite(undefined, formulas);`.',
+    '- `@sheetwrite/formulas` is the full engine. It adds the analysis families marked on the family pages: distributions and statistics, regression, finance, dates, text and regex, database, math and matrices, reshaping, LAMBDA helpers, and grouping. Select it before creating any stores: `import * as formulas from "@sheetwrite/formulas"; await initSheetwrite(undefined, formulas);`.',
     "- The active engine's registered names drive formula assist. Optional names are not suggested by the default engine and evaluate to `#NAME?` there; merely importing the optional package does not enable them.",
     "- Numeric functions use binary64 arithmetic with function-specific domains and bounded numerical algorithms. The inventory does not claim unlimited tail accuracy or complete Excel/Google Sheets/OpenFormula parity.",
     "",
-    "</details>",
-    "",
     "## Bounded evaluation contract",
     "",
-    "<details>",
-    "<summary>Evaluation limits and numerical behavior</summary>",
-    "",
     "- Parsing and dependency evaluation are each capped at 256 recursive levels. Range and matrix work is capped at 1,000,000 cells, 1,048,576 rows, 16,384 columns, and 64 MiB of value/intermediate storage; excess work returns an explicit formula error rather than truncating.",
-    "- One dynamic-array recompute pass is capped at 2,000,000 cell operations. Spill installation is atomic and collision-checked; see the [formula guide](/docs/guides/formulas/#dynamic-arrays-and-spills) for admission rules.",
+    "- One dynamic-array recompute pass is capped at 2,000,000 cell operations. Spill installation is atomic and collision-checked; see [Dynamic arrays and spills](/docs/features/formulas/dynamic-arrays-and-spills/) for admission rules.",
     "- `LET` permits at most 126 bindings and 16,384 expanded AST nodes. Bindings are lexical, shadow outer bindings, and are expanded lazily, so unused reads, errors, and volatility do not become dependencies.",
     "- Generated text is capped at 16 MiB and bounded searches at 4,000,000 steps. Text case conversion and parsing are Unicode-aware and host-locale independent; `NUMBERVALUE` defaults to `.` decimal and `,` grouping separators unless supplied explicitly.",
     "- `IRR` and `RATE` use deterministic root solving: 14 bracket steps, at most 100 solve steps, fixed `1e-12` convergence tolerances, and a finite search domain. Non-convergence or an invalid domain returns `#NUM!`.",
     "",
-    "No formula throughput or latency number is published here because this contract has no checked final formula-performance artifact. Use the [performance evidence protocol](/docs/guides/performance-resources/) to capture and validate measurements; limits above are implementation ceilings, not benchmark results.",
+    "No formula throughput or latency number is published here. The [formula engine performance](/docs/performance/formula-engine/) page has the measured results, and the [benchmark protocol](/docs/performance/benchmark-protocol/) shows how to capture and validate them; limits above are implementation ceilings, not benchmark results.",
     "",
-    "</details>",
+    "## Unsupported categories",
     "",
-    "## Functions by family",
+    "Unknown functions retain their source and evaluate to `#NAME?`; Sheetwrite does not silently execute a network, custom-code, or compatibility fallback.",
     "",
-    "<FormulaReference>",
+    "| Category | Scope | Examples | Source | Evidence |",
+    "| --- | --- | --- | --- | --- |",
+    ...unsupported.map((category, index) => {
+      const sourceId = string(category.source, `unsupportedCategories[${index}].source`);
+      const source = sources[sourceId];
+      if (!source)
+        throw new Error(`unsupportedCategories[${index}] has unknown source ${sourceId}`);
+      const evidence = object(category.evidence, `unsupportedCategories[${index}].evidence`);
+      return `| **${cell(string(category.title, `unsupportedCategories[${index}].title`))}** (\`${string(category.id, `unsupportedCategories[${index}].id`)}\`) | ${cell(string(category.scope, `unsupportedCategories[${index}].scope`))} | ${stringArray(
+        category.examples,
+        `unsupportedCategories[${index}].examples`,
+      )
+        .map((name) => `\`${name}\``)
+        .join(
+          ", ",
+        )} | [${cell(string(category.section, `unsupportedCategories[${index}].section`))}](${string(source.link, `sources.${sourceId}.link`)}) | ${stringArray(
+        evidence.paths,
+        `unsupportedCategories[${index}].evidence.paths`,
+      )
+        .map((path) => sourceLink(path))
+        .join("<br />")} |`;
+    }),
+    "",
+    "`RANDARRAY`, network/external-data functions, arbitrary external workbook links, and cube/OLAP functions are unsupported. `OFFSET`, `INDIRECT`, `RAND`, `RANDBETWEEN`, `TODAY` and `NOW` are volatile and recalculate after each edit. `OFFSET` and `INDIRECT` return references that can feed reference-taking functions or spill their values. `INDIRECT` reference text is not rewritten by fill, copy, or structural edits. Database functions and `LAMBDA` helpers require the full engine; `LET` is available in both engines.",
     "",
   ];
 
-  for (const [familyId, family] of Object.entries(families)) {
-    const title = string(family.title, `families.${familyId}.title`);
-    const sourceId = string(family.source, `families.${familyId}.source`);
-    const section = string(family.section, `families.${familyId}.section`);
-    const source = sources[sourceId];
-    if (!source) throw new Error(`families.${familyId} has unknown source ${sourceId}`);
-    const sourceUrl = string(source.link, `sources.${sourceId}.link`);
-    const familyFunctions = functions.filter((formula) => formula.family === familyId);
-    lines.push(
+  const familyPages = publishedFamilies.map((family): FormulaReferencePage => {
+    const used = (key: "signature" | "semantics" | "dialects" | "implementation"): string[] => [
+      ...new Set(family.functions.map((formula) => formula[key])),
+    ];
+    const lines = [
+      "---",
+      `title: ${JSON.stringify(`${family.title} functions`)}`,
+      `description: ${JSON.stringify(`Every ${family.title.toLowerCase()} formula function, its engine build, and its signature, semantic, dialect, and implementation profiles.`)}`,
+      "---",
+      "",
+      `This page lists the ${family.functions.length} functions of the ${family.title.toLowerCase()} family. Taxonomy/source: [${family.section}](${family.sourceUrl}). The [formula function contract](${FORMULA_FUNCTIONS_ROUTE}) has every family, the engine builds, and the evaluation limits.`,
+      "",
+      "## Functions",
+      "",
+      "<FormulaReference>",
+      "",
       '<section class="sw-formula-family">',
       "",
-      `### ${title}`,
-      "",
-      `Taxonomy/source: [${section}](${sourceUrl}).`,
-      "",
       '<table class="sw-formula-table"><thead><tr><th>Function (aliases)</th><th>Engine</th><th>Contract</th></tr></thead><tbody>',
-      ...familyFunctions.map((formula) => {
+      ...family.functions.map((formula) => {
         const names = [formula.canonical, ...formula.aliases];
         const aliases = formula.aliases.map((name) => `<code>${html(name)}</code>`).join(", ");
         const inDefaultEngine = formula.builds.includes("@sheetwrite/wasm");
@@ -319,125 +381,117 @@ export function renderFormulaFunctionContract(inventoryValue: unknown): string {
       "",
       "</section>",
       "",
-    );
-  }
+      "</FormulaReference>",
+      "",
+      "## Signature profiles",
+      "",
+      "Argument order, required/default state, accepted shapes, repetition, and return shape come directly from the inventory.",
+      "",
+    ];
+    for (const id of used("signature")) {
+      const signature = signatures[id];
+      if (signature === undefined) continue;
+      lines.push(
+        `<details id="signature-${anchor(id)}"><summary>Signature: ${id}</summary>`,
+        "",
+        `Return shape: \`${signature.returns}\`.`,
+        "",
+        "| Argument | Required | Default | Accepts | Repetition |",
+        "| --- | --- | --- | --- | --- |",
+        ...(signature.arguments.length === 0
+          ? ["| _none_ | — | — | — | — |"]
+          : signature.arguments.map(
+              (argument) =>
+                `| \`${argument.name}\` | ${argument.required ? "yes" : "no"} | ${cell(valueText(argument.default))} | ${argument.accepts.map((value) => `\`${value}\``).join(", ")} | \`${argument.repeat}\` |`,
+            )),
+        "",
+        "</details>",
+        "",
+      );
+    }
 
-  lines.push("</FormulaReference>", "");
-
-  lines.push(
-    "## Signature profiles",
-    "",
-    "Argument order, required/default state, accepted shapes, repetition, and return shape come directly from the inventory.",
-    "",
-  );
-  for (const [id, signature] of Object.entries(signatures)) {
     lines.push(
-      `<details id="signature-${anchor(id)}"><summary>Signature: ${id}</summary>`,
+      "## Semantic profiles",
       "",
-      `Return shape: \`${signature.returns}\`.`,
-      "",
-      "| Argument | Required | Default | Accepts | Repetition |",
-      "| --- | --- | --- | --- | --- |",
-      ...(signature.arguments.length === 0
-        ? ["| _none_ | — | — | — | — |"]
-        : signature.arguments.map(
-            (argument) =>
-              `| \`${argument.name}\` | ${argument.required ? "yes" : "no"} | ${cell(valueText(argument.default))} | ${argument.accepts.map((value) => `\`${value}\``).join(", ")} | \`${argument.repeat}\` |`,
-          )),
-      "",
-      "</details>",
+      "These values are normative for the listed Sheetwrite subset. `function-defined` and `contextual` are explicit limitations: consult the formula guides' function-specific sections rather than assuming another spreadsheet's edge behavior.",
       "",
     );
-  }
+    for (const id of used("semantics")) {
+      const profile = semantics[id];
+      if (profile === undefined) continue;
+      lines.push(
+        `<details id="semantics-${anchor(id)}"><summary>Semantics: ${id}</summary>`,
+        "",
+        "| Dimension | Contract |",
+        "| --- | --- |",
+        ...Object.entries(profile).map(
+          ([dimension, value]) =>
+            `| ${dimension} | ${cell(keyValues(value, `semanticsProfiles.${id}.${dimension}`))} |`,
+        ),
+        "",
+        "</details>",
+        "",
+      );
+    }
 
-  lines.push(
-    "## Semantic profiles",
-    "",
-    "These values are normative for the listed Sheetwrite subset. `function-defined` and `contextual` are explicit limitations: consult the formula guide's function-specific sections rather than assuming another spreadsheet's edge behavior.",
-    "",
-  );
-  for (const [id, profile] of Object.entries(semantics)) {
-    lines.push(
-      `<details id="semantics-${anchor(id)}"><summary>Semantics: ${id}</summary>`,
-      "",
-      "| Dimension | Contract |",
-      "| --- | --- |",
-      ...Object.entries(profile).map(
-        ([dimension, value]) =>
-          `| ${dimension} | ${cell(keyValues(value, `semanticsProfiles.${id}.${dimension}`))} |`,
-      ),
-      "",
-      "</details>",
-      "",
-    );
-  }
+    lines.push("## Dialect profiles", "");
+    for (const id of used("dialects")) {
+      const profile = dialects[id];
+      if (profile === undefined) continue;
+      lines.push(
+        `<details id="dialect-${anchor(id)}"><summary>Dialect: ${id}</summary>`,
+        "",
+        "| Dialect | Status |",
+        "| --- | --- |",
+        `| Microsoft Excel | ${cell(valueText(profile.excel))} |`,
+        `| Google Sheets | ${cell(valueText(profile.googleSheets))} |`,
+        `| OpenFormula | ${cell(valueText(profile.openFormula))} |`,
+        "",
+        `Limitations: ${stringArray(profile.divergences, `dialectProfiles.${id}.divergences`).join(" ")}`,
+        "",
+        "</details>",
+        "",
+      );
+    }
 
-  lines.push("## Dialect profiles", "");
-  for (const [id, profile] of Object.entries(dialects)) {
-    lines.push(
-      `<details id="dialect-${anchor(id)}"><summary>Dialect: ${id}</summary>`,
-      "",
-      "| Dialect | Status |",
-      "| --- | --- |",
-      `| Microsoft Excel | ${cell(valueText(profile.excel))} |`,
-      `| Google Sheets | ${cell(valueText(profile.googleSheets))} |`,
-      `| OpenFormula | ${cell(valueText(profile.openFormula))} |`,
-      "",
-      `Limitations: ${stringArray(profile.divergences, `dialectProfiles.${id}.divergences`).join(" ")}`,
-      "",
-      "</details>",
-      "",
-    );
-  }
+    lines.push("## Implementation profiles", "");
+    for (const id of used("implementation")) {
+      const profile = implementations[id];
+      if (profile === undefined) continue;
+      lines.push(
+        `<details id="implementation-${anchor(id)}"><summary>Implementation: ${id}</summary>`,
+        "",
+        "| Layer | Status and source/evidence |",
+        "| --- | --- |",
+        `| Parser | ${statusPaths(profile.parser, `implementationProfiles.${id}.parser`)} |`,
+        `| Evaluator | ${statusPaths(profile.evaluator, `implementationProfiles.${id}.evaluator`)} |`,
+        `| Formula assist | ${statusPaths(profile.assist, `implementationProfiles.${id}.assist`)} |`,
+        `| Evidence | ${statusPaths(profile.evidence, `implementationProfiles.${id}.evidence`)} |`,
+        "",
+        "</details>",
+        "",
+      );
+    }
+    return {
+      route: `reference/formula-functions/${anchor(family.id)}.md`,
+      content: `${lines.join("\n").trimEnd()}\n`,
+    };
+  });
 
-  lines.push("## Implementation profiles", "");
-  for (const [id, profile] of Object.entries(implementations)) {
-    lines.push(
-      `<details id="implementation-${anchor(id)}"><summary>Implementation: ${id}</summary>`,
-      "",
-      "| Layer | Status and source/evidence |",
-      "| --- | --- |",
-      `| Parser | ${statusPaths(profile.parser, `implementationProfiles.${id}.parser`)} |`,
-      `| Evaluator | ${statusPaths(profile.evaluator, `implementationProfiles.${id}.evaluator`)} |`,
-      `| Formula assist | ${statusPaths(profile.assist, `implementationProfiles.${id}.assist`)} |`,
-      `| Evidence | ${statusPaths(profile.evidence, `implementationProfiles.${id}.evidence`)} |`,
-      "",
-      "</details>",
-      "",
-    );
-  }
+  return [
+    { route: "reference/formula-functions.md", content: `${overview.join("\n").trimEnd()}\n` },
+    ...familyPages,
+  ];
+}
 
-  lines.push(
-    "## Unsupported categories",
-    "",
-    "Unknown functions retain their source and evaluate to `#NAME?`; Sheetwrite does not silently execute a network, custom-code, or compatibility fallback.",
-    "",
-    "| Category | Scope | Examples | Source | Evidence |",
-    "| --- | --- | --- | --- | --- |",
-    ...unsupported.map((category, index) => {
-      const sourceId = string(category.source, `unsupportedCategories[${index}].source`);
-      const source = sources[sourceId];
-      if (!source)
-        throw new Error(`unsupportedCategories[${index}] has unknown source ${sourceId}`);
-      const evidence = object(category.evidence, `unsupportedCategories[${index}].evidence`);
-      return `| **${cell(string(category.title, `unsupportedCategories[${index}].title`))}** (\`${string(category.id, `unsupportedCategories[${index}].id`)}\`) | ${cell(string(category.scope, `unsupportedCategories[${index}].scope`))} | ${stringArray(
-        category.examples,
-        `unsupportedCategories[${index}].examples`,
-      )
-        .map((name) => `\`${name}\``)
-        .join(
-          ", ",
-        )} | [${cell(string(category.section, `unsupportedCategories[${index}].section`))}](${string(source.link, `sources.${sourceId}.link`)}) | ${stringArray(
-        evidence.paths,
-        `unsupportedCategories[${index}].evidence.paths`,
-      )
-        .map((path) => sourceLink(path))
-        .join("<br />")} |`;
-    }),
-    "",
-    "Automatic volatile functions beyond the explicit host-clock barrier, network/external-data functions, arbitrary external workbook links, and cube/OLAP functions are unsupported. `TODAY` and `NOW` are the documented clock-function exception. Database functions and `LAMBDA` helpers require the full engine; `LET` is available in both engines.",
-    "",
-  );
-
-  return `${lines.join("\n").trimEnd()}\n`;
+/** Navigation entries for the family pages, in inventory order. */
+export function formulaFamilyNavigation(
+  pages: readonly FormulaReferencePage[],
+): Array<{ label: string; href: string }> {
+  return pages.flatMap((page) => {
+    const match = /^reference\/formula-functions\/([a-z0-9-]+)\.md$/.exec(page.route);
+    const title = /^title: "(.*) functions"$/m.exec(page.content)?.[1];
+    if (match === null || title === undefined) return [];
+    return [{ label: title, href: `${FORMULA_FUNCTIONS_ROUTE}${match[1]}/` }];
+  });
 }

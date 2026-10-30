@@ -1,6 +1,6 @@
 ---
 title: "MAX_HYPERLINK_TARGET_LENGTH | @sheetwrite/core"
-description: "External target ceiling, aligned with the bounded private clipboard payload."
+description: "MAX_HYPERLINK_TARGET_LENGTH variable in @sheetwrite/core: External target ceiling, aligned with the bounded private clipboard payload."
 ---
 <!-- api-export:@sheetwrite/core|.|MAX_HYPERLINK_TARGET_LENGTH -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="variable">variable</span></div>
@@ -8,7 +8,7 @@ description: "External target ceiling, aligned with the bounded private clipboar
 External target ceiling, aligned with the bounded private clipboard payload.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/hyperlink.ts#L11"><code>packages/core/src/hyperlink.ts#L11</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/hyperlink.ts#L18"><code>packages/core/src/hyperlink.ts#L18</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -28,6 +28,7 @@ const MAX_HYPERLINK_TARGET_LENGTH: 2048
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

@@ -1,4 +1,4 @@
-import { access, cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { access, cp, mkdir, mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
@@ -6,8 +6,10 @@ import { pathToFileURL } from "node:url";
 
 import { chromium } from "@playwright/test";
 
+import { assertPublishedDeclarations } from "./package-dist.js";
 import {
   assertPublishedFilePolicy,
+  packBuiltPackages,
   readReleaseManifestDigest,
   verifyReleaseArtifacts,
 } from "./release-artifacts.js";
@@ -28,7 +30,7 @@ interface PackResult {
   filename: string;
   size: number;
   unpackedSize: number;
-  files: Array<{ path: string }>;
+  files: ReadonlyArray<{ readonly path: string }>;
 }
 
 interface PackageSpec {
@@ -56,6 +58,13 @@ const mitCompatibleLicenses: Record<string, true> = {
 // upstream MIT grant and source commit: https://sources.debian.org/copyright/license/node-buffers/0.1.1-2/
 const auditedLicenseOverrides: Record<string, string> = {
   "buffers@0.1.1": "MIT",
+};
+/** Optional packages that core and the framework adapters must install and run without. */
+const OPTIONAL_PACKAGES = ["@sheetwrite/xlsx", "@sheetwrite/charts"] as const;
+/** Packages that ship only compiled `dist/` output, never their source or tests. */
+const DIST_ONLY_PACKAGES: Readonly<Record<string, true>> = {
+  "@sheetwrite/xlsx": true,
+  "@sheetwrite/charts": true,
 };
 const packageSpecs: PackageSpec[] = [
   {
@@ -111,7 +120,6 @@ const packageSpecs: PackageSpec[] = [
       "pkg/sheetwrite_wasm.d.ts",
       "pkg/sheetwrite_wasm.js",
       "pkg/sheetwrite_wasm_bg.wasm",
-      "pkg/sheetwrite_wasm_bg.wasm.d.ts",
     ],
   },
   {
@@ -127,7 +135,6 @@ const packageSpecs: PackageSpec[] = [
       "pkg/sheetwrite_wasm.d.ts",
       "pkg/sheetwrite_wasm.js",
       "pkg/sheetwrite_wasm_bg.wasm",
-      "pkg/sheetwrite_wasm_bg.wasm.d.ts",
     ],
   },
   {
@@ -147,6 +154,21 @@ const packageSpecs: PackageSpec[] = [
       "dist/table-import.js",
       "dist/workbook.d.ts",
       "dist/workbook.js",
+    ],
+  },
+  {
+    directory: "packages/charts",
+    requiredFiles: [
+      "LICENSE",
+      "README.md",
+      "dist/index.d.ts",
+      "dist/index.js",
+      "dist/register.d.ts",
+      "dist/register.js",
+      "dist/registration.d.ts",
+      "dist/registration.js",
+      "dist/view-cache.d.ts",
+      "dist/view-cache.js",
     ],
   },
   {
@@ -192,72 +214,6 @@ function collectExportTargets(value: unknown, targets: string[] = []): string[] 
   return targets;
 }
 
-function rewriteWorkspaceRanges(
-  dependencies: Record<string, string> | undefined,
-  versions: Map<string, string>,
-): Record<string, string> | undefined {
-  if (dependencies === undefined) return undefined;
-
-  return Object.fromEntries(
-    Object.entries(dependencies).map(([name, range]) => {
-      if (!range.startsWith("workspace:")) return [name, range];
-      const version = versions.get(name);
-      if (version === undefined) throw new Error(`No workspace version found for ${name}`);
-      return [name, version];
-    }),
-  );
-}
-
-async function copyManifestEntry(
-  sourceRoot: string,
-  packageRoot: string,
-  entry: string,
-): Promise<void> {
-  if (!/[*?[\]{}]/u.test(entry)) {
-    await cp(join(sourceRoot, entry), join(packageRoot, entry), { recursive: true });
-    return;
-  }
-  const matches = Array.from(
-    new Bun.Glob(entry).scanSync({
-      cwd: sourceRoot,
-      dot: true,
-      onlyFiles: true,
-      followSymlinks: false,
-    }),
-  );
-  if (matches.length === 0) throw new Error(`Package file pattern matched nothing: ${entry}`);
-  for (const path of matches) {
-    const target = join(packageRoot, path);
-    await mkdir(dirname(target), { recursive: true });
-    await cp(join(sourceRoot, path), target);
-  }
-}
-
-async function stagePackage(
-  spec: PackageSpec,
-  stageRoot: string,
-  versions: Map<string, string>,
-): Promise<PackageManifest> {
-  const sourceRoot = join(repositoryRoot, spec.directory);
-  const manifest = await readJson<PackageManifest>(join(sourceRoot, "package.json"));
-  const packageRoot = join(stageRoot, basename(spec.directory));
-  await mkdir(packageRoot, { recursive: true });
-
-  for (const path of [...(manifest.files ?? []), "LICENSE", "README.md"]) {
-    await copyManifestEntry(sourceRoot, packageRoot, path);
-  }
-
-  const stagedManifest: PackageManifest = {
-    ...manifest,
-    dependencies: rewriteWorkspaceRanges(manifest.dependencies, versions),
-  };
-  await writeFile(
-    join(packageRoot, "package.json"),
-    `${JSON.stringify(stagedManifest, null, 2)}\n`,
-  );
-  return stagedManifest;
-}
-
 async function assertWorkerBundle(packageRoot: string, manifest: PackageManifest): Promise<void> {
   if (manifest.name !== "@sheetwrite/core") return;
 
@@ -296,7 +252,7 @@ async function assertTarball(
     }
   }
 
-  if (manifest.name === "@sheetwrite/xlsx") {
+  if (Object.hasOwn(DIST_ONLY_PACKAGES, manifest.name)) {
     for (const path of packedFiles) {
       if (path.startsWith("src/") || path.startsWith("test/") || path.startsWith("node_modules/")) {
         throw new Error(`${manifest.name} tarball contains forbidden path ${path}`);
@@ -322,6 +278,7 @@ async function assertTarball(
   for (const target of collectExportTargets(packedManifest.exports)) {
     await access(join(packageRoot, target));
   }
+  await assertPublishedDeclarations(packageRoot, [...packedFiles]);
 
   await assertWorkerBundle(packageRoot, packedManifest);
   if (manifest.name === "@sheetwrite/formulas") {
@@ -358,13 +315,13 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
-async function verifyNoExcelClosure(
+async function verifyNoOptionalPackageClosure(
   name: string,
   packageName: string,
   tarballs: ReadonlyMap<string, string>,
   temporaryRoot: string,
 ): Promise<void> {
-  const root = join(temporaryRoot, `without-xlsx-${name}`);
+  const root = join(temporaryRoot, `without-optional-${name}`);
   await cp(join(repositoryRoot, "test/release-locks", name), root, { recursive: true });
   const artifactRoot = join(root, "artifacts");
   await mkdir(artifactRoot, { recursive: true });
@@ -378,13 +335,15 @@ async function verifyNoExcelClosure(
   await bindCanonicalTarballIntegrities(join(root, "package-lock.json"), localTarballs);
   await run(["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"], root);
 
-  // Core and the adapters must install and run without the optional XLSX package.
+  // Core and the adapters must install and run without the optional packages.
   const lock = await readFile(join(root, "package-lock.json"), "utf8");
-  if (lock.includes("node_modules/@sheetwrite/xlsx")) {
-    throw new Error(`${packageName} package-lock unexpectedly contains @sheetwrite/xlsx`);
-  }
-  if (await pathExists(join(root, "node_modules", "@sheetwrite", "xlsx"))) {
-    throw new Error(`${packageName} node_modules unexpectedly contains @sheetwrite/xlsx`);
+  for (const optionalPackage of OPTIONAL_PACKAGES) {
+    if (lock.includes(`node_modules/${optionalPackage}`)) {
+      throw new Error(`${packageName} package-lock unexpectedly contains ${optionalPackage}`);
+    }
+    if (await pathExists(join(root, "node_modules", ...optionalPackage.split("/")))) {
+      throw new Error(`${packageName} node_modules unexpectedly contains ${optionalPackage}`);
+    }
   }
 
   const adapterProbe =
@@ -551,6 +510,11 @@ function optionValue(name: string): string | undefined {
   return index < 0 ? undefined : process.argv[index + 1];
 }
 
+if (process.argv.includes("--help")) {
+  process.stdout.write("Usage: bun scripts/verify-packed-consumer.ts [--artifacts <directory>]\n");
+  process.exit(0);
+}
+
 const artifactDirectory = optionValue("--artifacts");
 const requiredArtifacts = process.env.SHEETWRITE_RELEASE_ARTIFACTS;
 if (process.env.SHEETWRITE_ARTIFACT_ONLY === "1" && artifactDirectory === undefined) {
@@ -565,50 +529,40 @@ if (
 
 const temporaryRoot = await mkdtemp(join(tmpdir(), "sheetwrite-packed-consumer-"));
 try {
-  const stageRoot = join(temporaryRoot, "stage");
   const tarballRoot = join(temporaryRoot, "tarballs");
   const extractRoot = join(temporaryRoot, "extracted");
   const consumerRoot = join(temporaryRoot, "consumer");
-  await Promise.all([
-    mkdir(stageRoot, { recursive: true }),
-    mkdir(tarballRoot, { recursive: true }),
-    mkdir(extractRoot, { recursive: true }),
-  ]);
+  await mkdir(extractRoot, { recursive: true });
 
   const sourceManifests = await Promise.all(
     packageSpecs.map((spec) =>
       readJson<PackageManifest>(join(repositoryRoot, spec.directory, "package.json")),
     ),
   );
-  const versions = new Map(
-    sourceManifests.map((manifest) => [manifest.name, manifest.version] as const),
-  );
   const tarballs = new Map<string, string>();
   const packageSizes = new Map<string, { packed: number; unpacked: number }>();
   let artifactManifestDigest: string | undefined;
 
   if (artifactDirectory === undefined) {
-    for (const spec of packageSpecs) {
-      const manifest = await stagePackage(spec, stageRoot, versions);
-      const packageRoot = join(stageRoot, basename(spec.directory));
-      const output = await run(
-        ["npm", "pack", "--ignore-scripts", "--json", "--pack-destination", tarballRoot],
-        packageRoot,
-      );
-      const results = JSON.parse(output) as PackResult[];
-      const result = results[0];
-      if (result === undefined) throw new Error(`npm pack returned no result for ${manifest.name}`);
-
-      const tarballPath = join(tarballRoot, result.filename);
+    const packages = await packBuiltPackages(tarballRoot);
+    const byName = new Map(packages.map((packed) => [packed.artifact.name, packed]));
+    for (const [index, spec] of packageSpecs.entries()) {
+      const manifest = sourceManifests[index];
+      if (manifest === undefined) throw new Error(`Missing source manifest for ${spec.directory}`);
+      const packed = byName.get(manifest.name);
+      if (packed === undefined) throw new Error(`Missing packed package ${manifest.name}`);
       await assertTarball(
         spec,
         manifest,
-        result,
-        tarballPath,
+        packed.pack,
+        packed.tarballPath,
         join(extractRoot, basename(spec.directory)),
       );
-      tarballs.set(manifest.name, tarballPath);
-      packageSizes.set(manifest.name, { packed: result.size, unpacked: result.unpackedSize });
+      tarballs.set(manifest.name, packed.tarballPath);
+      packageSizes.set(manifest.name, {
+        packed: packed.pack.size,
+        unpacked: packed.pack.unpackedSize,
+      });
     }
   } else {
     const release = await verifyReleaseArtifacts(resolve(artifactDirectory));
@@ -643,10 +597,10 @@ try {
   }
 
   await Promise.all([
-    verifyNoExcelClosure("core", "@sheetwrite/core", tarballs, temporaryRoot),
-    verifyNoExcelClosure("react", "@sheetwrite/react", tarballs, temporaryRoot),
-    verifyNoExcelClosure("vue", "@sheetwrite/vue", tarballs, temporaryRoot),
-    verifyNoExcelClosure("svelte", "@sheetwrite/svelte", tarballs, temporaryRoot),
+    verifyNoOptionalPackageClosure("core", "@sheetwrite/core", tarballs, temporaryRoot),
+    verifyNoOptionalPackageClosure("react", "@sheetwrite/react", tarballs, temporaryRoot),
+    verifyNoOptionalPackageClosure("vue", "@sheetwrite/vue", tarballs, temporaryRoot),
+    verifyNoOptionalPackageClosure("svelte", "@sheetwrite/svelte", tarballs, temporaryRoot),
   ]);
 
   await cp(fixtureRoot, consumerRoot, { recursive: true });

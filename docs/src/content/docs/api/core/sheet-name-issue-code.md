@@ -1,6 +1,6 @@
 ---
 title: "SheetNameIssueCode | @sheetwrite/core"
-description: "Stable reason codes returned by worksheet-name validation."
+description: "SheetNameIssueCode type in @sheetwrite/core: Stable reason codes returned by worksheet-name validation."
 ---
 <!-- api-export:@sheetwrite/core|.|SheetNameIssueCode -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
@@ -8,7 +8,7 @@ description: "Stable reason codes returned by worksheet-name validation."
 Stable reason codes returned by worksheet-name validation.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L16"><code>packages/core/src/types/document.ts#L16</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L18"><code>packages/core/src/types/document.ts#L18</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -33,6 +33,7 @@ export type SheetNameIssueCode =
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

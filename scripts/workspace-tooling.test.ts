@@ -28,6 +28,7 @@ async function graphFixture(extraPackage?: { readonly name: string; readonly bui
     "@sheetwrite/formulas": [],
     "@sheetwrite/core": ["@sheetwrite/wasm"],
     "@sheetwrite/xlsx": ["@sheetwrite/core"],
+    "@sheetwrite/charts": ["@sheetwrite/core"],
     "@sheetwrite/react": ["@sheetwrite/core"],
     "@sheetwrite/vue": ["@sheetwrite/core"],
     "@sheetwrite/svelte": ["@sheetwrite/core"],
@@ -173,20 +174,20 @@ describe("changeset workspace contract", () => {
     );
     expect(
       isGeneratedPackageSizeHistoryChange([
-        "docs/src/content/docs/guides/performance-resources.md",
+        "docs/src/content/docs/performance/delivery-size.md",
         "scripts/size-history.json",
       ]),
     ).toBeTrue();
     expect(
       isGeneratedPackageSizeHistoryChange([
-        "docs/src/content/docs/guides/performance-resources.md",
+        "docs/src/content/docs/performance/delivery-size.md",
         "docs/src/generated/docs-contract.json",
         "scripts/size-history.json",
       ]),
     ).toBeTrue();
     expect(
       isGeneratedPackageSizeHistoryChange([
-        "docs/src/content/docs/guides/performance-resources.md",
+        "docs/src/content/docs/performance/delivery-size.md",
         "scripts/changeset-ci.ts",
         "scripts/size-history.json",
       ]),
@@ -194,7 +195,7 @@ describe("changeset workspace contract", () => {
     expect(isGeneratedPackageSizeHistoryChange(["scripts/size-history.json"])).toBeFalse();
     expect(
       isGeneratedPackageSizeHistoryChange([
-        "docs/src/content/docs/guides/performance-resources.md",
+        "docs/src/content/docs/performance/delivery-size.md",
         "scripts/size-history.json",
         "scripts/size-history.json",
       ]),

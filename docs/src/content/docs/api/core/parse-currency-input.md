@@ -1,6 +1,6 @@
 ---
 title: "parseCurrencyInput | @sheetwrite/core"
-description: "Parse a currency-formatted string into a plain number, or null when the remaining text is not numeric."
+description: "parseCurrencyInput function in @sheetwrite/core: Parse a currency-formatted string into a plain number, or null when the remaining text is not numeric."
 ---
 <!-- api-export:@sheetwrite/core|.|parseCurrencyInput -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
@@ -12,7 +12,7 @@ grouping (`,`), and whitespace, and reads accounting-style parentheses
 renderer uses.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/cell-input.ts#L111"><code>packages/core/src/cell-input.ts#L111</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/cell-input.ts#L123"><code>packages/core/src/cell-input.ts#L123</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -32,6 +32,7 @@ function parseCurrencyInput(raw: string): number | null
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

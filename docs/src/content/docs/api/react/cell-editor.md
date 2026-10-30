@@ -1,6 +1,6 @@
 ---
 title: "CellEditor | @sheetwrite/react"
-description: "Framework-neutral named editor definition registered through GridOptions.editors."
+description: "CellEditor interface in @sheetwrite/react: Framework-neutral named editor definition registered through GridOptions.editors."
 ---
 <!-- api-export:@sheetwrite/react|.|CellEditor -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/react/">@sheetwrite/react</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -8,7 +8,7 @@ description: "Framework-neutral named editor definition registered through GridO
 Framework-neutral named editor definition registered through GridOptions.editors.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/types/grid.d.ts#L44"><code>packages/core/dist/types/grid.d.ts#L44</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/types/grid.d.ts#L60"><code>packages/core/dist/types/grid.d.ts#L60</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>1</span>

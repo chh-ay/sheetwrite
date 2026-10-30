@@ -7,6 +7,16 @@ export {
   parseCurrencyInput,
 } from "./cell-input.js";
 
+export { isCellFontFamily } from "./cell-style-fields.js";
+
+export {
+  openChartViews,
+  setChartRendererFactory,
+  setChartViewProviderFactory,
+} from "./chart-backend.js";
+
+export { MAX_CHART_POINTS, resolveChartView, subscribeChartChanges } from "./charts-live.js";
+
 export { SHEETWRITE_CLIPBOARD_MIME } from "./clipboard-controller.js";
 
 export {
@@ -56,6 +66,8 @@ export {
 } from "./delimited-text.js";
 
 export {
+  DEFAULT_MAX_CHANGE,
+  DEFAULT_MAX_ITERATIONS,
   DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
   DEFAULT_TRANSACTION_RESOURCE_LIMITS,
   type DocumentValidationError,
@@ -68,6 +80,7 @@ export {
   SnapshotValidationError,
   type SnapshotValidationOptions,
   type TransactionResourceValidationResult,
+  MAX_ITERATIONS,
   validateTransactionResources,
   validateWorkbookSnapshot,
   WORKBOOK_SCHEMA_VERSION,
@@ -95,15 +108,20 @@ export {
   downloadBytes,
   fromCsv,
   fromXlsxTable,
+  fromXlsxWorkbookFile,
   fromXlsxWorkbook,
   parseCsv,
   setXlsxTableExportBackend,
   setXlsxTableImportBackend,
   setXlsxWorkbookBackend,
   toCsv,
+  toCsvStream,
   toTsv,
+  toTsvStream,
   toXlsxTable,
+  toXlsxTableStream,
   toXlsxWorkbook,
+  toXlsxWorkbookStream,
   XlsxResourceError,
   type XlsxResourceLimits,
   type XlsxTableExportBackend,
@@ -135,6 +153,8 @@ export {
   sanitizeCellHyperlink,
   sanitizeHyperlinkStyle,
 } from "./hyperlink.js";
+
+export { ICON_NAMES, type IconName } from "./icons/icon-names.js";
 
 export {
   type LegacyRowLoader,
@@ -243,6 +263,7 @@ export {
 export type {
   AggregateOp,
   ApplyTransactionResult,
+  CalculationSettings,
   CellAddress,
   CellAlign,
   CellBlock,
@@ -264,7 +285,22 @@ export type {
   CellScalar,
   CellStyle,
   CellValue,
+  CellVerticalAlign,
   ChangeEvent,
+  ChartAnchor,
+  ChartChangeEvent,
+  ChartChangeListener,
+  ChartDefinition,
+  ChartKind,
+  ChartRange,
+  ChartRef,
+  ChartRenderer,
+  ChartRendererFactory,
+  ChartSeries,
+  ChartSeriesView,
+  ChartView,
+  ChartViewProvider,
+  ChartViewProviderFactory,
   Column,
   ColumnarData,
   ColumnFilter,
@@ -294,14 +330,17 @@ export type {
   GridConfig,
   GridEvents,
   GridOptions,
+  GridPanel,
   GridPresentation,
   GridTransaction,
   HighlightRange,
   HyperlinkTarget,
+  IconOverrides,
   KeyboardAction,
   KeyboardOptions,
   KeyShortcut,
   MergeRange,
+  MountedChart,
   MutationIssue,
   MutationPolicyMode,
   NamedRangeSnapshot,
@@ -313,6 +352,16 @@ export type {
   PersistenceBatchCommitRequest,
   PersistenceCommitRequest,
   PersistenceCommitResponse,
+  PivotAggregation,
+  PivotDefinition,
+  PivotFieldType,
+  PivotFilter,
+  PivotLayout,
+  PivotResultView,
+  PivotSort,
+  PivotSource,
+  PivotSourceField,
+  PivotValueField,
   PresenceOverlay,
   ProtectedRange,
   ProtectionRequest,
@@ -359,7 +408,13 @@ export type {
   WorkbookTableId,
   WorkbookTablePatch,
   WorkbookTableStyle,
+  WorkbookTableTotalsFunction,
   WorkbookTableUnsupportedFeature,
+  WorkbookTableXmlElement,
+  XlsxSourceDependency,
+  XlsxSourceGraph,
+  XlsxSourcePart,
+  XlsxSourceSnapshot,
 } from "./types.js";
 
 export {
@@ -367,6 +422,7 @@ export {
   DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
   validateWorkbookTableName,
   validWorkbookTable,
+  validWorkbookTableXmlElement,
   type WorkbookTableNameIssueCode,
   type WorkbookTableNameValidationResult,
   type WorkbookTableResourceLimits,

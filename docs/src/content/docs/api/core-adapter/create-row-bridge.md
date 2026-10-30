@@ -1,13 +1,13 @@
 ---
 title: "createRowBridge | @sheetwrite/core/adapter"
-description: "Create a typed bridge while preserving row and identity inference."
+description: "createRowBridge function in @sheetwrite/core/adapter: Create a typed bridge while preserving row and identity inference."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|createRowBridge -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="function">function</span></div>
 
 Create a typed bridge while preserving row and identity inference.
 
-### Examples
+## Examples
 
 ```ts compile
 import { createRowBridge } from "@sheetwrite/core";
@@ -19,13 +19,13 @@ const bridge = createRowBridge({
 });
 ```
 
-### See also
+## See also
 
 - [RowBridgeOptions](/docs/api/core-adapter/row-bridge-options/)
 - [RowBridge](/docs/api/core-adapter/row-bridge/)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L976"><code>packages/core/src/row-bridge.ts#L976</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L987"><code>packages/core/src/row-bridge.ts#L987</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -48,6 +48,7 @@ function createRowBridge<
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

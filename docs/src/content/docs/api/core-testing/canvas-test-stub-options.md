@@ -1,6 +1,6 @@
 ---
 title: "CanvasTestStubOptions | @sheetwrite/core/testing"
-description: "Layout dimensions installed by installCanvasTestStubs in DOM test environments."
+description: "CanvasTestStubOptions interface in @sheetwrite/core/testing: Layout dimensions installed by installCanvasTestStubs in DOM test environments."
 ---
 <!-- api-export:@sheetwrite/core|./testing|CanvasTestStubOptions -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-testing/">@sheetwrite/core/testing</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -57,6 +57,7 @@ export interface CanvasTestStubOptions {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

@@ -1,14 +1,32 @@
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { cpus, release } from "node:os";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 import { initSheetwrite, SheetwriteStore } from "@sheetwrite/core";
 import * as formulas from "@sheetwrite/formulas";
 import * as defaultEngine from "@sheetwrite/wasm";
 
-const engine = process.env.SHEETWRITE_BENCH_ENGINE === "full" ? formulas : defaultEngine;
+const ENGINE_PACKAGE = process.env.SHEETWRITE_BENCH_ENGINE === "full" ? "formulas" : "wasm";
+/**
+ * The paired formula gate runs this harness once per side and points this at
+ * the side's checkout. Only the engine package comes from there, so an older
+ * base needs built engine artifacts, not this benchmark code. The checkout is
+ * chosen at run time, so its loader can only be imported dynamically.
+ */
+const ENGINE_ROOT = process.env.SHEETWRITE_BENCH_ENGINE_ROOT;
+const engine: typeof defaultEngine =
+  ENGINE_ROOT === undefined
+    ? ENGINE_PACKAGE === "formulas"
+      ? formulas
+      : defaultEngine
+    : await import(
+        pathToFileURL(resolve(ENGINE_ROOT, `packages/${ENGINE_PACKAGE}/loader-node.mjs`)).href
+      );
 const { CellStore, initSync } = engine;
-type CellStore = defaultEngine.CellStore;
+// Fixtures run on either provider, so they use the store type both share.
+type CellStore = InstanceType<defaultEngine.EngineInstance["CellStore"]>;
 
 import {
   dependencyClosureFormulas,
@@ -33,12 +51,12 @@ import {
 import { protocolCaptureMeta } from "./protocol-meta.js";
 import { forceGc, mib, ms, now, type Stat, summarize } from "./stats.js";
 
-const WASM_PATH = new URL(
-  process.env.SHEETWRITE_BENCH_ENGINE === "full"
-    ? "../../packages/formulas/pkg/sheetwrite_wasm_bg.wasm"
-    : "../../packages/wasm/pkg/sheetwrite_wasm_bg.wasm",
-  import.meta.url,
-);
+const ENGINE_PKG_URL =
+  ENGINE_ROOT === undefined
+    ? new URL(`../../packages/${ENGINE_PACKAGE}/pkg/`, import.meta.url)
+    : pathToFileURL(`${resolve(ENGINE_ROOT, `packages/${ENGINE_PACKAGE}/pkg`)}/`);
+const WASM_PATH = new URL("sheetwrite_wasm_bg.wasm", ENGINE_PKG_URL);
+const ENGINE_GLUE_PATH = new URL("sheetwrite_wasm.js", ENGINE_PKG_URL);
 const FORMULA_SOURCE_URLS = {
   "bench/package.json": new URL("../package.json", import.meta.url),
   "bench/src/formula-bench.ts": new URL("./formula-bench.ts", import.meta.url),
@@ -47,12 +65,7 @@ const FORMULA_SOURCE_URLS = {
   "bench/src/protocol-meta.ts": new URL("./protocol-meta.ts", import.meta.url),
   "bench/src/stats.ts": new URL("./stats.ts", import.meta.url),
   "bun.lock": new URL("../../bun.lock", import.meta.url),
-  "packages/wasm/pkg/sheetwrite_wasm.js": new URL(
-    process.env.SHEETWRITE_BENCH_ENGINE === "full"
-      ? "../../packages/formulas/pkg/sheetwrite_wasm.js"
-      : "../../packages/wasm/pkg/sheetwrite_wasm.js",
-    import.meta.url,
-  ),
+  "packages/wasm/pkg/sheetwrite_wasm.js": ENGINE_GLUE_PATH,
   "packages/wasm/pkg/sheetwrite_wasm_bg.wasm": WASM_PATH,
 } as const;
 
@@ -146,26 +159,6 @@ export interface PassedRegressionGate {
 export interface BlockedRegressionGate {
   status: "blocked";
   blocker: string;
-}
-
-/**
- * One reviewed exceedance of the committed baseline. Workload rows name the
- * workload and size; aggregate memory rows carry the formula count in `field`
- * (`memory.<formulas>.wasmDeltaBytes`) instead.
- */
-export interface FormulaGateApproval {
-  workload?: string;
-  size?: number;
-  field: string;
-  maximum: number;
-  reason: string;
-}
-
-/** The reviewed approval file, bound to the one baseline it amends. */
-export interface FormulaBaselineApprovals {
-  baselineCommit: string;
-  baselineSourceDigest: string;
-  approvals: FormulaGateApproval[];
 }
 
 export interface FormulaBenchmarkResult extends GateIdentity {
@@ -408,6 +401,12 @@ interface TimedFixture {
   run(): void;
   check(): FormulaOutput;
   dispose(): void;
+  /**
+   * Return the store to its state before `run`, recalculated, so the same
+   * edit can be timed again on this fixture. Only edit workloads define it:
+   * load and first-recalculation runs consume state that no edit can restore.
+   */
+  restore?(): void;
 }
 
 type FixtureFactory = () => TimedFixture;
@@ -513,54 +512,47 @@ export interface AggregatedWorkloadSample extends CompleteFormulaWorkloadResult 
 }
 
 /**
- * One timed fixture run: a fresh fixture, a monotonic duration around `run`,
- * the post-run store allocation, and the workload's exact output check. The
- * duration is proven finite before it can enter an aggregate.
+ * Run and check the untimed warm-up fixtures. A restorable fixture is
+ * returned restored, ready for the timed loop.
  */
-function timedFixtureRun(
-  id: string,
-  factory: FixtureFactory,
-  expected: FormulaOutput,
-): { readonly elapsedMs: number; readonly allocation: FormulaAllocationSample } {
-  const fixture = factory();
-  fixture.store.resetFormulaMatrixResourceStats();
-  const started = now();
-  fixture.run();
-  const elapsedMs = now() - started;
-  const allocation = allocationAt(fixture.store);
-  assert(outputsEqual(fixture.check(), expected), `${id} measured output`);
-  fixture.dispose();
-  assert(Number.isFinite(elapsedMs) && elapsedMs >= 0, `${id} measured duration`);
-  return { elapsedMs, allocation };
-}
-
 function warmUpFixtures(
   id: string,
   factory: FixtureFactory,
   warmupFixtures: number,
   expected: FormulaOutput,
-): FormulaAllocationSample {
+): TimedFixture | undefined {
   if (!Number.isInteger(warmupFixtures) || warmupFixtures < 1) {
     throw new RangeError("warmupFixtures must be a positive integer");
   }
-  let allocation: FormulaAllocationSample | undefined;
+  let fixture: TimedFixture | undefined;
   for (let index = 0; index < warmupFixtures; index += 1) {
-    const fixture = factory();
+    fixture ??= factory();
     fixture.store.resetFormulaMatrixResourceStats();
     fixture.run();
     assert(outputsEqual(fixture.check(), expected), `${id} warmup output`);
-    allocation = allocationAt(fixture.store);
-    fixture.dispose();
+    allocationAt(fixture.store);
+    if (fixture.restore === undefined) {
+      fixture.dispose();
+      fixture = undefined;
+    } else {
+      fixture.restore();
+    }
   }
-  if (allocation === undefined) throw new RangeError("warmupFixtures must run at least once");
-  return allocation;
+  return fixture;
 }
 
 /**
  * Collect one aggregated timing sample: untimed warm-up fixtures first, then
- * repeated timed runs until the total wall time reaches `minimumSampleDurationMs`.
+ * repeated timed runs until their summed time reaches `minimumSampleDurationMs`.
  * A single run of a cheap workload sits close to timer and scheduler noise; the
  * aggregate averages that noise away while keeping one auditable sample.
+ *
+ * A fixture that can restore itself is built once and restored, untimed,
+ * between runs; others get a fresh fixture per run. Every run repeats the same
+ * work, so only the first and last runs are checked. The store-wide checks cost
+ * far more than a microsecond edit and would otherwise dominate the sample's
+ * wall time. Allocation comes from the first run, so the exact byte rule does
+ * not depend on how many edit/restore cycles fit into the time floor.
  */
 export function collectAggregatedSample(
   id: string,
@@ -573,24 +565,44 @@ export function collectAggregatedSample(
     throw new RangeError("minimumSampleDurationMs must be a positive number");
   }
   const expected = expectedOutput ?? expectedFormulaOutput(id, size);
-  let allocation = warmUpFixtures(id, factory, options.warmupFixtures, expected);
+  let fixture = warmUpFixtures(id, factory, options.warmupFixtures, expected) ?? factory();
 
   // One forced GC brackets the whole sample: a per-iteration GC would dominate
   // the cheap workloads the aggregate exists to measure.
   forceGc();
   let totalMs = 0;
   let iterations = 0;
-  while (totalMs < options.minimumSampleDurationMs) {
+  let allocation: FormulaAllocationSample | undefined;
+  for (;;) {
+    fixture.store.resetFormulaMatrixResourceStats();
+    const started = now();
+    fixture.run();
+    totalMs += now() - started;
+    iterations += 1;
+    if (allocation === undefined) {
+      allocation = allocationAt(fixture.store);
+      assert(outputsEqual(fixture.check(), expected), `${id} first measured output`);
+    }
+    if (totalMs >= options.minimumSampleDurationMs) break;
     if (iterations >= AGGREGATED_SAMPLE_MAX_ITERATIONS) {
       throw new RangeError(
         `${id} did not reach ${options.minimumSampleDurationMs} ms within ${AGGREGATED_SAMPLE_MAX_ITERATIONS} fixture runs`,
       );
     }
-    const run = timedFixtureRun(id, factory, expected);
-    totalMs += run.elapsedMs;
-    iterations += 1;
-    allocation = run.allocation;
+
+    if (fixture.restore === undefined) {
+      fixture.dispose();
+      fixture = factory();
+    } else {
+      fixture.restore();
+    }
   }
+
+  assert(allocation !== undefined, `${id} first measured allocation`);
+  assert(outputsEqual(fixture.check(), expected), `${id} last measured output`);
+  fixture.dispose();
+  assert(Number.isFinite(totalMs), `${id} measured duration`);
+
   const perIterationMs = totalMs / iterations;
   return {
     id,
@@ -701,20 +713,30 @@ function chainFixture(depth: number): TimedFixture {
   };
 }
 
+/** A1 starts at the source value; the timed edit writes the edited value to A1, or to unrelated C1. */
+const FAN_OUT_SOURCE_VALUE = 1;
+const FAN_OUT_EDITED_VALUE = 10;
+
 function fanOutEditFixture(count: number, unrelated = false): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, Math.max(1, count));
-  store.setNumber(sheet, 0, 0, 1, 0);
+  const editedColumn = unrelated ? 2 : 0;
+  store.setNumber(sheet, 0, 0, FAN_OUT_SOURCE_VALUE, 0);
   setFormulas(store, sheet, fanOutFormulas(count));
   store.recompute(sheet);
   return {
     store,
     run: () => {
-      store.setNumber(sheet, 0, unrelated ? 2 : 0, 10, 0);
+      store.setNumber(sheet, 0, editedColumn, FAN_OUT_EDITED_VALUE, 0);
       store.recompute(sheet);
     },
     check: () => numberAt(store, sheet, count - 1, 1),
     dispose: () => store.free(),
+    restore: () => {
+      if (unrelated) store.clearCell(sheet, 0, editedColumn, 0);
+      else store.setNumber(sheet, 0, editedColumn, FAN_OUT_SOURCE_VALUE, 0);
+      store.recompute(sheet);
+    },
   };
 }
 
@@ -752,6 +774,10 @@ export function constantEditFixture(count: number): TimedFixture {
     },
     check: () => `${numberAt(store, sheet, 0, 2)}:${numberAt(store, sheet, count - 1, 2)}`,
     dispose: () => store.free(),
+    restore: () => {
+      store.setFormula(sheet, 0, 2, `=A1+B1+${CONSTANT_EDIT_BASE}`, 0);
+      store.recompute(sheet);
+    },
   };
 }
 
@@ -824,6 +850,18 @@ export function gridConstantEditSample(count: number) {
   }
 }
 
+/** Undo a timed one-cell number edit, untimed, so the next timed edit repeats the same work. */
+function restoreNumber(
+  store: CellStore,
+  sheet: number,
+  cell: { row: number; col: number; value: number },
+): () => void {
+  return () => {
+    store.setNumber(sheet, cell.row, cell.col, cell.value, 0);
+    store.recompute(sheet);
+  };
+}
+
 function diamondFixture(levels: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(4, levels);
@@ -838,6 +876,7 @@ function diamondFixture(levels: number): TimedFixture {
     },
     check: () => numberAt(store, sheet, levels - 1, 3),
     dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, { row: 0, col: 0, value: 1 }),
   };
 }
 
@@ -861,6 +900,7 @@ function sharedRangeFixture(count: number): TimedFixture {
     },
     check: () => numberAt(store, sheet, count - 1, 1),
     dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, { row: 0, col: 0, value: 1 }),
   };
 }
 
@@ -885,6 +925,7 @@ function distinctRangeFixture(count: number): TimedFixture {
     },
     check: () => `${numberAt(store, sheet, 0, 1)}:${numberAt(store, sheet, count - 1, 1)}`,
     dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, { row: 0, col: 0, value: 1 }),
   };
 }
 
@@ -913,6 +954,7 @@ function crossSheetFixture(count: number): TimedFixture {
     },
     check: () => numberAt(store, summary, count - 1, 0),
     dispose: () => store.free(),
+    restore: restoreNumber(store, source, { row: 0, col: 0, value: 1 }),
   };
 }
 
@@ -1018,6 +1060,7 @@ function criteriaRangeFixture(count: number): TimedFixture {
     },
     check: () => numberAt(store, sheet, 0, 2),
     dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, { row: 0, col: 0, value: 0 }),
   };
 }
 
@@ -1049,6 +1092,7 @@ function lookupRangeFixture(count: number): TimedFixture {
     },
     check: () => numberAt(store, sheet, 0, 3),
     dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, { row: 0, col: 2, value: 0 }),
   };
 }
 
@@ -1243,6 +1287,12 @@ function lookupFixture(count: number, phase: LookupPhase, variant: LookupVariant
       return `${expectedValue}:${expectedKey}`;
     },
     dispose: () => store.free(),
+    ...(editsKey && {
+      restore: () => {
+        writeLookupKey(store, sheet, variant.initialKey);
+        store.recompute(sheet);
+      },
+    }),
   };
 }
 
@@ -1268,6 +1318,10 @@ function spillFilterResizeFixture(count: number): TimedFixture {
     check: () =>
       `${numberAt(store, sheet, count - 1, 2)}:${store.spillAnchorRow(sheet, count - 1, 2)}`,
     dispose: () => store.free(),
+    restore: () => {
+      store.setBool(sheet, count - 1, 1, false, 0);
+      store.recompute(sheet);
+    },
   };
 }
 
@@ -1311,6 +1365,7 @@ function sumProductVectorFixture(count: number): TimedFixture {
     },
     check: () => numberAt(store, sheet, 0, 2),
     dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, { row: 0, col: 0, value: 1 }),
   };
 }
 
@@ -1346,6 +1401,7 @@ function sumProductMatrixFixture(elements: number): TimedFixture {
     },
     check: () => numberAt(store, sheet, 0, columns * 2),
     dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, { row: 0, col: 0, value: 1 }),
   };
 }
 
@@ -1390,6 +1446,7 @@ function criteriaMultiRangeFixture(count: number): TimedFixture {
     },
     check: () => numberAt(store, sheet, 0, 3),
     dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, { row: 0, col: 0, value: 0 }),
   };
 }
 
@@ -1527,6 +1584,10 @@ function unicodeTextDateFixture(count: number): TimedFixture {
     },
     check: () => numberAt(store, sheet, count - 1, 1),
     dispose: () => store.free(),
+    restore: () => {
+      store.setString(sheet, 0, 0, "café😀-2024-02-29", 0);
+      store.recompute(sheet);
+    },
   };
 }
 
@@ -1582,6 +1643,7 @@ function letReuseFixture(count: number): TimedFixture {
     },
     check: () => numberAt(store, sheet, 0, 1),
     dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, { row: 0, col: 0, value: 1 }),
   };
 }
 
@@ -1616,6 +1678,7 @@ function letRepeatFixture(count: number): TimedFixture {
     },
     check: () => `${numberAt(store, sheet, 0, 3)}:${numberAt(store, sheet, 0, 2)}`,
     dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, { row: 0, col: 2, value: count }),
   };
 }
 
@@ -1655,109 +1718,149 @@ function incrementalDependencyClosureFixture(count: number): TimedFixture {
     },
     check: () => `${numberAt(store, sheet, 0, 2)}:${numberAt(store, sheet, count - 1, 2)}`,
     dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, { row: 0, col: 0, value: 0 }),
   };
 }
 
-function runWorkloads(smoke: boolean): CompleteFormulaWorkloadResult[] {
-  const results: CompleteFormulaWorkloadResult[] = [];
-  const sizes = smoke ? ([1_000] as const) : FORMULA_SIZES;
-  const samples = smoke ? SMOKE_SAMPLES : DEFAULT_SAMPLES;
-  for (const size of sizes) {
-    results.push(
-      collectFixture("independent-parse-load", size, () => independentLoadFixture(size), samples),
-      collectFixture(
-        "independent-first-recompute",
-        size,
-        () => independentRecomputeFixture(size),
-        samples,
-      ),
-    );
+/** One matrix row: its identity and a factory for a fresh, untimed fixture. */
+interface FormulaWorkload {
+  readonly id: string;
+  readonly size: number;
+  readonly factory: FixtureFactory;
+}
+
+function formulaWorkloads(smoke: boolean): FormulaWorkload[] {
+  const workloads: FormulaWorkload[] = [];
+  const add = (id: string, size: number, factory: FixtureFactory) =>
+    workloads.push({ id, size, factory });
+  for (const size of smoke ? ([1_000] as const) : FORMULA_SIZES) {
+    add("independent-parse-load", size, () => independentLoadFixture(size));
+    add("independent-first-recompute", size, () => independentRecomputeFixture(size));
   }
   for (const depth of smoke ? [8, 32] : [8, 16, 32, 64]) {
-    results.push(collectFixture("linear-chain", depth, () => chainFixture(depth), samples));
+    add("linear-chain", depth, () => chainFixture(depth));
   }
+
   const large = smoke ? 1_000 : 100_000;
   const range = smoke ? 10_000 : 100_000;
   const lookupFormulas = smoke ? 500 : 1_000;
-  results.push(
-    collectFixture("wide-fan-out-edit", 1_000, () => fanOutEditFixture(1_000), samples),
-    ...(smoke
-      ? []
-      : [collectFixture("wide-fan-out-edit", large, () => fanOutEditFixture(large), samples)]),
-    collectFixture("diamond-edit", 32, () => diamondFixture(32), samples),
-    collectFixture("shared-range-edit", 1_000, () => sharedRangeFixture(1_000), samples),
-    collectFixture("distinct-range-edit", 1_000, () => distinctRangeFixture(1_000), samples),
-    collectFixture("cross-sheet-range-edit", 1_000, () => crossSheetFixture(1_000), samples),
-    collectFixture("scalar-edit-affects-0", 1_000, () => fanOutEditFixture(1_000, true), samples),
-    collectFixture("scalar-edit-affects-1", 1, () => fanOutEditFixture(1), samples),
-    collectFixture("scalar-edit-affects-1000", 1_000, () => fanOutEditFixture(1_000), samples),
-    collectFixture("scalar-edit-affects-100000", large, () => fanOutEditFixture(large), samples),
-    collectFixture("formula-constant-edit", large, () => constantEditFixture(large), samples),
-    collectFixture(
-      "topology-remove-add",
-      smoke ? 1_000 : 10_000,
-      () => topologyFixture(smoke ? 1_000 : 10_000),
-      samples,
-    ),
-    collectFixture("cycles", 1_000, () => cycleFixture(1_000), samples),
-    collectFixture("removed-sheet-ref", 1_000, () => refRemovalFixture(1_000), samples),
-    collectFixture("error-propagation", 1_000, () => errorPropagationFixture(1_000), samples),
-    collectFixture("criteria-range-edit", range, () => criteriaRangeFixture(range), samples),
-    collectFixture("lookup-range-edit", range, () => lookupRangeFixture(range), samples),
-  );
+  const topology = smoke ? 1_000 : 10_000;
+  add("wide-fan-out-edit", 1_000, () => fanOutEditFixture(1_000));
+  if (!smoke) add("wide-fan-out-edit", large, () => fanOutEditFixture(large));
+  add("diamond-edit", 32, () => diamondFixture(32));
+  add("shared-range-edit", 1_000, () => sharedRangeFixture(1_000));
+  add("distinct-range-edit", 1_000, () => distinctRangeFixture(1_000));
+  add("cross-sheet-range-edit", 1_000, () => crossSheetFixture(1_000));
+  add("scalar-edit-affects-0", 1_000, () => fanOutEditFixture(1_000, true));
+  add("scalar-edit-affects-1", 1, () => fanOutEditFixture(1));
+  add("scalar-edit-affects-1000", 1_000, () => fanOutEditFixture(1_000));
+  add("scalar-edit-affects-100000", large, () => fanOutEditFixture(large));
+  add("formula-constant-edit", large, () => constantEditFixture(large));
+  add("topology-remove-add", topology, () => topologyFixture(topology));
+  add("cycles", 1_000, () => cycleFixture(1_000));
+  add("removed-sheet-ref", 1_000, () => refRemovalFixture(1_000));
+  add("error-propagation", 1_000, () => errorPropagationFixture(1_000));
+  add("criteria-range-edit", range, () => criteriaRangeFixture(range));
+  add("lookup-range-edit", range, () => lookupRangeFixture(range));
   for (const variant of LOOKUP_VARIANTS) {
-    results.push(
-      collectFixture(
-        variant.id,
-        lookupFormulas,
-        () => lookupFixture(lookupFormulas, "first-recompute", variant),
-        samples,
-      ),
-      collectFixture(
-        `${variant.id}${LOOKUP_EDIT_SUFFIX}`,
-        lookupFormulas,
-        () => lookupFixture(lookupFormulas, "key-edit", variant),
-        samples,
-      ),
+    add(variant.id, lookupFormulas, () =>
+      lookupFixture(lookupFormulas, "first-recompute", variant),
+    );
+    add(`${variant.id}${LOOKUP_EDIT_SUFFIX}`, lookupFormulas, () =>
+      lookupFixture(lookupFormulas, "key-edit", variant),
     );
   }
-  results.push(
-    collectFixture("spill-filter-resize", range, () => spillFilterResizeFixture(range), samples),
-    collectFixture("sumproduct-vector-edit", range, () => sumProductVectorFixture(range), samples),
-    collectFixture("sumproduct-matrix-edit", range, () => sumProductMatrixFixture(range), samples),
-    collectFixture(
-      "criteria-multi-range-edit",
-      range,
-      () => criteriaMultiRangeFixture(range),
-      samples,
-    ),
-    collectFixture("sum-multi-range", range, () => sumMultiRangeFixture(range), samples),
-    collectFixture("sumifs-3-criteria", range, () => sumifsCriteriaFixture(range), samples),
-    collectFixture("countif-100k", range, () => countifFixture(range), samples),
-    collectFixture("unicode-text-date-edit", 1_000, () => unicodeTextDateFixture(1_000), samples),
-    collectFixture(
-      "percentile-covariance",
-      range,
-      () => percentileCovarianceFixture(range),
-      samples,
-    ),
-    collectFixture("let-reuse-edit", range, () => letReuseFixture(range), samples),
-    collectFixture("let-repeat", range, () => letRepeatFixture(range), samples),
-    collectFixture("iterative-finance", 1_000, () => iterativeFinanceFixture(1_000), samples),
-    collectFixture(
-      "incremental-dependency-closure-edit",
-      range,
-      () => incrementalDependencyClosureFixture(range),
-      samples,
-    ),
-    collectFixture(
-      "spill-sequence-admission",
-      smoke ? 1_000 : 100_000,
-      () => spillSequenceAdmissionFixture(smoke ? 1_000 : 100_000),
-      samples,
-    ),
+  add("spill-filter-resize", range, () => spillFilterResizeFixture(range));
+  add("sumproduct-vector-edit", range, () => sumProductVectorFixture(range));
+  add("sumproduct-matrix-edit", range, () => sumProductMatrixFixture(range));
+  add("criteria-multi-range-edit", range, () => criteriaMultiRangeFixture(range));
+  add("sum-multi-range", range, () => sumMultiRangeFixture(range));
+  add("sumifs-3-criteria", range, () => sumifsCriteriaFixture(range));
+  add("countif-100k", range, () => countifFixture(range));
+  add("unicode-text-date-edit", 1_000, () => unicodeTextDateFixture(1_000));
+  add("percentile-covariance", range, () => percentileCovarianceFixture(range));
+  add("let-reuse-edit", range, () => letReuseFixture(range));
+  add("let-repeat", range, () => letRepeatFixture(range));
+  add("iterative-finance", 1_000, () => iterativeFinanceFixture(1_000));
+  add("incremental-dependency-closure-edit", range, () =>
+    incrementalDependencyClosureFixture(range),
   );
-  return results;
+  add("spill-sequence-admission", large, () => spillSequenceAdmissionFixture(large));
+  return workloads;
+}
+
+function runWorkloads(smoke: boolean): CompleteFormulaWorkloadResult[] {
+  const samples = smoke ? SMOKE_SAMPLES : DEFAULT_SAMPLES;
+  return formulaWorkloads(smoke).map(({ id, size, factory }) =>
+    collectFixture(id, size, factory, samples),
+  );
+}
+
+/** One side of a paired formula gate comparison: aggregated timings and exact counters. */
+export interface FormulaGateCapture {
+  /** SHA-256 of the engine glue and WASM binary this side loaded. */
+  engineDigest: string;
+  /** Per-iteration mean of one aggregated sample per workload. */
+  timings: Record<string, number>;
+  bytes: Record<string, number>;
+  /** Workloads this engine cannot run, with the missing API. */
+  skipped: Record<string, string>;
+}
+
+/**
+ * A fixture written for a newer engine may call a CellStore export an older
+ * base lacks. Only a TypeError naming a method that is absent from this
+ * engine's CellStore counts as that; anything else is a real failure.
+ */
+const MISSING_METHOD = /\.(\w+) is not a function/u;
+
+function missingCellStoreMethod(error: unknown): string | undefined {
+  if (!(error instanceof TypeError)) return undefined;
+  const method = MISSING_METHOD.exec(error.message)?.[1];
+  return method !== undefined && !(method in CellStore.prototype) ? method : undefined;
+}
+
+/**
+ * Capture one gate side in this process. Every workload is one aggregated
+ * sample of at least `SAMPLE_AGGREGATE_MS`, so 1-3 ms rows average dozens of
+ * runs instead of resting on a single cold run.
+ */
+function captureGateSide(): FormulaGateCapture {
+  const capture: FormulaGateCapture = {
+    engineDigest: sha256(Buffer.concat([readFileSync(ENGINE_GLUE_PATH), readFileSync(WASM_PATH)])),
+    timings: {},
+    bytes: {},
+    skipped: {},
+  };
+  for (const { id, size, factory } of formulaWorkloads(false)) {
+    const key = formulaWorkloadKey({ id, size });
+    let sample: AggregatedWorkloadSample;
+    try {
+      sample = collectAggregatedSample(id, size, factory, {
+        warmupFixtures: SAMPLE_WARMUP_FIXTURES,
+        minimumSampleDurationMs: SAMPLE_AGGREGATE_MS,
+      });
+    } catch (error) {
+      const method = missingCellStoreMethod(error);
+      if (method === undefined) throw error;
+      capture.skipped[key] = `CellStore.${method} is missing from this engine`;
+      continue;
+    }
+
+    const [timing] = sample.samplesMs;
+    const [allocation] = sample.allocationSamples;
+    if (timing === undefined || allocation === undefined) {
+      throw new Error(`${key} gate sample is empty`);
+    }
+    capture.timings[key] = timing;
+    for (const [field, value] of Object.entries(allocation)) {
+      capture.bytes[`${key}.allocation.${field}`] = value;
+    }
+  }
+  for (const { formulas: count, wasmDeltaBytes } of FORMULA_SIZES.map(probeMemory)) {
+    capture.bytes[`memory=formulas=${count}.wasmDeltaBytes`] = wasmDeltaBytes;
+  }
+  return capture;
 }
 
 function probeMemory(formulas: number): FormulaMemoryResult {
@@ -2408,132 +2511,25 @@ function validateFormulaBaselineBinding(
   }
 }
 
-const FORMULA_APPROVALS_URL = new URL(
-  "../results/formula-baseline-approvals.json",
-  import.meta.url,
-);
-
-/** Workload gate fields a review may raise, and whether each counts bytes or milliseconds. */
-const APPROVABLE_WORKLOAD_FIELDS: Record<string, "timing" | "bytes"> = {
-  median: "timing",
-  p95: "timing",
-  "allocation.retainedBytes.median": "bytes",
-  "allocation.retainedBytes.p95": "bytes",
-};
-const MEMORY_APPROVAL_FIELD = /^memory\.([1-9]\d*)\.wasmDeltaBytes$/u;
-
-/**
- * Peak transient bytes and transient allocation counts measure evaluator
- * scratch work that a storage design has no reason to grow, so no review can
- * accept them.
- */
-const UNAPPROVABLE_FIELD = /^allocation\.(?:peakTransientBytes|transientAllocations)\./u;
-
-/** Read the committed approval file; most baselines have none. */
-function readFormulaBaselineApprovals(): FormulaBaselineApprovals | undefined {
-  if (!existsSync(FORMULA_APPROVALS_URL)) return undefined;
-  return JSON.parse(readFileSync(FORMULA_APPROVALS_URL, "utf8")) as FormulaBaselineApprovals;
-}
-
-/** The gate row an approval raises, in the `<row>.<field>` form the gate reports. */
-interface ApprovalTarget {
-  row: string;
-  bytes: boolean;
-}
-
-function approvalTarget(
-  entry: Record<string, unknown>,
-  path: string,
-  baseline: FormulaBenchmarkResult,
-): ApprovalTarget {
-  const field = entry.field;
-  exactString(field, `${path}.field`);
-  if (UNAPPROVABLE_FIELD.test(field)) {
-    throw new Error(`${path}.field ${field} may not be approved`);
-  }
-
-  const memory = MEMORY_APPROVAL_FIELD.exec(field);
-  if (memory) {
-    exactObjectKeys(entry, ["field", "maximum", "reason"], path);
-    const formulas = Number(memory[1]);
-    if (!baseline.memory.some((measured) => measured.formulas === formulas)) {
-      throw new Error(`${path} names memory=formulas=${formulas}, which the baseline lacks`);
-    }
-    return { row: `memory=formulas=${formulas}.wasmDeltaBytes`, bytes: true };
-  }
-
-  if (!Object.hasOwn(APPROVABLE_WORKLOAD_FIELDS, field)) {
-    throw new Error(`${path}.field ${field} is not an approvable gate field`);
-  }
-  exactObjectKeys(entry, ["workload", "size", "field", "maximum", "reason"], path);
-  exactString(entry.workload, `${path}.workload`);
-  if (typeof entry.size !== "number" || !Number.isSafeInteger(entry.size)) {
-    throw new Error(`${path}.size must be an integer`);
-  }
-  const key = formulaWorkloadKey({ id: entry.workload, size: entry.size });
-  const bytes = APPROVABLE_WORKLOAD_FIELDS[field] === "bytes";
-  const previous = baseline.workloads.find((workload) => formulaWorkloadKey(workload) === key);
-  if (previous === undefined || (bytes && previous.allocationStat === undefined)) {
-    throw new Error(`${path} names ${key}.${field}, which the baseline lacks`);
-  }
-  if (field === "p95" && isSubMillisecond(previous)) {
-    throw new Error(`${path} names ${key}.p95, which the gate does not check`);
-  }
-  return { row: `${key}.${field}`, bytes };
-}
-
-function approvalMaximum(value: unknown, bytes: boolean, path: string): number {
-  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
-    throw new Error(`${path}.maximum must be a positive finite number`);
-  }
-  if (bytes && !Number.isSafeInteger(value)) {
-    throw new Error(`${path}.maximum must be a whole number of bytes`);
-  }
-  return value;
-}
-
-/**
- * Validate the approval file against the baseline it claims to amend and
- * return each approved maximum keyed by the gate row it raises. A file for
- * any other baseline is stale: recapturing the baseline retires every
- * approval, so the file must be removed or reviewed again.
- */
-export function formulaApprovalMaximums(
-  approvals: FormulaBaselineApprovals,
-  baseline: FormulaBenchmarkResult,
-): ReadonlyMap<string, number> {
-  exactObjectKeys(
-    approvals,
-    ["baselineCommit", "baselineSourceDigest", "approvals"],
-    "formula baseline approvals",
+/** Read and validate the committed baseline, `results/formula-results.json`. */
+function readCommittedFormulaBaseline(): FormulaBenchmarkResult {
+  const rawBaseline = readFileSync(
+    new URL("../results/formula-results.json", import.meta.url),
+    "utf8",
   );
-  const identity = formulaRegressionBaselineIdentity(baseline);
-  if (
-    approvals.baselineCommit !== identity.commit ||
-    approvals.baselineSourceDigest !== identity.sourceDigest
-  ) {
+  const baselineBytes = Buffer.byteLength(rawBaseline);
+  if (baselineBytes > FORMULA_ARTIFACT_MAX_BYTES) {
     throw new Error(
-      `formula baseline approvals are stale: they amend ${String(approvals.baselineCommit)}, not the committed baseline ${identity.commit}`,
+      `formula baseline artifact exceeded the ${FORMULA_ARTIFACT_MAX_BYTES} byte safety ceiling: ${baselineBytes}`,
     );
   }
-  if (!Array.isArray(approvals.approvals) || approvals.approvals.length === 0) {
-    throw new Error("formula baseline approvals must list at least one approval");
+  const baseline = JSON.parse(rawBaseline) as FormulaBenchmarkResult;
+  if (baseline.schemaVersion === FORMULA_BENCHMARK_SCHEMA_VERSION) {
+    validateFormulaEvidence(baseline, "full", true, regressionBaselineWorkloadKeys(baseline));
+  } else {
+    validateLegacyFormulaBaseline(baseline);
   }
-
-  const maximums = new Map<string, number>();
-  for (const [index, approval] of (approvals.approvals as unknown[]).entries()) {
-    const path = `formula baseline approvals[${index}]`;
-    const entry = objectRecord(approval, path);
-    const { row, bytes } = approvalTarget(entry, path, baseline);
-    if (typeof entry.reason !== "string" || entry.reason.trim().length === 0) {
-      throw new Error(`${path}.reason must state the measured reason`);
-    }
-    if (maximums.has(row)) {
-      throw new Error(`${path} duplicates the approval for ${row}`);
-    }
-    maximums.set(row, approvalMaximum(entry.maximum, bytes, path));
-  }
-  return maximums;
+  return baseline;
 }
 
 /** One compared gate value and the limit the baseline rule allows it. */
@@ -2544,13 +2540,10 @@ interface GateRow {
   ruleLimit: number;
 }
 
-/** A row with a reviewed approval passes up to its approved maximum instead of the baseline rule. */
-function assertWithinGate(gate: GateRow, approved: ReadonlyMap<string, number>): void {
-  const maximum = approved.get(gate.row);
-  const limit = maximum ?? gate.ruleLimit;
-  if (gate.candidate > limit) {
+function assertWithinGate(gate: GateRow): void {
+  if (gate.candidate > gate.ruleLimit) {
     throw new Error(
-      `${gate.row} regression: baseline ${gate.baseline}, candidate ${gate.candidate}, ${maximum === undefined ? "limit" : "approved maximum"} ${limit}`,
+      `${gate.row} regression: baseline ${gate.baseline}, candidate ${gate.candidate}, limit ${gate.ruleLimit}`,
     );
   }
 }
@@ -2558,13 +2551,8 @@ function assertWithinGate(gate: GateRow, approved: ReadonlyMap<string, number>):
 export function validateFormulaRegression(
   candidate: FormulaBenchmarkResult,
   baseline: FormulaBenchmarkResult,
-  approvals?: FormulaBaselineApprovals,
 ): void {
   validateFormulaBaselineBinding(candidate, baseline);
-  const approved =
-    approvals === undefined
-      ? new Map<string, number>()
-      : formulaApprovalMaximums(approvals, baseline);
   const baselineWorkloads = new Map(
     baseline.workloads.map((workload) => [formulaWorkloadKey(workload), workload]),
   );
@@ -2579,18 +2567,15 @@ export function validateFormulaRegression(
     for (const field of ["median", "p95"] as const) {
       if (field === "p95" && subMillisecond) continue;
       const before = previous.stat[field];
-      assertWithinGate(
-        {
-          row: `${key}.${field}`,
-          baseline: before,
-          candidate: workload.stat[field],
-          ruleLimit: timingRegressionLimit(
-            before,
-            subMillisecond ? SUB_MILLISECOND_MEDIAN_FLOOR_MS : TIMING_REGRESSION_FLOOR_MS,
-          ),
-        },
-        approved,
-      );
+      assertWithinGate({
+        row: `${key}.${field}`,
+        baseline: before,
+        candidate: workload.stat[field],
+        ruleLimit: timingRegressionLimit(
+          before,
+          subMillisecond ? SUB_MILLISECOND_MEDIAN_FLOOR_MS : TIMING_REGRESSION_FLOOR_MS,
+        ),
+      });
     }
     if (previous.allocationStat !== undefined) {
       for (const allocation of [
@@ -2600,15 +2585,12 @@ export function validateFormulaRegression(
       ] as const) {
         for (const field of ["median", "p95"] as const) {
           const before = previous.allocationStat[allocation][field];
-          assertWithinGate(
-            {
-              row: `${key}.allocation.${allocation}.${field}`,
-              baseline: before,
-              candidate: workload.allocationStat[allocation][field],
-              ruleLimit: before,
-            },
-            approved,
-          );
+          assertWithinGate({
+            row: `${key}.allocation.${allocation}.${field}`,
+            baseline: before,
+            candidate: workload.allocationStat[allocation][field],
+            ruleLimit: before,
+          });
         }
       }
     }
@@ -2623,29 +2605,25 @@ export function validateFormulaRegression(
   for (const memory of candidate.memory) {
     const before = baselineMemory.get(memory.formulas);
     if (before === undefined) continue;
-    assertWithinGate(
-      {
-        row: `memory=formulas=${memory.formulas}.wasmDeltaBytes`,
-        baseline: before,
-        candidate: memory.wasmDeltaBytes,
-        ruleLimit: before,
-      },
-      approved,
-    );
+    assertWithinGate({
+      row: `memory=formulas=${memory.formulas}.wasmDeltaBytes`,
+      baseline: before,
+      candidate: memory.wasmDeltaBytes,
+      ruleLimit: before,
+    });
   }
 }
 
 export function validateFormulaCapture(
   candidate: FormulaBenchmarkResult,
   baseline?: FormulaBenchmarkResult,
-  approvals?: FormulaBaselineApprovals,
 ): void {
   if (baseline === undefined) {
     validateFormulaEvidence(candidate, candidate.mode, false);
   } else if (candidate.mode === "smoke") {
     validateFormulaBaselineBinding(candidate, baseline);
   } else {
-    validateFormulaRegression(candidate, baseline, approvals);
+    validateFormulaRegression(candidate, baseline);
   }
 }
 
@@ -2710,35 +2688,8 @@ async function runBenchmark(
   }
   const mode: BenchmarkMode = smoke ? "smoke" : "full";
   let baseline: FormulaBenchmarkResult | undefined;
-  let approvals: FormulaBaselineApprovals | undefined;
   if (captureKind === "gated") {
-    const rawBaseline = readFileSync(
-      new URL("../results/formula-results.json", import.meta.url),
-      "utf8",
-    );
-    const baselineBytes = Buffer.byteLength(rawBaseline);
-    if (baselineBytes > FORMULA_ARTIFACT_MAX_BYTES) {
-      throw new Error(
-        `formula baseline artifact exceeded the ${FORMULA_ARTIFACT_MAX_BYTES} byte safety ceiling: ${baselineBytes}`,
-      );
-    }
-    const parsedBaseline = JSON.parse(rawBaseline) as FormulaBenchmarkResult;
-    if (parsedBaseline.schemaVersion === FORMULA_BENCHMARK_SCHEMA_VERSION) {
-      validateFormulaEvidence(
-        parsedBaseline,
-        "full",
-        true,
-        regressionBaselineWorkloadKeys(parsedBaseline),
-      );
-    } else {
-      validateLegacyFormulaBaseline(parsedBaseline);
-    }
-    baseline = parsedBaseline;
-
-    // Only the full matrix is compared row by row. A stale or malformed file
-    // fails here, before the capture spends its minutes.
-    approvals = smoke ? undefined : readFormulaBaselineApprovals();
-    if (approvals !== undefined) formulaApprovalMaximums(approvals, baseline);
+    baseline = readCommittedFormulaBaseline();
   }
 
   await initSheetwrite(undefined, engine);
@@ -2790,7 +2741,7 @@ async function runBenchmark(
     },
   };
   validateCurrentCaptureProvenance(result, captureKind, outputPath);
-  validateFormulaCapture(result, baseline, approvals);
+  validateFormulaCapture(result, baseline);
   const serialized = `${JSON.stringify(result, null, 2)}\n`;
   if (outputPath === "-") {
     process.stdout.write(serialized);
@@ -2808,6 +2759,11 @@ if (import.meta.main) {
   if (process.argv.includes("--grid-constant-edit")) {
     await initSheetwrite(undefined, engine);
     process.stdout.write(`${JSON.stringify(gridConstantEditSample(100_000))}\n`);
+    process.exit(0);
+  }
+  if (process.argv.includes("--gate-capture")) {
+    await engine.load();
+    process.stdout.write(`${JSON.stringify(captureGateSide())}\n`);
     process.exit(0);
   }
   if (sampleIndex >= 0) {

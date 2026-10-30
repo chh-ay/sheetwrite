@@ -1,6 +1,6 @@
 ---
 title: "CellOut | @sheetwrite/formulas"
-description: "Result of a single-cell read."
+description: "CellOut class in @sheetwrite/formulas: Result of a single-cell read."
 ---
 <!-- api-export:@sheetwrite/formulas|.|CellOut -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/formulas/">@sheetwrite/formulas</a><span class="api-status" data-kind="class">class</span></div>

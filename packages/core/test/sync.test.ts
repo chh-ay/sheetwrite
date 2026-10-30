@@ -1240,4 +1240,31 @@ describe("sync coordinator", () => {
     expect(coordinator.pendingCount).toBe(0);
     grid.destroy();
   });
+
+  it("reports the activity of the first busy commit in queue order", async () => {
+    const { grid, adapter, coordinator } = harness();
+    expect(coordinator.state.activity).toBe("idle");
+    grid.applyTransaction({ patches: [localSet(2)] });
+    grid.applyTransaction({ patches: [localSet(3)] });
+    expect(coordinator.state.activity).toBe("pending");
+
+    const sending = coordinator.sendNext();
+    expect(coordinator.state.activity).toBe("sending");
+    // A transport may report a conflict for a later commit while the head is in flight.
+    await coordinator.handleResponse({ status: "conflict", currentVersion: 8 }, "m2");
+    expect(coordinator.state.activity).toBe("sending");
+
+    const response = adapter.responses[0];
+    if (!response) throw new Error("The head commit must be in flight");
+    response.resolve({ status: "applied", version: 8, clientMutationId: "m1" });
+    await sending;
+    expect(coordinator.state.activity).toBe("conflict");
+
+    await coordinator.resumeAfterReload({ ...snapshot(), version: 8 });
+    expect(coordinator.state.activity).toBe("pending");
+    await coordinator.handleResponse({ status: "applied", version: 9, clientMutationId: "m2" });
+    expect(coordinator.state.activity).toBe("idle");
+    coordinator.destroy();
+    grid.destroy();
+  });
 });

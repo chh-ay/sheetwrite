@@ -1,6 +1,6 @@
 ---
 title: "SheetwriteProps | @sheetwrite/svelte"
-description: "Simple framework adapter props for columns and default row objects."
+description: "SheetwriteProps type in @sheetwrite/svelte: Simple framework adapter props for columns and default row objects."
 ---
 <!-- api-export:@sheetwrite/svelte|.|SheetwriteProps -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="type">type</span></div>

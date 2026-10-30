@@ -1,6 +1,6 @@
 ---
 title: "GRID_OPTION_POLICY | @sheetwrite/core/adapter"
-description: "Classification of adapter options as live-updatable or reset-sensitive."
+description: "GRID_OPTION_POLICY variable in @sheetwrite/core/adapter: Classification of adapter options as live-updatable or reset-sensitive."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|GRID_OPTION_POLICY -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="variable">variable</span></div>
@@ -47,6 +47,7 @@ const GRID_OPTION_POLICY: {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

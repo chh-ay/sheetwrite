@@ -1,6 +1,6 @@
 ---
 title: "GridSizeProps | @sheetwrite/core/adapter"
-description: "Explicit width and height accepted by framework adapters."
+description: "GridSizeProps type in @sheetwrite/core/adapter: Explicit width and height accepted by framework adapters."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|GridSizeProps -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="type">type</span></div>
@@ -56,6 +56,7 @@ export type GridSizeProps =
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

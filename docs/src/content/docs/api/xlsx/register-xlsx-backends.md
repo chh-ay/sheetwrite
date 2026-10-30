@@ -1,13 +1,13 @@
 ---
 title: "registerXlsxBackends | @sheetwrite/xlsx"
-description: "Register all concrete XLSX backends with the backend-neutral core contracts."
+description: "registerXlsxBackends function in @sheetwrite/xlsx: Register all concrete XLSX backends with the backend-neutral core contracts."
 ---
 <!-- api-export:@sheetwrite/xlsx|.|registerXlsxBackends -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/xlsx/">@sheetwrite/xlsx</a><span class="api-status" data-kind="function">function</span></div>
 
 Register all concrete XLSX backends with the backend-neutral core contracts.
 
-### Examples
+## Examples
 
 ```ts compile
 import { registerXlsxBackends } from "@sheetwrite/xlsx";
@@ -19,9 +19,9 @@ async function open(file: File) {
 }
 ```
 
-### See also
+## See also
 
-- [/docs/guides/xlsx-export/](/docs/guides/xlsx-export/)
+- [/docs/import-export/xlsx-export/](/docs/import-export/xlsx-export/)
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/xlsx/src/registration.ts#L26"><code>packages/xlsx/src/registration.ts#L26</code></a></dd></div>

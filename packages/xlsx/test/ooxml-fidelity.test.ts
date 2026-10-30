@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import {
+  type CalculationSettings,
   type DataValidationComparison,
   dateToSerial,
   type WorkbookSnapshot,
@@ -94,6 +95,12 @@ function oneColumnSnapshot(overrides: Partial<WorkbookSnapshot> = {}): WorkbookS
     ],
     ...overrides,
   };
+}
+
+function workbookXml(bytes: Uint8Array): string {
+  const part = unzipSync(bytes)["xl/workbook.xml"];
+  if (!part) throw new Error("xl/workbook.xml is missing");
+  return strFromU8(part);
 }
 
 describe("raw spec-authored OOXML fidelity", () => {
@@ -285,12 +292,14 @@ describe("raw spec-authored OOXML fidelity", () => {
         { styles, theme },
       ),
     );
-    expect(imported.sheets[0]!.cells[0]!.cells[0]!.style).toMatchObject({
+    const style = imported.sheets[0]!.cells[0]!.cells[0]!.style;
+    expect(style).toMatchObject({
       color: "#000000",
       backgroundColor: "#8EA9DB",
-      fontSize: 16,
       border: { left: { color: "#FF0000", width: 1, style: "solid" } },
     });
+    // Font 0 is the workbook default, so its 12pt size is not a per-cell style.
+    expect(style?.fontSize).toBeUndefined();
   });
 
   it("escapes SpreadsheetML control tokens without confusing literal escape text", async () => {
@@ -314,6 +323,46 @@ describe("raw spec-authored OOXML fidelity", () => {
       kind: "literal",
       value: literal,
     });
+  });
+
+  it("reads calcPr iteration settings, repairs damaged limits, and writes them back", async () => {
+    const cases: Array<[calcPr: string, expected: CalculationSettings | undefined]> = [
+      [
+        '<calcPr calcId="191029" iterate="1" iterateCount="50" iterateDelta="0.01"/>',
+        { iterate: true, maxIterations: 50, maxChange: 0.01 },
+      ],
+      // Limits set while iteration is off survive, so turning it on later keeps them.
+      ['<calcPr iterateCount="7"/>', { iterate: false, maxIterations: 7, maxChange: 0.001 }],
+      [
+        '<calcPr iterate="true" iterateCount="40000" iterateDelta="-1"/>',
+        { iterate: true, maxIterations: 32_767, maxChange: 0.001 },
+      ],
+      ['<calcPr calcId="191029" iterateCount="100" iterateDelta="0.001"/>', undefined],
+    ];
+    for (const [calcPr, expected] of cases) {
+      const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
+        rawWorkbook(sheet('<dimension ref="A1"/><sheetData/>'), { workbookExtra: calcPr }),
+      );
+      expect(imported.workbook.calculation).toEqual(expected);
+
+      const reimported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
+        await sheetwriteWorkbookBackend.toXlsxWorkbook(imported),
+      );
+      expect(reimported.workbook.calculation).toEqual(expected);
+    }
+
+    expect(
+      workbookXml(await sheetwriteWorkbookBackend.toXlsxWorkbook(oneColumnSnapshot())),
+    ).toContain('<calcPr fullCalcOnLoad="1" forceFullCalc="1"/>');
+    const iterative = oneColumnSnapshot({
+      workbook: {
+        activeSheet: "s",
+        calculation: { iterate: true, maxIterations: 50, maxChange: 0.01 },
+      },
+    });
+    expect(workbookXml(await sheetwriteWorkbookBackend.toXlsxWorkbook(iterative))).toContain(
+      '<calcPr fullCalcOnLoad="1" iterate="1" iterateCount="50" iterateDelta="0.01" forceFullCalc="1"/>',
+    );
   });
 
   it("writes every canonical conditional predicate and direct whole-sheet sort state natively", async () => {

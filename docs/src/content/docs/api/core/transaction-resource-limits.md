@@ -1,6 +1,6 @@
 ---
 title: "TransactionResourceLimits | @sheetwrite/core"
-description: "Public ceilings shared by transaction producers, persistence, transport, and replay."
+description: "TransactionResourceLimits interface in @sheetwrite/core: Public ceilings shared by transaction producers, persistence, transport, and replay."
 ---
 <!-- api-export:@sheetwrite/core|.|TransactionResourceLimits -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -57,6 +57,7 @@ export interface TransactionResourceLimits {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

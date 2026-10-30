@@ -278,7 +278,7 @@ export const COMPATIBILITY_INVENTORY: readonly CompatibilityRecord[] = [
     semantics:
       "FILTER, SORT, UNIQUE, TRANSPOSE, SEQUENCE, TAKE, DROP, CHOOSECOLS, CHOOSEROWS, direct range arrays, array constants, spill references (A1#), spill ownership, resizing, obstruction, read order between spills, history, and dependency invalidation are evaluated. The full engine adds SORTBY, reshaping, and LAMBDA array helpers.",
     divergence:
-      "No implicit-intersection operator or general Excel/Sheets dynamic-array family is claimed. Multi-key SORTBY, reshaping, and LAMBDA helpers need the full engine; the default engine returns #NAME? for them.",
+      "The implicit-intersection operator (@) is not supported and returns #VALUE!. The space intersection operator between references is supported. No general Excel/Sheets dynamic-array family is claimed. Multi-key SORTBY, reshaping, and LAMBDA helpers need the full engine; the default engine returns #NAME? for them.",
     source:
       "https://support.microsoft.com/en-us/office/dynamic-array-formulas-and-spilled-array-behavior-205c6b06-03ba-4151-89a1-87a7eb36e531",
     evidence: [
@@ -307,7 +307,10 @@ export const COMPATIBILITY_INVENTORY: readonly CompatibilityRecord[] = [
       "At most 126 bindings and 16,384 expanded AST nodes are admitted; LET does not define or execute reusable functions.",
     source:
       "https://support.microsoft.com/en-us/office/let-function-34842dd8-b92b-4d3f-b325-b8b8f9908999",
-    evidence: ["packages/wasm/src/tests.rs", "docs/src/content/docs/guides/formulas.md"],
+    evidence: [
+      "packages/wasm/src/tests.rs",
+      "docs/src/content/docs/features/formulas/authoring-and-references.md",
+    ],
     fixtureIds: ["formula-engine-vectors"],
     importBehavior:
       "Recognized LET source evaluates within the bounded lexical subset; invalid names, arity, or resource expansion return explicit formula errors.",
@@ -331,7 +334,7 @@ export const COMPATIBILITY_INVENTORY: readonly CompatibilityRecord[] = [
       "https://support.microsoft.com/en-us/office/lambda-function-bd212d27-1cd1-4321-a34a-ccbf254b8b67",
     evidence: [
       "packages/wasm/src/eval/analysis/lambda.rs",
-      "docs/src/content/docs/guides/analysis-formulas.md",
+      "docs/src/content/docs/features/formulas/analysis-formulas.md",
     ],
     fixtureIds: ["formula-engine-vectors"],
     importBehavior:
@@ -348,10 +351,15 @@ export const COMPATIBILITY_INVENTORY: readonly CompatibilityRecord[] = [
     status: "supported",
     resultMode: "evaluated",
     semantics:
-      "Cross-sheet references resolve by stable sheet handle and survive rename and reorder with canonical quoting.",
-    divergence: "External workbook links and 3-D references are unsupported.",
+      "Cross-sheet references resolve by stable sheet handle and survive rename and reorder with canonical quoting. 3-D references such as Jan:Mar!A1 span the sheets between the endpoints in tab order and follow sheet insert, move, rename and delete.",
+    divergence:
+      "External workbook links are unsupported. 3-D references are accepted only by SUM, AVERAGE, COUNT, COUNTA, MAX, MIN, PRODUCT, STDEV.S, STDEV.P, VAR.S and VAR.P; other positions return #VALUE!. Excel also accepts them in the A-suffixed aggregate functions.",
     source: "https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/",
-    evidence: ["packages/wasm/src/tests.rs", "packages/xlsx/test/worksheet-lifecycle.test.ts"],
+    evidence: [
+      "packages/wasm/src/tests.rs",
+      "packages/xlsx/test/worksheet-lifecycle.test.ts",
+      "packages/xlsx/test/formula-source-preservation.test.ts",
+    ],
     fixtureIds: ["formula-engine-vectors", "worksheet-xlsx-vectors"],
     importBehavior: "Native same-workbook references map to stable worksheet IDs.",
     exportBehavior:

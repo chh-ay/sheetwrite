@@ -1,6 +1,6 @@
 ---
 title: "SyncProtocolErrorCode | @sheetwrite/core"
-description: "Stable category identifying which synchronization protocol bound was violated."
+description: "SyncProtocolErrorCode type in @sheetwrite/core: Stable category identifying which synchronization protocol bound was violated."
 ---
 <!-- api-export:@sheetwrite/core|.|SyncProtocolErrorCode -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
@@ -8,7 +8,7 @@ description: "Stable category identifying which synchronization protocol bound w
 Stable category identifying which synchronization protocol bound was violated.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L184"><code>packages/core/src/sync.ts#L184</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L185"><code>packages/core/src/sync.ts#L185</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -46,6 +46,7 @@ export type SyncProtocolErrorCode =
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

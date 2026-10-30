@@ -1,6 +1,6 @@
 ---
 title: "PendingCommitStorage | @sheetwrite/core"
-description: "Host-owned durable queue."
+description: "PendingCommitStorage interface in @sheetwrite/core: Host-owned durable queue."
 ---
 <!-- api-export:@sheetwrite/core|.|PendingCommitStorage -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
@@ -8,7 +8,7 @@ description: "Host-owned durable queue."
 Host-owned durable queue. Browser storage lives in the optional `./browser` entrypoint.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L51"><code>packages/core/src/sync.ts#L51</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L52"><code>packages/core/src/sync.ts#L52</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>
@@ -87,6 +87,7 @@ export interface PendingCommitStorage {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

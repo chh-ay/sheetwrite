@@ -1,6 +1,6 @@
 ---
 title: "RangeSnapshot | @sheetwrite/wasm"
-description: "Opaque, store-local history payload for one dense rectangular cell block."
+description: "RangeSnapshot class in @sheetwrite/wasm: Opaque, store-local history payload for one dense rectangular cell block."
 ---
 <!-- api-export:@sheetwrite/wasm|.|RangeSnapshot -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/wasm/">@sheetwrite/wasm</a><span class="api-status" data-kind="class">class</span></div>
@@ -12,7 +12,7 @@ part of the serialized document protocol. A deduplicated local dictionary
 owns captured text independently of the store's pool epoch.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L438"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L438</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L446"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L446</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>

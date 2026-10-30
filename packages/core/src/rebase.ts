@@ -1,8 +1,11 @@
 import { remapFormulaA1Refs } from "./a1.js";
+import { chartTouchesSheet } from "./chart-definition.js";
 import { decodeRestoreBlock, encodeRestoreBlock } from "./restore-block.js";
 import type { CellValue } from "./types/cell.js";
-import type { CellAddress, Range } from "./types/coordinates.js";
+import type { ChartDefinition, ChartRange } from "./types/chart.js";
+import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
 import type { DocumentOp, PackedCellBlock, SheetSnapshot, SnapshotCell } from "./types/document.js";
+import type { PivotDefinition } from "./types/pivot.js";
 
 /** Stable conservative-rebase conflict category. */
 export type RebaseConflictCode =
@@ -242,6 +245,8 @@ function remoteFootprint(operation: DocumentOp): DocumentOp {
     case "addTable":
     case "updateTable":
     case "setSheetMeta":
+    case "setChart":
+    case "setPivot":
       return cloneJsonValue(operation);
     default:
       return { ...operation };
@@ -470,6 +475,8 @@ function transformDirectTarget(
       if (mapped) operation.patch.range = mapped;
       return null;
     }
+    case "setChart":
+      return transformChart(operation.chart, operation.sheet, change, operation.op);
     case "setSheetMeta":
       if (operation.sheet !== change.sheet) return null;
       if (
@@ -495,6 +502,8 @@ function transformDirectTarget(
         }
       }
       return null;
+    case "setPivot":
+      return transformPivot(operation.pivot, operation.sheet, change, operation.op);
     case "addSheet":
     case "removeSheet":
     case "renameSheet":
@@ -505,8 +514,89 @@ function transformDirectTarget(
     case "removeProtectedRange":
     case "removeNamedRange":
     case "removeTable":
+    case "setCalculation":
+    case "removeChart":
+    case "removePivot":
       return null;
   }
+}
+
+/**
+ * Shift a privately owned chart's anchor and live sources in place. A source
+ * that straddles the edit or an anchor whose cell was deleted is a conflict,
+ * like every other range-bearing metadata operation.
+ */
+function transformChart(
+  chart: ChartDefinition,
+  owner: SheetId,
+  change: Exclude<AxisChange, { kind: "move" }>,
+  operation: string,
+): TransformFailure | null {
+  // Only a source on the edited sheet can come back null.
+  const mapSource = (source: ChartRange): ChartRange | null =>
+    source === "#REF!" ? source : transformRange(source, change);
+
+  for (const series of chart.series) {
+    const values = mapSource(series.values);
+    const nameRange = series.nameRange === undefined ? undefined : mapSource(series.nameRange);
+    const categories = series.categories === undefined ? undefined : mapSource(series.categories);
+    if (!values || nameRange === null || categories === null) {
+      return overlappingStructure(operation);
+    }
+
+    series.values = values;
+    if (nameRange !== undefined) series.nameRange = nameRange;
+    if (categories !== undefined) series.categories = categories;
+  }
+  if (owner !== change.sheet) return null;
+
+  const index = transformIndex(change.axis === "row" ? chart.anchor.row : chart.anchor.col, change);
+  if (index === null) return deletedTarget(operation);
+  if (change.axis === "row") chart.anchor.row = index;
+  else chart.anchor.col = index;
+  return null;
+}
+
+/**
+ * Shift a privately owned pivot's anchor and live range source in place. A
+ * deleted anchor cell or a source that straddles the edit is a conflict.
+ * `tableSheet` is the sheet holding a table source, when the caller knows it.
+ */
+function transformPivot(
+  pivot: PivotDefinition,
+  owner: string,
+  change: Exclude<AxisChange, { kind: "move" }>,
+  operation: string,
+  tableSheet?: string,
+): TransformFailure | null {
+  const anchor = transformAddress({ sheet: owner, ...pivot.anchor }, change);
+  if (!anchor) return deletedTarget(operation);
+  pivot.anchor = { row: anchor.row, col: anchor.col };
+
+  const source = pivot.source;
+  if (source.invalid) return null;
+  if ("table" in source) {
+    // Field indices are table-column offsets. When the table's sheet is not
+    // known, any concurrent column edit may shift them.
+    const mayShift = tableSheet === undefined || tableSheet === change.sheet;
+    return change.axis === "column" && mayShift
+      ? {
+          code: "unsupported-structural",
+          message: "A table-sourced pivot cannot be rebased across a column edit",
+        }
+      : null;
+  }
+
+  // A range that straddles the edit changes size; one that moves whole keeps its fields.
+  const range = transformRange(source.range, change);
+  if (!range) return overlappingStructure(operation);
+  source.range = range;
+  return null;
+}
+
+/** Whether `pivot` summarizes a live range on `sheet`. */
+function pivotReadsSheet(pivot: PivotDefinition, sheet: string): boolean {
+  return !pivot.source.invalid && "range" in pivot.source && pivot.source.range.sheet === sheet;
 }
 
 function transformEmbeddedReferences(
@@ -571,6 +661,24 @@ function transformSheetSnapshot(
     const mapped = transformRange(table.range, change);
     if (!mapped && table.range.sheet === change.sheet) return overlappingStructure("addTable");
     if (mapped) table.range = mapped;
+  }
+  for (const chart of sheet.charts ?? []) {
+    const failure = transformChart(chart, sheet.id, change, "addSheet");
+    if (failure) return failure;
+  }
+  for (const pivot of sheet.pivots ?? []) {
+    // A table in the snapshot lives on the new sheet, which no remote edit can touch.
+    const source = pivot.source;
+    const ownTable =
+      "table" in source && (sheet.tables?.some((table) => table.id === source.table) ?? false);
+    const failure = transformPivot(
+      pivot,
+      sheet.id,
+      change,
+      "addSheet",
+      ownTable ? sheet.id : undefined,
+    );
+    if (failure) return failure;
   }
   return null;
 }
@@ -782,19 +890,28 @@ function operationTouchesSheet(
       return operation.range.sheet === sheet;
     case "addTable":
       return operation.table.range.sheet === sheet;
+    case "setChart":
+      return chartTouchesSheet(operation.chart, operation.sheet, sheet);
     case "setNamedRange":
       return operation.namedRange.range.sheet === sheet || operation.namedRange.scope === sheet;
     case "removeNamedRange":
       return operation.scope === sheet;
-    case "addSheet":
+    case "addSheet": {
+      const snapshot = operation.sheet;
       return (
-        operation.sheet.id === sheet ||
-        operation.sheet.cells.some((block) =>
+        snapshot.id === sheet ||
+        snapshot.cells.some((block) =>
           block.cells.some(
             (cell) => cell.value.kind === "ref" && cell.value.target.sheet === sheet,
           ),
-        )
+        ) ||
+        // A chart or pivot in the new sheet can read any other sheet.
+        (snapshot.charts?.some((chart) => chartTouchesSheet(chart, snapshot.id, sheet)) ?? false) ||
+        (snapshot.pivots?.some((pivot) => pivotReadsSheet(pivot, sheet)) ?? false)
       );
+    }
+    case "setPivot":
+      return operation.sheet === sheet || pivotReadsSheet(operation.pivot, sheet);
     default:
       return "sheet" in operation && operation.sheet === sheet;
   }
@@ -857,6 +974,14 @@ function mutationRanges(operation: DocumentOp): Range[] {
       return [operation.table.range];
     case "updateTable":
       return operation.patch.range ? [operation.patch.range] : [];
+    case "setPivot":
+      return [
+        {
+          sheet: operation.sheet,
+          start: { ...operation.pivot.anchor },
+          end: { ...operation.pivot.anchor },
+        },
+      ];
     default:
       return [];
   }
@@ -888,6 +1013,16 @@ function operationIdentity(operation: DocumentOp): string {
       return `table:${operation.tableId}`;
     case "setSheetMeta":
       return `sheet-meta:${operation.sheet}`;
+    case "setChart":
+    case "removeChart":
+      return `chart:${operation.sheet}:${operation.op === "setChart" ? operation.chart.id : operation.id}`;
+    // Workbook-wide: concurrent calculation changes always conflict, nothing else does.
+    case "setCalculation":
+      return "calculation";
+    case "setPivot":
+      return `pivot:${operation.pivot.id}`;
+    case "removePivot":
+      return `pivot:${operation.id}`;
     default:
       return "";
   }

@@ -1,5 +1,7 @@
 import { resolve, sep } from "node:path";
 
+import { MOVED_PAGES } from "../docs/src/lib/moved-pages.js";
+
 const repositoryRoot = resolve(import.meta.dir, "..");
 const outputRoot = resolve(repositoryRoot, process.env.DOCS_OUTPUT_DIR ?? "docs/dist/client");
 const base = "";
@@ -26,6 +28,11 @@ const server = Bun.serve({
       return new Response("", {
         headers: { "content-type": "application/javascript; charset=utf-8" },
       });
+    }
+    const moved = MOVED_PAGES[pathname.endsWith("/") ? pathname : `${pathname}/`];
+    // Same permanent redirect as the deployment config.
+    if (moved !== undefined) {
+      return new Response(null, { status: 308, headers: { location: moved.to } });
     }
     const candidate = outputPath(pathname);
     if (candidate !== null) {

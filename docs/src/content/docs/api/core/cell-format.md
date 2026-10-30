@@ -1,6 +1,6 @@
 ---
 title: "CellFormat | @sheetwrite/core"
-description: "How a column's cells are typed, parsed, and rendered: text verbatim, number via its numberFormat, date as an Excel-style serial (see date-serial.ts) rendered by a date numberFormat, and currency as a plain number…"
+description: "CellFormat type in @sheetwrite/core: How a column's cells are typed, parsed, and rendered: text verbatim, number via its numberFormat, date as an Excel-style…"
 ---
 <!-- api-export:@sheetwrite/core|.|CellFormat -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
@@ -11,7 +11,7 @@ rendered by a date `numberFormat`, and `currency` as a plain number rendered by
 a currency `numberFormat` (e.g. `$#,##0.00`).
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/cell.ts#L91"><code>packages/core/src/types/cell.ts#L91</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/cell.ts#L107"><code>packages/core/src/types/cell.ts#L107</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -31,6 +31,7 @@ export type CellFormat = "text" | "number" | "date" | "currency";
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

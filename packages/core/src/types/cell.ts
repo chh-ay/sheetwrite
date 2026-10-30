@@ -6,6 +6,9 @@ import type { CellAddress, Range } from "./coordinates.js";
 /** Horizontal text alignment supported by cell styles. */
 export type CellAlign = "left" | "center" | "right";
 
+/** Vertical text placement within a cell's height. */
+export type CellVerticalAlign = "top" | "middle" | "bottom";
+
 /** Visual border applied to one or more sides of a cell. */
 export interface CellBorder {
   /** hex color, e.g. "#111111" */
@@ -35,12 +38,25 @@ export interface CellStyle {
   strikethrough?: boolean;
   /** Font size in unzoomed CSS pixels; zoom is applied during painting. */
   fontSize?: number;
+  /**
+   * Font family name, e.g. "Calibri". The theme font family stays the fallback,
+   * so a font the browser lacks renders in the theme font. Letters, digits,
+   * spaces, `.`, `_` and `-` only; at most 128 characters.
+   */
+  fontFamily?: string;
   /** hex color, e.g. "#111111" */
   color?: string;
   /** hex color, e.g. "#ffffff" */
   backgroundColor?: string;
   /** Horizontal placement of cell text within its column. */
   align?: CellAlign;
+  /** Vertical placement of cell text; omitted keeps text centered. */
+  verticalAlign?: CellVerticalAlign;
+  /**
+   * Excel number-format code for this cell, e.g. "0.00%". Overrides the
+   * column's `numberFormat`; at most 255 characters.
+   */
+  numberFormat?: string;
   /** Wraps text within the cell width; row auto-fit accounts for the resulting line count. */
   wrap?: boolean;
   /** Border overrides for the cell's individual sides. */

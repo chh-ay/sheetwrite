@@ -1,6 +1,6 @@
 ---
 title: "DistinctColumn | @sheetwrite/formulas"
-description: "Distinct-value scan result for one column: parallel kind/number/text arrays whose buffers are surrendered once through the take accessors."
+description: "DistinctColumn class in @sheetwrite/formulas: Distinct-value scan result for one column: parallel kind/number/text arrays whose buffers are surrendered once…"
 ---
 <!-- api-export:@sheetwrite/formulas|.|DistinctColumn -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/formulas/">@sheetwrite/formulas</a><span class="api-status" data-kind="class">class</span></div>
@@ -9,7 +9,7 @@ Distinct-value scan result for one column: parallel kind/number/text
 arrays whose buffers are surrendered once through the `take*` accessors.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/pkg/sheetwrite_wasm.d.ts#L412"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L412</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/pkg/sheetwrite_wasm.d.ts#L429"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L429</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>

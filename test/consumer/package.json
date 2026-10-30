@@ -10,6 +10,7 @@
     "runtime:formulas": "bun run ./src/runtime-formulas.mjs"
   },
   "dependencies": {
+    "@sheetwrite/charts": "file:artifacts/sheetwrite-charts-0.5.4.tgz",
     "@sheetwrite/core": "file:artifacts/sheetwrite-core-0.5.4.tgz",
     "@sheetwrite/formulas": "file:artifacts/sheetwrite-formulas-0.5.4.tgz",
     "@sheetwrite/react": "file:artifacts/sheetwrite-react-0.5.4.tgz",

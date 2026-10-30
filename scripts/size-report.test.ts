@@ -10,27 +10,11 @@ import {
 import {
   BUNDLER_SOURCE_MAP_MODE,
   classifyPackedPath,
-  parsePackJson,
   SIZE_PROTOCOL_VERSION,
   summarizePack,
   validateBundlerEvidence,
   validateComparableAttribution,
 } from "./size-report.js";
-
-function packJson(overrides: Record<string, unknown> = {}): string {
-  return JSON.stringify([
-    {
-      filename: "sheetwrite.tgz",
-      size: 4,
-      unpackedSize: 3,
-      files: [
-        { path: "dist/index.js", size: 2 },
-        { path: "package.json", size: 1 },
-      ],
-      ...overrides,
-    },
-  ]);
-}
 
 function evidence(
   assets: unknown[],
@@ -91,6 +75,8 @@ function comparableEvidence(bundler: "next" | "vite", overrides: Record<string, 
           "svelte-initial",
           "worker-async",
           "xlsx-async",
+          "charts-async",
+          "chrome-async",
         ];
   const assets = roles.map((role) => ({
     path: `dist/${role}.js`,
@@ -125,25 +111,26 @@ function comparableEvidence(bundler: "next" | "vite", overrides: Record<string, 
   );
 }
 
-describe("npm pack parsing and classification", () => {
-  it("fails closed on malformed, duplicate, and unclassified pack data", () => {
-    expect(() => parsePackJson("not-json")).toThrow("Malformed npm pack JSON");
-    expect(() => parsePackJson("[]")).toThrow("exactly one result");
-    expect(() =>
-      parsePackJson(
-        packJson({
-          unpackedSize: 4,
-          files: [
-            { path: "dist/index.js", size: 2 },
-            { path: "dist/index.js", size: 2 },
-          ],
-        }),
-      ),
-    ).toThrow("duplicate file");
+describe("packed file classification", () => {
+  it("fails closed on unclassified files and inconsistent unpacked sizes", () => {
     expect(() => classifyPackedPath("dist/unexpected.bin")).toThrow("Unclassified");
-    expect(() => summarizePack("test", parsePackJson(packJson({ unpackedSize: 99 })))).toThrow(
-      "do not equal",
-    );
+    expect(() =>
+      summarizePack("test", {
+        filename: "sheetwrite.tgz",
+        size: 4,
+        unpackedSize: 99,
+        files: [
+          { path: "dist/index.js", size: 2 },
+          { path: "package.json", size: 1 },
+        ],
+      }),
+    ).toThrow("do not equal");
+  });
+
+  it("counts the icon sheet and its layout manifest as static assets, and nothing else in JSON", () => {
+    expect(classifyPackedPath("dist/icons.svg")).toBe("assets");
+    expect(classifyPackedPath("dist/icons.json")).toBe("assets");
+    expect(() => classifyPackedPath("dist/unexpected.json")).toThrow("Unclassified");
   });
 });
 
@@ -160,6 +147,12 @@ describe("manifest ownership", () => {
       kind: "javascript",
       owner: "worker-async",
       roles: ["worker-async"],
+    },
+    {
+      path: "dist/worker-ribbon-hash.js",
+      kind: "javascript",
+      owner: "chrome-async",
+      roles: ["chrome-async"],
     },
     {
       path: "dist/runtime-any-hash.wasm",
@@ -187,6 +180,18 @@ describe("manifest ownership", () => {
           complete[0],
           { ...complete[1], roles: ["core-initial", "worker-async"] },
           complete[2],
+          complete[3],
+        ]),
+      ),
+    ).toThrow("leaked into an initial entry");
+    // The lazy ribbon chunk is held to the same rule as the worker.
+    expect(() =>
+      validateBundlerEvidence(
+        evidence([
+          complete[0],
+          complete[1],
+          { ...complete[2], roles: ["chrome-async", "core-initial"] },
+          complete[3],
         ]),
       ),
     ).toThrow("leaked into an initial entry");

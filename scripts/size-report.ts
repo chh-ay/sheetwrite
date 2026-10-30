@@ -12,16 +12,18 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, dirname, join, relative, resolve, sep } from "node:path";
+import { basename, join, relative, resolve, sep } from "node:path";
 import { brotliCompressSync, constants, gzipSync } from "node:zlib";
 
 import {
   assertPublishedFilePolicy,
+  packBuiltPackages,
   readReleaseManifestDigest,
   verifyReleaseArtifacts,
 } from "./release-artifacts.js";
 import { bindCanonicalTarballIntegrities } from "./release-lock-integrity.mjs";
 import { captureProcess, readJson } from "./script-io.js";
+import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
 
 export const SIZE_PROTOCOL_VERSION = 2;
 export const SIZE_TOOL_NAME = "sheetwrite-delivery-size";
@@ -30,6 +32,7 @@ export const BUNDLER_SOURCE_MAP_MODE = "hidden-external";
 
 export type MetricUnit = "bytes" | "count";
 export type PackedCategory =
+  | "assets"
   | "css"
   | "declarations"
   | "maps"
@@ -48,7 +51,7 @@ export interface PackResult {
   filename: string;
   size: number;
   unpackedSize: number;
-  files: PackFile[];
+  files: readonly PackFile[];
 }
 
 export interface Metric {
@@ -197,13 +200,6 @@ export interface SizeReport {
   reproduction: string;
 }
 
-interface PackageManifest {
-  name: string;
-  version: string;
-  files?: string[];
-  dependencies?: Record<string, string>;
-}
-
 interface PackedPackage {
   name: string;
   tarballPath: string;
@@ -214,16 +210,13 @@ const repositoryRoot = resolve(import.meta.dir, "..");
 const bundlerEvidenceRoot = join(repositoryRoot, "test-results/bundlers");
 const reportPath = join(import.meta.dir, "size-report.json");
 const historyPath = join(import.meta.dir, "size-history.json");
-/** The optional package that core and the framework adapters must not install. */
-const XLSX_PACKAGE = "@sheetwrite/xlsx";
-const packageDirectories = [
-  "packages/wasm",
-  "packages/formulas",
-  "packages/core",
-  "packages/xlsx",
-  "packages/react",
-  "packages/vue",
-  "packages/svelte",
+/**
+ * Optional packages that core and the framework adapters must not install.
+ * Only the closure named here may contain the package; `metric` names its isolation count.
+ */
+const OPTIONAL_PACKAGE_CLOSURES = [
+  { packageName: "@sheetwrite/xlsx", closure: "core-xlsx", metric: "xlsxPackageCount" },
+  { packageName: "@sheetwrite/charts", closure: "core-charts", metric: "chartsPackageCount" },
 ] as const;
 const requiredBundlerRoles: Record<BundlerEvidence["bundler"], readonly string[]> = {
   vite: [
@@ -233,10 +226,14 @@ const requiredBundlerRoles: Record<BundlerEvidence["bundler"], readonly string[]
     "svelte-initial",
     "worker-async",
     "xlsx-async",
+    "charts-async",
+    "chrome-async",
   ],
-  webpack: ["core-initial", "worker-async"],
+  webpack: ["core-initial", "worker-async", "chrome-async"],
   next: ["core-initial"],
 };
+/** Lazily loaded roles; an asset that also belongs to an initial entry defeats the split. */
+const ASYNC_ROLES = new Set(["worker-async", "xlsx-async", "charts-async", "chrome-async"]);
 const ATTRIBUTION_METHOD = "source-map-generated-spans-with-explicit-opaque-assets-v2";
 const COMPARABLE_ENTRY = "core-first-paint";
 const SUBPATH_CANDIDATES = ["sync", "collaboration", "rebase", "persistence"] as const;
@@ -247,57 +244,18 @@ function isNonNegativeInteger(value: unknown): value is number {
   );
 }
 
-export function parsePackJson(input: string): PackResult {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(input);
-  } catch (error) {
-    throw new Error(
-      `Malformed npm pack JSON: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-  if (!Array.isArray(parsed) || parsed.length !== 1) {
-    throw new Error("npm pack JSON must contain exactly one result");
-  }
-  const candidate = parsed[0] as Record<string, unknown>;
-  if (
-    typeof candidate.filename !== "string" ||
-    candidate.filename.length === 0 ||
-    !isNonNegativeInteger(candidate.size) ||
-    !isNonNegativeInteger(candidate.unpackedSize) ||
-    !Array.isArray(candidate.files)
-  ) {
-    throw new Error("npm pack JSON has invalid filename, size, unpackedSize, or files");
-  }
-  const seen = new Set<string>();
-  const files = candidate.files.map((entry, index) => {
-    if (entry === null || typeof entry !== "object") {
-      throw new Error(`npm pack JSON file ${index} is malformed`);
-    }
-    const file = entry as Record<string, unknown>;
-    if (
-      typeof file.path !== "string" ||
-      file.path.length === 0 ||
-      !isNonNegativeInteger(file.size)
-    ) {
-      throw new Error(`npm pack JSON file ${index} has invalid path or size`);
-    }
-    if (seen.has(file.path)) throw new Error(`npm pack JSON contains duplicate file ${file.path}`);
-    seen.add(file.path);
-    return { path: file.path, size: file.size };
-  });
-  return {
-    filename: candidate.filename,
-    size: candidate.size,
-    unpackedSize: candidate.unpackedSize,
-    files,
-  };
-}
+/**
+ * Opt-in static files a host fetches or reads by URL: the icon sheet for
+ * strict-CSP pages and its layout manifest for replacement sheets. The JSON is
+ * listed by name so that any other JSON in a package still fails closed.
+ */
+const STATIC_ASSET_PATHS = new Set(["dist/icons.json"]);
 
 export function classifyPackedPath(path: string): PackedCategory {
   const lower = path.toLowerCase();
   if (lower.endsWith(".wasm")) return "wasm";
   if (lower.endsWith(".css")) return "css";
+  if (lower.endsWith(".svg") || STATIC_ASSET_PATHS.has(lower)) return "assets";
   if (lower.endsWith(".map")) return "maps";
   if (/\.d\.(?:c|m)?ts$/.test(lower)) return "declarations";
   if (/\.(?:c|m)?js$/.test(lower)) return "runtime-js";
@@ -318,6 +276,7 @@ export function summarizePack(name: string, result: PackResult): PackageReport {
     result.files.map((file) => file.path),
   );
   const categories: Record<PackedCategory, number> = {
+    assets: 0,
     css: 0,
     declarations: 0,
     maps: 0,
@@ -453,7 +412,7 @@ export function validateBundlerEvidence(value: unknown): BundlerEvidence {
   const initialRoles = new Set(["core-initial", "react-initial", "vue-initial", "svelte-initial"]);
   for (const asset of assets) {
     if (
-      (asset.roles.includes("worker-async") || asset.roles.includes("xlsx-async")) &&
+      asset.roles.some((role) => ASYNC_ROLES.has(role)) &&
       asset.roles.some((role) => initialRoles.has(role))
     ) {
       throw new Error(`${bundler} async asset ${asset.path} leaked into an initial entry`);
@@ -773,91 +732,13 @@ async function runCommand(command: string[], cwd = repositoryRoot): Promise<stri
   });
 }
 
-function rewriteWorkspaceRanges(
-  dependencies: Record<string, string> | undefined,
-  versions: ReadonlyMap<string, string>,
-): Record<string, string> | undefined {
-  if (dependencies === undefined) return undefined;
-  return Object.fromEntries(
-    Object.entries(dependencies).map(([name, range]) => {
-      if (!range.startsWith("workspace:")) return [name, range];
-      const version = versions.get(name);
-      if (version === undefined) throw new Error(`No workspace version found for ${name}`);
-      return [name, version];
-    }),
-  );
-}
-
-async function copyManifestEntry(
-  sourceRoot: string,
-  packageRoot: string,
-  entry: string,
-): Promise<void> {
-  if (!/[*?[\]{}]/u.test(entry)) {
-    await cp(join(sourceRoot, entry), join(packageRoot, entry), { recursive: true });
-    return;
-  }
-  const matches = Array.from(
-    new Bun.Glob(entry).scanSync({
-      cwd: sourceRoot,
-      dot: true,
-      onlyFiles: true,
-      followSymlinks: false,
-    }),
-  );
-  if (matches.length === 0) throw new Error(`Package file pattern matched nothing: ${entry}`);
-  for (const path of matches) {
-    const target = join(packageRoot, path);
-    await mkdir(dirname(target), { recursive: true });
-    await cp(join(sourceRoot, path), target);
-  }
-}
-
 async function packPackages(temporaryRoot: string): Promise<PackedPackage[]> {
-  const stageRoot = join(temporaryRoot, "stage");
-  const tarballRoot = join(temporaryRoot, "tarballs");
-  await Promise.all([
-    mkdir(stageRoot, { recursive: true }),
-    mkdir(tarballRoot, { recursive: true }),
-  ]);
-  const sourceManifests = await Promise.all(
-    packageDirectories.map((directory) =>
-      readJson<PackageManifest>(join(repositoryRoot, directory, "package.json")),
-    ),
-  );
-  const versions = new Map(sourceManifests.map((manifest) => [manifest.name, manifest.version]));
-  const packed: PackedPackage[] = [];
-
-  for (let index = 0; index < packageDirectories.length; index += 1) {
-    const directory = packageDirectories[index];
-    const sourceManifest = sourceManifests[index];
-    if (directory === undefined || sourceManifest === undefined)
-      throw new Error("Package list mismatch");
-    const sourceRoot = join(repositoryRoot, directory);
-    const packageRoot = join(stageRoot, basename(directory));
-    await mkdir(packageRoot, { recursive: true });
-    for (const path of sourceManifest.files ?? []) {
-      await copyManifestEntry(sourceRoot, packageRoot, path);
-    }
-    await cp(join(repositoryRoot, "LICENSE"), join(packageRoot, "LICENSE"));
-    await cp(join(sourceRoot, "README.md"), join(packageRoot, "README.md"));
-    const manifest: PackageManifest = {
-      ...sourceManifest,
-      dependencies: rewriteWorkspaceRanges(sourceManifest.dependencies, versions),
-    };
-    await writeFile(join(packageRoot, "package.json"), `${JSON.stringify(manifest, null, 2)}\n`);
-    const output = await runCommand(
-      ["npm", "pack", "--ignore-scripts", "--json", "--pack-destination", tarballRoot],
-      packageRoot,
-    );
-    const result = parsePackJson(output);
-    packed.push({
-      name: manifest.name,
-      tarballPath: join(tarballRoot, result.filename),
-      report: summarizePack(manifest.name, result),
-    });
-  }
-  return packed;
+  const packages = await packBuiltPackages(join(temporaryRoot, "tarballs"));
+  return packages.map(({ artifact, tarballPath, pack }) => ({
+    name: artifact.name,
+    tarballPath,
+    report: summarizePack(artifact.name, pack),
+  }));
 }
 
 async function loadPackedArtifacts(
@@ -959,8 +840,12 @@ async function measureClosure(
     logicalBytes += await sumPackageFiles(packageRoot);
   }
   packageNames.sort();
-  if (name !== "core-xlsx") {
-    const leaked = packageNames.filter((identity) => identity.startsWith(`${XLSX_PACKAGE}@`));
+  for (const optional of OPTIONAL_PACKAGE_CLOSURES) {
+    if (name === optional.closure) continue;
+
+    const leaked = packageNames.filter((identity) =>
+      identity.startsWith(`${optional.packageName}@`),
+    );
     if (leaked.length > 0) throw new Error(`${name} runtime closure contains ${leaked.join(", ")}`);
   }
   return { name, packageCount: packageNames.length, logicalBytes, packages: packageNames };
@@ -1103,6 +988,7 @@ async function buildSizeReport(
       ["vue", ["@sheetwrite/wasm", "@sheetwrite/core", "@sheetwrite/vue"]],
       ["svelte", ["@sheetwrite/wasm", "@sheetwrite/core", "@sheetwrite/svelte"]],
       ["core-xlsx", ["@sheetwrite/wasm", "@sheetwrite/core", "@sheetwrite/xlsx"]],
+      ["core-charts", ["@sheetwrite/wasm", "@sheetwrite/core", "@sheetwrite/charts"]],
     ];
     const closures = await Promise.all(
       closureSpecs.map(([name, names], index) =>
@@ -1163,11 +1049,14 @@ async function buildSizeReport(
         "install-closure",
         closure.name,
       );
-      if (closure.name !== "core-xlsx") {
+      for (const optional of OPTIONAL_PACKAGE_CLOSURES) {
+        if (closure.name === optional.closure) continue;
+
         addMetric(
           metrics,
-          `${prefix}.xlsxPackageCount`,
-          closure.packages.filter((identity) => identity.startsWith(`${XLSX_PACKAGE}@`)).length,
+          `${prefix}.${optional.metric}`,
+          closure.packages.filter((identity) => identity.startsWith(`${optional.packageName}@`))
+            .length,
           "count",
           "optional-dependency-isolation",
           closure.name,
@@ -1376,15 +1265,12 @@ function assertReleaseVersion(version: string): void {
 export async function capturePublishedRelease(version: string): Promise<SizeReleaseSnapshot> {
   assertReleaseVersion(version);
   const metrics: SizeReleaseSnapshot["metrics"] = {};
-  for (const directory of packageDirectories) {
-    const manifest = JSON.parse(
-      await readFile(join(repositoryRoot, directory, "package.json"), "utf8"),
-    ) as PackageManifest;
+  for (const packageName of PUBLISHABLE_PACKAGE_ORDER) {
     const metadataResponse = await fetch(
-      `https://registry.npmjs.org/${encodeURIComponent(manifest.name)}/${encodeURIComponent(version)}`,
+      `https://registry.npmjs.org/${encodeURIComponent(packageName)}/${encodeURIComponent(version)}`,
     );
     if (!metadataResponse.ok) {
-      throw new Error(`Published package not found: ${manifest.name}@${version}`);
+      throw new Error(`Published package not found: ${packageName}@${version}`);
     }
     const metadata = (await metadataResponse.json()) as {
       dist?: { fileCount?: number; tarball?: string; unpackedSize?: number };
@@ -1396,11 +1282,11 @@ export async function capturePublishedRelease(version: string): Promise<SizeRele
       !isNonNegativeInteger(metadata.dist.fileCount) ||
       !isNonNegativeInteger(metadata.dist.unpackedSize)
     ) {
-      throw new Error(`Incomplete registry size metadata: ${manifest.name}@${version}`);
+      throw new Error(`Incomplete registry size metadata: ${packageName}@${version}`);
     }
     const tarballResponse = await fetch(metadata.dist.tarball);
-    if (!tarballResponse.ok) throw new Error(`Cannot download ${manifest.name}@${version}`);
-    const prefix = `package.${manifest.name}`;
+    if (!tarballResponse.ok) throw new Error(`Cannot download ${packageName}@${version}`);
+    const prefix = `package.${packageName}`;
     metrics[`${prefix}.tarballBytes`] = {
       actual: (await tarballResponse.arrayBuffer()).byteLength,
       unit: "bytes",

@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "license": {
+    "name": "Apache-2.0",
+    "url": "https://github.com/apache/poi/blob/913c78891bd0cd20945b050c63abfb8c66c88009/legal/LICENSE"
+  },
+  "notice": {
+    "url": "https://github.com/apache/poi/blob/913c78891bd0cd20945b050c63abfb8c66c88009/legal/NOTICE",
+    "text": "Apache POI\nCopyright 2003-2026 The Apache Software Foundation\n\nThis product includes software developed at\nThe Apache Software Foundation (https://www.apache.org/)."
+  },
+  "repository": "https://github.com/apache/poi",
+  "commit": "913c78891bd0cd20945b050c63abfb8c66c88009",
+  "fixtures": [
+    {
+      "file": "preserve-WithChart.xlsx",
+      "path": "test-data/spreadsheet/WithChart.xlsx",
+      "sha256": "51f27aabf7417f5aaa0542857b6bb56a92d4afbabdc5c63f084c06f92b67429d",
+      "features": ["chart", "drawing"]
+    },
+    {
+      "file": "preserve-ExcelPivotTableSample.xlsx",
+      "path": "test-data/spreadsheet/ExcelPivotTableSample.xlsx",
+      "sha256": "f0ef1d61c9f3d8b27b18a876b8e24676314c6450ed64a725a7bfaa603fdd67e3",
+      "features": ["pivot table", "pivot cache"]
+    },
+    {
+      "file": "preserve-picture.xlsx",
+      "path": "test-data/spreadsheet/picture.xlsx",
+      "sha256": "fea2f13189e87d06297d7b5313abca4d0b6cd8747d5ca450e4db11273b265279",
+      "features": ["image", "drawing"]
+    },
+    {
+      "file": "preserve-SimpleMacro.xlsm",
+      "path": "test-data/spreadsheet/SimpleMacro.xlsm",
+      "sha256": "f76c986f4ebc25c2cc57c088b2511a1269f4bd61d6223a2ab58db351da348ba6",
+      "features": ["vba"]
+    },
+    {
+      "file": "preserve-54399.xlsx",
+      "path": "test-data/spreadsheet/54399.xlsx",
+      "sha256": "ac1770a7887c87ddffca3c1f692089e1c718136704b6199c19520bd10e28d450",
+      "features": ["customXml", "custom properties", "external links"]
+    },
+    {
+      "file": "preserve-CustomXMLMappings.xlsx",
+      "path": "test-data/spreadsheet/CustomXMLMappings.xlsx",
+      "sha256": "6a5fbb160c7c9c2add5125ac07ceaf3f841d40e03d5c75025ab71946d49af289",
+      "features": ["XML maps", "single-cell XML tables"]
+    }
+  ]
+}

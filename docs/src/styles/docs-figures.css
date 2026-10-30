@@ -1,0 +1,346 @@
+/* Result figures (docs/src/lib/grid-result.ts): a static mini-sheet that shows
+   what a docs snippet produces. Cell content keeps its own authored colors;
+   the sheet chrome follows the site tokens in light and dark themes. */
+.sw-prose .sw-grid-result {
+  margin: 0.75rem 0 1.5rem;
+}
+/* The sheet keeps grid-sized columns instead of stretching to the page: a
+   two-column result is a small corner of a sheet. The edge column and row fade
+   out, so the sheet reads as continuing past the figure. The cells fade
+   themselves, not the frame, so a figure that scrolls sideways on a phone
+   never fades real content. The frame draws only the top and left edges; the
+   faded cells end the sheet on the other two. */
+.sw-prose .sw-grid-result__frame {
+  width: fit-content;
+  max-width: 100%;
+  overflow-x: auto;
+  border-top: 1px solid var(--sw-border);
+  border-left: 1px solid var(--sw-border);
+  border-top-left-radius: 0.5rem;
+}
+/* Sheet and status bar share one width: the figure shrinks to the wider of
+   the two, and the faded edge column takes any width the bar adds. */
+.sw-prose .sw-grid-result:has(> .sw-mini-status) {
+  display: grid;
+  width: fit-content;
+  max-width: 100%;
+}
+/* The caption wraps to the sheet's width instead of widening the figure. */
+.sw-prose .sw-grid-result:has(> .sw-mini-status) > figcaption {
+  contain: inline-size;
+}
+.sw-prose .sw-grid-result__frame:has(+ .sw-mini-status) {
+  width: auto;
+}
+.sw-prose .sw-grid-result__frame:has(+ .sw-mini-status) .sw-grid-result__sheet {
+  min-width: 100%;
+}
+.sw-prose
+  .sw-grid-result__frame:has(+ .sw-mini-status)
+  .sw-grid-result__sheet
+  .sw-grid-result__edge:last-child {
+  width: 100%;
+}
+/* Separate borders, so each cell paints its own and a faded cell fades its
+   borders too; collapsed borders belong to the table and ignore a cell mask. */
+.sw-prose table.sw-grid-result__sheet {
+  width: max-content;
+  margin: 0;
+  /* Prose tables draw an outer border; the frame and faded cells replace it. */
+  border: 0;
+  border-radius: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  font: 400 0.82rem / 1.4 var(--sw-font-body);
+  font-variant-numeric: tabular-nums;
+}
+.sw-prose .sw-grid-result__sheet th,
+.sw-prose .sw-grid-result__sheet td {
+  border: 0 solid var(--sw-border);
+  border-width: 0 1px 1px 0;
+  padding: 0.35rem 0.7rem;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.sw-prose .sw-grid-result__sheet thead th,
+.sw-prose .sw-grid-result__sheet tbody th {
+  background: var(--sw-surface-2);
+  color: var(--sw-fg-dim);
+  font: 600 0.7rem / 1.4 var(--sw-font-mono);
+  text-align: center;
+}
+.sw-prose .sw-grid-result__sheet tbody th {
+  min-width: 2.5rem;
+}
+/* About the width of a default grid column. */
+.sw-prose .sw-grid-result__sheet td {
+  position: relative;
+  min-width: 6.5rem;
+  background: var(--sw-surface-1);
+  color: var(--sw-fg);
+}
+.sw-prose .sw-grid-result__sheet td[data-type="number"] {
+  text-align: right;
+}
+.sw-prose .sw-grid-result__sheet .sw-grid-result__edge {
+  min-width: 3.5rem;
+}
+.sw-prose .sw-grid-result__sheet :is(th, td).sw-grid-result__edge {
+  mask-image: linear-gradient(to right, #000, transparent);
+}
+.sw-prose .sw-grid-result__sheet tr.sw-grid-result__edge > * {
+  mask-image: linear-gradient(to bottom, #000, transparent);
+}
+.sw-prose .sw-grid-result__sheet tr.sw-grid-result__edge > :last-child {
+  mask-image:
+    linear-gradient(to right, #000, transparent), linear-gradient(to bottom, #000, transparent);
+  mask-composite: intersect;
+}
+.sw-prose .sw-grid-result__row-id {
+  margin-left: 0.5rem;
+  color: var(--sw-fg-muted);
+  font-weight: 500;
+}
+
+/* Markers match what the live grid paints: a tinted selection with an
+   outlined active cell, the amber note triangle, and a list chevron. They are
+   drawn by CSS so the cell text stays the real value. */
+.sw-prose .sw-grid-result__sheet td[data-selected="true"] {
+  background: color-mix(in srgb, var(--sw-accent) 14%, transparent);
+}
+.sw-prose .sw-grid-result__sheet td[data-active="true"] {
+  outline: 2px solid var(--sw-accent);
+  outline-offset: -2px;
+}
+.sw-prose .sw-grid-result__sheet td[data-note="true"]::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 8px;
+  height: 8px;
+  background: #f59e0b;
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+  content: "";
+}
+.sw-prose .sw-grid-result__sheet td[data-list="true"] {
+  padding-right: 1.6rem;
+}
+.sw-prose .sw-grid-result__sheet td[data-list="true"]::after {
+  position: absolute;
+  top: 50%;
+  right: 0.6rem;
+  width: 0.38rem;
+  height: 0.38rem;
+  border-right: 1.5px solid var(--sw-fg-muted);
+  border-bottom: 1.5px solid var(--sw-fg-muted);
+  transform: translateY(-70%) rotate(45deg);
+  content: "";
+}
+
+/* Authored blocks around the sheet: a find widget above it; a legend, a mini
+   menu or a status bar under it. */
+.sw-prose .sw-grid-result > :not(:first-child, figcaption) {
+  margin-top: 0.5rem;
+}
+.sw-prose .sw-grid-result__legend {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.35rem 1rem;
+  margin-bottom: 0;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.5rem;
+  font-size: 0.82rem;
+}
+.sw-prose .sw-grid-result__legend dt {
+  margin: 0;
+  color: var(--sw-fg-strong);
+  font: 600 0.75rem / 1.5 var(--sw-font-mono);
+}
+.sw-prose .sw-grid-result__legend dd {
+  margin: 0;
+  color: var(--sw-fg-muted);
+  line-height: 1.5;
+}
+.sw-prose .sw-grid-result figcaption {
+  margin-top: 0.4rem;
+  color: var(--sw-fg-muted);
+  font-size: 0.82rem;
+}
+
+/* Group overview pages: one card per page, with its New/Updated badge. */
+.sw-prose .sw-section-cards a p {
+  margin: 0;
+  color: var(--sw-fg-muted);
+  font-size: 0.85rem;
+}
+.sw-prose > .sw-section-cards:first-child {
+  margin-top: 0;
+}
+.sw-prose .sw-section-cards strong::after {
+  content: none;
+}
+
+/* These figures show chrome without pretending that static controls work. */
+.sw-prose .sw-chrome-result {
+  margin: 0.75rem 0 1.5rem;
+  padding: 0.75rem;
+  overflow-x: auto;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.5rem;
+  color: var(--sw-fg);
+  background: var(--sw-surface-1);
+}
+.sw-prose .sw-chrome-result figcaption {
+  margin-top: 0.5rem;
+  color: var(--sw-fg-muted);
+  font-size: 0.82rem;
+}
+.sw-mini-ribbon,
+.sw-mini-search,
+.sw-mini-status {
+  font-size: 0.8rem;
+}
+.sw-mini-ribbon [aria-selected="true"] {
+  border-bottom: 2px solid var(--sw-accent);
+  color: var(--sw-accent-strong);
+}
+.sw-mini-ribbon > div,
+.sw-mini-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* The find widget floats at the sheet's top right, as in the grid: a query
+   field with its match count, then the replace row. */
+.sw-mini-search {
+  display: grid;
+  gap: 0.4rem;
+  width: max-content;
+  max-width: 100%;
+  margin-left: auto;
+  padding: 0.5rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.45rem;
+  background: var(--sw-surface-2);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--sw-fg-strong) 12%, transparent);
+}
+.sw-mini-search > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+.sw-mini-search > div > span {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.3rem;
+  color: var(--sw-fg-muted);
+  line-height: 1.3;
+}
+/* The first span of each row is the text field: query, then replacement. */
+.sw-mini-search > div > span:first-child {
+  min-width: 9rem;
+  background: var(--sw-surface-0);
+  color: var(--sw-fg-strong);
+}
+.sw-mini-search > div:last-child > span:first-child {
+  color: var(--sw-fg-dim);
+}
+/* The match count is a label, not a control. */
+.sw-mini-search > div:first-child > span:nth-child(2) {
+  border-color: transparent;
+  font-variant-numeric: tabular-nums;
+}
+.sw-mini-ribbon section {
+  padding: 0.5rem;
+  border-right: 1px solid var(--sw-border);
+}
+.sw-mini-menu {
+  width: max-content;
+  min-width: 12rem;
+  padding: 0.35rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.35rem;
+  background: var(--sw-surface-2);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--sw-fg-strong) 12%, transparent);
+  font-size: 0.82rem;
+}
+/* Under a result sheet the menu opens from the clicked cell, past the row numbers. */
+.sw-grid-result > .sw-mini-menu {
+  margin-left: 3rem;
+}
+.sw-mini-menu > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 2rem;
+  padding: 0.25rem 0.5rem;
+}
+.sw-mini-menu kbd {
+  color: var(--sw-fg-muted);
+  font: 500 0.75rem / 1.4 var(--sw-font-mono);
+}
+.sw-mini-menu hr {
+  margin: 0.3rem;
+  border: 0;
+  border-top: 1px solid var(--sw-border);
+}
+.sw-mini-status {
+  justify-content: flex-end;
+  padding: 0.4rem 0.65rem;
+  background: var(--sw-surface-2);
+  border-top: 1px solid var(--sw-border);
+}
+/* The sheet name sits at the left, like the shell's sheet tab. */
+.sw-mini-status > span:first-child {
+  margin-right: auto;
+  color: var(--sw-fg-strong);
+  font-weight: 600;
+}
+/* Under a result sheet the status bar closes the frame, as in the shell. */
+.sw-prose .sw-grid-result > .sw-mini-status {
+  margin-top: -1px;
+  border: 1px solid var(--sw-border);
+  border-radius: 0 0 0.5rem 0.5rem;
+}
+.sw-mini-ribbon-tabs {
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid var(--sw-border);
+}
+.sw-mini-ribbon-tabs > span {
+  padding: 0.25rem 0.65rem;
+}
+.sw-mini-ribbon-tabs [data-active="true"] {
+  border-bottom: 2px solid var(--sw-accent);
+  color: var(--sw-accent-strong);
+}
+.sw-mini-ribbon-groups section > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.sw-mini-ribbon-groups small {
+  display: block;
+  margin-top: 0.6rem;
+  color: var(--sw-fg-muted);
+  text-align: center;
+}
+.sw-chrome-result [aria-disabled="true"] {
+  color: var(--sw-fg-dim);
+  opacity: 0.65;
+}
+.sw-mini-search mark {
+  color: var(--sw-fg-strong);
+  background: var(--sw-accent-soft);
+}
+/* A search match tints the whole cell, as the grid paints it, not just the
+   text. */
+.sw-prose .sw-grid-result__sheet td:has(> mark) {
+  background: var(--sw-accent-soft);
+}
+.sw-prose .sw-grid-result__sheet mark {
+  color: inherit;
+  background: none;
+}

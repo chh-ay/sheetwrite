@@ -1,6 +1,6 @@
 ---
 title: "DelimitedTextOptionsError | @sheetwrite/core"
-description: "Stable invalid-option failure for a delimited-text resource ceiling."
+description: "DelimitedTextOptionsError class in @sheetwrite/core: Stable invalid-option failure for a delimited-text resource ceiling."
 ---
 <!-- api-export:@sheetwrite/core|.|DelimitedTextOptionsError -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="class">class</span></div>
@@ -8,7 +8,7 @@ description: "Stable invalid-option failure for a delimited-text resource ceilin
 Stable invalid-option failure for a delimited-text resource ceiling.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/delimited-text.ts#L71"><code>packages/core/src/delimited-text.ts#L71</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/delimited-text.ts#L73"><code>packages/core/src/delimited-text.ts#L73</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>
@@ -75,6 +75,7 @@ class DelimitedTextOptionsError extends SheetwriteError {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

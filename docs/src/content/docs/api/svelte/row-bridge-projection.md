@@ -1,6 +1,6 @@
 ---
 title: "RowBridgeProjection | @sheetwrite/svelte"
-description: "Result of projection or reconciliation."
+description: "RowBridgeProjection interface in @sheetwrite/svelte: Result of projection or reconciliation."
 ---
 <!-- api-export:@sheetwrite/svelte|.|RowBridgeProjection -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="interface">interface</span></div>

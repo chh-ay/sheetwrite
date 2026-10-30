@@ -1,6 +1,6 @@
 ---
 title: "SyncInitInput | @sheetwrite/formulas"
-description: "Sources accepted by synchronous initialization: raw module bytes or a precompiled WebAssembly.Module."
+description: "SyncInitInput type in @sheetwrite/formulas: Sources accepted by synchronous initialization: raw module bytes or a precompiled WebAssembly.Module."
 ---
 <!-- api-export:@sheetwrite/formulas|.|SyncInitInput -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/formulas/">@sheetwrite/formulas</a><span class="api-status" data-kind="type">type</span></div>
@@ -8,7 +8,7 @@ description: "Sources accepted by synchronous initialization: raw module bytes o
 Sources accepted by synchronous initialization: raw module bytes or a precompiled `WebAssembly.Module`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/pkg/sheetwrite_wasm.d.ts#L649"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L649</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/pkg/sheetwrite_wasm.d.ts#L680"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L680</code></a></dd></div>
 </dl>
 
 ## Declaration

@@ -1,6 +1,6 @@
 ---
 title: "createSpreadsheetShell | @sheetwrite/core/shell"
-description: "Mount a complete spreadsheet shell into host: toolbar row, formula row (name box + formula bar), the grid, and a bottom row with sheet tabs and a selection status."
+description: "createSpreadsheetShell function in @sheetwrite/core/shell: Mount a complete spreadsheet shell into host: toolbar row, formula row (name box + formula bar)…"
 ---
 <!-- api-export:@sheetwrite/core|./shell|createSpreadsheetShell -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-shell/">@sheetwrite/core/shell</a><span class="api-status" data-kind="function">function</span></div>
@@ -12,7 +12,7 @@ the shell handle; `destroy` tears down every piece, the grid, and the shell
 DOM, and is safe to call twice.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/spreadsheet-shell.ts#L58"><code>packages/core/src/shell/spreadsheet-shell.ts#L58</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/spreadsheet-shell.ts#L104"><code>packages/core/src/shell/spreadsheet-shell.ts#L104</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -35,6 +35,7 @@ function createSpreadsheetShell(
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

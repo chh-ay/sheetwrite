@@ -1,6 +1,6 @@
 ---
 title: "parseCellInput | @sheetwrite/core"
-description: "Coerce raw text input into a CellValue, following spreadsheet input-bar conventions: - blank (after trimming) clears the cell to a null literal; - text longer than one character beginning with = becomes a formula; -…"
+description: "parseCellInput function in @sheetwrite/core: Coerce raw text input into a CellValue, following spreadsheet input-bar conventions: - blank (after trimming)…"
 ---
 <!-- api-export:@sheetwrite/core|.|parseCellInput -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
@@ -21,7 +21,7 @@ Shared by the grid's inline editor and any host-built formula bar, so input
 parsing is identical everywhere instead of re-derived per consumer.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/cell-input.ts#L28"><code>packages/core/src/cell-input.ts#L28</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/cell-input.ts#L40"><code>packages/core/src/cell-input.ts#L40</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -41,6 +41,7 @@ function parseCellInput(raw: string, type: CellFormat): CellValue
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

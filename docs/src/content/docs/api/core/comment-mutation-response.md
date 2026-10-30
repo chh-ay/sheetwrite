@@ -1,6 +1,6 @@
 ---
 title: "CommentMutationResponse | @sheetwrite/core"
-description: "Applied, duplicate, or conflict acknowledgement for a comment mutation."
+description: "CommentMutationResponse type in @sheetwrite/core: Applied, duplicate, or conflict acknowledgement for a comment mutation."
 ---
 <!-- api-export:@sheetwrite/core|.|CommentMutationResponse -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
@@ -79,6 +79,7 @@ export type CommentMutationResponse =
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

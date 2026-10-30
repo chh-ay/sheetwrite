@@ -1,6 +1,6 @@
 ---
 title: "IndexedDbPendingCommitStorageError | @sheetwrite/core/browser"
-description: "Typed IndexedDB failure raised by durable pending-commit storage."
+description: "IndexedDbPendingCommitStorageError class in @sheetwrite/core/browser: Typed IndexedDB failure raised by durable pending-commit storage."
 ---
 <!-- api-export:@sheetwrite/core|./browser|IndexedDbPendingCommitStorageError -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-browser/">@sheetwrite/core/browser</a><span class="api-status" data-kind="class">class</span></div>
@@ -59,6 +59,7 @@ class IndexedDbPendingCommitStorageError extends SheetwriteError {
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
