@@ -292,7 +292,14 @@ describe("native XLSX charts", () => {
     const anchor = drawing.match(/<xdr:oneCellAnchor\b[^>]*>[\s\S]*?<\/xdr:oneCellAnchor>/)?.[0];
     if (!anchor) throw new Error("authored drawing has no one-cell anchor");
     const repeats = 1_500;
-    const unlinked = anchor.replace(/<c:chart\b[^>]*\/>/, "");
+    // Full-sheet two-cell spans without a frame size would make anchor sizing walk every column.
+    const unlinked = anchor
+      .replace(/<c:chart\b[^>]*\/>/, "")
+      .replaceAll("oneCellAnchor", "twoCellAnchor")
+      .replace(
+        /<xdr:ext\b[^>]*\/>/,
+        "<xdr:to><xdr:col>16383</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>1048575</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>",
+      );
     parts[drawingPart] = strToU8(
       drawing.replace(
         "</xdr:wsDr>",
