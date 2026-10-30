@@ -1,270 +1,270 @@
 {
-  "candidateEngineDigest": "ff95e4a970d1aa230b18479480dbad3150b195fb49e945ed38004046af9c8361",
+  "candidateEngineDigest": "836993d7153bda43a60e3a0011aa2bb5ceb61c6d6157d9a8a04da32f4b427b5a",
   "rows": [
     {
       "key": "workload=countif-100k;size=100000.allocation.retainedBytes",
       "maximum": 2602705,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=criteria-multi-range-edit;size=100000.allocation.retainedBytes",
       "maximum": 5203382,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=criteria-range-edit;size=100000.allocation.retainedBytes",
       "maximum": 3902789,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=cross-sheet-range-edit;size=1000.allocation.retainedBytes",
       "maximum": 616681,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=cycles;size=1000.allocation.retainedBytes",
       "maximum": 699090,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=diamond-edit;size=32.allocation.retainedBytes",
       "maximum": 37298,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=distinct-range-edit;size=1000.allocation.retainedBytes",
       "maximum": 837201,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=error-propagation;size=1000.allocation.retainedBytes",
       "maximum": 283215,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=formula-constant-edit;size=100000.allocation.retainedBytes",
       "maximum": 55938753,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=incremental-dependency-closure-edit;size=100000.allocation.retainedBytes",
       "maximum": 72063489,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=independent-first-recompute;size=1000.allocation.retainedBytes",
       "maximum": 445317,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=independent-first-recompute;size=10000.allocation.retainedBytes",
       "maximum": 4009686,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=independent-first-recompute;size=100000.allocation.retainedBytes",
       "maximum": 36682631,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=independent-parse-load;size=1000.allocation.retainedBytes",
       "maximum": 352557,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=independent-parse-load;size=10000.allocation.retainedBytes",
       "maximum": 3171326,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=independent-parse-load;size=100000.allocation.retainedBytes",
       "maximum": 29015471,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=iterative-finance;size=1000.allocation.retainedBytes",
       "maximum": 872296,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=let-repeat;size=100000.allocation.retainedBytes",
       "maximum": 5203302,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=let-reuse-edit;size=100000.allocation.retainedBytes",
       "maximum": 2603095,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=linear-chain;size=16.allocation.retainedBytes",
       "maximum": 8637,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=linear-chain;size=32.allocation.retainedBytes",
       "maximum": 15681,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=linear-chain;size=64.allocation.retainedBytes",
       "maximum": 29769,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=linear-chain;size=8.allocation.retainedBytes",
       "maximum": 4263,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=lookup-range-edit;size=100000.allocation.retainedBytes",
       "maximum": 5202947,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=percentile-covariance;size=100000.allocation.retainedBytes",
       "maximum": 3903070,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=removed-sheet-ref;size=1000.allocation.retainedBytes",
       "maximum": 196778,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=scalar-edit-affects-0;size=1000.allocation.retainedBytes",
       "maximum": 396008,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=scalar-edit-affects-100000;size=100000.allocation.retainedBytes",
       "maximum": 32088397,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=scalar-edit-affects-1000;size=1000.allocation.retainedBytes",
       "maximum": 396008,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=scalar-edit-affects-1;size=1.allocation.retainedBytes",
       "maximum": 2431,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=shared-range-edit;size=1000.allocation.retainedBytes",
       "maximum": 503195,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=spill-filter-resize;size=100000.allocation.retainedBytes",
       "maximum": 5852516,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=spill-sequence-admission;size=100000.allocation.retainedBytes",
       "maximum": 3252071,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=sum-multi-range;size=100000.allocation.retainedBytes",
       "maximum": 3902742,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=sumifs-3-criteria;size=100000.allocation.retainedBytes",
       "maximum": 6503193,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=sumproduct-matrix-edit;size=100000.allocation.retainedBytes",
       "maximum": 2732774,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=sumproduct-vector-edit;size=100000.allocation.retainedBytes",
       "maximum": 3902776,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=text-lookup-many-edit;size=1000.allocation.retainedBytes",
       "maximum": 1682814,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=text-lookup-many-sorted-edit;size=1000.allocation.retainedBytes",
       "maximum": 1667526,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=text-lookup-many-sorted;size=1000.allocation.retainedBytes",
       "maximum": 1667499,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=text-lookup-many;size=1000.allocation.retainedBytes",
       "maximum": 1682787,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=topology-remove-add;size=10000.allocation.retainedBytes",
       "maximum": 4009686,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=unicode-text-date-edit;size=1000.allocation.retainedBytes",
       "maximum": 1191250,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=vlookup-many-edit;size=1000.allocation.retainedBytes",
       "maximum": 1072558,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=vlookup-many-sorted-edit;size=1000.allocation.retainedBytes",
       "maximum": 1071558,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=vlookup-many-sorted;size=1000.allocation.retainedBytes",
       "maximum": 1071531,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=vlookup-many;size=1000.allocation.retainedBytes",
       "maximum": 1072531,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=wide-fan-out-edit;size=1000.allocation.retainedBytes",
       "maximum": 396008,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=wide-fan-out-edit;size=100000.allocation.retainedBytes",
       "maximum": 32088397,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=xlookup-many-edit;size=1000.allocation.retainedBytes",
       "maximum": 1086846,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=xlookup-many-sorted-edit;size=1000.allocation.retainedBytes",
       "maximum": 1332846,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=xlookup-many-sorted;size=1000.allocation.retainedBytes",
       "maximum": 1332819,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     },
     {
       "key": "workload=xlookup-many;size=1000.allocation.retainedBytes",
       "maximum": 1086819,
-      "reason": "One pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
     }
   ]
 }
