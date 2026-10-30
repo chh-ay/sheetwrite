@@ -1,0 +1,44 @@
+{
+  "protocol": "sheetwrite-capture-scope-v1",
+  "label": "data",
+  "metadata": {
+    "commit": "ac4ab632d80abf8d0c2986685c04ebce7747e5fa",
+    "dirty": false,
+    "engineCommit": "ac4ab632d80abf8d0c2986685c04ebce7747e5fa",
+    "harnessCommit": "ac4ab632d80abf8d0c2986685c04ebce7747e5fa",
+    "harnessPatchSha256": "350a7073f76f6dca899e1b31aacb6550dc852360914cc4afabadcd6adff6d8b7",
+    "purpose": "capture",
+    "timestamp": "2026-10-28T17:28:29.861Z",
+    "machine": "hypr-zephyrus",
+    "cpu": "12th Gen Intel(R) Core(TM) i9-12900H",
+    "bun": "1.4.4",
+    "node": "v26.12.1",
+    "npm": "11.19.1",
+    "bunNodeCompat": "v26.3.0",
+    "kernel": "7.3.0-4-cachyos",
+    "cpuSlot": 4,
+    "memoryMax": "8G",
+    "effectiveMemoryMaxBytes": 8589934592,
+    "memoryMaxProof": "MemoryMax=8589934592",
+    "scope": "run-p69273-i107812.scope",
+    "slice": "/user.slice/user-1000.slice/user@1000.service/sheetwrite.slice/sheetwrite-heavy.slice",
+    "sliceHighBefore": 201,
+    "command": [
+      "bun",
+      "run",
+      "bench:data"
+    ]
+  },
+  "status": "passed",
+  "endedAt": "2026-10-28T17:40:26.872Z",
+  "exitCode": 0,
+  "sliceHighAfter": 201,
+  "memoryPeakBytes": 4966277120,
+  "artifacts": [
+    {
+      "file": "data-results.json",
+      "sha256": "00598342a231889e3bb5028fdd52beaf877f63951ee4dd9653ea065ab8b8cd1c",
+      "modifiedAtMs": 1793209226609
+    }
+  ]
+}

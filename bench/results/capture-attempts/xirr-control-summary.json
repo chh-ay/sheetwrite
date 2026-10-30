@@ -1,0 +1,80 @@
+{
+  "diagnosticOnly": true,
+  "method": "10 fresh-process ABBA blocks per context, one fixture warmup then five fresh timed samples per process; process medians summarized independently. Paired log-ratio bootstrap across blocks: 20,000 resamples, 99% interval. Not a release gate.",
+  "summary": [
+    {
+      "context": "isolated",
+      "baseline": {
+        "processes": 20,
+        "samples": 100,
+        "medianOfProcessMedians": 1.4422555000000017,
+        "medianOfProcessP95s": 1.5497172000000035,
+        "pooledMedian": 1.4314925000000045,
+        "pooledP95": 3.2836572500000125,
+        "wasmSha256": [
+          "1c13192ae2661591d1c3eb8c05dbec83b84867ae83af40deae72ae5c54bb8b63"
+        ]
+      },
+      "candidate": {
+        "processes": 20,
+        "samples": 100,
+        "medianOfProcessMedians": 1.0318405000000013,
+        "medianOfProcessP95s": 1.108636399999996,
+        "pooledMedian": 1.0381844999999998,
+        "pooledP95": 1.6348459000000033,
+        "wasmSha256": [
+          "37093c76ab59a9d45343108d5a17e8cd6a412ccf0d4745151e033c01f6a0f38a"
+        ]
+      },
+      "medianRatio": 0.7154353025521484,
+      "p95Ratio": 0.7153798125232097,
+      "pairedGeometricRatio": 0.7269198825358207,
+      "pairedRatio99Interval": [
+        0.7105289250911472,
+        0.7514333388735808
+      ]
+    },
+    {
+      "context": "after-linest",
+      "baseline": {
+        "processes": 20,
+        "samples": 100,
+        "medianOfProcessMedians": 2.560729500000008,
+        "medianOfProcessP95s": 2.605473299999997,
+        "pooledMedian": 2.5644775000000095,
+        "pooledP95": 2.6723037999999972,
+        "wasmSha256": [
+          "1c13192ae2661591d1c3eb8c05dbec83b84867ae83af40deae72ae5c54bb8b63"
+        ]
+      },
+      "candidate": {
+        "processes": 20,
+        "samples": 100,
+        "medianOfProcessMedians": 3.683173999999994,
+        "medianOfProcessP95s": 3.7539047999999893,
+        "pooledMedian": 3.6756660000000068,
+        "pooledP95": 3.800063199999994,
+        "wasmSha256": [
+          "37093c76ab59a9d45343108d5a17e8cd6a412ccf0d4745151e033c01f6a0f38a"
+        ]
+      },
+      "medianRatio": 1.4383299758916288,
+      "p95Ratio": 1.4407765376064277,
+      "pairedGeometricRatio": 1.4340838044109083,
+      "pairedRatio99Interval": [
+        1.409622411736947,
+        1.4575550663244468
+      ]
+    }
+  ],
+  "scope": {
+    "status": "passed",
+    "cap": "MemoryMax=8589934592",
+    "high": [
+      0,
+      0
+    ],
+    "peak": 87150592,
+    "affinity": "4,6"
+  }
+}

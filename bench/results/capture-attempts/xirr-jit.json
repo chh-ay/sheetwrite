@@ -1,0 +1,4038 @@
+{
+  "diagnosticOnly": true,
+  "workerSha256": "b99aed8d08a02cc87287524bce421eddcf601d4d30dda3374063beccabb1c6c9",
+  "rows": [
+    {
+      "mode": "default",
+      "block": 0,
+      "side": "baseline",
+      "context": "after-linest",
+      "wasmSha256": "1c13192ae2661591d1c3eb8c05dbec83b84867ae83af40deae72ae5c54bb8b63",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          2.540196000000009,
+          2.5277220000000113,
+          2.5877789999999834,
+          2.5196439999999996,
+          2.534235999999993
+        ],
+        "stat": {
+          "median": 2.534235999999993,
+          "p95": 2.5782623999999883,
+          "mean": 2.5419153999999993,
+          "stddev": 0.02392850679502695,
+          "min": 2.5196439999999996,
+          "max": 2.5877789999999834,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 595952,
+            "p95": 595952,
+            "mean": 595952,
+            "stddev": 0,
+            "min": 595952,
+            "max": 595952,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "default",
+      "block": 0,
+      "side": "candidate",
+      "context": "after-linest",
+      "wasmSha256": "37093c76ab59a9d45343108d5a17e8cd6a412ccf0d4745151e033c01f6a0f38a",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          3.628534000000002,
+          3.6059759999999983,
+          3.630720999999994,
+          3.75414600000002,
+          3.672336999999999
+        ],
+        "stat": {
+          "median": 3.630720999999994,
+          "p95": 3.7377842000000157,
+          "mean": 3.6583428000000024,
+          "stddev": 0.05247456698021277,
+          "min": 3.6059759999999983,
+          "max": 3.75414600000002,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 568448,
+            "p95": 568448,
+            "mean": 568448,
+            "stddev": 0,
+            "min": 568448,
+            "max": 568448,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "default",
+      "block": 0,
+      "side": "candidate",
+      "context": "after-linest",
+      "wasmSha256": "37093c76ab59a9d45343108d5a17e8cd6a412ccf0d4745151e033c01f6a0f38a",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          3.5927210000000116,
+          3.61888399999998,
+          3.685590000000019,
+          3.7431390000000135,
+          3.5880789999999934
+        ],
+        "stat": {
+          "median": 3.61888399999998,
+          "p95": 3.7316292000000146,
+          "mean": 3.6456826000000033,
+          "stddev": 0.059885926969872924,
+          "min": 3.5880789999999934,
+          "max": 3.7431390000000135,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 568448,
+            "p95": 568448,
+            "mean": 568448,
+            "stddev": 0,
+            "min": 568448,
+            "max": 568448,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "default",
+      "block": 0,
+      "side": "baseline",
+      "context": "after-linest",
+      "wasmSha256": "1c13192ae2661591d1c3eb8c05dbec83b84867ae83af40deae72ae5c54bb8b63",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          2.483210999999983,
+          2.4079729999999984,
+          2.4923610000000167,
+          2.4381159999999795,
+          2.399298999999985
+        ],
+        "stat": {
+          "median": 2.4381159999999795,
+          "p95": 2.49053100000001,
+          "mean": 2.4441919999999926,
+          "stddev": 0.03796537925005358,
+          "min": 2.399298999999985,
+          "max": 2.4923610000000167,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 595952,
+            "p95": 595952,
+            "mean": 595952,
+            "stddev": 0,
+            "min": 595952,
+            "max": 595952,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "default",
+      "block": 1,
+      "side": "baseline",
+      "context": "after-linest",
+      "wasmSha256": "1c13192ae2661591d1c3eb8c05dbec83b84867ae83af40deae72ae5c54bb8b63",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          2.4492549999999937,
+          2.4387199999999893,
+          2.497212999999988,
+          2.4945109999999886,
+          2.452623000000017
+        ],
+        "stat": {
+          "median": 2.452623000000017,
+          "p95": 2.496672599999988,
+          "mean": 2.466464399999995,
+          "stddev": 0.024452352472508473,
+          "min": 2.4387199999999893,
+          "max": 2.497212999999988,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 595952,
+            "p95": 595952,
+            "mean": 595952,
+            "stddev": 0,
+            "min": 595952,
+            "max": 595952,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "default",
+      "block": 1,
+      "side": "candidate",
+      "context": "after-linest",
+      "wasmSha256": "37093c76ab59a9d45343108d5a17e8cd6a412ccf0d4745151e033c01f6a0f38a",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          3.5880909999999915,
+          3.653638000000001,
+          3.67034799999999,
+          3.6945300000000145,
+          3.694763000000023
+        ],
+        "stat": {
+          "median": 3.67034799999999,
+          "p95": 3.694716400000021,
+          "mean": 3.660274000000004,
+          "stddev": 0.03929089491982489,
+          "min": 3.5880909999999915,
+          "max": 3.694763000000023,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 568448,
+            "p95": 568448,
+            "mean": 568448,
+            "stddev": 0,
+            "min": 568448,
+            "max": 568448,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "default",
+      "block": 1,
+      "side": "candidate",
+      "context": "after-linest",
+      "wasmSha256": "37093c76ab59a9d45343108d5a17e8cd6a412ccf0d4745151e033c01f6a0f38a",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          3.636799999999994,
+          3.6295029999999997,
+          3.765800999999982,
+          3.6670269999999903,
+          3.673093999999992
+        ],
+        "stat": {
+          "median": 3.6670269999999903,
+          "p95": 3.747259599999984,
+          "mean": 3.6744449999999915,
+          "stddev": 0.0486614838450234,
+          "min": 3.6295029999999997,
+          "max": 3.765800999999982,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 568448,
+            "p95": 568448,
+            "mean": 568448,
+            "stddev": 0,
+            "min": 568448,
+            "max": 568448,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "default",
+      "block": 1,
+      "side": "baseline",
+      "context": "after-linest",
+      "wasmSha256": "1c13192ae2661591d1c3eb8c05dbec83b84867ae83af40deae72ae5c54bb8b63",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          2.4553809999999885,
+          2.5389240000000086,
+          2.4416510000000073,
+          2.4627399999999966,
+          2.526467999999994
+        ],
+        "stat": {
+          "median": 2.4627399999999966,
+          "p95": 2.536432800000006,
+          "mean": 2.485032799999999,
+          "stddev": 0.039697143430732246,
+          "min": 2.4416510000000073,
+          "max": 2.5389240000000086,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 595952,
+            "p95": 595952,
+            "mean": 595952,
+            "stddev": 0,
+            "min": 595952,
+            "max": 595952,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "default",
+      "block": 2,
+      "side": "baseline",
+      "context": "after-linest",
+      "wasmSha256": "1c13192ae2661591d1c3eb8c05dbec83b84867ae83af40deae72ae5c54bb8b63",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          2.518619000000001,
+          2.548261000000025,
+          2.717548000000022,
+          2.5522390000000144,
+          2.5631640000000004
+        ],
+        "stat": {
+          "median": 2.5522390000000144,
+          "p95": 2.686671200000018,
+          "mean": 2.5799662000000128,
+          "stddev": 0.07035419232825225,
+          "min": 2.518619000000001,
+          "max": 2.717548000000022,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 595952,
+            "p95": 595952,
+            "mean": 595952,
+            "stddev": 0,
+            "min": 595952,
+            "max": 595952,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "default",
+      "block": 2,
+      "side": "candidate",
+      "context": "after-linest",
+      "wasmSha256": "37093c76ab59a9d45343108d5a17e8cd6a412ccf0d4745151e033c01f6a0f38a",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          3.60351399999999,
+          4.1427209999999945,
+          3.695928000000009,
+          3.690681999999981,
+          3.680084999999991
+        ],
+        "stat": {
+          "median": 3.690681999999981,
+          "p95": 4.0533623999999975,
+          "mean": 3.762585999999993,
+          "stddev": 0.19299036690467325,
+          "min": 3.60351399999999,
+          "max": 4.1427209999999945,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 568448,
+            "p95": 568448,
+            "mean": 568448,
+            "stddev": 0,
+            "min": 568448,
+            "max": 568448,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "default",
+      "block": 2,
+      "side": "candidate",
+      "context": "after-linest",
+      "wasmSha256": "37093c76ab59a9d45343108d5a17e8cd6a412ccf0d4745151e033c01f6a0f38a",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          3.6451879999999903,
+          4.139218999999997,
+          3.649360999999999,
+          4.052899999999994,
+          3.554210000000012
+        ],
+        "stat": {
+          "median": 3.649360999999999,
+          "p95": 4.121955199999997,
+          "mean": 3.8081755999999984,
+          "stddev": 0.23906707240822295,
+          "min": 3.554210000000012,
+          "max": 4.139218999999997,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 568448,
+            "p95": 568448,
+            "mean": 568448,
+            "stddev": 0,
+            "min": 568448,
+            "max": 568448,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "default",
+      "block": 2,
+      "side": "baseline",
+      "context": "after-linest",
+      "wasmSha256": "1c13192ae2661591d1c3eb8c05dbec83b84867ae83af40deae72ae5c54bb8b63",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          2.563565000000011,
+          2.512007000000011,
+          2.4788420000000144,
+          2.4866670000000113,
+          2.4872550000000047
+        ],
+        "stat": {
+          "median": 2.4872550000000047,
+          "p95": 2.553253400000011,
+          "mean": 2.5056672000000106,
+          "stddev": 0.031022431796363305,
+          "min": 2.4788420000000144,
+          "max": 2.563565000000011,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 595952,
+            "p95": 595952,
+            "mean": 595952,
+            "stddev": 0,
+            "min": 595952,
+            "max": 595952,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "noOMG",
+      "block": 0,
+      "side": "baseline",
+      "context": "after-linest",
+      "wasmSha256": "1c13192ae2661591d1c3eb8c05dbec83b84867ae83af40deae72ae5c54bb8b63",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          1.7644510000000082,
+          1.76523499999999,
+          1.7087270000000103,
+          1.7149750000000097,
+          1.831292999999988
+        ],
+        "stat": {
+          "median": 1.7644510000000082,
+          "p95": 1.8180813999999885,
+          "mean": 1.7569362000000013,
+          "stddev": 0.04413421637867013,
+          "min": 1.7087270000000103,
+          "max": 1.831292999999988,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 595952,
+            "p95": 595952,
+            "mean": 595952,
+            "stddev": 0,
+            "min": 595952,
+            "max": 595952,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "noOMG",
+      "block": 0,
+      "side": "candidate",
+      "context": "after-linest",
+      "wasmSha256": "37093c76ab59a9d45343108d5a17e8cd6a412ccf0d4745151e033c01f6a0f38a",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          1.337140000000005,
+          1.1704280000000153,
+          1.1411990000000003,
+          1.1703339999999969,
+          1.180213000000009
+        ],
+        "stat": {
+          "median": 1.1704280000000153,
+          "p95": 1.305754600000006,
+          "mean": 1.1998628000000053,
+          "stddev": 0.06987266016232714,
+          "min": 1.1411990000000003,
+          "max": 1.337140000000005,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 568448,
+            "p95": 568448,
+            "mean": 568448,
+            "stddev": 0,
+            "min": 568448,
+            "max": 568448,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "noOMG",
+      "block": 0,
+      "side": "candidate",
+      "context": "after-linest",
+      "wasmSha256": "37093c76ab59a9d45343108d5a17e8cd6a412ccf0d4745151e033c01f6a0f38a",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          1.0451600000000099,
+          1.005785000000003,
+          1.0695410000000152,
+          0.9933200000000113,
+          1.067104999999998
+        ],
+        "stat": {
+          "median": 1.0451600000000099,
+          "p95": 1.0690538000000118,
+          "mean": 1.0361822000000074,
+          "stddev": 0.03133939357039287,
+          "min": 0.9933200000000113,
+          "max": 1.0695410000000152,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 568448,
+            "p95": 568448,
+            "mean": 568448,
+            "stddev": 0,
+            "min": 568448,
+            "max": 568448,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "noOMG",
+      "block": 0,
+      "side": "baseline",
+      "context": "after-linest",
+      "wasmSha256": "1c13192ae2661591d1c3eb8c05dbec83b84867ae83af40deae72ae5c54bb8b63",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          1.8000679999999818,
+          1.844284999999985,
+          1.7710459999999841,
+          1.8037439999999947,
+          1.7393459999999834
+        ],
+        "stat": {
+          "median": 1.8000679999999818,
+          "p95": 1.836176799999987,
+          "mean": 1.791697799999986,
+          "stddev": 0.03506506122281947,
+          "min": 1.7393459999999834,
+          "max": 1.844284999999985,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 595952,
+            "p95": 595952,
+            "mean": 595952,
+            "stddev": 0,
+            "min": 595952,
+            "max": 595952,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "noOMG",
+      "block": 1,
+      "side": "baseline",
+      "context": "after-linest",
+      "wasmSha256": "1c13192ae2661591d1c3eb8c05dbec83b84867ae83af40deae72ae5c54bb8b63",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          1.9612410000000011,
+          2.049959000000001,
+          1.972327000000007,
+          2.0230370000000164,
+          2.031790000000001
+        ],
+        "stat": {
+          "median": 2.0230370000000164,
+          "p95": 2.046325200000001,
+          "mean": 2.0076708000000054,
+          "stddev": 0.03467292400937667,
+          "min": 1.9612410000000011,
+          "max": 2.049959000000001,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 595952,
+            "p95": 595952,
+            "mean": 595952,
+            "stddev": 0,
+            "min": 595952,
+            "max": 595952,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "noOMG",
+      "block": 1,
+      "side": "candidate",
+      "context": "after-linest",
+      "wasmSha256": "37093c76ab59a9d45343108d5a17e8cd6a412ccf0d4745151e033c01f6a0f38a",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          1.19559000000001,
+          1.1410199999999975,
+          1.1093160000000069,
+          1.1446050000000128,
+          1.1888979999999947
+        ],
+        "stat": {
+          "median": 1.1446050000000128,
+          "p95": 1.194251600000007,
+          "mean": 1.1558858000000043,
+          "stddev": 0.032196967487015254,
+          "min": 1.1093160000000069,
+          "max": 1.19559000000001,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 568448,
+            "p95": 568448,
+            "mean": 568448,
+            "stddev": 0,
+            "min": 568448,
+            "max": 568448,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "noOMG",
+      "block": 1,
+      "side": "candidate",
+      "context": "after-linest",
+      "wasmSha256": "37093c76ab59a9d45343108d5a17e8cd6a412ccf0d4745151e033c01f6a0f38a",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          0.9986090000000019,
+          0.9886869999999988,
+          1.0075930000000142,
+          0.9853549999999984,
+          0.9979089999999928
+        ],
+        "stat": {
+          "median": 0.9979089999999928,
+          "p95": 1.0057962000000118,
+          "mean": 0.9956306000000013,
+          "stddev": 0.007886222456922793,
+          "min": 0.9853549999999984,
+          "max": 1.0075930000000142,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 568448,
+            "p95": 568448,
+            "mean": 568448,
+            "stddev": 0,
+            "min": 568448,
+            "max": 568448,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "noOMG",
+      "block": 1,
+      "side": "baseline",
+      "context": "after-linest",
+      "wasmSha256": "1c13192ae2661591d1c3eb8c05dbec83b84867ae83af40deae72ae5c54bb8b63",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          2.137196000000017,
+          2.061257000000012,
+          2.09706700000001,
+          2.0269969999999944,
+          2.0419139999999913
+        ],
+        "stat": {
+          "median": 2.061257000000012,
+          "p95": 2.129170200000016,
+          "mean": 2.072886200000005,
+          "stddev": 0.039801496471372676,
+          "min": 2.0269969999999944,
+          "max": 2.137196000000017,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 595952,
+            "p95": 595952,
+            "mean": 595952,
+            "stddev": 0,
+            "min": 595952,
+            "max": 595952,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "noOMG",
+      "block": 2,
+      "side": "baseline",
+      "context": "after-linest",
+      "wasmSha256": "1c13192ae2661591d1c3eb8c05dbec83b84867ae83af40deae72ae5c54bb8b63",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          1.687909999999988,
+          1.7720379999999807,
+          1.7306499999999971,
+          1.7446989999999971,
+          1.7458310000000097
+        ],
+        "stat": {
+          "median": 1.7446989999999971,
+          "p95": 1.7667965999999864,
+          "mean": 1.7362255999999945,
+          "stddev": 0.02761186241165178,
+          "min": 1.687909999999988,
+          "max": 1.7720379999999807,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 595952,
+            "p95": 595952,
+            "mean": 595952,
+            "stddev": 0,
+            "min": 595952,
+            "max": 595952,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "noOMG",
+      "block": 2,
+      "side": "candidate",
+      "context": "after-linest",
+      "wasmSha256": "37093c76ab59a9d45343108d5a17e8cd6a412ccf0d4745151e033c01f6a0f38a",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          1.1958310000000125,
+          1.0913260000000093,
+          1.101697999999999,
+          1.2150540000000092,
+          1.1315379999999777
+        ],
+        "stat": {
+          "median": 1.1315379999999777,
+          "p95": 1.2112094000000098,
+          "mean": 1.1470894000000016,
+          "stddev": 0.049813075470607544,
+          "min": 1.0913260000000093,
+          "max": 1.2150540000000092,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 568448,
+            "p95": 568448,
+            "mean": 568448,
+            "stddev": 0,
+            "min": 568448,
+            "max": 568448,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "noOMG",
+      "block": 2,
+      "side": "candidate",
+      "context": "after-linest",
+      "wasmSha256": "37093c76ab59a9d45343108d5a17e8cd6a412ccf0d4745151e033c01f6a0f38a",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          1.0534300000000059,
+          1.0655290000000122,
+          1.0292839999999899,
+          1.0368220000000008,
+          1.0022049999999751
+        ],
+        "stat": {
+          "median": 1.0368220000000008,
+          "p95": 1.0631092000000109,
+          "mean": 1.0374539999999968,
+          "stddev": 0.02169367892268523,
+          "min": 1.0022049999999751,
+          "max": 1.0655290000000122,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 568448,
+            "p95": 568448,
+            "mean": 568448,
+            "stddev": 0,
+            "min": 568448,
+            "max": 568448,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "noOMG",
+      "block": 2,
+      "side": "baseline",
+      "context": "after-linest",
+      "wasmSha256": "1c13192ae2661591d1c3eb8c05dbec83b84867ae83af40deae72ae5c54bb8b63",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          2.1008279999999786,
+          1.9560669999999902,
+          2.100108000000006,
+          2.042985999999985,
+          2.0547380000000146
+        ],
+        "stat": {
+          "median": 2.0547380000000146,
+          "p95": 2.1006839999999842,
+          "mean": 2.050945399999995,
+          "stddev": 0.05288644754793169,
+          "min": 1.9560669999999902,
+          "max": 2.1008279999999786,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 595952,
+            "p95": 595952,
+            "mean": 595952,
+            "stddev": 0,
+            "min": 595952,
+            "max": 595952,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "synchronousJIT",
+      "block": 0,
+      "side": "baseline",
+      "context": "after-linest",
+      "wasmSha256": "1c13192ae2661591d1c3eb8c05dbec83b84867ae83af40deae72ae5c54bb8b63",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          2.7794609999999693,
+          9.485707000000048,
+          0.9649450000000002,
+          0.896158000000014,
+          2.1636689999999703
+        ],
+        "stat": {
+          "median": 2.1636689999999703,
+          "p95": 8.14445780000003,
+          "mean": 3.257988,
+          "stddev": 3.195224350658358,
+          "min": 0.896158000000014,
+          "max": 9.485707000000048,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 595952,
+            "p95": 595952,
+            "mean": 595952,
+            "stddev": 0,
+            "min": 595952,
+            "max": 595952,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "synchronousJIT",
+      "block": 0,
+      "side": "candidate",
+      "context": "after-linest",
+      "wasmSha256": "37093c76ab59a9d45343108d5a17e8cd6a412ccf0d4745151e033c01f6a0f38a",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          6.077971000000048,
+          15.514489000000026,
+          1.746120000000019,
+          0.676635000000033,
+          2.001293999999916
+        ],
+        "stat": {
+          "median": 2.001293999999916,
+          "p95": 13.627185400000029,
+          "mean": 5.203301800000008,
+          "stddev": 5.47323122023193,
+          "min": 0.676635000000033,
+          "max": 15.514489000000026,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 568448,
+            "p95": 568448,
+            "mean": 568448,
+            "stddev": 0,
+            "min": 568448,
+            "max": 568448,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "synchronousJIT",
+      "block": 0,
+      "side": "candidate",
+      "context": "after-linest",
+      "wasmSha256": "37093c76ab59a9d45343108d5a17e8cd6a412ccf0d4745151e033c01f6a0f38a",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          5.836320000000001,
+          15.88293299999998,
+          1.487480000000005,
+          0.5254250000000411,
+          2.1242879999999786
+        ],
+        "stat": {
+          "median": 2.1242879999999786,
+          "p95": 13.873610399999983,
+          "mean": 5.171289200000001,
+          "stddev": 5.650138043670687,
+          "min": 0.5254250000000411,
+          "max": 15.88293299999998,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 568448,
+            "p95": 568448,
+            "mean": 568448,
+            "stddev": 0,
+            "min": 568448,
+            "max": 568448,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "synchronousJIT",
+      "block": 0,
+      "side": "baseline",
+      "context": "after-linest",
+      "wasmSha256": "1c13192ae2661591d1c3eb8c05dbec83b84867ae83af40deae72ae5c54bb8b63",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          2.803643999999963,
+          9.828390000000013,
+          0.8743240000000014,
+          0.8620859999999766,
+          2.416848000000016
+        ],
+        "stat": {
+          "median": 2.416848000000016,
+          "p95": 8.423440800000002,
+          "mean": 3.357058399999994,
+          "stddev": 3.33038295543499,
+          "min": 0.8620859999999766,
+          "max": 9.828390000000013,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 595952,
+            "p95": 595952,
+            "mean": 595952,
+            "stddev": 0,
+            "min": 595952,
+            "max": 595952,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "synchronousJIT",
+      "block": 1,
+      "side": "baseline",
+      "context": "after-linest",
+      "wasmSha256": "1c13192ae2661591d1c3eb8c05dbec83b84867ae83af40deae72ae5c54bb8b63",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          2.6391740000000254,
+          10.470811999999967,
+          0.9730629999999678,
+          0.8168870000000084,
+          2.1641710000000103
+        ],
+        "stat": {
+          "median": 2.1641710000000103,
+          "p95": 8.904484399999976,
+          "mean": 3.412821399999996,
+          "stddev": 3.596225407009654,
+          "min": 0.8168870000000084,
+          "max": 10.470811999999967,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 595952,
+            "p95": 595952,
+            "mean": 595952,
+            "stddev": 0,
+            "min": 595952,
+            "max": 595952,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "synchronousJIT",
+      "block": 1,
+      "side": "candidate",
+      "context": "after-linest",
+      "wasmSha256": "37093c76ab59a9d45343108d5a17e8cd6a412ccf0d4745151e033c01f6a0f38a",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          5.566006000000016,
+          18.114206999999965,
+          2.44051300000001,
+          0.5848320000000058,
+          1.9608269999999948
+        ],
+        "stat": {
+          "median": 2.44051300000001,
+          "p95": 15.604566799999972,
+          "mean": 5.733276999999998,
+          "stddev": 6.401493059163012,
+          "min": 0.5848320000000058,
+          "max": 18.114206999999965,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 568448,
+            "p95": 568448,
+            "mean": 568448,
+            "stddev": 0,
+            "min": 568448,
+            "max": 568448,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "synchronousJIT",
+      "block": 1,
+      "side": "candidate",
+      "context": "after-linest",
+      "wasmSha256": "37093c76ab59a9d45343108d5a17e8cd6a412ccf0d4745151e033c01f6a0f38a",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          5.275269999999978,
+          16.035464000000047,
+          1.5511319999999387,
+          0.5762899999999718,
+          1.803476000000046
+        ],
+        "stat": {
+          "median": 1.803476000000046,
+          "p95": 13.883425200000032,
+          "mean": 5.048326399999996,
+          "stddev": 5.718867517115825,
+          "min": 0.5762899999999718,
+          "max": 16.035464000000047,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 568448,
+            "p95": 568448,
+            "mean": 568448,
+            "stddev": 0,
+            "min": 568448,
+            "max": 568448,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "synchronousJIT",
+      "block": 1,
+      "side": "baseline",
+      "context": "after-linest",
+      "wasmSha256": "1c13192ae2661591d1c3eb8c05dbec83b84867ae83af40deae72ae5c54bb8b63",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          2.824491000000023,
+          10.060155000000009,
+          0.9046889999999621,
+          0.9520279999999843,
+          2.5816350000000057
+        ],
+        "stat": {
+          "median": 2.5816350000000057,
+          "p95": 8.61302220000001,
+          "mean": 3.464599599999997,
+          "stddev": 3.3928417252868,
+          "min": 0.9046889999999621,
+          "max": 10.060155000000009,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 595952,
+            "p95": 595952,
+            "mean": 595952,
+            "stddev": 0,
+            "min": 595952,
+            "max": 595952,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "synchronousJIT",
+      "block": 2,
+      "side": "baseline",
+      "context": "after-linest",
+      "wasmSha256": "1c13192ae2661591d1c3eb8c05dbec83b84867ae83af40deae72ae5c54bb8b63",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          2.6017889999999966,
+          10.115046000000007,
+          0.9406209999999646,
+          0.8054789999999912,
+          1.9742519999999786
+        ],
+        "stat": {
+          "median": 1.9742519999999786,
+          "p95": 8.612394600000004,
+          "mean": 3.2874373999999875,
+          "stddev": 3.4778865287018657,
+          "min": 0.8054789999999912,
+          "max": 10.115046000000007,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 595952,
+            "p95": 595952,
+            "mean": 595952,
+            "stddev": 0,
+            "min": 595952,
+            "max": 595952,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "synchronousJIT",
+      "block": 2,
+      "side": "candidate",
+      "context": "after-linest",
+      "wasmSha256": "37093c76ab59a9d45343108d5a17e8cd6a412ccf0d4745151e033c01f6a0f38a",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          6.066981000000055,
+          15.851432999999929,
+          1.569268999999963,
+          0.5367949999999837,
+          1.9688100000000759
+        ],
+        "stat": {
+          "median": 1.9688100000000759,
+          "p95": 13.894542599999951,
+          "mean": 5.1986576000000015,
+          "stddev": 5.6492999438894325,
+          "min": 0.5367949999999837,
+          "max": 15.851432999999929,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 568448,
+            "p95": 568448,
+            "mean": 568448,
+            "stddev": 0,
+            "min": 568448,
+            "max": 568448,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "synchronousJIT",
+      "block": 2,
+      "side": "candidate",
+      "context": "after-linest",
+      "wasmSha256": "37093c76ab59a9d45343108d5a17e8cd6a412ccf0d4745151e033c01f6a0f38a",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          5.436034999999947,
+          18.208537999999976,
+          1.676211999999964,
+          0.5634169999999585,
+          1.8755199999999377
+        ],
+        "stat": {
+          "median": 1.8755199999999377,
+          "p95": 15.654037399999968,
+          "mean": 5.5519443999999565,
+          "stddev": 6.536445519859333,
+          "min": 0.5634169999999585,
+          "max": 18.208537999999976,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 568448,
+            "p95": 568448,
+            "mean": 568448,
+            "stddev": 0,
+            "min": 568448,
+            "max": 568448,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "synchronousJIT",
+      "block": 2,
+      "side": "baseline",
+      "context": "after-linest",
+      "wasmSha256": "1c13192ae2661591d1c3eb8c05dbec83b84867ae83af40deae72ae5c54bb8b63",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          2.826139000000012,
+          9.444467000000031,
+          0.8685689999999795,
+          0.9887479999999869,
+          2.369013000000052
+        ],
+        "stat": {
+          "median": 2.369013000000052,
+          "p95": 8.120801400000026,
+          "mean": 3.2993872000000124,
+          "stddev": 3.1654224486859643,
+          "min": 0.8685689999999795,
+          "max": 9.444467000000031,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 595952,
+            "p95": 595952,
+            "mean": 595952,
+            "stddev": 0,
+            "min": 595952,
+            "max": 595952,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "noOMGInlining",
+      "block": 0,
+      "side": "baseline",
+      "context": "after-linest",
+      "wasmSha256": "1c13192ae2661591d1c3eb8c05dbec83b84867ae83af40deae72ae5c54bb8b63",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          2.4606780000000015,
+          2.4213189999999827,
+          2.4965779999999995,
+          2.3944780000000208,
+          2.4515399999999943
+        ],
+        "stat": {
+          "median": 2.4515399999999943,
+          "p95": 2.489398,
+          "mean": 2.4449186,
+          "stddev": 0.0348197946093846,
+          "min": 2.3944780000000208,
+          "max": 2.4965779999999995,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 595952,
+            "p95": 595952,
+            "mean": 595952,
+            "stddev": 0,
+            "min": 595952,
+            "max": 595952,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "noOMGInlining",
+      "block": 0,
+      "side": "candidate",
+      "context": "after-linest",
+      "wasmSha256": "37093c76ab59a9d45343108d5a17e8cd6a412ccf0d4745151e033c01f6a0f38a",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          3.612148999999988,
+          3.6520960000000002,
+          3.6684709999999825,
+          3.6543550000000096,
+          3.7733550000000093
+        ],
+        "stat": {
+          "median": 3.6543550000000096,
+          "p95": 3.752378200000004,
+          "mean": 3.672085199999998,
+          "stddev": 0.053990575127151774,
+          "min": 3.612148999999988,
+          "max": 3.7733550000000093,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 568448,
+            "p95": 568448,
+            "mean": 568448,
+            "stddev": 0,
+            "min": 568448,
+            "max": 568448,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "noOMGInlining",
+      "block": 0,
+      "side": "candidate",
+      "context": "after-linest",
+      "wasmSha256": "37093c76ab59a9d45343108d5a17e8cd6a412ccf0d4745151e033c01f6a0f38a",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          3.6270250000000033,
+          3.5781900000000064,
+          3.6738479999999925,
+          3.7536039999999957,
+          3.655024000000026
+        ],
+        "stat": {
+          "median": 3.655024000000026,
+          "p95": 3.737652799999995,
+          "mean": 3.6575382000000047,
+          "stddev": 0.05784144003186225,
+          "min": 3.5781900000000064,
+          "max": 3.7536039999999957,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 568448,
+            "p95": 568448,
+            "mean": 568448,
+            "stddev": 0,
+            "min": 568448,
+            "max": 568448,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "noOMGInlining",
+      "block": 0,
+      "side": "baseline",
+      "context": "after-linest",
+      "wasmSha256": "1c13192ae2661591d1c3eb8c05dbec83b84867ae83af40deae72ae5c54bb8b63",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          2.545004000000006,
+          2.517657999999983,
+          2.4693309999999826,
+          2.461562999999984,
+          2.4873159999999928
+        ],
+        "stat": {
+          "median": 2.4873159999999928,
+          "p95": 2.539534800000001,
+          "mean": 2.4961743999999895,
+          "stddev": 0.0311218999715699,
+          "min": 2.461562999999984,
+          "max": 2.545004000000006,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 595952,
+            "p95": 595952,
+            "mean": 595952,
+            "stddev": 0,
+            "min": 595952,
+            "max": 595952,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "noOMGInlining",
+      "block": 1,
+      "side": "baseline",
+      "context": "after-linest",
+      "wasmSha256": "1c13192ae2661591d1c3eb8c05dbec83b84867ae83af40deae72ae5c54bb8b63",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          2.533725000000004,
+          2.5291890000000024,
+          2.612987000000004,
+          2.5808859999999925,
+          2.551544000000007
+        ],
+        "stat": {
+          "median": 2.551544000000007,
+          "p95": 2.6065668000000017,
+          "mean": 2.561666200000002,
+          "stddev": 0.03143616813417182,
+          "min": 2.5291890000000024,
+          "max": 2.612987000000004,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 595952,
+            "p95": 595952,
+            "mean": 595952,
+            "stddev": 0,
+            "min": 595952,
+            "max": 595952,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "noOMGInlining",
+      "block": 1,
+      "side": "candidate",
+      "context": "after-linest",
+      "wasmSha256": "37093c76ab59a9d45343108d5a17e8cd6a412ccf0d4745151e033c01f6a0f38a",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          3.7880370000000028,
+          3.643931000000009,
+          3.666989000000001,
+          3.72107299999999,
+          3.6401070000000004
+        ],
+        "stat": {
+          "median": 3.666989000000001,
+          "p95": 3.7746442,
+          "mean": 3.6920274000000006,
+          "stddev": 0.05603106865873427,
+          "min": 3.6401070000000004,
+          "max": 3.7880370000000028,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 568448,
+            "p95": 568448,
+            "mean": 568448,
+            "stddev": 0,
+            "min": 568448,
+            "max": 568448,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "noOMGInlining",
+      "block": 1,
+      "side": "candidate",
+      "context": "after-linest",
+      "wasmSha256": "37093c76ab59a9d45343108d5a17e8cd6a412ccf0d4745151e033c01f6a0f38a",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          3.6063230000000033,
+          3.634629999999987,
+          3.662366999999989,
+          3.8981589999999926,
+          3.6647550000000138
+        ],
+        "stat": {
+          "median": 3.662366999999989,
+          "p95": 3.8514781999999967,
+          "mean": 3.693246799999997,
+          "stddev": 0.10463845437772655,
+          "min": 3.6063230000000033,
+          "max": 3.8981589999999926,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 568448,
+            "p95": 568448,
+            "mean": 568448,
+            "stddev": 0,
+            "min": 568448,
+            "max": 568448,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "noOMGInlining",
+      "block": 1,
+      "side": "baseline",
+      "context": "after-linest",
+      "wasmSha256": "1c13192ae2661591d1c3eb8c05dbec83b84867ae83af40deae72ae5c54bb8b63",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          2.4755269999999996,
+          2.490495999999979,
+          2.481816999999978,
+          2.421293999999989,
+          2.426862
+        ],
+        "stat": {
+          "median": 2.4755269999999996,
+          "p95": 2.488760199999979,
+          "mean": 2.459199199999989,
+          "stddev": 0.029120955721948855,
+          "min": 2.421293999999989,
+          "max": 2.490495999999979,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 595952,
+            "p95": 595952,
+            "mean": 595952,
+            "stddev": 0,
+            "min": 595952,
+            "max": 595952,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "noOMGInlining",
+      "block": 2,
+      "side": "baseline",
+      "context": "after-linest",
+      "wasmSha256": "1c13192ae2661591d1c3eb8c05dbec83b84867ae83af40deae72ae5c54bb8b63",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          2.5351670000000013,
+          2.508281000000011,
+          2.5156029999999987,
+          2.5120369999999923,
+          2.411044000000004
+        ],
+        "stat": {
+          "median": 2.5120369999999923,
+          "p95": 2.5312542000000007,
+          "mean": 2.4964264000000016,
+          "stddev": 0.043687418507390406,
+          "min": 2.411044000000004,
+          "max": 2.5351670000000013,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 595952,
+            "p95": 595952,
+            "mean": 595952,
+            "stddev": 0,
+            "min": 595952,
+            "max": 595952,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "noOMGInlining",
+      "block": 2,
+      "side": "candidate",
+      "context": "after-linest",
+      "wasmSha256": "37093c76ab59a9d45343108d5a17e8cd6a412ccf0d4745151e033c01f6a0f38a",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          3.6820869999999957,
+          3.6996169999999893,
+          3.730790999999982,
+          3.6683160000000044,
+          3.7146129999999857
+        ],
+        "stat": {
+          "median": 3.6996169999999893,
+          "p95": 3.727555399999983,
+          "mean": 3.6990847999999916,
+          "stddev": 0.022281542176421705,
+          "min": 3.6683160000000044,
+          "max": 3.730790999999982,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 568448,
+            "p95": 568448,
+            "mean": 568448,
+            "stddev": 0,
+            "min": 568448,
+            "max": 568448,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "noOMGInlining",
+      "block": 2,
+      "side": "candidate",
+      "context": "after-linest",
+      "wasmSha256": "37093c76ab59a9d45343108d5a17e8cd6a412ccf0d4745151e033c01f6a0f38a",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          3.668908000000016,
+          3.715789000000001,
+          3.6879710000000046,
+          3.6736760000000004,
+          3.735676000000012
+        ],
+        "stat": {
+          "median": 3.6879710000000046,
+          "p95": 3.73169860000001,
+          "mean": 3.696404000000007,
+          "stddev": 0.025541243892966598,
+          "min": 3.668908000000016,
+          "max": 3.735676000000012,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 568448,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 568448,
+            "p95": 568448,
+            "mean": 568448,
+            "stddev": 0,
+            "min": 568448,
+            "max": 568448,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    },
+    {
+      "mode": "noOMGInlining",
+      "block": 2,
+      "side": "baseline",
+      "context": "after-linest",
+      "wasmSha256": "1c13192ae2661591d1c3eb8c05dbec83b84867ae83af40deae72ae5c54bb8b63",
+      "result": {
+        "id": "xirr",
+        "size": 1000,
+        "samplesMs": [
+          2.675613999999996,
+          2.639373000000006,
+          2.647137000000015,
+          2.6533990000000074,
+          2.627061999999995
+        ],
+        "stat": {
+          "median": 2.647137000000015,
+          "p95": 2.6711709999999984,
+          "mean": 2.648517000000004,
+          "stddev": 0.016148780102533487,
+          "min": 2.627061999999995,
+          "max": 2.675613999999996,
+          "iters": 5
+        },
+        "allocationSamples": [
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          {
+            "retainedBytes": 595952,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        ],
+        "allocationStat": {
+          "retainedBytes": {
+            "median": 595952,
+            "p95": 595952,
+            "mean": 595952,
+            "stddev": 0,
+            "min": 595952,
+            "max": 595952,
+            "iters": 5
+          },
+          "peakTransientBytes": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          },
+          "transientAllocations": {
+            "median": 0,
+            "p95": 0,
+            "mean": 0,
+            "stddev": 0,
+            "min": 0,
+            "max": 0,
+            "iters": 5
+          }
+        },
+        "output": 99.99999999999858
+      }
+    }
+  ]
+}

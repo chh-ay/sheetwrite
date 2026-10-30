@@ -1,0 +1,66 @@
+{
+  "protocol": "sheetwrite-capture-scope-v1",
+  "label": "xirr-control",
+  "metadata": {
+    "commit": "6dfc8bb7e3e45023101cb1d01bb202330d7d82e7",
+    "dirty": false,
+    "engineCommit": "6dfc8bb7e3e45023101cb1d01bb202330d7d82e7",
+    "harnessCommit": "6dfc8bb7e3e45023101cb1d01bb202330d7d82e7",
+    "purpose": "rehearsal",
+    "timestamp": "2026-10-29T04:15:25.169Z",
+    "machine": "hypr-zephyrus",
+    "cpu": "12th Gen Intel(R) Core(TM) i9-12900H",
+    "bun": "1.4.4",
+    "node": "v26.12.1",
+    "npm": "11.19.1",
+    "bunNodeCompat": "v26.3.0",
+    "kernel": "7.3.0-4-cachyos",
+    "cpuSlot": 4,
+    "effectiveCpuAffinity": "4,6",
+    "affinityProof": "Cpus_allowed_list:\t4,6",
+    "cpuSlotMeaning": "reserved entry slot; effectiveCpuAffinity records the actual CPU mask",
+    "memoryMax": "8G",
+    "effectiveMemoryMaxBytes": 8589934592,
+    "memoryMaxProof": "MemoryMax=8589934592",
+    "scope": "run-p40727-i21468.scope",
+    "slice": "/user.slice/user-1000.slice/user@1000.service/sheetwrite.slice/sheetwrite-heavy.slice",
+    "sliceHighBefore": 0,
+    "command": [
+      "bun",
+      "/tmp/xirr-control.ts"
+    ],
+    "verifiedToolchain": {
+      "npm": "11.19.1",
+      "node": "v26.12.1",
+      "bun": "1.4.4",
+      "kernel": "7.3.0-4-cachyos"
+    },
+    "affinityProofSource": "/proc/self/status before starting the frozen capture runner; child inherits affinity",
+    "reservationMode": "slot 4, both slot locks held, exclusive quiet lock",
+    "selectedRootWasmSha256": {
+      "packages/wasm/pkg/sheetwrite_wasm_bg.wasm": "1da0830e9c1467f6921de9c6031491f8c1e12b1a78dbd16410f538b9cedb4bd7",
+      "packages/formulas/pkg/sheetwrite_wasm_bg.wasm": "37093c76ab59a9d45343108d5a17e8cd6a412ccf0d4745151e033c01f6a0f38a"
+    },
+    "affinityRecorderSha256": "ed97771b10b314ab67c9fbe3e6d55c552d1be542b3219966ff7faf48200339e6",
+    "formulaAffinityCorrection": {
+      "reason": "JSC background WASM compilation competes with the main thread on one pinned CPU",
+      "intentionalProtocolCorrection": true,
+      "priorAbsoluteGateFailures": [
+        "capture-attempts/formula-attempt-1.json",
+        "capture-attempts/formula-attempt-2.json"
+      ],
+      "evidence": [
+        "capture-attempts/formula-affinity-confirmation.json",
+        "capture-attempts/formula-affinity-environment-matrix.json"
+      ],
+      "gateLimitsChanged": false,
+      "engineOptimizationApplied": false
+    }
+  },
+  "status": "passed",
+  "endedAt": "2026-10-29T04:15:39.013Z",
+  "exitCode": 0,
+  "sliceHighAfter": 0,
+  "memoryPeakBytes": 87150592,
+  "artifacts": []
+}

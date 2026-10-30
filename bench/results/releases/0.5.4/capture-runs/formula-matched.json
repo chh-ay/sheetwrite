@@ -1,0 +1,76 @@
+{
+  "protocol": "sheetwrite-capture-scope-v1",
+  "label": "formula-matched",
+  "metadata": {
+    "commit": "ac4ab632d80abf8d0c2986685c04ebce7747e5fa",
+    "dirty": false,
+    "engineCommit": "dcfb2037cc340451cf68bc4369e419c9adb13b3f",
+    "harnessCommit": "ac4ab632d80abf8d0c2986685c04ebce7747e5fa",
+    "harnessPatchSha256": "350a7073f76f6dca899e1b31aacb6550dc852360914cc4afabadcd6adff6d8b7",
+    "purpose": "capture",
+    "timestamp": "2026-10-29T04:25:16.957Z",
+    "machine": "hypr-zephyrus",
+    "cpu": "12th Gen Intel(R) Core(TM) i9-12900H",
+    "bun": "1.4.4",
+    "node": "v26.12.1",
+    "npm": "11.19.1",
+    "bunNodeCompat": "v26.3.0",
+    "kernel": "7.3.0-4-cachyos",
+    "cpuSlot": 4,
+    "memoryMax": "8G",
+    "effectiveMemoryMaxBytes": 8589934592,
+    "memoryMaxProof": "MemoryMax=8589934592",
+    "scope": "run-p52224-i101736.scope",
+    "slice": "/user.slice/user-1000.slice/user@1000.service/sheetwrite.slice/sheetwrite-heavy.slice",
+    "sliceHighBefore": 0,
+    "command": [
+      "bun",
+      "run",
+      "src/matched-engine-bench.ts",
+      "--results-dir",
+      "bench/results/releases/0.5.4"
+    ],
+    "verifiedToolchain": {
+      "npm": "11.19.1",
+      "node": "v26.12.1",
+      "bun": "1.4.4",
+      "kernel": "7.3.0-4-cachyos"
+    },
+    "effectiveCpuAffinity": "0-19",
+    "affinityProof": "Cpus_allowed_list:\t0-19",
+    "affinityProofSource": "/proc/self/status before starting the frozen capture runner; child inherits affinity",
+    "cpuSlotMeaning": "reserved entry slot; effectiveCpuAffinity records the actual CPU mask",
+    "reservationMode": "slot 4, both slot locks held, exclusive quiet lock",
+    "selectedRootWasmSha256": {
+      "packages/wasm/pkg/sheetwrite_wasm_bg.wasm": "7036bd31efec294b5bf916986f3d7ccbb7468c96497c44be47c2fbf809cf569c",
+      "packages/formulas/pkg/sheetwrite_wasm_bg.wasm": "1c13192ae2661591d1c3eb8c05dbec83b84867ae83af40deae72ae5c54bb8b63"
+    },
+    "affinityRecorderSha256": "d214029727281afab877f2a92a45f378c2ac44fc9734abd97ac12ee3d4dc5a56",
+    "formulaAffinityCorrection": {
+      "reason": "Use the full available CPU mask on a quiet machine, matching the documented historical release protocol; narrower masks interfere with background WASM compilation.",
+      "intentionalProtocolCorrection": true,
+      "supersededMasks": [
+        "4",
+        "4,6"
+      ],
+      "evidence": [
+        "capture-attempts/xirr-affinity-exact.json",
+        "capture-attempts/xirr-control.json"
+      ],
+      "gateLimitsChanged": false,
+      "engineOptimizationApplied": false
+    }
+  },
+  "status": "passed",
+  "endedAt": "2026-10-29T04:26:34.388Z",
+  "exitCode": 0,
+  "sliceHighAfter": 0,
+  "memoryPeakBytes": 176214016,
+  "artifacts": [
+    {
+      "file": "full-engine-matched-results.json",
+      "sha256": "41bebf9c57ba01424485f302e3671cbfb4d873911d16e6178a404c0c76019e17",
+      "modifiedAtMs": 1793247994384
+    }
+  ]
+}

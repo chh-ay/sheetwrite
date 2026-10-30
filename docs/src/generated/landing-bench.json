@@ -1,57 +1,57 @@
 {
   "available": true,
   "capture": {
-    "commit": "49e05e298c3f39a8cede038fe8d0062343abc21f",
-    "timestamp": "2026-10-17T05:18:22.963Z",
+    "commit": "ac4ab632d80abf8d0c2986685c04ebce7747e5fa",
+    "timestamp": "2026-10-28T17:15:44.246Z",
     "browser": "Chromium 153.0.8010.12",
     "rounds": 10,
     "engineVersions": {
-      "sheetwrite": "0.4.0",
+      "sheetwrite": "0.5.4",
       "handsontable": "18.1.2"
     }
   },
   "heroStats": {
     "millionRowScenarios": 14,
     "millionRowMedianMs": 0.6,
-    "millionRowHeapMb": 81
+    "millionRowHeapMb": 91
   },
   "sizes": [
     {
       "size": 1000,
       "comparedScenarios": 14,
-      "medianRatio": 6.5,
-      "bestRatio": 1112.4,
+      "medianRatio": 7.9,
+      "bestRatio": 2019.5,
       "bestScenario": "merge-heavy.paint",
       "handsontableIncomplete": 0
     },
     {
       "size": 10000,
       "comparedScenarios": 14,
-      "medianRatio": 6.4,
-      "bestRatio": 1049.8,
+      "medianRatio": 7.8,
+      "bestRatio": 1931.9,
       "bestScenario": "merge-heavy.paint",
       "handsontableIncomplete": 0
     },
     {
       "size": 100000,
       "comparedScenarios": 14,
-      "medianRatio": 8.2,
-      "bestRatio": 931,
+      "medianRatio": 8.6,
+      "bestRatio": 1956.6,
       "bestScenario": "merge-heavy.paint",
       "handsontableIncomplete": 0
     },
     {
       "size": 1000000,
       "comparedScenarios": 14,
-      "medianRatio": 7.1,
-      "bestRatio": 949.8,
+      "medianRatio": 7.7,
+      "bestRatio": 1988,
       "bestScenario": "merge-heavy.paint",
       "handsontableIncomplete": 0
     }
   ],
   "downloads": {
     "coreFirstLoadBrotliBytes": 442021,
-    "defaultEngineBrotliBytes": 256150,
-    "fullEngineBrotliBytes": 344260
+    "defaultEngineBrotliBytes": 297703,
+    "fullEngineBrotliBytes": 419673
   }
 }
