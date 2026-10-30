@@ -87,7 +87,7 @@ workload discards 30 warmup iterations and reports the median of seven
 one named workload):
 
 ```sh
-/home/vvin/learn/bench-run --slot 4 timeout 1200 bun \
+taskset -c <idle-core> timeout 1200 bun \
   --preload ./test-setup.ts --preload ./test-setup-svelte.ts \
   bench/src/adapter-lifetime-bench.ts
 ```
@@ -182,6 +182,14 @@ sample stays inside a few percent. The artifact retains all samples and
 checksums, every sample's iteration count and total, median paired ratios, and
 the p10 to p90 ratio spread; the evidence page marks any row whose spread is
 too wide to support a ratio claim.
+Edit samples build the fixture once per process, including the warmups. After
+every checked edit, an untimed restore writes the original source and
+recalculates it. The timed edit therefore always starts from the same values;
+it never becomes a same-value write or a clean recomputation. Load and first-
+recompute samples still need fresh fixtures because their operation consumes
+the state being measured. A reused fixture times a warmer edit than a fresh
+one, so absolute matched means captured before this change are not comparable
+with later ones; the default/full ratios remain comparable.
 The single-sample runner is
 `bun run src/formula-bench.ts --sample ID SIZE [--aggregate-ms 50] [--warmup-fixtures 3]`.
 It supports the matched workload set. Use the same pinned-runner command as
@@ -196,65 +204,152 @@ removed-sheet `#REF!`, and error propagation. Gates are deliberately broad:
 100K parse/load and recompute p95 must stay below 5 seconds and 100K formulas
 below 256 MiB; timer-floor workloads are recorded but never ratio-gated.
 
-A full `bench:formula` capture compares every row with the committed
-`results/formula-results.json` and stops on the first exceedance. For a
-workload whose baseline median is at least 1 ms, the median and p95 may each
-reach `max(baseline × 1.25, baseline + 0.1 ms)`. A workload whose baseline
-median is under 1 ms gates its median only, at
-`max(baseline × 1.25, baseline + 0.3 ms)`. With five samples, p95 is the
-slowest single sample, and below 1 ms it is dominated by GC and timer noise
-(the 0.5.0 A/A study measured a 33–466% spread on those rows). Those medians
-also move with code they do not run: two points of that study with the same
-Rust engine differed by up to 0.29 ms. Retained bytes, peak transient bytes,
-transient allocation counts, and the isolated WASM deltas may not grow at all.
+A release capture, `bench:formula`, compares one fresh capture with the
+committed `results/formula-results.json` on a quiet, pinned machine. It keeps
+that absolute baseline for release evidence and writes the tracked file when
+it passes. Its timing limits are `max(baseline × 1.25, baseline + 0.1 ms)` for
+median and p95 rows at or above 1 ms, and `max(baseline × 1.25, baseline +
+0.3 ms)` for sub-millisecond medians. Bytes may not grow.
 
-A baseline must itself carry a passed gate, so a regression the maintainer has
-reviewed and accepted cannot be recorded by recapturing the baseline. It is
-recorded in `results/formula-baseline-approvals.json` instead:
+### Formula gate for changes on a shared machine
+
+Before an engine change merges, compare its built engine with a base build.
+Do not use the absolute release baseline for this: other work on a shared
+machine can make an unchanged commit 1.3-2.8x slower than its quiet capture.
+From the candidate checkout:
+
+```sh
+taskset -c <idle-core> bun bench/src/formula-gate.ts \
+  --base <base-checkout> --output <gate-report.json>
+```
+
+`taskset -c <idle-core>` pins the run to one idle core on Linux; use the
+equivalent on other systems, or drop it.
+
+The harness, its fixtures and their sampling always come from the checkout
+that runs the gate. `--base` and `--candidate` (default: this checkout) only
+supply built engine packages, `packages/wasm/pkg` and its loader, so any older
+base works without this benchmark code. Build both engines first. The gate
+therefore measures the engine only: changes to TypeScript callers in
+`packages/core` are invisible to it. If a fixture calls a `CellStore` export
+that an older base lacks, that row is reported as skipped on the base; any
+other error fails the capture, and a row the candidate cannot run fails the
+gate.
+
+Each capture is a fresh process that runs every full-matrix workload once as
+an aggregated sample: three checked warm-up fixtures, then timed runs until
+they add up to at least 50 ms, reported as the per-run mean. Edit workloads
+restore their fixture, untimed, between runs; load and first-recalculation
+workloads build a fresh fixture per run. The first and last runs are checked.
+Allocation comes from the first run, so byte counters do not depend on how many
+runs fit into 50 ms. Captures took 11 s each across four 7-pair gates (14
+captures, about 2.6 minutes per gate) on the shared laptop; one capture during
+heavier load took 60 s.
+
+The gate runs 7 pairs (`--pairs <n>` may add more, never fewer: the limits below
+were measured at 7) in AB, BA, AB order, so machine drift affects both sides.
+For each row it takes the median of the paired candidate/base ratios and
+fails when it exceeds the row's ratio limit. There is no absolute floor:
+aggregation makes microsecond rows measurable, so they are gated too. If any
+row fails, the gate captures as many pairs again and judges every row on all
+of them: a noisy window rarely repeats, a real slowdown does. A gate that
+confirms therefore takes twice as long.
+
+The limits come from 56 same-engine pairs from eight gates on a shared
+20-thread laptop, in quiet and loaded windows. Each row's pair ratios were
+resampled 20,000 times into seven-pair medians. The limit is
+`1 + 1.2 × (q99.9 − 1)`, at least 1.15, rounded up to 0.05. A true slowdown
+`r` can measure as low as `r × q0.1`, so a regression reliably fails only at
+`limit / q0.1`, the minimum detectable ratio below; smaller slowdowns may pass.
+The 1K and 10K load and first-recompute rows build a fresh store for every
+run, so they are the noisiest; the 100K rows are the reliable load signal.
+
+| Workload | Ratio limit | q99.9 | q0.1 | Minimum detectable ratio |
+| --- | ---: | ---: | ---: | ---: |
+| independent-parse-load/1000 | 1.55 | 1.429 | 0.740 | 2.10 |
+| independent-first-recompute/1000 | 1.70 | 1.552 | 0.710 | 2.40 |
+| independent-parse-load/10000 | 1.65 | 1.518 | 0.817 | 2.05 |
+| independent-first-recompute/10000 | 1.30 | 1.247 | 0.908 | 1.45 |
+| independent-parse-load/100000 | 1.20 | 1.166 | 0.945 | 1.30 |
+| independent-first-recompute/100000 | 1.25 | 1.169 | 0.873 | 1.45 |
+| linear-chain/8 | 1.45 | 1.358 | 0.711 | 2.05 |
+| linear-chain/16 | 1.30 | 1.218 | 0.884 | 1.50 |
+| linear-chain/32 | 1.30 | 1.225 | 0.909 | 1.45 |
+| linear-chain/64 | 1.20 | 1.147 | 0.892 | 1.35 |
+| wide-fan-out-edit/1000 | 1.25 | 1.191 | 0.905 | 1.40 |
+| wide-fan-out-edit/100000 | 1.20 | 1.156 | 0.923 | 1.30 |
+| diamond-edit/32 | 1.25 | 1.207 | 0.932 | 1.35 |
+| shared-range-edit/1000 | 1.30 | 1.234 | 0.948 | 1.40 |
+| distinct-range-edit/1000 | 1.30 | 1.244 | 0.925 | 1.45 |
+| cross-sheet-range-edit/1000 | 1.30 | 1.220 | 0.937 | 1.40 |
+| scalar-edit-affects-0/1000 | 1.35 | 1.280 | 0.857 | 1.60 |
+| scalar-edit-affects-1/1 | 1.20 | 1.146 | 0.951 | 1.30 |
+| scalar-edit-affects-1000/1000 | 1.25 | 1.170 | 0.976 | 1.30 |
+| scalar-edit-affects-100000/100000 | 1.20 | 1.130 | 0.954 | 1.30 |
+| formula-constant-edit/100000 | 1.25 | 1.180 | 0.913 | 1.40 |
+| topology-remove-add/10000 | 1.20 | 1.161 | 0.965 | 1.25 |
+| cycles/1000 | 1.25 | 1.177 | 0.977 | 1.30 |
+| removed-sheet-ref/1000 | 1.30 | 1.212 | 0.871 | 1.50 |
+| error-propagation/1000 | 1.20 | 1.146 | 0.953 | 1.30 |
+| criteria-range-edit/100000 | 1.25 | 1.185 | 0.982 | 1.30 |
+| lookup-range-edit/100000 | 1.20 | 1.140 | 0.926 | 1.30 |
+| vlookup-many/1000 | 1.15 | 1.073 | 0.946 | 1.25 |
+| vlookup-many-edit/1000 | 1.15 | 1.082 | 0.980 | 1.20 |
+| vlookup-many-sorted/1000 | 1.15 | 1.060 | 0.964 | 1.20 |
+| vlookup-many-sorted-edit/1000 | 1.20 | 1.154 | 0.926 | 1.30 |
+| xlookup-many/1000 | 1.20 | 1.158 | 0.948 | 1.30 |
+| xlookup-many-edit/1000 | 1.25 | 1.173 | 0.936 | 1.35 |
+| xlookup-many-sorted/1000 | 1.20 | 1.145 | 0.959 | 1.30 |
+| xlookup-many-sorted-edit/1000 | 1.20 | 1.158 | 0.937 | 1.30 |
+| text-lookup-many/1000 | 1.20 | 1.161 | 0.922 | 1.35 |
+| text-lookup-many-edit/1000 | 1.15 | 1.105 | 0.958 | 1.25 |
+| text-lookup-many-sorted/1000 | 1.20 | 1.153 | 0.940 | 1.30 |
+| text-lookup-many-sorted-edit/1000 | 1.20 | 1.151 | 0.949 | 1.30 |
+| spill-filter-resize/100000 | 1.15 | 1.065 | 0.946 | 1.25 |
+| sumproduct-vector-edit/100000 | 1.15 | 1.082 | 0.932 | 1.25 |
+| sumproduct-matrix-edit/100000 | 1.15 | 1.046 | 0.957 | 1.25 |
+| criteria-multi-range-edit/100000 | 1.15 | 1.063 | 0.939 | 1.25 |
+| sum-multi-range/100000 | 1.15 | 1.081 | 0.959 | 1.20 |
+| sumifs-3-criteria/100000 | 1.15 | 1.076 | 0.957 | 1.25 |
+| countif-100k/100000 | 1.15 | 1.066 | 0.943 | 1.25 |
+| unicode-text-date-edit/1000 | 1.15 | 1.050 | 0.944 | 1.25 |
+| percentile-covariance/100000 | 1.15 | 1.078 | 0.926 | 1.25 |
+| let-reuse-edit/100000 | 1.15 | 1.086 | 0.902 | 1.30 |
+| let-repeat/100000 | 1.20 | 1.158 | 0.892 | 1.35 |
+| iterative-finance/1000 | 1.15 | 1.064 | 0.910 | 1.30 |
+| incremental-dependency-closure-edit/100000 | 1.15 | 1.111 | 0.940 | 1.25 |
+| spill-sequence-admission/100000 | 1.15 | 1.110 | 0.917 | 1.30 |
+
+Recalibrate these limits when the matrix, the sampling or the default pair
+count changes, from fresh same-engine pairs that are not the acceptance runs.
+
+Retained bytes, peak transient bytes, transient allocation counts, and the
+isolated WASM deltas are nearly deterministic: one row differed by 105 B in one
+of 14 same-engine captures. The gate compares the middle candidate capture with
+the middle base capture, so growth that appears in most captures fails even
+at one byte. A reviewed trade-off may pass `--accept-bytes <file>` for that
+exact candidate engine:
 
 ```json
 {
-  "baselineCommit": "<meta.commit of formula-results.json>",
-  "baselineSourceDigest": "<source.digest of formula-results.json>",
-  "approvals": [
+  "candidateEngineDigest": "<engineDigest from the candidate captures>",
+  "rows": [
     {
-      "workload": "linear-chain",
-      "size": 8,
-      "field": "allocation.retainedBytes.median",
-      "maximum": 9283,
-      "reason": "+4,620 B one-chunk minimum (#103/#107)"
-    },
-    {
-      "field": "memory.10000.wasmDeltaBytes",
-      "maximum": 6291520,
-      "reason": "+524,288 B from the FormulaEntry spill-reference flag (e725d980)"
+      "key": "workload=vlookup-many;size=1000.allocation.retainedBytes",
+      "maximum": 520000,
+      "reason": "lookup cache: +8 B per formula; paired median -20%"
     }
   ]
 }
 ```
 
-Use it only for an exceedance that has been measured and explained: a
-deterministic byte cost of a reviewed design, or a timing row whose A/A spread
-on this machine is wider than the gate's tolerance. Every row needs a reason
-that names its measurement; "noise" or "expected" is not a reason. A workload
-row names `workload`, `size`, and one of `median`, `p95` (only where the gate
-checks it), `allocation.retainedBytes.median`, or
-`allocation.retainedBytes.p95`; an aggregate memory row names only
-`memory.<formulas>.wasmDeltaBytes`. Peak transient bytes and transient
-allocation counts cannot be approved. `maximum` is the highest candidate value
-the row may reach: the observed value plus a stated margin, the measured A/A
-spread for timing rows and a small fixed margin for byte rows, which are
-deterministic. A listed row passes at or below its maximum; every other row
-keeps the baseline rule. The gate rejects the file if it has unknown keys,
-duplicate rows, rows missing from the baseline or not checked by it, a blank
-reason, or a maximum that is not a positive number (whole bytes for byte rows).
+The gate accepts only the listed rows, prints each accepted row and reason, and
+rejects a file for another engine build or a row that no longer grows. Once the
+change merges, the next base includes the new bytes, so the file lapses.
 
-The file is bound to the baseline it amends. Once `formula-results.json` is
-recaptured, its approvals are stale and the gate rejects them: delete the file
-in the change that records the new baseline, or review every row again against
-it. The passed gate record in `formula-results.json` keeps its exact schema,
-so it does not list the approvals; the committed approval file and its
-`baselineCommit` are the record.
+On a shared machine, pin both sides of a comparison to the same idle core.
+Never run two comparisons on that core at once, and never run a capture while a
+build is using it.
 
 Latest checked capture: `bench:formula:smoke` at
 `2026-07-13T08:56:07Z`, core commit `844da4e`, Bun 1.3.14, linux/x64,
@@ -438,7 +533,7 @@ inconclusive; it does not excuse a slower result. Leave fifteen seconds between
 locked commands so other checkouts can acquire the shared lock.
 
 ```sh
-flock -x /home/vvin/learn/quiet.lock taskset -c 4 bun run bench:interaction-sessions
+taskset -c <idle-core> bun run bench:interaction-sessions
 ```
 
 A change to a harness source file, to the sampling flags, or to the protocol

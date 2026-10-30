@@ -1,6 +1,6 @@
 {
-  "baseline": "/home/vvin/learn/sheetwrite-wt/mr-base",
-  "changed": "/home/vvin/learn/sheetwrite-wt/memory-release",
+  "baseline": "5a16a55bc6322f30917a7c49ebb04cfc2ee9d840",
+  "changed": "candidate",
   "engine": "wasm",
   "warmups": 40,
   "samples": 21,
