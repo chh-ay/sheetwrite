@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import type { ReleasePackageArtifact } from "./release-artifacts.js";
-import { parseCiRunId } from "./release-preflight.js";
+import { type CiRun, selectCiRun } from "./release-preflight.js";
 import {
   assertCanonicalReleaseIdentity,
   assertRegistryPackage,
@@ -37,35 +37,50 @@ function artifact(name: string, version = "0.2.0"): ReleasePackageArtifact {
   };
 }
 
-describe("CI-completion package release workflow", () => {
-  it("runs only after completed develop CI and serializes publication", async () => {
-    const { parsed, source } = await workflow();
-    const trigger = parsed.on as {
-      workflow_run?: {
-        workflows?: string[];
-        types?: string[];
-        branches?: string[];
-      };
-    };
-    expect(trigger.workflow_run).toEqual({
-      workflows: ["CI"],
-      types: ["completed"],
-      branches: ["develop"],
-    });
+function ciRun(overrides: Partial<CiRun> = {}): CiRun {
+  return {
+    id: 10,
+    head_sha: "a".repeat(40),
+    head_branch: "develop",
+    event: "push",
+    status: "completed",
+    conclusion: "success",
+    head_repository: { full_name: "chh-ay/sheetwrite" },
+    ...overrides,
+  };
+}
+
+describe("manual package release workflow", () => {
+  it("runs only when started on develop and serializes publication", async () => {
+    const { parsed } = await workflow();
+    // A manual start with no inputs: nothing chooses the commit except the develop head.
+    expect(Object.keys(parsed.on ?? {})).toEqual(["workflow_dispatch"]);
+    expect(parsed.on?.workflow_dispatch?.inputs).toBeUndefined();
     expect(parsed.concurrency).toEqual({
       group: "npm-release",
       "cancel-in-progress": false,
     });
-    const identity = parsed.jobs.identity!;
-    expect(identity.if).toContain("workflow_run.conclusion == 'success'");
-    expect(identity.if).toContain("workflow_run.event == 'push'");
-    expect(identity.if).toContain("workflow_run.head_branch == 'develop'");
-    expect(identity.if).toContain("workflow_run.head_repository.full_name == github.repository");
-    expect(source).not.toMatch(/push:\s*\n\s*tags:|RELEASE_TAG|RELEASE_VERSION/);
-    expect(parseCiRunId("42")).toBe(42);
-    expect(() => parseCiRunId("0")).toThrow("positive integer");
-    expect(() => parseCiRunId("1.5")).toThrow("positive integer");
-    expect(() => parseCiRunId(String(Number.MAX_SAFE_INTEGER + 1))).toThrow("safe integer");
+    expect(parsed.jobs.identity?.if).toBe("github.ref == 'refs/heads/develop'");
+  });
+
+  it("takes artifacts only from the newest passed develop push CI run of the commit", () => {
+    const sha = "a".repeat(40);
+    const repository = "chh-ay/sheetwrite";
+    const rejected = [
+      ciRun({ id: 90, head_sha: "b".repeat(40) }),
+      ciRun({ id: 91, head_branch: "feature" }),
+      ciRun({ id: 92, event: "pull_request" }),
+      ciRun({ id: 93, status: "in_progress", conclusion: null }),
+      ciRun({ id: 94, conclusion: "failure" }),
+      ciRun({ id: 95, head_repository: { full_name: "fork/sheetwrite" } }),
+    ];
+
+    expect(selectCiRun([ciRun({ id: 11 }), ciRun({ id: 12 }), ...rejected], sha, repository)).toBe(
+      12,
+    );
+    expect(() => selectCiRun(rejected, sha, repository)).toThrow(
+      "No successful develop push CI run",
+    );
   });
 
   it("binds canonical artifact bytes only to the exact source commit", () => {

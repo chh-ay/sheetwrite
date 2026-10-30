@@ -21,13 +21,38 @@ async function run(command: readonly string[]): Promise<string> {
   return stdout.trim();
 }
 
-export function parseCiRunId(value: string | undefined): number {
-  if (value === undefined || !/^[1-9]\d*$/.test(value)) {
-    throw new Error("CI_RUN_ID must be a positive integer");
+/** A workflow run as the GitHub Actions runs API reports it. */
+export interface CiRun {
+  readonly id: number;
+  readonly head_sha: string;
+  readonly head_branch: string | null;
+  readonly event: string;
+  readonly status: string | null;
+  readonly conclusion: string | null;
+  readonly head_repository: { readonly full_name: string } | null;
+}
+
+/**
+ * Selects the newest successful develop push CI run of the release commit.
+ * A manual release has no triggering CI run, so the canonical artifacts must
+ * come from a run that already passed for exactly this commit.
+ */
+export function selectCiRun(runs: readonly CiRun[], sha: string, repository: string): number {
+  const passed = runs.filter(
+    (run) =>
+      run.head_sha === sha &&
+      run.head_branch === "develop" &&
+      run.event === "push" &&
+      run.status === "completed" &&
+      run.conclusion === "success" &&
+      run.head_repository?.full_name === repository,
+  );
+
+  if (passed.length === 0) {
+    throw new Error(`No successful develop push CI run for ${sha}; wait for CI, then run again`);
   }
-  const runId = Number(value);
-  if (!Number.isSafeInteger(runId)) throw new Error("CI_RUN_ID must be a safe integer");
-  return runId;
+
+  return Math.max(...passed.map((run) => run.id));
 }
 
 async function main(): Promise<void> {
@@ -35,7 +60,6 @@ async function main(): Promise<void> {
   if (!expectedSha || !/^[0-9a-f]{40}$/.test(expectedSha)) {
     throw new Error("EXPECTED_SHA must be a full lowercase commit SHA");
   }
-  const ciRunId = parseCiRunId(process.env.CI_RUN_ID);
 
   const actualSha = await run(["git", "rev-parse", "HEAD"]);
   if (actualSha !== expectedSha) {
@@ -56,6 +80,17 @@ async function main(): Promise<void> {
   if (visibility !== "public") {
     throw new Error(`Repository visibility is ${visibility}, expected public`);
   }
+
+  const runs = JSON.parse(
+    await run([
+      "gh",
+      "api",
+      `repos/${repository}/actions/workflows/ci.yml/runs?head_sha=${expectedSha}&event=push&branch=develop&per_page=100`,
+      "--jq",
+      ".workflow_runs",
+    ]),
+  ) as CiRun[];
+  const ciRunId = selectCiRun(runs, expectedSha, repository);
 
   await run(["npm", "ping", "--registry", "https://registry.npmjs.org"]);
 
