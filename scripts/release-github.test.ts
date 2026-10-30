@@ -102,14 +102,16 @@ const expectedNotes = `## All packages
 
   Pivot tables update when their source cells change.
 
-  Also in @sheetwrite/react.
+  _Also in \`@sheetwrite/react\`._
 
 ## @sheetwrite/wasm
 
 ### Patch Changes
 
 - Fix a rounding error in \`ROUND\`. (#171 by @alice)
-- Make the engine start faster. (#176 by @alice) Also in @sheetwrite/formulas.
+- Make the engine start faster. (#176 by @alice)
+
+  _Also in \`@sheetwrite/formulas\`._
 
 ## @sheetwrite/formulas
 

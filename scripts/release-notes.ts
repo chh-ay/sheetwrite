@@ -196,12 +196,17 @@ function renderEntry(entry: ChangelogEntry, alsoIn: readonly string[]): string {
     ...entry.details.map((line) => (line === "" ? "" : `${ENTRY_CONTINUATION}${line}`)),
   ];
   if (alsoIn.length > 0) {
-    const note = `Also in ${alsoIn.join(", ")}.`;
-    // A one-line entry takes the note on its line; a longer one gets a last paragraph.
-    if (entry.details.length === 0) lines[0] = `${lines[0]} ${note}`;
-    else lines.push("", `${ENTRY_CONTINUATION}${note}`);
+    // Its own paragraph, so it does not read as part of the change's last sentence.
+    lines.push("", `${ENTRY_CONTINUATION}_Also in ${packageList(alsoIn)}._`);
   }
   return lines.join("\n");
+}
+
+/** "`a`", "`a` and `b`", "`a`, `b` and `c`". */
+function packageList(names: readonly string[]): string {
+  const quoted = names.map((name) => `\`${name}\``);
+  const last = quoted.pop();
+  return quoted.length === 0 ? `${last}` : `${quoted.join(", ")} and ${last}`;
 }
 
 /** One changeset: changesets copies the same text and pull request into every package it names. */
