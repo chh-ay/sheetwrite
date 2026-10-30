@@ -682,6 +682,16 @@ impl CellStore {
     /// NOW and TODAY formulas of one pass see the same instant. A pass without
     /// volatile formulas never reads it.
     pub(crate) fn recompute_seed_sheets(&mut self, seeds: &[usize]) {
+        // Without formulas or pivot tables an edit can change no calculated
+        // value, so the barrier only ends the pass. Doing that here keeps the
+        // formula pass, the largest function of the engine, out of plain value
+        // edits: a WebAssembly runtime that sees it run on every edit compiles
+        // it while the host edits a data grid.
+        if self.pivots.is_none() && !self.has_formulas() {
+            self.finish_formula_free_pass(seeds);
+            return;
+        }
+
         let has_volatile = seeds.iter().any(|&sheet| {
             self.sheets
                 .get(sheet)
@@ -735,22 +745,38 @@ impl CellStore {
         }
     }
 
+    fn has_formulas(&self) -> bool {
+        self.sheets.iter().any(|sheet| !sheet.formulas.is_empty())
+    }
+
+    /// Ends a pass of a workbook without formulas. No formula reads the edited
+    /// values, so only the sums cached by the last pass and the dirty seeds go.
+    fn finish_formula_free_pass(&mut self, seeds: &[usize]) {
+        RANGE_SUM_CACHE.with(|cache| cache.borrow_mut().clear());
+        self.finish_recompute(seeds.iter().copied(), None);
+    }
+
     /// Recalculates the formulas that the dirty cells of the `seeds` sheets
     /// affect. It does not settle pivot tables, which is why the pivot settle
     /// loops call it between their own steps.
     pub(crate) fn recompute_formulas(&mut self, seeds: &[usize]) {
+        #[cfg(test)]
+        {
+            self.formula_passes += 1;
+        }
+
         if seeds.is_empty() {
+            return;
+        }
+
+        if !self.has_formulas() {
+            self.finish_formula_free_pass(seeds);
             return;
         }
 
         RANGE_SUM_CACHE.with(|cache| cache.borrow_mut().clear());
         let _lookup_pass = LookupPassGuard::begin();
         let _iteration_pass = IterationPassGuard::begin(self.iteration.is_some());
-
-        if self.sheets.iter().all(|sheet| sheet.formulas.is_empty()) {
-            self.finish_recompute(seeds.iter().copied(), None);
-            return;
-        }
 
         let index = self.graph.ensure_index(&self.sheets);
         let mut affected = FxHashSet::default();
