@@ -12,7 +12,7 @@ part of the serialized document protocol. A deduplicated local dictionary
 owns captured text independently of the store's pool epoch.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L438"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L438</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L440"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L440</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>

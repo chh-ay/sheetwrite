@@ -5,7 +5,7 @@ description: "Generated, source-linked formula names, signatures, semantics, dia
 
 # Formula function contract
 
-This page is generated from the checked version 1 `sheetwrite.formula-capabilities` inventory. It publishes **100 required-supported target functions**, **54 incumbent functions**, and **145 optional analysis functions** (299 canonical functions total) without maintaining a second name list. Aliases share their canonical function's build availability.
+This page is generated from the checked version 1 `sheetwrite.formula-capabilities` inventory. It publishes **100 required-supported target functions**, **60 incumbent functions**, and **145 optional analysis functions** (305 canonical functions total) without maintaining a second name list. Aliases share their canonical function's build availability.
 
 A function's presence means only the signature and semantic profiles linked in its row. Microsoft Excel documentation supplies the naming/family taxonomy; it is not a blanket Excel claim. Google Sheets and OpenFormula behavior is unverified unless a dialect profile says otherwise.
 
@@ -158,9 +158,11 @@ Taxonomy/source: [Information functions](https://support.microsoft.com/en-us/off
 <tr data-formula-name="ISERR" data-engine="default"><td><code>ISERR</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="ISNA" data-engine="default"><td><code>ISNA</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="TYPE" data-engine="default"><td><code>TYPE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="ISFORMULA" data-engine="default"><td><code>ISFORMULA</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-required-reference">Signature: <code>required-reference</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-reference-information">Dialect: <code>excel-reference-information</code></a><br /><a href="#implementation-implemented-reference-information">Implementation: <code>implemented-reference-information</code></a></details></td></tr>
 <tr data-formula-name="N" data-engine="default"><td><code>N</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="T" data-engine="default"><td><code>T</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="NA" data-engine="default"><td><code>NA</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-zero">Signature: <code>zero</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="CELL" data-engine="default"><td><code>CELL</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-cell-info">Signature: <code>cell-info</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-reference-information">Dialect: <code>excel-reference-information</code></a><br /><a href="#implementation-implemented-reference-information">Implementation: <code>implemented-reference-information</code></a></details></td></tr>
 <tr data-formula-name="ISOMITTED" data-engine="full"><td><code>ISOMITTED</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-lambda-isomitted">Signature: <code>lambda-isomitted</code></a><br /><a href="#semantics-analysis-lambda">Semantics: <code>analysis-lambda</code></a><br /><a href="#dialect-analysis-lambda">Dialect: <code>analysis-lambda</code></a><br /><a href="#implementation-analysis-lambda">Implementation: <code>analysis-lambda</code></a></details></td></tr>
 </tbody></table>
 
@@ -213,6 +215,8 @@ Taxonomy/source: [Lookup and reference functions](https://support.microsoft.com/
 <tr data-formula-name="COLUMN" data-engine="default"><td><code>COLUMN</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-optional-reference">Signature: <code>optional-reference</code></a><br /><a href="#semantics-lookup">Semantics: <code>lookup</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="COLUMNS" data-engine="default"><td><code>COLUMNS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-lookup">Semantics: <code>lookup</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="ADDRESS" data-engine="default"><td><code>ADDRESS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-address">Signature: <code>address</code></a><br /><a href="#semantics-lookup">Semantics: <code>lookup</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="FORMULATEXT" data-engine="default"><td><code>FORMULATEXT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-required-reference">Signature: <code>required-reference</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-reference-information">Dialect: <code>excel-reference-information</code></a><br /><a href="#implementation-implemented-reference-information">Implementation: <code>implemented-reference-information</code></a></details></td></tr>
+<tr data-formula-name="HYPERLINK" data-engine="default"><td><code>HYPERLINK</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-hyperlink">Signature: <code>hyperlink</code></a><br /><a href="#semantics-hyperlink-display">Semantics: <code>hyperlink-display</code></a><br /><a href="#dialect-excel-hyperlink-value">Dialect: <code>excel-hyperlink-value</code></a><br /><a href="#implementation-implemented-reference-information">Implementation: <code>implemented-reference-information</code></a></details></td></tr>
 </tbody></table>
 
 </section>
@@ -236,6 +240,8 @@ Taxonomy/source: [Math and trigonometry functions](https://support.microsoft.com
 <tr data-formula-name="TRUNC" data-engine="default"><td><code>TRUNC</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-trunc">Signature: <code>trunc</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="SIGN" data-engine="default"><td><code>SIGN</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="PI" data-engine="default"><td><code>PI</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-zero">Signature: <code>zero</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="RAND" data-engine="default"><td><code>RAND</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-zero">Signature: <code>zero</code></a><br /><a href="#semantics-volatile-random">Semantics: <code>volatile-random</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-random">Implementation: <code>implemented-random</code></a></details></td></tr>
+<tr data-formula-name="RANDBETWEEN" data-engine="default"><td><code>RANDBETWEEN</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-random-between">Signature: <code>random-between</code></a><br /><a href="#semantics-volatile-random">Semantics: <code>volatile-random</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-random">Implementation: <code>implemented-random</code></a></details></td></tr>
 <tr data-formula-name="SUMIF" data-engine="default"><td><code>SUMIF</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-sumif">Signature: <code>sumif</code></a><br /><a href="#semantics-criteria">Semantics: <code>criteria</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="SUMIFS" data-engine="default"><td><code>SUMIFS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-sumifs">Signature: <code>sumifs</code></a><br /><a href="#semantics-criteria">Semantics: <code>criteria</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="PRODUCT" data-engine="default"><td><code>PRODUCT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
@@ -2097,6 +2103,49 @@ Return shape: `scalar`.
 
 </details>
 
+<details id="signature-random-between"><summary>Signature: random-between</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `bottom` | yes | none | `scalar`, `reference` | `once` |
+| `top` | yes | none | `scalar`, `reference` | `once` |
+
+</details>
+
+<details id="signature-required-reference"><summary>Signature: required-reference</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `reference` | yes | none | `range`, `reference` | `once` |
+
+</details>
+
+<details id="signature-hyperlink"><summary>Signature: hyperlink</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `linkLocation` | yes | none | `scalar`, `reference` | `once` |
+| `friendlyName` | no | none | `scalar`, `reference` | `once` |
+
+</details>
+
+<details id="signature-cell-info"><summary>Signature: cell-info</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `infoType` | yes | none | `scalar`, `reference` | `once` |
+| `reference` | no | formula-cell | `range`, `reference` | `once` |
+
+</details>
+
 ## Semantic profiles
 
 These values are normative for the listed Sheetwrite subset. `function-defined` and `contextual` are explicit limitations: consult the formula guide's function-specific sections rather than assuming another spreadsheet's edge behavior.
@@ -2423,6 +2472,34 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 
 </details>
 
+<details id="semantics-volatile-random"><summary>Semantics: volatile-random</summary>
+
+| Dimension | Contract |
+| --- | --- |
+| shape | scalar: accepted<br />range: rejected<br />array: rejected<br />broadcast: none<br />result: scalar |
+| coercion | blank: zero<br />text: number-if-parseable<br />boolean: number<br />error: propagate |
+| text | case: not-applicable<br />wildcard: not-applicable |
+| environment | locale: invariant<br />dateSystem: not-applicable |
+| numeric | tolerance: function-defined<br />domain: bounded<br />iteration: kind: none<br />maximum: none |
+| calculation | dependencies: tracked<br />lazy: eager<br />spill: scalar<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
+| persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
+
+</details>
+
+<details id="semantics-hyperlink-display"><summary>Semantics: hyperlink-display</summary>
+
+| Dimension | Contract |
+| --- | --- |
+| shape | scalar: accepted<br />range: rejected<br />array: rejected<br />broadcast: none<br />result: scalar |
+| coercion | blank: preserved<br />text: preserved<br />boolean: preserved<br />error: propagate |
+| text | case: not-applicable<br />wildcard: not-applicable |
+| environment | locale: invariant<br />dateSystem: not-applicable |
+| numeric | tolerance: exact<br />domain: all-inputs<br />iteration: kind: none<br />maximum: none |
+| calculation | dependencies: tracked<br />lazy: eager<br />spill: scalar<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
+| persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
+
+</details>
+
 ## Dialect profiles
 
 <details id="dialect-regex-lite-subset"><summary>Dialect: regex-lite-subset</summary>
@@ -2530,6 +2607,30 @@ Limitations: Available only in @sheetwrite/formulas. Named ranges are supported,
 | OpenFormula | unverified |
 
 Limitations: Available only in @sheetwrite/formulas. Aggregators must be a single eta-reduced built-in or a LAMBDA with one or two parameters. Vectors of functions are not supported. Grouping and output use the engine spill and work limits.
+
+</details>
+
+<details id="dialect-excel-reference-information"><summary>Dialect: excel-reference-information</summary>
+
+| Dialect | Status |
+| --- | --- |
+| Microsoft Excel | divergent |
+| Google Sheets | unverified |
+| OpenFormula | unverified |
+
+Limitations: CELL supports the info types address, col, contents, row and type. Other info types return #VALUE!. CELL without a reference describes the cell of the formula, as in LibreOffice. Excel uses the last changed cell. A formula that reads its own cell with FORMULATEXT, ISFORMULA or CELL is a #CYCLE! error. Cells inside a spilled range and host-linked reference cells hold no formula. For them, FORMULATEXT returns #N/A and ISFORMULA returns FALSE. Google Sheets and OpenFormula results require producer evidence before compatibility is claimed.
+
+</details>
+
+<details id="dialect-excel-hyperlink-value"><summary>Dialect: excel-hyperlink-value</summary>
+
+| Dialect | Status |
+| --- | --- |
+| Microsoft Excel | divergent |
+| Google Sheets | unverified |
+| OpenFormula | unverified |
+
+Limitations: HYPERLINK returns its display value: the friendly name, or the link when there is no friendly name. The grid does not open the link. Use cell hyperlinks for links that open. Google Sheets and OpenFormula results require producer evidence before compatibility is claimed.
 
 </details>
 
@@ -2689,16 +2790,38 @@ Limitations: Available only in @sheetwrite/formulas. Aggregators must be a singl
 
 </details>
 
+<details id="implementation-implemented-random"><summary>Implementation: implemented-random</summary>
+
+| Layer | Status and source/evidence |
+| --- | --- |
+| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/calc.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/random.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/random.rs)<br />[`packages/wasm/src/eval/dependency.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/dependency.rs) |
+| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
+| Evidence | source-linked<br />[`packages/wasm/src/tests.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/tests.rs)<br />[`packages/core/test/formula-assist.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/test/formula-assist.test.ts) |
+
+</details>
+
+<details id="implementation-implemented-reference-information"><summary>Implementation: implemented-reference-information</summary>
+
+| Layer | Status and source/evidence |
+| --- | --- |
+| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/calc.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/info.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/info.rs) |
+| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
+| Evidence | source-linked<br />[`packages/wasm/src/tests.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/tests.rs)<br />[`packages/core/test/formula-assist.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/test/formula-assist.test.ts) |
+
+</details>
+
 ## Unsupported categories
 
 Unknown functions retain their source and evaluate to `#NAME?`; Sheetwrite does not silently execute a network, custom-code, or compatibility fallback.
 
 | Category | Scope | Examples | Source | Evidence |
 | --- | --- | --- | --- | --- |
-| **Volatile recalculation** (`volatile`) | Automatic volatility semantics beyond the existing clock functions are outside the supported contract. | `INDIRECT`, `OFFSET`, `RAND`, `RANDBETWEEN`, `RANDARRAY` | [Math and trigonometry functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb) | [`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/formula-contract.test.ts) |
+| **Volatile references and arrays** (`volatile`) | OFFSET and INDIRECT build references at calculation time, and RANDARRAY returns a volatile array. These functions are outside the supported contract. | `INDIRECT`, `OFFSET`, `RANDARRAY` | [Math and trigonometry functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb) | [`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/formula-contract.test.ts) |
 | **Network functions** (`network`) | Formula evaluation never performs network requests. | `ENCODEURL`, `FILTERXML`, `IMAGE`, `WEBSERVICE` | [Web functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb) | [`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/formula-contract.test.ts) |
 | **External data functions** (`external`) | Functions that query external providers or live data connections are not evaluated. | `GOOGLEFINANCE`, `IMPORTDATA`, `IMPORTHTML`, `IMPORTXML`, `RTD` | [Add-in and Automation functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb) | [`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/formula-contract.test.ts) |
 | **Cube functions** (`cube`) | OLAP cube members, sets, and values are not resolved. | `CUBEMEMBER`, `CUBESET`, `CUBEVALUE` | [Cube functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb) | [`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/formula-contract.test.ts) |
 | **Arbitrary external workbook references** (`external-workbook`) | References to arbitrary workbook files are not loaded or dereferenced. | `'[Book.xlsx]Sheet1'!A1` | [Lookup and reference functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb) | [`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/formula-contract.test.ts) |
 
-Automatic volatile functions beyond the explicit host-clock barrier, network/external-data functions, arbitrary external workbook links, and cube/OLAP functions are unsupported. `TODAY` and `NOW` are the documented clock-function exception. Database functions and `LAMBDA` helpers require the full engine; `LET` is available in both engines.
+Volatile reference and array functions (`OFFSET`, `INDIRECT`, `RANDARRAY`), network/external-data functions, arbitrary external workbook links, and cube/OLAP functions are unsupported. `RAND`, `RANDBETWEEN`, `TODAY` and `NOW` are volatile and recalculate after each edit. Database functions and `LAMBDA` helpers require the full engine; `LET` is available in both engines.

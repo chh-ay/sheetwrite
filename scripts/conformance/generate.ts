@@ -89,6 +89,7 @@ const ARGUMENTS_BY_SIGNATURE: Record<string, string> = {
   address: "1,2",
   "array-unary": "A1:B2",
   "binary-number": "4,2",
+  "cell-info": '"row",A1',
   choose: '2,"a","b"',
   "choose-axis": "A1:B3,1",
   "criteria-many": 'A1:A3,">1"',
@@ -98,6 +99,7 @@ const ARGUMENTS_BY_SIGNATURE: Record<string, string> = {
   "date-three": "2020,1,2",
   filter: "A1:A3,B1:B3>2",
   "find-search": '"a","cat"',
+  hyperlink: '"https://example.com","Docs"',
   if: "TRUE,1,0",
   "if-error": "1,0",
   ifs: "TRUE,1",
@@ -118,10 +120,12 @@ const ARGUMENTS_BY_SIGNATURE: Record<string, string> = {
   percentile: "A1:A3,0.5",
   "period-payment": "0.1,1,10,1000",
   "pv-fv-pmt": "0.1,10,-100",
+  "random-between": "1,6",
   rank: "60,A1:A3,0",
   rate: "1,0,-100,110",
   "repeat-text": '"a",2',
   replace: '"abc",2,1,"x"',
+  "required-reference": "A1",
   round: "1.25,1",
   sequence: "2,2",
   sort: "A1:A3",
@@ -215,6 +219,33 @@ const CATEGORY_ASSERTIONS_BY_FUNCTION: Readonly<
   COLUMN: { boundary: "COLUMN(C1)=3" },
   COLUMNS: { boundary: "COLUMNS(C1)=1" },
   T: { "range-array": "TYPE(T(C1:C2))=16" },
+  // Random results cannot equal a baseline call, so each category pins an
+  // interval with one integer instead.
+  RANDBETWEEN: {
+    empty: "RANDBETWEEN(C1,0)=0",
+    mixed: "RANDBETWEEN(C1,2)=2",
+    boundary: "RANDBETWEEN(C1,C1)=0",
+  },
+  // FORMULATEXT and ISFORMULA describe the referenced cell, never its value,
+  // and corpus inputs are literals.
+  FORMULATEXT: {
+    empty: "ISNA(FORMULATEXT(C1))",
+    mixed: "ISNA(FORMULATEXT(C1))",
+    boundary: "ISNA(FORMULATEXT(C1))",
+    "range-array": "ISNA(FORMULATEXT(C1:C2))",
+  },
+  ISFORMULA: {
+    empty: "ISFORMULA(C1)=FALSE",
+    mixed: "ISFORMULA(C1)=FALSE",
+    boundary: "ISFORMULA(C1)=FALSE",
+    "range-array": "ISFORMULA(C1:C2)=FALSE",
+  },
+  CELL: {
+    empty: 'CELL("type",C1)="b"',
+    mixed: 'CELL("type",C1)="l"',
+    boundary: 'CELL("contents",C1)=0',
+    "range-array": 'CELL("row",C1:C2)=1',
+  },
 };
 
 const DIRECT_ERROR_EXPECTATIONS: Readonly<

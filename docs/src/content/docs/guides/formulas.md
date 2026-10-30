@@ -200,17 +200,28 @@ Dates are numbers: whole days since the spreadsheet epoch, with a fractional day
 - `DATE` treats 1900 as a leap year for this serial boundary and normalizes month/day overflow; `DATE(2024,13,1)` is 2025-01-01
 - `DATEVALUE` is locale-neutral: it accepts the documented ISO `yyyy-mm-dd` form and fixed slash-delimited numeric forms; it never consults the host locale
 
-`TODAY` and `NOW` are volatile, but never consult the clock during paint or ordinary dependency reads. The host captures one absolute instant and triggers a barrier:
+`RAND`, `RANDBETWEEN`, `TODAY` and `NOW` are volatile. Each edit recalculates them and their dependents, as in Excel. A transaction without source changes recalculates nothing. `TODAY` and `NOW` read the clock once per recalculation, never during paint or a dependency read, so every formula in one recalculation sees the same time. To recalculate without an edit, or to use a fixed time, the host passes one absolute instant to a barrier:
 
 ```ts prelude="core" partial="requires surrounding host state" title="Partial example"
 store.recalculateVolatile(new Date("2026-07-13T18:00:00.000Z"));
 ```
 
-The default captures `new Date()` once. The instant is converted to a UTC serial, so a fixed `Date` produces identical results in every host timezone. `TODAY` returns its whole-day component; `NOW` retains the fraction.
+The default uses `new Date()`. The instant is converted to a UTC serial, so a fixed `Date` produces identical results in every host timezone. The next edit reads the clock again. `TODAY` returns its whole-day component; `NOW` retains the fraction.
+
+`RAND()` returns a number in `[0, 1)`. `RANDBETWEEN(bottom, top)` returns an integer in `[bottom, top]`. It rounds `bottom` up and `top` down; if the result is an empty interval, it returns `#NUM!`, and a non-numeric bound returns `#VALUE!`. Each engine instance seeds its own generator. The generator is not cryptographic.
 
 Basic `TEXT` date patterns are `yyyy-mm-dd`, `yyyy/mm/dd`, `mm/dd/yyyy`, `dd/mm/yyyy`, `m/d/yyyy`, `yyyy-mm-dd hh:mm`, `yyyy-mm-dd hh:mm:ss`, `hh:mm`, and `hh:mm:ss`.
 
 Text evaluation is host-locale neutral. Function argument separators stay commas; `VALUE` uses `.` decimal and `,` grouping, and `NUMBERVALUE(text, [decimal_separator], [group_separator])` uses those same defaults unless the separators are supplied explicitly. Case conversion uses Unicode mappings, not browser locale. `LEN`, `LEFT`, `RIGHT`, and `MID` count Unicode scalar values rather than UTF-16 code units. Generated text is capped at 16 MiB and bounded searches at 4,000,000 steps; excess work returns `#NUM!`.
+
+## Cell information functions
+
+- `FORMULATEXT(reference)` returns the formula source of the top-left cell of `reference`. It returns `#N/A` when that cell holds no formula, and `#VALUE!` when the argument is not a reference.
+- `ISFORMULA(reference)` returns `TRUE` when the top-left cell of `reference` holds a formula, and `FALSE` otherwise.
+- `HYPERLINK(link, [friendly_name])` returns `friendly_name`, or `link` when there is no friendly name. The grid does not open the link; use [`Grid.setHyperlink`](/docs/api/core/grid/#grid-set-hyperlink) for links that open.
+- `CELL(info_type, [reference])` supports the info types `address`, `col`, `contents`, `row` and `type`. Other info types, such as `format` or `width`, return `#VALUE!`, because number formats and column widths live in the host. Without `reference`, `CELL` describes the cell of the formula, as in LibreOffice.
+
+Cells inside a spilled range and host-linked reference cells hold no formula. A formula that reads its own cell with these functions returns `#CYCLE!`.
 
 ## Criteria semantics and shapes
 
@@ -290,7 +301,7 @@ The admission check happens before materialization when the shape is statically 
 
 ## Unsupported categories
 
-Formula evaluation performs no network request and runs no custom JavaScript. Automatic volatile functions beyond the explicit `TODAY`/`NOW` host-clock barrier, network functions, external/live-data providers, arbitrary external workbook references, and cube/OLAP functions are unsupported. Examples include `RAND`, `RANDBETWEEN`, `INDIRECT`, `OFFSET`, `WEBSERVICE`, `GOOGLEFINANCE`, `IMPORT*`, `RTD`, and `CUBEVALUE`. Database functions such as `DSUM` and `LAMBDA` helpers such as `MAP` are in the full engine only.
+Formula evaluation performs no network request and runs no custom JavaScript. Volatile reference and array functions, network functions, external/live-data providers, arbitrary external workbook references, and cube/OLAP functions are unsupported. Examples include `INDIRECT`, `OFFSET`, `RANDARRAY`, `WEBSERVICE`, `GOOGLEFINANCE`, `IMPORT*`, `RTD`, and `CUBEVALUE`. Database functions such as `DSUM` and `LAMBDA` helpers such as `MAP` are in the full engine only.
 
 Unsupported names evaluate to `#NAME?` while preserving source for snapshots and interchange. There is no compatibility shim or side-effecting fallback. The generated [unsupported-category ledger](/docs/reference/formula-functions/#unsupported-categories) is derived from the versioned inventory.
 

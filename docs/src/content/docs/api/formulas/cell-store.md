@@ -706,7 +706,9 @@ recomputeVolatile: (serial: number) => boolean;
 ```
 
 <p class="api-member-doc">Explicit volatile barrier. `serial` is a UTC spreadsheet serial using
-the 1899-12-30 epoch; only TODAY/NOW formulas and their dependents dirty.</p>
+the 1899-12-30 epoch; only volatile formulas (TODAY, NOW, RAND,
+RANDBETWEEN) and their dependents recalculate, and TODAY and NOW use
+`serial` instead of the clock. Later recalculations read the clock.</p>
 </details>
 
 <details class="api-member" id="cell-store-reference-target" data-pagefind-weight="1">

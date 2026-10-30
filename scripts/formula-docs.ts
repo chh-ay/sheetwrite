@@ -435,7 +435,7 @@ export function renderFormulaFunctionContract(inventoryValue: unknown): string {
         .join("<br />")} |`;
     }),
     "",
-    "Automatic volatile functions beyond the explicit host-clock barrier, network/external-data functions, arbitrary external workbook links, and cube/OLAP functions are unsupported. `TODAY` and `NOW` are the documented clock-function exception. Database functions and `LAMBDA` helpers require the full engine; `LET` is available in both engines.",
+    "Volatile reference and array functions (`OFFSET`, `INDIRECT`, `RANDARRAY`), network/external-data functions, arbitrary external workbook links, and cube/OLAP functions are unsupported. `RAND`, `RANDBETWEEN`, `TODAY` and `NOW` are volatile and recalculate after each edit. Database functions and `LAMBDA` helpers require the full engine; `LET` is available in both engines.",
     "",
   );
 
