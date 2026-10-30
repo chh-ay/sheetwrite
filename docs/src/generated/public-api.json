@@ -313,7 +313,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L631",
+              "source": "src/types/grid.ts#L634",
               "jsDocTags": [],
               "documentation": "View-aware editable snapshot of one cell, for hosts building a detached\nformula bar or cell inspector. `address` is the translated *data* address —\nthe correct target for `Grid.applyTransaction` even under an active\nsort/filter view — while the `(row, col)` inputs of\n{@link Grid.getCellInput} are active-sheet view coordinates.",
               "memberDocs": [
@@ -823,7 +823,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L310",
+              "source": "src/types/grid.ts#L313",
               "jsDocTags": [],
               "documentation": "Built-in action names accepted by custom context-menu rows.",
               "memberDocs": []
@@ -835,7 +835,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L337",
+              "source": "src/types/grid.ts#L340",
               "jsDocTags": [],
               "documentation": "Cell and viewport coordinates resolved for one bundled context-menu opening.",
               "memberDocs": [
@@ -860,7 +860,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L398",
+              "source": "src/types/grid.ts#L401",
               "jsDocTags": [
                 "example",
                 "see"
@@ -912,7 +912,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L427",
+              "source": "src/types/grid.ts#L430",
               "jsDocTags": [],
               "documentation": "Static rows or a context-aware factory evaluated each time the menu opens.",
               "memberDocs": []
@@ -1587,7 +1587,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L705",
+              "source": "src/types/grid.ts#L708",
               "jsDocTags": [
                 "example",
                 "see"
@@ -1885,7 +1885,7 @@
                 },
                 {
                   "name": "deleteNote",
-                  "documentation": "Remove the focus cell's note as one undoable step. Does nothing when it has none."
+                  "documentation": "Remove the focus cell's note as one undoable step. Does nothing when it has\nnone. Does nothing on a read-only grid."
                 },
                 {
                   "name": "editNote",
@@ -1960,7 +1960,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L240",
+              "source": "src/types/grid.ts#L243",
               "jsDocTags": [],
               "documentation": "Built-in command names accepted by state queries and change events.",
               "memberDocs": []
@@ -1972,7 +1972,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L243",
+              "source": "src/types/grid.ts#L246",
               "jsDocTags": [],
               "documentation": "Observable availability and selection-derived activity for one command.",
               "memberDocs": []
@@ -1984,7 +1984,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L249",
+              "source": "src/types/grid.ts#L252",
               "jsDocTags": [],
               "documentation": "Complete command-state snapshot emitted whenever availability or activity can change.",
               "memberDocs": []
@@ -1996,7 +1996,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L454",
+              "source": "src/types/grid.ts#L457",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2084,7 +2084,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L651",
+              "source": "src/types/grid.ts#L654",
               "jsDocTags": [],
               "documentation": "Payload map for events emitted by a Grid.",
               "memberDocs": [
@@ -2117,7 +2117,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L524",
+              "source": "src/types/grid.ts#L527",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2194,7 +2194,7 @@
                 },
                 {
                   "name": "workerUrl",
-                  "documentation": "URL of the worker renderer module (`renderer: \"worker\"`), as served to the\nBROWSER. Usually not needed: by default the grid creates its worker as\n`new Worker(new URL(\"./worker.js\", import.meta.url))`, which bundlers such\nas Vite build together with the worker's imports. Pass a URL when there\nis no bundler, or when yours copies the file instead of building it, for\nexample a copy of `@sheetwrite/core/dist/` in your public assets (see\n`/docs/guides/worker-rendering/`). A bare specifier like\n`new URL(\"@sheetwrite/core/worker\", import.meta.url)` is NOT reliable: the\nplatform `Worker` constructor does not consult package exports. If the\nworker can't be constructed or fails to load, the grid falls back to the\nmain-thread canvas renderer and emits `renderer-fallback` once."
+                  "documentation": "URL of the worker renderer module (`renderer: \"worker\"`), as served to the\nBROWSER. Usually not needed: by default the grid creates its worker as\n`new Worker(new URL(\"./worker.js\", import.meta.url))`, which bundlers such\nas Vite build together with the worker's imports. Pass a URL when there\nis no bundler, or when yours copies the file instead of building it, for\nexample a copy of `@sheetwrite/core/dist/` in your public assets (see\n`/docs/features/worker-rendering/`). A bare specifier like\n`new URL(\"@sheetwrite/core/worker\", import.meta.url)` is NOT reliable: the\nplatform `Worker` constructor does not consult package exports. If the\nworker can't be constructed or fails to load, the grid falls back to the\nmain-thread canvas renderer and emits `renderer-fallback` once."
                 }
               ]
             },
@@ -2294,9 +2294,9 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L292",
+              "source": "src/types/grid.ts#L295",
               "jsDocTags": [],
-              "documentation": "Per-glyph icon overrides, keyed by the names on the command icon sheet\n(`ICON_NAMES`). One override applies wherever the glyph shows: the flat\ntoolbar, the ribbon and ribbon menus. Strings render as plain text; DOM nodes\nand node factories support SVG or HTML icons. To replace every glyph at once,\nset the `--sheetwrite-icon-sheet` CSS property to a sheet drawn on the layout\nin `@sheetwrite/core/icons.json`.",
+              "documentation": "Per-glyph icon overrides, keyed by the names on the command icon sheet\n(`ICON_NAMES`). One override applies wherever the glyph shows: the flat\ntoolbar, the ribbon and ribbon menus, and the context menu. Strings render\nas plain text; DOM nodes and node factories support SVG or HTML icons. To\nreplace every glyph at once, set the `--sheetwrite-icon-sheet` CSS property\nto a sheet drawn on the layout in `@sheetwrite/core/icons.json`.",
               "memberDocs": []
             },
             {
@@ -2323,7 +2323,7 @@
                 "example",
                 "see"
               ],
-              "documentation": "Load one WASM engine before `createGrid`. The default is `@sheetwrite/wasm`.\nPass the `@sheetwrite/formulas` module as the second argument to select the full engine.\n@example\n```ts\nimport { initSheetwrite } from \"@sheetwrite/core\";\nimport * as formulas from \"@sheetwrite/formulas\";\n\nawait initSheetwrite(undefined, formulas);\n```\n@see\n/docs/guides/formulas/\n@see\ncreateGrid",
+              "documentation": "Load one WASM engine before `createGrid`. The default is `@sheetwrite/wasm`.\nPass the `@sheetwrite/formulas` module as the second argument to select the full engine.\n@example\n```ts\nimport { initSheetwrite } from \"@sheetwrite/core\";\nimport * as formulas from \"@sheetwrite/formulas\";\n\nawait initSheetwrite(undefined, formulas);\n```\n@see\n/docs/start/choose-an-engine/\n@see\ncreateGrid",
               "memberDocs": []
             },
             {
@@ -2405,7 +2405,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L364",
+              "source": "src/types/grid.ts#L367",
               "jsDocTags": [],
               "documentation": "Built-in actions that can be rebound without replacing navigation.",
               "memberDocs": []
@@ -2417,7 +2417,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L377",
+              "source": "src/types/grid.ts#L380",
               "jsDocTags": [],
               "documentation": "Overrides replace all default keys for an action; null disables that action's keys.",
               "memberDocs": []
@@ -2429,7 +2429,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L352",
+              "source": "src/types/grid.ts#L355",
               "jsDocTags": [],
               "documentation": "A compact modified key combination or a key object. Modifiers may appear in\nany order before the final key, for example \"Mod+Shift+K\" or \"Ctrl+Alt+Delete\".\n`Mod`/`mod` means Command on macOS and Control elsewhere; Ctrl and Meta are literal.\nThe parser rejects unknown/repeated modifiers and missing keys.",
               "memberDocs": []
@@ -3182,7 +3182,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L617",
+              "source": "src/types/grid.ts#L620",
               "jsDocTags": [],
               "documentation": "Replacement count and refreshed search state returned by replace-all.",
               "memberDocs": [
@@ -3796,7 +3796,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L595",
+              "source": "src/types/grid.ts#L598",
               "jsDocTags": [],
               "documentation": "Case, whole-cell, sheet, and column constraints for grid search.",
               "memberDocs": [
@@ -3825,7 +3825,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L607",
+              "source": "src/types/grid.ts#L610",
               "jsDocTags": [],
               "documentation": "Ordered matches and active index produced by a grid search.",
               "memberDocs": [
@@ -4023,7 +4023,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L641",
+              "source": "src/types/grid.ts#L644",
               "jsDocTags": [],
               "documentation": "Actionable transaction outcome for a stable sheet lifecycle target.",
               "memberDocs": []
@@ -5076,7 +5076,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L213",
+              "source": "src/types/grid.ts#L216",
               "jsDocTags": [],
               "documentation": "Built-in action names accepted by custom toolbar items.",
               "memberDocs": []
@@ -5088,7 +5088,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L282",
+              "source": "src/types/grid.ts#L285",
               "jsDocTags": [],
               "documentation": "Text, DOM node, or node factory used as toolbar icon content.",
               "memberDocs": []
@@ -5100,7 +5100,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L295",
+              "source": "src/types/grid.ts#L298",
               "jsDocTags": [],
               "documentation": "Built-in, separator, or custom callback item in the grid toolbar.",
               "memberDocs": [
@@ -7868,7 +7868,7 @@
                 "example",
                 "see"
               ],
-              "documentation": "Initialize the WASM module. Idempotent and re-entrant: concurrent\nsame-source callers share one in-flight init; a concurrent different-source\ncall rejects; a different-source call after success warns and no-ops; a\nrejected init is retryable. When `source` is omitted the loader picks the\nright strategy for the runtime.\n@example\n```ts\nimport { initSheetwrite } from \"@sheetwrite/core\";\nimport * as formulas from \"@sheetwrite/formulas\";\n\nawait initSheetwrite(undefined, formulas);\n```\n@see\n/docs/guides/formulas/",
+              "documentation": "Initialize the WASM module. Idempotent and re-entrant: concurrent\nsame-source callers share one in-flight init; a concurrent different-source\ncall rejects; a different-source call after success warns and no-ops; a\nrejected init is retryable. When `source` is omitted the loader picks the\nright strategy for the runtime.\n@example\n```ts\nimport { initSheetwrite } from \"@sheetwrite/core\";\nimport * as formulas from \"@sheetwrite/formulas\";\n\nawait initSheetwrite(undefined, formulas);\n```\n@see\n/docs/start/choose-an-engine/",
               "memberDocs": []
             },
             {
@@ -8021,7 +8021,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L571",
+              "source": "../core/dist/types/grid.d.ts#L574",
               "jsDocTags": [
                 "example",
                 "see"
@@ -8297,7 +8297,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L155",
+              "source": "../core/dist/types/grid.d.ts#L158",
               "jsDocTags": [],
               "documentation": "Built-in command names accepted by state queries and change events.",
               "memberDocs": []
@@ -8309,7 +8309,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L157",
+              "source": "../core/dist/types/grid.d.ts#L160",
               "jsDocTags": [],
               "documentation": "Observable availability and selection-derived activity for one command.",
               "memberDocs": []
@@ -8831,7 +8831,7 @@
                 },
                 {
                   "name": "workerUrl",
-                  "documentation": "URL of the worker renderer module (`renderer: \"worker\"`), as served to the\nBROWSER. Usually not needed: by default the grid creates its worker as\n`new Worker(new URL(\"./worker.js\", import.meta.url))`, which bundlers such\nas Vite build together with the worker's imports. Pass a URL when there\nis no bundler, or when yours copies the file instead of building it, for\nexample a copy of `@sheetwrite/core/dist/` in your public assets (see\n`/docs/guides/worker-rendering/`). A bare specifier like\n`new URL(\"@sheetwrite/core/worker\", import.meta.url)` is NOT reliable: the\nplatform `Worker` constructor does not consult package exports. If the\nworker can't be constructed or fails to load, the grid falls back to the\nmain-thread canvas renderer and emits `renderer-fallback` once."
+                  "documentation": "URL of the worker renderer module (`renderer: \"worker\"`), as served to the\nBROWSER. Usually not needed: by default the grid creates its worker as\n`new Worker(new URL(\"./worker.js\", import.meta.url))`, which bundlers such\nas Vite build together with the worker's imports. Pass a URL when there\nis no bundler, or when yours copies the file instead of building it, for\nexample a copy of `@sheetwrite/core/dist/` in your public assets (see\n`/docs/features/worker-rendering/`). A bare specifier like\n`new URL(\"@sheetwrite/core/worker\", import.meta.url)` is NOT reliable: the\nplatform `Worker` constructor does not consult package exports. If the\nworker can't be constructed or fails to load, the grid falls back to the\nmain-thread canvas renderer and emits `renderer-fallback` once."
                 }
               ]
             },
@@ -8984,7 +8984,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L571",
+              "source": "../core/dist/types/grid.d.ts#L574",
               "jsDocTags": [
                 "example",
                 "see"
@@ -9260,7 +9260,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L155",
+              "source": "../core/dist/types/grid.d.ts#L158",
               "jsDocTags": [],
               "documentation": "Built-in command names accepted by state queries and change events.",
               "memberDocs": []
@@ -9272,7 +9272,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L157",
+              "source": "../core/dist/types/grid.d.ts#L160",
               "jsDocTags": [],
               "documentation": "Observable availability and selection-derived activity for one command.",
               "memberDocs": []
@@ -9933,7 +9933,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L571",
+              "source": "../core/dist/types/grid.d.ts#L574",
               "jsDocTags": [
                 "example",
                 "see"
@@ -10209,7 +10209,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L155",
+              "source": "../core/dist/types/grid.d.ts#L158",
               "jsDocTags": [],
               "documentation": "Built-in command names accepted by state queries and change events.",
               "memberDocs": []
@@ -10221,7 +10221,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L157",
+              "source": "../core/dist/types/grid.d.ts#L160",
               "jsDocTags": [],
               "documentation": "Observable availability and selection-derived activity for one command.",
               "memberDocs": []
@@ -11232,7 +11232,7 @@
                 "example",
                 "see"
               ],
-              "documentation": "Register all concrete XLSX backends with the backend-neutral core contracts.\n@example\n```ts\nimport { registerXlsxBackends } from \"@sheetwrite/xlsx\";\nimport { fromXlsxWorkbook } from \"@sheetwrite/core\";\n\nregisterXlsxBackends();\nasync function open(file: File) {\n  return fromXlsxWorkbook(await file.arrayBuffer());\n}\n```\n@see\n/docs/guides/xlsx-export/",
+              "documentation": "Register all concrete XLSX backends with the backend-neutral core contracts.\n@example\n```ts\nimport { registerXlsxBackends } from \"@sheetwrite/xlsx\";\nimport { fromXlsxWorkbook } from \"@sheetwrite/core\";\n\nregisterXlsxBackends();\nasync function open(file: File) {\n  return fromXlsxWorkbook(await file.arrayBuffer());\n}\n```\n@see\n/docs/import-export/xlsx-export/",
               "memberDocs": []
             },
             {
@@ -11316,7 +11316,7 @@
                 "example",
                 "see"
               ],
-              "documentation": "Register all concrete XLSX backends with the backend-neutral core contracts.\n@example\n```ts\nimport { registerXlsxBackends } from \"@sheetwrite/xlsx\";\nimport { fromXlsxWorkbook } from \"@sheetwrite/core\";\n\nregisterXlsxBackends();\nasync function open(file: File) {\n  return fromXlsxWorkbook(await file.arrayBuffer());\n}\n```\n@see\n/docs/guides/xlsx-export/",
+              "documentation": "Register all concrete XLSX backends with the backend-neutral core contracts.\n@example\n```ts\nimport { registerXlsxBackends } from \"@sheetwrite/xlsx\";\nimport { fromXlsxWorkbook } from \"@sheetwrite/core\";\n\nregisterXlsxBackends();\nasync function open(file: File) {\n  return fromXlsxWorkbook(await file.arrayBuffer());\n}\n```\n@see\n/docs/import-export/xlsx-export/",
               "memberDocs": []
             }
           ]

@@ -66,7 +66,7 @@ function CollaborationProofRoute() {
         { label: "Durability", value: "IndexedDB pending queues" },
         { label: "Conflicts", value: "Conservative rebase" },
       ]}
-      guideHref="/docs/guides/collaboration/"
+      guideHref="/docs/features/collaboration/"
       guideLabel="Read the collaboration guide"
       prompt="Use the sequencing lane: take Bram offline, queue one real Grid edit, then reconnect. Then clear 100,000 usage cells on Ana's client and undo them: Bram applies the batch in one transaction."
       slug="collaboration"

@@ -36,6 +36,12 @@ the exposed `Grid` for mutation IDs, acknowledgements, retry, and remote orderin
 
 WASM initializes on client mount. Supply a `#fallback` slot while loading, observe `@initialization-error`, and use `wasm-source` only for explicit asset control.
 
+## New in 0.6.0
+
+- Enable the opt-in ribbon with `:config="{ ribbon: true }"`. It loads only when requested. See [Toolbar and ribbon](https://sheetwrite.vercel.app/docs/features/grid/toolbar-and-ribbon/).
+- Use the exposed `Grid` and `grid.summarizeSelection(signal?)` for a custom status bar. The core shell shows Average, Count and Sum. See [Status bar](https://sheetwrite.vercel.app/docs/features/grid/status-bar/).
+- Core adds packed large undo and sync commits that do not scan the pending queue. Both formula engines add volatile functions, reference operators and iterative calculation. See [Editing and clipboard](https://sheetwrite.vercel.app/docs/features/grid/editing-and-clipboard/), [Collaboration](https://sheetwrite.vercel.app/docs/features/collaboration/) and [Choose an engine](https://sheetwrite.vercel.app/docs/start/choose-an-engine/).
+
 ## Advanced component
 
 ```vue
@@ -65,9 +71,13 @@ first-source warning.
 
 Events are `grid-change`, `viewport-change`, `selection-change`, `edit-begin`, `edit-commit`, `search`, `command-state-change`, `active-sheet-change`, `mutation-rejected`, `renderer-fallback`, `datasource-error`, `export-error`, `ready`, and `initialization-error`. Native DOM change/scroll listeners remain available on the host.
 
-For vanilla/preload control, use `initSheetwrite()` and `createGrid()` from `@sheetwrite/core`. See [installation](https://sheetwrite.vercel.app/docs/start/installation/), [Vue integration](https://sheetwrite.vercel.app/docs/frameworks/vue/), and [collaboration](https://sheetwrite.vercel.app/docs/guides/collaboration/).
+For vanilla/preload control, use `initSheetwrite()` and `createGrid()` from `@sheetwrite/core`. See [installation](https://sheetwrite.vercel.app/docs/start/installation/), [Vue tutorial](https://sheetwrite.vercel.app/docs/tutorials/excel-in-vue/), and [collaboration](https://sheetwrite.vercel.app/docs/features/collaboration/).
 
 XLSX is not installed by this adapter. If the toolbar configuration enables
 XLSX export, install `@sheetwrite/xlsx` and import
 `@sheetwrite/xlsx/register` before the action (or lazily inside its handler).
 CSV/TSV require no optional package.
+
+For workbook streaming and kept XLSX parts, use the registered core workbook
+APIs. See [Large files and streaming](https://sheetwrite.vercel.app/docs/import-export/large-files-and-streaming/)
+and [Kept parts and round trips](https://sheetwrite.vercel.app/docs/import-export/kept-parts-and-round-trips/).

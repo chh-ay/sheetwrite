@@ -18,7 +18,16 @@ The full engine adds these function families:
 | LAMBDA | `LAMBDA`, `MAP`, `REDUCE`, `SCAN`, `BYROW`, `MAKEARRAY` |
 | Grouping | `GROUPBY`, `PIVOTBY`, `PERCENTOF` |
 
-The [formulas guide](https://sheetwrite.vercel.app/docs/guides/formulas/#full-formula-engine) describes the limits, and the [formula function contract](https://sheetwrite.vercel.app/docs/reference/formula-functions/) lists every function with its build. The [analysis formulas guide](https://sheetwrite.vercel.app/docs/guides/analysis-formulas/) shows each family with examples, and the [formula analysis showcase](https://sheetwrite.vercel.app/showcases/formulas/) runs thirteen panels of them live.
+The [engine choice page](https://sheetwrite.vercel.app/docs/start/choose-an-engine/) describes the limits, and the [formula function contract](https://sheetwrite.vercel.app/docs/reference/formula-functions/) lists every function with its build. The [analysis formulas guide](https://sheetwrite.vercel.app/docs/features/formulas/analysis-formulas/) shows each family with examples, and the [formula analysis showcase](https://sheetwrite.vercel.app/showcases/formulas/) runs thirteen panels of them live.
+
+## New in 0.6.0
+
+The full engine has every 0.6.0 engine feature of `@sheetwrite/wasm`:
+
+- volatile recalculation after each cell-changing transaction, and the new `RAND`, `RANDBETWEEN`, `FORMULATEXT`, `ISFORMULA`, `HYPERLINK` and `CELL` functions ([Volatile functions](https://sheetwrite.vercel.app/docs/features/formulas/volatile-functions/))
+- volatile, reference-valued `OFFSET` and `INDIRECT` ([OFFSET and INDIRECT](https://sheetwrite.vercel.app/docs/features/formulas/offset-and-indirect/))
+- intersection, union and 3-D references, `AREAS`, and the optional `INDEX` argument `area_num` ([Operators](https://sheetwrite.vercel.app/docs/features/formulas/operators/))
+- opt-in iterative calculation for circular references; multi-cell spills inside a cycle still return `#CYCLE!` ([Iterative calculation](https://sheetwrite.vercel.app/docs/features/formulas/iterative-calculation/))
 
 ## Reshaping functions
 
@@ -84,7 +93,7 @@ Grouping, aggregation, and output use the existing spill and work limits. Too mu
 
 ## Contributors
 
-The Rust source is in `../wasm`. Do not add a second Rust crate here. Keep this package version aligned with `@sheetwrite/wasm` and keep its loader contract the same.
+The Rust source is in `../wasm`. Do not add a second Rust crate here. Keep the loader contract the same as in `@sheetwrite/wasm`.
 
 Keep family kernels small. Use `analysis::sorted_positions` for stable sorts so Wasm shares one sort implementation. Move owned cell values when a local matrix is no longer needed. Keep the order of floating-point sums unchanged. Compare heavy-case timings and both engine sizes when you change a kernel.
 
@@ -181,4 +190,4 @@ A family is one Rust file that owns a group of functions. Only the full engine c
 
    The contract test fails if a `NAMES` spelling is not in the inventory, if a family file is not registered in `mod.rs`, or if the full engine reports names that the inventory does not list.
 
-6. Build both engines and confirm that the default `packages/wasm/pkg/sheetwrite_wasm_bg.wasm` did not change size. Add a changeset for `@sheetwrite/formulas`.
+6. Build both engines and confirm that the default `packages/wasm/pkg/sheetwrite_wasm_bg.wasm` did not change size.

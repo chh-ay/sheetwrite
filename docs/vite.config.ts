@@ -19,6 +19,8 @@ import remarkMdxFrontmatter from "remark-mdx-frontmatter";
 import { defineConfig, type Plugin } from "vite";
 
 import { dedupeCodePopovers } from "./src/lib/dedupe-code-popovers.ts";
+import { renderGridResults } from "./src/lib/grid-result.ts";
+import { renderSectionCards } from "./src/lib/section-cards.ts";
 import { sheetwriteCodeHovers } from "./src/lib/sheetwrite-code-hovers.ts";
 
 interface HastNode {
@@ -305,6 +307,11 @@ export default defineConfig({
           ],
           // Raw HTML re-parse must run after Expressive Code: it drops fence `data.meta`.
           [rehypeRaw, { passThrough: nodeTypes }],
+          renderGridResults,
+          [
+            renderSectionCards,
+            { contentRoot: new URL("./src/content/docs/", import.meta.url).pathname },
+          ],
           hydrateFormulaReference,
           visualizeReleaseResults,
           dedupeCodePopovers,

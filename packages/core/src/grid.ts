@@ -333,7 +333,7 @@ function adaptiveRowHeaderWidth(theme: Theme, dataRowCount: number): number {
  *
  * await initSheetwrite(undefined, formulas);
  * ```
- * @see /docs/guides/formulas/
+ * @see /docs/start/choose-an-engine/
  * @see createGrid
  */
 export async function initSheetwrite(

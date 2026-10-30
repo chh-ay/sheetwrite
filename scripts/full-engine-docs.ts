@@ -97,7 +97,7 @@ export function renderFullEngineEvidence(
     ...choices,
     "</div>",
     "",
-    "[Browse functions by engine](/docs/reference/formula-functions/) · [Use the full engine](/docs/guides/analysis-formulas/)",
+    "[Browse functions by engine](/docs/reference/formula-functions/) · [Use the full engine](/docs/features/formulas/analysis-formulas/)",
     "",
     ...allMeasurements([
       ...analysisDetail(full),

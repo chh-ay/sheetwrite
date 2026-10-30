@@ -22,7 +22,7 @@ await initSheetwrite(undefined, formulas);
 
 ### See also
 
-- [/docs/guides/formulas/](/docs/guides/formulas/)
+- [/docs/start/choose-an-engine/](/docs/start/choose-an-engine/)
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/loader.d.ts#L30"><code>packages/formulas/loader.d.ts#L30</code></a></dd></div>

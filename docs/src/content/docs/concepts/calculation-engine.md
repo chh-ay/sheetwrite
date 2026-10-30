@@ -1,12 +1,13 @@
 ---
 title: Calculation engine
-description: "How Sheetwrite calculates formulas: two engine builds, incremental recalculation, spills, paged data, errors, and limits."
+description: Understand engine builds, incremental recalculation, spills, paged data, formula errors, volatility, and iteration.
+updated: "0.6.0"
 ---
 
 Sheetwrite calculates formulas in a Rust engine compiled to WebAssembly. The
 TypeScript core sends edits to the engine as transactions, and the engine keeps
 every formula result current. This page explains the model. The
-[formulas guide](/docs/guides/formulas/) has the exact syntax and semantics.
+[formulas guide](/docs/features/formulas/authoring-and-references/) has the exact syntax and semantics.
 
 ## One engine, two builds
 
@@ -16,10 +17,10 @@ every formula result current. This page explains the model. The
 | Full | `@sheetwrite/formulas` | The app needs analysis functions: `GROUPBY`, `PIVOTBY`, `LAMBDA`, statistics, regression, finance, regex, and more. |
 
 Both builds compile from the same source and have the same API, storage, and
-limits. The full build only registers more functions. An app selects one build
-one time, before it creates a Grid or a store, and cannot change it later. See
-[Full formula engine](/docs/start/installation/#full-formula-engine) and the
-[analysis formulas guide](/docs/guides/analysis-formulas/).
+limits. The full build only registers more functions.
+An app selects one build once, before it creates a Grid or a store, and cannot
+change it later. See [Choose an engine](/docs/start/choose-an-engine/) and the
+[analysis formulas guide](/docs/features/formulas/analysis-formulas/).
 
 ## What happens on an edit
 
@@ -39,8 +40,11 @@ the index stays valid.
 
 A formula that reads its own result, directly or through other formulas, is a
 circular reference and shows `#CYCLE!`. When the workbook turns on
-[iterative calculation](/docs/guides/iterative-calculation/), the engine
-calculates the cycle again until its values settle, as Excel does.
+[iterative calculation](/docs/features/formulas/iterative-calculation/), the engine
+calculates each cycle until every value changes by at most the configured tolerance
+or the iteration limit is reached. A cycle that does not converge keeps its last
+values. Iteration defaults to off, with 100 iterations and a maximum change of
+0.001. Multi-cell spilling formulas inside a cycle still show `#CYCLE!`.
 
 ## Spills
 
@@ -52,7 +56,7 @@ the anchor shows `#SPILL!` and no partial result appears.
 `A1#` refers to the current spill of `A1` and follows it when it grows or
 shrinks. When one spill reads another, the engine calculates them in dependency
 order, so the reader always sees current values. Spills that read each other
-show `#CYCLE!`. See [Dynamic arrays and spills](/docs/guides/formulas/#dynamic-arrays-and-spills).
+show `#CYCLE!`. See [Dynamic arrays and spills](/docs/features/formulas/dynamic-arrays-and-spills/#dynamic-arrays-and-spills).
 
 ## Paged data and `#LOADING!`
 
@@ -60,7 +64,7 @@ With a windowed datasource, only some rows are in memory. A formula that reads
 cells that are not loaded yet shows `#LOADING!` and calculates again when they
 arrive. For visible formulas, the Grid asks the engine which same-sheet cells
 they read and loads those cells with the window, within a cell budget. See
-[Cells that visible formulas read](/docs/guides/configuration/#cells-that-visible-formulas-read).
+[Cells that visible formulas read](/docs/features/data/datasources/#cells-that-visible-formulas-read).
 
 ## Errors are values
 
@@ -68,7 +72,7 @@ A formula error is a result, not an exception: `#DIV/0!`, `#N/A`, `#NAME?`,
 `#REF!`, `#VALUE!`, `#NUM!`, `#SPILL!`, `#CALC!`, `#CYCLE!`, and `#LOADING!`.
 Errors flow to dependent formulas, and `IFERROR` can replace them. An unknown
 function returns `#NAME?`, and its source stays in the document, so a later
-engine build can calculate it. See [Scalars, coercion, and errors](/docs/guides/formulas/#scalars-coercion-and-errors).
+engine build can calculate it. See [Scalars, coercion, and errors](/docs/features/formulas/authoring-and-references/#scalars-coercion-and-errors).
 
 ## Limits
 
@@ -92,14 +96,18 @@ recalculation, so every formula in one recalculation sees the same time.
 
 ## Volatile functions
 
-`OFFSET`, `INDIRECT`, `RAND`, `RANDBETWEEN`, `TODAY` and `NOW` are volatile. Each edit recalculates
-them and the formulas that read them, as in Excel. Other formulas recalculate
-only when a cell they read changes. The cost of an edit grows with the number
-of volatile formulas and their dependents, not with the size of the workbook.
+`OFFSET`, `INDIRECT`, `RAND`, `RANDBETWEEN`, `TODAY` and `NOW` are volatile.
+Each transaction that changes cell inputs recalculates them and their dependents,
+as in Excel. A transaction without cell changes recalculates nothing. Other
+formulas recalculate only when a cell they read changes. Workbooks without
+volatile formulas do no extra work; the cost grows with the volatile formulas
+and their dependents, not the workbook size.
+See [Volatile functions](/docs/features/formulas/volatile-functions/).
 
 `OFFSET` and `INDIRECT` choose references during calculation rather than relying
 only on references visible in the formula source. Their results can feed
 reference-taking functions or spill multiple cells. Volatile recalculation keeps
 their runtime-selected targets current; a runtime dependency cycle returns
-`#CYCLE!`. See [dynamic references](/docs/guides/formulas/#dynamic-references)
-for notation, bounds and reference-text rewrite rules.
+`#CYCLE!` when iteration is off. See
+[OFFSET and INDIRECT](/docs/features/formulas/offset-and-indirect/)
+for notation, bounds, and reference-text rewrite rules.

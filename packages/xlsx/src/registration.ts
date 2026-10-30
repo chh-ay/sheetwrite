@@ -21,7 +21,7 @@ import { sheetwriteWorkbookBackend } from "./workbook.js";
  *   return fromXlsxWorkbook(await file.arrayBuffer());
  * }
  * ```
- * @see /docs/guides/xlsx-export/
+ * @see /docs/import-export/xlsx-export/
  */
 export function registerXlsxBackends(): void {
   setXlsxTableExportBackend(sheetwriteTableExportBackend);

@@ -461,8 +461,7 @@ bun run bench:render:validate
 bun run bench:core-paths
 ```
 
-The evidence page at
-`docs/src/content/docs/guides/performance-resources.md` publishes every
+The Performance pages in `docs/src/content/docs/performance/` publish every
 artifact above. `bench:release` captures render-scale, the interaction
 evidence, paged storage, data, core paths, formula, formula engines, matched
 engines, and XLSX, then records the render regression baseline last. Every

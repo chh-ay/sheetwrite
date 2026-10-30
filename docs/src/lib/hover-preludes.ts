@@ -10,7 +10,7 @@
  */
 
 const CORE_TYPES =
-  'import type { AggregateOp, ApplyTransactionResult, CellAddress, CellBorders, CellEditor, CellPaintContext, CellRenderer, CellScalar, CellStyle, ChangeEvent, Column, ColumnarData, ColumnFilter, DataSource, DataValidationRule, DocumentOp, Grid, GridActions, GridCommandName, GridCommandState, GridConfig, GridEvents, GridOptions, HighlightRange, MutationPolicyMode, PersistenceAdapter, ProtectedRange, ProtectionResolver, ReplaceResult, ResolvedCell, RowGroup, SearchOptions, SearchResult, Selection, SheetId, SortKey, Store, SyncCoordinator, Theme, Transaction, VisibleWindowView, Workbook, WorkbookSnapshot } from "@sheetwrite/core";';
+  'import type { AggregateOp, ApplyTransactionResult, CellAddress, CellBorders, CellEditor, CellPaintContext, CellRenderer, CellScalar, CellStyle, ChangeEvent, Column, ColumnarData, ColumnFilter, DataSource, DataValidationRule, DocumentOp, Grid, GridActions, GridCommandName, GridCommandState, GridConfig, GridEvents, GridOptions, GridTransaction, HighlightRange, MutationPolicyMode, PersistenceAdapter, ProtectedRange, ProtectionResolver, RemoteOperationOptions, ReplaceResult, ResolvedCell, RowGroup, SearchOptions, SearchResult, Selection, SheetId, SortKey, Store, SyncCoordinator, Theme, Transaction, VisibleWindowView, Workbook, WorkbookSnapshot } from "@sheetwrite/core";';
 const CORE_VALUES =
   'import { createGrid, createGridFromSnapshot, initSheetwrite, validateWorkbookSnapshot } from "@sheetwrite/core";';
 const CORE_PRELUDE = [

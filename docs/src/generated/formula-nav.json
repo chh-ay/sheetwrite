@@ -1,0 +1,42 @@
+[
+  {
+    "label": "Dynamic array",
+    "href": "/docs/reference/formula-functions/array/"
+  },
+  {
+    "label": "Date and time",
+    "href": "/docs/reference/formula-functions/date-time/"
+  },
+  {
+    "label": "Financial",
+    "href": "/docs/reference/formula-functions/financial/"
+  },
+  {
+    "label": "Information and error",
+    "href": "/docs/reference/formula-functions/information-error/"
+  },
+  {
+    "label": "Logical and control flow",
+    "href": "/docs/reference/formula-functions/logical-control/"
+  },
+  {
+    "label": "Lookup and reference",
+    "href": "/docs/reference/formula-functions/lookup-reference/"
+  },
+  {
+    "label": "Math and trigonometry",
+    "href": "/docs/reference/formula-functions/math/"
+  },
+  {
+    "label": "Statistical",
+    "href": "/docs/reference/formula-functions/statistical/"
+  },
+  {
+    "label": "Text",
+    "href": "/docs/reference/formula-functions/text/"
+  },
+  {
+    "label": "Database",
+    "href": "/docs/reference/formula-functions/database/"
+  }
+]

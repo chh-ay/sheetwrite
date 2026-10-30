@@ -95,7 +95,7 @@ import * as formulas from "@sheetwrite/formulas";
 await initSheetwrite(undefined, formulas);
 ```
 
-Both engines have the same API. Select one before you create a Grid or a store. See [Analysis formulas](https://sheetwrite.vercel.app/docs/guides/analysis-formulas/) and the [function reference](https://sheetwrite.vercel.app/docs/reference/formula-functions/).
+Both engines have the same API. Select one before you create a Grid or a store. See [Choose an engine](https://sheetwrite.vercel.app/docs/start/choose-an-engine/), [Analysis formulas](https://sheetwrite.vercel.app/docs/features/formulas/analysis-formulas/) and the [function reference](https://sheetwrite.vercel.app/docs/reference/formula-functions/).
 
 ## Optional XLSX backend
 
@@ -125,7 +125,7 @@ hyperlinks, and the declared bounded conditional-format subset. Unsupported
 OOXML table/format extensions emit structured warnings instead of silently
 flattening into supported behavior. Calling any XLSX function without
 registration throws an error naming the exact package and registration import.
-CSV and TSV remain core-only. See [XLSX and export](https://sheetwrite.vercel.app/docs/guides/xlsx-export/)
+CSV and TSV remain core-only. See [XLSX export](https://sheetwrite.vercel.app/docs/import-export/xlsx-export/)
 and the [detailed compatibility results](https://sheetwrite.vercel.app/docs/reference/compatibility-results/)
 for the exact supported features, limits, and test evidence.
 
@@ -152,7 +152,7 @@ const backup = grid.exportSnapshot();
 grid.applyRemoteOperations(remoteOperations); // observable, not dirty or undoable
 ```
 
-See [Persistence and collaboration](https://sheetwrite.vercel.app/docs/guides/collaboration/)
+See [Collaboration](https://sheetwrite.vercel.app/docs/features/collaboration/)
 for the host adapter, pending queue, conflict reload, conservative rebase,
 presence, comments, and revisions.
 
@@ -160,13 +160,22 @@ presence, comments, and revisions.
 
 | Package | Purpose |
 |---|---|
-| `@sheetwrite/core` | Imperative grid, store, formulas, views, export, theming |
+| `@sheetwrite/core` | Imperative grid, ribbon, store, formulas, views, export, theming |
 | `@sheetwrite/wasm` | Default Rust/WASM engine; installs with the core |
 | `@sheetwrite/formulas` | Optional full formula engine with analysis functions |
 | `@sheetwrite/xlsx` | Optional concrete XLSX table/workbook backends and explicit registration |
 | `@sheetwrite/react` | React `Sheetwrite` and `SheetwriteGrid` |
 | `@sheetwrite/vue` | Vue `Sheetwrite` and `SheetwriteGrid` |
 | `@sheetwrite/svelte` | Svelte `Sheetwrite` and `SheetwriteGrid` |
+
+## New in 0.6.0
+
+- **Ribbon.** An opt-in Excel-style ribbon with Home, Insert, Data and View tabs, in `@sheetwrite/core`. See [Toolbar and ribbon](https://sheetwrite.vercel.app/docs/features/grid/toolbar-and-ribbon/).
+- **Status bar.** The shell shows the Average, Count and Sum of the selection. `Grid.summarizeSelection()` gives the totals to your own status bar. See [Status bar](https://sheetwrite.vercel.app/docs/features/grid/status-bar/).
+- **Formulas.** Both engines add `RAND`, `RANDBETWEEN`, `FORMULATEXT`, `ISFORMULA`, `HYPERLINK`, `CELL`, `OFFSET`, `INDIRECT` and `AREAS`. Volatile formulas recalculate after each cell-changing transaction. Formulas accept intersection, union and 3-D references. Opt-in iterative calculation supports circular references; multi-cell spills inside a cycle still return `#CYCLE!`. See [Volatile functions](https://sheetwrite.vercel.app/docs/features/formulas/volatile-functions/), [OFFSET and INDIRECT](https://sheetwrite.vercel.app/docs/features/formulas/offset-and-indirect/), [Operators](https://sheetwrite.vercel.app/docs/features/formulas/operators/) and [Iterative calculation](https://sheetwrite.vercel.app/docs/features/formulas/iterative-calculation/).
+- **XLSX.** Workbook import and export keep unmodeled parts within resource limits. Cell edits drop kept charts and pivot tables with a warning; structural edits drop affected images. CSV, TSV and XLSX export can stream, and workbook import can read a `Blob`. LibreOffice round-trip fixes cover alignment, dimensions and link text. See [Kept parts and round trips](https://sheetwrite.vercel.app/docs/import-export/kept-parts-and-round-trips/), [Large files and streaming](https://sheetwrite.vercel.app/docs/import-export/large-files-and-streaming/) and [LibreOffice compatibility](https://sheetwrite.vercel.app/docs/import-export/libreoffice-compatibility/).
+- **Undo and sync.** Undo of a large range is faster and uses less memory. A local commit costs the same at any offline queue depth. See [Editing and clipboard](https://sheetwrite.vercel.app/docs/features/grid/editing-and-clipboard/) and [Collaboration](https://sheetwrite.vercel.app/docs/features/collaboration/).
+- **Charts.** A charts package is planned. See [issue #192](https://github.com/chh-ay/sheetwrite/issues/192).
 
 ## Compatibility
 
@@ -180,10 +189,10 @@ and [compatibility limits](https://sheetwrite.vercel.app/docs/reference/compatib
 
 ## Releases
 
-All packages release together with one version number. The
-[release notes](https://sheetwrite.vercel.app/docs/releases/) list what is new,
-the measured performance, and the upgrade steps for each version. Each package
-also has a `CHANGELOG.md`, linked from the root [changelog](CHANGELOG.md).
+The [release notes](https://sheetwrite.vercel.app/docs/releases/) list new features,
+measured performance and upgrade steps. Each package also has a `CHANGELOG.md`,
+linked from the root [changelog](CHANGELOG.md). Contributor release instructions
+are in [CONTRIBUTING](CONTRIBUTING.md).
 
 ## Development
 

@@ -1,6 +1,8 @@
 import { copyFile, lstat, mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
+import { MOVED_PAGES } from "../docs/src/lib/moved-pages.js";
+
 const repositoryRoot = resolve(import.meta.dir, "..");
 const requiredFiles = [
   "index.html",
@@ -85,6 +87,13 @@ export async function prepareDocsDeployment(root = repositoryRoot): Promise<void
             src,
             headers: { "cache-control": IMMUTABLE_CACHE },
             continue: true,
+          })),
+          // Moved docs pages answer with a permanent redirect; the new page
+          // forwards an old #fragment itself, because a server never sees it.
+          ...Object.entries(MOVED_PAGES).map(([from, page]) => ({
+            src: `^${from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\/$/, "")}/?$`,
+            status: 308,
+            headers: { Location: page.to },
           })),
           { src: "^/$", dest: "/index.html" },
           ...[...files.keys()]

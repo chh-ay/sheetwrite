@@ -307,7 +307,10 @@ export const COMPATIBILITY_INVENTORY: readonly CompatibilityRecord[] = [
       "At most 126 bindings and 16,384 expanded AST nodes are admitted; LET does not define or execute reusable functions.",
     source:
       "https://support.microsoft.com/en-us/office/let-function-34842dd8-b92b-4d3f-b325-b8b8f9908999",
-    evidence: ["packages/wasm/src/tests.rs", "docs/src/content/docs/guides/formulas.md"],
+    evidence: [
+      "packages/wasm/src/tests.rs",
+      "docs/src/content/docs/features/formulas/authoring-and-references.md",
+    ],
     fixtureIds: ["formula-engine-vectors"],
     importBehavior:
       "Recognized LET source evaluates within the bounded lexical subset; invalid names, arity, or resource expansion return explicit formula errors.",
@@ -331,7 +334,7 @@ export const COMPATIBILITY_INVENTORY: readonly CompatibilityRecord[] = [
       "https://support.microsoft.com/en-us/office/lambda-function-bd212d27-1cd1-4321-a34a-ccbf254b8b67",
     evidence: [
       "packages/wasm/src/eval/analysis/lambda.rs",
-      "docs/src/content/docs/guides/analysis-formulas.md",
+      "docs/src/content/docs/features/formulas/analysis-formulas.md",
     ],
     fixtureIds: ["formula-engine-vectors"],
     importBehavior:

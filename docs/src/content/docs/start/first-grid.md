@@ -67,7 +67,7 @@ grid.applyTransaction({
 console.log(grid.store.getCell({ sheet: "sales", row: 2, col: 1 }).resolved); // 16
 ```
 
-Users can type the same formula in the cell. To use `GROUPBY`, `LAMBDA`, regression, and the other analysis functions, select the [full formula engine](/docs/guides/analysis-formulas/) before you create the grid.
+Users can type the same formula in the cell. To use `GROUPBY`, `LAMBDA`, regression, and the other analysis functions, select the [full formula engine](/docs/features/formulas/analysis-formulas/) before you create the grid.
 
 ## Save and open the document
 
@@ -81,7 +81,7 @@ const reopened = createGridFromSnapshot(host, JSON.parse(saved));
 console.log(reopened.store.getCell({ sheet: "sales", row: 2, col: 1 }).resolved); // 16
 ```
 
-For a server, save each change as an ordered operation instead of whole snapshots. The [persistence guide](/docs/guides/persistence/) explains the adapter and the offline queue.
+For a server, save each change as an ordered operation instead of whole snapshots. The [persistence guide](/docs/features/data/persistence/) explains the adapter and the offline queue.
 
 ## Next steps
 

@@ -305,7 +305,7 @@ async function main(): Promise<void> {
       "",
       smoke
         ? "Nothing was published. Run without --smoke for the release evidence."
-        : "Next: commit these artifacts, then `bun run docs:generate` regenerates docs/src/content/docs/guides/performance-resources.md from them.",
+        : "Next: commit these artifacts, then `bun run docs:generate` regenerates the Performance pages in docs/src/content/docs/performance/ from them.",
       "",
     ].join("\n"),
   );

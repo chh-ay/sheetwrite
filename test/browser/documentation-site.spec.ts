@@ -81,6 +81,40 @@ for (const [width, hasDesktopOutline] of [
   });
 }
 
+test("a moved page redirects permanently and forwards its old heading link", async ({
+  page,
+  request,
+}) => {
+  const redirect = await request.get(docsUrl("guides/configuration/"), { maxRedirects: 0 });
+  expect(redirect.status()).toBe(308);
+  expect(redirect.headers().location).toBe("/docs/features/grid/options-and-presentation/");
+
+  // The heading moved to another page than the redirect target; the target forwards it.
+  await page.goto(docsUrl("guides/configuration/#datasource-pages"));
+  await expect(page).toHaveURL(/\/docs\/features\/data\/datasources\/#requests-and-pages$/);
+  await expect(page.locator("#requests-and-pages")).toBeVisible();
+});
+
+test("feature overview cards lead to short examples and formatted result sheets", async ({
+  page,
+}) => {
+  await page.goto(docsUrl("features/formatting/"));
+  await waitForHydration(page);
+  const cards = page.locator(".sw-section-cards");
+  await cards.getByRole("link", { name: /Number formats/ }).click();
+  await expect(page).toHaveURL(/\/docs\/features\/formatting\/number-formats\/$/);
+  const result = page.locator(".sw-grid-result").first();
+  await expect(result.getByRole("columnheader", { name: "A", exact: true })).toBeVisible();
+  await expect(result.getByRole("cell", { name: "1.234,50", exact: true })).toBeVisible();
+  const setup = page
+    .locator("details")
+    .filter({ has: page.locator("summary", { hasText: "Full setup" }) })
+    .first();
+  await expect(setup).not.toHaveAttribute("open");
+  await setup.locator("summary").click();
+  await expect(setup.locator("pre")).toBeVisible();
+});
+
 test("sidebar marks only the nearest documentation route as current", async ({ page }) => {
   for (const [path, label] of [
     ["start/first-grid/", "First grid"],
@@ -394,7 +428,8 @@ test.describe("documentation site", () => {
   test("documentation search excludes browser-only test routes", async ({ page }) => {
     const { dialog, input } = await openSearch(page);
     // The query must first return real documentation results, or the check below proves nothing.
-    await input.fill("XLSX browser verification");
+    // Both words are in the test route's title and in the kept-parts guide.
+    await input.fill("XLSX verification");
     await expect(dialog.locator(`a[href^='${SITE_BASE}/docs/']`).first()).toBeVisible({
       timeout: 15_000,
     });

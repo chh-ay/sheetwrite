@@ -171,43 +171,43 @@ function DocsOverview() {
             <h2 id="build-features">Build a feature</h2>
           </div>
           <div className="sw-doc-recipes">
-            <Link to="/docs/$/" params={{ _splat: "guides/configuration" }}>
+            <Link to="/docs/$/" params={{ _splat: "features/grid/options-and-presentation" }}>
               <strong>Configure a grid</strong>
               <span>Options, shell, and rendering</span>
             </Link>
-            <Link to="/docs/$/" params={{ _splat: "guides/interaction" }}>
+            <Link to="/docs/$/" params={{ _splat: "features/grid/selection-and-keyboard" }}>
               <strong>Editing & interaction</strong>
               <span>Selection, clipboard, and validation</span>
             </Link>
-            <Link to="/docs/$/" params={{ _splat: "guides/data-operations" }}>
+            <Link to="/docs/$/" params={{ _splat: "features/data/data-operations" }}>
               <strong>Connect your data</strong>
               <span>Rows, transactions, and datasources</span>
             </Link>
-            <Link to="/docs/$/" params={{ _splat: "guides/formulas" }}>
+            <Link to="/docs/$/" params={{ _splat: "features/formulas/authoring-and-references" }}>
               <strong>Work with formulas</strong>
               <span>Expressions, references, and functions</span>
             </Link>
-            <Link to="/docs/$/" params={{ _splat: "guides/analysis-formulas" }}>
+            <Link to="/docs/$/" params={{ _splat: "features/formulas/analysis-formulas" }}>
               <strong>Analyze data</strong>
               <span>Group, pivot, forecast, and clean text</span>
             </Link>
-            <Link to="/docs/$/" params={{ _splat: "guides/host-owned-rows" }}>
+            <Link to="/docs/$/" params={{ _splat: "features/data/host-owned-rows" }}>
               <strong>Use your own row store</strong>
               <span>Host-owned rows and entity IDs</span>
             </Link>
-            <Link to="/docs/$/" params={{ _splat: "guides/persistence" }}>
+            <Link to="/docs/$/" params={{ _splat: "features/data/persistence" }}>
               <strong>Save & recover</strong>
               <span>Snapshots, pending work, and large undo</span>
             </Link>
-            <Link to="/docs/$/" params={{ _splat: "guides/collaboration" }}>
+            <Link to="/docs/$/" params={{ _splat: "features/collaboration" }}>
               <strong>Collaborate</strong>
               <span>Ordered commits, offline work, and rebase</span>
             </Link>
-            <Link to="/docs/$/" params={{ _splat: "guides/styling" }}>
+            <Link to="/docs/$/" params={{ _splat: "features/formatting/styles" }}>
               <strong>Style the grid</strong>
               <span>Themes, cell styles, and number formats</span>
             </Link>
-            <Link to="/docs/$/" params={{ _splat: "guides/xlsx-export" }}>
+            <Link to="/docs/$/" params={{ _splat: "import-export/xlsx-export" }}>
               <strong>Import & export</strong>
               <span>XLSX, CSV, and workbook interchange</span>
             </Link>

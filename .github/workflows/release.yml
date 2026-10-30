@@ -123,5 +123,5 @@ jobs:
           body: "Automated registry size history captured after the verified npm publication."
           add-paths: |
             scripts/size-history.json
-            docs/src/content/docs/guides/performance-resources.md
+            docs/src/content/docs/performance/delivery-size.md
             docs/src/generated/docs-contract.json

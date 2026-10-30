@@ -12,60 +12,118 @@ Sheetwrite packages are released together at version 0.5.4. This index is genera
 
 1. Choose one base package for your framework: `@sheetwrite/core` for vanilla, or `@sheetwrite/react`, `@sheetwrite/vue`, or `@sheetwrite/svelte`. Adapters bring core and the WebAssembly engine transitively and expose a package-local `styles.css`. Add optional feature packages, such as `@sheetwrite/xlsx`, only when the relevant guide requires them.
 2. Initialize the runtime before mounting a grid. The imperative core awaits `initSheetwrite()` once per document; framework components initialize WebAssembly automatically after client mount, so server-rendered hosts need a client-only boundary.
-3. The host owns the document. Sheetwrite never mutates host rows, so read Runtime ownership and Adapter lifecycle before choosing `defaultRows` seeding or explicit `workbook` plus `data`/`datasource` ownership.
-4. Readiness is generation-scoped: adapters publish `{ grid, generation, reason }` with reason `initial`, `input-reset`, or `renderer-reset`, and replacing reset-bound inputs replaces the grid. Destroy the grid when its host element's lifetime ends.
-5. Verify every symbol, option, event, and error code against the public API declarations in `llms-full.txt` or the generated API pages before using it. Anything absent from those declarations is not public API.
-6. Recover through typed errors with stable codes (Error handling), and read Compatibility and limits before claiming Excel, Google Sheets, LibreOffice, or OpenFormula parity.
+3. Choose the formula engine once, before the first Grid or store: `@sheetwrite/wasm` is the default; `@sheetwrite/formulas` is the full engine with the analysis families, selected with `import * as formulas from "@sheetwrite/formulas"; await initSheetwrite(undefined, formulas);`. A function the active engine lacks evaluates to `#NAME?`. Read Choose an engine and the Formula function contract before you use a function.
+4. Formulas follow the documented Excel rules, not assumptions: `OFFSET`, `INDIRECT`, `RAND`, `RANDBETWEEN`, `TODAY` and `NOW` are volatile and recalculate after each edit; space is the intersection operator, a parenthesized comma list is a union, and `Jan:Mar!B2` is a 3-D reference; a circular reference shows `#CYCLE!` unless the workbook turns on iterative calculation, a document setting that snapshots and XLSX files keep.
+5. Built-in chrome is opt-in: `config` shows the toolbar and `config: { ribbon: true }` shows the Excel-style ribbon. XLSX import and export need `@sheetwrite/xlsx` and `import "@sheetwrite/xlsx/register"`; workbook import keeps parts Sheetwrite does not model and writes them back on save.
+6. The host owns the document. Sheetwrite never mutates host rows, so read Runtime ownership and Adapter lifecycle before choosing `defaultRows` seeding or explicit `workbook` plus `data`/`datasource` ownership.
+7. Readiness is generation-scoped: adapters publish `{ grid, generation, reason }` with reason `initial`, `input-reset`, or `renderer-reset`, and replacing reset-bound inputs replaces the grid. Destroy the grid when its host element's lifetime ends.
+8. Verify every symbol, option, event, and error code against the public API declarations in `llms-full.txt` or the generated API pages before using it. Anything absent from those declarations is not public API.
+9. Recover through typed errors with stable codes (Error handling), and read Compatibility and limits before claiming Excel, Google Sheets, LibreOffice, or OpenFormula parity.
 
-## Start
+## Getting started
 
 - [Installation](https://sheetwrite.vercel.app/docs/start/installation/): Install Sheetwrite for Vanilla, React, Vue, or Svelte and initialize its WebAssembly runtime.
 - [Your first grid](https://sheetwrite.vercel.app/docs/start/first-grid/): Initialize Sheetwrite, create a workbook, and observe committed changes.
+- [Choose an engine](https://sheetwrite.vercel.app/docs/start/choose-an-engine/): Use the default engine for standard formulas or select the full engine for analysis functions.
+- [Upgrade to 0.6.0](https://sheetwrite.vercel.app/docs/start/upgrade-to-0-6-0/): Review formula recalculation, document protocol, XLSX fidelity, and optional UI changes before upgrading.
 
-## Ownership and lifecycle
-
-- [Runtime ownership](https://sheetwrite.vercel.app/docs/concepts/runtime-ownership/): Understand Sheetwrite runtime, renderer, store, virtualization, and document ownership boundaries.
-- [Adapter lifecycle](https://sheetwrite.vercel.app/docs/frameworks/lifecycle/): Initialization, readiness, resets, and transaction ownership across every Sheetwrite framework adapter.
-
-## Framework adapters
+## Frameworks
 
 - [Vanilla JavaScript](https://sheetwrite.vercel.app/docs/frameworks/vanilla/): Own Sheetwrite initialization and Grid lifetime without a framework adapter.
 - [React](https://sheetwrite.vercel.app/docs/frameworks/react/): Integrate Sheetwrite with React ownership, readiness, and controlled resets.
 - [Vue](https://sheetwrite.vercel.app/docs/frameworks/vue/): Integrate Sheetwrite with Vue events, exposed Grid state, and resets.
 - [Svelte](https://sheetwrite.vercel.app/docs/frameworks/svelte/): Integrate Sheetwrite with Svelte bindings, callbacks, and reset ownership.
+- [Adapter lifecycle](https://sheetwrite.vercel.app/docs/frameworks/lifecycle/): Initialization, readiness, resets, and transaction ownership across every Sheetwrite framework adapter.
 
-## Guides
+## Concepts
 
-- [Configuration](https://sheetwrite.vercel.app/docs/guides/configuration/): Configure data ownership, rendering, interaction, theming, protection, and toolbar behavior.
-- [Interaction and editing](https://sheetwrite.vercel.app/docs/guides/interaction/): Configure selection, editing, clipboard, validation, protection, search, merge, and fill behavior.
-- [Data operations and export](https://sheetwrite.vercel.app/docs/guides/data-operations/): Sort, filter, aggregate, load paged data, and export CSV, TSV, tables, or workbooks.
-- [Formulas](https://sheetwrite.vercel.app/docs/guides/formulas/): Use Sheetwrite formula syntax, references, functions, errors, and compatibility limits.
-- [Styling and theming](https://sheetwrite.vercel.app/docs/guides/styling/): Customize Sheetwrite with package CSS, theme tokens, cell styles, borders, and number formats.
-- [Persistence and recovery](https://sheetwrite.vercel.app/docs/guides/persistence/): Persist versioned snapshots and durable pending mutations without confusing session state with document state.
-- [Collaboration and offline work](https://sheetwrite.vercel.app/docs/guides/collaboration/): Sequence, persist, acknowledge, retry, and conservatively rebase Sheetwrite document operations.
-- [Worker rendering](https://sheetwrite.vercel.app/docs/guides/worker-rendering/): Configure OffscreenCanvas worker painting and understand capability-based main-thread fallback.
-- [XLSX and export](https://sheetwrite.vercel.app/docs/guides/xlsx-export/): Register the optional XLSX backend and choose table or workbook interchange deliberately.
-- [Accessibility](https://sheetwrite.vercel.app/docs/guides/accessibility/): Understand the ARIA grid mirror, keyboard behavior, focus, and visible-window accessibility limits.
-- [Keep app rows in your store](https://sheetwrite.vercel.app/docs/guides/host-owned-rows/): Use the row bridge when your app owns the row objects and Sheetwrite owns editing, history, sorting, and filtering. The bridge is optional. Without `getRowId`, `defaultRows` keeps its existing one-ti…
+- [Runtime ownership](https://sheetwrite.vercel.app/docs/concepts/runtime-ownership/): Understand Sheetwrite runtime, renderer, store, virtualization, and document ownership boundaries.
+- [Calculation engine](https://sheetwrite.vercel.app/docs/concepts/calculation-engine/): Understand engine builds, incremental recalculation, spills, paged data, formula errors, volatility, and iteration.
+- [Documents and operations](https://sheetwrite.vercel.app/docs/concepts/documents-and-operations/): Understand authoritative workbook snapshots, document operations, storage transactions, and cell inputs.
+- [Error handling](https://sheetwrite.vercel.app/docs/concepts/error-handling/): Typed failures, stable codes, recovery paths, event direction, validation, and incomplete-data behavior.
 
-## Contracts and reference
+## Features
+
+### Grid
+
+- [Grid](https://sheetwrite.vercel.app/docs/features/grid/): Set up the grid, add commands, and control how users select and edit cells.
+- [Grid options and presentation](https://sheetwrite.vercel.app/docs/features/grid/options-and-presentation/): Configure a grid with GridOptions and choose spreadsheet or data-grid headers.
+- [Toolbar and ribbon](https://sheetwrite.vercel.app/docs/features/grid/toolbar-and-ribbon/): Show the built-in flat toolbar or the Excel-style ribbon, and drive host chrome from command state.
+- [Selection and keyboard](https://sheetwrite.vercel.app/docs/features/grid/selection-and-keyboard/): Read and set the selection, navigate with the keyboard, and rebind or add shortcuts.
+- [Editing and clipboard](https://sheetwrite.vercel.app/docs/features/grid/editing-and-clipboard/): Edit cells inline, copy and paste with other spreadsheet apps, and undo or redo changes.
+- [Custom editors](https://sheetwrite.vercel.app/docs/features/grid/custom-editors/): Replace the stock cell editor with a host-supplied editor for a column.
+- [Resize, merge and fill](https://sheetwrite.vercel.app/docs/features/grid/resize-merge-and-fill/): Resize rows and columns, merge cells, and fill a range with the fill handle.
+- [Context menu](https://sheetwrite.vercel.app/docs/features/grid/context-menu/): Configure the built-in right-click menu, build your own menu, and draw temporary highlights.
+- [Search](https://sheetwrite.vercel.app/docs/features/grid/search/): Find matching cells, step through matches, and replace text from code or with Ctrl+F.
+- [Status bar](https://sheetwrite.vercel.app/docs/features/grid/status-bar/): Show Excel-style Average, Count and Sum for the selected cells, or read the totals yourself.
+- [Touch](https://sheetwrite.vercel.app/docs/features/grid/touch/): How the grid handles taps and drags from touch, pen, and mouse input.
+- [Grid methods](https://sheetwrite.vercel.app/docs/features/grid/grid-methods/): The imperative Grid handle that createGrid returns, grouped by task.
+
+### Formatting
+
+- [Formatting](https://sheetwrite.vercel.app/docs/features/formatting/): Set cell styles, fonts, alignment, number formats, and conditional formats.
+- [Styles and themes](https://sheetwrite.vercel.app/docs/features/formatting/styles/): Style the canvas with a theme, CSS custom properties, cell styles, and borders.
+- [Fonts and alignment](https://sheetwrite.vercel.app/docs/features/formatting/fonts-and-alignment/): Set the font family, size, emphasis, horizontal and vertical alignment, and text wrap of cells.
+- [Number formats](https://sheetwrite.vercel.app/docs/features/formatting/number-formats/): Show numbers and dates with Excel-style format codes and an explicit locale.
+- [Conditional formats](https://sheetwrite.vercel.app/docs/features/formatting/conditional-formats/): Style cells from their values with ordered comparison, text, blank and formula rules.
+
+### Data
+
+- [Data](https://sheetwrite.vercel.app/docs/features/data/): Sort and filter data, load rows, validate input, and save documents.
+- [Data operations](https://sheetwrite.vercel.app/docs/features/data/data-operations/): Sort, filter, hide, group and aggregate rows, then set frozen panes and zoom.
+- [Datasources](https://sheetwrite.vercel.app/docs/features/data/datasources/): Load rows on demand from an async, cancellable datasource instead of eager data.
+- [Keep app rows in your store](https://sheetwrite.vercel.app/docs/features/data/host-owned-rows/): Keep application row objects in your store while Sheetwrite projects edits through stable row IDs.
+- [Validation, protection and notes](https://sheetwrite.vercel.app/docs/features/data/validation-protection-and-notes/): Restrict what users can enter, protect ranges from local edits, and attach plain-text notes to cells.
+- [Persistence and recovery](https://sheetwrite.vercel.app/docs/features/data/persistence/): Persist versioned snapshots and durable pending mutations without confusing session state with document state.
+
+### Formulas
+
+- [Formulas](https://sheetwrite.vercel.app/docs/features/formulas/): Write formulas, work with references and arrays, and control recalculation.
+- [Authoring and references](https://sheetwrite.vercel.app/docs/features/formulas/authoring-and-references/): Store formula sources, use references and local names, and handle scalar values and errors.
+- [Operators](https://sheetwrite.vercel.app/docs/features/formulas/operators/): Combine values and references with spreadsheet operators, intersections, unions, and 3-D sheet spans.
+- [Dynamic arrays and spills](https://sheetwrite.vercel.app/docs/features/formulas/dynamic-arrays-and-spills/): Return rectangular formula results and reference their derived spill cells.
+- [OFFSET and INDIRECT](https://sheetwrite.vercel.app/docs/features/formulas/offset-and-indirect/): Choose reference targets at calculation time with OFFSET and INDIRECT.
+- [Volatile functions](https://sheetwrite.vercel.app/docs/features/formulas/volatile-functions/): Recalculate random values and runtime references on edits, or supply a fixed UTC clock instant.
+- [Iterative calculation](https://sheetwrite.vercel.app/docs/features/formulas/iterative-calculation/): Calculate circular references the way Excel does: turn on iterative calculation, set the maximum iterations and maximum change, and save the setting in snapshots and XLSX files.
+- [Lookup, criteria, and financial formulas](https://sheetwrite.vercel.app/docs/features/formulas/lookup-criteria-and-financial/): Find values, aggregate matching cells, and calculate cash flows with explicit shape and error rules.
+- [Analysis formulas](https://sheetwrite.vercel.app/docs/features/formulas/analysis-formulas/): Summarize, forecast, and clean data with the full formula engine. Worked examples for every function family in @sheetwrite/formulas.
+- [Collaboration and offline work](https://sheetwrite.vercel.app/docs/features/collaboration/): Sequence, persist, acknowledge, retry, and conservatively rebase Sheetwrite document operations.
+- [Worker rendering](https://sheetwrite.vercel.app/docs/features/worker-rendering/): Configure OffscreenCanvas worker painting and understand capability-based main-thread fallback.
+- [Accessibility](https://sheetwrite.vercel.app/docs/features/accessibility/): Understand the ARIA grid mirror, keyboard behavior, focus, and visible-window accessibility limits.
+
+## Import and export
+
+- [XLSX import](https://sheetwrite.vercel.app/docs/import-export/xlsx-import/): Import workbook snapshots or rectangular tables with explicit fidelity warnings.
+- [XLSX export](https://sheetwrite.vercel.app/docs/import-export/xlsx-export/): Download an active-sheet table or save a workbook with formulas and supported formatting.
+- [CSV and TSV](https://sheetwrite.vercel.app/docs/import-export/csv-and-tsv/): Exchange plain table values without installing the optional XLSX package.
+- [Kept parts and round trips](https://sheetwrite.vercel.app/docs/import-export/kept-parts-and-round-trips/): Keep eligible unmodelled XLSX parts as original compressed bytes and surface losses after edits.
+- [Large files and streaming](https://sheetwrite.vercel.app/docs/import-export/large-files-and-streaming/): Read seekable files and write bounded chunks while retaining explicit XLSX resource limits.
+- [LibreOffice compatibility](https://sheetwrite.vercel.app/docs/import-export/libreoffice-compatibility/): Understand the checked LibreOffice round trips, display fixes and known producer differences.
+
+## Tutorials
+
+- [Excel in JavaScript](https://sheetwrite.vercel.app/docs/tutorials/excel-in-javascript/): Open an XLSX table, edit it in a browser Grid, and download a workbook without a framework.
+- [Excel in React](https://sheetwrite.vercel.app/docs/tutorials/excel-in-react/): Open an XLSX table, edit it in React, and download the current workbook.
+- [Excel in Vue](https://sheetwrite.vercel.app/docs/tutorials/excel-in-vue/): Open an XLSX table, edit it in Vue, and download the current workbook.
+- [Excel in Svelte](https://sheetwrite.vercel.app/docs/tutorials/excel-in-svelte/): Open an XLSX table, edit it in Svelte, and download the current workbook.
+- [Excel in Node.js](https://sheetwrite.vercel.app/docs/tutorials/excel-in-nodejs/): Read real XLSX file bytes and save a workbook snapshot on the server without a DOM.
+- [Spreadsheet app with a ribbon](https://sheetwrite.vercel.app/docs/tutorials/spreadsheet-app-with-ribbon/): Build a disposable spreadsheet shell with a ribbon, formula bar, sheet tabs and XLSX file controls.
+
+## Reference
 
 - [Public API contract](https://sheetwrite.vercel.app/docs/reference/api-contract/): How Sheetwrite defines supported entry points, declaration stability, and generated reference pages.
 - [Document operations](https://sheetwrite.vercel.app/docs/reference/document-operations/): Transaction boundaries, local and remote application, snapshot validation, and conservative rebase.
-- [Error handling](https://sheetwrite.vercel.app/docs/reference/events-errors/): Typed failures, stable codes, recovery paths, event direction, validation, and incomplete-data behavior.
+- [Events](https://sheetwrite.vercel.app/docs/reference/events/): Grid events, their payloads, and which events carry committed document changes.
 - [Compatibility and limits](https://sheetwrite.vercel.app/docs/reference/compatibility-limits/): Explicit compatibility boundaries, resource ceilings, tuning defaults, limit behavior, and override paths.
 
-## More guides
+## Release notes
 
-- [Calculation engine](https://sheetwrite.vercel.app/docs/concepts/calculation-engine/): How Sheetwrite calculates formulas: two engine builds, incremental recalculation, spills, paged data, errors, and limits.
-- [Analysis formulas](https://sheetwrite.vercel.app/docs/guides/analysis-formulas/): Summarize, forecast, and clean data with the full formula engine. Worked examples for every function family in @sheetwrite/formulas.
-- [Iterative calculation](https://sheetwrite.vercel.app/docs/guides/iterative-calculation/): Calculate circular references the way Excel does: turn on iterative calculation, set the maximum iterations and maximum change, and save the setting in snapshots and XLSX files.
 - [Releases](https://sheetwrite.vercel.app/docs/releases/): Release notes for each Sheetwrite version, with new features, changes, fixes, performance results, and upgrade steps.
-- [Sheetwrite 0.5.0](https://sheetwrite.vercel.app/docs/releases/0.5.0/): The full formula engine, spill references, large undo, in-place conflict recovery, engine memory release, bounded string storage, faster loading and import, breaking changes, every fix, and the upgrade checklist for Sheetwrite 0.5.0.
-- [Sheetwrite 0.5.1](https://sheetwrite.vercel.app/docs/releases/0.5.1/): Typed shortcuts, busy states and visible command errors, restored column sum performance, redesigned documentation, and the upgrade checklist for Sheetwrite 0.5.1.
-- [Sheetwrite 0.5.2](https://sheetwrite.vercel.app/docs/releases/0.5.2/): Smaller npm packages, lower CSV import memory, shifted keyboard shortcuts, the Brotli security update for Bun and Node, redesigned documentation, and the upgrade checklist for Sheetwrite 0.5.2.
-- [Sheetwrite 0.5.3](https://sheetwrite.vercel.app/docs/releases/0.5.3/): Readable published JavaScript again, package READMEs with install commands for every package manager, and the upgrade checklist for Sheetwrite 0.5.3.
 - [Sheetwrite 0.5.4](https://sheetwrite.vercel.app/docs/releases/0.5.4/): No more missing source map references, release notes with size charts, and the upgrade checklist for Sheetwrite 0.5.4.
+- [Sheetwrite 0.5.3](https://sheetwrite.vercel.app/docs/releases/0.5.3/): Readable published JavaScript again, package READMEs with install commands for every package manager, and the upgrade checklist for Sheetwrite 0.5.3.
+- [Sheetwrite 0.5.2](https://sheetwrite.vercel.app/docs/releases/0.5.2/): Smaller npm packages, lower CSV import memory, shifted keyboard shortcuts, the Brotli security update for Bun and Node, redesigned documentation, and the upgrade checklist for Sheetwrite 0.5.2.
+- [Sheetwrite 0.5.1](https://sheetwrite.vercel.app/docs/releases/0.5.1/): Typed shortcuts, busy states and visible command errors, restored column sum performance, redesigned documentation, and the upgrade checklist for Sheetwrite 0.5.1.
+- [Sheetwrite 0.5.0](https://sheetwrite.vercel.app/docs/releases/0.5.0/): The full formula engine, spill references, large undo, in-place conflict recovery, engine memory release, bounded string storage, faster loading and import, breaking changes, every fix, and the upgrade checklist for Sheetwrite 0.5.0.
 
 ## Public API
 
@@ -83,8 +141,26 @@ Sheetwrite packages are released together at version 0.5.4. This index is genera
 
 These pages are generated from checked inventories and evidence. Their tables are published as HTML, not reproduced as plain text, so fetch these links directly.
 
-- [Performance and delivery evidence](https://sheetwrite.vercel.app/docs/guides/performance-resources/): Freshness-gated benchmark and package-size evidence for Sheetwrite.
+- [Performance](https://sheetwrite.vercel.app/docs/performance/): Benchmark and package-size evidence for Sheetwrite, one page per area.
+- [Benchmark protocol](https://sheetwrite.vercel.app/docs/performance/benchmark-protocol/): How the evidence is captured, and how to check a change for a timing regression.
+- [Core write path](https://sheetwrite.vercel.app/docs/performance/core-write-path/): Timings of store and document writes at production sizes.
+- [Data engine performance](https://sheetwrite.vercel.app/docs/performance/data-engine/): Ingest, window read, edit, sort, filter, and aggregate timings of the data store.
+- [Delivery size](https://sheetwrite.vercel.app/docs/performance/delivery-size/): Published package sizes for each Sheetwrite release.
+- [Formula engine performance](https://sheetwrite.vercel.app/docs/performance/formula-engine/): Recalculation timings by dependency shape, and how the two engine builds compare.
+- [Memory](https://sheetwrite.vercel.app/docs/performance/memory/): Release retained engine memory, and read which owner holds each byte.
+- [Render performance](https://sheetwrite.vercel.app/docs/performance/render/): Scroll, edit, and interaction timings of the live grid, measured against Handsontable.
+- [XLSX codec performance](https://sheetwrite.vercel.app/docs/performance/xlsx-codec/): Import and export time and peak memory for XLSX files.
 - [Detailed compatibility results](https://sheetwrite.vercel.app/docs/reference/compatibility-results/): Checked formula, workbook, clipboard, and XLSX examples with exact sources and limits.
 - [Formula function contract](https://sheetwrite.vercel.app/docs/reference/formula-functions/): Generated, source-linked formula names, signatures, semantics, dialect status, and unsupported boundaries.
-- [Moved guides](https://sheetwrite.vercel.app/docs/reference/moved-guides/): Where each former repository guide now lives in the documentation site.
+- [Dynamic array functions](https://sheetwrite.vercel.app/docs/reference/formula-functions/array/): Every dynamic array formula function, its engine build, and its signature, semantic, dialect, and implementation profiles.
+- [Database functions](https://sheetwrite.vercel.app/docs/reference/formula-functions/database/): Every database formula function, its engine build, and its signature, semantic, dialect, and implementation profiles.
+- [Date and time functions](https://sheetwrite.vercel.app/docs/reference/formula-functions/date-time/): Every date and time formula function, its engine build, and its signature, semantic, dialect, and implementation profiles.
+- [Financial functions](https://sheetwrite.vercel.app/docs/reference/formula-functions/financial/): Every financial formula function, its engine build, and its signature, semantic, dialect, and implementation profiles.
+- [Information and error functions](https://sheetwrite.vercel.app/docs/reference/formula-functions/information-error/): Every information and error formula function, its engine build, and its signature, semantic, dialect, and implementation profiles.
+- [Logical and control flow functions](https://sheetwrite.vercel.app/docs/reference/formula-functions/logical-control/): Every logical and control flow formula function, its engine build, and its signature, semantic, dialect, and implementation profiles.
+- [Lookup and reference functions](https://sheetwrite.vercel.app/docs/reference/formula-functions/lookup-reference/): Every lookup and reference formula function, its engine build, and its signature, semantic, dialect, and implementation profiles.
+- [Math and trigonometry functions](https://sheetwrite.vercel.app/docs/reference/formula-functions/math/): Every math and trigonometry formula function, its engine build, and its signature, semantic, dialect, and implementation profiles.
+- [Statistical functions](https://sheetwrite.vercel.app/docs/reference/formula-functions/statistical/): Every statistical formula function, its engine build, and its signature, semantic, dialect, and implementation profiles.
+- [Text functions](https://sheetwrite.vercel.app/docs/reference/formula-functions/text/): Every text formula function, its engine build, and its signature, semantic, dialect, and implementation profiles.
+- [Moved pages](https://sheetwrite.vercel.app/docs/reference/moved-guides/): Where each moved documentation page and each former repository guide lives now.
 - [Package entry-point inventory](https://sheetwrite.vercel.app/docs/reference/package-entry-points/): Compiler-backed classification of every publishable Sheetwrite package export.
