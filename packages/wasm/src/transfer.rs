@@ -79,31 +79,6 @@ impl Writer {
         });
     }
 
-    pub(crate) fn word_runs(&mut self, values: &[u64], default: u64) {
-        self.usize(values.len());
-        let mut start = 0;
-
-        while start < values.len() {
-            let is_default = values[start] == default;
-            let mut end = start + 1;
-            while end < values.len()
-                && end - start < (u32::MAX >> 1) as usize
-                && (values[end] == default) == is_default
-            {
-                end += 1;
-            }
-
-            self.u32(((end - start) as u32) << 1 | u32::from(!is_default));
-            if !is_default {
-                let words = &values[start..end];
-                self.0.extend_from_slice(unsafe {
-                    std::slice::from_raw_parts(words.as_ptr().cast(), std::mem::size_of_val(words))
-                });
-            }
-            start = end;
-        }
-    }
-
     pub(crate) fn strings(&mut self, strings: &StringStorage) {
         self.usize(strings.len());
 
@@ -294,34 +269,6 @@ impl<'a> Reader<'a> {
 
     pub(crate) fn words(&mut self) -> TransferResult<Vec<u64>> {
         self.array()
-    }
-
-    pub(crate) fn word_runs(&mut self, default: u64, maximum: usize) -> TransferResult<Vec<u64>> {
-        let length = self.usize()?;
-        if length > maximum {
-            return Err("invalid transferred overlay length".into());
-        }
-        let mut values = vec![default; length];
-        let mut offset = 0;
-        while offset < length {
-            let run = self.u32()?;
-            let count = (run >> 1) as usize;
-            if count == 0 || count > length - offset {
-                return Err("invalid transferred overlay run".into());
-            }
-            if run & 1 != 0 {
-                let words = &mut values[offset..offset + count];
-                let bytes = unsafe {
-                    std::slice::from_raw_parts_mut(
-                        words.as_mut_ptr().cast(),
-                        std::mem::size_of_val(words),
-                    )
-                };
-                self.read_exact(bytes)?;
-            }
-            offset += count;
-        }
-        Ok(values)
     }
 
     pub(crate) fn ints(&mut self) -> TransferResult<Vec<u32>> {

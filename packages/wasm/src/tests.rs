@@ -1,4 +1,9 @@
 use super::*;
+use crate::cells::{
+    checked_dense_cell_count, encode_num, payload_is_str, DEFAULT_MAX_PAGED_DIRTY_CELLS,
+    MAX_DENSE_CELLS,
+};
+use crate::memory::{StoreMemoryStats, SPILL_OWNERS};
 
 fn assert_close(actual: f64, expected: f64) {
     assert!(
@@ -108,7 +113,10 @@ fn sheet_noops_dense_limits_and_paged_load_state_preserve_invariants() {
     assert_eq!(checked_dense_cell_count(usize::MAX, 2), None);
     assert!(SheetData::try_new(usize::MAX, 2).is_err());
     let at_limit = SheetData::try_new(1, MAX_DENSE_CELLS).expect("limit must be accepted");
-    assert_eq!(at_limit.kind.len(), MAX_DENSE_CELLS);
+    assert_eq!(
+        at_limit.cells.source_kind_at(MAX_DENSE_CELLS - 1),
+        KIND_EMPTY
+    );
     drop(at_limit);
 
     let mut bounded_store = CellStore::new();
@@ -116,35 +124,38 @@ fn sheet_noops_dense_limits_and_paged_load_state_preserve_invariants() {
     assert!(bounded_store.sheets.is_empty());
     let mut dense = SheetData::new(2, 2);
     put_number(&mut dense, 1, 1, 9.0);
-    dense.resize_rows(2);
+    dense.cells.resize_rows(2);
     dense.insert_rows(0, 1, 0);
     dense.delete_rows(0, 2, 1);
     dense.delete_rows(0, 0, 0);
     dense.insert_cols(0, 1, 0);
     dense.delete_cols(0, 2, 1);
     dense.delete_cols(0, 0, 0);
-    assert_close(dense.num_at(dense.idx(1, 1)), 9.0);
+    assert_close(dense.cells.num_at(dense.cells.idx(1, 1)), 9.0);
 
-    dense.dirty_cells.extend((0..5_000).map(|row| (row, 0)));
-    dense.clear_dirty();
-    assert!(dense.dirty_cells.is_empty());
+    dense.formulas.clear_dirty();
+    dense
+        .formulas
+        .mark_cells_dirty((0..5_000).map(|row| (row, 0)));
+    dense.formulas.clear_dirty();
+    assert!(!dense.formulas.has_dirty());
 
     let mut paged = SheetData::new_paged(2, 2, 1, 0, DEFAULT_MAX_PAGED_DIRTY_CELLS);
-    assert!(!paged.is_fully_loaded());
-    assert!(!paged.range_fully_loaded(0, 0, 1, 1));
+    assert!(!paged.cells.is_fully_loaded());
+    assert!(!paged.cells.range_fully_loaded(0, 0, 1, 1));
     for col in 0..2 {
         for row in 0..2 {
             assert!(paged.write_cell(row, col, KIND_EMPTY, 0, 0, Some(1)));
         }
     }
-    assert!(paged.is_fully_loaded());
-    assert!(paged.range_fully_loaded(0, 0, 1, 1));
-    assert!(paged.is_cell_dirty(1, 1));
-    paged.mark_range_clean(0, 2, 0, 2);
-    assert!(!paged.is_cell_dirty(1, 1));
-    paged.pin_range(1, 1, &[0]);
-    paged.pin_range(0, 2, &[0, 1]);
-    assert_eq!(paged.paged_stats().map(|stats| stats.1), Some(4));
+    assert!(paged.cells.is_fully_loaded());
+    assert!(paged.cells.range_fully_loaded(0, 0, 1, 1));
+    assert!(paged.cells.is_cell_dirty(1, 1));
+    paged.cells.mark_range_clean(0, 2, 0, 2);
+    assert!(!paged.cells.is_cell_dirty(1, 1));
+    paged.cells.pin_range(1, 1, &[0]);
+    paged.cells.pin_range(0, 2, &[0, 1]);
+    assert_eq!(paged.cells.paged_stats().map(|stats| stats.1), Some(4));
 }
 
 #[test]
@@ -310,7 +321,9 @@ fn spill_ownership_budget_is_store_wide_atomic_and_released() {
 
     store.clear_cell(first, 0, 1, 0);
     store.recompute(first);
-    assert_eq!(store.sheets[first].spill_owners.capacity(), 0);
+    let mut stats = StoreMemoryStats::default();
+    store.sheets[first].add_memory_stats(&mut stats);
+    assert_eq!(stats.owners[SPILL_OWNERS].allocated_bytes, 0);
     store.set_number(second, 0, 0, 1.0, 0);
     store.recompute(second);
     assert_eq!(
@@ -1234,11 +1247,12 @@ fn nan_box_canonicalizes_hostile_string_tag_patterns() {
         let value = f64::from_bits(bits);
         assert!(value.is_nan());
         put_number(&mut sheet, row, 0, value);
-        let index = sheet.idx(row, 0);
-        assert_eq!(sheet.payload[index], encode_num(f64::NAN));
-        assert!(!payload_is_str(sheet.payload[index]));
-        assert_eq!(sheet.str_id_at(index), NO_STRING);
-        assert!(sheet.num_at(index).is_nan());
+        let index = sheet.cells.idx(row, 0);
+        let payload = sheet.cells.source_payload_at(index);
+        assert_eq!(payload, encode_num(f64::NAN));
+        assert!(!payload_is_str(payload));
+        assert_eq!(sheet.cells.str_id_at(index), NO_STRING);
+        assert!(sheet.cells.num_at(index).is_nan());
     }
 }
 
@@ -1306,6 +1320,18 @@ fn conditional_formula_rules_shift_relative_refs_stop_and_follow_dependency_edit
     store.recompute(sheet);
     let changed_dependency = decode_window(store.get_window(sheet, 0, 3, &[2]));
     assert_eq!(changed_dependency.cond_matches, vec![2, 2, 1]);
+}
+
+#[test]
+fn paged_aggregate_counts_loaded_formula_before_first_recompute() {
+    let mut store = CellStore::new();
+    let sheet = store.add_paged_sheet(1, 2, 1, 0, DEFAULT_MAX_PAGED_DIRTY_CELLS);
+    store.set_formula(sheet, 0, 0, "=7", 0);
+    assert_close(store.aggregate(sheet, 0, 4), 1.0);
+    assert_close(store.aggregate(sheet, 0, 0), 0.0);
+    store.recompute(sheet);
+    assert_close(store.aggregate(sheet, 0, 4), 1.0);
+    assert_close(store.aggregate(sheet, 0, 0), 7.0);
 }
 
 #[test]
@@ -1439,6 +1465,156 @@ fn opaque_range_snapshot_round_trip_preserves_cell_behavior() {
     store.recompute(sheet);
     assert_close(number(&store, sheet, 1, 0), 9.0);
     assert_eq!(store.style_id_at(sheet, 1, 0), styles_before[1]);
+}
+
+#[test]
+fn scoped_clear_preserves_unrelated_calculated_values_and_recomputes_readers() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(4, 3);
+    store.set_number(sheet, 0, 0, 5.0, 7);
+    store.set_formula(sheet, 0, 1, "=A1+1", 9);
+    store.set_formula(sheet, 0, 2, "=\"survivor\"", 0);
+    store.set_formula(sheet, 1, 2, "=SEQUENCE(2,1,10)", 0);
+    store.recompute(sheet);
+
+    assert!(store.clear_range(sheet, 0, 0, 0, 0, false, true));
+    assert_close(number(&store, sheet, 0, 1), 6.0);
+    assert_eq!(store.style_id_at(sheet, 0, 0), 0);
+    assert!(store.clear_range(sheet, 0, 0, 0, 0, true, false));
+    assert_eq!(string(&store, sheet, 0, 2).as_deref(), Some("survivor"));
+    assert_close(number(&store, sheet, 2, 2), 11.0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 0, 1), 1.0);
+
+    assert!(store.clear_range(sheet, 1, 2, 1, 2, true, false));
+    store.recompute(sheet);
+    assert_eq!(store.get_cell(sheet, 2, 2).kind(), KIND_EMPTY);
+}
+
+#[test]
+fn rectangle_writes_preserve_unrelated_results_and_recompute_registered_readers() {
+    const EDIT_ROWS: usize = 5000;
+    for write_kind in 0..6 {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(8, EDIT_ROWS + 4);
+        let other = store.add_sheet(2, 2);
+        store.set_sheet_name(sheet, "source", "Source");
+        store.set_number(sheet, 0, 0, 5.0, 0);
+        store.set_number(sheet, EDIT_ROWS - 1, 0, 7.0, 0);
+        store.set_formula(sheet, 0, 1, "=A1+1", 0);
+        store.set_formula(sheet, 1, 1, "=SUM(A1:A5000)", 0);
+        store.set_formula(sheet, 0, 2, "=\"survivor\"", 0);
+        store.set_formula(sheet, 1, 2, "=SEQUENCE(2,1,10)", 0);
+        store.set_formula(other, 0, 0, "=Source!A5000+2", 0);
+        store.set_formula(other, 1, 0, "=Source!B2+3", 0);
+        store.commit_sources();
+
+        // A prior scalar edit must survive the Cells -> Ranges transition.
+        store.set_number(sheet, EDIT_ROWS + 1, 3, 8.0, 0);
+        store.set_formula(sheet, EDIT_ROWS + 1, 4, "=D5002+1", 0);
+        let expected_source = match write_kind {
+            0 => {
+                assert!(store.clear_range(sheet, 0, 0, EDIT_ROWS - 1, 0, true, false));
+                0.0
+            }
+            1 => {
+                store.set_column_numbers(sheet, 0, 0, &vec![2.0; EDIT_ROWS], 0);
+                2.0
+            }
+            2 => {
+                store.set_column_strings(sheet, 0, 0, vec!["2".into(); EDIT_ROWS], 0);
+                2.0
+            }
+            3 => {
+                store.set_column_strings_packed(
+                    sheet,
+                    0,
+                    0,
+                    "2".repeat(EDIT_ROWS),
+                    &vec![1; EDIT_ROWS],
+                    0,
+                );
+                2.0
+            }
+            4 | 5 => {
+                let kinds = vec![KIND_NUMBER; EDIT_ROWS];
+                let numbers = vec![2.0; EDIT_ROWS];
+                let styles = vec![0; EDIT_ROWS];
+                let status = if write_kind == 4 {
+                    store.set_block_packed(
+                        sheet,
+                        0,
+                        0,
+                        EDIT_ROWS,
+                        1,
+                        &kinds,
+                        &numbers,
+                        b"",
+                        &[0],
+                        &styles,
+                        &[],
+                        vec![],
+                        &[],
+                        &[],
+                    )
+                } else {
+                    store.set_column_block_packed(
+                        sheet,
+                        0,
+                        0,
+                        EDIT_ROWS,
+                        1,
+                        &kinds,
+                        &numbers,
+                        b"",
+                        &[0],
+                        &styles,
+                        &[],
+                        vec![],
+                        &[],
+                        &[],
+                    )
+                };
+                assert_eq!(status, 0);
+                2.0
+            }
+            _ => unreachable!(),
+        };
+
+        assert_eq!(string(&store, sheet, 0, 2).as_deref(), Some("survivor"));
+        assert_close(number(&store, sheet, 2, 2), 11.0);
+        store.commit_sources();
+        assert_close(number(&store, sheet, 0, 1), expected_source + 1.0);
+        // SUM ignores strings, whereas arithmetic coerces numeric text.
+        let expected_sum = if matches!(write_kind, 2 | 3) {
+            0.0
+        } else {
+            expected_source * EDIT_ROWS as f64
+        };
+        assert_close(number(&store, sheet, 1, 1), expected_sum);
+        assert_close(number(&store, other, 0, 0), expected_source + 2.0);
+        assert_close(number(&store, other, 1, 0), expected_sum + 3.0);
+        assert_close(number(&store, sheet, EDIT_ROWS + 1, 4), 9.0);
+        assert_eq!(string(&store, sheet, 0, 2).as_deref(), Some("survivor"));
+        assert_close(number(&store, sheet, 2, 2), 11.0);
+    }
+}
+
+#[test]
+fn rectangle_clear_releases_attempted_spill_without_disturbing_other_spills() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(4, 6000);
+    store.set_number(sheet, 4999, 0, 1.0, 0);
+    store.set_formula(sheet, 0, 0, "=SEQUENCE(5000)", 0);
+    store.set_formula(sheet, 0, 2, "=SEQUENCE(2,1,20)", 0);
+    store.commit_sources();
+    assert_eq!(string(&store, sheet, 0, 0).as_deref(), Some("#SPILL!"));
+
+    assert!(store.clear_range(sheet, 1, 0, 5000, 0, true, false));
+    assert_close(number(&store, sheet, 1, 2), 21.0);
+    store.commit_sources();
+    assert_close(number(&store, sheet, 4999, 0), 5000.0);
+    assert_close(number(&store, sheet, 1, 2), 21.0);
 }
 
 #[test]
@@ -3381,7 +3557,7 @@ mod formula_dependency_epoch {
         assert_close(number(&store, sheet, 0, 2), 12.0);
         assert_close(number(&store, sheet, 1, 2), 24.0);
 
-        let epoch_before = store.formula_epoch;
+        let epoch_before = store.graph.epoch();
         assert_eq!(
             store.set_sparse_block(
                 sheet,
@@ -3402,7 +3578,8 @@ mod formula_dependency_epoch {
             0,
         );
         assert_eq!(
-            store.formula_epoch, epoch_before,
+            store.graph.epoch(),
+            epoch_before,
             "a constant-only rewrite must keep the cached dependency index"
         );
         store.recompute(sheet);
@@ -3418,7 +3595,7 @@ mod formula_dependency_epoch {
     }
 
     #[test]
-    fn formula_rewrite_with_new_reads_rebuilds_dependents() {
+    fn formula_rewrite_with_new_reads_patches_the_dependency_index() {
         let mut store = CellStore::new();
         let sheet = store.add_sheet(3, 2);
         store.set_number(sheet, 0, 0, 1.0, 0);
@@ -3427,11 +3604,12 @@ mod formula_dependency_epoch {
         store.recompute(sheet);
         assert_close(number(&store, sheet, 0, 2), 1.0);
 
-        let epoch_before = store.formula_epoch;
+        let epoch_before = store.graph.epoch();
         store.set_formula(sheet, 0, 2, "=B1", 0);
-        assert!(
-            store.formula_epoch > epoch_before,
-            "a changed read set must invalidate the dependency index"
+        assert_eq!(
+            store.graph.epoch(),
+            epoch_before,
+            "a changed read set must patch the dependency index, not rebuild it"
         );
         store.recompute(sheet);
         assert_close(number(&store, sheet, 0, 2), 2.0);
@@ -3466,9 +3644,9 @@ mod formula_dependency_epoch {
 
         // Array to a different array with the same reads and shape: the index
         // survives the rewrite and the spill is re-materialized.
-        let epoch_before = store.formula_epoch;
+        let epoch_before = store.graph.epoch();
         store.set_formula(sheet, 0, 2, "=SORT(A1:A3)", 0);
-        assert_eq!(store.formula_epoch, epoch_before);
+        assert_eq!(store.graph.epoch(), epoch_before);
         store.recompute(sheet);
         assert_eq!(
             [0, 1, 2].map(|row| number(&store, sheet, row, 2)),
@@ -3613,8 +3791,8 @@ mod formula_dependency_epoch {
                 let incremental = snapshot_cells(&store, sheet, ROWS, COLS);
                 // Drop every cache and dirty the whole sheet: the next pass
                 // must produce the same values from scratch.
-                store.dep_index = None;
-                store.sheets[sheet].all_dirty = true;
+                store.graph.invalidate();
+                store.sheets[sheet].formulas.mark_all_dirty();
                 store.recompute(sheet);
                 assert_eq!(
                     snapshot_cells(&store, sheet, ROWS, COLS),

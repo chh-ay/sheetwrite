@@ -1,13 +1,15 @@
-//! Bulk render-window assembly: one boundary crossing per visible window.
+//! Bulk render-window assembly: one boundary crossing per visible window,
+//! including the conditional-format rules evaluated against it.
 
-use std::collections::{HashMap, HashSet};
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use wasm_bindgen::prelude::*;
 
-use crate::calc::translate_relative_refs;
-use crate::derived::{DerivedOverlay, DERIVED_CHUNK_CELLS};
+use crate::calc::{translate_relative_refs, Ast};
+use crate::cells::{payload_num, payload_str_id};
+use crate::memory::{StoreMemoryStats, SHEET_INDEXES_METADATA};
 use crate::query::matches_needle;
-use crate::sheet::{formula_error_with_entry, payload_num, payload_str_id, CondPred, SheetData};
+use crate::sheet::{formula_error_with_entry, SheetData};
 use crate::store::CellStore;
 use crate::types::{
     cell_key, AbsCellKey, EvalResult, FormulaError, StringStorage, Value, KIND_BOOL, KIND_EMPTY,
@@ -16,6 +18,166 @@ use crate::types::{
 
 /// Global style id of a cell with no style of its own.
 const NO_STYLE_ID: u32 = 0;
+
+/// One conditional-format predicate, mirroring the host's rule kinds. String
+/// needles for case-insensitive `Contains` are pre-lowercased at rule-set time;
+/// formula ASTs are parsed once and translated from their stored anchor per cell.
+enum CondPred {
+    GtNum(f64),
+    LtNum(f64),
+    EqNum(f64),
+    EqStr(String),
+    EqEmpty,
+    Contains {
+        needle: String,
+        match_case: bool,
+    },
+    Formula {
+        ast: Ast,
+        anchor_row: u32,
+        anchor_col: u32,
+    },
+}
+
+/// One conditional-format rule: a normalized cell rectangle plus a predicate.
+/// The window read reports per-cell matches as a bitmask (rule index = bit),
+/// so the host merges styles only for matched cells; predicates evaluate here,
+/// where the cell data lives.
+struct CondRule {
+    r0: u32,
+    c0: u32,
+    r1: u32,
+    c1: u32,
+    pred: CondPred,
+    stop_if_true: bool,
+}
+
+/// Parsed conditional-format rules per sheet handle, synced from the host and
+/// evaluated per window. Not transferred on memory release: the host re-sends
+/// rules, and parsed ASTs would otherwise need their own codec.
+#[derive(Default)]
+pub(crate) struct ConditionalRules {
+    by_sheet: FxHashMap<usize, Vec<CondRule>>,
+}
+
+impl ConditionalRules {
+    fn for_sheet(&self, sheet: usize) -> &[CondRule] {
+        self.by_sheet.get(&sheet).map_or(&[], Vec::as_slice)
+    }
+
+    /// A removed sheet handle never renders again.
+    pub(crate) fn remove_sheet(&mut self, sheet: usize) {
+        self.by_sheet.remove(&sheet);
+    }
+
+    pub(crate) fn add_memory_stats(&self, stats: &mut StoreMemoryStats) {
+        let metadata = stats.owner_mut(SHEET_INDEXES_METADATA);
+        metadata
+            .add_hash_table::<usize, Vec<CondRule>>(self.by_sheet.len(), self.by_sheet.capacity());
+        for rules in self.by_sheet.values() {
+            metadata.add_vec::<CondRule>(rules.len(), rules.capacity());
+            for rule in rules {
+                let text = match &rule.pred {
+                    CondPred::EqStr(value) => Some(value),
+                    CondPred::Contains { needle, .. } => Some(needle),
+                    _ => None,
+                };
+                if let Some(text) = text {
+                    metadata.add_payload(text.len(), text.capacity());
+                }
+            }
+        }
+    }
+}
+
+#[wasm_bindgen]
+impl CellStore {
+    /// Replace a sheet's conditional-format rules. Packed columnar encoding,
+    /// one entry per rule: `kinds` 0 gt / 1 lt / 2 eqNum / 3 eqStr / 4 eqEmpty /
+    /// 5 contains / 6 boolean formula; `bounds` = normalized `[r0, c0, r1, c1]`
+    /// per rule; `nums` carries the numeric operand; `strs` the text/formula
+    /// operand; `flags` bit 0 = match-case for `contains`, bit 1 = stop-if-true.
+    /// Formula strings are parsed once here, never once per visible cell.
+    #[wasm_bindgen(js_name = setConditionalRules)]
+    pub fn set_conditional_rules(
+        &mut self,
+        sheet: usize,
+        kinds: &[u8],
+        bounds: &[u32],
+        nums: &[f64],
+        strs: Vec<String>,
+        flags: &[u8],
+    ) {
+        let formula_asts: Vec<Option<Ast>> = kinds
+            .iter()
+            .zip(strs.iter())
+            .take(32)
+            .map(|(&kind, source)| {
+                (kind == 6 && source.len() <= 8_192)
+                    .then(|| self.parse_formula_entry(source, sheet as u32, 0, 0).ast)
+                    .flatten()
+            })
+            .collect();
+
+        if self.sheets.get(sheet).is_none() {
+            return;
+        }
+
+        let mut rules: Vec<CondRule> = Vec::with_capacity(kinds.len().min(32));
+
+        for (i, (&kind, text)) in kinds.iter().zip(strs).take(32).enumerate() {
+            let b = i * 4;
+            let (Some(&r0), Some(&c0), Some(&r1), Some(&c1)) = (
+                bounds.get(b),
+                bounds.get(b + 1),
+                bounds.get(b + 2),
+                bounds.get(b + 3),
+            ) else {
+                break;
+            };
+
+            let num = nums.get(i).copied().unwrap_or(0.0);
+            let flag = flags.get(i).copied().unwrap_or(0);
+            let match_case = flag & 1 != 0;
+
+            let pred = match kind {
+                0 => CondPred::GtNum(num),
+                1 => CondPred::LtNum(num),
+                2 => CondPred::EqNum(num),
+                3 => CondPred::EqStr(text),
+                4 => CondPred::EqEmpty,
+                5 => CondPred::Contains {
+                    needle: if match_case {
+                        text
+                    } else {
+                        text.to_lowercase()
+                    },
+                    match_case,
+                },
+                6 => CondPred::Formula {
+                    ast: formula_asts
+                        .get(i)
+                        .and_then(Clone::clone)
+                        .unwrap_or(Ast::InvalidRef),
+                    anchor_row: r0,
+                    anchor_col: c0,
+                },
+                _ => continue,
+            };
+
+            rules.push(CondRule {
+                r0,
+                c0,
+                r1,
+                c1,
+                pred,
+                stop_if_true: flag & 2 != 0,
+            });
+        }
+
+        self.conditional_rules.by_sheet.insert(sheet, rules);
+    }
+}
 
 #[wasm_bindgen]
 impl CellStore {
@@ -33,8 +195,8 @@ impl CellStore {
         let Some(s) = self.sheets.get(sheet) else {
             return WindowView::empty(self.strings.epoch);
         };
-        let row_start = row_start.min(s.row_count);
-        let row_end = row_end.min(s.row_count);
+        let row_start = row_start.min(s.cells.row_count());
+        let row_end = row_end.min(s.cells.row_count());
         let n_rows = row_end.saturating_sub(row_start);
         let n_cols = cols.len();
         let Some(mut cells) = WindowCells::new(n_rows, n_cols) else {
@@ -43,40 +205,28 @@ impl CellStore {
 
         for (col_index, &col_u) in cols.iter().enumerate() {
             let col = col_u as usize;
-            if col >= s.n_cols {
+            if col >= s.cells.n_cols() {
                 continue;
             }
 
-            let mut row = row_start;
-            while row < row_end {
-                let start = s.idx(row, col);
-                let chunk = s.calculated_chunk_at(start);
-                let run_end = row_end.min(row + DERIVED_CHUNK_CELLS - start % DERIVED_CHUNK_CELLS);
-
-                for run_row in row..run_end {
-                    let src = s.idx(run_row, col);
-                    let dst = (run_row - row_start) * n_cols + col_index;
-
-                    // Dense cells are resident; only paged reads need a load-state check.
-                    let resolved = if s.is_paged() {
-                        s.is_loaded(run_row, col).then(|| s.resolved_cell_at(src))
-                    } else {
-                        Some(
-                            chunk
-                                .and_then(|values| {
-                                    DerivedOverlay::decode_present(
-                                        values[src % DERIVED_CHUNK_CELLS],
-                                    )
-                                })
-                                .unwrap_or_else(|| {
-                                    (s.source_kind_at(src), s.source_payload_at(src))
-                                }),
-                        )
-                    };
-                    cells.fill(s, run_row, col, dst, resolved);
+            if let Some(column) = s.cells.dense_column(col) {
+                for row in row_start..row_end {
+                    let dst = (row - row_start) * n_cols + col_index;
+                    cells.fill(s, row, col, dst, Some(column.cell(row)));
                 }
+                continue;
+            }
 
-                row = run_end;
+            let mut start = s.cells.idx(row_start, col);
+            let end = s.cells.idx(row_end, col);
+            while start < end {
+                let run = s.cells.run(start, end);
+                run.visit_paged(|src, resolved| {
+                    let row = src - col * s.cells.row_count();
+                    let dst = (row - row_start) * n_cols + col_index;
+                    cells.fill(s, row, col, dst, resolved);
+                });
+                start = run.end;
             }
         }
 
@@ -101,40 +251,26 @@ impl CellStore {
 
         for (col_index, &col_u) in cols.iter().enumerate() {
             let col = col_u as usize;
-            if col >= s.n_cols {
+            if col >= s.cells.n_cols() {
                 continue;
             }
 
-            let mut chunk_index = usize::MAX;
-            let mut chunk = None;
-
-            // Explicit rows preserve view order; cache a chunk until that order leaves it.
-            for (row_index, &row_u) in rows.iter().enumerate() {
-                let row = row_u as usize;
-                if row >= s.row_count {
-                    continue;
-                }
-
-                let dst = row_index * n_cols + col_index;
-                let src = s.idx(row, col);
-                let resolved = if s.is_paged() {
-                    s.is_loaded(row, col).then(|| s.resolved_cell_at(src))
-                } else {
-                    if src / DERIVED_CHUNK_CELLS != chunk_index {
-                        chunk_index = src / DERIVED_CHUNK_CELLS;
-                        chunk = s.calculated_chunk_at(src);
+            if let Some(column) = s.cells.dense_column(col) {
+                for (row_index, &row) in rows.iter().enumerate() {
+                    let row = row as usize;
+                    if row < s.cells.row_count() {
+                        let dst = row_index * n_cols + col_index;
+                        cells.fill(s, row, col, dst, Some(column.cell(row)));
                     }
-
-                    Some(
-                        chunk
-                            .and_then(|values| {
-                                DerivedOverlay::decode_present(values[src % DERIVED_CHUNK_CELLS])
-                            })
-                            .unwrap_or_else(|| (s.source_kind_at(src), s.source_payload_at(src))),
-                    )
-                };
-                cells.fill(s, row, col, dst, resolved);
+                }
+                continue;
             }
+
+            s.cells
+                .visit_paged_rows(rows, col, |row_index, row, resolved| {
+                    let dst = row_index * n_cols + col_index;
+                    cells.fill(s, row, col, dst, resolved);
+                });
         }
 
         let cond_matches = cond_matches_for_window(
@@ -192,9 +328,9 @@ impl WindowCells {
         row: usize,
         col: usize,
         dst: usize,
-        resolved: Option<(u8, u64)>,
+        resolved: Option<(u8, u64, u32)>,
     ) {
-        let Some((stored_kind, payload)) = resolved else {
+        let Some((stored_kind, payload, style)) = resolved else {
             self.kind[dst] = KIND_STRING;
             self.str_local[dst] = local_error_index(
                 FormulaError::Loading,
@@ -204,9 +340,8 @@ impl WindowCells {
             return;
         };
 
-        let src = sheet.idx(row, col);
         self.kind[dst] = stored_kind;
-        self.style_local[dst] = local_style_index(sheet.style_at(src), &mut self.style_dict);
+        self.style_local[dst] = local_style_index(style, &mut self.style_dict);
 
         match stored_kind {
             KIND_NUMBER | KIND_BOOL => self.num[dst] = payload_num(payload),
@@ -220,7 +355,7 @@ impl WindowCells {
             }
             KIND_FORMULA => {
                 let key = cell_key(row, col);
-                let entry = key.and_then(|key| sheet.formulas.get(&key));
+                let entry = key.and_then(|key| sheet.formulas.get(key));
                 let error = key.and_then(|key| formula_error_with_entry(sheet, key, entry));
                 if let Some(error) = error {
                     self.kind[dst] = KIND_STRING;
@@ -275,22 +410,20 @@ fn cond_matches_for_window<F: Fn(usize) -> u32>(
     cells: &WindowCells,
 ) -> Vec<u32> {
     let n_rows = cells.n_rows;
-    let Some(sheet) = store.sheets.get(sheet_index) else {
-        return Vec::new();
-    };
-    if sheet.cond_rules.is_empty() || n_rows == 0 || cols.is_empty() {
+    let rules = store.conditional_rules.for_sheet(sheet_index);
+    if rules.is_empty() || n_rows == 0 || cols.is_empty() {
         return Vec::new();
     }
 
     let n_cols = cols.len();
     let mut matches = vec![0u32; n_rows * n_cols];
-    let mut memo: HashMap<AbsCellKey, EvalResult> = HashMap::new();
-    let mut visiting: HashSet<AbsCellKey> = HashSet::new();
+    let mut memo: FxHashMap<AbsCellKey, EvalResult> = FxHashMap::default();
+    let mut visiting: FxHashSet<AbsCellKey> = FxHashSet::default();
     for ri in 0..n_rows {
         let data_row = data_row_at(ri);
         for (cj, &col) in cols.iter().enumerate() {
             let dst = ri * n_cols + cj;
-            for (bit, rule) in sheet.cond_rules.iter().take(32).enumerate() {
+            for (bit, rule) in rules.iter().take(32).enumerate() {
                 let covered =
                     data_row >= rule.r0 && data_row <= rule.r1 && col >= rule.c0 && col <= rule.c1;
                 if !covered {

@@ -36,10 +36,10 @@ pub(super) fn write_formula(out: &mut Writer, entry: &FormulaEntry, sheet: u32) 
     }
 
     out.bool(entry.ast.is_some());
-    out.error(entry.error);
-    out.bool(entry.volatile);
-    out.bool(entry.has_spill_refs);
-    out.bool(entry.produces_array);
+    out.error(entry.source_error());
+    out.bool(entry.volatile());
+    out.bool(entry.has_spill_refs());
+    out.bool(entry.produces_array());
     out.usize(entry.reads.cells.len());
 
     for key in &entry.reads.cells {
@@ -94,10 +94,10 @@ impl CellStore {
             entry.ast = None;
         }
 
-        entry.error = input.error()?;
-        entry.volatile = input.bool()?;
-        entry.has_spill_refs = input.bool()?;
-        entry.produces_array = input.bool()?;
+        entry.set_source_error(input.error()?);
+        entry.set_volatile(input.bool()?);
+        entry.set_has_spill_refs(input.bool()?);
+        entry.set_produces_array(input.bool()?);
 
         let cells = (0..input.count()?)
             .map(|_| {
@@ -188,7 +188,7 @@ impl CellStore {
             store.tables.insert(key, table);
         }
 
-        store.formula_epoch = input.u64()?;
+        store.graph = FormulaGraph::read_transfer(&mut input)?;
         store.mutation_revision = input.u64()?;
         store.volatile_serial = f64::from_bits(input.u64()?);
         store.spill_owner_cell_limit = input.usize()?;
@@ -276,7 +276,7 @@ impl CellStore {
             }
         }
 
-        out.u64(self.formula_epoch);
+        self.graph.write_transfer(&mut out);
         out.u64(self.mutation_revision);
         out.u64(self.volatile_serial.to_bits());
         out.usize(self.spill_owner_cell_limit);
@@ -284,7 +284,7 @@ impl CellStore {
         for (sheet, data) in self.sheets.iter().enumerate() {
             data.write_transfer(&mut out);
             out.usize(data.formulas.len());
-            for (&(row, col), entry) in &data.formulas {
+            for ((row, col), entry) in data.formulas.iter() {
                 out.u32(row);
                 out.u32(col);
                 write_formula(&mut out, entry, sheet as u32);
@@ -330,6 +330,31 @@ mod tests {
         replacement.recompute_changed();
         assert_eq!(replacement.get_cell(0, 0, 1).num(), 100.0);
         assert_eq!(original.get_cell(0, 0, 1).num(), 42.0);
+    }
+
+    #[test]
+    fn memory_transfer_preserves_pending_rectangle_dirty_state() {
+        const EDIT_ROWS: usize = 5000;
+        let mut original = CellStore::new();
+        original.add_sheet(3, EDIT_ROWS + 1);
+        original.set_formula(0, 0, 1, "=SUM(A1:A5000)", 0);
+        original.set_formula(0, 0, 2, "=\"survivor\"", 0);
+        original.recompute_changed();
+        original.set_column_numbers(0, 0, 0, &vec![1.0; EDIT_ROWS], 0);
+
+        let mut replacement =
+            CellStore::read_memory_state(&original.export_memory_state()).unwrap();
+
+        assert_eq!(
+            replacement.get_cell(0, 0, 2).string().as_deref(),
+            Some("survivor")
+        );
+        replacement.recompute_changed();
+        assert_eq!(replacement.get_cell(0, 0, 1).num(), EDIT_ROWS as f64);
+        assert_eq!(
+            replacement.get_cell(0, 0, 2).string().as_deref(),
+            Some("survivor")
+        );
     }
 
     #[test]

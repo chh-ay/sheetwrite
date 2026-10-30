@@ -98,14 +98,14 @@ impl RangeContext<'_, '_> {
         row: usize,
         col: usize,
     ) -> Result<Option<f64>, FormulaError> {
-        if !source.is_loaded(row, col) {
+        if !source.cells.is_loaded(row, col) {
             return Err(FormulaError::Loading);
         }
-        let index = source.idx(row, col);
-        match source.kind_at(index) {
+        let index = source.cells.idx(row, col);
+        match source.cells.kind_at(index) {
             KIND_EMPTY => Ok(None),
             KIND_NUMBER => {
-                let number = source.num_at(index);
+                let number = source.cells.num_at(index);
                 if !number.is_finite() || self.depth + 1 > FORMULA_RECURSION_LIMIT {
                     return Err(FormulaError::Num);
                 }

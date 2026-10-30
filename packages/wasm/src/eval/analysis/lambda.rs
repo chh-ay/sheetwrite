@@ -1,5 +1,5 @@
 //! Full-engine lexical functions and bounded array helpers.
-use std::collections::{HashMap, HashSet};
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::rc::Rc;
 
 use super::super::array::ast_produces_array;
@@ -272,9 +272,9 @@ pub(crate) fn shape(
             if arguments.len() != 3 {
                 return Err(FormulaError::Value);
             }
-            let affected = HashSet::new();
-            let mut memo = HashMap::new();
-            let mut visiting = HashSet::new();
+            let affected = FxHashSet::default();
+            let mut memo = FxHashMap::default();
+            let mut visiting = FxHashSet::default();
             let mut pass = EvalPass {
                 affected: &affected,
                 memo: &mut memo,

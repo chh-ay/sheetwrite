@@ -24,7 +24,7 @@ pub(crate) const RANGE_CELL_LIMIT: u64 = 1_000_000;
 
 pub(crate) type CellKey = (u32, u32);
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub(crate) struct AbsCellKey {
     pub(crate) sheet: u32,
     pub(crate) row: u32,
@@ -142,7 +142,7 @@ impl Value {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub(crate) struct CellRange {
     pub(crate) sheet: u32,
     pub(crate) row_start: u32,
@@ -327,12 +327,6 @@ fn formula_metadata(ast: &Ast, formula_sheet: u32) -> (ReadSet, bool) {
     )
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum PersistedSourceKind {
-    Formula,
-    Reference,
-}
-
 /// Stored derived-cell metadata: parsed formulas and plain references share the
 /// same Rust-owned read-set/dependency graph, while retaining distinct
 /// persistence kinds at the ABI boundary.
@@ -341,29 +335,77 @@ pub(crate) struct FormulaEntry {
     pub(crate) ast: Option<Ast>,
     pub(crate) source: String,
     pub(crate) reads: ReadSet,
-    /// Source parse rejection; recalculation never mutates this field.
-    pub(crate) error: Option<FormulaError>,
-    pub(crate) volatile: bool,
-    /// The formula contains `A1#`. Each evaluation replaces those with the
-    /// current spill ranges; other formulas skip that step.
-    pub(crate) has_spill_refs: bool,
-    pub(crate) produces_array: bool,
-    pub(crate) source_kind: PersistedSourceKind,
+    // Low nibble: source-error slot + 1 (zero means none). Upper bits are
+    // independent predicates. Keep this private to prevent invalid encodings.
+    flags: u8,
 }
 
 impl FormulaEntry {
+    const ERROR_MASK: u8 = 0x0f;
+    const VOLATILE: u8 = 1 << 4;
+    const SPILL_REFS: u8 = 1 << 5;
+    const PRODUCES_ARRAY: u8 = 1 << 6;
+    const REFERENCE: u8 = 1 << 7;
+
+    /// Source parse rejection; recalculation never mutates this value.
+    pub(crate) fn source_error(&self) -> Option<FormulaError> {
+        let encoded = self.flags & Self::ERROR_MASK;
+
+        encoded
+            .checked_sub(1)
+            .and_then(|slot| FormulaError::from_slot(u64::from(slot)))
+    }
+
+    pub(crate) fn set_source_error(&mut self, error: Option<FormulaError>) {
+        self.flags =
+            (self.flags & !Self::ERROR_MASK) | error.map_or(0, |error| (error.slot() + 1) as u8);
+    }
+
+    pub(crate) fn volatile(&self) -> bool {
+        self.flags & Self::VOLATILE != 0
+    }
+
+    pub(crate) fn set_volatile(&mut self, volatile: bool) {
+        self.set_flag(Self::VOLATILE, volatile);
+    }
+
+    /// Each evaluation resolves `A1#` against current spill ranges only when needed.
+    pub(crate) fn has_spill_refs(&self) -> bool {
+        self.flags & Self::SPILL_REFS != 0
+    }
+
+    pub(crate) fn set_has_spill_refs(&mut self, has_spill_refs: bool) {
+        self.set_flag(Self::SPILL_REFS, has_spill_refs);
+    }
+
+    pub(crate) fn produces_array(&self) -> bool {
+        self.flags & Self::PRODUCES_ARRAY != 0
+    }
+
+    pub(crate) fn set_produces_array(&mut self, produces_array: bool) {
+        self.set_flag(Self::PRODUCES_ARRAY, produces_array);
+    }
+
+    fn set_flag(&mut self, flag: u8, enabled: bool) {
+        self.flags = (self.flags & !flag) | if enabled { flag } else { 0 };
+    }
+
     pub(crate) fn parsed_source(ast: Ast, sheet: u32, source: String) -> Self {
         let (reads, volatile) = formula_metadata(&ast, sheet);
-        Self {
-            has_spill_refs: ast_contains_spill_ref(&ast),
-            produces_array: crate::eval::ast_produces_array(&ast),
-            ast: Some(ast),
-            source: source.to_string(),
+
+        let mut entry = Self {
+            flags: 0,
+            ast: None,
+            source,
             reads,
-            error: None,
-            volatile,
-            source_kind: PersistedSourceKind::Formula,
-        }
+        };
+
+        entry.set_volatile(volatile);
+        entry.set_has_spill_refs(ast_contains_spill_ref(&ast));
+        entry.set_produces_array(crate::eval::ast_produces_array(&ast));
+        entry.ast = Some(ast);
+
+        entry
     }
 
     pub(crate) fn reference(target: AbsCellKey, target_name: &str, formula_sheet: u32) -> Self {
@@ -381,20 +423,16 @@ impl FormulaEntry {
             reads: ReadSet::from_ast(&ast, formula_sheet),
             ast: Some(ast),
             source: String::new(),
-            error: None,
-            volatile: false,
-            has_spill_refs: false,
-            produces_array: false,
-            source_kind: PersistedSourceKind::Reference,
+            flags: Self::REFERENCE,
         }
     }
 
     pub(crate) fn is_formula(&self) -> bool {
-        self.source_kind == PersistedSourceKind::Formula
+        !self.is_reference()
     }
 
     pub(crate) fn is_reference(&self) -> bool {
-        self.source_kind == PersistedSourceKind::Reference
+        self.flags & Self::REFERENCE != 0
     }
 
     pub(crate) fn reference_target(&self, formula_sheet: u32) -> Option<AbsCellKey> {
@@ -421,16 +459,15 @@ impl FormulaEntry {
     }
 
     pub(crate) fn error(source: &str, error: FormulaError) -> Self {
-        Self {
+        let mut entry = Self {
             ast: None,
             source: source.to_string(),
             reads: ReadSet::default(),
-            error: Some(error),
-            volatile: false,
-            has_spill_refs: false,
-            produces_array: false,
-            source_kind: PersistedSourceKind::Formula,
-        }
+            flags: 0,
+        };
+        entry.set_source_error(Some(error));
+
+        entry
     }
 
     pub(crate) fn shift_rows(
@@ -445,7 +482,7 @@ impl FormulaEntry {
             self.source = serialize(ast);
             let (reads, volatile) = formula_metadata(ast, formula_sheet);
             self.reads = reads;
-            self.volatile = volatile;
+            self.set_volatile(volatile);
         }
     }
 
@@ -461,7 +498,7 @@ impl FormulaEntry {
             self.source = serialize(ast);
             let (reads, volatile) = formula_metadata(ast, formula_sheet);
             self.reads = reads;
-            self.volatile = volatile;
+            self.set_volatile(volatile);
         }
     }
 
@@ -475,7 +512,7 @@ impl FormulaEntry {
         self.source = serialize(ast);
         let (reads, volatile) = formula_metadata(ast, formula_sheet);
         self.reads = reads;
-        self.volatile = volatile;
+        self.set_volatile(volatile);
         true
     }
 
@@ -489,7 +526,7 @@ impl FormulaEntry {
         self.source = serialize(ast);
         let (reads, volatile) = formula_metadata(ast, formula_sheet);
         self.reads = reads;
-        self.volatile = volatile;
+        self.set_volatile(volatile);
         true
     }
 
@@ -511,7 +548,7 @@ impl FormulaEntry {
         self.source = serialize(ast);
         let (reads, volatile) = formula_metadata(ast, formula_sheet);
         self.reads = reads;
-        self.volatile = volatile;
+        self.set_volatile(volatile);
         true
     }
 
@@ -541,6 +578,86 @@ impl FormulaEntry {
         );
         if let Some(ast) = &self.ast {
             ast.heap_memory_stats(out);
+        }
+    }
+}
+
+// Include the no-error sentinel in the low nibble's capacity.
+const _: () = assert!(FormulaError::COUNT <= FormulaEntry::ERROR_MASK as usize);
+
+#[cfg(test)]
+mod formula_entry_tests {
+    use super::*;
+    use std::mem::size_of;
+
+    #[test]
+    fn formula_entry_inline_memory_budget() {
+        // Only size_of uses this baseline; its intentionally unread fields model
+        // the unpacked allocation cost without imposing a stable Rust layout.
+        #[allow(dead_code)]
+        struct UnpackedEntry {
+            ast: Option<Ast>,
+            source: String,
+            reads: ReadSet,
+            error: Option<FormulaError>,
+            volatile: bool,
+            has_spill_refs: bool,
+            produces_array: bool,
+            reference: bool,
+        }
+
+        assert!(size_of::<FormulaEntry>() <= size_of::<UnpackedEntry>());
+        #[cfg(target_arch = "wasm32")]
+        assert!(size_of::<FormulaEntry>() < size_of::<UnpackedEntry>());
+    }
+
+    #[test]
+    fn formula_entry_flags_preserve_independent_metadata() {
+        for reference in [false, true] {
+            let mut entry = if reference {
+                FormulaEntry::reference(
+                    AbsCellKey {
+                        sheet: 0,
+                        row: 1,
+                        col: 2,
+                    },
+                    "Sheet1",
+                    0,
+                )
+            } else {
+                FormulaEntry::parsed_source(Ast::Num(1.0), 0, "=1".to_string())
+            };
+
+            for (volatile, spill_refs, produces_array) in [
+                (false, false, false),
+                (false, false, true),
+                (false, true, false),
+                (false, true, true),
+                (true, false, false),
+                (true, false, true),
+                (true, true, false),
+                (true, true, true),
+                (false, false, false),
+            ] {
+                entry.set_volatile(volatile);
+                entry.set_has_spill_refs(spill_refs);
+                entry.set_produces_array(produces_array);
+
+                for error in std::iter::once(None)
+                    .chain(
+                        (0..FormulaError::COUNT).map(|slot| FormulaError::from_slot(slot as u64)),
+                    )
+                    .chain(std::iter::once(None))
+                {
+                    entry.set_source_error(error);
+                    assert_eq!(entry.source_error(), error);
+                    assert_eq!(entry.volatile(), volatile);
+                    assert_eq!(entry.has_spill_refs(), spill_refs);
+                    assert_eq!(entry.produces_array(), produces_array);
+                    assert_eq!(entry.is_reference(), reference);
+                    assert_eq!(entry.is_formula(), !reference);
+                }
+            }
         }
     }
 }

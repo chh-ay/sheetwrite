@@ -15,11 +15,13 @@
 #[cfg(not(feature = "formula-engine"))]
 compile_error!(
     "SHEETWRITE_STORE_ONLY_BLOCKED: formula-entry-ast,dependency-index; \
-     the store-only boundary must replace FormulaEntry::ast and CellStore::dep_index"
+     the store-only boundary must replace FormulaEntry::ast and FormulaGraph::index"
 );
 
 #[cfg(feature = "formula-engine")]
 mod calc;
+#[cfg(feature = "formula-engine")]
+mod cells;
 #[cfg(feature = "formula-engine")]
 mod derived;
 #[cfg(feature = "formula-engine")]
@@ -27,11 +29,15 @@ mod eval;
 #[cfg(feature = "formula-engine")]
 mod formula_reads;
 #[cfg(feature = "formula-engine")]
+mod graph;
+#[cfg(feature = "formula-engine")]
 mod memory;
 #[cfg(feature = "formula-engine")]
 mod query;
 #[cfg(feature = "formula-engine")]
 mod sheet;
+#[cfg(feature = "formula-engine")]
+mod spill;
 #[cfg(feature = "formula-engine")]
 mod store;
 #[cfg(feature = "formula-engine")]

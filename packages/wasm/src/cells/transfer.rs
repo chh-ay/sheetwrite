@@ -5,7 +5,7 @@ use crate::transfer::Writer;
 #[cfg(any(target_arch = "wasm32", test))]
 use crate::transfer::{Reader, TransferResult};
 
-fn write_keys(out: &mut Writer, keys: &HashSet<(usize, usize)>) {
+fn write_keys(out: &mut Writer, keys: &FxHashSet<(usize, usize)>) {
     out.usize(keys.len());
     for &(a, b) in keys {
         out.usize(a);
@@ -14,13 +14,13 @@ fn write_keys(out: &mut Writer, keys: &HashSet<(usize, usize)>) {
 }
 
 #[cfg(any(target_arch = "wasm32", test))]
-fn read_keys(input: &mut Reader<'_>) -> TransferResult<HashSet<(usize, usize)>> {
+fn read_keys(input: &mut Reader<'_>) -> TransferResult<FxHashSet<(usize, usize)>> {
     (0..input.count()?)
         .map(|_| Ok((input.usize()?, input.usize()?)))
         .collect()
 }
 
-impl SheetData {
+impl CellStorage {
     pub(crate) fn write_transfer(&self, out: &mut Writer) {
         out.usize(self.n_cols);
         out.usize(self.row_count);
@@ -93,46 +93,9 @@ impl SheetData {
             out.u64(paged.evictions);
         }
 
-        self.derived.write_transfer(out);
-
-        out.usize(self.spill_ranges.len());
-
-        for (&(row, col), range) in &self.spill_ranges {
-            out.u32(row);
-            out.u32(col);
-            out.u32(range.anchor.0);
-            out.u32(range.anchor.1);
-            out.u32(range.row_end);
-            out.u32(range.col_end);
+        if self.paged.is_some() {
+            self.derived.write_transfer(out);
         }
-
-        out.usize(self.spill_owners.len());
-
-        for (&(row, col), &(anchor_row, anchor_col)) in &self.spill_owners {
-            out.u32(row);
-            out.u32(col);
-            out.u32(anchor_row);
-            out.u32(anchor_col);
-        }
-
-        out.usize(self.spill_blockers.len());
-
-        for blocker in &self.spill_blockers {
-            out.u32(blocker.row_start);
-            out.u32(blocker.col_start);
-            out.u32(blocker.row_end);
-            out.u32(blocker.col_end);
-        }
-
-        out.usize(self.dirty_cells.len());
-
-        for &(row, col) in &self.dirty_cells {
-            out.u32(row);
-            out.u32(col);
-        }
-
-        out.bool(self.all_dirty);
-        // Conditional rules contain parsed ASTs and are lazily rebuilt by the host.
     }
 
     #[cfg(any(target_arch = "wasm32", test))]
@@ -220,9 +183,30 @@ impl SheetData {
         let cells = n_cols
             .checked_mul(row_count)
             .ok_or("transferred dimensions overflow")?;
-        let derived = DerivedOverlay::read_transfer(input, cells, paged.is_some())?;
-
-        let mut sheet = Self {
+        let derived = if paged.is_some() {
+            DerivedOverlay::read_transfer(input, cells)?
+        } else {
+            DerivedOverlay::default()
+        };
+        let dense_calculated_cells = if paged.is_none() {
+            let mut count = 0;
+            for (&kind, &payload) in kind.iter().zip(&payload) {
+                if kind & CALCULATED != 0 {
+                    if !matches!(kind & !CALCULATED, KIND_EMPTY | KIND_FORMULA)
+                        || payload == crate::derived::ABSENT_TAG
+                    {
+                        return Err("invalid transferred dense calculated slot".into());
+                    }
+                    count += 1;
+                } else if kind > KIND_FORMULA {
+                    return Err("invalid transferred dense source kind".into());
+                }
+            }
+            count
+        } else {
+            0
+        };
+        Ok(Self {
             n_cols,
             row_count,
             kind,
@@ -230,45 +214,7 @@ impl SheetData {
             style,
             paged,
             derived,
-            formulas: HashMap::new(),
-            spill_ranges: HashMap::new(),
-            spill_owners: HashMap::new(),
-            spill_blockers: Vec::new(),
-            dirty_cells: HashSet::new(),
-            all_dirty: false,
-            cond_rules: Vec::new(),
-        };
-
-        for _ in 0..input.count()? {
-            let key = (input.u32()?, input.u32()?);
-            let range = SpillRange {
-                anchor: (input.u32()?, input.u32()?),
-                row_end: input.u32()?,
-                col_end: input.u32()?,
-            };
-            sheet.spill_ranges.insert(key, range);
-        }
-
-        for _ in 0..input.count()? {
-            sheet
-                .spill_owners
-                .insert((input.u32()?, input.u32()?), (input.u32()?, input.u32()?));
-        }
-
-        for _ in 0..input.count()? {
-            sheet.spill_blockers.push(SpillBlocker {
-                row_start: input.u32()?,
-                col_start: input.u32()?,
-                row_end: input.u32()?,
-                col_end: input.u32()?,
-            });
-        }
-
-        for _ in 0..input.count()? {
-            sheet.dirty_cells.insert((input.u32()?, input.u32()?));
-        }
-
-        sheet.all_dirty = input.bool()?;
-        Ok(sheet)
+            dense_calculated_cells,
+        })
     }
 }

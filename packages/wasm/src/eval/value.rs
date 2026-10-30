@@ -2,7 +2,8 @@
 
 use std::cmp::Ordering;
 
-use crate::sheet::{payload_num, payload_str_id, SheetData};
+use crate::cells::{payload_num, payload_str_id};
+use crate::sheet::SheetData;
 use crate::types::{
     string_from_pool_ref, FormulaError, StringStorage, Value, KIND_BOOL, KIND_EMPTY, KIND_FORMULA,
     KIND_NUMBER, KIND_STRING,
@@ -20,8 +21,8 @@ pub(super) fn cached_formula_value(
         return Value::Error(error);
     }
 
-    let Some((kind, payload)) = sheet.calculated_cell_at(index) else {
-        return Value::number(sheet.num_at(index));
+    let Some((kind, payload)) = sheet.cells.calculated_cell_at(index) else {
+        return Value::number(sheet.cells.num_at(index));
     };
     match kind {
         KIND_STRING => string_from_pool_ref(strings, payload_str_id(payload))
@@ -198,7 +199,8 @@ pub(super) fn format_basic_text(value: &Value, format: &str) -> Result<String, F
 #[cfg(test)]
 mod tests {
     use super::cached_formula_value;
-    use crate::sheet::{encode_num, encode_str_id, SheetData};
+    use crate::cells::{encode_num, encode_str_id};
+    use crate::sheet::SheetData;
     use crate::types::{FormulaError, StringStorage, Value, KIND_BOOL, KIND_NUMBER, KIND_STRING};
 
     #[test]
@@ -211,26 +213,30 @@ mod tests {
             Value::Error(FormulaError::Ref)
         );
 
-        sheet.set_derived(0, KIND_NUMBER, encode_num(42.5));
+        sheet.cells.set_derived(0, KIND_NUMBER, encode_num(42.5));
         assert_eq!(
             cached_formula_value(&sheet, &strings, 0, None),
             Value::Number(42.5)
         );
 
         let text_id = strings.intern("cached");
-        sheet.set_derived(0, KIND_STRING, encode_str_id(text_id));
+        sheet
+            .cells
+            .set_derived(0, KIND_STRING, encode_str_id(text_id));
         assert_eq!(
             cached_formula_value(&sheet, &strings, 0, None),
             Value::text("cached")
         );
 
-        sheet.set_derived(0, KIND_STRING, encode_str_id(text_id + 1));
+        sheet
+            .cells
+            .set_derived(0, KIND_STRING, encode_str_id(text_id + 1));
         assert_eq!(
             cached_formula_value(&sheet, &strings, 0, None),
             Value::Error(FormulaError::Ref)
         );
 
-        sheet.set_derived(0, KIND_BOOL, encode_num(1.0));
+        sheet.cells.set_derived(0, KIND_BOOL, encode_num(1.0));
         assert_eq!(
             cached_formula_value(&sheet, &strings, 0, None),
             Value::Bool(true)
