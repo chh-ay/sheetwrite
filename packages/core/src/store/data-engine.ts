@@ -32,6 +32,7 @@ import { restoreBlockFacts } from "../restore-block.js";
 import { canAddSheetSnapshot } from "../sheet-lifecycle.js";
 import { validateSheetName } from "../sheet-name.js";
 import { StyleDictionary } from "../style-dictionary.js";
+import { preparedHistoryBlock, type TransactionPreparation } from "../transaction-preparation.js";
 import type {
   CellFormat,
   CellHyperlink,
@@ -131,7 +132,10 @@ export interface CompactRangeHistory {
   readonly resource: RangeSnapshot;
   readonly byteLength: number;
   readonly refs: ReadonlyArray<[offset: number, target: CellAddress]>;
-  toDocumentOp(range: Range): Extract<DocumentOp, { op: "setBlock" }>;
+  toDocumentOp(
+    range: Range,
+    preparation?: TransactionPreparation,
+  ): Extract<DocumentOp, { op: "setBlock" }>;
   dispose(): void;
 }
 
@@ -977,12 +981,14 @@ export class StoreDataEngine {
       },
 
       refs,
-      toDocumentOp: (target) => {
+      toDocumentOp: (target, preparation) => {
         if (disposed) throw new Error("history range snapshot already disposed");
         this.rangeMutationStats.historyMaterializations += 1;
         const kindsColumnMajor = resource.kinds();
         const numbersColumnMajor = this.wasm.snapshotNumbers(resource);
-        const textsColumnMajor = this.wasm.snapshotTexts(resource);
+        const textsColumnMajor = kindsColumnMajor.includes(KIND_STRING)
+          ? this.wasm.snapshotTexts(resource)
+          : undefined;
         const stylesColumnMajor = resource.styleIds();
         const values: CellScalar[] = new Array(rows * cols);
         const styleIds: number[] = new Array(rows * cols);
@@ -994,7 +1000,7 @@ export class StoreDataEngine {
             const offset = row * cols + col;
             const kind = kindsColumnMajor[source]!;
             const number = numbersColumnMajor[source]!;
-            const text = textsColumnMajor[source]!;
+            const text = textsColumnMajor?.[source] ?? "";
             values[offset] =
               kind === KIND_NUMBER
                 ? number
@@ -1022,7 +1028,27 @@ export class StoreDataEngine {
           styleTable,
           styleIds,
         };
-        return { op: "setBlock", range: target, block };
+        const operation: Extract<DocumentOp, { op: "setBlock" }> = {
+          op: "setBlock",
+          range: target,
+          block,
+        };
+        preparation?.seedHistory(operation, (bounds) => {
+          if (disposed) throw new Error("history range snapshot already disposed");
+          if (
+            bounds.end.row - bounds.start.row + 1 !== rows ||
+            bounds.end.col - bounds.start.col + 1 !== cols
+          )
+            return false;
+          this.noteRangeMutationFfi();
+          return this.wasm.restoreRange(
+            this.handleOf(bounds.sheet),
+            bounds.start.row,
+            bounds.start.col,
+            resource,
+          );
+        });
+        return operation;
       },
       dispose: () => {
         if (disposed) return;
@@ -1649,6 +1675,7 @@ export class StoreDataEngine {
     remoteLoad: boolean,
     captureChanges: boolean,
     captureDetailedChanges = false,
+    trustedHistory = false,
   ): StoreDataEngineEffects {
     const changes: ChangeEvent["changes"] | null = captureChanges ? [] : null;
     const appliedPatches: DocumentOp[] = [];
@@ -1661,7 +1688,7 @@ export class StoreDataEngine {
     if (remoteLoad) this.wasm.beginPageLoad();
     try {
       for (const patch of patches) {
-        if (!this.applyPatch(patch, changes, captureDetailedChanges)) continue;
+        if (!this.applyPatch(patch, changes, captureDetailedChanges, trustedHistory)) continue;
         appliedPatches.push(patch);
 
         if (patch.op === "set" || patch.op === "setNote") touchedSheets.add(patch.addr.sheet);
@@ -1713,6 +1740,7 @@ export class StoreDataEngine {
     patch: DocumentOp,
     changes: ChangeEvent["changes"] | null,
     captureDetailedChanges = false,
+    trustedHistory = false,
   ): boolean {
     switch (patch.op) {
       case "set": {
@@ -1845,7 +1873,8 @@ export class StoreDataEngine {
           changes && captureDetailedChanges
             ? this.captureBlockBeforeCells(bounds, rows, cols)
             : null;
-        const applied = this.writePackedBlock(bounds, block);
+        const history = trustedHistory ? preparedHistoryBlock(block) : undefined;
+        const applied = history ? history.restore(bounds) : this.writePackedBlock(bounds, block);
         if (!applied || !changes || !beforeCells) return applied;
         const formulas = new Map(block.formulas ?? []);
         const refs = new Map(block.refs ?? []);

@@ -1181,7 +1181,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L159",
+              "source": "src/sync.ts#L160",
               "jsDocTags": [],
               "documentation": "Security and durability defaults bound hostile remote versions, recovery\nbuffers, acknowledgement memory, and the offline pending queue independently.",
               "memberDocs": []
@@ -2205,7 +2205,7 @@
               "owners": [
                 "src/store/data-engine.ts"
               ],
-              "source": "src/store/data-engine.ts#L252",
+              "source": "src/store/data-engine.ts#L256",
               "jsDocTags": [],
               "documentation": "Error thrown when an operation requires datasource cells that are not loaded.",
               "memberDocs": []
@@ -2660,7 +2660,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L40",
+              "source": "src/sync.ts#L41",
               "jsDocTags": [],
               "documentation": "Mandatory bounds for one durable pending-commit restore.",
               "memberDocs": [
@@ -2685,7 +2685,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L51",
+              "source": "src/sync.ts#L52",
               "jsDocTags": [],
               "documentation": "Host-owned durable queue. Browser storage lives in the optional `./browser` entrypoint.",
               "memberDocs": [
@@ -4534,7 +4534,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L70",
+              "source": "src/sync.ts#L71",
               "jsDocTags": [],
               "documentation": "Current persistence activity reported by a sync coordinator.",
               "memberDocs": []
@@ -4546,7 +4546,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L288",
+              "source": "src/sync.ts#L289",
               "jsDocTags": [],
               "documentation": "Outcome of `SyncCoordinator.recoverConflict`.",
               "memberDocs": []
@@ -4558,7 +4558,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L273",
+              "source": "src/sync.ts#L274",
               "jsDocTags": [],
               "documentation": "Why a conflict cannot be recovered in place; the host reloads the document instead.",
               "memberDocs": []
@@ -4570,7 +4570,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L68",
+              "source": "src/sync.ts#L69",
               "jsDocTags": [],
               "documentation": "Host-controlled online state reported by synchronization.",
               "memberDocs": []
@@ -4582,7 +4582,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L325",
+              "source": "src/sync.ts#L326",
               "jsDocTags": [
                 "example",
                 "see"
@@ -4622,7 +4622,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L243",
+              "source": "src/sync.ts#L244",
               "jsDocTags": [],
               "documentation": "Queue, version, connection, or error transition emitted by synchronization.",
               "memberDocs": []
@@ -4634,7 +4634,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L122",
+              "source": "src/sync.ts#L123",
               "jsDocTags": [],
               "documentation": "Resource ceilings applied independently to remote collaboration input and local durability.",
               "memberDocs": [
@@ -4699,7 +4699,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L225",
+              "source": "src/sync.ts#L226",
               "jsDocTags": [],
               "documentation": "Document, version, durability, and online options for synchronization.",
               "memberDocs": [
@@ -4749,7 +4749,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L214",
+              "source": "src/sync.ts#L215",
               "jsDocTags": [],
               "documentation": "Typed local transaction rejection produced when the durable queue cannot reserve capacity.",
               "memberDocs": []
@@ -4761,7 +4761,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L80",
+              "source": "src/sync.ts#L81",
               "jsDocTags": [],
               "documentation": "Whether the durable local queue can currently admit another transaction.",
               "memberDocs": []
@@ -4773,7 +4773,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L112",
+              "source": "src/sync.ts#L113",
               "jsDocTags": [],
               "documentation": "Aggregate ceilings for local commits retained until durable acknowledgement.",
               "memberDocs": [
@@ -4798,7 +4798,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L205",
+              "source": "src/sync.ts#L206",
               "jsDocTags": [],
               "documentation": "Typed rejection of malformed or resource-exhausting synchronization input.",
               "memberDocs": []
@@ -4810,7 +4810,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L184",
+              "source": "src/sync.ts#L185",
               "jsDocTags": [],
               "documentation": "Stable category identifying which synchronization protocol bound was violated.",
               "memberDocs": []
@@ -4822,7 +4822,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L88",
+              "source": "src/sync.ts#L89",
               "jsDocTags": [],
               "documentation": "Immutable observable synchronization state.",
               "memberDocs": [
@@ -4855,7 +4855,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L104",
+              "source": "src/sync.ts#L105",
               "jsDocTags": [],
               "documentation": "Contiguous-version recovery request produced when remote input skips ahead.",
               "memberDocs": []

@@ -2,7 +2,7 @@ import { cellScalarToText, parseCellInput } from "./cell-input.js";
 import { replaceInText } from "./search-replace.js";
 import type { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
-import type { CellValue } from "./types/cell.js";
+import type { CellScalar, CellValue } from "./types/cell.js";
 import type { CellAddress, SheetId } from "./types/coordinates.js";
 import type { DocumentOp, Sheet, SnapshotCell } from "./types/document.js";
 import type { ReplaceResult, SearchOptions, SearchResult } from "./types/grid.js";
@@ -77,6 +77,25 @@ class FlatSearchMatchSet implements SearchMatchSet {
 }
 
 const EMPTY_MATCHES = new FlatSearchMatchSet(null, new Uint32Array(0));
+/** Case folding matches the engine's only for ASCII; any wider code unit rescans. */
+const NON_ASCII = /[\u0080-\uffff]/;
+// Rust `{}` and JS `String()` print an f64 the same way only in this range.
+const MIN_PLAIN_NUMBER = 1e-6;
+const MAX_PLAIN_NUMBER = 1e21;
+
+/**
+ * Text the engine's search sees for a stored scalar, or null when JS cannot
+ * reproduce it exactly (exponent forms, `-0`, infinities). Callers rescan then.
+ */
+function engineSearchText(value: CellScalar): string | null {
+  if (value === null) return "";
+  if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
+  if (typeof value === "string") return value;
+  const magnitude = Math.abs(value);
+  const plain =
+    Object.is(value, 0) || (magnitude >= MIN_PLAIN_NUMBER && magnitude < MAX_PLAIN_NUMBER);
+  return plain ? String(value) : null;
+}
 
 /**
  * Owns find state and match scanning, then asks the grid shell to reveal and
@@ -104,6 +123,87 @@ export class SearchController {
 
   get version(): number {
     return this.revision;
+  }
+
+  /**
+   * Refresh without scrolling: ordinary edits must not move the user's viewport.
+   *
+   * A literal edit's own match state is a complete check only when the sheet
+   * has no formulas or references. Otherwise an input on any sheet can change
+   * a computed match elsewhere, so the search must rescan conservatively.
+   */
+  refreshAfterChange(
+    patches: readonly DocumentOp[],
+    activeSheet: SheetId,
+    independentCells: boolean,
+  ): void {
+    if (!this.searchQuery) return;
+    if (
+      independentCells &&
+      activeSheet === this.searchMatches.sheet &&
+      patches.every((patch) => this.preservesMatchMembership(patch, activeSheet))
+    )
+      return;
+    const next = this.scanMatches(this.searchQuery, this.searchOpts);
+    const previous = this.searchMatches;
+    if (next.sheet === previous.sheet && next.length === previous.length) {
+      let unchanged = true;
+      for (let index = 0; index < next.length; index++) {
+        if (
+          next.rowAt(index) !== previous.rowAt(index) ||
+          next.colAt(index) !== previous.colAt(index)
+        ) {
+          unchanged = false;
+          break;
+        }
+      }
+      // Retain the match identity and row index when only values changed.
+      if (unchanged) return;
+    }
+
+    const active = previous.at(this.searchActive);
+    this.searchMatches = next;
+    this.searchActive = next.length > 0 ? 0 : -1;
+    if (active) {
+      for (let index = 0; index < next.length; index++) {
+        if (next.rowAt(index) === active.row && next.colAt(index) === active.col) {
+          this.searchActive = index;
+          break;
+        }
+      }
+    }
+    this.revision += 1;
+    this.emitSearch();
+  }
+
+  private preservesMatchMembership(patch: DocumentOp, sheet: SheetId): boolean {
+    if (patch.op === "setNote" || patch.op === "setRangeStyle") return true;
+    if (patch.op !== "set") return false;
+    if (patch.addr.sheet !== sheet) return true;
+    if (patch.value.kind !== "literal") return false;
+    if (this.searchOpts.columns && !this.searchOpts.columns.includes(patch.addr.col)) return true;
+
+    const text = engineSearchText(this.deps.store.getCell(patch.addr).resolved);
+    if (text === null) return false;
+    const caseFolded = !this.searchOpts.matchCase;
+    if (caseFolded && (NON_ASCII.test(text) || NON_ASCII.test(this.searchQuery))) return false;
+    const haystack = caseFolded ? text.toLowerCase() : text;
+    const needle = caseFolded ? this.searchQuery.toLowerCase() : this.searchQuery;
+    const matchesNow = this.searchOpts.wholeCell ? haystack === needle : haystack.includes(needle);
+    const matches = this.searchMatches;
+    let start = 0;
+    let end = matches.length;
+    while (start < end) {
+      const middle = start + ((end - start) >>> 1);
+      const row = matches.rowAt(middle);
+      const col = matches.colAt(middle);
+      if (row < patch.addr.row || (row === patch.addr.row && col < patch.addr.col))
+        start = middle + 1;
+      else end = middle;
+    }
+    const matchedBefore =
+      matches.rowAt(start) === patch.addr.row && matches.colAt(start) === patch.addr.col;
+    return matchesNow === matchedBefore;
   }
 
   search(query: string, opts: SearchOptions = {}): SearchResult {

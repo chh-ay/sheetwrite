@@ -20,11 +20,15 @@ import {
   UndoManager,
 } from "./history.js";
 import { cloneCellHyperlink } from "./hyperlink.js";
-import { encodeRestoreBlock, estimateRestoreBlockBytes } from "./restore-block.js";
+import {
+  encodeRestoreBlock,
+  encodeMeasuredRestoreBlock,
+  estimateRestoreBlockBytes,
+} from "./restore-block.js";
 import type { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
 import type { GridTransactionAdmissionDecision } from "./transaction-admission.js";
-import { TransactionPreparation } from "./transaction-preparation.js";
+import { preparedHistoryBlock, TransactionPreparation } from "./transaction-preparation.js";
 import type { CellValue, Column } from "./types/cell.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "./types/coordinates.js";
 import type {
@@ -763,7 +767,7 @@ export class DocumentController {
       kind: "rangeSnapshot",
       range: snapshot.range,
       byteLength: snapshot.byteLength,
-      toPatch: (target) => snapshot.toDocumentOp(target),
+      toPatch: (target, preparation) => snapshot.toDocumentOp(target, preparation),
       dispose: () => snapshot.dispose(),
     };
   }
@@ -1091,13 +1095,12 @@ export class DocumentController {
     action: HistoryAction,
     reason: "undo" | "redo",
   ): ApplyTransactionResult | null {
-    const patches = materializeHistoryAction(action);
-    if (patches.length === 0) return null;
-
     this.applyingHistory = true;
     let outcome: ApplyTransactionResult;
     const preparation = new TransactionPreparation();
     try {
+      const patches = materializeHistoryAction(action, preparation);
+      if (patches.length === 0) return null;
       const fitted = this.fitHistoryPatches(patches, preparation);
       outcome = this.commit(fitted.patches, reason, fitted.admitted);
     } finally {
@@ -1128,7 +1131,27 @@ export class DocumentController {
     admitted?: AdmittedTransactionResources;
   } {
     const limits = this.transactionResourceLimits;
-    const resources = validateTransactionResources(patches, limits);
+    const encodedBytes = preparation.measure(patches);
+    const resources =
+      patches.length <= limits.maxOperations && encodedBytes <= limits.maxEncodedBytes
+        ? { ok: true as const, operationCount: patches.length, encodedBytes }
+        : {
+            ok: false as const,
+            issue: {
+              kind: "resource-limit" as const,
+              severity: "error" as const,
+              resource:
+                patches.length > limits.maxOperations
+                  ? ("operations" as const)
+                  : ("encoded-bytes" as const),
+              actual: patches.length > limits.maxOperations ? patches.length : encodedBytes,
+              max:
+                patches.length > limits.maxOperations
+                  ? limits.maxOperations
+                  : limits.maxEncodedBytes,
+              message: "History restore exceeds the transaction resource limits",
+            },
+          };
     if (resources.ok) {
       return { patches, admitted: admitTransactionResources(patches, limits, resources) };
     }
@@ -1137,7 +1160,10 @@ export class DocumentController {
       const compact = patches.map((patch) => {
         if (patch.op !== "setBlock") return patch;
         try {
-          const operation = encodeRestoreBlock(patch.range, patch.block);
+          const measured = preparedHistoryBlock(patch.block);
+          const operation = measured
+            ? encodeMeasuredRestoreBlock(patch.range, patch.block, measured.blockBytes)
+            : encodeRestoreBlock(patch.range, patch.block);
           preparation.seed(operation, patch.block);
           return operation;
         } catch (error) {

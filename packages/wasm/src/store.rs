@@ -1686,19 +1686,51 @@ impl CellStore {
         c0: usize,
         snapshot: &RangeSnapshot,
     ) -> bool {
-        let dirty_revision = self.local_dirty_revision();
-        let Some(s) = self.sheets.get_mut(sheet) else {
+        let Some(existing) = self.sheets.get(sheet) else {
             return false;
         };
         if r0
             .checked_add(snapshot.rows)
-            .is_none_or(|end| end > s.row_count)
+            .is_none_or(|end| end > existing.row_count)
             || c0
                 .checked_add(snapshot.cols)
-                .is_none_or(|end| end > s.n_cols)
-            || (dirty_revision.is_some() && !s.can_dirty_rect(r0, c0, snapshot.rows, snapshot.cols))
+                .is_none_or(|end| end > existing.n_cols)
         {
             return false;
+        }
+        let mut sources = HashMap::with_capacity(snapshot.formulas.len());
+        for (row, col, entry) in &snapshot.formulas {
+            let Some(key) = cell_key(r0 + *row as usize, c0 + *col as usize) else {
+                return false;
+            };
+            let source = if entry.is_formula() {
+                self.parse_formula_entry(&entry.source, sheet as u32, key.0, key.1)
+            } else {
+                let Some(target) = entry.reference_target(sheet as u32) else {
+                    return false;
+                };
+                let target_sheet = target.sheet as usize;
+                if !self.sheet_alive.get(target_sheet).copied().unwrap_or(false)
+                    || !self.sheets[target_sheet]
+                        .contains_cell(target.row as usize, target.col as usize)
+                {
+                    return false;
+                }
+                FormulaEntry::reference(target, &self.sheet_names[target_sheet], sheet as u32)
+            };
+            sources.insert(key, source);
+        }
+        let revision = self.local_dirty_revision();
+        if let Some(revision) = revision {
+            if !self.sheets[sheet].prepare_dirty_rect(
+                r0,
+                c0,
+                snapshot.rows,
+                snapshot.cols,
+                revision,
+            ) {
+                return false;
+            }
         }
         let string_ids: Vec<u32> = (0..snapshot.strings.len())
             .map(|id| {
@@ -1706,45 +1738,27 @@ impl CellStore {
                     .intern(snapshot.strings.get(id as u32).expect("snapshot text ID"))
             })
             .collect();
-        s.invalidate_calculations();
-        s.formulas.retain(|&(row, col), _| {
-            let row = row as usize;
-            let col = col as usize;
-            row < r0 || row >= r0 + snapshot.rows || col < c0 || col >= c0 + snapshot.cols
-        });
-        for col_offset in 0..snapshot.cols {
-            let source = col_offset * snapshot.rows;
-            let col = c0 + col_offset;
-            for row_offset in 0..snapshot.rows {
-                let row = r0 + row_offset;
-                if !s.write_cell(
-                    row,
-                    col,
-                    snapshot.kind[source + row_offset],
-                    {
-                        let payload = snapshot.payload[source + row_offset];
-                        let id = payload_str_id(payload);
-                        if id == NO_STRING {
-                            payload
-                        } else {
-                            encode_str_id(string_ids[id as usize])
-                        }
+        self.replace_range_sources(
+            sheet,
+            (r0, c0),
+            (snapshot.rows, snapshot.cols),
+            revision,
+            sources,
+            |row, col| {
+                let offset = col * snapshot.rows + row;
+                let payload = snapshot.payload[offset];
+                let id = payload_str_id(payload);
+                (
+                    snapshot.kind[offset],
+                    if id == NO_STRING {
+                        payload
+                    } else {
+                        encode_str_id(string_ids[id as usize])
                     },
-                    snapshot.style[source + row_offset],
-                    dirty_revision,
-                ) {
-                    return false;
-                }
-            }
-        }
-        for (row, col, entry) in &snapshot.formulas {
-            s.formulas
-                .insert((r0 as u32 + *row, c0 as u32 + *col), entry.clone());
-        }
-        s.clear_dirty();
-        s.all_dirty = true;
-        self.bump_formula_epoch();
-        true
+                    snapshot.style[offset],
+                )
+            },
+        )
     }
 
     /// Hydrate one datasource page column while retaining local dirty cells and
@@ -2914,50 +2928,99 @@ impl CellStore {
             string_ids[offset] = self.intern(&text_buf[start as usize..end as usize]);
         }
 
+        if self.replace_range_sources(
+            sheet,
+            (start_row, start_col),
+            (rows, cols),
+            dirty_revision,
+            prepared,
+            |row, col| {
+                let offset = order.index(row, col, rows, cols);
+                if source_kinds[offset] != 0 {
+                    return (KIND_FORMULA, 0, styles[offset]);
+                }
+                let (kind, payload) = match kinds[offset] {
+                    KIND_NUMBER | KIND_BOOL => (kinds[offset], encode_num(numbers[offset])),
+                    KIND_STRING => (KIND_STRING, encode_str_id(string_ids[offset])),
+                    _ => (KIND_EMPTY, 0),
+                };
+                (kind, payload, styles[offset])
+            },
+        ) {
+            BLOCK_OK
+        } else {
+            BLOCK_RESOURCE_LIMIT
+        }
+    }
+
+    /// Packed writes and history restores share source replacement so a local
+    /// native undo has the same result as its serialized replay on another peer.
+    /// Readers supply source kinds directly, avoiding a second per-cell source
+    /// test after the packed reader has already selected formula or literal.
+    /// Choose the literal-only loop once per range; a numeric/text import must
+    /// not test the source map for every cell.
+    fn replace_range_sources(
+        &mut self,
+        sheet: usize,
+        start: (usize, usize),
+        dimensions: (usize, usize),
+        revision: Option<u64>,
+        sources: HashMap<(u32, u32), FormulaEntry>,
+        cell: impl Fn(usize, usize) -> (u8, u64, u32),
+    ) -> bool {
         self.sheets[sheet].invalidate_calculations();
-        for col_offset in 0..cols {
-            let col = start_col + col_offset;
-            for row_offset in 0..rows {
-                let row = start_row + row_offset;
-                let offset = order.index(row_offset, col_offset, rows, cols);
-                let (kind, payload) = if source_kinds[offset] != 0 {
-                    (KIND_FORMULA, 0)
-                } else {
-                    match kinds[offset] {
-                        KIND_NUMBER | KIND_BOOL => (kinds[offset], encode_num(numbers[offset])),
-                        KIND_STRING => (KIND_STRING, encode_str_id(string_ids[offset])),
-                        _ => (KIND_EMPTY, 0),
-                    }
-                };
+        let applied = if sources.is_empty() {
+            self.write_range_sources::<false>(sheet, start, dimensions, revision, sources, cell)
+        } else {
+            self.write_range_sources::<true>(sheet, start, dimensions, revision, sources, cell)
+        };
+        if !applied {
+            return false;
+        }
+        let sheet_data = &mut self.sheets[sheet];
+        sheet_data.clear_dirty();
+        sheet_data.all_dirty = true;
+        true
+    }
+
+    fn write_range_sources<const HAS_SOURCES: bool>(
+        &mut self,
+        sheet: usize,
+        start: (usize, usize),
+        dimensions: (usize, usize),
+        revision: Option<u64>,
+        mut sources: HashMap<(u32, u32), FormulaEntry>,
+        cell: impl Fn(usize, usize) -> (u8, u64, u32),
+    ) -> bool {
+        for col_offset in 0..dimensions.1 {
+            let col = start.1 + col_offset;
+            for row_offset in 0..dimensions.0 {
+                let row = start.0 + row_offset;
                 let Some(key) = cell_key(row, col) else {
-                    return BLOCK_SOURCE_INVALID;
+                    return false;
                 };
-                let source = if prepared.is_empty() {
-                    None
+                let source = if HAS_SOURCES && !sources.is_empty() {
+                    sources.remove(&key)
                 } else {
-                    prepared.remove(&key)
+                    None
                 };
+                let (kind, payload, style) = cell(row_offset, col_offset);
                 if !self.replace_cell_source(CellSourceWrite {
                     sheet,
                     row,
                     col,
                     kind,
                     payload,
-                    style: styles[offset],
+                    style,
                     source,
-                    revision: dirty_revision,
+                    revision,
                     hydrating: false,
                 }) {
-                    return BLOCK_RESOURCE_LIMIT;
+                    return false;
                 }
             }
         }
-        // Packed writes clear every spill, so all anchors must materialize
-        // again; `all_dirty` already covers the cells just written.
-        let sheet_data = &mut self.sheets[sheet];
-        sheet_data.clear_dirty();
-        sheet_data.all_dirty = true;
-        BLOCK_OK
+        true
     }
 
     /// Loaded row runs of one column inside `start_row..end_row`, as flat

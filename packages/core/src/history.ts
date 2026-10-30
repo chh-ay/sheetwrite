@@ -1,3 +1,4 @@
+import type { TransactionPreparation } from "./transaction-preparation.js";
 import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
 import type { DocumentOp } from "./types/document.js";
 
@@ -7,7 +8,10 @@ export type HistoryPart =
       kind: "rangeSnapshot";
       range: Range;
       byteLength: number;
-      toPatch: (range: Range) => Extract<DocumentOp, { op: "setBlock" }>;
+      toPatch: (
+        range: Range,
+        preparation?: TransactionPreparation,
+      ) => Extract<DocumentOp, { op: "setBlock" }>;
       dispose: () => void;
     };
 
@@ -22,16 +26,26 @@ export interface HistoryResourceStats {
   readonly undoEntries: number;
   readonly redoEntries: number;
   readonly retainedSnapshots: number;
+  /** Engine-reported payload bytes; excludes cloned formula ASTs and JS patch history. */
   readonly retainedSnapshotBytes: number;
 }
 
 /** Retains recent transaction-level undo resources without allowing unbounded history growth. */
 const DEFAULT_HISTORY_LIMIT = 200;
+/**
+ * A numeric range snapshot reports about 13 bytes per captured cell, so the
+ * entry count alone allows 200 million-cell clears (2.6 GB). This payload-byte
+ * budget keeps about twenty of them, except the newest entry is always kept.
+ * It is not a total history-memory ceiling: engine accounting excludes cloned
+ * formula ASTs, and JS patch inverses/redo payloads are only entry-count bounded.
+ */
+const DEFAULT_HISTORY_SNAPSHOT_BYTES = 256 * 1024 * 1024;
 
 /**
  * Bounded undo/redo over document transactions. Destructive bulk edits may
  * retain opaque store-local range resources, which are materialized into a
- * serializable `setBlock` only when undo executes.
+ * serializable `setBlock` only when undo executes. History drops its oldest
+ * entries when it exceeds either the entry count or reported snapshot payload bytes.
  */
 export class UndoManager {
   private readonly undoStack: UndoEntry[] = [];
@@ -44,9 +58,23 @@ export class UndoManager {
     if (undo.length === 0) return;
 
     this.undoStack.push({ undo, redo });
-    if (this.undoStack.length > this.limit) disposeEntry(this.undoStack.shift()!);
     for (const entry of this.redoStack) disposeEntry(entry);
     this.redoStack.length = 0;
+    this.evictOldest();
+  }
+
+  private evictOldest(): void {
+    let bytes = 0;
+    for (const entry of this.undoStack) bytes += entrySnapshotBytes(entry);
+    while (
+      this.undoStack.length > 1 &&
+      (this.undoStack.length > this.limit || bytes > DEFAULT_HISTORY_SNAPSHOT_BYTES)
+    ) {
+      const oldest = this.undoStack.shift();
+      if (!oldest) break;
+      bytes -= entrySnapshotBytes(oldest);
+      disposeEntry(oldest);
+    }
   }
 
   /** Rebase stored addresses after a row insert/delete in data space. */
@@ -120,8 +148,8 @@ export class UndoManager {
         for (const part of entry.undo) {
           if (part.kind !== "rangeSnapshot") continue;
           retainedSnapshots += 1;
-          retainedSnapshotBytes += part.byteLength;
         }
+        retainedSnapshotBytes += entrySnapshotBytes(entry);
       }
     }
     return {
@@ -138,11 +166,19 @@ export class UndoManager {
   }
 }
 
-export function materializeHistoryAction(action: HistoryAction): DocumentOp[] {
+function entrySnapshotBytes(entry: UndoEntry): number {
+  let bytes = 0;
+  for (const part of entry.undo) if (part.kind === "rangeSnapshot") bytes += part.byteLength;
+  return bytes;
+}
+export function materializeHistoryAction(
+  action: HistoryAction,
+  preparation?: TransactionPreparation,
+): DocumentOp[] {
   const patches: DocumentOp[] = [];
   for (const part of action) {
     if (part.kind === "patches") patches.push(...part.patches);
-    else patches.push(part.toPatch(part.range));
+    else patches.push(part.toPatch(part.range, preparation));
   }
   return patches;
 }

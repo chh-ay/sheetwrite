@@ -548,11 +548,13 @@ export class SheetwriteStore implements Store {
       const limits = isAtomicBatch(tx.patches)
         ? atomicBatchLimits(this.transactionResourceLimits)
         : this.transactionResourceLimits;
-      const resourceValidation = resolveTransactionResourceValidation(
+      const admittedResources = takeAdmittedTransactionResources(tx);
+      const resourceResolution = resolveTransactionResourceValidation(
         tx.patches,
         limits,
-        takeAdmittedTransactionResources(tx),
-      ).result;
+        admittedResources,
+      );
+      const resourceValidation = resourceResolution.result;
       if (!resourceValidation.ok) {
         return { status: "rejected", epoch: this.epoch, issues: [resourceValidation.issue] };
       }
@@ -618,6 +620,9 @@ export class SheetwriteStore implements Store {
         source === "remote" && options.localReplay !== true,
         hasListeners,
         this.detailedChangeCapture,
+        admittedResources !== undefined &&
+          resourceResolution.admitted === admittedResources &&
+          !this.protectionResolver,
       );
       if (effects.appliedPatches.length === 0) {
         return {

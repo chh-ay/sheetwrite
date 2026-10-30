@@ -313,6 +313,7 @@ export class OverlayPainter {
   private lastPresenceVersion = -1;
   private lastSearchVersion = -1;
   private lastGeometryVersion = -1;
+  private lastPaintNotes: readonly CellNote[] | undefined;
   private lastSearchActive = -1;
   private lastEditing = false;
   private lastFillPresent = false;
@@ -433,6 +434,7 @@ export class OverlayPainter {
     const selVersion = selection.version;
     const searchVersion = this.deps.searchVersion();
     const geometryVersion = this.deps.geometryVersion();
+    const notes = this.deps.sheet().notes;
     const searchActive = this.deps.searchActive();
     const editing = this.deps.isEditing();
     const fillPresent = fill !== null;
@@ -453,6 +455,7 @@ export class OverlayPainter {
       this.presenceVersion === this.lastPresenceVersion &&
       searchVersion === this.lastSearchVersion &&
       geometryVersion === this.lastGeometryVersion &&
+      notes === this.lastPaintNotes &&
       searchActive === this.lastSearchActive &&
       editing === this.lastEditing &&
       fillPresent === this.lastFillPresent &&
@@ -475,6 +478,7 @@ export class OverlayPainter {
     this.lastPresenceVersion = this.presenceVersion;
     this.lastSearchVersion = searchVersion;
     this.lastGeometryVersion = geometryVersion;
+    this.lastPaintNotes = notes;
     this.lastSearchActive = searchActive;
     this.lastEditing = editing;
     this.lastFillPresent = fillPresent;

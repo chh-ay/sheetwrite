@@ -8,7 +8,7 @@ description: "Why a conflict cannot be recovered in place; the host reloads the 
 Why a conflict cannot be recovered in place; the host reloads the document instead.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L273"><code>packages/core/src/sync.ts#L273</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L274"><code>packages/core/src/sync.ts#L274</code></a></dd></div>
 </dl>
 
 ## Declaration

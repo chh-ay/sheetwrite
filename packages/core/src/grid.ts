@@ -36,7 +36,7 @@ import { InteractionSessions } from "./interaction-sessions.js";
 import { Keymap } from "./keymap.js";
 import { MutationRevisionIndex, type MutationRevisionStats } from "./mutation-revision-index.js";
 import { OverlayPainter } from "./overlay-painter.js";
-import { ReadWindowController } from "./read-window-controller.js";
+import { type PaintedCells, ReadWindowController } from "./read-window-controller.js";
 import {
   createRuntimeResourceSnapshot,
   type RuntimeMemoryObservation,
@@ -512,6 +512,9 @@ export class GridImpl implements Grid {
   private readonly mutationRevisions = new MutationRevisionIndex();
   private destroyed = false;
   private storeEpoch = 0;
+  private windowContentRevision = 0;
+  private sourceSheet: SheetId | null = null;
+  private sheetHasSources = true;
   private autoFitGeneration = 0;
   private autoFitFrame = 0;
   private autoFitActive = false;
@@ -665,6 +668,7 @@ export class GridImpl implements Grid {
         retainRevision: (revision) => this.mutationRevisions.retainRevision(revision),
         onRowsLoaded: () => {
           this.storeEpoch += 1;
+          this.windowContentRevision += 1;
           this.scheduleRender();
         },
         onError: (request, error) => {
@@ -911,7 +915,7 @@ export class GridImpl implements Grid {
       theme: () => this.theme,
       overscan: () => this.overscan,
       zoom: () => this.zoom,
-      storeEpoch: () => this.storeEpoch,
+      storeEpoch: () => this.windowContentRevision,
       viewportHeight: () => this.viewportH(),
       viewportWidth: () => this.viewportEl.clientWidth,
       datasourceColumnCount: () => this.sheetById(this.activeSheet)?.columns.length ?? 0,
@@ -930,6 +934,12 @@ export class GridImpl implements Grid {
       if (this.autoFitActive) this.cancelAutoFit();
       this.mutationRevisions.record(event.transaction.patches, this.storeEpoch);
       this.activeSheetCache = null;
+      // Presence learned during this change describes the state after it, which
+      // cannot vouch for cells it just stopped computing (e.g. a removed spill).
+      const presenceKnown = this.sourceSheet === this.activeSheet;
+      const windowChanged = this.transactionAffectsWindow(event.transaction.patches);
+      if (windowChanged) this.windowContentRevision += 1;
+      let geometryChanged = false;
       let shouldRebuildRows = false;
       let shouldReconcileView = false;
       let shouldRebuildColumns = false;
@@ -940,6 +950,16 @@ export class GridImpl implements Grid {
       let sessionActive = this.activeSheet;
       for (const patch of event.transaction.patches) {
         if ("sheet" in patch && patch.sheet === this.activeSheet) {
+          if (
+            patch.op !== "setValidationRule" &&
+            patch.op !== "removeValidationRule" &&
+            patch.op !== "setHyperlink" &&
+            patch.op !== "removeHyperlink" &&
+            patch.op !== "setProtectedRange" &&
+            patch.op !== "removeProtectedRange"
+          ) {
+            geometryChanged = true;
+          }
           if (
             patch.op === "setSheetMeta" &&
             (patch.patch.sortKeys !== undefined ||
@@ -970,24 +990,30 @@ export class GridImpl implements Grid {
             this.displayedHasView || (this.loadable?.hasView(this.activeSheet) ?? false);
         }
         if (
-          patch.op === "addRows" ||
-          patch.op === "removeRows" ||
-          patch.op === "moveRows" ||
-          (patch.op === "setRowMeta" && patch.sheet === this.activeSheet) ||
-          (patch.op === "setSheetMeta" && patch.patch.rowGroups !== undefined)
+          "sheet" in patch &&
+          patch.sheet === this.activeSheet &&
+          (patch.op === "addRows" ||
+            patch.op === "removeRows" ||
+            patch.op === "moveRows" ||
+            patch.op === "setRowMeta" ||
+            (patch.op === "setSheetMeta" && patch.patch.rowGroups !== undefined))
         ) {
           shouldRebuildRows = true;
         } else if (
-          patch.op === "addColumns" ||
-          patch.op === "removeColumns" ||
-          patch.op === "moveColumns" ||
-          (patch.op === "setColumn" &&
-            patch.sheet === this.activeSheet &&
-            ("width" in patch.patch || "visible" in patch.patch))
+          "sheet" in patch &&
+          patch.sheet === this.activeSheet &&
+          (patch.op === "addColumns" ||
+            patch.op === "removeColumns" ||
+            patch.op === "moveColumns" ||
+            (patch.op === "setColumn" && ("width" in patch.patch || "visible" in patch.patch)))
         ) {
           shouldRebuildColumns = true;
         }
-        if (patch.op === "addMerge" || patch.op === "removeMerge" || patch.op === "setSheetMeta") {
+        if (
+          "sheet" in patch &&
+          patch.sheet === this.activeSheet &&
+          (patch.op === "addMerge" || patch.op === "removeMerge" || patch.op === "setSheetMeta")
+        ) {
           shouldApplyLayout = true;
         }
         if (
@@ -1054,6 +1080,12 @@ export class GridImpl implements Grid {
       if (shouldRebuildRows || shouldReconcileView) this.rebuildIndex();
       if (shouldRebuildColumns) this.rebuildColumnIndex();
       if (shouldRebuildColumns || shouldApplyLayout) this.applyLayout();
+      if (geometryChanged) this.readWindows.invalidateData();
+      this.searchController.refreshAfterChange(
+        event.transaction.patches,
+        this.activeSheet,
+        presenceKnown && !this.sheetHasSources,
+      );
       if (shouldReconcileView) {
         // Selection uses view-row positions: remote/history permutations must reset
         // it and scroll just like named actions, before change listeners run.
@@ -1064,7 +1096,13 @@ export class GridImpl implements Grid {
         this.readWindows.invalidateData();
       }
       if (sheetsChanged) this.renderTabs();
-      this.ariaMirror.bumpVersion();
+      if (
+        event.transaction.patches.some(
+          (patch) => patch.op === "setNote" && patch.addr.sheet === this.activeSheet,
+        )
+      ) {
+        this.ariaMirror.bumpVersion();
+      }
       this.scheduleRender();
       for (const fn of this.listeners.change) fn(event);
       this.queueCommandStateChange();
@@ -1078,6 +1116,100 @@ export class GridImpl implements Grid {
     }
     this.armResolutionListener();
     this.render();
+  }
+
+  private refreshSourcePresence(): void {
+    const engine = storeEngine(this.store);
+    this.sourceSheet = this.activeSheet;
+    if (!engine || engine.isPaged(this.activeSheet)) {
+      this.sheetHasSources = true;
+      return;
+    }
+    const sources = engine.captureSheetSources(this.activeSheet);
+    this.sheetHasSources =
+      !sources || sources.formulaOffsets.length > 0 || sources.referenceOffsets.length > 0;
+  }
+
+  private transactionAffectsWindow(patches: readonly DocumentOp[]): boolean {
+    // The handler runs before a removed or hidden active sheet is replaced, so
+    // the old sheet may be gone; the sheet switch repaints everything anyway.
+    const sheet = this.sheetById(this.activeSheet);
+    if (!sheet) return true;
+    // Presence is read after the first change on each sheet, so that change may
+    // have removed the last formula (and its spill); repaint it conservatively.
+    if (this.sourceSheet !== this.activeSheet) {
+      this.refreshSourcePresence();
+      return true;
+    }
+    let affectsWindow = false;
+    const engine = storeEngine(this.store);
+    // A source-free active sheet cannot receive computed values from another
+    // cell or sheet. Formula/ref presence is sticky until a sheet switch, so
+    // removing a spill anchor still refreshes its former children. Unknown
+    // stores, paged loads, conditional formats, validation and merge anchors
+    // stay conservative: their displayed result may depend on off-window data.
+    const dependentDisplay = Boolean(
+      this.sheetHasSources ||
+      !engine ||
+      engine.isPaged(this.activeSheet) ||
+      sheet.conditionalFormats?.length ||
+      sheet.validationRules?.length ||
+      sheet.merges?.length,
+    );
+    let painted: PaintedCells | null = null;
+    for (const patch of patches) {
+      let range: Range | CellAddress;
+      switch (patch.op) {
+        case "set":
+          if (
+            patch.addr.sheet === this.activeSheet &&
+            (patch.value.kind === "formula" || patch.value.kind === "ref")
+          )
+            this.sheetHasSources = true;
+          range = patch.addr;
+          break;
+        case "setRange":
+          if (
+            patch.range.sheet === this.activeSheet &&
+            patch.cells.some((cell) => cell.value.kind === "formula" || cell.value.kind === "ref")
+          )
+            this.sheetHasSources = true;
+          range = patch.range;
+          break;
+        case "setBlock":
+          if (
+            patch.range.sheet === this.activeSheet &&
+            (patch.block.formulas?.length || patch.block.refs?.length)
+          )
+            this.sheetHasSources = true;
+          range = patch.range;
+          break;
+        case "restoreBlock":
+          if (patch.range.sheet === this.activeSheet) this.sheetHasSources = true;
+          range = patch.range;
+          break;
+        case "setRangeStyle":
+        case "clearRange":
+          range = patch.range;
+          break;
+        case "setNote":
+          continue;
+        default:
+          affectsWindow = true;
+          continue;
+      }
+      if (affectsWindow || dependentDisplay || this.sheetHasSources) {
+        affectsWindow = true;
+        continue;
+      }
+      // Large off-screen batches pay for one window snapshot, not one per patch.
+      painted ??= this.readWindows.paintedCells();
+      affectsWindow =
+        "start" in range
+          ? painted.intersects(range.sheet, range.start, range.end)
+          : painted.intersects(range.sheet, range, range);
+    }
+    return affectsWindow;
   }
 
   private createRenderer(opts: GridOptions, host: HTMLElement): Renderer {
@@ -2144,7 +2276,12 @@ export class GridImpl implements Grid {
   private emitThemeChange(): void {
     const listeners = this.listeners["theme-change"];
     if (listeners.size === 0) return;
-    for (const fn of listeners) fn({ theme: { ...this.baseTheme } });
+    for (const fn of listeners)
+      fn({
+        theme: {
+          ...this.baseTheme,
+        },
+      });
   }
 
   getEffectiveTheme(): Theme {
