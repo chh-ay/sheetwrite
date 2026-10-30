@@ -184,6 +184,10 @@ describe("createToolbar", () => {
     // The pre-0.7 one-click toggle: an all-sides border on every selected cell.
     expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).style.border?.all).toBeDefined();
     expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).style.border?.all).toBeDefined();
+    // A second click removes it again, so the item is a toggle, not a one-way setter.
+    await click("border");
+    expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).style.border?.all).toBeUndefined();
+    expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).style.border?.all).toBeUndefined();
     await click("merge");
     expect(grid.store.getWorkbook().sheets[0]?.merges ?? []).toHaveLength(1);
     await click("unmerge");
