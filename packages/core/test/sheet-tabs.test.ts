@@ -92,6 +92,26 @@ describe("SheetTabs", () => {
     document.body.replaceChildren();
   });
 
+  it("does not remove the last visible sheet or remove a tab with Backspace", () => {
+    tabs.destroy();
+    const removed: string[] = [];
+    tabs = new SheetTabs(host, {
+      onActivate: () => {},
+      onRemove: (id) => {
+        removed.push(id);
+        return applied(id);
+      },
+    });
+    tabs.update([{ id: "a", name: "Only" }], "a");
+    tabButtons(host)[0]?.focus();
+    key(host, "Delete");
+    expect(removed).toEqual([]);
+
+    tabs.update(SHEETS, "a");
+    tabButtons(host)[0]?.focus();
+    key(host, "Backspace");
+    expect(removed).toEqual([]);
+  });
   it("renders visible sheets as an ID-controlled tablist and never reveals veryHidden", () => {
     tabs.update(
       [

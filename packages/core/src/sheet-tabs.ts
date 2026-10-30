@@ -888,9 +888,10 @@ export class SheetTabs {
         this.startRename(id);
         return;
       }
-      if ((event.key === "Delete" || event.key === "Backspace") && this.onRemove) {
+      const onRemove = this.onRemove;
+      if (event.key === "Delete" && onRemove && this.buttons.length > 1) {
         event.preventDefault();
-        this.performLifecycle(id, () => this.onRemove!(id));
+        this.performLifecycle(id, () => onRemove(id));
         return;
       }
       if (

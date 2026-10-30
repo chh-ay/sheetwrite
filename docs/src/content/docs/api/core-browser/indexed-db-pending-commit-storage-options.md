@@ -8,7 +8,7 @@ description: "IndexedDbPendingCommitStorageOptions interface in @sheetwrite/core
 Database and store naming options for durable pending commits.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/indexeddb.ts#L35"><code>packages/core/src/indexeddb.ts#L35</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/indexeddb.ts#L36"><code>packages/core/src/indexeddb.ts#L36</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

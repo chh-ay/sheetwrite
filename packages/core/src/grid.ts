@@ -3688,22 +3688,6 @@ export class GridImpl implements Grid {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
-    this.cancelAutoFit();
-    this.datasourceController.destroy();
-    this.mutationRevisions.clear();
-    this.readWindows.destroy();
-    this.interactions.destroy();
-    this.notes.destroy();
-    this.objectLayer.destroy();
-    this.scroller.removeEventListener("scroll", this.onScroll);
-    this.resizeObserver?.disconnect();
-    this.resolutionMediaQuery?.removeEventListener("change", this.onResolutionChange);
-    this.resolutionMediaQuery = null;
-    this.document.destroy();
-    this.disposeStore();
-    // Free the WASM CellStore only when we constructed it. A caller-provided
-    // store is owned by the caller and must stay usable after the grid is gone.
-    if (this.ownsStore) this.loadable?.dispose();
     let failure: unknown;
     let failed = false;
     const cleanup = (operation: () => void): void => {
@@ -3716,6 +3700,23 @@ export class GridImpl implements Grid {
         }
       }
     };
+    cleanup(() => this.cancelAutoFit());
+    cleanup(() => this.datasourceController.destroy());
+    cleanup(() => this.mutationRevisions.clear());
+    cleanup(() => this.readWindows.destroy());
+    cleanup(() => this.interactions.destroy());
+    cleanup(() => this.notes.destroy());
+    cleanup(() => this.objectLayer.destroy());
+    cleanup(() => this.scroller.removeEventListener("scroll", this.onScroll));
+    cleanup(() => this.resizeObserver?.disconnect());
+    cleanup(() =>
+      this.resolutionMediaQuery?.removeEventListener("change", this.onResolutionChange),
+    );
+    this.resolutionMediaQuery = null;
+    cleanup(() => this.document.destroy());
+    cleanup(() => this.disposeStore());
+    // A caller-provided store remains owned by its caller.
+    if (this.ownsStore) cleanup(() => this.loadable?.dispose());
     cleanup(() => this.renderer.destroy());
     cleanup(() => this.domOverlay.destroy());
     cleanup(() => this.scroller.remove());

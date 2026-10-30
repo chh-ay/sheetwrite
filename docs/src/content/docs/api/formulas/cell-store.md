@@ -67,7 +67,6 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-recompute-volatile"><code>recomputeVolatile</code></a>
 <a href="#cell-store-reference-target"><code>referenceTarget</code></a>
 <a href="#cell-store-references-targeting"><code>referencesTargeting</code></a>
-<a href="#cell-store-register-function"><code>registerFunction</code></a>
 <a href="#cell-store-remap-range-styles"><code>remapRangeStyles</code></a>
 <a href="#cell-store-remove-cols"><code>removeCols</code></a>
 <a href="#cell-store-remove-named-range"><code>removeNamedRange</code></a>
@@ -77,7 +76,6 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-rename-sheet"><code>renameSheet</code></a>
 <a href="#cell-store-reset-formula-matrix-resource-stats"><code>resetFormulaMatrixResourceStats</code></a>
 <a href="#cell-store-reset-query-resource-stats"><code>resetQueryResourceStats</code></a>
-<a href="#cell-store-restore-function"><code>restoreFunction</code></a>
 <a href="#cell-store-restore-range"><code>restoreRange</code></a>
 <a href="#cell-store-row-count"><code>rowCount</code></a>
 <a href="#cell-store-search"><code>search</code></a>
@@ -89,6 +87,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-set-column-strings-packed"><code>setColumnStringsPacked</code></a>
 <a href="#cell-store-set-conditional-rules"><code>setConditionalRules</code></a>
 <a href="#cell-store-set-formula"><code>setFormula</code></a>
+<a href="#cell-store-set-host-function"><code>setHostFunction</code></a>
 <a href="#cell-store-set-iterative-calculation"><code>setIterativeCalculation</code></a>
 <a href="#cell-store-set-named-range"><code>setNamedRange</code></a>
 <a href="#cell-store-set-number"><code>setNumber</code></a>
@@ -107,12 +106,11 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-spill-anchor-row"><code>spillAnchorRow</code></a>
 <a href="#cell-store-spill-derived-mask"><code>spillDerivedMask</code></a>
 <a href="#cell-store-string-pool-epoch"><code>stringPoolEpoch</code></a>
-<a href="#cell-store-unregister-function"><code>unregisterFunction</code></a>
 <a href="#cell-store-wasm-committed-bytes"><code>wasmCommittedBytes</code></a>
 <a href="#cell-store-import-memory-state"><code>importMemoryState</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>98</span>
+## Members <span class="api-count" data-pagefind-ignore>96</span>
 
 <div class="api-member-list">
 
@@ -686,18 +684,6 @@ referencesTargeting: (target_sheet: number, max_entries: number) => Uint32Array 
 targeting one sheet, bounded before crossing into the host.</p>
 </details>
 
-<details class="api-member" id="cell-store-register-function" data-pagefind-weight="1">
-<summary><code>registerFunction</code> <span class="api-member-summary">Registers a synchronous host function on this store and recalculates.</span></summary>
-
-```ts generated
-registerFunction: (name: string, implementation: Function, volatile: boolean) => boolean;
-```
-
-<p class="api-member-doc">Registers a synchronous host function on this store and
-recalculates. Returns `false` when the name cannot be a host
-function name.</p>
-</details>
-
 <details class="api-member" id="cell-store-remap-range-styles" data-pagefind-weight="1">
 <summary><code>remapRangeStyles</code> <span class="api-member-summary">Remap styles over a rectangle using parallel old/new id tables.</span></summary>
 
@@ -775,15 +761,6 @@ resetFormulaMatrixResourceStats: () => void;
 
 ```ts generated
 resetQueryResourceStats: () => void;
-```
-
-</details>
-
-<details class="api-member" id="cell-store-restore-function" data-pagefind-weight="1">
-<summary><code>restoreFunction</code> <span class="api-member-summary">Registers a host function without recalculating, for a store that takes over the calculated values of another after a memory release.</span></summary>
-
-```ts generated
-restoreFunction: (name: string, implementation: Function, volatile: boolean) => boolean;
 ```
 
 </details>
@@ -931,6 +908,21 @@ The dependency index is invalidated only when the rewrite changes what
 the formula reads or whether it produces an array. A constant-only edit
 keeps the cached index, so its next recompute visits just the edited
 formula and its dependents instead of every formula in the workbook.</p>
+</details>
+
+<details class="api-member" id="cell-store-set-host-function" data-pagefind-weight="1">
+<summary><code>setHostFunction</code> <span class="api-member-summary">Adds, replaces or removes (callback absent) a host function.</span></summary>
+
+```ts generated
+setHostFunction: (name: string, callback: Function | null | undefined, volatile: boolean, recalculate: boolean) => boolean;
+```
+
+<p class="api-member-doc">Adds, replaces or removes (`callback` absent) a host function.
+`recalculate` is `false` only for a store that takes over the
+calculated values of another after a memory release. Returns
+`false` when the name cannot be a host function name, or when a
+removed name was not registered. One method keeps the engine glue
+that every bundle loads small.</p>
 </details>
 
 <details class="api-member" id="cell-store-set-iterative-calculation" data-pagefind-weight="1">
@@ -1119,15 +1111,6 @@ spillDerivedMask: (sheet: number, row_start: number, row_end: number, cols: Uint
 
 ```ts generated
 stringPoolEpoch: () => number;
-```
-
-</details>
-
-<details class="api-member" id="cell-store-unregister-function" data-pagefind-weight="1">
-<summary><code>unregisterFunction</code> <span class="api-member-summary">Removes a host function and recalculates its callers to #NAME?.</span></summary>
-
-```ts generated
-unregisterFunction: (name: string) => boolean;
 ```
 
 </details>
@@ -1348,11 +1331,6 @@ class CellStore {
     target_sheet: number,
     max_entries: number,
   ) => Uint32Array | undefined;
-  registerFunction: (
-    name: string,
-    implementation: Function,
-    volatile: boolean,
-  ) => boolean;
   remapRangeStyles: (
     sheet: number,
     r0: number,
@@ -1370,11 +1348,6 @@ class CellStore {
   renameSheet: (sheet: number, id: string, name: string) => boolean;
   resetFormulaMatrixResourceStats: () => void;
   resetQueryResourceStats: () => void;
-  restoreFunction: (
-    name: string,
-    implementation: Function,
-    volatile: boolean,
-  ) => boolean;
   restoreRange: (
     sheet: number,
     r0: number,
@@ -1465,6 +1438,12 @@ class CellStore {
     src: string,
     style: number,
   ) => number;
+  setHostFunction: (
+    name: string,
+    callback: Function | null | undefined,
+    volatile: boolean,
+    recalculate: boolean,
+  ) => boolean;
   setIterativeCalculation: (
     enabled: boolean,
     max_iterations: number,
@@ -1548,7 +1527,6 @@ class CellStore {
     cols: Uint32Array,
   ) => Uint8Array;
   stringPoolEpoch: () => number;
-  unregisterFunction: (name: string) => boolean;
   wasmCommittedBytes: () => number;
   static importMemoryState: (bytes: Uint8Array) => CellStore;
 }

@@ -397,6 +397,15 @@ describe("ClipboardController", () => {
     expect(h.store.getCell({ sheet: "s1", row: 0, col: 2 }).resolved).toBe("world");
   });
 
+  it("preserves signed numbers from external paste", async () => {
+    h.setSystemClipboard("text\t-1\r\ntext\t+1");
+    h.select(0, 0);
+    await h.controller.paste();
+
+    expect(h.store.getCell({ sheet: "s1", row: 0, col: 1 }).resolved).toBe(-1);
+    expect(h.store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toBe(1);
+  });
+
   it("neutralizes injection prefixes in external text, never producing a formula", async () => {
     h.setSystemClipboard("=SUM(A1)\tsafe");
     h.select(0, 0);
@@ -534,6 +543,23 @@ describe("ClipboardController", () => {
     });
   });
 
+  it("exports safe colors and both text decorations in copied HTML", async () => {
+    h.store.seed(0, 0, { kind: "literal", value: "styled" }, "styled", {
+      underline: true,
+      strikethrough: true,
+      color: "red;background-image:url(https://example.test/pixel)",
+      backgroundColor: "#123456",
+    });
+    h.select(0, 0);
+    await h.controller.copy();
+    const [copied] = await navigator.clipboard.read();
+    if (!copied) throw new Error("copied clipboard entry missing");
+    const html = await (await copied.getType("text/html")).text();
+
+    expect(html).not.toContain("background-image");
+    expect(html).toContain("background-color:#123456");
+    expect(html).toContain("text-decoration:underline line-through");
+  });
   it("hardens every dangerous prefix in plain and preferred HTML while trusted private cells stay exact", async () => {
     Object.defineProperty(globalThis, "ClipboardItem", {
       configurable: true,

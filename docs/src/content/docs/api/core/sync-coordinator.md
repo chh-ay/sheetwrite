@@ -28,7 +28,7 @@ async function connect(grid: Grid, adapter: PersistenceAdapter, documentId: stri
 - [SyncCoordinator.recoverConflict](/docs/api/core/sync-coordinator/#sync-coordinator-recover-conflict)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L326"><code>packages/core/src/sync.ts#L326</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L340"><code>packages/core/src/sync.ts#L340</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -151,8 +151,10 @@ did not see change different cells, and neither inserts, deletes, or moves
 rows or columns: the local Grid then already shows the server result plus
 the pending work, so recovery applies the missed server versions and moves
 the pending queue onto the new server version. Call `flush` afterwards to
-send it. In every other case nothing changes and the result names the
-reason; the host then reloads and calls `resumeAfterReload`.
+send it. In every other case the pending queue and its durable storage do
+not change and the result names the reason; the host then reloads and calls
+`resumeAfterReload`. When a missed server version is rejected, the Grid can
+already show earlier missed versions; the reload replaces them.
 
 ### Examples
 
@@ -162,7 +164,7 @@ import type { SyncCoordinator } from "@sheetwrite/core";
 async function recover(sync: SyncCoordinator) {
   const result = await sync.recoverConflict();
   if (result.status === "recovered") await sync.flush();
-  // A reload-required result leaves the document unchanged for host recovery.
+  // A reload-required result leaves the pending queue unchanged for host recovery.
   return result;
 }
 ```

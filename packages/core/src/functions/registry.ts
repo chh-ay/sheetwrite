@@ -132,13 +132,17 @@ export class HostFunctionRegistry implements HostFunctionHooks {
     );
   }
 
-  /**
-   * Registers every host function on a new WASM store without recalculating:
-   * a replacement after a memory release already holds the calculated values,
-   * and a recalculation would draw new values for volatile formulas.
-   */
+  /** Later registrations change `wasm`; the engine calls this once `wasm` is live. */
   adopt(wasm: RecomputingCellStore): void {
     this.wasm = wasm;
+  }
+
+  /**
+   * Registers every host function on a replacement WASM store without
+   * recalculating: it already holds the calculated values, and a
+   * recalculation would draw new values for volatile formulas.
+   */
+  restore(wasm: RecomputingCellStore): void {
     for (const { metadata, call } of this.entries.values()) {
       if (!wasm.setHostFunction(metadata.name, call, metadata.volatile === true, false)) {
         throw invalidFunction(

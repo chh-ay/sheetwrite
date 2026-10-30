@@ -8,7 +8,7 @@ description: "validateWorkbookSnapshot function in @sheetwrite/core: Validate an
 Validate and canonically order a schema-1 snapshot without hydrating runtime state.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L3413"><code>packages/core/src/document-protocol.ts#L3413</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L3414"><code>packages/core/src/document-protocol.ts#L3414</code></a></dd></div>
 </dl>
 
 ## Declaration

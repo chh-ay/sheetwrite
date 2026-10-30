@@ -13,6 +13,7 @@ import {
   releaseEngineMemory,
   SheetwriteStore,
 } from "../src/index.js";
+import { storeEngine } from "../src/store/engine-registry.js";
 import { makeWorkbook } from "./fixtures.js";
 
 const address = (row: number, col: number) => ({ sheet: "s1", row, col });
@@ -261,6 +262,32 @@ describe("host formula functions", () => {
       setFormula(store, 2, 0, "=A1*2");
       expect(store.getCell(address(2, 0)).resolved).toBe(10);
     } finally {
+      store.dispose();
+    }
+  });
+
+  it("stay on the live engine store when a memory release aborts", async () => {
+    const store = new SheetwriteStore(makeWorkbook(4));
+    const failing = new SheetwriteStore(makeWorkbook(1));
+    try {
+      registerFunction(store, TAX_RATE, taxRate);
+      const failingEngine = storeEngine(failing);
+      if (failingEngine === null) throw new Error("store has no engine");
+      // The second store fails after the first one prepared its replacement,
+      // so the release aborts and frees that replacement.
+      failingEngine.prepareMemoryRelease = () => {
+        throw new Error("forced preparation failure");
+      };
+
+      await expect(releaseEngineMemory()).rejects.toThrow("preparation failed");
+
+      registerFunction(store, metadata("TWICE"), (value) => Number(value) * 2);
+      setFormula(store, 0, 0, '=TAXRATE("EU")');
+      setFormula(store, 0, 1, "=TWICE(21)");
+      expect(store.getCell(address(0, 0)).resolved).toBe(EU_RATE);
+      expect(store.getCell(address(0, 1)).resolved).toBe(42);
+    } finally {
+      failing.dispose();
       store.dispose();
     }
   });

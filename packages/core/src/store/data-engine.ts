@@ -426,7 +426,9 @@ class PackedTextBuffer {
 export interface HostFunctionHooks {
   /** Throws while a host function runs, so no store call reaches the busy engine. */
   assertIdle(): void;
-  /** Takes a new WASM store and registers every host function on it without recalculating. */
+  /** Registers every host function on a replacement WASM store without recalculating. */
+  restore(wasm: RecomputingCellStore): void;
+  /** Makes `wasm` the store that later registrations change; called once it is live. */
   adopt(wasm: RecomputingCellStore): void;
 }
 
@@ -4059,17 +4061,11 @@ export class StoreDataEngine {
             dataCell && typeof dataCell === "object" && !("kind" in dataCell) && "value" in dataCell
               ? dataCell
               : undefined;
-          const source = dataCellValue(dataCell);
+          const source = columnarScalar(dataCellValue(dataCell), column.type);
           const value: CellValue =
             source && typeof source === "object"
               ? source
-              : {
-                  kind: "literal",
-                  value:
-                    column.type === "number" || column.type === "currency"
-                      ? toNumber(dataCell)
-                      : toText(dataCell),
-                };
+              : { kind: "literal", value: source ?? null };
           cells.push({
             offset: rowOffset * blockWidth + col - blockStart,
             value,
@@ -4192,8 +4188,9 @@ export class StoreDataEngine {
 
       // The JS definitions survive the release; the new instance gets them again.
       // Host functions come first: the pivot pass below can calculate formulas
-      // that call them.
-      this.hostFunctions?.adopt(replacement);
+      // that call them. The registry switches to the replacement only in
+      // commit, so an aborted release leaves it on the live store.
+      this.hostFunctions?.restore(replacement);
       for (const sheet of this.workbook.sheets) {
         if (sheet.pivots?.length) this.syncPivots(sheet, replacement);
       }
@@ -4214,6 +4211,7 @@ export class StoreDataEngine {
       commit: () => {
         const previous = this.wasm;
         this.wasm = replacement;
+        this.hostFunctions?.adopt(replacement);
         this.view.replaceEngine(replacement);
         this.windowReader.replaceEngine(replacement);
         this.pagedDirtyPreflight?.replaceEngine(replacement);
@@ -4393,29 +4391,6 @@ function columnarScalar(
     return columnarScalar(unwrapped.value, type);
   }
   return typeof unwrapped === "string" ? parseCellLiteralInput(unwrapped, type) : unwrapped;
-}
-
-function toNumber(value: DataCell | undefined): number {
-  const unwrapped = dataCellValue(value);
-  if (typeof unwrapped === "number") return unwrapped;
-  if (typeof unwrapped === "string") {
-    const n = Number(unwrapped);
-    return Number.isFinite(n) ? n : Number.NaN;
-  }
-  if (unwrapped && typeof unwrapped === "object" && unwrapped.kind === "literal") {
-    return toNumber(unwrapped.value);
-  }
-  return Number.NaN;
-}
-
-function toText(value: DataCell | undefined): string {
-  const unwrapped = dataCellValue(value);
-  if (typeof unwrapped === "string") return unwrapped;
-  if (typeof unwrapped === "number") return String(unwrapped);
-  if (unwrapped && typeof unwrapped === "object" && unwrapped.kind === "literal") {
-    return toText(unwrapped.value);
-  }
-  return "";
 }
 
 function cloneJsonValue<T>(value: T): T {
