@@ -2576,6 +2576,23 @@
   text-decoration: none;
 }
 
+/* Stops the automatic story change; pressed while the reel is paused. */
+.sw-reel__pause {
+  margin-left: 1rem;
+  padding: 0.25rem 0.65rem;
+  border: 1px solid var(--sw-border-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--sw-fg-muted);
+  font: 600 var(--sw-type-xs) var(--sw-font-body);
+  cursor: pointer;
+}
+
+.sw-reel__pause[aria-pressed="true"] {
+  border-color: var(--sw-accent-strong);
+  color: var(--sw-fg-strong);
+}
+
 .sw-reel__stage {
   min-width: 0;
   padding: 1rem 1.25rem;
@@ -3580,8 +3597,9 @@
     animation: none !important;
   }
 
-  /* No timer, so the reel never changes story by itself. */
-  .sw-reel__timer {
+  /* No timer, so the reel never changes story by itself and needs no pause. */
+  .sw-reel__timer,
+  .sw-reel__pause {
     display: none;
   }
 

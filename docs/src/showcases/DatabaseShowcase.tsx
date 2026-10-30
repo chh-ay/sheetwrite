@@ -231,6 +231,10 @@ function wireSession(
  * Opens one session. A cancelled boot stops before `sync.ready()`, because
  * `ready()` restores the durable queue and flushes it: a stale StrictMode boot
  * must never touch the queue that the live session is about to drain.
+ *
+ * When a step fails or the boot is cancelled, every resource that is already
+ * open closes, newest first, so a failed boot leaves no database connection or
+ * Grid behind.
  */
 async function openSession(
   host: HTMLElement,
@@ -239,6 +243,7 @@ async function openSession(
 ): Promise<DatabaseSession | null> {
   await initSheetwrite();
   if (signal.aborted) return null;
+
   const seed = makeDatabaseSeedSnapshot();
   const adapter = await ShowcaseIndexedDbAdapter.open(
     { ...seed, sheets: [...seed.sheets, makeUsageSheet()] },
@@ -248,14 +253,42 @@ async function openSession(
       maxConflictTailVersions: 16,
     },
   );
-  const snapshot = await adapter.load(DATABASE_DOCUMENT_ID, signal);
-  if (signal.aborted) {
-    adapter.close();
-    return null;
+  const opened: Array<() => void> = [() => adapter.close()];
+  const closeOpened = () => {
+    for (const close of opened.reverse()) close();
+    opened.length = 0;
+  };
+
+  try {
+    const session = await startSession(host, callbacks, signal, adapter, opened);
+    if (!session) closeOpened();
+    return session;
+  } catch (error) {
+    closeOpened();
+    throw error;
   }
+}
+
+/**
+ * The steps of {@link openSession} after the document database opens. Each
+ * resource adds its close step to `opened` as soon as it exists; the caller
+ * runs them when this returns `null` (cancelled) or throws.
+ */
+async function startSession(
+  host: HTMLElement,
+  callbacks: SessionCallbacks,
+  signal: AbortSignal,
+  adapter: ShowcaseIndexedDbAdapter,
+  opened: Array<() => void>,
+): Promise<DatabaseSession | null> {
+  const snapshot = await adapter.load(DATABASE_DOCUMENT_ID, signal);
+  if (signal.aborted) return null;
+
   host.replaceChildren();
   const grid = mountDatabaseGrid(host, snapshot);
+  opened.push(() => grid.destroy());
   const storage = new IndexedDbPendingCommitStorage({ databaseName: QUEUE_DATABASE });
+  opened.push(() => storage.close());
   const link = new ShowcaseNetworkLink(adapter);
   const sync = new SyncCoordinator(grid, link, {
     documentId: DATABASE_DOCUMENT_ID,
@@ -263,24 +296,21 @@ async function openSession(
     pendingStorage: storage,
     createMutationId,
   });
+  opened.push(() => sync.destroy());
   const session: DatabaseSession = { adapter, link, storage, grid, sync, disposers: [] };
-  const isCurrent = () => !signal.aborted;
-  wireSession(session, callbacks, isCurrent);
-  if (signal.aborted) {
-    disposeSession(session);
-    return null;
-  }
+  opened.push(() => {
+    for (const dispose of session.disposers) dispose();
+    session.disposers.length = 0;
+  });
+  wireSession(session, callbacks, () => !signal.aborted);
+  if (signal.aborted) return null;
+
   await sync.ready();
-  if (signal.aborted) {
-    disposeSession(session);
-    return null;
-  }
+  if (signal.aborted) return null;
+
   if (sync.pendingCount > 0 && callbacks.autosave()) {
     await sync.flush();
-    if (signal.aborted) {
-      disposeSession(session);
-      return null;
-    }
+    if (signal.aborted) return null;
   }
   callbacks.onSyncState(sync.state);
   callbacks.onStats(adapter.stats());
@@ -317,6 +347,7 @@ export default function DatabaseShowcase() {
   const [crashReport, setCrashReport] = useState<CrashReport | null>(null);
   const restoredRef = useRef(0);
   const bootQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const mountRef = useRef<AbortController | null>(null);
   const [undoReport, setUndoReport] = useState<UndoReport | null>(null);
   const [undoRunning, setUndoRunning] = useState(false);
   const [limitReport, setLimitReport] = useState<LimitReport | null>(null);
@@ -381,17 +412,20 @@ export default function DatabaseShowcase() {
   /**
    * Boots one session at a time. A cancelled boot never reaches `sync.ready()`,
    * so a StrictMode re-mount cannot restore and flush the same durable queue
-   * twice.
+   * twice. Every boot, including a reset or reopen, uses the signal of the
+   * mount that started it, so unmount cancels a boot that still waits.
    */
   const boot = useCallback(
-    (announce: string | null, recovered: string, signal?: AbortSignal) => {
+    (announce: string | null, recovered: string) => {
+      const bootSignal = mountRef.current?.signal;
+      if (!bootSignal) return Promise.resolve();
+
       const nextBoot = bootQueueRef.current.then(async () => {
-        if (signal?.aborted) return;
+        if (bootSignal.aborted) return;
         const host = hostRef.current;
         if (!host) return;
         setStatus("loading");
         setStatusDetail("Opening IndexedDB…");
-        const bootSignal = signal ?? new AbortController().signal;
         try {
           restoredRef.current = 0;
           const session = await openSession(host, stableCallbacks, bootSignal);
@@ -431,9 +465,11 @@ export default function DatabaseShowcase() {
 
   useEffect(() => {
     const controller = new AbortController();
-    void boot(null, "Loaded from IndexedDB", controller.signal);
+    mountRef.current = controller;
+    void boot(null, "Loaded from IndexedDB");
     return () => {
       controller.abort();
+      if (mountRef.current === controller) mountRef.current = null;
       if (sessionRef.current) {
         disposeSession(sessionRef.current);
         sessionRef.current = null;

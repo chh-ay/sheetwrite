@@ -9,6 +9,9 @@ import {
   useState,
 } from "react";
 
+import { readPreference, writePreference } from "../lib/preference-storage.js";
+import { onTabListKey } from "./landing/tabKeys.js";
+
 interface TabItemProps {
   label: string;
   children: ReactNode;
@@ -36,10 +39,12 @@ export function Tabs({ children, syncKey }: Readonly<TabsProps>) {
   );
   const [selected, setSelected] = useState(0);
   const id = useId();
+  const labels = useMemo(() => tabs.map((tab) => tab.props.label), [tabs]);
+  const tabElementId = (label: string) => `${id}-tab-${labels.indexOf(label)}`;
 
   useEffect(() => {
     if (syncKey === undefined) return;
-    const stored = window.localStorage.getItem(syncKey);
+    const stored = readPreference(syncKey);
     const index = tabs.findIndex((tab) => tab.props.label === stored);
     if (index >= 0) setSelected(index);
 
@@ -55,9 +60,10 @@ export function Tabs({ children, syncKey }: Readonly<TabsProps>) {
   const select = (index: number) => {
     setSelected(index);
     if (syncKey === undefined) return;
-    const label = tabs[index]?.props.label;
+
+    const label = labels[index];
     if (label === undefined) return;
-    window.localStorage.setItem(syncKey, label);
+    writePreference(syncKey, label);
     window.dispatchEvent(new CustomEvent(TAB_EVENT, { detail: { key: syncKey, label } }));
   };
 
@@ -73,7 +79,18 @@ export function Tabs({ children, syncKey }: Readonly<TabsProps>) {
             id={`${id}-tab-${index}`}
             key={tab.props.label}
             onClick={() => select(index)}
+            onKeyDown={(event) =>
+              onTabListKey(
+                event,
+                labels,
+                tab.props.label,
+                (label) => select(labels.indexOf(label)),
+                tabElementId,
+              )
+            }
             role="tab"
+            // Only the selected tab is in the Tab sequence; arrow keys move between tabs.
+            tabIndex={index === selected ? 0 : -1}
             type="button"
           >
             {tab.props.label}
