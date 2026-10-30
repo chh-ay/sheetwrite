@@ -19,7 +19,7 @@ import { deflateSync, strToU8, unzipSync } from "fflate";
 import { registerXlsxBackends } from "../src/index.js";
 import { createCodecContext } from "../src/resources.js";
 import { validateStoredEntry, writeZip, ZipReader } from "../src/zip.js";
-import { rawXlsx, worksheet } from "./raw-opc.js";
+import { rawXlsx, rawZip, worksheet } from "./raw-opc.js";
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -379,4 +379,82 @@ describe("ZIP raw entries", () => {
       writeZip([{ name: "x.bin", stored: { ...forged, uncompressedSize: 4 } }], context),
     ).toThrow(/size/);
   });
+
+  it("reports ZIP64 size sentinels as unsupported instead of as resource limits", async () => {
+    const archive = patchEntries(rawZip({ "a.xml": "<a/>" }, 0), (view, central) => {
+      view.setUint32(central + CENTRAL_UNCOMPRESSED_SIZE, ZIP64_SENTINEL, true);
+    });
+    await expect(ZipReader.open(archive, createCodecContext("import"))).rejects.toThrow(
+      "ZIP64 entry is unsupported",
+    );
+  });
+
+  it("rejects a declared over-ratio entry before it reads any local header", async () => {
+    const archive = patchEntries(
+      rawZip({ "a.xml": "<a/>", "b.xml": `<b>${"b".repeat(4_096)}</b>` }),
+      (view, _central, local, index) => {
+        // The first local header is corrupt, and only a later entry is over the ratio.
+        if (index === 0) view.setUint32(local, 0, true);
+      },
+    );
+    await expect(
+      ZipReader.open(
+        archive,
+        createCodecContext("import", { resourceLimits: { maxCompressionRatio: 2 } }),
+      ),
+    ).rejects.toMatchObject({ resource: "maxCompressionRatio" });
+  });
+
+  it("checks the CRC and stored size of small buffered parts", async () => {
+    const context = createCodecContext("import");
+    const wrongCrc = patchEntries(rawZip({ "a.xml": "<a/>" }), (view, central, local) => {
+      view.setUint32(central + CENTRAL_CRC, 1, true);
+      view.setUint32(local + LOCAL_CRC, 1, true);
+    });
+    await expect((await ZipReader.open(wrongCrc, context)).read("a.xml")).rejects.toThrow(
+      "CRC mismatch for a.xml",
+    );
+
+    const wrongStoredSize = patchEntries(rawZip({ "a.xml": "<a/>" }, 0), (view, central, local) => {
+      const declared = view.getUint32(central + CENTRAL_UNCOMPRESSED_SIZE, true) + 1;
+      view.setUint32(central + CENTRAL_UNCOMPRESSED_SIZE, declared, true);
+      view.setUint32(local + LOCAL_UNCOMPRESSED_SIZE, declared, true);
+    });
+    await expect((await ZipReader.open(wrongStoredSize, context)).read("a.xml")).rejects.toThrow(
+      "stored size mismatch for a.xml",
+    );
+  });
 });
+
+const EOCD_SIGNATURE = 0x06054b50;
+const EOCD_BYTES = 22;
+const CENTRAL_HEADER_BYTES = 46;
+const CENTRAL_CRC = 16;
+const CENTRAL_UNCOMPRESSED_SIZE = 24;
+const CENTRAL_LOCAL_OFFSET = 42;
+const LOCAL_CRC = 14;
+const LOCAL_UNCOMPRESSED_SIZE = 22;
+const ZIP64_SENTINEL = 0xffffffff;
+
+/** Copy an archive and change the header fields of each entry in central-directory order. */
+function patchEntries(
+  source: Uint8Array,
+  patch: (view: DataView, central: number, local: number, index: number) => void,
+): Uint8Array {
+  const bytes = source.slice();
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let eocd = bytes.byteLength - EOCD_BYTES;
+  while (view.getUint32(eocd, true) !== EOCD_SIGNATURE) eocd--;
+  const count = view.getUint16(eocd + 10, true);
+  let central = view.getUint32(eocd + 16, true);
+
+  for (let index = 0; index < count; index++) {
+    patch(view, central, view.getUint32(central + CENTRAL_LOCAL_OFFSET, true), index);
+    central +=
+      CENTRAL_HEADER_BYTES +
+      view.getUint16(central + 28, true) +
+      view.getUint16(central + 30, true) +
+      view.getUint16(central + 32, true);
+  }
+  return bytes;
+}

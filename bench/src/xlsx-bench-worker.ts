@@ -18,6 +18,8 @@ interface WorkerResult {
   readonly heapAfterBytes: number;
   readonly arrayBuffersBeforeBytes: number;
   readonly arrayBuffersAfterBytes: number;
+  readonly heapRetainedBytes: number;
+  readonly arrayBuffersRetainedBytes: number;
   readonly inputBytes: number;
   readonly outputBytes: number;
   readonly checksum: string;
@@ -101,35 +103,16 @@ async function backend(engine: "current" | "baseline", root: string): Promise<Xl
   return implementation;
 }
 
-async function main(): Promise<WorkerResult> {
-  const engine = argument("--engine") as "current" | "baseline";
-  const operation = argument("--operation") as "import" | "export" | "reject";
-  const scenario = argument("--scenario");
-  const mode = argument("--mode") as XlsxCorpusMode;
-  const root = argument("--root");
-  const fixture = argument("--fixture");
-  if (engine !== "current" && engine !== "baseline") throw new Error(`invalid engine ${engine}`);
-  if (!(["import", "export", "reject"] as const).includes(operation)) {
-    throw new Error(`invalid operation ${operation}`);
+async function measureOperation(
+  implementation: XlsxWorkbookBackend,
+  operation: WorkerResult["operation"],
+  scenario: string,
+  input: Uint8Array | WorkbookSnapshot,
+): Promise<
+  Pick<WorkerResult, "durationMs" | "outputBytes" | "checksum" | "rejection"> & {
+    readonly after: NodeJS.MemoryUsage;
   }
-  if (mode !== "smoke" && mode !== "full") throw new Error(`invalid mode ${mode}`);
-
-  const implementation = await backend(engine, root);
-  let inputBytes = 0;
-  let input: Uint8Array | WorkbookSnapshot;
-  if (operation === "export") {
-    const corpus = createXlsxCorpus(mode);
-    const snapshot = corpus.scenarios[scenario as XlsxCorpusScenario];
-    if (!snapshot) throw new Error(`unknown export scenario ${scenario}`);
-    input = snapshot;
-    inputBytes = Buffer.byteLength(JSON.stringify(snapshot));
-  } else {
-    input = new Uint8Array(await Bun.file(fixture).arrayBuffer());
-    inputBytes = input.byteLength;
-  }
-
-  Bun.gc(true);
-  const before = process.memoryUsage();
+> {
   const started = performance.now();
   let ended = started;
   let outputBytes = 0;
@@ -169,8 +152,54 @@ async function main(): Promise<WorkerResult> {
       checksum = sha256(message);
     }
   }
-  const durationMs = ended - started;
-  const after = process.memoryUsage();
+  return {
+    durationMs: ended - started,
+    outputBytes,
+    checksum,
+    ...(rejection ? { rejection } : {}),
+    after: process.memoryUsage(),
+  };
+}
+
+async function main(): Promise<WorkerResult> {
+  const engine = argument("--engine") as "current" | "baseline";
+  const operation = argument("--operation") as "import" | "export" | "reject";
+  const scenario = argument("--scenario");
+  const mode = argument("--mode") as XlsxCorpusMode;
+  const root = argument("--root");
+  const fixture = argument("--fixture");
+  if (engine !== "current" && engine !== "baseline") throw new Error(`invalid engine ${engine}`);
+  if (!(["import", "export", "reject"] as const).includes(operation)) {
+    throw new Error(`invalid operation ${operation}`);
+  }
+  if (mode !== "smoke" && mode !== "full") throw new Error(`invalid mode ${mode}`);
+
+  const implementation = await backend(engine, root);
+  let inputBytes = 0;
+  let input: Uint8Array | WorkbookSnapshot;
+  if (operation === "export") {
+    const corpus = createXlsxCorpus(mode);
+    const snapshot = corpus.scenarios[scenario as XlsxCorpusScenario];
+    if (!snapshot) throw new Error(`unknown export scenario ${scenario}`);
+    input = snapshot;
+    inputBytes = Buffer.byteLength(JSON.stringify(snapshot));
+  } else {
+    input = new Uint8Array(await Bun.file(fixture).arrayBuffer());
+    inputBytes = input.byteLength;
+  }
+
+  Bun.gc(true);
+  const before = process.memoryUsage();
+  const { durationMs, outputBytes, checksum, rejection, after } = await measureOperation(
+    implementation,
+    operation,
+    scenario,
+    input,
+  );
+  // Clear completed operation frames before collecting unreachable codec temporaries.
+  await Bun.sleep(0);
+  Bun.gc(true);
+  const retained = process.memoryUsage();
   return {
     engine,
     operation,
@@ -184,6 +213,8 @@ async function main(): Promise<WorkerResult> {
     heapAfterBytes: after.heapUsed,
     arrayBuffersBeforeBytes: before.arrayBuffers,
     arrayBuffersAfterBytes: after.arrayBuffers,
+    heapRetainedBytes: retained.heapUsed,
+    arrayBuffersRetainedBytes: retained.arrayBuffers,
     inputBytes,
     outputBytes,
     checksum,

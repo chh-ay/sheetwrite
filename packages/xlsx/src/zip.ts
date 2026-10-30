@@ -6,6 +6,9 @@ const CENTRAL_SIGNATURE = 0x02014b50;
 const EOCD_SIGNATURE = 0x06054b50;
 const LOCAL_SIGNATURE = 0x04034b50;
 const MAX_EOCD_SEARCH = 65_557;
+const BUFFERED_ENTRY_BYTES = 64 * 1024;
+/** ZIP64 marks a 32-bit size field with this value and moves the real size elsewhere. */
+const ZIP64_SIZE = 0xffffffff;
 const UTF8 = new TextDecoder("utf-8", { fatal: true });
 const DOS_EPOCH = new Date(1980, 0, 1, 0, 0, 0, 0);
 
@@ -72,13 +75,11 @@ export function validateStoredEntry(entry: StoredZipEntry, context: XlsxCodecCon
   }
   if (verifiedEntries.has(entry)) return;
   let written = 0;
-  let checksum = 0xffffffff;
+  let checksum = 0;
   const accept = (chunk: Uint8Array): void => {
     written += chunk.byteLength;
     if (written > entry.uncompressedSize) fail("retained inflated size exceeds declaration");
-    for (let index = 0; index < chunk.length; index++) {
-      checksum = (CRC_TABLE[(checksum ^ (chunk[index] ?? 0)) & 0xff] ?? 0) ^ (checksum >>> 8);
-    }
+    checksum = crc32(chunk, checksum);
   };
   const inflater = entry.method === 8 ? new Inflate(accept) : undefined;
   try {
@@ -91,16 +92,21 @@ export function validateStoredEntry(entry: StoredZipEntry, context: XlsxCodecCon
     }
     if (inflater && entry.data.length === 0) inflater.push(new Uint8Array(0), true);
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith("Sheetwrite:")) throw error;
-    throw new TypeError("Sheetwrite: invalid retained ZIP deflate stream", { cause: error });
+    inflateFailure(error, "invalid retained ZIP deflate stream");
   }
   if (written !== entry.uncompressedSize) fail("retained inflated size mismatch");
-  if ((checksum ^ 0xffffffff) >>> 0 !== entry.crc32) fail("retained CRC mismatch");
+  if (checksum !== entry.crc32) fail("retained CRC mismatch");
   verifiedEntries.add(entry);
 }
 
 function fail(message: string): never {
   throw new TypeError(`Sheetwrite: invalid XLSX ZIP: ${message}`);
+}
+
+/** Keep codec failures as they are; report any other inflater error as a corrupt stream. */
+function inflateFailure(error: unknown, message: string): never {
+  if (error instanceof Error && error.message.startsWith("Sheetwrite:")) throw error;
+  throw new TypeError(`Sheetwrite: ${message}`, { cause: error });
 }
 
 function findEocd(bytes: Uint8Array, view: DataView): number {
@@ -170,7 +176,6 @@ function* parseEntries(
 
   const entries: ZipEntry[] = [];
   const names = new Set<string>();
-  let totalUncompressed = 0;
   let offset = centralOffset - baseOffset;
   for (let index = 0; index < entryCount; index++) {
     checkAbort(context);
@@ -213,16 +218,6 @@ function* parseEntries(
       if (names.has(foldedName)) return fail(`duplicate logical part name ${name}`);
       names.add(foldedName);
     }
-    assertResource(context, "maxEntryUncompressedBytes", uncompressedSize);
-    if (
-      uncompressedSize > 0 &&
-      (compressedSize === 0 ||
-        uncompressedSize / compressedSize > context.limits.maxCompressionRatio)
-    ) {
-      assertResource(context, "maxCompressionRatio", uncompressedSize / compressedSize);
-    }
-    totalUncompressed += uncompressedSize;
-    assertResource(context, "maxTotalUncompressedBytes", totalUncompressed);
     if (localOffset + 30 + nameLength > centralOffset) {
       return fail(`local header for ${name} is invalid`);
     }
@@ -289,6 +284,39 @@ function* parseEntries(
   return entries;
 }
 
+/** Reject declared expansion before reading local headers or constructing entry records. */
+function preflightExpansion(bytes: Uint8Array, context: XlsxCodecContext): void {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const eocd = findEocd(bytes, view);
+  const entryCount = view.getUint16(eocd + 10, true);
+  let offset = 0;
+  let totalUncompressed = 0;
+
+  for (let index = 0; index < entryCount; index++) {
+    checkAbort(context);
+    if (offset + 46 > eocd || view.getUint32(offset, true) !== CENTRAL_SIGNATURE) {
+      return fail(`central directory entry ${index} is truncated`);
+    }
+    const compressedSize = view.getUint32(offset + 20, true);
+    const uncompressedSize = view.getUint32(offset + 24, true);
+    // ZIP64 sentinels are not real sizes; the entry parser reports them as unsupported.
+    if (compressedSize !== ZIP64_SIZE && uncompressedSize !== ZIP64_SIZE) {
+      assertResource(context, "maxEntryUncompressedBytes", uncompressedSize);
+      if (uncompressedSize > 0) {
+        assertResource(context, "maxCompressionRatio", uncompressedSize / compressedSize);
+      }
+      totalUncompressed += uncompressedSize;
+      assertResource(context, "maxTotalUncompressedBytes", totalUncompressed);
+    }
+
+    offset +=
+      46 +
+      view.getUint16(offset + 28, true) +
+      view.getUint16(offset + 30, true) +
+      view.getUint16(offset + 32, true);
+  }
+}
+
 const CRC_TABLE = (() => {
   const table = new Uint32Array(256);
   for (let n = 0; n < table.length; n++) {
@@ -298,6 +326,15 @@ const CRC_TABLE = (() => {
   }
   return table;
 })();
+
+/** CRC-32 of `bytes`; pass an earlier result as `seed` to continue it over more bytes. */
+function crc32(bytes: Uint8Array, seed = 0): number {
+  let value = (seed ^ 0xffffffff) >>> 0;
+  for (let index = 0; index < bytes.length; index++) {
+    value = (CRC_TABLE[(value ^ (bytes[index] ?? 0)) & 0xff] ?? 0) ^ (value >>> 8);
+  }
+  return (value ^ 0xffffffff) >>> 0;
+}
 
 /** Seekable ZIP reader: only the directory and one requested part are resident. */
 export class ZipReader {
@@ -336,6 +373,7 @@ export class ZipReader {
     if (centralOffset + centralSize !== tailOffset + eocd)
       return fail("central directory bounds are inconsistent");
     const directory = await readRange(centralOffset, size - centralOffset);
+    preflightExpansion(directory, context);
     const parser = parseEntries(directory, context, centralOffset);
     let step = parser.next();
     while (!step.done) {
@@ -377,14 +415,12 @@ export class ZipReader {
   async *chunks(name: string): AsyncGenerator<Uint8Array> {
     const entry = this.#entry(name);
     let written = 0;
-    let checksum = 0xffffffff;
+    let checksum = 0;
     const pending: Uint8Array[] = [];
     const accept = (chunk: Uint8Array): void => {
       written += chunk.length;
       if (written > entry.uncompressedSize) fail(`inflated size exceeds declaration for ${name}`);
-      for (let index = 0; index < chunk.length; index++) {
-        checksum = (CRC_TABLE[(checksum ^ (chunk[index] ?? 0)) & 0xff] ?? 0) ^ (checksum >>> 8);
-      }
+      checksum = crc32(chunk, checksum);
       if (chunk.length) pending.push(chunk);
     };
     if (entry.method === 0 && entry.compressedSize !== entry.uncompressedSize)
@@ -403,11 +439,7 @@ export class ZipReader {
           if (inflater) inflater.push(chunk, isFinal);
           else accept(chunk);
         } catch (error) {
-          if (error instanceof TypeError && error.message.startsWith("Sheetwrite:")) throw error;
-          throw new TypeError(
-            `Sheetwrite: invalid XLSX ZIP: deflate stream for ${name} is corrupt`,
-            { cause: error },
-          );
+          inflateFailure(error, `invalid XLSX ZIP: deflate stream for ${name} is corrupt`);
         }
         yield* pending;
         pending.length = 0;
@@ -415,11 +447,45 @@ export class ZipReader {
     }
     if (inflater && entry.compressedSize === 0) inflater.push(new Uint8Array(0), true);
     if (written !== entry.uncompressedSize) fail(`inflated size mismatch for ${name}`);
-    if ((checksum ^ 0xffffffff) >>> 0 !== entry.crc32) fail(`CRC mismatch for ${name}`);
+    if (checksum !== entry.crc32) fail(`CRC mismatch for ${name}`);
   }
 
   async read(name: string): Promise<Uint8Array> {
-    const output = new Uint8Array(this.#entry(name).uncompressedSize);
+    const entry = this.#entry(name);
+    const output = new Uint8Array(entry.uncompressedSize);
+    if (
+      this.source instanceof Uint8Array &&
+      entry.uncompressedSize <= BUFFERED_ENTRY_BYTES &&
+      entry.compressedSize <= BUFFERED_ENTRY_BYTES
+    ) {
+      checkAbort(this.context);
+      const compressed = this.source.subarray(
+        entry.dataOffset,
+        entry.dataOffset + entry.compressedSize,
+      );
+      if (entry.method === 0) {
+        if (entry.compressedSize !== entry.uncompressedSize)
+          fail(`stored size mismatch for ${name}`);
+        output.set(compressed);
+      } else {
+        let written = 0;
+        const inflater = new Inflate((chunk) => {
+          if (written + chunk.length > output.length)
+            fail(`inflated size exceeds declaration for ${name}`);
+          output.set(chunk, written);
+          written += chunk.length;
+        });
+        try {
+          inflater.push(compressed, true);
+        } catch (error) {
+          inflateFailure(error, `invalid XLSX ZIP: deflate stream for ${name} is corrupt`);
+        }
+        if (written !== output.length) fail(`inflated size mismatch for ${name}`);
+      }
+      if (crc32(output) !== entry.crc32) fail(`CRC mismatch for ${name}`);
+      return output;
+    }
+
     let offset = 0;
     for await (const chunk of this.chunks(name)) {
       output.set(chunk, offset);
