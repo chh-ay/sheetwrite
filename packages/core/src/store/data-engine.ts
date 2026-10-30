@@ -1892,13 +1892,32 @@ export class StoreDataEngine {
 
     const snapshot = this.windowReader.readRectangle(bounds.sheet, bounds.start.row, rows, columns);
     const cells: Array<{ addr: CellAddress; before: ResolvedCell }> = [];
+    // Style ids index this window's own style list, so find its empty slots once.
+    const emptyStyleSlots = occupiedOnly
+      ? snapshot.styles.map((style) => Object.keys(style).length === 0)
+      : [];
+    // A formula or reference can resolve to empty and still be cleared.
+    const sources = occupiedOnly
+      ? this.captureSourceProjection(bounds.sheet, bounds.start.row, bounds.start.col, rows, cols)
+      : null;
+    const sourceOffsets = new Set([
+      ...(sources?.formulaOffsets ?? []),
+      ...(sources?.referenceOffsets ?? []),
+    ]);
 
     for (let offset = 0; offset < rows * cols; offset += 1) {
       const resolved = snapshot.values[offset] ?? null;
       const styleId = snapshot.styleIds[offset] ?? 0;
-      // A clear changes nothing in an empty cell with the default style (id 0);
+      // A clear changes nothing in an empty, unstyled cell without a source;
       // skipping it keeps a whole-column clear from allocating one change per row.
-      if (occupiedOnly && resolved === null && styleId === 0) continue;
+      if (
+        occupiedOnly &&
+        resolved === null &&
+        emptyStyleSlots[styleId] !== false &&
+        !sourceOffsets.has(offset)
+      ) {
+        continue;
+      }
       const style = snapshot.styles[styleId] ?? EMPTY_STYLE;
 
       const row = bounds.start.row + Math.floor(offset / cols);

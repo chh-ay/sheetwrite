@@ -398,6 +398,21 @@ describe("RowBridge", () => {
       rowCount: 3,
       columns: { name: ["A", null, null], amount: [null, null, 3] },
     });
+    // Row b holds no value, but a reference to an empty cell and a bold style.
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "sheet1", row: 1, col: 0 },
+          value: { kind: "ref", target: { sheet: "sheet1", row: 2, col: 0 } },
+        },
+        {
+          op: "setRangeStyle",
+          range: { sheet: "sheet1", start: { row: 1, col: 1 }, end: { row: 1, col: 1 } },
+          style: { bold: true },
+        },
+      ],
+    });
     const bridge = createRowBridge({ columns, defaultRows: rows, getRowId: (row) => row.id });
     const projections: RowBridgeProjection<string>[] = [];
     store.setDetailedChangeCapture(true);
@@ -418,6 +433,8 @@ describe("RowBridge", () => {
         clear?.kind === "clear" ? clear.cells.map((cell) => [cell.rowId, cell.columnKey]) : [],
       ).toEqual([
         ["row-a", "name"],
+        ["row-b", "name"],
+        ["row-b", "amount"],
         ["row-c", "amount"],
       ]);
     } finally {
