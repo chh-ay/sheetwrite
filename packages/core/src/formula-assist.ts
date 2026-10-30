@@ -221,18 +221,20 @@ function parseCell(ref: string): { row: number; col: number } | null {
 /**
  * Parse every A1 cell/range reference out of a formula, cycling {@link REF_PALETTE}
  * so each reference gets its own color. Mirrors the ref regex used by
- * `shiftA1Refs` in a1.ts, including the "skip tokens glued to an alphanumeric"
- * rule that stops function names (and identifiers) from matching.
+ * `shiftA1Refs` in a1.ts: text in double quotes and quoted sheet names are
+ * skipped whole, and so are tokens glued to an alphanumeric (function names).
+ * A reference after `!` names another sheet, so it is not highlighted here.
  */
 function parseFormulaRefs(text: string, sheet: SheetId): HighlightRange[] {
-  const re = /(\$?[A-Za-z]{1,3}\$?\d+)(?::(\$?[A-Za-z]{1,3}\$?\d+))?/g;
+  const re =
+    /"(?:[^"]|"")*"|'(?:[^']|'')*'|(\$?[A-Za-z]{1,3}\$?\d+)(?::(\$?[A-Za-z]{1,3}\$?\d+))?/g;
   const out: HighlightRange[] = [];
 
   let m: RegExpExecArray | null = re.exec(text);
   while (m !== null) {
     const prev = m.index > 0 ? text.charAt(m.index - 1) : "";
     const head = m[1];
-    if (head && prev !== "_" && !/[A-Za-z0-9]/.test(prev)) {
+    if (head && prev !== "_" && prev !== "!" && !/[A-Za-z0-9]/.test(prev)) {
       const start = parseCell(head);
       const end = m[2] ? parseCell(m[2]) : start;
       if (start && end) {

@@ -1,6 +1,8 @@
 import { afterEach, beforeAll, beforeEach, expect, it } from "bun:test";
 
 import { GridImpl, initSheetwrite } from "../src/grid.js";
+import { renderControl } from "../src/ribbon/ribbon-controls.js";
+import { RibbonPopup } from "../src/ribbon/ribbon-popup.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { IconOverrides, Workbook } from "../src/types.js";
@@ -334,4 +336,43 @@ it("keeps Tab inside a form popup, wrapping at both ends", async () => {
   );
   expect(document.activeElement).toBe(ok);
   expect(host.querySelector(".sheetwrite-ribbon-popup")).not.toBeNull();
+});
+
+it("shows a failed placement command in its form instead of rejecting", async () => {
+  const { grid } = await setup();
+  const popupHost = document.createElement("div");
+  document.body.appendChild(popupHost);
+  const submitted = Promise.withResolvers<string | null>();
+  const view = renderControl(
+    {
+      kind: "placement",
+      label: "PivotTable",
+      icon: "clear",
+      unavailable: () => null,
+      submit: () => submitted.promise,
+    },
+    {
+      grid,
+      popup: new RibbonPopup(popupHost),
+      focus: () => {
+        throw new Error("a placement form never reads the focus style");
+      },
+      focusGrid: () => {},
+      run: (_key, command) => command(),
+    },
+  );
+  popupHost.appendChild(view.element);
+  if (!(view.element instanceof HTMLButtonElement)) throw new Error("expected a trigger button");
+  view.element.click();
+  const form = popupHost.querySelector("form");
+  if (form === null) throw new Error("the placement form did not open");
+
+  form.dispatchEvent(new Event("submit", { cancelable: true }));
+  submitted.reject(new Error("the panel chunk failed to load"));
+  // The submit handler awaits the rejected promise, then runs its catch.
+  for (let turn = 0; turn < 4; turn++) await Promise.resolve();
+
+  const error = form.querySelector<HTMLElement>(".sheetwrite-ribbon-form-error");
+  expect(error?.hidden).toBe(false);
+  expect(error?.textContent).toContain("the panel chunk failed to load");
 });

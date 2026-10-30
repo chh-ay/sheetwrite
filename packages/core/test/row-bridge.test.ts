@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from "bun:test";
 
 import { initSheetwrite } from "../src/grid.js";
 import { encodeRestoreBlock } from "../src/restore-block.js";
-import { createRowBridge } from "../src/row-bridge.js";
+import { createRowBridge, type RowBridgeProjection } from "../src/row-bridge.js";
 import { SheetwriteStore } from "../src/store.js";
 import type { CellValue } from "../src/types/cell.js";
 import type { DocumentOp, Workbook } from "../src/types/document.js";
@@ -377,5 +377,51 @@ describe("RowBridge", () => {
       [literal("AA"), literal(null)],
       [literal("BB"), literal(null)],
     ]);
+  });
+
+  it("projects a clear as the cells it changed, not every cell of its range", () => {
+    const workbook: Workbook = {
+      activeSheet: "sheet1",
+      sheets: [
+        {
+          id: "sheet1",
+          name: "Sheet 1",
+          rowCount: 3,
+          columns: [
+            { key: "name", header: "Name", width: 100, type: "text" },
+            { key: "amount", header: "Amount", width: 100, type: "number" },
+          ],
+        },
+      ],
+    };
+    const store = new SheetwriteStore(workbook, {
+      rowCount: 3,
+      columns: { name: ["A", null, null], amount: [null, null, 3] },
+    });
+    const bridge = createRowBridge({ columns, defaultRows: rows, getRowId: (row) => row.id });
+    const projections: RowBridgeProjection<string>[] = [];
+    store.setDetailedChangeCapture(true);
+    store.on("change", (change) => projections.push(bridge.project(change)));
+
+    try {
+      store.applyTransaction({
+        patches: [
+          {
+            op: "clearRange",
+            range: { sheet: "sheet1", start: { row: 0, col: 0 }, end: { row: 2, col: 1 } },
+          },
+        ],
+      });
+
+      const clear = projections[0]?.deltas[0];
+      expect(
+        clear?.kind === "clear" ? clear.cells.map((cell) => [cell.rowId, cell.columnKey]) : [],
+      ).toEqual([
+        ["row-a", "name"],
+        ["row-c", "amount"],
+      ]);
+    } finally {
+      store.dispose();
+    }
   });
 });

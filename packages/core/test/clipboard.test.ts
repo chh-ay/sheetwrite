@@ -683,6 +683,24 @@ describe("ClipboardController", () => {
     expect((globalThis as Record<string, unknown>).__clipboardExecuted).toBeUndefined();
   });
 
+  it("parses signed HTML numbers into a number column before guarding formula text", async () => {
+    const item = new FakeClipboardItem({
+      "text/html": new Blob(["<table><tr><td>-5</td></tr><tr><td>+1</td></tr></table>"], {
+        type: "text/html",
+      }),
+    });
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { read: () => Promise.resolve([item]) },
+    });
+    // Column 1 is the number column.
+    h.select(1, 1);
+
+    await expect(h.controller.paste()).resolves.toBe("done");
+    expect(h.store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toBe(-5);
+    expect(h.store.getCell({ sheet: "s1", row: 2, col: 1 }).resolved).toBe(1);
+  });
+
   it("does not trust another controller's private clipboard token", async () => {
     let written: FakeClipboardItem | null = null;
     Object.defineProperty(navigator, "clipboard", {

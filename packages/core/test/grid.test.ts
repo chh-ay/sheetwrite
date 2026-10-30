@@ -1286,6 +1286,73 @@ describe("Grid auto-fit", () => {
     grid.destroy();
     store.dispose();
   });
+
+  it("fits the focused row of a sorted view, not the data row with the same number", () => {
+    const workbook = makeWorkbook(5);
+    // Amounts rise with the row, so a descending sort reverses the rows.
+    const store = new SheetwriteStore(workbook, makeColumnarData(5));
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 0, col: 0 },
+          value: { kind: "literal", value: `${"wide ".repeat(40)}\nsecond wrapped line` },
+          style: { wrap: true, fontSize: 18 },
+        },
+      ],
+    });
+    const grid = new GridImpl(mountHost(), { workbook }, store);
+    const sheet = workbook.sheets[0];
+    if (!sheet) throw new Error("expected the fixture sheet");
+
+    // A descending sort by amount shows data row 0 at view row 4.
+    grid.sortBy(1, false);
+    expect(grid.getCellInput(4, 0)?.address.row).toBe(0);
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 4, col: 0 } });
+    grid.actions.autoFitRows();
+
+    expect(sheet.rowHeights?.get(0)).toBeGreaterThan(DEFAULT_THEME.rowHeight);
+    expect(sheet.rowHeights?.get(4)).toBeUndefined();
+
+    grid.destroy();
+    store.dispose();
+  });
+});
+
+describe("Grid search over a custom store", () => {
+  it("reports matches at data rows when the store sorts its visible window", () => {
+    const workbook = makeWorkbook(5);
+    const lastRow = 4;
+    const window = (
+      sheet: string,
+      rows: { start: number; end: number },
+      cols: readonly number[],
+      needleRow: number,
+    ) => {
+      const values = new Array<CellScalar>((rows.end - rows.start) * cols.length).fill(null);
+      values[(needleRow - rows.start) * cols.length] = "needle";
+      return {
+        sheet,
+        stringPoolEpoch: 0,
+        rows,
+        cols,
+        values,
+        styleIds: new Uint32Array(values.length),
+        styles: [{}],
+      };
+    };
+    // The store shows its rows in descending order: data row 4 is view row 0.
+    const store: Store = {
+      ...makeFakeStore(workbook),
+      getVisibleWindow: (sheet, rows, cols) => window(sheet, rows, cols, 0),
+      getDataWindow: (sheet, rows, cols) => window(sheet, rows, cols, lastRow),
+    };
+    const grid = new GridImpl(mountHost(), { workbook }, store);
+
+    expect(grid.search("needle").matches).toEqual([{ sheet: "s1", row: lastRow, col: 0 }]);
+
+    grid.destroy();
+  });
 });
 
 describe("transactional document metadata", () => {

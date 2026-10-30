@@ -1885,23 +1885,25 @@ export class StoreDataEngine {
     bounds: Range,
     rows: number,
     cols: number,
+    occupiedOnly = false,
   ): Array<{ addr: CellAddress; before: ResolvedCell }> {
     const columns: number[] = new Array(cols);
     for (let col = 0; col < cols; col += 1) columns[col] = bounds.start.col + col;
 
     const snapshot = this.windowReader.readRectangle(bounds.sheet, bounds.start.row, rows, columns);
-    const cells = new Array<{ addr: CellAddress; before: ResolvedCell }>(rows * cols);
+    const cells: Array<{ addr: CellAddress; before: ResolvedCell }> = [];
 
     for (let offset = 0; offset < rows * cols; offset += 1) {
+      const resolved = snapshot.values[offset] ?? null;
+      const styleId = snapshot.styleIds[offset] ?? 0;
+      // A clear changes nothing in an empty cell with the default style (id 0);
+      // skipping it keeps a whole-column clear from allocating one change per row.
+      if (occupiedOnly && resolved === null && styleId === 0) continue;
+      const style = snapshot.styles[styleId] ?? EMPTY_STYLE;
+
       const row = bounds.start.row + Math.floor(offset / cols);
       const col = bounds.start.col + (offset % cols);
-      cells[offset] = {
-        addr: { sheet: bounds.sheet, row, col },
-        before: {
-          resolved: snapshot.values[offset] ?? null,
-          style: snapshot.styles[snapshot.styleIds[offset] ?? 0] ?? EMPTY_STYLE,
-        },
-      };
+      cells.push({ addr: { sheet: bounds.sheet, row, col }, before: { resolved, style } });
     }
 
     return cells;
@@ -2406,6 +2408,7 @@ export class StoreDataEngine {
                 bounds,
                 bounds.end.row - bounds.start.row + 1,
                 bounds.end.col - bounds.start.col + 1,
+                true,
               )
             : null;
         const applied = this.wasm.clearRange(
@@ -4114,11 +4117,14 @@ export class StoreDataEngine {
   endPageRequest(): void {
     this.pendingPageRequests -= 1;
 
-    if (this.pendingPageRequests === 0) {
-      const waiters = this.pageIdleWaiters;
-      this.pageIdleWaiters = undefined;
-      if (waiters) for (const resolve of waiters) resolve();
-    }
+    if (this.pendingPageRequests === 0) this.releasePageIdleWaiters();
+  }
+
+  /** A memory release waits here; a disposed store has no page load left to wait for. */
+  private releasePageIdleWaiters(): void {
+    const waiters = this.pageIdleWaiters;
+    this.pageIdleWaiters = undefined;
+    if (waiters) for (const resolve of waiters) resolve();
   }
 
   waitForPageLoads(): Promise<void> | undefined {
@@ -4203,6 +4209,7 @@ export class StoreDataEngine {
     this.boundaryAccounting.record("teardown", "js-to-wasm", 0, "scalar");
     for (const history of this.rangeHistory.keys()) history.dispose();
     this.memoryReleaseListeners.clear();
+    this.releasePageIdleWaiters();
     this.view.dispose();
     this.windowReader.clear();
     this.styles.clear();

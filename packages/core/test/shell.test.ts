@@ -299,8 +299,8 @@ describe("createFormulaBar", () => {
     const stable = input.value;
 
     input.focus();
-    input.dispatchEvent(new KeyboardEvent("keydown", { key: "x" }));
     input.value = "draft-in-progress";
+    input.dispatchEvent(new InputEvent("input", { inputType: "insertFromPaste" }));
 
     // A concurrent change event must not clobber the draft.
     grid.applyTransaction({
@@ -468,6 +468,35 @@ describe("createSpreadsheetShell", () => {
     expect(host.querySelectorAll(".sheetwrite-shell-tabs [role='tab']")).toHaveLength(2);
     shell.setGridConfig({ tabs: false });
     expect(host.querySelector(".sheetwrite-shell-tabs")).toBeNull();
+
+    shell.destroy();
+  });
+
+  it("keeps an open tab menu when a cell edit does not change the sheet list", () => {
+    const host = mountHost();
+    const shell = createSpreadsheetShell(host, {
+      grid: { workbook: multiSheetWorkbook(), data: makeColumnarData(10) },
+    });
+    const trigger = host.querySelector<HTMLButtonElement>(
+      ".sheetwrite-shell-tabs .sheetwrite-tab-options-button",
+    );
+    if (!trigger) throw new Error("expected the active tab's options button");
+    trigger.click();
+    expect(host.querySelector(".sheetwrite-tab-menu")).not.toBeNull();
+
+    shell.grid.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 0, col: 0 },
+          value: { kind: "literal", value: "remote edit" },
+        },
+      ],
+    });
+    expect(host.querySelector(".sheetwrite-tab-menu")).not.toBeNull();
+
+    shell.grid.applyTransaction({ patches: [{ op: "renameSheet", sheet: "s2", name: "Renamed" }] });
+    expect(host.querySelector(".sheetwrite-shell-tabs")?.textContent).toContain("Renamed");
 
     shell.destroy();
   });

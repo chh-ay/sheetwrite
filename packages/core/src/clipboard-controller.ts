@@ -403,7 +403,7 @@ function parseClipboardHtml(html: string, valuesOnly: boolean): CellWrite[][] | 
       values.push({
         value: formula
           ? { kind: "formula", src: formula }
-          : { kind: "literal", value: neutralizeInjection(cell.textContent ?? "") },
+          : { kind: "literal", value: cell.textContent ?? "" },
         style: valuesOnly || !(cell instanceof HTMLElement) ? undefined : styleFromHtml(cell),
       });
     }

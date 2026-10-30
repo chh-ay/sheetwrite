@@ -446,7 +446,12 @@ export class SearchController {
     const pairs: number[] = [];
     if (sheet.rowCount === 0 || cols.length === 0) return EMPTY_MATCHES;
 
-    const view = this.deps.store.getVisibleWindow(sheetId, { start: 0, end: sheet.rowCount }, cols);
+    // Matches are data addresses. A custom store's visible window can follow its
+    // own sort or filter, so read canonical data rows when the store offers them.
+    const rows = { start: 0, end: sheet.rowCount };
+    const view =
+      this.deps.store.getDataWindow?.(sheetId, rows, cols) ??
+      this.deps.store.getVisibleWindow(sheetId, rows, cols);
     const n = cols.length;
     for (let r = 0; r < sheet.rowCount; r++) {
       for (let c = 0; c < n; c++) {

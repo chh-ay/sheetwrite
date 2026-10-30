@@ -53,7 +53,7 @@ import type { Ribbon } from "./ribbon/ribbon.js";
 import { SearchController } from "./search-controller.js";
 import { type CellRef, SelectionModel, type SelRect } from "./selection.js";
 import { sheetNameKey, validateSheetName } from "./sheet-name.js";
-import { SheetTabs } from "./sheet-tabs.js";
+import { changesSheetTabs, SheetTabs } from "./sheet-tabs.js";
 import { mountSidePanel } from "./side-panel.js";
 import { IncompleteDataError, SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
@@ -1108,15 +1108,7 @@ export class GridImpl implements Grid {
         ) {
           shouldApplyLayout = true;
         }
-        if (
-          patch.op === "addSheet" ||
-          patch.op === "removeSheet" ||
-          patch.op === "renameSheet" ||
-          patch.op === "moveSheet" ||
-          patch.op === "setSheetVisibility"
-        ) {
-          sheetsChanged = true;
-        }
+        if (changesSheetTabs(patch)) sheetsChanged = true;
         if (patch.op === "addSheet") {
           sessionSheets.splice(patch.sheet.order, 0, {
             id: patch.sheet.id,
@@ -1940,10 +1932,13 @@ export class GridImpl implements Grid {
     if (!context) return;
 
     const mergeWidths = new Map<number, number>();
+    // Measurement walks view rows, so key each merge by the view row it shows on.
     for (const merge of sheet.merges ?? []) {
+      const viewRow = this.toViewRow(merge.r0);
+      if (viewRow === null) continue;
       let width = 0;
       for (let col = merge.c0; col <= merge.c1; col++) width += sheet.columns[col]?.width ?? 0;
-      mergeWidths.set(merge.r0 * sheet.columns.length + merge.c0, width);
+      mergeWidths.set(viewRow * sheet.columns.length + merge.c0, width);
     }
     const rowCount = r1 - r0 + 1;
     const columnCount = c1 - c0 + 1;
@@ -2366,10 +2361,14 @@ export class GridImpl implements Grid {
       },
       (error: unknown) => {
         if (!current()) return;
-        // Keep the grid usable with the flat toolbar, and still report why.
+        // Keep the grid usable with the flat toolbar, and still say why. A
+        // rethrow here would only become an unhandled rejection.
         this.toolbar = new Toolbar(this.host, config, this.baseTheme, this);
         this.setToolbarHeight(Toolbar.height);
-        throw error;
+        const detail = error instanceof Error && error.message ? error.message : String(error);
+        this.actionFeedback.show(
+          `The ribbon could not load, so the basic toolbar is shown: ${detail}`,
+        );
       },
     );
   }
@@ -3114,7 +3113,8 @@ export class GridImpl implements Grid {
       autoFitRows: () => {
         const focus = this.selection.focusCell;
         if (!focus) return;
-        const row = this.toDataRow(focus.row);
+        // `autoFitRows` takes view rows, the same space as the focus cell.
+        const row = focus.row;
         this.autoFitRows({
           sheet: this.activeSheet,
           start: { row, col: 0 },

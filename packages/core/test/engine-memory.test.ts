@@ -1,7 +1,8 @@
-import { beforeAll, describe, expect, it } from "bun:test";
+import { beforeAll, describe, expect, it, spyOn } from "bun:test";
 
 import { getEngine } from "../src/engine.js";
 import { initSheetwrite, releaseEngineMemory, SheetwriteStore } from "../src/index.js";
+import { storeEngine } from "../src/store/engine-registry.js";
 import { makeWorkbook } from "./fixtures.js";
 
 beforeAll(async () => {
@@ -114,6 +115,29 @@ describe("explicit engine memory release", () => {
     } finally {
       store.dispose();
     }
+  });
+
+  it("finishes a release when a store that waits for a page load is disposed", async () => {
+    const store = new SheetwriteStore(makeWorkbook(2));
+    const engine = storeEngine(store);
+    if (!engine) throw new Error("Expected a registered engine");
+
+    // A datasource request that never ends; disposing the store must end the wait.
+    engine.beginPageRequest();
+    const asked = Promise.withResolvers<void>();
+    const waitForPageLoads = engine.waitForPageLoads.bind(engine);
+    spyOn(engine, "waitForPageLoads").mockImplementation(() => {
+      const wait = waitForPageLoads();
+      asked.resolve();
+      return wait;
+    });
+    const release = releaseEngineMemory();
+    await asked.promise;
+
+    // Without the fix this await never settles and the test runner times out.
+    store.dispose();
+
+    await expect(release).resolves.toMatchObject({ wasmBytesAfter: expect.any(Number) });
   });
 
   for (const engine of ["wasm", "formulas"]) {

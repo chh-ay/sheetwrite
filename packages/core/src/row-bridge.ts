@@ -81,7 +81,11 @@ export interface RowBridgeRangeDelta<
   readonly cells: readonly RowBridgeCell<Id>[];
 }
 
-/** A clearRange effect expanded to its exact changed cells. */
+/**
+ * A clearRange effect expanded to its exact changed cells. The cells come from
+ * the store's detailed change capture, which `createGridController` turns on
+ * with a row bridge; `range` always covers the whole clear.
+ */
 export interface RowBridgeClearDelta<
   Id extends RowBridgeId = RowBridgeId,
 > extends RowBridgeDeltaBase<Id> {
@@ -634,20 +638,28 @@ export class RowBridge<
         );
       }
     } else if (operation.op === "clearRange") {
+      // Only cells that held something change. Walking every address would
+      // allocate per cell for a whole-column clear, so read the captured changes.
       const range = operation.range;
       const startRow = Math.min(range.start.row, range.end.row);
       const endRow = Math.max(range.start.row, range.end.row);
       const startCol = Math.min(range.start.col, range.end.col);
       const endCol = Math.max(range.start.col, range.end.col);
-      for (let row = startRow; row <= endRow; row += 1) {
-        for (let col = startCol; col <= endCol; col += 1) {
-          const addr = { sheet: range.sheet, row, col };
-          addresses.push(addr);
-          if (operation.contents !== false) {
-            values.set(cellAddressKey(addr), { kind: "literal", value: null });
-          }
+      for (const queue of changeQueues.values()) {
+        const addr = queue[0]?.addr;
+        if (
+          addr === undefined ||
+          addr.sheet !== range.sheet ||
+          addr.row < startRow ||
+          addr.row > endRow ||
+          addr.col < startCol ||
+          addr.col > endCol
+        ) {
+          continue;
         }
+        addresses.push(addr);
       }
+      addresses.sort((left, right) => left.row - right.row || left.col - right.col);
     }
     return addresses.map((addr) => {
       const key = cellAddressKey(addr);

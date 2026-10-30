@@ -570,22 +570,27 @@ function renderPlacement(spec: RibbonPlacementSpec, context: RibbonContext): Rib
       // Enter may repeat while the optional panel chunk is still loading.
       if (save.disabled) return;
       save.disabled = true;
+      let message: string | null;
       try {
-        const message = await spec.submit(
+        message = await spec.submit(
           context.grid,
           existing.checked ? { kind: "cell", text: field.value } : { kind: "new-sheet" },
         );
-        if (message !== null) {
-          error.textContent = message;
-          error.hidden = false;
-          (existing.checked ? field : newSheet).focus();
-          return;
-        }
-        // The command moved focus into the panel it opened; leave it there.
-        context.popup.closeAll(false);
+      } catch (cause) {
+        // A failed panel-chunk load must reach the user, not become an unhandled rejection.
+        const detail = cause instanceof Error && cause.message ? cause.message : String(cause);
+        message = `${spec.label} could not run: ${detail}`;
       } finally {
         save.disabled = false;
       }
+      if (message !== null) {
+        error.textContent = message;
+        error.hidden = false;
+        (existing.checked ? field : newSheet).focus();
+        return;
+      }
+      // The command moved focus into the panel it opened; leave it there.
+      context.popup.closeAll(false);
     });
     context.popup.open(trigger, form, { role: "dialog", label: spec.label, focus: true });
   });
