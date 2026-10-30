@@ -5,7 +5,7 @@ import { basename, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import type { XlsxWorkbookWarning } from "../../packages/core/src/export.js";
-import type { WorkbookSnapshot } from "../../packages/core/src/types/document.js";
+import type { WorkbookSnapshot, XlsxSourceGraph } from "../../packages/core/src/types/document.js";
 import { sheetwriteWorkbookBackend } from "../../packages/xlsx/src/workbook.js";
 import { canonicalJson } from "./normalize.js";
 
@@ -68,11 +68,15 @@ function sortedRanges<T extends Parameters<typeof rangeKey>[0]>(
 
 /** Normalized semantic state compared independently from ZIP/XML byte identity. */
 export function workbookFeatureState(snapshot: WorkbookSnapshot): unknown {
+  // Preserved XLSX parts are opaque producer bytes, so a resave by another
+  // application changes or adds them by design. Their loss is checked
+  // separately by `retainedGraphLosses`, which allows additions.
+  const { xlsxSource: _preservedParts, ...workbook } = snapshot.workbook;
   return {
     schemaVersion: snapshot.schemaVersion,
     documentId: snapshot.documentId,
     version: snapshot.version,
-    workbook: snapshot.workbook,
+    workbook,
     sheets: [...snapshot.sheets]
       .sort((left, right) => left.order - right.order)
       .map((sheet) => {
@@ -113,6 +117,40 @@ function normalized(value: unknown): unknown {
     return result;
   }
   return value;
+}
+
+/** Kind of a retained graph: who links to it and through which relationship. */
+function retainedGraphKind(graph: XlsxSourceGraph): string {
+  return `${graph.owner}${graph.sheetId === undefined ? "" : `:${graph.sheetId}`} ${graph.type}`;
+}
+
+/**
+ * Retained graphs (charts, pivots, drawings, …) the round trip lost, as a
+ * count per kind. Producers rename parts and add graphs of their own (a
+ * theme, document properties), so no graph identity is stable across them;
+ * this proves only that no kind lost members. A dropped chart replaced by a
+ * different chart on the same owner still passes.
+ */
+export function retainedGraphLosses(
+  expected: WorkbookSnapshot,
+  actual: WorkbookSnapshot,
+): string[] {
+  const remaining = new Map<string, number>();
+  for (const graph of expected.workbook.xlsxSource?.graphs ?? []) {
+    const kind = retainedGraphKind(graph);
+    remaining.set(kind, (remaining.get(kind) ?? 0) + 1);
+  }
+  for (const graph of actual.workbook.xlsxSource?.graphs ?? []) {
+    const kind = retainedGraphKind(graph);
+    const count = remaining.get(kind);
+    if (count !== undefined) remaining.set(kind, count - 1);
+  }
+
+  const losses: string[] = [];
+  for (const [kind, count] of remaining) {
+    if (count > 0) losses.push(`$workbook.xlsxSource.graphs: ${count} retained ${kind} lost`);
+  }
+  return losses;
 }
 
 export function structuralDifferences(expected: unknown, actual: unknown): string[] {
@@ -264,10 +302,13 @@ async function chain(
 ): Promise<WorkbookRoundtripChain> {
   const producerBytes = bounded(await resaver.resave(input, id), `${id} producer output`);
   const imported = await importWorkbook(producerBytes);
-  const differences = structuralDifferences(
-    workbookFeatureState(expected),
-    workbookFeatureState(imported.snapshot),
-  );
+  const differences = [
+    ...structuralDifferences(
+      workbookFeatureState(expected),
+      workbookFeatureState(imported.snapshot),
+    ),
+    ...retainedGraphLosses(expected, imported.snapshot),
+  ];
   return {
     id,
     direction,
