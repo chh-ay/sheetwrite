@@ -70,11 +70,11 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 
 | Dialect | Status |
 | --- | --- |
-| Microsoft Excel | documented |
+| Microsoft Excel | divergent |
 | Google Sheets | unverified |
 | OpenFormula | unverified |
 
-Limitations: Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?. Database criteria use header names, AND across columns, and OR across rows. Custom formula predicates under headers that are not database fields are not supported.
+Limitations: Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?. Database criteria use header names, AND across columns, and OR across rows. Custom formula predicates under headers that are not database fields are not supported. A not-equal criterion does not match a value of a different type, so "<>" skips numbers in a field that Excel counts as nonblank (#246).
 
 </details>
 
