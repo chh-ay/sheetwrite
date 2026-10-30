@@ -32,7 +32,7 @@ const config: GridConfig = {
 - [ContextMenuItem](/docs/api/core/context-menu-item/)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L428"><code>packages/core/src/types/grid.ts#L428</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L454"><code>packages/core/src/types/grid.ts#L454</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -172,13 +172,13 @@ A custom `toolbar` item list still renders the flat toolbar instead.</p>
 </details>
 
 <details class="api-member" id="grid-config-icons" data-pagefind-weight="1">
-<summary><code>icons</code> <span class="api-member-summary">Override built-in toolbar icons by action name.</span></summary>
+<summary><code>icons</code> <span class="api-member-summary">Replace built-in command icons by glyph name, in the toolbar, ribbon, ribbon menus and context menu.</span></summary>
 
 ```ts generated
-icons?: Partial<Record<ToolbarActionName, ToolbarIcon>>;
+icons?: IconOverrides;
 ```
 
-<p class="api-member-doc">Override built-in toolbar icons by action name. Strings render as plain text; DOM nodes/factories support SVG/HTML icons.</p>
+<p class="api-member-doc">Replace built-in command icons by glyph name, in the toolbar, ribbon, ribbon menus and context menu. See <a href="/docs/api/core/icon-overrides/"><code>IconOverrides</code></a>.</p>
 </details>
 
 <details class="api-member" id="grid-config-context-menu" data-pagefind-weight="1">
@@ -253,7 +253,7 @@ export interface GridConfig {
   sort?: boolean;
   export?: boolean;
   ribbon?: boolean;
-  icons?: Partial<Record<ToolbarActionName, ToolbarIcon>>;
+  icons?: IconOverrides;
   contextMenu?: boolean | ContextMenuItems;
   undo?: boolean;
   find?: boolean;

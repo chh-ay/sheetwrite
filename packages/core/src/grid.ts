@@ -35,6 +35,7 @@ import { hyperlinkAt, resolveHyperlinkTarget, sanitizeCellHyperlink } from "./hy
 import { InteractionSessions } from "./interaction-sessions.js";
 import { Keymap } from "./keymap.js";
 import { MutationRevisionIndex, type MutationRevisionStats } from "./mutation-revision-index.js";
+import { type NoteCell, NotePopover } from "./note-popover.js";
 import { OverlayPainter } from "./overlay-painter.js";
 import { type PaintedCells, ReadWindowController } from "./read-window-controller.js";
 import {
@@ -473,6 +474,7 @@ export class GridImpl implements Grid {
   /** Bumped whenever chrome is rebuilt, so a ribbon chunk that loads late is dropped. */
   private chromeGeneration = 0;
   private findBar: FindBar | null = null;
+  private readonly notes: NotePopover;
   private readonly actionFeedback: ActionFeedback;
   private config: GridConfig | undefined;
   private readonly presentation: GridPresentation;
@@ -848,8 +850,39 @@ export class GridImpl implements Grid {
       pasteValues: () => void this.clipboard.pasteValues(),
       commit: (patches, reason) => this.document.commit(patches, reason),
       readOnly: () => this.readOnly,
+      onEditStart: () => this.notes.hideCard(),
     });
     this.interactions.configureMenu(config, this.theme);
+
+    this.notes = new NotePopover({
+      host,
+      scroller: this.scroller,
+      theme: this.baseTheme,
+      cellAt: (clientX, clientY) => {
+        // The row header column is not a cell, though hit-testing clamps it to the first one.
+        const left = this.viewportEl.getBoundingClientRect().left;
+        if (clientX - left < this.theme.rowHeaderWidth) return null;
+
+        const cell = this.interactions.cellAtPointer(clientX, clientY);
+        return cell ? this.noteCell(cell.row, cell.col) : null;
+      },
+      noteAt: (address) => this.getNote(address),
+      cellRect: (cell) => {
+        const viewport = this.viewportEl.getBoundingClientRect();
+        const rect = this.screenRect(
+          cell.row,
+          cell.col,
+          this.geometry.toContent(this.scroller.scrollTop),
+          this.scroller.scrollLeft,
+        );
+        const left = viewport.left + rect.x;
+        const top = viewport.top + rect.y;
+        return { left, top, right: left + rect.w, bottom: top + rect.h };
+      },
+      editorLabel: (cell) => `Note for ${this.columnHeader(cell.col)}, row ${cell.row + 1}`,
+      commit: (address, text) => this.setNote(address, text),
+      returnFocus: () => this.host.focus(),
+    });
 
     this.overlayPainter = new OverlayPainter(this.viewportEl, {
       theme: () => this.theme,
@@ -1070,13 +1103,18 @@ export class GridImpl implements Grid {
         this.mutationRevisions.clear();
         this.displayedHiddenRows = new Set(this.sheet().hiddenRows);
       }
-      this.interactions.reconcile(
-        shouldResetDatasource
-          ? "structure"
-          : shouldReconcileView || shouldRebuildRows || shouldRebuildColumns || shouldApplyLayout
-            ? "view"
-            : "value",
-      );
+      const change = shouldResetDatasource
+        ? "structure"
+        : shouldReconcileView || shouldRebuildRows || shouldRebuildColumns || shouldApplyLayout
+          ? "view"
+          : "value";
+      this.interactions.reconcile(change);
+
+      // A note edit holds a data address that a structure change moves; geometry
+      // changes move the shown card away from its cell.
+      if (change === "structure") this.notes.dismiss();
+      else if (change === "view") this.notes.hideCard();
+
       if (shouldRebuildRows || shouldReconcileView) this.rebuildIndex();
       if (shouldRebuildColumns) this.rebuildColumnIndex();
       if (shouldRebuildColumns || shouldApplyLayout) this.applyLayout();
@@ -1102,6 +1140,7 @@ export class GridImpl implements Grid {
         )
       ) {
         this.ariaMirror.bumpVersion();
+        this.notes.refresh();
       }
       this.scheduleRender();
       for (const fn of this.listeners.change) fn(event);
@@ -1527,6 +1566,17 @@ export class GridImpl implements Grid {
 
   private repositionEditor(contentTop: number, scrollLeft: number): void {
     this.interactions.reposition(contentTop, scrollLeft);
+    this.notes.reposition();
+  }
+
+  /** A view cell, resolved to its merge anchor, with the data address its note lives at. */
+  private noteCell(row: number, col: number): NoteCell {
+    const anchor = this.anchorCell(row, col);
+    return {
+      row: anchor.row,
+      col: anchor.col,
+      address: { sheet: this.activeSheet, row: this.toDataRow(anchor.row), col: anchor.col },
+    };
   }
 
   beginEdit(row: number, col: number, initial?: string, selectAll = false): void {
@@ -2077,6 +2127,7 @@ export class GridImpl implements Grid {
       return;
 
     this.interactions.reconcile("sheet");
+    this.notes.dismiss();
     this.cancelAutoFit();
     this.domOverlay.reset();
     this.mutationRevisions.clear();
@@ -2206,14 +2257,13 @@ export class GridImpl implements Grid {
   }
 
   /**
-   * The built-in toolbar, find bar, and context menu read their palette from
-   * custom properties seeded on the grid root when they are created. Seed them
-   * again from the new base theme so a theme switch (for example to dark)
-   * repaints the widgets too, not only the canvas.
+   * The built-in widgets (toolbar, find bar, context menu, note card) read
+   * their palette from custom properties seeded on the grid root when they are
+   * created. The note card always exists, so seed them again from the new base
+   * theme so a theme switch (for example to dark) repaints the widgets too, not
+   * only the canvas.
    */
   private reseedWidgetTheme(): void {
-    if (!this.toolbar && !this.ribbon && !this.findBar && this.config?.contextMenu === false)
-      return;
     seedWidgetTheme(this.host, this.baseTheme);
   }
 
@@ -2249,8 +2299,10 @@ export class GridImpl implements Grid {
   private mountRibbon(RibbonClass: typeof Ribbon): void {
     // The grid owns widget theming: seed now, reseed on every theme change.
     seedWidgetTheme(this.host, this.baseTheme);
+    const icons = this.config?.icons;
     const ribbon = new RibbonClass(this.host, this, {
       onHeightChange: (height) => this.setToolbarHeight(height),
+      ...(icons === undefined ? {} : { icons }),
     });
 
     // Grid layout offsets the viewport by the ribbon's height, so chrome must leave normal flow.
@@ -2296,6 +2348,7 @@ export class GridImpl implements Grid {
     if (readOnly) {
       this.cancelAutoFit();
       this.interactions.reconcile("read-only");
+      this.notes.dismiss();
     }
     if (readOnly) this.host.setAttribute("aria-readonly", "true");
     else this.host.removeAttribute("aria-readonly");
@@ -2408,6 +2461,7 @@ export class GridImpl implements Grid {
     if (next === this.zoom) return;
     this.zoom = next;
     this.applyZoomedTheme();
+    this.notes.hideCard();
   }
 
   getZoom(): number {
@@ -2876,6 +2930,22 @@ export class GridImpl implements Grid {
         this.exportXlsx(filename ?? "sheetwrite.xlsx").catch((error: unknown) => {
           this.emitExportError(error, "xlsx");
         }),
+      editNote: () => {
+        // Same gate as the cell editor: do not open an editor whose save must fail.
+        const focus = this.selection.focusCell;
+        if (this.readOnly || !focus) return;
+
+        const cell = this.noteCell(focus.row, focus.col);
+        this.scrollToCell({ sheet: this.activeSheet, row: cell.row, col: cell.col });
+        this.notes.edit(cell);
+      },
+      deleteNote: () => {
+        const focus = this.selection.focusCell;
+        if (this.readOnly || !focus) return;
+
+        const { address } = this.noteCell(focus.row, focus.col);
+        if (this.getNote(address) !== null) this.setNote(address, null);
+      },
       undo: () => this.undo(),
       redo: () => this.redo(),
     };
@@ -3401,6 +3471,7 @@ export class GridImpl implements Grid {
     this.mutationRevisions.clear();
     this.readWindows.destroy();
     this.interactions.destroy();
+    this.notes.destroy();
     this.scroller.removeEventListener("scroll", this.onScroll);
     this.resizeObserver?.disconnect();
     this.resolutionMediaQuery?.removeEventListener("change", this.onResolutionChange);

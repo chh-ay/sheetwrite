@@ -105,6 +105,8 @@ interface InteractionDependencies {
   paste: () => void;
   pasteValues: () => void;
   commit: (patches: DocumentOp[], reason: CommitReason) => ApplyTransactionResult;
+  /** Runs before a cell editor opens; hides the note card that would cover it. */
+  onEditStart: () => void;
   readOnly: () => boolean;
 }
 
@@ -290,6 +292,7 @@ export class InteractionSessions {
     const contentTop = this.deps.contentTop();
 
     this.cancelPointer();
+    this.deps.onEditStart();
     this.cancelEditor();
     const generation = ++this.generation;
     this.editingAddress = dataAddr;
@@ -852,6 +855,9 @@ export class InteractionSessions {
           break;
         case "clearContents":
           this.deps.clearSelection();
+          break;
+        case "editNote":
+          this.deps.grid.actions.editNote();
           break;
       }
       return;

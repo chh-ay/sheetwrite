@@ -216,7 +216,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L100",
+              "source": "src/types/grid.ts#L101",
               "jsDocTags": [],
               "documentation": "Framework-neutral named editor definition registered through GridOptions.editors.",
               "memberDocs": []
@@ -228,7 +228,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L75",
+              "source": "src/types/grid.ts#L76",
               "jsDocTags": [],
               "documentation": "Immutable state and guarded completion callbacks for one mounted editor.",
               "memberDocs": []
@@ -240,7 +240,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L91",
+              "source": "src/types/grid.ts#L92",
               "jsDocTags": [],
               "documentation": "Retained lifecycle returned by a custom editor's mount method.",
               "memberDocs": []
@@ -252,7 +252,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L64",
+              "source": "src/types/grid.ts#L65",
               "jsDocTags": [],
               "documentation": "Selection movement applied after a successful editor commit.",
               "memberDocs": []
@@ -264,7 +264,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L67",
+              "source": "src/types/grid.ts#L68",
               "jsDocTags": [],
               "documentation": "Viewport-relative geometry of the cell currently owned by an editor.",
               "memberDocs": []
@@ -313,7 +313,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L605",
+              "source": "src/types/grid.ts#L631",
               "jsDocTags": [],
               "documentation": "View-aware editable snapshot of one cell, for hosts building a detached\nformula bar or cell inspector. `address` is the translated *data* address —\nthe correct target for `Grid.applyTransaction` even under an active\nsort/filter view — while the `(row, col)` inputs of\n{@link Grid.getCellInput} are active-sheet view coordinates.",
               "memberDocs": [
@@ -819,11 +819,11 @@
             {
               "name": "ContextMenuActionName",
               "kind": "type",
-              "signature": "export type ContextMenuActionName = | \"cut\" | \"copy\" | \"paste\" | \"clearContents\" | \"merge\" | \"unmerge\" | \"insertRowAbove\" | \"insertRowBelow\" | \"deleteRow\" | \"insertColumnLeft\" | \"insertColumnRight\" | \"deleteColumn\" | \"hideRow\" | \"showAllRows\" | \"autoFitRow\" | \"hideColumn\" | \"showAllColumns\" | \"autoFitColumn\" | \"clearFilter\" | \"exportCsv\" | \"exportXlsx\" | \"separator\";",
+              "signature": "export type ContextMenuActionName = | \"cut\" | \"copy\" | \"paste\" | \"clearContents\" | \"merge\" | \"unmerge\" | \"insertRowAbove\" | \"insertRowBelow\" | \"deleteRow\" | \"insertColumnLeft\" | \"insertColumnRight\" | \"deleteColumn\" | \"hideRow\" | \"showAllRows\" | \"autoFitRow\" | \"hideColumn\" | \"showAllColumns\" | \"autoFitColumn\" | \"clearFilter\" | \"exportCsv\" | \"exportXlsx\" | \"editNote\" | \"deleteNote\" | \"separator\";",
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L291",
+              "source": "src/types/grid.ts#L310",
               "jsDocTags": [],
               "documentation": "Built-in action names accepted by custom context-menu rows.",
               "memberDocs": []
@@ -835,7 +835,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L316",
+              "source": "src/types/grid.ts#L337",
               "jsDocTags": [],
               "documentation": "Cell and viewport coordinates resolved for one bundled context-menu opening.",
               "memberDocs": [
@@ -856,11 +856,11 @@
             {
               "name": "ContextMenuItem",
               "kind": "interface",
-              "signature": "export interface ContextMenuItem { id?: string; action?: ContextMenuActionName; onClick?: (grid: Grid, cell: CellAddress | null) => void; label?: string; shortcut?: KeyboardAction | KeyShortcut; visible?: boolean | ((context: ContextMenuContext) => boolean); disabled?: boolean | ((context: ContextMenuContext) => boolean); }",
+              "signature": "export interface ContextMenuItem { id?: string; action?: ContextMenuActionName; onClick?: (grid: Grid, cell: CellAddress | null) => void; label?: string; shortcut?: KeyboardAction | KeyShortcut; visible?: boolean | ((context: ContextMenuContext) => boolean); disabled?: boolean | ((context: ContextMenuContext) => boolean); icon?: IconName; items?: readonly ContextMenuItem[]; }",
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L376",
+              "source": "src/types/grid.ts#L398",
               "jsDocTags": [
                 "example",
                 "see"
@@ -876,8 +876,16 @@
                   "documentation": "Static or context-aware disabled state."
                 },
                 {
+                  "name": "icon",
+                  "documentation": "Glyph shown before the label. Built-in actions have one by default; `config.icons` overrides apply."
+                },
+                {
                   "name": "id",
                   "documentation": "Stable host identifier, exposed as `data-context-menu-item`."
+                },
+                {
+                  "name": "items",
+                  "documentation": "Rows of a submenu. The row opens it on click, hover or the Right Arrow key and runs nothing itself."
                 },
                 {
                   "name": "label",
@@ -904,7 +912,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L401",
+              "source": "src/types/grid.ts#L427",
               "jsDocTags": [],
               "documentation": "Static rows or a context-aware factory evaluated each time the menu opens.",
               "memberDocs": []
@@ -916,7 +924,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L420",
+              "source": "src/grid.ts#L421",
               "jsDocTags": [
                 "example",
                 "see"
@@ -1242,7 +1250,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L294",
+              "source": "src/grid.ts#L295",
               "jsDocTags": [],
               "documentation": "Default canvas theme used before CSS and explicit theme overrides.",
               "memberDocs": []
@@ -1579,7 +1587,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L679",
+              "source": "src/types/grid.ts#L705",
               "jsDocTags": [
                 "example",
                 "see"
@@ -1851,11 +1859,11 @@
             {
               "name": "GridActions",
               "kind": "interface",
-              "signature": "export interface GridActions { toggleBold(): void; toggleItalic(): void; toggleUnderline(): void; toggleStrikethrough(): void; setAlign(align: CellAlign): void; setTextColor(color: string | null): void; setFillColor(color: string | null): void; toggleBorder(): void; setBorders(preset: BorderPreset): void; setFontFamily(family: string | null): void; setFontSize(size: number | null): void; stepFontSize(direction: 1 | -1): void; setVerticalAlign(align: CellVerticalAlign): void; toggleWrap(): void; setNumberFormat(code: string | null): void; stepDecimals(direction: 1 | -1): void; mergeAndCenter(): void; clearAll(): void; autoSum(): void; find(): void; freezePanes(): void; clearFormat(): void; merge(): void; unmerge(): void; sort(ascending: boolean): void; insertRowAbove(): void; insertRowBelow(): void; deleteRow(): void; insertColumnLeft(): void; insertColumnRight(): void; deleteColumn(): void; hideRows(rows?: readonly number[]): void; showRows(rows?: readonly number[]): void; autoFitRows(): void; hideColumns(cols?: readonly number[]): void; showColumns(cols?: readonly number[]): void; autoFitColumns(cols?: readonly number[]): void; clearFilter(col?: number): void; copy(): Promise<ClipboardOutcome>; cut(): Promise<ClipboardOutcome>; paste(): Promise<ClipboardOutcome>; pasteValues(): Promise<ClipboardOutcome>; clearContents(): void; exportCsv(filename?: string): void; exportXlsx(filename?: string): Promise<void>; undo(): void; redo(): void; }",
+              "signature": "export interface GridActions { toggleBold(): void; toggleItalic(): void; toggleUnderline(): void; toggleStrikethrough(): void; setAlign(align: CellAlign): void; setTextColor(color: string | null): void; setFillColor(color: string | null): void; toggleBorder(): void; setBorders(preset: BorderPreset): void; setFontFamily(family: string | null): void; setFontSize(size: number | null): void; stepFontSize(direction: 1 | -1): void; setVerticalAlign(align: CellVerticalAlign): void; toggleWrap(): void; setNumberFormat(code: string | null): void; stepDecimals(direction: 1 | -1): void; mergeAndCenter(): void; clearAll(): void; autoSum(): void; find(): void; freezePanes(): void; clearFormat(): void; merge(): void; unmerge(): void; sort(ascending: boolean): void; insertRowAbove(): void; insertRowBelow(): void; deleteRow(): void; insertColumnLeft(): void; insertColumnRight(): void; deleteColumn(): void; hideRows(rows?: readonly number[]): void; showRows(rows?: readonly number[]): void; autoFitRows(): void; hideColumns(cols?: readonly number[]): void; showColumns(cols?: readonly number[]): void; autoFitColumns(cols?: readonly number[]): void; clearFilter(col?: number): void; copy(): Promise<ClipboardOutcome>; cut(): Promise<ClipboardOutcome>; paste(): Promise<ClipboardOutcome>; pasteValues(): Promise<ClipboardOutcome>; clearContents(): void; exportCsv(filename?: string): void; exportXlsx(filename?: string): Promise<void>; editNote(): void; deleteNote(): void; undo(): void; redo(): void; }",
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L121",
+              "source": "src/types/grid.ts#L122",
               "jsDocTags": [],
               "documentation": "Imperative operations the toolbar and context menu bind to; also exposed as `Grid.actions`.",
               "memberDocs": [
@@ -1874,6 +1882,14 @@
                 {
                   "name": "cut",
                   "documentation": "Copy + clear the source (after the clipboard accepted). Never rejects."
+                },
+                {
+                  "name": "deleteNote",
+                  "documentation": "Remove the focus cell's note as one undoable step. Does nothing when it has none."
+                },
+                {
+                  "name": "editNote",
+                  "documentation": "Open the note editor on the focus cell, with its note or empty for a new\none. Ctrl or Cmd+Enter and leaving the editor save; Escape cancels. Does\nnothing on a read-only grid."
                 },
                 {
                   "name": "exportCsv",
@@ -1944,7 +1960,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L231",
+              "source": "src/types/grid.ts#L240",
               "jsDocTags": [],
               "documentation": "Built-in command names accepted by state queries and change events.",
               "memberDocs": []
@@ -1956,7 +1972,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L234",
+              "source": "src/types/grid.ts#L243",
               "jsDocTags": [],
               "documentation": "Observable availability and selection-derived activity for one command.",
               "memberDocs": []
@@ -1968,7 +1984,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L240",
+              "source": "src/types/grid.ts#L249",
               "jsDocTags": [],
               "documentation": "Complete command-state snapshot emitted whenever availability or activity can change.",
               "memberDocs": []
@@ -1976,11 +1992,11 @@
             {
               "name": "GridConfig",
               "kind": "interface",
-              "signature": "export interface GridConfig { toolbar?: boolean | ToolbarItem[]; bold?: boolean; italic?: boolean; align?: boolean; textColor?: boolean; fillColor?: boolean; border?: boolean; clearFormat?: boolean; merge?: boolean; sort?: boolean; export?: boolean; ribbon?: boolean; icons?: Partial<Record<ToolbarActionName, ToolbarIcon>>; contextMenu?: boolean | ContextMenuItems; undo?: boolean; find?: boolean; tabs?: boolean; keyboard?: boolean | KeyboardOptions | ((e: KeyboardEvent, grid: Grid) => boolean); }",
+              "signature": "export interface GridConfig { toolbar?: boolean | ToolbarItem[]; bold?: boolean; italic?: boolean; align?: boolean; textColor?: boolean; fillColor?: boolean; border?: boolean; clearFormat?: boolean; merge?: boolean; sort?: boolean; export?: boolean; ribbon?: boolean; icons?: IconOverrides; contextMenu?: boolean | ContextMenuItems; undo?: boolean; find?: boolean; tabs?: boolean; keyboard?: boolean | KeyboardOptions | ((e: KeyboardEvent, grid: Grid) => boolean); }",
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L428",
+              "source": "src/types/grid.ts#L454",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2021,7 +2037,7 @@
                 },
                 {
                   "name": "icons",
-                  "documentation": "Override built-in toolbar icons by action name. Strings render as plain text; DOM nodes/factories support SVG/HTML icons."
+                  "documentation": "Replace built-in command icons by glyph name, in the toolbar, ribbon, ribbon menus and context menu. See {@link IconOverrides}."
                 },
                 {
                   "name": "italic",
@@ -2068,7 +2084,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L625",
+              "source": "src/types/grid.ts#L651",
               "jsDocTags": [],
               "documentation": "Payload map for events emitted by a Grid.",
               "memberDocs": [
@@ -2101,7 +2117,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L498",
+              "source": "src/types/grid.ts#L524",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2189,7 +2205,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L118",
+              "source": "src/types/grid.ts#L119",
               "jsDocTags": [],
               "documentation": "Header semantics used by the retained canvas and accessibility mirror.",
               "memberDocs": []
@@ -2248,6 +2264,42 @@
               "memberDocs": []
             },
             {
+              "name": "ICON_NAMES",
+              "kind": "variable",
+              "signature": "readonly [\"undo\", \"redo\", \"paste\", \"cut\", \"copy\", \"find\", \"zoomIn\", \"zoomOut\", \"autoSum\", \"clear\", \"bold\", \"italic\", \"underline\", \"strikethrough\", \"textColor\", \"fillColor\", \"fontGrow\", \"fontShrink\", \"clearFormat\", \"separator\", \"alignLeft\", \"alignCenter\", \"alignRight\", \"alignTop\", \"alignMiddle\", \"alignBottom\", \"wrap\", \"merge\", \"unmerge\", \"mergeAndCenter\", \"border\", \"borderAll\", \"borderOutside\", \"borderThickOutside\", \"borderTop\", \"borderBottom\", \"borderLeft\", \"borderRight\", \"borderNone\", \"currency\", \"percent\", \"comma\", \"decimalIncrease\", \"decimalDecrease\", \"hyperlink\", \"note\", \"exportCsv\", \"exportXlsx\", \"insert\", \"delete\", \"format\", \"hideRows\", \"unhideRows\", \"hideColumns\", \"unhideColumns\", \"freeze\", \"groupRows\", \"ungroupRows\", \"sortAsc\", \"sortDesc\", \"sortFilter\", \"clearFilter\"]",
+              "owners": [
+                "src/icons/icon-names.ts"
+              ],
+              "source": "src/icons/icon-names.ts#L4",
+              "jsDocTags": [],
+              "documentation": "Every glyph on the command icon sheet.",
+              "memberDocs": []
+            },
+            {
+              "name": "IconName",
+              "kind": "type",
+              "signature": "export type IconName = (typeof ICON_NAMES)[number];",
+              "owners": [
+                "src/icons/icon-names.ts"
+              ],
+              "source": "src/icons/icon-names.ts#L70",
+              "jsDocTags": [],
+              "documentation": "The name of one glyph on the command icon sheet; the key of `IconOverrides`.",
+              "memberDocs": []
+            },
+            {
+              "name": "IconOverrides",
+              "kind": "type",
+              "signature": "export type IconOverrides = Partial<Record<IconName, ToolbarIcon>>;",
+              "owners": [
+                "src/types/grid.ts"
+              ],
+              "source": "src/types/grid.ts#L292",
+              "jsDocTags": [],
+              "documentation": "Per-glyph icon overrides, keyed by the names on the command icon sheet\n(`ICON_NAMES`). One override applies wherever the glyph shows: the flat\ntoolbar, the ribbon and ribbon menus. Strings render as plain text; DOM nodes\nand node factories support SVG or HTML icons. To replace every glyph at once,\nset the `--sheetwrite-icon-sheet` CSS property to a sheet drawn on the layout\nin `@sheetwrite/core/icons.json`.",
+              "memberDocs": []
+            },
+            {
               "name": "IncompleteDataError",
               "kind": "class",
               "signature": "class IncompleteDataError extends SheetwriteError { constructor(sheet: SheetId, capability: Extract<QueryCapability, { status: \"incomplete\"; }>); capability: { status: \"incomplete\"; loadedCells: number; totalCells: number; }; name: \"IncompleteDataError\" }",
@@ -2266,7 +2318,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L338",
+              "source": "src/grid.ts#L339",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2317,7 +2369,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L350",
+              "source": "src/grid.ts#L351",
               "jsDocTags": [],
               "documentation": "Whether `initSheetwrite` has completed — the single readiness source.",
               "memberDocs": []
@@ -2349,11 +2401,11 @@
             {
               "name": "KeyboardAction",
               "kind": "type",
-              "signature": "export type KeyboardAction = | \"copy\" | \"cut\" | \"paste\" | \"pasteValues\" | \"undo\" | \"redo\" | \"find\" | \"replace\" | \"clearContents\";",
+              "signature": "export type KeyboardAction = | \"copy\" | \"cut\" | \"paste\" | \"pasteValues\" | \"undo\" | \"redo\" | \"find\" | \"replace\" | \"clearContents\" | \"editNote\";",
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L343",
+              "source": "src/types/grid.ts#L364",
               "jsDocTags": [],
               "documentation": "Built-in actions that can be rebound without replacing navigation.",
               "memberDocs": []
@@ -2365,7 +2417,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L355",
+              "source": "src/types/grid.ts#L377",
               "jsDocTags": [],
               "documentation": "Overrides replace all default keys for an action; null disables that action's keys.",
               "memberDocs": []
@@ -2377,7 +2429,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L331",
+              "source": "src/types/grid.ts#L352",
               "jsDocTags": [],
               "documentation": "A compact modified key combination or a key object. Modifiers may appear in\nany order before the final key, for example \"Mod+Shift+K\" or \"Ctrl+Alt+Delete\".\n`Mod`/`mod` means Command on macOS and Control elsewhere; Ctrl and Meta are literal.\nThe parser rejects unknown/repeated modifiers and missing keys.",
               "memberDocs": []
@@ -3130,7 +3182,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L591",
+              "source": "src/types/grid.ts#L617",
               "jsDocTags": [],
               "documentation": "Replacement count and refreshed search state returned by replace-all.",
               "memberDocs": [
@@ -3187,7 +3239,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L355",
+              "source": "src/grid.ts#L356",
               "jsDocTags": [],
               "documentation": "Read `--sheetwrite-*` CSS custom properties into a partial theme.",
               "memberDocs": []
@@ -3744,7 +3796,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L569",
+              "source": "src/types/grid.ts#L595",
               "jsDocTags": [],
               "documentation": "Case, whole-cell, sheet, and column constraints for grid search.",
               "memberDocs": [
@@ -3773,7 +3825,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L581",
+              "source": "src/types/grid.ts#L607",
               "jsDocTags": [],
               "documentation": "Ordered matches and active index produced by a grid search.",
               "memberDocs": [
@@ -3971,7 +4023,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L615",
+              "source": "src/types/grid.ts#L641",
               "jsDocTags": [],
               "documentation": "Actionable transaction outcome for a stable sheet lifecycle target.",
               "memberDocs": []
@@ -5024,7 +5076,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L204",
+              "source": "src/types/grid.ts#L213",
               "jsDocTags": [],
               "documentation": "Built-in action names accepted by custom toolbar items.",
               "memberDocs": []
@@ -5036,7 +5088,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L273",
+              "source": "src/types/grid.ts#L282",
               "jsDocTags": [],
               "documentation": "Text, DOM node, or node factory used as toolbar icon content.",
               "memberDocs": []
@@ -5048,7 +5100,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L276",
+              "source": "src/types/grid.ts#L295",
               "jsDocTags": [],
               "documentation": "Built-in, separator, or custom callback item in the grid toolbar.",
               "memberDocs": [
@@ -7012,6 +7064,20 @@
           ]
         },
         {
+          "subpath": "./icons.json",
+          "target": "./dist/icons.json",
+          "kind": "asset",
+          "classification": "asset",
+          "exports": []
+        },
+        {
+          "subpath": "./icons.svg",
+          "target": "./dist/icons.svg",
+          "kind": "asset",
+          "classification": "asset",
+          "exports": []
+        },
+        {
           "subpath": "./shell",
           "target": "./dist/shell.d.ts",
           "source": "src/shell.ts",
@@ -7049,7 +7115,7 @@
               "owners": [
                 "src/shell/ribbon-factory.ts"
               ],
-              "source": "src/shell/ribbon-factory.ts#L22",
+              "source": "src/shell/ribbon-factory.ts#L24",
               "jsDocTags": [],
               "documentation": "Mount an Excel-style ribbon (Home, Insert, Data, View) bound to\n`grid.actions`, in normal document flow. Groups shrink, then collapse into\ndropdowns, as the host narrows. Returns the piece with an idempotent\n`destroy`.",
               "memberDocs": []
@@ -7073,7 +7139,7 @@
               "owners": [
                 "src/shell/spreadsheet-shell.ts"
               ],
-              "source": "src/shell/spreadsheet-shell.ts#L100",
+              "source": "src/shell/spreadsheet-shell.ts#L104",
               "jsDocTags": [],
               "documentation": "Mount a complete spreadsheet shell into `host`: toolbar row, formula row\n(name box + formula bar), the grid, and a bottom row with sheet tabs and a\nselection status. The host must have a real size; the shell fills it. Returns\nthe shell handle; `destroy` tears down every piece, the grid, and the shell\nDOM, and is safe to call twice.",
               "memberDocs": []
@@ -7159,7 +7225,7 @@
             {
               "name": "RibbonOptions",
               "kind": "interface",
-              "signature": "export interface RibbonOptions { focusGrid?: () => void; onHeightChange?: (height: number) => void; }",
+              "signature": "export interface RibbonOptions { focusGrid?: () => void; onHeightChange?: (height: number) => void; icons?: IconOverrides; }",
               "owners": [
                 "src/shell/ribbon-factory.ts"
               ],
@@ -7170,6 +7236,10 @@
                 {
                   "name": "focusGrid",
                   "documentation": "Return keyboard focus to the grid after a pick or Escape (default: focus `host`)."
+                },
+                {
+                  "name": "icons",
+                  "documentation": "Replace built-in icons by glyph name, as `GridConfig.icons`."
                 },
                 {
                   "name": "onHeightChange",
@@ -7196,7 +7266,7 @@
               "owners": [
                 "src/shell/spreadsheet-shell.ts"
               ],
-              "source": "src/shell/spreadsheet-shell.ts#L75",
+              "source": "src/shell/spreadsheet-shell.ts#L79",
               "jsDocTags": [],
               "documentation": "Disposable controller for the framework-neutral spreadsheet shell.",
               "memberDocs": [
@@ -7221,7 +7291,7 @@
               "owners": [
                 "src/shell/spreadsheet-shell.ts"
               ],
-              "source": "src/shell/spreadsheet-shell.ts#L61",
+              "source": "src/shell/spreadsheet-shell.ts#L65",
               "jsDocTags": [],
               "documentation": "Host elements and feature options used to create a spreadsheet shell.",
               "memberDocs": [
@@ -7246,7 +7316,7 @@
             {
               "name": "ToolbarOptions",
               "kind": "interface",
-              "signature": "export interface ToolbarOptions { items?: readonly ToolbarItem[]; icons?: Partial<Record<ToolbarActionName, ToolbarIcon>>; label?: string; }",
+              "signature": "export interface ToolbarOptions { items?: readonly ToolbarItem[]; icons?: IconOverrides; label?: string; }",
               "owners": [
                 "src/shell/toolbar-factory.ts"
               ],
@@ -7256,7 +7326,7 @@
               "memberDocs": [
                 {
                   "name": "icons",
-                  "documentation": "Per-action icon overrides, exactly like `GridConfig.icons`."
+                  "documentation": "Per-glyph icon overrides, exactly like `GridConfig.icons`."
                 },
                 {
                   "name": "items",
@@ -7891,7 +7961,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L44",
+              "source": "../core/dist/types/grid.d.ts#L45",
               "jsDocTags": [],
               "documentation": "Framework-neutral named editor definition registered through GridOptions.editors.",
               "memberDocs": []
@@ -7903,7 +7973,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L21",
+              "source": "../core/dist/types/grid.d.ts#L22",
               "jsDocTags": [],
               "documentation": "Immutable state and guarded completion callbacks for one mounted editor.",
               "memberDocs": []
@@ -7915,7 +7985,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L36",
+              "source": "../core/dist/types/grid.d.ts#L37",
               "jsDocTags": [],
               "documentation": "Retained lifecycle returned by a custom editor's mount method.",
               "memberDocs": []
@@ -7927,7 +7997,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L12",
+              "source": "../core/dist/types/grid.d.ts#L13",
               "jsDocTags": [],
               "documentation": "Selection movement applied after a successful editor commit.",
               "memberDocs": []
@@ -7951,7 +8021,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L549",
+              "source": "../core/dist/types/grid.d.ts#L571",
               "jsDocTags": [
                 "example",
                 "see"
@@ -8227,7 +8297,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L146",
+              "source": "../core/dist/types/grid.d.ts#L155",
               "jsDocTags": [],
               "documentation": "Built-in command names accepted by state queries and change events.",
               "memberDocs": []
@@ -8239,7 +8309,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L148",
+              "source": "../core/dist/types/grid.d.ts#L157",
               "jsDocTags": [],
               "documentation": "Observable availability and selection-derived activity for one command.",
               "memberDocs": []
@@ -8854,7 +8924,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L44",
+              "source": "../core/dist/types/grid.d.ts#L45",
               "jsDocTags": [],
               "documentation": "Framework-neutral named editor definition registered through GridOptions.editors.",
               "memberDocs": []
@@ -8866,7 +8936,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L21",
+              "source": "../core/dist/types/grid.d.ts#L22",
               "jsDocTags": [],
               "documentation": "Immutable state and guarded completion callbacks for one mounted editor.",
               "memberDocs": []
@@ -8878,7 +8948,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L36",
+              "source": "../core/dist/types/grid.d.ts#L37",
               "jsDocTags": [],
               "documentation": "Retained lifecycle returned by a custom editor's mount method.",
               "memberDocs": []
@@ -8890,7 +8960,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L12",
+              "source": "../core/dist/types/grid.d.ts#L13",
               "jsDocTags": [],
               "documentation": "Selection movement applied after a successful editor commit.",
               "memberDocs": []
@@ -8914,7 +8984,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L549",
+              "source": "../core/dist/types/grid.d.ts#L571",
               "jsDocTags": [
                 "example",
                 "see"
@@ -9190,7 +9260,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L146",
+              "source": "../core/dist/types/grid.d.ts#L155",
               "jsDocTags": [],
               "documentation": "Built-in command names accepted by state queries and change events.",
               "memberDocs": []
@@ -9202,7 +9272,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L148",
+              "source": "../core/dist/types/grid.d.ts#L157",
               "jsDocTags": [],
               "documentation": "Observable availability and selection-derived activity for one command.",
               "memberDocs": []
@@ -9803,7 +9873,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L44",
+              "source": "../core/dist/types/grid.d.ts#L45",
               "jsDocTags": [],
               "documentation": "Framework-neutral named editor definition registered through GridOptions.editors.",
               "memberDocs": []
@@ -9815,7 +9885,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L21",
+              "source": "../core/dist/types/grid.d.ts#L22",
               "jsDocTags": [],
               "documentation": "Immutable state and guarded completion callbacks for one mounted editor.",
               "memberDocs": []
@@ -9827,7 +9897,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L36",
+              "source": "../core/dist/types/grid.d.ts#L37",
               "jsDocTags": [],
               "documentation": "Retained lifecycle returned by a custom editor's mount method.",
               "memberDocs": []
@@ -9839,7 +9909,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L12",
+              "source": "../core/dist/types/grid.d.ts#L13",
               "jsDocTags": [],
               "documentation": "Selection movement applied after a successful editor commit.",
               "memberDocs": []
@@ -9863,7 +9933,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L549",
+              "source": "../core/dist/types/grid.d.ts#L571",
               "jsDocTags": [
                 "example",
                 "see"
@@ -10139,7 +10209,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L146",
+              "source": "../core/dist/types/grid.d.ts#L155",
               "jsDocTags": [],
               "documentation": "Built-in command names accepted by state queries and change events.",
               "memberDocs": []
@@ -10151,7 +10221,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L148",
+              "source": "../core/dist/types/grid.d.ts#L157",
               "jsDocTags": [],
               "documentation": "Observable availability and selection-derived activity for one command.",
               "memberDocs": []

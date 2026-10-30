@@ -54,20 +54,24 @@
       "default": "./dist/testing.js"
     },
     "./styles.css": "./styles.css",
-    "./shell.css": "./shell.css"
+    "./shell.css": "./shell.css",
+    "./icons.svg": "./dist/icons.svg",
+    "./icons.json": "./dist/icons.json"
   },
   "files": [
     "dist/**/*.js",
     "dist/**/*.d.ts",
     "styles.css",
-    "shell.css"
+    "shell.css",
+    "dist/icons.svg",
+    "dist/icons.json"
   ],
   "publishConfig": {
     "access": "public",
     "provenance": true
   },
   "scripts": {
-    "build": "rm -rf dist && tsc -p tsconfig.build.json && tsc -p tsconfig.types.json && rm -f dist/types/*.js dist/types/*.js.map && bun ../../scripts/package-dist.ts .",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && tsc -p tsconfig.types.json && rm -f dist/types/*.js dist/types/*.js.map && bun ../../scripts/package-dist.ts . && cp src/icons/sheet.svg dist/icons.svg && cp src/icons/icons.json dist/icons.json",
     "prepublishOnly": "bun run build",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },

@@ -479,13 +479,7 @@
     grid-area: ledger;
     min-width: 0;
     padding: 1.25rem 1.5rem 1rem;
-    background:
-      radial-gradient(
-        40rem 12rem at 95% 0%,
-        color-mix(in srgb, var(--sw-demo-accent) 12%, transparent),
-        transparent 75%
-      ),
-      var(--sw-demo-surface);
+    background: var(--sw-demo-surface);
     border-bottom: 1px solid var(--sw-demo-border);
   }
 

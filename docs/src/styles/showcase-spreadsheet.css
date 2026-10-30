@@ -4,10 +4,11 @@
   color: var(--sw-demo-fg);
 }
 
+/* Same page inset as every other capability showcase. */
 .sw-spreadsheet {
-  max-width: 1440px;
-  margin: 0 auto;
-  padding: 2rem clamp(1rem, 3vw, 3rem) 4rem;
+  width: calc(100% - 2 * var(--sw-page-inset));
+  margin-inline: auto;
+  padding-block: 2rem 4rem;
 }
 
 .sw-spreadsheet-workspace {
@@ -74,22 +75,154 @@
   margin-top: 2rem;
 }
 
-.sw-spreadsheet-notes h2 {
-  margin: 0 0 0.75rem;
-  color: var(--sw-demo-fg-strong);
-  font-size: 1.05rem;
+.sw-spreadsheet-notes > div {
+  min-width: 0;
+  padding: 1.5rem;
+  border: 1px solid var(--sw-demo-border);
+  border-radius: 0.75rem;
+  background: var(--sw-demo-panel);
 }
 
-.sw-spreadsheet-notes ol {
-  display: grid;
-  gap: 0.5rem;
-  margin: 0;
-  padding-left: 1.25rem;
+.sw-spreadsheet-notes h2 {
+  margin: 0 0 1rem;
+  color: var(--sw-demo-fg-strong);
+  font-size: 1.25rem;
+  font-weight: 650;
+}
+
+.sw-spreadsheet-notes h3 {
+  margin: 1.5rem 0 0.75rem;
+  color: var(--sw-demo-fg-strong);
+  font-size: 1rem;
+  font-weight: 650;
 }
 
 .sw-spreadsheet-notes p {
-  margin: 0 0 0.75rem;
+  margin: 0;
   color: var(--sw-demo-muted);
+  line-height: 1.6;
+}
+
+/* Numbered steps: the number in a circle, then action, how, and the result. */
+.sw-spreadsheet-steps {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+
+.sw-spreadsheet-steps li {
+  position: relative;
+  display: grid;
+  gap: 0.25rem;
+  justify-items: start;
+  padding: 0.9rem 0 0.9rem 2.75rem;
+  border-top: 1px solid var(--sw-demo-border);
+  counter-increment: step;
+}
+
+.sw-spreadsheet-steps li::before {
+  position: absolute;
+  top: 0.9rem;
+  left: 0;
+  display: grid;
+  width: 1.75rem;
+  height: 1.75rem;
+  place-items: center;
+  border: 1px solid var(--sw-demo-border-strong);
+  border-radius: 50%;
+  color: var(--sw-demo-fg-strong);
+  font-size: 0.85rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  content: counter(step);
+}
+
+.sw-spreadsheet-steps strong {
+  color: var(--sw-demo-fg-strong);
+}
+
+.sw-spreadsheet-steps span {
+  color: var(--sw-demo-muted);
+  line-height: 1.5;
+}
+
+.sw-spreadsheet-steps .sw-spreadsheet-steps__result {
+  color: var(--sw-demo-accent-strong);
+}
+
+.sw-spreadsheet-steps button {
+  margin-top: 0.4rem;
+  min-height: 2.25rem;
+  padding: 0.35rem 0.85rem;
+  border: 1px solid var(--sw-demo-accent);
+  border-radius: 0.4rem;
+  background: color-mix(in srgb, var(--sw-demo-accent) 14%, var(--sw-demo-raised));
+  color: var(--sw-demo-fg-strong);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.sw-spreadsheet-steps button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sw-spreadsheet-steps button:focus-visible {
+  outline: 2px solid var(--sw-demo-accent);
+  outline-offset: 3px;
+}
+
+.sw-spreadsheet-code {
+  margin: 0 0 1rem;
+  padding: 1rem;
+  overflow-x: auto;
+  border: 1px solid var(--sw-demo-border);
+  border-radius: 0.5rem;
+  background: var(--sw-demo-deep);
+  color: var(--sw-demo-fg);
+  font: 0.85rem / 1.6 var(--sw-font-mono);
+  white-space: pre;
+}
+
+.sw-spreadsheet-keys {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.sw-spreadsheet-keys div {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  gap: 1rem;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--sw-demo-border);
+}
+
+.sw-spreadsheet-keys dt {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.sw-spreadsheet-keys dd {
+  margin: 0;
+  color: var(--sw-demo-muted);
+}
+
+.sw-spreadsheet-keys kbd {
+  min-width: 1.75rem;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid var(--sw-demo-border-strong);
+  border-bottom-width: 2px;
+  border-radius: 0.3rem;
+  background: var(--sw-demo-raised);
+  color: var(--sw-demo-fg-strong);
+  font: 0.8rem / 1.4 var(--sw-font-body);
+  text-align: center;
 }
 
 @media (prefers-reduced-motion: reduce) {

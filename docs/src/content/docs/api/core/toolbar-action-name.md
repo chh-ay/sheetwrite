@@ -8,7 +8,7 @@ description: "Built-in action names accepted by custom toolbar items."
 Built-in action names accepted by custom toolbar items.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L204"><code>packages/core/src/types/grid.ts#L204</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L213"><code>packages/core/src/types/grid.ts#L213</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -63,9 +63,7 @@ export type ToolbarActionName =
 
 <ul class="api-consumer-list">
 <li><a href="/docs/api/core/grid-command-name/"><code>GridCommandName</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li><a href="/docs/api/core/grid-config/"><code>GridConfig</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/toolbar-item/"><code>ToolbarItem</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li><a href="/docs/api/core-shell/toolbar-options/"><code>ToolbarOptions</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/react/grid-command-name/"><code>GridCommandName</code></a><span class="api-consumer-kind">@sheetwrite/react</span></li>
 <li><a href="/docs/api/svelte/grid-command-name/"><code>GridCommandName</code></a><span class="api-consumer-kind">@sheetwrite/svelte</span></li>
 <li><a href="/docs/api/vue/grid-command-name/"><code>GridCommandName</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>

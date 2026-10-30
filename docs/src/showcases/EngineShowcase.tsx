@@ -196,8 +196,8 @@ export default function EngineShowcase() {
           description={
             <>
               Follow one revenue change through a real 50,000-row forecast: the requested page, the
-              recalculation, the paint checkpoint and the host acknowledgement. In 0.5.0, visible
-              formulas also load the far-right Plan column they read.{" "}
+              recalculation, the paint checkpoint and the host acknowledgement. Visible formulas
+              also load the far-right Plan column they read.{" "}
               <Link to="/showcases/">Browse every live feature →</Link>
             </>
           }
@@ -205,7 +205,7 @@ export default function EngineShowcase() {
           facts={[
             { label: "Ledger", value: "50,000 rows" },
             { label: "Accounts", value: "3,846 / four regions" },
-            { label: "New in 0.5.0", value: "Off-screen formula reads" },
+            { label: "Formula reads", value: "Off-screen columns included" },
             { label: "Evidence", value: "Measured in your browser" },
           ]}
           title="One change. Watch the whole Grid follow."
@@ -340,7 +340,7 @@ export default function EngineShowcase() {
                 data-resolved={offScreenResolved}
                 data-testid="engine-offscreen-band"
               >
-                <p className="sw-engine__eyebrow">NEW / 0.5.0 · off-screen formula reads</p>
+                <p className="sw-engine__eyebrow">OFF-SCREEN FORMULA READS</p>
                 <strong>
                   Variance {ENGINE_COLUMN_LETTER.variance}
                   {rowLabel} reads Plan {offScreenRead}
@@ -517,9 +517,9 @@ export default function EngineShowcase() {
             </fieldset>
           </section>
 
-          <section className="sw-engine-rewrite" aria-label="Formula rewrite in Sheetwrite 0.5.0">
+          <section className="sw-engine-rewrite" aria-label="Formula rewrite">
             <div>
-              <span className="sw-engine__eyebrow">NEW / 0.5.0 · same reads, new constant</span>
+              <span className="sw-engine__eyebrow">SAME READS, NEW CONSTANT</span>
               <p>
                 Rewrite the forecast formula in {ENGINE_COLUMN_LETTER.forecast}
                 {rowLabel} from <code>=${offScreenRead}</code> to{" "}

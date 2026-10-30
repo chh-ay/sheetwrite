@@ -8,7 +8,7 @@ description: "Imperative operations the toolbar and context menu bind to; also e
 Imperative operations the toolbar and context menu bind to; also exposed as `Grid.actions`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L121"><code>packages/core/src/types/grid.ts#L121</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L122"><code>packages/core/src/types/grid.ts#L122</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -57,11 +57,13 @@ Imperative operations the toolbar and context menu bind to; also exposed as `Gri
 <a href="#grid-actions-clear-contents"><code>clearContents</code></a>
 <a href="#grid-actions-export-csv"><code>exportCsv</code></a>
 <a href="#grid-actions-export-xlsx"><code>exportXlsx</code></a>
+<a href="#grid-actions-edit-note"><code>editNote</code></a>
+<a href="#grid-actions-delete-note"><code>deleteNote</code></a>
 <a href="#grid-actions-undo"><code>undo</code></a>
 <a href="#grid-actions-redo"><code>redo</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>47</span>
+## Members <span class="api-count" data-pagefind-ignore>49</span>
 
 <div class="api-member-list">
 
@@ -481,6 +483,28 @@ exportXlsx(filename?: string): Promise<void>;
 rejects; a failure emits `export-error`.</p>
 </details>
 
+<details class="api-member" id="grid-actions-edit-note" data-pagefind-weight="1">
+<summary><code>editNote</code> <span class="api-member-summary">Open the note editor on the focus cell, with its note or empty for a new one.</span></summary>
+
+```ts generated
+editNote(): void;
+```
+
+<p class="api-member-doc">Open the note editor on the focus cell, with its note or empty for a new
+one. Ctrl or Cmd+Enter and leaving the editor save; Escape cancels. Does
+nothing on a read-only grid.</p>
+</details>
+
+<details class="api-member" id="grid-actions-delete-note" data-pagefind-weight="1">
+<summary><code>deleteNote</code> <span class="api-member-summary">Remove the focus cell's note as one undoable step.</span></summary>
+
+```ts generated
+deleteNote(): void;
+```
+
+<p class="api-member-doc">Remove the focus cell's note as one undoable step. Does nothing when it has none.</p>
+</details>
+
 <details class="api-member" id="grid-actions-undo" data-pagefind-weight="1">
 <summary><code>undo</code></summary>
 
@@ -552,6 +576,8 @@ export interface GridActions {
   clearContents(): void;
   exportCsv(filename?: string): void;
   exportXlsx(filename?: string): Promise<void>;
+  editNote(): void;
+  deleteNote(): void;
   undo(): void;
   redo(): void;
 }

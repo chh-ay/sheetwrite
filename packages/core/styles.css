@@ -179,12 +179,14 @@
    !important; and because the tokens are seeded on the grid root (an ancestor),
    `.sheetwrite-find { --sheetwrite-widget-bg: … }` wins too. */
 
-/* Find / replace bar */
+/* Find / replace bar: two rows of one field and its buttons. Both fields share
+   one bordered style with their own focus ring, so host page styles cannot
+   make them differ. The match count sits inside the find field. */
 .sheetwrite-find {
   flex-direction: column;
   align-items: stretch;
   gap: 6px;
-  padding: 6px 8px;
+  padding: 8px;
   border: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
   border-radius: 8px;
   background: var(--sheetwrite-widget-bg, var(--sheetwrite-bg, #ffffff));
@@ -199,17 +201,21 @@
 .sheetwrite-find-replace-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+}
+
+.sheetwrite-find-field {
+  position: relative;
+  display: inline-flex;
 }
 
 .sheetwrite-find-input,
 .sheetwrite-find-replace-input {
-  width: 220px;
-  height: 28px;
+  width: 240px;
+  height: 30px;
   padding: 0 8px;
-  border: none;
-  border-bottom: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
-  border-radius: 0;
+  border: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #dddddd));
+  border-radius: 6px;
   background: var(--sheetwrite-widget-bg, var(--sheetwrite-bg, #ffffff));
   color: var(--sheetwrite-widget-fg, var(--sheetwrite-fg, #111111));
   font: inherit;
@@ -217,37 +223,82 @@
   box-sizing: border-box;
 }
 
+/* Room for "12 of 340" inside the find field. */
+.sheetwrite-find-input {
+  padding-right: 76px;
+}
+
+.sheetwrite-find-input:focus,
+.sheetwrite-find-replace-input:focus {
+  border-color: var(--sheetwrite-widget-accent, #2563eb);
+  box-shadow: 0 0 0 2px var(--sheetwrite-widget-selection, var(--sheetwrite-selection, #2563eb33));
+}
+
 .sheetwrite-find-count {
-  min-width: 72px;
-  text-align: right;
-  opacity: 0.72;
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  color: var(--sheetwrite-widget-muted, #6b7280);
+  font-size: 0.9em;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  pointer-events: none;
+  transform: translateY(-50%);
 }
 
 .sheetwrite-find-btn {
   border: none;
   background: transparent;
-  color: var(--sheetwrite-widget-accent, var(--sheetwrite-header-fg, #6b4a1f));
+  color: var(--sheetwrite-widget-fg, var(--sheetwrite-fg, #111111));
   font: inherit;
   line-height: 1;
   cursor: pointer;
 }
 
 .sheetwrite-find-btn:hover {
-  background: var(--sheetwrite-widget-selection, var(--sheetwrite-selection, #2563eb22));
+  background: var(--sheetwrite-menu-hover, var(--sheetwrite-grid-line, #eeeeee));
+}
+
+.sheetwrite-find-btn:focus-visible {
+  outline: 2px solid var(--sheetwrite-widget-accent, #2563eb);
+  outline-offset: 1px;
 }
 
 .sheetwrite-find-icon-btn {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   padding: 0;
-  border-radius: 50%;
+  border-radius: 6px;
+  color: var(--sheetwrite-widget-muted, #6b7280);
+}
+
+.sheetwrite-find-icon-btn:hover {
+  color: var(--sheetwrite-widget-fg, var(--sheetwrite-fg, #111111));
+}
+
+/* The divider before Close. It is drawn here, not as a DOM node, because it is
+   only cosmetic. The margin plus the row gap leaves 6px on each side of it. */
+.sheetwrite-find-close {
+  position: relative;
+  margin-left: 9px;
+}
+
+.sheetwrite-find-close::before {
+  content: "";
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: -7px;
+  width: 1px;
+  background: var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
 }
 
 .sheetwrite-find-text-btn {
-  height: 28px;
-  padding: 0 10px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #dddddd));
   border-radius: 6px;
+  font-weight: 500;
 }
 
 /* Toolbar */
@@ -276,7 +327,7 @@
   font: inherit;
 }
 
-.sheetwrite-tb-button > svg {
+.sheetwrite-tb-button > :is(svg, .sheetwrite-icon) {
   display: block;
   width: 16px;
   height: 16px;
@@ -481,7 +532,7 @@
   cursor: default;
 }
 
-.sheetwrite-ribbon-icon > svg {
+.sheetwrite-ribbon-icon > :is(svg, .sheetwrite-icon) {
   display: block;
   width: 16px;
   height: 16px;
@@ -516,7 +567,8 @@
   line-height: 1.15;
 }
 
-.sheetwrite-ribbon-button[data-large] > .sheetwrite-ribbon-icon > svg {
+.sheetwrite-ribbon-button[data-large] > .sheetwrite-ribbon-icon > :is(svg, .sheetwrite-icon) {
+  --sheetwrite-icon-size: 32px;
   width: 32px;
   height: 32px;
 }
@@ -542,7 +594,8 @@
 .sheetwrite-ribbon-group:is([data-size="medium"], [data-size="small"])
   .sheetwrite-ribbon-button[data-large]
   > .sheetwrite-ribbon-icon
-  > svg {
+  > :is(svg, .sheetwrite-icon) {
+  --sheetwrite-icon-size: 16px;
   width: 16px;
   height: 16px;
 }
@@ -642,20 +695,108 @@
   border-radius: 0 3px 3px 0;
 }
 
+/* One stepper, [−] [percent] [+], sized like the font combos beside it. */
 .sheetwrite-ribbon-zoom {
   display: inline-flex;
-  align-items: center;
-  gap: 2px;
+  align-items: stretch;
+  align-self: center;
+  height: 24px;
   grid-row: span 3;
+  overflow: hidden;
+  border: 1px solid var(--sheetwrite-ribbon-line);
+  border-radius: 4px;
+  background: var(--sheetwrite-widget-bg, #ffffff);
+  box-sizing: border-box;
+}
+
+.sheetwrite-ribbon-zoom > .sheetwrite-ribbon-zoom-step {
+  width: 26px;
+  height: auto;
+  padding: 0;
+  border-radius: 0;
+  justify-content: center;
 }
 
 .sheetwrite-ribbon-zoom-readout {
-  min-width: 44px;
-  padding: 2px 4px;
-  border: 1px solid var(--sheetwrite-ribbon-line);
-  border-radius: 4px;
-  text-align: center;
+  min-width: 48px;
+  padding: 0 6px;
+  border: 0;
+  border-inline: 1px solid var(--sheetwrite-ribbon-line);
+  background: transparent;
+  color: inherit;
+  font: inherit;
   font-variant-numeric: tabular-nums;
+  text-align: center;
+  cursor: pointer;
+}
+
+.sheetwrite-ribbon-zoom-readout:hover:not(:disabled) {
+  background: var(--sheetwrite-ribbon-hover);
+}
+
+/* At 100% the reset has nothing to do, but it still shows the current zoom, so
+   it keeps the normal text color instead of the browser's disabled gray. */
+.sheetwrite-ribbon-zoom-readout:disabled {
+  color: inherit;
+  cursor: default;
+  opacity: 1;
+}
+
+/* High Contrast paints disabled button text GrayText; the readout is a value. */
+@media (forced-colors: active) {
+  .sheetwrite-ribbon-zoom-readout:disabled {
+    color: CanvasText;
+  }
+}
+
+/* Cell notes (src/note-popover.ts): the hover card and the editor share one
+   look. Both are position: fixed under the grid host, so the widget variables
+   reach them and overflow cannot clip them. The amber edge matches the corner
+   mark the canvas paints on a noted cell. */
+.sheetwrite-note,
+.sheetwrite-note-editor {
+  z-index: 1001;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: 240px;
+  margin: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
+  border-left: 3px solid var(--sheetwrite-note-accent, #f59e0b);
+  border-radius: 4px;
+  background: var(--sheetwrite-widget-bg, var(--sheetwrite-bg, #ffffff));
+  color: var(--sheetwrite-widget-fg, var(--sheetwrite-fg, #111111));
+  font: var(--sheetwrite-widget-font, 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
+  box-shadow: var(--sheetwrite-menu-shadow, 0 6px 20px rgba(0, 0, 0, 0.18));
+}
+
+.sheetwrite-note {
+  max-height: 240px;
+  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.sheetwrite-note-editor {
+  width: 240px;
+  height: 120px;
+  resize: both;
+  outline: none;
+}
+
+.sheetwrite-note-editor:focus-visible {
+  border-color: var(--sheetwrite-selection-border, #2563eb);
+}
+
+@media (forced-colors: active) {
+  .sheetwrite-note,
+  .sheetwrite-note-editor {
+    border-color: CanvasText;
+  }
+
+  .sheetwrite-note-editor:focus-visible {
+    outline: 2px solid Highlight;
+  }
 }
 
 /* Popups live under the grid host so the widget variables reach them;
@@ -713,7 +854,7 @@
   background: var(--sheetwrite-widget-selection, #2563eb22);
 }
 
-.sheetwrite-ribbon-menu-item > .sheetwrite-ribbon-icon > svg {
+.sheetwrite-ribbon-menu-item > .sheetwrite-ribbon-icon > :is(svg, .sheetwrite-icon) {
   width: 16px;
   height: 16px;
 }
@@ -812,12 +953,14 @@ textarea.sheetwrite-ribbon-field {
   min-height: 72px;
 }
 
-/* Context menu */
+/* Context menu: icon column, label, then shortcut or submenu chevron. Rows are
+   inset with rounded highlights; hover and keyboard focus look the same. */
 .sheetwrite-context-menu {
-  min-width: 160px;
-  padding: 4px 0;
+  min-width: 200px;
+  /* Keep in sync with MENU_PADDING_PX in src/context-menu.ts. */
+  padding: 4px;
   border: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--sheetwrite-widget-bg, var(--sheetwrite-bg, #ffffff));
   color: var(--sheetwrite-widget-fg, var(--sheetwrite-fg, #111111));
   font: var(--sheetwrite-widget-font, 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
@@ -827,19 +970,37 @@ textarea.sheetwrite-ribbon-field {
   z-index: 1000;
 }
 
+/* A submenu stacks above the menu that opened it. */
+.sheetwrite-context-menu-sub {
+  z-index: 1001;
+}
+
 .sheetwrite-context-menu-item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  padding: 5px 14px;
+  gap: 10px;
+  min-height: 28px;
+  padding: 0 10px 0 8px;
+  border-radius: 5px;
   cursor: pointer;
   white-space: nowrap;
   background: transparent;
+  outline: none;
 }
 
-.sheetwrite-context-menu-item:hover:not(.sheetwrite-context-menu-item-disabled) {
+.sheetwrite-context-menu-item:is(:hover, :focus-visible, :focus):not(
+    .sheetwrite-context-menu-item-disabled
+  ),
+.sheetwrite-context-menu-item[aria-expanded="true"] {
   background: var(--sheetwrite-menu-hover, var(--sheetwrite-grid-line, #eeeeee));
+}
+
+/* High Contrast drops backgrounds; an outline keeps the active row visible. */
+@media (forced-colors: active) {
+  .sheetwrite-context-menu-item:is(:focus, [aria-expanded="true"]) {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
 }
 
 .sheetwrite-context-menu-item-disabled {
@@ -847,14 +1008,40 @@ textarea.sheetwrite-ribbon-field {
   opacity: var(--sheetwrite-menu-disabled-opacity, 0.5);
 }
 
+.sheetwrite-context-menu-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--sheetwrite-widget-muted, #6b7280);
+}
+
+.sheetwrite-context-menu-label {
+  flex: 1;
+}
+
 .sheetwrite-context-menu-shortcut {
+  margin-left: 24px;
   color: var(--sheetwrite-widget-muted, #6b7280);
   font-size: 0.9em;
 }
 
+/* Submenu chevron, drawn with borders so it follows the text color. */
+.sheetwrite-context-menu-arrow {
+  width: 6px;
+  height: 6px;
+  margin: 0 2px 0 24px;
+  border-top: 1.5px solid currentColor;
+  border-right: 1.5px solid currentColor;
+  opacity: 0.6;
+  transform: rotate(45deg);
+}
+
 .sheetwrite-context-menu-sep {
   height: 1px;
-  margin: 4px 0;
+  margin: 4px 6px;
   background: var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
 }
 
@@ -1162,3 +1349,283 @@ textarea.sheetwrite-ribbon-field {
     transition: none;
   }
 }
+
+/* @generated icon-sheet: start (bun scripts/icon-sheet.ts) */
+/* Command icons: one sheet, cropped per glyph. Set --sheetwrite-icon-size on the
+   icon or any ancestor to scale it. Under a Content Security Policy that blocks
+   data: images, set --sheetwrite-icon-sheet to url() of the shipped
+   @sheetwrite/core/icons.svg. */
+.sheetwrite-icon {
+  --sheetwrite-icon-sheet-default: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='576' height='576' viewBox='0 0 576 576' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cg id='undo' transform='translate(0 0)'%3E%3Cpath d='M9 6 4.5 10.5 9 15'/%3E%3Cpath d='M4.5 10.5H14a5 5 0 0 1 0 10h-3'/%3E%3C/g%3E%3Cg id='redo' transform='translate(36 0)'%3E%3Cpath d='M15 6l4.5 4.5L15 15'/%3E%3Cpath d='M19.5 10.5H10a5 5 0 0 0 0 10h3'/%3E%3C/g%3E%3Cg id='paste' transform='translate(72 0)'%3E%3Cpath d='M9 4.5H6.5A1.5 1.5 0 0 0 5 6v13.5A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H15'/%3E%3Cpath d='M9.5 3h5a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.5.5h-5a.5.5 0 0 1-.5-.5v-2a.5.5 0 0 1 .5-.5Z'/%3E%3Cpath d='M8.5 11h7M8.5 14.5h7M8.5 18h4'/%3E%3C/g%3E%3Cg id='cut' transform='translate(108 0)'%3E%3Cpath d='M9 17.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Z'/%3E%3Cpath d='M20 17.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Z'/%3E%3Cpath d='M8 15.4 16.5 3.5'/%3E%3Cpath d='M16 15.4 7.5 3.5'/%3E%3C/g%3E%3Cg id='copy' transform='translate(144 0)'%3E%3Cpath d='M9.5 8h9A1.5 1.5 0 0 1 20 9.5v10a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 8 19.5v-10A1.5 1.5 0 0 1 9.5 8Z'/%3E%3Cpath d='M16 5.5v-1A1.5 1.5 0 0 0 14.5 3h-9A1.5 1.5 0 0 0 4 4.5v10A1.5 1.5 0 0 0 5.5 16H8'/%3E%3C/g%3E%3Cg id='find' transform='translate(180 0)'%3E%3Cpath d='M16.5 10.5a6 6 0 1 1-12 0 6 6 0 0 1 12 0Z'/%3E%3Cpath d='m15 15 5.5 5.5'/%3E%3C/g%3E%3Cg id='zoomIn' transform='translate(216 0)'%3E%3Cpath d='M16.5 10.5a6 6 0 1 1-12 0 6 6 0 0 1 12 0Z'/%3E%3Cpath d='m15 15 5.5 5.5'/%3E%3Cpath d='M7.5 10.5h6M10.5 7.5v6'/%3E%3C/g%3E%3Cg id='zoomOut' transform='translate(252 0)'%3E%3Cpath d='M16.5 10.5a6 6 0 1 1-12 0 6 6 0 0 1 12 0Z'/%3E%3Cpath d='m15 15 5.5 5.5'/%3E%3Cpath d='M7.5 10.5h6'/%3E%3C/g%3E%3Cg id='autoSum' transform='translate(288 0)'%3E%3Cpath d='M18 5H6l6.5 7L6 19h12'/%3E%3C/g%3E%3Cg id='clear' transform='translate(324 0)'%3E%3Cpath d='M4 15.5a1.5 1.5 0 0 1 0-2.1L8.5 9l6.5 6.5-4.4 4.5H8.5Z' fill='%23000' fill-opacity='0.24' stroke='none'/%3E%3Cpath d='M8.5 20 4 15.5a1.5 1.5 0 0 1 0-2.1L12.9 4.5a1.5 1.5 0 0 1 2.1 0l4.5 4.5a1.5 1.5 0 0 1 0 2.1L10.6 20Z'/%3E%3Cpath d='M8.5 20H20'/%3E%3Cpath d='M8.5 9 15 15.5'/%3E%3C/g%3E%3Cg id='bold' transform='translate(0 36)'%3E%3Cpath d='M7 4.5h6.25a3.75 3.75 0 0 1 0 7.5H7Z' stroke-width='2.6'/%3E%3Cpath d='M7 12h7.25a3.75 3.75 0 0 1 0 7.5H7Z' stroke-width='2.6'/%3E%3C/g%3E%3Cg id='italic' transform='translate(36 36)'%3E%3Cpath d='M10 4.5h8M6 19.5h8M14 4.5l-4 15'/%3E%3C/g%3E%3Cg id='underline' transform='translate(72 36)'%3E%3Cpath d='M7 4v6.5a5 5 0 0 0 10 0V4'/%3E%3Cpath d='M5 20.5h14'/%3E%3C/g%3E%3Cg id='strikethrough' transform='translate(108 36)'%3E%3Cpath d='M4 12h16'/%3E%3Cpath d='M16.5 7.5C15.9 5.7 14.1 4.5 12 4.5c-2.6 0-4.5 1.6-4.5 3.6 0 1.4.9 2.4 2.5 3'/%3E%3Cpath d='M8 16.5c.6 1.8 2.4 3 4.5 3 2.6 0 4.5-1.6 4.5-3.6 0-.6-.1-1.1-.4-1.6'/%3E%3C/g%3E%3Cg id='textColor' transform='translate(144 36)'%3E%3Cpath d='M6.5 17 12 4l5.5 13'/%3E%3Cpath d='M8.4 12.5h7.2'/%3E%3C/g%3E%3Cg id='fillColor' transform='translate(180 36)'%3E%3Cpath d='M5 11.5h13l-6.5 6.5Z' fill='%23000' fill-opacity='0.24' stroke='none'/%3E%3Cpath d='M5 11.5 11.5 5l6.5 6.5-6.5 6.5Z'/%3E%3Cpath d='M9 2.5 11.5 5'/%3E%3Cpath d='M19.5 15c.8 1.1 1.5 2.1 1.5 2.9a1.5 1.5 0 0 1-3 0c0-.8.7-1.8 1.5-2.9Z'/%3E%3C/g%3E%3Cg id='fontGrow' transform='translate(216 36)'%3E%3Cpath d='M3 19 8 6l5 13'/%3E%3Cpath d='M4.9 14.5h6.2'/%3E%3Cpath d='m15.5 8 3-3 3 3'/%3E%3C/g%3E%3Cg id='fontShrink' transform='translate(252 36)'%3E%3Cpath d='M3 19 8 6l5 13'/%3E%3Cpath d='M4.9 14.5h6.2'/%3E%3Cpath d='m15.5 5 3 3 3-3'/%3E%3C/g%3E%3Cg id='clearFormat' transform='translate(288 36)'%3E%3Cpath d='M5 5h10'/%3E%3Cpath d='M10 5v14'/%3E%3Cpath d='m14 14 6 6'/%3E%3Cpath d='m20 14-6 6'/%3E%3C/g%3E%3Cg id='separator' transform='translate(324 36)'%3E%3Cpath d='M12 4v16'/%3E%3C/g%3E%3Cg id='alignLeft' transform='translate(0 72)'%3E%3Cpath d='M4 6h16M4 10h10M4 14h16M4 18h10'/%3E%3C/g%3E%3Cg id='alignCenter' transform='translate(36 72)'%3E%3Cpath d='M4 6h16M7 10h10M4 14h16M7 18h10'/%3E%3C/g%3E%3Cg id='alignRight' transform='translate(72 72)'%3E%3Cpath d='M4 6h16M10 10h10M4 14h16M10 18h10'/%3E%3C/g%3E%3Cg id='alignTop' transform='translate(108 72)'%3E%3Cpath d='M4 4h16'/%3E%3Cpath d='M12 20V8'/%3E%3Cpath d='m8 12 4-4 4 4'/%3E%3C/g%3E%3Cg id='alignMiddle' transform='translate(144 72)'%3E%3Cpath d='M4 12h16'/%3E%3Cpath d='M12 3v5.5m-3-3 3 3 3-3'/%3E%3Cpath d='M12 21v-5.5m-3 3 3-3 3 3'/%3E%3C/g%3E%3Cg id='alignBottom' transform='translate(180 72)'%3E%3Cpath d='M4 20h16'/%3E%3Cpath d='M12 4v12'/%3E%3Cpath d='m8 12 4 4 4-4'/%3E%3C/g%3E%3Cg id='wrap' transform='translate(216 72)'%3E%3Cpath d='M4 6h16'/%3E%3Cpath d='M4 12h12.5a3.5 3.5 0 0 1 0 7H12'/%3E%3Cpath d='m14 17-2 2 2 2'/%3E%3Cpath d='M4 18h4'/%3E%3C/g%3E%3Cg id='merge' transform='translate(252 72)'%3E%3Cpath d='M7 5H4.5A1.5 1.5 0 0 0 3 6.5v11A1.5 1.5 0 0 0 4.5 19H7M17 5h2.5A1.5 1.5 0 0 1 21 6.5v11a1.5 1.5 0 0 1-1.5 1.5H17'/%3E%3Cpath d='M6.5 12h4m-2-2 2 2-2 2'/%3E%3Cpath d='M17.5 12h-4m2-2-2 2 2 2'/%3E%3C/g%3E%3Cg id='unmerge' transform='translate(288 72)'%3E%3Cpath d='M7 5H4.5A1.5 1.5 0 0 0 3 6.5v11A1.5 1.5 0 0 0 4.5 19H7M17 5h2.5A1.5 1.5 0 0 1 21 6.5v11a1.5 1.5 0 0 1-1.5 1.5H17'/%3E%3Cpath d='M12 5v14' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M10.5 12h-4m2-2-2 2 2 2'/%3E%3Cpath d='M13.5 12h4m-2-2 2 2-2 2'/%3E%3C/g%3E%3Cg id='mergeAndCenter' transform='translate(324 72)'%3E%3Cpath d='M7 5H4.5A1.5 1.5 0 0 0 3 6.5v11A1.5 1.5 0 0 0 4.5 19H7M17 5h2.5A1.5 1.5 0 0 1 21 6.5v11a1.5 1.5 0 0 1-1.5 1.5H17'/%3E%3Cpath d='M8.5 9h7M7 12.5h10M9.5 16h5'/%3E%3C/g%3E%3Cg id='border' transform='translate(0 108)'%3E%3Cpath d='M4 4h16v16H4Z'/%3E%3Cpath d='M12 4v16M4 12h16'/%3E%3C/g%3E%3Cg id='borderAll' transform='translate(36 108)'%3E%3Cpath d='M4 4h16v16H4Z'/%3E%3Cpath d='M12 4v16M4 12h16'/%3E%3C/g%3E%3Cg id='borderOutside' transform='translate(72 108)'%3E%3Cpath d='M4 4h16v16H4Z'/%3E%3Cpath d='M12 4v16M4 12h16' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3C/g%3E%3Cg id='borderThickOutside' transform='translate(108 108)'%3E%3Cpath d='M4 4h16v16H4Z' stroke-width='2.6'/%3E%3Cpath d='M12 4v16M4 12h16' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3C/g%3E%3Cg id='borderTop' transform='translate(144 108)'%3E%3Cpath d='M4 4h16v16H4Z' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M12 4v16M4 12h16' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M4 4h16'/%3E%3C/g%3E%3Cg id='borderBottom' transform='translate(180 108)'%3E%3Cpath d='M4 4h16v16H4Z' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M12 4v16M4 12h16' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M4 20h16'/%3E%3C/g%3E%3Cg id='borderLeft' transform='translate(216 108)'%3E%3Cpath d='M4 4h16v16H4Z' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M12 4v16M4 12h16' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M4 4v16'/%3E%3C/g%3E%3Cg id='borderRight' transform='translate(252 108)'%3E%3Cpath d='M4 4h16v16H4Z' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M12 4v16M4 12h16' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M20 4v16'/%3E%3C/g%3E%3Cg id='borderNone' transform='translate(288 108)'%3E%3Cpath d='M4 4h16v16H4Z' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M12 4v16M4 12h16' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3C/g%3E%3Cg id='currency' transform='translate(0 144)'%3E%3Cpath d='M12 3.5v17'/%3E%3Cpath d='M16.5 7.5c-.6-1.4-2.3-2.5-4.5-2.5-2.5 0-4.3 1.4-4.3 3.3 0 4.3 9 2.4 9 7 0 1.9-1.9 3.2-4.7 3.2-2.3 0-4.1-1.1-4.8-2.6'/%3E%3C/g%3E%3Cg id='percent' transform='translate(36 144)'%3E%3Cpath d='M18.5 5.5l-13 13'/%3E%3Cpath d='M9.2 7a2.2 2.2 0 1 1-4.4 0 2.2 2.2 0 0 1 4.4 0Z'/%3E%3Cpath d='M19.2 17a2.2 2.2 0 1 1-4.4 0 2.2 2.2 0 0 1 4.4 0Z'/%3E%3C/g%3E%3Cg id='comma' transform='translate(72 144)'%3E%3Cpath d='M6 13h.01' stroke-width='2.6'/%3E%3Cpath d='M7 13.3c0 1.4-.7 2.5-2 3.2'/%3E%3Cpath d='M13.5 10.5a2 2.6 0 0 1-4 0 2 2.6 0 0 1 4 0Z'/%3E%3Cpath d='M19.5 10.5a2 2.6 0 0 1-4 0 2 2.6 0 0 1 4 0Z'/%3E%3C/g%3E%3Cg id='decimalIncrease' transform='translate(108 144)'%3E%3Cpath d='M4.5 13h.01' stroke-width='2.6'/%3E%3Cpath d='M10.5 10.5a2 2.6 0 0 1-4 0 2 2.6 0 0 1 4 0Z'/%3E%3Cpath d='M16.5 10.5a2 2.6 0 0 1-4 0 2 2.6 0 0 1 4 0Z'/%3E%3Cpath d='M5 19h14m-3-2.5 3 2.5-3 2.5'/%3E%3C/g%3E%3Cg id='decimalDecrease' transform='translate(144 144)'%3E%3Cpath d='M4.5 13h.01' stroke-width='2.6'/%3E%3Cpath d='M10.5 10.5a2 2.6 0 0 1-4 0 2 2.6 0 0 1 4 0Z'/%3E%3Cpath d='M19 19H5m3-2.5L5 19l3 2.5'/%3E%3C/g%3E%3Cg id='hyperlink' transform='translate(180 144)'%3E%3Cpath d='M10 14a4 4 0 0 0 5.66.34l3-3a4 4 0 0 0-5.66-5.66l-1.7 1.7'/%3E%3Cpath d='M14 10a4 4 0 0 0-5.66-.34l-3 3a4 4 0 0 0 5.66 5.66l1.7-1.7'/%3E%3C/g%3E%3Cg id='note' transform='translate(216 144)'%3E%3Cpath d='M14 20v-4.5a1.5 1.5 0 0 1 1.5-1.5H20Z' fill='%23000' fill-opacity='0.24' stroke='none'/%3E%3Cpath d='M5.5 4h13A1.5 1.5 0 0 1 20 5.5V14l-6 6H5.5A1.5 1.5 0 0 1 4 18.5v-13A1.5 1.5 0 0 1 5.5 4Z'/%3E%3Cpath d='M14 20v-4.5a1.5 1.5 0 0 1 1.5-1.5H20'/%3E%3Cpath d='M8 9h8M8 12.5h5'/%3E%3C/g%3E%3Cg id='exportCsv' transform='translate(252 144)'%3E%3Cpath d='M6.5 3H14l4.5 4.5v12A1.5 1.5 0 0 1 17 21H6.5A1.5 1.5 0 0 1 5 19.5v-15A1.5 1.5 0 0 1 6.5 3Z'/%3E%3Cpath d='M14 3v4.5h4.5'/%3E%3Cpath d='M8 12h7M8 15h7M8 18h4'/%3E%3C/g%3E%3Cg id='exportXlsx' transform='translate(288 144)'%3E%3Cpath d='M6.5 3H14l4.5 4.5v12A1.5 1.5 0 0 1 17 21H6.5A1.5 1.5 0 0 1 5 19.5v-15A1.5 1.5 0 0 1 6.5 3Z'/%3E%3Cpath d='M14 3v4.5h4.5'/%3E%3Cpath d='M8 11h7v7H8Z' fill='%23000' fill-opacity='0.24' stroke='none'/%3E%3Cpath d='M8 11h7v7H8ZM11.5 11v7M8 14.5h7'/%3E%3C/g%3E%3Cg id='insert' transform='translate(0 180)'%3E%3Cpath d='M3 5h12M3 19h12' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M3 9.5h12v5H3Z' fill='%23000' fill-opacity='0.24' stroke='none'/%3E%3Cpath d='M3 9.5h12M3 14.5h12'/%3E%3Cpath d='M19 9.5v5M16.5 12h5'/%3E%3C/g%3E%3Cg id='delete' transform='translate(36 180)'%3E%3Cpath d='M3 5h12M3 19h12' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M3 9.5h12v5H3Z' fill='%23000' fill-opacity='0.24' stroke='none'/%3E%3Cpath d='M3 9.5h12M3 14.5h12'/%3E%3Cpath d='m16.5 9.5 5 5m0-5-5 5'/%3E%3C/g%3E%3Cg id='format' transform='translate(72 180)'%3E%3Cpath d='M4 4v16M20 4v16'/%3E%3Cpath d='M7.5 12h9'/%3E%3Cpath d='m10 9.5-2.5 2.5 2.5 2.5'/%3E%3Cpath d='m14 9.5 2.5 2.5-2.5 2.5'/%3E%3C/g%3E%3Cg id='hideRows' transform='translate(108 180)'%3E%3Cpath d='M3 4h18M3 20h18' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M3 10.8h18v2.4H3Z' fill='%23000' fill-opacity='0.24' stroke='none'/%3E%3Cpath d='M3 10.8h18M3 13.2h18'/%3E%3Cpath d='M12 5.5v3.3m-1.8-1.8 1.8 1.8 1.8-1.8'/%3E%3Cpath d='M12 18.5v-3.3m-1.8 1.8 1.8-1.8 1.8 1.8'/%3E%3C/g%3E%3Cg id='unhideRows' transform='translate(144 180)'%3E%3Cpath d='M3 4h18M3 20h18' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M3 10.8h18v2.4H3Z' fill='%23000' fill-opacity='0.24' stroke='none'/%3E%3Cpath d='M3 10.8h18M3 13.2h18'/%3E%3Cpath d='M12 8.8V5.5m-1.8 1.8L12 5.5l1.8 1.8'/%3E%3Cpath d='M12 15.2v3.3m-1.8-1.8 1.8 1.8 1.8-1.8'/%3E%3C/g%3E%3Cg id='hideColumns' transform='translate(180 180)'%3E%3Cpath d='M4 3v18M20 3v18' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M10.8 3h2.4v18h-2.4Z' fill='%23000' fill-opacity='0.24' stroke='none'/%3E%3Cpath d='M10.8 3v18M13.2 3v18'/%3E%3Cpath d='M5.5 12h3.3m-1.8-1.8 1.8 1.8-1.8 1.8'/%3E%3Cpath d='M18.5 12h-3.3m1.8-1.8-1.8 1.8 1.8 1.8'/%3E%3C/g%3E%3Cg id='unhideColumns' transform='translate(216 180)'%3E%3Cpath d='M4 3v18M20 3v18' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M10.8 3h2.4v18h-2.4Z' fill='%23000' fill-opacity='0.24' stroke='none'/%3E%3Cpath d='M10.8 3v18M13.2 3v18'/%3E%3Cpath d='M8.8 12H5.5m1.8-1.8L5.5 12l1.8 1.8'/%3E%3Cpath d='M15.2 12h3.3m-1.8-1.8 1.8 1.8-1.8 1.8'/%3E%3C/g%3E%3Cg id='freeze' transform='translate(252 180)'%3E%3Cpath d='M3 3h18v18H3Z' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='M3 3h18v5.5H3Z' fill='%23000' fill-opacity='0.24' stroke='none'/%3E%3Cpath d='M3 8.5h5.5V21H3Z' fill='%23000' fill-opacity='0.24' stroke='none'/%3E%3Cpath d='M3 8.5h18M8.5 8.5V21' stroke-width='2.6'/%3E%3C/g%3E%3Cg id='groupRows' transform='translate(288 180)'%3E%3Cpath d='M10 6h10M10 12h10M10 18h10'/%3E%3Cpath d='M7.5 6H5v12h2.5'/%3E%3Cpath d='M5 12H3'/%3E%3C/g%3E%3Cg id='ungroupRows' transform='translate(324 180)'%3E%3Cpath d='M10 6h10M10 12h10M10 18h10'/%3E%3Cpath d='M7.5 6H5v12h2.5' stroke-dasharray='1.6 2.4' stroke-opacity='0.5'/%3E%3Cpath d='m2.5 10.5 3 3m0-3-3 3'/%3E%3C/g%3E%3Cg id='sortAsc' transform='translate(0 216)'%3E%3Cpath d='M6 4v16m-3-3 3 3 3-3'/%3E%3Cpath d='M12.5 11 15 4.5l2.5 6.5M13.3 9h3.4'/%3E%3Cpath d='M12.5 13.5h5l-5 6h5'/%3E%3C/g%3E%3Cg id='sortDesc' transform='translate(36 216)'%3E%3Cpath d='M6 4v16m-3-3 3 3 3-3'/%3E%3Cpath d='M12.5 4.5h5l-5 6h5'/%3E%3Cpath d='M12.5 20 15 13.5l2.5 6.5M13.3 18h3.4'/%3E%3C/g%3E%3Cg id='sortFilter' transform='translate(72 216)'%3E%3Cpath d='M4 5h16l-6 7.5V19l-4 2v-8.5Z'/%3E%3C/g%3E%3Cg id='clearFilter' transform='translate(108 216)'%3E%3Cpath d='M3 5h12l-4.5 5.5v6.5l-3 1.5v-8Z'/%3E%3Cpath d='m15.5 14.5 5 5m0-5-5 5'/%3E%3C/g%3E%3C/svg%3E");
+  display: block;
+  flex: none;
+  width: var(--sheetwrite-icon-size, 16px);
+  height: var(--sheetwrite-icon-size, 16px);
+  background-color: currentColor;
+  -webkit-mask: var(--sheetwrite-icon-sheet, var(--sheetwrite-icon-sheet-default)) no-repeat;
+  mask: var(--sheetwrite-icon-sheet, var(--sheetwrite-icon-sheet-default)) no-repeat;
+  -webkit-mask-size: calc(var(--sheetwrite-icon-size, 16px) * 24)
+    calc(var(--sheetwrite-icon-size, 16px) * 24);
+  mask-size: calc(var(--sheetwrite-icon-size, 16px) * 24)
+    calc(var(--sheetwrite-icon-size, 16px) * 24);
+  -webkit-mask-position: calc(var(--sheetwrite-icon-size, 16px) * var(--sheetwrite-icon-x, 0))
+    calc(var(--sheetwrite-icon-size, 16px) * var(--sheetwrite-icon-y, 0));
+  mask-position: calc(var(--sheetwrite-icon-size, 16px) * var(--sheetwrite-icon-x, 0))
+    calc(var(--sheetwrite-icon-size, 16px) * var(--sheetwrite-icon-y, 0));
+}
+/* High Contrast replaces background colours; keep the glyph in the text colour. */
+@media (forced-colors: active) {
+  .sheetwrite-icon {
+    forced-color-adjust: none;
+    background-color: CanvasText;
+  }
+}
+.sheetwrite-icon[data-icon="undo"] {
+  --sheetwrite-icon-x: 0;
+  --sheetwrite-icon-y: 0;
+}
+.sheetwrite-icon[data-icon="redo"] {
+  --sheetwrite-icon-x: -1.5;
+  --sheetwrite-icon-y: 0;
+}
+.sheetwrite-icon[data-icon="paste"] {
+  --sheetwrite-icon-x: -3;
+  --sheetwrite-icon-y: 0;
+}
+.sheetwrite-icon[data-icon="cut"] {
+  --sheetwrite-icon-x: -4.5;
+  --sheetwrite-icon-y: 0;
+}
+.sheetwrite-icon[data-icon="copy"] {
+  --sheetwrite-icon-x: -6;
+  --sheetwrite-icon-y: 0;
+}
+.sheetwrite-icon[data-icon="find"] {
+  --sheetwrite-icon-x: -7.5;
+  --sheetwrite-icon-y: 0;
+}
+.sheetwrite-icon[data-icon="zoomIn"] {
+  --sheetwrite-icon-x: -9;
+  --sheetwrite-icon-y: 0;
+}
+.sheetwrite-icon[data-icon="zoomOut"] {
+  --sheetwrite-icon-x: -10.5;
+  --sheetwrite-icon-y: 0;
+}
+.sheetwrite-icon[data-icon="autoSum"] {
+  --sheetwrite-icon-x: -12;
+  --sheetwrite-icon-y: 0;
+}
+.sheetwrite-icon[data-icon="clear"] {
+  --sheetwrite-icon-x: -13.5;
+  --sheetwrite-icon-y: 0;
+}
+.sheetwrite-icon[data-icon="bold"] {
+  --sheetwrite-icon-x: 0;
+  --sheetwrite-icon-y: -1.5;
+}
+.sheetwrite-icon[data-icon="italic"] {
+  --sheetwrite-icon-x: -1.5;
+  --sheetwrite-icon-y: -1.5;
+}
+.sheetwrite-icon[data-icon="underline"] {
+  --sheetwrite-icon-x: -3;
+  --sheetwrite-icon-y: -1.5;
+}
+.sheetwrite-icon[data-icon="strikethrough"] {
+  --sheetwrite-icon-x: -4.5;
+  --sheetwrite-icon-y: -1.5;
+}
+.sheetwrite-icon[data-icon="textColor"] {
+  --sheetwrite-icon-x: -6;
+  --sheetwrite-icon-y: -1.5;
+}
+.sheetwrite-icon[data-icon="fillColor"] {
+  --sheetwrite-icon-x: -7.5;
+  --sheetwrite-icon-y: -1.5;
+}
+.sheetwrite-icon[data-icon="fontGrow"] {
+  --sheetwrite-icon-x: -9;
+  --sheetwrite-icon-y: -1.5;
+}
+.sheetwrite-icon[data-icon="fontShrink"] {
+  --sheetwrite-icon-x: -10.5;
+  --sheetwrite-icon-y: -1.5;
+}
+.sheetwrite-icon[data-icon="clearFormat"] {
+  --sheetwrite-icon-x: -12;
+  --sheetwrite-icon-y: -1.5;
+}
+.sheetwrite-icon[data-icon="separator"] {
+  --sheetwrite-icon-x: -13.5;
+  --sheetwrite-icon-y: -1.5;
+}
+.sheetwrite-icon[data-icon="alignLeft"] {
+  --sheetwrite-icon-x: 0;
+  --sheetwrite-icon-y: -3;
+}
+.sheetwrite-icon[data-icon="alignCenter"] {
+  --sheetwrite-icon-x: -1.5;
+  --sheetwrite-icon-y: -3;
+}
+.sheetwrite-icon[data-icon="alignRight"] {
+  --sheetwrite-icon-x: -3;
+  --sheetwrite-icon-y: -3;
+}
+.sheetwrite-icon[data-icon="alignTop"] {
+  --sheetwrite-icon-x: -4.5;
+  --sheetwrite-icon-y: -3;
+}
+.sheetwrite-icon[data-icon="alignMiddle"] {
+  --sheetwrite-icon-x: -6;
+  --sheetwrite-icon-y: -3;
+}
+.sheetwrite-icon[data-icon="alignBottom"] {
+  --sheetwrite-icon-x: -7.5;
+  --sheetwrite-icon-y: -3;
+}
+.sheetwrite-icon[data-icon="wrap"] {
+  --sheetwrite-icon-x: -9;
+  --sheetwrite-icon-y: -3;
+}
+.sheetwrite-icon[data-icon="merge"] {
+  --sheetwrite-icon-x: -10.5;
+  --sheetwrite-icon-y: -3;
+}
+.sheetwrite-icon[data-icon="unmerge"] {
+  --sheetwrite-icon-x: -12;
+  --sheetwrite-icon-y: -3;
+}
+.sheetwrite-icon[data-icon="mergeAndCenter"] {
+  --sheetwrite-icon-x: -13.5;
+  --sheetwrite-icon-y: -3;
+}
+.sheetwrite-icon[data-icon="border"] {
+  --sheetwrite-icon-x: 0;
+  --sheetwrite-icon-y: -4.5;
+}
+.sheetwrite-icon[data-icon="borderAll"] {
+  --sheetwrite-icon-x: -1.5;
+  --sheetwrite-icon-y: -4.5;
+}
+.sheetwrite-icon[data-icon="borderOutside"] {
+  --sheetwrite-icon-x: -3;
+  --sheetwrite-icon-y: -4.5;
+}
+.sheetwrite-icon[data-icon="borderThickOutside"] {
+  --sheetwrite-icon-x: -4.5;
+  --sheetwrite-icon-y: -4.5;
+}
+.sheetwrite-icon[data-icon="borderTop"] {
+  --sheetwrite-icon-x: -6;
+  --sheetwrite-icon-y: -4.5;
+}
+.sheetwrite-icon[data-icon="borderBottom"] {
+  --sheetwrite-icon-x: -7.5;
+  --sheetwrite-icon-y: -4.5;
+}
+.sheetwrite-icon[data-icon="borderLeft"] {
+  --sheetwrite-icon-x: -9;
+  --sheetwrite-icon-y: -4.5;
+}
+.sheetwrite-icon[data-icon="borderRight"] {
+  --sheetwrite-icon-x: -10.5;
+  --sheetwrite-icon-y: -4.5;
+}
+.sheetwrite-icon[data-icon="borderNone"] {
+  --sheetwrite-icon-x: -12;
+  --sheetwrite-icon-y: -4.5;
+}
+.sheetwrite-icon[data-icon="currency"] {
+  --sheetwrite-icon-x: 0;
+  --sheetwrite-icon-y: -6;
+}
+.sheetwrite-icon[data-icon="percent"] {
+  --sheetwrite-icon-x: -1.5;
+  --sheetwrite-icon-y: -6;
+}
+.sheetwrite-icon[data-icon="comma"] {
+  --sheetwrite-icon-x: -3;
+  --sheetwrite-icon-y: -6;
+}
+.sheetwrite-icon[data-icon="decimalIncrease"] {
+  --sheetwrite-icon-x: -4.5;
+  --sheetwrite-icon-y: -6;
+}
+.sheetwrite-icon[data-icon="decimalDecrease"] {
+  --sheetwrite-icon-x: -6;
+  --sheetwrite-icon-y: -6;
+}
+.sheetwrite-icon[data-icon="hyperlink"] {
+  --sheetwrite-icon-x: -7.5;
+  --sheetwrite-icon-y: -6;
+}
+.sheetwrite-icon[data-icon="note"] {
+  --sheetwrite-icon-x: -9;
+  --sheetwrite-icon-y: -6;
+}
+.sheetwrite-icon[data-icon="exportCsv"] {
+  --sheetwrite-icon-x: -10.5;
+  --sheetwrite-icon-y: -6;
+}
+.sheetwrite-icon[data-icon="exportXlsx"] {
+  --sheetwrite-icon-x: -12;
+  --sheetwrite-icon-y: -6;
+}
+.sheetwrite-icon[data-icon="insert"] {
+  --sheetwrite-icon-x: 0;
+  --sheetwrite-icon-y: -7.5;
+}
+.sheetwrite-icon[data-icon="delete"] {
+  --sheetwrite-icon-x: -1.5;
+  --sheetwrite-icon-y: -7.5;
+}
+.sheetwrite-icon[data-icon="format"] {
+  --sheetwrite-icon-x: -3;
+  --sheetwrite-icon-y: -7.5;
+}
+.sheetwrite-icon[data-icon="hideRows"] {
+  --sheetwrite-icon-x: -4.5;
+  --sheetwrite-icon-y: -7.5;
+}
+.sheetwrite-icon[data-icon="unhideRows"] {
+  --sheetwrite-icon-x: -6;
+  --sheetwrite-icon-y: -7.5;
+}
+.sheetwrite-icon[data-icon="hideColumns"] {
+  --sheetwrite-icon-x: -7.5;
+  --sheetwrite-icon-y: -7.5;
+}
+.sheetwrite-icon[data-icon="unhideColumns"] {
+  --sheetwrite-icon-x: -9;
+  --sheetwrite-icon-y: -7.5;
+}
+.sheetwrite-icon[data-icon="freeze"] {
+  --sheetwrite-icon-x: -10.5;
+  --sheetwrite-icon-y: -7.5;
+}
+.sheetwrite-icon[data-icon="groupRows"] {
+  --sheetwrite-icon-x: -12;
+  --sheetwrite-icon-y: -7.5;
+}
+.sheetwrite-icon[data-icon="ungroupRows"] {
+  --sheetwrite-icon-x: -13.5;
+  --sheetwrite-icon-y: -7.5;
+}
+.sheetwrite-icon[data-icon="sortAsc"] {
+  --sheetwrite-icon-x: 0;
+  --sheetwrite-icon-y: -9;
+}
+.sheetwrite-icon[data-icon="sortDesc"] {
+  --sheetwrite-icon-x: -1.5;
+  --sheetwrite-icon-y: -9;
+}
+.sheetwrite-icon[data-icon="sortFilter"] {
+  --sheetwrite-icon-x: -3;
+  --sheetwrite-icon-y: -9;
+}
+.sheetwrite-icon[data-icon="clearFilter"] {
+  --sheetwrite-icon-x: -4.5;
+  --sheetwrite-icon-y: -9;
+}
+/* @generated icon-sheet: end */

@@ -72,7 +72,7 @@ function DatabaseProofRoute() {
         {
           title: "Atomic sequencing",
           detail:
-            "Each commit compares its base version against the stored head inside one serialized adapter queue — stale writers get a recoverable conflict, never a lost update.",
+            "Each commit compares its base version against the stored head inside one serialized adapter queue. Stale writers get a recoverable conflict, never a lost update.",
         },
         {
           title: "Idempotent retries",
@@ -82,7 +82,7 @@ function DatabaseProofRoute() {
         {
           title: "Bounded storage",
           detail:
-            "The operation tail is capped by record count and bytes; crossing either bound folds the tail into one compacted snapshot record — watch the gauges.",
+            "The operation tail is capped by record count and bytes; crossing either bound folds the tail into one compacted snapshot record. Watch the gauges.",
         },
         {
           title: "Reload recovery",
@@ -90,14 +90,14 @@ function DatabaseProofRoute() {
             "Close and reopen the session (or reload this page): committed state and the durable pending queue come back from IndexedDB exactly once.",
         },
         {
-          title: "Large undo (0.5.0)",
+          title: "Large undo",
           detail:
             "Clearing 100,000 cells and undoing once restores them through one compressed restoreBlock commit: one history step, one server version, and the commit journal shows the bytes before and after compression.",
         },
         {
-          title: "Oversized undo (0.5.0)",
+          title: "Oversized undo",
           detail:
-            "When an undo exceeds the transaction limits, the Grid emits mutation-rejected with a resource-limit issue, drops that entry, and keeps older history undoable — try it under the 128-byte limit in the failure lab.",
+            "When an undo exceeds the transaction limits, the Grid emits mutation-rejected with a resource-limit issue, drops that entry, and keeps older history undoable. Try it under the 128-byte limit in the failure lab.",
         },
       ]}
     >

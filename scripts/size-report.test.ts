@@ -125,6 +125,12 @@ describe("packed file classification", () => {
       }),
     ).toThrow("do not equal");
   });
+
+  it("counts the icon sheet and its layout manifest as static assets, and nothing else in JSON", () => {
+    expect(classifyPackedPath("dist/icons.svg")).toBe("assets");
+    expect(classifyPackedPath("dist/icons.json")).toBe("assets");
+    expect(() => classifyPackedPath("dist/unexpected.json")).toThrow("Unclassified");
+  });
 });
 
 describe("manifest ownership", () => {

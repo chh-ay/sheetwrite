@@ -8,7 +8,7 @@ description: "Viewport-relative geometry of the cell currently owned by an edito
 Viewport-relative geometry of the cell currently owned by an editor.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L67"><code>packages/core/src/types/grid.ts#L67</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L68"><code>packages/core/src/types/grid.ts#L68</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>

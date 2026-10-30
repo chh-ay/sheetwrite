@@ -1,5 +1,6 @@
 import { actionFeedbackFor } from "./action-feedback.js";
-import { COMMAND_ICONS } from "./command-icons.js";
+import { sheetIcon } from "./command-icons.js";
+import { iconContentNode } from "./icons/resolve.js";
 import { isKeyboardAction } from "./keymap.js";
 import type {
   Grid,
@@ -7,6 +8,7 @@ import type {
   GridCommandName,
   GridCommandState,
   GridConfig,
+  IconOverrides,
   ToolbarActionName,
   ToolbarIcon,
   ToolbarItem,
@@ -195,21 +197,10 @@ export function renderToolbarItems(
   bar: HTMLElement,
   items: readonly ToolbarItem[],
   grid: Grid,
-  icons?: Partial<Record<ToolbarActionName, ToolbarIcon>>,
+  icons?: IconOverrides,
 ): () => void {
   const controls = new Map<GridCommandName, HTMLButtonElement | HTMLInputElement>();
   const shortcutLabels = new Map<GridCommandName, string>();
-  const setIcon = (el: HTMLElement, content: ToolbarIcon): void => {
-    if (typeof content === "string") {
-      // Icon strings are text-only; never interpret them as HTML.
-      el.textContent = content;
-      return;
-    }
-
-    const node = typeof content === "function" ? content() : content.cloneNode(true);
-    el.replaceChildren(node);
-  };
-
   const addButton = (
     suffix: string,
     icon: ToolbarIcon,
@@ -221,7 +212,7 @@ export function renderToolbarItems(
     button.className = `sheetwrite-tb-button sheetwrite-tb-${suffix}`;
     button.title = title;
     if (title) button.setAttribute("aria-label", title);
-    setIcon(button, icon);
+    button.replaceChildren(iconContentNode(icon));
 
     // Mouse activation must not steal focus/selection from the grid.
     button.addEventListener("mousedown", preventDefault);
@@ -309,7 +300,7 @@ export function renderToolbarItems(
     const shortcut = action && isKeyboardAction(action) ? grid.getShortcutLabel(action) : "";
     const title = shortcut ? `${label} (${shortcut})` : label;
     if (action && isKeyboardAction(action)) shortcutLabels.set(action, label);
-    const icon = item.icon ?? (action ? (icons?.[action] ?? COMMAND_ICONS[action] ?? "") : "");
+    const icon = item.icon ?? (action ? (icons?.[action] ?? (() => sheetIcon(action))) : "");
 
     if (item.onClick) {
       const onClick = item.onClick;

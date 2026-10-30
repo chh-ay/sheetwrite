@@ -12,12 +12,21 @@ interface DemoSelectProps {
   options: readonly DemoSelectOption[];
   onValueChange: (value: string) => void;
   className?: string;
+  disabled?: boolean;
 }
 
-export function DemoSelect({ label, value, options, onValueChange, className }: DemoSelectProps) {
+export function DemoSelect({
+  label,
+  value,
+  options,
+  onValueChange,
+  className,
+  disabled = false,
+}: DemoSelectProps) {
   return (
     <div className={["sw-demo-select", className].filter(Boolean).join(" ")}>
       <Select.Root
+        disabled={disabled}
         items={options}
         value={value}
         onValueChange={(next) => {
@@ -32,7 +41,13 @@ export function DemoSelect({ label, value, options, onValueChange, className }: 
           </Select.Icon>
         </Select.Trigger>
         <Select.Portal>
-          <Select.Positioner className="sw-demo-select__positioner" sideOffset={4}>
+          {/* Open below the field like a menu; Base UI's default lays the list
+              over the trigger, which hides the field being changed. */}
+          <Select.Positioner
+            alignItemWithTrigger={false}
+            className="sw-demo-select__positioner"
+            sideOffset={4}
+          >
             <Select.Popup className="sw-demo-select__popup">
               <Select.List className="sw-demo-select__list">
                 {options.map((option) => (

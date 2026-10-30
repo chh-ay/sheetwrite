@@ -6120,7 +6120,7 @@ Members:
 ##### `ContextMenuActionName` — type
 
 ```ts
-export type ContextMenuActionName = | "cut" | "copy" | "paste" | "clearContents" | "merge" | "unmerge" | "insertRowAbove" | "insertRowBelow" | "deleteRow" | "insertColumnLeft" | "insertColumnRight" | "deleteColumn" | "hideRow" | "showAllRows" | "autoFitRow" | "hideColumn" | "showAllColumns" | "autoFitColumn" | "clearFilter" | "exportCsv" | "exportXlsx" | "separator";
+export type ContextMenuActionName = | "cut" | "copy" | "paste" | "clearContents" | "merge" | "unmerge" | "insertRowAbove" | "insertRowBelow" | "deleteRow" | "insertColumnLeft" | "insertColumnRight" | "deleteColumn" | "hideRow" | "showAllRows" | "autoFitRow" | "hideColumn" | "showAllColumns" | "autoFitColumn" | "clearFilter" | "exportCsv" | "exportXlsx" | "editNote" | "deleteNote" | "separator";
 ```
 
 Built-in action names accepted by custom context-menu rows.
@@ -6141,7 +6141,7 @@ Members:
 ##### `ContextMenuItem` — interface
 
 ```ts
-export interface ContextMenuItem { id?: string; action?: ContextMenuActionName; onClick?: (grid: Grid, cell: CellAddress | null) => void; label?: string; shortcut?: KeyboardAction | KeyShortcut; visible?: boolean | ((context: ContextMenuContext) => boolean); disabled?: boolean | ((context: ContextMenuContext) => boolean); }
+export interface ContextMenuItem { id?: string; action?: ContextMenuActionName; onClick?: (grid: Grid, cell: CellAddress | null) => void; label?: string; shortcut?: KeyboardAction | KeyShortcut; visible?: boolean | ((context: ContextMenuContext) => boolean); disabled?: boolean | ((context: ContextMenuContext) => boolean); icon?: IconName; items?: readonly ContextMenuItem[]; }
 ```
 
 Built-in, separator, or custom callback row in the right-click menu.
@@ -6164,7 +6164,9 @@ GridConfig.contextMenu
 Members:
 - `action` — Built-in action to bind (or "separator"). Omit when supplying `onClick`.
 - `disabled` — Static or context-aware disabled state.
+- `icon` — Glyph shown before the label. Built-in actions have one by default; `config.icons` overrides apply.
 - `id` — Stable host identifier, exposed as `data-context-menu-item`.
+- `items` — Rows of a submenu. The row opens it on click, hover or the Right Arrow key and runs nothing itself.
 - `label` — Menu row text. Defaults per action.
 - `onClick` — Custom click handler; receives the grid and the right-clicked cell (null if none).
 - `shortcut` — A bound action name or a custom key combination. An explicit combination
@@ -6899,7 +6901,7 @@ Grid.redo
 ##### `GridActions` — interface
 
 ```ts
-export interface GridActions { toggleBold(): void; toggleItalic(): void; toggleUnderline(): void; toggleStrikethrough(): void; setAlign(align: CellAlign): void; setTextColor(color: string | null): void; setFillColor(color: string | null): void; toggleBorder(): void; setBorders(preset: BorderPreset): void; setFontFamily(family: string | null): void; setFontSize(size: number | null): void; stepFontSize(direction: 1 | -1): void; setVerticalAlign(align: CellVerticalAlign): void; toggleWrap(): void; setNumberFormat(code: string | null): void; stepDecimals(direction: 1 | -1): void; mergeAndCenter(): void; clearAll(): void; autoSum(): void; find(): void; freezePanes(): void; clearFormat(): void; merge(): void; unmerge(): void; sort(ascending: boolean): void; insertRowAbove(): void; insertRowBelow(): void; deleteRow(): void; insertColumnLeft(): void; insertColumnRight(): void; deleteColumn(): void; hideRows(rows?: readonly number[]): void; showRows(rows?: readonly number[]): void; autoFitRows(): void; hideColumns(cols?: readonly number[]): void; showColumns(cols?: readonly number[]): void; autoFitColumns(cols?: readonly number[]): void; clearFilter(col?: number): void; copy(): Promise<ClipboardOutcome>; cut(): Promise<ClipboardOutcome>; paste(): Promise<ClipboardOutcome>; pasteValues(): Promise<ClipboardOutcome>; clearContents(): void; exportCsv(filename?: string): void; exportXlsx(filename?: string): Promise<void>; undo(): void; redo(): void; }
+export interface GridActions { toggleBold(): void; toggleItalic(): void; toggleUnderline(): void; toggleStrikethrough(): void; setAlign(align: CellAlign): void; setTextColor(color: string | null): void; setFillColor(color: string | null): void; toggleBorder(): void; setBorders(preset: BorderPreset): void; setFontFamily(family: string | null): void; setFontSize(size: number | null): void; stepFontSize(direction: 1 | -1): void; setVerticalAlign(align: CellVerticalAlign): void; toggleWrap(): void; setNumberFormat(code: string | null): void; stepDecimals(direction: 1 | -1): void; mergeAndCenter(): void; clearAll(): void; autoSum(): void; find(): void; freezePanes(): void; clearFormat(): void; merge(): void; unmerge(): void; sort(ascending: boolean): void; insertRowAbove(): void; insertRowBelow(): void; deleteRow(): void; insertColumnLeft(): void; insertColumnRight(): void; deleteColumn(): void; hideRows(rows?: readonly number[]): void; showRows(rows?: readonly number[]): void; autoFitRows(): void; hideColumns(cols?: readonly number[]): void; showColumns(cols?: readonly number[]): void; autoFitColumns(cols?: readonly number[]): void; clearFilter(col?: number): void; copy(): Promise<ClipboardOutcome>; cut(): Promise<ClipboardOutcome>; paste(): Promise<ClipboardOutcome>; pasteValues(): Promise<ClipboardOutcome>; clearContents(): void; exportCsv(filename?: string): void; exportXlsx(filename?: string): Promise<void>; editNote(): void; deleteNote(): void; undo(): void; redo(): void; }
 ```
 
 Imperative operations the toolbar and context menu bind to; also exposed as `Grid.actions`.
@@ -6910,6 +6912,10 @@ above it, or to its left when there are none above.
 - `clearAll` — Clear the selection's contents and formatting, as one undoable step.
 - `copy` — Copy the focused rectangle to the system clipboard. Never rejects.
 - `cut` — Copy + clear the source (after the clipboard accepted). Never rejects.
+- `deleteNote` — Remove the focus cell's note as one undoable step. Does nothing when it has none.
+- `editNote` — Open the note editor on the focus cell, with its note or empty for a new
+one. Ctrl or Cmd+Enter and leaving the editor save; Escape cancels. Does
+nothing on a read-only grid.
 - `exportCsv` — Download the active sheet as CSV. Never throws; a failure emits `export-error`.
 - `exportXlsx` — Download the active sheet as XLSX. Resolves when the download starts and never
 rejects; a failure emits `export-error`.
@@ -6957,7 +6963,7 @@ Complete command-state snapshot emitted whenever availability or activity can ch
 ##### `GridConfig` — interface
 
 ```ts
-export interface GridConfig { toolbar?: boolean | ToolbarItem[]; bold?: boolean; italic?: boolean; align?: boolean; textColor?: boolean; fillColor?: boolean; border?: boolean; clearFormat?: boolean; merge?: boolean; sort?: boolean; export?: boolean; ribbon?: boolean; icons?: Partial<Record<ToolbarActionName, ToolbarIcon>>; contextMenu?: boolean | ContextMenuItems; undo?: boolean; find?: boolean; tabs?: boolean; keyboard?: boolean | KeyboardOptions | ((e: KeyboardEvent, grid: Grid) => boolean); }
+export interface GridConfig { toolbar?: boolean | ToolbarItem[]; bold?: boolean; italic?: boolean; align?: boolean; textColor?: boolean; fillColor?: boolean; border?: boolean; clearFormat?: boolean; merge?: boolean; sort?: boolean; export?: boolean; ribbon?: boolean; icons?: IconOverrides; contextMenu?: boolean | ContextMenuItems; undo?: boolean; find?: boolean; tabs?: boolean; keyboard?: boolean | KeyboardOptions | ((e: KeyboardEvent, grid: Grid) => boolean); }
 ```
 
 Toolbar / feature configuration. When `config` is set the built-in toolbar is
@@ -6992,7 +6998,7 @@ Members:
 - `export` — Show CSV/XLSX export controls in the default toolbar (default false).
 - `fillColor` — Show the fill-color control in the default toolbar (default true).
 - `find` — Built-in Ctrl+F find widget: enabled (true, default) or disabled (false).
-- `icons` — Override built-in toolbar icons by action name. Strings render as plain text; DOM nodes/factories support SVG/HTML icons.
+- `icons` — Replace built-in command icons by glyph name, in the toolbar, ribbon, ribbon menus and context menu. See {@link IconOverrides}.
 - `italic` — Show the italic control in the default toolbar (default true).
 - `keyboard` — Built-in keyboard handling. `true` (default) keeps the stock Sheets-style
 bindings. An object replaces individual action bindings; omitted actions
@@ -7138,6 +7144,35 @@ export type HyperlinkTarget = | { kind: "external"; url: string } | { kind: "int
 
 Browser-safe external target or stable workbook-internal range target.
 
+##### `ICON_NAMES` — variable
+
+```ts
+readonly ["undo", "redo", "paste", "cut", "copy", "find", "zoomIn", "zoomOut", "autoSum", "clear", "bold", "italic", "underline", "strikethrough", "textColor", "fillColor", "fontGrow", "fontShrink", "clearFormat", "separator", "alignLeft", "alignCenter", "alignRight", "alignTop", "alignMiddle", "alignBottom", "wrap", "merge", "unmerge", "mergeAndCenter", "border", "borderAll", "borderOutside", "borderThickOutside", "borderTop", "borderBottom", "borderLeft", "borderRight", "borderNone", "currency", "percent", "comma", "decimalIncrease", "decimalDecrease", "hyperlink", "note", "exportCsv", "exportXlsx", "insert", "delete", "format", "hideRows", "unhideRows", "hideColumns", "unhideColumns", "freeze", "groupRows", "ungroupRows", "sortAsc", "sortDesc", "sortFilter", "clearFilter"]
+```
+
+Every glyph on the command icon sheet.
+
+##### `IconName` — type
+
+```ts
+export type IconName = (typeof ICON_NAMES)[number];
+```
+
+The name of one glyph on the command icon sheet; the key of `IconOverrides`.
+
+##### `IconOverrides` — type
+
+```ts
+export type IconOverrides = Partial<Record<IconName, ToolbarIcon>>;
+```
+
+Per-glyph icon overrides, keyed by the names on the command icon sheet
+(`ICON_NAMES`). One override applies wherever the glyph shows: the flat
+toolbar, the ribbon and ribbon menus. Strings render as plain text; DOM nodes
+and node factories support SVG or HTML icons. To replace every glyph at once,
+set the `--sheetwrite-icon-sheet` CSS property to a sheet drawn on the layout
+in `@sheetwrite/core/icons.json`.
+
 ##### `IncompleteDataError` — class
 
 ```ts
@@ -7219,7 +7254,7 @@ Whether an identifier is bounded, non-empty, trimmed, and free of control charac
 ##### `KeyboardAction` — type
 
 ```ts
-export type KeyboardAction = | "copy" | "cut" | "paste" | "pasteValues" | "undo" | "redo" | "find" | "replace" | "clearContents";
+export type KeyboardAction = | "copy" | "cut" | "paste" | "pasteValues" | "undo" | "redo" | "find" | "replace" | "clearContents" | "editNote";
 ```
 
 Built-in actions that can be rebound without replacing navigation.
@@ -10207,6 +10242,16 @@ export interface IndexedDbPendingCommitStorageOptions { databaseName?: string; s
 
 Database and store naming options for durable pending commits.
 
+#### `@sheetwrite/core/icons.json` — asset
+
+Declaration target: `./dist/icons.json`
+Page: https://sheetwrite.vercel.app/docs/api/core-icons-json/
+
+#### `@sheetwrite/core/icons.svg` — asset
+
+Declaration target: `./dist/icons.svg`
+Page: https://sheetwrite.vercel.app/docs/api/core-icons-svg/
+
 #### `@sheetwrite/core/shell` — supported
 
 Declaration target: `./dist/shell.d.ts`
@@ -10324,13 +10369,14 @@ Members:
 ##### `RibbonOptions` — interface
 
 ```ts
-export interface RibbonOptions { focusGrid?: () => void; onHeightChange?: (height: number) => void; }
+export interface RibbonOptions { focusGrid?: () => void; onHeightChange?: (height: number) => void; icons?: IconOverrides; }
 ```
 
 Options for {@link createRibbon}.
 
 Members:
 - `focusGrid` — Return keyboard focus to the grid after a pick or Escape (default: focus `host`).
+- `icons` — Replace built-in icons by glyph name, as `GridConfig.icons`.
 - `onHeightChange` — Called with the new height after the ribbon is minimized or expanded.
 
 ##### `ShellPiece` — interface
@@ -10371,13 +10417,13 @@ Members:
 ##### `ToolbarOptions` — interface
 
 ```ts
-export interface ToolbarOptions { items?: readonly ToolbarItem[]; icons?: Partial<Record<ToolbarActionName, ToolbarIcon>>; label?: string; }
+export interface ToolbarOptions { items?: readonly ToolbarItem[]; icons?: IconOverrides; label?: string; }
 ```
 
 Host element and configuration used to create the built-in toolbar.
 
 Members:
-- `icons` — Per-action icon overrides, exactly like `GridConfig.icons`.
+- `icons` — Per-glyph icon overrides, exactly like `GridConfig.icons`.
 - `items` — Items to render; defaults to the full built-in action set.
 - `label` — Accessible toolbar label (default "Spreadsheet formatting").
 

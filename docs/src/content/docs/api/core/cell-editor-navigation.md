@@ -8,7 +8,7 @@ description: "Selection movement applied after a successful editor commit."
 Selection movement applied after a successful editor commit.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L64"><code>packages/core/src/types/grid.ts#L64</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L65"><code>packages/core/src/types/grid.ts#L65</code></a></dd></div>
 </dl>
 
 ## Declaration

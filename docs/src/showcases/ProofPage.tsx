@@ -101,7 +101,7 @@ export function ProofPage({
         >
           <header>
             <p className="sw-proofs-page__eyebrow">OWNERSHIP BOUNDARY</p>
-            <h2 id={`${slug}-boundary`}>What Sheetwrite provides — and what your host owns.</h2>
+            <h2 id={`${slug}-boundary`}>What Sheetwrite provides, and what your host owns.</h2>
             <p>{boundaryLede}</p>
           </header>
           <div className="sw-proofs-page__boundary-map">

@@ -19,26 +19,10 @@
   color: var(--sw-fg);
   background-color: var(--sw-surface-0);
   background-image:
-    radial-gradient(
-      60rem 32rem at 78% -6rem,
-      color-mix(in srgb, var(--sw-accent) 12%, transparent),
-      transparent 70%
-    ),
-    linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--sw-border) 24%, transparent) 1px,
-      transparent 1px
-    ),
-    linear-gradient(color-mix(in srgb, var(--sw-border) 24%, transparent) 1px, transparent 1px);
-  background-position:
-    0 0,
-    center top,
-    center top;
-  background-repeat: no-repeat, repeat, repeat;
-  background-size:
-    auto,
-    4rem 4rem,
-    4rem 4rem;
+    linear-gradient(90deg, var(--sw-grid-line) 1px, transparent 1px),
+    linear-gradient(var(--sw-grid-line) 1px, transparent 1px);
+  background-position: center top;
+  background-size: 4rem 4rem;
 }
 
 .sw-landing :is(a, button):focus-visible {
@@ -167,6 +151,8 @@
   color: var(--sw-fg-strong);
   font: 700 clamp(2.5rem, 4.6vw, 4rem) / 1.03 var(--sw-font-display);
   letter-spacing: -0.045em;
+  /* Even lines: no single word left alone on the last one. */
+  text-wrap: balance;
 }
 
 .sw-lp-hero__lede {
@@ -196,13 +182,7 @@
   overflow: hidden;
   border: 1px solid var(--sw-border-strong);
   border-radius: 1rem;
-  background:
-    radial-gradient(
-      30rem 18rem at 70% 0,
-      color-mix(in srgb, var(--sw-accent) 10%, transparent),
-      transparent 70%
-    ),
-    color-mix(in srgb, var(--sw-surface-1) 94%, transparent);
+  background: color-mix(in srgb, var(--sw-surface-1) 94%, transparent);
   box-shadow: var(--sw-shadow);
 }
 
@@ -652,13 +632,7 @@
   overflow: hidden;
   border: 1px solid var(--sw-border-strong);
   border-radius: 1rem;
-  background:
-    radial-gradient(
-      36rem 16rem at 50% 0,
-      color-mix(in srgb, var(--sw-accent) 7%, transparent),
-      transparent 70%
-    ),
-    color-mix(in srgb, var(--sw-surface-1) 92%, transparent);
+  background: color-mix(in srgb, var(--sw-surface-1) 92%, transparent);
 }
 
 .sw-arch .as {
@@ -894,6 +868,13 @@
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+/* Eight cards fill two rows of four; six fill two rows of three. `:where`
+   keeps this at the plain list's specificity, so the narrower media rules
+   below still win by source order. */
+.sw-features:where(:has(> li:nth-child(8))) {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .sw-features > li {
@@ -1419,16 +1400,31 @@
 
 /* ---- Code tabs --------------------------------------------------------------- */
 
+/* Heading over result on the left, code on the right. One column puts the
+   result after the code it shows. */
 .sw-lp-split {
   display: grid;
+  grid-template-areas:
+    "head code"
+    "result code";
   grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-  gap: clamp(2rem, 5vw, 4.5rem);
+  grid-template-rows: auto 1fr;
+  gap: 2rem clamp(2rem, 5vw, 4.5rem);
   align-items: start;
 }
 
 .sw-lp-split .sw-lp-head {
   display: block;
+  grid-area: head;
   margin: 0;
+}
+
+.sw-lp-split .sw-code-tabs {
+  grid-area: code;
+}
+
+.sw-lp-split .sw-lp-result {
+  grid-area: result;
 }
 
 .sw-lp-split .sw-lp-head h2 {
@@ -1484,16 +1480,77 @@
   box-shadow: none;
 }
 
-.sw-code-tabs__install {
-  padding: 0.75rem;
-  border-top: 1px solid var(--sw-border);
+/* On the landing, the snippet is read, not studied: hover popovers still work,
+   but names do not carry the docs' dotted underline. */
+.sw-code-tabs__panel .sw-code-popover__trigger,
+.sw-code-tabs__panel .sw-code-popover__trigger[data-hover-kind] {
+  text-decoration: none;
+}
+
+/* The result beside the code: the same rows as a small sheet. The grid gap
+   spaces it, so it has no margin of its own. */
+.sw-lp-result {
+  margin: 0;
+}
+
+.sw-lp-result table {
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--sw-border-strong);
+  border-radius: 0.75rem;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: color-mix(in srgb, var(--sw-surface-1) 94%, transparent);
+  font-variant-numeric: tabular-nums;
+}
+
+.sw-lp-result th,
+.sw-lp-result td {
+  padding: 0.6rem 0.85rem;
+  border-bottom: 1px solid var(--sw-border);
+  text-align: left;
+}
+
+.sw-lp-result tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+.sw-lp-result thead th {
+  background: var(--sw-surface-2);
+  color: var(--sw-fg-strong);
+  font: 650 var(--sw-type-sm) / 1.2 var(--sw-font-body);
+}
+
+.sw-lp-result th:first-child {
+  width: 2.5rem;
+  border-right: 1px solid var(--sw-border);
+  background: var(--sw-surface-2);
+  color: var(--sw-fg-dim);
+  font: 600 var(--sw-type-xs) / 1.2 var(--sw-font-mono);
+  text-align: center;
+}
+
+.sw-lp-result td {
+  color: var(--sw-fg);
+}
+
+.sw-lp-result td:last-child,
+.sw-lp-result thead th:last-child {
+  text-align: right;
+}
+
+.sw-lp-result figcaption {
+  margin-top: 0.75rem;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-type-sm);
+  line-height: 1.55;
 }
 
 /* ---- Engine choice ----------------------------------------------------------- */
 
 .sw-lp-engines__choices {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.9fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1.25rem;
 }
 
@@ -1509,13 +1566,7 @@
 
 .sw-lp-engines__choices article[data-variant="full"] {
   border-color: color-mix(in srgb, var(--sw-accent) 45%, var(--sw-border));
-  background:
-    radial-gradient(
-      20rem 10rem at 100% 0,
-      color-mix(in srgb, var(--sw-accent) 10%, transparent),
-      transparent 70%
-    ),
-    color-mix(in srgb, var(--sw-surface-1) 92%, transparent);
+  background: color-mix(in srgb, var(--sw-surface-1) 92%, transparent);
 }
 
 .sw-lp-engines__choices article > span {
@@ -1547,40 +1598,74 @@
   font-size: var(--sw-type-sm);
 }
 
-.sw-lp-engines__choices ul {
+.sw-lp-engines__choices .sw-lp-engines__size {
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-type-sm);
+}
+
+.sw-lp-engines__size b {
+  color: var(--sw-fg-strong);
+  font: 700 1.5rem / 1 var(--sw-font-display);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* ---- New in this release ---------------------------------------------------- */
+
+.sw-lp-new {
   display: grid;
-  align-content: start;
-  gap: 0.7rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 1rem 2.5rem;
+  align-items: center;
+  margin-top: 1.25rem;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.9rem;
+  background: color-mix(in srgb, var(--sw-surface-1) 92%, transparent);
+}
+
+.sw-lp-new h3 {
+  margin: 0;
+  color: var(--sw-accent-strong);
+  font: 650 var(--sw-type-xs) / 1.4 var(--sw-font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.sw-lp-new ul {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem 2rem;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.sw-lp-engines__choices li {
+.sw-lp-new li {
   position: relative;
-  padding-left: 1.4rem;
+  padding-left: 1.1rem;
   color: var(--sw-fg);
+  font-size: var(--sw-type-sm);
   line-height: 1.5;
 }
 
-.sw-lp-engines__choices li::before {
+.sw-lp-new li::before {
   position: absolute;
   top: 0.55em;
-  left: 0.2rem;
-  width: 0.45rem;
-  height: 0.45rem;
+  left: 0;
+  width: 0.4rem;
+  height: 0.4rem;
   border-radius: 50%;
   background: var(--sw-accent);
   content: "";
 }
 
-.sw-lp-engines__choices li:last-child::before {
-  content: none;
-}
-
-.sw-lp-engines__choices li a {
+.sw-lp-new > a {
   color: var(--sw-accent-strong);
   font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
 }
 
 /* ---- Benchmarks -------------------------------------------------------------- */
@@ -1692,13 +1777,7 @@
   padding: clamp(2rem, 4vw, 3rem);
   border: 1px solid color-mix(in srgb, var(--sw-accent) 40%, var(--sw-border));
   border-radius: 1.25rem;
-  background:
-    radial-gradient(
-      40rem 16rem at 0 0,
-      color-mix(in srgb, var(--sw-accent) 14%, transparent),
-      transparent 70%
-    ),
-    color-mix(in srgb, var(--sw-surface-1) 94%, transparent);
+  background: color-mix(in srgb, var(--sw-surface-1) 94%, transparent);
 }
 
 .sw-lp-close h2 {
@@ -1720,13 +1799,7 @@
 .sw-landing-footer {
   position: relative;
   border-top: 1px solid var(--sw-border);
-  background:
-    radial-gradient(
-      40rem 14rem at 15% 0,
-      color-mix(in srgb, var(--sw-accent) 7%, transparent),
-      transparent 70%
-    ),
-    color-mix(in srgb, var(--sw-surface-1) 82%, transparent);
+  background: color-mix(in srgb, var(--sw-surface-1) 82%, transparent);
   color: var(--sw-fg-dim);
 }
 
@@ -1840,10 +1913,29 @@
   background: color-mix(in srgb, var(--sw-surface-1) 92%, transparent);
 }
 
+/* Story changes ease instead of cutting: the indicator slides under the tabs,
+   the tab tint fades, and the new copy and stage rise in. */
+.sw-reel {
+  --sr-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
 .sw-reel__tabs {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   border-bottom: 1px solid var(--sw-border);
+}
+
+.sw-reel__tabs::before {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: calc(100% / 3);
+  height: 2px;
+  background: color-mix(in srgb, var(--sw-accent) 25%, transparent);
+  content: "";
+  transform: translateX(calc(var(--sr-index, 0) * 100%));
+  transition: transform 0.4s var(--sr-ease);
 }
 
 .sw-reel__tabs button {
@@ -1856,6 +1948,9 @@
   font: 650 var(--sw-type-sm) / 1.2 var(--sw-font-body);
   text-align: left;
   cursor: pointer;
+  transition:
+    background-color 0.3s var(--sr-ease),
+    color 0.3s var(--sr-ease);
 }
 
 .sw-reel__tabs button + button {
@@ -1869,16 +1964,6 @@
 .sw-reel__tabs button[aria-selected="true"] {
   background: color-mix(in srgb, var(--sw-accent) 7%, transparent);
   color: var(--sw-fg-strong);
-}
-
-.sw-reel__tabs button[aria-selected="true"]::after {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: 2px;
-  background: color-mix(in srgb, var(--sw-accent) 25%, transparent);
-  content: "";
 }
 
 /* The progress bar is the reel's timer: its end selects the next story. */
@@ -1908,6 +1993,7 @@
 
 .sw-reel__copy {
   padding: clamp(1.5rem, 3vw, 2.5rem);
+  animation: sr-panel-in 0.45s var(--sr-ease) both;
 }
 
 .sw-reel__copy h3 {
@@ -1934,6 +2020,15 @@
   padding: 1rem 1.25rem;
   border-left: 1px solid var(--sw-border);
   background: color-mix(in srgb, var(--sw-surface-0) 55%, transparent);
+  /* The stage follows the copy, so the eye reads the claim, then the proof. */
+  animation: sr-panel-in 0.5s 0.08s var(--sr-ease) both;
+}
+
+@keyframes sr-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.6rem);
+  }
 }
 
 .sr {
@@ -2044,10 +2139,6 @@
   fill: color-mix(in srgb, var(--sw-accent) 34%, transparent);
 }
 
-.sr-ana-flash rect {
-  fill: color-mix(in srgb, var(--sw-accent) 34%, transparent);
-}
-
 .sr-dot {
   fill: var(--sw-accent);
 }
@@ -2059,12 +2150,18 @@
 
 .sr-state-offline,
 .sr-outbox,
-.sr-broadcast,
-.sr-v0,
-.sr-s0,
-.sr-s1,
-.sr-s2 {
+.sr-packet,
+.sr-pulse,
+.sr-roll:not([data-final]),
+.sr-batch-group {
   opacity: 0;
+}
+
+/* The server lights its edge as it commits a version. */
+.sr-pulse {
+  fill: none;
+  stroke: var(--sw-accent-strong);
+  stroke-width: 2;
 }
 
 .sr-outbox rect {
@@ -2076,10 +2173,24 @@
   font: 650 11px var(--sw-font-mono);
 }
 
-.sr-broadcast {
-  fill: var(--sw-accent-strong);
-  stroke: color-mix(in srgb, var(--sw-accent) 35%, transparent);
-  stroke-width: 6;
+.sr-packet {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.sr-packet rect {
+  fill: color-mix(in srgb, var(--sw-accent) 24%, var(--sw-surface-2));
+  stroke: var(--sw-accent-strong);
+}
+
+.sr-packet[data-tone="pending"] rect {
+  fill: color-mix(in srgb, var(--sw-demo-warn) 26%, var(--sw-surface-2));
+  stroke: var(--sw-demo-warn);
+}
+
+.sr .sr-packet text {
+  fill: var(--sw-fg-strong);
+  font: 650 11px var(--sw-font-mono);
 }
 
 .sr-data,
@@ -2120,6 +2231,22 @@
   stroke: var(--sw-accent-strong);
 }
 
+.sr-batch-chip rect {
+  fill: color-mix(in srgb, var(--sw-accent) 24%, var(--sw-surface-2));
+  stroke: var(--sw-accent-strong);
+}
+
+.sr .sr-batch-chip text {
+  fill: var(--sw-fg-strong);
+  font: 650 11px var(--sw-font-mono);
+}
+
+.sr-batch-outline {
+  fill: none;
+  stroke: var(--sw-accent-strong);
+  stroke-dasharray: 4 3;
+}
+
 .sr .sr-block text:first-of-type {
   fill: var(--sw-fg-strong);
   font-weight: 700;
@@ -2127,6 +2254,11 @@
 
 .sr-peer-cells rect {
   fill: color-mix(in srgb, var(--sw-accent) 34%, transparent);
+}
+
+/* The peer's cells before the restore arrives: present, but empty. */
+.sr-peer-empty rect {
+  fill: color-mix(in srgb, var(--sw-fg) 8%, transparent);
 }
 
 .sr .sr-batch {
@@ -2186,53 +2318,71 @@
 .sr-offline .sr-wire[data-side="bram"] {
   animation: sr-wire var(--sr-loop, 10s) linear both;
 }
-.sr-offline .sr-mini[data-flash] {
-  animation: sr-edit 0.6s ease-out both;
+
+/* Bram's edited cell: pending (amber) while the edit waits, committed (green)
+   once the server gives it a version. */
+.sr-offline [data-device="bram"] .sr-mini[data-flash] {
+  animation:
+    sr-cell-pending 0.3s ease-out var(--edit) both,
+    sr-cell-commit 0.6s ease-out var(--ack) forwards;
 }
+
+/* Ana's matching cell stays plain until the server's packet reaches it. */
+.sr-offline [data-device="ana"] .sr-mini[data-flash] {
+  animation: sr-cell-apply 0.6s ease-out var(--apply) both;
+}
+
+/* A chip lifts out of the edited cell into its outbox slot, waits, moves up the
+   queue as older chips leave, then travels Bram's wire into the server. */
 .sr-offline .sr-outbox {
-  animation: sr-outbox var(--sr-loop, 10s) cubic-bezier(0.45, 0, 0.25, 1) both;
-  animation-delay: calc(var(--i) * 0.9s);
+  transform-box: fill-box;
+  transform-origin: center;
+  animation:
+    sr-chip-queue 0.5s cubic-bezier(0.2, 0.8, 0.3, 1) var(--edit) both,
+    sr-chip-drain 0.6s cubic-bezier(0.45, 0, 0.55, 1) var(--drain) forwards;
 }
-.sr-offline .sr-s0 {
-  animation: sr-s0 var(--sr-loop, 10s) linear both;
+.sr-offline .sr-queue[data-shifts="1"] {
+  animation: sr-queue-1 0.3s ease-out var(--shift-1) forwards;
 }
-.sr-offline .sr-s1 {
-  animation: sr-s1 var(--sr-loop, 10s) linear both;
+.sr-offline .sr-queue[data-shifts="2"] {
+  animation:
+    sr-queue-1 0.3s ease-out var(--shift-1) forwards,
+    sr-queue-2 0.3s ease-out var(--shift-2) forwards;
 }
-.sr-offline .sr-s2 {
-  animation: sr-s2 var(--sr-loop, 10s) linear both;
+
+/* The committed version runs Ana's wire, then lands in the cell it changes. */
+.sr-offline .sr-packet {
+  animation: sr-packet 0.55s cubic-bezier(0.45, 0, 0.55, 1) var(--send) both;
 }
-.sr-offline .sr-s3 {
-  animation: sr-s3 var(--sr-loop, 10s) linear both;
+
+/* Odometer: the first value is shown from the start, every later value rolls
+   in, and every value but the last rolls out when the next arrives. */
+.sr .sr-roll {
+  --roll: 14px;
 }
-.sr-offline .sr-broadcast {
-  animation: sr-broadcast 0.9s cubic-bezier(0.45, 0, 0.25, 1) both;
-  animation-delay: calc(7s + var(--i) * 0.4s);
+.sr .sr-roll[data-first] {
+  animation:
+    sr-roll-in 1ms linear 0s both,
+    sr-roll-out 0.35s ease-in var(--out) forwards;
 }
-.sr-offline .sr-ana-flash rect {
-  animation: sr-appear 0.3s ease-out both;
+.sr .sr-roll:not([data-first], [data-final]) {
+  animation:
+    sr-roll-in 0.35s ease-out var(--in) both,
+    sr-roll-out 0.35s ease-in var(--out) forwards;
 }
-.sr-offline .sr-ana-flash rect:nth-child(1) {
-  animation-delay: 7.8s;
+.sr .sr-roll[data-final] {
+  animation: sr-roll-in 0.35s ease-out var(--in) both;
 }
-.sr-offline .sr-ana-flash rect:nth-child(2) {
-  animation-delay: 8.2s;
-}
-.sr-offline .sr-ana-flash rect:nth-child(3) {
-  animation-delay: 8.6s;
-}
-.sr-offline .sr-v0 {
-  animation: sr-hide 0.2s linear 8.8s both;
-}
-.sr-offline .sr-v1 {
-  animation: sr-appear 0.2s linear 8.8s both;
+.sr .sr-big.sr-roll {
+  --roll: 24px;
 }
 
 .sr-undo .sr-data {
   animation: sr-wipe 0.35s ease-in both;
 }
+/* Undo restores the whole local grid in one step, right after the key press. */
 .sr-undo .sr-restored {
-  animation: sr-restore 0.6s ease-out 6.6s both;
+  animation: sr-restore 0.6s ease-out var(--local-restore) both;
 }
 .sr-undo .sr-cleared {
   animation: sr-cleared var(--sr-loop, 10s) linear both;
@@ -2242,20 +2392,47 @@
   transform-origin: center;
   animation: sr-key var(--sr-loop, 10s) ease-out both;
 }
-/* Scales around its own centre; the offsets move that centre onto the server, then the peer. */
+.sr-undo .sr-packet {
+  animation: sr-hop 0.4s cubic-bezier(0.45, 0, 0.55, 1) var(--at) both;
+}
+
+/* The one compressed restore leaves the grid on the wire and merges into the server. */
 .sr-undo .sr-block {
   transform-box: fill-box;
   transform-origin: center;
-  animation: sr-block var(--sr-loop, 10s) cubic-bezier(0.45, 0, 0.25, 1) both;
+  animation: sr-restore-send 1s cubic-bezier(0.45, 0, 0.55, 1) var(--restore-send) both;
 }
-.sr-undo .sr-server .sr-sub {
-  animation: sr-appear 0.3s ease-out 5.6s both;
+
+/* Inside the server it becomes five versions, then one outline groups them. */
+.sr-undo .sr-batch-chip {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: sr-pop 0.25s ease-out var(--at) both;
 }
+.sr-undo .sr-batch-outline {
+  animation: sr-appear 0.3s ease-out var(--at) both;
+}
+
+/* The batch travels to the peer as a unit. */
+.sr-undo .sr-batch-group {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: sr-batch-send 0.7s cubic-bezier(0.45, 0, 0.55, 1) var(--batch-send) both;
+}
+
+/* The peer's cells empty with the clear (v50), then all fill at once when the
+   batch lands: all of it or none. */
 .sr-undo .sr-peer-cells {
-  animation: sr-appear 0.4s ease-out 6.6s both;
+  animation:
+    sr-hide 0.3s ease-out var(--clear-applied) both,
+    sr-show 0.3s ease-out var(--batch-applied) forwards;
 }
 .sr-undo .sr-batch {
-  animation: sr-appear 0.4s ease-out 6.4s both;
+  animation: sr-appear 0.4s ease-out var(--batch-applied) both;
+}
+
+.sr .sr-pulse {
+  animation: sr-pulse 0.7s ease-out var(--at) both;
 }
 
 @keyframes sr-type {
@@ -2373,110 +2550,157 @@
   }
 }
 
-/* Before its edit lands (backwards fill), the cell is plain; then it flashes
-   amber and settles on the edited colour. */
-@keyframes sr-edit {
-  0% {
+@keyframes sr-cell-pending {
+  from {
     fill: color-mix(in srgb, var(--sw-fg) 7%, transparent);
   }
-  15% {
-    fill: var(--sw-demo-warn);
+  to {
+    fill: color-mix(in srgb, var(--sw-demo-warn) 45%, transparent);
   }
-  100% {
+}
+
+@keyframes sr-cell-commit {
+  from {
+    fill: color-mix(in srgb, var(--sw-demo-warn) 45%, transparent);
+  }
+  30% {
+    fill: var(--sw-accent);
+  }
+  to {
     fill: color-mix(in srgb, var(--sw-accent) 34%, transparent);
   }
 }
 
-/* Each chip: appear (offline), wait, then fly to the server (after reconnect). */
-@keyframes sr-outbox {
-  0%,
-  18% {
-    opacity: 0;
-    transform: none;
+@keyframes sr-cell-apply {
+  from {
+    fill: color-mix(in srgb, var(--sw-fg) 7%, transparent);
   }
-  21%,
-  52% {
+  30% {
+    fill: var(--sw-accent);
+  }
+  to {
+    fill: color-mix(in srgb, var(--sw-accent) 34%, transparent);
+  }
+}
+
+@keyframes sr-chip-queue {
+  from {
+    opacity: 0;
+    transform: translate(var(--from-x), var(--from-y)) scale(0.4);
+  }
+  50% {
+    opacity: 1;
+  }
+  to {
     opacity: 1;
     transform: none;
   }
-  58% {
-    opacity: 0.9;
-    transform: translate(var(--dx), -145px);
+}
+
+@keyframes sr-chip-drain {
+  from {
+    opacity: 1;
+    transform: none;
   }
-  60%,
-  100% {
+  40% {
+    transform: translate(var(--exit-x), var(--exit-y));
+  }
+  85% {
+    opacity: 1;
+    transform: translate(var(--to-x), var(--to-y)) scale(0.6);
+  }
+  to {
     opacity: 0;
-    transform: translate(var(--dx), -145px);
+    transform: translate(var(--to-x), var(--to-y)) scale(0.3);
   }
 }
 
-@keyframes sr-s0 {
-  0%,
-  56.9% {
+@keyframes sr-queue-1 {
+  to {
+    transform: translateX(calc(var(--pitch) * -1));
+  }
+}
+
+@keyframes sr-queue-2 {
+  from {
+    transform: translateX(calc(var(--pitch) * -1));
+  }
+  to {
+    transform: translateX(calc(var(--pitch) * -2));
+  }
+}
+
+@keyframes sr-pulse {
+  from {
+    opacity: 0;
+  }
+  20% {
     opacity: 1;
   }
-  57%,
-  100% {
+  to {
     opacity: 0;
   }
 }
 
-@keyframes sr-s1 {
-  0%,
-  56.9% {
+@keyframes sr-packet {
+  from {
     opacity: 0;
+    transform: none;
   }
-  57%,
-  65.9% {
+  10% {
     opacity: 1;
   }
-  66%,
-  100% {
-    opacity: 0;
+  45% {
+    transform: translate(var(--wire-x), 0);
   }
-}
-
-@keyframes sr-s2 {
-  0%,
-  65.9% {
-    opacity: 0;
-  }
-  66%,
-  74.9% {
+  85% {
     opacity: 1;
+    transform: translate(var(--to-x), var(--to-y)) scale(0.7);
   }
-  75%,
-  100% {
+  to {
     opacity: 0;
+    transform: translate(var(--to-x), var(--to-y)) scale(0.7);
   }
 }
 
-@keyframes sr-s3 {
-  0%,
-  74.9% {
-    opacity: 0;
-  }
-  75%,
-  100% {
-    opacity: 1;
-  }
-}
-
-@keyframes sr-broadcast {
-  0% {
+/* A packet travels one wire segment and is absorbed at the far end. */
+@keyframes sr-hop {
+  from {
     opacity: 0;
     transform: none;
   }
   15% {
     opacity: 1;
   }
-  85% {
+  80% {
     opacity: 1;
-    transform: translate(-200px, 20px);
+    transform: translate(var(--dx), var(--dy));
   }
-  100% {
+  to {
     opacity: 0;
-    transform: translate(-200px, 20px);
+    transform: translate(var(--dx), var(--dy)) scale(0.6);
+  }
+}
+
+@keyframes sr-roll-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--roll));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sr-roll-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(calc(var(--roll) * -1));
   }
 }
 
@@ -2505,12 +2729,69 @@
     opacity: 0;
   }
   28%,
-  64% {
+  39% {
     opacity: 1;
   }
-  68%,
+  42%,
   100% {
     opacity: 0;
+  }
+}
+
+@keyframes sr-restore-send {
+  from {
+    opacity: 0;
+    transform: translateX(-40px) scale(0.9);
+  }
+  25%,
+  45% {
+    opacity: 1;
+    transform: none;
+  }
+  90% {
+    opacity: 1;
+    transform: translateX(var(--dx)) scale(0.4);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(var(--dx)) scale(0.3);
+  }
+}
+
+/* Unlike sr-appear, ends at an explicit 1: it follows sr-hide on the same
+   element, whose held 0 would otherwise be the implicit end value. */
+@keyframes sr-show {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sr-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sr-batch-send {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  85% {
+    opacity: 1;
+    transform: translateY(var(--peer-drop)) scale(0.7);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(var(--peer-drop)) scale(0.7);
   }
 }
 
@@ -2539,41 +2820,39 @@
   }
 }
 
-@keyframes sr-block {
-  0%,
-  43% {
-    opacity: 0;
-    transform: translateX(-200px);
-  }
-  47% {
-    opacity: 1;
-    transform: none;
-  }
-  53% {
-    opacity: 1;
-    transform: none;
-  }
-  58% {
-    opacity: 1;
-    transform: translate(106px, -68px) scale(0.6);
-  }
-  62% {
-    opacity: 1;
-    transform: translate(106px, 92px) scale(0.6);
-  }
-  66%,
-  100% {
-    opacity: 0;
-    transform: translate(106px, 92px) scale(0.6);
-  }
-}
-
 /* ---- Responsive ---------------------------------------------------------------- */
 
 @media (max-width: 72rem) {
   .sw-lp-hero,
   .sw-lp-split {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sw-lp-split {
+    grid-template-areas:
+      "head"
+      "code"
+      "result";
+    grid-template-rows: auto;
+  }
+
+  /* One column: the demo comes before the install command, so the product
+     shows near the top of the first screen. */
+  .sw-lp-hero {
+    row-gap: 0;
+  }
+
+  .sw-lp-hero__copy {
+    display: contents;
+  }
+
+  .sw-lp-hero > .sw-hero-scene {
+    margin-top: 2.25rem;
+  }
+
+  .sw-lp-hero__install {
+    order: 1;
+    margin-top: 1.5rem;
   }
 
   .sw-lp-hero h1 {
@@ -2592,8 +2871,9 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .sw-lp-engines__choices ul {
-    grid-column: 1 / -1;
+  .sw-lp-new {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
   }
 
   .sw-arch__steps {
@@ -2621,6 +2901,11 @@
     row-gap: 1rem;
   }
 
+  /* The full eyebrow wraps at phone width and strands its last word. */
+  .sw-lp-eyebrow__extra {
+    display: none;
+  }
+
   /* Keep every chapter reachable on touch screens. */
   .sw-hero-scene__captions button {
     padding: 0.75rem 0.5rem;
@@ -2638,7 +2923,8 @@
   }
 
   .sw-features,
-  .sw-lp-engines__choices {
+  .sw-lp-engines__choices,
+  .sw-lp-new ul {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -2679,8 +2965,15 @@
   }
 
   .sw-lp-button,
-  .sw-features a {
+  .sw-features a,
+  .sw-reel__tabs::before,
+  .sw-reel__tabs button {
     transition: none;
+  }
+
+  .sw-reel__copy,
+  .sw-reel__stage {
+    animation: none;
   }
 
   .sw-features a:hover {

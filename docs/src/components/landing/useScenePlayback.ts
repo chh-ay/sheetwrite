@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * The illustrations are plain SVG with CSS keyframes. Their non-animated
  * styles are the finished, informative state, so a reduced-motion reader (for
  * whom the stylesheet removes the animations) sees the complete picture.
- * `data-landing-running` reports whether any animation currently plays.
+ * `data-landing-running` reports whether the scene can play its animations.
  * `replay()` remounts the subtree through `epoch`, which restarts every
  * animation from its first frame. `sync()` applies the current decision to
  * animations that mounted later (for example a newly selected story).
@@ -28,8 +28,11 @@ export function useScenePlayback<T extends HTMLElement>() {
       const play = visible && !reducedMotion.matches;
       const animations = root.getAnimations({ subtree: true });
       for (const animation of animations) {
-        if (play) animation.play();
-        else animation.pause();
+        // Pause only running animations. Resume only paused ones. play() on a
+        // finished animation starts it again, so a finished entrance would
+        // play again when you scroll back. replay() remounts it through epoch.
+        if (!play && animation.playState === "running") animation.pause();
+        else if (play && animation.playState === "paused") animation.play();
       }
       root.dataset.landingRunning = String(play && animations.length > 0);
     };

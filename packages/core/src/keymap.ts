@@ -19,6 +19,8 @@ const DEFAULT_BINDINGS: Record<KeyboardAction, readonly KeyShortcut[]> = {
   find: ["Mod+F"],
   replace: ["Mod+H"],
   clearContents: [{ key: "Delete" }, { key: "Backspace" }],
+  // Excel opens the note editor with Shift+F2.
+  editNote: ["Shift+F2"],
 };
 const ACTIONS = Object.keys(DEFAULT_BINDINGS) as KeyboardAction[];
 const APPLE_PLATFORM = /Mac|iPhone|iPad|iPod/i;

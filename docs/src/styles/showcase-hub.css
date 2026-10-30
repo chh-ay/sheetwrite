@@ -13,13 +13,7 @@
   position: relative;
   isolation: isolate;
   min-height: 100vh;
-  background:
-    radial-gradient(
-      ellipse at 85% 0%,
-      color-mix(in srgb, var(--sw-accent) 9%, transparent),
-      transparent 45rem
-    ),
-    var(--sw-surface-0);
+  background: var(--sw-surface-0);
   color: var(--sw-fg);
 }
 
@@ -30,12 +24,8 @@
   z-index: -1;
   height: 56rem;
   background:
-    linear-gradient(color-mix(in srgb, var(--sw-border) 55%, transparent) 1px, transparent 1px),
-    linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--sw-border) 55%, transparent) 1px,
-      transparent 1px
-    );
+    linear-gradient(var(--sw-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--sw-grid-line) 1px, transparent 1px);
   background-size: 4rem 4rem;
   content: "";
   mask-image: radial-gradient(ellipse 80% 70% at 50% 0%, #000 30%, transparent 100%);
@@ -313,13 +303,7 @@
   gap: 0.5rem;
   padding: 1.5rem 1.25rem 3rem;
   border-bottom: 0;
-  background:
-    radial-gradient(
-      ellipse at 50% 15%,
-      color-mix(in srgb, var(--sw-hub-accent) 9%, transparent),
-      transparent 85%
-    ),
-    var(--sw-surface-0);
+  background: var(--sw-surface-0);
   color: var(--sw-demo-fg);
 }
 
@@ -671,22 +655,221 @@
   text-align: right;
 }
 
-/* Engine trace: one public event per line. */
-.sw-hub-trace {
+/* Engine waterfall: stage labels beside bars that start where the last ended. */
+.sw-hub-waterfall {
   display: grid;
-  gap: 0.3rem;
+  width: 100%;
+  gap: 0.45rem;
 }
 
-.sw-hub-trace code {
+.sw-hub-waterfall > span {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.sw-hub-waterfall i {
   color: var(--sw-demo-fg-soft);
-  font: 500 0.72rem / 1.4 var(--sw-font-mono);
+  font: 500 0.75rem / 1.2 var(--sw-font-body);
+  font-style: normal;
 }
 
-.sw-hub-trace i {
-  display: inline-block;
-  min-width: 5.5rem;
+.sw-hub-waterfall b {
+  display: flex;
+  height: 0.6rem;
+  border-radius: 0.2rem;
+  background: color-mix(in srgb, var(--sw-demo-border) 60%, transparent);
+}
+
+.sw-hub-waterfall s {
+  display: block;
+  height: 100%;
+  border-radius: 0.2rem;
+  background: var(--sw-hub-accent);
+}
+
+/* Host rows: ID chips that stay with their records while the bars sort. */
+.sw-hub-records {
+  display: grid;
+  width: 100%;
+  gap: 0.4rem;
+}
+
+.sw-hub-records > span {
+  display: grid;
+  grid-template-columns: 3.25rem minmax(0, 1fr);
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.sw-hub-records code {
+  padding: 0.1rem 0.4rem;
+  border: 1px solid color-mix(in srgb, var(--sw-hub-accent) 55%, transparent);
+  border-radius: 999px;
   color: var(--sw-hub-accent-ink);
+  font: 600 0.75rem / 1.3 var(--sw-font-mono);
+  text-align: center;
+}
+
+.sw-hub-records b {
+  height: 0.6rem;
+  border-radius: 0.2rem;
+  background: color-mix(in srgb, var(--sw-hub-accent) 35%, transparent);
+}
+
+.sw-hub-records [data-edited] code {
+  background: color-mix(in srgb, var(--sw-hub-accent) 20%, transparent);
+}
+
+.sw-hub-records [data-edited] b {
+  background: var(--sw-hub-accent);
+}
+
+/* Formatting: a three-row budget with real formatting differences. */
+.sw-hub-budget {
+  display: grid;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--sw-demo-border);
+  border-radius: 0.3rem;
+  font: 500 0.75rem / 1.2 var(--sw-font-body);
+  font-variant-numeric: tabular-nums;
+}
+
+.sw-hub-budget > span {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 0.8fr);
+  border-top: 1px solid var(--sw-demo-border);
+}
+
+.sw-hub-budget > span:first-child {
+  border-top: 0;
+}
+
+.sw-hub-budget i {
+  padding: 0.3rem 0.5rem;
+  color: var(--sw-demo-fg-soft);
   font-style: normal;
+}
+
+.sw-hub-budget i + i {
+  text-align: right;
+}
+
+.sw-hub-budget [data-tone="head"] {
+  background: color-mix(in srgb, var(--sw-hub-accent) 22%, transparent);
+}
+
+.sw-hub-budget [data-tone="head"] i {
+  color: var(--sw-fg-strong);
+  font-weight: 650;
+}
+
+.sw-hub-budget [data-tone="negative"] i + i {
+  background: color-mix(in srgb, var(--sw-demo-danger) 14%, transparent);
+  color: var(--sw-demo-danger);
+}
+
+.sw-hub-budget [data-tone="total"] i {
+  color: var(--sw-fg-strong);
+  font-weight: 700;
+}
+
+.sw-hub-budget [data-tone="total"] i:first-child {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+/* Data tools: a filtered header, then cells that show each rule's outcome. */
+.sw-hub-rules {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: center;
+  width: 100%;
+}
+
+.sw-hub-rules__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1.75rem);
+  gap: 3px;
+}
+
+.sw-hub-rules__grid i,
+.sw-hub-rules__grid b {
+  height: 1rem;
+  border-radius: 2px;
+}
+
+.sw-hub-rules__grid i {
+  background: color-mix(in srgb, var(--sw-demo-fg) 16%, transparent);
+}
+
+/* The filtered column: a funnel mark drawn as a small accent triangle. */
+.sw-hub-rules__grid i[data-filtered] {
+  background:
+    linear-gradient(to bottom right, transparent 50%, var(--sw-hub-accent) 50%) right 2px bottom
+      2px / 0.5rem 0.5rem no-repeat,
+    color-mix(in srgb, var(--sw-hub-accent) 28%, transparent);
+}
+
+.sw-hub-rules__grid b {
+  background: color-mix(in srgb, var(--sw-demo-fg) 7%, transparent);
+}
+
+.sw-hub-rules__grid b[data-state="reject"] {
+  outline: 2px solid var(--sw-demo-danger);
+  outline-offset: -2px;
+}
+
+.sw-hub-rules__grid b[data-state="warn"] {
+  background: color-mix(in srgb, var(--sw-demo-warn) 45%, transparent);
+}
+
+.sw-hub-rules__grid b[data-state="lock"] {
+  background: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--sw-demo-fg) 22%, transparent) 0 2px,
+    transparent 2px 5px
+  );
+}
+
+.sw-hub-rules__legend {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.sw-hub-rules__legend span {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+  color: var(--sw-demo-fg-soft);
+  font: 500 0.75rem / 1.2 var(--sw-font-body);
+}
+
+.sw-hub-rules__legend span::before {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 2px;
+  content: "";
+}
+
+.sw-hub-rules__legend [data-state="reject"]::before {
+  outline: 2px solid var(--sw-demo-danger);
+  outline-offset: -2px;
+}
+
+.sw-hub-rules__legend [data-state="warn"]::before {
+  background: color-mix(in srgb, var(--sw-demo-warn) 45%, transparent);
+}
+
+.sw-hub-rules__legend [data-state="lock"]::before {
+  background: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--sw-demo-fg) 30%, transparent) 0 2px,
+    transparent 2px 4px
+  );
 }
 
 /* The app showcase leads the hub at full width: preview beside the copy. */

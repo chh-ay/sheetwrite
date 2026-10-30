@@ -58,13 +58,7 @@
   align-items: center;
   padding: calc(var(--sw-demo-space-4) * 1.25) calc(var(--sw-demo-space-4) * 1.5);
   border-bottom: 1px solid var(--sw-demo-border);
-  background:
-    radial-gradient(
-      52rem 16rem at 88% -30%,
-      color-mix(in srgb, var(--sw-demo-accent) 16%, transparent),
-      transparent 70%
-    ),
-    var(--sw-demo-surface);
+  background: var(--sw-demo-surface);
 }
 
 .sw-engine-stage__intro {

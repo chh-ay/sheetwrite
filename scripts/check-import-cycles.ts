@@ -237,6 +237,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "GridConfig",
       "GridEvents",
       "GridOptions",
+      "IconOverrides",
       "KeyboardAction",
       "KeyboardOptions",
       "KeyShortcut",

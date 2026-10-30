@@ -1074,13 +1074,12 @@ function PerformanceRoute() {
         </section>
 
         <section aria-labelledby="paging-title" className="sw-sp-section" id="paging">
-          <p className="sw-sp-kicker">Live rectangular paging</p>
-          <h2 id="paging-title">Requested columns, returned columns, bounded owners</h2>
+          <p className="sw-sp-kicker">Paging</p>
+          <h2 id="paging-title">Only the columns on screen are loaded.</h2>
           <p>
-            This source uses windowed column loading. Every request names exact sorted column bands;
-            every row generates only those keys and returns explicit <code>null</code> blanks.
-            Counts below come from that source and public Store and runtime diagnostics. The exact
-            API setting is <code>{`{ protocol: 2, columns: "windowed" }`}</code>.
+            Each request names the exact columns it needs, and the source returns only those, with
+            explicit <code>null</code> blanks. The source setting is{" "}
+            <code>{`{ protocol: 2, columns: "windowed" }`}</code>.
           </p>
 
           <details className="sw-sp-diagnostics">
@@ -1217,11 +1216,11 @@ function PerformanceRoute() {
             </summary>
             <div className="sw-sp-console">
               <div className="sw-sp-console__intro">
-                <h3>Incomplete global work stays typed and visible</h3>
+                <h3>Whole-sheet answers need the whole sheet</h3>
                 <p>
-                  A bounded working set cannot honestly answer a whole-sheet query or export. These
-                  controls call the real aggregate and CSV APIs; <code>IncompleteDataError</code>
-                  carries the public loaded and total counts.
+                  With only part of the sheet loaded, a whole-sheet SUM or CSV export cannot be
+                  correct. These controls call the real APIs, which refuse with{" "}
+                  <code>IncompleteDataError</code> and report how much is loaded.
                 </p>
               </div>
               <div className="sw-sp-actions">
@@ -1268,21 +1267,20 @@ function PerformanceRoute() {
 
         <section aria-labelledby="resource-title" className="sw-sp-section" id="resources">
           <div className="sw-sp-resource-copy">
-            <p className="sw-sp-kicker">Measured ownership</p>
-            <h2 id="resource-title">Cache capacity is not logical size</h2>
+            <p className="sw-sp-kicker">Memory</p>
+            <h2 id="resource-title">Data size, allocated memory and WASM pages, apart.</h2>
             <p>
               The public resource report
               <span data-testid="scale-resource-schema" data-empty={!stats.resource}>
                 {stats.resource ? ` v${stats.resource.schemaVersion}` : " (loading report)"}
               </span>{" "}
-              separates logical live bytes, allocated owner capacity, and observed WASM committed
-              pages. The clean page cache and sparse dirty overlay remain distinct owners.
+              shows each separately. The page cache and the unsaved edits are counted on their own.
             </p>
           </div>
           <div className="sw-sp-resource-panel">
             <dl className="sw-sp-stats" data-testid="scale-resource-summary">
               <div>
-                <dt>Logical live payload</dt>
+                <dt>Data size</dt>
                 <dd data-testid="scale-resource-logical">
                   {formatBytes(stats.resource?.totals.logicalLiveBytes ?? 0, {
                     kib: 1,
@@ -1292,7 +1290,7 @@ function PerformanceRoute() {
                 </dd>
               </div>
               <div>
-                <dt>Allocated owner capacity</dt>
+                <dt>Allocated memory</dt>
                 <dd data-testid="scale-resource-allocated">
                   {formatBytes(stats.resource?.totals.allocatedCapacityBytes ?? 0, {
                     kib: 1,
@@ -1302,7 +1300,7 @@ function PerformanceRoute() {
                 </dd>
               </div>
               <div>
-                <dt>WASM committed pages</dt>
+                <dt>WASM pages</dt>
                 <dd data-testid="scale-resource-committed">
                   {stats.resource?.wasm.wasmCommittedBytes == null
                     ? "Unavailable"
@@ -1366,11 +1364,11 @@ function PerformanceRoute() {
         </section>
 
         <section aria-labelledby="crossing-title" className="sw-sp-section" id="wasm-crossings">
-          <p className="sw-sp-kicker">Measured operation cost</p>
-          <h2 id="crossing-title">WASM crossings are counted, not guessed</h2>
+          <p className="sw-sp-kicker">Engine calls</p>
+          <h2 id="crossing-title">Every call into the engine is counted.</h2>
           <p>
-            Each control commits a real 20,000-cell Grid transaction and reads the public packed
-            mutation and runtime ownership counters before and after it.
+            Each control commits a real 20,000-cell edit and reads the engine's public counters
+            before and after it.
           </p>
           <details className="sw-sp-debug-disclosure" data-testid="scale-crossing-details">
             <summary>
@@ -1451,7 +1449,7 @@ function PerformanceRoute() {
         >
           <div className="sw-sp-proof-heading">
             <div>
-              <p className="sw-sp-kicker">Decision record</p>
+              <p className="sw-sp-kicker">Benchmark</p>
               <h2 id="evidence-title">The working set stays bounded as the address space grows.</h2>
             </div>
             <p>

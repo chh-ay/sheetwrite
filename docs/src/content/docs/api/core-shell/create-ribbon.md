@@ -11,7 +11,7 @@ dropdowns, as the host narrows. Returns the piece with an idempotent
 `destroy`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/ribbon-factory.ts#L22"><code>packages/core/src/shell/ribbon-factory.ts#L22</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/ribbon-factory.ts#L24"><code>packages/core/src/shell/ribbon-factory.ts#L24</code></a></dd></div>
 </dl>
 
 ## Declaration

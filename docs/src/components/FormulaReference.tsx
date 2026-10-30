@@ -1,5 +1,13 @@
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 
+import { DemoSelect } from "../showcases/ui/DemoSelect.js";
+
+const ENGINE_OPTIONS = [
+  { label: "Either engine", value: "all" },
+  { label: "Default and full", value: "default" },
+  { label: "Full only", value: "full" },
+] as const;
+
 /** Filters generated family rows without duplicating the checked formula inventory. */
 export function FormulaReference({ children }: Readonly<{ children: ReactNode }>) {
   const root = useRef<HTMLDivElement>(null);
@@ -38,18 +46,13 @@ export function FormulaReference({ children }: Readonly<{ children: ReactNode }>
             onChange={(event) => setQuery(event.target.value)}
           />
         </label>
-        <label htmlFor={`${id}-engine`}>
-          Available in
-          <select
-            id={`${id}-engine`}
-            value={engine}
-            onChange={(event) => setEngine(event.target.value)}
-          >
-            <option value="all">Either engine</option>
-            <option value="default">Default and full</option>
-            <option value="full">Full only</option>
-          </select>
-        </label>
+        <DemoSelect
+          className="sw-formula-filter__engine"
+          label="Available in"
+          options={ENGINE_OPTIONS}
+          value={engine}
+          onValueChange={setEngine}
+        />
         <p role="status">{count === null ? "All functions" : `${count} functions`}</p>
       </div>
       {count === 0 ? <p>No functions match. Try another name or engine.</p> : null}

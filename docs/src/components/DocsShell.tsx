@@ -1,7 +1,13 @@
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 
-import { DOCS_NAVIGATION, type DocumentNeighbours, documentNeighbours } from "../lib/navigation.js";
+import {
+  DOCS_NAVIGATION,
+  type DocumentNeighbours,
+  documentNeighbours,
+  type NavigationItem,
+  navigationBadge,
+} from "../lib/navigation.js";
 import {
   LATEST_RELEASE,
   RELEASES_HREF,
@@ -49,22 +55,35 @@ function Brand() {
 
 interface NavigationLocation {
   section: string;
+  /** Groups between the section and the page, outermost first. */
+  ancestors: readonly NavigationItem[];
   label: string;
   href: string;
 }
 
-/** Deepest navigation entry whose href contains the current page. */
+/**
+ * Deepest navigation entry whose href contains the current page, with the
+ * groups above it, so the sidebar can open exactly that path and the header
+ * can show it.
+ */
 function nearestNavigationItem(activeHref: string | undefined): NavigationLocation | undefined {
   if (activeHref === undefined) return undefined;
   let nearest: NavigationLocation | undefined;
-  for (const section of DOCS_NAVIGATION) {
-    for (const item of section.items) {
-      const matches =
-        activeHref === item.href || (item.href !== "/docs/" && activeHref.startsWith(item.href));
-      if (matches && (nearest === undefined || item.href.length > nearest.href.length)) {
-        nearest = { section: section.label, label: item.label, href: item.href };
+  const visit = (section: string, item: NavigationItem, ancestors: NavigationItem[]): void => {
+    const { href } = item;
+    if (href !== undefined) {
+      const matches = activeHref === href || (href !== "/docs/" && activeHref.startsWith(href));
+      if (matches && (nearest === undefined || href.length > nearest.href.length)) {
+        nearest = { section, ancestors: [...ancestors], label: item.label, href };
       }
     }
+    if (item.items === undefined) return;
+    ancestors.push(item);
+    for (const child of item.items) visit(section, child, ancestors);
+    ancestors.pop();
+  };
+  for (const section of DOCS_NAVIGATION) {
+    for (const item of section.items) visit(section.label, item, []);
   }
   return nearest;
 }
@@ -75,9 +94,9 @@ interface Crumb {
 }
 
 /**
- * Trail for the page header. Section and package names come from the same
- * navigation model the sidebar renders, so the two never disagree about where
- * a page sits; the page's own name ends the trail.
+ * Trail for the page header. Section, group and package names come from the
+ * same navigation model the sidebar renders, so the two never disagree about
+ * where a page sits; the page's own name ends the trail.
  */
 function breadcrumbsFor(activeHref: string | undefined, title: string): readonly Crumb[] {
   const trail: Crumb[] = [{ href: "/docs/", label: "Documentation" }];
@@ -88,6 +107,7 @@ function breadcrumbsFor(activeHref: string | undefined, title: string): readonly
   // A section's index page carries the section's name; one crumb is enough.
   if (nearest.section === title) return [...trail, { label: title }];
   trail.push({ label: nearest.section });
+  for (const group of nearest.ancestors) trail.push({ href: group.href, label: group.label });
   // The entry the page itself belongs to is not a step above it.
   if (nearest.href !== activeHref) trail.push({ href: nearest.href, label: nearest.label });
   return [...trail, { label: title }];
@@ -144,6 +164,80 @@ function LatestReleaseCard({
   );
 }
 
+const BADGE_TEXT = { new: "New", updated: "Updated" } as const;
+
+/** New/Updated marker for the latest release; text, so screen readers announce it. */
+function NavigationBadgeLabel({ item }: Readonly<{ item: NavigationItem }>) {
+  const badge = navigationBadge(item, LATEST_RELEASE.version);
+  if (badge === undefined) return null;
+  return (
+    <span className="sw-nav-badge" data-badge={badge}>
+      {BADGE_TEXT[badge]}
+    </span>
+  );
+}
+
+interface NavigationEntriesProps {
+  items: readonly NavigationItem[];
+  current: NavigationLocation | undefined;
+  onNavigate?: () => void;
+}
+
+/**
+ * One level of the tree. A group is a collapsible block that opens when the
+ * current page is inside it; its own page, if any, is the first link inside,
+ * because a link in the toggle row would also toggle the group.
+ */
+function NavigationEntries({ items, current, onNavigate }: Readonly<NavigationEntriesProps>) {
+  return items.map((item) => {
+    if (item.items === undefined) {
+      return (
+        <Link
+          activeOptions={{ exact: true }}
+          aria-current={current?.href === item.href ? "page" : undefined}
+          key={item.href}
+          onClick={onNavigate}
+          to={item.href}
+        >
+          <span>{item.label}</span>
+          <NavigationBadgeLabel item={item} />
+        </Link>
+      );
+    }
+
+    // A group's own page opens the group too; call its link Overview to avoid repeating the name.
+    const open =
+      (current?.ancestors.includes(item) ?? false) ||
+      (item.href !== undefined && current?.href === item.href);
+    const ownPage =
+      item.href === undefined
+        ? []
+        : [
+            {
+              label: "Overview",
+              href: item.href,
+              added: item.added,
+              updated: item.updated,
+            },
+          ];
+    return (
+      <details className="sw-nav-subgroup" key={`${item.label}:${open}`} open={open}>
+        <summary>
+          <span>{item.label}</span>
+          <NavigationBadgeLabel item={item} />
+        </summary>
+        <div>
+          <NavigationEntries
+            current={current}
+            items={[...ownPage, ...item.items]}
+            onNavigate={onNavigate}
+          />
+        </div>
+      </details>
+    );
+  });
+}
+
 /**
  * The section list itself, shared by the sidebar and the drawer so the two can
  * never advertise different documentation. `onNavigate` lets the drawer close
@@ -154,7 +248,6 @@ function NavigationSections({
   onNavigate,
 }: Readonly<{ activeHref?: string; onNavigate?: () => void }>) {
   const current = nearestNavigationItem(activeHref);
-  const currentHref = current?.href;
   return (
     <nav aria-label="Documentation" className="sw-sidebar__nav">
       <LatestReleaseCard activeHref={activeHref} onNavigate={onNavigate} />
@@ -164,19 +257,12 @@ function NavigationSections({
           key={`${section.label}:${current?.section}`}
           open={section.label === current?.section}
         >
-          <summary>{section.label}</summary>
+          <summary>
+            <span>{section.label}</span>
+            <NavigationBadgeLabel item={section} />
+          </summary>
           <div>
-            {section.items.map((item) => (
-              <Link
-                activeOptions={{ exact: true }}
-                aria-current={currentHref === item.href ? "page" : undefined}
-                key={item.href}
-                onClick={onNavigate}
-                to={item.href}
-              >
-                {item.label}
-              </Link>
-            ))}
+            <NavigationEntries current={current} items={section.items} onNavigate={onNavigate} />
           </div>
         </details>
       ))}
