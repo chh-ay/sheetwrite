@@ -78,6 +78,8 @@ test.describe("react workbench — controlled analytics", () => {
     await openWorkbench(page);
 
     await expect(page.locator(GRID)).toBeInViewport();
+    // The page owns the one main landmark; the workbench inside it adds none.
+    await expect(page.getByRole("main")).toHaveCount(1);
     await expect(
       page.getByRole("complementary", { name: "Controlled analytics state" }),
     ).toBeVisible();

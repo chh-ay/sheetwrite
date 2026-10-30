@@ -1,5 +1,4 @@
-import { cellA1 } from "@sheetwrite/core";
-import { createGrid, type Grid } from "@sheetwrite/core";
+import { cellA1, createGrid, type DocumentOp, type Grid } from "@sheetwrite/core";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -55,7 +54,10 @@ export default function FormulasShowcase() {
   const [error, setError] = useState("");
   const [activeSheet, setActiveSheet] = useState<string>(ANALYSIS_SHEET_ID);
   const [selected, setSelected] = useState<FormulaPanel["id"]>(FORMULA_PANELS[0]!.id);
-  const [promotion, setPromotion] = useState(false);
+  // The writes that put back the cells the promotion changed. The page holds
+  // them, not Grid history, because a later edit (such as a playground formula)
+  // would otherwise be the one that `grid.undo()` removes.
+  const [promotionRestore, setPromotionRestore] = useState<DocumentOp[] | null>(null);
   const [recalc, setRecalc] = useState<Recalc | null>(null);
   const [draft, setDraft] = useState(PLAYGROUND_EXAMPLE);
   const [playground, setPlayground] = useState<{ result: string; ms: number } | null>(null);
@@ -161,26 +163,42 @@ export default function FormulasShowcase() {
     const grid = gridRef.current;
     const ledger = ledgerRef.current;
     if (!grid || !ledger) return;
+
     const started = performance.now();
-    if (promotion) {
-      grid.undo();
+    if (promotionRestore) {
+      const result = grid.applyTransaction({ patches: promotionRestore });
+      if (result.status !== "applied") return;
+
       setRecalc({
         label: "Undo: the promotion is gone and every panel follows",
-        cells: 0,
+        cells: promotionRestore.length,
         ms: performance.now() - started,
       });
-      setPromotion(false);
+      setPromotionRestore(null);
       return;
     }
+
     const patches = apacPromotionOps(ledger);
-    const result = grid.applyTransaction({ patches });
-    if (result.status !== "applied") return;
+    const restore: DocumentOp[] = [];
+    const stopRecording = grid.on("change", ({ changes }) => {
+      for (const change of changes) {
+        restore.push({ op: "set", addr: change.addr, value: change.oldValue });
+      }
+    });
+    let applied = false;
+    try {
+      applied = grid.applyTransaction({ patches }).status === "applied";
+    } finally {
+      stopRecording();
+    }
+    if (!applied) return;
+
     setRecalc({
       label: "APAC promotion: +20% units on every APAC order",
       cells: patches.length,
       ms: performance.now() - started,
     });
-    setPromotion(true);
+    setPromotionRestore(restore);
   };
 
   const runDraft = () => {
@@ -252,13 +270,13 @@ export default function FormulasShowcase() {
             </div>
             <div className="sw-fx-bar__actions">
               <button
-                aria-pressed={promotion}
+                aria-pressed={promotionRestore !== null}
                 data-testid="formulas-promotion"
                 disabled={state !== "ready"}
                 onClick={togglePromotion}
                 type="button"
               >
-                {promotion ? "Undo the APAC promotion" : "Run an APAC promotion: +20% units"}
+                {promotionRestore ? "Undo the APAC promotion" : "Run an APAC promotion: +20% units"}
               </button>
               <fieldset className="sw-fx-sheets" aria-label="Sheet">
                 {[
