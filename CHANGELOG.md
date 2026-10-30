@@ -6,13 +6,26 @@ Published releases and user-visible changes to Sheetwrite are recorded here. Pac
 - [`@sheetwrite/wasm`](packages/wasm/CHANGELOG.md)
 - [`@sheetwrite/formulas`](packages/formulas/CHANGELOG.md)
 - [`@sheetwrite/xlsx`](packages/xlsx/CHANGELOG.md)
+- [`@sheetwrite/charts`](packages/charts/CHANGELOG.md)
 - [`@sheetwrite/react`](packages/react/CHANGELOG.md)
 - [`@sheetwrite/vue`](packages/vue/CHANGELOG.md)
 - [`@sheetwrite/svelte`](packages/svelte/CHANGELOG.md)
 
 From 0.5.0, each release has a release post with highlights, measured
 performance, and an upgrade checklist:
-[sheetwrite.vercel.app/docs/releases](https://sheetwrite.vercel.app/docs/releases/).
+[sheetwrite.dev/docs/releases](https://www.sheetwrite.dev/docs/releases/).
+
+## 0.6.0
+
+- Add charts (with the new optional `@sheetwrite/charts`), pivot tables,
+  reference operators, `OFFSET` and `INDIRECT`, iterative calculation, and an
+  optional Excel-style ribbon.
+- Keep XLSX parts Sheetwrite does not model, lower XLSX import memory, and
+  speed up formula edits and large undo.
+- Remove 10 unused engine `CellStore` methods; volatile functions recalculate
+  after each edit.
+- All eight packages and the engine crate release as 0.6.0.
+- [Release notes](https://www.sheetwrite.dev/docs/releases/0.6.0/).
 
 ## 0.5.4
 

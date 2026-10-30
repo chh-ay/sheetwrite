@@ -1,0 +1,69 @@
+{
+  "protocol": "sheetwrite-capture-scope-v1",
+  "label": "formula",
+  "metadata": {
+    "commit": "ac4ab632d80abf8d0c2986685c04ebce7747e5fa",
+    "dirty": false,
+    "engineCommit": "dcfb2037cc340451cf68bc4369e419c9adb13b3f",
+    "harnessCommit": "ac4ab632d80abf8d0c2986685c04ebce7747e5fa",
+    "purpose": "capture",
+    "timestamp": "2026-10-29T03:24:31.614Z",
+    "machine": "hypr-zephyrus",
+    "cpu": "12th Gen Intel(R) Core(TM) i9-12900H",
+    "bun": "1.4.4",
+    "node": "v26.12.1",
+    "npm": "11.20.0",
+    "bunNodeCompat": "v26.3.0",
+    "kernel": "7.3.0-4-cachyos",
+    "cpuSlot": 4,
+    "memoryMax": "8G",
+    "effectiveMemoryMaxBytes": 8589934592,
+    "memoryMaxProof": "MemoryMax=8589934592",
+    "scope": "run-p8530-i12969.scope",
+    "slice": "/user.slice/user-1000.slice/user@1000.service/sheetwrite.slice/sheetwrite-heavy.slice",
+    "sliceHighBefore": 0,
+    "command": [
+      "bun",
+      "run",
+      "src/formula-bench.ts",
+      "--output",
+      "results/releases/0.5.4/formula-results.json"
+    ],
+    "effectiveCpuAffinity": "4,6",
+    "affinityProof": "Cpus_allowed_list:\t4,6",
+    "affinityProofSource": "/proc/self/status before starting the frozen capture runner; child inherits affinity",
+    "cpuSlotMeaning": "reserved entry slot; effectiveCpuAffinity records the actual CPU mask",
+    "reservationMode": "slot 4, both slot locks held, exclusive quiet lock",
+    "selectedRootWasmSha256": {
+      "packages/wasm/pkg/sheetwrite_wasm_bg.wasm": "7036bd31efec294b5bf916986f3d7ccbb7468c96497c44be47c2fbf809cf569c",
+      "packages/formulas/pkg/sheetwrite_wasm_bg.wasm": "1c13192ae2661591d1c3eb8c05dbec83b84867ae83af40deae72ae5c54bb8b63"
+    },
+    "affinityRecorderSha256": "cb2214ba2acd0a6beef69ef26ff6c11aca0954cd2bc5e197966d20ee46db229c",
+    "formulaAffinityCorrection": {
+      "reason": "JSC background WASM compilation competes with the main thread on one pinned CPU",
+      "intentionalProtocolCorrection": true,
+      "priorAbsoluteGateFailures": [
+        "capture-attempts/formula-attempt-1.json",
+        "capture-attempts/formula-attempt-2.json"
+      ],
+      "evidence": [
+        "capture-attempts/formula-affinity-confirmation.json",
+        "capture-attempts/formula-affinity-environment-matrix.json"
+      ],
+      "gateLimitsChanged": false,
+      "engineOptimizationApplied": false
+    }
+  },
+  "status": "passed",
+  "endedAt": "2026-10-29T03:24:44.401Z",
+  "exitCode": 0,
+  "sliceHighAfter": 0,
+  "memoryPeakBytes": 290361344,
+  "artifacts": [
+    {
+      "file": "formula-results.json",
+      "sha256": "60f7c2184adc931ade3af5244b53f1196f961656d4d13d4b4c5720a06504e7f8",
+      "modifiedAtMs": 1793244284390
+    }
+  ]
+}

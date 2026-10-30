@@ -1,5 +1,52 @@
 # @sheetwrite/vue
 
+## 0.6.0
+
+### Minor Changes
+
+- fbdd6db: Release with the other packages, so all eight packages share version 0.6.0 and the adapters depend on `@sheetwrite/core` 0.6.0. The adapter APIs do not change.
+
+### Patch Changes
+
+- 8d70aae: Package READMEs and API doc comments link to the restructured documentation pages.
+- 3bdb073: The packages are smaller to install. The code is not minified and stays readable.
+  
+  - `@sheetwrite/core` is 1.83 MB → 1.55 MB unpacked (387 KB → 350 KB packed), with 214 → 157 files.
+  - The packages publish only the type declarations that their entry points use. Core no longer ships 57 internal declaration files (117 KB), and `@sheetwrite/xlsx` no longer ships 8. You cannot import these files through the package `exports`, so no types change.
+  - The published JavaScript uses 2-space indentation instead of 4. This saves 155 KB in core and 20 KB in `@sheetwrite/xlsx`.
+  - `@sheetwrite/wasm` and `@sheetwrite/formulas` no longer publish `pkg/sheetwrite_wasm_bg.wasm.d.ts` (14 KB each). No entry point refers to it, and `sheetwrite_wasm.d.ts` has the same types.
+- Updated dependencies [cbcf0b8]
+- Updated dependencies [81e45e3]
+- Updated dependencies [92dcd37]
+- Updated dependencies [d99f762]
+- Updated dependencies [b159a35]
+- Updated dependencies [b159a35]
+- Updated dependencies [b159a35]
+- Updated dependencies [92dcd37]
+- Updated dependencies [92dcd37]
+- Updated dependencies [b6f333c]
+- Updated dependencies [8d70aae]
+- Updated dependencies [9dc3ab1]
+- Updated dependencies [03ad409]
+- Updated dependencies [286ac93]
+- Updated dependencies [ec8e0ee]
+- Updated dependencies [0b5cc2d]
+- Updated dependencies [ec8e0ee]
+- Updated dependencies [78665d3]
+- Updated dependencies [60590f9]
+- Updated dependencies [c56a350]
+- Updated dependencies [c0f9c00]
+- Updated dependencies [0f36fda]
+- Updated dependencies [92dcd37]
+- Updated dependencies [c56a350]
+- Updated dependencies [3bdb073]
+- Updated dependencies [ec8e0ee]
+- Updated dependencies [bcfe991]
+- Updated dependencies [bcfe991]
+- Updated dependencies [2984b0b]
+- Updated dependencies [5308206]
+  - @sheetwrite/core@0.6.0
+
 ## 0.5.4
 
 ### Patch Changes

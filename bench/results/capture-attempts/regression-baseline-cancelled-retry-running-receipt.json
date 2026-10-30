@@ -1,0 +1,33 @@
+{
+  "protocol": "sheetwrite-capture-scope-v1",
+  "label": "regression-baseline",
+  "metadata": {
+    "commit": "ac4ab632d80abf8d0c2986685c04ebce7747e5fa",
+    "dirty": false,
+    "engineCommit": "ac4ab632d80abf8d0c2986685c04ebce7747e5fa",
+    "harnessCommit": "ac4ab632d80abf8d0c2986685c04ebce7747e5fa",
+    "harnessPatchSha256": "350a7073f76f6dca899e1b31aacb6550dc852360914cc4afabadcd6adff6d8b7",
+    "purpose": "capture",
+    "timestamp": "2026-10-29T03:53:45.575Z",
+    "machine": "hypr-zephyrus",
+    "cpu": "12th Gen Intel(R) Core(TM) i9-12900H",
+    "bun": "1.4.4",
+    "node": "v26.12.1",
+    "npm": "11.19.1",
+    "bunNodeCompat": "v26.3.0",
+    "kernel": "7.3.0-4-cachyos",
+    "cpuSlot": 4,
+    "memoryMax": "8G",
+    "effectiveMemoryMaxBytes": 8589934592,
+    "memoryMaxProof": "MemoryMax=8589934592",
+    "scope": "run-p32269-i89981.scope",
+    "slice": "/user.slice/user-1000.slice/user@1000.service/sheetwrite.slice/sheetwrite-heavy.slice",
+    "sliceHighBefore": 0,
+    "command": [
+      "bash",
+      "-c",
+      "bun run src/render-driver.ts --rounds 10 --output results/render-baseline-raw.json --markdown-output results/render-baseline-raw.md && bun run src/generate-baseline.ts --input results/render-baseline-raw.json --power-mode balanced --concurrency 1 --write-baseline"
+    ]
+  },
+  "status": "running"
+}

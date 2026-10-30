@@ -1,0 +1,243 @@
+{
+  "protocolVersion": 1,
+  "mode": "full",
+  "matrixId": "paged-full-v1",
+  "meta": {
+    "commit": "685c9c920f89860ffff96531a3d18b6845808444",
+    "dirty": false,
+    "timestamp": "2026-10-28T17:16:27.748Z",
+    "engineVersions": {
+      "sheetwrite": "0.5.4"
+    }
+  },
+  "rows": 1000000,
+  "columns": 5,
+  "runs": 12,
+  "pageRows": 120,
+  "cacheBudgetBytes": 33554432,
+  "chunkRows": 4096,
+  "denseLogicalBytes": 65000000,
+  "widePageColumns": 256,
+  "cacheChurnPages": 2048,
+  "cacheChurnBudgetBytes": 30720,
+  "cacheChurnRetainedChunks": 512,
+  "timings": {
+    "startup": {
+      "samplesMs": [
+        3.779463,
+        0.17881499999998596,
+        0.08861500000000433,
+        0.08484900000001971,
+        0.058952999999974054,
+        0.11351700000000164,
+        0.0590249999999628,
+        0.13852900000000545,
+        0.06673799999998664,
+        0.18805600000007416,
+        0.06827999999995882,
+        0.5312889999999015
+      ],
+      "stat": {
+        "median": 0.10106600000000299,
+        "p95": 1.9929672999999435,
+        "mean": 0.4463440833333229,
+        "stddev": 1.0126893170565252,
+        "min": 0.058952999999974054,
+        "max": 3.779463,
+        "iters": 12
+      }
+    },
+    "first-page": {
+      "samplesMs": [
+        4.826244000000003,
+        0.24871899999999414,
+        0.1572969999999998,
+        0.4794650000000047,
+        0.16370699999998806,
+        0.15592199999997547,
+        0.1447989999999777,
+        0.1493719999999712,
+        0.145608999999979,
+        0.14661399999999958,
+        0.1501940000000559,
+        0.1519620000000259
+      ],
+      "stat": {
+        "median": 0.1539420000000007,
+        "p95": 2.4355155500000008,
+        "mean": 0.5766586666666645,
+        "stddev": 1.2845698838036774,
+        "min": 0.1447989999999777,
+        "max": 4.826244000000003,
+        "iters": 12
+      }
+    },
+    "distant-page": {
+      "samplesMs": [
+        2.3216250000000045,
+        0.17763800000000174,
+        0.14572499999999877,
+        0.18520700000004808,
+        0.15065600000002632,
+        0.14867299999997385,
+        0.15161599999998998,
+        0.14238399999999274,
+        0.14250499999997146,
+        0.15547700000001896,
+        0.14671099999998205,
+        0.1425369999999475
+      ],
+      "stat": {
+        "median": 0.1496645000000001,
+        "p95": 1.146595100000027,
+        "mean": 0.33422949999999635,
+        "stddev": 0.5993681531914143,
+        "min": 0.14238399999999274,
+        "max": 2.3216250000000045,
+        "iters": 12
+      }
+    },
+    "wide-page": {
+      "samplesMs": [
+        49.823145,
+        30.049758999999995,
+        35.484995000000026,
+        12.010455999999976,
+        13.353964000000019,
+        11.136792000000014,
+        11.365161999999998,
+        13.166952000000038,
+        11.52920800000004,
+        10.740424000000075,
+        12.616055999999958,
+        10.711546999999996
+      ],
+      "stat": {
+        "median": 12.313255999999967,
+        "p95": 41.9371625,
+        "mean": 18.499038333333345,
+        "stddev": 12.278945943449726,
+        "min": 10.711546999999996,
+        "max": 49.823145,
+        "iters": 12
+      }
+    },
+    "cache-churn": {
+      "samplesMs": [
+        49.99880800000001,
+        32.57138499999999,
+        47.69680900000003,
+        26.18428499999999,
+        20.86658299999999,
+        24.076411000000007,
+        15.885644000000013,
+        15.755769999999984,
+        15.856746000000044,
+        16.186147000000005,
+        15.958521000000019,
+        16.02814699999999
+      ],
+      "stat": {
+        "median": 18.526365,
+        "p95": 48.73270855000002,
+        "mean": 24.75543800000001,
+        "stddev": 11.930658086837628,
+        "min": 15.755769999999984,
+        "max": 49.99880800000001,
+        "iters": 12
+      }
+    }
+  },
+  "peakAllocatedBytes": 537600,
+  "peakChunks": 10,
+  "probes": [
+    {
+      "scenario": "empty",
+      "wasmDeltaBytes": 65536,
+      "chunks": 0,
+      "loadedCells": 0,
+      "dirtyCells": 0,
+      "allocatedBytes": 0,
+      "dirtyAllocatedBytes": 0,
+      "retainedBytes": 0,
+      "fullyLoaded": false
+    },
+    {
+      "scenario": "padding",
+      "wasmDeltaBytes": 65536,
+      "chunks": 0,
+      "loadedCells": 0,
+      "dirtyCells": 0,
+      "allocatedBytes": 0,
+      "dirtyAllocatedBytes": 0,
+      "retainedBytes": 0,
+      "fullyLoaded": false
+    },
+    {
+      "scenario": "viewport",
+      "wasmDeltaBytes": 327680,
+      "chunks": 5,
+      "loadedCells": 150,
+      "dirtyCells": 0,
+      "allocatedBytes": 268800,
+      "dirtyAllocatedBytes": 0,
+      "retainedBytes": 268800,
+      "fullyLoaded": false
+    },
+    {
+      "scenario": "scroll-1",
+      "wasmDeltaBytes": 1703936,
+      "chunks": 15,
+      "loadedCells": 50000,
+      "dirtyCells": 0,
+      "allocatedBytes": 806400,
+      "dirtyAllocatedBytes": 0,
+      "retainedBytes": 806400,
+      "fullyLoaded": false
+    },
+    {
+      "scenario": "scroll-10",
+      "wasmDeltaBytes": 7667712,
+      "chunks": 125,
+      "loadedCells": 500000,
+      "dirtyCells": 0,
+      "allocatedBytes": 6720000,
+      "dirtyAllocatedBytes": 0,
+      "retainedBytes": 6720000,
+      "fullyLoaded": false
+    },
+    {
+      "scenario": "scroll-100",
+      "wasmDeltaBytes": 34799616,
+      "chunks": 624,
+      "loadedCells": 2538304,
+      "dirtyCells": 0,
+      "allocatedBytes": 33546240,
+      "dirtyAllocatedBytes": 0,
+      "retainedBytes": 33546240,
+      "fullyLoaded": false
+    },
+    {
+      "scenario": "dirty-100",
+      "wasmDeltaBytes": 65536,
+      "chunks": 0,
+      "loadedCells": 100,
+      "dirtyCells": 100,
+      "allocatedBytes": 0,
+      "dirtyAllocatedBytes": 5679,
+      "retainedBytes": 5679,
+      "fullyLoaded": false
+    },
+    {
+      "scenario": "dirty-10000",
+      "wasmDeltaBytes": 3473408,
+      "chunks": 0,
+      "loadedCells": 10000,
+      "dirtyCells": 10000,
+      "allocatedBytes": 0,
+      "dirtyAllocatedBytes": 718911,
+      "retainedBytes": 718911,
+      "fullyLoaded": false
+    }
+  ]
+}

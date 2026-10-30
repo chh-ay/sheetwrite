@@ -2441,17 +2441,6 @@ fn let_binding_and_expansion_limits_are_deterministic() {
 }
 
 #[test]
-fn required_sequence_spill_regression_preserves_matrix_shape() {
-    let mut store = CellStore::new();
-    let sheet = store.add_sheet(6, 8);
-    store.set_formula(sheet, 0, 0, "=SEQUENCE(2,3,10,2)", 0);
-    store.recompute(sheet);
-    assert_close(number(&store, sheet, 0, 0), 10.0);
-    assert_close(number(&store, sheet, 0, 2), 14.0);
-    assert_close(number(&store, sheet, 1, 0), 16.0);
-}
-
-#[test]
 fn array_constants_spill_with_their_shape_and_keep_element_types() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(8, 8);

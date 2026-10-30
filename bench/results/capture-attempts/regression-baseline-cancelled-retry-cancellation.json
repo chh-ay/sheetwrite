@@ -1,0 +1,12 @@
+{
+  "protocol": "sheetwrite-capture-cancellation-v1",
+  "recordedAt": "2026-10-29T03:59:32.644Z",
+  "scope": "run-p32269-i89981.scope",
+  "originalReceipt": "regression-baseline-cancelled-retry-running-receipt.json",
+  "status": "cancelled",
+  "benchmarkJob": "bg_4",
+  "scopeConfirmedUnloaded": true,
+  "approved": false,
+  "retryRawWritten": false,
+  "reason": "Cancelled on advisory; coordinator subsequently reaffirmed unchanged atomic capture authorization."
+}

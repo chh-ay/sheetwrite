@@ -10,7 +10,14 @@ import {
   SAMPLE_AGGREGATE_MS,
   SAMPLE_WARMUP_FIXTURES,
 } from "./formula-bench.js";
-import { validateExactMatrix, validateRawStat } from "./gate-protocol.js";
+import {
+  benchmarkEnginePath,
+  captureEngineBaselineContext,
+  type EngineBaselineContext,
+  validateEngineBaselineContext,
+  validateExactMatrix,
+  validateRawStat,
+} from "./gate-protocol.js";
 import { type ProtocolCaptureMeta, protocolCaptureMeta } from "./protocol-meta.js";
 import { resultsDirectory } from "./results-dir.js";
 import { type Stat, summarize } from "./stats.js";
@@ -39,6 +46,7 @@ const SOURCE_PATHS = [
   "bench/src/matched-engine-bench.ts",
   "bench/src/formula-bench.ts",
   "bench/src/formula-dataset.ts",
+  "bench/src/gate-protocol.ts",
   "bench/src/stats.ts",
   "packages/wasm/pkg/sheetwrite_wasm_bg.wasm",
   "packages/formulas/pkg/sheetwrite_wasm_bg.wasm",
@@ -68,6 +76,7 @@ export interface MatchedEngineResult {
   warmupFixtures: typeof MATCHED_WARMUP_FIXTURES;
   sourceFiles: Record<string, string>;
   sourceDigest: string;
+  baselineContext?: EngineBaselineContext;
   rows: MatchedEngineRow[];
 }
 /** Floating-point slack when a sample's mean is recomputed from its total and iteration count. */
@@ -83,8 +92,16 @@ function percentile(samples: readonly number[], fraction: number): number {
 function hash(bytes: string | Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
-function sourceDigest(result: Pick<MatchedEngineResult, "meta" | "sourceFiles">): string {
-  return hash(JSON.stringify({ commit: result.meta.commit, files: result.sourceFiles }));
+function sourceDigest(
+  result: Pick<MatchedEngineResult, "meta" | "sourceFiles" | "baselineContext">,
+): string {
+  return hash(
+    JSON.stringify({
+      commit: result.meta.commit,
+      files: result.sourceFiles,
+      ...(result.baselineContext === undefined ? {} : { baselineContext: result.baselineContext }),
+    }),
+  );
 }
 function workloadKey(workload: { id: string; size: number }): string {
   return `${workload.id}:${workload.size}`;
@@ -147,6 +164,14 @@ export function validateMatchedEngineResult(result: MatchedEngineResult): void {
     result.sourceDigest !== sourceDigest(result)
   )
     throw new Error("Matched source digest mismatch");
+  if (result.baselineContext !== undefined) {
+    validateEngineBaselineContext(result.baselineContext, result.meta.commit, ["wasm", "formulas"]);
+    for (const path of Object.keys(result.baselineContext.currentWasmFiles)) {
+      if (result.sourceFiles[path] !== result.baselineContext.engineFiles[path]) {
+        throw new Error("Matched baseline WASM source binding mismatch");
+      }
+    }
+  }
   validateExactMatrix(
     "matched workloads",
     MATCHED_ENGINE_WORKLOADS.map(workloadKey),
@@ -227,6 +252,7 @@ function runMatchedSample(workload: { id: string; size: number }, engine: Engine
 
 async function captureMatchedEngines(rounds: number, resultsDir: string): Promise<void> {
   const meta = protocolCaptureMeta();
+  const baselineContext = captureEngineBaselineContext(meta.commit, ["wasm", "formulas"]);
   const rows: MatchedEngineRow[] = [];
   for (const workload of MATCHED_ENGINE_WORKLOADS) {
     const samples: MatchedSample[] = [];
@@ -255,7 +281,13 @@ async function captureMatchedEngines(rounds: number, resultsDir: string): Promis
   const sourceFiles = Object.fromEntries(
     SOURCE_PATHS.map((path) => [
       path,
-      hash(readFileSync(new URL(`../../${path}`, import.meta.url))),
+      hash(
+        readFileSync(
+          path.startsWith("packages/")
+            ? benchmarkEnginePath(path)
+            : new URL(`../../${path}`, import.meta.url),
+        ),
+      ),
     ]),
   );
   const result: MatchedEngineResult = {
@@ -273,7 +305,8 @@ async function captureMatchedEngines(rounds: number, resultsDir: string): Promis
     minimumSampleDurationMs: MATCHED_MINIMUM_SAMPLE_MS,
     warmupFixtures: MATCHED_WARMUP_FIXTURES,
     sourceFiles,
-    sourceDigest: sourceDigest({ meta, sourceFiles }),
+    ...(baselineContext === undefined ? {} : { baselineContext }),
+    sourceDigest: sourceDigest({ meta, sourceFiles, baselineContext }),
     rows,
   };
   validateMatchedEngineResult(result);

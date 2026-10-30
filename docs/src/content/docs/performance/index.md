@@ -6,6 +6,10 @@ Every number in this section comes from a validated local protocol artifact capt
 
 Each page shows the results first, then the method and the command that reproduces them.
 
+## Sheetwrite 0.6.0 evidence
+
+The render page includes chart-source tracking; the data-engine page includes incremental pivots. [Release comparison](/docs/performance/benchmark-protocol/#release-comparison) shows fresh 0.5.4 and 0.6.0 measurements, recorded thresholds, every flagged row, and the conditions both sides were captured under. The original committed 0.5.x files remain under `bench/results/releases/0.5.0/` as history only.
+
 - [Render performance](/docs/performance/render/): Scroll, edit, and interaction timings of the live grid, measured against Handsontable.
 - [Data engine performance](/docs/performance/data-engine/): Ingest, window read, edit, sort, filter, and aggregate timings of the data store.
 - [Core write path](/docs/performance/core-write-path/): Timings of store and document writes at production sizes.

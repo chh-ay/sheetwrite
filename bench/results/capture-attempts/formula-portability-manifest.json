@@ -1,0 +1,432 @@
+{
+  "protocol": "sheetwrite-portability-recapture-diagnostic-v1",
+  "files": [
+    {
+      "file": "formula-before-portability-baseline.json.gz",
+      "originalSha256": "4b2fa232998a03dcb1aa0fafcba4caa5e94d7cc49442d6b7ed65884a49962243",
+      "purpose": "Pre-recapture evidence, superseded only because its output path named this machine. Machine directory prefixes in it are replaced by placeholders."
+    },
+    {
+      "file": "formula-before-portability-baseline-receipt.json.gz",
+      "originalSha256": "0ab2bfaa7eab2b2a93a979b679fc9a6c870649f28933bc59f1dc3ce86a7fe2ff",
+      "purpose": "Pre-recapture evidence, superseded only because its output path named this machine. Machine directory prefixes in it are replaced by placeholders."
+    },
+    {
+      "file": "comparison-before-portability.json.gz",
+      "originalSha256": "746e5930f1408b137b4e9f2e0888c1d7471f57a4b8b62ee56150e9febba45252",
+      "purpose": "Pre-recapture evidence, superseded only because its output path named this machine. Machine directory prefixes in it are replaced by placeholders."
+    }
+  ],
+  "reason": "One authorized baseline plain-formula recapture uses relative --output; not a timing retry or threshold change.",
+  "originalFlags": [
+    {
+      "artifact": "formula-results.json",
+      "key": "workloads[id=independent-parse-load;size=10000].stat",
+      "unit": "ms",
+      "rounds": {
+        "base": 1,
+        "candidate": 1
+      },
+      "base": {
+        "median": 6.159528999999992,
+        "p95": 6.188474800000006,
+        "max": 6.19563500000001
+      },
+      "candidate": {
+        "median": 5.972545999999994,
+        "p95": 8.621650399999998,
+        "max": 9.200997999999998
+      },
+      "medianRatio": 0.9696432957779729,
+      "p95Ratio": 1.3931785583097132,
+      "medianDelta": -0.1869829999999979,
+      "p95Delta": 2.4331755999999922,
+      "verdict": "regression",
+      "limit": 7.69941124999999
+    },
+    {
+      "artifact": "formula-default-results.json",
+      "key": "workloads[id=text-lookup-many-sorted;size=1000].stat",
+      "unit": "ms",
+      "rounds": {
+        "base": 1,
+        "candidate": 1
+      },
+      "base": {
+        "median": 3.1991589999997814,
+        "p95": 3.291867799999636,
+        "max": 3.303081999999449
+      },
+      "candidate": {
+        "median": 4.016172999999981,
+        "p95": 4.454976999999962,
+        "max": 4.562719999999899
+      },
+      "medianRatio": 1.2553839931057678,
+      "p95Ratio": 1.3533280406948465,
+      "medianDelta": 0.8170140000001993,
+      "p95Delta": 1.163109200000326,
+      "verdict": "regression",
+      "limit": 3.9989487499997267
+    },
+    {
+      "artifact": "formula-full-results.json",
+      "key": "workloads[id=independent-parse-load;size=1000].stat",
+      "unit": "ms",
+      "rounds": {
+        "base": 1,
+        "candidate": 1
+      },
+      "base": {
+        "median": 0.8259299999999996,
+        "p95": 0.9563775999999962,
+        "max": 0.9825189999999964
+      },
+      "candidate": {
+        "median": 1.209468000000001,
+        "p95": 1.5702083999999998,
+        "max": 1.6489079999999987
+      },
+      "medianRatio": 1.4643710726090609,
+      "p95Ratio": 1.641828917783108,
+      "medianDelta": 0.3835380000000015,
+      "p95Delta": 0.6138308000000037,
+      "verdict": "regression",
+      "limit": 1.1259299999999997
+    },
+    {
+      "artifact": "formula-full-results.json",
+      "key": "workloads[id=text-lookup-many;size=1000].stat",
+      "unit": "ms",
+      "rounds": {
+        "base": 1,
+        "candidate": 1
+      },
+      "base": {
+        "median": 2.1184629999997924,
+        "p95": 2.1745234000001803,
+        "max": 2.1881530000000566
+      },
+      "candidate": {
+        "median": 2.449101000000155,
+        "p95": 3.2150005999999847,
+        "max": 3.3597350000000006
+      },
+      "medianRatio": 1.1560744747490965,
+      "p95Ratio": 1.4784851705894348,
+      "medianDelta": 0.3306380000003628,
+      "p95Delta": 1.0404771999998044,
+      "verdict": "regression",
+      "limit": 2.6480787499997405
+    },
+    {
+      "artifact": "full-engine-results.json",
+      "key": "engines[engine=default].shared.workloads[id=text-lookup-many-sorted;size=1000].stat",
+      "unit": "ms",
+      "rounds": {
+        "base": 1,
+        "candidate": 1
+      },
+      "base": {
+        "median": 3.1991589999997814,
+        "p95": 3.291867799999636,
+        "max": 3.303081999999449
+      },
+      "candidate": {
+        "median": 4.016172999999981,
+        "p95": 4.454976999999962,
+        "max": 4.562719999999899
+      },
+      "medianRatio": 1.2553839931057678,
+      "p95Ratio": 1.3533280406948465,
+      "medianDelta": 0.8170140000001993,
+      "p95Delta": 1.163109200000326,
+      "verdict": "regression",
+      "limit": 3.9989487499997267
+    },
+    {
+      "artifact": "full-engine-results.json",
+      "key": "engines[engine=full].shared.workloads[id=independent-parse-load;size=1000].stat",
+      "unit": "ms",
+      "rounds": {
+        "base": 1,
+        "candidate": 1
+      },
+      "base": {
+        "median": 0.8259299999999996,
+        "p95": 0.9563775999999962,
+        "max": 0.9825189999999964
+      },
+      "candidate": {
+        "median": 1.209468000000001,
+        "p95": 1.5702083999999998,
+        "max": 1.6489079999999987
+      },
+      "medianRatio": 1.4643710726090609,
+      "p95Ratio": 1.641828917783108,
+      "medianDelta": 0.3835380000000015,
+      "p95Delta": 0.6138308000000037,
+      "verdict": "regression",
+      "limit": 1.1259299999999997
+    },
+    {
+      "artifact": "full-engine-results.json",
+      "key": "engines[engine=full].shared.workloads[id=text-lookup-many;size=1000].stat",
+      "unit": "ms",
+      "rounds": {
+        "base": 1,
+        "candidate": 1
+      },
+      "base": {
+        "median": 2.1184629999997924,
+        "p95": 2.1745234000001803,
+        "max": 2.1881530000000566
+      },
+      "candidate": {
+        "median": 2.449101000000155,
+        "p95": 3.2150005999999847,
+        "max": 3.3597350000000006
+      },
+      "medianRatio": 1.1560744747490965,
+      "p95Ratio": 1.4784851705894348,
+      "medianDelta": 0.3306380000003628,
+      "p95Delta": 1.0404771999998044,
+      "verdict": "regression",
+      "limit": 2.6480787499997405
+    },
+    {
+      "artifact": "render-baseline.json",
+      "key": "cells[key=engine=handsontable;rows=100000;scenario=altering.insert-5-rows-top]",
+      "unit": "ms",
+      "rounds": {
+        "base": 1,
+        "candidate": 1
+      },
+      "base": {
+        "median": 14.507142857132878,
+        "p95": 21.208571428571094,
+        "mad": 0.6580357143663731
+      },
+      "candidate": {
+        "median": 17.300000000046566,
+        "p95": 18.78333333331393,
+        "mad": 0.7333333333954215
+      },
+      "medianRatio": 1.1925160019735033,
+      "p95Ratio": 0.8856482105159611,
+      "medianDelta": 2.7928571429136877,
+      "p95Delta": -2.425238095257164,
+      "verdict": "regression",
+      "limit": 0,
+      "lowerConfidenceBoundMs": 1.5999999999268244
+    },
+    {
+      "artifact": "render-baseline.json",
+      "key": "cells[key=engine=handsontable;rows=100000;scenario=altering.remove-5-rows-top]",
+      "unit": "ms",
+      "rounds": {
+        "base": 1,
+        "candidate": 1
+      },
+      "base": {
+        "median": 12.537499999991269,
+        "p95": 15.525714285709961,
+        "mad": 0.5256944444263354
+      },
+      "candidate": {
+        "median": 15.01428571429902,
+        "p95": 15.837142857110926,
+        "mad": 0.4071428570563773
+      },
+      "medianRatio": 1.1975502065251824,
+      "p95Ratio": 1.0200588884781685,
+      "medianDelta": 2.4767857143077503,
+      "p95Delta": 0.311428571400965,
+      "verdict": "regression",
+      "limit": 0,
+      "lowerConfidenceBoundMs": 1.648412698473308
+    },
+    {
+      "artifact": "render-baseline.json",
+      "key": "cells[key=engine=handsontable;rows=100000;scenario=edit-commit.middle]",
+      "unit": "ms",
+      "rounds": {
+        "base": 1,
+        "candidate": 1
+      },
+      "base": {
+        "median": 4.954761904775209,
+        "p95": 5.520160818755714,
+        "mad": 0.08916666669981721
+      },
+      "candidate": {
+        "median": 7.803846153860482,
+        "p95": 8.175769230766365,
+        "mad": 0.09230769226828972
+      },
+      "medianRatio": 1.5750194063491598,
+      "p95Ratio": 1.4810744648938046,
+      "medianDelta": 2.849084249085273,
+      "p95Delta": 2.6556084120106513,
+      "verdict": "regression",
+      "limit": 0,
+      "lowerConfidenceBoundMs": 2.6196153846529064
+    },
+    {
+      "artifact": "render-baseline.json",
+      "key": "cells[key=engine=handsontable;rows=100000;scenario=formatted-paint.top-left]",
+      "unit": "ms",
+      "rounds": {
+        "base": 1,
+        "candidate": 1
+      },
+      "base": {
+        "median": 3.36333333333799,
+        "p95": 3.7223214285564605,
+        "mad": 0.09075268817069126
+      },
+      "candidate": {
+        "median": 6.138235294095733,
+        "p95": 7.648100961597474,
+        "mad": 0.047058823559542606
+      },
+      "medianRatio": 1.8250451815918438,
+      "p95Ratio": 2.0546589294851563,
+      "medianDelta": 2.7749019607577434,
+      "p95Delta": 3.9257795330410135,
+      "verdict": "regression",
+      "limit": 0,
+      "lowerConfidenceBoundMs": 2.6362001352302222
+    },
+    {
+      "artifact": "render-baseline.json",
+      "key": "cells[key=engine=handsontable;rows=100000;scenario=merge-heavy.paint]",
+      "unit": "ms",
+      "rounds": {
+        "base": 1,
+        "candidate": 1
+      },
+      "base": {
+        "median": 3.4844827586222955,
+        "p95": 3.762407407409477,
+        "mad": 0.03867816092425058
+      },
+      "candidate": {
+        "median": 6.368750000008731,
+        "p95": 6.54218749999418,
+        "mad": 0.07500000001164153
+      },
+      "medianRatio": 1.8277461652663838,
+      "p95Ratio": 1.7388301668528394,
+      "medianDelta": 2.8842672413864356,
+      "p95Delta": 2.7797800925847027,
+      "verdict": "regression",
+      "limit": 0,
+      "lowerConfidenceBoundMs": 2.704910714281141
+    },
+    {
+      "artifact": "render-baseline.json",
+      "key": "cells[key=engine=handsontable;rows=100000;scenario=scroll-down.middle]",
+      "unit": "ms",
+      "rounds": {
+        "base": 1,
+        "candidate": 1
+      },
+      "base": {
+        "median": 4.0021538461553146,
+        "p95": 4.97818181816044,
+        "mad": 0.1136923077036267
+      },
+      "candidate": {
+        "median": 6.860000000055879,
+        "p95": 9.855954545440616,
+        "mad": 0.17000000001862636
+      },
+      "medianRatio": 1.7140770354557875,
+      "p95Ratio": 1.9798301680115478,
+      "medianDelta": 2.8578461539005646,
+      "p95Delta": 4.877772727280176,
+      "verdict": "regression",
+      "limit": 0,
+      "lowerConfidenceBoundMs": 2.4153623187948225
+    },
+    {
+      "artifact": "render-baseline.json",
+      "key": "cells[key=engine=handsontable;rows=100000;scenario=scroll-down.top-left]",
+      "unit": "ms",
+      "rounds": {
+        "base": 1,
+        "candidate": 1
+      },
+      "base": {
+        "median": 15.764285714282389,
+        "p95": 16.022142857160155,
+        "mad": 0.15000000000665192
+      },
+      "candidate": {
+        "median": 21.339999999990688,
+        "p95": 21.890999999940394,
+        "mad": 0.40000000009313297
+      },
+      "medianRatio": 1.3536927956498988,
+      "p95Ratio": 1.3662966430334567,
+      "medianDelta": 5.575714285708299,
+      "p95Delta": 5.868857142780239,
+      "verdict": "regression",
+      "limit": 0,
+      "lowerConfidenceBoundMs": 4.968571428562116
+    },
+    {
+      "artifact": "render-baseline.json",
+      "key": "cells[key=engine=handsontable;rows=100000;scenario=scroll-right.top-left]",
+      "unit": "ms",
+      "rounds": {
+        "base": 1,
+        "candidate": 1
+      },
+      "base": {
+        "median": 10.55,
+        "p95": 10.68549999996554,
+        "mad": 0.0649999999790456
+      },
+      "candidate": {
+        "median": 16.414285714372195,
+        "p95": 17.75999999988902,
+        "mad": 0.12142857137535401
+      },
+      "medianRatio": 1.5558564658172696,
+      "p95Ratio": 1.6620654157452897,
+      "medianDelta": 5.864285714372194,
+      "p95Delta": 7.0744999999234786,
+      "verdict": "regression",
+      "limit": 0,
+      "lowerConfidenceBoundMs": 5.726428571529686
+    },
+    {
+      "artifact": "render-baseline.json",
+      "key": "cells[key=engine=handsontable;rows=100000;scenario=scroll-smooth.same-window]",
+      "unit": "ms",
+      "rounds": {
+        "base": 1,
+        "candidate": 1
+      },
+      "base": {
+        "median": 7.723076923114535,
+        "p95": 8.33189102564804,
+        "mad": 0.14615384611086135
+      },
+      "candidate": {
+        "median": 10.530000000004655,
+        "p95": 11.310000000042944,
+        "mad": 0.09500000006519294
+      },
+      "medianRatio": 1.363446215133405,
+      "p95Ratio": 1.3574349406668182,
+      "medianDelta": 2.8069230768901203,
+      "p95Delta": 2.978108974394903,
+      "verdict": "regression",
+      "limit": 0,
+      "lowerConfidenceBoundMs": 2.4488461538343334
+    }
+  ]
+}

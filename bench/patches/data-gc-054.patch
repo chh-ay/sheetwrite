@@ -1,0 +1,767 @@
+--- a/bench/src/data-bench.ts
++++ b/bench/src/data-bench.ts
+@@ -29,10 +29,17 @@
+  * Memory is sampled in isolated subprocesses (`--mem <engine> <rows>`): the JS
+  * heap delta around a single ingest for both engines, plus — for Sheetwrite —
+  * the WASM linear-memory delta, since its data lives off the JS heap entirely.
++ *
++ * Every timed sample of both engines runs after a forced full GC, taken outside
++ * the timed region once the previous sample's instance is released, and every
++ * engine run ends with one more. `--heap-trace <path>` writes the post-GC heap
++ * after each of those GCs as a separate diagnostic file, never as a result.
++ * All ingest iterations close and replace their global happy-dom Window outside
++ * timing; this releases document-owned selector caches without private symbols.
+  */
+ 
+ // Side-effecting DOM bootstrap MUST be first so Handsontable boots headlessly.
+-import "./dom-setup.js";
++import { resetBenchmarkDocument } from "./dom-setup.js";
+ import { mkdirSync, readFileSync } from "node:fs";
+ import { dirname } from "node:path";
+ 
+@@ -61,13 +68,13 @@
+   type BenchmarkMode,
+   type GateIdentity,
+   MATRIX_IDS,
+-  PERFORMANCE_GATE_PROTOCOL_VERSION,
++  DATA_GATE_PROTOCOL_VERSION,
+   validateExactMatrix,
+   validateRawStat,
+ } from "./gate-protocol.js";
+ import { createHandsontable } from "./handsontable-runtime.js";
+ import { packageVersion, protocolCaptureMeta } from "./protocol-meta.js";
+-import { collect, forceGc, type MeasureOptions, mib, ms, type Stat, summarize } from "./stats.js";
++import { collect, forceGc, type MeasureOptions, mib, ms, now, type Stat, summarize } from "./stats.js";
+ 
+ /** Sheetwrite is measured across the full range; its store scales to 1M. */
+ export const SHEETWRITE_ROWS = [1_000, 10_000, 100_000, 500_000, 1_000_000] as const;
+@@ -230,19 +237,24 @@
+ const NUMERIC_CYCLE_LENGTH = 97;
+ const NUMERIC_COLUMN_WIDTH = 120;
+ 
+-/** Per-workload iteration plan; expensive at-scale ops sample fewer times. */
+-type IterationPlan = Pick<MeasureOptions, "warmup" | "iters" | "gcBetween">;
++/**
++ * Per-workload iteration plan; expensive at-scale ops sample fewer times. The
++ * plan names its workload so the optional heap trace can label every sample.
++ */
++interface IterationPlan extends Pick<MeasureOptions, "warmup" | "iters"> {
++  readonly workload: Workload | QueryScenario;
++}
+ 
+ function plan(workload: Workload | QueryScenario, rows: number): IterationPlan {
+   const atScale = rows >= 500_000;
+   switch (workload) {
+     case "ingest":
+     case "ingest-numeric-only":
+-      return atScale ? { warmup: 1, iters: 3, gcBetween: true } : { warmup: 1, iters: 7 };
++      return atScale ? { workload, warmup: 1, iters: 3 } : { workload, warmup: 1, iters: 7 };
+     case "windowRead":
+-      return { warmup: 50, iters: 300 };
++      return { workload, warmup: 50, iters: 300 };
+     case "edit":
+-      return atScale ? { warmup: 1, iters: 5, gcBetween: true } : { warmup: 1, iters: 15 };
++      return atScale ? { workload, warmup: 1, iters: 5 } : { workload, warmup: 1, iters: 15 };
+     case "sort":
+     case "filter":
+     case "multiFilter":
+@@ -253,22 +265,144 @@
+     case "filter-value-set-10":
+     case "filter-value-set-1000":
+       return atScale
+-        ? { warmup: 1, iters: 5, gcBetween: true }
+-        : { warmup: rows >= 100_000 ? 1 : 2, iters: 15 };
++        ? { workload, warmup: 1, iters: 5 }
++        : { workload, warmup: rows >= 100_000 ? 1 : 2, iters: 15 };
+     case "filter-value-set-50000":
+       // Every row is compared with every picked value, so this scenario keeps a
+       // single warm-up and few samples: minutes of run time buy no more signal.
+-      return { warmup: 1, iters: 3, gcBetween: true };
++      return { workload, warmup: 1, iters: 3 };
+     case "aggregate":
+-      return { warmup: 20, iters: 200 };
++      return { workload, warmup: 20, iters: 200 };
+   }
+ }
+ export interface DataStat extends Stat {
+   readonly samples: readonly number[];
+ }
+ 
+-function measure(fn: () => void, opts: MeasureOptions): DataStat {
+-  const samples = collect(fn, opts);
++/** Workload label of the GC taken after one engine has finished one row size. */
++const ENGINE_BOUNDARY = "engine-boundary";
++
++/** One post-GC heap reading of the diagnostic `--heap-trace` output. */
++interface HeapTracePoint {
++  readonly engine: EngineId;
++  readonly rows: number;
++  readonly workload: Workload | QueryScenario | typeof ENGINE_BOUNDARY;
++  /** Timed samples of this workload already finished when the GC ran. */
++  readonly completedSamples: number;
++  readonly heapUsedBytes: number;
++  readonly rssBytes: number;
++  readonly maxRssBytes: number;
++}
++
++interface HeapTrace {
++  /** Engine and row size the current workloads belong to. */
++  scope: { readonly engine: EngineId; readonly rows: number } | undefined;
++  readonly points: HeapTracePoint[];
++}
++
++/** `resourceUsage().maxRSS` is reported in kibibytes. */
++const KIB = 1024;
++
++/** Present only when `--heap-trace` asks for the diagnostic trace. */
++let heapTrace: HeapTrace | undefined;
++
++function recordHeap(workload: HeapTracePoint["workload"], completedSamples: number): void {
++  if (!heapTrace) return;
++  const scope = heapTrace.scope;
++  if (!scope) throw new Error(`heap trace has no engine scope for ${workload}`);
++
++  const memory = process.memoryUsage();
++  heapTrace.points.push({
++    ...scope,
++    workload,
++    completedSamples,
++    heapUsedBytes: memory.heapUsed,
++    rssBytes: memory.rss,
++    maxRssBytes: process.resourceUsage().maxRSS * KIB,
++  });
++}
++
++/**
++ * Every timed sample starts from a fully collected heap, so garbage left by an
++ * earlier sample, workload or engine is never collected inside a timed region.
++ * The workload's own untimed teardown runs first and releases what the sample
++ * built; only then does the GC run. The same GC after the last sample leaves a
++ * clean heap for the next workload, and its reading shows what that sample kept.
++ */
++function measure(
++  fn: () => void,
++  opts: IterationPlan & Pick<MeasureOptions, "before" | "after">,
++): DataStat {
++  const collectAndRecord = (completedSamples: number): void => {
++    forceGc();
++    recordHeap(opts.workload, completedSamples);
++  };
++
++  let setups = 0;
++  let teardowns = 0;
++  const samples = collect(fn, {
++    warmup: opts.warmup,
++    iters: opts.iters,
++    before: () => {
++      opts.before?.();
++
++      // Without a warm-up no teardown precedes the first sample, so its GC runs here.
++      if (setups === 0 && opts.warmup === 0) collectAndRecord(0);
++      setups += 1;
++    },
++    after: () => {
++      opts.after?.();
++
++      // collect() runs warm-up rounds through the same hook first. The last
++      // warm-up's GC prepares the first sample; earlier warm-ups need none.
++      const completedSamples = teardowns + 1 - opts.warmup;
++      teardowns += 1;
++      if (completedSamples >= 0) collectAndRecord(completedSamples);
++    },
++  });
++  return { ...summarize(samples), samples };
++}
++
++/** Only ingests own the entire DOM; read/edit workloads keep their live grid. */
++async function measureIngest(
++  fn: () => void,
++  opts: IterationPlan & Pick<MeasureOptions, "before" | "after">,
++): Promise<DataStat> {
++  const samples = new Array<number>(opts.iters);
++  let previousDocument: WeakRef<Document> | undefined;
++  for (let iteration = 0; iteration < opts.warmup + opts.iters; iteration++) {
++    if (previousDocument?.deref() === document) {
++      throw new Error("An ingest reused the previous sample document");
++    }
++    previousDocument = new WeakRef(document);
++    opts.before?.();
++    if (iteration === 0 && opts.warmup === 0) {
++      forceGc();
++      recordHeap(opts.workload, 0);
++    }
++    try {
++      if (iteration < opts.warmup) {
++        fn();
++      } else {
++        const t0 = now();
++        fn();
++        samples[iteration - opts.warmup] = now() - t0;
++      }
++    } finally {
++      try {
++        opts.after?.();
++      } finally {
++        // Closing the old global Window drops happy-dom's document-owned selector caches.
++        hotContainer = undefined;
++        await resetBenchmarkDocument();
++      }
++    }
++    const completedSamples = iteration + 1 - opts.warmup;
++    if (completedSamples >= 0) {
++      forceGc();
++      recordHeap(opts.workload, completedSamples);
++    }
++  }
+   return { ...summarize(samples), samples };
+ }
+ 
+@@ -285,7 +419,7 @@
+   };
+ }
+ 
+-function measureBatched(fn: () => void, opts: MeasureOptions, batch: number): DataStat {
++function measureBatched(fn: () => void, opts: IterationPlan, batch: number): DataStat {
+   return perOperation(
+     measure(() => {
+       for (let i = 0; i < batch; i++) fn();
+@@ -328,7 +462,7 @@
+   readonly memory: MemoryProfile;
+ }
+ 
+-export interface DataBenchmarkResult extends GateIdentity {
++export interface DataBenchmarkResult extends GateIdentity<typeof DATA_GATE_PROTOCOL_VERSION> {
+   readonly meta: {
+     readonly engineVersions: Readonly<Record<EngineId, string>>;
+     readonly bun: string;
+@@ -341,6 +475,10 @@
+     readonly handsontableRows: readonly number[];
+     /** Fixture, versioned, behind every query scenario in this artifact. */
+     readonly queryFixtures?: Readonly<Record<QueryScenario, string>>;
++    /** Every timed sample ran after a forced full GC; see {@link measure}. */
++    readonly gcBetweenSamples: true;
++    /** A closed and replaced global document separates every ingest iteration. */
++    readonly freshDocumentBetweenIngestSamples: true;
+   };
+   readonly sheetwrite: Readonly<Record<string, EngineResult>>;
+   readonly handsontable: Readonly<Record<string, EngineResult>>;
+@@ -430,6 +568,13 @@
+     if (typeof result.meta[field] !== "string" || result.meta[field].length === 0) {
+       throw new Error(`data metadata.${field} must be a non-empty string`);
+     }
++  }
++  // Numbers sampled without a GC before each sample come from another method.
++  if (result.meta.gcBetweenSamples !== true) {
++    throw new Error("data metadata.gcBetweenSamples must be true");
++  }
++  if (result.meta.freshDocumentBetweenIngestSamples !== true) {
++    throw new Error("data metadata.freshDocumentBetweenIngestSamples must be true");
+   }
+   const expectedSheetwriteRows = expectedMode === "smoke" ? [1_000] : [...SHEETWRITE_ROWS];
+   const expectedHandsontableRows = expectedMode === "smoke" ? [] : [...HANDSONTABLE_ROWS];
+@@ -673,33 +818,31 @@
+   }
+ }
+ 
+-function benchSheetwrite(
++async function benchSheetwrite(
+   ds: ColumnarDataset,
+   columnar: SheetwriteColumnar,
+   mode: BenchmarkMode,
+-): TimedEngineResult {
++): Promise<TimedEngineResult> {
+   const rows = ds.rowCount;
+   const stats = {} as Record<Workload, DataStat>;
+ 
+   // (a) ingest — a fresh store per timed iteration loads all columns into WASM.
+   let storeSink: SheetwriteStore | undefined;
+-  stats.ingest = measure(
++  stats.ingest = await measureIngest(
+     () => {
+       storeSink = new SheetwriteStore(makeWorkbook(rows), columnar);
+     },
+     {
+       ...plan("ingest", rows),
+-      before: () => {
+-        // Free the previous iteration's store: its WASM allocations are
+-        // reclaimed deterministically instead of accumulating across
+-        // iterations/rounds. The shared linear memory remains reusable.
++      after: () => {
++        // Free this iteration's store before the GC that follows it: its WASM
++        // allocations are reclaimed deterministically instead of accumulating
++        // across iterations/rounds. The shared linear memory remains reusable.
+         storeSink?.dispose();
+         storeSink = undefined;
+       },
+     },
+   );
+-  storeSink?.dispose();
+-  storeSink = undefined;
+ 
+   // One persistent store backs the remaining read/mutate workloads.
+   const store = new SheetwriteStore(makeWorkbook(rows), columnar);
+@@ -861,22 +1004,21 @@
+   if (measures("ingest-numeric-only")) {
+     const numericData = makeNumericIngestData(rows);
+     let numericSink: SheetwriteStore | undefined;
+-    queries["ingest-numeric-only"] = measure(
++    queries["ingest-numeric-only"] = await measureIngest(
+       () => {
+         numericSink = new SheetwriteStore(makeNumericIngestWorkbook(rows), numericData);
+       },
+       {
+         ...plan("ingest-numeric-only", rows),
+-        before: () => {
+-          numericSink?.dispose();
++        after: () => {
++          // Check each loaded store before it is released for the next GC.
++          if (!numericSink) throw new Error(`ingest-numeric-only ${rows} built no store`);
++          assertNumericIngest(`ingest-numeric-only ${rows}`, numericSink, rows);
++          numericSink.dispose();
+           numericSink = undefined;
+         },
+       },
+     );
+-    if (numericSink) {
+-      assertNumericIngest(`ingest-numeric-only ${rows}`, numericSink, rows);
+-      numericSink.dispose();
+-    }
+   }
+ 
+   queryStore.dispose();
+@@ -1118,11 +1260,10 @@
+   return hotContainer;
+ }
+ 
+-function benchHandsontable(ds: ColumnarDataset): Omit<EngineResult, "memory"> {
++async function benchHandsontable(ds: ColumnarDataset): Promise<Omit<EngineResult, "memory">> {
+   const rows = ds.rowCount;
+   const stats = {} as Record<Workload, DataStat>;
+   const notes: Partial<Record<Workload, string>> = {};
+-  const host = container();
+ 
+   const guard = (workload: Workload, run: () => DataStat): DataStat => {
+     try {
+@@ -1136,25 +1277,42 @@
+   // (a) ingest — a fresh instance per timed iteration; construction builds the
+   // data map + index and renders the viewport (all rows, headless). Destroyed
+   // in the untimed teardown.
+-  stats.ingest = guard("ingest", () => {
+-    let hot: HotInstance | undefined;
+-    const stat = measure(
++  let ingestHot: HotInstance | undefined;
++  let ingestHost: HTMLElement | undefined;
++  try {
++    stats.ingest = await measureIngest(
+       () => {
+-        hot = createHandsontable(host, hotOptions(toAoA(ds)));
++        if (!ingestHost) throw new Error("Handsontable ingest has no sample host");
++        ingestHot = createHandsontable(ingestHost, hotOptions(toAoA(ds)));
+       },
+       {
+         ...plan("ingest", rows),
+         before: () => {
+-          hot?.destroy();
+-          hot = undefined;
++          ingestHost = container();
++        },
++        after: () => {
++          try {
++            if (ingestHot && ingestHot.rootElement.ownerDocument !== document) {
++              throw new Error("Handsontable ingest used a stale benchmark document");
++            }
++          } finally {
++            ingestHot?.destroy();
++            ingestHot = undefined;
++            // The host also owns its old document; drop it before reset and GC.
++            ingestHost = undefined;
++          }
+         },
+       },
+     );
+-    hot?.destroy();
+-    return stat;
+-  });
++  } catch (err) {
++    notes.ingest = `headless limitation: ${(err as Error).message}`;
++    stats.ingest = { ...summarize([]), samples: [] };
++  } finally {
++    ingestHot?.destroy();
++  }
+ 
+   // Persistent instance for the remaining workloads.
++  const host = container();
+   const hot = createHandsontable(host, hotOptions(toAoA(ds)));
+ 
+   // (b) windowRead — read the same 50×5 range via getData at rotating offsets.
+@@ -1523,6 +1681,20 @@
+   return `${out.join("\n")}\n`;
+ }
+ 
++/** Labels the heap-trace points of the engine run that starts now. */
++function beginEngineRun(engine: EngineId, rows: number): void {
++  if (heapTrace) heapTrace.scope = { engine, rows };
++}
++
++/**
++ * Collects everything an engine run left behind once its stores and instances
++ * are released, so the next engine or row size starts from a clean heap.
++ */
++function endEngineRun(): void {
++  forceGc();
++  recordHeap(ENGINE_BOUNDARY, 0);
++}
++
+ export async function runSheetwriteDataBench(
+   rowsList: readonly number[] = SHEETWRITE_ROWS,
+   mode: BenchmarkMode = "full",
+@@ -1534,7 +1706,9 @@
+   for (const rows of rowsList) {
+     process.stderr.write(`\n▶ Sheetwrite ${N(rows)} rows …\n`);
+     const ds = makeColumnar(rows);
+-    results.set(rows, benchSheetwrite(ds, toSheetwriteColumnar(ds), mode));
++    beginEngineRun("sheetwrite", rows);
++    results.set(rows, await benchSheetwrite(ds, toSheetwriteColumnar(ds), mode));
++    endEngineRun();
+   }
+   return results;
+ }
+@@ -1545,7 +1719,7 @@
+   handsontable: ReadonlyMap<number, EngineResult>,
+ ): DataBenchmarkResult {
+   return {
+-    protocolVersion: PERFORMANCE_GATE_PROTOCOL_VERSION,
++    protocolVersion: DATA_GATE_PROTOCOL_VERSION,
+     mode,
+     matrixId: MATRIX_IDS.data[mode],
+     meta: {
+@@ -1560,6 +1734,8 @@
+       sheetwriteRows: [...sheetwrite.keys()],
+       handsontableRows: [...handsontable.keys()],
+       queryFixtures: QUERY_FIXTURES,
++      gcBetweenSamples: true,
++      freshDocumentBetweenIngestSamples: true,
+     },
+     sheetwrite: Object.fromEntries(sheetwrite),
+     handsontable: Object.fromEntries(handsontable),
+@@ -1618,7 +1794,9 @@
+   for (const rows of HANDSONTABLE_ROWS) {
+     process.stderr.write(`\n▶ Handsontable ${N(rows)} rows …\n`);
+     const ds = makeColumnar(rows);
+-    const timed = benchHandsontable(ds);
++    beginEngineRun("handsontable", rows);
++    const timed = await benchHandsontable(ds);
++    endEngineRun();
+     const memory = probeMemory("handsontable", rows);
+     hot.set(rows, { ...timed, memory });
+   }
+@@ -1635,14 +1813,47 @@
+   return index < 0 ? undefined : args[index + 1];
+ }
+ 
++/**
++ * Writes the `--heap-trace` diagnostic: post-GC heap readings after every
++ * timed sample and engine run. It is never a benchmark result and is kept out
++ * of the result artifact, so timing reports cannot be mistaken for it.
++ */
++async function writeHeapTrace(trace: HeapTrace, path: string, mode: BenchmarkMode): Promise<void> {
++  mkdirSync(dirname(path), { recursive: true });
++  const diagnostic = {
++    kind: "data-heap-trace-diagnostic",
++    matrixId: MATRIX_IDS.data[mode],
++    gcBetweenSamples: true,
++    freshDocumentBetweenIngestSamples: true,
++    ...protocolCaptureMeta(),
++    points: trace.points,
++  };
++  await Bun.write(path, `${JSON.stringify(diagnostic, null, 2)}\n`);
++  process.stderr.write(`\n✔ wrote heap trace ${path}\n`);
++}
++
+ if (import.meta.main) {
+   const args = process.argv.slice(2).filter((argument) => argument !== "--");
+   const outputPath = argumentValue(args, "--output");
+-  if (args.includes("--mem")) {
+-    await runMemMode();
+-  } else if (args.includes("--smoke")) {
+-    await runSmokeBench(outputPath);
+-  } else {
+-    await runFullBench(outputPath);
+-  }
+-}
++  const heapTracePath = argumentValue(args, "--heap-trace");
++  if (heapTracePath !== undefined && heapTracePath === outputPath) {
++    throw new Error("--heap-trace must not overwrite the --output result artifact");
++  }
++  const mode: BenchmarkMode = args.includes("--smoke") ? "smoke" : "full";
++  const trace: HeapTrace | undefined =
++    heapTracePath === undefined ? undefined : { scope: undefined, points: [] };
++  heapTrace = trace;
++
++  try {
++    if (args.includes("--mem")) {
++      await runMemMode();
++    } else if (mode === "smoke") {
++      await runSmokeBench(outputPath);
++    } else {
++      await runFullBench(outputPath);
++    }
++  } finally {
++    // A failed run still leaves the readings taken before it failed.
++    if (trace && heapTracePath !== undefined) await writeHeapTrace(trace, heapTracePath, mode);
++  }
++}
+--- a/bench/src/dom-setup.ts
++++ b/bench/src/dom-setup.ts
+@@ -56,3 +56,18 @@
+     }),
+   });
+ }
++
++/** Call only after disposing a sample's store/grid, never while a grid is live. */
++export async function resetBenchmarkDocument(): Promise<void> {
++  const previousDocument = new WeakRef(document);
++  await GlobalRegistrator.unregister();
++  GlobalRegistrator.register();
++  Object.defineProperty(window, "frameElement", {
++    value: null,
++    configurable: true,
++    writable: true,
++  });
++  if (document === previousDocument.deref()) {
++    throw new Error("happy-dom failed to replace the benchmark document");
++  }
++}
+--- a/bench/src/gate-protocol.ts
++++ b/bench/src/gate-protocol.ts
+@@ -10,12 +10,16 @@
+ import { summarize } from "./stats.js";
+ 
+ export const PERFORMANCE_GATE_PROTOCOL_VERSION = 1 as const;
++/** Data v2 uses full GC and a fresh document between ingest samples. */
++export const DATA_GATE_PROTOCOL_VERSION = 2 as const;
+ export type BenchmarkMode = "full" | "smoke";
+ 
+ export const MATRIX_IDS = {
++  // v2: every timed data sample runs after a forced full GC, so v1 numbers are
++  // a different sampling method and must never be compared with v2 numbers.
+   data: {
+-    full: "data-full-v1",
+-    smoke: "data-smoke-v1",
++    full: "data-full-v2",
++    smoke: "data-smoke-v2",
+   },
+   paged: {
+     full: "paged-full-v1",
+@@ -35,8 +39,12 @@
+   },
+ } as const;
+ 
+-export interface GateIdentity {
+-  readonly protocolVersion: typeof PERFORMANCE_GATE_PROTOCOL_VERSION;
++export interface GateIdentity<
++  ProtocolVersion extends
++    | typeof PERFORMANCE_GATE_PROTOCOL_VERSION
++    | typeof DATA_GATE_PROTOCOL_VERSION = typeof PERFORMANCE_GATE_PROTOCOL_VERSION,
++> {
++  readonly protocolVersion: ProtocolVersion;
+   readonly mode: BenchmarkMode;
+   readonly matrixId: string;
+ }
+@@ -85,11 +93,13 @@
+ export function assertGateIdentity(
+   family: keyof typeof MATRIX_IDS,
+   mode: BenchmarkMode,
+-  value: GateIdentity,
++  value: GateIdentity<typeof PERFORMANCE_GATE_PROTOCOL_VERSION | typeof DATA_GATE_PROTOCOL_VERSION>,
+ ): void {
+-  if (value.protocolVersion !== PERFORMANCE_GATE_PROTOCOL_VERSION) {
++  const protocolVersion =
++    family === "data" ? DATA_GATE_PROTOCOL_VERSION : PERFORMANCE_GATE_PROTOCOL_VERSION;
++  if (value.protocolVersion !== protocolVersion) {
+     throw new Error(
+-      `${family} stale protocol: expected ${PERFORMANCE_GATE_PROTOCOL_VERSION}, observed ${String(value.protocolVersion)}`,
++      `${family} stale protocol: expected ${protocolVersion}, observed ${String(value.protocolVersion)}`,
+     );
+   }
+   if (value.mode !== mode) {
+--- a/bench/test/data-gate.test.ts
++++ b/bench/test/data-gate.test.ts
+@@ -1,4 +1,4 @@
+-import { describe, expect, test } from "bun:test";
++import { describe, expect, spyOn, test } from "bun:test";
+ 
+ import {
+   type DataBenchmarkResult,
+@@ -6,10 +6,19 @@
+   type EngineResult,
+   QUERY_FIXTURES,
+   QUERY_SCENARIOS,
++  runSheetwriteDataBench,
+   validateDataBenchmark,
+   WORKLOADS,
+ } from "../src/data-bench.js";
+-import { MATRIX_IDS, PERFORMANCE_GATE_PROTOCOL_VERSION } from "../src/gate-protocol.js";
++import { SheetwriteStore } from "../../packages/core/src/index.js";
++import { resetBenchmarkDocument } from "../src/dom-setup.js";
++import { createHandsontable } from "../src/handsontable-runtime.js";
++import {
++  assertGateIdentity,
++  DATA_GATE_PROTOCOL_VERSION,
++  MATRIX_IDS,
++  PERFORMANCE_GATE_PROTOCOL_VERSION,
++} from "../src/gate-protocol.js";
+ import { summarize } from "../src/stats.js";
+ 
+ interface FixtureOptions {
+@@ -63,7 +72,7 @@
+ function smokeFixture(options: FixtureOptions = {}): DataBenchmarkResult {
+   const row = engineResult(1_000, options);
+   return {
+-    protocolVersion: PERFORMANCE_GATE_PROTOCOL_VERSION,
++    protocolVersion: DATA_GATE_PROTOCOL_VERSION,
+     mode: "smoke",
+     matrixId: MATRIX_IDS.data.smoke,
+     meta: {
+@@ -77,6 +86,8 @@
+       timestamp: new Date(0).toISOString(),
+       sheetwriteRows: [1_000],
+       handsontableRows: [],
++      gcBetweenSamples: true,
++      freshDocumentBetweenIngestSamples: true,
+     },
+     sheetwrite: options.duplicateRow ? { "1000": row, "01000": row } : { "1000": row },
+     handsontable: {},
+@@ -127,9 +138,132 @@
+     );
+   });
+ 
++  test("rejects artifacts sampled without the forced GC between samples", () => {
++    const valid = smokeFixture();
++    expect(() => validateDataBenchmark({
++      ...valid,
++      protocolVersion: PERFORMANCE_GATE_PROTOCOL_VERSION,
++    } as unknown as DataBenchmarkResult, "smoke")).toThrow("data stale protocol: expected 2, observed 1");
++    // A v1 artifact keeps its old matrix id; it was sampled without the GC.
++    expect(() => validateDataBenchmark({ ...valid, matrixId: "data-smoke-v1" }, "smoke")).toThrow(
++      "data stale matrix",
++    );
++    const { gcBetweenSamples: _omitted, ...metaWithoutGc } = valid.meta;
++    for (const meta of [metaWithoutGc, { ...valid.meta, gcBetweenSamples: false }]) {
++      const invalid = { ...valid, meta } as unknown as DataBenchmarkResult;
++      expect(() => validateDataBenchmark(invalid, "smoke")).toThrow(
++        "data metadata.gcBetweenSamples must be true",
++      );
++    }
++  });
++
++  test("keeps the other benchmark families on their existing protocol", () => {
++    for (const family of ["formula", "paged", "range", "render"] as const) {
++      const identity = {
++        protocolVersion: PERFORMANCE_GATE_PROTOCOL_VERSION,
++        mode: "smoke" as const,
++        matrixId: MATRIX_IDS[family].smoke,
++      };
++      expect(() => assertGateIdentity(family, "smoke", identity)).not.toThrow();
++      expect(() => assertGateIdentity(family, "smoke", {
++        ...identity,
++        protocolVersion: DATA_GATE_PROTOCOL_VERSION,
++      })).toThrow(`${family} stale protocol: expected 1, observed 2`);
++    }
++  });
++
++  test("requires fresh documents for the ingest sampling method", () => {
++    const valid = smokeFixture();
++    const { freshDocumentBetweenIngestSamples: _omitted, ...metaWithoutFreshDocument } = valid.meta;
++    for (const meta of [
++      metaWithoutFreshDocument,
++      { ...valid.meta, freshDocumentBetweenIngestSamples: false },
++    ]) {
++      expect(() =>
++        validateDataBenchmark({ ...valid, meta } as unknown as DataBenchmarkResult, "smoke"),
++      ).toThrow("data metadata.freshDocumentBetweenIngestSamples must be true");
++    }
++  });
++
+   test("requires bounded query resources and exact distinct sentinels", () => {
+     expect(() =>
+       validateDataBenchmark(smokeFixture({ invalidQueryResources: true }), "smoke"),
+     ).toThrow("query resource counters violate structural bounds");
+   });
+ });
++
++
++describe("data sample lifecycle", () => {
++  test("collects after every Sheetwrite sample and closes each ingest document", async () => {
++    const collectedDocuments: Document[] = [];
++    const disposalsAtCollection: number[] = [];
++    const dispose = spyOn(SheetwriteStore.prototype, "dispose");
++    const gc = spyOn(Bun, "gc").mockImplementation((full) => {
++      expect(full).toBe(true);
++      collectedDocuments.push(document);
++      disposalsAtCollection.push(dispose.mock.calls.length);
++      return 0;
++    });
++
++    try {
++      const rows = 1_000;
++      const results = await runSheetwriteDataBench([rows], "smoke");
++      const result = results.get(rows);
++      if (!result) throw new Error("Sheetwrite omitted the requested row size");
++      const allStats = [...Object.values(result.stats), ...Object.values(result.queries ?? {})];
++      // Each workload collects after its final warm-up and every timed sample;
++      // one more GC runs once all of this engine's stores have been released.
++      const expectedCollections = allStats.reduce((count, stat) => count + stat.iters + 1, 1);
++      expect(gc).toHaveBeenCalledTimes(expectedCollections);
++      expect(result.stats.ingest.samples).toHaveLength(7);
++      expect(result.stats.windowRead.samples).toHaveLength(300);
++      expect(result.stats.aggregate.samples).toHaveLength(200);
++      expect(result.queries?.["ingest-numeric-only"]?.samples).toHaveLength(7);
++
++      // The first eight collections follow the warm-up and seven ingests. A
++      // fresh document must already be installed before each post-sample GC.
++      const ingestCollections = collectedDocuments.slice(0, 8);
++      expect(new Set(ingestCollections).size).toBe(8);
++      expect(ingestCollections.at(-1)).not.toBe(document);
++      // Each ingest store must be disposed before that sample's GC, rather
++      // than left alive until the next iteration or workload starts.
++      const firstDisposals = disposalsAtCollection[0];
++      if (firstDisposals === undefined) throw new Error("No post-warm-up collection occurred");
++      expect(disposalsAtCollection.slice(0, 8)).toEqual(
++        Array.from({ length: 8 }, (_, index) => firstDisposals + index),
++      );
++    } finally {
++      gc.mockRestore();
++      dispose.mockRestore();
++    }
++  });
++
++  test("the public document reset gives the next grid a fresh usable owner", async () => {
++    const documents = new Set<Document>();
++    for (let sample = 0; sample < 3; sample++) {
++      const owner = document;
++      expect(documents.has(owner)).toBe(false);
++      documents.add(owner);
++      const host = document.createElement("div");
++      document.body.appendChild(host);
++      const hot = createHandsontable(host, {
++        data: [[sample]],
++        width: 200,
++        height: 100,
++        autoColumnSize: false,
++        autoRowSize: false,
++        licenseKey: "non-commercial-and-evaluation",
++      });
++      try {
++        expect(hot.rootElement.ownerDocument).toBe(owner);
++        expect(hot.getSourceDataAtCell(0, 0)).toBe(sample);
++      } finally {
++        hot.destroy();
++      }
++      await resetBenchmarkDocument();
++      expect(document).not.toBe(owner);
++      expect(document.body.contains(host)).toBe(false);
++      expect(window.frameElement).toBeNull();
++    }
++  });
++});

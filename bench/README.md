@@ -185,12 +185,20 @@ role; their hashes use the selected engine. The outer artifact records the
 physical paths and binds each engine to its captured WASM hash.
 
 Build the packages first. Run one capture at a time from `bench/` on an
-otherwise idle machine, pinned to one CPU. Do not run concurrent builds or
-timing captures: competing work adds scheduler and CPU noise. For example,
-on Linux with CPU 4:
+otherwise idle machine. Release formula captures use the full available CPU
+mask, not a one-core or two-core restriction: background WASM compilation can
+otherwise contend with the timed main thread. Hold both benchmark slots and
+the quiet lock exclusively so no build or second benchmark runs concurrently.
+On the 20-logical-CPU release machine, the effective mask is `0-19`; slot 4
+is only the reserved entry slot:
 
 ```sh
-taskset -c 4 bun run src/full-engine-bench.ts
+BENCH_MEMORY_MAX=8G "$HOME/learn/bench-run" --slot 4 \
+  flock -x "$HOME/learn/bench-slots/8.lock" \
+  flock -x "$HOME/learn/quiet.lock" taskset -c 0-19 \
+  bun src/capture-scope.ts --label formula-engines \
+  --output results/capture-runs/formula-engines.json \
+  -- bun run src/full-engine-bench.ts
 ```
 
 `bench:formula:matched` checks the eight shared rows that were slower in the
@@ -599,11 +607,17 @@ bun run bench:core-paths
 
 The Performance pages in `docs/src/content/docs/performance/` publish every
 artifact above. `bench:release` captures render-scale, the interaction
-evidence, paged storage, data, core paths, formula, formula engines, matched
-engines, and XLSX, then records the render regression baseline last. Every
-capture stamps its artifact with the commit, tree state, and timestamp.
-Run unpinned on an otherwise idle machine, with no concurrent builds or timing
-captures. The 0.4.0 and 0.5.0 captures both ran unpinned on the same machine.
+evidence, paged storage, data, core paths, chart tracking, pivot, formula,
+formula engines, matched engines, and XLSX, then records the render regression
+baseline last. Every capture stamps its artifact with the commit, tree state,
+and timestamp. For the 0.6.0 capture, run every benchmark through the
+machine's benchmark runner, one capture at a time in its own memory scope.
+Non-formula suites use CPU 4. Formula, formula-engines and formula-matched
+use the full available mask `0-19` under exclusive quiet-machine isolation,
+with matching effective affinity on both versions. Builds and tests use the
+machine's build runner. Capture 0.5.4 and 0.6.0 afresh with the same pinned
+toolchain and `BENCH_MEMORY_MAX=8G`. Old committed results are history only,
+never comparison inputs.
 
 ```sh
 # Build first: every capture needs the built packages and WASM binaries.
@@ -624,6 +638,77 @@ rehearses the same order with the smoke
 matrices of the suites that have one, writing to `results/smoke/` (ignored by
 git) so a rehearsal never overwrites published evidence. Regenerate the page
 after a release capture with `bun run docs:generate`.
+
+On the release machine, give each suite a fresh scope and record its cap
+and the parent slice's high counter. For example, from `bench/`:
+
+```sh
+BENCH_MEMORY_MAX=8G <bench-runner> --slot 4 \
+  bun src/capture-scope.ts --label data \
+  --output results/capture-runs/data.json \
+  --harness-patch patches/data-gc-054.patch -- bun run bench:data
+```
+
+The recorder requires a clean source tree. It checks the actual scope cap
+with `systemctl`, then reads `sheetwrite-heavy.slice`'s high counter before
+and after the suite. A changed counter rejects the timings. Each complete
+record includes both counters, cap proof, memory peak, commit, machine,
+toolchain, command and observed effective CPU affinity. `cpuSlot` is the
+reservation, not an override of that effective mask. Legacy records without
+an explicit override can use their recorded slot mask. The comparison rejects
+a same-suite affinity mismatch; different suites need not share one mask.
+
+Use the same recorder and cap for the fresh 0.5.4 checkout. Copy its complete
+results and records to `results/releases/0.5.4/`. The recorded
+`results/release-capture-metadata.json` names the immutable measurement commit,
+baseline commit and method notes. The comparison validates every receipt
+against those commits and separately records its own newer generator commit:
+
+```sh
+bun src/release-comparison.ts --base-ref release/version-0.5.4 \
+  --baseline-results-dir results/releases/0.5.4 \
+  --output results/release-comparison.json
+```
+
+Comparison refuses stale commits, missing suites, wrong caps, and records
+that report throttling. Chart tracking and pivots are new-only measurements.
+
+
+### Chart tracking and pivot evidence
+
+`bench:charts` writes `results/chart-tracking-results.json`. Its full matrix
+uses 200, 2,000, and 20,000 charts, at most 100 per owner sheet, sourcing
+distinct two-cell rows in one contiguous region of the data sheet. The no-chart
+control has the same sheets and data as its corresponding literal-source
+workbook. Each measured operation is one committed cell edit, not an
+amortized batch. Median and p95 summarize 101 samples after 20 warmups.
+Initial index construction and correctness assertions are untimed.
+
+Literal-source outside edits must emit no event and perform no view
+resolution; inside edits must name exactly the one matching chart.
+The listener records chart identities and event time only. View resolution
+runs after the commit timer stops. Inside edits change the literal second
+cell of chart 0's source. In the formula case, its first cell reads that
+second cell, so the formula stays in place and the index is not rebuilt.
+Outside edits change a literal after the source region. A formula-replacement
+edit, which rebuilds the chart index, is not measured in 0.6. The formula rows
+are named `literal-dependency-edit`. The conservative policy reports every
+computed chart on both inside
+and outside value commits. Their cost can grow with chart count. Outside
+literal edits still query the source index; a silent event stream is not a
+claim of constant time. Every sample checks event count, exact identities,
+and resolution count.
+
+Smoke admits both full-size 20,000-chart fixtures before it records the
+200-chart timing rows, with five samples and two warmups. Setup transactions
+use the core operation limit and check the encoded byte limit. This makes a
+large-fixture admission failure stop rehearsal before the release run.
+
+`bench:pivot` writes `results/pivot-results.json`, using the existing
+100,000-row, three-row-field, one-column-field SUM/AVERAGE and MAX matrix.
+It retains the 100× full-build-versus-incremental-edit gate for ordinary
+edits, donor-key edits, and MAX-extreme edits. It has no reduced smoke
+matrix and is re-measured by the full release capture.
 
 Render captures retain structured failures, but only Handsontable's million-row
 `altering.insert-5-rows-top` and `altering.remove-5-rows-top` RangeErrors with

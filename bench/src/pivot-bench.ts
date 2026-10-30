@@ -1,11 +1,13 @@
 import { writeFileSync } from "node:fs";
+import { cpus, hostname } from "node:os";
 import { parseArgs } from "node:util";
 
 import { CellStore, load } from "@sheetwrite/formulas";
 
+import { protocolCaptureMeta } from "./protocol-meta.js";
 import { now, summarize } from "./stats.js";
 
-// Run through bench-run --slot 8. Only the full-engine artifacts are needed.
+// Run through bench-run --slot 4. Only the full-engine artifacts are needed.
 const SOURCE_ROWS = 100_000;
 const SOURCE_FIELDS = 6;
 const AXIS_CARDINALITY = 10;
@@ -203,6 +205,15 @@ try {
   const maxEdit = summarize(maxEdits);
   const maxEditSpeedup = maxBuild.median / maxEdit.median;
   const result = {
+    schemaVersion: 1,
+    protocol: "sheetwrite-pivot-v1",
+    mode: "full",
+    meta: {
+      ...protocolCaptureMeta(),
+      machine: hostname(),
+      cpu: cpus()[0]?.model ?? "unknown",
+      memoryMax: process.env.BENCH_MEMORY_MAX ?? "6G",
+    },
     sourceRows: SOURCE_ROWS,
     rowFields: 3,
     columnFields: 1,

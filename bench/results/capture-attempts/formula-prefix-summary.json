@@ -1,0 +1,179 @@
+{
+  "diagnosticOnly": true,
+  "rawFile": "formula-prefix-10.json.gz",
+  "method": "20 fresh processes per side and engine; exact workload factories/order through flagged row; 1 warmup and 5 samples per fixture; 10 ABBA blocks; geometric ratio of block mean log-stat differences; seeded 10,000 block bootstraps, percentile 99% interval; no official artifact replacement",
+  "rows": [
+    {
+      "engine": "default",
+      "id": "independent-parse-load",
+      "size": 10000,
+      "processesPerSide": 20,
+      "samplesPerSide": 100,
+      "statistics": {
+        "median": {
+          "baselineMedianAcrossProcesses": 6.509370500000003,
+          "candidateMedianAcrossProcesses": 6.3674179999999865,
+          "pairedGeometricRatio": 0.9872433730013107,
+          "blockBootstrap99Interval": [
+            0.9343183268750154,
+            1.0412320255656482
+          ],
+          "baselineRange": [
+            5.643294999999995,
+            7.325035000000014
+          ],
+          "candidateRange": [
+            5.4206120000000055,
+            6.927491000000003
+          ]
+        },
+        "p95": {
+          "baselineMedianAcrossProcesses": 7.071040100000016,
+          "candidateMedianAcrossProcesses": 6.885493699999998,
+          "pairedGeometricRatio": 1.004056071306735,
+          "blockBootstrap99Interval": [
+            0.9404382331852815,
+            1.0658518932055019
+          ],
+          "baselineRange": [
+            6.498248999999992,
+            8.761468399999984
+          ],
+          "candidateRange": [
+            5.709488799999991,
+            9.204209800000006
+          ]
+        }
+      }
+    },
+    {
+      "engine": "default",
+      "id": "text-lookup-many-sorted",
+      "size": 1000,
+      "processesPerSide": 20,
+      "samplesPerSide": 100,
+      "statistics": {
+        "median": {
+          "baselineMedianAcrossProcesses": 3.348223500000131,
+          "candidateMedianAcrossProcesses": 3.4633499999995365,
+          "pairedGeometricRatio": 1.0442136667149837,
+          "blockBootstrap99Interval": [
+            1.015166720662396,
+            1.0769154311497582
+          ],
+          "baselineRange": [
+            3.2025620000003983,
+            3.9179110000004584
+          ],
+          "candidateRange": [
+            3.3673280000002705,
+            4.170241000000715
+          ]
+        },
+        "p95": {
+          "baselineMedianAcrossProcesses": 3.4357458999997106,
+          "candidateMedianAcrossProcesses": 3.556688199999735,
+          "pairedGeometricRatio": 0.9997861028052888,
+          "blockBootstrap99Interval": [
+            0.8827383552211602,
+            1.0936066289623054
+          ],
+          "baselineRange": [
+            3.3366697999999815,
+            5.834491800000251
+          ],
+          "candidateRange": [
+            3.4197596000005435,
+            4.80919780000022
+          ]
+        }
+      }
+    },
+    {
+      "engine": "full",
+      "id": "independent-parse-load",
+      "size": 1000,
+      "processesPerSide": 20,
+      "samplesPerSide": 100,
+      "statistics": {
+        "median": {
+          "baselineMedianAcrossProcesses": 1.0473495000000028,
+          "candidateMedianAcrossProcesses": 1.0121625000000058,
+          "pairedGeometricRatio": 0.9974429587019762,
+          "blockBootstrap99Interval": [
+            0.9265761304542309,
+            1.0791190892543585
+          ],
+          "baselineRange": [
+            0.8035320000000041,
+            1.3871380000000073
+          ],
+          "candidateRange": [
+            0.7977089999999976,
+            1.4246380000000016
+          ]
+        },
+        "p95": {
+          "baselineMedianAcrossProcesses": 1.3334322999999941,
+          "candidateMedianAcrossProcesses": 1.3685432000000048,
+          "pairedGeometricRatio": 1.0385651749444622,
+          "blockBootstrap99Interval": [
+            0.9727846019066156,
+            1.1178406363508036
+          ],
+          "baselineRange": [
+            1.0202763999999944,
+            1.5323958000000033
+          ],
+          "candidateRange": [
+            1.059763200000002,
+            1.9763658000000048
+          ]
+        }
+      }
+    },
+    {
+      "engine": "full",
+      "id": "text-lookup-many",
+      "size": 1000,
+      "processesPerSide": 20,
+      "samplesPerSide": 100,
+      "statistics": {
+        "median": {
+          "baselineMedianAcrossProcesses": 2.0918369999999413,
+          "candidateMedianAcrossProcesses": 2.2836935000004814,
+          "pairedGeometricRatio": 1.127978649932715,
+          "blockBootstrap99Interval": [
+            1.0944744607464771,
+            1.169646015144367
+          ],
+          "baselineRange": [
+            2.0224740000003294,
+            2.1832359999998516
+          ],
+          "candidateRange": [
+            2.203620000000228,
+            2.691515000000436
+          ]
+        },
+        "p95": {
+          "baselineMedianAcrossProcesses": 2.1570389999997133,
+          "candidateMedianAcrossProcesses": 2.337923299999784,
+          "pairedGeometricRatio": 1.1423808611498274,
+          "blockBootstrap99Interval": [
+            1.0861757651990884,
+            1.2219595676606172
+          ],
+          "baselineRange": [
+            2.082667799999581,
+            2.4577332000000753
+          ],
+          "candidateRange": [
+            2.234194799999932,
+            3.8899900000002163
+          ]
+        }
+      }
+    }
+  ]
+}

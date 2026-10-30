@@ -1,0 +1,65 @@
+{
+  "protocol": "sheetwrite-capture-scope-v1",
+  "label": "regression-baseline",
+  "metadata": {
+    "commit": "685c9c920f89860ffff96531a3d18b6845808444",
+    "dirty": false,
+    "engineCommit": "dcfb2037cc340451cf68bc4369e419c9adb13b3f",
+    "harnessCommit": "685c9c920f89860ffff96531a3d18b6845808444",
+    "harnessPatchSha256": "350a7073f76f6dca899e1b31aacb6550dc852360914cc4afabadcd6adff6d8b7",
+    "purpose": "capture",
+    "timestamp": "2026-10-29T03:40:43.579Z",
+    "machine": "hypr-zephyrus",
+    "cpu": "12th Gen Intel(R) Core(TM) i9-12900H",
+    "bun": "1.4.4",
+    "node": "v26.12.1",
+    "npm": "11.19.1",
+    "bunNodeCompat": "v26.3.0",
+    "kernel": "7.3.0-4-cachyos",
+    "cpuSlot": 4,
+    "memoryMax": "8G",
+    "effectiveMemoryMaxBytes": 8589934592,
+    "memoryMaxProof": "MemoryMax=8589934592",
+    "scope": "run-p27051-i1894.scope",
+    "slice": "/user.slice/user-1000.slice/user@1000.service/sheetwrite.slice/sheetwrite-heavy.slice",
+    "sliceHighBefore": 0,
+    "command": [
+      "bash",
+      "-c",
+      "bun run src/render-driver.ts --rounds 10 --output results/render-baseline-raw.json --markdown-output results/render-baseline-raw.md && bun run src/generate-baseline.ts --input results/render-baseline-raw.json --power-mode balanced --concurrency 1 --write-baseline"
+    ],
+    "verifiedToolchain": {
+      "npm": "11.19.1",
+      "node": "v26.12.1",
+      "bun": "1.4.4",
+      "kernel": "7.3.0-4-cachyos"
+    },
+    "effectiveCpuAffinity": "4",
+    "affinityProof": "Cpus_allowed_list:\t4",
+    "affinityProofSource": "/proc/self/status before starting the frozen capture runner; child inherits affinity",
+    "cpuSlotMeaning": "reserved entry slot; effectiveCpuAffinity records the actual CPU mask",
+    "reservationMode": "slot 4, both slot locks held, exclusive quiet lock",
+    "selectedRootWasmSha256": {
+      "packages/wasm/pkg/sheetwrite_wasm_bg.wasm": "7036bd31efec294b5bf916986f3d7ccbb7468c96497c44be47c2fbf809cf569c",
+      "packages/formulas/pkg/sheetwrite_wasm_bg.wasm": "1c13192ae2661591d1c3eb8c05dbec83b84867ae83af40deae72ae5c54bb8b63"
+    },
+    "affinityRecorderSha256": "ed97771b10b314ab67c9fbe3e6d55c552d1be542b3219966ff7faf48200339e6"
+  },
+  "status": "passed",
+  "endedAt": "2026-10-29T03:46:02.784Z",
+  "exitCode": 0,
+  "sliceHighAfter": 0,
+  "memoryPeakBytes": 894844928,
+  "artifacts": [
+    {
+      "file": "render-baseline-raw.json",
+      "sha256": "d7c3e65eea5ec2d48e0568fb83ebc862b0f21bbf78d4f8ef9978a61f2f08e986",
+      "modifiedAtMs": 1793245562724
+    },
+    {
+      "file": "render-baseline.json",
+      "sha256": "9b51168a9e22e3be86b65b0e95852c0f4ec69b6d17b69e71637e95aad5bd2dcd",
+      "modifiedAtMs": 1793245562778
+    }
+  ]
+}

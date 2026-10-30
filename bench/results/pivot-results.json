@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "protocol": "sheetwrite-pivot-v1",
+  "mode": "full",
+  "meta": {
+    "commit": "ac4ab632d80abf8d0c2986685c04ebce7747e5fa",
+    "dirty": false,
+    "timestamp": "2026-10-28T17:42:28.546Z",
+    "machine": "hypr-zephyrus",
+    "cpu": "12th Gen Intel(R) Core(TM) i9-12900H",
+    "memoryMax": "8G"
+  },
+  "sourceRows": 100000,
+  "rowFields": 3,
+  "columnFields": 1,
+  "valueFields": 2,
+  "buildMs": {
+    "median": 28.872947000000067,
+    "p95": 30.493193099999985,
+    "mean": 29.163982466666667,
+    "stddev": 0.6512554546038878,
+    "min": 28.486110999999937,
+    "max": 30.50638600000002,
+    "iters": 15
+  },
+  "editMs": {
+    "median": 0.0016898799999989934,
+    "p95": 0.011575861999999678,
+    "mean": 0.0034321553333333367,
+    "stddev": 0.004319564524408855,
+    "min": 0.0015567400000009001,
+    "max": 0.018008330000000114,
+    "iters": 15
+  },
+  "speedup": 17085.79721638061,
+  "donorKeyEditMs": {
+    "median": 0.002743990000000167,
+    "p95": 0.012722328999999026,
+    "mean": 0.004335538000000119,
+    "stddev": 0.004338388407959697,
+    "min": 0.0026273500000024794,
+    "max": 0.01909983999999895,
+    "iters": 15
+  },
+  "donorKeyEditSpeedup": 10522.249352220057,
+  "maxBuildMs": {
+    "median": 81.81857600000012,
+    "p95": 108.91592909999994,
+    "mean": 87.32027186666666,
+    "stddev": 19.58741049070971,
+    "min": 80.56586100000004,
+    "max": 160.410979,
+    "iters": 15
+  },
+  "maxExtremeEditMs": {
+    "median": 0.002488540000001649,
+    "p95": 0.011053965999999138,
+    "mean": 0.004180621333333343,
+    "stddev": 0.004210311800491478,
+    "min": 0.0022996499999999287,
+    "max": 0.01874235999999996,
+    "iters": 15
+  },
+  "maxExtremeEditSpeedup": 32878.143811208945,
+  "targetSpeedup": 100,
+  "meetsTarget": true,
+  "retainedBytesBeforePivot": 9466121,
+  "retainedBytesWithPivot": 14245202,
+  "retainedBytesPerPivot": 4779081,
+  "status": [
+    0,
+    0,
+    0,
+    1113,
+    23,
+    2,
+    1
+  ]
+}

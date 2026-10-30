@@ -20,6 +20,7 @@ import {
 import { API, type Diagnostic, type Project } from "typescript/unstable/async";
 
 import { validateEngineVersions } from "../bench/src/engine-versions.js";
+import { DATA_GATE_PROTOCOL_VERSION } from "../bench/src/gate-protocol.js";
 import { MOVED_HEADINGS, MOVED_PAGES, type MovedPage } from "../docs/src/lib/moved-pages.js";
 import { DOCS_NAVIGATION, navigationPages } from "../docs/src/lib/navigation.js";
 import {
@@ -90,6 +91,14 @@ import {
   analyzePublicApi,
   type PublicApiManifest,
 } from "./public-api.js";
+import {
+  renderChartTrackingSection,
+  renderPivotSection,
+  renderReleaseComparisonSection,
+  validateChartTrackingArtifact,
+  validatePivotArtifact,
+  validateReleaseComparisonArtifact,
+} from "./release-performance-docs.js";
 import {
   formatMetricDelta,
   formatMetricDisplay,
@@ -1970,7 +1979,7 @@ interface DataEvidence {
 
 function validateDataArtifact(value: Record<string, unknown>): DataEvidence | string {
   const artifact = value as unknown as Partial<DataEvidence>;
-  if (artifact.protocolVersion !== 1 || artifact.mode !== "full") {
+  if (artifact.protocolVersion !== DATA_GATE_PROTOCOL_VERSION || artifact.mode !== "full") {
     return "artifact is not a full-mode data protocol capture";
   }
   validateEngineVersions(artifact.meta?.engineVersions, ["sheetwrite", "handsontable"]);
@@ -2689,14 +2698,14 @@ export const PERFORMANCE_PAGES: readonly PerformancePage[] = [
     title: "Render performance",
     description:
       "Scroll, edit, and interaction timings of the live grid, measured against Handsontable.",
-    sections: ["Render benchmark"],
+    sections: ["Render benchmark", "Chart source tracking"],
   },
   {
     slug: "data-engine",
     title: "Data engine performance",
     description:
       "Ingest, window read, edit, sort, filter, and aggregate timings of the data store.",
-    sections: ["Data engine benchmark"],
+    sections: ["Data engine benchmark", "Incremental pivot engine"],
   },
   {
     slug: "core-write-path",
@@ -2733,7 +2742,12 @@ export const PERFORMANCE_PAGES: readonly PerformancePage[] = [
     slug: "benchmark-protocol",
     title: "Benchmark protocol",
     description: "How the evidence is captured, and how to check a change for a timing regression.",
-    sections: ["Capture", "Matched local regression check", "Pending local evidence"],
+    sections: [
+      "Release comparison",
+      "Capture",
+      "Matched local regression check",
+      "Pending local evidence",
+    ],
   },
 ];
 
@@ -2821,6 +2835,10 @@ export function splitPerformancePages(
     "",
     "Each page shows the results first, then the method and the command that reproduces them.",
     "",
+    "## Sheetwrite 0.6.0 evidence",
+    "",
+    "The render page includes chart-source tracking; the data-engine page includes incremental pivots. [Release comparison](/docs/performance/benchmark-protocol/#release-comparison) shows fresh 0.5.4 and 0.6.0 measurements, recorded thresholds, every flagged row, and the conditions both sides were captured under. The original committed 0.5.x files remain under `bench/results/releases/0.5.0/` as history only.",
+    "",
     ...PERFORMANCE_PAGES.map(
       (page) => `- [${page.title}](/docs/performance/${page.slug}/): ${page.description}`,
     ),
@@ -2866,6 +2884,21 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
     "bun run --filter @sheetwrite/bench bench:xlsx -- --baseline-root <checkout of the baseline commit>",
     validateXlsxArtifact,
   );
+  const chartTracking = await loadEvidence(
+    "bench/results/chart-tracking-results.json",
+    "bun run --filter @sheetwrite/bench bench:charts",
+    validateChartTrackingArtifact,
+  );
+  const pivot = await loadEvidence(
+    "bench/results/pivot-results.json",
+    "bun run --filter @sheetwrite/bench bench:pivot -- --output results/pivot-results.json",
+    validatePivotArtifact,
+  );
+  const releaseComparison = await loadEvidence(
+    "bench/results/release-comparison.json",
+    "cd bench && bun src/release-comparison.ts --base-ref release/version-0.5.4 --baseline-results-dir results/releases/0.5.4",
+    validateReleaseComparisonArtifact,
+  );
   const captures = (
     [
       { label: "Render benchmark", loaded: scale },
@@ -2875,6 +2908,9 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
       { label: "Formula engines (analysis capture)", loaded: fullEngine },
       { label: "Formula engines (matched capture)", loaded: matchedEngine },
       { label: "XLSX codec benchmark", loaded: xlsx },
+      { label: "Chart source tracking", loaded: chartTracking },
+      { label: "Incremental pivot engine", loaded: pivot },
+      { label: "Release comparison", loaded: releaseComparison },
     ] satisfies Array<{ label: string; loaded: CapturedEvidence }>
   ).flatMap(({ label, loaded }) => {
     if (!("evidence" in loaded)) return [];
@@ -3178,6 +3214,29 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
     lines.push(...renderXlsxSection(xlsx.evidence, xlsx.source));
   } else {
     pending.push(xlsx);
+  }
+  if ("evidence" in chartTracking) {
+    lines.push(...renderChartTrackingSection(chartTracking.evidence, chartTracking.source));
+  } else {
+    pending.push(chartTracking);
+  }
+  if ("evidence" in pivot) {
+    lines.push(...renderPivotSection(pivot.evidence, pivot.source));
+  } else {
+    pending.push(pivot);
+  }
+  if ("evidence" in releaseComparison) {
+    lines.push(
+      ...renderReleaseComparisonSection(releaseComparison.evidence, releaseComparison.source),
+    );
+  } else {
+    lines.push(
+      "## Release comparison",
+      "",
+      "The 0.6 comparison has no validated clean-tree artifact yet. Historical 0.5 evidence is preserved unmodified from `feat/chart-pivot-ui` under `bench/results/releases/0.5.0/`. No old/new timing claims are published until `bench/results/release-comparison.json` is available.",
+      "",
+    );
+    pending.push(releaseComparison);
   }
   lines.push("## Delivery size", "");
   const latestRelease = sizeHistory.releases.at(-1);

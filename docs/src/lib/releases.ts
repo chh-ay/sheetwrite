@@ -16,6 +16,18 @@ interface Release {
 
 const RELEASES: readonly [Release, ...Release[]] = [
   {
+    version: "0.6.0",
+    date: "2026-10-30",
+    summary:
+      "Charts, pivot tables, reference operators, iterative calculation and an Excel-style ribbon.",
+    highlights: [
+      "Charts that follow their cells, with an optional SVG renderer",
+      "Pivot tables that the full engine updates after each edit",
+      "Reference operators, OFFSET and INDIRECT, and iterative calculation",
+      "An Excel-style ribbon, and XLSX files that keep the parts Sheetwrite does not model",
+    ],
+  },
+  {
     version: "0.5.4",
     date: "2026-10-24",
     summary: "No more references to unpublished source maps.",

@@ -424,9 +424,10 @@ describe("performance pages", () => {
     const pages = new Map(
       splitPerformancePages(evidence).map((page) => [page.route, page.content]),
     );
-    expect(pages.get("performance/render.md")).toContain("Render benchmark body.");
+    const formula = pages.get("performance/formula-engine.md") ?? "";
+    expect(formula).toContain("Formula engine benchmark body.");
     // A one-section page takes its heading from its title.
-    expect(pages.get("performance/render.md")).not.toContain("## Render benchmark");
+    expect(formula).not.toContain("## Formula engine benchmark");
     const memory = pages.get("performance/memory.md") ?? "";
     expect(memory).toContain("## Release retained engine memory");
     expect(memory).toContain("## Runtime resource ownership");
@@ -436,16 +437,19 @@ describe("performance pages", () => {
   it("lifts a one-section page's headings to sit right under its title", () => {
     const fenced = "```md\n### Not a heading\n<h4>Literal</h4>\n```\n";
     const nested = evidence
-      .replace("Render benchmark body.\n", `### Scale\n\n<h4>Card</h4>\n\n#### Detail\n\n${fenced}`)
+      .replace(
+        "Formula engine benchmark body.\n",
+        `### Scale\n\n<h4>Card</h4>\n\n#### Detail\n\n${fenced}`,
+      )
       .replace("Runtime resource ownership body.\n", "### Owners\n");
     const pages = new Map(splitPerformancePages(nested).map((page) => [page.route, page.content]));
 
-    const render = pages.get("performance/render.md") ?? "";
-    expect(render).toMatch(/^## Scale$/m);
-    expect(render).toContain("<h3>Card</h3>");
-    expect(render).toMatch(/^### Detail$/m);
+    const formula = pages.get("performance/formula-engine.md") ?? "";
+    expect(formula).toMatch(/^## Scale$/m);
+    expect(formula).toContain("<h3>Card</h3>");
+    expect(formula).toMatch(/^### Detail$/m);
     // Code shows its text as written.
-    expect(render).toContain(fenced);
+    expect(formula).toContain(fenced);
     // A page with several sections keeps their H2s, so nothing moves.
     expect(pages.get("performance/memory.md")).toMatch(/^### Owners$/m);
   });

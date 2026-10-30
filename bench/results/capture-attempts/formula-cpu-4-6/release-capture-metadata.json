@@ -1,0 +1,426 @@
+{
+  "schemaVersion": 1,
+  "protocol": "sheetwrite-0.6.0-capture-metadata-v1",
+  "captureCommit": "ac4ab632d80abf8d0c2986685c04ebce7747e5fa",
+  "baselineEngineCommit": "dcfb2037cc340451cf68bc4369e419c9adb13b3f",
+  "baselineNativeHarnessCommit": "685c9c920f89860ffff96531a3d18b6845808444",
+  "baselineFormulaHarnessCommit": "ac4ab632d80abf8d0c2986685c04ebce7747e5fa",
+  "dataHarnessPatchSha256": "350a7073f76f6dca899e1b31aacb6550dc852360914cc4afabadcd6adff6d8b7",
+  "memoryMax": "8G",
+  "memoryMaxProof": "MemoryMax=8589934592",
+  "formulaMethod": {
+    "effectiveCpuAffinity": "4,6",
+    "reservedEntrySlot": 4,
+    "exclusiveSlotLocks": [
+      4,
+      8
+    ],
+    "cpu8Executed": false,
+    "reason": "One pinned CPU makes background WASM compilation contend with the main thread. Two CPUs are an intentional formula-only capture protocol correction.",
+    "gateLimitsChanged": false,
+    "engineOptimizationApplied": false,
+    "priorFailedAttempts": [
+      "capture-attempts/formula-attempt-1.json",
+      "capture-attempts/formula-attempt-2.json"
+    ],
+    "affinityEvidence": [
+      "capture-attempts/formula-affinity-confirmation.json",
+      "capture-attempts/formula-affinity-environment-matrix.json"
+    ],
+    "wrongNpmPair": {
+      "publish": false,
+      "version": "11.20.0",
+      "artifacts": "capture-attempts/formula-affinity-npm-11.20.0-*.json"
+    },
+    "coldRow": {
+      "key": "workloads[id=independent-parse-load;size=1000].stat",
+      "baseline": {
+        "median": 0.904319000000001,
+        "p95": 0.9844567999999925,
+        "max": 1.0021759999999915
+      },
+      "candidate": {
+        "median": 0.9725329999999985,
+        "p95": 1.0653564000000018,
+        "max": 1.0859820000000013
+      },
+      "medianRatio": 1.075431346681865,
+      "p95Ratio": 1.0821768918656562,
+      "note": "Earlier about-5% observations describe steady-state or isolated-row experiments, not this latest full cold pair."
+    }
+  },
+  "pairedGate": {
+    "commit": "8ac210897e615bc2945f39cd4f0a5605c5e48641",
+    "sourceCaptureCommit": "ac4ab632d80abf8d0c2986685c04ebce7747e5fa",
+    "status": "passed",
+    "rows": 52,
+    "engineBinariesMatchBySha256": true,
+    "wasmSha256": {
+      "default": "1da0830e9c1467f6921de9c6031491f8c1e12b1a78dbd16410f538b9cedb4bd7",
+      "full": "37093c76ab59a9d45343108d5a17e8cd6a412ccf0d4745151e033c01f6a0f38a"
+    },
+    "log": "capture-attempts/formula-paired-gate.log",
+    "fix": "Own-checkout root is not a baseline engine root. The one-line fix and regression test land after the capture-results commit."
+  },
+  "compilationDiagnostics": {
+    "publishedAsReleaseMetrics": false,
+    "earliestMeasuredCommit": "03cb3f55",
+    "parentCommit": "def1047e",
+    "metric": "Median total of first three timed samples with concurrentJIT=false; four processes per build",
+    "beforeMs": 58.805,
+    "afterMs": 60.199,
+    "beforeRangeMs": [
+      58.03,
+      58.986
+    ],
+    "afterRangeMs": [
+      60.059,
+      60.453
+    ],
+    "largestMeasuredStep": {
+      "commit": "c304ab6a",
+      "beforeMs": 66.531,
+      "afterMs": 72.152
+    },
+    "caveat": "Diagnostic synchronous compilation is not the release cold-row median, not a statistically established steady-state first-bad commit, and not one commit explaining the gate failure. Outlining prototype rejected and unshipped; only benchmark workloads were checked."
+  },
+  "captureNotes": [
+    "All measured candidate suites use frozen ac4ab632; publication tooling commits follow it.",
+    "Completed non-formula captures retain CPU 4. Formula suites use effective affinity 4,6 on both engines; cpuSlot 4 means reservation only.",
+    "Each suite has a separate 8G scope and unchanged slice high counter. Counters reset after scope/slice recreation; only within-suite deltas are compared.",
+    "The original render-baseline attempt completed timing but failed untimed approval because generated handoff material was untracked. A retry was cancelled; neither receipt was relabeled. The final unchanged atomic capture passed after handoff relocation.",
+    "Historical committed 0.5.x artifacts are history only, not comparison inputs."
+  ],
+  "regressionTriage": {
+    "flags": [
+      {
+        "artifact": "formula-results.json",
+        "key": "workloads[id=text-lookup-many;size=1000].stat",
+        "base": {
+          "median": 1.8926860000001398,
+          "p95": 2.1852907999997115,
+          "max": 2.2583919999997306
+        },
+        "candidate": {
+          "median": 2.483723999999711,
+          "p95": 4.4349957999998875,
+          "max": 4.482262999999875
+        },
+        "medianRatio": 1.3122747249145013,
+        "p95Ratio": 2.029476260093381,
+        "limit": 2.3658575000001747
+      },
+      {
+        "artifact": "full-engine-results.json",
+        "key": "analysis[id=xirr;size=1000].stat",
+        "base": {
+          "median": 2.6980860000003304,
+          "p95": 2.7135350000011385,
+          "max": 2.7164320000010775
+        },
+        "candidate": {
+          "median": 3.6479939999990165,
+          "p95": 3.6727464000003236,
+          "max": 3.6761420000002545
+        },
+        "medianRatio": 1.352067354412932,
+        "p95Ratio": 1.353491441974687,
+        "limit": 3.372607500000413
+      },
+      {
+        "artifact": "render-baseline.json",
+        "key": "cells[key=engine=handsontable;rows=100000;scenario=altering.insert-5-rows-top]",
+        "base": {
+          "median": 14.507142857132878,
+          "p95": 21.208571428571094,
+          "mad": 0.6580357143663731
+        },
+        "candidate": {
+          "median": 17.300000000046566,
+          "p95": 18.78333333331393,
+          "mad": 0.7333333333954215
+        },
+        "medianRatio": 1.1925160019735033,
+        "p95Ratio": 0.8856482105159611,
+        "limit": 0
+      },
+      {
+        "artifact": "render-baseline.json",
+        "key": "cells[key=engine=handsontable;rows=100000;scenario=altering.remove-5-rows-top]",
+        "base": {
+          "median": 12.537499999991269,
+          "p95": 15.525714285709961,
+          "mad": 0.5256944444263354
+        },
+        "candidate": {
+          "median": 15.01428571429902,
+          "p95": 15.837142857110926,
+          "mad": 0.4071428570563773
+        },
+        "medianRatio": 1.1975502065251824,
+        "p95Ratio": 1.0200588884781685,
+        "limit": 0
+      },
+      {
+        "artifact": "render-baseline.json",
+        "key": "cells[key=engine=handsontable;rows=100000;scenario=edit-commit.middle]",
+        "base": {
+          "median": 4.954761904775209,
+          "p95": 5.520160818755714,
+          "mad": 0.08916666669981721
+        },
+        "candidate": {
+          "median": 7.803846153860482,
+          "p95": 8.175769230766365,
+          "mad": 0.09230769226828972
+        },
+        "medianRatio": 1.5750194063491598,
+        "p95Ratio": 1.4810744648938046,
+        "limit": 0
+      },
+      {
+        "artifact": "render-baseline.json",
+        "key": "cells[key=engine=handsontable;rows=100000;scenario=formatted-paint.top-left]",
+        "base": {
+          "median": 3.36333333333799,
+          "p95": 3.7223214285564605,
+          "mad": 0.09075268817069126
+        },
+        "candidate": {
+          "median": 6.138235294095733,
+          "p95": 7.648100961597474,
+          "mad": 0.047058823559542606
+        },
+        "medianRatio": 1.8250451815918438,
+        "p95Ratio": 2.0546589294851563,
+        "limit": 0
+      },
+      {
+        "artifact": "render-baseline.json",
+        "key": "cells[key=engine=handsontable;rows=100000;scenario=merge-heavy.paint]",
+        "base": {
+          "median": 3.4844827586222955,
+          "p95": 3.762407407409477,
+          "mad": 0.03867816092425058
+        },
+        "candidate": {
+          "median": 6.368750000008731,
+          "p95": 6.54218749999418,
+          "mad": 0.07500000001164153
+        },
+        "medianRatio": 1.8277461652663838,
+        "p95Ratio": 1.7388301668528394,
+        "limit": 0
+      },
+      {
+        "artifact": "render-baseline.json",
+        "key": "cells[key=engine=handsontable;rows=100000;scenario=scroll-down.middle]",
+        "base": {
+          "median": 4.0021538461553146,
+          "p95": 4.97818181816044,
+          "mad": 0.1136923077036267
+        },
+        "candidate": {
+          "median": 6.860000000055879,
+          "p95": 9.855954545440616,
+          "mad": 0.17000000001862636
+        },
+        "medianRatio": 1.7140770354557875,
+        "p95Ratio": 1.9798301680115478,
+        "limit": 0
+      },
+      {
+        "artifact": "render-baseline.json",
+        "key": "cells[key=engine=handsontable;rows=100000;scenario=scroll-down.top-left]",
+        "base": {
+          "median": 15.764285714282389,
+          "p95": 16.022142857160155,
+          "mad": 0.15000000000665192
+        },
+        "candidate": {
+          "median": 21.339999999990688,
+          "p95": 21.890999999940394,
+          "mad": 0.40000000009313297
+        },
+        "medianRatio": 1.3536927956498988,
+        "p95Ratio": 1.3662966430334567,
+        "limit": 0
+      },
+      {
+        "artifact": "render-baseline.json",
+        "key": "cells[key=engine=handsontable;rows=100000;scenario=scroll-right.top-left]",
+        "base": {
+          "median": 10.55,
+          "p95": 10.68549999996554,
+          "mad": 0.0649999999790456
+        },
+        "candidate": {
+          "median": 16.414285714372195,
+          "p95": 17.75999999988902,
+          "mad": 0.12142857137535401
+        },
+        "medianRatio": 1.5558564658172696,
+        "p95Ratio": 1.6620654157452897,
+        "limit": 0
+      },
+      {
+        "artifact": "render-baseline.json",
+        "key": "cells[key=engine=handsontable;rows=100000;scenario=scroll-smooth.same-window]",
+        "base": {
+          "median": 7.723076923114535,
+          "p95": 8.33189102564804,
+          "mad": 0.14615384611086135
+        },
+        "candidate": {
+          "median": 10.530000000004655,
+          "p95": 11.310000000042944,
+          "mad": 0.09500000006519294
+        },
+        "medianRatio": 1.363446215133405,
+        "p95Ratio": 1.3574349406668182,
+        "limit": 0
+      }
+    ],
+    "releaseReady": false,
+    "confirmedBlocker": "XIRR after the preceding LINEST workload reproducibly exceeds the documented 25% comparison budget. Isolated XIRR is faster, so context/JIT state changes behavior; that does not excuse the published workload regression.",
+    "xirr": {
+      "source": "capture-attempts/xirr-control.json",
+      "summary": "capture-attempts/xirr-control-summary.json",
+      "scope": "capture-attempts/xirr-control-scope.json",
+      "diagnosticOnly": true,
+      "contexts": [
+        {
+          "context": "isolated",
+          "baseline": {
+            "processes": 20,
+            "samples": 100,
+            "medianOfProcessMedians": 1.4422555000000017,
+            "medianOfProcessP95s": 1.5497172000000035,
+            "pooledMedian": 1.4314925000000045,
+            "pooledP95": 3.2836572500000125,
+            "wasmSha256": [
+              "1c13192ae2661591d1c3eb8c05dbec83b84867ae83af40deae72ae5c54bb8b63"
+            ]
+          },
+          "candidate": {
+            "processes": 20,
+            "samples": 100,
+            "medianOfProcessMedians": 1.0318405000000013,
+            "medianOfProcessP95s": 1.108636399999996,
+            "pooledMedian": 1.0381844999999998,
+            "pooledP95": 1.6348459000000033,
+            "wasmSha256": [
+              "37093c76ab59a9d45343108d5a17e8cd6a412ccf0d4745151e033c01f6a0f38a"
+            ]
+          },
+          "medianRatio": 0.7154353025521484,
+          "p95Ratio": 0.7153798125232097,
+          "pairedGeometricRatio": 0.7269198825358207,
+          "pairedRatio99Interval": [
+            0.7105289250911472,
+            0.7514333388735808
+          ]
+        },
+        {
+          "context": "after-linest",
+          "baseline": {
+            "processes": 20,
+            "samples": 100,
+            "medianOfProcessMedians": 2.560729500000008,
+            "medianOfProcessP95s": 2.605473299999997,
+            "pooledMedian": 2.5644775000000095,
+            "pooledP95": 2.6723037999999972,
+            "wasmSha256": [
+              "1c13192ae2661591d1c3eb8c05dbec83b84867ae83af40deae72ae5c54bb8b63"
+            ]
+          },
+          "candidate": {
+            "processes": 20,
+            "samples": 100,
+            "medianOfProcessMedians": 3.683173999999994,
+            "medianOfProcessP95s": 3.7539047999999893,
+            "pooledMedian": 3.6756660000000068,
+            "pooledP95": 3.800063199999994,
+            "wasmSha256": [
+              "37093c76ab59a9d45343108d5a17e8cd6a412ccf0d4745151e033c01f6a0f38a"
+            ]
+          },
+          "medianRatio": 1.4383299758916288,
+          "p95Ratio": 1.4407765376064277,
+          "pairedGeometricRatio": 1.4340838044109083,
+          "pairedRatio99Interval": [
+            1.409622411736947,
+            1.4575550663244468
+          ]
+        }
+      ],
+      "method": "10 fresh-process ABBA blocks per context, one fixture warmup then five fresh timed samples per process; process medians summarized independently. Paired log-ratio bootstrap across blocks: 20,000 resamples, 99% interval. Not a release gate."
+    },
+    "textLookup": {
+      "classification": "Raw release flag retained; existing controls do not establish a reproducible >25% product regression. Cause not isolated.",
+      "pairedGateReportedRatio": 1.036,
+      "pairedGateLimit": 1.2,
+      "pairedGateLog": "capture-attempts/formula-paired-gate.log",
+      "otherFreshRows": [
+        {
+          "artifact": "formula-default-results.json",
+          "metric": {
+            "key": "workloads[id=text-lookup-many;size=1000].stat",
+            "unit": "ms",
+            "rounds": {
+              "base": 1,
+              "candidate": 1
+            },
+            "base": {
+              "median": 2.2850119999993694,
+              "p95": 2.297668400000293,
+              "max": 2.299224000000322
+            },
+            "candidate": {
+              "median": 2.432372999999643,
+              "p95": 2.474482799999896,
+              "max": 2.483092999999826
+            },
+            "medianRatio": 1.0644902521301045,
+            "p95Ratio": 1.0769538372027836,
+            "medianDelta": 0.14736100000027363,
+            "p95Delta": 0.17681439999960302,
+            "verdict": "within-noise",
+            "limit": 2.856264999999212
+          }
+        },
+        {
+          "artifact": "formula-full-results.json",
+          "metric": {
+            "key": "workloads[id=text-lookup-many;size=1000].stat",
+            "unit": "ms",
+            "rounds": {
+              "base": 1,
+              "candidate": 1
+            },
+            "base": {
+              "median": 2.3365300000004936,
+              "p95": 2.3523816000000806,
+              "max": 2.3555740000001606
+            },
+            "candidate": {
+              "median": 2.4407529999998587,
+              "p95": 2.4620625999998085,
+              "max": 2.4653639999996813
+            },
+            "medianRatio": 1.0446058899305137,
+            "p95Ratio": 1.0466255134794984,
+            "medianDelta": 0.10422299999936513,
+            "p95Delta": 0.10968099999972791,
+            "verdict": "within-noise",
+            "limit": 2.920662500000617
+          }
+        }
+      ]
+    },
+    "handsontable": {
+      "flagCount": 9,
+      "classification": "All nine render-baseline flags affect the unchanged Handsontable control, not Sheetwrite. They show comparison-environment or harness uncertainty; the cause is not isolated. No normalization or flag suppression was applied."
+    }
+  }
+}
