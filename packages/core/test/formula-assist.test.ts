@@ -187,7 +187,8 @@ describe("FormulaAssist ref highlighting", () => {
       sheet: () => "s1",
     });
 
-    ta.value = `="A1"&'Q1'!B2+Data!C3+D4`;
+    // `LOG10` is a function name, not column LOG row 10.
+    ta.value = `="A1"&'Q1'!B2+Data!C3+LOG10(D4)`;
     ta.setSelectionRange(ta.value.length, ta.value.length);
     assist.attach(ta, THEME);
 

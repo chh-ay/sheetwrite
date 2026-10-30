@@ -8,6 +8,19 @@ const LAST_ROW_NUMBER = 1_048_576;
 const RANGE_WITH_CORNERS =
   /"(?:[^"]|"")*"|'(?:[^']|'')*'|(#REF!|\$?[A-Za-z]{1,3}\$?[0-9]+):(#REF!|\$?[A-Za-z]{1,3}\$?[0-9]+)/g;
 
+const NAME_CHARACTER = /[A-Za-z0-9_]/;
+
+/**
+ * Whether A1-shaped text at `offset` is part of a longer name, not a reference:
+ * a letter, digit or `_` touches it on either side, or `(` follows it, as in
+ * `LOG10(` or `BIN2DEC`.
+ */
+export function isGluedToName(text: string, offset: number, length: number): boolean {
+  const before = offset > 0 ? text.charAt(offset - 1) : "";
+  const after = text.charAt(offset + length);
+  return NAME_CHARACTER.test(before) || after === "(" || NAME_CHARACTER.test(after);
+}
+
 /** Column index (0-based) → A1 column label (0 → "A", 26 → "AA"). */
 export function colToA1(col: number): string {
   let c = col + 1;
@@ -68,10 +81,7 @@ export function shiftA1Refs(src: string, dRow: number, dCol: number): string {
       full: string,
     ): string => {
       if (match.startsWith('"') || match.startsWith("'")) return match;
-      const prev = offset > 0 ? full.charAt(offset - 1) : "";
-      if (prev === "_" || /[A-Za-z0-9]/.test(prev)) return match;
-      const next = full.charAt(offset + match.length);
-      if (next === "(" || next === "_" || /[A-Za-z0-9]/.test(next)) return match;
+      if (isGluedToName(full, offset, match.length)) return match;
 
       let col = labelToCol(letters.toUpperCase());
       let rowNum = Number(digits);
@@ -162,10 +172,8 @@ export function remapFormulaA1Refs(
       full: string,
     ): string => {
       if (match.startsWith('"') || match.startsWith("'")) return match;
-      const previous = offset > 0 ? full.charAt(offset - 1) : "";
-      if (previous === "!" || previous === "_" || /[A-Za-z0-9]/.test(previous)) return match;
-      const next = full.charAt(offset + match.length);
-      if (next === "(" || next === "_" || /[A-Za-z0-9]/.test(next)) return match;
+      if (offset > 0 && full.charAt(offset - 1) === "!") return match;
+      if (isGluedToName(full, offset, match.length)) return match;
       const start = a1Corner(colAbsolute, letters, rowAbsolute, digits);
       const at = (corner: A1Corner) => (axis === "row" ? corner.row : corner.col);
 

@@ -1,4 +1,4 @@
-import { labelToCol } from "./a1.js";
+import { isGluedToName, labelToCol } from "./a1.js";
 import { engineFunctionNames } from "./engine.js";
 import type { HighlightRange, SheetId } from "./types/coordinates.js";
 import type { Theme } from "./types/render.js";
@@ -234,7 +234,8 @@ function parseFormulaRefs(text: string, sheet: SheetId): HighlightRange[] {
   while (m !== null) {
     const prev = m.index > 0 ? text.charAt(m.index - 1) : "";
     const head = m[1];
-    if (head && prev !== "_" && prev !== "!" && !/[A-Za-z0-9]/.test(prev)) {
+    // `!` means the reference names another sheet; glued text is a function name.
+    if (head && prev !== "!" && !isGluedToName(text, m.index, m[0].length)) {
       const start = parseCell(head);
       const end = m[2] ? parseCell(m[2]) : start;
       if (start && end) {

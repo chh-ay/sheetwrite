@@ -441,4 +441,85 @@ describe("RowBridge", () => {
       store.dispose();
     }
   });
+
+  it("lists every cleared cell when capture is off, even beside a captured set", () => {
+    const workbook: Workbook = {
+      activeSheet: "sheet1",
+      sheets: [
+        {
+          id: "sheet1",
+          name: "Sheet 1",
+          rowCount: 3,
+          columns: [
+            { key: "name", header: "Name", width: 100, type: "text" },
+            { key: "amount", header: "Amount", width: 100, type: "number" },
+          ],
+        },
+      ],
+    };
+    const store = new SheetwriteStore(workbook, {
+      rowCount: 3,
+      columns: { name: ["A", "B", "C"], amount: [1, 2, 3] },
+    });
+    const bridge = createRowBridge({ columns, defaultRows: rows, getRowId: (row) => row.id });
+    const projections: RowBridgeProjection<string>[] = [];
+    store.on("change", (change) => projections.push(bridge.project(change)));
+
+    try {
+      // A set always reports its change; the clear has no per-cell capture here.
+      store.applyTransaction({
+        patches: [
+          {
+            op: "clearRange",
+            range: { sheet: "sheet1", start: { row: 0, col: 0 }, end: { row: 1, col: 0 } },
+          },
+          { op: "set", addr: { sheet: "sheet1", row: 2, col: 1 }, value: literal(30) },
+        ],
+      });
+
+      const clear = projections[0]?.deltas.find((delta) => delta.kind === "clear");
+      expect(
+        clear?.kind === "clear" ? clear.cells.map((cell) => [cell.rowId, cell.columnKey]) : [],
+      ).toEqual([
+        ["row-a", "name"],
+        ["row-b", "name"],
+      ]);
+    } finally {
+      store.dispose();
+    }
+  });
+
+  it("projects a captured clear of an empty range as no cells", () => {
+    const store = new SheetwriteStore({
+      activeSheet: "sheet1",
+      sheets: [
+        {
+          id: "sheet1",
+          name: "Sheet 1",
+          rowCount: 3,
+          columns: [{ key: "name", header: "Name", width: 100, type: "text" }],
+        },
+      ],
+    });
+    const bridge = createRowBridge({ columns, defaultRows: rows, getRowId: (row) => row.id });
+    const projections: RowBridgeProjection<string>[] = [];
+    store.setDetailedChangeCapture(true);
+    store.on("change", (change) => projections.push(bridge.project(change)));
+
+    try {
+      store.applyTransaction({
+        patches: [
+          {
+            op: "clearRange",
+            range: { sheet: "sheet1", start: { row: 0, col: 0 }, end: { row: 2, col: 0 } },
+          },
+        ],
+      });
+
+      const clear = projections[0]?.deltas[0];
+      expect(clear?.kind === "clear" ? clear.cells : null).toEqual([]);
+    } finally {
+      store.dispose();
+    }
+  });
 });

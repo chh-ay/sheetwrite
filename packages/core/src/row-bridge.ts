@@ -1,3 +1,4 @@
+import { capturedClearOperations } from "./clear-capture.js";
 import { restoreBlockFacts } from "./restore-block.js";
 import type { CellScalar, CellValue } from "./types/cell.js";
 import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
@@ -639,9 +640,9 @@ export class RowBridge<
       const endRow = Math.max(range.start.row, range.end.row);
       const startCol = Math.min(range.start.col, range.end.col);
       const endCol = Math.max(range.start.col, range.end.col);
-      if (changeQueues.size > 0) {
-        // Detailed capture lists only the cells that held something. Walking
-        // every address would allocate per cell for a whole-column clear.
+      if (capturedClearOperations.has(operation)) {
+        // The store listed exactly the cells this clear changed. Walking every
+        // address would allocate per cell for a whole-column clear.
         for (const queue of changeQueues.values()) {
           const addr = queue[0]?.addr;
           if (
@@ -658,7 +659,7 @@ export class RowBridge<
         }
         addresses.sort((left, right) => left.row - right.row || left.col - right.col);
       } else {
-        // Without captured changes (reconcile, or capture off) every cell may have changed.
+        // Without capture for this clear (reconcile, or capture off) every cell may have changed.
         for (let row = startRow; row <= endRow; row += 1) {
           for (let col = startCol; col <= endCol; col += 1) {
             const addr = { sheet: range.sheet, row, col };
