@@ -161,6 +161,20 @@ async function measureOperation(
   };
 }
 
+/**
+ * Collect garbage and read memory from a timer callback. The collector scans the native stack
+ * conservatively, so old values in the frame of `main` can keep dead codec objects alive. A timer
+ * callback starts on a new stack after this frame is suspended.
+ */
+function retainedUsage(): Promise<NodeJS.MemoryUsage> {
+  const { promise, resolve } = Promise.withResolvers<NodeJS.MemoryUsage>();
+  setTimeout(() => {
+    Bun.gc(true);
+    resolve(process.memoryUsage());
+  }, 0);
+  return promise;
+}
+
 async function main(): Promise<WorkerResult> {
   const engine = argument("--engine") as "current" | "baseline";
   const operation = argument("--operation") as "import" | "export" | "reject";
@@ -196,10 +210,7 @@ async function main(): Promise<WorkerResult> {
     scenario,
     input,
   );
-  // Clear completed operation frames before collecting unreachable codec temporaries.
-  await Bun.sleep(0);
-  Bun.gc(true);
-  const retained = process.memoryUsage();
+  const retained = await retainedUsage();
   return {
     engine,
     operation,

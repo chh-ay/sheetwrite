@@ -405,24 +405,15 @@ describe("ZIP raw entries", () => {
     ).rejects.toMatchObject({ resource: "maxCompressionRatio" });
   });
 });
+
 const EOCD_SIGNATURE = 0x06054b50;
 const EOCD_BYTES = 22;
 const CENTRAL_HEADER_BYTES = 46;
-const CENTRAL_CRC = 16;
 const CENTRAL_UNCOMPRESSED_SIZE = 24;
 const CENTRAL_LOCAL_OFFSET = 42;
-const LOCAL_CRC = 14;
 const LOCAL_UNCOMPRESSED_SIZE = 22;
 const ZIP64_SENTINEL = 0xffffffff;
-
-const CENTRAL_METHOD = 10;
-const LOCAL_METHOD = 8;
-const LOCAL_COMPRESSED_SIZE = 18;
-const DEFLATE_METHOD = 8;
-const ONE_STEP_READ_BYTES = 64 * 1024;
-/** A stored deflate block has a 1-byte header and two 16-bit length fields before its data. */
-const STORED_BLOCK_HEADER_BYTES = 5;
-const STORED_BLOCKS = 2;
+const ONE_STEP_PARSE_BYTES = 64 * 1024;
 const LETTER_COUNT = 26;
 const LOWERCASE_A = 97;
 
@@ -437,14 +428,6 @@ function letters(length: number): string {
   return text;
 }
 
-/** Set the CRC in the central and local headers. */
-function declareCrc(crc: number): (view: DataView, central: number, local: number) => void {
-  return (view, central, local) => {
-    view.setUint32(central + CENTRAL_CRC, crc, true);
-    view.setUint32(local + LOCAL_CRC, crc, true);
-  };
-}
-
 /** Set the uncompressed size in the central and local headers. */
 function declareSize(size: number): (view: DataView, central: number, local: number) => void {
   return (view, central, local) => {
@@ -453,171 +436,103 @@ function declareSize(size: number): (view: DataView, central: number, local: num
   };
 }
 
-/**
- * Make a one-part archive whose deflate stream has only stored blocks. Its compressed size is
- * then exactly the text length plus the block headers.
- */
-function storedBlockZip(text: string): Uint8Array {
-  const data = strToU8(text);
-  const split = Math.ceil(data.length / STORED_BLOCKS);
-  const stream = new Uint8Array(data.length + STORED_BLOCKS * STORED_BLOCK_HEADER_BYTES);
-  const view = new DataView(stream.buffer);
-  let offset = 0;
+const SHEET_PART = "xl/worksheets/sheet1.xml";
+const CENTRAL_NAME_LENGTH = 28;
+const SMALL_SHEET_DATA =
+  '<sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>hello</t></is></c><c r="B1"><v>42</v></c></row></sheetData>';
 
-  for (let block = 0; block < STORED_BLOCKS; block++) {
-    const part = data.subarray(block * split, (block + 1) * split);
-    // Bit 0 marks the final block; bits 1-2 stay 0 for a stored block.
-    stream[offset] = block === STORED_BLOCKS - 1 ? 1 : 0;
-    view.setUint16(offset + 1, part.length, true);
-    view.setUint16(offset + 3, part.length ^ 0xffff, true);
-    stream.set(part, offset + STORED_BLOCK_HEADER_BYTES);
-    offset += STORED_BLOCK_HEADER_BYTES + part.length;
-  }
+/** A worksheet of exactly `size` bytes; a comment of varied text fills the remaining space. */
+function sizedWorksheet(size: number, body: string): string {
+  const unpadded = worksheet(`${body}<!---->`);
+  const xml = worksheet(`${body}<!--${letters(size - unpadded.length)}-->`);
+  expect(xml.length).toBe(size);
+  return xml;
+}
 
-  // A stored copy of the text gives the CRC that the inflated part must match.
-  let crc = 0;
-  patchEntries(rawZip({ "a.xml": data }, 0), (headers, central) => {
-    crc = headers.getUint32(central + CENTRAL_CRC, true);
-  });
-  return patchEntries(rawZip({ "a.xml": stream }, 0), (headers, central, local) => {
-    headers.setUint16(central + CENTRAL_METHOD, DEFLATE_METHOD, true);
-    headers.setUint16(local + LOCAL_METHOD, DEFLATE_METHOD, true);
-    declareCrc(crc)(headers, central, local);
-    declareSize(data.length)(headers, central, local);
-    expect(headers.getUint32(local + LOCAL_COMPRESSED_SIZE, true)).toBe(stream.length);
+/** Change the header fields of one named part. */
+function patchPart(
+  source: Uint8Array,
+  name: string,
+  patch: (view: DataView, central: number, local: number) => void,
+): Uint8Array {
+  const nameBytes = strToU8(name);
+  return patchEntries(source, (view, central, local) => {
+    const length = view.getUint16(central + CENTRAL_NAME_LENGTH, true);
+    const entryName = new Uint8Array(view.buffer, central + CENTRAL_HEADER_BYTES, length);
+    if (Buffer.compare(entryName, nameBytes) === 0) patch(view, central, local);
   });
 }
 
-// In-memory parts are read in one step when both sizes that the archive declares are 64 KiB or
-// less. The archive controls those sizes, so each limit must hold on both sides of the boundary.
-describe("ZIP one-step read boundary", () => {
-  for (const size of [ONE_STEP_READ_BYTES, ONE_STEP_READ_BYTES + 1]) {
-    describe(`at a declared uncompressed size of ${size} bytes`, () => {
-      it("reads stored and deflated parts on the path that their size selects", async () => {
-        const text = letters(size);
-        for (const level of [0, 6] as const) {
-          const reader = await ZipReader.open(
-            rawZip({ "a.xml": text }, level),
-            createCodecContext("import"),
-          );
-          const streamed = spyOn(ZipReader.prototype, "chunks");
-          try {
-            const bytes = await reader.read("a.xml");
-            expect(bytes.byteLength).toBe(size);
-            expect(new TextDecoder().decode(bytes)).toBe(text);
-            expect(streamed).toHaveBeenCalledTimes(size > ONE_STEP_READ_BYTES ? 1 : 0);
-          } finally {
-            streamed.mockRestore();
-          }
+// Worksheets of 64 KiB or less, by the size that the archive declares, are parsed in one step.
+// The archive controls that size, so each limit must hold on both sides of the boundary.
+describe("worksheet one-step parse boundary", () => {
+  for (const size of [ONE_STEP_PARSE_BYTES, ONE_STEP_PARSE_BYTES + 1]) {
+    describe(`at a declared worksheet size of ${size} bytes`, () => {
+      it("reads the cells on the path that the size selects", async () => {
+        const archive = rawXlsx({ sheets: [{ xml: sizedWorksheet(size, SMALL_SHEET_DATA) }] });
+        const buffered = spyOn(ZipReader.prototype, "read");
+        try {
+          const snapshot = await fromXlsxWorkbook(archive);
+          const cells = JSON.stringify(snapshot.sheets[0]?.cells);
+          expect(cells).toContain('"hello"');
+          expect(cells).toContain("42");
+          const sheetReads = buffered.mock.calls.filter(([part]) => part === SHEET_PART);
+          expect(sheetReads.length).toBe(size > ONE_STEP_PARSE_BYTES ? 0 : 1);
+        } finally {
+          buffered.mockRestore();
         }
-      });
-
-      it("rejects a compression ratio over the limit", async () => {
-        await expect(
-          ZipReader.open(rawZip({ "a.xml": "a".repeat(size) }), createCodecContext("import")),
-        ).rejects.toMatchObject({ resource: "maxCompressionRatio" });
-      });
-
-      it("rejects an entry over the size limit", async () => {
-        const context = createCodecContext("import", {
-          resourceLimits: { maxEntryUncompressedBytes: size - 1 },
-        });
-        await expect(
-          ZipReader.open(rawZip({ "a.xml": letters(size) }), context),
-        ).rejects.toMatchObject({ resource: "maxEntryUncompressedBytes" });
       });
 
       it("rejects XML deeper than the limit", async () => {
         const depth = createCodecContext("import").limits.maxXmlDepth + 1;
-        // Varied text keeps the part under the compression-ratio limit.
-        const xml = `${"<a>".repeat(depth)}${letters(size - 7 * depth)}${"</a>".repeat(depth)}`;
-        expect(xml.length).toBe(size);
-        // The content types part is the first part that an import reads and parses.
+        const body = `${SMALL_SHEET_DATA}${"<a>".repeat(depth)}${"</a>".repeat(depth)}`;
+        const archive = rawXlsx({ sheets: [{ xml: sizedWorksheet(size, body) }] });
+        await expect(fromXlsxWorkbook(archive)).rejects.toMatchObject({ resource: "maxXmlDepth" });
+      });
+
+      it("rejects cell text over the limit", async () => {
+        const textBytes = 2_000;
+        const body = `<sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>${letters(textBytes)}</t></is></c></row></sheetData>`;
+        const archive = rawXlsx({ sheets: [{ xml: sizedWorksheet(size, body) }] });
         await expect(
-          fromXlsxWorkbook(rawZip({ "[Content_Types].xml": xml })),
-        ).rejects.toMatchObject({ resource: "maxXmlDepth" });
+          fromXlsxWorkbook(archive, { resourceLimits: { maxXmlTextBytes: textBytes - 1 } }),
+        ).rejects.toMatchObject({ resource: "maxXmlTextBytes" });
       });
 
-      it("rejects a CRC mismatch in stored and deflated parts", async () => {
-        for (const level of [0, 6] as const) {
-          const archive = patchEntries(rawZip({ "a.xml": letters(size) }, level), declareCrc(1));
-          const reader = await ZipReader.open(archive, createCodecContext("import"));
-          await expect(reader.read("a.xml")).rejects.toThrow("CRC mismatch for a.xml");
+      it("rejects more elements than the limit", async () => {
+        const rowCount = 100;
+        const rows = Array.from(
+          { length: rowCount },
+          (_, index) => `<row r="${index + 1}"><c r="A${index + 1}"><v>1</v></c></row>`,
+        ).join("");
+        const body = `<sheetData>${rows}</sheetData>`;
+        const archive = rawXlsx({ sheets: [{ xml: sizedWorksheet(size, body) }] });
+        // The other parts of this package have far fewer elements than the limit.
+        await expect(
+          fromXlsxWorkbook(archive, { resourceLimits: { maxXmlElements: rowCount } }),
+        ).rejects.toMatchObject({ resource: "maxXmlElements" });
+      });
+
+      it("rejects a worksheet over the entry size limit", async () => {
+        const archive = rawXlsx({ sheets: [{ xml: sizedWorksheet(size, SMALL_SHEET_DATA) }] });
+        await expect(
+          fromXlsxWorkbook(archive, { resourceLimits: { maxEntryUncompressedBytes: size - 1 } }),
+        ).rejects.toMatchObject({ resource: "maxEntryUncompressedBytes" });
+      });
+
+      it("rejects worksheet data longer or shorter than the declared size", async () => {
+        for (const actual of [size + 1, size - 1]) {
+          const archive = patchPart(
+            rawXlsx({ sheets: [{ xml: sizedWorksheet(actual, SMALL_SHEET_DATA) }] }),
+            SHEET_PART,
+            declareSize(size),
+          );
+          await expect(fromXlsxWorkbook(archive)).rejects.toThrow(
+            actual > size
+              ? `inflated size exceeds declaration for ${SHEET_PART}`
+              : `inflated size mismatch for ${SHEET_PART}`,
+          );
         }
-      });
-
-      it("rejects stored data shorter than the declared size", async () => {
-        const archive = patchEntries(rawZip({ "a.xml": letters(size - 1) }, 0), declareSize(size));
-        const reader = await ZipReader.open(archive, createCodecContext("import"));
-        await expect(reader.read("a.xml")).rejects.toThrow("stored size mismatch for a.xml");
-      });
-
-      it("rejects inflated data longer or shorter than the declared size", async () => {
-        const longer = patchEntries(rawZip({ "a.xml": letters(size + 1) }), declareSize(size));
-        const longerReader = await ZipReader.open(longer, createCodecContext("import"));
-        await expect(longerReader.read("a.xml")).rejects.toThrow(
-          "inflated size exceeds declaration for a.xml",
-        );
-
-        const shorter = patchEntries(rawZip({ "a.xml": letters(size - 1) }), declareSize(size));
-        const shorterReader = await ZipReader.open(shorter, createCodecContext("import"));
-        await expect(shorterReader.read("a.xml")).rejects.toThrow(
-          "inflated size mismatch for a.xml",
-        );
-      });
-    });
-  }
-
-  // Stored deflate blocks make the compressed size exact while the part stays under 64 KiB.
-  for (const compressedSize of [ONE_STEP_READ_BYTES, ONE_STEP_READ_BYTES + 1]) {
-    describe(`at a declared compressed size of ${compressedSize} bytes`, () => {
-      const text = letters(compressedSize - STORED_BLOCKS * STORED_BLOCK_HEADER_BYTES);
-      const archive = storedBlockZip(text);
-
-      it("reads the part on the path that its compressed size selects", async () => {
-        const reader = await ZipReader.open(archive, createCodecContext("import"));
-        expect(reader.entries.get("a.xml")?.compressedSize).toBe(compressedSize);
-        const streamed = spyOn(ZipReader.prototype, "chunks");
-        try {
-          expect(new TextDecoder().decode(await reader.read("a.xml"))).toBe(text);
-          expect(streamed).toHaveBeenCalledTimes(compressedSize > ONE_STEP_READ_BYTES ? 1 : 0);
-        } finally {
-          streamed.mockRestore();
-        }
-      });
-
-      it("rejects a CRC mismatch", async () => {
-        const reader = await ZipReader.open(
-          patchEntries(archive, declareCrc(1)),
-          createCodecContext("import"),
-        );
-        await expect(reader.read("a.xml")).rejects.toThrow("CRC mismatch for a.xml");
-      });
-
-      it("rejects inflated data longer or shorter than the declared size", async () => {
-        const longer = await ZipReader.open(
-          patchEntries(archive, declareSize(text.length - 1)),
-          createCodecContext("import"),
-        );
-        await expect(longer.read("a.xml")).rejects.toThrow(
-          "inflated size exceeds declaration for a.xml",
-        );
-
-        const shorter = await ZipReader.open(
-          patchEntries(archive, declareSize(text.length + 1)),
-          createCodecContext("import"),
-        );
-        await expect(shorter.read("a.xml")).rejects.toThrow("inflated size mismatch for a.xml");
-      });
-
-      it("rejects a compression ratio over the limit", async () => {
-        // The part is a little smaller than its compressed form, so its ratio is just below 1.
-        const context = createCodecContext("import", {
-          resourceLimits: { maxCompressionRatio: 0.5 },
-        });
-        await expect(ZipReader.open(archive, context)).rejects.toMatchObject({
-          resource: "maxCompressionRatio",
-        });
       });
     });
   }
