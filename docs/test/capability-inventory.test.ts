@@ -84,6 +84,7 @@ const REQUIRED_CAPABILITY_IDS = [
   "collab.recovery",
   "lifecycle.engine-events",
   "workflow.host-owned-rows",
+  "workflow.ribbon",
   "lifecycle.vanilla",
   "lifecycle.react",
   "lifecycle.vue",

@@ -1,0 +1,105 @@
+.sw-spreadsheet-frame {
+  min-height: 100vh;
+  background: var(--sw-demo-deep);
+  color: var(--sw-demo-fg);
+}
+
+.sw-spreadsheet {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 2rem clamp(1rem, 3vw, 3rem) 4rem;
+}
+
+.sw-spreadsheet-workspace {
+  overflow: hidden;
+  border: 1px solid var(--sw-demo-border);
+  border-radius: 1rem;
+  background: var(--sw-demo-surface);
+  box-shadow: var(--sw-demo-shadow);
+}
+
+.sw-spreadsheet-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--sw-demo-border);
+  color: var(--sw-demo-fg-strong);
+}
+
+.sw-spreadsheet-widths {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.sw-spreadsheet-widths button {
+  min-height: 2.25rem;
+  padding: 0.35rem 0.85rem;
+  border: 1px solid var(--sw-demo-border-strong);
+  border-radius: 0.4rem;
+  background: var(--sw-demo-raised);
+  color: var(--sw-demo-fg);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.sw-spreadsheet-widths button[aria-pressed="true"] {
+  border-color: var(--sw-demo-accent);
+  color: var(--sw-demo-accent);
+}
+
+.sw-spreadsheet-widths button:focus-visible {
+  outline: 2px solid var(--sw-demo-accent);
+  outline-offset: 3px;
+}
+
+/* The window narrows in place so the ribbon's fold is visible, not simulated. */
+.sw-spreadsheet-window {
+  margin: 0 auto;
+  border-inline: 1px solid var(--sw-demo-border);
+  transition: max-width 0.25s ease;
+}
+
+.sw-spreadsheet-host {
+  height: min(72vh, 640px);
+  min-height: 420px;
+}
+
+.sw-spreadsheet-notes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+.sw-spreadsheet-notes h2 {
+  margin: 0 0 0.75rem;
+  color: var(--sw-demo-fg-strong);
+  font-size: 1.05rem;
+}
+
+.sw-spreadsheet-notes ol {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.sw-spreadsheet-notes p {
+  margin: 0 0 0.75rem;
+  color: var(--sw-demo-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sw-spreadsheet-window {
+    transition: none;
+  }
+}
+
+@media (max-width: 52rem) {
+  .sw-spreadsheet-notes {
+    grid-template-columns: 1fr;
+  }
+}

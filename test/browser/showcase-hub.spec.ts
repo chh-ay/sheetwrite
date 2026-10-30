@@ -93,7 +93,7 @@ test("hub links every showcase, filters accessibly, and never clips a card", asy
   await expect(workbookFilter).toHaveAttribute("aria-pressed", "true");
   expect(
     (await launchers.evaluateAll((links) => links.map((link) => link.dataset.owner))).sort(),
-  ).toEqual(["formatting", "interoperability"]);
+  ).toEqual(["formatting", "interoperability", "spreadsheet"]);
   await page.getByRole("button", { name: "Formulas", exact: true }).click();
   expect(
     (await launchers.evaluateAll((links) => links.map((link) => link.dataset.owner))).sort(),
