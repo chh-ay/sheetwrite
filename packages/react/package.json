@@ -1,6 +1,6 @@
 {
   "name": "@sheetwrite/react",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "type": "module",
   "description": "React adapter for Sheetwrite.",
   "license": "MIT",

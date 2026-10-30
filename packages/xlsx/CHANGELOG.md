@@ -1,5 +1,80 @@
 # @sheetwrite/xlsx
 
+## 0.6.0
+
+### Minor Changes
+
+- 81e45e3: Add three cell style fields: `fontFamily` (with the theme font as fallback), `verticalAlign` (`top`, `middle` or `bottom`), and a per-cell `numberFormat` that overrides the column's format; `General` opts a cell out of it. Paint, column auto-fit, snapshots, clipboard and hyperlink styles all honor them, and `isCellFontFamily` exposes the font-name rule. XLSX import and export round-trip all three: a column that mixes number formats keeps each cell's format instead of dropping them, and only fonts other than the workbook default become a cell `fontFamily`.
+- 0b5cc2d: Add iterative calculation for circular references, as in Excel. The new `setCalculation` document operation sets `{ iterate, maxIterations, maxChange }`. The defaults are the Excel defaults: off, 100 iterations, and a maximum change of 0.001. When iteration is off, a circular reference shows `#CYCLE!`, as before. When it is on, the engine calculates each circular reference again until no value changes by more than `maxChange`, or until `maxIterations` passes are done. A cycle that does not settle keeps the values of its last pass. Formulas that read a cycle calculate once, after it settles. `OFFSET`, `INDIRECT` and volatile functions work inside a cycle, and a cycle that only `OFFSET` or `INDIRECT` closes also iterates.
+  
+  The setting is undoable and is part of the workbook snapshot as `workbook.calculation`. Snapshots of workbooks with the default setting do not change. XLSX import reads `iterate`, `iterateCount` and `iterateDelta` from `<calcPr>`, and export writes them. The WASM `CellStore` has the new `setIterativeCalculation` method. Core exports `CalculationSettings`, `DEFAULT_MAX_ITERATIONS`, `DEFAULT_MAX_CHANGE` and `MAX_ITERATIONS`.
+  
+  The engine finds circular references once per recalculation, only when the dependency check finds a cycle, so workbooks without one do no extra work.
+- b6f333c: XLSX import now reads pivot tables into pivot definitions on the sheet that holds them. The reader reads the source range, table or workbook range name, the row, column and value fields, hidden items and page fields as filters, grand totals, subtotals, a descending sort and the compact or tabular layout. Excel `count` becomes `COUNTA` and `countNums` becomes `COUNT`. The reader captures Excel's rendered values as saved pivot output before removing them from ordinary source cells. The default engine shows those values and makes them available to formulas. The full engine calculates fresh output. XLSX export writes saved output back when no fresh rendered values replace it.
+  
+  When a pivot uses a feature that a pivot definition cannot hold, for example "show values as", Show All Items, a product summary, calculated or grouped fields, value filters, a custom manual item order or the outline layout, the reader keeps the pivot as an opaque part, as before, and gives an `unsupported-feature` warning.
+  
+  XLSX export writes each pivot as a pivot table part and a pivot cache definition. The cache lists the field names and items from the source cells, has no records and has `refreshOnLoad="1"`, so Excel and LibreOffice calculate the output when they open the file. A pivot that OOXML cannot express, such as a `DISTINCTCOUNT` value or a deleted source, stays only in the Sheetwrite metadata and gives a warning. A workbook without pivots has no extra export cost.
+- 5308206: Opening and saving an XLSX file now keeps the parts Sheetwrite does not model: charts, pivot tables, images, VBA projects, customXml, XML maps, data connections, themes and document properties. They are kept as their original compressed bytes in the new `WorkbookSnapshot.workbook.xlsxSource` and written back unchanged. Charts and pivots are dropped with a warning once a cell changes, images once their sheet's rows or columns move, and VBA and customXml always survive. The new `maxPreservedBytes` resource limit (64 MiB by default) bounds the kept data.
+  
+  Table autofilter rules, sort state, calculated-column formulas and totals-row functions now round-trip through XLSX.
+  
+  New streaming functions `toCsvStream`, `toTsvStream`, `toXlsxTableStream` and `toXlsxWorkbookStream` return a `ReadableStream<Uint8Array>`, and `fromXlsxWorkbookFile` imports a `Blob` without buffering every part. The existing functions are unchanged.
+  
+  Import no longer writes the workbook's default font size onto every cell; only cells with a different size get a `fontSize` style.
+
+### Patch Changes
+
+- 8d70aae: Package READMEs and API doc comments link to the restructured documentation pages.
+- 60590f9: Keep workbook layout and link text stable when another spreadsheet app saves an XLSX file.
+  
+  Import cells with no XLSX vertical alignment at the bottom, as Excel shows them. Import centered cells with the Sheetwrite default alignment. Export the Sheetwrite default as centered alignment. This changes how imported Excel cells with no alignment setting appear.
+  
+  Use the OOXML column width conversion. Keep automatic row heights automatic. Use cell text when a hyperlink has no display text. Export hyperlink colors and underlines in cell styles so other apps can keep them.
+  
+  Native fixture widths now match what Excel shows. Remove the old extra 5 pixels. The changed widths, in pixels, are: 19 → 14, 25 → 20, 26 → 21, 40 → 35, 44 → 39, 52 → 47, 53 → 48, 60 → 55, 64 → 59, 78 → 73, 85 → 80, 86 → 81, 94 → 89, 107 → 102, 114 → 109, 116 → 111, 119 → 114, 132 → 127, 154 → 149, 156 → 151, 162 → 157, and 171 → 166.
+  
+  Keep explicit cell font colors and underline settings when a hyperlink has no style. Use the default link look only for font properties the cell does not set.
+- 3bdb073: The packages are smaller to install. The code is not minified and stays readable.
+  
+  - `@sheetwrite/core` is 1.83 MB → 1.55 MB unpacked (387 KB → 350 KB packed), with 214 → 157 files.
+  - The packages publish only the type declarations that their entry points use. Core no longer ships 57 internal declaration files (117 KB), and `@sheetwrite/xlsx` no longer ships 8. You cannot import these files through the package `exports`, so no types change.
+  - The published JavaScript uses 2-space indentation instead of 4. This saves 155 KB in core and 20 KB in `@sheetwrite/xlsx`.
+  - `@sheetwrite/wasm` and `@sheetwrite/formulas` no longer publish `pkg/sheetwrite_wasm_bg.wasm.d.ts` (14 KB each). No entry point refers to it, and `sheetwrite_wasm.d.ts` has the same types.
+- 2984b0b: XLSX import now builds the snapshot cells while it reads the worksheet rows, so each cell has one representation in memory instead of two. Restoring Sheetwrite sidecar fields now indexes only the sidecar cells, not all cells. Snapshot validation now finds duplicate cells with sorted numeric keys instead of a set of text keys, builds cell paths only for cells that fail, and counts the bytes of integers without making text. Validation results are the same. On generated 200,000 × 8 and 1,000,000 × 8 workbooks, over seven interleaved rounds for each side, the median import peak RSS went from 1,095 MiB to 800 MiB and from 5,061 MiB to 3,352 MiB (buffered). With `fromXlsxWorkbookFile`, it went from 1,112 MiB to 779 MiB and from 4,475 MiB to 3,336 MiB. The highest candidate run was lower than the median baseline run in all four cases, and the median import time decreased by about 20%.
+- 5308206: XLSX import now parses each worksheet from bounded inflated chunks instead of building a whole-worksheet XML tree, and releases parsed cells as soon as the snapshot holds them. On a generated 200,000 × 8 workbook, five interleaved rounds against a baseline given the same early cell release measured median peak RSS 1,254 MiB → 994 MiB (buffered) and 1,068 MiB (`fromXlsxWorkbookFile`); single runs varied by up to about 400 MiB, and the highest candidate run (1,491 MiB) was above the highest baseline run. Character references longer than 31 characters are now rejected wherever they fall in the file.
+- Updated dependencies [cbcf0b8]
+- Updated dependencies [81e45e3]
+- Updated dependencies [92dcd37]
+- Updated dependencies [d99f762]
+- Updated dependencies [b159a35]
+- Updated dependencies [b159a35]
+- Updated dependencies [b159a35]
+- Updated dependencies [92dcd37]
+- Updated dependencies [92dcd37]
+- Updated dependencies [b6f333c]
+- Updated dependencies [8d70aae]
+- Updated dependencies [9dc3ab1]
+- Updated dependencies [03ad409]
+- Updated dependencies [286ac93]
+- Updated dependencies [ec8e0ee]
+- Updated dependencies [0b5cc2d]
+- Updated dependencies [ec8e0ee]
+- Updated dependencies [78665d3]
+- Updated dependencies [60590f9]
+- Updated dependencies [c56a350]
+- Updated dependencies [c0f9c00]
+- Updated dependencies [0f36fda]
+- Updated dependencies [92dcd37]
+- Updated dependencies [c56a350]
+- Updated dependencies [3bdb073]
+- Updated dependencies [ec8e0ee]
+- Updated dependencies [bcfe991]
+- Updated dependencies [bcfe991]
+- Updated dependencies [2984b0b]
+- Updated dependencies [5308206]
+  - @sheetwrite/core@0.6.0
+
 ## 0.5.4
 
 ### Patch Changes

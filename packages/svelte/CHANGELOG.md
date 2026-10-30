@@ -1,5 +1,42 @@
 # @sheetwrite/svelte
 
+## 0.5.5
+
+### Patch Changes
+
+- 8d70aae: Package READMEs and API doc comments link to the restructured documentation pages.
+- Updated dependencies [cbcf0b8]
+- Updated dependencies [81e45e3]
+- Updated dependencies [92dcd37]
+- Updated dependencies [d99f762]
+- Updated dependencies [b159a35]
+- Updated dependencies [b159a35]
+- Updated dependencies [b159a35]
+- Updated dependencies [92dcd37]
+- Updated dependencies [92dcd37]
+- Updated dependencies [b6f333c]
+- Updated dependencies [8d70aae]
+- Updated dependencies [9dc3ab1]
+- Updated dependencies [03ad409]
+- Updated dependencies [286ac93]
+- Updated dependencies [ec8e0ee]
+- Updated dependencies [0b5cc2d]
+- Updated dependencies [ec8e0ee]
+- Updated dependencies [78665d3]
+- Updated dependencies [60590f9]
+- Updated dependencies [c56a350]
+- Updated dependencies [c0f9c00]
+- Updated dependencies [0f36fda]
+- Updated dependencies [92dcd37]
+- Updated dependencies [c56a350]
+- Updated dependencies [3bdb073]
+- Updated dependencies [ec8e0ee]
+- Updated dependencies [bcfe991]
+- Updated dependencies [bcfe991]
+- Updated dependencies [2984b0b]
+- Updated dependencies [5308206]
+  - @sheetwrite/core@0.6.0
+
 ## 0.5.4
 
 ### Patch Changes
