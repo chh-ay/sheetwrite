@@ -8,7 +8,7 @@ description: "API reference for @sheetwrite/core."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/index.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>370</dd></div>
+<div><dt>Exports</dt><dd>375</dd></div>
 </dl>
 
 Source entry: `packages/core/src/index.ts`
@@ -37,7 +37,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/xlsx-resource-error/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>XlsxResourceError</code></span><span class="api-symbol-card__desc">Stable resource-limit failure surfaced before an XLSX codec allocates unsafe data.</span></a>
 </div>
 
-### Functions <span class="api-count" data-pagefind-ignore>70</span>
+### Functions <span class="api-count" data-pagefind-ignore>71</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/assert-runtime-resource-snapshot/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>assertRuntimeResourceSnapshot</code></span><span class="api-symbol-card__desc">Reject overlap, negative values, and attempts to fold runtime observations into owner totals.</span></a>
@@ -88,6 +88,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/sanitize-cell-hyperlink/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>sanitizeCellHyperlink</code></span><span class="api-symbol-card__desc">Sanitize one untrusted clipboard/snapshot value without cloning its object graph.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/sanitize-hyperlink-style/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>sanitizeHyperlinkStyle</code></span><span class="api-symbol-card__desc">Convert an untrusted style into one bounded, plain renderer-safe value.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/serial-to-date/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>serialToDate</code></span><span class="api-symbol-card__desc">Convert a date serial back to a Date.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/set-chart-renderer-factory/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>setChartRendererFactory</code></span><span class="api-symbol-card__desc">Register the renderer that draws charts in the grid's object layer; null removes it.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/set-chart-view-provider-factory/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>setChartViewProviderFactory</code></span><span class="api-symbol-card__desc">Register an optional chart provider; null removes the current provider.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/set-xlsx-table-export-backend/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>setXlsxTableExportBackend</code></span><span class="api-symbol-card__desc">Registers the optional table XLSX export implementation used by core.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/set-xlsx-table-import-backend/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>setXlsxTableImportBackend</code></span><span class="api-symbol-card__desc">Registers the optional table XLSX import implementation used by core.</span></a>
@@ -112,7 +113,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/workbook-table-name-key/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>workbookTableNameKey</code></span><span class="api-symbol-card__desc">Locale-independent key used for table and table-column collision checks.</span></a>
 </div>
 
-### Interfaces <span class="api-count" data-pagefind-ignore>163</span>
+### Interfaces <span class="api-count" data-pagefind-ignore>166</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/boundary-operation-stats/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>BoundaryOperationStats</code></span><span class="api-symbol-card__desc">Fixed-cardinality boundary crossing counters for one operation.</span></a>
@@ -137,6 +138,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/chart-change-event/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>ChartChangeEvent</code></span><span class="api-symbol-card__desc">Charts whose ChartView may differ after one store commit.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/chart-definition/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>ChartDefinition</code></span><span class="api-symbol-card__desc">Persisted chart definition; IDs are unique within the owning sheet.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/chart-ref/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>ChartRef</code></span><span class="api-symbol-card__desc">Stable identity of one chart: the sheet that owns it and its ID on that sheet.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/chart-renderer/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>ChartRenderer</code></span><span class="api-symbol-card__desc">Draws charts into host elements that the grid's object layer owns.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/chart-series/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>ChartSeries</code></span><span class="api-symbol-card__desc">Sources are read in row-major order.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/chart-series-view/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>ChartSeriesView</code></span><span class="api-symbol-card__desc">Resolved plain data; the renderer does not read cells.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/chart-view/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>ChartView</code></span><span class="api-symbol-card__desc">One immutable-by-convention rendering input, refreshed on chart-change events.</span></a>
@@ -171,11 +173,13 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/grid-config/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>GridConfig</code></span><span class="api-symbol-card__desc">Toolbar / feature configuration.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/grid-events/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>GridEvents</code></span><span class="api-symbol-card__desc">Payload map for events emitted by a Grid.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/grid-options/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>GridOptions</code></span><span class="api-symbol-card__desc">Workbook, data, rendering, policy, and built-in UI options used to create a Grid.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/grid-panel/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>GridPanel</code></span><span class="api-symbol-card__desc">One side panel that Grid.openPanel shows on the grid's right edge.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/grid-transaction/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>GridTransaction</code></span><span class="api-symbol-card__desc">An undoable transaction submitted through a Grid.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/highlight-range/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>HighlightRange</code></span><span class="api-symbol-card__desc">A highlight target: a range plus an optional per-range color override.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/keyboard-options/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>KeyboardOptions</code></span><span class="api-symbol-card__desc">Overrides replace all default keys for an action; null disables that action's keys.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/legacy-row-page/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>LegacyRowPage</code></span><span class="api-symbol-card__desc">Row-only page shape accepted by the full-width compatibility adapter.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/merge-range/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>MergeRange</code></span><span class="api-symbol-card__desc">Inclusive merged-cell rectangle in data-row/column coordinates.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/mounted-chart/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>MountedChart</code></span><span class="api-symbol-card__desc">Draws one chart into a box that core places and sizes.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/named-range-snapshot/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>NamedRangeSnapshot</code></span><span class="api-symbol-card__desc">Workbook-global or sheet-scoped named range used by formulas and persistence.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/packed-cell-block/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PackedCellBlock</code></span><span class="api-symbol-card__desc">Dense row-major mutation payload.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/paged-store-stats/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PagedStoreStats</code></span><span class="api-symbol-card__desc">Allocation and load statistics for one paged datasource sheet.</span></a>
@@ -280,7 +284,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/xlsx-workbook-warning/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>XlsxWorkbookWarning</code></span><span class="api-symbol-card__desc">Structured fidelity warning emitted during XLSX conversion.</span></a>
 </div>
 
-### Types <span class="api-count" data-pagefind-ignore>93</span>
+### Types <span class="api-count" data-pagefind-ignore>94</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/aggregate-op/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>AggregateOp</code></span><span class="api-symbol-card__desc">Column aggregate operation for Grid.aggregate / Store data ops.</span></a>
@@ -297,6 +301,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/chart-change-listener/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>ChartChangeListener</code></span><span class="api-symbol-card__desc">Listener for subscribeChartChanges and ChartViewProvider.subscribe.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/chart-kind/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>ChartKind</code></span><span class="api-symbol-card__desc">Chart families that the document model supports.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/chart-range/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>ChartRange</code></span><span class="api-symbol-card__desc">A deleted source remains explicit instead of silently reading another cell.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/chart-renderer-factory/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>ChartRendererFactory</code></span><span class="api-symbol-card__desc">Creates the chart renderer of one grid.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/chart-view-provider-factory/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>ChartViewProviderFactory</code></span><span class="api-symbol-card__desc">Creates a chart provider owned and disposed by one renderer or host.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/column-filter/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>ColumnFilter</code></span><span class="api-symbol-card__desc">One column's filter predicate.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/comment-anchor/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>CommentAnchor</code></span><span class="api-symbol-card__desc">Document location to which a comment thread is attached.</span></a>

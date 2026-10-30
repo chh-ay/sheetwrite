@@ -20,6 +20,7 @@ import {
   type RibbonFocus,
   type RibbonFormSpec,
   type RibbonMenuSpec,
+  type RibbonPlacementSpec,
 } from "./ribbon-model.js";
 import type { RibbonPopup } from "./ribbon-popup.js";
 
@@ -503,6 +504,107 @@ function renderForm(spec: RibbonFormSpec, context: RibbonContext): RibbonControl
   };
 }
 
+let placementSerial = 0;
+
+/**
+ * Excel's "Choose where to place" form: a new sheet, or an existing sheet at
+ * a cell typed as A1. The button stays disabled, with the reason as its
+ * tooltip, when the command cannot run here at all.
+ */
+function renderPlacement(spec: RibbonPlacementSpec, context: RibbonContext): RibbonControlView {
+  const trigger = commandButton(spec.label, spec.icon, true, context.icons);
+  trigger.setAttribute("aria-haspopup", "dialog");
+  trigger.setAttribute("aria-expanded", "false");
+  trigger.addEventListener("click", () => {
+    placementSerial += 1;
+    const group = `sheetwrite-ribbon-placement-${placementSerial}`;
+    const form = document.createElement("form");
+    form.className = "sheetwrite-ribbon-form";
+
+    const choices = document.createElement("fieldset");
+    choices.className = "sheetwrite-ribbon-choices";
+    const legend = document.createElement("legend");
+    legend.textContent = `Choose where to place the ${spec.label}`;
+    const choice = (text: string, checked: boolean): HTMLInputElement => {
+      const label = document.createElement("label");
+      const radio = document.createElement("input");
+      radio.type = "radio";
+      radio.name = group;
+      radio.checked = checked;
+      label.append(radio, text);
+      choices.appendChild(label);
+      return radio;
+    };
+    choices.appendChild(legend);
+    const newSheet = choice("New worksheet", true);
+    const existing = choice("Existing worksheet", false);
+
+    const location = document.createElement("label");
+    location.textContent = "Location";
+    const field = document.createElement("input");
+    field.className = "sheetwrite-ribbon-field";
+    field.disabled = true;
+    field.autocomplete = "off";
+    field.spellcheck = false;
+    location.appendChild(field);
+    const pickExisting = (): void => {
+      field.disabled = !existing.checked;
+      if (existing.checked) field.focus();
+    };
+    newSheet.addEventListener("change", pickExisting);
+    existing.addEventListener("change", pickExisting);
+
+    const error = document.createElement("p");
+    error.className = "sheetwrite-ribbon-form-error";
+    error.setAttribute("role", "alert");
+    error.hidden = true;
+    const save = document.createElement("button");
+    save.type = "submit";
+    save.className = "sheetwrite-ribbon-form-button";
+    save.textContent = "OK";
+    form.append(choices, location, error, save);
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      // Enter may repeat while the optional panel chunk is still loading.
+      if (save.disabled) return;
+      save.disabled = true;
+      try {
+        const message = await spec.submit(
+          context.grid,
+          existing.checked ? { kind: "cell", text: field.value } : { kind: "new-sheet" },
+        );
+        if (message !== null) {
+          error.textContent = message;
+          error.hidden = false;
+          (existing.checked ? field : newSheet).focus();
+          return;
+        }
+        // The command moved focus into the panel it opened; leave it there.
+        context.popup.closeAll(false);
+      } finally {
+        save.disabled = false;
+      }
+    });
+    context.popup.open(trigger, form, { role: "dialog", label: spec.label, focus: true });
+  });
+
+  let reason: string | null = null;
+  return {
+    element: trigger,
+    refresh({ state }) {
+      const next = spec.unavailable(context.grid);
+      trigger.disabled = next !== null || isDisabled("edit", state);
+      if (next === reason) return;
+      reason = next;
+      trigger.title = next ?? spec.label;
+      // Assistive technology reads the reason too; a tooltip alone is mouse-only.
+      if (next === null) trigger.removeAttribute("aria-description");
+      else trigger.setAttribute("aria-description", next);
+    },
+  };
+}
+
 /**
  * One stepper, as in a status-bar zoom: [−] [percent] [+]. The percent is the
  * reset to 100%, so the group shows one number, and it is disabled when the
@@ -568,6 +670,8 @@ export function renderControl(spec: RibbonControlSpec, context: RibbonContext): 
       return renderColor(spec, context);
     case "form":
       return renderForm(spec, context);
+    case "placement":
+      return renderPlacement(spec, context);
     case "zoom":
       return renderZoom(context);
   }

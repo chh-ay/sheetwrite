@@ -31,20 +31,31 @@ if (wasm.length !== 1) throw new Error(`Expected one webpack WASM asset, got ${w
 if (!publicFiles.includes("main.js")) throw new Error("webpack emitted no initial main.js");
 
 // `chunkFilename` names every lazy chunk `worker-*`, so tell the opt-in ribbon
-// apart by content. It must stay out of main.js, or every app downloads it.
+// and the chart and pivot panels apart by content. Both must stay out of
+// main.js, or every app downloads them.
 const RIBBON_MARKER = "sheetwrite-ribbon-tabs";
+const PANEL_MARKER = "sheetwrite-panel-section";
 const ribbonChunks = [];
+const panelChunks = [];
 const workers = [];
 for (const file of lazyChunks) {
   const code = await readFile(resolve(root, file), "utf8");
-  (code.includes(RIBBON_MARKER) ? ribbonChunks : workers).push(file);
+  if (code.includes(RIBBON_MARKER)) ribbonChunks.push(file);
+  else if (code.includes(PANEL_MARKER)) panelChunks.push(file);
+  else workers.push(file);
 }
 if (workers.length !== 1)
   throw new Error(`Expected one webpack Worker chunk, got ${workers.length}`);
 if (ribbonChunks.length !== 1)
   throw new Error(`Expected one lazy webpack ribbon chunk, got ${ribbonChunks.length}`);
-if ((await readFile(resolve(root, "main.js"), "utf8")).includes(RIBBON_MARKER)) {
+if (panelChunks.length !== 1)
+  throw new Error(`Expected one lazy webpack panel chunk, got ${panelChunks.length}`);
+const mainCode = await readFile(resolve(root, "main.js"), "utf8");
+if (mainCode.includes(RIBBON_MARKER)) {
   throw new Error("The ribbon is in webpack's main.js; it must load lazily");
+}
+if (mainCode.includes(PANEL_MARKER)) {
+  throw new Error("The side panels are in webpack's main.js; they must load lazily");
 }
 
 const assets = publicFiles.map((file) => {
@@ -57,7 +68,7 @@ const assets = publicFiles.map((file) => {
   } else if (workers.includes(file)) {
     owner = "worker-async";
     roles = ["worker-async"];
-  } else if (ribbonChunks.includes(file)) {
+  } else if (ribbonChunks.includes(file) || panelChunks.includes(file)) {
     owner = "chrome-async";
     roles = ["chrome-async"];
   } else {

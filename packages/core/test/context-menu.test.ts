@@ -288,6 +288,48 @@ describe("ContextMenu", () => {
     grid.destroy();
   });
 
+  it("offers PivotTable Fields only on a pivot's output, and not on a read-only grid", () => {
+    const { host, grid, menu } = liveMenu();
+    // A pivot over A1:B3 with its output anchored at C1. The default engine keeps
+    // the definition without output, so the anchor alone is the output cell.
+    const placed = grid.setPivot(
+      {
+        id: "p1",
+        name: "By name",
+        source: { range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 2, col: 1 } } },
+        anchor: { row: 0, col: 2 },
+        rows: [0],
+        columns: [],
+        values: [{ field: 1, aggregation: "SUM" }],
+      },
+      "s1",
+    );
+    expect(placed.status).toBe("applied");
+    /** Open the menu on a cell; returns its row ids and whether the pivot row shows its glyph. */
+    const openAt = (row: number, col: number) => {
+      const cell = { sheet: "s1", row, col };
+      grid.setSelection({ kind: "cell", addr: cell });
+      menu.open({ cell, clientX: 10, clientY: 10 });
+      const root = openMenu(host);
+      const ids = rowIds(root);
+      const glyph = root.querySelector(
+        '[data-context-menu-item="pivotFields"] [data-icon="pivotTable"]',
+      );
+      menu.close();
+      return { ids, glyph: glyph !== null };
+    };
+
+    expect(openAt(0, 2)).toEqual(expect.objectContaining({ glyph: true }));
+    expect(openAt(0, 2).ids).toContain("pivotFields");
+    expect(openAt(2, 0).ids).not.toContain("pivotFields");
+
+    grid.setReadOnly(true);
+    expect(openAt(0, 2).ids).not.toContain("pivotFields");
+
+    menu.destroy();
+    grid.destroy();
+  });
+
   it("moves through the menu and its submenus with the keyboard", () => {
     const { host, grid, menu } = liveMenu();
     const cell = { sheet: "s1", row: 0, col: 0 };

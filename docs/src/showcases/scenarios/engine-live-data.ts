@@ -7,6 +7,15 @@ import type {
   Workbook,
 } from "@sheetwrite/core";
 
+import {
+  isDipMonth,
+  regionRevenueFactor,
+  STORY_MONTHS,
+  STORY_REGIONS,
+  type StoryRegion,
+  storyDemandIndex,
+} from "./orders-story.js";
+
 // Pure workbook data shared by the showcase and prebuilt-site browser specs.
 export const ENGINE_LIVE_SHEET = "forecast" satisfies SheetId;
 export const ENGINE_LIVE_ROWS = 50_000;
@@ -16,7 +25,9 @@ export const ENGINE_LIVE_STORAGE: Required<DataSourceStorageOptions> = {
   cacheBytes: 2 * 1024 * 1024,
   dirtyCellLimit: 4_096,
 };
+/** In the order of `STORY_REGIONS`: Europe follows the EMEA story, with its price change dip. */
 const REGIONS = ["North America", "Europe", "Asia Pacific", "Latin America"] as const;
+export const ENGINE_DIP_REGION = "Europe";
 const PRODUCTS = [
   "Subscriptions",
   "Managed services",
@@ -39,9 +50,16 @@ const MONTHS = [
   "Nov",
   "Dec",
 ] as const;
-const SEASONALITY = [
-  0.94, 0.96, 1.02, 0.98, 1.01, 1.06, 0.95, 0.97, 1.04, 1.08, 1.12, 1.18,
-] as const;
+/** Story month of January 2026: the forecast covers the second story year. */
+const FY26_FIRST_STORY_MONTH = STORY_MONTHS - MONTHS.length;
+/** Zero-based FY26 month from which the April re-forecast plans include the dip region's recovery. */
+export const ENGINE_REFORECAST_FIRST_MONTH = 4;
+/** Renewal rate of dip region accounts in the dip months. */
+const DIP_RENEWAL = 0.86;
+/** Monthly volume of small, mid and large accounts at a demand index of 1. */
+const ACCOUNT_SIZE_TIERS = [60, 120, 240] as const;
+/** Authored tier sequence; its length differs from the product count, so tiers mix with products. */
+const ACCOUNT_TIER_PATTERN = [0, 1, 0, 2, 1, 0, 1] as const;
 const SUBSCRIPTION_DISCOUNT = 0.05;
 export const ENGINE_ACTUAL_ADJUSTMENT = 1_250;
 
@@ -210,17 +228,29 @@ interface EngineAccountFacts {
   readonly renewal: number;
   readonly contractTerm: number;
   readonly planVersion: string;
+  readonly storyRegion: StoryRegion;
+  /** Monthly volume at a demand index of 1. */
+  readonly size: number;
+  /** True when the April re-forecast replaced the January board plan. */
+  readonly reforecast: boolean;
 }
 
 /**
- * Seeded account facts. One account holds one product line in one region for
- * twelve months, then its annual total row.
+ * Account facts. One account holds one product line in one region for
+ * twelve months, then its annual total row. An authored tier sets the account
+ * size; a small seeded variation keeps accounts of one tier apart.
  */
 function engineAccountFacts(account: number): EngineAccountFacts {
   const seed = ((account + 1) * 2_654_435_761) >>> 0;
+  const regionIndex = account % REGIONS.length;
   const productIndex = Math.floor(account / REGIONS.length) % PRODUCTS.length;
+  const tier =
+    ACCOUNT_TIER_PATTERN[Math.floor(account / REGIONS.length) % ACCOUNT_TIER_PATTERN.length];
+  const sizeVariation = (((seed >>> 8) % 21) - 10) / 100;
+  const reforecast = account % 5 === 0;
+
   return {
-    region: REGIONS[account % REGIONS.length] ?? "North America",
+    region: REGIONS[regionIndex] ?? "North America",
     product: PRODUCTS[productIndex] ?? "Subscriptions",
     productIndex,
     label: `AC-${String(account + 1).padStart(4, "0")}`,
@@ -228,7 +258,10 @@ function engineAccountFacts(account: number): EngineAccountFacts {
     price: PRODUCT_PRICE[productIndex] ?? 72,
     renewal: 0.95 + ((seed >>> 20) % 40) / 1_000,
     contractTerm: [12, 24, 36][seed % 3] ?? 12,
-    planVersion: account % 5 === 0 ? "Re-forecast / Apr 2026" : "Board / Jan 2026",
+    planVersion: reforecast ? "Re-forecast / Apr 2026" : "Board / Jan 2026",
+    storyRegion: STORY_REGIONS[regionIndex] ?? "Americas",
+    size: (ACCOUNT_SIZE_TIERS[tier ?? 0] ?? ACCOUNT_SIZE_TIERS[0]) * (1 + sizeVariation),
+    reforecast,
   };
 }
 
@@ -325,24 +358,31 @@ export function engineLiveRow(row: number, columns?: readonly EngineColumnBand[]
         ]),
       );
     } else {
-      // Seeded account sizes and seasonality, not a repeating arithmetic sawtooth.
+      // Story rules: season and growth set the volume. The January board plan
+      // does not know the dip region's price change; the actuals do.
+      const storyMonth = FY26_FIRST_STORY_MONTH + month;
       const volumeKey = VOLUME_KEY_BY_PRODUCT[facts.productIndex] ?? "seats";
-      const volume = Math.round((35 + (facts.seed % 380)) * (SEASONALITY[month] ?? 1));
+      const volume = Math.round(facts.size * storyDemandIndex(storyMonth));
       const baseFees = 600 + ((facts.seed >>> 12) % 12) * 125;
-      const plan =
+      const trendRevenue =
         facts.productIndex === 0
-          ? Math.round(volume * facts.price * (1 - SUBSCRIPTION_DISCOUNT) + baseFees)
-          : Math.round(volume * facts.price);
-      const noise = ((((facts.seed >>> 8) + month * 43) % 121) - 60) / 1_000;
-      const renewalDip =
-        facts.region === "Europe" && facts.productIndex === 2 && month === 8 ? -0.16 : 0;
-      const supportUpside = facts.productIndex === 3 && month >= 9 ? 0.085 : 0;
+          ? volume * facts.price * (1 - SUBSCRIPTION_DISCOUNT) + baseFees
+          : volume * facts.price;
+
+      const regionFactor = regionRevenueFactor(facts.storyRegion, storyMonth);
+      const plansRecovery = facts.reforecast && month >= ENGINE_REFORECAST_FIRST_MONTH;
+      const plan = Math.round(trendRevenue * (plansRecovery ? regionFactor : 1));
+
+      // A small seeded variation so that months of one account are not identical.
+      const variation = ((((facts.seed >>> 4) + month * 7) % 31) - 15) / 1_000;
+      const dipping = isDipMonth(facts.storyRegion, storyMonth);
+
       completeRow = {
         period: `${MONTHS[month] ?? ""} 2026`,
         region: facts.region,
         product: facts.product,
         account: facts.label,
-        actual: Math.round(plan * (1 + noise + renewalDip + supportUpside)),
+        actual: Math.round(trendRevenue * regionFactor * (1 + variation)),
         // AA stays off screen; D and E read it and the Grid loads it with the window.
         forecast: { kind: "formula", src: `=${ENGINE_PLAN_COLUMN}${sheetRow}` },
         variance: { kind: "formula", src: `=C${sheetRow}-${ENGINE_PLAN_COLUMN}${sheetRow}` },
@@ -356,7 +396,7 @@ export function engineLiveRow(row: number, columns?: readonly EngineColumnBand[]
             }
           : {}),
         ...accountUnitValues(facts),
-        renewal: renewalDip ? 0.81 : facts.renewal,
+        renewal: dipping ? DIP_RENEWAL : facts.renewal,
         contractTerm: facts.contractTerm,
         quarter: `Q${Math.floor(month / 3) + 1}`,
         planVersion: facts.planVersion,

@@ -136,6 +136,8 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "ChartSeriesView",
       "ChartView",
       "ChartViewProvider",
+      "ChartRenderer",
+      "MountedChart",
     ],
   },
   document: {
@@ -225,6 +227,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
     exports: [
       "CellLoadState",
       "ClipboardWindowView",
+      "ChartRendererFactory",
       "ChartViewProviderFactory",
       "PagedStoreStats",
       "QueryCapability",
@@ -251,6 +254,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
     source: "packages/core/src/types/grid.ts",
     dependencies: [
       "cell",
+      "chart",
       "coordinates",
       "data",
       "document",
@@ -281,6 +285,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "GridConfig",
       "GridEvents",
       "GridOptions",
+      "GridPanel",
       "IconOverrides",
       "KeyboardAction",
       "KeyboardOptions",

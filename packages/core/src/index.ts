@@ -9,7 +9,11 @@ export {
 
 export { isCellFontFamily } from "./cell-style-fields.js";
 
-export { openChartViews, setChartViewProviderFactory } from "./chart-backend.js";
+export {
+  openChartViews,
+  setChartRendererFactory,
+  setChartViewProviderFactory,
+} from "./chart-backend.js";
 
 export { MAX_CHART_POINTS, resolveChartView, subscribeChartChanges } from "./charts-live.js";
 
@@ -290,6 +294,8 @@ export type {
   ChartKind,
   ChartRange,
   ChartRef,
+  ChartRenderer,
+  ChartRendererFactory,
   ChartSeries,
   ChartSeriesView,
   ChartView,
@@ -324,6 +330,7 @@ export type {
   GridConfig,
   GridEvents,
   GridOptions,
+  GridPanel,
   GridPresentation,
   GridTransaction,
   HighlightRange,
@@ -333,6 +340,7 @@ export type {
   KeyboardOptions,
   KeyShortcut,
   MergeRange,
+  MountedChart,
   MutationIssue,
   MutationPolicyMode,
   NamedRangeSnapshot,

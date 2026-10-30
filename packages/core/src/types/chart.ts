@@ -97,3 +97,17 @@ export interface ChartViewProvider {
   /** Stop observing the store and release cached views. */
   dispose(): void;
 }
+
+/** Draws one chart into a box that core places and sizes. */
+export interface MountedChart {
+  /** Core calls this after it changes the box size in CSS pixels. */
+  resize(width: number, height: number): void;
+  dispose(): void;
+}
+
+/** Draws charts into host elements that the grid's object layer owns. */
+export interface ChartRenderer {
+  /** `host` is an empty element that core owns, positions and clips. */
+  mount(host: HTMLElement, chart: ChartRef, size: { width: number; height: number }): MountedChart;
+  dispose(): void;
+}

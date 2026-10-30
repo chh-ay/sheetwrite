@@ -18,6 +18,7 @@ import { Route as VueRouteImport } from './routes/vue'
 import { Route as DocsIndexRouteImport } from './routes/docs.index'
 import { Route as DocsSplatRouteImport } from './routes/docs.$'
 import { Route as ShowcasesIndexRouteImport } from './routes/showcases.index'
+import { Route as ShowcasesAnalysisRouteImport } from './routes/showcases.analysis'
 import { Route as ShowcasesCollaborationRouteImport } from './routes/showcases.collaboration'
 import { Route as ShowcasesDataToolsRouteImport } from './routes/showcases.data-tools'
 import { Route as ShowcasesDatabaseRouteImport } from './routes/showcases.database'
@@ -79,6 +80,11 @@ const DocsSplatRoute = DocsSplatRouteImport.update({
 const ShowcasesIndexRoute = ShowcasesIndexRouteImport.update({
   id: '/showcases/',
   path: '/showcases/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShowcasesAnalysisRoute = ShowcasesAnalysisRouteImport.update({
+  id: '/showcases/analysis',
+  path: '/showcases/analysis',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShowcasesCollaborationRoute = ShowcasesCollaborationRouteImport.update({
@@ -177,6 +183,7 @@ export interface FileRoutesByFullPath {
   '/vanilla': typeof VanillaRoute
   '/vue': typeof VueRoute
   '/docs/$': typeof DocsSplatRoute
+  '/showcases/analysis': typeof ShowcasesAnalysisRoute
   '/showcases/collaboration': typeof ShowcasesCollaborationRoute
   '/showcases/data-tools': typeof ShowcasesDataToolsRoute
   '/showcases/database': typeof ShowcasesDatabaseRoute
@@ -205,6 +212,7 @@ export interface FileRoutesByTo {
   '/vanilla': typeof VanillaRoute
   '/vue': typeof VueRoute
   '/docs/$': typeof DocsSplatRoute
+  '/showcases/analysis': typeof ShowcasesAnalysisRoute
   '/showcases/collaboration': typeof ShowcasesCollaborationRoute
   '/showcases/data-tools': typeof ShowcasesDataToolsRoute
   '/showcases/database': typeof ShowcasesDatabaseRoute
@@ -234,6 +242,7 @@ export interface FileRoutesById {
   '/vanilla': typeof VanillaRoute
   '/vue': typeof VueRoute
   '/docs/$': typeof DocsSplatRoute
+  '/showcases/analysis': typeof ShowcasesAnalysisRoute
   '/showcases/collaboration': typeof ShowcasesCollaborationRoute
   '/showcases/data-tools': typeof ShowcasesDataToolsRoute
   '/showcases/database': typeof ShowcasesDatabaseRoute
@@ -264,6 +273,7 @@ export interface FileRouteTypes {
     | '/vanilla'
     | '/vue'
     | '/docs/$'
+    | '/showcases/analysis'
     | '/showcases/collaboration'
     | '/showcases/data-tools'
     | '/showcases/database'
@@ -292,6 +302,7 @@ export interface FileRouteTypes {
     | '/vanilla'
     | '/vue'
     | '/docs/$'
+    | '/showcases/analysis'
     | '/showcases/collaboration'
     | '/showcases/data-tools'
     | '/showcases/database'
@@ -320,6 +331,7 @@ export interface FileRouteTypes {
     | '/vanilla'
     | '/vue'
     | '/docs/$'
+    | '/showcases/analysis'
     | '/showcases/collaboration'
     | '/showcases/data-tools'
     | '/showcases/database'
@@ -349,6 +361,7 @@ export interface RootRouteChildren {
   VanillaRoute: typeof VanillaRoute
   VueRoute: typeof VueRoute
   DocsSplatRoute: typeof DocsSplatRoute
+  ShowcasesAnalysisRoute: typeof ShowcasesAnalysisRoute
   ShowcasesCollaborationRoute: typeof ShowcasesCollaborationRoute
   ShowcasesDataToolsRoute: typeof ShowcasesDataToolsRoute
   ShowcasesDatabaseRoute: typeof ShowcasesDatabaseRoute
@@ -433,6 +446,13 @@ declare module '@tanstack/react-router' {
       path: '/showcases'
       fullPath: '/showcases/'
       preLoaderRoute: typeof ShowcasesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/showcases/analysis': {
+      id: '/showcases/analysis'
+      path: '/showcases/analysis'
+      fullPath: '/showcases/analysis'
+      preLoaderRoute: typeof ShowcasesAnalysisRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/showcases/collaboration': {
@@ -565,6 +585,7 @@ const rootRouteChildren: RootRouteChildren = {
   VanillaRoute: VanillaRoute,
   VueRoute: VueRoute,
   DocsSplatRoute: DocsSplatRoute,
+  ShowcasesAnalysisRoute: ShowcasesAnalysisRoute,
   ShowcasesCollaborationRoute: ShowcasesCollaborationRoute,
   ShowcasesDataToolsRoute: ShowcasesDataToolsRoute,
   ShowcasesDatabaseRoute: ShowcasesDatabaseRoute,

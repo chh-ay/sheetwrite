@@ -8,7 +8,7 @@ description: "Imperative operations the toolbar and context menu bind to; also e
 Imperative operations the toolbar and context menu bind to; also exposed as `Grid.actions`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L123"><code>packages/core/src/types/grid.ts#L123</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L138"><code>packages/core/src/types/grid.ts#L138</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -59,11 +59,12 @@ Imperative operations the toolbar and context menu bind to; also exposed as `Gri
 <a href="#grid-actions-export-xlsx"><code>exportXlsx</code></a>
 <a href="#grid-actions-edit-note"><code>editNote</code></a>
 <a href="#grid-actions-delete-note"><code>deleteNote</code></a>
+<a href="#grid-actions-show-pivot-fields"><code>showPivotFields</code></a>
 <a href="#grid-actions-undo"><code>undo</code></a>
 <a href="#grid-actions-redo"><code>redo</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>49</span>
+## Members <span class="api-count" data-pagefind-ignore>50</span>
 
 <div class="api-member-list">
 
@@ -506,6 +507,18 @@ deleteNote(): void;
 none. Does nothing on a read-only grid.</p>
 </details>
 
+<details class="api-member" id="grid-actions-show-pivot-fields" data-pagefind-weight="1">
+<summary><code>showPivotFields</code> <span class="api-member-summary">Open the field list of the pivot table whose output holds the focus cell.</span></summary>
+
+```ts generated
+showPivotFields(): void;
+```
+
+<p class="api-member-doc">Open the field list of the pivot table whose output holds the focus cell.
+Does nothing when the focus cell is outside every pivot. Does nothing on a
+read-only grid.</p>
+</details>
+
 <details class="api-member" id="grid-actions-undo" data-pagefind-weight="1">
 <summary><code>undo</code></summary>
 
@@ -579,6 +592,7 @@ export interface GridActions {
   exportXlsx(filename?: string): Promise<void>;
   editNote(): void;
   deleteNote(): void;
+  showPivotFields(): void;
   undo(): void;
   redo(): void;
 }

@@ -14,7 +14,14 @@ import type { CellValue } from "./types/cell.js";
 import type { CellAddress, HighlightRange, SheetId } from "./types/coordinates.js";
 import type { CommitReason, DocumentOp, Sheet, SnapshotCell } from "./types/document.js";
 import type { KeyboardOptions } from "./types/grid.js";
-import type { CellEditor, CellEditorRect, Grid, GridConfig, GridEvents } from "./types/grid.js";
+import type {
+  CellEditor,
+  CellEditorRect,
+  ContextMenuItem,
+  Grid,
+  GridConfig,
+  GridEvents,
+} from "./types/grid.js";
 import type { Theme } from "./types/render.js";
 import type { Store } from "./types/store.js";
 import type { ApplyTransactionResult } from "./types/transaction.js";
@@ -163,6 +170,17 @@ export class InteractionSessions {
             this.deps.grid.actions,
             this.deps.grid,
           );
+  }
+
+  /**
+   * Open the context menu with `items` at a point, for a menu that belongs to
+   * an object, not a cell. Returns false when the host turned menus off.
+   */
+  openMenu(items: readonly ContextMenuItem[], clientX: number, clientY: number): boolean {
+    if (!this.contextMenu) return false;
+
+    this.contextMenu.open({ cell: null, clientX, clientY }, items);
+    return true;
   }
 
   private readonly onContextMenu = (e: MouseEvent): void => {

@@ -1,12 +1,15 @@
 import { afterEach, beforeAll, describe, expect, it } from "bun:test";
 
 import {
+  createGrid,
   initSheetwrite,
   isSheetwriteError,
   openChartViews,
   SheetwriteStore,
+  setChartRendererFactory,
   setChartViewProviderFactory,
 } from "@sheetwrite/core";
+import { installCanvasTestStubs } from "@sheetwrite/core/testing";
 
 import { chartWorkbook, SALES, setCell } from "./fixtures.js";
 
@@ -18,6 +21,7 @@ const stores: SheetwriteStore[] = [];
 
 afterEach(() => {
   setChartViewProviderFactory(null);
+  setChartRendererFactory(null);
 
   for (const store of stores.splice(0)) store.dispose();
 });
@@ -66,6 +70,27 @@ describe("charts package registration", () => {
       expect(views.get(SALES)?.series[0]?.values).toEqual([4, null, null]);
     } finally {
       views.dispose();
+    }
+  });
+
+  it("draws the charts of a grid after registration", async () => {
+    const charts = await import("../src/index.js");
+    charts.registerChartsBackend();
+    const restoreCanvas = installCanvasTestStubs();
+    const host = document.createElement("div");
+    document.body.append(host);
+    const grid = createGrid(host, {
+      workbook: chartWorkbook(),
+      config: { toolbar: false, find: false, contextMenu: false },
+    });
+
+    try {
+      expect(host.querySelector(".sheetwrite-chart")?.getAttribute("role")).toBe("img");
+      expect(host.querySelector(".sheetwrite-object-fallback")).toBeNull();
+    } finally {
+      grid.destroy();
+      host.remove();
+      restoreCanvas();
     }
   });
 

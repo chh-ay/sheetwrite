@@ -26,6 +26,7 @@ const OWNER_BY_ID = new Map(CAPABILITY_OWNERS.map((owner) => [owner.id, owner]))
 /** The featured app card, capability launch cards, then the four framework adapters. */
 const SCENE_ORDER = [
   "spreadsheet",
+  "analysis",
   "performance",
   "formulas",
   "collaboration",
@@ -52,6 +53,7 @@ const SCENE_SUMMARY: Readonly<Record<SceneOwnerId, string>> = {
   "data-tools": "Sort, filter and organize 4,800 orders; exercise validation and protection.",
   spreadsheet:
     "An Excel-style ribbon, formula bar and sheet tabs around one grid. Narrow it and watch the groups fold.",
+  analysis: "A pivot table and a live chart over two years of orders. Edit an order and both move.",
 };
 
 /** Real import and mount line per first-party adapter. */
@@ -94,7 +96,8 @@ const HUB_GROUPS: readonly { id: HubGroup; label: string }[] = [
 
 function ownerGroup(owner: (typeof CAPABILITY_OWNERS)[number]): Exclude<HubGroup, "all"> {
   if (owner.kind === "framework") return "framework";
-  if (owner.id === "formulas" || owner.id === "engine") return "formulas";
+  if (owner.id === "formulas" || owner.id === "engine" || owner.id === "analysis")
+    return "formulas";
   if (owner.id === "interoperability" || owner.id === "formatting" || owner.id === "spreadsheet") {
     return "workbook";
   }
@@ -349,6 +352,59 @@ function FormattingScene() {
   );
 }
 
+/**
+ * A pivot in miniature beside the chart drawn from it: two regions over four
+ * months, with the same EMEA dip in the table and in the line.
+ */
+const ANALYSIS_MONTHS = [
+  { month: "Jan", americas: 84, emea: 61 },
+  { month: "Feb", americas: 80, emea: 58 },
+  { month: "Mar", americas: 90, emea: 41, dip: true },
+  { month: "Apr", americas: 92, emea: 47 },
+] as const;
+const ANALYSIS_CHART = { width: 120, height: 64, top: 100, inset: 6 } as const;
+
+/** SVG points for one region's line, scaled to the scene chart. */
+function analysisLine(region: "americas" | "emea"): string {
+  const { width, height, top, inset } = ANALYSIS_CHART;
+  const step = (width - 2 * inset) / (ANALYSIS_MONTHS.length - 1);
+
+  return ANALYSIS_MONTHS.map(
+    (row, index) =>
+      `${inset + index * step},${height - inset - (row[region] / top) * (height - 2 * inset)}`,
+  ).join(" ");
+}
+
+function AnalysisScene() {
+  const { width, height } = ANALYSIS_CHART;
+
+  return (
+    <span aria-hidden="true" className="sw-hub-scene sw-hub-scene--analysis">
+      <span className="sw-hub-analysis">
+        <span className="sw-hub-budget sw-hub-analysis__pivot">
+          <span data-tone="head">
+            <i>Month</i>
+            <i>Americas</i>
+            <i>EMEA</i>
+          </span>
+          {ANALYSIS_MONTHS.map((row) => (
+            <span data-tone={"dip" in row ? "negative" : undefined} key={row.month}>
+              <i>{row.month}</i>
+              <i>{row.americas}k</i>
+              <i>{row.emea}k</i>
+            </span>
+          ))}
+        </span>
+        <svg className="sw-hub-analysis__chart" viewBox={`0 0 ${width} ${height}`}>
+          <polyline data-series="1" points={analysisLine("americas")} />
+          <polyline data-series="2" points={analysisLine("emea")} />
+        </svg>
+      </span>
+      <span className="sw-hub-scene__caption">one edit moves the pivot and the chart</span>
+    </span>
+  );
+}
+
 /** A filtered column over a mini grid: one rejected, one warned and one locked cell. */
 const DATA_TOOL_ROW_COUNT = 4;
 const DATA_TOOL_COLUMN_COUNT = 4;
@@ -434,6 +490,8 @@ function CapabilityScene({ id, medianMs }: Readonly<{ id: SceneOwnerId; medianMs
   switch (id) {
     case "spreadsheet":
       return <SpreadsheetScene />;
+    case "analysis":
+      return <AnalysisScene />;
     case "performance":
       return <PerformanceScene medianMs={medianMs} />;
     case "formulas":

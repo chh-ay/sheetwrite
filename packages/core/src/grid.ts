@@ -36,7 +36,9 @@ import { InteractionSessions } from "./interaction-sessions.js";
 import { Keymap } from "./keymap.js";
 import { MutationRevisionIndex, type MutationRevisionStats } from "./mutation-revision-index.js";
 import { type NoteCell, NotePopover } from "./note-popover.js";
+import { ObjectLayer } from "./object-layer.js";
 import { OverlayPainter } from "./overlay-painter.js";
+import { attachPanelTriggers, showPivotFields } from "./panels/panel-loader.js";
 import { clonePivots, pivotOwner, uncomputedPivotResult, withoutSavedOutput } from "./pivot.js";
 import { type PaintedCells, ReadWindowController } from "./read-window-controller.js";
 import {
@@ -52,6 +54,7 @@ import { SearchController } from "./search-controller.js";
 import { type CellRef, SelectionModel, type SelRect } from "./selection.js";
 import { sheetNameKey, validateSheetName } from "./sheet-name.js";
 import { SheetTabs } from "./sheet-tabs.js";
+import { mountSidePanel } from "./side-panel.js";
 import { IncompleteDataError, SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
 import {
@@ -71,6 +74,7 @@ import type {
   Column,
   ConditionalFormatRule,
 } from "./types/cell.js";
+import type { ChartDefinition, ChartRef } from "./types/chart.js";
 import type {
   CellAddress,
   HighlightRange,
@@ -95,7 +99,7 @@ import type {
   SortKey,
   WorkbookSnapshot,
 } from "./types/document.js";
-import type { KeyboardAction, KeyboardOptions } from "./types/grid.js";
+import type { ContextMenuItem, KeyboardAction, KeyboardOptions } from "./types/grid.js";
 import type {
   CellEditor,
   CellInputSnapshot,
@@ -106,6 +110,7 @@ import type {
   GridConfig,
   GridEvents,
   GridOptions,
+  GridPanel,
   GridPresentation,
   ReplaceResult,
   SearchOptions,
@@ -164,6 +169,8 @@ export function measureMaxElementHeight(
 const DEFAULT_OVERSCAN = 6;
 /** Width of synthesized workbook and presentation-padding columns, in CSS pixels. */
 const DEFAULT_COL_WIDTH = 100;
+/** Width of the side panel, in CSS pixels; the cells give up this much room while it is open. */
+const PANEL_WIDTH = 320;
 const GRID_COMMANDS: readonly GridCommandName[] = [
   "bold",
   "italic",
@@ -500,6 +507,8 @@ export class GridImpl implements Grid {
     "mutation-rejected": new Set(),
     "export-error": new Set(),
     "theme-change": new Set(),
+    "chart-select": new Set(),
+    "chart-activate": new Set(),
   };
 
   /** Which renderer actually constructed; set by `createRenderer`. */
@@ -543,6 +552,14 @@ export class GridImpl implements Grid {
   };
   private readonly onScroll = () => this.scheduleRender();
   private readonly disposeStore: () => void;
+  private readonly objectLayer: ObjectLayer;
+  private readonly panelHost: HTMLDivElement;
+  /** Cleanup of the open side panel; `null` while no panel is open. */
+  private panelDispose: (() => void) | null = null;
+  /** The cell selection last emitted, to tell a real move from a re-emit. */
+  private lastSelectionKey = "";
+  /** Detaches the chart and pivot panel controller once its chunk has loaded. */
+  private disposePanels: (() => void) | null = null;
 
   constructor(
     host: HTMLElement,
@@ -773,6 +790,13 @@ export class GridImpl implements Grid {
     this.scroller.appendChild(this.sizer);
     this.viewportEl.appendChild(this.scroller);
 
+    // The side panel docks on the right edge, between the ribbon and the tab bar.
+    this.panelHost = document.createElement("div");
+    this.panelHost.className = "sheetwrite-panel-host";
+    this.panelHost.hidden = true;
+    this.panelHost.style.cssText = `position:absolute;right:0;width:${PANEL_WIDTH}px;top:${this.toolbarHeight}px;bottom:${this.tabBarHeight}px;`;
+    host.appendChild(this.panelHost);
+
     this.renderer = this.createRenderer(opts, this.viewportEl);
     this.renderer.setRenderers(this.customRenderers);
 
@@ -920,6 +944,37 @@ export class GridImpl implements Grid {
     });
     this.domOverlay.setRenderers(this.customRenderers);
     this.domOverlay.setTheme(this.theme);
+
+    this.objectLayer = new ObjectLayer({
+      viewport: this.viewportEl,
+      scroller: this.scroller,
+      store: this.store,
+      geometry: this.geometry,
+      activeSheet: () => this.activeSheet,
+      charts: () => this.sheetById(this.activeSheet)?.charts ?? [],
+      theme: () => this.theme,
+      zoom: () => this.zoom,
+      readOnly: () => this.readOnly,
+      setChart: (chart) => this.setChart(chart, this.activeSheet),
+      removeChart: (id) => this.removeChart(id, this.activeSheet),
+      focusGrid: () => this.host.focus(),
+      onSelect: (chart) => {
+        for (const fn of this.listeners["chart-select"]) fn(chart);
+      },
+      onActivate: (chart) => {
+        for (const fn of this.listeners["chart-activate"]) fn(chart);
+      },
+      onContextMenu: (chart, clientX, clientY) =>
+        this.interactions.openMenu(this.chartMenuItems(chart), clientX, clientY),
+      isHistoryShortcut: (event) => {
+        const action = this.keymap.action(event);
+        return action === "undo" || action === "redo";
+      },
+    });
+    this.objectLayer.sync();
+    // The grid emits no selection at construction; start from the real one so
+    // the first re-emit (an undo, say) does not count as a move.
+    this.lastSelectionKey = JSON.stringify(this.getSelection());
 
     this.ariaMirror = new AriaMirror({
       host,
@@ -1146,6 +1201,8 @@ export class GridImpl implements Grid {
         this.ariaMirror.bumpVersion();
         this.notes.refresh();
       }
+      // Chart edits, undo and sheet changes all arrive here.
+      this.objectLayer.sync();
       this.scheduleRender();
       for (const fn of this.listeners.change) fn(event);
       this.queueCommandStateChange();
@@ -1158,7 +1215,14 @@ export class GridImpl implements Grid {
       this.resizeObserver.observe(host);
     }
     this.armResolutionListener();
+    this.attachPanels();
     this.render();
+  }
+
+  /** Listen for first use without fetching the panel chunk on ordinary grids. */
+  private attachPanels(): void {
+    if (this.presentation !== "spreadsheet") return;
+    this.disposePanels = attachPanelTriggers(this, this.config?.icons);
   }
 
   private refreshSourcePresence(): void {
@@ -1572,6 +1636,7 @@ export class GridImpl implements Grid {
   private repositionEditor(contentTop: number, scrollLeft: number): void {
     this.interactions.reposition(contentTop, scrollLeft);
     this.notes.reposition();
+    this.objectLayer.place(contentTop, scrollLeft);
   }
 
   /** A view cell, resolved to its merge anchor, with the data address its note lives at. */
@@ -1650,10 +1715,17 @@ export class GridImpl implements Grid {
 
   private emitSelection(): void {
     this.ariaMirror.bumpVersion();
-    if (this.listeners.selection.size > 0) {
-      const selection = this.getSelection();
-      for (const listener of this.listeners.selection) listener({ selection });
+    const selection = this.getSelection();
+
+    // One thing is selected at a time: a new cell selection, by any route,
+    // deselects the chart. Undo re-emits an unchanged selection and must keep it.
+    const selectionKey = JSON.stringify(selection);
+    if (selectionKey !== this.lastSelectionKey) {
+      this.lastSelectionKey = selectionKey;
+      this.objectLayer.select(null);
     }
+
+    for (const listener of this.listeners.selection) listener({ selection });
     this.emitCommandStateChange();
   }
 
@@ -2149,6 +2221,7 @@ export class GridImpl implements Grid {
     this.scroller.scrollTop = 0;
     this.scroller.scrollLeft = 0;
 
+    this.objectLayer.sync();
     this.applyLayout();
     this.renderTabs();
     for (const fn of this.listeners["active-sheet"]) fn({ sheet: id });
@@ -2326,6 +2399,7 @@ export class GridImpl implements Grid {
   private setToolbarHeight(height: number): void {
     this.toolbarHeight = height;
     this.viewportEl.style.top = `${height}px`;
+    this.panelHost.style.top = `${height}px`;
     this.applyLayout();
     this.render();
   }
@@ -2364,6 +2438,8 @@ export class GridImpl implements Grid {
         ? null
         : new FindBar(this.host, this.baseTheme, this, this.readOnly);
     this.emitCommandStateChange();
+    // Object handles show only while the grid can be edited.
+    this.scheduleRender();
   }
 
   setConfig(config: GridConfig | undefined): void {
@@ -2411,6 +2487,8 @@ export class GridImpl implements Grid {
 
     this.viewportEl.style.top = `${this.toolbarHeight}px`;
     this.viewportEl.style.bottom = `${this.tabBarHeight}px`;
+    this.panelHost.style.top = `${this.toolbarHeight}px`;
+    this.panelHost.style.bottom = `${this.tabBarHeight}px`;
     this.applyLayout();
     this.render();
     this.emitCommandStateChange();
@@ -2766,6 +2844,78 @@ export class GridImpl implements Grid {
     return pivot ? uncomputedPivotResult(sheet, pivot) : null;
   }
 
+  getCharts(sheet: SheetId = this.activeSheet): readonly ChartDefinition[] {
+    return structuredClone(this.sheetById(sheet)?.charts ?? []);
+  }
+
+  setChart(chart: ChartDefinition, sheet: SheetId = this.activeSheet): ApplyTransactionResult {
+    return this.document.commit([{ op: "setChart", sheet, chart: structuredClone(chart) }], "api");
+  }
+
+  removeChart(id: string, sheet?: SheetId): ApplyTransactionResult {
+    const owner =
+      sheet ??
+      this.store
+        .getWorkbook()
+        .sheets.find((candidate) => candidate.charts?.some((chart) => chart.id === id))?.id ??
+      this.activeSheet;
+    return this.document.commit([{ op: "removeChart", sheet: owner, id }], "api");
+  }
+
+  selectChart(id: string | null, sheet: SheetId = this.activeSheet): void {
+    if (id !== null && sheet !== this.activeSheet) this.setActiveSheet(sheet);
+    // Charts on other sheets are never selected, so there is nothing to deselect there.
+    if (sheet === this.activeSheet) this.objectLayer.select(id);
+  }
+
+  /**
+   * A chart's right-click menu. Edit chart does what Enter does; a read-only
+   * grid can open the chart's panel but not delete the chart.
+   */
+  private chartMenuItems(chart: ChartRef): ContextMenuItem[] {
+    return [
+      {
+        id: "editChart",
+        label: "Edit chart",
+        icon: "chart",
+        onClick: () => {
+          for (const fn of this.listeners["chart-activate"]) fn(chart);
+        },
+      },
+      { action: "separator" },
+      {
+        id: "deleteChart",
+        label: "Delete chart",
+        icon: "delete",
+        visible: () => !this.readOnly,
+        onClick: () => {
+          this.removeChart(chart.id, chart.sheet);
+        },
+      },
+    ];
+  }
+
+  openPanel(panel: GridPanel | null): void {
+    const wasOpen = this.panelDispose !== null;
+    const hadFocus = this.panelHost.contains(document.activeElement);
+    this.panelDispose?.();
+    this.panelDispose = null;
+
+    const isOpen = panel !== null;
+    // The panel focuses its first control while it mounts; a hidden host refuses focus.
+    this.panelHost.hidden = !isOpen;
+    if (panel) {
+      this.panelDispose = mountSidePanel(this.panelHost, panel, () => this.openPanel(null));
+    }
+    if (isOpen !== wasOpen) {
+      this.viewportEl.style.right = isOpen ? `${PANEL_WIDTH}px` : "0px";
+      this.syncSizer();
+      this.render();
+    }
+    // Escape and the close button leave focus in a removed panel; give it back to the grid.
+    if (!isOpen && hadFocus) this.host.focus();
+  }
+
   setProtectionResolver(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void {
     this.store.setProtectionResolver?.(resolver, mode);
   }
@@ -3007,6 +3157,12 @@ export class GridImpl implements Grid {
 
         const { address } = this.noteCell(focus.row, focus.col);
         if (this.getNote(address) !== null) this.setNote(address, null);
+      },
+      showPivotFields: () => {
+        // The field list edits the pivot, so a read-only grid does not open it.
+        if (this.readOnly) return;
+
+        showPivotFields(this);
       },
       undo: () => this.undo(),
       redo: () => this.redo(),
@@ -3534,6 +3690,7 @@ export class GridImpl implements Grid {
     this.readWindows.destroy();
     this.interactions.destroy();
     this.notes.destroy();
+    this.objectLayer.destroy();
     this.scroller.removeEventListener("scroll", this.onScroll);
     this.resizeObserver?.disconnect();
     this.resolutionMediaQuery?.removeEventListener("change", this.onResolutionChange);
@@ -3565,6 +3722,9 @@ export class GridImpl implements Grid {
     cleanup(() => this.ribbon?.destroy());
     cleanup(() => this.findBar?.destroy());
     cleanup(() => this.actionFeedback.destroy());
+    cleanup(() => this.panelDispose?.());
+    cleanup(() => this.disposePanels?.());
+    cleanup(() => this.panelHost.remove());
     cleanup(() => this.viewportEl.remove());
     cleanup(() => this.ariaMirror.destroy());
     cleanup(() => this.host.classList.remove("sheetwrite"));

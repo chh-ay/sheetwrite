@@ -2,7 +2,7 @@
 // No runtime values live here.
 
 import type { CellScalar, CellStyle, Column } from "./cell.js";
-import type { ChartViewProvider } from "./chart.js";
+import type { ChartRenderer, ChartViewProvider } from "./chart.js";
 import type { CellAddress, SheetId } from "./coordinates.js";
 import type {
   DocumentOp,
@@ -20,6 +20,12 @@ import type {
 
 /** Creates a chart provider owned and disposed by one renderer or host. */
 export type ChartViewProviderFactory = (store: Store) => ChartViewProvider;
+
+/**
+ * Creates the chart renderer of one grid. The grid disposes it. It lives next
+ * to `ChartViewProviderFactory` because the chart type domain cannot read `Store`.
+ */
+export type ChartRendererFactory = (store: Store) => ChartRenderer;
 
 /** Retained logical payload and allocated capacity attributed to one exclusive owner. */
 export interface ResourceOwnerBytes {

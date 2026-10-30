@@ -21,6 +21,7 @@ import type {
   Column,
   ConditionalFormatRule,
 } from "./cell.js";
+import type { ChartDefinition, ChartRef } from "./chart.js";
 import type {
   CellAddress,
   HighlightRange,
@@ -61,6 +62,20 @@ import type {
   RemoteOperationOptions,
   TransactionResourceLimits,
 } from "./transaction.js";
+
+/** One side panel that `Grid.openPanel` shows on the grid's right edge. */
+export interface GridPanel {
+  /** Text in the panel header; it also names the panel for assistive technology. */
+  title: string;
+  /** Fill `body`, then return a function that releases what `render` set up. */
+  render(body: HTMLElement): () => void;
+  /**
+   * Move keyboard focus into the panel when it opens. Default `true`. Use
+   * `false` for a panel that opens on cell selection, so arrow keys keep moving
+   * the cell cursor.
+   */
+  focus?: boolean;
+}
 
 /** Selection movement applied after a successful editor commit. */
 export type CellEditorNavigation = "down" | "right" | "left" | "none";
@@ -209,6 +224,12 @@ export interface GridActions {
    * none. Does nothing on a read-only grid.
    */
   deleteNote(): void;
+  /**
+   * Open the field list of the pivot table whose output holds the focus cell.
+   * Does nothing when the focus cell is outside every pivot. Does nothing on a
+   * read-only grid.
+   */
+  showPivotFields(): void;
   undo(): void;
   redo(): void;
 }
@@ -335,6 +356,7 @@ export type ContextMenuActionName =
   | "exportXlsx"
   | "editNote"
   | "deleteNote"
+  | "pivotFields"
   | "separator";
 
 /** Cell and viewport coordinates resolved for one bundled context-menu opening. */
@@ -685,6 +707,10 @@ export interface GridEvents {
   };
   /** Built-in toolbar/context-menu export failed after its action was dispatched. */
   "export-error": { format: "csv" | "xlsx"; error: SheetwriteError };
+  /** A chart object on the active sheet was selected; `null` when no object is selected. */
+  "chart-select": ChartRef | null;
+  /** The user pressed Enter on a selected chart, for example to open its editor. */
+  "chart-activate": ChartRef;
 }
 
 /**
@@ -994,6 +1020,28 @@ export interface Grid {
    * no pivot with `id`.
    */
   getPivotResult(sheet: SheetId, id: string): PivotResultView | null;
+  /** Clones of the chart definitions on `sheet` (default: the active sheet). */
+  getCharts(sheet?: SheetId): readonly ChartDefinition[];
+  /**
+   * Insert or replace the chart with `chart.id` as one undo entry. `sheet`
+   * defaults to the active sheet; chart IDs are unique only within a sheet.
+   */
+  setChart(chart: ChartDefinition, sheet?: SheetId): ApplyTransactionResult;
+  /** Remove a chart from `sheet` (default: the first sheet that holds it) as one undo entry. */
+  removeChart(id: string, sheet?: SheetId): ApplyTransactionResult;
+  /**
+   * Select the chart object `id` on `sheet` (default: the active sheet), or
+   * deselect with `null`. Selecting a chart on another sheet activates that
+   * sheet first. Emits `chart-select`.
+   */
+  selectChart(id: string | null, sheet?: SheetId): void;
+  /**
+   * Show `panel` on the grid's right edge and shrink the cells to make room;
+   * `null` closes the open panel. One panel shows at a time: opening a panel
+   * closes the previous one. Escape and the close button close it and return
+   * focus to the grid.
+   */
+  openPanel(panel: GridPanel | null): void;
   setProtectionResolver(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void;
   setNote(addr: CellAddress, text: string | null): ApplyTransactionResult;
   getNote(addr: CellAddress): string | null;
