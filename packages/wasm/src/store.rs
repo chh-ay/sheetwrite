@@ -272,6 +272,10 @@ pub struct CellStore {
     /// it to bound recalculation work, which no value can show.
     #[cfg(test)]
     pub(crate) recomputed_formulas: usize,
+    /// Changed-spill index nodes the stale runtime-reader check visited,
+    /// summed over passes. Tests read it to bound that check's work.
+    #[cfg(test)]
+    pub(crate) stale_reader_visits: usize,
 }
 
 /// Cell order of the flat input arrays of a packed block write.
@@ -348,6 +352,8 @@ impl CellStore {
             tables: HashMap::new(),
             #[cfg(test)]
             recomputed_formulas: 0,
+            #[cfg(test)]
+            stale_reader_visits: 0,
         }
     }
 
@@ -740,9 +746,7 @@ impl CellStore {
         self.sheet_lookup.insert(name_key, sheet);
         self.graph.invalidate();
 
-        for formula_sheet in affected {
-            self.recompute(formula_sheet);
-        }
+        self.recompute_with_volatile_sheets(affected);
 
         true
     }
@@ -801,9 +805,7 @@ impl CellStore {
             self.refresh_named_formula_entries();
             self.recompute_all_sheets();
         } else {
-            for formula_sheet in affected {
-                self.recompute(formula_sheet);
-            }
+            self.recompute_with_volatile_sheets(affected);
         }
 
         self.strings.request_collection();
@@ -2317,7 +2319,7 @@ impl CellStore {
 
     /// Explicit volatile barrier. `serial` is a UTC spreadsheet serial using
     /// the 1899-12-30 epoch; only volatile formulas (TODAY, NOW, RAND,
-    /// RANDBETWEEN) and their dependents recalculate, and TODAY and NOW use
+    /// RANDBETWEEN, OFFSET, INDIRECT) and their dependents recalculate, and TODAY and NOW use
     /// `serial` instead of the clock. Later recalculations read the clock.
     #[wasm_bindgen(js_name = recomputeVolatile)]
     pub fn recompute_volatile(&mut self, serial: f64) -> bool {
@@ -3593,11 +3595,25 @@ impl CellStore {
     }
 
     fn recompute_all_sheets(&mut self) {
-        for sheet in 0..self.sheets.len() {
-            if self.sheet_alive.get(sheet).copied().unwrap_or(false) {
-                self.recompute_sheet(sheet);
+        let live: Vec<usize> = (0..self.sheets.len())
+            .filter(|&sheet| self.sheet_alive.get(sheet).copied().unwrap_or(false))
+            .collect();
+
+        // One pass for every sheet: a pass per sheet would recalculate the
+        // workbook's volatile formulas once per sheet.
+        self.recompute_seed_sheets(&live);
+    }
+
+    /// A sheet rename or removal changes what INDIRECT text names, and no
+    /// static read records that, so the volatile sheets join the seeds.
+    fn recompute_with_volatile_sheets(&mut self, mut seeds: Vec<usize>) {
+        for (sheet, data) in self.sheets.iter().enumerate() {
+            if data.formulas.has_volatile() && !seeds.contains(&sheet) {
+                seeds.push(sheet);
             }
         }
+
+        self.recompute_seed_sheets(&seeds);
     }
 
     fn refresh_named_formula_entries(&mut self) {

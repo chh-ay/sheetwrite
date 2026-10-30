@@ -278,7 +278,15 @@ pub(crate) enum FormulaValueKind {
 
 fn ast_is_volatile(ast: &Ast) -> bool {
     match ast {
-        Ast::Func(Func::Today | Func::Now | Func::Rand | Func::RandBetween, _) => true,
+        Ast::Func(
+            Func::Today
+            | Func::Now
+            | Func::Rand
+            | Func::RandBetween
+            | Func::Offset
+            | Func::Indirect,
+            _,
+        ) => true,
         Ast::Func(_, args) | Ast::UnknownFunc(_, args) => args.iter().any(ast_is_volatile),
         Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
             ast_is_volatile(left) || ast_is_volatile(right)
@@ -304,7 +312,7 @@ fn ast_contains_let(ast: &Ast) -> bool {
 
 fn ast_contains_spill_ref(ast: &Ast) -> bool {
     match ast {
-        Ast::Func(Func::AnchorArray, _) => true,
+        Ast::Func(Func::AnchorArray | Func::Offset | Func::Indirect, _) => true,
         Ast::Func(_, args) | Ast::UnknownFunc(_, args) => args.iter().any(ast_contains_spill_ref),
         Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
             ast_contains_spill_ref(left) || ast_contains_spill_ref(right)
@@ -369,7 +377,8 @@ impl FormulaEntry {
         self.set_flag(Self::VOLATILE, volatile);
     }
 
-    /// Each evaluation resolves `A1#` against current spill ranges only when needed.
+    /// Runtime references share the existing spill-resolution path and flag.
+    /// This avoids a new entry field or checks on formulas without these calls.
     pub(crate) fn has_spill_refs(&self) -> bool {
         self.flags & Self::SPILL_REFS != 0
     }

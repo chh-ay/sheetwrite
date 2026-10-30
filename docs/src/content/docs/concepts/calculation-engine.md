@@ -87,7 +87,14 @@ recalculation, so every formula in one recalculation sees the same time.
 
 ## Volatile functions
 
-`RAND`, `RANDBETWEEN`, `TODAY` and `NOW` are volatile. Each edit recalculates
+`OFFSET`, `INDIRECT`, `RAND`, `RANDBETWEEN`, `TODAY` and `NOW` are volatile. Each edit recalculates
 them and the formulas that read them, as in Excel. Other formulas recalculate
 only when a cell they read changes. The cost of an edit grows with the number
 of volatile formulas and their dependents, not with the size of the workbook.
+
+`OFFSET` and `INDIRECT` choose references during calculation rather than relying
+only on references visible in the formula source. Their results can feed
+reference-taking functions or spill multiple cells. Volatile recalculation keeps
+their runtime-selected targets current; a runtime dependency cycle returns
+`#CYCLE!`. See [dynamic references](/docs/guides/formulas/#dynamic-references)
+for notation, bounds and reference-text rewrite rules.

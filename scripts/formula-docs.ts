@@ -435,7 +435,7 @@ export function renderFormulaFunctionContract(inventoryValue: unknown): string {
         .join("<br />")} |`;
     }),
     "",
-    "Volatile reference and array functions (`OFFSET`, `INDIRECT`, `RANDARRAY`), network/external-data functions, arbitrary external workbook links, and cube/OLAP functions are unsupported. `RAND`, `RANDBETWEEN`, `TODAY` and `NOW` are volatile and recalculate after each edit. Database functions and `LAMBDA` helpers require the full engine; `LET` is available in both engines.",
+    "`RANDARRAY`, network/external-data functions, arbitrary external workbook links, and cube/OLAP functions are unsupported. `OFFSET`, `INDIRECT`, `RAND`, `RANDBETWEEN`, `TODAY` and `NOW` are volatile and recalculate after each edit. `OFFSET` and `INDIRECT` return references that can feed reference-taking functions or spill their values. `INDIRECT` reference text is not rewritten by fill, copy, or structural edits. Database functions and `LAMBDA` helpers require the full engine; `LET` is available in both engines.",
     "",
   );
 
