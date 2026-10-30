@@ -78,31 +78,30 @@ function DocsOverview() {
 
         <section aria-labelledby="new-in-release">
           <div className="sw-doc-section-head">
-            <h2 id="new-in-release">New in 0.6.0</h2>
-            <Link to="/docs/$/" params={{ _splat: "releases/0.6.0" }}>
+            <h2 id="new-in-release">New in 0.6.1</h2>
+            <Link to="/docs/$/" params={{ _splat: "releases/0.6.1" }}>
               Read the release notes →
             </Link>
           </div>
           <div className="sw-doc-destinations">
+            <Link to="/docs/$/" params={{ _splat: "releases/0.6.1" }} hash="data-grid-edits">
+              <span className="sw-doc-eyebrow">Performance</span>
+              <strong>
+                Four slowdowns fixed <span aria-hidden="true">→</span>
+              </strong>
+              <span>Faster data-grid edits, paged scrolling, text lookups and XLSX rejects.</span>
+            </Link>
             <Link to="/docs/$/" params={{ _splat: "releases/0.6.0" }} hash="charts">
-              <span className="sw-doc-eyebrow">Charts</span>
+              <span className="sw-doc-eyebrow">0.6.0</span>
               <strong>
-                Charts in the grid <span aria-hidden="true">→</span>
+                Charts and pivot tables <span aria-hidden="true">→</span>
               </strong>
               <span>
-                Seven chart kinds that follow their cell ranges, with an optional SVG renderer.
+                Charts that follow their cell ranges, and pivot tables that the full engine
+                calculates.
               </span>
             </Link>
-            <Link to="/docs/$/" params={{ _splat: "releases/0.6.0" }} hash="pivot-tables">
-              <span className="sw-doc-eyebrow">Analysis</span>
-              <strong>
-                Pivot tables <span aria-hidden="true">→</span>
-              </strong>
-              <span>
-                The full engine calculates them, and their field list opens beside the grid.
-              </span>
-            </Link>
-            <Link to="/docs/$/" params={{ _splat: "releases/0.6.0" }} hash="upgrade-checklist">
+            <Link to="/docs/$/" params={{ _splat: "releases/0.6.1" }} hash="upgrade-checklist">
               <span className="sw-doc-eyebrow">Upgrade</span>
               <strong>
                 Upgrade checklist <span aria-hidden="true">→</span>
