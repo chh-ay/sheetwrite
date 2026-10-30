@@ -1,5 +1,12 @@
 # @sheetwrite/charts
 
+## 0.6.1
+
+### Patch Changes
+
+- Updated dependencies [[`c29a25a`](https://github.com/chh-ay/sheetwrite/commit/c29a25a65c4ff01ae32ad89fc6b32dde4798ffde)]:
+  - @sheetwrite/core@0.6.1
+
 ## 0.6.0
 
 ### Minor Changes
