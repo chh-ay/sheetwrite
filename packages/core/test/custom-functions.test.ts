@@ -269,10 +269,11 @@ describe("host formula functions", () => {
   it("stay on the live engine store when a memory release aborts", async () => {
     const store = new SheetwriteStore(makeWorkbook(4));
     const failing = new SheetwriteStore(makeWorkbook(1));
+    const failingEngine = storeEngine(failing);
+    if (failingEngine === null) throw new Error("store has no engine");
+    const prepare = failingEngine.prepareMemoryRelease.bind(failingEngine);
     try {
       registerFunction(store, TAX_RATE, taxRate);
-      const failingEngine = storeEngine(failing);
-      if (failingEngine === null) throw new Error("store has no engine");
       // The second store fails after the first one prepared its replacement,
       // so the release aborts and frees that replacement.
       failingEngine.prepareMemoryRelease = () => {
@@ -287,6 +288,9 @@ describe("host formula functions", () => {
       expect(store.getCell(address(0, 0)).resolved).toBe(EU_RATE);
       expect(store.getCell(address(0, 1)).resolved).toBe(42);
     } finally {
+      // The disposed engine stays listed until it is collected, so later
+      // releases in the same process must see its real preparation again.
+      failingEngine.prepareMemoryRelease = prepare;
       failing.dispose();
       store.dispose();
     }
