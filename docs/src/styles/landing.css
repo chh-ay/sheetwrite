@@ -1,7 +1,7 @@
 /* ==========================================================================
    Landing (root route)
 
-   HeroScene and ArchitectureScene use seekable scripted SVG timelines.
+   HeroApp and ArchitectureScene use seekable scripted timelines.
    Numbered chapter buttons restart from that chapter; reduced motion keeps
    the selected frame still. Both pause while off screen. Feature cards and
    the story reel use CSS keyframes with informative non-animated states;
@@ -137,66 +137,738 @@
 }
 
 /* ---- Hero ---------------------------------------------------------------- */
+/* Copy on the left, the actions on the right, and the app preview across the
+   whole container below them. */
 
 .sw-lp-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
-  gap: clamp(2rem, 5vw, 4.5rem);
-  align-items: center;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr);
+  column-gap: clamp(2rem, 5vw, 4.5rem);
+  row-gap: clamp(2rem, 5vh, 3rem);
+  align-items: end;
 }
 
 .sw-lp-hero h1 {
-  max-width: 15ch;
+  max-width: 17ch;
   margin: 0;
   color: var(--sw-fg-strong);
   font: 700 clamp(2.5rem, 4.6vw, 4rem) / 1.03 var(--sw-font-display);
   letter-spacing: -0.045em;
+  overflow-wrap: break-word;
   /* Even lines: no single word left alone on the last one. */
   text-wrap: balance;
 }
 
 .sw-lp-hero__lede {
-  max-width: 34rem;
-  margin: 1.4rem 0 2rem;
+  max-width: 38rem;
+  margin: 1.4rem 0 0;
   color: var(--sw-fg-muted);
   font-size: 1.12rem;
   line-height: 1.65;
 }
 
-.sw-lp-hero__install {
-  max-width: 24rem;
-  margin-top: 1.25rem;
+/* One column width for both rows: the two buttons split it evenly and the
+   install command fills it, so their edges line up. */
+.sw-lp-hero__start {
+  display: grid;
+  gap: 1.25rem;
+  width: min(100%, 26rem);
 }
 
-/* ---- Hero illustration --------------------------------------------------- */
-/* A scripted loop (HeroScene.tsx) sets transforms, opacity and text from one
-   timeline; these rules only paint. Without JavaScript or with reduced motion
-   the server-rendered markup is the finished edit. */
+.sw-lp-hero__start .sw-lp-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
 
-.sw-hero-scene {
+.sw-lp-hero__start .sw-lp-button {
+  justify-content: center;
+}
+
+/* ---- Hero illustration: the spreadsheet app ------------------------------- */
+/* HeroApp.tsx sets text, transforms, opacity and data attributes from one
+   timeline; these rules only paint. The server renders the finished edit,
+   which reduced motion and a page without scripting keep. Sizes are cell
+   units, so overlays (selection, chart, pulses) land on the same cells at
+   every width. */
+
+.sw-hero-app {
+  grid-column: 1 / -1;
+  min-width: 0;
   margin: 0;
 }
 
-.sw-hero-scene__frame {
+.ha-window {
+  /* Cell geometry: row header, column width, column header, row height. */
+  --rhw: 2.25rem;
+  --cw: 6.25rem;
+  --chh: 1.6rem;
+  --rh: 1.85rem;
+  --rows: 11;
+  /* Where the chart sits, in cells: column F, row 2, 5 × 9 cells. */
+  --chart-c: 5;
+  --chart-r: 1;
+  --chart-w: 5;
+  --chart-h: 9;
+  --ha-line: color-mix(in srgb, var(--sw-border) 70%, transparent);
+
   position: relative;
   overflow: hidden;
   border: 1px solid var(--sw-border-strong);
   border-radius: 1rem;
-  background: color-mix(in srgb, var(--sw-surface-1) 94%, transparent);
+  background: var(--sw-surface-1);
   box-shadow: var(--sw-shadow);
+  color: var(--sw-fg);
+  font: 400 0.8125rem / 1.3 var(--sw-font-body);
+  user-select: none;
 }
 
-.sw-hero-scene__captions {
+.ha-title {
+  padding: 0.7rem 1.1rem;
+  border-bottom: 1px solid var(--sw-border);
+  color: var(--sw-fg-strong);
+  font-size: 0.875rem;
+}
+
+.ha-glyph {
+  --s: 16px;
+  display: block;
+  flex: none;
+  width: var(--s);
+  height: var(--s);
+  background-color: currentColor;
+  -webkit-mask: var(--ha-icons) no-repeat;
+  mask: var(--ha-icons) no-repeat;
+  -webkit-mask-size: calc(var(--s) * 24) calc(var(--s) * 24);
+  mask-size: calc(var(--s) * 24) calc(var(--s) * 24);
+  -webkit-mask-position: calc(var(--s) * var(--gx)) calc(var(--s) * var(--gy));
+  mask-position: calc(var(--s) * var(--gx)) calc(var(--s) * var(--gy));
+}
+
+.ha-glyph[data-large] {
+  --s: 26px;
+}
+
+/* Ribbon */
+
+.ha-ribbon {
+  position: relative;
+  /* The chart menu opens over the formula bar and the sheet. */
+  z-index: 2;
+  border-bottom: 1px solid var(--sw-border);
+  background: var(--sw-surface-2);
+}
+
+.ha-ribbon__tabs {
+  display: flex;
+  gap: 0.15rem;
+  padding: 0.35rem 0.6rem 0;
+}
+
+.ha-ribbon__tabs span {
+  padding: 0.3rem 0.75rem 0.35rem;
+  color: var(--sw-fg-muted);
+}
+
+:is(
+  .sw-hero-app[data-tab="home"] [data-tab="home"],
+  .sw-hero-app[data-tab="insert"] [data-tab="insert"]
+) {
+  color: var(--sw-fg-strong);
+  font-weight: 600;
+  box-shadow: inset 0 -2px var(--sw-accent-strong);
+}
+
+.ha-ribbon__panel {
+  display: flex;
+  align-items: stretch;
+  height: 5.75rem;
+  padding: 0.4rem 0.35rem 0;
+  background: var(--sw-surface-1);
+}
+
+.sw-hero-app:not([data-tab="home"]) [data-panel="home"],
+.sw-hero-app:not([data-tab="insert"]) [data-panel="insert"] {
+  display: none;
+}
+
+.ha-group {
+  display: grid;
+  flex: none;
+  grid-template-rows: minmax(0, 1fr) auto;
+  padding: 0 0.55rem;
+  border-right: 1px solid var(--sw-border);
+}
+
+.ha-group__body {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.3rem;
+}
+
+.ha-group__label {
+  padding: 0.2rem 0 0.35rem;
+  color: var(--sw-fg-dim);
+  font-size: 0.6875rem;
+  text-align: center;
+}
+
+.ha-command {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 0.25rem;
+  min-width: 3.4rem;
+  padding: 0.3rem 0.35rem;
+  border-radius: 0.35rem;
+  color: var(--sw-fg-strong);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.ha-caret {
+  width: 0;
+  height: 0;
+  border: 3px solid transparent;
+  border-top-color: currentColor;
+  border-bottom: 0;
+}
+
+.ha-stack {
+  display: grid;
+  align-content: start;
+  gap: 0.25rem;
+}
+
+.ha-row {
+  display: flex;
+  gap: 0.1rem;
+}
+
+.ha-small {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.3rem;
+  border-radius: 0.3rem;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.ha-select {
+  display: block;
+  min-width: 6.5rem;
+  padding: 0.2rem 0.45rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.3rem;
+  background: var(--sw-surface-0);
+  font-size: 0.75rem;
+}
+
+/* The chart menu: Insert › Chart, the same seven kinds as the product. */
+.ha-menu-anchor {
+  position: relative;
+}
+
+.sw-hero-app[data-menu="true"] [data-target="chart-button"] {
+  background: color-mix(in srgb, var(--sw-accent) 16%, transparent);
+}
+
+.ha-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  display: grid;
+  min-width: 9rem;
+  padding: 0.25rem;
+  border: 1px solid var(--sw-border-strong);
+  border-radius: 0.45rem;
+  background: var(--sw-surface-1);
+  box-shadow: var(--sw-shadow);
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+.sw-hero-app[data-menu="true"] .ha-menu {
+  opacity: 1;
+  transform: none;
+}
+
+.ha-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 0.3rem;
+  font-size: 0.75rem;
+}
+
+.ha-menu__item[data-target] {
+  background: color-mix(in srgb, var(--sw-accent) 14%, transparent);
+}
+
+/* Name box and formula bar */
+
+.ha-bar {
+  display: grid;
+  grid-template-columns: 4.5rem auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.6rem;
+  border-bottom: 1px solid var(--sw-border);
+}
+
+.ha-bar__name,
+.ha-bar__formula {
+  min-height: 1.5rem;
+  padding: 0 0.45rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.3rem;
+  background: var(--sw-surface-0);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5rem;
+}
+
+.ha-bar__name {
+  text-align: center;
+}
+
+.ha-bar__fx {
+  color: var(--sw-fg-dim);
+  font-style: italic;
+}
+
+.ha-bar__formula {
+  display: flex;
+  align-items: center;
+}
+
+.ha-caret-line {
+  width: 1px;
+  height: 1em;
+  margin-left: 1px;
+  background: var(--sw-fg-strong);
+  opacity: 0;
+}
+
+.sw-hero-app[data-editing="true"] .ha-caret-line {
+  animation: ha-blink 1s steps(1) infinite;
+}
+
+@keyframes ha-blink {
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Sheet */
+
+.ha-sheet {
+  position: relative;
+  height: calc(var(--chh) + var(--rows) * var(--rh));
+  overflow: hidden;
+  background: var(--sw-surface-0);
+}
+
+.ha-colheads,
+.ha-cells {
+  display: grid;
+  grid-template-columns: var(--rhw) repeat(12, var(--cw));
+}
+
+.ha-colheads {
+  height: var(--chh);
+  border-bottom: 1px solid var(--sw-border);
+  background: var(--sw-surface-2);
+}
+
+.ha-colheads span,
+.ha-rowhead {
+  display: grid;
+  place-items: center;
+  border-right: 1px solid var(--sw-border);
+  color: var(--sw-fg-muted);
+  font-size: 0.75rem;
+}
+
+.ha-view {
+  position: absolute;
+  inset: var(--chh) 0 0;
+}
+
+.ha-cells {
+  grid-auto-rows: var(--rh);
+}
+
+.ha-rowhead {
+  border-bottom: 1px solid var(--sw-border);
+  background: var(--sw-surface-2);
+}
+
+.ha-cell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+  padding: 0 0.5rem;
+  overflow: hidden;
+  border-right: 1px solid var(--ha-line);
+  border-bottom: 1px solid var(--ha-line);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ha-cell[data-text] {
+  justify-content: flex-start;
+}
+
+.ha-cell[data-head] {
+  color: var(--sw-fg-strong);
+  font-weight: 600;
+}
+
+.ha-cell[data-total] {
+  border-top: 1px solid var(--sw-fg-dim);
+  color: var(--sw-fg-strong);
+  font-weight: 650;
+}
+
+.ha-cell[data-units] {
+  opacity: var(--units, 0);
+}
+
+/* "Sum of Revenue" wraps onto two lines, as a pivot header does, instead of
+   being clipped in a narrow column. */
+[data-part="pivot-view"] .ha-cell[data-head] {
+  font-size: 0.6875rem;
+  line-height: 1.1;
+  text-align: right;
+  white-space: normal;
+}
+
+[data-part="pivot-view"] .ha-cell[data-head][data-text] {
+  text-align: left;
+}
+
+/* Overlays placed in cell units (see cellBox in HeroApp.tsx). */
+.ha-box {
+  position: absolute;
+  top: calc(var(--r) * var(--rh));
+  left: calc(var(--rhw) + var(--c) * var(--cw));
+  width: calc(var(--w) * var(--cw));
+  height: calc(var(--h) * var(--rh));
+  pointer-events: none;
+}
+
+.ha-selection {
+  margin: -1px 0 0 -1px;
+  border: 2px solid var(--sw-accent-strong);
+  background: color-mix(in srgb, var(--sw-accent) 9%, transparent);
+}
+
+.ha-pulse {
+  background: color-mix(in srgb, var(--sw-accent) 26%, transparent);
+}
+
+/* The pointer aims at these; they draw nothing. */
+.ha-anchor {
+  visibility: hidden;
+}
+
+.ha-rest {
+  position: absolute;
+  right: 18%;
+  bottom: 22%;
+  width: 1px;
+  height: 1px;
+}
+
+/* Chart, floating over its cells like the object layer */
+
+.ha-chart {
+  position: absolute;
+  top: calc(var(--chart-r) * var(--rh) + 4px);
+  left: calc(var(--rhw) + var(--chart-c) * var(--cw) + 6px);
+  width: calc(var(--chart-w) * var(--cw) - 12px);
+  height: calc(var(--chart-h) * var(--rh) - 8px);
+  border: 1px solid var(--sw-border);
+  border-radius: 0.4rem;
+  background: var(--sw-surface-1);
+  box-shadow: 0 6px 18px -10px color-mix(in srgb, var(--sw-fg) 35%, transparent);
+  transform-origin: top left;
+}
+
+.sw-hero-app[data-chart-selected="true"] .ha-chart {
+  border-color: var(--sw-accent-strong);
+}
+
+.ha-chart svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.ha-chart__title {
+  fill: var(--sw-fg-strong);
+  font: 600 12px var(--sw-font-body);
+  text-anchor: middle;
+}
+
+.ha-chart__grid {
+  stroke: var(--sw-border);
+  stroke-width: 1;
+}
+
+.ha-chart__axis {
+  fill: var(--sw-fg-dim);
+  font: 9px var(--sw-font-body);
+  text-anchor: end;
+}
+
+.ha-chart__label {
+  fill: var(--sw-fg-muted);
+  font: 10px var(--sw-font-body);
+  text-anchor: middle;
+}
+
+.ha-chart__bar {
+  fill: color-mix(in srgb, var(--sw-accent) 70%, var(--sw-surface-1));
+  transform-box: fill-box;
+  transform-origin: bottom;
+}
+
+.ha-chart__bar[data-edited] {
+  fill: var(--sw-accent-strong);
+}
+
+.ha-chart__handle {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border: 1.5px solid var(--sw-accent-strong);
+  border-radius: 2px;
+  background: var(--sw-surface-1);
+  opacity: 0;
+}
+
+.sw-hero-app[data-chart-selected="true"] .ha-chart__handle {
+  opacity: 1;
+}
+
+.ha-chart__handle[data-corner^="n"] {
+  top: -4px;
+}
+
+.ha-chart__handle[data-corner^="s"] {
+  bottom: -4px;
+}
+
+.ha-chart__handle[data-corner$="w"] {
+  left: -4px;
+}
+
+.ha-chart__handle[data-corner$="e"] {
+  right: -4px;
+}
+
+.ha-chart__target {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1px;
+  height: 1px;
+}
+
+/* PivotTable Fields, docked to the sheet's right edge */
+
+.ha-fields {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  align-content: start;
+  gap: 0.35rem;
+  width: 15rem;
+  padding: 0.75rem;
+  border-left: 1px solid var(--sw-border);
+  background: var(--sw-surface-1);
+  box-shadow: -10px 0 24px -18px color-mix(in srgb, var(--sw-fg) 45%, transparent);
+}
+
+.ha-fields strong {
+  margin-bottom: 0.25rem;
+  color: var(--sw-fg-strong);
+}
+
+.ha-fields ul {
+  display: grid;
+  gap: 0.1rem;
+  margin: 0 0 0.35rem;
+  padding: 0;
+  list-style: none;
+}
+
+.ha-fields li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.2rem 0.3rem;
+  border-radius: 0.3rem;
+  font-size: 0.75rem;
+}
+
+.ha-fields li::before {
+  width: 0.75rem;
+  height: 0.75rem;
+  border: 1.5px solid var(--sw-border-strong);
+  border-radius: 0.2rem;
+  content: "";
+}
+
+:is(
+  .ha-fields li[data-on],
+  .sw-hero-app[data-units-checked="true"] .ha-fields li[data-units]
+)::before {
+  border-color: var(--sw-accent-strong);
+  background: var(--sw-accent-strong);
+  box-shadow: inset 0 0 0 2px var(--sw-surface-1);
+}
+
+.ha-fields__area {
+  margin-top: 0.3rem;
+  color: var(--sw-fg-dim);
+  font-size: 0.6875rem;
+}
+
+.ha-fields__chip {
+  justify-self: start;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.3rem;
+  background: var(--sw-surface-2);
+  font-size: 0.75rem;
+}
+
+/* Sheet tabs */
+
+.ha-sheets {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.3rem 0.6rem;
+  border-top: 1px solid var(--sw-border);
+  background: var(--sw-surface-2);
+  font-size: 0.75rem;
+}
+
+.ha-sheets span {
+  padding: 0.25rem 0.75rem;
+  border-radius: 0.3rem;
+  color: var(--sw-fg-muted);
+}
+
+:is(
+  .sw-hero-app[data-sheet="sales"] [data-sheet-tab="sales"],
+  .sw-hero-app[data-sheet="pivot"] [data-sheet-tab="pivot"]
+) {
+  background: var(--sw-surface-1);
+  color: var(--sw-fg-strong);
+  font-weight: 600;
+  box-shadow: inset 0 -2px var(--sw-accent-strong);
+}
+
+.ha-sheets .ha-sheets__add {
+  color: var(--sw-fg-dim);
+}
+
+.sw-hero-app[data-pivot-tab="false"] [data-sheet-tab="pivot"] {
+  display: none;
+}
+
+/* What just happened, and the key that did it */
+
+.ha-badge,
+.ha-key {
+  position: absolute;
+  bottom: 3rem;
+  z-index: 3;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.ha-badge {
+  right: 1rem;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--sw-accent) 45%, var(--sw-border));
+  background: var(--sw-surface-1);
+  box-shadow: var(--sw-shadow);
+  color: var(--sw-fg-strong);
+}
+
+.ha-key {
+  left: 1rem;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--sw-border-strong);
+  border-bottom-width: 3px;
+  background: var(--sw-surface-1);
+  color: var(--sw-fg-strong);
+  font-family: var(--sw-font-body);
+}
+
+.ha-pointer {
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  z-index: 5;
+  width: 16px;
+  height: 22px;
+  pointer-events: none;
+}
+
+.ha-pointer svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.ha-pointer path {
+  fill: var(--sw-fg-strong);
+  stroke: var(--sw-surface-0);
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
+.ha-ripple {
+  position: absolute;
+  top: -11px;
+  left: -11px;
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--sw-accent-strong);
+  border-radius: 50%;
+  opacity: 0;
+}
+
+/* Acts: numbered chapter buttons under the picture */
+
+/* A solid strip like the window above it: over the page's grid background a
+   transparent row read as unfinished. */
+.ha-acts {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin: 0;
+  margin: 0.75rem 0 0;
   padding: 0;
-  border-bottom: 1px solid var(--sw-border);
+  overflow: hidden;
+  border: 1px solid var(--sw-border-strong);
+  border-radius: 0.75rem;
+  background: var(--sw-surface-1);
   list-style: none;
   counter-reset: act;
 }
 
-.sw-hero-scene__captions li {
+.ha-acts li {
   position: relative;
   min-width: 0;
   color: var(--sw-fg-dim);
@@ -205,11 +877,11 @@
   transition: color 0.4s ease;
 }
 
-.sw-hero-scene__captions li + li {
+.ha-acts li + li {
   border-left: 1px solid var(--sw-border);
 }
 
-.sw-hero-scene__captions button::before {
+.ha-acts button::before {
   display: block;
   margin-bottom: 0.2rem;
   color: var(--sw-fg-dim);
@@ -217,10 +889,10 @@
   font: 650 var(--sw-type-xs) / 1 var(--sw-font-mono);
 }
 
-.sw-hero-scene__captions li::after {
+.ha-acts li::after {
   position: absolute;
   right: 0;
-  bottom: -1px;
+  bottom: 0;
   left: 0;
   height: 2px;
   background: var(--sw-accent-strong);
@@ -229,19 +901,19 @@
   transform-origin: left;
 }
 
-.sw-hero-scene__captions li[data-current="true"] {
+.ha-acts li[data-current="true"] {
   color: var(--sw-fg-strong);
 }
 
-.sw-hero-scene__captions li[data-current="true"] button::before {
+.ha-acts li[data-current="true"] button::before {
   color: var(--sw-accent-strong);
 }
 
-.sw-hero-scene__captions li[data-current="true"]::after {
+.ha-acts li[data-current="true"]::after {
   transform: scaleX(1);
 }
 
-.sw-hero-scene__captions button,
+.ha-acts button,
 .sw-arch__steps button {
   display: block;
   align-content: start;
@@ -256,26 +928,19 @@
   cursor: pointer;
 }
 
-.sw-hero-scene__captions button:hover,
+.ha-acts button:hover,
 .sw-arch__steps button:hover {
   background: color-mix(in srgb, var(--sw-accent) 7%, transparent);
   color: var(--sw-fg-strong);
 }
 
-.sw-hero-scene__captions button:focus-visible,
+.ha-acts button:focus-visible,
 .sw-arch__steps button:focus-visible {
   outline: 2px solid var(--sw-accent-strong);
   outline-offset: -4px;
 }
 
-.sw-hero-scene .hs {
-  display: block;
-  width: 100%;
-  height: auto;
-  padding: 0.5rem 0.5rem 0.25rem;
-}
-
-.sw-hero-scene figcaption {
+.sw-hero-app figcaption {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem 1rem;
@@ -286,7 +951,7 @@
   font-size: var(--sw-type-xs);
 }
 
-.sw-hero-scene__replay {
+.sw-hero-app__replay {
   padding: 0.35rem 0.75rem;
   border: 1px solid var(--sw-border-strong);
   border-radius: 999px;
@@ -296,286 +961,54 @@
   cursor: pointer;
 }
 
-.sw-hero-scene__replay:hover {
+.sw-hero-app__replay:hover {
   border-color: var(--sw-accent);
   color: var(--sw-accent-strong);
 }
 
-.hs text {
-  font-family: var(--sw-font-body);
-  font-variant-numeric: tabular-nums;
-}
-
-.hs-sheet,
-.hs-pointer,
-.hs-viewport,
-.hs-address,
-.hs-key g {
-  transform-box: view-box;
-  transform-origin: 0 0;
-}
-
-.hs-card {
-  fill: var(--sw-surface-2);
-  stroke: var(--sw-border-strong);
-}
-
-.hs-ref,
-.hs-input {
-  fill: var(--sw-surface-0);
-  stroke: var(--sw-border);
-}
-
-.hs .hs-ref-text {
-  fill: var(--sw-fg);
-  font: 600 12px var(--sw-font-mono);
-}
-
-.hs .hs-fx {
-  fill: var(--sw-accent-strong);
-  font: italic 650 14px var(--sw-font-mono);
-}
-
-.hs .hs-formula {
-  fill: var(--sw-fg-strong);
-  font: 500 14px var(--sw-font-mono);
-}
-
-.hs-caret {
-  fill: var(--sw-accent-strong);
-  opacity: 0;
-}
-
-.sw-hero-scene[data-editing="true"] .hs-caret {
-  animation: hs-blink 0.8s steps(1) infinite;
-}
-
-@keyframes hs-blink {
-  0% {
-    opacity: 1;
+/* Narrower frames fold ribbon groups the way the real ribbon does. */
+@media (max-width: 64rem) {
+  .ha-group[data-fold="medium"] {
+    display: none;
   }
-  50% {
-    opacity: 0;
+
+  .ha-window {
+    --cw: 5.5rem;
+    --chart-c: 4;
   }
 }
 
-.hs-headrow {
-  fill: color-mix(in srgb, var(--sw-fg) 5%, transparent);
+/* Phones: the chart moves under the data, and the field list narrows. */
+@media (max-width: 48rem) {
+  .ha-group[data-fold="narrow"] {
+    display: none;
+  }
+
+  .ha-window {
+    --rhw: 1.75rem;
+    --cw: 4.6rem;
+    --rows: 15;
+    --chart-c: 0;
+    --chart-r: 7;
+    --chart-w: 4;
+    --chart-h: 7;
+  }
+
+  .ha-fields {
+    width: 10.5rem;
+  }
+
+  .ha-badge {
+    right: 0.6rem;
+    left: 0.6rem;
+    text-align: center;
+  }
+
+  .ha-key {
+    bottom: 5.5rem;
+  }
 }
 
-.hs-rule {
-  stroke: var(--sw-border);
-}
-
-.hs .hs-letter,
-.hs .hs-rownum {
-  fill: var(--sw-fg-dim);
-  font: 600 11px var(--sw-font-mono);
-}
-
-.hs .hs-letter[data-active],
-.hs .hs-rownum[data-active] {
-  fill: var(--sw-accent-strong);
-}
-
-.hs .hs-cell {
-  fill: var(--sw-fg);
-  font-size: 14px;
-}
-
-.hs [data-head] .hs-cell {
-  fill: var(--sw-fg-strong);
-  font-weight: 650;
-}
-
-.hs-b3 {
-  fill: transparent;
-}
-
-.hs-b3[data-state="editing"] {
-  fill: color-mix(in srgb, var(--sw-accent) 12%, var(--sw-surface-2));
-}
-
-.hs .hs-cell[data-part="b3"] {
-  fill: var(--sw-fg-strong);
-  font-weight: 650;
-}
-
-.hs [data-total] .hs-cell {
-  fill: var(--sw-fg-strong);
-  font-weight: 650;
-}
-
-.hs-pulse {
-  fill: color-mix(in srgb, var(--sw-accent) 30%, transparent);
-  opacity: 0;
-}
-
-.hs-path {
-  fill: none;
-  stroke: var(--sw-demo-warn);
-  stroke-dasharray: 1;
-  stroke-dashoffset: 0;
-  stroke-linejoin: round;
-  stroke-width: 2;
-}
-
-.hs-selection {
-  fill: none;
-  stroke: var(--sw-accent-strong);
-  stroke-width: 2.5;
-}
-
-.hs-badge rect {
-  fill: var(--sw-surface-0);
-  stroke: color-mix(in srgb, var(--sw-accent) 45%, var(--sw-border));
-}
-
-.hs-badge circle {
-  fill: var(--sw-accent-strong);
-}
-
-.hs .hs-badge text {
-  fill: var(--sw-fg-strong);
-  font: 600 12px var(--sw-font-body);
-}
-
-.hs-pointer path {
-  fill: var(--sw-fg-strong);
-  stroke: var(--sw-surface-0);
-  stroke-linejoin: round;
-  stroke-width: 1.5;
-}
-
-.hs-ripple {
-  fill: none;
-  stroke: var(--sw-accent-strong);
-  stroke-width: 2;
-}
-
-.hs-tile {
-  fill: color-mix(in srgb, var(--sw-fg) 7%, transparent);
-}
-
-.hs-lit {
-  fill: var(--sw-accent);
-  opacity: 0;
-}
-
-/* Just fetched: a short bright flash before the tile settles. */
-.hs-lit[data-fetched] {
-  fill: var(--sw-fg-strong);
-}
-
-.hs-key rect {
-  fill: var(--sw-surface-0);
-  stroke: var(--sw-border-strong);
-  filter: drop-shadow(0 3px 0 var(--sw-border-strong));
-}
-
-.hs .hs-key text {
-  fill: var(--sw-fg-strong);
-  font: 650 12px var(--sw-font-mono);
-}
-
-.hs-callout path {
-  fill: none;
-  stroke: var(--sw-accent);
-  stroke-width: 1.5;
-}
-
-.hs-callout rect {
-  fill: color-mix(in srgb, var(--sw-accent) 14%, var(--sw-surface-0));
-  stroke: color-mix(in srgb, var(--sw-accent) 50%, transparent);
-}
-
-.hs .hs-callout text {
-  fill: var(--sw-accent-strong);
-  font: 600 12px var(--sw-font-body);
-}
-
-.hs-viewport-frame {
-  fill: color-mix(in srgb, var(--sw-accent) 10%, transparent);
-  stroke: var(--sw-accent-strong);
-  stroke-width: 2;
-}
-
-.hs-viewport-flash {
-  fill: none;
-  stroke: var(--sw-demo-warn);
-  stroke-width: 3;
-  opacity: 0;
-}
-
-.hs-address rect {
-  fill: var(--sw-surface-0);
-  stroke: var(--sw-accent);
-}
-
-.hs .hs-address text {
-  fill: var(--sw-accent-strong);
-  font: 650 11px var(--sw-font-mono);
-}
-
-.hs-hud rect {
-  fill: color-mix(in srgb, var(--sw-surface-0) 85%, transparent);
-  stroke: var(--sw-border);
-}
-
-.hs .hs-hud text {
-  fill: var(--sw-fg-muted);
-  font: 600 12px var(--sw-font-mono);
-}
-
-.hs .hs-hud .hs-hud-rows,
-.hs .hs-hud .hs-hud-resident {
-  fill: var(--sw-fg-strong);
-}
-
-.hs-memory-card {
-  fill: var(--sw-surface-2);
-  stroke: var(--sw-border-strong);
-}
-
-.hs .hs-memory-label {
-  fill: var(--sw-fg-muted);
-  font-size: 13px;
-}
-
-.hs .hs-memory-value {
-  fill: var(--sw-fg-strong);
-  font: 700 15px var(--sw-font-display);
-}
-
-.hs .hs-memory-value[data-kind="resident"] {
-  fill: var(--sw-accent-strong);
-}
-
-.hs-memory-track {
-  fill: color-mix(in srgb, var(--sw-fg) 8%, transparent);
-}
-
-.hs-memory-bar[data-kind="all"] {
-  fill: color-mix(in srgb, var(--sw-fg) 30%, transparent);
-}
-
-.hs-memory-bar[data-kind="resident"] {
-  fill: var(--sw-accent-strong);
-}
-
-.hs .hs-memory-note {
-  fill: var(--sw-fg-dim);
-  font-size: 12px;
-}
-
-/* Hidden until the timeline shows them. */
-.hs-pointer,
-.hs-field,
-.hs-memory,
-.hs-key,
-.hs-callout {
-  opacity: 0;
-}
 /* ---- Measured facts strip --------------------------------------------------- */
 
 .sw-lp-facts {
@@ -1103,6 +1536,64 @@
   fill: color-mix(in srgb, var(--sw-fg) 16%, transparent);
 }
 
+.fg .fg-tab {
+  fill: var(--sw-fg-muted);
+  font: 600 8px var(--sw-font-body);
+  text-anchor: middle;
+}
+
+.fg-tab-line {
+  fill: var(--sw-accent-strong);
+}
+
+.fg-ribbon,
+.fg-formula,
+.fg-namebox {
+  fill: color-mix(in srgb, var(--sw-fg) 5%, transparent);
+  stroke: var(--sw-border);
+}
+
+.fg-ribbon-button,
+.fg-ribbon-group {
+  fill: color-mix(in srgb, var(--sw-fg) 16%, transparent);
+}
+
+.fg-ribbon-button[data-press] {
+  fill: var(--sw-accent);
+}
+
+.fg .fg-fx {
+  fill: var(--sw-fg-dim);
+  font: italic 600 8px var(--sw-font-body);
+}
+
+.fg-sheet-tab {
+  fill: color-mix(in srgb, var(--sw-fg) 12%, transparent);
+}
+
+.fg-sheet-tab[data-active] {
+  fill: var(--sw-accent);
+}
+
+.fg-axis {
+  fill: none;
+  stroke: var(--sw-border-strong);
+}
+
+.fg-chart-bar {
+  fill: color-mix(in srgb, var(--sw-accent) 60%, transparent);
+  transform-box: fill-box;
+  transform-origin: bottom;
+}
+
+.fg-chart-bar[data-edited] {
+  fill: var(--sw-accent-strong);
+}
+
+.fg-cell[data-edited] {
+  fill: color-mix(in srgb, var(--sw-accent) 26%, transparent);
+}
+
 /* Glyph animations: a six-second loop per card. */
 .sw-features
   :where(
@@ -1118,7 +1609,11 @@
     .fg-file,
     .fg-mini-grid,
     .fg-check,
-    .fg-host-row
+    .fg-host-row,
+    .fg-tab-line,
+    .fg-ribbon-button[data-press],
+    .fg-chart-bar,
+    .fg-cell[data-edited]
   ) {
   animation: 6s cubic-bezier(0.45, 0, 0.25, 1) infinite both;
 }
@@ -1189,6 +1684,72 @@
 
 .sw-features .fg-host-row {
   animation-name: fg-sort;
+}
+
+.sw-features .fg-tab-line {
+  animation-name: fg-tabs;
+}
+
+.sw-features .fg-ribbon-button[data-press] {
+  animation-name: fg-appear;
+  animation-delay: 1.6s;
+}
+
+.sw-features .fg-chart-bar {
+  animation-name: fg-grow;
+  animation-delay: calc(var(--i) * 0.2s);
+}
+
+.sw-features .fg-chart-bar[data-edited] {
+  animation-name: fg-follow;
+  animation-delay: 0s;
+}
+
+.sw-features .fg-cell[data-edited] {
+  animation-name: fg-edit-a;
+}
+
+@keyframes fg-tabs {
+  0%,
+  25% {
+    transform: none;
+  }
+  33%,
+  58% {
+    transform: translateX(44px);
+  }
+  66%,
+  92% {
+    transform: translateX(88px);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes fg-grow {
+  0% {
+    transform: scaleY(0.15);
+  }
+  30%,
+  100% {
+    transform: none;
+  }
+}
+
+/* The edited bar grows in shorter, then rises when its cell changes. */
+@keyframes fg-follow {
+  0% {
+    transform: scaleY(0.12);
+  }
+  25%,
+  45% {
+    transform: scaleY(0.7);
+  }
+  60%,
+  100% {
+    transform: none;
+  }
 }
 
 @keyframes fg-lit {
@@ -1922,7 +2483,7 @@
 .sw-reel__tabs {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--sr-count, 3), minmax(0, 1fr));
   border-bottom: 1px solid var(--sw-border);
 }
 
@@ -1930,7 +2491,7 @@
   position: absolute;
   bottom: 0;
   left: 0;
-  width: calc(100% / 3);
+  width: calc(100% / var(--sr-count, 3));
   height: 2px;
   background: color-mix(in srgb, var(--sw-accent) 25%, transparent);
   content: "";
@@ -2304,6 +2865,80 @@
 }
 .sr-spill :where(.sr-tag, .sr-change-count, .sr-note) {
   animation: sr-appear 0.4s ease-out 3.8s both;
+}
+
+/* Analysis: the pivot fills in, the bars grow, then one order changes and the
+   pivot row, the grand total and the EMEA bar follow it in that order. */
+.sr-bar {
+  fill: color-mix(in srgb, var(--sw-accent) 60%, transparent);
+  transform-box: fill-box;
+  transform-origin: bottom;
+}
+
+.sr-bar[data-edited] {
+  fill: var(--sw-accent-strong);
+}
+
+.sr .sr-total {
+  fill: var(--sw-fg-strong);
+  font-weight: 700;
+}
+
+.sr-analysis .sr-pivot-row {
+  animation: sr-appear 0.4s ease-out both;
+}
+.sr-analysis .sr-bar {
+  animation: sr-bar-grow 0.9s cubic-bezier(0.3, 0.7, 0.3, 1) both;
+}
+/* One animation over the whole loop: grow to the old value, hold, then rise
+   to the new one at the edit. */
+.sr-analysis .sr-bar[data-edited] {
+  animation: sr-bar-follow var(--sr-loop, 10s) linear both;
+}
+.sr-analysis .sr-change[data-step="order"] .sr-flash {
+  animation: sr-flash 1.2s ease-out 6s both;
+}
+.sr-analysis .sr-change[data-step="order"] .sr-before {
+  animation: sr-hide 0.2s linear 6.1s both;
+}
+.sr-analysis .sr-change[data-step="order"] .sr-after {
+  animation: sr-appear 0.2s linear 6.1s both;
+}
+.sr-analysis .sr-change[data-step="pivot"] .sr-flash {
+  animation: sr-flash 1.2s ease-out 6.5s both;
+}
+.sr-analysis .sr-change[data-step="pivot"] .sr-before {
+  animation: sr-hide 0.2s linear 6.6s both;
+}
+.sr-analysis .sr-change[data-step="pivot"] .sr-after {
+  animation: sr-appear 0.2s linear 6.6s both;
+}
+.sr-analysis .sr-link {
+  animation: sr-appear 0.5s ease-out 6.2s both;
+}
+.sr-analysis .sr-note {
+  animation: sr-appear 0.4s ease-out 7.4s both;
+}
+
+@keyframes sr-bar-grow {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+@keyframes sr-bar-follow {
+  0%,
+  24% {
+    transform: scaleY(0);
+  }
+  32%,
+  68% {
+    transform: scaleY(var(--sr-from));
+  }
+  76%,
+  100% {
+    transform: none;
+  }
 }
 
 .sr-offline .sr-dot-bram {
@@ -2836,23 +3471,9 @@
     grid-template-rows: auto;
   }
 
-  /* One column: the demo comes before the install command, so the product
-     shows near the top of the first screen. */
+  /* One column: copy, then the actions, then the app preview. */
   .sw-lp-hero {
-    row-gap: 0;
-  }
-
-  .sw-lp-hero__copy {
-    display: contents;
-  }
-
-  .sw-lp-hero > .sw-hero-scene {
-    margin-top: 2.25rem;
-  }
-
-  .sw-lp-hero__install {
-    order: 1;
-    margin-top: 1.5rem;
+    row-gap: 1.75rem;
   }
 
   .sw-lp-hero h1 {
@@ -2907,7 +3528,7 @@
   }
 
   /* Keep every chapter reachable on touch screens. */
-  .sw-hero-scene__captions button {
+  .ha-acts button {
     padding: 0.75rem 0.5rem;
     font-size: 0.6875rem;
   }
@@ -2954,7 +3575,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sw-landing :is(.hs, .as, .fg, .sr) *,
+  .sw-landing :is(.ha-window, .as, .fg, .sr) *,
   .sw-landing .sw-bench__track i {
     animation: none !important;
   }
