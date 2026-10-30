@@ -7,9 +7,9 @@ description: "Each release measured against the previous one on the same machine
 
 Each suite ran once on 0.5.4 and once on 0.6.0, on the same machine. Change is 0.6.0 / 0.5.4 for the median, with the p95 ratio in brackets when it differs: below 1× is faster or smaller, above 1× is slower or larger. A suite with a documented budget marks rows beyond it as flagged; rows without a budget are only marked faster, slower, smaller or larger.
 
-The summary counts Sheetwrite's own measurements. Lower and higher cover time, memory and counts alike. Handsontable control runs and full-engine rows that repeat the formula tables are counted apart, so a change is not counted twice or credited to Sheetwrite.
+The summary counts Sheetwrite's own measurements. **Lower** and **higher** cover time, memory and counts alike; **same** is unchanged or within budget; **new** has no 0.5.4 counterpart. **Apart** counts Handsontable control runs and full-engine rows that repeat the formula tables, so a change is not counted twice or credited to Sheetwrite.
 
-| Suite | Measurements | Lower | Higher | Unchanged or within budget | New in 0.6 | Flagged | Control or repeat |
+| Suite | Rows | Lower | Higher | Same | New | Flagged | Apart |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | Render scale | 112 | 16 | 39 | 1 | 0 | 0 | 56 |
 | Interaction | 7 | 1 | 3 | 3 | 0 | 0 | 0 |
