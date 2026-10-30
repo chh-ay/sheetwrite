@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 
+import { writePreference } from "../lib/preference-storage.js";
+
 type Theme = "light" | "dark";
 
 function currentTheme(): Theme {
@@ -15,7 +17,7 @@ export function ThemeToggle() {
   const toggle = () => {
     const next = currentTheme() === "dark" ? "light" : "dark";
     document.documentElement.dataset.theme = next;
-    window.localStorage.setItem("sheetwrite-theme", next);
+    writePreference("sheetwrite-theme", next);
     setTheme(next);
   };
 

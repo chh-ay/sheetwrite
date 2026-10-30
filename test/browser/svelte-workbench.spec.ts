@@ -151,6 +151,8 @@ test("svelte workbench boots synced, paints the dispatch model, and shows live p
   await page.emulateMedia({ reducedMotion: "reduce" });
   const errors = collectErrors(page);
   await bootWorkbench(page);
+  // The page owns the one main landmark; the workbench inside it adds none.
+  await expect(page.getByRole("main")).toHaveCount(1);
 
   const gridSurface = page.locator(".sw-svw .sw-demo-grid");
   await expect(gridSurface).toBeVisible();
@@ -172,6 +174,8 @@ test("svelte workbench boots synced, paints the dispatch model, and shows live p
   const toggle = page.getByTestId("connection-toggle");
   await expect(toggle).toHaveRole("switch");
   await expect(toggle).toHaveAttribute("aria-checked", "true");
+  // The visible action text is the accessible name, so voice users can say it.
+  await expect(toggle).toHaveAccessibleName("Connected · Go offline");
   await expect(page.getByTestId("sync-status")).toHaveRole("status");
   await expect(page.getByTestId("activity-feed")).toHaveAttribute("aria-live", "polite");
 
@@ -228,6 +232,9 @@ test("offline edits queue durably and drain in order on reconnect", async ({ pag
 
   await page.getByTestId("connection-toggle").click();
   await expect(page.getByTestId("connection-toggle")).toHaveAttribute("aria-checked", "false");
+  await expect(page.getByTestId("connection-toggle")).toHaveAccessibleName(
+    /^Reconnect · \d+ queued$/,
+  );
   await expect(page.getByTestId("sync-status")).toContainText("Offline");
 
   await page.getByTestId("log-button").click();

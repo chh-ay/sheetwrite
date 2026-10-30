@@ -1,4 +1,5 @@
 import formulaHeadingTargets from "../generated/formula-heading-targets.json" with { type: "json" };
+import { fragmentId } from "./fragment.js";
 
 /** Pages that keep their address but move some headings to topic pages. */
 export const MOVED_HEADINGS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
@@ -292,10 +293,6 @@ export const MOVED_PAGES: Readonly<Record<string, MovedPage>> = {
   },
 };
 
-function anchorOf(hash: string): string {
-  return decodeURIComponent(hash.replace(/^#/, ""));
-}
-
 /** The URL that replaces an old page and fragment, or undefined for a page that did not move. */
 export function movedPageTarget(
   href: string,
@@ -304,7 +301,7 @@ export function movedPageTarget(
 ): string | undefined {
   const page = movedPages[href];
   if (page === undefined) return undefined;
-  const anchor = anchorOf(hash);
+  const anchor = fragmentId(hash);
   if (anchor.length === 0) return page.to;
   return page.anchors[anchor] ?? `${page.to}#${anchor}`;
 }
@@ -318,7 +315,7 @@ export function forwardedHeading(
   hash: string,
   movedPages: Readonly<Record<string, MovedPage>> = MOVED_PAGES,
 ): string | undefined {
-  const anchor = anchorOf(hash);
+  const anchor = fragmentId(hash);
   if (anchor.length === 0) return undefined;
   const movedHeading = MOVED_HEADINGS[href]?.[anchor];
   if (movedHeading !== undefined) return movedHeading;

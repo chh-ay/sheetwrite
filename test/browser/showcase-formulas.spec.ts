@@ -6,6 +6,7 @@ import {
   FORMULA_PANELS,
   LEDGER_YEAR,
   ORDER_ROWS,
+  PLAYGROUND,
   REGIONS,
 } from "../../docs/src/showcases/scenarios/formulas.js";
 import { PEAK_MONTHS_OF_YEAR } from "../../docs/src/showcases/scenarios/orders-story.js";
@@ -132,16 +133,24 @@ test("the full engine computes the dashboard and every panel follows one edit", 
   const [bestRow] = await readBlock(page, best.row, best.col, 1, 2);
   expect(bestRow).toEqual(ranked);
 
-  // Undo restores the original totals.
+  // A visitor formula evaluates in the playground cell after the promotion.
+  const draft = "=ROWS(UNIQUE(Orders!B1:B20000))";
+  await page.getByTestId("formulas-draft").fill(draft);
+  await page.getByTestId("formulas-run").click();
+  await expect(page.getByTestId("formulas-draft-result")).toContainText(`${REGIONS.length} ·`);
+
+  // Undo removes the promotion, not the later playground formula.
   await page.getByTestId("formulas-promotion").click();
   await expect
     .poll(async () => (await readBlock(page, region.row + 1, region.col + 1, 1, 1))[0]?.[0])
     .toBe(block[1]?.[1]);
-
-  // A visitor formula evaluates in the playground cell.
-  await page.getByTestId("formulas-draft").fill("=ROWS(UNIQUE(Orders!B1:B20000))");
-  await page.getByTestId("formulas-run").click();
-  await expect(page.getByTestId("formulas-draft-result")).toContainText(`${REGIONS.length} ·`);
+  expect(
+    await page.evaluate((addr) => window.__sheetwriteFormulasGrid?.store.getFormula(addr), {
+      sheet: ANALYSIS_SHEET_ID,
+      row: PLAYGROUND.row,
+      col: PLAYGROUND.col,
+    }),
+  ).toBe(draft);
 
   expect(errors.page).toEqual([]);
   expect(errors.console).toEqual([]);

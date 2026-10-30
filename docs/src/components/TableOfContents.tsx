@@ -39,6 +39,8 @@ export function useDocumentOutline(): readonly OutlineItem[] {
       for (const node of article.querySelectorAll<HTMLElement>(memberTargets)) {
         // Search-target anchors are invisible duplicates of the member rows.
         if (node.classList.contains("api-search-anchor")) continue;
+        // A filtered-out group hides its heading; a link to it would go nowhere.
+        if (node.hidden) continue;
         const isMember = node.tagName === "DETAILS";
         // Member rows: only the name code, never the trailing doc summary.
         // Headings: own text minus decorations like the .api-count chip.
@@ -71,9 +73,15 @@ export function useDocumentOutline(): readonly OutlineItem[] {
 
     scan();
     // Suspense resolves the article after this effect on client navigations;
-    // rescan when its children actually arrive (attribute churn is ignored).
+    // rescan when its children actually arrive. Of the attributes, only
+    // `hidden` changes the outline (the exported-symbol filter sets it).
     const mutations = new MutationObserver(scan);
-    mutations.observe(article, { childList: true, subtree: true });
+    mutations.observe(article, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["hidden"],
+    });
     return () => mutations.disconnect();
   }, [pathname]);
 

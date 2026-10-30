@@ -90,8 +90,23 @@ function MovedDocument({ from }: Readonly<{ from: string }>) {
       <p>
         This page has a new address: <a href={target}>{target}</a>.
       </p>
+      <DocumentReady />
     </main>
   );
+}
+
+/**
+ * Marks the docs page ready for interaction. In an article it runs inside the
+ * content boundary, so it fires after the lazy MDX controls hydrate.
+ */
+function DocumentReady() {
+  useEffect(() => {
+    document.documentElement.dataset.hydrated = "true";
+    return () => {
+      delete document.documentElement.dataset.hydrated;
+    };
+  }, []);
+  return null;
 }
 
 function DocumentRoute() {
@@ -130,6 +145,7 @@ function DocumentRoute() {
         }
       >
         <Content components={DOCUMENT_COMPONENTS} />
+        <DocumentReady key={activeHref} />
       </Suspense>
     </DocsShell>
   );
@@ -149,6 +165,7 @@ function DocumentNotFound() {
         </Link>{" "}
         or search the documentation.
       </p>
+      <DocumentReady />
     </DocsShell>
   );
 }

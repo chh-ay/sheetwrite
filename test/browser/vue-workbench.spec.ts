@@ -116,6 +116,8 @@ test("boots the governed business workbook, paints, and stays accessible", async
   const errors = collectErrors(page);
   await page.setViewportSize({ width: 1568, height: 869 });
   await openWorkbench(page);
+  // The page owns the one main landmark; the workbench inside it adds none.
+  await expect(page.getByRole("main")).toHaveCount(1);
 
   // The frozen PO column stays out of the ARIA mirror window, so the first
   // mirrored body cell is the supplier column; PO-0001 is asserted from the
@@ -169,7 +171,8 @@ test("boots the governed business workbook, paints, and stays accessible", async
   await expect(page.getByRole("tab", { name: "Orders sheet" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Suppliers sheet" })).toBeVisible();
   await openTask(page, "Notes");
-  const noteEditor = page.getByRole("textbox", { name: "Cell note" });
+  // The textarea's accessible name is its visible label, so voice users can say it.
+  const noteEditor = page.getByRole("textbox", { name: "Selected-cell note", exact: true });
   await expect(noteEditor).toBeVisible();
   await expect(page.getByRole("list", { name: "Adapter events" })).toBeVisible();
   await expect(page.getByTestId("persistence")).toHaveAttribute("aria-live", "polite");
@@ -392,7 +395,9 @@ test("read-only is a live option that never rebuilds the grid", async ({ page })
   await expect(readOnly).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(GRID)).toHaveAttribute("aria-readonly", "true");
   await openTask(page, "Notes");
-  await expect(page.getByRole("textbox", { name: "Cell note" })).toBeDisabled();
+  await expect(
+    page.getByRole("textbox", { name: "Selected-cell note", exact: true }),
+  ).toBeDisabled();
   await expect(page.getByTestId("props")).toContainText("true");
   await expect(page.getByRole("button", { name: "Add sheet", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /^Options for / })).toHaveCount(0);
