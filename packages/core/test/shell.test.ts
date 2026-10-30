@@ -201,9 +201,9 @@ describe("createToolbar", () => {
     const piece = createToolbar(host, grid, {
       label: "Editing",
       items: [
-        { onClick: () => { }, title: "One" },
-        { onClick: () => { }, title: "Two" },
-        { onClick: () => { }, title: "Three" },
+        { onClick: () => {}, title: "One" },
+        { onClick: () => {}, title: "Two" },
+        { onClick: () => {}, title: "Three" },
       ],
     });
     try {
@@ -237,9 +237,9 @@ describe("createToolbar", () => {
     const { grid, store, host } = makeGrid();
     const piece = createToolbar(host, grid, {
       items: [
-        { onClick: () => { }, title: "One" },
+        { onClick: () => {}, title: "One" },
         { action: "undo" },
-        { onClick: () => { }, title: "Two" },
+        { onClick: () => {}, title: "Two" },
       ],
     });
     const fullPiece = createToolbar(host, grid);
