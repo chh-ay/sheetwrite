@@ -15,6 +15,12 @@ From 0.5.0, each release has a release post with highlights, measured
 performance, and an upgrade checklist:
 [sheetwrite.dev/docs/releases](https://www.sheetwrite.dev/docs/releases/).
 
+## 0.6.1
+
+- Make data-grid value edits, scrolling back to evicted pages, text lookups
+  and XLSX expansion rejects faster again; no API changes.
+- [Release notes](https://www.sheetwrite.dev/docs/releases/0.6.1/).
+
 ## 0.6.0
 
 - Add charts (with the new optional `@sheetwrite/charts`), pivot tables,
