@@ -8,7 +8,7 @@ description: "Browser-safe external target or stable workbook-internal range tar
 Browser-safe external target or stable workbook-internal range target.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/cell.ts#L51"><code>packages/core/src/types/cell.ts#L51</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/cell.ts#L67"><code>packages/core/src/types/cell.ts#L67</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>2</span>

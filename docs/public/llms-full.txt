@@ -3631,13 +3631,20 @@ interface CellStyle {
   underline?: boolean;
   strikethrough?: boolean;
   fontSize?: number;
+  fontFamily?: string;       // e.g. "Calibri"; the theme font is the fallback
   color?: string;            // hex text color, e.g. "#111111"
   backgroundColor?: string;  // hex fill, e.g. "#ffffff"
   align?: "left" | "center" | "right";
+  verticalAlign?: "top" | "middle" | "bottom"; // omitted = centered
+  numberFormat?: string;     // overrides the column's numberFormat
   wrap?: boolean;
   border?: CellBorders;
 }
 ```
+
+`fontFamily` names one family. It is drawn before the theme font's families, so
+a font the browser does not have falls back to the theme font. Names may use
+letters, digits, spaces, `.`, `_` and `-` (at most 128 characters).
 
 Apply a style to a cell via a transaction (a `set` replaces value + style, so pass
 the current value back when only restyling):
@@ -3705,12 +3712,25 @@ const columns: Column[] = [
 ];
 ```
 
+A cell can override its column with its own `numberFormat` in `CellStyle`. The
+code `General` opts a cell out of its column's format:
+
+```ts
+grid.styleRange(
+  { sheet: "sheet1", start: { row: 0, col: 2 }, end: { row: 9, col: 2 } },
+  { numberFormat: "0.0%" },
+);
+```
+
+XLSX import keeps each cell's own format, so a column that mixes formats
+round-trips cell by cell.
+
 `formatNumber(value, code?, locale?)` is exported from `@sheetwrite/core`. It is
 a cached renderer for the supported Excel-style families:
 
 | Code | Example output |
 | --- | --- |
-| _(none)_ | `1234.5` → locale-default `1,234.5` |
+| _(none)_ or `General` | `1234.5` → locale-default `1,234.5` |
 | `0` | `1234.5` → `1235` |
 | `0.00` | `1234.5` → `1234.50` |
 | `#,##0.00` | `1234.5` → `1,234.50` |
@@ -5622,7 +5642,7 @@ Spreadsheet display text for a resolved scalar.
 ##### `CellStyle` — interface
 
 ```ts
-export interface CellStyle { bold?: boolean; italic?: boolean; underline?: boolean; strikethrough?: boolean; fontSize?: number; color?: string; backgroundColor?: string; align?: CellAlign; wrap?: boolean; border?: CellBorders; }
+export interface CellStyle { bold?: boolean; italic?: boolean; underline?: boolean; strikethrough?: boolean; fontSize?: number; fontFamily?: string; color?: string; backgroundColor?: string; align?: CellAlign; verticalAlign?: CellVerticalAlign; numberFormat?: string; wrap?: boolean; border?: CellBorders; }
 ```
 
 Serializable formatting applied to a cell or used as a column default.
@@ -5633,10 +5653,16 @@ Members:
 - `bold` — Uses the bold variant of the theme font.
 - `border` — Border overrides for the cell's individual sides.
 - `color` — hex color, e.g. "#111111"
+- `fontFamily` — Font family name, e.g. "Calibri". The theme font family stays the fallback,
+so a font the browser lacks renders in the theme font. Letters, digits,
+spaces, `.`, `_` and `-` only; at most 128 characters.
 - `fontSize` — Font size in unzoomed CSS pixels; zoom is applied during painting.
 - `italic` — Uses the italic variant of the theme font.
+- `numberFormat` — Excel number-format code for this cell, e.g. "0.00%". Overrides the
+column's `numberFormat`; at most 255 characters.
 - `strikethrough` — Draws a line through each rendered text run.
 - `underline` — Draws a line beneath each rendered text run.
+- `verticalAlign` — Vertical placement of cell text; omitted keeps text centered.
 - `wrap` — Wraps text within the cell width; row auto-fit accounts for the resulting line count.
 
 ##### `CellValue` — type
@@ -5648,6 +5674,14 @@ export type CellValue = | { kind: "literal"; value: CellScalar } | { kind: "ref"
 A cell's persisted input: a literal, a cross-reference, or a formula.
 References resolve through the store's reference graph; formulas resolve in
 the WASM calculation engine.
+
+##### `CellVerticalAlign` — type
+
+```ts
+export type CellVerticalAlign = "top" | "middle" | "bottom";
+```
+
+Vertical text placement within a cell's height.
 
 ##### `ChangeEvent` — interface
 
@@ -6318,12 +6352,13 @@ Members:
 ##### `formatNumber` — function
 
 ```ts
-(value: number | string, code?: string, locale?: string): string
+(value: number | string, format?: string, locale?: string): string
 ```
 
 Deterministic Excel-style number/date formatter. Supports explicit locale
 separators, percent/scientific notation, UTC date/time tokens, four-section
 positive/negative/zero/text codes, quoted literals, and backslash escapes.
+`General` formats exactly like an omitted code.
 
 ##### `fromCsv` — function
 
@@ -6829,6 +6864,16 @@ await initSheetwrite(undefined, formulas);
 /docs/guides/formulas/
 @see
 createGrid
+
+##### `isCellFontFamily` — function
+
+```ts
+(value: string): boolean
+```
+
+Whether `value` is a valid cell `fontFamily`: 1-128 letters, digits,
+spaces, `.`, `_` or `-`, starting with a letter or digit and not ending in a
+space. The same rule guards snapshots, hyperlinks, clipboard and XLSX import.
 
 ##### `isSafeExternalHyperlink` — function
 

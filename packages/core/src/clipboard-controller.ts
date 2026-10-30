@@ -1,5 +1,6 @@
 import { cellA1, shiftA1Refs } from "./a1.js";
 import { parseCellInput } from "./cell-input.js";
+import { isCellFontFamily, isCellNumberFormat, isCellVerticalAlign } from "./cell-style-fields.js";
 import {
   type ClipboardCell,
   type ClipboardSnapshot,
@@ -79,6 +80,9 @@ function clipboardHtml(snapshot: ClipboardSnapshot): string {
       if (style.color) css.push(`color:${style.color}`);
       if (style.backgroundColor) css.push(`background-color:${style.backgroundColor}`);
       if (style.align) css.push(`text-align:${style.align}`);
+      if (style.verticalAlign) css.push(`vertical-align:${style.verticalAlign}`);
+      // The family is validated to need no escaping beyond its quotes.
+      if (style.fontFamily) css.push(`font-family:"${style.fontFamily}"`);
       const styleAttr = css.length > 0 ? ` style="${escapeHtml(css.join(";"))}"` : "";
       const text =
         cell.resolved === null
@@ -249,6 +253,13 @@ function safeClipboardStyle(value: unknown): CellStyle {
   if (input.align === "left" || input.align === "center" || input.align === "right") {
     style.align = input.align;
   }
+  if (isCellVerticalAlign(input.verticalAlign)) style.verticalAlign = input.verticalAlign;
+  if (typeof input.fontFamily === "string" && isCellFontFamily(input.fontFamily)) {
+    style.fontFamily = input.fontFamily;
+  }
+  if (typeof input.numberFormat === "string" && isCellNumberFormat(input.numberFormat)) {
+    style.numberFormat = input.numberFormat;
+  }
   if (input.border && typeof input.border === "object" && !Array.isArray(input.border)) {
     const borders: NonNullable<CellStyle["border"]> = {};
     const borderInput = input.border as Record<string, unknown>;
@@ -330,9 +341,19 @@ function safeCssColor(value: string): string | undefined {
   return `#${channels.map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
 }
 
+/** The first family of a CSS `font-family` list, when it is a safe cell font family. */
+function htmlFontFamily(value: string): string | undefined {
+  const first = value
+    .split(",")[0]
+    ?.trim()
+    .replace(/^(["'])(.*)\1$/u, "$2");
+  return first !== undefined && isCellFontFamily(first) ? first : undefined;
+}
+
 function styleFromHtml(cell: HTMLElement): CellStyle | undefined {
   const decoration = cell.style.textDecoration.toLowerCase();
   const align = cell.style.textAlign;
+  const fontFamily = htmlFontFamily(cell.style.fontFamily);
   const style: CellStyle = {
     ...(cell.style.fontWeight === "bold" || Number(cell.style.fontWeight) >= 600
       ? { bold: true }
@@ -345,6 +366,10 @@ function styleFromHtml(cell: HTMLElement): CellStyle | undefined {
       ? { backgroundColor: safeCssColor(cell.style.backgroundColor) }
       : {}),
     ...(align === "left" || align === "center" || align === "right" ? { align } : {}),
+    ...(isCellVerticalAlign(cell.style.verticalAlign)
+      ? { verticalAlign: cell.style.verticalAlign }
+      : {}),
+    ...(fontFamily ? { fontFamily } : {}),
     ...(cell.style.whiteSpace.includes("pre-wrap") ? { wrap: true } : {}),
   };
   return Object.keys(style).length > 0 ? style : undefined;

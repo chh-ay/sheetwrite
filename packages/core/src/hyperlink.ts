@@ -1,3 +1,4 @@
+import { isCellFontFamily, isCellVerticalAlign } from "./cell-style-fields.js";
 import { SheetwriteError } from "./errors.js";
 import type { CellBorder, CellHyperlink, CellStyle, HyperlinkTarget } from "./types/cell.js";
 import type { CellAddress, Range } from "./types/coordinates.js";
@@ -29,9 +30,11 @@ const STYLE_KEYS = new Set([
   "underline",
   "strikethrough",
   "fontSize",
+  "fontFamily",
   "color",
   "backgroundColor",
   "align",
+  "verticalAlign",
   "wrap",
   "border",
 ]);
@@ -200,6 +203,14 @@ export function sanitizeHyperlinkStyle(value: unknown): CellStyle | null {
     return null;
   }
   if (style.align !== undefined) result.align = style.align;
+  if (style.fontFamily !== undefined) {
+    if (typeof style.fontFamily !== "string" || !isCellFontFamily(style.fontFamily)) return null;
+    result.fontFamily = style.fontFamily;
+  }
+  if (style.verticalAlign !== undefined) {
+    if (!isCellVerticalAlign(style.verticalAlign)) return null;
+    result.verticalAlign = style.verticalAlign;
+  }
   if (style.border !== undefined) {
     const borders = dataProperties(style.border, BORDER_SIDES);
     if (!borders) return null;

@@ -8,7 +8,7 @@ description: "Private-format MIME type used for rich Sheetwrite clipboard payloa
 Private-format MIME type used for rich Sheetwrite clipboard payloads.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/clipboard-controller.ts#L57"><code>packages/core/src/clipboard-controller.ts#L57</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/clipboard-controller.ts#L58"><code>packages/core/src/clipboard-controller.ts#L58</code></a></dd></div>
 </dl>
 
 ## Declaration

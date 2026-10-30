@@ -8,7 +8,7 @@ description: "API reference for @sheetwrite/core."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/index.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>322</dd></div>
+<div><dt>Exports</dt><dd>324</dd></div>
 </dl>
 
 Source entry: `packages/core/src/index.ts`
@@ -37,7 +37,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/xlsx-resource-error/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>XlsxResourceError</code></span><span class="api-symbol-card__desc">Stable resource-limit failure surfaced before an XLSX codec allocates unsafe data.</span></a>
 </div>
 
-### Functions <span class="api-count" data-pagefind-ignore>59</span>
+### Functions <span class="api-count" data-pagefind-ignore>60</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/assert-runtime-resource-snapshot/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>assertRuntimeResourceSnapshot</code></span><span class="api-symbol-card__desc">Reject overlap, negative values, and attempts to fold runtime observations into owner totals.</span></a>
@@ -61,6 +61,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/from-xlsx-workbook/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>fromXlsxWorkbook</code></span><span class="api-symbol-card__desc">Formula-preserving, multi-sheet workbook import through the optional XLSX backend.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/hyperlink-at/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>hyperlinkAt</code></span><span class="api-symbol-card__desc">Return the first validated hyperlink covering an address, or null when none does.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/init-sheetwrite/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>initSheetwrite</code></span><span class="api-symbol-card__desc">Load one WASM engine before createGrid.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/is-cell-font-family/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>isCellFontFamily</code></span><span class="api-symbol-card__desc">Whether value is a valid cell fontFamily: 1-128 letters, digits, spaces, ., or -, starting with a letter or digit and not ending in a space.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/is-safe-external-hyperlink/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>isSafeExternalHyperlink</code></span><span class="api-symbol-card__desc">Validate, but never activate or fetch, an external hyperlink target.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/is-sheetwrite-error/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>isSheetwriteError</code></span><span class="api-symbol-card__desc">Narrow same-realm errors, cross-realm errors, and serialized failure envelopes.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/is-sheetwrite-ready/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>isSheetwriteReady</code></span><span class="api-symbol-card__desc">Whether initSheetwrite has completed — the single readiness source.</span></a>
@@ -249,7 +250,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/xlsx-workbook-warning/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>XlsxWorkbookWarning</code></span><span class="api-symbol-card__desc">Structured fidelity warning emitted during XLSX conversion.</span></a>
 </div>
 
-### Types <span class="api-count" data-pagefind-ignore>81</span>
+### Types <span class="api-count" data-pagefind-ignore>82</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/aggregate-op/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>AggregateOp</code></span><span class="api-symbol-card__desc">Column aggregate operation for Grid.aggregate / Store data ops.</span></a>
@@ -262,6 +263,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/cell-load-state/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>CellLoadState</code></span><span class="api-symbol-card__desc">Datasource loading state for a resolved cell.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/cell-scalar/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>CellScalar</code></span><span class="api-symbol-card__desc">A scalar that can be displayed directly.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/cell-value/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>CellValue</code></span><span class="api-symbol-card__desc">A cell's persisted input: a literal, a cross-reference, or a formula.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/cell-vertical-align/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>CellVerticalAlign</code></span><span class="api-symbol-card__desc">Vertical text placement within a cell's height.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/column-filter/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>ColumnFilter</code></span><span class="api-symbol-card__desc">One column's filter predicate.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/comment-anchor/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>CommentAnchor</code></span><span class="api-symbol-card__desc">Document location to which a comment thread is attached.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/comment-coordinator-event/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>CommentCoordinatorEvent</code></span><span class="api-symbol-card__desc">State transition emitted by the comment coordinator.</span></a>

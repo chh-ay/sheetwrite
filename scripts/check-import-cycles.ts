@@ -95,6 +95,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "CellHyperlink",
       "CellStyle",
       "CellValue",
+      "CellVerticalAlign",
       "Column",
       "ConditionalFormatPredicate",
       "ConditionalFormatRule",

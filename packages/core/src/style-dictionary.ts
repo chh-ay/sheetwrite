@@ -4,6 +4,23 @@ import type { ResourceOwnerBytes } from "./types/store.js";
 const EMPTY: CellStyle = {};
 
 /**
+ * Interning key covering every `CellStyle` field: a field left out would make
+ * two styles that differ only in it share one id. The number format is
+ * JSON-quoted because format codes may contain `|`.
+ */
+function styleKey(style: CellStyle): string {
+  const border = style.border ? JSON.stringify(style.border) : "";
+  const numberFormat = style.numberFormat === undefined ? "" : JSON.stringify(style.numberFormat);
+  return `${style.bold ? 1 : 0}|${style.italic ? 1 : 0}|${style.underline ? 1 : 0}|${
+    style.strikethrough ? 1 : 0
+  }|${style.fontSize ?? ""}|${style.fontFamily ?? ""}|${style.color ?? ""}|${
+    style.backgroundColor ?? ""
+  }|${style.align ?? ""}|${style.verticalAlign ?? ""}|${style.wrap ? 1 : 0}|${numberFormat}|${border}`;
+}
+
+const EMPTY_KEY = styleKey(EMPTY);
+
+/**
  * Interns `CellStyle` objects to dense `u32` ids. The store keeps only the id
  * per cell (in WASM memory); this small dictionary holds the actual objects on
  * the JS side. Id `0` is always the empty/default style.
@@ -14,13 +31,8 @@ export class StyleDictionary {
 
   intern(style: CellStyle | undefined): number {
     if (!style) return 0;
-    const border = style.border ? JSON.stringify(style.border) : "";
-    const key = `${style.bold ? 1 : 0}|${style.italic ? 1 : 0}|${style.underline ? 1 : 0}|${
-      style.strikethrough ? 1 : 0
-    }|${style.fontSize ?? ""}|${style.color ?? ""}|${style.backgroundColor ?? ""}|${
-      style.align ?? ""
-    }|${style.wrap ? 1 : 0}|${border}`;
-    if (key === "0|0|0|0|||||0|") return 0;
+    const key = styleKey(style);
+    if (key === EMPTY_KEY) return 0;
     const existing = this.lookup.get(key);
     if (existing !== undefined) return existing;
     const id = this.styles.length;

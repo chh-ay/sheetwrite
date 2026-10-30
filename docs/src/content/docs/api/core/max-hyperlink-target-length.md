@@ -8,7 +8,7 @@ description: "External target ceiling, aligned with the bounded private clipboar
 External target ceiling, aligned with the bounded private clipboard payload.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/hyperlink.ts#L11"><code>packages/core/src/hyperlink.ts#L11</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/hyperlink.ts#L12"><code>packages/core/src/hyperlink.ts#L12</code></a></dd></div>
 </dl>
 
 ## Declaration
