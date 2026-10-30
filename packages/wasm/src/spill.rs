@@ -72,6 +72,11 @@ impl SpillRange {
     fn cols(self) -> usize {
         (self.col_end - self.anchor.1) as usize + 1
     }
+
+    /// Cells the range covers, its anchor included.
+    pub(crate) fn cells(self) -> usize {
+        ((self.row_end - self.anchor.0) as usize + 1) * self.cols()
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -379,6 +384,13 @@ impl SpillState {
     pub(crate) fn forget(&mut self, anchor: CellKey, cells: &mut CellStorage) {
         self.ranges.remove(&anchor);
         self.compact(cells);
+    }
+
+    /// Registers `range` as `anchor`'s attempt without filling it. A pivot
+    /// whose anchor shows an error keeps its anchor cell registered, so the
+    /// error is spill state that a write there detaches.
+    pub(crate) fn register_attempt(&mut self, range: SpillRange) {
+        self.ranges.insert(range.anchor, range);
     }
 
     /// Registers `range` as `anchor`'s attempt and checks that every

@@ -19,6 +19,7 @@ import {
 
 import { formulaContainsExternalReference, spillReferencesToXlsx } from "./formula.js";
 import { type ContentTypeOverride, contentTypesXml, relationshipsXml } from "./opc.js";
+import { preparePivots } from "./pivot.js";
 import {
   assertResource,
   checkAbort,
@@ -82,8 +83,8 @@ export interface WorkbookWriteHook {
   readonly workbookRelationships?: readonly ExtraRelationship[];
   readonly contentTypeOverrides?: readonly ContentTypeOverride[];
   readonly contentTypeDefaults?: readonly { extension: string; contentType: string }[];
-  /** `afterCalcPr` sits where CT_Workbook places `<pivotCaches>`. */
-  workbookXml?(ids: readonly string[]): { afterCalcPr?: string };
+  /** `<pivotCache>` elements for `workbookRelationships`; the writer wraps them in `<pivotCaches>`. */
+  workbookXml?(ids: readonly string[]): { pivotCaches?: readonly string[] };
   sheet?(
     sheet: SheetSnapshot,
     part: { sheetNumber: number; name: string },
@@ -125,7 +126,14 @@ function hasExactBorderWidth(style: CellStyle | undefined): boolean {
   );
 }
 
-function metadataSnapshot(snapshot: WorkbookSnapshot): WorkbookSnapshot {
+/**
+ * Workbook metadata for the hidden sheet. The saved output of a native pivot
+ * is left out: the worksheet holds it as the pivot's rendered cells.
+ */
+function metadataSnapshot(
+  snapshot: WorkbookSnapshot,
+  nativePivots: ReadonlySet<string>,
+): WorkbookSnapshot {
   const { xlsxSource: _source, ...workbook } = snapshot.workbook;
   return {
     ...snapshot,
@@ -133,6 +141,15 @@ function metadataSnapshot(snapshot: WorkbookSnapshot): WorkbookSnapshot {
     sheets: snapshot.sheets.map((sheet) => ({
       ...sheet,
       columns: sheet.columns.map((column) => ({ ...column })),
+      ...(sheet.pivots
+        ? {
+            pivots: sheet.pivots.map((pivot) => {
+              if (!pivot.savedOutput || !nativePivots.has(pivot.id)) return pivot;
+              const { savedOutput: _saved, ...definition } = pivot;
+              return definition;
+            }),
+          }
+        : {}),
       cells: sheet.cells.flatMap((block) => {
         const preserved = block.cells
           .filter((cell) => cell.value.kind === "ref" || hasExactBorderWidth(cell.style))
@@ -645,6 +662,7 @@ function* writeSheet(
   sheetNumber: number,
   tableStartId: number,
   hook?: WorkbookWriteHook,
+  pivotRelationships: readonly ExtraRelationship[] = [],
 ): Generator<Uint8Array, SheetWriteResult> {
   const byRow = new Map<number, AbsoluteCell[]>();
   for (const block of sheet.cells) {
@@ -886,6 +904,10 @@ function* writeSheet(
     relationshipEntries.push({ ...relationship, id });
     return id;
   });
+  // Pivot tables have no worksheet element; Excel finds them through relationships.
+  for (const relationship of pivotRelationships) {
+    relationshipEntries.push({ ...relationship, id: `rId${nextRelationshipId++}` });
+  }
   xml.append(sheetHook?.beforeLegacyDrawing?.(extraIds) ?? "");
   if (legacyDrawingId) xml.append(`<legacyDrawing r:id="${legacyDrawingId}"/>`);
   nextRelationshipId = Math.max(nextRelationshipId, 3);
@@ -918,8 +940,12 @@ function* writeSheet(
   return { relationships, comments, vml, tables };
 }
 
-function metadataSheetXml(snapshot: WorkbookSnapshot, context: XlsxCodecContext): Uint8Array {
-  const json = JSON.stringify(canonicalJsonValue(metadataSnapshot(snapshot)));
+function metadataSheetXml(
+  snapshot: WorkbookSnapshot,
+  nativePivots: ReadonlySet<string>,
+  context: XlsxCodecContext,
+): Uint8Array {
+  const json = JSON.stringify(canonicalJsonValue(metadataSnapshot(snapshot, nativePivots)));
   const chunks = [META_MARKER];
   let chunkParts: string[] = [];
   let chunkBytes = 0;
@@ -966,8 +992,7 @@ function workbookXml(
   ordered: readonly SheetSnapshot[],
   metadataName: string,
   context: XlsxCodecContext,
-  hook?: WorkbookWriteHook,
-  extraIds: readonly string[] = [],
+  pivotCaches: readonly string[],
 ): Uint8Array {
   const xml = new XmlBuffer(context);
   xml.append('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
@@ -1020,7 +1045,8 @@ function workbookXml(
     xml.append("</definedNames>");
   }
   xml.append(`<calcPr fullCalcOnLoad="1"${iterationAttributes(snapshot)} forceFullCalc="1"/>`);
-  xml.append(hook?.workbookXml?.(extraIds).afterCalcPr ?? "");
+  // CT_Workbook places `<pivotCaches>` directly after `<calcPr>`.
+  if (pivotCaches.length > 0) xml.append(`<pivotCaches>${pivotCaches.join("")}</pivotCaches>`);
   xml.append("</workbook>");
   return xml.finish();
 }
@@ -1062,6 +1088,7 @@ function* writeWorkbookParts(
   snapshot = checked.value;
   const hook = resolveHook?.(snapshot);
   const ordered = [...snapshot.sheets].sort((left, right) => left.order - right.order);
+  const pivots = preparePivots(snapshot, ordered, context);
   const metadataName = metadataSheetName(snapshot);
   const styles = new StylesRegistry(context);
   const overrides: ContentTypeOverride[] = [
@@ -1087,9 +1114,10 @@ function* writeWorkbookParts(
         number,
         sheetTableId,
         hook,
+        pivots?.sheetRelationships(exportSheet.id),
       );
     }
-    yield { name: part, data: chunks(sheet) };
+    yield { name: part, data: chunks(pivots ? pivots.withSavedOutput(sheet) : sheet) };
     if (!result) throw new Error(`Sheetwrite: worksheet ${part} was not consumed before advancing`);
     overrides.push({ part, contentType: WORKSHEET_CONTENT });
     workbookRelationships.push({
@@ -1112,9 +1140,14 @@ function* writeWorkbookParts(
     }
     nextTableId += result.tables.length;
   }
+  for (const part of pivots?.parts ?? []) yield part;
+  overrides.push(...(pivots?.overrides ?? []));
   const metadataNumber = ordered.length + 1;
   const metadataPart = `xl/worksheets/sheet${metadataNumber}.xml`;
-  yield { name: metadataPart, data: metadataSheetXml(snapshot, context) };
+  yield {
+    name: metadataPart,
+    data: metadataSheetXml(snapshot, pivots?.nativeIds ?? new Set(), context),
+  };
   overrides.push({ part: metadataPart, contentType: WORKSHEET_CONTENT });
   workbookRelationships.push({
     id: `rId${metadataNumber}`,
@@ -1131,10 +1164,19 @@ function* writeWorkbookParts(
     workbookRelationships.push({ ...relationship, id });
     return id;
   });
+  const pivotIds = (pivots?.workbookRelationships ?? []).map((relationship, index) => {
+    const id = `rId${metadataNumber + 2 + extraIds.length + index}`;
+    workbookRelationships.push({ ...relationship, id });
+    return id;
+  });
+  const pivotCaches = [
+    ...(hook?.workbookXml?.(extraIds).pivotCaches ?? []),
+    ...(pivots?.pivotCaches(pivotIds) ?? []),
+  ];
   yield { name: "xl/styles.xml", data: styles.toXml() };
   yield {
     name: "xl/workbook.xml",
-    data: workbookXml(snapshot, ordered, metadataName, context, hook, extraIds),
+    data: workbookXml(snapshot, ordered, metadataName, context, pivotCaches),
   };
   yield {
     name: "xl/_rels/workbook.xml.rels",

@@ -8,10 +8,10 @@ description: "Exhaustive serializable operation union for workbook mutations."
 Exhaustive serializable operation union for workbook mutations.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L449"><code>packages/core/src/types/document.ts#L449</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L464"><code>packages/core/src/types/document.ts#L464</code></a></dd></div>
 </dl>
 
-## Variants <span class="api-count" data-pagefind-ignore>37</span>
+## Variants <span class="api-count" data-pagefind-ignore>39</span>
 
 <div class="api-variant-list" data-pagefind-ignore>
 <div class="api-variant">
@@ -362,6 +362,20 @@ Exhaustive serializable operation union for workbook mutations.
 ```
 
 </div>
+<div class="api-variant">
+
+```ts generated
+{ op: "setPivot"; sheet: SheetId; pivot: PivotDefinition }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ op: "removePivot"; sheet: SheetId; id: string }
+```
+
+</div>
 </div>
 
 ## Declaration
@@ -570,6 +584,16 @@ export type DocumentOp =
     }
   | {
       op: "removeChart";
+      sheet: SheetId;
+      id: string;
+    }
+  | {
+      op: "setPivot";
+      sheet: SheetId;
+      pivot: PivotDefinition;
+    }
+  | {
+      op: "removePivot";
       sheet: SheetId;
       id: string;
     };

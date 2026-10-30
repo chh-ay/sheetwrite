@@ -51,6 +51,7 @@ import type {
   Workbook,
   WorkbookSnapshot,
 } from "./document.js";
+import type { PivotDefinition, PivotResultView, PivotSourceField } from "./pivot.js";
 import type { CellRenderer, Theme } from "./render.js";
 import type { Store } from "./store.js";
 import type {
@@ -975,6 +976,24 @@ export interface Grid {
   removeValidationRule(id: string): ApplyTransactionResult;
   setProtectedRange(protectedRange: ProtectedRange): ApplyTransactionResult;
   removeProtectedRange(id: string): ApplyTransactionResult;
+  /** Clones of the pivot definitions on `sheet`, or on every sheet; no engine is needed. */
+  getPivots(sheet?: SheetId): PivotDefinition[];
+  /**
+   * Insert or replace a pivot as one undo entry. `sheet` defaults to the sheet
+   * that holds the pivot's ID, then to the active sheet. The pivot's
+   * `savedOutput` is removed, because it does not match a changed definition.
+   */
+  setPivot(pivot: PivotDefinition, sheet?: SheetId): ApplyTransactionResult;
+  /** Remove a pivot from `sheet` (default: the sheet that holds it) as one undo entry. */
+  removePivot(id: string, sheet?: SheetId): ApplyTransactionResult;
+  /** Source fields for the field list; empty on the default engine. */
+  getPivotFields(sheet: SheetId, id: string): PivotSourceField[];
+  /**
+   * Plain-JSON output of one pivot. The default engine reports the saved
+   * output (`saved`), or `unavailable` without one. Null when `sheet` holds
+   * no pivot with `id`.
+   */
+  getPivotResult(sheet: SheetId, id: string): PivotResultView | null;
   setProtectionResolver(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void;
   setNote(addr: CellAddress, text: string | null): ApplyTransactionResult;
   getNote(addr: CellAddress): string | null;

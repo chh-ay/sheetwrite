@@ -8,7 +8,7 @@ description: "Sources accepted by synchronous initialization: raw module bytes o
 Sources accepted by synchronous initialization: raw module bytes or a precompiled `WebAssembly.Module`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L670"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L670</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L687"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L687</code></a></dd></div>
 </dl>
 
 ## Declaration

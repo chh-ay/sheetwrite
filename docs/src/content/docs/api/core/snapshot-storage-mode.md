@@ -8,7 +8,7 @@ description: "Allocation mode used when enforcing snapshot construction capacity
 Allocation mode used when enforcing snapshot construction capacity.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L339"><code>packages/core/src/document-protocol.ts#L339</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L345"><code>packages/core/src/document-protocol.ts#L345</code></a></dd></div>
 </dl>
 
 ## Declaration

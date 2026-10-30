@@ -40,6 +40,7 @@ import {
 
 import { formulaContainsExternalReference, spillReferencesFromXlsx } from "./formula.js";
 import { OpcPackage, type OpcRelationship, relationshipTypeMatches } from "./opc.js";
+import { readPivots } from "./pivot.js";
 import { capturePreserved, isRetainedRelationship } from "./preservation.js";
 import {
   assertResource,
@@ -2043,6 +2044,28 @@ function externalNamedRanges(
   return ranges.length > 0 ? ranges : undefined;
 }
 
+/** Grow `sheet` so that `row` and `col` lie inside it; references may point past the cells. */
+function extendSheet(sheet: SheetSnapshot, row: number, col: number): void {
+  sheet.rowCount = Math.max(sheet.rowCount, row + 1);
+  if (sheet.columns.length <= col) {
+    const keys = new Set(sheet.columns.map((column) => column.key));
+    while (sheet.columns.length <= col) {
+      const index = sheet.columns.length;
+      const stem = `column${index + 1}`;
+      let key = stem;
+      let suffix = 2;
+      while (keys.has(key)) key = `${stem}_${suffix++}`;
+      keys.add(key);
+      sheet.columns.push({ key, header: colToA1(index), width: 75, type: "text" });
+    }
+  }
+  const block = sheet.cells[0];
+  if (block) {
+    block.rowCount = Math.max(block.rowCount, sheet.rowCount);
+    block.colCount = Math.max(block.colCount, sheet.columns.length);
+  }
+}
+
 /** Read a preflighted OOXML workbook into Sheetwrite's implementation-neutral snapshot. */
 export async function readWorkbook(
   data: Blob | ArrayBuffer | Uint8Array,
@@ -2548,30 +2571,7 @@ export async function readWorkbook(
   }
   for (const namedRange of namedRanges ?? []) {
     const sheet = sheets.find((candidate) => candidate.id === namedRange.range.sheet);
-    if (!sheet) continue;
-    sheet.rowCount = Math.max(sheet.rowCount, namedRange.range.end.row + 1);
-    if (sheet.columns.length <= namedRange.range.end.col) {
-      const keys = new Set(sheet.columns.map((column) => column.key));
-      while (sheet.columns.length <= namedRange.range.end.col) {
-        const col = sheet.columns.length;
-        const stem = `column${col + 1}`;
-        let key = stem;
-        let suffix = 2;
-        while (keys.has(key)) key = `${stem}_${suffix++}`;
-        keys.add(key);
-        sheet.columns.push({
-          key,
-          header: colToA1(col),
-          width: 75,
-          type: "text",
-        });
-      }
-    }
-    const block = sheet.cells[0];
-    if (block) {
-      block.rowCount = Math.max(block.rowCount, sheet.rowCount);
-      block.colCount = Math.max(block.colCount, sheet.columns.length);
-    }
+    if (sheet) extendSheet(sheet, namedRange.range.end.row, namedRange.range.end.col);
   }
   const calculation = workbookCalculation(workbookRoot);
   const snapshot: WorkbookSnapshot = {
@@ -2586,8 +2586,18 @@ export async function readWorkbook(
     sheets,
   };
   if (metadata) restoreSidecarFields(snapshot, metadata);
+  const modelledPivotParts = await readPivots(
+    packageFile,
+    {
+      snapshot,
+      sheetParts: sourceReferences.map((reference) => reference.relationship.target),
+      metadata,
+      extendSheet,
+    },
+    context,
+  );
   if (readOptions.preserveOpaqueParts !== false)
-    await capturePreserved(packageFile, snapshot, context);
+    await capturePreserved(packageFile, snapshot, context, modelledPivotParts);
   const checked = validateCodecSnapshot(snapshot, context);
   if (!checked.ok) {
     throw new TypeError(

@@ -8,7 +8,7 @@ description: "Whether the WASM module has finished initializing."
 Whether the WASM module has finished initializing.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/loader.d.ts#L34"><code>packages/wasm/loader.d.ts#L34</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/loader.d.ts#L47"><code>packages/wasm/loader.d.ts#L47</code></a></dd></div>
 </dl>
 
 ## Declaration

@@ -2,7 +2,7 @@ import * as defaultEngine from "@sheetwrite/wasm";
 
 /** A complete engine module from `@sheetwrite/wasm` or `@sheetwrite/formulas`. */
 export interface SheetwriteEngine {
-  CellStore: typeof defaultEngine.CellStore;
+  CellStore: defaultEngine.EngineInstance["CellStore"];
   load: typeof defaultEngine.load;
   isLoaded: typeof defaultEngine.isLoaded;
   createEngine: typeof defaultEngine.createEngine;

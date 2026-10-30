@@ -9,7 +9,7 @@ Instantiates the given `module`, which can either be bytes or
 a precompiled `WebAssembly.Module`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/pkg/sheetwrite_wasm.d.ts#L686"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L686</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/pkg/sheetwrite_wasm.d.ts#L734"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L734</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -41,6 +41,6 @@ function initSync(
 <p class="api-consumers-label">Public exports naming <code>initSync</code></p>
 
 <ul class="api-consumer-list">
-<li>None.</li>
+<li><a href="/docs/api/wasm/engine-instance/"><code>EngineInstance</code></a><span class="api-consumer-kind">@sheetwrite/wasm</span></li>
 </ul>
 </div>

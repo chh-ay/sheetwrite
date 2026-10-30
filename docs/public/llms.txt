@@ -125,12 +125,16 @@ Sheetwrite packages are released together at version 0.5.4. This index is genera
 - [Sheetwrite 0.5.1](https://sheetwrite.vercel.app/docs/releases/0.5.1/): Typed shortcuts, busy states and visible command errors, restored column sum performance, redesigned documentation, and the upgrade checklist for Sheetwrite 0.5.1.
 - [Sheetwrite 0.5.0](https://sheetwrite.vercel.app/docs/releases/0.5.0/): The full formula engine, spill references, large undo, in-place conflict recovery, engine memory release, bounded string storage, faster loading and import, breaking changes, every fix, and the upgrade checklist for Sheetwrite 0.5.0.
 
+## More guides
+
+- [Pivot tables](https://sheetwrite.vercel.app/docs/features/pivot-tables/): Summarize a range or a table into a pivot table: define rows, columns, values and filters, read the result for a field list, and keep the definition through edits, undo, snapshots and collaboration.
+
 ## Public API
 
 - [API reference](https://sheetwrite.vercel.app/docs/api/): Generated reference for every classified Sheetwrite package entry point.
 - [`@sheetwrite/charts`](https://sheetwrite.vercel.app/docs/api/charts/): 12 exports across 2 entry points (primary entry point: supported).
-- [`@sheetwrite/core`](https://sheetwrite.vercel.app/docs/api/core/): 360 exports across 10 entry points (primary entry point: supported).
-- [`@sheetwrite/formulas`](https://sheetwrite.vercel.app/docs/api/formulas/): 16 exports across 2 entry points (primary entry point: internal).
+- [`@sheetwrite/core`](https://sheetwrite.vercel.app/docs/api/core/): 370 exports across 10 entry points (primary entry point: supported).
+- [`@sheetwrite/formulas`](https://sheetwrite.vercel.app/docs/api/formulas/): 17 exports across 2 entry points (primary entry point: internal).
 - [`@sheetwrite/react`](https://sheetwrite.vercel.app/docs/api/react/): 19 exports across 2 entry points (primary entry point: supported).
 - [`@sheetwrite/svelte`](https://sheetwrite.vercel.app/docs/api/svelte/): 19 exports across 2 entry points (primary entry point: supported).
 - [`@sheetwrite/vue`](https://sheetwrite.vercel.app/docs/api/vue/): 22 exports across 2 entry points (primary entry point: supported).

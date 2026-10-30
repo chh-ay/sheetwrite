@@ -91,6 +91,22 @@ Row and column fields can have multiple columns. The functions support headers, 
 
 Grouping, aggregation, and output use the existing spill and work limits. Too much work or an oversized result returns `#NUM!`. An empty filtered result returns `#CALC!`.
 
+## Pivot tables
+
+Pivot tables are separate from the `PIVOTBY` formula. The full engine
+exports `setPivots`, `pivotStatus`, and `pivotFields` for core's bulk pivot
+interface. The cache shares key and aggregation rules with `PIVOTBY`; it supports
+SUM, COUNT, AVERAGE, MIN, MAX, COUNTA, and DISTINCTCOUNT. A source-cell edit updates
+its old and new groups, not the whole source. With unchanged axes, only affected
+output groups are evaluated and written.
+
+Output uses the normal spill ownership rules, but does not create formula
+sources. A blocker or colliding pivot anchor reports `#SPILL!`; clearing the
+blocker or separating the anchors retries output. A pivot is limited to 100,000
+axis groups and 1,000,000 output cells; a larger result reports `#NUM!`.
+The memory statistics include the cache. Engine memory transfer does not save
+the cache: core resends definitions and the replacement engine rebuilds them.
+
 ## Contributors
 
 The Rust source is in `../wasm`. Do not add a second Rust crate here. Keep the loader contract the same as in `@sheetwrite/wasm`.

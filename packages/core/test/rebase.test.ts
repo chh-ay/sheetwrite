@@ -5,6 +5,7 @@ import {
   type CellValue,
   type Column,
   type DocumentOp,
+  type PivotDefinition,
   type Range,
   type RebaseConflictCode,
   rebaseDocumentOperations,
@@ -542,6 +543,61 @@ describe("metadata, identity, and sheet lifecycle", () => {
       value: literal("unrelated"),
     };
     expectRebased([unrelated], [{ op: "removeSheet", sheet: SHEET }], [unrelated]);
+  });
+
+  it("moves an addSheet snapshot pivot's range source and conflicts when an edit crosses it", () => {
+    const withPivot = (start: number, end: number): DocumentOp => {
+      const pivot: PivotDefinition = {
+        id: "pivot-1",
+        name: "Pivot",
+        source: { range: range("row", start, end) },
+        anchor: { row: 0, col: 0 },
+        rows: [0],
+        columns: [],
+        values: [{ field: 1, aggregation: "SUM" }],
+      };
+      return { op: "addSheet", sheet: { ...snapshot("new"), pivots: [pivot] } };
+    };
+
+    expectRebased([withPivot(6, 9)], [structure("row", "insert", 4, 2)], [withPivot(8, 11)]);
+    expectConflict([withPivot(6, 9)], [structure("row", "delete", 7, 2)], "structural-overlap");
+    expectConflict([withPivot(6, 9)], [{ op: "removeSheet", sheet: SHEET }], "sheet-removed");
+  });
+
+  it("keeps an addSheet snapshot pivot on its own table across a column edit on another sheet", () => {
+    const tableSheet = snapshot("new");
+    const local: DocumentOp = {
+      op: "addSheet",
+      sheet: {
+        ...tableSheet,
+        tables: [
+          {
+            id: "own-table",
+            name: "Own",
+            range: { sheet: "new", start: { row: 0, col: 0 }, end: { row: 4, col: 1 } },
+            columns: [
+              { id: "key", name: "Key" },
+              { id: "amount", name: "Amount" },
+            ],
+            headerRow: true,
+            totalsRow: false,
+          },
+        ],
+        pivots: [
+          {
+            id: "pivot-1",
+            name: "Pivot",
+            source: { table: "own-table" },
+            anchor: { row: 0, col: 3 },
+            rows: [0],
+            columns: [],
+            values: [{ field: 1, aggregation: "SUM" }],
+          },
+        ],
+      },
+    };
+
+    expectRebased([local], [structure("column", "insert", 1, 2)], [local]);
   });
 
   it("detects sheet-removal conflicts across representative operation families", () => {

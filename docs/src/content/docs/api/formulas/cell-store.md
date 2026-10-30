@@ -64,6 +64,8 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-pin-range"><code>pinRange</code></a>
 <a href="#cell-store-pin-read-window"><code>pinReadWindow</code></a>
 <a href="#cell-store-pin-viewport-bands"><code>pinViewportBands</code></a>
+<a href="#cell-store-pivot-fields"><code>pivotFields</code></a>
+<a href="#cell-store-pivot-status"><code>pivotStatus</code></a>
 <a href="#cell-store-pool-strings"><code>poolStrings</code></a>
 <a href="#cell-store-query-resource-stats"><code>queryResourceStats</code></a>
 <a href="#cell-store-range-fully-loaded"><code>rangeFullyLoaded</code></a>
@@ -95,6 +97,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-set-iterative-calculation"><code>setIterativeCalculation</code></a>
 <a href="#cell-store-set-named-range"><code>setNamedRange</code></a>
 <a href="#cell-store-set-number"><code>setNumber</code></a>
+<a href="#cell-store-set-pivots"><code>setPivots</code></a>
 <a href="#cell-store-set-sheet-name"><code>setSheetName</code></a>
 <a href="#cell-store-set-sheet-order"><code>setSheetOrder</code></a>
 <a href="#cell-store-set-sparse-block"><code>setSparseBlock</code></a>
@@ -116,7 +119,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-import-memory-state"><code>importMemoryState</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>102</span>
+## Members <span class="api-count" data-pagefind-ignore>105</span>
 
 <div class="api-member-list">
 
@@ -651,6 +654,29 @@ pinViewportBands: (sheet: number, bands: Uint32Array) => void;
 
 </details>
 
+<details class="api-member" id="cell-store-pivot-fields" data-pagefind-weight="1">
+<summary><code>pivotFields</code> <span class="api-member-summary">The fields of pivot index on sheet; empty while its source is invalid.</span></summary>
+
+```ts generated
+pivotFields: (sheet: number, index: number) => PivotFields;
+```
+
+</details>
+
+<details class="api-member" id="cell-store-pivot-status" data-pagefind-weight="1">
+<summary><code>pivotStatus</code> <span class="api-member-summary">One record per pivot of sheet, in the order sent: [error (0 ok, else error slot + 1), rowStart, colStart, rows, cols, headerRows, labelCols].</span></summary>
+
+```ts generated
+pivotStatus: (sheet: number) => Uint32Array;
+```
+
+<p class="api-member-doc">One record per pivot of `sheet`, in the order sent: `[error (0 ok,
+else error slot + 1), rowStart, colStart, rows, cols, headerRows,
+labelCols]`. A pivot with an error covers only its anchor, which
+shows the error, or nothing (0 × 0) when a source value or formula
+holds the anchor: that cell belongs to the user.</p>
+</details>
+
 <details class="api-member" id="cell-store-pool-strings" data-pagefind-weight="1">
 <summary><code>poolStrings</code></summary>
 
@@ -990,6 +1016,24 @@ setNamedRange: (name: string, scope: number, sheet: number, row_start: number, c
 setNumber: (sheet: number, row: number, col: number, value: number, style: number) => void;
 ```
 
+</details>
+
+<details class="api-member" id="cell-store-set-pivots" data-pagefind-weight="1">
+<summary><code>setPivots</code> <span class="api-member-summary">Replaces every pivot anchored on sheet with the packed definitions, concatenated per pivot: [id, sourceKind (0 range, 1 table, 2 invalid), sourceSheet | tableId, r0, c0, r1, c1, anchorRow, anchorCol, nRows,…</span></summary>
+
+```ts generated
+setPivots: (sheet: number, numbers: Float64Array, strings: string[]) => boolean;
+```
+
+<p class="api-member-doc">Replaces every pivot anchored on `sheet` with the packed definitions,
+concatenated per pivot: `[id, sourceKind (0 range, 1 table,
+2 invalid), sourceSheet | tableId, r0, c0, r1, c1, anchorRow,
+anchorCol, nRows, ...rowFields, nCols, ...colFields, nValues,
+...(field, aggregation, name | -1), nFilters, ...(field, nValues,
+...(kind, payload)), nSort, ...(axis, field, descending), flags]`.
+Text slots index `strings`. A pivot whose definition did not change
+keeps its cache. Output appears at the next recalculation. Returns
+`false`, changing nothing, for a malformed payload or a dead sheet.</p>
 </details>
 
 <details class="api-member" id="cell-store-set-sheet-name" data-pagefind-weight="1">
@@ -1383,6 +1427,8 @@ class CellStore {
     cols: Uint32Array,
   ) => void;
   pinViewportBands: (sheet: number, bands: Uint32Array) => void;
+  pivotFields: (sheet: number, index: number) => PivotFields;
+  pivotStatus: (sheet: number) => Uint32Array;
   poolStrings: (ids: Uint32Array) => string[];
   queryResourceStats: () => Float64Array;
   rangeFullyLoaded: (
@@ -1538,6 +1584,11 @@ class CellStore {
     value: number,
     style: number,
   ) => void;
+  setPivots: (
+    sheet: number,
+    numbers: Float64Array,
+    strings: string[],
+  ) => boolean;
   setSheetName: (sheet: number, id: string, name: string) => void;
   setSheetOrder: (order: Uint32Array) => boolean;
   setSparseBlock: (
@@ -1624,5 +1675,6 @@ class CellStore {
 
 <ul class="api-consumer-list">
 <li><a href="/docs/api/core/sheetwrite-engine/"><code>SheetwriteEngine</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/wasm/engine-instance/"><code>EngineInstance</code></a><span class="api-consumer-kind">@sheetwrite/wasm</span></li>
 </ul>
 </div>

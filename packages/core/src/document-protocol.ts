@@ -24,6 +24,12 @@ import {
   MAX_HYPERLINK_DISPLAY_LENGTH,
   MAX_HYPERLINKS_PER_SHEET,
 } from "./hyperlink.js";
+import {
+  clonePivot,
+  MAX_PIVOTS_PER_WORKBOOK,
+  validatePivotReferences,
+  validatePivotShape,
+} from "./pivot.js";
 import { preparedRestore } from "./transaction-preparation.js";
 import type { MergeRange, Range } from "./types/coordinates.js";
 import type {
@@ -484,6 +490,7 @@ const SHEET_METADATA_ARRAY_KEYS = [
   "rowGroups",
   "tables",
   "charts",
+  "pivots",
   "cells",
 ] as const;
 
@@ -1039,7 +1046,10 @@ export function assertWorkbookAllocationLimits(
       (sheet.rowGroups?.length ?? 0) +
       (sheet.tables?.length ?? 0) +
       (sheet.tables?.reduce((count, table) => count + table.columns.length, 0) ?? 0) +
-      (sheet.charts?.length ?? 0);
+      (sheet.charts?.length ?? 0) +
+      (sheet.pivots?.length ?? 0) +
+      (sheet.pivots?.reduce((count, pivot) => count + (pivot.savedOutput?.cells.length ?? 0), 0) ??
+        0);
     if (metadataEntries > limits.maxMetadataEntries) {
       throw new SnapshotResourceError(
         "maxMetadataEntries",
@@ -1852,6 +1862,10 @@ function validateSheetShape(value: unknown, path: string, errors: DocumentValida
       validateChartShape(chart, `${path}.charts[${index}]`, errors);
     });
   }
+  const pivots = optionalArray(sheet, "pivots", path, errors);
+  pivots?.forEach((pivot, index) => {
+    validatePivotShape(pivot, `${path}.pivots[${index}]`, errors);
+  });
 
   const blocks = arrayAt(ownValue(sheet, "cells"), `${path}.cells`, errors);
   blocks?.forEach((entry, blockIndex) => {
@@ -2429,7 +2443,12 @@ export function validateDocumentOperationShape(
       validateOperationSheetId(operation, path, errors);
       validateChartShape(ownValue(operation, "chart"), `${path}.chart`, errors);
       break;
+    case "setPivot":
+      validateOperationSheetId(operation, path, errors);
+      validatePivotShape(ownValue(operation, "pivot"), `${path}.pivot`, errors);
+      break;
     case "removeChart":
+    case "removePivot":
       validateOperationSheetId(operation, path, errors);
       requireString(operation, "id", path, errors, true);
       break;
@@ -2837,6 +2856,54 @@ function hasDuplicateCellAddress(sheet: SheetSnapshot): boolean {
   return false;
 }
 
+/**
+ * Pivot references may point at any sheet or table, including ones listed
+ * later, so they are checked after every sheet and table is known.
+ */
+function validateSnapshotPivots(
+  sheets: readonly SheetSnapshot[],
+  tables: readonly WorkbookTable[],
+  errors: DocumentValidationError[],
+): void {
+  const sheetSizes = new Map(
+    sheets.map((sheet) => [sheet.id, { rows: sheet.rowCount, cols: sheet.columns.length }]),
+  );
+  const tableWidths = new Map(tables.map((table) => [table.id, table.columns.length]));
+  const scope = {
+    sheetSize: (id: string) => sheetSizes.get(id),
+    tableWidth: (id: string) => tableWidths.get(id),
+  };
+  const ids = new Set<string>();
+
+  for (let sheetIndex = 0; sheetIndex < sheets.length; sheetIndex++) {
+    const sheet = sheets[sheetIndex];
+    if (!sheet?.pivots) continue;
+    const ownerSize = { rows: sheet.rowCount, cols: sheet.columns.length };
+    for (let index = 0; index < sheet.pivots.length; index++) {
+      const pivot = sheet.pivots[index];
+      if (!pivot) continue;
+      const path = `sheets[${sheetIndex}].pivots[${index}]`;
+      if (ids.has(pivot.id)) {
+        errors.push({
+          path: `${path}.id`,
+          code: "duplicate-id",
+          message: "Pivot IDs must be unique in the workbook",
+        });
+      }
+      ids.add(pivot.id);
+      if (ids.size > MAX_PIVOTS_PER_WORKBOOK) {
+        errors.push({
+          path,
+          code: "resource-limit",
+          message: `Workbook pivot limit ${MAX_PIVOTS_PER_WORKBOOK} exceeded`,
+        });
+        return;
+      }
+      validatePivotReferences(pivot, ownerSize, scope, path, errors);
+    }
+  }
+}
+
 function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
   const errors: DocumentValidationError[] = [];
   lastMergeValidationStats = { normalized: 0, nodeVisits: 0, errors: 0 };
@@ -3200,6 +3267,9 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
             .map((table) => structuredClone(table))
         : undefined,
       charts: sheet.charts?.map((chart) => structuredClone(chart)),
+      pivots: sheet.pivots
+        ? [...sheet.pivots].sort((a, b) => a.id.localeCompare(b.id)).map(clonePivot)
+        : undefined,
       cells: sheet.cells.map((block) => ({
         ...block,
         cells: [...block.cells].sort(
@@ -3217,6 +3287,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
     if (normalizedSheet.rowMeta === undefined) delete normalizedSheet.rowMeta;
     if (normalizedSheet.tables === undefined) delete normalizedSheet.tables;
     if (normalizedSheet.charts === undefined) delete normalizedSheet.charts;
+    if (normalizedSheet.pivots === undefined) delete normalizedSheet.pivots;
     normalizedSheets.push(normalizedSheet);
   }
 
@@ -3325,6 +3396,8 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
     }
   }
 
+  validateSnapshotPivots(validated.sheets, acceptedTables, errors);
+
   if (errors.length > 0) return { ok: false, errors };
   return {
     ok: true,
@@ -3414,6 +3487,8 @@ export function documentOpTarget(operation: DocumentOp): string {
     case "removeTable":
     case "setChart":
     case "removeChart":
+    case "setPivot":
+    case "removePivot":
       return operation.sheet;
     case "addSheet":
       return operation.sheet.id;

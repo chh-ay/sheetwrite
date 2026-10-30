@@ -11,6 +11,7 @@ import {
   takeAdmittedTransactionResources,
   validateDocumentOperationShape,
 } from "./document-protocol.js";
+import { clonePivots, pivotOwner, withoutSavedOutput } from "./pivot.js";
 import type {
   RuntimeMemoryObservation,
   RuntimeResourceOperation,
@@ -49,6 +50,7 @@ import type {
   WorkbookSnapshot,
   XlsxSourceSnapshot,
 } from "./types/document.js";
+import type { PivotDefinition, PivotResultView, PivotSourceField } from "./types/pivot.js";
 import type {
   CellLoadState,
   ClipboardWindowView,
@@ -184,7 +186,7 @@ export class SheetwriteStore implements Store {
         { cause: error },
       );
     }
-    this.policy = new StoreMutationPolicy(workbook);
+    this.policy = new StoreMutationPolicy(workbook, (sheet) => this.engine.pivotOutputs(sheet));
     this.protectionResolver = options.protectionResolver;
     this.mutationPolicy = options.mutationPolicy ?? "atomic";
     registerStoreEngine(this, this.engine);
@@ -232,6 +234,47 @@ export class SheetwriteStore implements Store {
   ): void {
     this.protectionResolver = resolver;
     this.mutationPolicy = mode;
+  }
+
+  /** Clones of the pivot definitions on `sheet`, or on every sheet; readable without the engine. */
+  getPivots(sheet?: SheetId): PivotDefinition[] {
+    return clonePivots(this.engine.getWorkbook().sheets, sheet);
+  }
+
+  /**
+   * Insert or replace a pivot. `sheet` defaults to the sheet that holds the
+   * pivot's ID, then to the active sheet. The pivot's `savedOutput` is
+   * removed: saved values do not match a definition the caller changed.
+   */
+  setPivot(pivot: PivotDefinition, sheet?: SheetId): ApplyTransactionResult {
+    const sheets = this.engine.getWorkbook().sheets;
+    const owner =
+      sheet ?? pivotOwner(sheets, pivot.id)?.id ?? this.engine.getWorkbook().activeSheet;
+    return this.applyTransaction(
+      { patches: [{ op: "setPivot", sheet: owner, pivot: withoutSavedOutput(pivot) }] },
+      "api",
+    );
+  }
+
+  /** Remove a pivot; `sheet` defaults to the sheet that holds it. */
+  removePivot(id: string, sheet?: SheetId): ApplyTransactionResult {
+    const owner = sheet ?? pivotOwner(this.engine.getWorkbook().sheets, id)?.id;
+    if (owner === undefined) return { status: "noop", epoch: this.epoch, reason: "out-of-bounds" };
+    return this.applyTransaction({ patches: [{ op: "removePivot", sheet: owner, id }] }, "api");
+  }
+
+  /** Source fields of one pivot; empty on the default engine or for an unknown pivot. */
+  getPivotFields(sheet: SheetId, id: string): PivotSourceField[] {
+    return this.engine.getPivotFields(sheet, id);
+  }
+
+  /**
+   * Plain-JSON output of one pivot. The default engine reports the saved
+   * output (`saved`), or `unavailable` without one. Null when `sheet` holds
+   * no pivot with `id`.
+   */
+  getPivotResult(sheet: SheetId, id: string): PivotResultView | null {
+    return this.engine.getPivotResult(sheet, id);
   }
 
   getRangeMutationAllocationStats(): RangeMutationAllocationStats {
@@ -624,6 +667,7 @@ export class SheetwriteStore implements Store {
         admittedResources !== undefined &&
           resourceResolution.admitted === admittedResources &&
           !this.protectionResolver,
+        source === "remote" || commitReason === "undo" || commitReason === "redo",
       );
       if (effects.appliedPatches.length === 0) {
         return {
@@ -869,6 +913,12 @@ export class SheetwriteStore implements Store {
           }
         } else if (operation.op === "setChart") {
           for (const range of chartSourceRanges(operation.chart)) requiredSheets.push(range.sheet);
+        } else if (
+          operation.op === "setPivot" &&
+          !operation.pivot.source.invalid &&
+          "range" in operation.pivot.source
+        ) {
+          requiredSheets.push(operation.pivot.source.range.sheet);
         }
       }
       const missingSheet = requiredSheets.find(

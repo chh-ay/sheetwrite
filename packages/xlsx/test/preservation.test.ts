@@ -176,6 +176,24 @@ function storeOf(snapshot: WorkbookSnapshot): SheetwriteStore {
   return SheetwriteStore.fromSnapshot(snapshot);
 }
 
+/** The pivot sample with values shown as "% of total", which no pivot definition can hold. */
+const OPAQUE_PIVOT_SAMPLE = "preserve-ExcelPivotTableSample.xlsx (% of total)";
+
+/** A corpus fixture, or the pivot sample rewritten so its pivots stay opaque parts. */
+async function load(file: string): Promise<Uint8Array> {
+  if (file !== OPAQUE_PIVOT_SAMPLE) return fixture(file);
+  const files = unzipSync(await fixture("preserve-ExcelPivotTableSample.xlsx"));
+  for (const part of ["xl/pivotTables/pivotTable1.xml", "xl/pivotTables/pivotTable2.xml"]) {
+    files[part] = strToU8(
+      strFromU8(files[part] ?? new Uint8Array()).replace(
+        'baseItem="0"/>',
+        'baseItem="0" showDataAs="percentOfTotal"/>',
+      ),
+    );
+  }
+  return zipSync(files);
+}
+
 beforeAll(async () => {
   await initSheetwrite();
   registerXlsxBackends();
@@ -193,7 +211,7 @@ describe("XLSX unmodelled-part preservation", () => {
       ],
     ],
     [
-      "preserve-ExcelPivotTableSample.xlsx",
+      OPAQUE_PIVOT_SAMPLE,
       [
         "xl/pivotTables/pivotTable1.xml",
         "xl/pivotCache/pivotCacheDefinition1.xml",
@@ -219,7 +237,7 @@ describe("XLSX unmodelled-part preservation", () => {
   ];
   for (const [file, parts] of unchanged) {
     it(`keeps the compressed bytes of ${file} parts and a valid package on open and save`, async () => {
-      const original = await fixture(file);
+      const original = await load(file);
       const snapshot = await fromXlsxWorkbook(original);
       const saved = await toXlsxWorkbook(snapshot);
 
@@ -238,9 +256,7 @@ describe("XLSX unmodelled-part preservation", () => {
   }
 
   it("writes pivot caches after calcPr with ids that resolve", async () => {
-    const saved = await toXlsxWorkbook(
-      await fromXlsxWorkbook(await fixture("preserve-ExcelPivotTableSample.xlsx")),
-    );
+    const saved = await toXlsxWorkbook(await fromXlsxWorkbook(await load(OPAQUE_PIVOT_SAMPLE)));
     const workbook = strFromU8(unzipSync(saved)["xl/workbook.xml"] ?? new Uint8Array());
 
     expect(workbook).toMatch(
@@ -251,9 +267,9 @@ describe("XLSX unmodelled-part preservation", () => {
   it("drops charts and pivots after a store edit on any sheet, with a warning", async () => {
     for (const [file, target] of [
       ["preserve-WithChart.xlsx", "xl/drawings/drawing1.xml"],
-      ["preserve-ExcelPivotTableSample.xlsx", "xl/pivotCache/pivotCacheDefinition1.xml"],
+      [OPAQUE_PIVOT_SAMPLE, "xl/pivotCache/pivotCacheDefinition1.xml"],
     ] as const) {
-      const store = storeOf(await fromXlsxWorkbook(await fixture(file)));
+      const store = storeOf(await fromXlsxWorkbook(await load(file)));
       const sheet = store.exportSnapshot().sheets[0]?.id ?? "";
       store.applyTransaction({
         patches: [

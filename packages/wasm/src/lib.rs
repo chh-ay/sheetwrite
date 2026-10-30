@@ -32,6 +32,8 @@ mod formula_reads;
 mod graph;
 #[cfg(feature = "formula-engine")]
 mod memory;
+#[cfg(feature = "analysis")]
+mod pivot;
 #[cfg(feature = "formula-engine")]
 mod query;
 #[cfg(feature = "formula-engine")]

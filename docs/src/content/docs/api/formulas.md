@@ -8,20 +8,21 @@ description: "API reference for @sheetwrite/formulas."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./loader.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>16</dd></div>
+<div><dt>Exports</dt><dd>17</dd></div>
 </dl>
 
 Source entry: `packages/formulas/loader.d.ts`
 
 ## Exported symbols
 
-### Classes <span class="api-count" data-pagefind-ignore>7</span>
+### Classes <span class="api-count" data-pagefind-ignore>8</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/formulas/cell-out/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>CellOut</code></span><span class="api-symbol-card__desc">Result of a single-cell read.</span></a>
 <a class="api-symbol-card" href="/docs/api/formulas/cell-snapshot/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>CellSnapshot</code></span><span class="api-symbol-card__desc">Resolved values of a sparse coordinate batch, one entry per requested cell.</span></a>
 <a class="api-symbol-card" href="/docs/api/formulas/cell-store/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>CellStore</code></span><span class="api-symbol-card__desc">The workbook-wide store: every sheet, one string pool.</span></a>
 <a class="api-symbol-card" href="/docs/api/formulas/distinct-column/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>DistinctColumn</code></span><span class="api-symbol-card__desc">Distinct-value scan result for one column: parallel kind/number/text arrays whose buffers are surrendered once through the take accessors.</span></a>
+<a class="api-symbol-card" href="/docs/api/formulas/pivot-fields/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>PivotFields</code></span><span class="api-symbol-card__desc">The names and types of a pivot's source fields, for the field list.</span></a>
 <a class="api-symbol-card" href="/docs/api/formulas/range-snapshot/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>RangeSnapshot</code></span><span class="api-symbol-card__desc">Opaque, store-local history payload for one dense rectangular cell block.</span></a>
 <a class="api-symbol-card" href="/docs/api/formulas/source-snapshot/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>SourceSnapshot</code></span><span class="api-symbol-card__desc">Compact serializable projection of persisted derived-cell sources and spill identity in one range.</span></a>
 <a class="api-symbol-card" href="/docs/api/formulas/window-view/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>WindowView</code></span><span class="api-symbol-card__desc">A bulk window of resolved cells, row-major over nrows x ncols.</span></a>

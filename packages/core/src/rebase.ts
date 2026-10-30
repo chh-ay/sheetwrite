@@ -5,6 +5,7 @@ import type { CellValue } from "./types/cell.js";
 import type { ChartDefinition, ChartRange } from "./types/chart.js";
 import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
 import type { DocumentOp, PackedCellBlock, SheetSnapshot, SnapshotCell } from "./types/document.js";
+import type { PivotDefinition } from "./types/pivot.js";
 
 /** Stable conservative-rebase conflict category. */
 export type RebaseConflictCode =
@@ -245,6 +246,7 @@ function remoteFootprint(operation: DocumentOp): DocumentOp {
     case "updateTable":
     case "setSheetMeta":
     case "setChart":
+    case "setPivot":
       return cloneJsonValue(operation);
     default:
       return { ...operation };
@@ -500,6 +502,8 @@ function transformDirectTarget(
         }
       }
       return null;
+    case "setPivot":
+      return transformPivot(operation.pivot, operation.sheet, change, operation.op);
     case "addSheet":
     case "removeSheet":
     case "renameSheet":
@@ -512,6 +516,7 @@ function transformDirectTarget(
     case "removeTable":
     case "setCalculation":
     case "removeChart":
+    case "removePivot":
       return null;
   }
 }
@@ -550,6 +555,48 @@ function transformChart(
   if (change.axis === "row") chart.anchor.row = index;
   else chart.anchor.col = index;
   return null;
+}
+
+/**
+ * Shift a privately owned pivot's anchor and live range source in place. A
+ * deleted anchor cell or a source that straddles the edit is a conflict.
+ * `tableSheet` is the sheet holding a table source, when the caller knows it.
+ */
+function transformPivot(
+  pivot: PivotDefinition,
+  owner: string,
+  change: Exclude<AxisChange, { kind: "move" }>,
+  operation: string,
+  tableSheet?: string,
+): TransformFailure | null {
+  const anchor = transformAddress({ sheet: owner, ...pivot.anchor }, change);
+  if (!anchor) return deletedTarget(operation);
+  pivot.anchor = { row: anchor.row, col: anchor.col };
+
+  const source = pivot.source;
+  if (source.invalid) return null;
+  if ("table" in source) {
+    // Field indices are table-column offsets. When the table's sheet is not
+    // known, any concurrent column edit may shift them.
+    const mayShift = tableSheet === undefined || tableSheet === change.sheet;
+    return change.axis === "column" && mayShift
+      ? {
+          code: "unsupported-structural",
+          message: "A table-sourced pivot cannot be rebased across a column edit",
+        }
+      : null;
+  }
+
+  // A range that straddles the edit changes size; one that moves whole keeps its fields.
+  const range = transformRange(source.range, change);
+  if (!range) return overlappingStructure(operation);
+  source.range = range;
+  return null;
+}
+
+/** Whether `pivot` summarizes a live range on `sheet`. */
+function pivotReadsSheet(pivot: PivotDefinition, sheet: string): boolean {
+  return !pivot.source.invalid && "range" in pivot.source && pivot.source.range.sheet === sheet;
 }
 
 function transformEmbeddedReferences(
@@ -617,6 +664,20 @@ function transformSheetSnapshot(
   }
   for (const chart of sheet.charts ?? []) {
     const failure = transformChart(chart, sheet.id, change, "addSheet");
+    if (failure) return failure;
+  }
+  for (const pivot of sheet.pivots ?? []) {
+    // A table in the snapshot lives on the new sheet, which no remote edit can touch.
+    const source = pivot.source;
+    const ownTable =
+      "table" in source && (sheet.tables?.some((table) => table.id === source.table) ?? false);
+    const failure = transformPivot(
+      pivot,
+      sheet.id,
+      change,
+      "addSheet",
+      ownTable ? sheet.id : undefined,
+    );
     if (failure) return failure;
   }
   return null;
@@ -844,10 +905,13 @@ function operationTouchesSheet(
             (cell) => cell.value.kind === "ref" && cell.value.target.sheet === sheet,
           ),
         ) ||
-        // A chart in the new sheet can read any other sheet.
-        (snapshot.charts?.some((chart) => chartTouchesSheet(chart, snapshot.id, sheet)) ?? false)
+        // A chart or pivot in the new sheet can read any other sheet.
+        (snapshot.charts?.some((chart) => chartTouchesSheet(chart, snapshot.id, sheet)) ?? false) ||
+        (snapshot.pivots?.some((pivot) => pivotReadsSheet(pivot, sheet)) ?? false)
       );
     }
+    case "setPivot":
+      return operation.sheet === sheet || pivotReadsSheet(operation.pivot, sheet);
     default:
       return "sheet" in operation && operation.sheet === sheet;
   }
@@ -910,6 +974,14 @@ function mutationRanges(operation: DocumentOp): Range[] {
       return [operation.table.range];
     case "updateTable":
       return operation.patch.range ? [operation.patch.range] : [];
+    case "setPivot":
+      return [
+        {
+          sheet: operation.sheet,
+          start: { ...operation.pivot.anchor },
+          end: { ...operation.pivot.anchor },
+        },
+      ];
     default:
       return [];
   }
@@ -947,6 +1019,10 @@ function operationIdentity(operation: DocumentOp): string {
     // Workbook-wide: concurrent calculation changes always conflict, nothing else does.
     case "setCalculation":
       return "calculation";
+    case "setPivot":
+      return `pivot:${operation.pivot.id}`;
+    case "removePivot":
+      return `pivot:${operation.id}`;
     default:
       return "";
   }

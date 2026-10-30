@@ -27,6 +27,7 @@ import { markStoredEntryVerified, type StoredZipEntry, validateStoredEntry } fro
  * - VBA, customXml and themes do not read cells and survive every edit.
  * - Images (drawings without charts) follow their sheet's row/column layout.
  * - Charts and pivots read cell values, so any edit to any sheet drops them.
+ *   Pivots the reader maps to definitions (pivot.ts) are not retained here.
  * - Parts that point into worksheets, tables, styles or the workbook part,
  *   whose bytes Sheetwrite rewrites, are dropped with a warning.
  */
@@ -263,13 +264,14 @@ function reachableParts(packageFile: OpcPackage, target: string): string[] | und
 
 /**
  * Record the parts Sheetwrite does not model on an imported snapshot. Only
- * their compressed payloads are copied; worksheet and other modelled parts are
- * never retained.
+ * their compressed payloads are copied; worksheet and other modelled parts,
+ * including the `modelled` pivot parts, are never retained.
  */
 export async function capturePreserved(
   packageFile: OpcPackage,
   snapshot: WorkbookSnapshot,
   context: XlsxCodecContext,
+  modelled: ReadonlySet<string>,
 ): Promise<void> {
   const workbookPart = packageFile.officeDocumentPart();
   const roots = graphRoots(
@@ -294,6 +296,7 @@ export async function capturePreserved(
 
   for (const root of roots) {
     checkAbort(context);
+    if (modelled.has(root.relationship.target)) continue;
     const parts = reachableParts(packageFile, root.relationship.target);
     if (!parts) {
       dropWarning(context, root.relationship.target, "it points at a missing or rewritten part");
@@ -564,16 +567,14 @@ export function preparePreserved(
     rootRelationships: graphs.filter((graph) => graph.owner === "root").map(absolute),
     workbookRelationships: workbookGraphs.map(absolute),
     workbookXml(ids) {
-      const caches = workbookGraphs.flatMap((graph, index) =>
+      const pivotCaches = workbookGraphs.flatMap((graph, index) =>
         graph.cacheId === undefined
           ? []
           : [
               `<pivotCache cacheId="${escapeXml(graph.cacheId)}" r:id="${escapeXml(ids[index] ?? "")}"/>`,
             ],
       );
-      return caches.length > 0
-        ? { afterCalcPr: `<pivotCaches>${caches.join("")}</pivotCaches>` }
-        : {};
+      return { pivotCaches };
     },
     sheet(sheet) {
       const sheetGraphs = graphs.filter(

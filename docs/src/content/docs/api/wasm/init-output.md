@@ -8,7 +8,7 @@ description: "Result of module initialization: the instantiated exports plus the
 Result of module initialization: the instantiated exports plus the shared linear memory.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L519"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L519</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L535"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L535</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -113,6 +113,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-set-iterative-calculation"><code>cellstore_setIterativeCalculation</code></a>
 <a href="#init-output-cellstore-set-named-range"><code>cellstore_setNamedRange</code></a>
 <a href="#init-output-cellstore-set-number"><code>cellstore_setNumber</code></a>
+<a href="#init-output-cellstore-set-saved-pivots"><code>cellstore_setSavedPivots</code></a>
 <a href="#init-output-cellstore-set-sheet-name"><code>cellstore_setSheetName</code></a>
 <a href="#init-output-cellstore-set-sheet-order"><code>cellstore_setSheetOrder</code></a>
 <a href="#init-output-cellstore-set-sparse-block"><code>cellstore_setSparseBlock</code></a>
@@ -162,7 +163,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-wbindgen-start"><code>__wbindgen_start</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>148</span>
+## Members <span class="api-count" data-pagefind-ignore>149</span>
 
 <div class="api-member-list">
 
@@ -1071,6 +1072,15 @@ readonly cellstore_setNamedRange: (a: number, b: number, c: number, d: number, e
 
 ```ts generated
 readonly cellstore_setNumber: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-set-saved-pivots" data-pagefind-weight="1">
+<summary><code>cellstore_setSavedPivots</code></summary>
+
+```ts generated
+readonly cellstore_setSavedPivots: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number) => number;
 ```
 
 </details>
@@ -2060,6 +2070,20 @@ export interface InitOutput {
     e: number,
     f: number,
   ) => void;
+  readonly cellstore_setSavedPivots: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+    g: number,
+    h: number,
+    i: number,
+    j: number,
+    k: number,
+    l: number,
+  ) => number;
   readonly cellstore_setSheetName: (
     a: number,
     b: number,
@@ -2253,6 +2277,7 @@ export interface InitOutput {
 
 <ul class="api-consumer-list">
 <li><a href="/docs/api/formulas/init-sync/"><code>initSync</code></a><span class="api-consumer-kind">@sheetwrite/formulas</span></li>
+<li><a href="/docs/api/wasm/engine-instance/"><code>EngineInstance</code></a><span class="api-consumer-kind">@sheetwrite/wasm</span></li>
 <li><a href="/docs/api/wasm/init-sync/"><code>initSync</code></a><span class="api-consumer-kind">@sheetwrite/wasm</span></li>
 </ul>
 </div>

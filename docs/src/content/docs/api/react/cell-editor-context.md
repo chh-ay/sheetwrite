@@ -8,7 +8,7 @@ description: "Immutable state and guarded completion callbacks for one mounted e
 Immutable state and guarded completion callbacks for one mounted editor.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/types/grid.d.ts#L22"><code>packages/core/dist/types/grid.d.ts#L22</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/types/grid.d.ts#L23"><code>packages/core/dist/types/grid.d.ts#L23</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>

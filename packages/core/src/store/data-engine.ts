@@ -23,6 +23,22 @@ import {
   sanitizeCellHyperlink,
 } from "../hyperlink.js";
 import {
+  applyPivotRewrites,
+  clonePivot,
+  encodePivotPayload,
+  encodeSavedPivotPayload,
+  MAX_PIVOTS_PER_WORKBOOK,
+  type PivotIssue,
+  pivotOwner,
+  pivotRewrites,
+  planPivotEdit,
+  savedOutputRange,
+  sheetPivotScope,
+  uncomputedPivotResult,
+  validatePivotReferences,
+  validatePivotShape,
+} from "../pivot.js";
+import {
   consumeSourceSnapshot,
   type RangeSourceProjection,
   referenceTargetFromPacked,
@@ -81,6 +97,12 @@ import type {
   WorkbookSnapshot,
 } from "../types/document.js";
 import type {
+  PivotDefinition,
+  PivotFieldType,
+  PivotResultView,
+  PivotSourceField,
+} from "../types/pivot.js";
+import type {
   CellLoadState,
   ClipboardWindowView,
   PagedStoreStats,
@@ -107,7 +129,9 @@ import {
   normalizedRange,
   normalizeMerge,
   patchSheetId,
+  pivotWrittenRange,
   positiveCount,
+  rangesIntersect,
   rebaseRangeCols,
   rebaseRangeRows,
   remapSpan,
@@ -131,6 +155,59 @@ import { StoreWindowReader } from "./window-reader.js";
 import { KIND_BOOL, KIND_FORMULA, KIND_NUMBER, KIND_STRING } from "./wire-tags.js";
 
 const AGG_OP: Record<AggregateOp, number> = { sum: 0, avg: 1, min: 2, max: 3, count: 4 };
+
+/** Engine field-type codes, indexed by code. */
+const PIVOT_FIELD_TYPES: readonly PivotFieldType[] = [
+  "blank",
+  "number",
+  "text",
+  "boolean",
+  "mixed",
+];
+
+/** `pivotStatus` values per pivot: error, row, col, rows, cols, headerRows, labelCols. */
+const PIVOT_STATUS_STRIDE = 7;
+
+/** Error sentinels by engine `FormulaError` slot; `pivotStatus` sends slot + 1. */
+const PIVOT_ERRORS: readonly string[] = [
+  "#CYCLE!",
+  "#DIV/0!",
+  "#REF!",
+  "#NUM!",
+  "#VALUE!",
+  "#NAME?",
+  "#N/A",
+  "#SPILL!",
+  "#CALC!",
+  "#LOADING!",
+  "#NULL!",
+];
+
+interface PivotStatusRecord {
+  /** 0 when the output rendered; otherwise the anchor shows an error. */
+  readonly error: number;
+  readonly row: number;
+  readonly col: number;
+  readonly rows: number;
+  readonly cols: number;
+  readonly headerRows: number;
+  readonly labelCols: number;
+}
+
+function pivotStatusAt(status: Uint32Array, index: number): PivotStatusRecord | null {
+  const base = index * PIVOT_STATUS_STRIDE;
+  if (base + PIVOT_STATUS_STRIDE > status.length) return null;
+  const at = (offset: number): number => status[base + offset] ?? 0;
+  return {
+    error: at(0),
+    row: at(1),
+    col: at(2),
+    rows: at(3),
+    cols: at(4),
+    headerRows: at(5),
+    labelCols: at(6),
+  };
+}
 
 /** Rows per allocation-lazy chunk; this matches the store engine's native default. */
 const DEFAULT_PAGED_CHUNK_ROWS = 4_096;
@@ -365,6 +442,8 @@ export class StoreDataEngine {
   private disposed = false;
   private committedBytesAfterDispose: number | null = null;
   private readonly spillBlockersDirty = new Set<SheetId>();
+  /** Sheets whose pivots must be sent to the engine before the mutation commits. */
+  private readonly pivotSheetsDirty = new Set<SheetId>();
 
   private readonly rangeHistory = new Map<
     CompactRangeHistory,
@@ -463,6 +542,7 @@ export class StoreDataEngine {
         throw new Error(`invalid named range: ${namedRange.name}`);
       }
     }
+    this.loadPivots();
 
     // Before any cell is loaded, so formulas compute once under the stored limits.
     // Defaults need no engine call and are dropped to keep snapshots unchanged.
@@ -476,6 +556,8 @@ export class StoreDataEngine {
 
     if (data) {
       this.withResourceOperation("ingest", () => this.loadColumnar(workbook.activeSheet, data));
+    } else if (workbook.sheets.some((sheet) => sheet.pivots?.length)) {
+      this.wasm.commitSources();
     }
     this.resourceOperation = null;
   }
@@ -636,6 +718,88 @@ export class StoreDataEngine {
       if (sheet) this.syncSpillBlockers(sheet);
     }
     this.spillBlockersDirty.clear();
+  }
+
+  /** Validate every loaded pivot against the whole workbook, then install them. */
+  private loadPivots(): void {
+    const ids = new Set<string>();
+    for (const sheet of this.workbook.sheets) {
+      for (const [index, pivot] of (sheet.pivots ?? []).entries()) {
+        const issues = this.pivotIssues(pivot, sheet, this.workbook.sheets);
+        if (ids.has(pivot.id) || ids.size >= MAX_PIVOTS_PER_WORKBOOK || issues.length > 0) {
+          this.wasm.free();
+          const reason = issues[0]?.message ?? "Pivot IDs must be unique within the limit";
+          throw new Error(`invalid pivot ${sheet.id}.pivots[${index}]: ${reason}`);
+        }
+        ids.add(pivot.id);
+      }
+      if (sheet.pivots?.length) this.syncPivots(sheet);
+    }
+  }
+
+  private pivotIssues(pivot: unknown, owner: Sheet, sheets: readonly Sheet[]): PivotIssue[] {
+    const issues: PivotIssue[] = [];
+    validatePivotShape(pivot, "pivot", issues);
+    if (issues.length > 0) return issues;
+
+    // Shape validation above proves the definition schema.
+    validatePivotReferences(
+      pivot as PivotDefinition,
+      { rows: owner.rowCount, cols: owner.columns.length },
+      sheetPivotScope(sheets),
+      "pivot",
+      issues,
+    );
+    return issues;
+  }
+
+  /** The full engine gets every definition; the default engine only saved output. */
+  private syncPivots(sheet: Sheet, wasm: RecomputingCellStore = this.wasm): void {
+    const pivots = sheet.pivots ?? [];
+    if (!wasm.setPivots) {
+      if (!wasm.setSavedPivots) {
+        if (pivots.some((pivot) => pivot.savedOutput !== undefined)) {
+          throw new Error("Engine cannot install saved pivot output");
+        }
+        return;
+      }
+      const saved = encodeSavedPivotPayload(pivots);
+      this.boundaryAccounting.record(
+        this.resourceOperation ?? "edit",
+        "js-to-wasm",
+        saved.layout.byteLength +
+          saved.kinds.byteLength +
+          saved.numbers.byteLength +
+          saved.textLengths.byteLength,
+        "bulk",
+      );
+      const handle = this.handleOf(sheet.id);
+      const { layout, kinds, numbers, text, textLengths } = saved;
+      if (!wasm.setSavedPivots(handle, layout, kinds, numbers, text, textLengths)) {
+        throw new RangeError(`saved pivot payload rejected for sheet: ${sheet.id}`);
+      }
+      return;
+    }
+
+    const payload = encodePivotPayload(pivots, (id) => this.handles.get(id));
+    this.boundaryAccounting.record(
+      this.resourceOperation ?? "edit",
+      "js-to-wasm",
+      payload.numbers.byteLength,
+      "bulk",
+    );
+    if (!wasm.setPivots(this.handleOf(sheet.id), payload.numbers, payload.strings)) {
+      throw new RangeError(`pivot payload rejected for sheet: ${sheet.id}`);
+    }
+  }
+
+  /** Runs inside the mutation, so the engine renders pivots at the commit barrier. */
+  private flushPivots(): void {
+    for (const sheetId of this.pivotSheetsDirty) {
+      const sheet = this.workbook.sheets.find((candidate) => candidate.id === sheetId);
+      if (sheet) this.syncPivots(sheet);
+    }
+    this.pivotSheetsDirty.clear();
   }
 
   private spillAnchor(addr: CellAddress): CellAddress | null {
@@ -1114,6 +1278,136 @@ export class StoreDataEngine {
     return this.workbook;
   }
 
+  private pivotCount(): number {
+    let count = 0;
+    for (const sheet of this.workbook.sheets) count += sheet.pivots?.length ?? 0;
+    return count;
+  }
+
+  /** Status record of the pivot at `index` on `sheet`, or null without engine support. */
+  private pivotStatusRecord(sheet: SheetId, index: number): PivotStatusRecord | null {
+    if (!this.wasm.pivotStatus) return null;
+    return pivotStatusAt(this.wasm.pivotStatus(this.handleOf(sheet)), index);
+  }
+
+  /**
+   * Rendered output rectangles of the pivots on `sheet`. The default engine
+   * has no `pivotStatus`, so the rectangle comes from the anchor and
+   * `savedOutput`, and counts only while the engine shows it: a blocked
+   * saved output owns no cells, so the user can clear its blocker.
+   */
+  pivotOutputs(sheet: SheetId): Array<{ id: string; range: Range }> {
+    const pivots = this.workbook.sheets.find((candidate) => candidate.id === sheet)?.pivots;
+    if (!pivots?.length) return [];
+    if (!this.wasm.pivotStatus) return this.savedPivotOutputs(sheet, pivots);
+
+    const status = this.wasm.pivotStatus(this.handleOf(sheet));
+    const outputs: Array<{ id: string; range: Range }> = [];
+    for (const [index, pivot] of pivots.entries()) {
+      const record = pivotStatusAt(status, index);
+      if (!record || record.rows === 0 || record.cols === 0) continue;
+      outputs.push({
+        id: pivot.id,
+        range: {
+          sheet,
+          start: { row: record.row, col: record.col },
+          end: { row: record.row + record.rows - 1, col: record.col + record.cols - 1 },
+        },
+      });
+    }
+    return outputs;
+  }
+
+  private savedPivotOutputs(
+    sheet: SheetId,
+    pivots: readonly PivotDefinition[],
+  ): Array<{ id: string; range: Range }> {
+    const outputs: Array<{ id: string; range: Range }> = [];
+    for (const pivot of pivots) {
+      const range = savedOutputRange(sheet, pivot);
+      if (!range) continue;
+      // An installed output owns its anchor; a blocked one does not.
+      const owner = this.spillAnchor({ sheet, row: range.start.row, col: range.start.col });
+      if (owner && owner.row === range.start.row && owner.col === range.start.col) {
+        outputs.push({ id: pivot.id, range });
+      }
+    }
+    return outputs;
+  }
+
+  /**
+   * Plain view of one pivot's output: one status call and one bulk read.
+   * Null when `sheet` holds no pivot with `id`.
+   */
+  getPivotResult(sheet: SheetId, id: string): PivotResultView | null {
+    const pivots = this.workbook.sheets.find((candidate) => candidate.id === sheet)?.pivots ?? [];
+    const index = pivots.findIndex((pivot) => pivot.id === id);
+    const pivot = pivots[index];
+    if (!pivot) return null;
+
+    const record = this.pivotStatusRecord(sheet, index);
+    if (!record) {
+      const result = uncomputedPivotResult(sheet, pivot);
+      if (!pivot.savedOutput) return result;
+      const owner = this.spillAnchor({ sheet, ...pivot.anchor });
+      if (owner && owner.row === pivot.anchor.row && owner.col === pivot.anchor.col) return result;
+      return { ...result, status: "error", error: "#SPILL!", rows: 0, cols: 0, cells: [] };
+    }
+
+    if (record.error !== 0) {
+      // An anchor that holds a source keeps it, so the code names the error, not the cell.
+      return {
+        status: "error",
+        error: PIVOT_ERRORS[record.error - 1] ?? "#VALUE!",
+        anchor: { sheet, row: record.row, col: record.col },
+        rows: 0,
+        cols: 0,
+        headerRows: 0,
+        labelCols: 0,
+        cells: [],
+      };
+    }
+
+    const cols = Array.from({ length: record.cols }, (_, offset) => record.col + offset);
+    const window = this.getDataWindow(
+      sheet,
+      { start: record.row, end: record.row + record.rows },
+      cols,
+    );
+    const cells = Array.from(window.values);
+    return {
+      status: "ok",
+      anchor: { sheet, row: record.row, col: record.col },
+      rows: record.rows,
+      cols: record.cols,
+      headerRows: record.headerRows,
+      labelCols: record.labelCols,
+      cells,
+    };
+  }
+
+  /** Source fields of one pivot; empty on the default engine or for an unknown pivot. */
+  getPivotFields(sheet: SheetId, id: string): PivotSourceField[] {
+    const index =
+      this.workbook.sheets
+        .find((candidate) => candidate.id === sheet)
+        ?.pivots?.findIndex((pivot) => pivot.id === id) ?? -1;
+    if (index < 0 || !this.wasm.pivotFields) return [];
+
+    const list = this.wasm.pivotFields(this.handleOf(sheet), index);
+    try {
+      const names = list.names();
+      const types = list.types();
+      return names.map((header, field) => ({
+        index: field,
+        header,
+        type: PIVOT_FIELD_TYPES[types[field] ?? 0] ?? "mixed",
+      }));
+    } finally {
+      list.free();
+    }
+  }
+
   private rawCell(addr: CellAddress): ResolvedCell {
     const cell = this.wasm.getCell(this.handleOf(addr.sheet), addr.row, addr.col);
     const resolved = resolvedScalar(cell.kind, cell.num, cell.string ?? null);
@@ -1244,15 +1538,26 @@ export class StoreDataEngine {
 
   /**
    * Whether any cell in the rectangle takes its value from elsewhere: a formula,
-   * a cross-reference or a spill child. Chart tracking calls it once per series
-   * range when its index is rebuilt, never per edit: the source capture walks
-   * every formula on the sheet. Callers clip the range to the sheet first.
+   * a cross-reference, a spill child or pivot output. Chart tracking calls it
+   * once per series range when its index is rebuilt, never per edit: the source
+   * capture walks every formula on the sheet. Callers clip the range to the
+   * sheet first.
    */
   chartSourcesComputed(range: Range): boolean {
+    const bounds = normalizedRange(range);
+
+    // The engine writes pivot output with no document op on its cells. The output
+    // grows down and right from the anchor like a spill, so a pivot anchored at or
+    // above-left of the range end can reach it. This model test is cheap, so do it first.
+    const pivots = this.workbook.sheets.find((sheet) => sheet.id === bounds.sheet)?.pivots ?? [];
+    const pivotReaches = pivots.some(
+      (pivot) => pivot.anchor.row <= bounds.end.row && pivot.anchor.col <= bounds.end.col,
+    );
+    if (pivotReaches) return true;
+
     // Spill children carry no source of their own, so the source capture cannot see them.
     if (this.hasSpillChildren(range)) return true;
 
-    const bounds = normalizedRange(range);
     // Include anchors above and left: an existing spill may grow into this range
     // after a precedent changes. This conservatively follows those formulas too.
     // Not `captureSourceProjection`: that one counts toward range-mutation statistics.
@@ -1748,6 +2053,49 @@ export class StoreDataEngine {
     );
   }
 
+  /**
+   * Peer operations and history may restore a source that blocks derived
+   * output. Uninstall only the pivots whose output a replayed write touches;
+   * `flushPivots` reinstalls them at the barrier. The engine keeps the caches
+   * of unchanged definitions, so other pivots on the sheet are not rebuilt.
+   */
+  private releaseReplayedPivotOutputs(patches: readonly DocumentOp[]): void {
+    // One status call per sheet, not per patch; null marks a sheet without pivots.
+    const outputsBySheet = new Map<SheetId, Array<{ id: string; range: Range }> | null>();
+    const releasedBySheet = new Map<SheetId, Set<string>>();
+    for (const patch of patches) {
+      const sheetId = patchSheetId(patch);
+      if (sheetId === null) continue;
+      let outputs = outputsBySheet.get(sheetId);
+      if (outputs === undefined) {
+        const sheet = this.workbook.sheets.find((candidate) => candidate.id === sheetId);
+        outputs = sheet?.pivots?.length ? this.pivotOutputs(sheetId) : null;
+        outputsBySheet.set(sheetId, outputs);
+      }
+      if (!outputs?.length) continue;
+
+      const written = pivotWrittenRange(patch);
+      if (!written) continue;
+      for (const output of outputs) {
+        if (!rangesIntersect(output.range, written)) continue;
+        let released = releasedBySheet.get(sheetId);
+        if (!released) {
+          released = new Set();
+          releasedBySheet.set(sheetId, released);
+        }
+        released.add(output.id);
+      }
+    }
+
+    for (const [sheetId, released] of releasedBySheet) {
+      const sheet = this.workbook.sheets.find((candidate) => candidate.id === sheetId);
+      if (!sheet) continue;
+      const kept = (sheet.pivots ?? []).filter((pivot) => !released.has(pivot.id));
+      this.syncPivots({ ...sheet, pivots: kept });
+      this.pivotSheetsDirty.add(sheetId);
+    }
+  }
+
   /** Apply raw patches once; remote loads suppress paged dirty tracking. */
   applyPatches(
     patches: readonly DocumentOp[],
@@ -1755,6 +2103,7 @@ export class StoreDataEngine {
     captureChanges: boolean,
     captureDetailedChanges = false,
     trustedHistory = false,
+    replayPivotSources = false,
   ): StoreDataEngineEffects {
     const changes: ChangeEvent["changes"] | null = captureChanges ? [] : null;
     const appliedPatches: DocumentOp[] = [];
@@ -1766,8 +2115,16 @@ export class StoreDataEngine {
 
     if (remoteLoad) this.wasm.beginPageLoad();
     try {
+      if (replayPivotSources) this.releaseReplayedPivotOutputs(patches);
       for (const patch of patches) {
+        // Planned before the edit, from the same rule the undo inverse uses.
+        const pivotPlan = planPivotEdit(patch, this.workbook.sheets);
+        const rewrites = pivotPlan ? pivotRewrites(this.workbook.sheets, pivotPlan) : [];
         if (!this.applyPatch(patch, changes, captureDetailedChanges, trustedHistory)) continue;
+        if (rewrites.length > 0) {
+          applyPivotRewrites(this.workbook.sheets, rewrites);
+          for (const rewrite of rewrites) this.pivotSheetsDirty.add(rewrite.owner);
+        }
         appliedPatches.push(patch);
 
         if (patch.op === "set" || patch.op === "setNote") touchedSheets.add(patch.addr.sheet);
@@ -1806,6 +2163,7 @@ export class StoreDataEngine {
         for (const touched of touchedSheets) this.spillBlockersDirty.add(touched);
       }
       this.flushSpillBlockers();
+      this.flushPivots();
       if (appliedPatches.length === 0) return { appliedPatches, changes, storageRevision };
       this.rangeMutationStats.documentOperations += appliedPatches.length;
       this.rangeMutationStats.jsPatchObjects += appliedPatches.length;
@@ -2491,6 +2849,32 @@ export class StoreDataEngine {
         sheet.tables = [...sheet.tables!.slice(0, index), ...sheet.tables!.slice(index + 1)];
         return true;
       }
+      case "setPivot": {
+        const sheet = this.workbook.sheets.find((candidate) => candidate.id === patch.sheet);
+        if (!sheet || this.pivotIssues(patch.pivot, sheet, this.workbook.sheets).length > 0) {
+          return false;
+        }
+        const owner = pivotOwner(this.workbook.sheets, patch.pivot.id);
+        if (owner && owner !== sheet) return false;
+        if (!owner && this.pivotCount() >= MAX_PIVOTS_PER_WORKBOOK) return false;
+
+        const pivot = clonePivot(patch.pivot);
+        const pivots = sheet.pivots ?? [];
+        sheet.pivots = owner
+          ? pivots.map((current) => (current.id === pivot.id ? pivot : current))
+          : [...pivots, pivot];
+        this.pivotSheetsDirty.add(sheet.id);
+        return true;
+      }
+      case "removePivot": {
+        const sheet = this.workbook.sheets.find((candidate) => candidate.id === patch.sheet);
+        if (!sheet?.pivots?.some((pivot) => pivot.id === patch.id)) return false;
+        sheet.pivots = sheet.pivots.filter((pivot) => pivot.id !== patch.id);
+        // Free the output now, not at the barrier: a later write in the same
+        // batch may target the cells, and the engine refuses writes into output.
+        this.syncPivots(sheet);
+        return true;
+      }
       case "setSheetMeta": {
         const sheet = this.sheetMeta(patch.sheet);
         if (
@@ -2611,7 +2995,18 @@ export class StoreDataEngine {
   ): Array<Extract<DocumentOp, { op: "set" }>> {
     const rows = rowEnd - rowStart;
     const cols = colEnd - colStart;
-    const sources = this.captureSourceProjection(sheet, rowStart, colStart, rows, cols);
+    this.noteRangeMutationFfi();
+    const snapshot = this.wasm.captureSources(this.handleOf(sheet), rowStart, colStart, rows, cols);
+    const derived = snapshot?.spillDerived();
+    const sources = snapshot ? consumeSourceSnapshot(snapshot, this.sheetIdsByHandle) : null;
+    // Only outputs crossing the moved rectangle need a per-cell ownership check.
+    const outputs = this.pivotOutputs(sheet).filter(
+      ({ range }) =>
+        range.start.row < rowEnd &&
+        range.end.row >= rowStart &&
+        range.start.col < colEnd &&
+        range.end.col >= colStart,
+    );
     const columns = Array.from({ length: cols }, (_, offset) => colStart + offset);
     const window = this.windowReader.read(
       sheet,
@@ -2628,11 +3023,21 @@ export class StoreDataEngine {
         const style = window.styles[window.styleIds[offset] ?? 0] ?? {};
         const formula = sources?.formulaAt(offset);
         const target = sources?.referenceAt(offset);
+        const pivotDerived = outputs.some(
+          ({ range }) =>
+            row >= range.start.row &&
+            row <= range.end.row &&
+            col >= range.start.col &&
+            col <= range.end.col,
+        );
         const value: CellValue = formula
           ? { kind: "formula", src: formula }
           : target
             ? { kind: "ref", target }
-            : { kind: "literal", value: window.values[offset] ?? null };
+            : {
+                kind: "literal",
+                value: derived?.[offset] || pivotDerived ? null : (window.values[offset] ?? null),
+              };
         if (value.kind === "literal" && value.value === null && Object.keys(style).length === 0) {
           continue;
         }
@@ -3055,6 +3460,23 @@ export class StoreDataEngine {
       );
     } catch {
       return false;
+    }
+    if (snapshot.pivots?.length) {
+      const sheets = [...this.workbook.sheets, sheet];
+      if (this.pivotCount() + snapshot.pivots.length > MAX_PIVOTS_PER_WORKBOOK) return false;
+      const ids = new Set<string>();
+      for (const pivot of snapshot.pivots) {
+        if (
+          ids.has(pivot.id) ||
+          pivotOwner(this.workbook.sheets, pivot.id) ||
+          this.pivotIssues(pivot, sheet, sheets).length > 0
+        ) {
+          return false;
+        }
+        ids.add(pivot.id);
+      }
+      sheet.pivots = snapshot.pivots.map(clonePivot);
+      this.pivotSheetsDirty.add(sheet.id);
     }
     const handle = this.allocateSheet(snapshot.columns.length, snapshot.rowCount);
     this.wasm.setSheetName(handle, snapshot.id, name.name);
@@ -3739,6 +4161,14 @@ export class StoreDataEngine {
           replace: owner.replace,
         });
       }
+
+      // The JS definitions survive the release; the new instance gets them again.
+      for (const sheet of this.workbook.sheets) {
+        if (sheet.pivots?.length) this.syncPivots(sheet, replacement);
+      }
+      // Installing definitions marks pivots dirty; finish calculation before the
+      // replacement becomes observable, without changing no-pivot transfers.
+      if (this.workbook.sheets.some((sheet) => sheet.pivots?.length)) replacement.commitSources();
     } catch (cause) {
       for (const snapshot of history) snapshot.replacement.free();
       replacement.free();

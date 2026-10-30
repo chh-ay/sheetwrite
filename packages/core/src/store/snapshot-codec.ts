@@ -63,6 +63,7 @@ export function decodeWorkbookSnapshot(
         rowGroups: cloneJsonValue(source.rowGroups),
         tables: cloneJsonValue(source.tables),
         charts: cloneJsonValue(source.charts),
+        pivots: cloneJsonValue(source.pivots),
       };
     }),
   };
@@ -152,6 +153,7 @@ export class StoreSnapshotCodec {
         ...(sheet.rowGroups?.length ? { rowGroups: cloneJsonValue(sheet.rowGroups) } : {}),
         ...(sheet.tables?.length ? { tables: cloneJsonValue(sheet.tables) } : {}),
         ...(sheet.charts?.length ? { charts: cloneJsonValue(sheet.charts) } : {}),
+        ...(sheet.pivots?.length ? { pivots: cloneJsonValue(sheet.pivots) } : {}),
         cells:
           cells.length > 0
             ? [

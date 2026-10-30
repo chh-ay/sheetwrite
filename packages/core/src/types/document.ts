@@ -11,6 +11,7 @@ import type {
 } from "./cell.js";
 import type { ChartDefinition } from "./chart.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "./coordinates.js";
+import type { PivotDefinition } from "./pivot.js";
 import type { WorkbookTable, WorkbookTablePatch } from "./table.js";
 
 /** Stable reason codes returned by worksheet-name validation. */
@@ -80,6 +81,9 @@ export interface Sheet {
   tables?: WorkbookTable[];
   /** Charts anchored to this sheet; series sources use stable sheet IDs. */
   charts?: ChartDefinition[];
+
+  /** Pivot tables anchored on this sheet; IDs are unique in the workbook. */
+  pivots?: PivotDefinition[];
 }
 
 /** One key of a multi-column sort, applied in array order (first = primary). */
@@ -315,6 +319,15 @@ export type MutationIssue =
       sheet?: SheetId;
       operationIndex: number;
       message: string;
+    }
+  /** A local write into cells a pivot table's output owns. */
+  | {
+      kind: "pivot-output";
+      severity: "error";
+      pivotId: string;
+      range: Range;
+      operationIndex: number;
+      message: string;
     };
 
 /** Persistent display and grouping metadata for one document row. */
@@ -378,6 +391,8 @@ export interface SheetSnapshot {
   rowGroups?: RowGroup[];
   tables?: WorkbookTable[];
   charts?: ChartDefinition[];
+  /** Pivot tables anchored on this sheet. */
+  pivots?: PivotDefinition[];
   cells: CellBlock[];
 }
 
@@ -500,4 +515,8 @@ export type DocumentOp =
   | { op: "removeNamedRange"; name: string; scope?: SheetId }
   | { op: "setCalculation"; calculation: CalculationSettings }
   | { op: "setChart"; sheet: SheetId; chart: ChartDefinition }
-  | { op: "removeChart"; sheet: SheetId; id: string };
+  | { op: "removeChart"; sheet: SheetId; id: string }
+
+  /** Insert or replace the pivot with `pivot.id` on `sheet`. */
+  | { op: "setPivot"; sheet: SheetId; pivot: PivotDefinition }
+  | { op: "removePivot"; sheet: SheetId; id: string };

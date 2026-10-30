@@ -23,7 +23,7 @@ await initSheetwrite(undefined, formulas);
 - [createGrid](/docs/api/core/create-grid/)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/grid.ts#L339"><code>packages/core/src/grid.ts#L339</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/grid.ts#L341"><code>packages/core/src/grid.ts#L341</code></a></dd></div>
 </dl>
 
 ## Declaration

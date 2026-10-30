@@ -242,7 +242,7 @@ class ChartIndex {
   readonly charts: ChartRef[] = [];
   readonly sources = new Map<SheetId, SheetSources>();
   readonly owned = new Map<SheetId, number[]>();
-  /** Charts that read a formula, reference or spill result; any value change may move them. */
+  /** Charts that read a formula, reference, spill or pivot output; any value change may move them. */
   readonly computed: number[] = [];
 
   constructor(store: Store) {
@@ -410,6 +410,14 @@ function classifyPatch(patch: DocumentOp, context: PatchContext): void {
       return;
     case "removeChart":
       direct.push({ sheet: patch.sheet, id: patch.id });
+      context.rebuild = true;
+      return;
+    case "setPivot":
+    case "removePivot":
+      // Output cells on the anchor sheet appear, move or clear with no cell op on them,
+      // and a source can start or stop reading pivot output.
+      sheetWide(patch.sheet);
+      context.valuesChanged = true;
       context.rebuild = true;
       return;
     case "addTable":
