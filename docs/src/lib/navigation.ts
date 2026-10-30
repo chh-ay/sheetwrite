@@ -258,6 +258,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
           { label: "XLSX codec", href: "/docs/performance/xlsx-codec/" },
           { label: "Delivery size", href: "/docs/performance/delivery-size/" },
           { label: "Memory", href: "/docs/performance/memory/" },
+          { label: "Release comparison", href: "/docs/performance/release-comparison/" },
           { label: "Benchmark protocol", href: "/docs/performance/benchmark-protocol/" },
         ],
       },

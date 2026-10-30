@@ -25,7 +25,7 @@ import landingStylesheet from "../styles/landing.css?url";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: pageMeta(
-      "Sheetwrite — Spreadsheet, data grid & multi-sheet workbook engine · XLSX/CSV",
+      "Sheetwrite — Spreadsheet, data grid & workbook engine · XLSX/CSV",
       "Spreadsheet and data-grid engine for multi-sheet workbooks, with XLSX/CSV exchange, Rust/WASM core, and React/Vue/Svelte framework adapters.",
     ),
     links: [{ rel: "stylesheet", href: landingStylesheet }],

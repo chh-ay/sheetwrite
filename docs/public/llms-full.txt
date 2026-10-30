@@ -8958,7 +8958,7 @@ without display text shows its cell text.
 
 These results compare one fresh 0.5.4 capture with one 0.6.0 capture of each
 suite, on the same machine and toolchain. Times vary by device and workload.
-The [release comparison](https://www.sheetwrite.dev/docs/performance/benchmark-protocol/#release-comparison)
+The [release comparison](https://www.sheetwrite.dev/docs/performance/release-comparison/)
 lists every measurement, its threshold and the capture conditions.
 
 ### Faster paths

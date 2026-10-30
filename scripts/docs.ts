@@ -2739,15 +2739,17 @@ export const PERFORMANCE_PAGES: readonly PerformancePage[] = [
     sections: ["Release retained engine memory", "Runtime resource ownership"],
   },
   {
+    slug: "release-comparison",
+    title: "Release comparison",
+    description:
+      "Each release measured against the previous one on the same machine, suite by suite.",
+    sections: ["Release comparison"],
+  },
+  {
     slug: "benchmark-protocol",
     title: "Benchmark protocol",
     description: "How the evidence is captured, and how to check a change for a timing regression.",
-    sections: [
-      "Release comparison",
-      "Capture",
-      "Matched local regression check",
-      "Pending local evidence",
-    ],
+    sections: ["Capture", "Matched local regression check", "Pending local evidence"],
   },
 ];
 
@@ -2837,7 +2839,7 @@ export function splitPerformancePages(
     "",
     "## Sheetwrite 0.6.0 evidence",
     "",
-    "The render page includes chart-source tracking; the data-engine page includes incremental pivots. [Release comparison](/docs/performance/benchmark-protocol/#release-comparison) shows fresh 0.5.4 and 0.6.0 measurements, recorded thresholds, every flagged row, and the conditions both sides were captured under. The original committed 0.5.x files remain under `bench/results/releases/0.5.0/` as history only.",
+    "The render page includes chart-source tracking; the data-engine page includes incremental pivots. The [release comparison](/docs/performance/release-comparison/) shows fresh 0.5.4 and 0.6.0 measurements, recorded thresholds, every flagged row, and the conditions both sides were captured under. The original committed 0.5.x files remain under `bench/results/releases/0.5.0/` as history only.",
     "",
     ...PERFORMANCE_PAGES.map(
       (page) => `- [${page.title}](/docs/performance/${page.slug}/): ${page.description}`,

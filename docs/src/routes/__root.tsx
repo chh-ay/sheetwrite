@@ -22,7 +22,8 @@ import tokensStylesheet from "../styles/tokens.css?url";
 const THEME_SCRIPT =
   'document.documentElement.dataset.theme=localStorage.getItem("sheetwrite-theme")??(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark")';
 
-const SITE_TITLE = "Sheetwrite — Spreadsheet, data grid & multi-sheet workbook engine · XLSX/CSV";
+// Search engines truncate titles past 70 characters.
+const SITE_TITLE = "Sheetwrite — Spreadsheet, data grid & workbook engine · XLSX/CSV";
 const SITE_DESCRIPTION =
   "Spreadsheet and data-grid engine for multi-sheet workbooks, with XLSX/CSV exchange, Rust/WASM core, and React/Vue/Svelte framework adapters.";
 const SOCIAL_IMAGE_ALT =

@@ -22,7 +22,7 @@ function docsUrl(path = ""): string {
   return siteUrl(`/docs/${path}`);
 }
 
-const SITE_TITLE = "Sheetwrite — Spreadsheet, data grid & multi-sheet workbook engine · XLSX/CSV";
+const SITE_TITLE = "Sheetwrite — Spreadsheet, data grid & workbook engine · XLSX/CSV";
 const SITE_DESCRIPTION =
   "Spreadsheet and data-grid engine for multi-sheet workbooks, with XLSX/CSV exchange, Rust/WASM core, and React/Vue/Svelte framework adapters.";
 const SOCIAL_IMAGE_ALT =
