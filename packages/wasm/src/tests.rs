@@ -153,8 +153,6 @@ fn sheet_noops_dense_limits_and_paged_load_state_preserve_invariants() {
     assert!(paged.cells.is_cell_dirty(1, 1));
     paged.cells.mark_range_clean(0, 2, 0, 2);
     assert!(!paged.cells.is_cell_dirty(1, 1));
-    paged.cells.pin_range(1, 1, &[0]);
-    paged.cells.pin_range(0, 2, &[0, 1]);
     assert_eq!(paged.cells.paged_stats().map(|stats| stats.1), Some(4));
 }
 
@@ -806,8 +804,8 @@ fn rename_sheet_rewrites_canonical_sources_and_quoting_without_changing_handles(
         store.formula_source(summary, 0, 0).as_deref(),
         Some("=('O''Brien'!A1+1)")
     );
-    assert!(store.is_sheet_alive(source));
-    assert!(store.is_sheet_alive(summary));
+    assert!(store.sheet_alive[source]);
+    assert!(store.sheet_alive[summary]);
 }
 
 #[test]
@@ -832,8 +830,8 @@ fn remove_sheet_tombstones_handle_and_invalidates_transitive_formula_dependencie
     );
     assert_eq!(string(&store, summary, 0, 0).as_deref(), Some("#REF!"));
     assert_eq!(string(&store, summary, 0, 1).as_deref(), Some("#REF!"));
-    assert!(!store.is_sheet_alive(source));
-    assert!(store.is_sheet_alive(summary));
+    assert!(!store.sheet_alive[source]);
+    assert!(store.sheet_alive[summary]);
     assert_eq!(store.row_count(source), 0);
 
     let replacement = store.add_sheet(1, 1);
@@ -843,7 +841,7 @@ fn remove_sheet_tombstones_handle_and_invalidates_transitive_formula_dependencie
     );
     assert_eq!(string(&store, summary, 0, 2).as_deref(), Some("#REF!"));
     assert_eq!(replacement, 2);
-    assert!(store.is_sheet_alive(replacement));
+    assert!(store.sheet_alive[replacement]);
     assert!(!store.remove_sheet(source));
 }
 
@@ -898,7 +896,6 @@ fn public_api_bounds_checks_do_not_panic() {
         store.remove_cols(99, 0, 1);
         store.set_sheet_name(99, "missing", "Missing");
         store.mark_range_clean(99, 0, 1, 0, 1);
-        store.pin_range(99, 0, 1, &[0]);
         store.set_bool(99, 0, 0, true, 0);
         store.set_conditional_rules(99, &[], &[], &[], Vec::new(), &[]);
         store.commit_sources();
@@ -913,8 +910,6 @@ fn public_api_bounds_checks_do_not_panic() {
         assert!(!store.range_fully_loaded(99, 0, 0, 0, 0));
         assert_eq!(store.row_count(99), 0);
         assert_eq!(store.col_count(99), 0);
-        assert_eq!(store.style_id_at(99, 0, 0), 0);
-        assert_eq!(store.style_id_at(sheet, 9, 9), 0);
         assert_ne!(
             store.set_block_packed(
                 99,
@@ -1413,9 +1408,9 @@ fn opaque_range_snapshot_round_trip_preserves_cell_behavior() {
         .expect("formula source should be available before capture");
     let text_before = string(&store, sheet, 2, 1);
     let styles_before = [
-        store.style_id_at(sheet, 0, 0),
-        store.style_id_at(sheet, 1, 0),
-        store.style_id_at(sheet, 2, 1),
+        store.get_cell(sheet, 0, 0).style(),
+        store.get_cell(sheet, 1, 0).style(),
+        store.get_cell(sheet, 2, 1).style(),
     ];
 
     let snapshot = store.capture_range(sheet, 0, 0, 3, 2).unwrap();
@@ -1454,9 +1449,9 @@ fn opaque_range_snapshot_round_trip_preserves_cell_behavior() {
     assert_eq!(string(&store, sheet, 2, 1), text_before);
     assert_eq!(
         [
-            store.style_id_at(sheet, 0, 0),
-            store.style_id_at(sheet, 1, 0),
-            store.style_id_at(sheet, 2, 1),
+            store.get_cell(sheet, 0, 0).style(),
+            store.get_cell(sheet, 1, 0).style(),
+            store.get_cell(sheet, 2, 1).style(),
         ],
         styles_before
     );
@@ -1464,7 +1459,7 @@ fn opaque_range_snapshot_round_trip_preserves_cell_behavior() {
     store.set_number(sheet, 0, 0, 8.0, styles_before[0]);
     store.recompute(sheet);
     assert_close(number(&store, sheet, 1, 0), 9.0);
-    assert_eq!(store.style_id_at(sheet, 1, 0), styles_before[1]);
+    assert_eq!(store.get_cell(sheet, 1, 0).style(), styles_before[1]);
 }
 
 #[test]
@@ -1479,7 +1474,7 @@ fn scoped_clear_preserves_unrelated_calculated_values_and_recomputes_readers() {
 
     assert!(store.clear_range(sheet, 0, 0, 0, 0, false, true));
     assert_close(number(&store, sheet, 0, 1), 6.0);
-    assert_eq!(store.style_id_at(sheet, 0, 0), 0);
+    assert_eq!(store.get_cell(sheet, 0, 0).style(), 0);
     assert!(store.clear_range(sheet, 0, 0, 0, 0, true, false));
     assert_eq!(string(&store, sheet, 0, 2).as_deref(), Some("survivor"));
     assert_close(number(&store, sheet, 2, 2), 11.0);
@@ -1806,14 +1801,13 @@ fn paged_sheet_allocates_lazily_and_evicts_only_clean_chunks() {
 }
 
 #[test]
-fn explicit_viewport_and_mapped_read_pins_have_independent_lifetimes() {
+fn viewport_and_mapped_read_pins_have_independent_lifetimes() {
     let mut store = CellStore::new();
     let sheet = store.add_paged_sheet(1, 32, 4, 64, DEFAULT_MAX_PAGED_DIRTY_CELLS);
-    store.pin_range(sheet, 0, 1, &[0]);
     store.pin_viewport_bands(sheet, &[4, 5, 0, 1]);
     store.pin_read_window(sheet, 0, 1, &[8], &[0]);
     store.begin_page_load();
-    for row in [0, 4, 8] {
+    for row in [4, 8] {
         store.set_column_numbers(sheet, 0, row, &[row as f64 + 1.0], 0);
     }
     store.commit_sources();
@@ -1822,23 +1816,14 @@ fn explicit_viewport_and_mapped_read_pins_have_independent_lifetimes() {
     store.begin_page_load();
     store.set_column_numbers(sheet, 0, 12, &[13.0], 0);
     store.commit_sources();
-    assert_close(number(&store, sheet, 0, 0), 1.0);
     assert_close(number(&store, sheet, 4, 0), 5.0);
     assert_eq!(store.cell_state(sheet, 8, 0), 0);
 
     store.pin_viewport_bands(sheet, &[]);
-    store.pin_range(sheet, 0, 0, &[]);
     store.begin_page_load();
     store.set_column_numbers(sheet, 0, 16, &[17.0], 0);
     store.commit_sources();
-    assert_close(number(&store, sheet, 0, 0), 1.0);
     assert_eq!(store.cell_state(sheet, 4, 0), 0);
-
-    store.pin_range(sheet, 0, 1, &[]);
-    store.begin_page_load();
-    store.set_column_numbers(sheet, 0, 20, &[21.0], 0);
-    store.commit_sources();
-    assert_eq!(store.cell_state(sheet, 0, 0), 0);
 }
 
 #[test]
@@ -5695,5 +5680,203 @@ mod reference_operators {
         assert_close(number(&store, summary, 0, 0), 1.0);
         assert_eq!(source(&store, 1).as_deref(), Some("=SUM(#REF!)"));
         assert_eq!(string(&store, summary, 1, 0).as_deref(), Some("#REF!"));
+    }
+}
+
+/// The dense column scans in `filterRows`, `dataEdgeOrdered`, `rangeStyleIds`
+/// and `aggregate` classify literals from the raw kind byte. These tests put
+/// formula results and calculated spill cells in the same column, so the
+/// branches that resolve a calculated slot are covered too.
+mod dense_reader_fast_paths {
+    use super::*;
+
+    const ROWS: usize = 14;
+    const SPILL_ANCHOR_ROW: usize = 7;
+    const SPILL_CHILD_ROWS: [usize; 2] = [8, 9];
+    const BLANK_ROWS: [usize; 3] = [3, 12, 13];
+
+    /// Column A: a literal of each kind, formulas with number, text, error
+    /// and boolean results, and `=SEQUENCE(3)`, whose rows 8 and 9 are
+    /// calculated cells with no source. Every written cell has its own style.
+    fn formula_column() -> (CellStore, usize) {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(2, ROWS);
+        store.set_number(sheet, 0, 0, 5.0, 1);
+        store.set_string(sheet, 1, 0, "Needle 7", 2);
+        store.set_bool(sheet, 2, 0, true, 3);
+        store.set_formula(sheet, 4, 0, "=2+3", 4);
+        store.set_formula(sheet, 5, 0, "=\"needle\"", 5);
+        store.set_formula(sheet, 6, 0, "=1/0", 6);
+        store.set_formula(sheet, SPILL_ANCHOR_ROW, 0, "=SEQUENCE(3)", 7);
+        store.set_formula(sheet, 10, 0, "=12345", 8);
+        store.set_formula(sheet, 11, 0, "=TRUE", 9);
+        store.recompute(sheet);
+
+        for (row, value) in SPILL_CHILD_ROWS.into_iter().zip([2.0, 3.0]) {
+            assert_close(store.get_cell(sheet, row, 0).num(), value);
+        }
+        (store, sheet)
+    }
+
+    #[test]
+    fn filter_rows_matches_formula_results_and_spilled_values() {
+        let (store, sheet) = formula_column();
+        let cases: [(&str, &[u32]); 6] = [
+            ("needle", &[1, 5]),
+            ("5", &[0, 4, 10]),
+            ("2", &[8, 10]),
+            ("3", &[9, 10]),
+            ("true", &[2, 11]),
+            ("#div/0", &[6]),
+        ];
+        for (needle, rows) in cases {
+            assert_eq!(
+                store.filter_rows(sheet, 0, needle),
+                rows,
+                "needle {needle:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn data_edge_ordered_treats_formula_and_spilled_cells_as_data() {
+        let (store, sheet) = formula_column();
+        // View order puts blank row 3 first and blank row 12 after the literals.
+        let order: Vec<u32> = [3, 0, 1, 2, 12, 4, 5, 6, 7, 8, 9, 10, 11, 13]
+            .into_iter()
+            .collect();
+        let last_view = (order.len() - 1) as u32;
+        let cases = [
+            (0, 1, 1),
+            (1, 1, 3),
+            (3, 1, 5),
+            (5, 1, 12),
+            (12, 1, last_view),
+            (12, -1, 5),
+            (5, -1, 3),
+        ];
+        for (view, step, expected) in cases {
+            assert_eq!(
+                store.data_edge_ordered(sheet, &order, view, 0, step, 0),
+                expected,
+                "from view {view} by {step}"
+            );
+        }
+    }
+
+    #[test]
+    fn range_style_ids_match_get_cell_styles_with_formulas_and_spills() {
+        let (store, sheet) = formula_column();
+        let ranges = [(0, ROWS - 1), (4, 6), (SPILL_ANCHOR_ROW, 9), (2, 3)];
+        for (first, last) in ranges {
+            let mut expected: Vec<u32> = (first..=last)
+                .map(|row| store.get_cell(sheet, row, 0).style())
+                .collect();
+            expected.sort_unstable();
+            expected.dedup();
+            assert_eq!(
+                store.range_style_ids(sheet, first, 0, last, 0),
+                expected,
+                "rows {first}..={last}"
+            );
+        }
+    }
+
+    #[test]
+    fn aggregate_counts_number_formulas_and_skips_text_and_error_results() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(1, ROWS);
+        store.set_number(sheet, 0, 0, 5.0, 0);
+        store.set_string(sheet, 1, 0, "Needle 7", 0);
+        store.set_bool(sheet, 2, 0, true, 0);
+        store.set_formula(sheet, 4, 0, "=2+3", 0);
+        store.set_formula(sheet, 5, 0, "=\"needle\"", 0);
+        store.set_formula(sheet, 6, 0, "=1/0", 0);
+        store.set_formula(sheet, 10, 0, "=12345", 0);
+        store.recompute(sheet);
+        for row in BLANK_ROWS {
+            assert_eq!(store.get_cell(sheet, row, 0).kind(), KIND_EMPTY);
+        }
+
+        assert_close(store.aggregate(sheet, 0, 0), 12_355.0);
+        assert_close(store.aggregate(sheet, 0, 1), 12_355.0 / 3.0);
+        assert_close(store.aggregate(sheet, 0, 2), 5.0);
+        assert_close(store.aggregate(sheet, 0, 3), 12_345.0);
+        assert_close(store.aggregate(sheet, 0, 4), 3.0);
+    }
+}
+
+/// One column aggregate must give the same result on dense and paged
+/// storage. Paged storage follows Excel: logical and blank formula results
+/// are ignored, and spilled values count.
+mod aggregate_storage_parity {
+    use super::*;
+
+    const ROWS: usize = 8;
+    const COLS: usize = 2;
+    const PAGE_ROWS: usize = 4;
+    /// Large enough that no loaded page is evicted during a test.
+    const PAGE_BYTE_BUDGET: usize = 1_000_000;
+    const OPS: std::ops::RangeInclusive<u8> = 0..=4;
+
+    /// The same column A on a dense and a paged sheet: a number literal and
+    /// one formula, recomputed.
+    fn dense_and_paged(formula: &str) -> [(CellStore, usize); 2] {
+        let mut dense = CellStore::new();
+        let dense_sheet = dense.add_sheet(COLS, ROWS);
+        let mut paged = CellStore::new();
+        let paged_sheet = paged.add_paged_sheet(
+            COLS,
+            ROWS,
+            PAGE_ROWS,
+            PAGE_BYTE_BUDGET,
+            DEFAULT_MAX_PAGED_DIRTY_CELLS,
+        );
+
+        // Load every page as blank first: an unloaded paged cell reads as
+        // #LOADING!, which would hide the spill.
+        paged.begin_page_load();
+        for col in 0..COLS {
+            for row in 0..ROWS {
+                paged.clear_cell(paged_sheet, row, col, 0);
+            }
+        }
+        paged.commit_sources();
+
+        for (store, sheet) in [(&mut dense, dense_sheet), (&mut paged, paged_sheet)] {
+            store.set_number(sheet, 0, 0, 4.0, 0);
+            store.set_formula(sheet, 1, 0, formula, 0);
+            store.recompute(sheet);
+        }
+        [(dense, dense_sheet), (paged, paged_sheet)]
+    }
+
+    fn assert_dense_matches_paged(formula: &str, expected: [f64; 5]) {
+        let [(dense, dense_sheet), (paged, paged_sheet)] = dense_and_paged(formula);
+        for (op, expected) in OPS.zip(expected) {
+            let dense_value = dense.aggregate(dense_sheet, 0, op);
+            let paged_value = paged.aggregate(paged_sheet, 0, op);
+            assert_eq!(
+                dense_value.to_bits(),
+                paged_value.to_bits(),
+                "{formula} op {op}: dense {dense_value}, paged {paged_value}"
+            );
+            assert_close(dense_value, expected);
+        }
+    }
+
+    #[test]
+    fn a_formula_returning_true_is_ignored() {
+        assert_dense_matches_paged("=TRUE", [4.0, 4.0, 4.0, 4.0, 1.0]);
+    }
+
+    #[test]
+    fn a_formula_returning_a_blank_is_ignored() {
+        assert_dense_matches_paged("=B1", [4.0, 4.0, 4.0, 4.0, 1.0]);
+    }
+
+    #[test]
+    fn spilled_values_count() {
+        assert_dense_matches_paged("=SEQUENCE(3)", [10.0, 2.5, 1.0, 4.0, 4.0]);
     }
 }

@@ -392,6 +392,120 @@ Isolated WASM growth was 0.88 MiB (1K), 7.31 MiB (10K), and 62.00 MiB
 and gate metadata remain in `results/formula-results.json`; the generated
 `results/formula-results.md` is the matching human-readable report.
 
+### Engine reader gate
+
+`src/reader-gate.ts` compares the `CellStore` readers of two built engines:
+window projection (`getWindow`, `getWindowRows`, with and without
+conditional rules), column queries (aggregate, sort, filter, search, distinct
+values, data edges), batched cell reads (`getCell`, `cellSnapshots`,
+`captureRange`, `persistedCellData`, `rangeStyleIds`) and formula range
+readers (ten families of eight formulas over ~100k-row ranges, recomputed after
+an edit). `src/reader-bench.ts` holds the 39 readers and their deterministic
+100,000-row fixtures. As with the formula gate, the harness always comes from
+the checkout that runs the gate; `--base` and `--candidate` (default: this
+checkout) only supply a built `packages/wasm/pkg`, so a 0.5.x base works
+without this benchmark code.
+
+Build a 0.5.x base once, in its own worktree (48b137c8 is the v0.5.4 release
+commit):
+
+```sh
+git worktree add --detach <base-checkout> 48b137c8
+cd <base-checkout> && bun install && bun run build:wasm
+```
+
+Build the candidate's engine the same way (`bun run build:wasm`), then, from
+the candidate checkout:
+
+```sh
+taskset -c <idle-core> bun bench/src/reader-gate.ts \
+  --base <base-checkout> --output <reader-report.json>
+```
+
+`taskset -c <idle-core>` pins the gate and every harness process it starts to
+one idle core on Linux; use the equivalent on other systems, or drop it. The
+gate does no pinning of its own. `bun run reader:gate --base <base-checkout>`
+from `bench/` runs the same command unpinned. `READER_CASES=<regex>` narrows
+both sides to the matching readers when attributing one regression.
+
+The gate first calibrates each reader on both engines and runs both at the
+larger loop count, so every sample on either side does identical work. The
+calibration aims each sample at 120 ms but does not guarantee it: a reader
+whose first calls run slower than later ones can sample shorter (AVG D has
+sampled at 41 ms). It then runs `--pairs` pairs (default and minimum: 8) in
+ABBA order: even pairs run the base first, odd pairs the candidate. Each side
+of a pair is a fresh process that builds the fixtures untimed, checks that
+every formula computed a number, then runs one warm-up and five timed samples
+per reader; its median sample is that side's time. The paired ratio is
+candidate / base, and each reader reports the median of its paired ratios.
+
+After its timed samples, each side calls every reader for up to four more
+iterations, untimed, and hashes the full results: window bytes and strings,
+whole sort orders, every filter and search index, distinct values, `getCell`
+kinds, numbers and text, snapshot contents, persisted cell data and style ids.
+Numbers hash their IEEE bits, so NaN and the infinities count. Both engines
+must produce the same digest in every pair. Rebuilding either engine during a
+gate fails it; the engine hash covers the `.wasm` module and every `.js` glue
+file in `packages/wasm/pkg`.
+
+A reader fails when its digests differ in any pair (the readers disagree), or
+when its median paired ratio exceeds its limit. No single pair can excuse a
+high median, so more pairs only make the median steadier and never loosen the
+gate. The gate exits non-zero when any reader fails.
+
+The limits live in
+[`results/reader-noise-floor.json`](./results/reader-noise-floor.json):
+
+```json
+{
+  "measuredAt": "<ISO timestamp of the A/A run>",
+  "source": { "sha": "<commit>", "engineSha256": "<engine hash>", "cpus": "8" },
+  "gatePairs": 8,
+  "rows": {
+    "getWindow 40x8": { "aaRatios": [0.98, 1.03, "... one per A/A pair"], "limit": 1.06 }
+  }
+}
+```
+
+Every harness reader needs a row and unknown rows are rejected. A row keeps
+every A/A pair ratio, at least 24 of them. Its limit resamples those ratios
+20,000 times into 8-pair medians, the statistic the gate judges, with a fixed
+seed; takes the 99.9th percentile; widens its excess over 1 by 1.2, as the
+formula gate does; and rounds up to 0.01, never below 1. The loader recomputes
+every limit, so a loosened row does not load. With 24 or more A/A pairs one
+slow A/A pair cannot set a limit alone. To refresh the floor after a harness
+or sampling change, run an A/A gate of one checkout against itself on the
+bench slot, then convert its report:
+
+```sh
+taskset -c <idle-core> bun bench/src/reader-gate.ts \
+  --base <base-checkout> --candidate <base-checkout> --pairs 24 --output <aa-report.json>
+bun bench/src/reader-gate.ts --write-floor <aa-report.json>
+```
+
+An A/A run (`--base` and `--candidate` resolve to the same checkout) needs no
+floor and reports no verdict. `--write-floor` accepts only such a report: one
+commit and one engine hash on both sides, no verdict, and no `READER_CASES`
+filter. The floor records that commit, engine hash and the CPUs the run was
+pinned to.
+
+[`results/reader-baseline-0.5.x.json`](./results/reader-baseline-0.5.x.json)
+is the gate report of the reviewed tip against the immutable 0.5.x baseline.
+The gate checks that `--base` names that report's base commit. It then
+measures fresh paired ratios against that build and gates all selected
+readers with their A/A limits. It prints the reference ratios for context but
+never compares historical absolute milliseconds: those move with machine load.
+Because the base stays at 0.5.x, the gate catches a reader that falls behind
+0.5.x, not one that loses a speedup this branch gained over it.
+
+`--output` writes `{ meta, summary, verdict }`: `meta` holds the start time,
+both commits, both engine SHA-256s, the CPUs the gate may run on (the bench
+slot under `taskset`), Bun version, pair count, order, reader filter,
+calibrations and loop counts; `summary` holds one row per reader with base
+and candidate median ms, median/min/max paired ratio, candidate-slower pairs,
+digest agreement and every pair's samples; `verdict` is `null` for an A/A
+run.
+
 ### Honest asymmetries (declared, not hidden)
 
 - **Sheetwrite** keeps all cell data in **WASM linear memory** (a Rust columnar
@@ -811,10 +925,14 @@ bench/
     gate-protocol.ts       # exact matrices, resource/stat checks, fingerprints
     generate-baseline.ts   # non-overwriting controlled candidate generation
     render-gate.ts         # exact full/smoke renderer gate policies
+    reader-bench.ts        # one-engine CellStore reader timing (39 readers)
+    reader-gate.ts         # paired ABBA reader gate and noise-floor writer
     verify.ts              # deterministic CI smoke orchestration and artifacts
   results/
     data-results.{md,json} # generated by bench:data
     formula-results.{md,json} # generated by bench:formula[:smoke]
     paged-results.json     # generated by bench:paged
     render-results.{md,json} # generated by bench:render
+    reader-noise-floor.json # per-reader limits, written by reader-gate --write-floor
+    reader-baseline-0.5.x.json # 0.5.x-vs-tip reader summary (documentation only)
 ```

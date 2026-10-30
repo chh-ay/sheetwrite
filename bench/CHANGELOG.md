@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Gate engine reader changes with a paired ABBA harness over 39 `CellStore` readers (windows, queries, batched cell reads, formula ranges). A reader fails only when its digests disagree, or when its median paired ratio exceeds its A/A noise limit and the candidate is slower in every pair. `--write-floor` turns an A/A report into the committed per-reader limits.
 - Gate formula changes with one harness that loads the base and candidate engine builds in interleaved captures, aggregates each row to at least 50 ms, and compares median paired ratios against measured per-row limits. Keep the absolute formula baseline for quiet-machine release captures.
 - Reuse restorable edit fixtures in matched engine samples instead of rebuilding their formula sheets for every timed edit.
 - Remove stale formula baseline approvals. Reviewed byte trade-offs now name the exact candidate engine digest, row, maximum and reason.

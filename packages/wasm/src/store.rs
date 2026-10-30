@@ -4,6 +4,7 @@ use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::mem::size_of;
 
+use rustc_hash::FxHashSet;
 use wasm_bindgen::prelude::*;
 
 use crate::calc::{
@@ -109,14 +110,6 @@ impl SourceSnapshot {
     #[wasm_bindgen(js_name = spillDerived)]
     pub fn spill_derived(&self) -> Vec<u8> {
         self.spill_derived.clone()
-    }
-
-    #[wasm_bindgen(js_name = byteLength)]
-    pub fn byte_length(&self) -> usize {
-        (self.formula_offsets.len() + self.reference_offsets.len()) * std::mem::size_of::<u32>()
-            + self.reference_targets.len() * std::mem::size_of::<u32>()
-            + self.formula_sources.iter().map(String::len).sum::<usize>()
-            + self.spill_derived.len()
     }
 }
 
@@ -572,27 +565,11 @@ impl CellStore {
         }
     }
 
-    #[wasm_bindgen(js_name = canDirtyCell)]
-    pub fn can_dirty_cell(&self, sheet: usize, row: usize, col: usize) -> bool {
-        self.loading_page > 0
-            || self.sheets.get(sheet).is_some_and(|data| {
-                data.cells.contains_cell(row, col) && data.cells.can_dirty_cell(row, col)
-            })
-    }
-
     #[wasm_bindgen(js_name = pagedDirtyCoordinates)]
     pub fn paged_dirty_coordinates(&self, sheet: usize) -> Vec<f64> {
         self.sheets
             .get(sheet)
             .map_or_else(Vec::new, |data| data.cells.dirty_coordinates())
-    }
-
-    #[wasm_bindgen(js_name = dirtyRevision)]
-    pub fn dirty_revision(&self, sheet: usize, row: usize, col: usize) -> u64 {
-        self.sheets
-            .get(sheet)
-            .and_then(|data| data.cells.dirty_revision(row, col))
-            .unwrap_or(0)
     }
 
     #[wasm_bindgen(js_name = isFullyLoaded)]
@@ -654,21 +631,6 @@ impl CellStore {
         }
     }
 
-    #[wasm_bindgen(js_name = markCellCleanRevision)]
-    pub fn mark_cell_clean_revision(
-        &mut self,
-        sheet: usize,
-        row: usize,
-        col: usize,
-        revision: u64,
-    ) -> bool {
-        revision != 0
-            && self
-                .sheets
-                .get_mut(sheet)
-                .is_some_and(|data| data.cells.mark_cell_clean_revision(row, col, revision))
-    }
-
     #[wasm_bindgen(js_name = acknowledgeRevision)]
     pub fn acknowledge_revision(&mut self, revision: u64) {
         if revision == 0 {
@@ -680,15 +642,7 @@ impl CellStore {
         }
     }
 
-    /// Replaces caller-owned persistent pins; empty row ranges leave them unchanged.
-    #[wasm_bindgen(js_name = pinRange)]
-    pub fn pin_range(&mut self, sheet: usize, start_row: usize, end_row: usize, cols: &[u32]) {
-        if let Some(data) = self.sheets.get_mut(sheet) {
-            data.cells.pin_range(start_row, end_row, cols);
-        }
-    }
-
-    /// Replaces transient read protection without changing explicit or viewport pins.
+    /// Replaces transient read protection without changing viewport pins.
     /// Nonempty `rows` are backing row IDs; otherwise `[start_row, end_row)` is used.
     #[wasm_bindgen(js_name = pinReadWindow)]
     pub fn pin_read_window(
@@ -903,11 +857,6 @@ impl CellStore {
             .collect()
     }
 
-    #[wasm_bindgen(js_name = isSheetAlive)]
-    pub fn is_sheet_alive(&self, sheet: usize) -> bool {
-        self.sheet_alive.get(sheet).copied().unwrap_or(false)
-    }
-
     #[wasm_bindgen(js_name = rowCount)]
     pub fn row_count(&self, sheet: usize) -> usize {
         self.sheets.get(sheet).map_or(0, |s| s.cells.row_count())
@@ -950,20 +899,6 @@ impl CellStore {
             revision,
             hydrating: false,
         });
-    }
-
-    /// Current style-dictionary id at a cell; `0` when out of bounds. Used by
-    /// the host to write derived (reference-shadow) values without disturbing
-    /// the cell's style.
-    #[wasm_bindgen(js_name = styleIdAt)]
-    pub fn style_id_at(&self, sheet: usize, row: usize, col: usize) -> u32 {
-        let Some(s) = self.sheets.get(sheet) else {
-            return 0;
-        };
-        if !s.cells.contains_cell(row, col) {
-            return 0;
-        }
-        s.cells.style_at(s.cells.idx(row, col))
     }
 
     #[wasm_bindgen(js_name = setString)]
@@ -1312,16 +1247,31 @@ impl CellStore {
         if r0 > r1 || c0 > c1 || r1 >= s.cells.row_count() || c1 >= s.cells.n_cols() {
             return Vec::new();
         }
-        let mut ids = HashMap::<u32, ()>::new();
+
+        // Neighbouring cells usually share a style, so a run of equal ids costs
+        // one compare instead of one hash insert per cell.
+        let mut ids = FxHashSet::<u32>::default();
         for col in c0..=c1 {
+            if let Some(column) = s.cells.dense_column(col) {
+                let mut previous = None;
+                for &style in column.styles(r0..=r1) {
+                    if previous != Some(style) {
+                        ids.insert(style);
+                        previous = Some(style);
+                    }
+                }
+                continue;
+            }
+
             let base = col * s.cells.row_count();
             for row in r0..=r1 {
                 if s.cells.is_loaded(row, col) {
-                    ids.insert(s.cells.style_at(base + row), ());
+                    ids.insert(s.cells.style_at(base + row));
                 }
             }
         }
-        let mut out: Vec<u32> = ids.into_keys().collect();
+
+        let mut out: Vec<u32> = ids.into_iter().collect();
         out.sort_unstable();
         out
     }
@@ -1796,115 +1746,6 @@ impl CellStore {
                 )
             },
         )
-    }
-
-    /// Hydrate one datasource page column while retaining local dirty cells and
-    /// request-revision exceptions. `protected_offsets` is sorted and relative
-    /// to `start_row`.
-    #[wasm_bindgen(js_name = hydratePageNumbers)]
-    pub fn hydrate_page_numbers(
-        &mut self,
-        sheet: usize,
-        col: usize,
-        start_row: usize,
-        values: &[f64],
-        style: u32,
-        protected_offsets: &[u32],
-    ) {
-        let Some(existing) = self.sheets.get(sheet) else {
-            return;
-        };
-        if col >= existing.cells.n_cols() || start_row >= existing.cells.row_count() {
-            return;
-        }
-
-        let limit = values.len().min(existing.cells.row_count() - start_row);
-        let mut protected_index = 0usize;
-        let mut wrote = false;
-        let s = &mut self.sheets[sheet];
-        s.spill.clear_all(&mut s.cells);
-        for (offset, &value) in values.iter().take(limit).enumerate() {
-            while protected_offsets
-                .get(protected_index)
-                .is_some_and(|protected| *protected < offset as u32)
-            {
-                protected_index += 1;
-            }
-            if protected_offsets.get(protected_index) == Some(&(offset as u32)) {
-                continue;
-            }
-            let row = start_row + offset;
-            let Some(key) = cell_key(row, col) else {
-                continue;
-            };
-            if !s.hydrate_cell(row, col, KIND_NUMBER, encode_num(value), style) {
-                continue;
-            }
-            self.graph.replace_entry(&mut s.formulas, sheet, key, None);
-            wrote = true;
-        }
-        if wrote {
-            s.formulas.mark_all_dirty();
-        }
-    }
-
-    /// Packed-string counterpart to [`CellStore::hydrate_page_numbers`].
-    #[wasm_bindgen(js_name = hydratePageStringsPacked)]
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "wasm-bindgen export: JS passes flat scalars and typed arrays"
-    )]
-    pub fn hydrate_page_strings_packed(
-        &mut self,
-        sheet: usize,
-        col: usize,
-        start_row: usize,
-        buf: String,
-        utf16_lens: &[u32],
-        style: u32,
-        protected_offsets: &[u32],
-    ) {
-        let Some(existing) = self.sheets.get(sheet) else {
-            return;
-        };
-        if col >= existing.cells.n_cols() || start_row >= existing.cells.row_count() {
-            return;
-        }
-
-        let limit = utf16_lens.len().min(existing.cells.row_count() - start_row);
-        let slices = utf16_slices(&buf, utf16_lens, limit);
-        let mut protected_index = 0usize;
-        let mut wrote = false;
-        let s = &mut self.sheets[sheet];
-        s.spill.clear_all(&mut s.cells);
-        for (offset, text) in slices.into_iter().enumerate() {
-            while protected_offsets
-                .get(protected_index)
-                .is_some_and(|protected| *protected < offset as u32)
-            {
-                protected_index += 1;
-            }
-            if protected_offsets.get(protected_index) == Some(&(offset as u32)) {
-                continue;
-            }
-            let row = start_row + offset;
-            let Some(key) = cell_key(row, col) else {
-                continue;
-            };
-            if self.sheets[sheet].cells.is_cell_dirty(row, col) {
-                continue;
-            }
-            let id = self.intern(text);
-            let s = &mut self.sheets[sheet];
-            if !s.hydrate_cell(row, col, KIND_STRING, encode_str_id(id), style) {
-                continue;
-            }
-            self.graph.replace_entry(&mut s.formulas, sheet, key, None);
-            wrote = true;
-        }
-        if wrote {
-            self.sheets[sheet].formulas.mark_all_dirty();
-        }
     }
 
     /// Bulk-load one column with numbers starting at `start_row`.
@@ -2640,44 +2481,6 @@ impl CellStore {
             }
         }
         mask
-    }
-
-    /// Packed row-major `[anchor_row, anchor_col, ...]` owner coordinates.
-    #[wasm_bindgen(js_name = spillOwnerCoordinates)]
-    pub fn spill_owner_coordinates(
-        &self,
-        sheet: usize,
-        row_start: usize,
-        row_end: usize,
-        cols: &[u32],
-    ) -> Vec<u32> {
-        let Some(data) = self.sheets.get(sheet) else {
-            return Vec::new();
-        };
-        let row_start = row_start.min(data.cells.row_count());
-        let row_end = row_end.min(data.cells.row_count());
-        let Some(len) = row_end
-            .saturating_sub(row_start)
-            .checked_mul(cols.len())
-            .and_then(|cells| cells.checked_mul(2))
-        else {
-            return Vec::new();
-        };
-        let mut owners = vec![u32::MAX; len];
-        for (col_index, &col) in cols.iter().enumerate() {
-            if col as usize >= data.cells.n_cols() {
-                continue;
-            }
-            for row_index in 0..row_end.saturating_sub(row_start) {
-                let cell = ((row_start + row_index) as u32, col);
-                if let Some(anchor) = data.spill.owner(cell) {
-                    let offset = (row_index * cols.len() + col_index) * 2;
-                    owners[offset] = anchor.0;
-                    owners[offset + 1] = anchor.1;
-                }
-            }
-        }
-        owners
     }
 
     #[wasm_bindgen(js_name = poolStrings)]

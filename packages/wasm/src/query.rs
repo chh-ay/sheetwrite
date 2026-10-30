@@ -6,7 +6,7 @@ use std::collections::HashSet;
 
 use wasm_bindgen::prelude::*;
 
-use crate::cells::{payload_is_str, payload_num, payload_str_id, CellRun};
+use crate::cells::{dense_resolved, payload_num, payload_str_id, source_kind, CellRun};
 use crate::sheet::{formula_error_at, SheetData};
 use crate::store::CellStore;
 use crate::types::{
@@ -127,6 +127,45 @@ impl<'a> ValueSet<'a> {
     }
 }
 
+/// `filterRows` matches text in any letter case, anywhere in the cell.
+const FILTER_CASE_INSENSITIVE: bool = true;
+const FILTER_WHOLE_CELL: bool = false;
+
+/// `aggregate` op codes. Every op except SUM also needs count and extrema.
+const AGGREGATE_SUM: u8 = 0;
+const AGGREGATE_AVERAGE: u8 = 1;
+const AGGREGATE_MIN: u8 = 2;
+const AGGREGATE_MAX: u8 = 3;
+
+/// Running column aggregate. A sum skips the count and extrema updates.
+struct NumericAccumulator {
+    sum: f64,
+    count: u32,
+    min: f64,
+    max: f64,
+}
+
+impl NumericAccumulator {
+    fn new() -> Self {
+        Self {
+            sum: 0.0,
+            count: 0,
+            min: f64::INFINITY,
+            max: f64::NEG_INFINITY,
+        }
+    }
+
+    #[inline]
+    fn add(&mut self, value: f64, op: u8) {
+        self.sum += value;
+        if op != AGGREGATE_SUM {
+            self.count += 1;
+            self.min = self.min.min(value);
+            self.max = self.max.max(value);
+        }
+    }
+}
+
 #[wasm_bindgen]
 impl CellStore {
     /// `[contains cache constructions, owned distinct strings]`.
@@ -150,129 +189,91 @@ impl CellStore {
             return 0.0;
         }
 
-        let base = col * s.cells.row_count();
-        let mut sum = 0.0;
-        let mut count = 0u32;
-        let mut min = f64::INFINITY;
-        let mut max = f64::NEG_INFINITY;
-        let end = base + s.cells.row_count();
-        let mut start = base;
-        while start < end {
-            let run = s.cells.run(start, end);
-            let value_at = |index| {
-                if s.cells.is_paged() {
-                    return numeric_cell_value(s, index);
-                }
-                let (kind, payload) = run.source(index);
-                match kind {
-                    KIND_NUMBER => Some(f64::from_bits(payload)),
+        let row_count = s.cells.row_count();
+        let base = col * row_count;
+        let mut acc = NumericAccumulator::new();
+
+        // Dense columns scan their slices directly. A run read per cell adds a
+        // dirty-overlay probe, a payload load and bounds checks for cells that
+        // are not numbers, which made this scan 2.6-6x slower than 0.5.4.
+        if let Some(column) = s.cells.dense_column(col) {
+            let (kinds, payloads) = column.raw_slices();
+            for (row, &raw) in kinds.iter().enumerate() {
+                // The kind byte decides first, so text, booleans and blanks
+                // never load their payload. A formula decodes its own slot and
+                // builds its key from the loop's row and column, without the
+                // style load and the divide that a general cell read costs.
+                // Like paged storage and Excel, logical and blank results are
+                // not numbers, and a spilled number counts.
+                let value = match source_kind(raw) {
+                    KIND_NUMBER => Some(f64::from_bits(payloads[row])),
                     KIND_FORMULA => {
-                        let (_, payload) = run.resolved(index);
-                        (!payload_is_str(payload)
-                            && key_for_index(s, index)
+                        let (kind, payload) = dense_resolved(raw, payloads[row]);
+                        (!matches!(kind, KIND_STRING | KIND_BOOL | KIND_EMPTY)
+                            && cell_key(row, col)
                                 .is_some_and(|key| formula_error_at(s, key).is_none()))
                         .then(|| payload_num(payload))
                     }
+                    // A spilled value sits in a calculated slot with no source.
+                    KIND_EMPTY if raw != KIND_EMPTY => {
+                        let (kind, payload) = dense_resolved(raw, payloads[row]);
+                        (kind == KIND_NUMBER).then(|| f64::from_bits(payload))
+                    }
                     _ => None,
-                }
-            };
-            // The common sum scan avoids maintaining unused extrema and counts.
-            if op == 0 {
-                for index in run.start..run.end {
-                    if let Some(value) = value_at(index) {
-                        sum += value;
-                    }
-                }
-            } else {
-                for index in run.start..run.end {
-                    if let Some(value) = value_at(index) {
-                        sum += value;
-                        count += 1;
-                        min = min.min(value);
-                        max = max.max(value);
-                    }
+                };
+                if let Some(value) = value {
+                    acc.add(value, op);
                 }
             }
-            start = run.end;
+        } else {
+            // Paged runs touch each source page once, keeping eviction order
+            // the same as a windowed read of this column.
+            let end = base + row_count;
+            let mut start = base;
+            while start < end {
+                let run = s.cells.run(start, end);
+                for index in run.start..run.end {
+                    if let Some(value) = numeric_cell_value(s, index) {
+                        acc.add(value, op);
+                    }
+                }
+                start = run.end;
+            }
         }
+
+        let NumericAccumulator {
+            sum,
+            count,
+            min,
+            max,
+        } = acc;
+
         match op {
-            0 => sum,
-            1 => {
+            AGGREGATE_SUM => sum,
+            AGGREGATE_AVERAGE => {
                 if count > 0 {
                     sum / f64::from(count)
                 } else {
                     0.0
                 }
             }
-            2 => {
+            AGGREGATE_MIN => {
                 if count > 0 {
                     min
                 } else {
                     0.0
                 }
             }
-            3 => {
+            AGGREGATE_MAX => {
                 if count > 0 {
                     max
                 } else {
                     0.0
                 }
             }
+            // COUNT is op 4; an unknown op also counts, as it always has.
             _ => f64::from(count),
         }
-    }
-
-    /// Stable row order sorted by a column. Returns a data-row permutation.
-    #[wasm_bindgen(js_name = sortRows)]
-    pub fn sort_rows(&self, sheet: usize, col: usize, ascending: bool) -> Vec<u32> {
-        let Some(s) = self.sheets.get(sheet) else {
-            return Vec::new();
-        };
-        if col >= s.cells.n_cols() {
-            return Vec::new();
-        }
-
-        let base = col * s.cells.row_count();
-
-        if let Some(order) = if s.cells.row_count() >= MIN_RADIX_SORT_ROWS {
-            sort_finite_number_column_radix(s, base, ascending)
-        } else {
-            sort_finite_number_column_comparison(s, base, ascending)
-        } {
-            return order;
-        }
-
-        // Decorate-sort-undecorate: materialize each row's comparison key ONCE
-        // (one pool deref per row) instead of rebuilding both operands inside
-        // the comparator — a comparison sort would otherwise reconstruct keys
-        // ~2·n·log2(n) times, each a scattered heap deref for text cells.
-        let mut keys: Vec<ComparableCell> = Vec::with_capacity(s.cells.row_count());
-        let mut start = base;
-        let end = base + s.cells.row_count();
-        while start < end {
-            let run = s.cells.run(start, end);
-            for index in run.start..run.end {
-                keys.push(ComparableCell::from_run(s, &self.strings, &run, index));
-            }
-            start = run.end;
-        }
-
-        let mut order: Vec<u32> = (0..s.cells.row_count() as u32).collect();
-        order.sort_unstable_by(|&a, &b| {
-            // SAFETY: `order` holds only rows from `0..row_count` and `keys`
-            // has exactly `row_count` entries.
-            let ka = unsafe { keys.get_unchecked(a as usize) };
-            // SAFETY: as above.
-            let kb = unsafe { keys.get_unchecked(b as usize) };
-            let ord = ka.cmp(kb);
-            let ord = if ascending { ord } else { ord.reverse() };
-            if ord == Ordering::Equal {
-                a.cmp(&b)
-            } else {
-                ord
-            }
-        });
-        order
     }
 
     /// Data-row indices whose column text contains `needle` (case-insensitive).
@@ -290,6 +291,52 @@ impl CellStore {
         let mut out: Vec<u32> = Vec::with_capacity(s.cells.row_count().min(1024));
         let mut cache = MatchCache::new();
 
+        // Dense columns read their slices directly; see `aggregate`.
+        if let Some(column) = s.cells.dense_column(col) {
+            let (kinds, payloads) = column.raw_slices();
+            for (row, &raw) in kinds.iter().enumerate() {
+                // Literals never carry the calculated bit, so the raw byte
+                // classifies them and their payload is their value; a bare
+                // empty byte has no calculated value. Only formula and
+                // calculated slots need the general cell match.
+                let matched = match raw {
+                    KIND_STRING => cache.matches(
+                        &self.strings,
+                        payload_str_id(payloads[row]),
+                        &needle,
+                        FILTER_CASE_INSENSITIVE,
+                        FILTER_WHOLE_CELL,
+                    ),
+                    KIND_NUMBER => number_matches_text(
+                        payload_num(payloads[row]),
+                        &needle,
+                        FILTER_CASE_INSENSITIVE,
+                        FILTER_WHOLE_CELL,
+                    ),
+                    KIND_BOOL => matches_needle(
+                        boolean_text(payload_num(payloads[row]) != 0.0),
+                        &needle,
+                        FILTER_CASE_INSENSITIVE,
+                        FILTER_WHOLE_CELL,
+                    ),
+                    KIND_EMPTY => false,
+                    _ => cell_matches_text(
+                        s,
+                        &self.strings,
+                        base + row,
+                        &needle,
+                        FILTER_CASE_INSENSITIVE,
+                        FILTER_WHOLE_CELL,
+                        &mut cache,
+                    ),
+                };
+                if matched {
+                    out.push(row as u32);
+                }
+            }
+            return out;
+        }
+
         let mut start = base;
         let end = base + s.cells.row_count();
         while start < end {
@@ -297,11 +344,25 @@ impl CellStore {
             for index in run.start..run.end {
                 let (kind, payload) = run.source(index);
                 let matched = if kind == KIND_STRING {
-                    cache.matches(&self.strings, payload_str_id(payload), &needle, true, false)
+                    cache.matches(
+                        &self.strings,
+                        payload_str_id(payload),
+                        &needle,
+                        FILTER_CASE_INSENSITIVE,
+                        FILTER_WHOLE_CELL,
+                    )
                 } else if kind == KIND_EMPTY && run.resolved(index).0 == KIND_EMPTY {
                     false
                 } else {
-                    cell_matches_text(s, &self.strings, index, &needle, true, false, &mut cache)
+                    cell_matches_text(
+                        s,
+                        &self.strings,
+                        index,
+                        &needle,
+                        FILTER_CASE_INSENSITIVE,
+                        FILTER_WHOLE_CELL,
+                        &mut cache,
+                    )
                 };
                 if matched {
                     out.push((index - base) as u32);
@@ -444,6 +505,62 @@ impl CellStore {
     }
 }
 
+/// Single-key sort stays a crate helper: JS sorts through `sortRowsMulti`,
+/// which delegates here for one key without a survivor list.
+impl CellStore {
+    /// Stable row order sorted by a column. Returns a data-row permutation.
+    pub(crate) fn sort_rows(&self, sheet: usize, col: usize, ascending: bool) -> Vec<u32> {
+        let Some(s) = self.sheets.get(sheet) else {
+            return Vec::new();
+        };
+        if col >= s.cells.n_cols() {
+            return Vec::new();
+        }
+
+        let base = col * s.cells.row_count();
+
+        if let Some(order) = if s.cells.row_count() >= MIN_RADIX_SORT_ROWS {
+            sort_finite_number_column_radix(s, col, ascending)
+        } else {
+            sort_finite_number_column_comparison(s, base, ascending)
+        } {
+            return order;
+        }
+
+        // Decorate-sort-undecorate: materialize each row's comparison key ONCE
+        // (one pool deref per row) instead of rebuilding both operands inside
+        // the comparator — a comparison sort would otherwise reconstruct keys
+        // ~2·n·log2(n) times, each a scattered heap deref for text cells.
+        let mut keys: Vec<ComparableCell> = Vec::with_capacity(s.cells.row_count());
+        let mut start = base;
+        let end = base + s.cells.row_count();
+        while start < end {
+            let run = s.cells.run(start, end);
+            for index in run.start..run.end {
+                keys.push(ComparableCell::from_run(s, &self.strings, &run, index));
+            }
+            start = run.end;
+        }
+
+        let mut order: Vec<u32> = (0..s.cells.row_count() as u32).collect();
+        order.sort_unstable_by(|&a, &b| {
+            // SAFETY: `order` holds only rows from `0..row_count` and `keys`
+            // has exactly `row_count` entries.
+            let ka = unsafe { keys.get_unchecked(a as usize) };
+            // SAFETY: as above.
+            let kb = unsafe { keys.get_unchecked(b as usize) };
+            let ord = ka.cmp(kb);
+            let ord = if ascending { ord } else { ord.reverse() };
+            if ord == Ordering::Equal {
+                a.cmp(&b)
+            } else {
+                ord
+            }
+        });
+        order
+    }
+}
+
 #[wasm_bindgen]
 impl CellStore {
     #[wasm_bindgen(js_name = sortRowsMulti)]
@@ -488,6 +605,7 @@ impl CellStore {
         let mut keys: Vec<ComparableCell<'_>> = Vec::with_capacity(row_count * cols.len());
         for &col in cols {
             let base = col as usize * data.cells.row_count();
+
             let mut cached_run: Option<CellRun<'_>> = None;
             for &row in &rows {
                 let index = base + row as usize;
@@ -788,11 +906,19 @@ impl CellStore {
         if d_row == 0 {
             return self.data_edge(sheet, order[row] as usize, col, 0, d_col);
         }
+        // Literal kinds decide occupancy from the raw byte; only formula and
+        // calculated cells need the resolved kind with its error lookup.
+        let column = data.cells.dense_column(col);
         let occupied = |view: usize| {
             order.get(view).is_some_and(|&r| {
                 let r = r as usize;
+                let index = col * data.cells.row_count() + r;
                 r < data.cells.row_count()
-                    && resolved_kind(data, col * data.cells.row_count() + r) != 0
+                    && match column.map(|column| column.raw_kind(r)) {
+                        Some(KIND_NUMBER | KIND_STRING | KIND_BOOL) => true,
+                        Some(KIND_EMPTY) => false,
+                        _ => resolved_kind(data, index) != 0,
+                    }
             })
         };
         edge_scan(row, order.len(), d_row.signum() as isize, occupied) as u32
@@ -1196,20 +1322,40 @@ fn sort_finite_number_column_comparison(
 
 fn sort_finite_number_column_radix(
     sheet: &SheetData,
-    base: usize,
+    col: usize,
     ascending: bool,
 ) -> Option<Vec<u32>> {
     let mut pairs = Vec::with_capacity(sheet.cells.row_count());
-    let end = base + sheet.cells.row_count();
-    let mut start = base;
-    while start < end {
-        let run = sheet.cells.run(start, end);
-        for index in run.start..run.end {
-            let value = source_number_in_run(&run, index, sheet.cells.is_paged())?;
-            let key = finite_number_sort_key(value)?;
-            pairs.push((if ascending { key } else { !key }, (index - base) as u32));
+    let direction = |key: u64| if ascending { key } else { !key };
+
+    // A dense column gathers keys from its slices; only literal numbers sort
+    // here, so a formula or any other source ends the numeric path early.
+    if let Some(column) = sheet.cells.dense_column(col) {
+        for (row, (kind, payload)) in column.sources().enumerate() {
+            if kind != KIND_NUMBER {
+                return None;
+            }
+            pairs.push((
+                direction(finite_number_sort_key(f64::from_bits(payload))?),
+                row as u32,
+            ));
         }
-        start = run.end;
+    } else {
+        // Only paged storage has no dense column, and a paged blank source
+        // resolves through the run's overlays before it counts as blank.
+        let paged = sheet.cells.is_paged();
+        let base = col * sheet.cells.row_count();
+        let end = base + sheet.cells.row_count();
+        let mut start = base;
+        while start < end {
+            let run = sheet.cells.run(start, end);
+            for index in run.start..run.end {
+                let value = source_number_in_run(&run, index, paged)?;
+                let key = finite_number_sort_key(value)?;
+                pairs.push((direction(key), (index - base) as u32));
+            }
+            start = run.end;
+        }
     }
 
     radix_sort_numeric_pairs(&mut pairs);

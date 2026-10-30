@@ -27,6 +27,7 @@
     "bench:formula:engines": "bun run src/full-engine-bench.ts",
     "bench:formula:matched": "bun run src/matched-engine-bench.ts",
     "bench:view-index": "bun run src/view-index-bench.ts",
+    "reader:gate": "bun run src/reader-gate.ts",
     "bench:epochs": "bun run src/epoch-split-bench.ts",
     "bench:formula:smoke": "bun run src/formula-bench.ts --smoke",
     "bench:resource": "bun run src/resource-bench.ts",
