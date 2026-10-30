@@ -1,9 +1,9 @@
 import { validConditionalRules } from "./conditional-format.js";
+import { overlappingMergeIndices } from "./document-protocol.js";
 import { validateSheetName } from "./sheet-name.js";
 import {
   integerAt,
   mergeCrossesFreeze,
-  mergesOverlap,
   normalizeMerge,
   positiveCount,
   uniqueColumnKeys,
@@ -85,9 +85,7 @@ function addSheetSnapshotIssue(
     (snapshot.frozenRows !== undefined && snapshot.frozenRows > snapshot.rowCount) ||
     (snapshot.frozenCols !== undefined && snapshot.frozenCols > snapshot.columns.length) ||
     merges.some((merge) => !validMerge(candidate, merge) || mergeCrossesFreeze(candidate, merge)) ||
-    merges.some((merge, index) =>
-      merges.slice(index + 1).some((other) => mergesOverlap(merge, other)),
-    ) ||
+    overlappingMergeIndices(merges).includes(true) ||
     !validConditionalRules(candidate, snapshot.conditionalFormats ?? []) ||
     !validValidationRules(candidate, snapshot.validationRules ?? []) ||
     !validProtectedRanges(candidate, snapshot.protectedRanges ?? []) ||

@@ -867,6 +867,16 @@ describe("SheetwriteStore", () => {
 });
 
 describe("datasource row hydration", () => {
+  it("keeps empty numeric cells and boolean text cells during page hydration", () => {
+    const store = new SheetwriteStore(makeWorkbook(5));
+    store.loadPage("s1", 0, ALL_SOURCE_COLUMN_BANDS, [{ name: true, amount: null, city: false }]);
+
+    expect(store.getCell(addr(0, 0)).resolved).toBe(true);
+    expect(store.getCell(addr(0, 1)).resolved).toBeNull();
+    expect(store.getCell(addr(0, 2)).resolved).toBe(false);
+    store.dispose();
+  });
+
   it("preserves rich cells without producing dirty changes", () => {
     const store = new SheetwriteStore(makeWorkbook(5));
     let changes = 0;
@@ -1229,7 +1239,7 @@ describe("paged datasource storage", () => {
     expect(store.getVisibleWindow("s1", { start: 0, end: 2 }, [2, 0]).values).toEqual([
       "A",
       "alpha",
-      "",
+      null,
       "beta",
     ]);
     expect(store.getCellLoadState(addr(0, 1))).toBe("unloaded");

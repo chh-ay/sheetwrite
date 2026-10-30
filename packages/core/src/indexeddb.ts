@@ -1,4 +1,5 @@
 import { boundedJsonByteLength, JsonByteLengthError, SheetwriteError } from "./errors.js";
+import { compareCodeUnits } from "./plain-data.js";
 import type { PendingCommitLoadOptions, PendingCommitStorage } from "./sync.js";
 import type { PendingCommit } from "./types/transaction.js";
 
@@ -120,7 +121,7 @@ export class IndexedDbPendingCommitStorage implements PendingCommitStorage {
       legacy.records.sort(
         (left, right) =>
           left.baseVersion - right.baseVersion ||
-          left.clientMutationId.localeCompare(right.clientMutationId),
+          compareCodeUnits(left.clientMutationId, right.clientMutationId),
       );
       await this.ensureSequenceFloor(database, documentId, legacy.maxSequence + 1, options.signal);
       for (const record of legacy.records) await this.put(record, options.signal);

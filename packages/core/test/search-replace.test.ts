@@ -34,6 +34,11 @@ describe("replaceInText", () => {
     expect(replaceInText("aXbXc", "x", "-")).toBe("a-b-c");
     expect(replaceInText("Tokyo", "tok", "Kyo")).toBe("Kyoyo");
   });
+
+  it("preserves original offsets when Unicode lowercase expands", () => {
+    expect(replaceInText("İabc abc", "abc", "x")).toBe("İx x");
+    expect(replaceInText("İx", "İ", "Y")).toBe("Yx");
+  });
   it("matchCase only hits exact casing", () => {
     expect(replaceInText("aXbxc", "x", "-", { matchCase: true })).toBe("aXb-c");
   });
@@ -143,6 +148,25 @@ describe("replaceAll", () => {
     grid.actions.redo();
     expect(store.getCell(A(8, 2)).resolved).toBe("changed");
     expect(store.getRefTarget(A(9, 0))).toEqual(A(4, 1));
+    grid.destroy();
+    store.dispose();
+  });
+
+  it("keeps matching reference cells linked during replace all", () => {
+    const workbook = makeWorkbook(3);
+    const store = new SheetwriteStore(workbook);
+    store.applyTransaction({
+      patches: [
+        { op: "set", addr: A(0, 0), value: { kind: "literal", value: "match" } },
+        { op: "set", addr: A(1, 0), value: { kind: "ref", target: A(0, 0) } },
+      ],
+    });
+    const grid = new GridImpl(mountHost(), { workbook }, store);
+    grid.search("match");
+
+    expect(grid.replaceAll("changed").replaced).toBe(1);
+    expect(store.getRefTarget(A(1, 0))).toEqual(A(0, 0));
+    expect(store.getCell(A(1, 0)).resolved).toBe("changed");
     grid.destroy();
     store.dispose();
   });
