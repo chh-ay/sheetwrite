@@ -23,10 +23,7 @@ export const Route = createFileRoute("/showcases/")({
 
 const OWNER_BY_ID = new Map(CAPABILITY_OWNERS.map((owner) => [owner.id, owner]));
 
-/**
- * Seven capability owners: three featured cards on the first desktop row, four
- * on the second, then the four adapters.
- */
+/** Capability launch cards followed by the four framework adapters. */
 const SCENE_ORDER = [
   "performance",
   "formulas",
@@ -34,6 +31,7 @@ const SCENE_ORDER = [
   "database",
   "host-rows",
   "interoperability",
+  "formatting",
   "engine",
 ] as const satisfies readonly CapabilityOwnerId[];
 
@@ -46,6 +44,7 @@ const SCENE_SUMMARY: Readonly<Record<SceneOwnerId, string>> = {
   database: "IndexedDB snapshots, commits, compaction, and reload recovery.",
   "host-rows": "Your store owns the rows. Sort, filter and edit; every delta names the record.",
   interoperability: "XLSX and delimited exchange with fixture-backed fidelity warnings.",
+  formatting: "A styled P&L, mixed number formats, and a live XLSX fidelity check.",
   collaboration: "Sequencing, reconnects, conflicts, and recovery across two clients.",
   engine: "A 50,000-row forecast with every public engine event traced beside it.",
 };
@@ -91,7 +90,7 @@ const HUB_GROUPS: readonly { id: HubGroup; label: string }[] = [
 function ownerGroup(owner: (typeof CAPABILITY_OWNERS)[number]): Exclude<HubGroup, "all"> {
   if (owner.kind === "framework") return "framework";
   if (owner.id === "formulas" || owner.id === "engine") return "formulas";
-  if (owner.id === "interoperability") return "workbook";
+  if (owner.id === "interoperability" || owner.id === "formatting") return "workbook";
   if (owner.id === "collaboration") return "collaboration";
   return "data";
 }
@@ -302,6 +301,21 @@ function HostRowsScene() {
   );
 }
 
+function FormattingScene() {
+  return (
+    <span aria-hidden="true" className="sw-hub-scene sw-hub-scene--interoperability">
+      <span className="sw-hub-trace">
+        <strong>Q1 operating budget</strong>
+        <span>
+          <b>$84,250.00</b> · <em>12.5%</em> · 2026-01-01
+        </span>
+        <code>General → Currency → Accounting</code>
+      </span>
+      <span className="sw-hub-scene__caption">typography · per-cell formats · XLSX proof</span>
+    </span>
+  );
+}
+
 function CapabilityScene({ id, medianMs }: Readonly<{ id: SceneOwnerId; medianMs?: number }>) {
   switch (id) {
     case "performance":
@@ -314,6 +328,8 @@ function CapabilityScene({ id, medianMs }: Readonly<{ id: SceneOwnerId; medianMs
       return <HostRowsScene />;
     case "interoperability":
       return <InteroperabilityScene />;
+    case "formatting":
+      return <FormattingScene />;
     case "collaboration":
       return <CollaborationScene />;
     case "engine":

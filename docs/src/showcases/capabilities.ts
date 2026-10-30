@@ -16,6 +16,7 @@ export type CapabilityOwnerId =
   | "svelte"
   | "database"
   | "interoperability"
+  | "formatting"
   | "engine"
   | "formulas"
   | "performance"
@@ -126,6 +127,15 @@ export const CAPABILITY_OWNERS: readonly CapabilityOwner[] = [
     routeFile: "docs/src/routes/showcases.interoperability.tsx",
     responsibility:
       "XLSX/Excel and CSV/TSV exchange against independent fixtures: fidelity, intentional loss, warnings, resource limits, optional package boundary.",
+    kind: "capability",
+  },
+  {
+    id: "formatting",
+    label: "Formatting & number formats",
+    href: "/showcases/formatting/",
+    routeFile: "docs/src/routes/showcases.formatting.tsx",
+    responsibility:
+      "Live budget typography, alignment, borders, fills, mixed per-cell number formats, conditional formatting, and XLSX style fidelity.",
     kind: "capability",
   },
   {
@@ -482,12 +492,16 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     id: "formatting.cell-styles",
     title: "Cell styles & number formats",
     area: "workflow",
-    primary: "vue",
-    interaction: "Bold, fills, currency number formats, and conditional formats paint live.",
+    primary: "formatting",
+    secondary: [
+      { owner: "vue", reason: "Supplier workflow uses currency and conditional styles." },
+    ],
+    interaction:
+      "Change live budget styles and mixed number formats, then export and re-import XLSX to compare their fidelity.",
     scope: "browser",
     accessibility: "Style never encodes the only copy of information; values stay readable.",
-    testPath: VUE_SPEC,
-    sharedModules: [BUSINESS_SCENARIO],
+    testPath: "test/browser/showcase-formatting.spec.ts",
+    sharedModules: ["docs/src/showcases/scenarios/formatting.ts"],
     boundary: "Theming beyond the documented Theme contract is host-owned CSS.",
   },
   {
