@@ -11,6 +11,7 @@ import { installGridScrollHints } from "../lib/grid-scroll-hint.ts";
 import { installAnchorReveal } from "../lib/reveal-anchor.ts";
 import { SITE_URL } from "../lib/seo.js";
 
+import demoSelectStylesheet from "../styles/demo-select.css?url";
 import docsFiguresStylesheet from "../styles/docs-figures.css?url";
 import showcaseStylesheet from "../styles/showcase.css?url";
 import siteShellStylesheet from "../styles/site-shell.css?url";
@@ -19,8 +20,10 @@ import siteStylesheet from "../styles/site.css?url";
 import "virtual:expressive-code.css";
 import tokensStylesheet from "../styles/tokens.css?url";
 
+// Blocked storage throws a DOMException; the saved theme is optional, so the
+// script then follows the system color scheme.
 const THEME_SCRIPT =
-  'document.documentElement.dataset.theme=localStorage.getItem("sheetwrite-theme")??(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark")';
+  '{let saved=null;try{saved=localStorage.getItem("sheetwrite-theme")}catch(error){if(!(error instanceof DOMException))throw error}document.documentElement.dataset.theme=saved??(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark")}';
 
 // Kept short: search results cut long titles by pixel width, and Bing warns past about 70 characters.
 const SITE_TITLE = "Sheetwrite — Spreadsheet, data grid & workbook engine · XLSX/CSV";
@@ -70,6 +73,8 @@ export const Route = createRootRoute({
         { rel: "stylesheet", href: siteStylesheet },
         // Shell refinements layer over site.css; link order is the cascade.
         { rel: "stylesheet", href: siteShellStylesheet },
+        // Showcases and the formula reference both render DemoSelect.
+        { rel: "stylesheet", href: demoSelectStylesheet },
         ...(showcaseChrome ? [{ rel: "stylesheet", href: showcaseStylesheet }] : []),
         // Result figures and section cards exist only on documentation pages.
         ...(showcaseChrome ? [] : [{ rel: "stylesheet", href: docsFiguresStylesheet }]),
