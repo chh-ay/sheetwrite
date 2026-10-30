@@ -5947,7 +5947,7 @@ grid.store.applyTransaction({
 
 ## Registration
 
-Import the functions from `@sheetwrite/core/functions`. An application that does not import this entry carries none of its code.
+Import the functions from `@sheetwrite/core/functions`. An application that does not import this entry carries none of its JavaScript.
 
 `registerFunction(store, metadata, implementation)` adds a function to one store and recalculates every formula. Registering the same name again replaces the function. `unregisterFunction(store, name)` removes it, and formulas that call it show `#NAME?`. Names are not case-sensitive.
 
