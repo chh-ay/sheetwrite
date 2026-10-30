@@ -14,6 +14,7 @@ import type { Theme } from "../types/render.js";
 import type { ChangeEvent } from "../types/transaction.js";
 import { seedWidgetTheme } from "../widget-theme.js";
 import { createFormulaBar, createNameBox, type ShellPiece } from "./formula-controls.js";
+import { createRibbon } from "./ribbon-factory.js";
 import { createSelectionStatus } from "./selection-status.js";
 import { createToolbar } from "./toolbar-factory.js";
 
@@ -23,6 +24,8 @@ export interface SpreadsheetShellOptions {
   grid: GridOptions;
   /** Toolbar items (default: the full built-in action set). */
   toolbar?: readonly ToolbarItem[];
+  /** Use an Excel-style ribbon instead of the flat toolbar. */
+  ribbon?: boolean;
   /** Event callbacks forwarded from the owned grid. */
   onChange?: (event: ChangeEvent) => void;
   onSelectionChange?: (selection: Selection | null) => void;
@@ -114,7 +117,11 @@ export function createSpreadsheetShell(
   const focusGrid = (): void => gridHost.focus();
 
   const pieces: ShellPiece[] = [];
-  pieces.push(createToolbar(toolbarRow, grid, { items: options.toolbar }));
+  pieces.push(
+    options.ribbon
+      ? createRibbon(toolbarRow, grid, { focusGrid })
+      : createToolbar(toolbarRow, grid, { items: options.toolbar }),
+  );
   pieces.push(createNameBox(formulaRow, grid, { focusGrid }));
   formulaRow.appendChild(fx);
   const formulaBar = createFormulaBar(formulaRow, grid, { focusGrid });

@@ -28,7 +28,7 @@ function updateTotal(grid: Grid) {
 - [Grid.applyTransaction](/docs/api/core/grid/#grid-apply-transaction)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L602"><code>packages/core/src/types/grid.ts#L602</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L660"><code>packages/core/src/types/grid.ts#L660</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -36,6 +36,7 @@ function updateTotal(grid: Grid) {
 <a href="#grid-actions"><code>actions</code></a>
 <a href="#grid-get-runtime-resource-snapshot"><code>getRuntimeResourceSnapshot</code></a>
 <a href="#grid-get-command-state"><code>getCommandState</code></a>
+<a href="#grid-get-focus-cell-style"><code>getFocusCellStyle</code></a>
 <a href="#grid-set-active-sheet"><code>setActiveSheet</code></a>
 <a href="#grid-scroll-to-cell"><code>scrollToCell</code></a>
 <a href="#grid-get-cell-at-point"><code>getCellAtPoint</code></a>
@@ -124,7 +125,7 @@ function updateTotal(grid: Grid) {
 <a href="#grid-destroy"><code>destroy</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>90</span>
+## Members <span class="api-count" data-pagefind-ignore>91</span>
 
 <div class="api-member-list">
 
@@ -162,6 +163,17 @@ getRuntimeResourceSnapshot( operation: RuntimeResourceOperation, phase: RuntimeR
 getCommandState(command: GridCommandName): GridCommandState;
 ```
 
+</details>
+
+<details class="api-member" id="grid-get-focus-cell-style" data-pagefind-weight="1">
+<summary><code>getFocusCellStyle</code> <span class="api-member-summary">Effective style of the focus cell: its own style over its column's cellStyle.</span></summary>
+
+```ts generated
+getFocusCellStyle(): CellStyle;
+```
+
+<p class="api-member-doc">Effective style of the focus cell: its own style over its column's
+`cellStyle`. Empty when nothing is selected.</p>
 </details>
 
 <details class="api-member" id="grid-set-active-sheet" data-pagefind-weight="1">
@@ -1117,6 +1129,7 @@ export interface Grid {
     runtime?: RuntimeMemoryObservation,
   ): RuntimeResourceSnapshot;
   getCommandState(command: GridCommandName): GridCommandState;
+  getFocusCellStyle(): CellStyle;
   setActiveSheet(id: SheetId): void;
   scrollToCell(addr: CellAddress): void;
   getCellAtPoint(clientX: number, clientY: number): CellAddress | null;
@@ -1262,6 +1275,6 @@ export interface Grid {
 <li><a href="/docs/api/core/to-xlsx-workbook/"><code>toXlsxWorkbook</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core-adapter/grid-controller/"><code>GridController</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core-adapter/grid-publication-adapter/"><code>GridPublicationAdapter</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li class="api-consumer-more">and 17 more</li>
+<li class="api-consumer-more">and 18 more</li>
 </ul>
 </div>

@@ -18,3 +18,4 @@ export {
   type SpreadsheetShellOptions,
 } from "./shell/spreadsheet-shell.js";
 export { createToolbar, type ToolbarOptions } from "./shell/toolbar-factory.js";
+export { createRibbon, type RibbonOptions } from "./shell/ribbon-factory.js";

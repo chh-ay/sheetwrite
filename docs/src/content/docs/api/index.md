@@ -12,7 +12,7 @@ The package `exports` maps define this inventory. Supported, internal, asset, an
 <tr><td><a href="/docs/api/core/"><code>@sheetwrite/core</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>324</td></tr>
 <tr><td><a href="/docs/api/core-adapter/"><code>@sheetwrite/core/adapter</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>55</td></tr>
 <tr><td><a href="/docs/api/core-browser/"><code>@sheetwrite/core/browser</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>4</td></tr>
-<tr><td><a href="/docs/api/core-shell/"><code>@sheetwrite/core/shell</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>13</td></tr>
+<tr><td><a href="/docs/api/core-shell/"><code>@sheetwrite/core/shell</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>15</td></tr>
 <tr><td><a href="/docs/api/core-shell-css/"><code>@sheetwrite/core/shell.css</code></a></td><td><span class="api-status" data-status="asset">asset</span></td><td>0</td></tr>
 <tr><td><a href="/docs/api/core-styles-css/"><code>@sheetwrite/core/styles.css</code></a></td><td><span class="api-status" data-status="asset">asset</span></td><td>0</td></tr>
 <tr><td><a href="/docs/api/core-testing/"><code>@sheetwrite/core/testing</code></a></td><td><span class="api-status" data-status="test-only">test-only</span></td><td>4</td></tr>

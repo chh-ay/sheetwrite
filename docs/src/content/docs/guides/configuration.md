@@ -410,6 +410,7 @@ createGrid(host, { workbook });                            // no toolbar (config
 | `sort` | `boolean` | `true` | Sort the selected column. |
 | `export` | `boolean` | `true` | CSV / XLSX export buttons. |
 | `undo` | `boolean` | `true` | Undo / redo buttons (also bound to Ctrl+Z / Ctrl+Shift+Z). |
+| `ribbon` | `boolean` | `false` | Show the Excel-style ribbon instead of the flat toolbar (see below). |
 
 ¹ "Default `true`" means: when you supply a `config` object at all. With no
 `config` there is no toolbar.
@@ -424,6 +425,40 @@ Built-in buttons show a busy state and ignore repeated starts while their
 command is pending.
 
 Every control acts on the current selection — see [Interaction](/docs/guides/interaction/).
+
+### Ribbon
+
+Set `ribbon: true` to replace the flat toolbar with an Excel-style ribbon. It
+has four tabs (Home, Insert, Data, View) with Excel's groups and labels: font
+name and size, borders, fill and font colors, vertical and horizontal
+alignment, wrap, merge, number formats, insert and delete, AutoSum, clear,
+sort and filter, find, links, notes, row groups, freeze panes and zoom.
+
+```ts prelude="core" partial="requires surrounding host state" title="Excel-style ribbon"
+createGrid(host, { workbook, config: { ribbon: true } });
+```
+
+The per-control flags above apply to the flat toolbar only. A custom
+`toolbar: [...]` item list still renders the flat toolbar, and
+`toolbar: false` removes both.
+
+As the grid narrows, the ribbon shrinks the way Excel does. Large buttons
+become small ones, then labels go, then whole groups fold into one dropdown
+button that opens the group in a popup. Double-click a tab, or use the arrow
+at the right, to hide the panel and keep only the tab row. The grid takes the
+space back.
+
+Keyboard: Tab reaches the tab row, arrow keys move between tabs, and Escape
+returns focus to the grid. Menus and lists use the arrow keys, Enter and
+Escape. Ctrl/Cmd shortcuts such as undo still work while focus is in the
+ribbon. Every control reads the same `getCommandState` contract as host
+chrome, so it disables while the grid is read-only.
+
+The composable shell mounts the same ribbon: pass `ribbon: true` to the
+spreadsheet shell, or call [`createRibbon`](/docs/api/core-shell/create-ribbon/)
+to place it yourself. It styles itself from the same `--sheetwrite-widget-*`,
+`--sheetwrite-toolbar-*` and `--sheetwrite-menu-*` properties as the toolbar,
+so light, dark and host themes apply.
 
 ### Host-owned command state
 

@@ -29,6 +29,7 @@ import {
 import { normalizeSheetwriteError, SheetwriteError } from "./errors.js";
 import { downloadBytes, toCsv, toXlsxTable } from "./export.js";
 import { FindBar } from "./find-bar.js";
+import { stepFontSizePx, stepNumberFormatDecimals } from "./format-presets.js";
 import { GeometryLayoutController } from "./geometry-layout-controller.js";
 import { hyperlinkAt, resolveHyperlinkTarget, sanitizeCellHyperlink } from "./hyperlink.js";
 import { InteractionSessions } from "./interaction-sessions.js";
@@ -43,6 +44,7 @@ import {
   type RuntimeResourcePhase,
   type RuntimeResourceSnapshot,
 } from "./resource-accounting.js";
+import { Ribbon } from "./ribbon/ribbon.js";
 import { SearchController } from "./search-controller.js";
 import { type CellRef, SelectionModel, type SelRect } from "./selection.js";
 import { sheetNameKey, validateSheetName } from "./sheet-name.js";
@@ -165,6 +167,10 @@ const GRID_COMMANDS: readonly GridCommandName[] = [
   "alignLeft",
   "alignCenter",
   "alignRight",
+  "alignTop",
+  "alignMiddle",
+  "alignBottom",
+  "wrap",
   "textColor",
   "fillColor",
   "border",
@@ -186,6 +192,10 @@ const COMMAND_STATE_ACTIVITY_COMMANDS: readonly GridCommandName[] = [
   "alignLeft",
   "alignCenter",
   "alignRight",
+  "alignTop",
+  "alignMiddle",
+  "alignBottom",
+  "wrap",
   "border",
 ];
 /** Bound synchronous command-state work; larger uniform selections report mixed conservatively. */
@@ -200,6 +210,10 @@ function isFormattingCommand(command: GridCommandName): boolean {
     command === "alignLeft" ||
     command === "alignCenter" ||
     command === "alignRight" ||
+    command === "alignTop" ||
+    command === "alignMiddle" ||
+    command === "alignBottom" ||
+    command === "wrap" ||
     command === "textColor" ||
     command === "fillColor" ||
     command === "border" ||
@@ -232,6 +246,14 @@ function formattingCommandActive(
       return effectiveStyleValue(cell, column, "align") === "center";
     case "alignRight":
       return effectiveStyleValue(cell, column, "align") === "right";
+    case "alignTop":
+      return effectiveStyleValue(cell, column, "verticalAlign") === "top";
+    case "alignMiddle":
+      return (effectiveStyleValue(cell, column, "verticalAlign") ?? "middle") === "middle";
+    case "alignBottom":
+      return effectiveStyleValue(cell, column, "verticalAlign") === "bottom";
+    case "wrap":
+      return effectiveStyleValue(cell, column, "wrap") === true;
     case "border":
       return effectiveStyleValue(cell, column, "border") !== undefined;
     default:
@@ -439,6 +461,7 @@ export class GridImpl implements Grid {
   private zoom = 1;
   private baseTheme: Theme;
   private toolbar: Toolbar | null = null;
+  private ribbon: Ribbon | null = null;
   private findBar: FindBar | null = null;
   private readonly actionFeedback: ActionFeedback;
   private config: GridConfig | undefined;
@@ -713,10 +736,7 @@ export class GridImpl implements Grid {
     this.actionFeedback = attachActionFeedback(this, host);
 
     const config = this.config;
-    if (config && config.toolbar !== false) {
-      this.toolbar = new Toolbar(host, config, this.theme, this);
-      this.toolbarHeight = Toolbar.height;
-    }
+    this.createToolbar(config);
 
     if (config?.find !== false) {
       this.findBar = new FindBar(host, this.theme, this, this.readOnly);
@@ -2050,8 +2070,35 @@ export class GridImpl implements Grid {
    * repaints the widgets too, not only the canvas.
    */
   private reseedWidgetTheme(): void {
-    if (!this.toolbar && !this.findBar && this.config?.contextMenu === false) return;
+    if (!this.toolbar && !this.ribbon && !this.findBar && this.config?.contextMenu === false)
+      return;
     seedWidgetTheme(this.host, this.baseTheme);
+  }
+
+  private createToolbar(config: GridConfig | undefined): void {
+    if (!config || config.toolbar === false) return;
+    if (config.ribbon === true && !Array.isArray(config.toolbar)) {
+      // The grid owns widget theming: seed now, reseed on every theme change.
+      seedWidgetTheme(this.host, this.baseTheme);
+      this.ribbon = new Ribbon(this.host, this, {
+        onHeightChange: (height: number) => {
+          this.toolbarHeight = height;
+          this.viewportEl.style.top = `${height}px`;
+          this.applyLayout();
+          this.render();
+        },
+      });
+      // Grid layout offsets the viewport by the ribbon's height, so chrome must leave normal flow.
+      const el = this.ribbon.element;
+      el.style.position = "absolute";
+      el.style.top = "0";
+      el.style.left = "0";
+      el.style.right = "0";
+      this.toolbarHeight = this.ribbon.height;
+    } else {
+      this.toolbar = new Toolbar(this.host, config, this.baseTheme, this);
+      this.toolbarHeight = Toolbar.height;
+    }
   }
 
   private emitThemeChange(): void {
@@ -2108,12 +2155,11 @@ export class GridImpl implements Grid {
       typeof keyboard === "function" ? (event: KeyboardEvent) => keyboard(event, this) : keyboard;
 
     this.toolbar?.destroy();
+    this.ribbon?.destroy();
+    this.ribbon = null;
     this.toolbar = null;
     this.toolbarHeight = 0;
-    if (config && config.toolbar !== false) {
-      this.toolbar = new Toolbar(this.host, config, this.baseTheme, this);
-      this.toolbarHeight = Toolbar.height;
-    }
+    this.createToolbar(config);
 
     this.interactions.configureMenu(config, this.baseTheme);
 
@@ -2535,8 +2581,51 @@ export class GridImpl implements Grid {
       toggleUnderline: () => this.styleActions.toggleStyle("underline"),
       toggleStrikethrough: () => this.styleActions.toggleStyle("strikethrough"),
       setAlign: (align) => this.styleActions.applyStyle({ align }),
-      setTextColor: (color) => this.styleActions.applyStyle({ color }),
-      setFillColor: (color) => this.styleActions.applyStyle({ backgroundColor: color }),
+      setTextColor: (color) => this.styleActions.applyStyle({ color: color ?? undefined }),
+      setFillColor: (color) =>
+        this.styleActions.applyStyle({ backgroundColor: color ?? undefined }),
+      setFontFamily: (family) => this.styleActions.applyStyle({ fontFamily: family ?? undefined }),
+      setFontSize: (px) => this.styleActions.applyStyle({ fontSize: px ?? undefined }),
+      stepFontSize: (direction) => {
+        const defaultFontSize = 13;
+        const themeFontSize =
+          Number.parseFloat(/(\d+(?:\.\d+)?)px/.exec(this.baseTheme.font)?.[1] ?? "") ||
+          defaultFontSize;
+        this.styleActions.applyStyle({
+          fontSize: stepFontSizePx(this.getFocusCellStyle().fontSize ?? themeFontSize, direction),
+        });
+      },
+      setVerticalAlign: (verticalAlign) => this.styleActions.applyStyle({ verticalAlign }),
+      toggleWrap: () => this.styleActions.applyStyle({ wrap: !this.getFocusCellStyle().wrap }),
+      setNumberFormat: (code) => this.styleActions.applyStyle({ numberFormat: code ?? undefined }),
+      stepDecimals: (direction) => {
+        const focus = this.selection.focusCell;
+        if (!focus) return;
+        const column = this.sheet().columns[focus.col];
+        const value = this.store.getCell({
+          sheet: this.activeSheet,
+          row: this.toDataRow(focus.row),
+          col: focus.col,
+        }).resolved;
+        const numberFormat = stepNumberFormatDecimals(
+          this.getFocusCellStyle().numberFormat ?? column?.numberFormat,
+          direction,
+          typeof value === "number" ? value : undefined,
+          column?.numberLocale,
+        );
+        if (numberFormat === undefined) return;
+
+        this.styleActions.applyStyle({ numberFormat });
+      },
+      setBorders: (preset) => this.styleActions.setBorders(preset),
+      mergeAndCenter: () => this.styleActions.mergeSelection(true),
+      clearAll: () => this.styleActions.clearAll(),
+      autoSum: () => this.autoSum(),
+      find: () => this.findBar?.open(),
+      freezePanes: () => {
+        const focus = this.selection.focusCell;
+        if (focus) this.setFrozen(focus.row, focus.col);
+      },
       toggleBorder: () => this.styleActions.toggleBorder(),
       clearFormat: () => this.styleActions.applyStyle(null),
       merge: () => this.styleActions.mergeSelection(),
@@ -2613,6 +2702,78 @@ export class GridImpl implements Grid {
       undo: () => this.undo(),
       redo: () => this.redo(),
     };
+  }
+
+  getFocusCellStyle(): CellStyle {
+    const focus = this.selection.focusCell;
+    if (!focus) return {};
+    const anchor = this.anchorCell(focus.row, focus.col);
+    const cell = this.store.getCell({
+      sheet: this.activeSheet,
+      row: this.toDataRow(anchor.row),
+      col: anchor.col,
+    });
+    return { ...this.sheet().columns[anchor.col]?.cellStyle, ...cell.style };
+  }
+
+  private autoSum(): void {
+    const focus = this.selection.focusCell;
+    if (this.readOnly || !focus) return;
+    const row = this.toDataRow(focus.row);
+    const col = focus.col;
+    const chunkCells = 4_096;
+    const numericStart = (vertical: boolean): number => {
+      let end = vertical ? row : col;
+      const origin = end;
+      while (end > 0) {
+        const start = Math.max(0, end - chunkCells);
+        const columns = vertical
+          ? [col]
+          : Array.from({ length: end - start }, (_, index) => start + index);
+        const window = this.store.getDataWindow?.(
+          this.activeSheet,
+          vertical ? { start, end } : { start: row, end: row + 1 },
+          columns,
+        );
+        let values: ArrayLike<CellScalar>;
+        if (window) values = window.values;
+        else {
+          const coordinates =
+            columns.length === 1 && vertical
+              ? Array.from({ length: end - start }, (_, index) => ({ row: start + index, col }))
+              : columns.map((column) => ({ row, col: column }));
+          const engine = storeEngine(this.store);
+          // Custom stores without canonical windows retain their scalar data-address contract.
+          const cells = engine
+            ? engine.captureResolvedCells(this.activeSheet, coordinates)
+            : coordinates.map((coordinate) =>
+                this.store.getCell({ sheet: this.activeSheet, ...coordinate }),
+              );
+          values = cells.map((cell) => cell.resolved);
+        }
+        for (let index = values.length - 1; index >= 0; index--) {
+          if (typeof values[index] !== "number") return start + index + 1;
+        }
+        end = start;
+      }
+      return origin === 0 ? origin : end;
+    };
+    const firstRow = numericStart(true);
+    const vertical = firstRow < row;
+    const firstCol = vertical ? col : numericStart(false);
+    if (!vertical && firstCol === col) return;
+    const start = `${colToA1(firstCol)}${(vertical ? firstRow : row) + 1}`;
+    const end = `${colToA1(vertical ? col : col - 1)}${(vertical ? row - 1 : row) + 1}`;
+    this.document.commit(
+      [
+        {
+          op: "set",
+          addr: { sheet: this.activeSheet, row, col },
+          value: { kind: "formula", src: `=SUM(${start}:${end})` },
+        },
+      ],
+      "edit-enter",
+    );
   }
 
   getCommandState(command: GridCommandName): GridCommandState {
@@ -3020,6 +3181,7 @@ export class GridImpl implements Grid {
     cleanup(() => this.sheetTabs?.destroy());
     cleanup(() => this.tabBar?.remove());
     cleanup(() => this.toolbar?.destroy());
+    cleanup(() => this.ribbon?.destroy());
     cleanup(() => this.findBar?.destroy());
     cleanup(() => this.actionFeedback.destroy());
     cleanup(() => this.viewportEl.remove());
