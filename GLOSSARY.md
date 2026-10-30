@@ -40,6 +40,32 @@ _Avoid_: pivot config, pivot spec
 The remembered source-row contributions and group aggregates used to update a pivot table when its source changes.
 _Avoid_: pivot state, pivot data
 
+## Errors, aborts and memory
+
+**Failure**:
+An expected way for an operation to not complete, such as bad input or a limit that is passed. It rejects or throws a `SheetwriteError` with a `code`. A programmer bug is not a failure, and an abort is not a failure.
+_Avoid_: error (alone, for an expected case), exception
+
+**Abort**:
+The stop of an operation because its `AbortSignal` fired. The operation rejects with `signal.reason` and leaves no partial state. An abort never shows an error alert.
+_Avoid_: cancel failure, aborted error
+
+**Scope**:
+One lifetime, such as a grid, a chrome build or one long operation, that owns an `AbortController` and a list of disposers. Ending a scope aborts its work and runs its disposers in reverse order.
+_Avoid_: context, session (for a lifetime)
+
+**Disposer**:
+A function, added to a scope, that frees one resource: a timer, a listener, an observer, a worker or an object URL.
+_Avoid_: cleanup callback, teardown hook
+
+**Owner-scoped cache**:
+A cache whose entries live only as long as their owner (a grid or a workbook). It is keyed by the owner in a `WeakMap` or stored on the owner, so destroying the owner frees it.
+_Avoid_: global cache, module cache (for an owned cache)
+
+**Trim**:
+Dropping the caches of an open grid that can be built again (layout, text measurement, parsed formulas, render caches) while the document data stays. The next use builds again what it needs.
+_Avoid_: purge, flush, garbage collect
+
 ## Release
 
 **Package assembly**:
