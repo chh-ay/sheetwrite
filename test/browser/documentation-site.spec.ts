@@ -380,7 +380,10 @@ test.describe("documentation site", () => {
     await expect(page).toHaveURL(/\/docs\/api\/core\/grid\/$/);
     await expect(page.locator("main h1")).toContainText("Grid");
     await expect(page.locator(".api-member[open]")).toHaveCount(0);
-    await expect(page.getByRole("button", { name: /copy/i })).toHaveCount(0);
+    // Signatures are for reading, so they carry no copy control; examples keep theirs,
+    // also after in-site navigation. The CSS locator counts collapsed members too.
+    await expect(page.locator(".api-member .copy, .api-declaration .copy")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Copy to clipboard" }).first()).toBeVisible();
     await page.locator("#grid-get-cell-at-point summary").click();
     await expect(page.locator("#grid-get-cell-at-point pre")).toContainText(
       "clientX: number, clientY: number",
