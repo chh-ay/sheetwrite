@@ -12,11 +12,11 @@ This page lists the 25 functions of the date and time family. Taxonomy/source: [
 <section class="sw-formula-family">
 
 <table class="sw-formula-table"><thead><tr><th>Function (aliases)</th><th>Engine</th><th>Contract</th></tr></thead><tbody>
-<tr data-formula-name="DATE" data-engine="default"><td><code>DATE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-date-three">Signature: <code>date-three</code></a><br /><a href="#semantics-date-time">Semantics: <code>date-time</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="DATE" data-engine="default"><td><code>DATE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-date-three">Signature: <code>date-three</code></a><br /><a href="#semantics-date-time">Semantics: <code>date-time</code></a><br /><a href="#dialect-excel-date-negative">Dialect: <code>excel-date-negative</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="DATEVALUE" data-engine="default"><td><code>DATEVALUE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-date-time">Semantics: <code>date-time</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
-<tr data-formula-name="DAY" data-engine="default"><td><code>DAY</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-date-time">Semantics: <code>date-time</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
-<tr data-formula-name="MONTH" data-engine="default"><td><code>MONTH</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-date-time">Semantics: <code>date-time</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
-<tr data-formula-name="YEAR" data-engine="default"><td><code>YEAR</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-date-time">Semantics: <code>date-time</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="DAY" data-engine="default"><td><code>DAY</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-date-time">Semantics: <code>date-time</code></a><br /><a href="#dialect-excel-date-serial">Dialect: <code>excel-date-serial</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="MONTH" data-engine="default"><td><code>MONTH</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-date-time">Semantics: <code>date-time</code></a><br /><a href="#dialect-excel-date-serial">Dialect: <code>excel-date-serial</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="YEAR" data-engine="default"><td><code>YEAR</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-date-time">Semantics: <code>date-time</code></a><br /><a href="#dialect-excel-date-serial">Dialect: <code>excel-date-serial</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="TODAY" data-engine="default"><td><code>TODAY</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-zero">Signature: <code>zero</code></a><br /><a href="#semantics-volatile-date">Semantics: <code>volatile-date</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="NOW" data-engine="default"><td><code>NOW</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-zero">Signature: <code>zero</code></a><br /><a href="#semantics-volatile-date">Semantics: <code>volatile-date</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="TIME" data-engine="default"><td><code>TIME</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-date-three">Signature: <code>date-three</code></a><br /><a href="#semantics-date-time">Semantics: <code>date-time</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
@@ -217,6 +217,18 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 
 ## Dialect profiles
 
+<details id="dialect-excel-date-negative"><summary>Dialect: excel-date-negative</summary>
+
+| Dialect | Status |
+| --- | --- |
+| Microsoft Excel | divergent |
+| Google Sheets | unverified |
+| OpenFormula | unverified |
+
+Limitations: DATE can return a negative serial, as in =DATE(1900,1,-1). Excel returns #NUM! (#246).
+
+</details>
+
 <details id="dialect-excel-documented"><summary>Dialect: excel-documented</summary>
 
 | Dialect | Status |
@@ -226,6 +238,18 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 | OpenFormula | unverified |
 
 Limitations: Google Sheets and OpenFormula results require producer evidence before compatibility is claimed.
+
+</details>
+
+<details id="dialect-excel-date-serial"><summary>Dialect: excel-date-serial</summary>
+
+| Dialect | Status |
+| --- | --- |
+| Microsoft Excel | divergent |
+| Google Sheets | unverified |
+| OpenFormula | unverified |
+
+Limitations: Serial 0 and blank cells read as 1899-12-31. Excel returns year 1900, month 1 and day 0 (#246). Negative serials are accepted. Excel returns #NUM! (#246).
 
 </details>
 

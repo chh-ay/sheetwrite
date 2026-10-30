@@ -1,5 +1,13 @@
 # @sheetwrite/core
 
+## 0.6.1
+
+### Patch Changes
+
+- [#232](https://github.com/chh-ay/sheetwrite/pull/232) [`c29a25a`](https://github.com/chh-ay/sheetwrite/commit/c29a25a65c4ff01ae32ad89fc6b32dde4798ffde) Thanks [@chh-ay](https://github.com/chh-ay)! - Reduce repeated accessibility DOM updates when revisiting loaded datasource pages.
+- Updated dependencies [[`1ceb09a`](https://github.com/chh-ay/sheetwrite/commit/1ceb09a7567a99292744d8b4fd459ffc0c73b3fb), [`3df2d80`](https://github.com/chh-ay/sheetwrite/commit/3df2d80d6b670d41ba5b18954befe281694a2ddd)]:
+  - @sheetwrite/wasm@0.6.1
+
 ## 0.6.0
 
 ### Minor Changes
