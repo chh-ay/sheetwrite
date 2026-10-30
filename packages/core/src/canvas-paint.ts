@@ -173,12 +173,43 @@ export function fontFor(
   return font;
 }
 
+/** First probe length for a paragraph's first line; later lines start from the previous line's length. */
+const FIRST_LINE_GUESS = 16;
+const WHITESPACE = /\s/;
+/**
+ * Below U+0300 every code unit is a whole grapheme. From there on, combining
+ * marks, surrogate pairs, ZWJ sequences and Indic clusters span several.
+ */
+const MAY_HAVE_CLUSTERS = /[\u0300-\uffff]/;
+let graphemeSegmenter: Intl.Segmenter | undefined;
+
+/** End offset of each grapheme, or null when every code unit is one. */
+function graphemeEnds(paragraph: string): number[] | null {
+  if (!MAY_HAVE_CLUSTERS.test(paragraph)) return null;
+  graphemeSegmenter ??= new Intl.Segmenter(undefined, { granularity: "grapheme" });
+  const ends: number[] = [];
+  for (const { index, segment } of graphemeSegmenter.segment(paragraph)) {
+    ends.push(index + segment.length);
+  }
+  return ends;
+}
+
 /**
  * Wrapped-only line layout; the ordinary single-line path never calls this.
  * `maxLines` bounds the work for cells whose block cannot fit: the caller only
  * draws lines that fit the cell height, so generating more than
  * `floor(height / lineHeight) + 1` lines cannot change the pixels. A result
  * whose length reaches `maxLines` therefore means "more lines exist".
+ *
+ * Lines break between graphemes, never inside an emoji or a cluster. Inside
+ * a cluster a prefix can be wider than the whole (a half-built ZWJ sequence),
+ * but across graphemes width grows with length, so each break is found by
+ * search instead of measuring every prefix, which made a line of L characters
+ * cost L measurements of growing strings. Joining scripts such as Arabic can
+ * shrink slightly when a letter takes its final form; there the search may
+ * pick a different break than a scan would, but every line it picks fits.
+ * The search gallops forward from the previous line's length, then bisects,
+ * so measured text stays close to one line long however long the paragraph is.
  */
 function layoutTextLinesInto(
   ctx: Ctx,
@@ -188,27 +219,71 @@ function layoutTextLinesInto(
   lines: string[],
 ): string[] {
   const limit = Math.max(1, maxLines);
+
   for (const paragraph of text.split("\n")) {
     if (lines.length >= limit) break;
     if (paragraph === "") {
       lines.push("");
       continue;
     }
+
+    // Break units: graphemes, or plain code units when they coincide (no allocation).
+    const ends = graphemeEnds(paragraph);
+    const count = ends === null ? paragraph.length : ends.length;
+    const endOf = (unit: number): number => (ends === null ? unit + 1 : (ends[unit] ?? 0));
+
+    let first = 0;
     let start = 0;
-    while (start < paragraph.length && lines.length < limit) {
-      let end = start;
-      let lastBreak = -1;
-      while (end < paragraph.length) {
-        const next = end + 1;
-        if (/\s/.test(paragraph[end]!)) lastBreak = next;
-        if (ctx.measureText(paragraph.slice(start, next)).width > width) {
-          if (end === start) end = next;
-          else if (lastBreak > start) end = lastBreak;
+    let guess = FIRST_LINE_GUESS;
+    const overflows = (unit: number): boolean =>
+      ctx.measureText(paragraph.slice(start, endOf(unit))).width > width;
+
+    while (first < count && lines.length < limit) {
+      // Gallop: grow the probe until it overflows or the paragraph ends.
+      let fits = first - 1;
+      let over = -1;
+      for (let step = guess; ; step *= 2) {
+        const probe = Math.min(count - 1, fits + step);
+        if (overflows(probe)) {
+          over = probe;
           break;
         }
-        end = next;
+        fits = probe;
+        if (probe === count - 1) break;
       }
+      if (over === -1) {
+        lines.push(paragraph.slice(start));
+        break;
+      }
+
+      // Bisect for the first unit that does not fit.
+      let low = fits + 1;
+      let high = over;
+      while (low < high) {
+        const mid = (low + high) >>> 1;
+        if (overflows(mid)) high = mid;
+        else low = mid + 1;
+      }
+      const overflowUnit = low;
+
+      // A first unit too wide for the cell still gets a line of its own.
+      // Otherwise break after the last whitespace up to the overflowing unit
+      // (it may be that whitespace), or mid-word just before it.
+      let last = first;
+      if (overflowUnit > first) {
+        last = overflowUnit - 1;
+        for (let unit = overflowUnit; unit >= first; unit--) {
+          if (WHITESPACE.test(paragraph[endOf(unit) - 1] ?? "")) {
+            last = unit;
+            break;
+          }
+        }
+      }
+
+      const end = endOf(last);
       lines.push(paragraph.slice(start, end));
+      guess = last - first + 1;
+      first = last + 1;
       start = end;
     }
   }
