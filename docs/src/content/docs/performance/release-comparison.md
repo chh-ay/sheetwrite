@@ -5,25 +5,27 @@ description: "Each release measured against the previous one on the same machine
 
 ## Sheetwrite 0.6.0 compared with a fresh 0.5.4 capture
 
-Each suite ran once on 0.5.4 and once on 0.6.0, on the same machine. Change is 0.6.0 / 0.5.4 for the median, with the p95 ratio in brackets when it differs: below 1× is faster or smaller, above 1× is slower or larger. A suite with a documented budget marks rows beyond it as flagged; rows without a budget are only marked faster or slower.
+Each suite ran once on 0.5.4 and once on 0.6.0, on the same machine. Change is 0.6.0 / 0.5.4 for the median, with the p95 ratio in brackets when it differs: below 1× is faster or smaller, above 1× is slower or larger. A suite with a documented budget marks rows beyond it as flagged; rows without a budget are only marked faster, slower, smaller or larger.
 
-| Suite | Measurements | Faster | Slower | Unchanged or within budget | Flagged |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Render scale | 112 | 17 | 95 | 0 | 0 |
-| Interaction | 7 | 1 | 3 | 3 | 0 |
-| Paged | 5 | 4 | 1 | 0 | 0 |
-| Data | 89 | 64 | 25 | 0 | 0 |
-| Core paths | 14 | 9 | 5 | 0 | 0 |
-| Chart tracking | 34 | — | — | — | New in 0.6 |
-| Pivot | 5 | — | — | — | New in 0.6 |
-| Formula | 212 | 101 | 0 | 110 | 1 |
-| Formula default | 212 | 92 | 0 | 119 | 1 |
-| Formula full | 212 | 99 | 0 | 111 | 2 |
-| Full engine | 458 | 205 | 0 | 248 | 3 |
-| Full engine matched | 24 | 17 | 7 | 0 | 0 |
-| Xlsx | 48 | 14 | 32 | 2 | 0 |
-| Render baseline raw | 28 | 8 | 20 | 0 | 0 |
-| Render baseline | 28 | 2 | 0 | 17 | 9 |
+The summary counts Sheetwrite's own measurements. Lower and higher cover time, memory and counts alike. Handsontable control runs and full-engine rows that repeat the formula tables are counted apart, so a change is not counted twice or credited to Sheetwrite.
+
+| Suite | Measurements | Lower | Higher | Unchanged or within budget | New in 0.6 | Flagged | Control or repeat |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Render scale | 112 | 16 | 39 | 1 | 0 | 0 | 56 |
+| Interaction | 7 | 1 | 3 | 3 | 0 | 0 | 0 |
+| Paged | 5 | 4 | 1 | 0 | 0 | 0 | 0 |
+| Data | 89 | 62 | 25 | 2 | 0 | 0 | 0 |
+| Core paths | 14 | 9 | 5 | 0 | 0 | 0 | 0 |
+| Chart tracking | 34 | 0 | 0 | 0 | 34 | 0 | 0 |
+| Pivot | 5 | 0 | 0 | 0 | 5 | 0 | 0 |
+| Formula | 212 | 89 | 0 | 122 | 0 | 1 | 0 |
+| Formula default | 212 | 81 | 0 | 130 | 0 | 1 | 0 |
+| Formula full | 212 | 88 | 0 | 122 | 0 | 2 | 0 |
+| Full engine | 458 | 14 | 0 | 18 | 2 | 0 | 424 |
+| Full engine matched | 24 | 17 | 7 | 0 | 0 | 0 | 0 |
+| Xlsx | 48 | 13 | 32 | 3 | 0 | 0 | 0 |
+| Render baseline raw | 28 | 6 | 8 | 0 | 0 | 0 | 14 |
+| Render baseline | 28 | 2 | 0 | 12 | 0 | 0 | 14 |
 
 ## Flagged rows
 
@@ -35,18 +37,18 @@ Each suite ran once on 0.5.4 and once on 0.6.0, on the same machine. Change is 0
 | Formula default | <span title="workloads[id=text-lookup-many-sorted;size=1000].stat">Text lookup many sorted · 1,000</span> | 3.20 ms / 3.29 ms | 4.02 ms / 4.45 ms | 1.26× (p95 1.35×) | **Flagged** |
 | Formula full | <span title="workloads[id=independent-parse-load;size=1000].stat">Independent parse load · 1,000</span> | 0.83 ms / 0.96 ms | 1.21 ms / 1.57 ms | 1.46× (p95 1.64×) | **Flagged** |
 | Formula full | <span title="workloads[id=text-lookup-many;size=1000].stat">Text lookup many · 1,000</span> | 2.12 ms / 2.17 ms | 2.45 ms / 3.22 ms | 1.16× (p95 1.48×) | **Flagged** |
-| Full engine | <span title="engines[engine=default].shared.workloads[id=text-lookup-many-sorted;size=1000].stat">Default · text lookup many sorted · 1,000</span> | 3.20 ms / 3.29 ms | 4.02 ms / 4.45 ms | 1.26× (p95 1.35×) | **Flagged** |
-| Full engine | <span title="engines[engine=full].shared.workloads[id=independent-parse-load;size=1000].stat">Full · independent parse load · 1,000</span> | 0.83 ms / 0.96 ms | 1.21 ms / 1.57 ms | 1.46× (p95 1.64×) | **Flagged** |
-| Full engine | <span title="engines[engine=full].shared.workloads[id=text-lookup-many;size=1000].stat">Full · text lookup many · 1,000</span> | 2.12 ms / 2.17 ms | 2.45 ms / 3.22 ms | 1.16× (p95 1.48×) | **Flagged** |
-| Render baseline | <span title="cells[key=engine=handsontable;rows=100000;scenario=altering.insert-5-rows-top]">Engine · 100,000 rows · altering · insert 5 rows top</span> | 14.5 ms / 21.2 ms | 17.3 ms / 18.8 ms | 1.19× (p95 0.89×) | **Flagged** |
-| Render baseline | <span title="cells[key=engine=handsontable;rows=100000;scenario=altering.remove-5-rows-top]">Engine · 100,000 rows · altering · remove 5 rows top</span> | 12.5 ms / 15.5 ms | 15.0 ms / 15.8 ms | 1.20× (p95 1.02×) | **Flagged** |
-| Render baseline | <span title="cells[key=engine=handsontable;rows=100000;scenario=edit-commit.middle]">Engine · 100,000 rows · edit commit · middle</span> | 4.95 ms / 5.52 ms | 7.80 ms / 8.18 ms | 1.58× (p95 1.48×) | **Flagged** |
-| Render baseline | <span title="cells[key=engine=handsontable;rows=100000;scenario=formatted-paint.top-left]">Engine · 100,000 rows · formatted paint · top left</span> | 3.36 ms / 3.72 ms | 6.14 ms / 7.65 ms | 1.83× (p95 2.05×) | **Flagged** |
-| Render baseline | <span title="cells[key=engine=handsontable;rows=100000;scenario=merge-heavy.paint]">Engine · 100,000 rows · merge heavy · paint</span> | 3.48 ms / 3.76 ms | 6.37 ms / 6.54 ms | 1.83× (p95 1.74×) | **Flagged** |
-| Render baseline | <span title="cells[key=engine=handsontable;rows=100000;scenario=scroll-down.middle]">Engine · 100,000 rows · scroll down · middle</span> | 4.00 ms / 4.98 ms | 6.86 ms / 9.86 ms | 1.71× (p95 1.98×) | **Flagged** |
-| Render baseline | <span title="cells[key=engine=handsontable;rows=100000;scenario=scroll-down.top-left]">Engine · 100,000 rows · scroll down · top left</span> | 15.8 ms / 16.0 ms | 21.3 ms / 21.9 ms | 1.35× | **Flagged** |
-| Render baseline | <span title="cells[key=engine=handsontable;rows=100000;scenario=scroll-right.top-left]">Engine · 100,000 rows · scroll right · top left</span> | 10.6 ms / 10.7 ms | 16.4 ms / 17.8 ms | 1.56× (p95 1.66×) | **Flagged** |
-| Render baseline | <span title="cells[key=engine=handsontable;rows=100000;scenario=scroll-smooth.same-window]">Engine · 100,000 rows · scroll smooth · same window</span> | 7.72 ms / 8.33 ms | 10.5 ms / 11.3 ms | 1.36× | **Flagged** |
+| Full engine · repeat of formula table | <span title="engines[engine=default].shared.workloads[id=text-lookup-many-sorted;size=1000].stat">Default · text lookup many sorted · 1,000</span> | 3.20 ms / 3.29 ms | 4.02 ms / 4.45 ms | 1.26× (p95 1.35×) | **Flagged** |
+| Full engine · repeat of formula table | <span title="engines[engine=full].shared.workloads[id=independent-parse-load;size=1000].stat">Full · independent parse load · 1,000</span> | 0.83 ms / 0.96 ms | 1.21 ms / 1.57 ms | 1.46× (p95 1.64×) | **Flagged** |
+| Full engine · repeat of formula table | <span title="engines[engine=full].shared.workloads[id=text-lookup-many;size=1000].stat">Full · text lookup many · 1,000</span> | 2.12 ms / 2.17 ms | 2.45 ms / 3.22 ms | 1.16× (p95 1.48×) | **Flagged** |
+| Render baseline · Handsontable control | <span title="cells[key=engine=handsontable;rows=100000;scenario=altering.insert-5-rows-top]">Handsontable · 100,000 rows · altering · insert 5 rows top</span> | 14.5 ms / 21.2 ms | 17.3 ms / 18.8 ms | 1.19× (p95 0.89×) | **Flagged** |
+| Render baseline · Handsontable control | <span title="cells[key=engine=handsontable;rows=100000;scenario=altering.remove-5-rows-top]">Handsontable · 100,000 rows · altering · remove 5 rows top</span> | 12.5 ms / 15.5 ms | 15.0 ms / 15.8 ms | 1.20× (p95 1.02×) | **Flagged** |
+| Render baseline · Handsontable control | <span title="cells[key=engine=handsontable;rows=100000;scenario=edit-commit.middle]">Handsontable · 100,000 rows · edit commit · middle</span> | 4.95 ms / 5.52 ms | 7.80 ms / 8.18 ms | 1.58× (p95 1.48×) | **Flagged** |
+| Render baseline · Handsontable control | <span title="cells[key=engine=handsontable;rows=100000;scenario=formatted-paint.top-left]">Handsontable · 100,000 rows · formatted paint · top left</span> | 3.36 ms / 3.72 ms | 6.14 ms / 7.65 ms | 1.83× (p95 2.05×) | **Flagged** |
+| Render baseline · Handsontable control | <span title="cells[key=engine=handsontable;rows=100000;scenario=merge-heavy.paint]">Handsontable · 100,000 rows · merge heavy · paint</span> | 3.48 ms / 3.76 ms | 6.37 ms / 6.54 ms | 1.83× (p95 1.74×) | **Flagged** |
+| Render baseline · Handsontable control | <span title="cells[key=engine=handsontable;rows=100000;scenario=scroll-down.middle]">Handsontable · 100,000 rows · scroll down · middle</span> | 4.00 ms / 4.98 ms | 6.86 ms / 9.86 ms | 1.71× (p95 1.98×) | **Flagged** |
+| Render baseline · Handsontable control | <span title="cells[key=engine=handsontable;rows=100000;scenario=scroll-down.top-left]">Handsontable · 100,000 rows · scroll down · top left</span> | 15.8 ms / 16.0 ms | 21.3 ms / 21.9 ms | 1.35× | **Flagged** |
+| Render baseline · Handsontable control | <span title="cells[key=engine=handsontable;rows=100000;scenario=scroll-right.top-left]">Handsontable · 100,000 rows · scroll right · top left</span> | 10.6 ms / 10.7 ms | 16.4 ms / 17.8 ms | 1.56× (p95 1.66×) | **Flagged** |
+| Render baseline · Handsontable control | <span title="cells[key=engine=handsontable;rows=100000;scenario=scroll-smooth.same-window]">Handsontable · 100,000 rows · scroll smooth · same window</span> | 7.72 ms / 8.33 ms | 10.5 ms / 11.3 ms | 1.36× | **Flagged** |
 
 ## Reading the flags
 
@@ -199,7 +201,7 @@ Threshold: **none**. No documented historical-capture noise threshold for this s
 | <span title="results[engine=sheetwrite;rows=1000000;scenarioId=edit-open.middle]">Sheetwrite · 1,000,000 rows · edit open · middle</span> | 0.58 ms / 1.52 ms | 0.56 ms / 1.30 ms | 0.95× (p95 0.86×) | Faster |
 | <span title="results[engine=sheetwrite;rows=1000000;scenarioId=edit-open.top-left]">Sheetwrite · 1,000,000 rows · edit open · top left</span> | 0.50 ms / 1.42 ms | 0.58 ms / 1.37 ms | 1.15× (p95 0.96×) | Slower |
 | <span title="results[engine=sheetwrite;rows=1000000;scenarioId=formatted-paint.top-left]">Sheetwrite · 1,000,000 rows · formatted paint · top left</span> | 0.41 ms / 0.70 ms | 4 µs | 0.01× | Faster |
-| <span title="results[engine=sheetwrite;rows=1000000;scenarioId=merge-heavy.paint]">Sheetwrite · 1,000,000 rows · merge heavy · paint</span> | 3 µs | 3 µs | 1.00× | Faster |
+| <span title="results[engine=sheetwrite;rows=1000000;scenarioId=merge-heavy.paint]">Sheetwrite · 1,000,000 rows · merge heavy · paint</span> | 3 µs | 3 µs | 1.00× | Unchanged |
 | <span title="results[engine=sheetwrite;rows=1000000;scenarioId=scroll-down.middle]">Sheetwrite · 1,000,000 rows · scroll down · middle</span> | 1.10 ms / 1.81 ms | 1.12 ms / 1.67 ms | 1.02× (p95 0.93×) | Slower |
 | <span title="results[engine=sheetwrite;rows=1000000;scenarioId=scroll-down.top-left]">Sheetwrite · 1,000,000 rows · scroll down · top left</span> | 1.11 ms / 1.18 ms | 1.16 ms / 1.26 ms | 1.05× | Slower |
 | <span title="results[engine=sheetwrite;rows=1000000;scenarioId=scroll-right.top-left]">Sheetwrite · 1,000,000 rows · scroll right · top left</span> | 0.27 ms / 0.41 ms | 0.26 ms / 0.40 ms | 0.99× | Faster |
@@ -307,7 +309,7 @@ Threshold: **none**. No documented historical-capture noise threshold for this s
 | <span title="handsontable.10000.stats.filter">Handsontable · 10,000 · stats · filter</span> | 589 ms / 627 ms | 582 ms / 617 ms | 0.99× | Faster |
 | <span title="handsontable.10000.stats.ingest">Handsontable · 10,000 · stats · ingest</span> | 3.99 s / 4.30 s | 3.88 s / 4.16 s | 0.97× | Faster |
 | <span title="handsontable.10000.stats.multiFilter">Handsontable · 10,000 · stats · multi filter</span> | 1.23 s / 1.32 s | 1.21 s / 1.25 s | 0.98× | Faster |
-| <span title="handsontable.10000.stats.sort">Handsontable · 10,000 · stats · sort</span> | 1.44 s / 1.55 s | 1.44 s / 1.55 s | 1.00× | Faster |
+| <span title="handsontable.10000.stats.sort">Handsontable · 10,000 · stats · sort</span> | 1.44 s / 1.55 s | 1.44 s / 1.55 s | 1.00× | Unchanged |
 | <span title="handsontable.10000.stats.windowRead">Handsontable · 10,000 · stats · window read</span> | 0.18 ms / 0.23 ms | 0.18 ms / 0.25 ms | 1.01× (p95 1.10×) | Slower |
 | <span title="sheetwrite.1000.queries.filter-value-set-10">Sheetwrite · 1,000 · filter value set 10</span> | 0.19 ms / 0.72 ms | 0.17 ms / 0.67 ms | 0.86× (p95 0.92×) | Faster |
 | <span title="sheetwrite.1000.queries.filter-value-set-1000">Sheetwrite · 1,000 · filter value set 1000</span> | 0.92 ms / 1.62 ms | 0.83 ms / 1.37 ms | 0.91× (p95 0.84×) | Faster |
@@ -378,7 +380,7 @@ Threshold: **none**. No documented historical-capture noise threshold for this s
 | <span title="sheetwrite.500000.stats.filter">Sheetwrite · 500,000 · stats · filter</span> | 1.75 ms / 1.79 ms | 1.56 ms / 1.61 ms | 0.90× | Faster |
 | <span title="sheetwrite.500000.stats.ingest">Sheetwrite · 500,000 · stats · ingest</span> | 325 ms / 327 ms | 291 ms / 297 ms | 0.89× | Faster |
 | <span title="sheetwrite.500000.stats.multiFilter">Sheetwrite · 500,000 · stats · multi filter</span> | 19.2 ms / 19.8 ms | 18.3 ms / 18.6 ms | 0.96× | Faster |
-| <span title="sheetwrite.500000.stats.sort">Sheetwrite · 500,000 · stats · sort</span> | 10.0 ms / 10.1 ms | 10.0 ms / 10.1 ms | 1.00× | Faster |
+| <span title="sheetwrite.500000.stats.sort">Sheetwrite · 500,000 · stats · sort</span> | 10.0 ms / 10.1 ms | 10.0 ms / 10.1 ms | 1.00× | Unchanged |
 | <span title="sheetwrite.500000.stats.windowRead">Sheetwrite · 500,000 · stats · window read</span> | 0.01 ms / 0.02 ms | 0.02 ms | 1.05× | Slower |
 
 </details>
@@ -478,15 +480,15 @@ Threshold: **formula-release-limit**. Release limits: max(baseline × 1.25, base
 | Measurement | 0.5.4 median / p95 | 0.6.0 median / p95 | Change | Result |
 | --- | ---: | ---: | ---: | --- |
 | <span title="workloads[id=countif-100k;size=100000].allocationStat.peakTransientBytes">Countif 100k · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="workloads[id=countif-100k;size=100000].allocationStat.retainedBytes">Countif 100k · 100,000 · allocation stat · retained bytes</span> | 2.5 MiB | 2.5 MiB | 1.00× | Smaller |
+| <span title="workloads[id=countif-100k;size=100000].allocationStat.retainedBytes">Countif 100k · 100,000 · allocation stat · retained bytes</span> | 2.5 MiB | 2.5 MiB | 1.00× | Unchanged |
 | <span title="workloads[id=countif-100k;size=100000].allocationStat.transientAllocations">Countif 100k · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="workloads[id=countif-100k;size=100000].stat">Countif 100k · 100,000</span> | 0.94 ms / 1.06 ms | 0.87 ms / 0.91 ms | 0.92× (p95 0.86×) | Faster |
 | <span title="workloads[id=criteria-multi-range-edit;size=100000].allocationStat.peakTransientBytes">Criteria multi range edit · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="workloads[id=criteria-multi-range-edit;size=100000].allocationStat.retainedBytes">Criteria multi range edit · 100,000 · allocation stat · retained bytes</span> | 5.0 MiB | 5.0 MiB | 1.00× | Smaller |
+| <span title="workloads[id=criteria-multi-range-edit;size=100000].allocationStat.retainedBytes">Criteria multi range edit · 100,000 · allocation stat · retained bytes</span> | 5.0 MiB | 5.0 MiB | 1.00× | Unchanged |
 | <span title="workloads[id=criteria-multi-range-edit;size=100000].allocationStat.transientAllocations">Criteria multi range edit · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="workloads[id=criteria-multi-range-edit;size=100000].stat">Criteria multi range edit · 100,000</span> | 4.79 ms / 5.02 ms | 4.25 ms / 4.31 ms | 0.89× | Faster |
 | <span title="workloads[id=criteria-range-edit;size=100000].allocationStat.peakTransientBytes">Criteria range edit · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="workloads[id=criteria-range-edit;size=100000].allocationStat.retainedBytes">Criteria range edit · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Smaller |
+| <span title="workloads[id=criteria-range-edit;size=100000].allocationStat.retainedBytes">Criteria range edit · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Unchanged |
 | <span title="workloads[id=criteria-range-edit;size=100000].allocationStat.transientAllocations">Criteria range edit · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="workloads[id=criteria-range-edit;size=100000].stat">Criteria range edit · 100,000</span> | 1.60 ms / 1.65 ms | 1.68 ms / 1.74 ms | 1.05× | Within budget |
 | <span title="workloads[id=cross-sheet-range-edit;size=1000].allocationStat.peakTransientBytes">Cross sheet range edit · 1,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
@@ -512,7 +514,7 @@ Threshold: **formula-release-limit**. Release limits: max(baseline × 1.25, base
 | <span title="workloads[id=formula-constant-edit;size=100000].allocationStat.peakTransientBytes">Formula constant edit · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
 | <span title="workloads[id=formula-constant-edit;size=100000].allocationStat.retainedBytes">Formula constant edit · 100,000 · allocation stat · retained bytes</span> | 55.0 MiB | 53.3 MiB | 0.97× | Smaller |
 | <span title="workloads[id=formula-constant-edit;size=100000].allocationStat.transientAllocations">Formula constant edit · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
-| <span title="workloads[id=formula-constant-edit;size=100000].stat">Formula constant edit · 100,000</span> | 0.03 ms / 0.04 ms | 0.03 ms / 0.04 ms | 1.00× (p95 1.06×) | Faster |
+| <span title="workloads[id=formula-constant-edit;size=100000].stat">Formula constant edit · 100,000</span> | 0.03 ms / 0.04 ms | 0.03 ms / 0.04 ms | 1.00× (p95 1.06×) | Unchanged |
 | <span title="workloads[id=incremental-dependency-closure-edit;size=100000].allocationStat.peakTransientBytes">Incremental dependency closure edit · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
 | <span title="workloads[id=incremental-dependency-closure-edit;size=100000].allocationStat.retainedBytes">Incremental dependency closure edit · 100,000 · allocation stat · retained bytes</span> | 72.0 MiB | 68.7 MiB | 0.95× | Smaller |
 | <span title="workloads[id=incremental-dependency-closure-edit;size=100000].allocationStat.transientAllocations">Incremental dependency closure edit · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
@@ -546,11 +548,11 @@ Threshold: **formula-release-limit**. Release limits: max(baseline × 1.25, base
 | <span title="workloads[id=iterative-finance;size=1000].allocationStat.transientAllocations">Iterative finance · 1,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="workloads[id=iterative-finance;size=1000].stat">Iterative finance · 1,000</span> | 3.83 ms / 4.18 ms | 2.85 ms / 2.93 ms | 0.74× | Faster |
 | <span title="workloads[id=let-repeat;size=100000].allocationStat.peakTransientBytes">Let repeat · 100,000 · allocation stat · peak transient bytes</span> | 1.5 MiB | 1.5 MiB | 1.00× | Unchanged |
-| <span title="workloads[id=let-repeat;size=100000].allocationStat.retainedBytes">Let repeat · 100,000 · allocation stat · retained bytes</span> | 5.0 MiB | 5.0 MiB | 1.00× | Smaller |
+| <span title="workloads[id=let-repeat;size=100000].allocationStat.retainedBytes">Let repeat · 100,000 · allocation stat · retained bytes</span> | 5.0 MiB | 5.0 MiB | 1.00× | Unchanged |
 | <span title="workloads[id=let-repeat;size=100000].allocationStat.transientAllocations">Let repeat · 100,000 · allocation stat · transient allocations</span> | 2 | 2 | 1.00× | Unchanged |
 | <span title="workloads[id=let-repeat;size=100000].stat">Let repeat · 100,000</span> | 1.93 ms / 2.07 ms | 1.71 ms | 0.88× (p95 0.83×) | Faster |
 | <span title="workloads[id=let-reuse-edit;size=100000].allocationStat.peakTransientBytes">Let reuse edit · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="workloads[id=let-reuse-edit;size=100000].allocationStat.retainedBytes">Let reuse edit · 100,000 · allocation stat · retained bytes</span> | 2.5 MiB | 2.5 MiB | 1.00× | Smaller |
+| <span title="workloads[id=let-reuse-edit;size=100000].allocationStat.retainedBytes">Let reuse edit · 100,000 · allocation stat · retained bytes</span> | 2.5 MiB | 2.5 MiB | 1.00× | Unchanged |
 | <span title="workloads[id=let-reuse-edit;size=100000].allocationStat.transientAllocations">Let reuse edit · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="workloads[id=let-reuse-edit;size=100000].stat">Let reuse edit · 100,000</span> | 0.64 ms / 0.66 ms | 0.50 ms / 0.51 ms | 0.78× | Faster |
 | <span title="workloads[id=linear-chain;size=16].allocationStat.peakTransientBytes">Linear chain · 16 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
@@ -570,11 +572,11 @@ Threshold: **formula-release-limit**. Release limits: max(baseline × 1.25, base
 | <span title="workloads[id=linear-chain;size=8].allocationStat.transientAllocations">Linear chain · 8 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="workloads[id=linear-chain;size=8].stat">Linear chain · 8</span> | 0.02 ms / 0.04 ms | 0.02 ms / 0.04 ms | 0.97× | Faster |
 | <span title="workloads[id=lookup-range-edit;size=100000].allocationStat.peakTransientBytes">Lookup range edit · 100,000 · allocation stat · peak transient bytes</span> | 1.5 MiB | 1.5 MiB | 1.00× | Unchanged |
-| <span title="workloads[id=lookup-range-edit;size=100000].allocationStat.retainedBytes">Lookup range edit · 100,000 · allocation stat · retained bytes</span> | 5.0 MiB | 5.0 MiB | 1.00× | Smaller |
+| <span title="workloads[id=lookup-range-edit;size=100000].allocationStat.retainedBytes">Lookup range edit · 100,000 · allocation stat · retained bytes</span> | 5.0 MiB | 5.0 MiB | 1.00× | Unchanged |
 | <span title="workloads[id=lookup-range-edit;size=100000].allocationStat.transientAllocations">Lookup range edit · 100,000 · allocation stat · transient allocations</span> | 2 | 2 | 1.00× | Unchanged |
 | <span title="workloads[id=lookup-range-edit;size=100000].stat">Lookup range edit · 100,000</span> | 1.88 ms / 2.72 ms | 1.73 ms / 1.79 ms | 0.92× (p95 0.66×) | Faster |
 | <span title="workloads[id=percentile-covariance;size=100000].allocationStat.peakTransientBytes">Percentile covariance · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="workloads[id=percentile-covariance;size=100000].allocationStat.retainedBytes">Percentile covariance · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Smaller |
+| <span title="workloads[id=percentile-covariance;size=100000].allocationStat.retainedBytes">Percentile covariance · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Unchanged |
 | <span title="workloads[id=percentile-covariance;size=100000].allocationStat.transientAllocations">Percentile covariance · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="workloads[id=percentile-covariance;size=100000].stat">Percentile covariance · 100,000</span> | 3.52 ms / 3.71 ms | 2.85 ms / 3.10 ms | 0.81× | Faster |
 | <span title="workloads[id=removed-sheet-ref;size=1000].allocationStat.peakTransientBytes">Removed sheet ref · 1,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
@@ -610,19 +612,19 @@ Threshold: **formula-release-limit**. Release limits: max(baseline × 1.25, base
 | <span title="workloads[id=spill-sequence-admission;size=100000].allocationStat.transientAllocations">Spill sequence admission · 100,000 · allocation stat · transient allocations</span> | 1 | 1 | 1.00× | Unchanged |
 | <span title="workloads[id=spill-sequence-admission;size=100000].stat">Spill sequence admission · 100,000</span> | 11.4 ms / 11.6 ms | 4.38 ms / 5.27 ms | 0.38× (p95 0.45×) | Faster |
 | <span title="workloads[id=sum-multi-range;size=100000].allocationStat.peakTransientBytes">Sum multi range · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="workloads[id=sum-multi-range;size=100000].allocationStat.retainedBytes">Sum multi range · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Smaller |
+| <span title="workloads[id=sum-multi-range;size=100000].allocationStat.retainedBytes">Sum multi range · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Unchanged |
 | <span title="workloads[id=sum-multi-range;size=100000].allocationStat.transientAllocations">Sum multi range · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="workloads[id=sum-multi-range;size=100000].stat">Sum multi range · 100,000</span> | 4.03 ms / 4.74 ms | 3.79 ms / 3.93 ms | 0.94× (p95 0.83×) | Faster |
 | <span title="workloads[id=sumifs-3-criteria;size=100000].allocationStat.peakTransientBytes">Sumifs 3 criteria · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="workloads[id=sumifs-3-criteria;size=100000].allocationStat.retainedBytes">Sumifs 3 criteria · 100,000 · allocation stat · retained bytes</span> | 6.2 MiB | 6.2 MiB | 1.00× | Smaller |
+| <span title="workloads[id=sumifs-3-criteria;size=100000].allocationStat.retainedBytes">Sumifs 3 criteria · 100,000 · allocation stat · retained bytes</span> | 6.2 MiB | 6.2 MiB | 1.00× | Unchanged |
 | <span title="workloads[id=sumifs-3-criteria;size=100000].allocationStat.transientAllocations">Sumifs 3 criteria · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="workloads[id=sumifs-3-criteria;size=100000].stat">Sumifs 3 criteria · 100,000</span> | 7.11 ms / 7.48 ms | 5.79 ms / 5.93 ms | 0.81× | Faster |
 | <span title="workloads[id=sumproduct-matrix-edit;size=100000].allocationStat.peakTransientBytes">Sumproduct matrix edit · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="workloads[id=sumproduct-matrix-edit;size=100000].allocationStat.retainedBytes">Sumproduct matrix edit · 100,000 · allocation stat · retained bytes</span> | 2.6 MiB | 2.6 MiB | 1.00× | Smaller |
+| <span title="workloads[id=sumproduct-matrix-edit;size=100000].allocationStat.retainedBytes">Sumproduct matrix edit · 100,000 · allocation stat · retained bytes</span> | 2.6 MiB | 2.6 MiB | 1.00× | Unchanged |
 | <span title="workloads[id=sumproduct-matrix-edit;size=100000].allocationStat.transientAllocations">Sumproduct matrix edit · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="workloads[id=sumproduct-matrix-edit;size=100000].stat">Sumproduct matrix edit · 100,000</span> | 1.76 ms / 1.81 ms | 1.54 ms / 1.59 ms | 0.88× | Faster |
 | <span title="workloads[id=sumproduct-vector-edit;size=100000].allocationStat.peakTransientBytes">Sumproduct vector edit · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="workloads[id=sumproduct-vector-edit;size=100000].allocationStat.retainedBytes">Sumproduct vector edit · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Smaller |
+| <span title="workloads[id=sumproduct-vector-edit;size=100000].allocationStat.retainedBytes">Sumproduct vector edit · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Unchanged |
 | <span title="workloads[id=sumproduct-vector-edit;size=100000].allocationStat.transientAllocations">Sumproduct vector edit · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="workloads[id=sumproduct-vector-edit;size=100000].stat">Sumproduct vector edit · 100,000</span> | 1.85 ms / 1.94 ms | 1.57 ms / 2.10 ms | 0.85× (p95 1.08×) | Faster |
 | <span title="workloads[id=text-lookup-many-edit;size=1000].allocationStat.peakTransientBytes">Text lookup many edit · 1,000 · allocation stat · peak transient bytes</span> | 156.3 KiB | 156.3 KiB | 1.00× | Unchanged |
@@ -701,15 +703,15 @@ Threshold: **formula-release-limit**. Release limits: max(baseline × 1.25, base
 | Measurement | 0.5.4 median / p95 | 0.6.0 median / p95 | Change | Result |
 | --- | ---: | ---: | ---: | --- |
 | <span title="workloads[id=countif-100k;size=100000].allocationStat.peakTransientBytes">Countif 100k · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="workloads[id=countif-100k;size=100000].allocationStat.retainedBytes">Countif 100k · 100,000 · allocation stat · retained bytes</span> | 2.5 MiB | 2.5 MiB | 1.00× | Smaller |
+| <span title="workloads[id=countif-100k;size=100000].allocationStat.retainedBytes">Countif 100k · 100,000 · allocation stat · retained bytes</span> | 2.5 MiB | 2.5 MiB | 1.00× | Unchanged |
 | <span title="workloads[id=countif-100k;size=100000].allocationStat.transientAllocations">Countif 100k · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="workloads[id=countif-100k;size=100000].stat">Countif 100k · 100,000</span> | 0.94 ms / 0.96 ms | 0.89 ms / 0.91 ms | 0.95× | Faster |
 | <span title="workloads[id=criteria-multi-range-edit;size=100000].allocationStat.peakTransientBytes">Criteria multi range edit · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="workloads[id=criteria-multi-range-edit;size=100000].allocationStat.retainedBytes">Criteria multi range edit · 100,000 · allocation stat · retained bytes</span> | 5.0 MiB | 5.0 MiB | 1.00× | Smaller |
+| <span title="workloads[id=criteria-multi-range-edit;size=100000].allocationStat.retainedBytes">Criteria multi range edit · 100,000 · allocation stat · retained bytes</span> | 5.0 MiB | 5.0 MiB | 1.00× | Unchanged |
 | <span title="workloads[id=criteria-multi-range-edit;size=100000].allocationStat.transientAllocations">Criteria multi range edit · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="workloads[id=criteria-multi-range-edit;size=100000].stat">Criteria multi range edit · 100,000</span> | 5.50 ms / 7.79 ms | 5.16 ms / 5.45 ms | 0.94× (p95 0.70×) | Faster |
 | <span title="workloads[id=criteria-range-edit;size=100000].allocationStat.peakTransientBytes">Criteria range edit · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="workloads[id=criteria-range-edit;size=100000].allocationStat.retainedBytes">Criteria range edit · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Smaller |
+| <span title="workloads[id=criteria-range-edit;size=100000].allocationStat.retainedBytes">Criteria range edit · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Unchanged |
 | <span title="workloads[id=criteria-range-edit;size=100000].allocationStat.transientAllocations">Criteria range edit · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="workloads[id=criteria-range-edit;size=100000].stat">Criteria range edit · 100,000</span> | 1.62 ms / 1.66 ms | 1.59 ms / 1.68 ms | 0.98× | Faster |
 | <span title="workloads[id=cross-sheet-range-edit;size=1000].allocationStat.peakTransientBytes">Cross sheet range edit · 1,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
@@ -769,11 +771,11 @@ Threshold: **formula-release-limit**. Release limits: max(baseline × 1.25, base
 | <span title="workloads[id=iterative-finance;size=1000].allocationStat.transientAllocations">Iterative finance · 1,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="workloads[id=iterative-finance;size=1000].stat">Iterative finance · 1,000</span> | 3.13 ms / 3.15 ms | 2.85 ms / 2.88 ms | 0.91× | Faster |
 | <span title="workloads[id=let-repeat;size=100000].allocationStat.peakTransientBytes">Let repeat · 100,000 · allocation stat · peak transient bytes</span> | 1.5 MiB | 1.5 MiB | 1.00× | Unchanged |
-| <span title="workloads[id=let-repeat;size=100000].allocationStat.retainedBytes">Let repeat · 100,000 · allocation stat · retained bytes</span> | 5.0 MiB | 5.0 MiB | 1.00× | Smaller |
+| <span title="workloads[id=let-repeat;size=100000].allocationStat.retainedBytes">Let repeat · 100,000 · allocation stat · retained bytes</span> | 5.0 MiB | 5.0 MiB | 1.00× | Unchanged |
 | <span title="workloads[id=let-repeat;size=100000].allocationStat.transientAllocations">Let repeat · 100,000 · allocation stat · transient allocations</span> | 2 | 2 | 1.00× | Unchanged |
 | <span title="workloads[id=let-repeat;size=100000].stat">Let repeat · 100,000</span> | 1.65 ms / 1.70 ms | 1.71 ms / 1.77 ms | 1.03× | Within budget |
 | <span title="workloads[id=let-reuse-edit;size=100000].allocationStat.peakTransientBytes">Let reuse edit · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="workloads[id=let-reuse-edit;size=100000].allocationStat.retainedBytes">Let reuse edit · 100,000 · allocation stat · retained bytes</span> | 2.5 MiB | 2.5 MiB | 1.00× | Smaller |
+| <span title="workloads[id=let-reuse-edit;size=100000].allocationStat.retainedBytes">Let reuse edit · 100,000 · allocation stat · retained bytes</span> | 2.5 MiB | 2.5 MiB | 1.00× | Unchanged |
 | <span title="workloads[id=let-reuse-edit;size=100000].allocationStat.transientAllocations">Let reuse edit · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="workloads[id=let-reuse-edit;size=100000].stat">Let reuse edit · 100,000</span> | 0.58 ms / 0.64 ms | 0.51 ms | 0.88× (p95 0.80×) | Faster |
 | <span title="workloads[id=linear-chain;size=16].allocationStat.peakTransientBytes">Linear chain · 16 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
@@ -793,11 +795,11 @@ Threshold: **formula-release-limit**. Release limits: max(baseline × 1.25, base
 | <span title="workloads[id=linear-chain;size=8].allocationStat.transientAllocations">Linear chain · 8 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="workloads[id=linear-chain;size=8].stat">Linear chain · 8</span> | 0.02 ms / 0.03 ms | 0.02 ms / 0.04 ms | 1.45× (p95 1.10×) | Within budget |
 | <span title="workloads[id=lookup-range-edit;size=100000].allocationStat.peakTransientBytes">Lookup range edit · 100,000 · allocation stat · peak transient bytes</span> | 1.5 MiB | 1.5 MiB | 1.00× | Unchanged |
-| <span title="workloads[id=lookup-range-edit;size=100000].allocationStat.retainedBytes">Lookup range edit · 100,000 · allocation stat · retained bytes</span> | 5.0 MiB | 5.0 MiB | 1.00× | Smaller |
+| <span title="workloads[id=lookup-range-edit;size=100000].allocationStat.retainedBytes">Lookup range edit · 100,000 · allocation stat · retained bytes</span> | 5.0 MiB | 5.0 MiB | 1.00× | Unchanged |
 | <span title="workloads[id=lookup-range-edit;size=100000].allocationStat.transientAllocations">Lookup range edit · 100,000 · allocation stat · transient allocations</span> | 2 | 2 | 1.00× | Unchanged |
 | <span title="workloads[id=lookup-range-edit;size=100000].stat">Lookup range edit · 100,000</span> | 1.73 ms / 1.79 ms | 1.71 ms / 1.77 ms | 0.99× | Faster |
 | <span title="workloads[id=percentile-covariance;size=100000].allocationStat.peakTransientBytes">Percentile covariance · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="workloads[id=percentile-covariance;size=100000].allocationStat.retainedBytes">Percentile covariance · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Smaller |
+| <span title="workloads[id=percentile-covariance;size=100000].allocationStat.retainedBytes">Percentile covariance · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Unchanged |
 | <span title="workloads[id=percentile-covariance;size=100000].allocationStat.transientAllocations">Percentile covariance · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="workloads[id=percentile-covariance;size=100000].stat">Percentile covariance · 100,000</span> | 3.15 ms / 3.18 ms | 2.83 ms / 2.86 ms | 0.90× | Faster |
 | <span title="workloads[id=removed-sheet-ref;size=1000].allocationStat.peakTransientBytes">Removed sheet ref · 1,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
@@ -833,19 +835,19 @@ Threshold: **formula-release-limit**. Release limits: max(baseline × 1.25, base
 | <span title="workloads[id=spill-sequence-admission;size=100000].allocationStat.transientAllocations">Spill sequence admission · 100,000 · allocation stat · transient allocations</span> | 1 | 1 | 1.00× | Unchanged |
 | <span title="workloads[id=spill-sequence-admission;size=100000].stat">Spill sequence admission · 100,000</span> | 11.0 ms / 11.3 ms | 4.36 ms / 4.44 ms | 0.39× | Faster |
 | <span title="workloads[id=sum-multi-range;size=100000].allocationStat.peakTransientBytes">Sum multi range · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="workloads[id=sum-multi-range;size=100000].allocationStat.retainedBytes">Sum multi range · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Smaller |
+| <span title="workloads[id=sum-multi-range;size=100000].allocationStat.retainedBytes">Sum multi range · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Unchanged |
 | <span title="workloads[id=sum-multi-range;size=100000].allocationStat.transientAllocations">Sum multi range · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="workloads[id=sum-multi-range;size=100000].stat">Sum multi range · 100,000</span> | 3.90 ms / 4.19 ms | 4.36 ms / 4.39 ms | 1.12× (p95 1.05×) | Within budget |
 | <span title="workloads[id=sumifs-3-criteria;size=100000].allocationStat.peakTransientBytes">Sumifs 3 criteria · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="workloads[id=sumifs-3-criteria;size=100000].allocationStat.retainedBytes">Sumifs 3 criteria · 100,000 · allocation stat · retained bytes</span> | 6.2 MiB | 6.2 MiB | 1.00× | Smaller |
+| <span title="workloads[id=sumifs-3-criteria;size=100000].allocationStat.retainedBytes">Sumifs 3 criteria · 100,000 · allocation stat · retained bytes</span> | 6.2 MiB | 6.2 MiB | 1.00× | Unchanged |
 | <span title="workloads[id=sumifs-3-criteria;size=100000].allocationStat.transientAllocations">Sumifs 3 criteria · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="workloads[id=sumifs-3-criteria;size=100000].stat">Sumifs 3 criteria · 100,000</span> | 6.14 ms / 6.20 ms | 5.61 ms / 5.83 ms | 0.91× | Faster |
 | <span title="workloads[id=sumproduct-matrix-edit;size=100000].allocationStat.peakTransientBytes">Sumproduct matrix edit · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="workloads[id=sumproduct-matrix-edit;size=100000].allocationStat.retainedBytes">Sumproduct matrix edit · 100,000 · allocation stat · retained bytes</span> | 2.6 MiB | 2.6 MiB | 1.00× | Smaller |
+| <span title="workloads[id=sumproduct-matrix-edit;size=100000].allocationStat.retainedBytes">Sumproduct matrix edit · 100,000 · allocation stat · retained bytes</span> | 2.6 MiB | 2.6 MiB | 1.00× | Unchanged |
 | <span title="workloads[id=sumproduct-matrix-edit;size=100000].allocationStat.transientAllocations">Sumproduct matrix edit · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="workloads[id=sumproduct-matrix-edit;size=100000].stat">Sumproduct matrix edit · 100,000</span> | 1.72 ms / 3.01 ms | 1.83 ms / 1.86 ms | 1.06× (p95 0.62×) | Within budget |
 | <span title="workloads[id=sumproduct-vector-edit;size=100000].allocationStat.peakTransientBytes">Sumproduct vector edit · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="workloads[id=sumproduct-vector-edit;size=100000].allocationStat.retainedBytes">Sumproduct vector edit · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Smaller |
+| <span title="workloads[id=sumproduct-vector-edit;size=100000].allocationStat.retainedBytes">Sumproduct vector edit · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Unchanged |
 | <span title="workloads[id=sumproduct-vector-edit;size=100000].allocationStat.transientAllocations">Sumproduct vector edit · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="workloads[id=sumproduct-vector-edit;size=100000].stat">Sumproduct vector edit · 100,000</span> | 1.82 ms / 2.94 ms | 1.88 ms / 1.90 ms | 1.03× (p95 0.65×) | Within budget |
 | <span title="workloads[id=text-lookup-many-edit;size=1000].allocationStat.peakTransientBytes">Text lookup many edit · 1,000 · allocation stat · peak transient bytes</span> | 156.3 KiB | 156.3 KiB | 1.00× | Unchanged |
@@ -924,15 +926,15 @@ Threshold: **formula-release-limit**. Release limits: max(baseline × 1.25, base
 | Measurement | 0.5.4 median / p95 | 0.6.0 median / p95 | Change | Result |
 | --- | ---: | ---: | ---: | --- |
 | <span title="workloads[id=countif-100k;size=100000].allocationStat.peakTransientBytes">Countif 100k · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="workloads[id=countif-100k;size=100000].allocationStat.retainedBytes">Countif 100k · 100,000 · allocation stat · retained bytes</span> | 2.5 MiB | 2.5 MiB | 1.00× | Smaller |
+| <span title="workloads[id=countif-100k;size=100000].allocationStat.retainedBytes">Countif 100k · 100,000 · allocation stat · retained bytes</span> | 2.5 MiB | 2.5 MiB | 1.00× | Unchanged |
 | <span title="workloads[id=countif-100k;size=100000].allocationStat.transientAllocations">Countif 100k · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="workloads[id=countif-100k;size=100000].stat">Countif 100k · 100,000</span> | 1.09 ms / 1.13 ms | 0.91 ms / 0.97 ms | 0.84× | Faster |
 | <span title="workloads[id=criteria-multi-range-edit;size=100000].allocationStat.peakTransientBytes">Criteria multi range edit · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="workloads[id=criteria-multi-range-edit;size=100000].allocationStat.retainedBytes">Criteria multi range edit · 100,000 · allocation stat · retained bytes</span> | 5.0 MiB | 5.0 MiB | 1.00× | Smaller |
+| <span title="workloads[id=criteria-multi-range-edit;size=100000].allocationStat.retainedBytes">Criteria multi range edit · 100,000 · allocation stat · retained bytes</span> | 5.0 MiB | 5.0 MiB | 1.00× | Unchanged |
 | <span title="workloads[id=criteria-multi-range-edit;size=100000].allocationStat.transientAllocations">Criteria multi range edit · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="workloads[id=criteria-multi-range-edit;size=100000].stat">Criteria multi range edit · 100,000</span> | 5.45 ms / 5.54 ms | 4.84 ms / 4.97 ms | 0.89× | Faster |
 | <span title="workloads[id=criteria-range-edit;size=100000].allocationStat.peakTransientBytes">Criteria range edit · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="workloads[id=criteria-range-edit;size=100000].allocationStat.retainedBytes">Criteria range edit · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Smaller |
+| <span title="workloads[id=criteria-range-edit;size=100000].allocationStat.retainedBytes">Criteria range edit · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Unchanged |
 | <span title="workloads[id=criteria-range-edit;size=100000].allocationStat.transientAllocations">Criteria range edit · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="workloads[id=criteria-range-edit;size=100000].stat">Criteria range edit · 100,000</span> | 1.62 ms / 1.64 ms | 1.56 ms / 1.60 ms | 0.97× | Faster |
 | <span title="workloads[id=cross-sheet-range-edit;size=1000].allocationStat.peakTransientBytes">Cross sheet range edit · 1,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
@@ -992,11 +994,11 @@ Threshold: **formula-release-limit**. Release limits: max(baseline × 1.25, base
 | <span title="workloads[id=iterative-finance;size=1000].allocationStat.transientAllocations">Iterative finance · 1,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="workloads[id=iterative-finance;size=1000].stat">Iterative finance · 1,000</span> | 3.60 ms / 5.36 ms | 3.02 ms / 3.38 ms | 0.84× (p95 0.63×) | Faster |
 | <span title="workloads[id=let-repeat;size=100000].allocationStat.peakTransientBytes">Let repeat · 100,000 · allocation stat · peak transient bytes</span> | 1.5 MiB | 1.5 MiB | 1.00× | Unchanged |
-| <span title="workloads[id=let-repeat;size=100000].allocationStat.retainedBytes">Let repeat · 100,000 · allocation stat · retained bytes</span> | 5.0 MiB | 5.0 MiB | 1.00× | Smaller |
+| <span title="workloads[id=let-repeat;size=100000].allocationStat.retainedBytes">Let repeat · 100,000 · allocation stat · retained bytes</span> | 5.0 MiB | 5.0 MiB | 1.00× | Unchanged |
 | <span title="workloads[id=let-repeat;size=100000].allocationStat.transientAllocations">Let repeat · 100,000 · allocation stat · transient allocations</span> | 2 | 2 | 1.00× | Unchanged |
 | <span title="workloads[id=let-repeat;size=100000].stat">Let repeat · 100,000</span> | 1.88 ms / 1.99 ms | 1.80 ms / 2.10 ms | 0.96× (p95 1.05×) | Faster |
 | <span title="workloads[id=let-reuse-edit;size=100000].allocationStat.peakTransientBytes">Let reuse edit · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="workloads[id=let-reuse-edit;size=100000].allocationStat.retainedBytes">Let reuse edit · 100,000 · allocation stat · retained bytes</span> | 2.5 MiB | 2.5 MiB | 1.00× | Smaller |
+| <span title="workloads[id=let-reuse-edit;size=100000].allocationStat.retainedBytes">Let reuse edit · 100,000 · allocation stat · retained bytes</span> | 2.5 MiB | 2.5 MiB | 1.00× | Unchanged |
 | <span title="workloads[id=let-reuse-edit;size=100000].allocationStat.transientAllocations">Let reuse edit · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="workloads[id=let-reuse-edit;size=100000].stat">Let reuse edit · 100,000</span> | 0.55 ms / 0.59 ms | 0.51 ms / 0.58 ms | 0.92× (p95 0.99×) | Faster |
 | <span title="workloads[id=linear-chain;size=16].allocationStat.peakTransientBytes">Linear chain · 16 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
@@ -1016,11 +1018,11 @@ Threshold: **formula-release-limit**. Release limits: max(baseline × 1.25, base
 | <span title="workloads[id=linear-chain;size=8].allocationStat.transientAllocations">Linear chain · 8 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="workloads[id=linear-chain;size=8].stat">Linear chain · 8</span> | 0.02 ms / 0.03 ms | 0.02 ms / 0.03 ms | 1.06× (p95 0.95×) | Within budget |
 | <span title="workloads[id=lookup-range-edit;size=100000].allocationStat.peakTransientBytes">Lookup range edit · 100,000 · allocation stat · peak transient bytes</span> | 1.5 MiB | 1.5 MiB | 1.00× | Unchanged |
-| <span title="workloads[id=lookup-range-edit;size=100000].allocationStat.retainedBytes">Lookup range edit · 100,000 · allocation stat · retained bytes</span> | 5.0 MiB | 5.0 MiB | 1.00× | Smaller |
+| <span title="workloads[id=lookup-range-edit;size=100000].allocationStat.retainedBytes">Lookup range edit · 100,000 · allocation stat · retained bytes</span> | 5.0 MiB | 5.0 MiB | 1.00× | Unchanged |
 | <span title="workloads[id=lookup-range-edit;size=100000].allocationStat.transientAllocations">Lookup range edit · 100,000 · allocation stat · transient allocations</span> | 2 | 2 | 1.00× | Unchanged |
 | <span title="workloads[id=lookup-range-edit;size=100000].stat">Lookup range edit · 100,000</span> | 1.76 ms / 1.87 ms | 1.67 ms / 1.72 ms | 0.95× | Faster |
 | <span title="workloads[id=percentile-covariance;size=100000].allocationStat.peakTransientBytes">Percentile covariance · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="workloads[id=percentile-covariance;size=100000].allocationStat.retainedBytes">Percentile covariance · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Smaller |
+| <span title="workloads[id=percentile-covariance;size=100000].allocationStat.retainedBytes">Percentile covariance · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Unchanged |
 | <span title="workloads[id=percentile-covariance;size=100000].allocationStat.transientAllocations">Percentile covariance · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="workloads[id=percentile-covariance;size=100000].stat">Percentile covariance · 100,000</span> | 3.64 ms / 3.74 ms | 2.93 ms / 3.06 ms | 0.81× | Faster |
 | <span title="workloads[id=removed-sheet-ref;size=1000].allocationStat.peakTransientBytes">Removed sheet ref · 1,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
@@ -1056,19 +1058,19 @@ Threshold: **formula-release-limit**. Release limits: max(baseline × 1.25, base
 | <span title="workloads[id=spill-sequence-admission;size=100000].allocationStat.transientAllocations">Spill sequence admission · 100,000 · allocation stat · transient allocations</span> | 1 | 1 | 1.00× | Unchanged |
 | <span title="workloads[id=spill-sequence-admission;size=100000].stat">Spill sequence admission · 100,000</span> | 11.3 ms / 11.5 ms | 5.34 ms / 5.43 ms | 0.47× | Faster |
 | <span title="workloads[id=sum-multi-range;size=100000].allocationStat.peakTransientBytes">Sum multi range · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="workloads[id=sum-multi-range;size=100000].allocationStat.retainedBytes">Sum multi range · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Smaller |
+| <span title="workloads[id=sum-multi-range;size=100000].allocationStat.retainedBytes">Sum multi range · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Unchanged |
 | <span title="workloads[id=sum-multi-range;size=100000].allocationStat.transientAllocations">Sum multi range · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="workloads[id=sum-multi-range;size=100000].stat">Sum multi range · 100,000</span> | 3.94 ms / 4.18 ms | 3.79 ms / 3.93 ms | 0.96× | Faster |
 | <span title="workloads[id=sumifs-3-criteria;size=100000].allocationStat.peakTransientBytes">Sumifs 3 criteria · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="workloads[id=sumifs-3-criteria;size=100000].allocationStat.retainedBytes">Sumifs 3 criteria · 100,000 · allocation stat · retained bytes</span> | 6.2 MiB | 6.2 MiB | 1.00× | Smaller |
+| <span title="workloads[id=sumifs-3-criteria;size=100000].allocationStat.retainedBytes">Sumifs 3 criteria · 100,000 · allocation stat · retained bytes</span> | 6.2 MiB | 6.2 MiB | 1.00× | Unchanged |
 | <span title="workloads[id=sumifs-3-criteria;size=100000].allocationStat.transientAllocations">Sumifs 3 criteria · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="workloads[id=sumifs-3-criteria;size=100000].stat">Sumifs 3 criteria · 100,000</span> | 6.46 ms / 6.80 ms | 5.99 ms / 6.04 ms | 0.93× | Faster |
 | <span title="workloads[id=sumproduct-matrix-edit;size=100000].allocationStat.peakTransientBytes">Sumproduct matrix edit · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="workloads[id=sumproduct-matrix-edit;size=100000].allocationStat.retainedBytes">Sumproduct matrix edit · 100,000 · allocation stat · retained bytes</span> | 2.6 MiB | 2.6 MiB | 1.00× | Smaller |
+| <span title="workloads[id=sumproduct-matrix-edit;size=100000].allocationStat.retainedBytes">Sumproduct matrix edit · 100,000 · allocation stat · retained bytes</span> | 2.6 MiB | 2.6 MiB | 1.00× | Unchanged |
 | <span title="workloads[id=sumproduct-matrix-edit;size=100000].allocationStat.transientAllocations">Sumproduct matrix edit · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="workloads[id=sumproduct-matrix-edit;size=100000].stat">Sumproduct matrix edit · 100,000</span> | 1.70 ms / 1.76 ms | 1.58 ms / 1.63 ms | 0.93× | Faster |
 | <span title="workloads[id=sumproduct-vector-edit;size=100000].allocationStat.peakTransientBytes">Sumproduct vector edit · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="workloads[id=sumproduct-vector-edit;size=100000].allocationStat.retainedBytes">Sumproduct vector edit · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Smaller |
+| <span title="workloads[id=sumproduct-vector-edit;size=100000].allocationStat.retainedBytes">Sumproduct vector edit · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Unchanged |
 | <span title="workloads[id=sumproduct-vector-edit;size=100000].allocationStat.transientAllocations">Sumproduct vector edit · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="workloads[id=sumproduct-vector-edit;size=100000].stat">Sumproduct vector edit · 100,000</span> | 2.20 ms / 2.34 ms | 2.00 ms / 2.08 ms | 0.91× | Faster |
 | <span title="workloads[id=text-lookup-many-edit;size=1000].allocationStat.peakTransientBytes">Text lookup many edit · 1,000 · allocation stat · peak transient bytes</span> | 156.3 KiB | 156.3 KiB | 1.00× | Unchanged |
@@ -1138,7 +1140,7 @@ Threshold: **formula-release-limit**. Release limits: max(baseline × 1.25, base
 
 </details>
 
-<details class="bench-all"><summary>Full engine · 458 measurements · 3 flagged</summary>
+<details class="bench-all"><summary>Full engine · 458 measurements</summary>
 
 Artifact <code>bench/results/full-engine-results.json</code>. Baseline: 0.5.4 engine (WASM) under 0.6 core and harness, <code title="ac4ab632d80abf8d0c2986685c04ebce7747e5fa">ac4ab632d80a</code> · 2026-10-29 04:24 UTC. Candidate: <code title="ac4ab632d80abf8d0c2986685c04ebce7747e5fa">ac4ab632d80a</code> · 2026-10-29 04:24 UTC.
 
@@ -1180,15 +1182,15 @@ Threshold: **formula-release-limit**. Release limits: max(baseline × 1.25, base
 | <span title="analysis[id=xirr;size=1000].stat">Xirr · 1,000</span> | 1.36 ms / 2.05 ms | 0.92 ms / 1.33 ms | 0.67× | Faster |
 | <span title="engines[engine=default].initialization.stat">Default · initialization</span> | — | 4.28 ms / 4.73 ms | — | New in 0.6 · 0.6-only: timed current-core path; no version ratio |
 | <span title="engines[engine=default].shared.workloads[id=countif-100k;size=100000].allocationStat.peakTransientBytes">Default · countif 100k · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="engines[engine=default].shared.workloads[id=countif-100k;size=100000].allocationStat.retainedBytes">Default · countif 100k · 100,000 · allocation stat · retained bytes</span> | 2.5 MiB | 2.5 MiB | 1.00× | Smaller |
+| <span title="engines[engine=default].shared.workloads[id=countif-100k;size=100000].allocationStat.retainedBytes">Default · countif 100k · 100,000 · allocation stat · retained bytes</span> | 2.5 MiB | 2.5 MiB | 1.00× | Unchanged |
 | <span title="engines[engine=default].shared.workloads[id=countif-100k;size=100000].allocationStat.transientAllocations">Default · countif 100k · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="engines[engine=default].shared.workloads[id=countif-100k;size=100000].stat">Default · countif 100k · 100,000</span> | 0.94 ms / 0.96 ms | 0.89 ms / 0.91 ms | 0.95× | Faster |
 | <span title="engines[engine=default].shared.workloads[id=criteria-multi-range-edit;size=100000].allocationStat.peakTransientBytes">Default · criteria multi range edit · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="engines[engine=default].shared.workloads[id=criteria-multi-range-edit;size=100000].allocationStat.retainedBytes">Default · criteria multi range edit · 100,000 · allocation stat · retained bytes</span> | 5.0 MiB | 5.0 MiB | 1.00× | Smaller |
+| <span title="engines[engine=default].shared.workloads[id=criteria-multi-range-edit;size=100000].allocationStat.retainedBytes">Default · criteria multi range edit · 100,000 · allocation stat · retained bytes</span> | 5.0 MiB | 5.0 MiB | 1.00× | Unchanged |
 | <span title="engines[engine=default].shared.workloads[id=criteria-multi-range-edit;size=100000].allocationStat.transientAllocations">Default · criteria multi range edit · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="engines[engine=default].shared.workloads[id=criteria-multi-range-edit;size=100000].stat">Default · criteria multi range edit · 100,000</span> | 5.50 ms / 7.79 ms | 5.16 ms / 5.45 ms | 0.94× (p95 0.70×) | Faster |
 | <span title="engines[engine=default].shared.workloads[id=criteria-range-edit;size=100000].allocationStat.peakTransientBytes">Default · criteria range edit · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="engines[engine=default].shared.workloads[id=criteria-range-edit;size=100000].allocationStat.retainedBytes">Default · criteria range edit · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Smaller |
+| <span title="engines[engine=default].shared.workloads[id=criteria-range-edit;size=100000].allocationStat.retainedBytes">Default · criteria range edit · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Unchanged |
 | <span title="engines[engine=default].shared.workloads[id=criteria-range-edit;size=100000].allocationStat.transientAllocations">Default · criteria range edit · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="engines[engine=default].shared.workloads[id=criteria-range-edit;size=100000].stat">Default · criteria range edit · 100,000</span> | 1.62 ms / 1.66 ms | 1.59 ms / 1.68 ms | 0.98× | Faster |
 | <span title="engines[engine=default].shared.workloads[id=cross-sheet-range-edit;size=1000].allocationStat.peakTransientBytes">Default · cross sheet range edit · 1,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
@@ -1248,11 +1250,11 @@ Threshold: **formula-release-limit**. Release limits: max(baseline × 1.25, base
 | <span title="engines[engine=default].shared.workloads[id=iterative-finance;size=1000].allocationStat.transientAllocations">Default · iterative finance · 1,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="engines[engine=default].shared.workloads[id=iterative-finance;size=1000].stat">Default · iterative finance · 1,000</span> | 3.13 ms / 3.15 ms | 2.85 ms / 2.88 ms | 0.91× | Faster |
 | <span title="engines[engine=default].shared.workloads[id=let-repeat;size=100000].allocationStat.peakTransientBytes">Default · let repeat · 100,000 · allocation stat · peak transient bytes</span> | 1.5 MiB | 1.5 MiB | 1.00× | Unchanged |
-| <span title="engines[engine=default].shared.workloads[id=let-repeat;size=100000].allocationStat.retainedBytes">Default · let repeat · 100,000 · allocation stat · retained bytes</span> | 5.0 MiB | 5.0 MiB | 1.00× | Smaller |
+| <span title="engines[engine=default].shared.workloads[id=let-repeat;size=100000].allocationStat.retainedBytes">Default · let repeat · 100,000 · allocation stat · retained bytes</span> | 5.0 MiB | 5.0 MiB | 1.00× | Unchanged |
 | <span title="engines[engine=default].shared.workloads[id=let-repeat;size=100000].allocationStat.transientAllocations">Default · let repeat · 100,000 · allocation stat · transient allocations</span> | 2 | 2 | 1.00× | Unchanged |
 | <span title="engines[engine=default].shared.workloads[id=let-repeat;size=100000].stat">Default · let repeat · 100,000</span> | 1.65 ms / 1.70 ms | 1.71 ms / 1.77 ms | 1.03× | Within budget |
 | <span title="engines[engine=default].shared.workloads[id=let-reuse-edit;size=100000].allocationStat.peakTransientBytes">Default · let reuse edit · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="engines[engine=default].shared.workloads[id=let-reuse-edit;size=100000].allocationStat.retainedBytes">Default · let reuse edit · 100,000 · allocation stat · retained bytes</span> | 2.5 MiB | 2.5 MiB | 1.00× | Smaller |
+| <span title="engines[engine=default].shared.workloads[id=let-reuse-edit;size=100000].allocationStat.retainedBytes">Default · let reuse edit · 100,000 · allocation stat · retained bytes</span> | 2.5 MiB | 2.5 MiB | 1.00× | Unchanged |
 | <span title="engines[engine=default].shared.workloads[id=let-reuse-edit;size=100000].allocationStat.transientAllocations">Default · let reuse edit · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="engines[engine=default].shared.workloads[id=let-reuse-edit;size=100000].stat">Default · let reuse edit · 100,000</span> | 0.58 ms / 0.64 ms | 0.51 ms | 0.88× (p95 0.80×) | Faster |
 | <span title="engines[engine=default].shared.workloads[id=linear-chain;size=16].allocationStat.peakTransientBytes">Default · linear chain · 16 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
@@ -1272,11 +1274,11 @@ Threshold: **formula-release-limit**. Release limits: max(baseline × 1.25, base
 | <span title="engines[engine=default].shared.workloads[id=linear-chain;size=8].allocationStat.transientAllocations">Default · linear chain · 8 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="engines[engine=default].shared.workloads[id=linear-chain;size=8].stat">Default · linear chain · 8</span> | 0.02 ms / 0.03 ms | 0.02 ms / 0.04 ms | 1.45× (p95 1.10×) | Within budget |
 | <span title="engines[engine=default].shared.workloads[id=lookup-range-edit;size=100000].allocationStat.peakTransientBytes">Default · lookup range edit · 100,000 · allocation stat · peak transient bytes</span> | 1.5 MiB | 1.5 MiB | 1.00× | Unchanged |
-| <span title="engines[engine=default].shared.workloads[id=lookup-range-edit;size=100000].allocationStat.retainedBytes">Default · lookup range edit · 100,000 · allocation stat · retained bytes</span> | 5.0 MiB | 5.0 MiB | 1.00× | Smaller |
+| <span title="engines[engine=default].shared.workloads[id=lookup-range-edit;size=100000].allocationStat.retainedBytes">Default · lookup range edit · 100,000 · allocation stat · retained bytes</span> | 5.0 MiB | 5.0 MiB | 1.00× | Unchanged |
 | <span title="engines[engine=default].shared.workloads[id=lookup-range-edit;size=100000].allocationStat.transientAllocations">Default · lookup range edit · 100,000 · allocation stat · transient allocations</span> | 2 | 2 | 1.00× | Unchanged |
 | <span title="engines[engine=default].shared.workloads[id=lookup-range-edit;size=100000].stat">Default · lookup range edit · 100,000</span> | 1.73 ms / 1.79 ms | 1.71 ms / 1.77 ms | 0.99× | Faster |
 | <span title="engines[engine=default].shared.workloads[id=percentile-covariance;size=100000].allocationStat.peakTransientBytes">Default · percentile covariance · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="engines[engine=default].shared.workloads[id=percentile-covariance;size=100000].allocationStat.retainedBytes">Default · percentile covariance · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Smaller |
+| <span title="engines[engine=default].shared.workloads[id=percentile-covariance;size=100000].allocationStat.retainedBytes">Default · percentile covariance · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Unchanged |
 | <span title="engines[engine=default].shared.workloads[id=percentile-covariance;size=100000].allocationStat.transientAllocations">Default · percentile covariance · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="engines[engine=default].shared.workloads[id=percentile-covariance;size=100000].stat">Default · percentile covariance · 100,000</span> | 3.15 ms / 3.18 ms | 2.83 ms / 2.86 ms | 0.90× | Faster |
 | <span title="engines[engine=default].shared.workloads[id=removed-sheet-ref;size=1000].allocationStat.peakTransientBytes">Default · removed sheet ref · 1,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
@@ -1312,19 +1314,19 @@ Threshold: **formula-release-limit**. Release limits: max(baseline × 1.25, base
 | <span title="engines[engine=default].shared.workloads[id=spill-sequence-admission;size=100000].allocationStat.transientAllocations">Default · spill sequence admission · 100,000 · allocation stat · transient allocations</span> | 1 | 1 | 1.00× | Unchanged |
 | <span title="engines[engine=default].shared.workloads[id=spill-sequence-admission;size=100000].stat">Default · spill sequence admission · 100,000</span> | 11.0 ms / 11.3 ms | 4.36 ms / 4.44 ms | 0.39× | Faster |
 | <span title="engines[engine=default].shared.workloads[id=sum-multi-range;size=100000].allocationStat.peakTransientBytes">Default · sum multi range · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="engines[engine=default].shared.workloads[id=sum-multi-range;size=100000].allocationStat.retainedBytes">Default · sum multi range · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Smaller |
+| <span title="engines[engine=default].shared.workloads[id=sum-multi-range;size=100000].allocationStat.retainedBytes">Default · sum multi range · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Unchanged |
 | <span title="engines[engine=default].shared.workloads[id=sum-multi-range;size=100000].allocationStat.transientAllocations">Default · sum multi range · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="engines[engine=default].shared.workloads[id=sum-multi-range;size=100000].stat">Default · sum multi range · 100,000</span> | 3.90 ms / 4.19 ms | 4.36 ms / 4.39 ms | 1.12× (p95 1.05×) | Within budget |
 | <span title="engines[engine=default].shared.workloads[id=sumifs-3-criteria;size=100000].allocationStat.peakTransientBytes">Default · sumifs 3 criteria · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="engines[engine=default].shared.workloads[id=sumifs-3-criteria;size=100000].allocationStat.retainedBytes">Default · sumifs 3 criteria · 100,000 · allocation stat · retained bytes</span> | 6.2 MiB | 6.2 MiB | 1.00× | Smaller |
+| <span title="engines[engine=default].shared.workloads[id=sumifs-3-criteria;size=100000].allocationStat.retainedBytes">Default · sumifs 3 criteria · 100,000 · allocation stat · retained bytes</span> | 6.2 MiB | 6.2 MiB | 1.00× | Unchanged |
 | <span title="engines[engine=default].shared.workloads[id=sumifs-3-criteria;size=100000].allocationStat.transientAllocations">Default · sumifs 3 criteria · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="engines[engine=default].shared.workloads[id=sumifs-3-criteria;size=100000].stat">Default · sumifs 3 criteria · 100,000</span> | 6.14 ms / 6.20 ms | 5.61 ms / 5.83 ms | 0.91× | Faster |
 | <span title="engines[engine=default].shared.workloads[id=sumproduct-matrix-edit;size=100000].allocationStat.peakTransientBytes">Default · sumproduct matrix edit · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="engines[engine=default].shared.workloads[id=sumproduct-matrix-edit;size=100000].allocationStat.retainedBytes">Default · sumproduct matrix edit · 100,000 · allocation stat · retained bytes</span> | 2.6 MiB | 2.6 MiB | 1.00× | Smaller |
+| <span title="engines[engine=default].shared.workloads[id=sumproduct-matrix-edit;size=100000].allocationStat.retainedBytes">Default · sumproduct matrix edit · 100,000 · allocation stat · retained bytes</span> | 2.6 MiB | 2.6 MiB | 1.00× | Unchanged |
 | <span title="engines[engine=default].shared.workloads[id=sumproduct-matrix-edit;size=100000].allocationStat.transientAllocations">Default · sumproduct matrix edit · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="engines[engine=default].shared.workloads[id=sumproduct-matrix-edit;size=100000].stat">Default · sumproduct matrix edit · 100,000</span> | 1.72 ms / 3.01 ms | 1.83 ms / 1.86 ms | 1.06× (p95 0.62×) | Within budget |
 | <span title="engines[engine=default].shared.workloads[id=sumproduct-vector-edit;size=100000].allocationStat.peakTransientBytes">Default · sumproduct vector edit · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="engines[engine=default].shared.workloads[id=sumproduct-vector-edit;size=100000].allocationStat.retainedBytes">Default · sumproduct vector edit · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Smaller |
+| <span title="engines[engine=default].shared.workloads[id=sumproduct-vector-edit;size=100000].allocationStat.retainedBytes">Default · sumproduct vector edit · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Unchanged |
 | <span title="engines[engine=default].shared.workloads[id=sumproduct-vector-edit;size=100000].allocationStat.transientAllocations">Default · sumproduct vector edit · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="engines[engine=default].shared.workloads[id=sumproduct-vector-edit;size=100000].stat">Default · sumproduct vector edit · 100,000</span> | 1.82 ms / 2.94 ms | 1.88 ms / 1.90 ms | 1.03× (p95 0.65×) | Within budget |
 | <span title="engines[engine=default].shared.workloads[id=text-lookup-many-edit;size=1000].allocationStat.peakTransientBytes">Default · text lookup many edit · 1,000 · allocation stat · peak transient bytes</span> | 156.3 KiB | 156.3 KiB | 1.00× | Unchanged |
@@ -1393,15 +1395,15 @@ Threshold: **formula-release-limit**. Release limits: max(baseline × 1.25, base
 | <span title="engines[engine=default].shared.workloads[id=xlookup-many;size=1000].stat">Default · xlookup many · 1,000</span> | 1.28 ms / 1.29 ms | 0.90 ms / 0.91 ms | 0.70× | Faster |
 | <span title="engines[engine=full].initialization.stat">Full · initialization</span> | — | 5.77 ms / 6.26 ms | — | New in 0.6 · 0.6-only: timed current-core path; no version ratio |
 | <span title="engines[engine=full].shared.workloads[id=countif-100k;size=100000].allocationStat.peakTransientBytes">Full · countif 100k · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="engines[engine=full].shared.workloads[id=countif-100k;size=100000].allocationStat.retainedBytes">Full · countif 100k · 100,000 · allocation stat · retained bytes</span> | 2.5 MiB | 2.5 MiB | 1.00× | Smaller |
+| <span title="engines[engine=full].shared.workloads[id=countif-100k;size=100000].allocationStat.retainedBytes">Full · countif 100k · 100,000 · allocation stat · retained bytes</span> | 2.5 MiB | 2.5 MiB | 1.00× | Unchanged |
 | <span title="engines[engine=full].shared.workloads[id=countif-100k;size=100000].allocationStat.transientAllocations">Full · countif 100k · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="engines[engine=full].shared.workloads[id=countif-100k;size=100000].stat">Full · countif 100k · 100,000</span> | 1.09 ms / 1.13 ms | 0.91 ms / 0.97 ms | 0.84× | Faster |
 | <span title="engines[engine=full].shared.workloads[id=criteria-multi-range-edit;size=100000].allocationStat.peakTransientBytes">Full · criteria multi range edit · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="engines[engine=full].shared.workloads[id=criteria-multi-range-edit;size=100000].allocationStat.retainedBytes">Full · criteria multi range edit · 100,000 · allocation stat · retained bytes</span> | 5.0 MiB | 5.0 MiB | 1.00× | Smaller |
+| <span title="engines[engine=full].shared.workloads[id=criteria-multi-range-edit;size=100000].allocationStat.retainedBytes">Full · criteria multi range edit · 100,000 · allocation stat · retained bytes</span> | 5.0 MiB | 5.0 MiB | 1.00× | Unchanged |
 | <span title="engines[engine=full].shared.workloads[id=criteria-multi-range-edit;size=100000].allocationStat.transientAllocations">Full · criteria multi range edit · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="engines[engine=full].shared.workloads[id=criteria-multi-range-edit;size=100000].stat">Full · criteria multi range edit · 100,000</span> | 5.45 ms / 5.54 ms | 4.84 ms / 4.97 ms | 0.89× | Faster |
 | <span title="engines[engine=full].shared.workloads[id=criteria-range-edit;size=100000].allocationStat.peakTransientBytes">Full · criteria range edit · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="engines[engine=full].shared.workloads[id=criteria-range-edit;size=100000].allocationStat.retainedBytes">Full · criteria range edit · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Smaller |
+| <span title="engines[engine=full].shared.workloads[id=criteria-range-edit;size=100000].allocationStat.retainedBytes">Full · criteria range edit · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Unchanged |
 | <span title="engines[engine=full].shared.workloads[id=criteria-range-edit;size=100000].allocationStat.transientAllocations">Full · criteria range edit · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="engines[engine=full].shared.workloads[id=criteria-range-edit;size=100000].stat">Full · criteria range edit · 100,000</span> | 1.62 ms / 1.64 ms | 1.56 ms / 1.60 ms | 0.97× | Faster |
 | <span title="engines[engine=full].shared.workloads[id=cross-sheet-range-edit;size=1000].allocationStat.peakTransientBytes">Full · cross sheet range edit · 1,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
@@ -1461,11 +1463,11 @@ Threshold: **formula-release-limit**. Release limits: max(baseline × 1.25, base
 | <span title="engines[engine=full].shared.workloads[id=iterative-finance;size=1000].allocationStat.transientAllocations">Full · iterative finance · 1,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="engines[engine=full].shared.workloads[id=iterative-finance;size=1000].stat">Full · iterative finance · 1,000</span> | 3.60 ms / 5.36 ms | 3.02 ms / 3.38 ms | 0.84× (p95 0.63×) | Faster |
 | <span title="engines[engine=full].shared.workloads[id=let-repeat;size=100000].allocationStat.peakTransientBytes">Full · let repeat · 100,000 · allocation stat · peak transient bytes</span> | 1.5 MiB | 1.5 MiB | 1.00× | Unchanged |
-| <span title="engines[engine=full].shared.workloads[id=let-repeat;size=100000].allocationStat.retainedBytes">Full · let repeat · 100,000 · allocation stat · retained bytes</span> | 5.0 MiB | 5.0 MiB | 1.00× | Smaller |
+| <span title="engines[engine=full].shared.workloads[id=let-repeat;size=100000].allocationStat.retainedBytes">Full · let repeat · 100,000 · allocation stat · retained bytes</span> | 5.0 MiB | 5.0 MiB | 1.00× | Unchanged |
 | <span title="engines[engine=full].shared.workloads[id=let-repeat;size=100000].allocationStat.transientAllocations">Full · let repeat · 100,000 · allocation stat · transient allocations</span> | 2 | 2 | 1.00× | Unchanged |
 | <span title="engines[engine=full].shared.workloads[id=let-repeat;size=100000].stat">Full · let repeat · 100,000</span> | 1.88 ms / 1.99 ms | 1.80 ms / 2.10 ms | 0.96× (p95 1.05×) | Faster |
 | <span title="engines[engine=full].shared.workloads[id=let-reuse-edit;size=100000].allocationStat.peakTransientBytes">Full · let reuse edit · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="engines[engine=full].shared.workloads[id=let-reuse-edit;size=100000].allocationStat.retainedBytes">Full · let reuse edit · 100,000 · allocation stat · retained bytes</span> | 2.5 MiB | 2.5 MiB | 1.00× | Smaller |
+| <span title="engines[engine=full].shared.workloads[id=let-reuse-edit;size=100000].allocationStat.retainedBytes">Full · let reuse edit · 100,000 · allocation stat · retained bytes</span> | 2.5 MiB | 2.5 MiB | 1.00× | Unchanged |
 | <span title="engines[engine=full].shared.workloads[id=let-reuse-edit;size=100000].allocationStat.transientAllocations">Full · let reuse edit · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="engines[engine=full].shared.workloads[id=let-reuse-edit;size=100000].stat">Full · let reuse edit · 100,000</span> | 0.55 ms / 0.59 ms | 0.51 ms / 0.58 ms | 0.92× (p95 0.99×) | Faster |
 | <span title="engines[engine=full].shared.workloads[id=linear-chain;size=16].allocationStat.peakTransientBytes">Full · linear chain · 16 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
@@ -1485,11 +1487,11 @@ Threshold: **formula-release-limit**. Release limits: max(baseline × 1.25, base
 | <span title="engines[engine=full].shared.workloads[id=linear-chain;size=8].allocationStat.transientAllocations">Full · linear chain · 8 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="engines[engine=full].shared.workloads[id=linear-chain;size=8].stat">Full · linear chain · 8</span> | 0.02 ms / 0.03 ms | 0.02 ms / 0.03 ms | 1.06× (p95 0.95×) | Within budget |
 | <span title="engines[engine=full].shared.workloads[id=lookup-range-edit;size=100000].allocationStat.peakTransientBytes">Full · lookup range edit · 100,000 · allocation stat · peak transient bytes</span> | 1.5 MiB | 1.5 MiB | 1.00× | Unchanged |
-| <span title="engines[engine=full].shared.workloads[id=lookup-range-edit;size=100000].allocationStat.retainedBytes">Full · lookup range edit · 100,000 · allocation stat · retained bytes</span> | 5.0 MiB | 5.0 MiB | 1.00× | Smaller |
+| <span title="engines[engine=full].shared.workloads[id=lookup-range-edit;size=100000].allocationStat.retainedBytes">Full · lookup range edit · 100,000 · allocation stat · retained bytes</span> | 5.0 MiB | 5.0 MiB | 1.00× | Unchanged |
 | <span title="engines[engine=full].shared.workloads[id=lookup-range-edit;size=100000].allocationStat.transientAllocations">Full · lookup range edit · 100,000 · allocation stat · transient allocations</span> | 2 | 2 | 1.00× | Unchanged |
 | <span title="engines[engine=full].shared.workloads[id=lookup-range-edit;size=100000].stat">Full · lookup range edit · 100,000</span> | 1.76 ms / 1.87 ms | 1.67 ms / 1.72 ms | 0.95× | Faster |
 | <span title="engines[engine=full].shared.workloads[id=percentile-covariance;size=100000].allocationStat.peakTransientBytes">Full · percentile covariance · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="engines[engine=full].shared.workloads[id=percentile-covariance;size=100000].allocationStat.retainedBytes">Full · percentile covariance · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Smaller |
+| <span title="engines[engine=full].shared.workloads[id=percentile-covariance;size=100000].allocationStat.retainedBytes">Full · percentile covariance · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Unchanged |
 | <span title="engines[engine=full].shared.workloads[id=percentile-covariance;size=100000].allocationStat.transientAllocations">Full · percentile covariance · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="engines[engine=full].shared.workloads[id=percentile-covariance;size=100000].stat">Full · percentile covariance · 100,000</span> | 3.64 ms / 3.74 ms | 2.93 ms / 3.06 ms | 0.81× | Faster |
 | <span title="engines[engine=full].shared.workloads[id=removed-sheet-ref;size=1000].allocationStat.peakTransientBytes">Full · removed sheet ref · 1,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
@@ -1525,19 +1527,19 @@ Threshold: **formula-release-limit**. Release limits: max(baseline × 1.25, base
 | <span title="engines[engine=full].shared.workloads[id=spill-sequence-admission;size=100000].allocationStat.transientAllocations">Full · spill sequence admission · 100,000 · allocation stat · transient allocations</span> | 1 | 1 | 1.00× | Unchanged |
 | <span title="engines[engine=full].shared.workloads[id=spill-sequence-admission;size=100000].stat">Full · spill sequence admission · 100,000</span> | 11.3 ms / 11.5 ms | 5.34 ms / 5.43 ms | 0.47× | Faster |
 | <span title="engines[engine=full].shared.workloads[id=sum-multi-range;size=100000].allocationStat.peakTransientBytes">Full · sum multi range · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="engines[engine=full].shared.workloads[id=sum-multi-range;size=100000].allocationStat.retainedBytes">Full · sum multi range · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Smaller |
+| <span title="engines[engine=full].shared.workloads[id=sum-multi-range;size=100000].allocationStat.retainedBytes">Full · sum multi range · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Unchanged |
 | <span title="engines[engine=full].shared.workloads[id=sum-multi-range;size=100000].allocationStat.transientAllocations">Full · sum multi range · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="engines[engine=full].shared.workloads[id=sum-multi-range;size=100000].stat">Full · sum multi range · 100,000</span> | 3.94 ms / 4.18 ms | 3.79 ms / 3.93 ms | 0.96× | Faster |
 | <span title="engines[engine=full].shared.workloads[id=sumifs-3-criteria;size=100000].allocationStat.peakTransientBytes">Full · sumifs 3 criteria · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="engines[engine=full].shared.workloads[id=sumifs-3-criteria;size=100000].allocationStat.retainedBytes">Full · sumifs 3 criteria · 100,000 · allocation stat · retained bytes</span> | 6.2 MiB | 6.2 MiB | 1.00× | Smaller |
+| <span title="engines[engine=full].shared.workloads[id=sumifs-3-criteria;size=100000].allocationStat.retainedBytes">Full · sumifs 3 criteria · 100,000 · allocation stat · retained bytes</span> | 6.2 MiB | 6.2 MiB | 1.00× | Unchanged |
 | <span title="engines[engine=full].shared.workloads[id=sumifs-3-criteria;size=100000].allocationStat.transientAllocations">Full · sumifs 3 criteria · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="engines[engine=full].shared.workloads[id=sumifs-3-criteria;size=100000].stat">Full · sumifs 3 criteria · 100,000</span> | 6.46 ms / 6.80 ms | 5.99 ms / 6.04 ms | 0.93× | Faster |
 | <span title="engines[engine=full].shared.workloads[id=sumproduct-matrix-edit;size=100000].allocationStat.peakTransientBytes">Full · sumproduct matrix edit · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="engines[engine=full].shared.workloads[id=sumproduct-matrix-edit;size=100000].allocationStat.retainedBytes">Full · sumproduct matrix edit · 100,000 · allocation stat · retained bytes</span> | 2.6 MiB | 2.6 MiB | 1.00× | Smaller |
+| <span title="engines[engine=full].shared.workloads[id=sumproduct-matrix-edit;size=100000].allocationStat.retainedBytes">Full · sumproduct matrix edit · 100,000 · allocation stat · retained bytes</span> | 2.6 MiB | 2.6 MiB | 1.00× | Unchanged |
 | <span title="engines[engine=full].shared.workloads[id=sumproduct-matrix-edit;size=100000].allocationStat.transientAllocations">Full · sumproduct matrix edit · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="engines[engine=full].shared.workloads[id=sumproduct-matrix-edit;size=100000].stat">Full · sumproduct matrix edit · 100,000</span> | 1.70 ms / 1.76 ms | 1.58 ms / 1.63 ms | 0.93× | Faster |
 | <span title="engines[engine=full].shared.workloads[id=sumproduct-vector-edit;size=100000].allocationStat.peakTransientBytes">Full · sumproduct vector edit · 100,000 · allocation stat · peak transient bytes</span> | 0 B | 0 B | 1.00× | Unchanged |
-| <span title="engines[engine=full].shared.workloads[id=sumproduct-vector-edit;size=100000].allocationStat.retainedBytes">Full · sumproduct vector edit · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Smaller |
+| <span title="engines[engine=full].shared.workloads[id=sumproduct-vector-edit;size=100000].allocationStat.retainedBytes">Full · sumproduct vector edit · 100,000 · allocation stat · retained bytes</span> | 3.7 MiB | 3.7 MiB | 1.00× | Unchanged |
 | <span title="engines[engine=full].shared.workloads[id=sumproduct-vector-edit;size=100000].allocationStat.transientAllocations">Full · sumproduct vector edit · 100,000 · allocation stat · transient allocations</span> | 0 | 0 | 1.00× | Unchanged |
 | <span title="engines[engine=full].shared.workloads[id=sumproduct-vector-edit;size=100000].stat">Full · sumproduct vector edit · 100,000</span> | 2.20 ms / 2.34 ms | 2.00 ms / 2.08 ms | 0.91× | Faster |
 | <span title="engines[engine=full].shared.workloads[id=text-lookup-many-edit;size=1000].allocationStat.peakTransientBytes">Full · text lookup many edit · 1,000 · allocation stat · peak transient bytes</span> | 156.3 KiB | 156.3 KiB | 1.00× | Unchanged |
@@ -1681,7 +1683,7 @@ Threshold: **none**. No documented historical-capture noise threshold. The XLSX 
 | <span title="summaries[engine=current;scenario=deep-xml;operation=reject].durationMs">Current · deep xml · reject · duration ms</span> | 5.94 ms / 6.50 ms | 8.78 ms / 9.58 ms | 1.48× | Slower |
 | <span title="summaries[engine=current;scenario=deep-xml;operation=reject].maxRssBytes">Current · deep xml · reject · max rss bytes</span> | 44.5 MiB / 44.7 MiB | 46.7 MiB / 47.4 MiB | 1.05× | Larger |
 | <span title="summaries[engine=current;scenario=deep-xml;operation=reject].processWallMs">Current · deep xml · reject · process wall ms</span> | 51.2 ms / 51.6 ms | 59.4 ms / 60.1 ms | 1.16× | Slower |
-| <span title="summaries[engine=current;scenario=deep-xml;operation=reject].retainedAllocationDeltaBytes">Current · deep xml · reject · retained allocation delta bytes</span> | 1.3 MiB | 1.3 MiB | 1.00× | Smaller |
+| <span title="summaries[engine=current;scenario=deep-xml;operation=reject].retainedAllocationDeltaBytes">Current · deep xml · reject · retained allocation delta bytes</span> | 1.3 MiB | 1.3 MiB | 1.00× | Unchanged |
 | <span title="summaries[engine=current;scenario=rich;operation=export].durationMs">Current · rich · export · duration ms</span> | 357 ms / 380 ms | 370 ms / 387 ms | 1.04× | Slower |
 | <span title="summaries[engine=current;scenario=rich;operation=export].maxRssBytes">Current · rich · export · max rss bytes</span> | 133.1 MiB / 133.7 MiB | 138.9 MiB / 141.0 MiB | 1.04× | Larger |
 | <span title="summaries[engine=current;scenario=rich;operation=export].processWallMs">Current · rich · export · process wall ms</span> | 451 ms / 477 ms | 470 ms / 489 ms | 1.04× | Slower |
@@ -1740,7 +1742,7 @@ Threshold: **none**. No documented historical-capture noise threshold for this s
 
 </details>
 
-<details class="bench-all"><summary>Render baseline · 28 measurements · 9 flagged</summary>
+<details class="bench-all"><summary>Render baseline · 28 measurements</summary>
 
 Artifact <code>bench/results/render-baseline.json</code>. Baseline: 0.5.4, <code title="685c9c920f89860ffff96531a3d18b6845808444">685c9c920f89</code> · 2026-10-29 03:40 UTC · scope start. Candidate: <code title="ac4ab632d80abf8d0c2986685c04ebce7747e5fa">ac4ab632d80a</code> · 2026-10-29 03:59 UTC · scope start.
 
@@ -1748,34 +1750,34 @@ Threshold: **bootstrap-median-delta**. Independent raw-sample median bootstrap; 
 
 | Measurement | 0.5.4 median / p95 | 0.6.0 median / p95 | Change | Result |
 | --- | ---: | ---: | ---: | --- |
-| <span title="cells[key=engine=handsontable;rows=100000;scenario=altering.insert-5-rows-top]">Engine · 100,000 rows · altering · insert 5 rows top</span> | 14.5 ms / 21.2 ms | 17.3 ms / 18.8 ms | 1.19× (p95 0.89×) | **Flagged** |
-| <span title="cells[key=engine=handsontable;rows=100000;scenario=altering.remove-5-rows-top]">Engine · 100,000 rows · altering · remove 5 rows top</span> | 12.5 ms / 15.5 ms | 15.0 ms / 15.8 ms | 1.20× (p95 1.02×) | **Flagged** |
-| <span title="cells[key=engine=handsontable;rows=100000;scenario=arrow-down.top-left]">Engine · 100,000 rows · arrow down · top left</span> | 1.46 ms / 2.11 ms | 1.47 ms / 1.69 ms | 1.01× (p95 0.80×) | Within budget |
-| <span title="cells[key=engine=handsontable;rows=100000;scenario=arrow-right.middle]">Engine · 100,000 rows · arrow right · middle</span> | 1.37 ms / 1.46 ms | 1.38 ms / 1.48 ms | 1.00× | Within budget |
-| <span title="cells[key=engine=handsontable;rows=100000;scenario=edit-commit.middle]">Engine · 100,000 rows · edit commit · middle</span> | 4.95 ms / 5.52 ms | 7.80 ms / 8.18 ms | 1.58× (p95 1.48×) | **Flagged** |
-| <span title="cells[key=engine=handsontable;rows=100000;scenario=edit-open.bottom-right]">Engine · 100,000 rows · edit open · bottom right</span> | 1.46 ms / 2.06 ms | 1.44 ms / 1.77 ms | 0.99× (p95 0.86×) | Within budget |
-| <span title="cells[key=engine=handsontable;rows=100000;scenario=edit-open.middle]">Engine · 100,000 rows · edit open · middle</span> | 1.04 ms / 1.10 ms | 1.04 ms / 1.12 ms | 1.00× | Within budget |
-| <span title="cells[key=engine=handsontable;rows=100000;scenario=edit-open.top-left]">Engine · 100,000 rows · edit open · top left</span> | 1.09 ms / 1.19 ms | 1.14 ms / 1.36 ms | 1.04× (p95 1.15×) | Within budget |
-| <span title="cells[key=engine=handsontable;rows=100000;scenario=formatted-paint.top-left]">Engine · 100,000 rows · formatted paint · top left</span> | 3.36 ms / 3.72 ms | 6.14 ms / 7.65 ms | 1.83× (p95 2.05×) | **Flagged** |
-| <span title="cells[key=engine=handsontable;rows=100000;scenario=merge-heavy.paint]">Engine · 100,000 rows · merge heavy · paint</span> | 3.48 ms / 3.76 ms | 6.37 ms / 6.54 ms | 1.83× (p95 1.74×) | **Flagged** |
-| <span title="cells[key=engine=handsontable;rows=100000;scenario=scroll-down.middle]">Engine · 100,000 rows · scroll down · middle</span> | 4.00 ms / 4.98 ms | 6.86 ms / 9.86 ms | 1.71× (p95 1.98×) | **Flagged** |
-| <span title="cells[key=engine=handsontable;rows=100000;scenario=scroll-down.top-left]">Engine · 100,000 rows · scroll down · top left</span> | 15.8 ms / 16.0 ms | 21.3 ms / 21.9 ms | 1.35× | **Flagged** |
-| <span title="cells[key=engine=handsontable;rows=100000;scenario=scroll-right.top-left]">Engine · 100,000 rows · scroll right · top left</span> | 10.6 ms / 10.7 ms | 16.4 ms / 17.8 ms | 1.56× (p95 1.66×) | **Flagged** |
-| <span title="cells[key=engine=handsontable;rows=100000;scenario=scroll-smooth.same-window]">Engine · 100,000 rows · scroll smooth · same window</span> | 7.72 ms / 8.33 ms | 10.5 ms / 11.3 ms | 1.36× | **Flagged** |
-| <span title="cells[key=engine=sheetwrite;rows=100000;scenario=altering.insert-5-rows-top]">Engine · 100,000 rows · altering · insert 5 rows top</span> | 1.87 ms / 2.19 ms | 1.97 ms / 2.33 ms | 1.05× | Within budget |
-| <span title="cells[key=engine=sheetwrite;rows=100000;scenario=altering.remove-5-rows-top]">Engine · 100,000 rows · altering · remove 5 rows top</span> | 1.66 ms / 1.80 ms | 1.64 ms / 1.84 ms | 0.99× | Within budget |
-| <span title="cells[key=engine=sheetwrite;rows=100000;scenario=arrow-down.top-left]">Engine · 100,000 rows · arrow down · top left</span> | 0.69 ms / 0.80 ms | 0.71 ms / 0.78 ms | 1.03× (p95 0.98×) | Within budget |
-| <span title="cells[key=engine=sheetwrite;rows=100000;scenario=arrow-right.middle]">Engine · 100,000 rows · arrow right · middle</span> | 0.69 ms / 0.81 ms | 0.69 ms / 0.82 ms | 1.00× | Within budget |
-| <span title="cells[key=engine=sheetwrite;rows=100000;scenario=edit-commit.middle]">Engine · 100,000 rows · edit commit · middle</span> | 0.96 ms / 1.15 ms | 1.05 ms / 1.24 ms | 1.09× | Within budget |
-| <span title="cells[key=engine=sheetwrite;rows=100000;scenario=edit-open.bottom-right]">Engine · 100,000 rows · edit open · bottom right</span> | 0.56 ms / 0.63 ms | 0.58 ms / 0.64 ms | 1.02× | Within budget |
-| <span title="cells[key=engine=sheetwrite;rows=100000;scenario=edit-open.middle]">Engine · 100,000 rows · edit open · middle</span> | 0.65 ms / 0.79 ms | 0.65 ms / 0.79 ms | 1.00× | Within budget |
-| <span title="cells[key=engine=sheetwrite;rows=100000;scenario=edit-open.top-left]">Engine · 100,000 rows · edit open · top left</span> | 0.60 ms / 0.94 ms | 0.63 ms / 0.92 ms | 1.05× (p95 0.98×) | Within budget |
-| <span title="cells[key=engine=sheetwrite;rows=100000;scenario=formatted-paint.top-left]">Engine · 100,000 rows · formatted paint · top left</span> | 0.47 ms / 0.55 ms | 4 µs | 0.01× | Faster beyond noise |
-| <span title="cells[key=engine=sheetwrite;rows=100000;scenario=merge-heavy.paint]">Engine · 100,000 rows · merge heavy · paint</span> | 3 µs / 4 µs | 3 µs | 0.98× (p95 0.79×) | Faster beyond noise |
-| <span title="cells[key=engine=sheetwrite;rows=100000;scenario=scroll-down.middle]">Engine · 100,000 rows · scroll down · middle</span> | 1.18 ms / 1.30 ms | 1.15 ms / 1.32 ms | 0.98× | Within budget |
-| <span title="cells[key=engine=sheetwrite;rows=100000;scenario=scroll-down.top-left]">Engine · 100,000 rows · scroll down · top left</span> | 1.36 ms / 1.59 ms | 1.41 ms / 1.59 ms | 1.04× | Within budget |
-| <span title="cells[key=engine=sheetwrite;rows=100000;scenario=scroll-right.top-left]">Engine · 100,000 rows · scroll right · top left</span> | 0.26 ms / 0.31 ms | 0.26 ms / 0.31 ms | 1.00× | Within budget |
-| <span title="cells[key=engine=sheetwrite;rows=100000;scenario=scroll-smooth.same-window]">Engine · 100,000 rows · scroll smooth · same window</span> | 0.41 ms / 0.46 ms | 0.40 ms / 0.47 ms | 0.97× | Within budget |
+| <span title="cells[key=engine=handsontable;rows=100000;scenario=altering.insert-5-rows-top]">Handsontable · 100,000 rows · altering · insert 5 rows top</span> | 14.5 ms / 21.2 ms | 17.3 ms / 18.8 ms | 1.19× (p95 0.89×) | **Flagged** |
+| <span title="cells[key=engine=handsontable;rows=100000;scenario=altering.remove-5-rows-top]">Handsontable · 100,000 rows · altering · remove 5 rows top</span> | 12.5 ms / 15.5 ms | 15.0 ms / 15.8 ms | 1.20× (p95 1.02×) | **Flagged** |
+| <span title="cells[key=engine=handsontable;rows=100000;scenario=arrow-down.top-left]">Handsontable · 100,000 rows · arrow down · top left</span> | 1.46 ms / 2.11 ms | 1.47 ms / 1.69 ms | 1.01× (p95 0.80×) | Within budget |
+| <span title="cells[key=engine=handsontable;rows=100000;scenario=arrow-right.middle]">Handsontable · 100,000 rows · arrow right · middle</span> | 1.37 ms / 1.46 ms | 1.38 ms / 1.48 ms | 1.00× | Within budget |
+| <span title="cells[key=engine=handsontable;rows=100000;scenario=edit-commit.middle]">Handsontable · 100,000 rows · edit commit · middle</span> | 4.95 ms / 5.52 ms | 7.80 ms / 8.18 ms | 1.58× (p95 1.48×) | **Flagged** |
+| <span title="cells[key=engine=handsontable;rows=100000;scenario=edit-open.bottom-right]">Handsontable · 100,000 rows · edit open · bottom right</span> | 1.46 ms / 2.06 ms | 1.44 ms / 1.77 ms | 0.99× (p95 0.86×) | Within budget |
+| <span title="cells[key=engine=handsontable;rows=100000;scenario=edit-open.middle]">Handsontable · 100,000 rows · edit open · middle</span> | 1.04 ms / 1.10 ms | 1.04 ms / 1.12 ms | 1.00× | Within budget |
+| <span title="cells[key=engine=handsontable;rows=100000;scenario=edit-open.top-left]">Handsontable · 100,000 rows · edit open · top left</span> | 1.09 ms / 1.19 ms | 1.14 ms / 1.36 ms | 1.04× (p95 1.15×) | Within budget |
+| <span title="cells[key=engine=handsontable;rows=100000;scenario=formatted-paint.top-left]">Handsontable · 100,000 rows · formatted paint · top left</span> | 3.36 ms / 3.72 ms | 6.14 ms / 7.65 ms | 1.83× (p95 2.05×) | **Flagged** |
+| <span title="cells[key=engine=handsontable;rows=100000;scenario=merge-heavy.paint]">Handsontable · 100,000 rows · merge heavy · paint</span> | 3.48 ms / 3.76 ms | 6.37 ms / 6.54 ms | 1.83× (p95 1.74×) | **Flagged** |
+| <span title="cells[key=engine=handsontable;rows=100000;scenario=scroll-down.middle]">Handsontable · 100,000 rows · scroll down · middle</span> | 4.00 ms / 4.98 ms | 6.86 ms / 9.86 ms | 1.71× (p95 1.98×) | **Flagged** |
+| <span title="cells[key=engine=handsontable;rows=100000;scenario=scroll-down.top-left]">Handsontable · 100,000 rows · scroll down · top left</span> | 15.8 ms / 16.0 ms | 21.3 ms / 21.9 ms | 1.35× | **Flagged** |
+| <span title="cells[key=engine=handsontable;rows=100000;scenario=scroll-right.top-left]">Handsontable · 100,000 rows · scroll right · top left</span> | 10.6 ms / 10.7 ms | 16.4 ms / 17.8 ms | 1.56× (p95 1.66×) | **Flagged** |
+| <span title="cells[key=engine=handsontable;rows=100000;scenario=scroll-smooth.same-window]">Handsontable · 100,000 rows · scroll smooth · same window</span> | 7.72 ms / 8.33 ms | 10.5 ms / 11.3 ms | 1.36× | **Flagged** |
+| <span title="cells[key=engine=sheetwrite;rows=100000;scenario=altering.insert-5-rows-top]">Sheetwrite · 100,000 rows · altering · insert 5 rows top</span> | 1.87 ms / 2.19 ms | 1.97 ms / 2.33 ms | 1.05× | Within budget |
+| <span title="cells[key=engine=sheetwrite;rows=100000;scenario=altering.remove-5-rows-top]">Sheetwrite · 100,000 rows · altering · remove 5 rows top</span> | 1.66 ms / 1.80 ms | 1.64 ms / 1.84 ms | 0.99× | Within budget |
+| <span title="cells[key=engine=sheetwrite;rows=100000;scenario=arrow-down.top-left]">Sheetwrite · 100,000 rows · arrow down · top left</span> | 0.69 ms / 0.80 ms | 0.71 ms / 0.78 ms | 1.03× (p95 0.98×) | Within budget |
+| <span title="cells[key=engine=sheetwrite;rows=100000;scenario=arrow-right.middle]">Sheetwrite · 100,000 rows · arrow right · middle</span> | 0.69 ms / 0.81 ms | 0.69 ms / 0.82 ms | 1.00× | Within budget |
+| <span title="cells[key=engine=sheetwrite;rows=100000;scenario=edit-commit.middle]">Sheetwrite · 100,000 rows · edit commit · middle</span> | 0.96 ms / 1.15 ms | 1.05 ms / 1.24 ms | 1.09× | Within budget |
+| <span title="cells[key=engine=sheetwrite;rows=100000;scenario=edit-open.bottom-right]">Sheetwrite · 100,000 rows · edit open · bottom right</span> | 0.56 ms / 0.63 ms | 0.58 ms / 0.64 ms | 1.02× | Within budget |
+| <span title="cells[key=engine=sheetwrite;rows=100000;scenario=edit-open.middle]">Sheetwrite · 100,000 rows · edit open · middle</span> | 0.65 ms / 0.79 ms | 0.65 ms / 0.79 ms | 1.00× | Within budget |
+| <span title="cells[key=engine=sheetwrite;rows=100000;scenario=edit-open.top-left]">Sheetwrite · 100,000 rows · edit open · top left</span> | 0.60 ms / 0.94 ms | 0.63 ms / 0.92 ms | 1.05× (p95 0.98×) | Within budget |
+| <span title="cells[key=engine=sheetwrite;rows=100000;scenario=formatted-paint.top-left]">Sheetwrite · 100,000 rows · formatted paint · top left</span> | 0.47 ms / 0.55 ms | 4 µs | 0.01× | Faster beyond noise |
+| <span title="cells[key=engine=sheetwrite;rows=100000;scenario=merge-heavy.paint]">Sheetwrite · 100,000 rows · merge heavy · paint</span> | 3 µs / 4 µs | 3 µs | 0.98× (p95 0.79×) | Faster beyond noise |
+| <span title="cells[key=engine=sheetwrite;rows=100000;scenario=scroll-down.middle]">Sheetwrite · 100,000 rows · scroll down · middle</span> | 1.18 ms / 1.30 ms | 1.15 ms / 1.32 ms | 0.98× | Within budget |
+| <span title="cells[key=engine=sheetwrite;rows=100000;scenario=scroll-down.top-left]">Sheetwrite · 100,000 rows · scroll down · top left</span> | 1.36 ms / 1.59 ms | 1.41 ms / 1.59 ms | 1.04× | Within budget |
+| <span title="cells[key=engine=sheetwrite;rows=100000;scenario=scroll-right.top-left]">Sheetwrite · 100,000 rows · scroll right · top left</span> | 0.26 ms / 0.31 ms | 0.26 ms / 0.31 ms | 1.00× | Within budget |
+| <span title="cells[key=engine=sheetwrite;rows=100000;scenario=scroll-smooth.same-window]">Sheetwrite · 100,000 rows · scroll smooth · same window</span> | 0.41 ms / 0.46 ms | 0.40 ms / 0.47 ms | 0.97× | Within budget |
 
 </details>
 

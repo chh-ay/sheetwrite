@@ -438,8 +438,11 @@ function metricLabel(key: string): string {
       continue;
     }
     for (const pair of (selector[1] ?? "").split(";")) {
-      const [name = "", value = ""] = pair.split("=");
-      if (!/^\d+$/u.test(value)) parts.push(value);
+      // A value may itself contain "=" (`key=engine=handsontable`), so split at the first one.
+      const split = pair.indexOf("=");
+      const name = split === -1 ? "" : pair.slice(0, split);
+      const value = split === -1 ? pair : pair.slice(split + 1);
+      if (!/^\d+$/u.test(value)) parts.push(value.slice(value.lastIndexOf("=") + 1));
       else
         parts.push(
           name === "rows" ? `${formatCount(Number(value))} rows` : formatCount(Number(value)),
@@ -477,6 +480,18 @@ const VERDICT_LABELS: Readonly<Record<string, string>> = {
   removed: "Removed",
 };
 
+/**
+ * The verdict a reader can check against the shown values: an unbudgeted faster or
+ * slower row whose values are equal once rounded for display reads unchanged.
+ */
+function shownVerdict(metric: ComparisonMetric): string {
+  if (metric.verdict !== "faster" && metric.verdict !== "slower") return metric.verdict;
+  const same =
+    metricStat(metric.base, metric.unit) === metricStat(metric.candidate, metric.unit) &&
+    (metric.medianRatio === null || formatRatio(metric.medianRatio) === formatRatio(1));
+  return same ? "unchanged" : metric.verdict;
+}
+
 function metricRow(metric: ComparisonMetric, leading: string[] = []): string {
   const label = `<span title="${html(metric.key)}">${comparisonCell(metricLabel(metric.key))}</span>`;
   // A row can be flagged on its p95 alone, so show that ratio when it tells a different story.
@@ -489,12 +504,13 @@ function metricRow(metric: ComparisonMetric, leading: string[] = []): string {
   const change = metric.medianRatio === null ? "—" : `${formatRatio(metric.medianRatio)}${p95}`;
   // Bytes and counts get smaller or larger, not faster or slower.
   const sized = metric.unit === "bytes" || metric.unit === "count";
+  const shown = shownVerdict(metric);
   const verdictLabel =
-    sized && metric.verdict === "faster"
+    sized && shown === "faster"
       ? "Smaller"
-      : sized && metric.verdict === "slower"
+      : sized && shown === "slower"
         ? "Larger"
-        : (VERDICT_LABELS[metric.verdict] ?? comparisonCell(metric.verdict));
+        : (VERDICT_LABELS[shown] ?? comparisonCell(shown));
   const verdict = [
     verdictLabel,
     ...(metric.note === undefined ? [] : [comparisonCell(metric.note)]),
@@ -506,6 +522,14 @@ function metricRow(metric: ComparisonMetric, leading: string[] = []): string {
 /** A suite's artifact as a name: "formula-default-results.json" reads "Formula default". */
 function suiteName(artifact: string): string {
   return readableId(artifact.replace(/(-results)?\.json$/u, ""));
+}
+
+/**
+ * Rows that do not measure a Sheetwrite change of their own: Handsontable control
+ * runs, and full-engine rows that repeat the formula tables' workloads.
+ */
+function isControlOrRepeat(key: string): boolean {
+  return /engine=handsontable/u.test(key) || /\.shared\.workloads\[/u.test(key);
 }
 
 export function renderReleaseComparisonSection(
@@ -525,7 +549,11 @@ export function renderReleaseComparisonSection(
     return `${shortHash(stamp.commit)} · ${formatCaptureTime(timestamp)} UTC${origin}`;
   };
   const count = (suite: ReleaseComparisonEvidence["suites"][number], ...verdicts: string[]) =>
-    suite.metrics.filter((metric) => verdicts.includes(metric.verdict)).length;
+    suite.metrics.filter(
+      (metric) => !isControlOrRepeat(metric.key) && verdicts.includes(shownVerdict(metric)),
+    ).length;
+  const others = (suite: ReleaseComparisonEvidence["suites"][number]) =>
+    suite.metrics.filter((metric) => isControlOrRepeat(metric.key)).length;
   const flags = evidence.suites.flatMap((suite) =>
     suite.metrics
       .filter((metric) => metric.verdict === "regression")
@@ -541,14 +569,15 @@ export function renderReleaseComparisonSection(
     "",
     "### Sheetwrite 0.6.0 compared with a fresh 0.5.4 capture",
     "",
-    "Each suite ran once on 0.5.4 and once on 0.6.0, on the same machine. Change is 0.6.0 / 0.5.4 for the median, with the p95 ratio in brackets when it differs: below 1× is faster or smaller, above 1× is slower or larger. A suite with a documented budget marks rows beyond it as flagged; rows without a budget are only marked faster or slower.",
+    "Each suite ran once on 0.5.4 and once on 0.6.0, on the same machine. Change is 0.6.0 / 0.5.4 for the median, with the p95 ratio in brackets when it differs: below 1× is faster or smaller, above 1× is slower or larger. A suite with a documented budget marks rows beyond it as flagged; rows without a budget are only marked faster, slower, smaller or larger.",
     "",
-    "| Suite | Measurements | Faster | Slower | Unchanged or within budget | Flagged |",
-    "| --- | ---: | ---: | ---: | ---: | ---: |",
-    ...evidence.suites.map((suite) =>
-      suite.status === "new-only"
-        ? `| ${suiteName(suite.artifact)} | ${suite.metrics.length} | — | — | — | New in 0.6 |`
-        : `| ${suiteName(suite.artifact)} | ${suite.metrics.length} | ${count(suite, "faster", "improvement")} | ${count(suite, "slower")} | ${count(suite, "unchanged", "within-noise")} | ${count(suite, "regression")} |`,
+    "The summary counts Sheetwrite's own measurements. Lower and higher cover time, memory and counts alike. Handsontable control runs and full-engine rows that repeat the formula tables are counted apart, so a change is not counted twice or credited to Sheetwrite.",
+    "",
+    "| Suite | Measurements | Lower | Higher | Unchanged or within budget | New in 0.6 | Flagged | Control or repeat |",
+    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ...evidence.suites.map(
+      (suite) =>
+        `| ${suiteName(suite.artifact)} | ${suite.metrics.length} | ${count(suite, "faster", "improvement")} | ${count(suite, "slower")} | ${count(suite, "unchanged", "within-noise")} | ${count(suite, "new-only")} | ${count(suite, "regression")} | ${others(suite)} |`,
     ),
     "",
     "### Flagged rows",
@@ -557,7 +586,11 @@ export function renderReleaseComparisonSection(
     "",
     "| Suite | Measurement | 0.5.4 median / p95 | 0.6.0 median / p95 | Change | Result |",
     "| --- | --- | ---: | ---: | ---: | --- |",
-    ...flags.map(({ suite, metric }) => metricRow(metric, [suiteName(suite.artifact)])),
+    ...flags.map(({ suite, metric }) =>
+      metricRow(metric, [
+        `${suiteName(suite.artifact)}${isControlOrRepeat(metric.key) ? (/engine=handsontable/u.test(metric.key) ? " · Handsontable control" : " · repeat of formula table") : ""}`,
+      ]),
+    ),
     "",
     ...evidence.captureMetadata.publicationNotes.flatMap((note) => [
       `### ${html(note.title)}`,
