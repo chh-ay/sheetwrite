@@ -9,6 +9,7 @@ import type {
   Column,
   ConditionalFormatRule,
 } from "./cell.js";
+import type { ChartDefinition } from "./chart.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "./coordinates.js";
 import type { WorkbookTable, WorkbookTablePatch } from "./table.js";
 
@@ -77,6 +78,8 @@ export interface Sheet {
   frozenCols?: number;
   /** Native workbook tables anchored to this stable worksheet identity. */
   tables?: WorkbookTable[];
+  /** Charts anchored to this sheet; series sources use stable sheet IDs. */
+  charts?: ChartDefinition[];
 }
 
 /** One key of a multi-column sort, applied in array order (first = primary). */
@@ -374,6 +377,7 @@ export interface SheetSnapshot {
   filters?: Array<[col: number, filter: ColumnFilter]>;
   rowGroups?: RowGroup[];
   tables?: WorkbookTable[];
+  charts?: ChartDefinition[];
   cells: CellBlock[];
 }
 
@@ -494,4 +498,6 @@ export type DocumentOp =
   | { op: "setNote"; addr: CellAddress; text: string | null }
   | { op: "setNamedRange"; namedRange: NamedRangeSnapshot }
   | { op: "removeNamedRange"; name: string; scope?: SheetId }
-  | { op: "setCalculation"; calculation: CalculationSettings };
+  | { op: "setCalculation"; calculation: CalculationSettings }
+  | { op: "setChart"; sheet: SheetId; chart: ChartDefinition }
+  | { op: "removeChart"; sheet: SheetId; id: string };

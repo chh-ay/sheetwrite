@@ -121,6 +121,7 @@ export const MIGRATION_ROUTES = {
 } as const;
 
 const PACKAGE_DIRECTORIES: Readonly<Record<string, string>> = {
+  "@sheetwrite/charts": "packages/charts",
   "@sheetwrite/core": "packages/core",
   "@sheetwrite/formulas": "packages/formulas",
   "@sheetwrite/react": "packages/react",
@@ -3735,6 +3736,7 @@ const SNIPPET_COMPILER_OPTIONS = {
   moduleResolution: "bundler",
   noEmit: true,
   paths: {
+    "@sheetwrite/charts": ["../packages/charts/dist/index.d.ts"],
     "@sheetwrite/core": ["../packages/core/dist/index.d.ts"],
     "@sheetwrite/core/*": ["../packages/core/dist/*"],
     "@sheetwrite/react": ["../packages/react/dist/index.d.ts"],
@@ -4174,6 +4176,7 @@ const REQUIRED_API_EXAMPLES: Readonly<Record<string, readonly string[]>> = {
   "@sheetwrite/vue": ["Sheetwrite", "SheetwriteGrid"],
   "@sheetwrite/svelte": ["Sheetwrite", "SheetwriteGrid"],
   "@sheetwrite/xlsx": ["registerXlsxBackends"],
+  "@sheetwrite/charts": ["createChartViewCache", "registerChartsBackend"],
   "@sheetwrite/wasm": ["load"],
   "@sheetwrite/formulas": ["load"],
 };

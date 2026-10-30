@@ -8,10 +8,10 @@ description: "Exhaustive serializable operation union for workbook mutations."
 Exhaustive serializable operation union for workbook mutations.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L445"><code>packages/core/src/types/document.ts#L445</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L449"><code>packages/core/src/types/document.ts#L449</code></a></dd></div>
 </dl>
 
-## Variants <span class="api-count" data-pagefind-ignore>35</span>
+## Variants <span class="api-count" data-pagefind-ignore>37</span>
 
 <div class="api-variant-list" data-pagefind-ignore>
 <div class="api-variant">
@@ -348,6 +348,20 @@ Exhaustive serializable operation union for workbook mutations.
 ```
 
 </div>
+<div class="api-variant">
+
+```ts generated
+{ op: "setChart"; sheet: SheetId; chart: ChartDefinition }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ op: "removeChart"; sheet: SheetId; id: string }
+```
+
+</div>
 </div>
 
 ## Declaration
@@ -548,6 +562,16 @@ export type DocumentOp =
   | {
       op: "setCalculation";
       calculation: CalculationSettings;
+    }
+  | {
+      op: "setChart";
+      sheet: SheetId;
+      chart: ChartDefinition;
+    }
+  | {
+      op: "removeChart";
+      sheet: SheetId;
+      id: string;
     };
 ```
 
@@ -560,6 +584,7 @@ export type DocumentOp =
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

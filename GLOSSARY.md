@@ -16,6 +16,20 @@ _Avoid_: source row, model row
 A row's position after the view is applied; selection, scrolling, and painting address displayed rows.
 _Avoid_: view row, visual row
 
+## Charts
+
+**Chart**:
+A sheet-owned definition, keyed by a stable ID, that plots series from cell ranges. It is anchored to a cell, with pixel offsets and size.
+_Avoid_: graph, plot (as a noun for the definition)
+
+**Series**:
+One plotted set of points. It has values, optional categories and a name, each read from a range or given as text.
+_Avoid_: dataset, trace
+
+**Chart view**:
+The resolved plain data of one chart (`ChartView`): series values, categories and number formats. The renderer draws only from it.
+_Avoid_: chart data, chart state
+
 ## Release
 
 **Package assembly**:

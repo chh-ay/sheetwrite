@@ -28,6 +28,7 @@ async function graphFixture(extraPackage?: { readonly name: string; readonly bui
     "@sheetwrite/formulas": [],
     "@sheetwrite/core": ["@sheetwrite/wasm"],
     "@sheetwrite/xlsx": ["@sheetwrite/core"],
+    "@sheetwrite/charts": ["@sheetwrite/core"],
     "@sheetwrite/react": ["@sheetwrite/core"],
     "@sheetwrite/vue": ["@sheetwrite/core"],
     "@sheetwrite/svelte": ["@sheetwrite/core"],

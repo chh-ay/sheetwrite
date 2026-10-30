@@ -164,6 +164,7 @@ presence, comments, and revisions.
 | `@sheetwrite/wasm` | Default Rust/WASM engine; installs with the core |
 | `@sheetwrite/formulas` | Optional full formula engine with analysis functions |
 | `@sheetwrite/xlsx` | Optional concrete XLSX table/workbook backends and explicit registration |
+| `@sheetwrite/charts` | Optional live chart views that a chart renderer reads |
 | `@sheetwrite/react` | React `Sheetwrite` and `SheetwriteGrid` |
 | `@sheetwrite/vue` | Vue `Sheetwrite` and `SheetwriteGrid` |
 | `@sheetwrite/svelte` | Svelte `Sheetwrite` and `SheetwriteGrid` |

@@ -8,7 +8,7 @@ description: "Optional display text ceiling used by SpreadsheetML shared-string 
 Optional display text ceiling used by SpreadsheetML shared-string implementations.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/hyperlink.ts#L14"><code>packages/core/src/hyperlink.ts#L14</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/hyperlink.ts#L20"><code>packages/core/src/hyperlink.ts#L20</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -28,6 +28,7 @@ const MAX_HYPERLINK_DISPLAY_LENGTH: 32767
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

@@ -6,6 +6,8 @@ import * as Adapter from "@sheetwrite/core/adapter";
 import * as Shell from "@sheetwrite/core/shell";
 import * as Xlsx from "@sheetwrite/xlsx";
 import "@sheetwrite/xlsx/register";
+import * as Charts from "@sheetwrite/charts";
+import "@sheetwrite/charts/register";
 import * as ReactAdapter from "@sheetwrite/react";
 import * as VueAdapter from "@sheetwrite/vue";
 import { load } from "@sheetwrite/wasm";
@@ -13,6 +15,7 @@ import { load } from "@sheetwrite/wasm";
 const entries = {
   "@sheetwrite/core": Core,
   "@sheetwrite/xlsx": Xlsx,
+  "@sheetwrite/charts": Charts,
   "@sheetwrite/core/adapter": Adapter,
   "@sheetwrite/core/shell": Shell,
   "@sheetwrite/react": ReactAdapter,
@@ -114,6 +117,44 @@ if (tableData.columns.Value?.[0] !== "packed") {
   throw new Error("Packed table XLSX round-trip changed the value");
 }
 store.dispose();
+
+// The packed charts register entry must let packed core open live views of a packed store.
+const chartStore = new Core.SheetwriteStore({
+  activeSheet: "chart",
+  sheets: [
+    {
+      id: "chart",
+      name: "Chart",
+      rowCount: 2,
+      columns: [{ key: "amount", header: "Amount", width: 80, type: "number" }],
+      charts: [
+        {
+          id: "packed",
+          kind: "column",
+          anchor: { row: 0, col: 0, offsetX: 0, offsetY: 0, width: 320, height: 200 },
+          series: [
+            {
+              name: "Amount",
+              values: { sheet: "chart", start: { row: 0, col: 0 }, end: { row: 1, col: 0 } },
+            },
+          ],
+        },
+      ],
+    },
+  ],
+});
+const chartViews = Core.openChartViews(chartStore);
+chartStore.applyTransaction({
+  patches: [
+    { op: "set", addr: { sheet: "chart", row: 1, col: 0 }, value: { kind: "literal", value: 5 } },
+  ],
+});
+const packedChartValues = chartViews.get({ sheet: "chart", id: "packed" })?.series[0]?.values;
+if (JSON.stringify(packedChartValues) !== JSON.stringify([null, 5])) {
+  throw new Error(`Packed chart view resolved ${JSON.stringify(packedChartValues)}`);
+}
+chartViews.dispose();
+chartStore.dispose();
 
 const workbookSnapshot = {
   schemaVersion: 1,

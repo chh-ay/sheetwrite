@@ -8,7 +8,7 @@ description: "Validate and canonically order a schema-1 snapshot without hydrati
 Validate and canonically order a schema-1 snapshot without hydrating runtime state.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L3269"><code>packages/core/src/document-protocol.ts#L3269</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L3340"><code>packages/core/src/document-protocol.ts#L3340</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -31,6 +31,7 @@ function validateWorkbookSnapshot(
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

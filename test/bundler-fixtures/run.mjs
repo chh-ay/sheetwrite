@@ -16,10 +16,13 @@ const packageDirectories = [
   "packages/wasm",
   "packages/core",
   "packages/xlsx",
+  "packages/charts",
   "packages/react",
   "packages/vue",
   "packages/svelte",
 ];
+// The fixtures use every release package except @sheetwrite/formulas.
+const RELEASE_PACKAGE_COUNT = packageDirectories.length + 1;
 const sourceManifests = await Promise.all(
   packageDirectories.map(async (directory) =>
     JSON.parse(await readFile(join(repositoryRoot, directory, "package.json"), "utf8")),
@@ -166,9 +169,13 @@ if (artifactDirectory === undefined) {
   const releaseManifestBytes = await readFile(join(artifactRoot, "release-artifacts.json"));
   const releaseManifest = JSON.parse(releaseManifestBytes.toString("utf8"));
   artifactManifestDigest = `sha512-${createHash("sha512").update(releaseManifestBytes).digest("base64")}`;
-  // The bundler fixtures use six of the seven release packages; they do not use @sheetwrite/formulas.
-  if (!Array.isArray(releaseManifest.packages) || releaseManifest.packages.length !== 7) {
-    throw new Error("Canonical release manifest must contain exactly seven packages");
+  if (
+    !Array.isArray(releaseManifest.packages) ||
+    releaseManifest.packages.length !== RELEASE_PACKAGE_COUNT
+  ) {
+    throw new Error(
+      `Canonical release manifest must contain exactly ${RELEASE_PACKAGE_COUNT} packages`,
+    );
   }
   for (const sourceManifest of sourceManifests) {
     const artifact = releaseManifest.packages.find((entry) => entry.name === sourceManifest.name);

@@ -989,7 +989,9 @@ export class GridImpl implements Grid {
             patch.op !== "setHyperlink" &&
             patch.op !== "removeHyperlink" &&
             patch.op !== "setProtectedRange" &&
-            patch.op !== "removeProtectedRange"
+            patch.op !== "removeProtectedRange" &&
+            patch.op !== "setChart" &&
+            patch.op !== "removeChart"
           ) {
             geometryChanged = true;
           }

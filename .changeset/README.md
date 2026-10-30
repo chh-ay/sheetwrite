@@ -18,7 +18,7 @@ alongside your change.
 
 Private workspaces are excluded by Changesets policy, so you only select the
 published packages: `@sheetwrite/core`, `@sheetwrite/wasm`, `@sheetwrite/xlsx`,
-`@sheetwrite/react`, `@sheetwrite/vue`, `@sheetwrite/svelte`.
+`@sheetwrite/charts`, `@sheetwrite/react`, `@sheetwrite/vue`, `@sheetwrite/svelte`.
 
 ## How releases consume them
 

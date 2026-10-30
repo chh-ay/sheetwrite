@@ -2,6 +2,7 @@
 // Renderer-agnostic, framework-agnostic. No runtime values live here.
 
 export type * from "./types/cell.js";
+export type * from "./types/chart.js";
 export type * from "./types/coordinates.js";
 export type * from "./types/data.js";
 export type * from "./types/document.js";

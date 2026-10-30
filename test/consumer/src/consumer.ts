@@ -5,6 +5,8 @@ import * as Shell from "@sheetwrite/core/shell";
 import * as Worker from "@sheetwrite/core/worker";
 import * as Xlsx from "@sheetwrite/xlsx";
 import "@sheetwrite/xlsx/register";
+import * as Charts from "@sheetwrite/charts";
+import "@sheetwrite/charts/register";
 import * as ReactAdapter from "@sheetwrite/react";
 import * as SvelteAdapter from "@sheetwrite/svelte";
 import * as VueAdapter from "@sheetwrite/vue";
@@ -57,6 +59,7 @@ const publicEntries: readonly Record<string, unknown>[] = [
   Shell,
   Worker,
   Xlsx,
+  Charts,
   ReactAdapter,
   SvelteAdapter,
   VueAdapter,

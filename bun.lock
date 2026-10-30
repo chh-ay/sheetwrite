@@ -50,6 +50,7 @@
         "@fontsource-variable/inter": "^5.2.8",
         "@fontsource-variable/space-grotesk": "^5.2.8",
         "@fontsource/jetbrains-mono": "^5.2.8",
+        "@sheetwrite/charts": "workspace:*",
         "@sheetwrite/core": "workspace:*",
         "@sheetwrite/formulas": "workspace:*",
         "@sheetwrite/react": "workspace:*",
@@ -98,9 +99,16 @@
         "vite": "8.1.6",
       },
     },
+    "packages/charts": {
+      "name": "@sheetwrite/charts",
+      "version": "0.5.4",
+      "dependencies": {
+        "@sheetwrite/core": "workspace:*",
+      },
+    },
     "packages/core": {
       "name": "@sheetwrite/core",
-      "version": "0.5.2",
+      "version": "0.5.4",
       "dependencies": {
         "@sheetwrite/wasm": "workspace:*",
         "fflate": "0.8.3",
@@ -108,11 +116,11 @@
     },
     "packages/formulas": {
       "name": "@sheetwrite/formulas",
-      "version": "0.5.2",
+      "version": "0.5.4",
     },
     "packages/react": {
       "name": "@sheetwrite/react",
-      "version": "0.5.2",
+      "version": "0.5.4",
       "dependencies": {
         "@sheetwrite/core": "workspace:*",
       },
@@ -122,7 +130,7 @@
     },
     "packages/svelte": {
       "name": "@sheetwrite/svelte",
-      "version": "0.5.2",
+      "version": "0.5.4",
       "dependencies": {
         "@sheetwrite/core": "workspace:*",
       },
@@ -136,7 +144,7 @@
     },
     "packages/vue": {
       "name": "@sheetwrite/vue",
-      "version": "0.5.2",
+      "version": "0.5.4",
       "dependencies": {
         "@sheetwrite/core": "workspace:*",
       },
@@ -146,11 +154,11 @@
     },
     "packages/wasm": {
       "name": "@sheetwrite/wasm",
-      "version": "0.5.2",
+      "version": "0.5.4",
     },
     "packages/xlsx": {
       "name": "@sheetwrite/xlsx",
-      "version": "0.5.2",
+      "version": "0.5.4",
       "dependencies": {
         "@sheetwrite/core": "workspace:*",
         "fflate": "0.8.3",
@@ -561,6 +569,8 @@
     "@rollup/rollup-win32-x64-msvc": ["@rollup/rollup-win32-x64-msvc@4.62.2", "", { "os": "win32", "cpu": "x64" }, "sha512-BfzEnDJOt9T8M989/lA37EcJgat01wLRnoi5dQf3QzOH7jzpqTAzdDbVfRljVr5r+jzKqpbHeyOfAaXxAd0PAA=="],
 
     "@sheetwrite/bench": ["@sheetwrite/bench@workspace:bench"],
+
+    "@sheetwrite/charts": ["@sheetwrite/charts@workspace:packages/charts"],
 
     "@sheetwrite/core": ["@sheetwrite/core@workspace:packages/core"],
 

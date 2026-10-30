@@ -244,6 +244,9 @@ export class StoreMutationPolicy {
       case "setNamedRange":
       case "removeNamedRange":
       case "setCalculation":
+      // A chart only reads its sources, so protection and validation never apply.
+      case "setChart":
+      case "removeChart":
         return [];
       default: {
         const unclassified: never = patch;

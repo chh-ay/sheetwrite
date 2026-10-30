@@ -8,7 +8,7 @@ description: "Validate, but never activate or fetch, an external hyperlink targe
 Validate, but never activate or fetch, an external hyperlink target.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/hyperlink.ts#L72"><code>packages/core/src/hyperlink.ts#L72</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/hyperlink.ts#L44"><code>packages/core/src/hyperlink.ts#L44</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -28,6 +28,7 @@ function isSafeExternalHyperlink(url: string): boolean
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>

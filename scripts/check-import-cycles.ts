@@ -104,9 +104,26 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "HyperlinkTarget",
     ],
   },
+  chart: {
+    source: "packages/core/src/types/chart.ts",
+    dependencies: ["coordinates"],
+    exports: [
+      "ChartAnchor",
+      "ChartChangeEvent",
+      "ChartChangeListener",
+      "ChartDefinition",
+      "ChartKind",
+      "ChartRange",
+      "ChartRef",
+      "ChartSeries",
+      "ChartSeriesView",
+      "ChartView",
+      "ChartViewProvider",
+    ],
+  },
   document: {
     source: "packages/core/src/types/document.ts",
-    dependencies: ["cell", "coordinates", "table"],
+    dependencies: ["cell", "chart", "coordinates", "table"],
     exports: [
       "AddSheetInput",
       "CalculationSettings",
@@ -187,10 +204,11 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
   },
   store: {
     source: "packages/core/src/types/store.ts",
-    dependencies: ["cell", "coordinates", "document", "transaction"],
+    dependencies: ["cell", "chart", "coordinates", "document", "transaction"],
     exports: [
       "CellLoadState",
       "ClipboardWindowView",
+      "ChartViewProviderFactory",
       "PagedStoreStats",
       "QueryCapability",
       "ResolvedCell",
