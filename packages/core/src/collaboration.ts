@@ -759,7 +759,7 @@ function clonePresenceMessage(message: PresenceMessage): PresenceMessage {
 
 function validateAdapterVersion(version: number): void {
   if (!Number.isSafeInteger(version) || version < 0) {
-    throw new Error("Comment adapter returned an invalid version");
+    throw new Error("Collaboration adapter returned an invalid version");
   }
 }
 

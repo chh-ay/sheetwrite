@@ -4,8 +4,8 @@
 
 Fix several bugs that changed user data:
 
-- Fill, copy and row or column edits keep function names such as `LOG10` and `BIN2DEC`. A reference that moves outside the sheet becomes `#REF!` instead of moving to column A or row 1.
-- Pasting `-5` or `+1` from another app into a number column stores a number. Only text that would become a formula gets a leading quote.
+- Fill, copy and row or column edits keep function names such as `LOG10` and `BIN2DEC`. A reference that moves outside the sheet, before column A or row 1 or past column XFD or row 1048576, becomes `#REF!` instead of stopping at the edge. A range with such a corner becomes one `#REF!`.
+- Pasting `-5` or `+1` as plain text from another app into a number column stores a number. Only text that would become a formula gets a leading quote.
 - Case-insensitive replace keeps non-ASCII text intact when lower case changes the text length (for example `İ`).
 - Replace all skips reference cells, so the reference stays linked.
 - `loadPage` keeps empty cells, booleans and dates, the same as `loadColumnar`.

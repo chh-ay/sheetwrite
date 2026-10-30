@@ -34,6 +34,18 @@ describe("shiftA1Refs", () => {
     expect(shiftA1Refs("=$A$1+A$1+$A1", -1, -1)).toBe("=$A$1+#REF!+#REF!");
   });
 
+  it("turns a range with a corner off the sheet into one #REF!", () => {
+    expect(shiftA1Refs("=SUM(A1:B2)", -1, 0)).toBe("=SUM(#REF!)");
+    expect(shiftA1Refs("=SUM(B2:C3)", -1, 0)).toBe("=SUM(B1:C2)");
+    expect(shiftA1Refs('=SUM(A1:B2)&"A1:B2"', 0, -1)).toBe('=SUM(#REF!)&"A1:B2"');
+  });
+
+  it("turns a reference past the last row or column into #REF!", () => {
+    expect(shiftA1Refs("=XFD1", 0, 1)).toBe("=#REF!");
+    expect(shiftA1Refs("=A1048576", 1, 0)).toBe("=#REF!");
+    expect(shiftA1Refs("=XFC1048575", 1, 1)).toBe("=XFD1048576");
+  });
+
   it("preserves array constants and text while shifting adjacent references", () => {
     expect(shiftA1Refs('=SUM({1,2;3,4})+A1&{"A1","a""B2"}', 2, 1)).toBe(
       '=SUM({1,2;3,4})+B3&{"A1","a""B2"}',
