@@ -522,4 +522,47 @@ describe("RowBridge", () => {
       store.dispose();
     }
   });
+
+  it("keeps a later write's change out of a captured clear in the same transaction", () => {
+    const store = new SheetwriteStore(
+      {
+        activeSheet: "sheet1",
+        sheets: [
+          {
+            id: "sheet1",
+            name: "Sheet 1",
+            rowCount: 3,
+            columns: [{ key: "name", header: "Name", width: 100, type: "text" }],
+          },
+        ],
+      },
+      { rowCount: 3, columns: { name: ["A", null, "C"] } },
+    );
+    const bridge = createRowBridge({ columns, defaultRows: rows, getRowId: (row) => row.id });
+    const projections: RowBridgeProjection<string>[] = [];
+    store.setDetailedChangeCapture(true);
+    store.on("change", (change) => projections.push(bridge.project(change)));
+
+    try {
+      // Row b is empty before the clear, so only the set changes it.
+      store.applyTransaction({
+        patches: [
+          {
+            op: "clearRange",
+            range: { sheet: "sheet1", start: { row: 0, col: 0 }, end: { row: 2, col: 0 } },
+          },
+          { op: "set", addr: { sheet: "sheet1", row: 1, col: 0 }, value: literal("B") },
+        ],
+      });
+
+      const [clear, set] = projections[0]?.deltas ?? [];
+      expect(clear?.kind === "clear" ? clear.cells.map((cell) => cell.rowId) : []).toEqual([
+        "row-a",
+        "row-c",
+      ]);
+      expect(set?.kind === "cell" ? set.cell.next : null).toEqual(literal("B"));
+    } finally {
+      store.dispose();
+    }
+  });
 });

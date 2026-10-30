@@ -12,7 +12,7 @@ import {
   sanitizeChartDefinition,
   sheetChartsFit,
 } from "../chart-definition.js";
-import { capturedClearOperations } from "../clear-capture.js";
+import { capturedClearCells } from "../clear-capture.js";
 import { validConditionalRules } from "../conditional-format.js";
 import { dateToSerial } from "../date-serial.js";
 import { isValidCalculationSettings, storedCalculationSettings } from "../document-protocol.js";
@@ -2441,7 +2441,10 @@ export class StoreDataEngine {
           clearStyle,
         );
         if (applied && changes && beforeCells) {
-          capturedClearOperations.add(patch);
+          capturedClearCells.set(
+            patch,
+            beforeCells.map((entry) => entry.addr),
+          );
           for (const entry of beforeCells) {
             changes.push({
               addr: entry.addr,

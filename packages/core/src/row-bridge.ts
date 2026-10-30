@@ -1,4 +1,4 @@
-import { capturedClearOperations } from "./clear-capture.js";
+import { capturedClearCells } from "./clear-capture.js";
 import { restoreBlockFacts } from "./restore-block.js";
 import type { CellScalar, CellValue } from "./types/cell.js";
 import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
@@ -635,31 +635,19 @@ export class RowBridge<
         );
       }
     } else if (operation.op === "clearRange") {
-      const range = operation.range;
-      const startRow = Math.min(range.start.row, range.end.row);
-      const endRow = Math.max(range.start.row, range.end.row);
-      const startCol = Math.min(range.start.col, range.end.col);
-      const endCol = Math.max(range.start.col, range.end.col);
-      if (capturedClearOperations.has(operation)) {
-        // The store listed exactly the cells this clear changed. Walking every
-        // address would allocate per cell for a whole-column clear.
-        for (const queue of changeQueues.values()) {
-          const addr = queue[0]?.addr;
-          if (
-            addr === undefined ||
-            addr.sheet !== range.sheet ||
-            addr.row < startRow ||
-            addr.row > endRow ||
-            addr.col < startCol ||
-            addr.col > endCol
-          ) {
-            continue;
-          }
-          addresses.push(addr);
-        }
-        addresses.sort((left, right) => left.row - right.row || left.col - right.col);
+      const captured = capturedClearCells.get(operation);
+      if (captured) {
+        // The store listed exactly the cells this clear changed, in the order of
+        // their change entries. A later write in the same transaction keeps its
+        // own change, and a whole-column clear allocates nothing per empty cell.
+        for (const addr of captured) addresses.push(addr);
       } else {
         // Without capture for this clear (reconcile, or capture off) every cell may have changed.
+        const range = operation.range;
+        const startRow = Math.min(range.start.row, range.end.row);
+        const endRow = Math.max(range.start.row, range.end.row);
+        const startCol = Math.min(range.start.col, range.end.col);
+        const endCol = Math.max(range.start.col, range.end.col);
         for (let row = startRow; row <= endRow; row += 1) {
           for (let col = startCol; col <= endCol; col += 1) {
             const addr = { sheet: range.sheet, row, col };
