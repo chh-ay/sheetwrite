@@ -523,6 +523,94 @@ describe("workbook document protocol", () => {
     }
   });
 
+  it("admits large disjoint merge sets on added sheets and rejects a distant overlap", () => {
+    const count = 4_000;
+    const columns = 128;
+    const mergesPerRow = columns / 2;
+    // Admission requires each merge to cover more than one cell.
+    const merges = Array.from({ length: count }, (_, index) => ({
+      r0: Math.floor(index / mergesPerRow),
+      c0: (index % mergesPerRow) * 2,
+      r1: Math.floor(index / mergesPerRow),
+      c1: (index % mergesPerRow) * 2 + 1,
+    }));
+    const [source] = mergeSnapshot(merges, Math.ceil(count / mergesPerRow), columns).sheets;
+    if (!source) throw new Error("merge sheet missing");
+    const store = new SheetwriteStore(makeWorkbook(1));
+
+    const overlapping = { ...source, id: "overlap", name: "Overlap", order: 1 };
+    overlapping.merges = [{ r0: 0, c0: 1, r1: 1, c1: 2 }, ...merges];
+    expect(
+      store.applyTransaction({ patches: [{ op: "addSheet", sheet: overlapping }] }),
+    ).toMatchObject({
+      status: "rejected",
+    });
+
+    const disjoint = { ...source, id: "added", name: "Added", order: 1 };
+    expect(
+      store.applyTransaction({ patches: [{ op: "addSheet", sheet: disjoint }] }),
+    ).toMatchObject({
+      status: "applied",
+    });
+    store.dispose();
+  });
+
+  it("rejects zero row heights like row metadata operations", () => {
+    const snapshot = richSnapshot();
+    const input = {
+      ...snapshot,
+      sheets: snapshot.sheets.map((sheet) =>
+        sheet.id === "sheet-a" ? { ...sheet, rowMeta: [[0, { height: 0 }]] } : sheet,
+      ),
+    };
+
+    const result = validateWorkbookSnapshot(input);
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("zero row height unexpectedly accepted");
+    expect(result.errors.map((error) => error.path)).toContain("sheets[1].rowMeta[0][1].height");
+  });
+
+  it("orders canonical identifiers independently of the runtime locale", () => {
+    const snapshot = richSnapshot();
+    const range = { sheet: "sheet-a", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } };
+    const input = {
+      ...snapshot,
+      sheets: snapshot.sheets.map((sheet) =>
+        sheet.id === "sheet-a"
+          ? {
+              ...sheet,
+              protectedRanges: [
+                { id: "a", range },
+                { id: "B", range },
+              ],
+            }
+          : sheet,
+      ),
+    };
+
+    const result = validateWorkbookSnapshot(input);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("snapshot unexpectedly rejected");
+    const sheet = result.value.sheets.find((candidate) => candidate.id === "sheet-a");
+    expect(sheet?.protectedRanges?.map((protectedRange) => protectedRange.id)).toEqual(["B", "a"]);
+  });
+
+  it("reports table column overflow as a table limit", () => {
+    const snapshot = richSnapshot();
+    const columns = Array.from({ length: 16_385 }, (_, index) => ({ name: `C${index}` }));
+    const input = {
+      ...snapshot,
+      sheets: snapshot.sheets.map((sheet) =>
+        sheet.id === "sheet-a" ? { ...sheet, tables: [{ id: "wide", columns }] } : sheet,
+      ),
+    };
+
+    const result = validateWorkbookSnapshot(input);
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("wide table unexpectedly accepted");
+    expect(result.errors[0]?.message).toContain("table column limit");
+  });
+
   it("validates named range scope, identity, and formula-safe names", () => {
     const scoped = richSnapshot();
     scoped.workbook.namedRanges!.push({

@@ -310,7 +310,7 @@ export class SearchController {
         const cell = captured?.[index];
         // Custom stores without an engine retain their scalar read contract.
         const patch = cell
-          ? cell.value.kind === "formula"
+          ? cell.value.kind === "formula" || cell.value.kind === "ref"
             ? null
             : this.replacementFromCell(addr, replacement, cell)
           : this.replacementPatch(addr, replacement);
@@ -361,8 +361,9 @@ export class SearchController {
     addr: CellAddress,
     replacement: string,
   ): Extract<DocumentOp, { op: "set" }> | null {
-    // Formula source text must never be rewritten by a resolved-value search.
+    // Formula and reference sources must never be rewritten by a resolved-value search.
     if (this.deps.store.getFormula(addr) !== null) return null;
+    if (this.deps.store.getRefTarget(addr) !== null) return null;
 
     return this.replacementFromCell(addr, replacement, this.deps.store.getCell(addr));
   }

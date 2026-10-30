@@ -41,6 +41,19 @@ export function replaceInText(
   // original so untouched spans keep their casing.
   const haystack = text.toLowerCase();
   const needle = query.toLowerCase();
+  if (haystack.length !== text.length || needle.length !== query.length) {
+    let result = "";
+    let previousEnd = 0;
+    for (let offset = 0; offset <= text.length - query.length; offset++) {
+      if (text.slice(offset, offset + query.length).toLowerCase() !== needle) continue;
+
+      result += text.slice(previousEnd, offset) + replacement;
+      previousEnd = offset + query.length;
+      offset = previousEnd - 1;
+    }
+
+    return previousEnd === 0 ? null : result + text.slice(previousEnd);
+  }
   let idx = haystack.indexOf(needle);
   if (idx < 0) return null;
 

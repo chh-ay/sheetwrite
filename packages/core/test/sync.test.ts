@@ -18,9 +18,12 @@ import {
   SyncPendingCapacityError,
   SyncProtocolError,
   type VersionedOperation,
+  type PendingCommit,
+  type PendingCommitStorage,
   type WorkbookSnapshot,
 } from "../src/index.js";
 import { SheetwriteStore } from "../src/store.js";
+import type * as SyncModule from "../src/sync.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 
 beforeAll(async () => {
@@ -709,6 +712,111 @@ describe("sync coordinator", () => {
     expect(await coordinator.recoverConflict()).toEqual({ status: "no-conflict" });
     coordinator.destroy();
     grid.destroy();
+  });
+
+  it("keeps durable queue bases when a missed version is rejected during recovery", async () => {
+    const replacements: string[][] = [];
+    const records = new Map<string, PendingCommit>();
+    const pendingStorage: PendingCommitStorage = {
+      load: async () => [],
+      put: async (commit) => {
+        records.set(commit.clientMutationId, structuredClone(commit));
+      },
+      remove: async (_documentId, clientMutationId) => {
+        records.delete(clientMutationId);
+      },
+      replace: async (_documentId, expected, commits) => {
+        replacements.push([...expected]);
+        for (const commit of commits) records.set(commit.clientMutationId, structuredClone(commit));
+      },
+    };
+    const { grid, coordinator } = harness(["m1"], { pendingStorage });
+    await coordinator.ready();
+    grid.applyTransaction({ patches: [localSet(2)] });
+    await coordinator.ready();
+    await coordinator.handleResponse(
+      {
+        status: "conflict",
+        currentVersion: 8,
+        operationsSinceBase: [
+          {
+            version: 8,
+            operations: [
+              {
+                op: "set",
+                addr: { sheet: "missing", row: 1, col: 0 },
+                value: { kind: "literal", value: 8 },
+              },
+            ],
+          },
+        ],
+      },
+      "m1",
+    );
+
+    expect(await coordinator.recoverConflict()).toMatchObject({
+      status: "reload-required",
+      reason: "rejected",
+    });
+    expect(replacements).toEqual([]);
+    expect(records.get("m1")?.baseVersion).toBe(7);
+    coordinator.destroy();
+    grid.destroy();
+  });
+
+  it("keeps the host offline flag when a remote subscription starts", async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const grid = createGridFromSnapshot(host, snapshot());
+    const coordinator = new SyncCoordinator(grid, new MemoryPersistenceAdapter(snapshot()), {
+      documentId: "sync-doc",
+      serverVersion: 7,
+    });
+    coordinator.setOnline(false);
+    grid.applyTransaction({ patches: [localSet(2)] });
+
+    const dispose = coordinator.subscribe({ subscribe: () => () => {} });
+    // `flush` shares a running flush, so it shows whether `subscribe` started one.
+    expect(await coordinator.flush()).toEqual([]);
+    expect(coordinator.pendingCount).toBe(1);
+
+    coordinator.setOnline(true);
+    expect(await coordinator.flush()).toHaveLength(1);
+    expect(coordinator.pendingCount).toBe(0);
+    dispose();
+    coordinator.destroy();
+    grid.destroy();
+  });
+
+  it("creates distinct default mutation IDs on separate page loads in the same millisecond", async () => {
+    const now = spyOn(Date, "now").mockReturnValue(1_700_000_000_000);
+    const ids: string[] = [];
+    try {
+      for (const page of ["first-page", "second-page"]) {
+        // A fresh module instance stands in for a new page load: the module
+        // state starts again, as it does in a reloaded browser tab.
+        const pageModule: typeof SyncModule = await import(`../src/sync.js?${page}`);
+        const host = document.createElement("div");
+        document.body.appendChild(host);
+        const grid = createGridFromSnapshot(host, snapshot());
+        const adapter = new ControlledAdapter(snapshot());
+        const coordinator = new pageModule.SyncCoordinator(grid, adapter, {
+          documentId: "sync-doc",
+          serverVersion: 7,
+          initialConnection: "offline",
+        });
+        grid.applyTransaction({ patches: [localSet(2)] });
+        const id = coordinator.pendingCommits()[0]?.clientMutationId;
+        if (id === undefined) throw new Error("default mutation ID missing");
+        ids.push(id);
+        coordinator.destroy();
+        grid.destroy();
+      }
+    } finally {
+      now.mockRestore();
+    }
+
+    expect(new Set(ids).size).toBe(2);
   });
 
   it("leaves the conflict for a reload when in-place recovery is not safe", async () => {

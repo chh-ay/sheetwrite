@@ -304,9 +304,9 @@ export class InteractionSessions {
       row: this.deps.toDataRow(editCell.row),
       col: editCell.col,
     };
-    const formula = this.deps.loadable?.getFormula(dataAddr) ?? null;
+    const formula = this.deps.store.getFormula(dataAddr);
     const current = this.deps.store.getCell(dataAddr).resolved;
-    const text = initial ?? formula ?? (current === null ? "" : String(current));
+    const text = initial ?? formula ?? cellScalarToText(current);
     const contentTop = this.deps.contentTop();
 
     this.cancelPointer();

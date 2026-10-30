@@ -60,12 +60,15 @@ export function shiftA1Refs(src: string, dRow: number, dCol: number): string {
       if (match.startsWith('"') || match.startsWith("'")) return match;
       const prev = offset > 0 ? full.charAt(offset - 1) : "";
       if (prev === "_" || /[A-Za-z0-9]/.test(prev)) return match;
+      const next = full.charAt(offset + match.length);
+      if (next === "(" || next === "_" || /[A-Za-z0-9]/.test(next)) return match;
 
       let col = labelToCol(letters.toUpperCase());
       let rowNum = Number(digits);
 
-      if (!ca) col = Math.max(0, col + dCol);
-      if (!ra) rowNum = Math.max(1, rowNum + dRow);
+      if (!ca) col += dCol;
+      if (!ra) rowNum += dRow;
+      if (col < 0 || rowNum < 1) return "#REF!";
 
       return `${ca}${colToA1(col)}${ra}${rowNum}`;
     },
@@ -98,6 +101,8 @@ export function remapFormulaA1Refs(
       if (match.startsWith('"') || match.startsWith("'")) return match;
       const previous = offset > 0 ? full.charAt(offset - 1) : "";
       if (previous === "!" || previous === "_" || /[A-Za-z0-9]/.test(previous)) return match;
+      const next = full.charAt(offset + match.length);
+      if (next === "(" || next === "_" || /[A-Za-z0-9]/.test(next)) return match;
       const col = labelToCol(letters.toUpperCase());
       const row = Number(digits) - 1;
       const mapped = remap(axis === "row" ? row : col);
