@@ -1,5 +1,5 @@
 import { heapStats } from "bun:jsc";
-import { beforeAll, describe, expect, it } from "bun:test";
+import { beforeAll, describe, expect, it, spyOn } from "bun:test";
 
 import {
   fromXlsxWorkbook,
@@ -493,16 +493,22 @@ function storedBlockZip(text: string): Uint8Array {
 describe("ZIP one-step read boundary", () => {
   for (const size of [ONE_STEP_READ_BYTES, ONE_STEP_READ_BYTES + 1]) {
     describe(`at a declared uncompressed size of ${size} bytes`, () => {
-      it("reads stored and deflated parts", async () => {
+      it("reads stored and deflated parts on the path that their size selects", async () => {
         const text = letters(size);
         for (const level of [0, 6] as const) {
           const reader = await ZipReader.open(
             rawZip({ "a.xml": text }, level),
             createCodecContext("import"),
           );
-          const bytes = await reader.read("a.xml");
-          expect(bytes.byteLength).toBe(size);
-          expect(new TextDecoder().decode(bytes)).toBe(text);
+          const streamed = spyOn(ZipReader.prototype, "chunks");
+          try {
+            const bytes = await reader.read("a.xml");
+            expect(bytes.byteLength).toBe(size);
+            expect(new TextDecoder().decode(bytes)).toBe(text);
+            expect(streamed).toHaveBeenCalledTimes(size > ONE_STEP_READ_BYTES ? 1 : 0);
+          } finally {
+            streamed.mockRestore();
+          }
         }
       });
 
@@ -568,10 +574,16 @@ describe("ZIP one-step read boundary", () => {
       const text = letters(compressedSize - STORED_BLOCKS * STORED_BLOCK_HEADER_BYTES);
       const archive = storedBlockZip(text);
 
-      it("reads the part", async () => {
+      it("reads the part on the path that its compressed size selects", async () => {
         const reader = await ZipReader.open(archive, createCodecContext("import"));
         expect(reader.entries.get("a.xml")?.compressedSize).toBe(compressedSize);
-        expect(new TextDecoder().decode(await reader.read("a.xml"))).toBe(text);
+        const streamed = spyOn(ZipReader.prototype, "chunks");
+        try {
+          expect(new TextDecoder().decode(await reader.read("a.xml"))).toBe(text);
+          expect(streamed).toHaveBeenCalledTimes(compressedSize > ONE_STEP_READ_BYTES ? 1 : 0);
+        } finally {
+          streamed.mockRestore();
+        }
       });
 
       it("rejects a CRC mismatch", async () => {
