@@ -311,9 +311,8 @@ describe("native XLSX charts", () => {
     const imported = await fromXlsxWorkbook(zipSync(parts, { level: 0 }), { onWarning });
 
     expect(imported.sheets[0]?.charts).toHaveLength(KINDS.length);
-    expect(warnings.filter((warning) => warning.code === "unsupported-feature")).toHaveLength(
-      repeats,
-    );
+    // The repeated frames share one chart part, so the host gets one warning, not one per frame.
+    expect(warnings.filter((warning) => warning.code === "unsupported-feature")).toHaveLength(1);
     const exported = await toXlsxWorkbook(imported);
     expect(packageProblems(exported)).toEqual([]);
   }, 5_000);

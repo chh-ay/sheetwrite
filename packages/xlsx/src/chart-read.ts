@@ -466,7 +466,8 @@ async function readDrawing(
     }
     if (!chart || !relationship) {
       retained.push(anchorNode);
-      if (relationship) {
+      // One warning per chart part: repeated frames must not flood the host.
+      if (relationship && !retainedTargets.has(relationship.target)) {
         retainedTargets.add(relationship.target);
         emitWarning(context, {
           code: "unsupported-feature",
