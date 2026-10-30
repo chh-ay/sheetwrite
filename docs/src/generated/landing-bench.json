@@ -50,7 +50,7 @@
     }
   ],
   "downloads": {
-    "coreFirstLoadBrotliBytes": 442021,
+    "coreFirstLoadBrotliBytes": 464509,
     "defaultEngineBrotliBytes": 297703,
     "fullEngineBrotliBytes": 419673
   }
