@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { brotliCompressSync, constants } from "node:zlib";
 
-import * as formulas from "@sheetwrite/formulas";
+import type * as Formulas from "@sheetwrite/formulas";
 
 import {
   type CompleteFormulaBenchmarkResult,
@@ -11,7 +12,14 @@ import {
   collectFixture,
   validateFormulaCapture,
 } from "./formula-bench.js";
-import { validateExactMatrix, validateRawStat } from "./gate-protocol.js";
+import {
+  benchmarkEnginePath,
+  captureEngineBaselineContext,
+  type EngineBaselineContext,
+  validateEngineBaselineContext,
+  validateExactMatrix,
+  validateRawStat,
+} from "./gate-protocol.js";
 import { type ProtocolCaptureMeta, protocolCaptureMeta } from "./protocol-meta.js";
 import { resultsDirectory } from "./results-dir.js";
 import { type Stat, summarize } from "./stats.js";
@@ -50,6 +58,7 @@ export interface FullEngineResult {
   sourceFiles: Record<string, string>;
   sourceDigest: string;
   initializationMethod: string;
+  baselineContext?: EngineBaselineContext;
   engines: EngineCapture[];
   analysis: CompleteFormulaWorkloadResult[];
 }
@@ -58,6 +67,7 @@ const INIT_METHOD =
 const SOURCE_PATHS = [
   "bench/src/full-engine-bench.ts",
   "bench/src/formula-bench.ts",
+  "bench/src/gate-protocol.ts",
   "bench/src/node-engine-init.mjs",
   "packages/core/dist/index.js",
   "packages/formulas/loader.mjs",
@@ -70,8 +80,16 @@ const SOURCE_PATHS = [
 function hash(bytes: string | Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
-function sourceDigest(result: Pick<FullEngineResult, "meta" | "sourceFiles">): string {
-  return hash(JSON.stringify({ commit: result.meta.commit, files: result.sourceFiles }));
+function sourceDigest(
+  result: Pick<FullEngineResult, "meta" | "sourceFiles" | "baselineContext">,
+): string {
+  return hash(
+    JSON.stringify({
+      commit: result.meta.commit,
+      files: result.sourceFiles,
+      ...(result.baselineContext === undefined ? {} : { baselineContext: result.baselineContext }),
+    }),
+  );
 }
 function exactKeys(value: object, keys: readonly string[], label: string): void {
   validateExactMatrix(label, keys, Object.keys(value));
@@ -87,6 +105,7 @@ export function validateFullEngineResult(result: FullEngineResult): void {
       "initializationMethod",
       "engines",
       "analysis",
+      ...(result.baselineContext === undefined ? [] : ["baselineContext"]),
     ],
     "engine artifact fields",
   );
@@ -108,6 +127,14 @@ export function validateFullEngineResult(result: FullEngineResult): void {
     result.sourceDigest !== sourceDigest(result)
   )
     throw new Error("engine source digest mismatch");
+  if (result.baselineContext !== undefined) {
+    validateEngineBaselineContext(result.baselineContext, result.meta.commit, ["wasm", "formulas"]);
+    for (const [path, digest] of Object.entries(result.baselineContext.engineFiles)) {
+      if (path in result.sourceFiles && result.sourceFiles[path] !== digest) {
+        throw new Error("Engine baseline source binding mismatch");
+      }
+    }
+  }
   validateExactMatrix(
     "engine",
     ENGINE_IDS,
@@ -122,6 +149,35 @@ export function validateFullEngineResult(result: FullEngineResult): void {
       capture.shared.meta.dirty !== result.meta.dirty
     )
       throw new Error("engine capture provenance mismatch");
+    const childBaseline = capture.shared.source.baselineContext;
+    if (result.baselineContext !== undefined) {
+      const parentBaseline = result.baselineContext;
+      const packagePrefix = `packages/${capture.engine === "full" ? "formulas" : "wasm"}/`;
+      if (
+        childBaseline === undefined ||
+        childBaseline.engineCommit !== parentBaseline.engineCommit ||
+        childBaseline.harnessCommit !== parentBaseline.harnessCommit ||
+        JSON.stringify(childBaseline.engineFiles) !==
+          JSON.stringify(
+            Object.fromEntries(
+              Object.entries(parentBaseline.engineFiles).filter(([path]) =>
+                path.startsWith(packagePrefix),
+              ),
+            ),
+          ) ||
+        JSON.stringify(childBaseline.currentWasmFiles) !==
+          JSON.stringify(
+            Object.fromEntries(
+              Object.entries(parentBaseline.currentWasmFiles).filter(([path]) =>
+                path.startsWith(packagePrefix),
+              ),
+            ),
+          )
+      )
+        throw new Error("Shared baseline engine provenance mismatch");
+    } else if (childBaseline !== undefined) {
+      throw new Error("Unexpected shared baseline engine provenance");
+    }
     exactKeys(capture.wasm, ["rawBytes", "brotliBytes", "sha256"], "engine wasm fields");
     const wasmPath = `packages/${capture.engine === "full" ? "formulas" : "wasm"}/pkg/sheetwrite_wasm_bg.wasm`;
     if (
@@ -194,7 +250,7 @@ export function validateFullEngineResult(result: FullEngineResult): void {
     }
   }
 }
-function analysisFixture(formula: string) {
+function analysisFixture(formulas: typeof Formulas, formula: string) {
   const store = new formulas.CellStore();
   const sheet = store.addSheet(6, ANALYSIS_COUNT);
   store.setColumnNumbers(
@@ -264,6 +320,7 @@ function analysisFixture(formula: string) {
 
 async function capture(): Promise<void> {
   const meta = protocolCaptureMeta();
+  const baselineContext = captureEngineBaselineContext(meta.commit, ["wasm", "formulas"]);
   const args = process.argv.slice(2).filter((argument) => argument !== "--");
   const resultsDir = resultsDirectory(args);
   const engines: EngineCapture[] = [];
@@ -282,9 +339,8 @@ async function capture(): Promise<void> {
     const shared = JSON.parse(lastLine) as CompleteFormulaBenchmarkResult;
 
     const bytes = readFileSync(
-      new URL(
-        `../../packages/${engine === "full" ? "formulas" : "wasm"}/pkg/sheetwrite_wasm_bg.wasm`,
-        import.meta.url,
+      benchmarkEnginePath(
+        `packages/${engine === "full" ? "formulas" : "wasm"}/pkg/sheetwrite_wasm_bg.wasm`,
       ),
     );
 
@@ -301,7 +357,11 @@ async function capture(): Promise<void> {
       const probe = JSON.parse(initialized.stdout.toString()) as {
         elapsedMs: number;
         node: string;
+        wasmSha256: string;
       };
+      if (probe.wasmSha256 !== hash(bytes)) {
+        throw new Error(`${engine} Node initialization WASM hash mismatch`);
+      }
       if (node !== "" && node !== probe.node)
         throw new Error("Node version changed during capture");
       node = probe.node;
@@ -321,12 +381,16 @@ async function capture(): Promise<void> {
     });
   }
 
+  // The engine checkout is selected at runtime, while the harness stays current.
+  const formulas: typeof Formulas = await import(
+    pathToFileURL(benchmarkEnginePath("packages/formulas/loader-node.mjs")).href
+  );
   await formulas.load();
   const analysis = ANALYSIS_CASES.map((scenario) =>
     collectFixture(
       scenario.id,
       ANALYSIS_COUNT,
-      () => analysisFixture(scenario.formula),
+      () => analysisFixture(formulas, scenario.formula),
       SAMPLE_COUNT,
       scenario.expected * ANALYSIS_COUNT,
     ),
@@ -335,14 +399,21 @@ async function capture(): Promise<void> {
   const sourceFiles = Object.fromEntries(
     SOURCE_PATHS.map((path) => [
       path,
-      hash(readFileSync(new URL(`../../${path}`, import.meta.url))),
+      hash(
+        readFileSync(
+          path.startsWith("packages/wasm/") || path.startsWith("packages/formulas/")
+            ? benchmarkEnginePath(path)
+            : new URL(`../../${path}`, import.meta.url),
+        ),
+      ),
     ]),
   );
   const result: FullEngineResult = {
     schemaVersion: 2,
     meta,
     sourceFiles,
-    sourceDigest: sourceDigest({ meta, sourceFiles }),
+    ...(baselineContext === undefined ? {} : { baselineContext }),
+    sourceDigest: sourceDigest({ meta, sourceFiles, baselineContext }),
     initializationMethod: INIT_METHOD,
     engines,
     analysis,

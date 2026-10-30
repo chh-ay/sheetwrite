@@ -1,4 +1,5 @@
 import { expect, it } from "bun:test";
+import { gzipSync } from "node:zlib";
 
 import { findLocalPaths } from "./check-local-paths.js";
 
@@ -28,4 +29,11 @@ it("skips lockfiles and binary files", () => {
   const leaked = encode(LINUX_HOME);
   expect(findLocalPaths("bun.lock", leaked)).toEqual([]);
   expect(findLocalPaths("assets/image.png", new Uint8Array([...leaked, 0]))).toEqual([]);
+});
+
+it("reads gzip archives as the text they contain", () => {
+  const archived = gzipSync(encode(`portable\n"root": "${LINUX_HOME}"\n`));
+  expect(findLocalPaths("bench/results/receipt.json.gz", archived)).toEqual([
+    { path: "bench/results/receipt.json.gz", line: 2, text: `"root": "${LINUX_HOME}"` },
+  ]);
 });

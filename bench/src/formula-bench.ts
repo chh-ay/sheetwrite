@@ -42,6 +42,9 @@ import {
   assertFiniteNonNegative,
   assertGateIdentity,
   type BenchmarkMode,
+  type EngineBaselineContext,
+  captureEngineBaselineContext,
+  validateEngineBaselineContext,
   type GateIdentity,
   MATRIX_IDS,
   PERFORMANCE_GATE_PROTOCOL_VERSION,
@@ -50,6 +53,11 @@ import {
 } from "./gate-protocol.js";
 import { protocolCaptureMeta } from "./protocol-meta.js";
 import { forceGc, mib, ms, now, type Stat, summarize } from "./stats.js";
+
+// Check every entry path before it can load or measure the selected baseline.
+if (ENGINE_ROOT !== undefined) {
+  captureEngineBaselineContext(protocolCaptureMeta().commit, [ENGINE_PACKAGE]);
+}
 
 const ENGINE_PKG_URL =
   ENGINE_ROOT === undefined
@@ -148,6 +156,7 @@ export interface FormulaSourceProvenance {
   commit: string;
   files: Record<string, string>;
   digest: string;
+  baselineContext?: EngineBaselineContext;
 }
 
 export interface PassedRegressionGate {
@@ -1918,8 +1927,16 @@ function sha256(value: string | Uint8Array): string {
 export function formulaSourceDigest(
   commit: string,
   files: Readonly<Record<string, string>>,
+  baselineContext?: EngineBaselineContext,
 ): string {
-  return sha256(JSON.stringify({ protocol: FORMULA_PROTOCOL, commit, files }));
+  return sha256(
+    JSON.stringify({
+      protocol: FORMULA_PROTOCOL,
+      commit,
+      files,
+      ...(baselineContext === undefined ? {} : { baselineContext }),
+    }),
+  );
 }
 
 function currentFormulaSourceProvenance(commit: string): FormulaSourceProvenance {
@@ -1929,11 +1946,13 @@ function currentFormulaSourceProvenance(commit: string): FormulaSourceProvenance
       readFileSync(FORMULA_SOURCE_URLS[path as keyof typeof FORMULA_SOURCE_URLS]),
     );
   }
+  const baselineContext = captureEngineBaselineContext(commit, [ENGINE_PACKAGE]);
   return {
     protocol: FORMULA_PROTOCOL,
     commit,
     files,
-    digest: formulaSourceDigest(commit, files),
+    ...(baselineContext === undefined ? {} : { baselineContext }),
+    digest: formulaSourceDigest(commit, files, baselineContext),
   };
 }
 
@@ -2097,7 +2116,13 @@ function validateProvenance(
 
   exactObjectKeys(
     result.source,
-    ["protocol", "commit", "files", "digest"],
+    [
+      "protocol",
+      "commit",
+      "files",
+      "digest",
+      ...(result.source.baselineContext === undefined ? [] : ["baselineContext"]),
+    ],
     "formula source provenance",
   );
   if (result.source.protocol !== FORMULA_PROTOCOL || result.source.commit !== result.meta.commit) {
@@ -2109,7 +2134,29 @@ function validateProvenance(
       throw new Error(`formula source provenance.files.${path} must be a SHA-256 digest`);
     }
   }
-  const digest = formulaSourceDigest(result.source.commit, result.source.files);
+  if (result.source.baselineContext !== undefined) {
+    const packages = Object.keys(result.source.baselineContext.currentWasmFiles).map((path) => {
+      if (path === "packages/wasm/pkg/sheetwrite_wasm_bg.wasm") return "wasm" as const;
+      if (path === "packages/formulas/pkg/sheetwrite_wasm_bg.wasm") return "formulas" as const;
+      throw new Error("Unexpected baseline formula engine");
+    });
+    if (packages.length !== 1) throw new Error("Formula baseline must identify one engine");
+    validateEngineBaselineContext(result.source.baselineContext, result.source.commit, packages);
+    const packageName = packages[0];
+    for (const filename of ["sheetwrite_wasm.js", "sheetwrite_wasm_bg.wasm"]) {
+      if (
+        result.source.files[`packages/wasm/pkg/${filename}`] !==
+        result.source.baselineContext.engineFiles[`packages/${packageName}/pkg/${filename}`]
+      ) {
+        throw new Error("Formula baseline engine file binding mismatch");
+      }
+    }
+  }
+  const digest = formulaSourceDigest(
+    result.source.commit,
+    result.source.files,
+    result.source.baselineContext,
+  );
   if (result.source.digest !== digest) {
     throw new Error("formula source provenance.digest does not match its file hashes");
   }

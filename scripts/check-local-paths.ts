@@ -1,11 +1,13 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { gunzipSync } from "node:zlib";
 
 /** A home directory names one developer's machine; committed files must stay portable. */
 const HOME_PATH = /\/home\/[^/\s"'`]+\/|\/Users\/[^/\s"'`]+\/|[A-Za-z]:\\{1,2}Users\\{1,2}/u;
 const LOCKFILE =
   /(?:^|\/)(?:bun\.lockb?|package-lock\.json|yarn\.lock|pnpm-lock\.yaml|Cargo\.lock)$/u;
 const BINARY_BYTE = 0;
+const GZIP_MAGIC = [0x1f, 0x8b] as const;
 
 /** Regular files only: symlinks and submodule gitlinks resolve to directories. */
 const REGULAR_FILE_MODE = /^100(?:644|755) /u;
@@ -16,8 +18,14 @@ export interface LocalPathHit {
   text: string;
 }
 
-/** Report each line of a text file that names a home directory. */
+/**
+ * Report each line of a text file that names a home directory. Gzip files are
+ * read decompressed: an archived log or receipt is still committed text.
+ */
 export function findLocalPaths(path: string, contents: Uint8Array): LocalPathHit[] {
+  if (contents[0] === GZIP_MAGIC[0] && contents[1] === GZIP_MAGIC[1]) {
+    return findLocalPaths(path, gunzipSync(contents));
+  }
   if (LOCKFILE.test(path) || contents.includes(BINARY_BYTE)) return [];
   const text = new TextDecoder().decode(contents);
   if (!HOME_PATH.test(text)) return [];

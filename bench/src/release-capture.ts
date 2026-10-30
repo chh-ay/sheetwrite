@@ -89,6 +89,24 @@ const STEPS: readonly CaptureStep[] = [
     ],
   },
   {
+    name: "chart-tracking",
+    artifacts: ["chart-tracking-results.json"],
+    full: [["bench:charts"]],
+    smoke: [
+      [
+        "src/chart-tracking-bench.ts",
+        "--smoke",
+        "--output",
+        `${SCRATCH_DIRECTORY}/chart-tracking-results.json`,
+      ],
+    ],
+  },
+  {
+    name: "pivot",
+    artifacts: ["pivot-results.json"],
+    full: [["bench:pivot"]],
+  },
+  {
     name: "formula",
     artifacts: ["formula-results.json"],
     full: [["bench:formula"]],
@@ -149,6 +167,11 @@ const STEPS: readonly CaptureStep[] = [
 
 /** Every artifact the evidence page publishes, in capture order. */
 export const RELEASE_ARTIFACTS: readonly string[] = STEPS.flatMap((step) => step.artifacts);
+
+/** Shared coverage contract for per-suite scope receipts and comparison. */
+export const RELEASE_SUITE_ARTIFACTS: ReadonlyMap<string, readonly string[]> = new Map(
+  STEPS.map((step) => [step.name, step.artifacts] as const),
+);
 
 /** Rehearsal commands that write artifacts, for the scratch-directory contract. */
 export const RELEASE_SMOKE_COMMANDS: readonly (readonly string[])[] = STEPS.flatMap(

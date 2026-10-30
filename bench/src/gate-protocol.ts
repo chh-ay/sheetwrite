@@ -10,12 +10,16 @@ import type { Stat } from "./stats.js";
 import { summarize } from "./stats.js";
 
 export const PERFORMANCE_GATE_PROTOCOL_VERSION = 1 as const;
+/** Data v2 uses full GC and a fresh document between ingest samples. */
+export const DATA_GATE_PROTOCOL_VERSION = 2 as const;
 export type BenchmarkMode = "full" | "smoke";
 
 export const MATRIX_IDS = {
+  // v2: every timed data sample runs after a forced full GC, so v1 numbers are
+  // a different sampling method and must never be compared with v2 numbers.
   data: {
-    full: "data-full-v1",
-    smoke: "data-smoke-v1",
+    full: "data-full-v2",
+    smoke: "data-smoke-v2",
   },
   paged: {
     full: "paged-full-v1",
@@ -35,8 +39,12 @@ export const MATRIX_IDS = {
   },
 } as const;
 
-export interface GateIdentity {
-  readonly protocolVersion: typeof PERFORMANCE_GATE_PROTOCOL_VERSION;
+export interface GateIdentity<
+  ProtocolVersion extends
+    | typeof PERFORMANCE_GATE_PROTOCOL_VERSION
+    | typeof DATA_GATE_PROTOCOL_VERSION = typeof PERFORMANCE_GATE_PROTOCOL_VERSION,
+> {
+  readonly protocolVersion: ProtocolVersion;
   readonly mode: BenchmarkMode;
   readonly matrixId: string;
 }
@@ -96,11 +104,13 @@ export function validateExactMatrix(
 export function assertGateIdentity(
   family: keyof typeof MATRIX_IDS,
   mode: BenchmarkMode,
-  value: GateIdentity,
+  value: GateIdentity<typeof PERFORMANCE_GATE_PROTOCOL_VERSION | typeof DATA_GATE_PROTOCOL_VERSION>,
 ): void {
-  if (value.protocolVersion !== PERFORMANCE_GATE_PROTOCOL_VERSION) {
+  const protocolVersion =
+    family === "data" ? DATA_GATE_PROTOCOL_VERSION : PERFORMANCE_GATE_PROTOCOL_VERSION;
+  if (value.protocolVersion !== protocolVersion) {
     throw new Error(
-      `${family} stale protocol: expected ${PERFORMANCE_GATE_PROTOCOL_VERSION}, observed ${String(value.protocolVersion)}`,
+      `${family} stale protocol: expected ${protocolVersion}, observed ${String(value.protocolVersion)}`,
     );
   }
   if (value.mode !== mode) {
@@ -305,4 +315,125 @@ export function fingerprintMismatches<T extends object>(
           `${key}: expected ${JSON.stringify(left[key])}, observed ${JSON.stringify(right[key])}`,
       ),
   );
+}
+
+export type BenchmarkEnginePackage = "wasm" | "formulas";
+
+/** The frozen harness remains current; only these engine files come from 0.5.4. */
+export interface EngineBaselineContext {
+  label: "0.5.4 engine (WASM) under 0.6 core and harness";
+  engineCommit: string;
+  harnessCommit: string;
+  engineFiles: Record<string, string>;
+  currentWasmFiles: Record<string, string>;
+}
+
+const ENGINE_RUNTIME_FILES = [
+  "loader-node.mjs",
+  "loader-state.mjs",
+  "pkg/sheetwrite_wasm.js",
+  "pkg/sheetwrite_wasm_factory.js",
+  "pkg/sheetwrite_wasm_bg.wasm",
+] as const;
+const BASELINE_ENGINE_LABEL = "0.5.4 engine (WASM) under 0.6 core and harness";
+
+export function benchmarkEnginePath(path: string): string {
+  return resolve(process.env.SHEETWRITE_BENCH_ENGINE_ROOT ?? REPOSITORY_ROOT, path);
+}
+
+export function validateEngineBaselineContext(
+  context: EngineBaselineContext,
+  harnessCommit: string,
+  packages: readonly BenchmarkEnginePackage[],
+): void {
+  validateExactMatrix(
+    "baseline context fields",
+    ["label", "engineCommit", "harnessCommit", "engineFiles", "currentWasmFiles"],
+    Object.keys(context),
+  );
+  if (
+    context.label !== BASELINE_ENGINE_LABEL ||
+    !/^[0-9a-f]{40}$/u.test(context.engineCommit) ||
+    context.harnessCommit !== harnessCommit ||
+    !/^[0-9a-f]{40}$/u.test(harnessCommit)
+  )
+    throw new Error("Invalid baseline engine provenance");
+
+  const runtimePaths = packages.flatMap((name) =>
+    ENGINE_RUNTIME_FILES.map((path) => `packages/${name}/${path}`),
+  );
+  const wasmPaths = packages.map((name) => `packages/${name}/pkg/sheetwrite_wasm_bg.wasm`);
+  validateExactMatrix("baseline engine files", runtimePaths, Object.keys(context.engineFiles));
+  validateExactMatrix(
+    "baseline current WASM files",
+    wasmPaths,
+    Object.keys(context.currentWasmFiles),
+  );
+  for (const digest of [
+    ...Object.values(context.engineFiles),
+    ...Object.values(context.currentWasmFiles),
+  ]) {
+    if (!/^[0-9a-f]{64}$/u.test(digest)) throw new Error("Invalid baseline file digest");
+  }
+  for (const path of wasmPaths) {
+    if (context.engineFiles[path] === context.currentWasmFiles[path]) {
+      throw new Error(`Baseline loaded current 0.6 WASM: ${path}`);
+    }
+  }
+}
+
+export function captureEngineBaselineContext(
+  harnessCommit: string,
+  packages: readonly BenchmarkEnginePackage[],
+): EngineBaselineContext | undefined {
+  const root = process.env.SHEETWRITE_BENCH_ENGINE_ROOT;
+  // The paired gate also points the root at this checkout; that side is the candidate, not a baseline.
+  if (root === undefined || resolve(root) === REPOSITORY_ROOT) return undefined;
+  const versions = packages.map((name) => {
+    const manifest = JSON.parse(
+      readFileSync(resolve(root, `packages/${name}/package.json`), "utf8"),
+    ) as { version?: unknown };
+    return manifest.version;
+  });
+  if (!versions.includes("0.5.4")) return undefined;
+  if (versions.some((version) => version !== "0.5.4"))
+    throw new Error("Mixed baseline engine versions");
+
+  const ref = process.env.SHEETWRITE_BENCH_ENGINE_REF ?? "HEAD";
+  const commit = Bun.spawnSync(["git", "rev-parse", "--verify", `${ref}^{commit}`], {
+    cwd: root,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  if (commit.exitCode !== 0) throw new Error("Cannot identify baseline engine commit");
+  const engineCommit = commit.stdout.toString().trim();
+  // A bench-only patch may change HEAD, but must not change the claimed engine code.
+  const engineDiff = Bun.spawnSync(["git", "diff", "--exit-code", engineCommit, "--", "packages"], {
+    cwd: root,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  if (engineDiff.exitCode !== 0)
+    throw new Error("Baseline packages differ from the claimed engine ref");
+  const context: EngineBaselineContext = {
+    label: BASELINE_ENGINE_LABEL,
+    engineCommit,
+    harnessCommit,
+    engineFiles: Object.fromEntries(
+      packages.flatMap((name) =>
+        ENGINE_RUNTIME_FILES.map((path) => {
+          const key = `packages/${name}/${path}`;
+          return [key, sha256(readFileSync(resolve(root, key)))];
+        }),
+      ),
+    ),
+    currentWasmFiles: Object.fromEntries(
+      packages.map((name) => {
+        const key = `packages/${name}/pkg/sheetwrite_wasm_bg.wasm`;
+        return [key, sha256(readFileSync(resolve(REPOSITORY_ROOT, key)))];
+      }),
+    ),
+  };
+  validateEngineBaselineContext(context, harnessCommit, packages);
+  return context;
 }
