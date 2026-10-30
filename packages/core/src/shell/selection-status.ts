@@ -1,9 +1,11 @@
-// Geometry-only status line. It never enumerates selected cells, never reads
-// the store, and runs constant-time work per selection event — safe next to
-// any selection size.
+// Status line in the spirit of Excel's: the selection's shape plus Average,
+// Count and Sum. Geometry is constant-time per selection event; the totals
+// come from Grid.summarizeSelection, which reads in bounded chunks between
+// frames, so this piece stays safe next to any selection size.
 
+import { formatNumber } from "../number-format.js";
 import type { Selection } from "../types/coordinates.js";
-import type { Grid } from "../types/grid.js";
+import type { Grid, SelectionSummary } from "../types/grid.js";
 import type { ShellPiece } from "./formula-controls.js";
 
 /** Human phrase for a selection's geometry; blank for null/single-cell. */
@@ -23,8 +25,25 @@ export function describeSelection(selection: Selection | null): string {
 }
 
 /**
- * `<output role="status">` that follows the grid's selection. Text nodes only;
- * polite live region so screen readers announce changes without interrupting.
+ * Excel's rule: totals appear once two or more cells hold values, and
+ * Average and Sum only when at least one of them is a number.
+ */
+function describeSummary(summary: SelectionSummary | null): string {
+  if (summary === null || summary.count < 2) return "";
+  const parts: string[] = [];
+  if (summary.average !== null) parts.push(`Average: ${formatNumber(summary.average)}`);
+  parts.push(`Count: ${summary.count}`);
+  if (summary.numericCount > 0) parts.push(`Sum: ${formatNumber(summary.sum)}`);
+  return parts.join(STATUS_SEPARATOR);
+}
+
+/** Runs of spaces collapse in HTML, so parts need a visible separator. */
+const STATUS_SEPARATOR = " · ";
+
+/**
+ * `<output role="status">` that follows the grid's selection and its values.
+ * Text nodes only; polite live region so screen readers announce changes
+ * without interrupting.
  */
 export function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece {
   const output = document.createElement("output");
@@ -32,15 +51,46 @@ export function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece
   output.setAttribute("role", "status");
   output.setAttribute("aria-live", "polite");
 
-  const render = (selection: Selection | null): void => {
-    const description = describeSelection(selection);
-    output.textContent = description;
-    output.hidden = description === "";
+  let geometry = "";
+  let totals = "";
+  let pending: AbortController | null = null;
+
+  const show = (): void => {
+    const text = [totals, geometry].filter(Boolean).join(STATUS_SEPARATOR);
+    output.textContent = text;
+    output.hidden = text === "";
     host.hidden = output.hidden && host.childElementCount === 1;
   };
-  const unsubscribe = grid.on("selection", (event) => render(event.selection));
+
+  // A newer selection or edit makes an unfinished summary stale: abort it so
+  // a huge selection never queues work behind the user.
+  const summarize = (): void => {
+    pending?.abort();
+    const controller = new AbortController();
+    pending = controller;
+    grid.summarizeSelection(controller.signal).then(
+      (summary) => {
+        if (controller.signal.aborted) return;
+        totals = describeSummary(summary);
+        show();
+      },
+      (error: unknown) => {
+        if (!controller.signal.aborted) throw error;
+      },
+    );
+  };
+
+  const onSelection = (selection: Selection | null): void => {
+    geometry = describeSelection(selection);
+    show();
+    summarize();
+  };
+  const unsubscribes = [
+    grid.on("selection", (event) => onSelection(event.selection)),
+    grid.on("change", summarize),
+  ];
   host.appendChild(output);
-  render(grid.getSelection());
+  onSelection(grid.getSelection());
 
   let destroyed = false;
   return {
@@ -48,7 +98,8 @@ export function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece
     destroy() {
       if (destroyed) return;
       destroyed = true;
-      unsubscribe();
+      pending?.abort();
+      for (const unsubscribe of unsubscribes) unsubscribe();
       output.remove();
     },
   };

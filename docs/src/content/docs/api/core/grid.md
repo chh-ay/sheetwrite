@@ -28,7 +28,7 @@ function updateTotal(grid: Grid) {
 - [Grid.applyTransaction](/docs/api/core/grid/#grid-apply-transaction)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L662"><code>packages/core/src/types/grid.ts#L662</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L679"><code>packages/core/src/types/grid.ts#L679</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -37,6 +37,7 @@ function updateTotal(grid: Grid) {
 <a href="#grid-get-runtime-resource-snapshot"><code>getRuntimeResourceSnapshot</code></a>
 <a href="#grid-get-command-state"><code>getCommandState</code></a>
 <a href="#grid-get-focus-cell-style"><code>getFocusCellStyle</code></a>
+<a href="#grid-summarize-selection"><code>summarizeSelection</code></a>
 <a href="#grid-set-active-sheet"><code>setActiveSheet</code></a>
 <a href="#grid-scroll-to-cell"><code>scrollToCell</code></a>
 <a href="#grid-get-cell-at-point"><code>getCellAtPoint</code></a>
@@ -125,7 +126,7 @@ function updateTotal(grid: Grid) {
 <a href="#grid-destroy"><code>destroy</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>91</span>
+## Members <span class="api-count" data-pagefind-ignore>92</span>
 
 <div class="api-member-list">
 
@@ -174,6 +175,19 @@ getFocusCellStyle(): CellStyle;
 
 <p class="api-member-doc">Effective style of the focus cell: its own style over its column's
 `cellStyle`. Empty when nothing is selected.</p>
+</details>
+
+<details class="api-member" id="grid-summarize-selection" data-pagefind-weight="1">
+<summary><code>summarizeSelection</code> <span class="api-member-summary">Totals for the current selection, for a status bar.</span></summary>
+
+```ts generated
+summarizeSelection(signal?: AbortSignal): Promise<SelectionSummary | null>;
+```
+
+<p class="api-member-doc">Totals for the current selection, for a status bar. Large selections are
+read in chunks between frames, so the page stays responsive; abort
+`signal` to stop early, which rejects with the signal's reason. Resolves
+null when nothing is selected.</p>
 </details>
 
 <details class="api-member" id="grid-set-active-sheet" data-pagefind-weight="1">
@@ -1130,6 +1144,7 @@ export interface Grid {
   ): RuntimeResourceSnapshot;
   getCommandState(command: GridCommandName): GridCommandState;
   getFocusCellStyle(): CellStyle;
+  summarizeSelection(signal?: AbortSignal): Promise<SelectionSummary | null>;
   setActiveSheet(id: SheetId): void;
   scrollToCell(addr: CellAddress): void;
   getCellAtPoint(clientX: number, clientY: number): CellAddress | null;

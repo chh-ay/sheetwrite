@@ -241,6 +241,23 @@ export interface GridCommandStateChangeEvent {
   readonly states: Readonly<Record<GridCommandName, GridCommandState>>;
 }
 
+/**
+ * Totals over the selected cells the user can see, like Excel's status bar.
+ * Rows a filter hides are left out. Overlapping ranges count once per range,
+ * as in Excel.
+ */
+export interface SelectionSummary {
+  /** Cells that hold any value, including text and errors. */
+  readonly count: number;
+  /** Cells that hold a number (dates are numbers too). */
+  readonly numericCount: number;
+  readonly sum: number;
+  /** Mean of the numeric cells; null when there are none. */
+  readonly average: number | null;
+  readonly min: number | null;
+  readonly max: number | null;
+}
+
 /** Excel border presets accepted by {@link GridActions.setBorders}. */
 export type BorderPreset =
   | "all"
@@ -676,6 +693,13 @@ export interface Grid {
    * `cellStyle`. Empty when nothing is selected.
    */
   getFocusCellStyle(): CellStyle;
+  /**
+   * Totals for the current selection, for a status bar. Large selections are
+   * read in chunks between frames, so the page stays responsive; abort
+   * `signal` to stop early, which rejects with the signal's reason. Resolves
+   * null when nothing is selected.
+   */
+  summarizeSelection(signal?: AbortSignal): Promise<SelectionSummary | null>;
   setActiveSheet(id: SheetId): void;
   scrollToCell(addr: CellAddress): void;
   /**

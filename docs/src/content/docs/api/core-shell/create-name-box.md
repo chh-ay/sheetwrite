@@ -1,16 +1,17 @@
 ---
 title: "createNameBox | @sheetwrite/core/shell"
-description: "A1 jump box: shows the focused cell's reference and navigates on Enter."
+description: "A1 jump box, like Excel's name box: shows the focused cell's reference, and on Enter selects the typed cell (B7) or range (B2:D9); $ markers are accepted."
 ---
 <!-- api-export:@sheetwrite/core|./shell|createNameBox -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-shell/">@sheetwrite/core/shell</a><span class="api-status" data-kind="function">function</span></div>
 
-A1 jump box: shows the focused cell's reference and navigates on Enter.
-Invalid or out-of-bounds references set `aria-invalid` and make no grid
-calls; Escape restores the displayed reference.
+A1 jump box, like Excel's name box: shows the focused cell's reference, and
+on Enter selects the typed cell (`B7`) or range (`B2:D9`); `$` markers are
+accepted. Invalid or out-of-bounds references set `aria-invalid` and make
+no grid calls; Escape restores the displayed reference.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/formula-controls.ts#L29"><code>packages/core/src/shell/formula-controls.ts#L29</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/formula-controls.ts#L33"><code>packages/core/src/shell/formula-controls.ts#L33</code></a></dd></div>
 </dl>
 
 ## Declaration

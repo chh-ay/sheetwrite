@@ -185,12 +185,6 @@ All packages release together with one version number. The
 the measured performance, and the upgrade steps for each version. Each package
 also has a `CHANGELOG.md`, linked from the root [changelog](CHANGELOG.md).
 
-Merged changesets update one version pull request. After its version commit
-passes CI on `develop`, publication downloads and rehashes the canonical
-tarballs from that CI run, skips versions already on npm, and publishes the rest
-in dependency order with provenance. Each package then gets a git tag and a
-GitHub Release named `<package>@<version>`.
-
 ## Development
 
 Contributor and CI tooling is pinned to Bun 1.4.4, Rust 1.99.0 with the
