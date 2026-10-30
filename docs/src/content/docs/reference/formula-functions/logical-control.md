@@ -22,7 +22,7 @@ This page lists the 17 functions of the logical and control flow family. Taxonom
 <tr data-formula-name="TRUE" data-engine="default"><td><code>TRUE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-zero">Signature: <code>zero</code></a><br /><a href="#semantics-logical">Semantics: <code>logical</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="FALSE" data-engine="default"><td><code>FALSE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-zero">Signature: <code>zero</code></a><br /><a href="#semantics-logical">Semantics: <code>logical</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="LET" data-engine="default"><td><code>LET</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-let">Signature: <code>let</code></a><br /><a href="#semantics-let-binding">Semantics: <code>let-binding</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
-<tr data-formula-name="LAMBDA" data-engine="full"><td><code>LAMBDA</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-lambda-lambda">Signature: <code>lambda-lambda</code></a><br /><a href="#semantics-analysis-lambda">Semantics: <code>analysis-lambda</code></a><br /><a href="#dialect-analysis-lambda">Dialect: <code>analysis-lambda</code></a><br /><a href="#implementation-analysis-lambda">Implementation: <code>analysis-lambda</code></a></details></td></tr>
+<tr data-formula-name="LAMBDA" data-engine="full"><td><code>LAMBDA</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-lambda-lambda">Signature: <code>lambda-lambda</code></a><br /><a href="#semantics-analysis-lambda">Semantics: <code>analysis-lambda</code></a><br /><a href="#dialect-analysis-lambda-call">Dialect: <code>analysis-lambda-call</code></a><br /><a href="#implementation-analysis-lambda">Implementation: <code>analysis-lambda</code></a></details></td></tr>
 <tr data-formula-name="MAP" data-engine="full"><td><code>MAP</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-lambda-map">Signature: <code>lambda-map</code></a><br /><a href="#semantics-analysis-lambda">Semantics: <code>analysis-lambda</code></a><br /><a href="#dialect-analysis-lambda">Dialect: <code>analysis-lambda</code></a><br /><a href="#implementation-analysis-lambda">Implementation: <code>analysis-lambda</code></a></details></td></tr>
 <tr data-formula-name="REDUCE" data-engine="full"><td><code>REDUCE</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-lambda-reduce">Signature: <code>lambda-reduce</code></a><br /><a href="#semantics-analysis-lambda">Semantics: <code>analysis-lambda</code></a><br /><a href="#dialect-analysis-lambda">Dialect: <code>analysis-lambda</code></a><br /><a href="#implementation-analysis-lambda">Implementation: <code>analysis-lambda</code></a></details></td></tr>
 <tr data-formula-name="SCAN" data-engine="full"><td><code>SCAN</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-lambda-scan">Signature: <code>lambda-scan</code></a><br /><a href="#semantics-analysis-lambda">Semantics: <code>analysis-lambda</code></a><br /><a href="#dialect-analysis-lambda">Dialect: <code>analysis-lambda</code></a><br /><a href="#implementation-analysis-lambda">Implementation: <code>analysis-lambda</code></a></details></td></tr>
@@ -265,6 +265,18 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 | OpenFormula | unverified |
 
 Limitations: Google Sheets and OpenFormula results require producer evidence before compatibility is claimed.
+
+</details>
+
+<details id="dialect-analysis-lambda-call"><summary>Dialect: analysis-lambda-call</summary>
+
+| Dialect | Status |
+| --- | --- |
+| Microsoft Excel | divergent |
+| Google Sheets | unverified |
+| OpenFormula | unverified |
+
+Limitations: Available only in @sheetwrite/formulas. Named ranges are supported, but workbook-defined named formulas are not available. LAMBDA uses lexical parameters and LET bindings. Calls are limited to depth 64 and 2000000 work units. Helpers reject nested arrays. An error argument stops the call before the body runs. =LAMBDA(x,IFERROR(x,0))(1/0) returns #DIV/0!; Excel returns 0 (#246).
 
 </details>
 

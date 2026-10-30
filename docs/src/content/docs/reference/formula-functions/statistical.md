@@ -17,9 +17,9 @@ This page lists the 92 functions of the statistical family. Taxonomy/source: [St
 <tr data-formula-name="MAX" data-engine="default"><td><code>MAX</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-optional-variadic-values">Signature: <code>optional-variadic-values</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="COUNT" data-engine="default"><td><code>COUNT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-optional-variadic-values">Signature: <code>optional-variadic-values</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="COUNTA" data-engine="default"><td><code>COUNTA</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-optional-variadic-values">Signature: <code>optional-variadic-values</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
-<tr data-formula-name="COUNTIF" data-engine="default"><td><code>COUNTIF</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-criteria-one">Signature: <code>criteria-one</code></a><br /><a href="#semantics-criteria">Semantics: <code>criteria</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="COUNTIF" data-engine="default"><td><code>COUNTIF</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-criteria-one">Signature: <code>criteria-one</code></a><br /><a href="#semantics-criteria">Semantics: <code>criteria</code></a><br /><a href="#dialect-excel-criteria-mixed-types">Dialect: <code>excel-criteria-mixed-types</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="COUNTIFS" data-engine="default"><td><code>COUNTIFS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-criteria-many">Signature: <code>criteria-many</code></a><br /><a href="#semantics-criteria">Semantics: <code>criteria</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
-<tr data-formula-name="AVERAGEIF" data-engine="default"><td><code>AVERAGEIF</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-sumif">Signature: <code>sumif</code></a><br /><a href="#semantics-criteria">Semantics: <code>criteria</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="AVERAGEIF" data-engine="default"><td><code>AVERAGEIF</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-sumif">Signature: <code>sumif</code></a><br /><a href="#semantics-criteria">Semantics: <code>criteria</code></a><br /><a href="#dialect-excel-criteria-range">Dialect: <code>excel-criteria-range</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="AVERAGEIFS" data-engine="default"><td><code>AVERAGEIFS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-sumifs">Signature: <code>sumifs</code></a><br /><a href="#semantics-criteria">Semantics: <code>criteria</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="MEDIAN" data-engine="default"><td><code>MEDIAN</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="MODE.SNGL" data-engine="default"><td><code>MODE.SNGL</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
@@ -694,6 +694,30 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 | OpenFormula | unverified |
 
 Limitations: Google Sheets and OpenFormula results require producer evidence before compatibility is claimed.
+
+</details>
+
+<details id="dialect-excel-criteria-mixed-types"><summary>Dialect: excel-criteria-mixed-types</summary>
+
+| Dialect | Status |
+| --- | --- |
+| Microsoft Excel | divergent |
+| Google Sheets | unverified |
+| OpenFormula | unverified |
+
+Limitations: A not-equal criterion does not match a value of a different type. With 5, "x" and a blank cell, =COUNTIF(A1:A3,"<>") counts only the text cell; Excel counts both nonblank cells (#246).
+
+</details>
+
+<details id="dialect-excel-criteria-range"><summary>Dialect: excel-criteria-range</summary>
+
+| Dialect | Status |
+| --- | --- |
+| Microsoft Excel | divergent |
+| Google Sheets | unverified |
+| OpenFormula | unverified |
+
+Limitations: A not-equal criterion does not match a value of a different type. With 5, "x" and a blank cell, "<>" selects only the text cell; Excel selects both nonblank cells (#246). The value range must have the same shape as the criteria range. =SUMIF(A1:A10,">0",B1) returns #VALUE!; Excel uses B1 as the top-left cell of a ten-row value range (#246).
 
 </details>
 
