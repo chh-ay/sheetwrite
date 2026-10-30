@@ -1596,6 +1596,58 @@ fn rectangle_writes_preserve_unrelated_results_and_recompute_registered_readers(
 }
 
 #[test]
+fn many_scalar_writes_before_a_bulk_write_recompute_every_reader() {
+    // More written cells than registered formulas and read keys make the
+    // pass scan the registered sources instead of walking each small
+    // dirty rectangle cell by cell.
+    const WRITTEN_ROWS: usize = 300;
+    const ROW_STEP: usize = 3;
+    const BULK_ROWS: usize = 50;
+    const SCALAR_COL: usize = 2;
+    const BULK_COL: usize = 0;
+    const FORMULA_COL: usize = 4;
+    const INITIAL_VALUE: f64 = 1.0;
+    const WRITTEN_VALUE: f64 = 4.0;
+    const BULK_VALUE: f64 = 3.0;
+
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(8, WRITTEN_ROWS * ROW_STEP + 1);
+    let other = store.add_sheet(2, 2);
+    store.set_sheet_name(sheet, "source", "Source");
+    for index in 0..WRITTEN_ROWS {
+        store.set_number(sheet, index * ROW_STEP, SCALAR_COL, INITIAL_VALUE, 0);
+    }
+    store.set_formula(sheet, 0, FORMULA_COL, "=C4*2", 0);
+    store.set_formula(sheet, 1, FORMULA_COL, "=SUM(C1:C900)", 0);
+    store.set_formula(sheet, 2, FORMULA_COL, "=SUM(A1:A50)", 0);
+    store.set_formula(other, 0, 0, "=Source!C7+1", 0);
+    store.commit_sources();
+    assert_close(number(&store, sheet, 0, FORMULA_COL), INITIAL_VALUE * 2.0);
+
+    // Reverse order keeps the dirty cells from arriving as one sorted run.
+    for index in (0..WRITTEN_ROWS).rev() {
+        store.set_number(sheet, index * ROW_STEP, SCALAR_COL, WRITTEN_VALUE, 0);
+    }
+
+    // A scalar written into the formula column is a dirty formula reader too.
+    store.set_formula(sheet, 3, FORMULA_COL, "=C10+1", 0);
+    store.set_column_numbers(sheet, BULK_COL, 0, &[BULK_VALUE; BULK_ROWS], 0);
+    store.commit_sources();
+
+    assert_close(number(&store, sheet, 0, FORMULA_COL), WRITTEN_VALUE * 2.0);
+    assert_close(
+        number(&store, sheet, 1, FORMULA_COL),
+        WRITTEN_VALUE * WRITTEN_ROWS as f64,
+    );
+    assert_close(
+        number(&store, sheet, 2, FORMULA_COL),
+        BULK_VALUE * BULK_ROWS as f64,
+    );
+    assert_close(number(&store, sheet, 3, FORMULA_COL), WRITTEN_VALUE + 1.0);
+    assert_close(number(&store, other, 0, 0), WRITTEN_VALUE + 1.0);
+}
+
+#[test]
 fn rectangle_clear_releases_attempted_spill_without_disturbing_other_spills() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(4, 6000);

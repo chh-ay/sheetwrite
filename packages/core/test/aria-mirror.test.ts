@@ -81,3 +81,48 @@ describe("AriaMirror absolute indices", () => {
     }
   });
 });
+
+describe("AriaMirror refreshes", () => {
+  // Paged data refreshes the same window often; rewriting unchanged nodes made revisits 2x slower.
+  it("writes nothing when a refresh leaves the labels unchanged, and only the changed cell otherwise", () => {
+    const { host, mirror } = mountMirror();
+    const observer = new MutationObserver(() => {});
+    try {
+      mirror.update(view([0, 1, 2]));
+      observer.observe(host, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        characterData: true,
+      });
+
+      // Records are read before any microtask, so none are handed to the callback first.
+      mirror.bumpVersion();
+      mirror.update(view([0, 1, 2]));
+      // Count records only: comparing DOM nodes deep-walks the whole document.
+      expect(observer.takeRecords().length).toBe(0);
+
+      const changed = view([0, 1, 2]);
+      mirror.bumpVersion();
+      mirror.update({ ...changed, values: ["r3c0", "loaded", "r3c2"] });
+      const cells = [...host.querySelectorAll('[role="gridcell"]')];
+      const changedCells = new Set(
+        observer
+          .takeRecords()
+          .map((record) =>
+            cells.indexOf(
+              record.target instanceof Element
+                ? record.target
+                : (record.target.parentElement ?? host),
+            ),
+          ),
+      );
+      expect([...changedCells]).toEqual([1]);
+      expect(cells[1]?.textContent).toBe("loaded");
+    } finally {
+      observer.disconnect();
+      mirror.destroy();
+      host.remove();
+    }
+  });
+});

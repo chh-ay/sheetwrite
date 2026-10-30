@@ -55,6 +55,7 @@ import {
   decodeXstring,
   parseXml,
   parseXmlChunks,
+  type XmlChildStream,
   type XmlElement,
   xmlAttribute,
   xmlBoolean,
@@ -67,6 +68,7 @@ import { normalizePartName } from "./zip.js";
 
 const META_MARKER = "sheetwrite-workbook-metadata-v1";
 const META_STEM = "__sheetwrite_meta__";
+const BUFFERED_WORKSHEET_XML_BYTES = 64 * 1024;
 const MAIN_NAMESPACES = [
   "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
   "http://purl.oclc.org/ooxml/spreadsheetml/main",
@@ -1431,14 +1433,21 @@ async function parseSheet(
   };
 
   const part = normalizePartName(target);
-  const root = await parseXmlChunks(packageFile.archive.chunks(part), part, context, {
+  const rowStream: XmlChildStream = {
     parent: "sheetData",
     parentIsRoot: false,
     // The tree path read only `row` children; other children are skipped alike.
     child: (rowElement, rootElement) => {
       if (xmlLocalName(rowElement.name) === "row") processRow(rowElement, rootElement);
     },
-  });
+  };
+  const entry = packageFile.archive.entries.get(part);
+  // For a small worksheet, the asynchronous XML driver costs more than the parse. Both parsers
+  // apply the same XML limits, and the declared size is checked against the inflated bytes.
+  const root =
+    entry && entry.uncompressedSize <= BUFFERED_WORKSHEET_XML_BYTES
+      ? parseXml(await packageFile.archive.read(part), part, context, rowStream)
+      : await parseXmlChunks(packageFile.archive.chunks(part), part, context, rowStream);
   assertXmlRoot(root, "worksheet", MAIN_NAMESPACES, target);
   const lateColumns = xmlChild(root, "cols");
   if (
