@@ -8,7 +8,7 @@ description: "FormulaFunction type in @sheetwrite/core: A synchronous host funct
 A synchronous host function. Promises and other non-scalar results become `#VALUE!`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/formula.ts#L31"><code>packages/core/src/types/formula.ts#L31</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/formula.ts#L26"><code>packages/core/src/types/formula.ts#L26</code></a></dd></div>
 </dl>
 
 ## Declaration

@@ -94,7 +94,7 @@ The function is synchronous. The engine calls it during recalculation.
 
 The function returns a number, text, boolean, or `null` for an empty result. A thrown error, a promise, or any other value shows `#VALUE!`. A number that is not finite shows `#NUM!`. A failure never stops recalculation.
 
-The function must not read or change the store. The store is busy while it calculates, so such a call fails and the formula shows `#VALUE!`. Use the arguments instead.
+The function must not read or change the store. The store is busy while it calculates, so every store call from inside the function, a read such as `getCell` or a change such as `applyTransaction`, throws a `SheetwriteError` with code `blocked` before it reaches the engine. If the function does not catch it, the formula shows `#VALUE!`. The document stays as it was. Use the arguments instead.
 
 ## Volatility
 
@@ -106,7 +106,7 @@ Snapshots, history and collaboration keep only the formula text. A store loaded 
 
 ## Function metadata
 
-`store.listFunctions()` returns one list of `FormulaFunctionMetadata`: the built-in functions of the active engine, then the host functions of the store in registration order. Built-in and host functions use the same fields:
+`await store.listFunctions()` returns one list of `FormulaFunctionMetadata`: the built-in functions of the active engine, then the host functions of the store in registration order. The table of built-in functions loads on the first call, so an application that never asks for it does not download it. Built-in and host functions use the same fields:
 
 | Field | Meaning |
 | --- | --- |

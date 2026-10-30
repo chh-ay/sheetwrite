@@ -83,7 +83,7 @@ export const SHEETWRITE_ERROR_OPERATIONS = [
   "hyperlink-activate",
   "keyboard-configure",
   "chart-view",
-  "register-function",
+  "host-function",
 ] as const;
 
 /** Exhaustive stable operation discriminator for consumer-visible failures. */

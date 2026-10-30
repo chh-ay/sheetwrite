@@ -1468,8 +1468,13 @@ export class StoreDataEngine {
   }
 
   /** Built-in functions of the active engine, then the host functions of this store. */
-  listFunctions(): readonly FormulaFunctionMetadata[] {
+  listFunctions(): Promise<readonly FormulaFunctionMetadata[]> {
     return this.hostFunctions.list();
+  }
+
+  /** Whether recalculation is inside a host function, so the store must not change. */
+  isCallingHostFunction(): boolean {
+    return this.hostFunctions.isCalling;
   }
 
   /** Map a displayed row position to the backing data row under sort/filter. */

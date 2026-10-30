@@ -173,8 +173,11 @@ export interface Store {
   registerFunction(metadata: FormulaFunctionMetadata, implementation: FormulaFunction): void;
   /** Remove a host function; formulas that call it show `#NAME?`. Returns whether it existed. */
   unregisterFunction(name: string): boolean;
-  /** Metadata of the built-in functions of the active engine, then of the host functions. */
-  listFunctions(): readonly FormulaFunctionMetadata[];
+  /**
+   * Metadata of the built-in functions of the active engine, then of the host
+   * functions. The built-in table loads on the first call.
+   */
+  listFunctions(): Promise<readonly FormulaFunctionMetadata[]>;
   /** Bulk read of a visible window; the only read a renderer should use per frame. */
   getVisibleWindow(
     sheet: SheetId,

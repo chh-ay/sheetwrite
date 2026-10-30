@@ -74,6 +74,7 @@ import {
   readableText,
   shortHash,
 } from "./evidence-format.js";
+import { extractVolatileFunctions } from "./formula-contract.js";
 import {
   formulaFamilyNavigation,
   loadFormulaContractInventory,
@@ -3599,11 +3600,16 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     const oldHeading = [...headingAnchors(`### ${family.label}`)][0];
     if (oldHeading !== undefined) formulaHeadingTargets[oldHeading] = family.href;
   }
+  const [engineTypes, engineCalc] = await Promise.all([
+    readFile(join(repositoryRoot, "packages/wasm/src/types.rs"), "utf8"),
+    readFile(join(repositoryRoot, "packages/wasm/src/calc.rs"), "utf8"),
+  ]);
+  const volatileNames = new Set(extractVolatileFunctions(engineTypes, engineCalc));
   const files: ExpectedFile[] = [
     ...apiFiles,
     {
       path: join(repositoryRoot, "packages/core/src/generated/function-metadata.ts"),
-      content: renderFunctionMetadata(formulaInventory),
+      content: renderFunctionMetadata(formulaInventory, volatileNames),
     },
     {
       path: join(contentRoot, "reference/package-entry-points.md"),

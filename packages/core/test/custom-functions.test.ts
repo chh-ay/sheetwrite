@@ -167,14 +167,18 @@ describe("host formula functions", () => {
     }
   });
 
-  it("list built-in and host metadata in one list and refuse names that are not free", () => {
+  it("list built-in and host metadata in one list and refuse names that are not free", async () => {
     const store = new SheetwriteStore(makeWorkbook(2));
     try {
       store.registerFunction(TAX_RATE, taxRate);
 
-      const functions = store.listFunctions();
+      const functions = await store.listFunctions();
       const names = functions.map((entry) => entry.name);
-      expect(functions.find((entry) => entry.name === "SUM")?.returnKind).toBeString();
+      expect(functions.find((entry) => entry.name === "SUM")).toMatchObject({
+        returnKind: expect.any(String),
+        volatile: false,
+      });
+      expect(functions.find((entry) => entry.name === "NOW")?.volatile).toBe(true);
       // Analysis functions belong to @sheetwrite/formulas, not the default engine.
       expect(names).not.toContain("REGEXTEST");
       expect(functions.at(-1)).toMatchObject({
@@ -194,7 +198,59 @@ describe("host formula functions", () => {
         }
         expect(isSheetwriteError(failure) && failure.code).toBe("invalid-function");
       }
-      expect(store.listFunctions()).toHaveLength(functions.length);
+      expect(await store.listFunctions()).toHaveLength(functions.length);
+    } finally {
+      store.dispose();
+    }
+  });
+
+  it("refuse store reads and changes during a call and leave the store usable and disposable", () => {
+    const store = new SheetwriteStore(makeWorkbook(4));
+    try {
+      const refusals: unknown[] = [];
+      const recordRefusal = (use: () => void): number => {
+        try {
+          use();
+        } catch (error) {
+          refusals.push(error);
+          throw error;
+        }
+        return 1;
+      };
+      store.registerFunction(metadata("PEEK"), () =>
+        recordRefusal(() => store.getCell(address(0, 0))),
+      );
+      store.registerFunction(metadata("POKE"), () =>
+        recordRefusal(() =>
+          store.applyTransaction({
+            patches: [{ op: "set", addr: address(0, 0), value: { kind: "literal", value: 99 } }],
+          }),
+        ),
+      );
+      store.applyTransaction({
+        patches: [{ op: "set", addr: address(0, 0), value: { kind: "literal", value: 5 } }],
+      });
+
+      setFormula(store, 1, 0, "=PEEK()");
+      setFormula(store, 1, 1, "=POKE()");
+
+      expect(store.getCell(address(1, 0)).resolved).toBe("#VALUE!");
+      expect(store.getCell(address(1, 1)).resolved).toBe("#VALUE!");
+      expect(refusals.map((error) => isSheetwriteError(error) && error.code)).toEqual([
+        "blocked",
+        "blocked",
+      ]);
+
+      // The refused change left the document and the engine in step.
+      expect(store.getCell(address(0, 0)).resolved).toBe(5);
+      const restored = SheetwriteStore.fromSnapshot(store.exportSnapshot());
+      try {
+        expect(restored.getCell(address(0, 0)).resolved).toBe(5);
+      } finally {
+        restored.dispose();
+      }
+      setFormula(store, 2, 0, "=A1*2");
+      expect(store.getCell(address(2, 0)).resolved).toBe(10);
     } finally {
       store.dispose();
     }

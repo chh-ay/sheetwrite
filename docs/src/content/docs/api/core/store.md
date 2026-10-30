@@ -125,9 +125,11 @@ unregisterFunction(name: string): boolean;
 <summary><code>listFunctions</code> <span class="api-member-summary">Metadata of the built-in functions of the active engine, then of the host functions.</span></summary>
 
 ```ts generated
-listFunctions(): readonly FormulaFunctionMetadata[];
+listFunctions(): Promise<readonly FormulaFunctionMetadata[]>;
 ```
 
+<p class="api-member-doc">Metadata of the built-in functions of the active engine, then of the host
+functions. The built-in table loads on the first call.</p>
 </details>
 
 <details class="api-member" id="store-get-visible-window" data-pagefind-weight="1">
@@ -279,7 +281,7 @@ export interface Store {
     implementation: FormulaFunction,
   ): void;
   unregisterFunction(name: string): boolean;
-  listFunctions(): readonly FormulaFunctionMetadata[];
+  listFunctions(): Promise<readonly FormulaFunctionMetadata[]>;
   getVisibleWindow(
     sheet: SheetId,
     rows: {

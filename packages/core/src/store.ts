@@ -11,6 +11,7 @@ import {
   takeAdmittedTransactionResources,
   validateDocumentOperationShape,
 } from "./document-protocol.js";
+import { SheetwriteError } from "./errors.js";
 import { clonePivots, pivotOwner, withoutSavedOutput } from "./pivot.js";
 import type {
   RuntimeMemoryObservation,
@@ -266,6 +267,7 @@ export class SheetwriteStore implements Store {
 
   /** Source fields of one pivot; empty on the default engine or for an unknown pivot. */
   getPivotFields(sheet: SheetId, id: string): PivotSourceField[] {
+    this.assertNotInHostFunction();
     return this.engine.getPivotFields(sheet, id);
   }
 
@@ -275,6 +277,7 @@ export class SheetwriteStore implements Store {
    * no pivot with `id`.
    */
   getPivotResult(sheet: SheetId, id: string): PivotResultView | null {
+    this.assertNotInHostFunction();
     return this.engine.getPivotResult(sheet, id);
   }
 
@@ -291,6 +294,7 @@ export class SheetwriteStore implements Store {
     phase: RuntimeResourcePhase,
     runtime?: RuntimeMemoryObservation,
   ): RuntimeResourceSnapshot {
+    this.assertNotInHostFunction();
     return this.engine.getRuntimeResourceSnapshot(operation, phase, runtime);
   }
 
@@ -299,10 +303,12 @@ export class SheetwriteStore implements Store {
   }
 
   getFormulaMatrixResourcePeak(): TransientResourcePeak {
+    this.assertNotInHostFunction();
     return this.engine.getFormulaMatrixResourcePeak();
   }
 
   resetFormulaMatrixResourcePeak(): void {
+    this.assertNotInHostFunction();
     this.engine.resetFormulaMatrixResourcePeak();
   }
 
@@ -311,18 +317,22 @@ export class SheetwriteStore implements Store {
   }
 
   isPaged(sheet: SheetId): boolean {
+    this.assertNotInHostFunction();
     return this.engine.isPaged(sheet);
   }
 
   getPagedStats(sheet: SheetId): PagedStoreStats {
+    this.assertNotInHostFunction();
     return this.engine.getPagedStats(sheet);
   }
 
   queryCapability(sheet: SheetId): QueryCapability {
+    this.assertNotInHostFunction();
     return this.engine.queryCapability(sheet);
   }
 
   getCellLoadState(addr: CellAddress): CellLoadState {
+    this.assertNotInHostFunction();
     return this.engine.getCellLoadState(addr);
   }
 
@@ -332,18 +342,22 @@ export class SheetwriteStore implements Store {
     endRow: number,
     columns: readonly number[],
   ): boolean {
+    this.assertNotInHostFunction();
     return this.engine.areColumnsFullyLoaded(sheet, startRow, endRow, columns);
   }
 
   isRangeFullyLoaded(input: Range): boolean {
+    this.assertNotInHostFunction();
     return this.engine.isRangeFullyLoaded(input);
   }
 
   canApplyLocally(patch: DocumentOp): boolean {
+    this.assertNotInHostFunction();
     return this.engine.canApplyLocally(patch);
   }
 
   captureRangeHistory(input: Range): CompactRangeHistory | null {
+    this.assertNotInHostFunction();
     return this.engine.captureRangeHistory(input);
   }
 
@@ -352,22 +366,27 @@ export class SheetwriteStore implements Store {
   }
 
   getCell(addr: CellAddress): ResolvedCell {
+    this.assertNotInHostFunction();
     return this.engine.getCell(addr);
   }
 
   getFormula(addr: CellAddress): string | null {
+    this.assertNotInHostFunction();
     return this.engine.getFormula(addr);
   }
   /** Owning dynamic-array formula cell, or null when `addr` is not spilled. */
   getSpillAnchor(addr: CellAddress): CellAddress | null {
+    this.assertNotInHostFunction();
     return this.engine.getSpillAnchor(addr);
   }
 
   getRefTarget(addr: CellAddress): CellAddress | null {
+    this.assertNotInHostFunction();
     return this.engine.getRefTarget(addr);
   }
 
   recalculateVolatile(now = new Date()): void {
+    this.assertNotInHostFunction();
     this.engine.recomputeVolatile(now);
     this.notifyRecalculated();
   }
@@ -378,8 +397,9 @@ export class SheetwriteStore implements Store {
    * replaces the function. The function receives each argument as a scalar,
    * or as row arrays for a block of more than one cell, and returns a number,
    * text, boolean, or `null` for an empty result. A thrown error or any other
-   * result shows `#VALUE!`. Snapshots keep only the formula text, so register
-   * the function again after you load one.
+   * result shows `#VALUE!`. The function must not use the store: every store
+   * call inside it throws a `blocked` error before it reaches the engine. Snapshots keep
+   * only the formula text, so register the function again after you load one.
    *
    * @throws {SheetwriteError} `invalid-function` when the name is a built-in
    * function, a cell reference, or not a function name, or when the metadata
@@ -403,12 +423,14 @@ export class SheetwriteStore implements Store {
    * @see /docs/features/formulas/custom-functions/
    */
   registerFunction(metadata: FormulaFunctionMetadata, implementation: FormulaFunction): void {
+    this.assertNotInHostFunction();
     this.engine.registerFunction(metadata, implementation);
     this.notifyRecalculated();
   }
 
   /** Removes a host function. Formulas that call it show `#NAME?`. Returns whether it existed. */
   unregisterFunction(name: string): boolean {
+    this.assertNotInHostFunction();
     const removed = this.engine.unregisterFunction(name);
     if (removed) this.notifyRecalculated();
 
@@ -418,10 +440,28 @@ export class SheetwriteStore implements Store {
   /**
    * Metadata of every function that formulas in this store can call: the
    * built-in functions of the active engine, then the host functions of this
-   * store in registration order. Formula help reads this one list.
+   * store in registration order. Formula help reads this one list. The
+   * built-in table loads on the first call, so the result is a promise.
    */
-  listFunctions(): readonly FormulaFunctionMetadata[] {
+  listFunctions(): Promise<readonly FormulaFunctionMetadata[]> {
     return this.engine.listFunctions();
+  }
+
+  /**
+   * A host function runs inside recalculation, while the engine store is
+   * busy. A change at that point could update the JavaScript document state
+   * and then fail in the engine. A read that reaches the busy engine object
+   * fails in a way that leaves the object unable to be freed. So every store
+   * call that can reach the engine refuses before it starts.
+   */
+  private assertNotInHostFunction(): void {
+    if (!this.engine.isCallingHostFunction()) return;
+
+    throw new SheetwriteError(
+      "blocked",
+      "host-function",
+      "A formula function cannot use the store while formulas calculate",
+    );
   }
 
   /** Calculated values changed without a document edit. */
@@ -438,10 +478,12 @@ export class SheetwriteStore implements Store {
   }
 
   dataRowAt(sheet: SheetId, viewRow: number): number {
+    this.assertNotInHostFunction();
     return this.engine.dataRowAt(sheet, viewRow);
   }
 
   viewRowOf(sheet: SheetId, dataRow: number): number | null {
+    this.assertNotInHostFunction();
     return this.engine.viewRowOf(sheet, dataRow);
   }
 
@@ -450,6 +492,7 @@ export class SheetwriteStore implements Store {
     rows: { start: number; end: number },
     cols: readonly number[],
   ): VisibleWindowView {
+    this.assertNotInHostFunction();
     return this.engine.getVisibleWindow(sheet, rows, cols);
   }
 
@@ -458,6 +501,7 @@ export class SheetwriteStore implements Store {
     rows: { start: number; end: number },
     cols: readonly number[],
   ): VisibleWindowView {
+    this.assertNotInHostFunction();
     return this.engine.getDataWindow(sheet, rows, cols);
   }
 
@@ -466,6 +510,7 @@ export class SheetwriteStore implements Store {
     viewRows: { start: number; end: number },
     cols: readonly number[],
   ): ClipboardWindowView {
+    this.assertNotInHostFunction();
     return this.engine.getClipboardWindow(sheet, viewRows, cols);
   }
 
@@ -483,6 +528,7 @@ export class SheetwriteStore implements Store {
    * @see AggregateOp
    */
   aggregate(sheet: SheetId, col: number, op: AggregateOp): number {
+    this.assertNotInHostFunction();
     return this.engine.aggregate(sheet, col, op);
   }
 
@@ -527,10 +573,12 @@ export class SheetwriteStore implements Store {
   }
 
   columnFilters(sheet: SheetId): ReadonlyMap<number, ColumnFilter> {
+    this.assertNotInHostFunction();
     return this.engine.columnFilters(sheet);
   }
 
   distinctValues(sheet: SheetId, col: number, limit = 1000): CellScalar[] {
+    this.assertNotInHostFunction();
     return this.engine.distinctValues(sheet, col, limit);
   }
 
@@ -566,6 +614,7 @@ export class SheetwriteStore implements Store {
   }
 
   hiddenRows(sheet: SheetId): number[] {
+    this.assertNotInHostFunction();
     return this.engine.hiddenRows(sheet);
   }
 
@@ -594,10 +643,12 @@ export class SheetwriteStore implements Store {
   }
 
   rowGroups(sheet: SheetId): readonly RowGroup[] {
+    this.assertNotInHostFunction();
     return this.engine.rowGroups(sheet);
   }
 
   dataEdge(sheet: SheetId, row: number, col: number, dRow: number, dCol: number): number {
+    this.assertNotInHostFunction();
     return this.engine.dataEdge(sheet, row, col, dRow, dCol);
   }
 
@@ -606,6 +657,7 @@ export class SheetwriteStore implements Store {
     query: string,
     opts: { matchCase?: boolean; wholeCell?: boolean; columns?: number[] } = {},
   ): CellAddress[] {
+    this.assertNotInHostFunction();
     return this.engine.searchCells(sheet, query, opts);
   }
 
@@ -614,6 +666,7 @@ export class SheetwriteStore implements Store {
     query: string,
     opts: { matchCase?: boolean; wholeCell?: boolean; columns?: number[] } = {},
   ): Uint32Array {
+    this.assertNotInHostFunction();
     return this.engine.searchCellsFlat(sheet, query, opts);
   }
 
@@ -627,14 +680,17 @@ export class SheetwriteStore implements Store {
   }
 
   viewRowCount(sheet: SheetId): number {
+    this.assertNotInHostFunction();
     return this.engine.viewRowCount(sheet);
   }
 
   hasView(sheet: SheetId): boolean {
+    this.assertNotInHostFunction();
     return this.engine.hasView(sheet);
   }
 
   ensureColumns(sheet: SheetId, columns: readonly Column[]): void {
+    this.assertNotInHostFunction();
     this.engine.ensureColumns(sheet, columns);
   }
 
@@ -642,6 +698,7 @@ export class SheetwriteStore implements Store {
     tx: Transaction,
     reasonOrOptions: CommitReason | TransactionApplicationOptions = {},
   ): ApplyTransactionResult {
+    this.assertNotInHostFunction();
     const preparation = new TransactionPreparation(tx.patches);
     try {
       // A transaction built and measured by an engine layer carries its resource
@@ -835,18 +892,22 @@ export class SheetwriteStore implements Store {
   }
 
   acknowledgeOperations(operations: readonly DocumentOp[], storageRevision?: bigint): void {
+    this.assertNotInHostFunction();
     this.engine.acknowledgeOperations(operations, storageRevision);
   }
 
   exportSnapshot(): WorkbookSnapshot {
+    this.assertNotInHostFunction();
     return this.engine.exportSnapshot(this.documentId, this.documentVersion);
   }
 
   renameSheetFormulaIdentity(sheet: SheetId, name: string): boolean {
+    this.assertNotInHostFunction();
     return this.engine.renameSheetFormulaIdentity(sheet, name);
   }
 
   removeSheetFormulaIdentity(sheet: SheetId): boolean {
+    this.assertNotInHostFunction();
     return this.engine.removeSheetFormulaIdentity(sheet);
   }
 
@@ -857,10 +918,12 @@ export class SheetwriteStore implements Store {
     rows: readonly RowData[],
     protect?: (addr: CellAddress) => boolean,
   ): void {
+    this.assertNotInHostFunction();
     this.engine.loadPage(sheet, start, columns, rows, protect);
   }
 
   dispose(): void {
+    this.assertNotInHostFunction();
     this.engine.dispose();
   }
 
@@ -1001,6 +1064,7 @@ export class SheetwriteStore implements Store {
   }
 
   private requireCompleteQuery(sheet: SheetId): void {
+    this.assertNotInHostFunction();
     const capability = this.engine.queryCapability(sheet);
     if (capability.status === "incomplete") throw new IncompleteDataError(sheet, capability);
   }

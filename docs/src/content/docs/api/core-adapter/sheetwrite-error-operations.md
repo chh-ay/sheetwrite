@@ -41,7 +41,7 @@ const SHEETWRITE_ERROR_OPERATIONS: readonly [
   "hyperlink-activate",
   "keyboard-configure",
   "chart-view",
-  "register-function",
+  "host-function",
 ]
 ```
 

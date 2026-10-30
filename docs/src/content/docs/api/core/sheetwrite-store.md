@@ -29,7 +29,7 @@ async function total(workbook: Workbook) {
 - [createGrid](/docs/api/core/create-grid/)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/store.ts#L146"><code>packages/core/src/store.ts#L146</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/store.ts#L147"><code>packages/core/src/store.ts#L147</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -484,12 +484,13 @@ isRangeFullyLoaded: (input: Range) => boolean;
 <summary><code>listFunctions</code> <span class="api-member-summary">Metadata of every function that formulas in this store can call: the built-in functions of the active engine, then the host functions of this store in registration order.</span></summary>
 
 ```ts generated
-listFunctions: () => readonly FormulaFunctionMetadata[];
+listFunctions: () => Promise<readonly FormulaFunctionMetadata[]>;
 ```
 
 <p class="api-member-doc">Metadata of every function that formulas in this store can call: the
 built-in functions of the active engine, then the host functions of this
-store in registration order. Formula help reads this one list.</p>
+store in registration order. Formula help reads this one list. The
+built-in table loads on the first call, so the result is a promise.</p>
 </details>
 
 <details class="api-member" id="sheetwrite-store-load-page" data-pagefind-weight="1">
@@ -544,8 +545,9 @@ can call, then recalculates every formula. Registering a name again
 replaces the function. The function receives each argument as a scalar,
 or as row arrays for a block of more than one cell, and returns a number,
 text, boolean, or `null` for an empty result. A thrown error or any other
-result shows `#VALUE!`. Snapshots keep only the formula text, so register
-the function again after you load one.
+result shows `#VALUE!`. The function must not use the store: a read shows
+`#VALUE!`, and a change throws before it changes anything. Snapshots keep
+only the formula text, so register the function again after you load one.
 
 ### Examples
 
@@ -880,7 +882,7 @@ class SheetwriteStore implements Store {
   hideRows: (sheet: SheetId, rows: readonly number[]) => void;
   isPaged: (sheet: SheetId) => boolean;
   isRangeFullyLoaded: (input: Range) => boolean;
-  listFunctions: () => readonly FormulaFunctionMetadata[];
+  listFunctions: () => Promise<readonly FormulaFunctionMetadata[]>;
   loadPage: (
     sheet: SheetId,
     start: number,

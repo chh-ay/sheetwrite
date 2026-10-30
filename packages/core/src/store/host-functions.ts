@@ -1,23 +1,42 @@
 import { engineFunctionNames } from "../engine.js";
 import { SheetwriteError } from "../errors.js";
-import { BUILT_IN_FUNCTION_METADATA } from "../generated/function-metadata.js";
-import type { FormulaFunction, FormulaFunctionMetadata } from "../types/formula.js";
+import type {
+  FormulaArgumentMetadata,
+  FormulaFunction,
+  FormulaFunctionMetadata,
+} from "../types/formula.js";
 import type { RecomputingCellStore } from "./wasm-contract.js";
 
-/** The package name that `builds` uses for each engine. */
-const DEFAULT_ENGINE_BUILD = "@sheetwrite/wasm";
-const FULL_ENGINE_BUILD = "@sheetwrite/formulas";
+/**
+ * The built-in functions as `docs:generate` writes them: each family title and
+ * signature profile once, and one row per name that refers to them by index.
+ * Rows are `[name, family, profile, flags]`.
+ */
+export interface BuiltInFunctionTable {
+  readonly families: readonly string[];
+  readonly profiles: readonly {
+    readonly arguments: readonly FormulaArgumentMetadata[];
+    readonly returnKind: string;
+  }[];
+  readonly functions: readonly (readonly [string, number, number, number])[];
+}
+
+/** Row flag bits; `scripts/formula-docs.ts` writes the same bits. */
+const FUNCTION_FLAG_VOLATILE = 1;
+const FUNCTION_FLAG_DEFAULT_ENGINE = 2;
+const FUNCTION_FLAG_FULL_ENGINE = 4;
 
 /** The spelling that the formula parser reads as a function call. */
 const FUNCTION_NAME = /^[A-Za-z_][A-Za-z0-9_.]*$/u;
 
 interface HostFunctionEntry {
   readonly metadata: FormulaFunctionMetadata;
-  readonly implementation: FormulaFunction;
+  /** The host's function, wrapped so the store knows when a call is running. */
+  readonly guarded: FormulaFunction;
 }
 
 function invalid(message: string, name: string): SheetwriteError {
-  return new SheetwriteError("invalid-function", "register-function", message, {
+  return new SheetwriteError("invalid-function", "host-function", message, {
     context: { name },
   });
 }
@@ -73,12 +92,48 @@ function frozenMetadata(metadata: FormulaFunctionMetadata): FormulaFunctionMetad
 }
 
 /**
+ * The built-in functions of the active engine. A static import would put the
+ * table in every bundle that includes the store, so it loads on the first
+ * call and bundlers split it into its own chunk.
+ */
+async function builtInFunctions(): Promise<FormulaFunctionMetadata[]> {
+  const { BUILT_IN_FUNCTIONS } = await import("../generated/function-metadata.js");
+  const engineFlag =
+    engineFunctionNames === undefined ? FUNCTION_FLAG_DEFAULT_ENGINE : FUNCTION_FLAG_FULL_ENGINE;
+
+  return BUILT_IN_FUNCTIONS.functions.flatMap(([name, family, profile, flags]) => {
+    const familyTitle = BUILT_IN_FUNCTIONS.families[family];
+    const signature = BUILT_IN_FUNCTIONS.profiles[profile];
+    if ((flags & engineFlag) === 0 || familyTitle === undefined || signature === undefined) {
+      return [];
+    }
+
+    return [
+      {
+        name,
+        description: `${familyTitle} function.`,
+        arguments: signature.arguments,
+        returnKind: signature.returnKind,
+        examples: [],
+        volatile: (flags & FUNCTION_FLAG_VOLATILE) !== 0,
+      },
+    ];
+  });
+}
+
+/**
  * Host functions of one store. The registry keeps them in JavaScript, because
  * the WASM store that calls them can be replaced when engine memory is
  * released.
  */
 export class HostFunctionRegistry {
   private readonly entries = new Map<string, HostFunctionEntry>();
+  private runningCalls = 0;
+
+  /** Whether the engine is inside a host function call, so the store is busy. */
+  get isCalling(): boolean {
+    return this.runningCalls > 0;
+  }
 
   register(
     wasm: RecomputingCellStore,
@@ -90,14 +145,22 @@ export class HostFunctionRegistry {
       throw invalid("Function implementation must be a function", frozen.name);
     }
 
-    if (!wasm.registerFunction(frozen.name, implementation, frozen.volatile === true)) {
+    const guarded: FormulaFunction = (...values) => {
+      this.runningCalls += 1;
+      try {
+        return implementation(...values);
+      } finally {
+        this.runningCalls -= 1;
+      }
+    };
+    if (!wasm.registerFunction(frozen.name, guarded, frozen.volatile === true)) {
       throw invalid(
         "Function name is a built-in function, a cell reference, or not a function name",
         frozen.name,
       );
     }
 
-    this.entries.set(frozen.name, { metadata: frozen, implementation });
+    this.entries.set(frozen.name, { metadata: frozen, guarded });
   }
 
   unregister(wasm: RecomputingCellStore, name: string): boolean {
@@ -113,17 +176,16 @@ export class HostFunctionRegistry {
    * recalculation would draw new values for volatile formulas.
    */
   restore(wasm: RecomputingCellStore): void {
-    for (const { metadata, implementation } of this.entries.values()) {
-      if (!wasm.restoreFunction(metadata.name, implementation, metadata.volatile === true)) {
+    for (const { metadata, guarded } of this.entries.values()) {
+      if (!wasm.restoreFunction(metadata.name, guarded, metadata.volatile === true)) {
         throw invalid("The replacement engine refused a registered function", metadata.name);
       }
     }
   }
 
   /** Built-in functions of the active engine, then host functions in registration order. */
-  list(): readonly FormulaFunctionMetadata[] {
-    const build = engineFunctionNames === undefined ? DEFAULT_ENGINE_BUILD : FULL_ENGINE_BUILD;
-    const builtIns = BUILT_IN_FUNCTION_METADATA.filter((entry) => entry.builds.includes(build));
+  async list(): Promise<readonly FormulaFunctionMetadata[]> {
+    const builtIns = await builtInFunctions();
 
     return [...builtIns, ...[...this.entries.values()].map((entry) => entry.metadata)];
   }

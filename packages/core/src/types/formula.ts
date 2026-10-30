@@ -22,10 +22,5 @@ export interface FormulaFunctionMetadata {
   readonly volatile?: boolean;
 }
 
-/** Built-in metadata also names the engines that include the function. */
-export interface BuiltInFormulaFunctionMetadata extends FormulaFunctionMetadata {
-  readonly builds: readonly string[];
-}
-
 /** A synchronous host function. Promises and other non-scalar results become `#VALUE!`. */
 export type FormulaFunction = (...arguments_: readonly FormulaArgument[]) => FormulaScalar;

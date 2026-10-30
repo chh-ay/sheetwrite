@@ -2,6 +2,7 @@
 //! store. Formulas keep only their source text, so a workbook that names a
 //! function the host did not register evaluates it to `#NAME?`.
 
+use super::matrix::EvalMatrix;
 use super::{ast_produces_array, range_from_ast, CellStore, EvalPass};
 use crate::calc::{parse, Ast};
 use crate::types::{FormulaError, Value};
@@ -9,13 +10,27 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 /// One evaluated argument: a scalar is a 1 x 1 block. Values are row-major.
+/// It owns the evaluated matrix, so the matrix memory counter keeps the
+/// values until the host function returns.
+pub(crate) struct CustomArgument {
+    block: EvalMatrix,
+}
+
 // The native build has no JavaScript adapter, so only the engine tests read
 // the shape; the WASM adapter reads it to build nested arrays.
 #[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
-pub(crate) struct CustomArgument {
-    pub(crate) rows: usize,
-    pub(crate) cols: usize,
-    pub(crate) values: Vec<Value>,
+impl CustomArgument {
+    pub(crate) fn rows(&self) -> usize {
+        self.block.rows
+    }
+
+    pub(crate) fn cols(&self) -> usize {
+        self.block.cols
+    }
+
+    pub(crate) fn values(&self) -> &[Value] {
+        &self.block.values
+    }
 }
 
 pub(crate) type CustomImplementation = Rc<dyn Fn(&[CustomArgument]) -> Value>;
@@ -147,25 +162,16 @@ impl CellStore {
 
         let mut evaluated = Vec::with_capacity(arguments.len());
         for argument in arguments {
-            let argument =
-                if range_from_ast(argument, sheet).is_some() || ast_produces_array(argument) {
-                    let mut matrix = match self.eval_matrix_arg(argument, sheet, pass, depth + 1) {
-                        Ok(matrix) => matrix,
-                        Err(error) => return Value::Error(error),
-                    };
-                    CustomArgument {
-                        rows: matrix.rows,
-                        cols: matrix.cols,
-                        values: std::mem::take(&mut matrix.values),
-                    }
-                } else {
-                    CustomArgument {
-                        rows: 1,
-                        cols: 1,
-                        values: vec![self.eval_ast(argument, sheet, pass, depth + 1)],
-                    }
-                };
-            if let Some(Value::Error(error)) = argument
+            let block = if range_from_ast(argument, sheet).is_some() || ast_produces_array(argument)
+            {
+                match self.eval_matrix_arg(argument, sheet, pass, depth + 1) {
+                    Ok(matrix) => matrix,
+                    Err(error) => return Value::Error(error),
+                }
+            } else {
+                EvalMatrix::new(1, 1, vec![self.eval_ast(argument, sheet, pass, depth + 1)])
+            };
+            if let Some(Value::Error(error)) = block
                 .values
                 .iter()
                 .find(|value| matches!(value, Value::Error(_)))
@@ -173,7 +179,7 @@ impl CellStore {
                 return Value::Error(*error);
             }
 
-            evaluated.push(argument);
+            evaluated.push(CustomArgument { block });
         }
 
         (function.implementation)(&evaluated)
@@ -246,13 +252,14 @@ mod javascript {
     /// A block of more than one cell becomes nested row arrays; one cell
     /// becomes its scalar, so `F(A1)` and `F(1)` read the same.
     fn argument_to_js(argument: &CustomArgument) -> JsValue {
-        if argument.rows <= 1 && argument.cols <= 1 {
-            return argument.values.first().map_or(JsValue::NULL, to_js);
+        let (row_count, col_count) = (argument.rows(), argument.cols());
+        if row_count <= 1 && col_count <= 1 {
+            return argument.values().first().map_or(JsValue::NULL, to_js);
         }
 
-        let rows = js_sys::Array::new_with_length(argument.rows as u32);
-        for (index, row) in argument.values.chunks(argument.cols).enumerate() {
-            let cells = js_sys::Array::new_with_length(argument.cols as u32);
+        let rows = js_sys::Array::new_with_length(row_count as u32);
+        for (index, row) in argument.values().chunks(col_count).enumerate() {
+            let cells = js_sys::Array::new_with_length(col_count as u32);
             for (column, value) in row.iter().enumerate() {
                 cells.set(column as u32, to_js(value));
             }
@@ -330,6 +337,7 @@ mod javascript {
 #[cfg(test)]
 mod tests {
     use super::{CustomArgument, CustomFunction};
+    use crate::eval::matrix_resource_stats;
     use crate::types::{FormulaError, Value};
     use crate::CellStore;
     use std::cell::{Cell, RefCell};
@@ -357,7 +365,7 @@ mod tests {
 
         assert!(store.install_custom_function(
             "TaxRate",
-            function(|arguments| match arguments[0].values[0] {
+            function(|arguments| match arguments[0].values()[0] {
                 Value::Number(number) => Value::Number(number / 10.0),
                 _ => Value::Error(FormulaError::Value),
             }),
@@ -377,7 +385,7 @@ mod tests {
     }
 
     #[test]
-    fn ranges_arrive_as_row_major_blocks_and_error_arguments_skip_the_call() {
+    fn ranges_arrive_as_accounted_row_major_blocks_and_error_arguments_skip_the_call() {
         let mut store = CellStore::new();
         let sheet = store.add_sheet(3, 3);
         for (row, value) in [1.0, 2.0, 3.0, 4.0].chunks(2).enumerate() {
@@ -386,20 +394,27 @@ mod tests {
         }
         let calls = Rc::new(Cell::new(0));
         let shapes = Rc::new(RefCell::new(Vec::new()));
-        let (seen_calls, seen_shapes) = (Rc::clone(&calls), Rc::clone(&shapes));
+        let live_bytes = Rc::new(Cell::new(0));
+        let (seen_calls, seen_shapes, seen_bytes) = (
+            Rc::clone(&calls),
+            Rc::clone(&shapes),
+            Rc::clone(&live_bytes),
+        );
         store.install_custom_function(
             "SHAPE",
             function(move |arguments| {
                 seen_calls.set(seen_calls.get() + 1);
-                seen_shapes.borrow_mut().extend(
-                    arguments
-                        .iter()
-                        .map(|argument| (argument.rows, argument.cols, argument.values.clone())),
-                );
+                seen_bytes.set(matrix_resource_stats()[0]);
+                seen_shapes
+                    .borrow_mut()
+                    .extend(arguments.iter().map(|argument| {
+                        (argument.rows(), argument.cols(), argument.values().to_vec())
+                    }));
                 Value::Blank
             }),
         );
 
+        let before = matrix_resource_stats()[0];
         store.set_formula(sheet, 2, 0, "=SHAPE(A1:B2)", 0);
         store.set_formula(sheet, 2, 1, "=SHAPE(1/0)", 0);
         store.commit_sources();
@@ -408,6 +423,12 @@ mod tests {
         let numbers = [1.0, 2.0, 3.0, 4.0].map(Value::Number).to_vec();
         assert_eq!(*shapes.borrow(), vec![(2, 2, numbers)]);
         assert_eq!(text(&store, sheet, 2, 1).as_deref(), Some("#DIV/0!"));
+
+        // The 2 x 2 block stays counted while the host function runs, and the
+        // count returns to its start once the call ends.
+        let block_bytes = (4 * std::mem::size_of::<Value>()) as u64;
+        assert!(live_bytes.get() >= before + block_bytes);
+        assert_eq!(matrix_resource_stats()[0], before);
     }
 
     #[test]

@@ -45,7 +45,7 @@ function makeFakeStore(
     recalculateVolatile: () => {},
     registerFunction: () => {},
     unregisterFunction: () => false,
-    listFunctions: () => [],
+    listFunctions: () => Promise.resolve([]),
     getVisibleWindow: (sheet, rows, cols) => {
       hooks.onWindow?.();
       const n = Math.max(0, (rows.end - rows.start) * cols.length);
