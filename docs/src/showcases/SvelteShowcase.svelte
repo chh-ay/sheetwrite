@@ -262,7 +262,7 @@ async function mergeConflict(): Promise<void> {
 </script>
 
 <section class="sw-demo-app sw-svw" data-framework="svelte" data-generation={generation} data-remount-note={remountNote}>
-  <main class="sw-demo-main" id="dispatch">
+  <div class="sw-demo-main" id="dispatch">
     <header class="sw-demo-controlbar sw-svw-chrome">
       <div class="sw-demo-controlbar__identity">
         <span class="sw-demo-product__mark" aria-hidden="true">
@@ -281,7 +281,6 @@ async function mergeConflict(): Promise<void> {
         data-testid="connection-toggle"
         role="switch"
         aria-checked={online}
-        aria-label="Connection to dispatch server"
         disabled={!ready || actionState.pending}
         aria-busy={actionState.pending || undefined}
         onclick={toggleConnection}
@@ -452,5 +451,5 @@ async function mergeConflict(): Promise<void> {
         <Radio size={13} aria-hidden="true" /> Svelte 5 runes · IndexedDB queue
       </span>
     </footer>
-  </main>
+  </div>
 </section>

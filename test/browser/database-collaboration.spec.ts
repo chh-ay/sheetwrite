@@ -20,6 +20,25 @@ const READY_TIMEOUT = 30_000;
 /** Covers the showcase's 6 s storm and 30 s drain window, plus remount time. */
 const CHAOS_TIMEOUT = 50_000;
 const CONFLICT_RECOVERY_TIMEOUT = 2_000;
+/** The database showcase's IndexedDB names (docs/src/showcases/DatabaseShowcase.tsx). */
+const DOCUMENT_DATABASE = "sheetwrite-showcase-subscription-revenue";
+const QUEUE_DATABASE = "sheetwrite-showcase-subscription-revenue-queue";
+/** Newer than any queue schema version, so the showcase cannot open the queue. */
+const FUTURE_QUEUE_VERSION = 1_000;
+
+type DeletionOutcome = "deleted" | "blocked" | "failed";
+
+/** Deletes one IndexedDB database; an open connection that ignores the request blocks it. */
+async function deleteDatabase(page: Page, name: string): Promise<DeletionOutcome> {
+  return page.evaluate(async (databaseName) => {
+    const { promise, resolve } = Promise.withResolvers<DeletionOutcome>();
+    const request = indexedDB.deleteDatabase(databaseName);
+    request.onsuccess = () => resolve("deleted");
+    request.onerror = () => resolve("failed");
+    request.onblocked = () => resolve("blocked");
+    return promise;
+  }, name);
+}
 
 /** Seed revenue: every ledger row's seats × rate, straight from the seed snapshot. */
 function seedRevenueTotal(): number {
@@ -315,6 +334,50 @@ test.describe("database proof", () => {
 
     expect(errors.console).toEqual([]);
     expect(errors.page).toEqual([]);
+  });
+
+  test("a failed boot closes the document database it opened", async ({ page }) => {
+    // Hold the queue database at a newer version than the showcase opens, so
+    // the session fails after the document database is already open.
+    await page.goto(siteUrl("/docs/"));
+    await page.evaluate(
+      async ({ name, version }) => {
+        const { promise, resolve, reject } = Promise.withResolvers<void>();
+        const request = indexedDB.open(name, version);
+        request.onsuccess = () => {
+          request.result.close();
+          resolve();
+        };
+        request.onerror = () => reject(request.error);
+        await promise;
+      },
+      { name: QUEUE_DATABASE, version: FUTURE_QUEUE_VERSION },
+    );
+
+    await page.goto(DATABASE_URL);
+    await expect(page.getByTestId("dbx-status")).toHaveAttribute("data-status", "error", {
+      timeout: READY_TIMEOUT,
+    });
+
+    expect(await deleteDatabase(page, DOCUMENT_DATABASE)).toBe("deleted");
+  });
+
+  test("leaving the page while a session reopens leaves no session open", async ({ page }) => {
+    await page.goto(DATABASE_URL);
+    await databaseReady(page);
+
+    await page.getByRole("button", { name: "Close and reopen session" }).click();
+    await page
+      .getByRole("navigation", { name: "Site", exact: true })
+      .getByRole("link", { name: "Docs", exact: true })
+      .click();
+    await expect(page).toHaveURL(siteUrl("/docs/"));
+
+    // A boot that finished after unmount would keep its connection open and
+    // block the deletion for good.
+    await expect
+      .poll(() => deleteDatabase(page, DOCUMENT_DATABASE), { timeout: READY_TIMEOUT })
+      .toBe("deleted");
   });
 });
 
