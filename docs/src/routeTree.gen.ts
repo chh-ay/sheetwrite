@@ -19,6 +19,7 @@ import { Route as DocsIndexRouteImport } from './routes/docs.index'
 import { Route as DocsSplatRouteImport } from './routes/docs.$'
 import { Route as ShowcasesIndexRouteImport } from './routes/showcases.index'
 import { Route as ShowcasesCollaborationRouteImport } from './routes/showcases.collaboration'
+import { Route as ShowcasesDataToolsRouteImport } from './routes/showcases.data-tools'
 import { Route as ShowcasesDatabaseRouteImport } from './routes/showcases.database'
 import { Route as ShowcasesEngineRouteImport } from './routes/showcases.engine'
 import { Route as ShowcasesFormattingRouteImport } from './routes/showcases.formatting'
@@ -82,6 +83,11 @@ const ShowcasesIndexRoute = ShowcasesIndexRouteImport.update({
 const ShowcasesCollaborationRoute = ShowcasesCollaborationRouteImport.update({
   id: '/showcases/collaboration',
   path: '/showcases/collaboration',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShowcasesDataToolsRoute = ShowcasesDataToolsRouteImport.update({
+  id: '/showcases/data-tools',
+  path: '/showcases/data-tools',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShowcasesDatabaseRoute = ShowcasesDatabaseRouteImport.update({
@@ -166,6 +172,7 @@ export interface FileRoutesByFullPath {
   '/vue': typeof VueRoute
   '/docs/$': typeof DocsSplatRoute
   '/showcases/collaboration': typeof ShowcasesCollaborationRoute
+  '/showcases/data-tools': typeof ShowcasesDataToolsRoute
   '/showcases/database': typeof ShowcasesDatabaseRoute
   '/showcases/engine': typeof ShowcasesEngineRoute
   '/showcases/formatting': typeof ShowcasesFormattingRoute
@@ -192,6 +199,7 @@ export interface FileRoutesByTo {
   '/vue': typeof VueRoute
   '/docs/$': typeof DocsSplatRoute
   '/showcases/collaboration': typeof ShowcasesCollaborationRoute
+  '/showcases/data-tools': typeof ShowcasesDataToolsRoute
   '/showcases/database': typeof ShowcasesDatabaseRoute
   '/showcases/engine': typeof ShowcasesEngineRoute
   '/showcases/formatting': typeof ShowcasesFormattingRoute
@@ -219,6 +227,7 @@ export interface FileRoutesById {
   '/vue': typeof VueRoute
   '/docs/$': typeof DocsSplatRoute
   '/showcases/collaboration': typeof ShowcasesCollaborationRoute
+  '/showcases/data-tools': typeof ShowcasesDataToolsRoute
   '/showcases/database': typeof ShowcasesDatabaseRoute
   '/showcases/engine': typeof ShowcasesEngineRoute
   '/showcases/formatting': typeof ShowcasesFormattingRoute
@@ -247,6 +256,7 @@ export interface FileRouteTypes {
     | '/vue'
     | '/docs/$'
     | '/showcases/collaboration'
+    | '/showcases/data-tools'
     | '/showcases/database'
     | '/showcases/engine'
     | '/showcases/formatting'
@@ -273,6 +283,7 @@ export interface FileRouteTypes {
     | '/vue'
     | '/docs/$'
     | '/showcases/collaboration'
+    | '/showcases/data-tools'
     | '/showcases/database'
     | '/showcases/engine'
     | '/showcases/formatting'
@@ -299,6 +310,7 @@ export interface FileRouteTypes {
     | '/vue'
     | '/docs/$'
     | '/showcases/collaboration'
+    | '/showcases/data-tools'
     | '/showcases/database'
     | '/showcases/engine'
     | '/showcases/formatting'
@@ -326,6 +338,7 @@ export interface RootRouteChildren {
   VueRoute: typeof VueRoute
   DocsSplatRoute: typeof DocsSplatRoute
   ShowcasesCollaborationRoute: typeof ShowcasesCollaborationRoute
+  ShowcasesDataToolsRoute: typeof ShowcasesDataToolsRoute
   ShowcasesDatabaseRoute: typeof ShowcasesDatabaseRoute
   ShowcasesEngineRoute: typeof ShowcasesEngineRoute
   ShowcasesFormattingRoute: typeof ShowcasesFormattingRoute
@@ -414,6 +427,13 @@ declare module '@tanstack/react-router' {
       path: '/showcases/collaboration'
       fullPath: '/showcases/collaboration'
       preLoaderRoute: typeof ShowcasesCollaborationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/showcases/data-tools': {
+      id: '/showcases/data-tools'
+      path: '/showcases/data-tools'
+      fullPath: '/showcases/data-tools'
+      preLoaderRoute: typeof ShowcasesDataToolsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/showcases/database': {
@@ -526,6 +546,7 @@ const rootRouteChildren: RootRouteChildren = {
   VueRoute: VueRoute,
   DocsSplatRoute: DocsSplatRoute,
   ShowcasesCollaborationRoute: ShowcasesCollaborationRoute,
+  ShowcasesDataToolsRoute: ShowcasesDataToolsRoute,
   ShowcasesDatabaseRoute: ShowcasesDatabaseRoute,
   ShowcasesEngineRoute: ShowcasesEngineRoute,
   ShowcasesFormattingRoute: ShowcasesFormattingRoute,
