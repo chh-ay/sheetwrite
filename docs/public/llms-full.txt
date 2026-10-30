@@ -4,7 +4,7 @@
 
 Every authored guide in the Sheetwrite documentation, followed by every compiler-verified public API declaration. Generated reference tables (API pages, formula functions, compatibility results, entry-point inventory, performance evidence) are published as HTML and are linked from https://www.sheetwrite.dev/llms.txt instead of being repeated here.
 
-Packages: 0.6.0. Canonical HTML: https://www.sheetwrite.dev/docs/
+Packages: 0.6.1. Canonical HTML: https://www.sheetwrite.dev/docs/
 
 ## Contents
 
@@ -76,6 +76,7 @@ Packages: 0.6.0. Canonical HTML: https://www.sheetwrite.dev/docs/
 - [Events](#events)
 - [Compatibility and limits](#compatibility-and-limits)
 - [Releases](#releases)
+- [Sheetwrite 0.6.1](#sheetwrite-0-6-1)
 - [Sheetwrite 0.6.0](#sheetwrite-0-6-0)
 - [Sheetwrite 0.5.4](#sheetwrite-0-5-4)
 - [Sheetwrite 0.5.3](#sheetwrite-0-5-3)
@@ -8787,7 +8788,11 @@ All Sheetwrite packages release together with one version number. Each release
 post lists what is new, what changed, what is fixed, the measured performance
 results, and the steps to upgrade.
 
-**0.6.0**Oct 30, 2026Latest
+**0.6.1**Oct 30, 2026Latest
+Four slowdowns fixed
+Data-grid edits as fast as 0.5.4 againFaster scrolling back to evicted pagesFaster text lookups and XLSX rejects
+
+**0.6.0**Oct 30, 2026
 Charts and pivot tables
 Charts with an optional SVG rendererPivot tables in the full engineReference operators, iterative calculation and the ribbon
 
@@ -8813,6 +8818,81 @@ Optional full formula engine with analysis functionsSpill references and array c
 
 Releases before 0.5.0 are listed in each package's `CHANGELOG.md` in the
 [repository](https://github.com/chh-ay/sheetwrite).
+
+### Sheetwrite 0.6.1
+
+Source: https://www.sheetwrite.dev/docs/releases/0.6.1/
+
+Sheetwrite 0.6.1 fixes four slowdowns that the
+[0.6.0 release comparison](https://www.sheetwrite.dev/docs/performance/release-comparison/) found against
+0.5.4. It has no API changes. All eight packages release as 0.6.1.
+
+## Highlights
+
+- **Data-grid edits as fast as 0.5.4 again.** Value edits in a workbook
+without formulas no longer run the formula recalculation pass.
+- **Faster scrolling back to evicted pages.** The screen-reader mirror no
+longer rewrites cells whose labels did not change.
+- **Faster text lookups.** Recalculation after many single-cell writes no
+longer checks every written cell.
+- **Faster XLSX safety checks.** A file that expands too much is rejected
+before its parts are read.
+
+## Changes
+
+Each number below compares the same workload, one capture of each version on
+the same machine, paired run by run. A ratio below 1× is faster.
+
+### Data-grid edits
+
+0.6.0 made 1,000 value edits on a data grid about 27% slower than 0.5.4.
+Every value edit called the formula recalculation pass, even in a workbook
+without formulas, where the pass has no work to do.
+
+In 0.6.1 a value edit in a workbook without formulas or pivot tables skips
+the pass. Edits take 0.79× the time of 0.6.0, the same as 0.5.4. Workbooks
+with formulas or pivot tables recalculate as before.
+
+### Paged scrolling
+
+In 0.6.0, every data refresh also refreshes the accessibility mirror, so a
+screen reader reads loaded values instead of `#LOADING!`. The mirror then
+rewrote every cell, even when nothing had changed. Scrolling back to a page
+that was evicted took 2.1× as long as in 0.5.4.
+
+In 0.6.1 the mirror writes only the cells and attributes that change. The
+same scroll takes 0.60× the time of 0.6.0. Screen readers still read the
+loaded values.
+
+### Text lookups
+
+When many single-cell writes are followed by one bulk write, the next
+recalculation checked every written cell, although the sheet had far fewer
+formulas. In 0.6.1 the recalculation checks the formulas instead when they
+are fewer. Lookups over 1,000 text cells are 9% to 17% faster than in 0.5.4.
+
+### XLSX import and export
+
+- A file whose parts declare too much expansion, such as a ZIP bomb, is now
+rejected from the archive directory, before any part is read. The reject
+takes 0.84× the time of 0.6.0.
+- Small worksheets parse in one step: the deeply nested XML reject takes
+0.98× the time of 0.6.0, with the same depth and size limits.
+- Export leaves about 7% less short-lived memory behind for large scalar
+sheets.
+
+All limits apply as before. Import and export produce the same bytes.
+
+## Upgrade checklist
+
+EveryoneRequired
+Update every package together
+Install 0.6.1 for each `@sheetwrite/*` package that you use. Packages from different versions are not supported together.
+`core``wasm``formulas``xlsx``charts``react``vue``svelte`
+
+If you upgrade from 0.5.xAlso do
+Complete the 0.6.0 steps first
+Read the 0.6.0 upgrade checklist (https://www.sheetwrite.dev/docs/releases/0.6.0/#upgrade-checklist).
 
 ### Sheetwrite 0.6.0
 
