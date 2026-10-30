@@ -499,6 +499,33 @@ function consumeJsonString(state: JsonInspectionState, value: string): boolean {
   return true;
 }
 
+/** `String(n)` spells an integer below 10^21 as plain digits, and exponent notation from there. */
+const PLAIN_INTEGER_DIGITS = 21;
+const DECIMAL_BASE = 10;
+/** Exact doubles 10^0 … 10^21, so each digit costs one compare. */
+const POWERS_OF_TEN = Float64Array.from(
+  { length: PLAIN_INTEGER_DIGITS + 1 },
+  (_unused, exponent) => DECIMAL_BASE ** exponent,
+);
+
+/**
+ * Length of a finite number's JSON text. Integers, the common cell value, are
+ * measured against exact powers of ten instead of allocating their text.
+ */
+function jsonNumberLength(value: number): number {
+  const magnitude = Math.abs(value);
+  if (!Number.isInteger(value) || magnitude >= (POWERS_OF_TEN[PLAIN_INTEGER_DIGITS] ?? 0)) {
+    return String(value).length;
+  }
+  // -0 is written "0", and `value < 0` is false for it.
+  let length = value < 0 ? 2 : 1;
+  for (let digits = 1; digits < PLAIN_INTEGER_DIGITS; digits++) {
+    if (magnitude < (POWERS_OF_TEN[digits] ?? 0)) break;
+    length += 1;
+  }
+  return length;
+}
+
 function serializedLimitIssue(path: string, maxBytes: number): JsonSafetyIssue {
   return {
     path,
@@ -543,8 +570,7 @@ function findJsonSafetyIssue(
         message: "Numbers must be finite",
       };
     }
-    const serialized = Object.is(value, -0) ? "0" : String(value);
-    return consumeBytes(state, serialized.length)
+    return consumeBytes(state, jsonNumberLength(value))
       ? undefined
       : serializedLimitIssue(jsonPath(segments), state.maxBytes);
   }
@@ -1738,14 +1764,14 @@ function validateSheetShape(value: unknown, path: string, errors: DocumentValida
     }
     const cells = arrayAt(ownValue(block, "cells"), `${blockPath}.cells`, errors);
     cells?.forEach((cellEntry, cellIndex) => {
-      const cellPath = `${blockPath}.cells[${cellIndex}]`;
-      const cell = recordAt(cellEntry, cellPath, errors);
-      if (!cell) return;
-      requireNonNegativeInteger(cell, "rowOffset", cellPath, errors);
-      requireNonNegativeInteger(cell, "colOffset", cellPath, errors);
-      validateCellValueShape(ownValue(cell, "value"), `${cellPath}.value`, errors);
-      const style = ownValue(cell, "style");
-      if (style !== undefined) validateCellStyle(style, `${cellPath}.style`, errors);
+      // Paths are read only by recorded errors, and almost every cell is valid,
+      // so a cell's three path strings are built only to report the errors a
+      // path-free pass already found.
+      const errorCount = errors.length;
+      validateCellShape(cellEntry, "", errors);
+      if (errors.length === errorCount) return;
+      errors.length = errorCount;
+      validateCellShape(cellEntry, `${blockPath}.cells[${cellIndex}]`, errors);
     });
   });
 }
@@ -1758,11 +1784,7 @@ function validateOperationSheetId(
   requireString(operation, "sheet", path, errors, true);
 }
 
-function validateOperationCell(
-  entry: unknown,
-  path: string,
-  errors: DocumentValidationError[],
-): void {
+function validateCellShape(entry: unknown, path: string, errors: DocumentValidationError[]): void {
   const cell = recordAt(entry, path, errors);
   if (!cell) return;
   requireNonNegativeInteger(cell, "rowOffset", path, errors);
@@ -1919,7 +1941,7 @@ export function validateDocumentOperationShape(
       validateRangeShape(ownValue(operation, "range"), `${path}.range`, errors);
       const cells = arrayAt(ownValue(operation, "cells"), `${path}.cells`, errors);
       cells?.forEach((cell, index) => {
-        validateOperationCell(cell, `${path}.cells[${index}]`, errors);
+        validateCellShape(cell, `${path}.cells[${index}]`, errors);
       });
       break;
     }
@@ -2633,6 +2655,43 @@ function validateXlsxSource(value: unknown, errors: DocumentValidationError[]): 
   }
 }
 
+function cellBlockInSheet(block: SheetSnapshot["cells"][number], sheet: SheetSnapshot): boolean {
+  return (
+    block.startRow <= sheet.rowCount &&
+    block.rowCount <= sheet.rowCount - block.startRow &&
+    block.startCol <= sheet.columns.length &&
+    block.colCount <= sheet.columns.length - block.startCol
+  );
+}
+
+/**
+ * Whether two in-bounds cells share an address. A sorted 8-byte key per cell
+ * replaces a Set entry per cell, which cost about 100 bytes each and made
+ * validating a large snapshot allocate as much as the snapshot itself.
+ * In-bounds cells have col < columns.length, so row * width + col is unique
+ * and, under the logical-cell limit, exact as a double.
+ */
+function hasDuplicateCellAddress(sheet: SheetSnapshot): boolean {
+  const width = sheet.columns.length;
+  let cellCount = 0;
+  for (const block of sheet.cells) cellCount += block.cells.length;
+  const keys = new Float64Array(cellCount);
+  let keyCount = 0;
+  for (const block of sheet.cells) {
+    if (!cellBlockInSheet(block, sheet)) continue;
+    for (const cell of block.cells) {
+      if (cell.rowOffset >= block.rowCount || cell.colOffset >= block.colCount) continue;
+      keys[keyCount++] =
+        (block.startRow + cell.rowOffset) * width + block.startCol + cell.colOffset;
+    }
+  }
+  const sorted = keys.subarray(0, keyCount).sort();
+  for (let index = 1; index < sorted.length; index++) {
+    if (sorted[index] === sorted[index - 1]) return true;
+  }
+  return false;
+}
+
 function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
   const errors: DocumentValidationError[] = [];
   lastMergeValidationStats = { normalized: 0, nodeVisits: 0, errors: 0 };
@@ -2731,29 +2790,38 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
       );
     }
 
-    const occupied = new Set<string>();
+    // Only a sheet with a duplicate address pays for the Set that names each
+    // duplicate in cell order.
+    const occupied = hasDuplicateCellAddress(sheet) ? new Set<number>() : undefined;
+    const sheetWidth = sheet.columns.length;
     for (let blockIndex = 0; blockIndex < sheet.cells.length; blockIndex++) {
       const block = sheet.cells[blockIndex]!;
       const blockPath = `${path}.cells[${blockIndex}]`;
-      const blockInBounds =
-        block.startRow <= sheet.rowCount &&
-        block.rowCount <= sheet.rowCount - block.startRow &&
-        block.startCol <= sheet.columns.length &&
-        block.colCount <= sheet.columns.length - block.startCol;
+      const blockInBounds = cellBlockInSheet(block, sheet);
       if (!blockInBounds) {
         invalid(errors, blockPath, "Cell block lies outside the sheet", "out-of-bounds");
       }
       for (let cellIndex = 0; cellIndex < block.cells.length; cellIndex++) {
         const cell = block.cells[cellIndex]!;
-        const cellPath = `${blockPath}.cells[${cellIndex}]`;
         if (cell.rowOffset >= block.rowCount || cell.colOffset >= block.colCount) {
-          invalid(errors, cellPath, "Cell offset lies outside its block", "out-of-bounds");
+          invalid(
+            errors,
+            `${blockPath}.cells[${cellIndex}]`,
+            "Cell offset lies outside its block",
+            "out-of-bounds",
+          );
           continue;
         }
-        if (!blockInBounds) continue;
-        const key = `${block.startRow + cell.rowOffset}:${block.startCol + cell.colOffset}`;
+        if (!blockInBounds || !occupied) continue;
+        const key =
+          (block.startRow + cell.rowOffset) * sheetWidth + block.startCol + cell.colOffset;
         if (occupied.has(key)) {
-          invalid(errors, cellPath, "A snapshot cell may appear only once", "duplicate-id");
+          invalid(
+            errors,
+            `${blockPath}.cells[${cellIndex}]`,
+            "A snapshot cell may appear only once",
+            "duplicate-id",
+          );
         }
         occupied.add(key);
       }

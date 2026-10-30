@@ -67,18 +67,50 @@ const MAIN_NAMESPACES = [
   "http://purl.oclc.org/ooxml/spreadsheetml/main",
 ] as const;
 
-interface ParsedCell {
-  readonly row: number;
-  readonly col: number;
-  value: CellValue | null;
-  /**
-   * Shared with every cell of the same style record and never mutated; the
-   * snapshot builder gives each output cell its own copy.
-   */
-  readonly style?: CellStyle;
-  readonly styleRecord: ParsedCellStyle;
+/** Columns' style records and numeric literals, gathered as rows stream past. */
+interface ColumnCells {
+  readonly styleIndices: Set<number>;
+  hasNumericValue: boolean;
+}
+
+/** A shared-formula cell whose master may follow it in the worksheet. */
+interface PendingSharedFormula {
+  readonly cell: SnapshotCell;
+  readonly index: string;
   readonly address: string;
-  readonly sharedFormula?: string;
+}
+
+const INITIAL_STYLE_INDEX_CAPACITY = 1_024;
+
+/**
+ * Style record index of each parsed cell, in cell order. The cell's own style
+ * copy waits for its column's default format, which needs every row; four
+ * bytes per cell keep that wait far below a second record per cell.
+ */
+class CellStyleIndices {
+  #values = new Uint32Array(INITIAL_STYLE_INDEX_CAPACITY);
+  #length = 0;
+
+  clear(): void {
+    this.#values = new Uint32Array(INITIAL_STYLE_INDEX_CAPACITY);
+    this.#length = 0;
+  }
+
+  push(styleIndex: number): void {
+    if (this.#length === this.#values.length) {
+      const grown = new Uint32Array(this.#values.length * 2);
+      grown.set(this.#values);
+      this.#values = grown;
+    }
+    this.#values[this.#length++] = styleIndex;
+  }
+
+  at(cellIndex: number): number {
+    if (cellIndex >= this.#length) {
+      throw new RangeError(`Sheetwrite: XLSX cell ${cellIndex} has no recorded style`);
+    }
+    return this.#values[cellIndex] ?? 0;
+  }
 }
 
 interface ParsedValidation {
@@ -105,7 +137,13 @@ interface ParsedSheet {
   readonly name: string;
   readonly state: string | undefined;
   readonly part: string;
-  readonly cells: ParsedCell[];
+  /**
+   * Output cells, built while rows stream so no second per-cell record is
+   * resident; offsets are sheet coordinates and styles are attached later.
+   */
+  readonly cells: SnapshotCell[];
+  readonly cellStyles: CellStyleIndices;
+  readonly columnCells: ReadonlyMap<number, ColumnCells>;
   readonly rowCount: number;
   readonly columnCount: number;
   readonly conditionalFormats: ConditionalFormatRule[];
@@ -1196,7 +1234,10 @@ async function parseSheet(
   columnSource?: XmlElement,
 ): Promise<ParsedSheet> {
   const target = reference.relationship.target;
-  const cells: ParsedCell[] = [];
+  const cells: SnapshotCell[] = [];
+  const cellStyles = new CellStyleIndices();
+  const columnCells = new Map<number, ColumnCells>();
+  const pendingSharedFormulas: PendingSharedFormula[] = [];
   const sharedMasters = new Map<
     string,
     { formula: string; row: number; col: number; authoritative: boolean }
@@ -1343,14 +1384,25 @@ async function parseSheet(
           usage.cells += 1;
           assertResource(context, "maxCells", usage.cells);
         }
-        cells.push({
-          ...address,
-          value,
-          style: styleRecord.style,
-          styleRecord,
-          address: addressText,
-          sharedFormula,
-        });
+        const cell: SnapshotCell = {
+          rowOffset: address.row,
+          colOffset: address.col,
+          value: value ?? { kind: "literal", value: null },
+        };
+        cells.push(cell);
+        cellStyles.push(styleIndex);
+        let column = columnCells.get(address.col);
+        if (!column) {
+          column = { styleIndices: new Set(), hasNumericValue: false };
+          columnCells.set(address.col, column);
+        }
+        column.styleIndices.add(styleIndex);
+        if (value?.kind === "literal" && typeof value.value === "number") {
+          column.hasNumericValue = true;
+        }
+        if (sharedFormula) {
+          pendingSharedFormulas.push({ cell, index: sharedFormula, address: addressText });
+        }
       }
     }
   };
@@ -1375,6 +1427,13 @@ async function parseSheet(
     // Column styles apply to every row, including rows already streamed; a
     // second streamed pass is cheaper than retaining the worksheet document.
     usage.cells = cellsBeforeSheet;
+    // This frame stays alive until the second pass returns; drop its cells so
+    // the worksheet is not resident twice.
+    cells.length = 0;
+    cellStyles.clear();
+    columnCells.clear();
+    pendingSharedFormulas.length = 0;
+    sharedMasters.clear();
     return parseSheet(
       packageFile,
       reference,
@@ -1387,26 +1446,26 @@ async function parseSheet(
     );
   }
   readColumnStyles(root);
-  for (const cell of cells) {
-    if (!cell.sharedFormula) continue;
-    const master = sharedMasters.get(cell.sharedFormula);
+  for (const pending of pendingSharedFormulas) {
+    const master = sharedMasters.get(pending.index);
     if (!master) {
-      return readerFailure(`shared formula ${cell.sharedFormula} at ${cell.address} has no master`);
+      return readerFailure(`shared formula ${pending.index} at ${pending.address} has no master`);
     }
+    const { rowOffset: row, colOffset: col } = pending.cell;
     const formula =
-      cell.row === master.row && cell.col === master.col
+      row === master.row && col === master.col
         ? master.formula
-        : translateFormula(master.formula, master.row, master.col, cell.row, cell.col);
+        : translateFormula(master.formula, master.row, master.col, row, col);
     if (formulaContainsExternalReference(formula)) {
       emitWarning(context, {
         code: "external-formula",
         message: "External shared formula was neutralized as inert text",
         sheet: reference.name,
-        cell: cell.address,
+        cell: pending.address,
       });
-      cell.value = { kind: "literal", value: `=${formula}` };
+      pending.cell.value = { kind: "literal", value: `=${formula}` };
     } else {
-      cell.value = { kind: "formula", src: `=${formula}` };
+      pending.cell.value = { kind: "formula", src: `=${formula}` };
     }
   }
   const dimension = xmlAttribute(
@@ -1568,6 +1627,8 @@ async function parseSheet(
     state: reference.state,
     part: reference.relationship.target,
     cells,
+    cellStyles,
+    columnCells,
     rowCount: Math.max(0, maxRow + 1),
     columnCount: Math.max(1, maxCol + 1),
     columns,
@@ -1602,13 +1663,13 @@ async function parseSheet(
 function metadataFromSheet(sheet: ParsedSheet, context: XlsxCodecContext): WorkbookSnapshot | null {
   if (!sheet.name.startsWith(META_STEM)) return null;
   const ordered = sheet.cells
-    .filter((cell) => cell.col === 0)
-    .sort((left, right) => left.row - right.row);
+    .filter((cell) => cell.colOffset === 0)
+    .sort((left, right) => left.rowOffset - right.rowOffset);
   const marker = ordered[0]?.value;
   if (marker?.kind !== "literal" || marker.value !== META_MARKER) return null;
   let json = "";
   for (const cell of ordered.slice(1)) {
-    if (cell.value?.kind === "literal" && typeof cell.value.value === "string")
+    if (cell.value.kind === "literal" && typeof cell.value.value === "string")
       json += cell.value.value;
   }
   try {
@@ -1626,24 +1687,25 @@ function metadataFromSheet(sheet: ParsedSheet, context: XlsxCodecContext): Workb
   return null;
 }
 
-function columnFromParsed(sheet: ParsedSheet, col: number, key: string): Column {
+function columnFromParsed(
+  sheet: ParsedSheet,
+  styles: ParsedStyles,
+  col: number,
+  key: string,
+): Column {
   const definition = sheet.columns.get(col);
   const formats = new Set<string>();
   const semanticTypes = new Set<Column["type"]>();
-  let hasNumericValue = false;
-  for (const cell of sheet.cells) {
-    if (cell.col !== col) continue;
-    if (cell.styleRecord.numberFormat) formats.add(cell.styleRecord.numberFormat);
-    if (cell.styleRecord.date) semanticTypes.add("date");
-    else if (cell.styleRecord.numberFormat) {
-      semanticTypes.add(
-        /[$€£¥]|currency/i.test(cell.styleRecord.numberFormat) ? "currency" : "number",
-      );
-    }
-    if (cell.value?.kind === "literal" && typeof cell.value.value === "number") {
-      hasNumericValue = true;
+  const cells = sheet.columnCells.get(col);
+  for (const styleIndex of cells?.styleIndices ?? []) {
+    const record = styles.at(styleIndex);
+    if (record.numberFormat) formats.add(record.numberFormat);
+    if (record.date) semanticTypes.add("date");
+    else if (record.numberFormat) {
+      semanticTypes.add(/[$€£¥]|currency/i.test(record.numberFormat) ? "currency" : "number");
     }
   }
+  const hasNumericValue = cells?.hasNumericValue === true;
   if (definition?.type) semanticTypes.add(definition.type);
   if (definition?.numberFormat) formats.add(definition.numberFormat);
   // A column default is chosen only when every formatted cell agrees; cells
@@ -1674,14 +1736,13 @@ function columnFromParsed(sheet: ParsedSheet, col: number, key: string): Column 
  * need an override.
  */
 function cellNumberFormatOverride(
-  cell: ParsedSheet["cells"][number],
+  record: ParsedCellStyle,
+  value: CellValue,
   columnFormat: string | undefined,
 ): string | undefined {
-  const own = cell.styleRecord.numberFormat;
+  const own = record.numberFormat;
   if (own === columnFormat) return undefined;
   if (own !== undefined) return own;
-  const value = cell.value;
-  if (!value) return undefined;
   if (value.kind === "literal" && typeof value.value !== "number") return undefined;
   return "General";
 }
@@ -1693,16 +1754,23 @@ function restoreSidecarFields(snapshot: WorkbookSnapshot, metadata: WorkbookSnap
         (candidate) => sheetNameKey(candidate.name) === sheetNameKey(sheet.name),
       ) ?? metadata.sheets.find((candidate) => candidate.order === sheet.order);
     if (!meta || sheet.cells.length === 0) continue;
-    const cells = sheet.cells[0]!.cells;
-    const byOffset = new Map(
-      cells.map((cell) => [cell.rowOffset * sheet.columns.length + cell.colOffset, cell]),
-    );
+    // Index the sidecar, which holds only the cells it restores, so the sheet's
+    // cells are scanned once instead of indexed.
+    const sidecarCells = new Map<number, SnapshotCell[]>();
     for (const block of meta.cells) {
       for (const sidecar of block.cells) {
         const row = block.startRow + sidecar.rowOffset;
         const col = block.startCol + sidecar.colOffset;
-        const existing = byOffset.get(row * sheet.columns.length + col);
-        if (!existing) continue;
+        const offset = row * sheet.columns.length + col;
+        const restored = sidecarCells.get(offset);
+        if (restored) restored.push(sidecar);
+        else sidecarCells.set(offset, [sidecar]);
+      }
+    }
+    if (sidecarCells.size === 0) continue;
+    for (const existing of sheet.cells[0]?.cells ?? []) {
+      const offset = existing.rowOffset * sheet.columns.length + existing.colOffset;
+      for (const sidecar of sidecarCells.get(offset) ?? []) {
         if (sidecar.value.kind === "ref" && existing.value.kind === "formula") {
           const reference = sidecar.value;
           const target = snapshot.sheets.find(
@@ -2105,7 +2173,7 @@ export async function readWorkbook(
       let suffix = 2;
       while (keys.has(key)) key = `${preferredKey}_${suffix++}`;
       keys.add(key);
-      const nativeColumn = columnFromParsed(source, col, key);
+      const nativeColumn = columnFromParsed(source, styles, col, key);
       if (!metaColumn) {
         columns.push(nativeColumn);
         continue;
@@ -2118,7 +2186,7 @@ export async function readWorkbook(
           if (value !== undefined) Object.assign(column, { [property]: structuredClone(value) });
         }
       }
-      if (source.cells.some((cell) => cell.col === col)) {
+      if (source.columnCells.has(col)) {
         column.type = nativeColumn.type;
         if (nativeColumn.numberFormat) column.numberFormat = nativeColumn.numberFormat;
         else delete column.numberFormat;
@@ -2131,21 +2199,23 @@ export async function readWorkbook(
       source.tables.reduce((maximum, table) => Math.max(maximum, table.range.end.row + 1), 0),
     );
     assertResource(context, "maxRowsPerSheet", rowCount);
-    const snapshotCells: SnapshotCell[] = source.cells.map((cell) => {
-      const style = cell.style ? (copyStyleData(cell.style) as CellStyle) : undefined;
-      const numberFormat = cellNumberFormatOverride(cell, columns[cell.col]?.numberFormat);
+    // The parsed cells become the snapshot's cells: each gets its own style copy
+    // now that every column default is known, and no second array is built.
+    const snapshotCells = source.cells;
+    for (let index = 0; index < snapshotCells.length; index++) {
+      const cell = snapshotCells[index];
+      if (!cell) continue;
+      const record = styles.at(source.cellStyles.at(index));
+      // Parsed styles are typed `CellStyle`, and the copy keeps their shape.
+      const style = record.style ? (copyStyleData(record.style) as CellStyle) : undefined;
+      const numberFormat = cellNumberFormatOverride(
+        record,
+        cell.value,
+        columns[cell.colOffset]?.numberFormat,
+      );
       const cellStyle = numberFormat ? { ...style, numberFormat } : style;
-      return {
-        rowOffset: cell.row,
-        colOffset: cell.col,
-        value: cell.value ?? { kind: "literal", value: null },
-        // Parsed styles are typed `CellStyle`, and the copy keeps their shape.
-        ...(cellStyle ? { style: cellStyle } : {}),
-      };
-    });
-    // Parsed cells are not read again; releasing them before preservation capture and
-    // snapshot validation keeps one cell representation resident instead of two.
-    source.cells.length = 0;
+      if (cellStyle) cell.style = cellStyle;
+    }
     const nativeValidations = source.validations.map((validation, index) => {
       const sidecar = meta?.validationRules?.[index];
       const sameBlankDefault =

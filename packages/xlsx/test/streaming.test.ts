@@ -1,3 +1,4 @@
+import { heapStats } from "bun:jsc";
 import { beforeAll, describe, expect, it } from "bun:test";
 
 import {
@@ -298,10 +299,56 @@ describe("XLSX streaming", () => {
       { kind: "literal", value: 7 },
     ]);
   });
+
+  it("keeps one object representation per cell when the worksheet ends", async () => {
+    const rowCount = 20_000;
+    const columns = ["A", "B", "C", "D"];
+    const rows = Array.from(
+      { length: rowCount },
+      (_unused, row) =>
+        `<row r="${row + 1}">${columns.map((column, col) => `<c r="${column}${row + 1}"><v>${row * columns.length + col}</v></c>`).join("")}</row>`,
+    ).join("");
+    // The zoom warning is sent after the last row is read and before the snapshot is built.
+    const bytes = rawXlsx({
+      sheets: [
+        {
+          xml: worksheet(
+            `<sheetViews><sheetView workbookViewId="0" zoomScale="80"/></sheetViews><sheetData>${rows}</sheetData>`,
+          ),
+        },
+      ],
+    });
+    const cells = rowCount * columns.length;
+    const before = liveObjects();
+    let atWorksheetEnd = 0;
+    const imported = await fromXlsxWorkbook(bytes, {
+      onWarning: (warning) => {
+        if (warning.message.includes("zoom")) atWorksheetEnd = liveObjects();
+      },
+    });
+
+    expect(imported.sheets[0]?.cells[0]?.cells).toHaveLength(cells);
+    expect(atWorksheetEnd).toBeGreaterThan(before);
+    // Each output cell is two objects, a cell and its value. A second per-cell
+    // record or a retained row tree adds at least one more object per cell.
+    expect(atWorksheetEnd - before).toBeLessThan(
+      cells * (OUTPUT_OBJECTS_PER_CELL + PER_CELL_SLACK) + FIXED_OBJECT_SLACK,
+    );
+  });
 });
 
 function storedWorkbook(sheetXml: string): Blob {
   return new Blob([new Uint8Array(rawXlsx({ sheets: [{ xml: sheetXml }], compressionLevel: 0 }))]);
+}
+
+/** A snapshot cell and its value object: the representation import must return. */
+const OUTPUT_OBJECTS_PER_CELL = 2;
+const PER_CELL_SLACK = 0.25;
+const FIXED_OBJECT_SLACK = 20_000;
+
+function liveObjects(): number {
+  Bun.gc(true);
+  return heapStats().objectCount;
 }
 
 describe("ZIP raw entries", () => {

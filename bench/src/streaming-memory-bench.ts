@@ -204,7 +204,7 @@ async function runOne(args: readonly string[]): Promise<StreamingMemoryResult | 
 
 /**
  * Interleave baseline and candidate in fresh processes so machine drift lands on both sides.
- * Arms: baseline buffered, candidate buffered (regression guard), candidate stream.
+ * Arms: buffered and stream on each checkout.
  * `--baseline-root` is a built checkout of the pre-change commit.
  */
 async function main(): Promise<void> {
@@ -232,6 +232,7 @@ async function main(): Promise<void> {
       { root: baselineRoot, mode: "buffered" },
       { root: candidateRoot, mode: "buffered" },
       { root: candidateRoot, mode: "stream" },
+      { root: baselineRoot, mode: "stream" },
     ];
     for (const operation of operations) {
       for (let pair = 0; pair < pairs; pair++) {
