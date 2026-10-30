@@ -281,7 +281,7 @@ Limitations: Google Sheets and OpenFormula results require producer evidence bef
 
 | Dialect | Status |
 | --- | --- |
-| Microsoft Excel | documented |
+| Microsoft Excel | divergent |
 | Google Sheets | unverified |
 | OpenFormula | unverified |
 

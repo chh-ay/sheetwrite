@@ -176,7 +176,7 @@ Limitations: CELL supports the info types address, col, contents, row and type. 
 
 | Dialect | Status |
 | --- | --- |
-| Microsoft Excel | documented |
+| Microsoft Excel | divergent |
 | Google Sheets | unverified |
 | OpenFormula | unverified |
 
