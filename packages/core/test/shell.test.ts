@@ -160,6 +160,33 @@ describe("createToolbar", () => {
     store.dispose();
   });
 
+  it("keeps one-click merge, unmerge and clear-format buttons in custom toolbars", async () => {
+    const { grid, store, host } = makeGrid();
+    const piece = createToolbar(host, grid, {
+      items: [{ action: "merge" }, { action: "unmerge" }, { action: "clearFormat" }],
+    });
+    const click = async (action: string): Promise<void> => {
+      const button = piece.element.querySelector<HTMLButtonElement>(`[data-command="${action}"]`);
+      if (button === null) throw new Error(`no ${action} button`);
+      button.click();
+      for (let turn = 0; turn < 8; turn += 1) await Promise.resolve();
+    };
+    const range = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } };
+    grid.setSelection({ kind: "range", range });
+    grid.styleRange(range, { bold: true });
+
+    await click("merge");
+    expect(grid.store.getWorkbook().sheets[0]?.merges ?? []).toHaveLength(1);
+    await click("unmerge");
+    expect(grid.store.getWorkbook().sheets[0]?.merges ?? []).toHaveLength(0);
+    await click("clearFormat");
+    expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).style.bold).not.toBe(true);
+
+    piece.destroy();
+    grid.destroy();
+    store.dispose();
+  });
+
   it("moves keyboard focus within toolbar bounds and ignores unrelated keys", () => {
     const { grid, store, host } = makeGrid();
     const piece = createToolbar(host, grid, {

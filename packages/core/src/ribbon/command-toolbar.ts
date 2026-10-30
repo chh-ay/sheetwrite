@@ -42,8 +42,9 @@ export interface CommandToolbarOptions {
 }
 
 /**
- * Legacy toolbar actions whose command is a menu in the registry. Every other
- * `ToolbarActionName` is the id of a registry command.
+ * Legacy toolbar actions that are items of a registry menu. A custom toolbar
+ * that names one gets a one-click button for that exact item, as before 0.7.
+ * Every other `ToolbarActionName` is the id of a registry command.
  */
 const ACTION_COMMANDS: Partial<Record<ToolbarActionName, string>> = {
   clearFormat: "clear",
@@ -88,17 +89,29 @@ function customEntries(items: readonly ToolbarItem[]): ToolbarEntry[] {
     }
 
     const spec = item.action === undefined ? undefined : registryCommand(item.action);
-    const onClick = item.onClick;
+    const menuItem =
+      spec?.kind === "menu" && item.action !== undefined && item.action in ACTION_COMMANDS
+        ? spec.items.find((entry) => entry.icon === item.action)
+        : undefined;
+    const onClick =
+      item.onClick ??
+      (menuItem === undefined ? undefined : (grid: Grid) => void menuItem.run(grid));
     if (onClick !== undefined) {
+      // A menu item keeps its own name and glyph unless the item overrides them.
+      const named =
+        menuItem === undefined ? item : { ...item, title: item.title ?? menuItem.label };
+      const shown =
+        spec !== undefined && menuItem?.icon !== undefined && spec.kind === "menu"
+          ? { ...spec, icon: menuItem.icon }
+          : spec;
       entries.push(
-        spec === undefined
-          ? { kind: "custom", item, onClick }
-          : { kind: "custom", item, onClick, spec },
+        shown === undefined
+          ? { kind: "custom", item: named, onClick }
+          : { kind: "custom", item: named, onClick, spec: shown },
       );
       continue;
     }
 
-    // Merge and Unmerge both name the Merge & Center menu: show it once.
     if (spec === undefined || placed.has(spec.id)) continue;
     placed.add(spec.id);
     entries.push({ kind: "command", spec, item });
@@ -131,7 +144,7 @@ function renderCustom(
   const button = document.createElement("button");
   button.type = "button";
   button.className = "sheetwrite-ribbon-button";
-  button.dataset.command = spec?.id ?? "custom";
+  button.dataset.command = item.action ?? spec?.id ?? "custom";
   if (label !== "") {
     button.title = label;
     button.setAttribute("aria-label", label);
