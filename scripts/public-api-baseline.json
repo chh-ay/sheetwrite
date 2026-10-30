@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "46c02d23beebcce0467fc571c20f3bd2a29259328db8c6baa4e8443ef7c847e5",
+  "sha256": "edb1a554da8955a3ae1a94b3095a2353fcbdda1587867326e873966bd4048530",
   "intentionalExports": [
     {
       "package": "@sheetwrite/charts",
@@ -80,6 +80,7 @@
         "Column",
         "ColumnFilter",
         "ColumnarData",
+        "CommandFlags",
         "CommentAdapter",
         "CommentAnchor",
         "CommentAuthorRef",
@@ -213,6 +214,8 @@
         "RevisionRestoreRequest",
         "RevisionRestoreResponse",
         "RevisionSummary",
+        "RibbonConfig",
+        "RibbonMode",
         "RowBridge",
         "RowBridgeCell",
         "RowBridgeClearDelta",

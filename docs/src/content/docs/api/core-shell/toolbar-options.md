@@ -8,18 +8,27 @@ description: "ToolbarOptions interface in @sheetwrite/core/shell: Host element a
 Host element and configuration used to create the built-in toolbar.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/toolbar-factory.ts#L10"><code>packages/core/src/shell/toolbar-factory.ts#L10</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/toolbar-factory.ts#L9"><code>packages/core/src/shell/toolbar-factory.ts#L9</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>3</span>
+## Members <span class="api-count" data-pagefind-ignore>5</span>
 
 <div class="api-member-list">
 
 <details class="api-member" id="toolbar-options-items" data-pagefind-weight="1">
-<summary><code>items</code> <span class="api-member-summary">Items to render; defaults to the full built-in action set.</span></summary>
+<summary><code>items</code> <span class="api-member-summary">Items to render; defaults to every command flags shows, in ribbon order.</span></summary>
 
 ```ts generated
 items?: readonly ToolbarItem[];
+```
+
+</details>
+
+<details class="api-member" id="toolbar-options-flags" data-pagefind-weight="1">
+<summary><code>flags</code> <span class="api-member-summary">GridConfig switches that choose the default commands (default: all, with Export).</span></summary>
+
+```ts generated
+flags?: CommandFlags;
 ```
 
 </details>
@@ -41,6 +50,15 @@ label?: string;
 ```
 
 </details>
+
+<details class="api-member" id="toolbar-options-focus-grid" data-pagefind-weight="1">
+<summary><code>focusGrid</code> <span class="api-member-summary">Return keyboard focus to the grid after a pick or Escape (default: focus host).</span></summary>
+
+```ts generated
+focusGrid?: () => void;
+```
+
+</details>
 </div>
 
 ## Declaration
@@ -51,8 +69,10 @@ label?: string;
 ```ts generated
 export interface ToolbarOptions {
   items?: readonly ToolbarItem[];
+  flags?: CommandFlags;
   icons?: IconOverrides;
   label?: string;
+  focusGrid?: () => void;
 }
 ```
 

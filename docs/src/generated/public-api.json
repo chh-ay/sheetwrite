@@ -645,7 +645,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L657",
+              "source": "src/types/grid.ts#L696",
               "jsDocTags": [],
               "documentation": "View-aware editable snapshot of one cell, for hosts building a detached\nformula bar or cell inspector. `address` is the translated *data* address —\nthe correct target for `Grid.applyTransaction` even under an active\nsort/filter view — while the `(row, col)` inputs of\n{@link Grid.getCellInput} are active-sheet view coordinates.",
               "memberDocs": [
@@ -1206,6 +1206,18 @@
               "memberDocs": []
             },
             {
+              "name": "CommandFlags",
+              "kind": "type",
+              "signature": "export type CommandFlags = Pick< GridConfig, | \"undo\" | \"bold\" | \"italic\" | \"align\" | \"textColor\" | \"fillColor\" | \"border\" | \"clearFormat\" | \"merge\" | \"sort\" | \"export\" >;",
+              "owners": [
+                "src/types/grid.ts"
+              ],
+              "source": "src/types/grid.ts#L353",
+              "jsDocTags": [],
+              "documentation": "The `GridConfig` switches that choose built-in commands. They apply to every\nrenderer of the command model: the toolbar, the full ribbon and the compact\nribbon. Each defaults to true, except `export`.",
+              "memberDocs": []
+            },
+            {
               "name": "CommentAdapter",
               "kind": "interface",
               "signature": "export interface CommentAdapter { listComments(documentId: string, signal?: AbortSignal): Promise<CommentListResult>; mutateComment(request: CommentMutationRequest): Promise<CommentMutationResponse>; subscribeComments?( documentId: string, listener: (event: VersionedCommentEvent) => void, signal?: AbortSignal, ): undefined | (() => void); }",
@@ -1397,7 +1409,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L335",
+              "source": "src/types/grid.ts#L369",
               "jsDocTags": [],
               "documentation": "Built-in action names accepted by custom context-menu rows.",
               "memberDocs": []
@@ -1409,7 +1421,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L363",
+              "source": "src/types/grid.ts#L397",
               "jsDocTags": [],
               "documentation": "Cell and viewport coordinates resolved for one bundled context-menu opening.",
               "memberDocs": [
@@ -1434,7 +1446,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L424",
+              "source": "src/types/grid.ts#L458",
               "jsDocTags": [
                 "example",
                 "see"
@@ -1486,7 +1498,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L453",
+              "source": "src/types/grid.ts#L487",
               "jsDocTags": [],
               "documentation": "Static rows or a context-aware factory evaluated each time the menu opens.",
               "memberDocs": []
@@ -1498,7 +1510,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L430",
+              "source": "src/grid.ts#L434",
               "jsDocTags": [
                 "example",
                 "see"
@@ -1824,7 +1836,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L304",
+              "source": "src/grid.ts#L308",
               "jsDocTags": [],
               "documentation": "Default canvas theme used before CSS and explicit theme overrides.",
               "memberDocs": []
@@ -2161,7 +2173,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L735",
+              "source": "src/types/grid.ts#L774",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2610,11 +2622,11 @@
             {
               "name": "GridConfig",
               "kind": "interface",
-              "signature": "export interface GridConfig { toolbar?: boolean | ToolbarItem[]; bold?: boolean; italic?: boolean; align?: boolean; textColor?: boolean; fillColor?: boolean; border?: boolean; clearFormat?: boolean; merge?: boolean; sort?: boolean; export?: boolean; ribbon?: boolean; icons?: IconOverrides; contextMenu?: boolean | ContextMenuItems; undo?: boolean; find?: boolean; tabs?: boolean; keyboard?: boolean | KeyboardOptions | ((e: KeyboardEvent, grid: Grid) => boolean); }",
+              "signature": "export interface GridConfig { toolbar?: boolean | ToolbarItem[]; bold?: boolean; italic?: boolean; align?: boolean; textColor?: boolean; fillColor?: boolean; border?: boolean; clearFormat?: boolean; merge?: boolean; sort?: boolean; export?: boolean; ribbon?: boolean | RibbonConfig; icons?: IconOverrides; contextMenu?: boolean | ContextMenuItems; undo?: boolean; find?: boolean; tabs?: boolean; keyboard?: boolean | KeyboardOptions | ((e: KeyboardEvent, grid: Grid) => boolean); }",
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L480",
+              "source": "src/types/grid.ts#L514",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2623,19 +2635,19 @@
               "memberDocs": [
                 {
                   "name": "align",
-                  "documentation": "Show left, center, and right alignment controls (default true)."
+                  "documentation": "Show the horizontal and vertical alignment commands (default true)."
                 },
                 {
                   "name": "bold",
-                  "documentation": "Show the bold control in the default toolbar (default true)."
+                  "documentation": "Show Bold, and Underline and Strikethrough with Italic (default true). See {@link CommandFlags}."
                 },
                 {
                   "name": "border",
-                  "documentation": "Show the border control in the default toolbar (default true)."
+                  "documentation": "Show the Borders command (default true)."
                 },
                 {
                   "name": "clearFormat",
-                  "documentation": "Show the clear-format control in the default toolbar (default true)."
+                  "documentation": "Show the Clear command, which holds Clear Formats (default true)."
                 },
                 {
                   "name": "contextMenu",
@@ -2643,11 +2655,11 @@
                 },
                 {
                   "name": "export",
-                  "documentation": "Show CSV/XLSX export controls in the default toolbar (default false)."
+                  "documentation": "Show the Export CSV and Export XLSX commands (default false)."
                 },
                 {
                   "name": "fillColor",
-                  "documentation": "Show the fill-color control in the default toolbar (default true)."
+                  "documentation": "Show the Fill Color command (default true)."
                 },
                 {
                   "name": "find",
@@ -2659,7 +2671,7 @@
                 },
                 {
                   "name": "italic",
-                  "documentation": "Show the italic control in the default toolbar (default true)."
+                  "documentation": "Show Italic, and Underline and Strikethrough with Bold (default true)."
                 },
                 {
                   "name": "keyboard",
@@ -2667,15 +2679,15 @@
                 },
                 {
                   "name": "merge",
-                  "documentation": "Show merge and unmerge controls in the default toolbar (default true)."
+                  "documentation": "Show the Merge & Center command, which holds Merge and Unmerge (default true)."
                 },
                 {
                   "name": "ribbon",
-                  "documentation": "Replace the built-in toolbar with an Excel-style ribbon (Home, Insert,\nData and View tabs) that narrows its groups as the grid gets narrower.\nA custom `toolbar` item list still renders the flat toolbar instead."
+                  "documentation": "Replace the built-in toolbar with an Excel-style ribbon (Home, Insert,\nData and View tabs). Pass an object to choose its initial full, compact\nor automatic layout. A custom `toolbar` item list still renders the\ntoolbar instead."
                 },
                 {
                   "name": "sort",
-                  "documentation": "Show ascending and descending sort controls in the default toolbar (default true)."
+                  "documentation": "Show Sort & Filter and the sort commands (default true)."
                 },
                 {
                   "name": "tabs",
@@ -2683,15 +2695,15 @@
                 },
                 {
                   "name": "textColor",
-                  "documentation": "Show the text-color control in the default toolbar (default true)."
+                  "documentation": "Show the Font Color command (default true)."
                 },
                 {
                   "name": "toolbar",
-                  "documentation": "Show the built-in toolbar (true), hide it (false), or supply a custom item list."
+                  "documentation": "Show the built-in toolbar (true), hide it (false), or supply a custom item\nlist. The toolbar shows the ribbon's commands on one row, with the rest in\na \"More commands\" menu."
                 },
                 {
                   "name": "undo",
-                  "documentation": "Show undo/redo controls in the built-in toolbar (default true)."
+                  "documentation": "Show Undo and Redo (default true)."
                 }
               ]
             },
@@ -2702,7 +2714,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L677",
+              "source": "src/types/grid.ts#L716",
               "jsDocTags": [],
               "documentation": "Payload map for events emitted by a Grid.",
               "memberDocs": [
@@ -2743,7 +2755,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L550",
+              "source": "src/types/grid.ts#L589",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2969,7 +2981,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L348",
+              "source": "src/grid.ts#L352",
               "jsDocTags": [
                 "example",
                 "see"
@@ -3020,7 +3032,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L360",
+              "source": "src/grid.ts#L364",
               "jsDocTags": [],
               "documentation": "Whether `initSheetwrite` has completed — the single readiness source.",
               "memberDocs": []
@@ -3056,7 +3068,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L390",
+              "source": "src/types/grid.ts#L424",
               "jsDocTags": [],
               "documentation": "Built-in actions that can be rebound without replacing navigation.",
               "memberDocs": []
@@ -3068,7 +3080,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L403",
+              "source": "src/types/grid.ts#L437",
               "jsDocTags": [],
               "documentation": "Overrides replace all default keys for an action; null disables that action's keys.",
               "memberDocs": []
@@ -3080,7 +3092,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L378",
+              "source": "src/types/grid.ts#L412",
               "jsDocTags": [],
               "documentation": "A compact modified key combination or a key object. Modifiers may appear in\nany order before the final key, for example \"Mod+Shift+K\" or \"Ctrl+Alt+Delete\".\n`Mod`/`mod` means Command on macOS and Control elsewhere; Ctrl and Meta are literal.\nThe parser rejects unknown/repeated modifiers and missing keys.",
               "memberDocs": []
@@ -4077,7 +4089,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L643",
+              "source": "src/types/grid.ts#L682",
               "jsDocTags": [],
               "documentation": "Replacement count and refreshed search state returned by replace-all.",
               "memberDocs": [
@@ -4146,7 +4158,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L365",
+              "source": "src/grid.ts#L369",
               "jsDocTags": [],
               "documentation": "Read `--sheetwrite-*` CSS custom properties into a partial theme.",
               "memberDocs": []
@@ -4271,6 +4283,39 @@
               "source": "src/collaboration.ts#L244",
               "jsDocTags": [],
               "documentation": "Host-provided metadata describing a saved workbook revision.",
+              "memberDocs": []
+            },
+            {
+              "name": "RibbonConfig",
+              "kind": "interface",
+              "signature": "export interface RibbonConfig { mode?: RibbonMode; compactWidth?: number; }",
+              "owners": [
+                "src/types/grid.ts"
+              ],
+              "source": "src/types/grid.ts#L341",
+              "jsDocTags": [],
+              "documentation": "Initial layout settings for the built-in or composable ribbon.",
+              "memberDocs": [
+                {
+                  "name": "compactWidth",
+                  "documentation": "Width in CSS pixels below which `auto` uses compact (default 768)."
+                },
+                {
+                  "name": "mode",
+                  "documentation": "Initial layout (default `full`). The ribbon's layout button changes it at run time."
+                }
+              ]
+            },
+            {
+              "name": "RibbonMode",
+              "kind": "type",
+              "signature": "export type RibbonMode = \"full\" | \"compact\" | \"auto\";",
+              "owners": [
+                "src/types/grid.ts"
+              ],
+              "source": "src/types/grid.ts#L338",
+              "jsDocTags": [],
+              "documentation": "Layout of the Excel-style ribbon. `auto` chooses compact below the configured width.",
               "memberDocs": []
             },
             {
@@ -4703,7 +4748,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L621",
+              "source": "src/types/grid.ts#L660",
               "jsDocTags": [],
               "documentation": "Case, whole-cell, sheet, and column constraints for grid search.",
               "memberDocs": [
@@ -4732,7 +4777,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L633",
+              "source": "src/types/grid.ts#L672",
               "jsDocTags": [],
               "documentation": "Ordered matches and active index produced by a grid search.",
               "memberDocs": [
@@ -4962,7 +5007,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L667",
+              "source": "src/types/grid.ts#L706",
               "jsDocTags": [],
               "documentation": "Actionable transaction outcome for a stable sheet lifecycle target.",
               "memberDocs": []
@@ -6075,9 +6120,9 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L320",
+              "source": "src/types/grid.ts#L323",
               "jsDocTags": [],
-              "documentation": "Built-in, separator, or custom callback item in the grid toolbar.",
+              "documentation": "Built-in, separator, or custom callback item in the grid toolbar. A built-in\n`action` renders the same command, glyph and state as the ribbon.",
               "memberDocs": [
                 {
                   "name": "action",
@@ -6093,7 +6138,7 @@
                 },
                 {
                   "name": "title",
-                  "documentation": "Accessible tooltip."
+                  "documentation": "Accessible name and tooltip; replaces the built-in command's label."
                 }
               ]
             },
@@ -8090,9 +8135,9 @@
               "owners": [
                 "src/shell/ribbon-factory.ts"
               ],
-              "source": "src/shell/ribbon-factory.ts#L24",
+              "source": "src/shell/ribbon-factory.ts#L27",
               "jsDocTags": [],
-              "documentation": "Mount an Excel-style ribbon (Home, Insert, Data, View) bound to\n`grid.actions`, in normal document flow. Groups shrink, then collapse into\ndropdowns, as the host narrows. Returns the piece with an idempotent\n`destroy`.",
+              "documentation": "Mount an Excel-style ribbon (Home, Insert, Data, View) bound to\n`grid.actions`, in normal document flow. It renders the same commands as\nthe toolbar, in a full or a compact layout. Groups shrink, then collapse into\ndropdowns, as the host narrows. Returns the piece with an idempotent\n`destroy`.",
               "memberDocs": []
             },
             {
@@ -8114,7 +8159,7 @@
               "owners": [
                 "src/shell/spreadsheet-shell.ts"
               ],
-              "source": "src/shell/spreadsheet-shell.ts#L104",
+              "source": "src/shell/spreadsheet-shell.ts#L131",
               "jsDocTags": [],
               "documentation": "Mount a complete spreadsheet shell into `host`: toolbar row, formula row\n(name box + formula bar), the grid, and a bottom row with sheet tabs and a\nselection status. The host must have a real size; the shell fills it. Returns\nthe shell handle; `destroy` tears down every piece, the grid, and the shell\nDOM, and is safe to call twice.",
               "memberDocs": []
@@ -8126,9 +8171,9 @@
               "owners": [
                 "src/shell/toolbar-factory.ts"
               ],
-              "source": "src/shell/toolbar-factory.ts#L25",
+              "source": "src/shell/toolbar-factory.ts#L29",
               "jsDocTags": [],
-              "documentation": "Mount a toolbar bound to `grid.actions` (custom items receive the grid).\nMouse clicks never steal grid focus; keyboard users get local\nLeft/Right/Home/End movement across the controls while the toolbar has\nfocus. Returns the mounted piece with an idempotent `destroy`.",
+              "documentation": "Mount a toolbar bound to `grid.actions` (custom items receive the grid). It\nshows the ribbon's commands on one row, with the same glyphs, state and\nkeyboard; commands that do not fit move into a \"More commands\" popup. Mouse\nclicks never steal grid focus; Left/Right/Home/End move between controls and\nEscape returns focus to the grid. Returns the piece with an idempotent `destroy`.",
               "memberDocs": []
             },
             {
@@ -8200,7 +8245,7 @@
             {
               "name": "RibbonOptions",
               "kind": "interface",
-              "signature": "export interface RibbonOptions { focusGrid?: () => void; onHeightChange?: (height: number) => void; icons?: IconOverrides; }",
+              "signature": "export interface RibbonOptions { focusGrid?: () => void; onHeightChange?: (height: number) => void; icons?: IconOverrides; flags?: CommandFlags; mode?: RibbonMode; compactWidth?: number; }",
               "owners": [
                 "src/shell/ribbon-factory.ts"
               ],
@@ -8209,12 +8254,24 @@
               "documentation": "Options for {@link createRibbon}.",
               "memberDocs": [
                 {
+                  "name": "compactWidth",
+                  "documentation": "Width in CSS pixels below which `auto` uses compact (default 768)."
+                },
+                {
+                  "name": "flags",
+                  "documentation": "`GridConfig` switches that choose commands (default: all but Export)."
+                },
+                {
                   "name": "focusGrid",
                   "documentation": "Return keyboard focus to the grid after a pick or Escape (default: focus `host`)."
                 },
                 {
                   "name": "icons",
                   "documentation": "Replace built-in icons by glyph name, as `GridConfig.icons`."
+                },
+                {
+                  "name": "mode",
+                  "documentation": "Initial layout (default `full`). The ribbon's layout button changes it at run time."
                 },
                 {
                   "name": "onHeightChange",
@@ -8241,7 +8298,7 @@
               "owners": [
                 "src/shell/spreadsheet-shell.ts"
               ],
-              "source": "src/shell/spreadsheet-shell.ts#L79",
+              "source": "src/shell/spreadsheet-shell.ts#L106",
               "jsDocTags": [],
               "documentation": "Disposable controller for the framework-neutral spreadsheet shell.",
               "memberDocs": [
@@ -8262,11 +8319,11 @@
             {
               "name": "SpreadsheetShellOptions",
               "kind": "interface",
-              "signature": "export interface SpreadsheetShellOptions { grid: GridOptions; toolbar?: readonly ToolbarItem[]; ribbon?: boolean; onChange?: (event: ChangeEvent) => void; onSelectionChange?: (selection: Selection | null) => void; onReady?: (grid: Grid) => void; }",
+              "signature": "export interface SpreadsheetShellOptions { grid: GridOptions; toolbar?: readonly ToolbarItem[]; ribbon?: boolean | RibbonConfig; onChange?: (event: ChangeEvent) => void; onSelectionChange?: (selection: Selection | null) => void; onReady?: (grid: Grid) => void; }",
               "owners": [
                 "src/shell/spreadsheet-shell.ts"
               ],
-              "source": "src/shell/spreadsheet-shell.ts#L65",
+              "source": "src/shell/spreadsheet-shell.ts#L92",
               "jsDocTags": [],
               "documentation": "Host elements and feature options used to create a spreadsheet shell.",
               "memberDocs": [
@@ -8280,32 +8337,40 @@
                 },
                 {
                   "name": "ribbon",
-                  "documentation": "Use an Excel-style ribbon instead of the flat toolbar."
+                  "documentation": "Use an Excel-style ribbon instead of the toolbar; an object sets its layout."
                 },
                 {
                   "name": "toolbar",
-                  "documentation": "Toolbar items (default: the full built-in action set)."
+                  "documentation": "Toolbar items (default: every command the grid config's flags show, with Export)."
                 }
               ]
             },
             {
               "name": "ToolbarOptions",
               "kind": "interface",
-              "signature": "export interface ToolbarOptions { items?: readonly ToolbarItem[]; icons?: IconOverrides; label?: string; }",
+              "signature": "export interface ToolbarOptions { items?: readonly ToolbarItem[]; flags?: CommandFlags; icons?: IconOverrides; label?: string; focusGrid?: () => void; }",
               "owners": [
                 "src/shell/toolbar-factory.ts"
               ],
-              "source": "src/shell/toolbar-factory.ts#L10",
+              "source": "src/shell/toolbar-factory.ts#L9",
               "jsDocTags": [],
               "documentation": "Host element and configuration used to create the built-in toolbar.",
               "memberDocs": [
+                {
+                  "name": "flags",
+                  "documentation": "`GridConfig` switches that choose the default commands (default: all, with Export)."
+                },
+                {
+                  "name": "focusGrid",
+                  "documentation": "Return keyboard focus to the grid after a pick or Escape (default: focus `host`)."
+                },
                 {
                   "name": "icons",
                   "documentation": "Per-glyph icon overrides, exactly like `GridConfig.icons`."
                 },
                 {
                   "name": "items",
-                  "documentation": "Items to render; defaults to the full built-in action set."
+                  "documentation": "Items to render; defaults to every command `flags` shows, in ribbon order."
                 },
                 {
                   "name": "label",
@@ -9005,7 +9070,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L599",
+              "source": "../core/dist/types/grid.d.ts#L622",
               "jsDocTags": [
                 "example",
                 "see"
@@ -10008,7 +10073,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L599",
+              "source": "../core/dist/types/grid.d.ts#L622",
               "jsDocTags": [
                 "example",
                 "see"
@@ -10997,7 +11062,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L599",
+              "source": "../core/dist/types/grid.d.ts#L622",
               "jsDocTags": [
                 "example",
                 "see"

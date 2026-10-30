@@ -1797,19 +1797,6 @@
   color: var(--sheetwrite-toolbar-fg);
 }
 
-:is(.sw-demo-app, .sw-vanilla-app) .sheetwrite-tb-button {
-  border-radius: var(--sw-demo-radius-1);
-  transition:
-    color var(--sw-demo-transition),
-    background var(--sw-demo-transition);
-}
-
-:is(.sw-demo-app, .sw-vanilla-app) .sheetwrite-tb-button:hover {
-  border-color: color-mix(in srgb, var(--sw-demo-accent) 32%, transparent);
-  background: color-mix(in srgb, var(--sw-demo-accent) 12%, transparent);
-  color: var(--sw-demo-accent-strong);
-}
-
 :is(.sw-demo-app, .sw-vanilla-app) :is(.sheetwrite-shell-namebox, .sheetwrite-shell-formula) {
   border-color: var(--sw-demo-border);
   background: var(--sw-demo-surface);
@@ -2221,31 +2208,6 @@
   }
 }
 
-/* Color inputs show their actual value inside a recognizable picker frame. */
-:is(.sw-demo-app, .sw-vanilla-app) .sheetwrite-tb-color {
-  width: 2rem;
-  height: 1.9rem;
-  padding: 0.3rem;
-  border: 1px solid var(--sw-demo-border-strong);
-  border-radius: 0.4rem;
-  background: var(--sw-demo-raised);
-  cursor: pointer;
-}
-
-:is(.sw-demo-app, .sw-vanilla-app) .sheetwrite-tb-color::-webkit-color-swatch-wrapper {
-  padding: 0;
-}
-
-:is(.sw-demo-app, .sw-vanilla-app) .sheetwrite-tb-color::-webkit-color-swatch {
-  border: 1px solid var(--sw-demo-muted);
-  border-radius: 0.15rem;
-}
-
-:is(.sw-demo-app, .sw-vanilla-app) .sheetwrite-tb-color::-moz-color-swatch {
-  border: 1px solid var(--sw-demo-muted);
-  border-radius: 0.15rem;
-}
-
 :root {
   --demo-surface: var(--sw-demo-surface);
   --demo-border: var(--sw-demo-border);
@@ -2277,14 +2239,6 @@
   --sw-demo-dim: var(--sw-fg-dim);
   --sw-demo-ink: var(--sw-surface-1);
   --sw-demo-accent-strong: var(--sw-accent-strong);
-}
-
-:is(.sw-demo-app, .sw-vanilla-app) .sheetwrite-tb-button {
-  color: var(--sw-fg-muted);
-}
-
-:is(.sw-demo-app, .sw-vanilla-app) .sheetwrite-tb-button:not(:disabled):hover {
-  color: var(--sw-fg-strong);
 }
 
 @media (max-width: 42rem) {

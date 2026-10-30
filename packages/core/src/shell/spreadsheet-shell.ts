@@ -6,11 +6,19 @@
 
 import { createGridController, type GridController } from "../grid-controller.js";
 import { DEFAULT_THEME } from "../grid.js";
-import { RIBBON_EXPANDED_HEIGHT } from "../ribbon/ribbon-metrics.js";
+import { assertRibbonConfig, RIBBON_EXPANDED_HEIGHT } from "../ribbon/ribbon-metrics.js";
 import { sheetNameKey } from "../sheet-name.js";
 import { SheetTabs } from "../sheet-tabs.js";
 import type { Selection, SheetId } from "../types/coordinates.js";
-import type { Grid, GridConfig, GridOptions, IconOverrides, ToolbarItem } from "../types/grid.js";
+import type {
+  CommandFlags,
+  Grid,
+  GridConfig,
+  GridOptions,
+  IconOverrides,
+  RibbonConfig,
+  ToolbarItem,
+} from "../types/grid.js";
 import type { Theme } from "../types/render.js";
 import type { ChangeEvent } from "../types/transaction.js";
 import { seedWidgetTheme } from "../widget-theme.js";
@@ -18,18 +26,33 @@ import { createFormulaBar, createNameBox, type ShellPiece } from "./formula-cont
 import { createSelectionStatus } from "./selection-status.js";
 import { createToolbar } from "./toolbar-factory.js";
 
+interface ShellChromeOptions {
+  readonly focusGrid: () => void;
+  readonly items: readonly ToolbarItem[] | undefined;
+  readonly flags: CommandFlags;
+  readonly icons: IconOverrides | undefined;
+}
+
+function mountToolbar(host: HTMLElement, grid: Grid, chrome: ShellChromeOptions): ShellPiece {
+  return createToolbar(host, grid, {
+    focusGrid: chrome.focusGrid,
+    flags: chrome.flags,
+    ...(chrome.items === undefined ? {} : { items: chrome.items }),
+    ...(chrome.icons === undefined ? {} : { icons: chrome.icons }),
+  });
+}
+
 /**
- * The ribbon loads as its own chunk, so shells without it never download it.
- * Its row keeps the ribbon's height meanwhile, so the grid does not move when
- * it arrives; if the chunk fails, the flat toolbar takes its place and the
- * error is still reported.
+ * The ribbon class loads as its own chunk. Its row keeps the ribbon's height
+ * meanwhile, so the grid does not move when it arrives; if the chunk fails,
+ * the toolbar renders the same commands in its place and the error is still
+ * reported.
  */
 function mountRibbonWhenLoaded(
   host: HTMLElement,
   grid: Grid,
-  focusGrid: () => void,
-  fallbackItems: readonly ToolbarItem[] | undefined,
-  icons: IconOverrides | undefined,
+  chrome: ShellChromeOptions,
+  layout: RibbonConfig,
 ): ShellPiece {
   let piece: ShellPiece | null = null;
   let destroyed = false;
@@ -38,16 +61,20 @@ function mountRibbonWhenLoaded(
   void import("./ribbon-factory.js").then(
     ({ createRibbon }) => {
       if (destroyed) return;
+
       host.style.minHeight = "";
-      piece = createRibbon(host, grid, { focusGrid, ...(icons === undefined ? {} : { icons }) });
+      piece = createRibbon(host, grid, {
+        focusGrid: chrome.focusGrid,
+        flags: chrome.flags,
+        ...layout,
+        ...(chrome.icons === undefined ? {} : { icons: chrome.icons }),
+      });
     },
     (error: unknown) => {
       if (destroyed) return;
+
       host.style.minHeight = "";
-      piece = createToolbar(host, grid, {
-        items: fallbackItems,
-        ...(icons === undefined ? {} : { icons }),
-      });
+      piece = mountToolbar(host, grid, chrome);
       throw error;
     },
   );
@@ -65,10 +92,10 @@ function mountRibbonWhenLoaded(
 export interface SpreadsheetShellOptions {
   /** Options for the single grid the shell owns. `initSheetwrite` must already be awaited. */
   grid: GridOptions;
-  /** Toolbar items (default: the full built-in action set). */
+  /** Toolbar items (default: every command the grid config's flags show, with Export). */
   toolbar?: readonly ToolbarItem[];
-  /** Use an Excel-style ribbon instead of the flat toolbar. */
-  ribbon?: boolean;
+  /** Use an Excel-style ribbon instead of the toolbar; an object sets its layout. */
+  ribbon?: boolean | RibbonConfig;
   /** Event callbacks forwarded from the owned grid. */
   onChange?: (event: ChangeEvent) => void;
   onSelectionChange?: (selection: Selection | null) => void;
@@ -105,6 +132,8 @@ export function createSpreadsheetShell(
   host: HTMLElement,
   options: SpreadsheetShellOptions,
 ): SpreadsheetShell {
+  assertRibbonConfig(options.ribbon);
+
   const root = document.createElement("div");
   root.className = "sheetwrite-shell";
 
@@ -157,18 +186,28 @@ export function createSpreadsheetShell(
     throw error;
   }
 
-  const focusGrid = (): void => gridHost.focus();
-  // The shell's own chrome honours the grid's glyph overrides, like the grid's built-in chrome.
-  const icons = options.grid.config?.icons;
+  // The shell's own chrome honours the grid's glyph overrides and command
+  // flags, like the grid's built-in chrome. The shell toolbar shows Export
+  // unless the config turns it off.
+  const gridConfig = options.grid.config ?? {};
+  const chrome: ShellChromeOptions = {
+    focusGrid: () => gridHost.focus(),
+    items: options.toolbar,
+    flags: { export: true, ...gridConfig },
+    icons: gridConfig.icons,
+  };
+  const focusGrid = chrome.focusGrid;
 
   const pieces: ShellPiece[] = [];
   pieces.push(
     options.ribbon
-      ? mountRibbonWhenLoaded(toolbarRow, grid, focusGrid, options.toolbar, icons)
-      : createToolbar(toolbarRow, grid, {
-          items: options.toolbar,
-          ...(icons === undefined ? {} : { icons }),
-        }),
+      ? mountRibbonWhenLoaded(
+          toolbarRow,
+          grid,
+          { ...chrome, flags: gridConfig },
+          typeof options.ribbon === "object" ? options.ribbon : {},
+        )
+      : mountToolbar(toolbarRow, grid, chrome),
   );
   pieces.push(createNameBox(formulaRow, grid, { focusGrid }));
   formulaRow.appendChild(fx);

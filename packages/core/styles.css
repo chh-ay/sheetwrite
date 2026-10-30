@@ -301,60 +301,76 @@
   font-weight: 500;
 }
 
-/* Toolbar */
-.sheetwrite-toolbar {
+/* Toolbar (config.toolbar / createToolbar): the ribbon's commands and
+   controls on one row. Commands that do not fit move into the More commands
+   popup. The row height is mirrored in ribbon-metrics.ts for the grid's layout. */
+.sheetwrite-command-toolbar {
   display: flex;
   align-items: center;
   gap: 2px;
+  height: 36px;
   padding: 0 6px;
-  border-bottom: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
-  background: var(--sheetwrite-toolbar-bg, var(--sheetwrite-header-bg, #f4ede1));
-  color: var(--sheetwrite-toolbar-fg, var(--sheetwrite-header-fg, #6b4a1f));
-  font: var(--sheetwrite-widget-font, 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
-  box-sizing: border-box;
-  overflow-x: auto;
+  overflow: hidden;
 }
 
-.sheetwrite-tb-button {
-  min-width: 28px;
-  height: 26px;
-  padding: 0 6px;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  font: inherit;
+.sheetwrite-command-toolbar-row {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  overflow: hidden;
 }
 
-.sheetwrite-tb-button > :is(svg, .sheetwrite-icon) {
-  display: block;
-  width: 16px;
-  height: 16px;
-  margin: auto;
-  pointer-events: none;
+.sheetwrite-command-toolbar [hidden] {
+  display: none;
 }
 
-.sheetwrite-tb-color {
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-}
-
-.sheetwrite-tb-separator {
+.sheetwrite-command-toolbar-separator {
+  flex: none;
   width: 1px;
   height: 20px;
   margin: 0 4px;
-  background: var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
+  background: var(--sheetwrite-ribbon-line);
+}
+
+.sheetwrite-command-toolbar-overflow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  max-width: 360px;
+}
+
+/* One row: large ribbon buttons render small, and labels are names only. */
+:is(.sheetwrite-command-toolbar, .sheetwrite-command-toolbar-overflow)
+  :is(.sheetwrite-ribbon-button, .sheetwrite-ribbon-split)[data-large] {
+  flex-direction: row;
+  height: 24px;
+  max-width: none;
+  padding: 0 4px;
+}
+
+:is(.sheetwrite-command-toolbar, .sheetwrite-command-toolbar-overflow)
+  .sheetwrite-ribbon-split[data-large]
+  > :is(.sheetwrite-ribbon-button, .sheetwrite-ribbon-split-arrow) {
+  height: 24px;
+}
+
+:is(.sheetwrite-command-toolbar, .sheetwrite-command-toolbar-overflow)
+  .sheetwrite-ribbon-button[data-large]
+  > .sheetwrite-ribbon-icon
+  > :is(svg, .sheetwrite-icon) {
+  --sheetwrite-icon-size: 16px;
+  width: 16px;
+  height: 16px;
 }
 
 /* Ribbon (config.ribbon / createRibbon). Groups set data-size to large,
    medium, small or collapsed as the ribbon narrows (see ribbon-fit.ts). The
-   tab row and panel heights are mirrored in ribbon.ts for the grid's layout. */
-.sheetwrite-ribbon {
+   tab row and panel heights are mirrored in ribbon-metrics.ts for the grid's
+   layout. The toolbar shares the ribbon's palette and control rules. */
+:is(.sheetwrite-ribbon, .sheetwrite-command-toolbar) {
   --sheetwrite-ribbon-hover: var(--sheetwrite-menu-hover, var(--sheetwrite-grid-line, #eeeeee));
   --sheetwrite-ribbon-pressed: var(--sheetwrite-widget-selection, #2563eb22);
   --sheetwrite-ribbon-line: var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
@@ -366,7 +382,7 @@
   user-select: none;
 }
 
-.sheetwrite-ribbon :focus-visible {
+:is(.sheetwrite-ribbon, .sheetwrite-command-toolbar) :focus-visible {
   outline: 2px solid var(--sheetwrite-widget-accent, #2563eb);
   outline-offset: -2px;
 }
@@ -381,6 +397,7 @@
 }
 
 .sheetwrite-ribbon-tab,
+.sheetwrite-ribbon-mode,
 .sheetwrite-ribbon-minimize {
   height: 26px;
   padding: 0 12px;
@@ -393,6 +410,7 @@
 }
 
 .sheetwrite-ribbon-tab:hover,
+.sheetwrite-ribbon-mode:hover,
 .sheetwrite-ribbon-minimize:hover {
   background: var(--sheetwrite-ribbon-hover);
 }
@@ -409,8 +427,18 @@
   color: inherit;
 }
 
-.sheetwrite-ribbon-minimize {
+.sheetwrite-ribbon-mode {
   margin-left: auto;
+  padding: 0 6px;
+  white-space: nowrap;
+}
+
+.sheetwrite-ribbon-mode[aria-pressed="true"] {
+  background: var(--sheetwrite-ribbon-hover);
+}
+
+.sheetwrite-ribbon-minimize {
+  margin-left: 0;
   padding: 0 8px;
 }
 
@@ -527,7 +555,7 @@
   border-color: var(--sheetwrite-ribbon-line);
 }
 
-.sheetwrite-ribbon :disabled {
+:is(.sheetwrite-ribbon, .sheetwrite-command-toolbar) :disabled {
   opacity: var(--sheetwrite-menu-disabled-opacity, 0.45);
   cursor: default;
 }
@@ -541,7 +569,8 @@
 
 /* Labels show beside small buttons in flow groups, never in dense rows. */
 .sheetwrite-ribbon-row .sheetwrite-ribbon-label,
-.sheetwrite-ribbon-group[data-size="small"] .sheetwrite-ribbon-label {
+.sheetwrite-ribbon-group[data-size="small"] .sheetwrite-ribbon-label,
+:is(.sheetwrite-command-toolbar, .sheetwrite-command-toolbar-overflow) .sheetwrite-ribbon-label {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -986,6 +1015,57 @@ textarea.sheetwrite-ribbon-field {
 /* A collapsed group's controls, lent to the popup, render at full size. */
 .sheetwrite-ribbon-group-popup > .sheetwrite-ribbon-group-body {
   min-height: 72px;
+}
+
+/* Compact changes only the panel layout. A borrowed group keeps its full
+   layout in a popup, so no controls or their keyboard state are recreated. */
+.sheetwrite-ribbon[data-mode="compact"] .sheetwrite-ribbon-panel {
+  height: 36px;
+  padding-bottom: 4px;
+}
+
+.sheetwrite-ribbon[data-mode="compact"] .sheetwrite-ribbon-group {
+  display: flex;
+  align-items: center;
+}
+
+.sheetwrite-ribbon[data-mode="compact"] .sheetwrite-ribbon-group-label {
+  display: none;
+}
+
+.sheetwrite-ribbon[data-mode="compact"]
+  .sheetwrite-ribbon-group:not([data-size="collapsed"])
+  > .sheetwrite-ribbon-group-body {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 2px;
+}
+
+.sheetwrite-ribbon[data-mode="compact"]
+  .sheetwrite-ribbon-group
+  > .sheetwrite-ribbon-group-body
+  > .sheetwrite-ribbon-row {
+  display: contents;
+}
+
+.sheetwrite-ribbon[data-mode="compact"] .sheetwrite-ribbon-group-button[data-large] {
+  flex-direction: row;
+  align-items: center;
+  height: 24px;
+  min-width: 24px;
+  max-width: none;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
+.sheetwrite-ribbon[data-mode="compact"]
+  .sheetwrite-ribbon-group-button[data-large]
+  > .sheetwrite-ribbon-icon
+  > :is(svg, .sheetwrite-icon) {
+  --sheetwrite-icon-size: 16px;
+  width: 16px;
+  height: 16px;
 }
 
 /* The placement choice of Insert › PivotTable: radios in a borderless group. */

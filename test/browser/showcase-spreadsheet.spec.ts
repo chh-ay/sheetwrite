@@ -54,6 +54,7 @@ test("ribbon commands edit the workbook and AutoSum totals the ledger", async ({
 });
 
 test("narrowing the window folds ribbon groups, and widening restores them", async ({ page }) => {
+  await page.setViewportSize({ width: 1_600, height: 900 });
   await open(page);
   const editing = page.locator('.sheetwrite-ribbon-group[aria-label="Editing"]');
   await expect(editing).toHaveAttribute("data-size", "large");
@@ -86,4 +87,93 @@ test("the ribbon follows the site theme and the page fits a phone", async ({ pag
     ).toBe(true);
   }
   expect(backgrounds[0]).not.toBe(backgrounds[1]);
+});
+
+for (const mode of ["full", "compact"] as const) {
+  test(`${mode} ribbon keeps tab, menu and toggle keyboard semantics @portability`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1_600, height: 900 });
+    await open(page);
+    const ribbon = page.getByRole("region", { name: "Ribbon" });
+    const switcher = ribbon.getByRole("button", { name: "Compact ribbon" });
+    await expect(ribbon).toHaveAttribute("data-mode", "full");
+    if (mode === "compact") {
+      await switcher.focus();
+      await switcher.press("Space");
+    }
+    await expect(ribbon).toHaveAttribute("data-mode", mode);
+    await expect(switcher).toHaveAttribute("aria-pressed", String(mode === "compact"));
+
+    const home = ribbon.getByRole("tab", { name: "Home", exact: true });
+    await home.focus();
+    await home.press("ArrowRight");
+    const insert = ribbon.getByRole("tab", { name: "Insert", exact: true });
+    await expect(insert).toBeFocused();
+    await expect(insert).toHaveAttribute("aria-selected", "true");
+    await insert.press("Home");
+    await expect(home).toBeFocused();
+
+    await select(page, "B2");
+    const bold = ribbon.getByRole("button", { name: "Bold", exact: true });
+    const font = ribbon.getByRole("group", { name: "Font", exact: true });
+    if (!(await bold.isVisible())) {
+      await font.getByRole("button", { name: "Font", exact: true }).click();
+    }
+
+    await bold.focus();
+    await bold.press("Space");
+    await expect(bold).toHaveAttribute("aria-pressed", "true");
+    expect((await cell(page, "sales", 1, 1)).bold).toBe(true);
+
+    const options = page.getByRole("button", { name: "Borders options" });
+    await options.focus();
+    await options.press("ArrowDown");
+    const menu = page.getByRole("menu", { name: "Borders", exact: true });
+    const bottom = menu.getByRole("menuitem", { name: "Bottom Border", exact: true });
+    await expect(bottom).toBeFocused();
+    await bottom.press("ArrowDown");
+    const top = menu.getByRole("menuitem", { name: "Top Border", exact: true });
+    await expect(top).toBeFocused();
+    await top.press("Escape");
+    await expect(menu).not.toBeVisible();
+    await expect(options).toBeFocused();
+    await expect(options).toHaveAttribute("aria-expanded", "false");
+  });
+}
+
+test("automatic ribbon layout follows host width until the user chooses a mode", async ({
+  page,
+}) => {
+  // Wide enough that the showcase host is above the default compact width.
+  await page.setViewportSize({ width: 1_600, height: 900 });
+  await open(page);
+  const ribbon = page.getByRole("region", { name: "Ribbon" });
+  await expect(ribbon).toHaveAttribute("data-mode", "full");
+  const panel = ribbon.getByRole("tabpanel");
+  const fullHeight = await panel.evaluate((element) => element.getBoundingClientRect().height);
+
+  await page.getByRole("button", { name: "Narrow" }).click();
+  await expect(ribbon).toHaveAttribute("data-mode", "compact");
+  expect(await panel.evaluate((element) => element.getBoundingClientRect().height)).toBeLessThan(
+    fullHeight,
+  );
+  const rows = await ribbon
+    .locator('.sheetwrite-ribbon-group:not([data-size="collapsed"]) [data-command]')
+    .evaluateAll((elements) =>
+      elements.map((element) => {
+        const box = element.getBoundingClientRect();
+        return Math.round(box.top + box.height / 2);
+      }),
+    );
+  expect(rows.length).toBeGreaterThan(0);
+  expect(Math.max(...rows) - Math.min(...rows)).toBeLessThanOrEqual(2);
+
+  await page.getByRole("button", { name: "Wide" }).click();
+  await expect(ribbon).toHaveAttribute("data-mode", "full");
+  await ribbon.getByRole("button", { name: "Compact ribbon" }).click();
+  await expect(ribbon).toHaveAttribute("data-mode", "compact");
+  await page.getByRole("button", { name: "Narrow" }).click();
+  await page.getByRole("button", { name: "Wide" }).click();
+  await expect(ribbon).toHaveAttribute("data-mode", "compact");
 });

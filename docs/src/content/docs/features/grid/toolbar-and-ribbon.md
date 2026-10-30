@@ -1,9 +1,9 @@
 ---
 title: Toolbar and ribbon
-description: Show the built-in flat toolbar or the Excel-style ribbon, and drive host chrome from command state.
+description: Show the built-in toolbar or the Excel-style ribbon in a full or compact layout, all rendered from one command model, and drive host chrome from command state.
 ---
 
-Set `config` to show the built-in toolbar, or `config: { ribbon: true }` to show an Excel-style ribbon instead.
+Set `config` to show the built-in toolbar, or `config: { ribbon: true }` to show an Excel-style ribbon instead. The toolbar, the full ribbon and the compact ribbon render one command model: the same commands, glyphs, enabled and pressed state, keyboard behavior and accessible names.
 
 ```ts prelude="core" partial="requires a host and the Budget workbook shown in Full setup" title="Show the ribbon"
 const grid = createGrid(host, { workbook, config: { ribbon: true } });
@@ -105,6 +105,23 @@ Groups fold in Excel order. On Home, Editing folds first, then Cells, Number, Al
 
 Double-click a tab, or use the arrow at the right, to hide the panel and keep only the tab row. The grid takes the space back.
 
+### Compact ribbon
+
+The compact ribbon shows the selected tab's commands on one row, like Excel's simplified ribbon. It uses the same live controls as the full ribbon, so a value you type in a box and the selected tab stay when you switch.
+
+- The **Compact** button in the tab row switches between the full and the compact layout. It is a toggle button: `aria-pressed` tells screen readers which layout is on.
+- `ribbon: { mode: "compact" }` starts compact. `ribbon: { mode: "auto" }` uses compact while the ribbon is narrower than `compactWidth` (default 768 CSS pixels) and full otherwise. When the user picks a layout with the button, the ribbon keeps that layout at every width.
+- Groups that do not fit on the row fold into dropdown buttons, as in the full ribbon.
+
+```ts prelude="core" partial="requires a host and the Budget workbook shown in Full setup" title="Compact ribbon on narrow screens"
+const grid = createGrid(host, {
+  workbook,
+  config: { ribbon: { mode: "auto", compactWidth: 900 } },
+});
+```
+
+`compactWidth` must be a positive finite number; other values throw a `RangeError` when the grid is created or reconfigured.
+
 ### Keyboard
 
 | Key | Effect |
@@ -117,15 +134,15 @@ Double-click a tab, or use the arrow at the right, to hide the panel and keep on
 
 ### Loading
 
-The ribbon loads with `import()` as its own chunk, only when a grid asks for it. A grid without the ribbon does not download it; that is about 25 KB less minified JavaScript.
+The ribbon and the toolbar load with `import()` as their own chunk, only when a grid asks for one. A grid without chrome does not download it.
 
-- The grid reserves the ribbon's height while the chunk loads, so nothing moves when it arrives.
+- The grid reserves the chrome's height while the chunk loads, so nothing moves when it arrives.
 - A chunk that arrives after the chrome was rebuilt, or after the grid was destroyed, is dropped.
-- If the chunk fails to load, the grid shows the flat toolbar. The load error is still reported as an unhandled promise rejection; the host cannot catch it.
+- If the chunk fails to load, the grid gives the space back and shows no chrome. The load error is still reported as an unhandled promise rejection; the host cannot catch it.
 
 ### Ribbon outside the grid
 
-The composable shell mounts the same ribbon. Pass `ribbon: true` to `createSpreadsheetShell`, or call [`createRibbon`](/docs/api/core-shell/create-ribbon/) to place it yourself:
+The composable shell mounts the same ribbon. Pass `ribbon: true` (or a `RibbonConfig` object) to `createSpreadsheetShell`, or call [`createRibbon`](/docs/api/core-shell/create-ribbon/) to place it yourself:
 
 ```ts prelude="core" partial="requires a mounted grid and a ribbon host element" title="Place the ribbon yourself"
 import { createRibbon } from "@sheetwrite/core/shell";
@@ -144,45 +161,61 @@ ribbon.destroy();
 | `RibbonOptions` field | Effect |
 | --- | --- |
 | `focusGrid` | Returns keyboard focus to the grid after a pick or Escape. By default the host gets focus. |
-| `onHeightChange` | Called with the new height after the ribbon is minimized or expanded. |
+| `onHeightChange` | Called with the new height after the ribbon is minimized or expanded, or changes layout. |
+| `mode`, `compactWidth` | The initial layout, as in `GridConfig.ribbon`. |
+| `flags` | The [command flags](#command-flags) that choose commands. By default every command shows except Export. |
 
-The ribbon styles itself from the same `--sheetwrite-widget-*`, `--sheetwrite-toolbar-*` and `--sheetwrite-menu-*` properties as the toolbar, so light, dark and host themes apply.
+The ribbon and the toolbar style themselves from the same `--sheetwrite-widget-*`, `--sheetwrite-toolbar-*` and `--sheetwrite-menu-*` properties, so light, dark and host themes apply.
 
-## GridConfig (toolbar)
+## Toolbar
 
-Each flag toggles one control. When `config` is present, every flag except `export` and `ribbon` defaults to `true`. `toolbar: false` suppresses the toolbar entirely.
+The toolbar shows the ribbon's commands on one row, in ribbon order (Home, Insert, Data, View), with a separator between groups. Commands that do not fit move, in order, into a **More commands** button at the end of the row. It opens the remaining commands in a popup group, so every command stays reachable at any width.
 
 ```ts prelude="core" partial="requires surrounding host state" title="Toolbar flags"
-createGrid(host, { workbook, config: {} });                 // toolbar with the default controls
-createGrid(host, { workbook, config: { sort: false } });    // toolbar, no sort controls
-createGrid(host, { workbook, config: { export: true } });   // toolbar with CSV and XLSX buttons
+createGrid(host, { workbook, config: {} });                 // toolbar with the default commands
+createGrid(host, { workbook, config: { sort: false } });    // toolbar, no sort commands
+createGrid(host, { workbook, config: { export: true } });   // toolbar with Export CSV and Export XLSX
 createGrid(host, { workbook, config: { toolbar: false } }); // no toolbar
 createGrid(host, { workbook });                             // no toolbar (config omitted)
 ```
 
-| Flag | Type | Default | Control |
-| --- | --- | --- | --- |
-| `toolbar` | `boolean \| ToolbarItem[]` | `true`¹ | Master switch. `false` removes the toolbar. An item list replaces the default controls. |
-| `undo` | `boolean` | `true` | Undo / redo buttons (also bound to Ctrl+Z / Ctrl+Shift+Z). |
-| `bold` | `boolean` | `true` | Bold toggle. |
-| `italic` | `boolean` | `true` | Italic toggle. |
-| `align` | `boolean` | `true` | Left / center / right alignment. |
-| `textColor` | `boolean` | `true` | Text color picker. |
-| `fillColor` | `boolean` | `true` | Fill (background) color picker. |
-| `border` | `boolean` | `true` | Border control. |
-| `clearFormat` | `boolean` | `true` | Clear formatting. |
-| `merge` | `boolean` | `true` | Merge / unmerge selection. |
-| `sort` | `boolean` | `true` | Sort the selected column ascending / descending. |
-| `export` | `boolean` | `false` | CSV / XLSX export buttons. |
-| `ribbon` | `boolean` | `false` | Show the Excel-style ribbon instead of the flat toolbar. |
+| Key | Effect |
+| --- | --- |
+| Tab | Reaches the toolbar controls. The toolbar is first in the host. |
+| Left / Right, Home / End | Move between controls. A text box keeps these keys for its caret. |
+| Arrow Down | Opens a menu or split button's list, as in the ribbon. |
+| Escape | Closes a popup, or returns focus to the grid. |
+| Ctrl/Cmd shortcuts | Still reach the grid. |
+
+Each command keeps its accessible name, and its tooltip adds the keyboard shortcut when one is bound (for example "Undo (Ctrl+Z)"). Every command element has a `data-command` attribute with the command ID, for host styles and tests.
+
+### Command flags
+
+These `GridConfig` fields ([`CommandFlags`](/docs/api/core/command-flags/)) choose built-in commands in every renderer: the toolbar, the full ribbon and the compact ribbon. When `config` is present, every flag except `export` defaults to `true`.
+
+| Flag | Default | Commands |
+| --- | --- | --- |
+| `toolbar` | `true`¹ | Master switch. `false` removes the toolbar and the ribbon. An item list replaces the default commands. |
+| `undo` | `true` | Undo and Redo (also bound to Ctrl+Z / Ctrl+Shift+Z). |
+| `bold` | `true` | Bold. Underline and Strikethrough show while `bold` or `italic` is on. |
+| `italic` | `true` | Italic. |
+| `align` | `true` | Align Left, Center, Align Right, and Top, Middle and Bottom Align. |
+| `textColor` | `true` | Font Color palette. |
+| `fillColor` | `true` | Fill Color palette. |
+| `border` | `true` | Borders. |
+| `clearFormat` | `true` | Clear (Clear All, Clear Formats, Clear Contents). |
+| `merge` | `true` | Merge & Center (also Merge Cells and Unmerge Cells). |
+| `sort` | `true` | Sort & Filter, Sort A to Z and Sort Z to A. |
+| `export` | `false` | Export CSV and Export XLSX, in the Data tab's Export group. |
+| `ribbon` | `false` | Show the ribbon instead of the toolbar. See [Compact ribbon](#compact-ribbon). |
 
 ¹ "Default `true`" means: when you supply a `config` object at all. With no `config` there is no toolbar.
 
-The underline and strikethrough toggles show when `bold` or `italic` is on.
+The shell's `createToolbar` shows Export by default; pass `flags` to change it.
 
-### Toolbar actions
+### Custom toolbar items
 
-Every control acts on the current selection; see [Interaction → Selection model](/docs/features/grid/selection-and-keyboard/#selection-model). A custom `toolbar: ToolbarItem[]` list names built-in actions, separators, or `onClick(grid)` callbacks:
+A custom `toolbar: ToolbarItem[]` list names built-in actions, separators, or `onClick(grid)` callbacks. Every control acts on the current selection; see [Interaction → Selection model](/docs/features/grid/selection-and-keyboard/#selection-model).
 
 ```ts prelude="core" partial="requires surrounding host state" title="Custom toolbar items"
 createGrid(host, {
@@ -199,7 +232,21 @@ createGrid(host, {
 });
 ```
 
-Built-in action names: `bold`, `italic`, `underline`, `strikethrough`, `alignLeft`, `alignCenter`, `alignRight`, `alignTop`, `alignMiddle`, `alignBottom`, `wrap`, `textColor`, `fillColor`, `border`, `clearFormat`, `merge`, `unmerge`, `sortAsc`, `sortDesc`, `exportCsv`, `exportXlsx`, `undo`, `redo` and `separator`.
+Built-in action names: `bold`, `italic`, `underline`, `strikethrough`, `alignLeft`, `alignCenter`, `alignRight`, `alignTop`, `alignMiddle`, `alignBottom`, `wrap`, `textColor`, `fillColor`, `border`, `clearFormat`, `merge`, `unmerge`, `sortAsc`, `sortDesc`, `exportCsv`, `exportXlsx`, `undo`, `redo` and `separator`. A built-in action renders the ribbon's command with that ID; `title` and `icon` replace its name and glyph in that toolbar only.
+
+### Options that changed in 0.7
+
+Every toolbar option keeps working. These parts render differently because the toolbar now uses the ribbon's commands:
+
+| Before 0.7 | Now | Use instead |
+| --- | --- | --- |
+| `textColor` and `fillColor` were native color inputs. | Font Color and Fill Color are palette split buttons. | The palette, or `grid.actions.setTextColor` / `setFillColor` from host chrome. |
+| `border` toggled all borders. | Borders is a split button: the face adds a bottom border and the menu has every preset. | Pick "All Borders" from the menu, or call `grid.actions.setBorders("all")`. |
+| `clearFormat` was one button. | It shows the Clear menu. | Pick "Clear Formats", or call `grid.actions.clearFormat()`. |
+| `merge` and `unmerge` were two buttons. | Both show one Merge & Center menu. | Pick "Merge Cells" or "Unmerge Cells". |
+| Controls had `.sheetwrite-tb-<action>` classes. | Controls use the ribbon's classes. | Select `[data-command="<id>"]`. |
+| The toolbar mounted synchronously with the grid. | It loads with the ribbon's chunk. | Wait for the toolbar before you query its elements. |
+| A ribbon chunk that failed to load fell back to the flat toolbar. | The toolbar shares that chunk, so the grid shows no chrome. | Handle the reported load error. The shell still falls back to its toolbar. |
 
 ### Export buttons
 
@@ -240,7 +287,7 @@ stop();
 | `disabled` | Accounts for read-only mode, empty selections, and undo/redo history. |
 | `activity` | `"inactive"`, `"active"` or `"mixed"` across the current selection, for formatting commands. |
 
-The built-in toolbar uses the same contract, including native `disabled` and `aria-pressed="mixed"`.
+The built-in toolbar and ribbon use the same contract, including native `disabled` and `aria-pressed="mixed"`.
 
 ## Feature flags
 
@@ -250,7 +297,7 @@ These `GridConfig` fields enable behavior outside the toolbar row:
 | --- | --- | --- | --- |
 | `find` | `boolean` | `true` | Built-in **Ctrl+F** search box, next/previous controls, and live match count. See [Search](/docs/features/grid/search/). |
 | `contextMenu` | `boolean \| ContextMenuItems` | `true` | Built-in right-click menu, disabled menu, static readonly rows, or a context-aware row factory. See [Context menu](/docs/features/grid/context-menu/). |
-| `icons` | `Partial<Record<ToolbarActionName, ToolbarIcon>>` | `undefined` | Built-in toolbar icon overrides. Strings render as text; a DOM `Node` or `() => Node` supports SVG/HTML without `innerHTML`. |
+| `icons` | `IconOverrides` | `undefined` | Built-in command glyph overrides, in the toolbar, ribbon, ribbon menus and context menu. Strings render as text; a DOM `Node` or `() => Node` supports SVG/HTML without `innerHTML`. |
 | `tabs` | `boolean` | `true` | Bottom sheet-tab bar for multi-sheet workbooks. |
 | `keyboard` | `boolean \| KeyboardOptions \| function` | `true` | Built-in key bindings. See [Interaction → Keyboard navigation](/docs/features/grid/selection-and-keyboard/#keyboard-navigation). |
 
@@ -258,8 +305,7 @@ Undo, redo and find are keyboard-driven and work without the toolbar: **Ctrl+Z**
 
 ## Edge cases and limits
 
-- The per-control flags apply to the flat toolbar only, not to the ribbon.
-- A custom `toolbar: [...]` item list still renders the flat toolbar, even with `ribbon: true`.
+- A custom `toolbar: [...]` item list still renders the toolbar, even with `ribbon: true`.
 - `toolbar: false` removes both the toolbar and the ribbon.
 - Command-state aggregation is bounded. Very large selections conservatively report `mixed` instead of forcing an unbounded cell walk.
 - `grid.setConfig(config)` reconfigures the built-in chrome without replacing the grid or clearing selection and history.

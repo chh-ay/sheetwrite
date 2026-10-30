@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
-import { DEFAULT_THEME, GridImpl, initSheetwrite } from "../src/grid.js";
+import { GridImpl, initSheetwrite } from "../src/grid.js";
 import {
   createFormulaBar,
   createNameBox,
@@ -140,41 +140,28 @@ describe("createToolbar", () => {
     store.dispose();
   });
 
-  it("shows the theme's text and fill colors until the user picks one", () => {
+  it("shows the ribbon's commands with the default flags, Export included", () => {
     const { grid, store, host } = makeGrid();
-    grid.setTheme({ fg: "#123", bg: "rgb(250, 240, 230)" });
-    const piece = createToolbar(host, grid, {
-      items: [{ action: "textColor" }, { action: "fillColor" }],
-    });
-    const [text, fill] = [...piece.element.querySelectorAll<HTMLInputElement>("input")];
-    // An unseeded color input shows black, which is wrong for an unstyled fill.
-    expect(text!.value).toBe("#112233");
-    expect(fill!.value).toBe("#faf0e6");
+    const piece = createToolbar(host, grid, { flags: { export: true, italic: false } });
+    const command = (id: string) => piece.element.querySelector(`[data-command="${id}"]`);
 
-    // A theme switch (for example to dark) updates swatches the user has not used.
-    grid.setTheme({ fg: "#e5e7eb", bg: "#0b1220" });
-    expect(text!.value).toBe("#e5e7eb");
-    expect(fill!.value).toBe("#0b1220");
-
-    // Once the user picks a fill, that choice stays when the theme changes.
-    const addr = { sheet: "s1", row: 1, col: 0 };
-    grid.setSelection({ kind: "cell", addr });
-    fill!.value = "#ff0000";
-    fill!.dispatchEvent(new Event("change"));
-    fill!.dispatchEvent(new Event("blur"));
-    expect(store.getCell(addr).style.backgroundColor).toBe("#ff0000");
-    grid.replaceTheme(undefined);
-    expect(fill!.value).toBe("#ff0000");
-    // The text swatch was never picked, so it follows the reset to the default theme.
-    expect(text!.value).toBe(DEFAULT_THEME.fg);
+    // Commands from every ribbon tab, in ribbon order, each once.
+    for (const id of ["undo", "paste", "fontSize", "textColor", "insert", "chart", "zoom"]) {
+      expect(command(id), id).not.toBeNull();
+    }
+    expect(piece.element.querySelectorAll('[data-command="insert"]')).toHaveLength(1);
+    expect(command("exportCsv")).not.toBeNull();
+    expect(command("italic")).toBeNull();
+    // Underline shows while either Bold or Italic is on.
+    expect(command("underline")).not.toBeNull();
 
     piece.destroy();
     grid.destroy();
     store.dispose();
   });
+
   it("moves keyboard focus within toolbar bounds and ignores unrelated keys", () => {
-    const host = mountHost();
-    const grid = {} as Grid;
+    const { grid, store, host } = makeGrid();
     const piece = createToolbar(host, grid, {
       label: "Editing",
       items: [
@@ -205,7 +192,8 @@ describe("createToolbar", () => {
       expect(piece.element.getAttribute("aria-label")).toBe("Editing");
     } finally {
       piece.destroy();
-      host.remove();
+      grid.destroy();
+      store.dispose();
     }
   });
 });

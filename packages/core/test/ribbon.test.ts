@@ -1,9 +1,10 @@
 import { afterEach, beforeAll, beforeEach, expect, it } from "bun:test";
 
 import { GridImpl, initSheetwrite } from "../src/grid.js";
+import { createToolbar } from "../src/shell.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import type { IconOverrides, Workbook } from "../src/types.js";
+import type { GridConfig, IconOverrides, Workbook } from "../src/types.js";
 
 let restore: () => void;
 const grids: GridImpl[] = [];
@@ -33,7 +34,7 @@ async function ribbonMounted(host: HTMLElement): Promise<void> {
   if (!host.querySelector(".sheetwrite-ribbon")) throw new Error("the ribbon did not mount");
 }
 
-async function setup(readOnly = false, icons?: IconOverrides) {
+async function setup(readOnly = false, icons?: IconOverrides, ribbon: GridConfig["ribbon"] = true) {
   const workbook: Workbook = {
     activeSheet: "s1",
     sheets: [
@@ -55,7 +56,7 @@ async function setup(readOnly = false, icons?: IconOverrides) {
   const host = document.createElement("div");
   Object.defineProperties(host, { clientWidth: { value: 900 }, clientHeight: { value: 500 } });
   document.body.appendChild(host);
-  const config = icons === undefined ? { ribbon: true } : { ribbon: true, icons };
+  const config: GridConfig = { ribbon, ...(icons === undefined ? {} : { icons }) };
   const grid = new GridImpl(host, { workbook, readOnly, config }, store);
   grids.push(grid);
   await ribbonMounted(host);
@@ -91,6 +92,81 @@ async function setup(readOnly = false, icons?: IconOverrides) {
     target.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 0 }));
   return { grid, host, control, openTab, select, cell, key, press };
 }
+
+it.each(["full", "compact"] as const)(
+  "%s ribbon runs commands and follows selection, history and read-only state",
+  async (mode) => {
+    const { grid, host, control, select, cell, press } = await setup(false, undefined, { mode });
+    select(0, 0);
+    const undo = control("Undo", ".sheetwrite-ribbon-group-body");
+    const bold = control("Bold");
+    // A command runs through the async action feedback, which settles in microtasks.
+    const settle = async (): Promise<void> => {
+      for (let turn = 0; turn < 8; turn += 1) await Promise.resolve();
+    };
+
+    expect(host.querySelector(".sheetwrite-ribbon")?.getAttribute("data-mode")).toBe(mode);
+    expect(undo.disabled).toBe(true);
+    expect(bold.getAttribute("aria-pressed")).toBe("false");
+    press(bold);
+    await settle();
+    expect(cell(0, 0).style.bold).toBe(true);
+    expect(bold.getAttribute("aria-pressed")).toBe("true");
+    expect(undo.disabled).toBe(false);
+
+    press(undo);
+    await settle();
+    expect(cell(0, 0).style.bold).not.toBe(true);
+    select(1, 0);
+    expect(bold.getAttribute("aria-pressed")).toBe("false");
+    grid.setReadOnly(true);
+    expect(bold.disabled).toBe(true);
+    expect(control("Find").disabled).toBe(false);
+  },
+);
+
+it("switches layout without losing a value-box draft or the active tab", async () => {
+  const { host, control, openTab, press } = await setup();
+  const size = control<HTMLInputElement>("Font Size");
+  size.value = "14";
+  press(control("Compact ribbon"));
+
+  expect(control<HTMLInputElement>("Font Size").value).toBe("14");
+  expect(control("Compact ribbon").getAttribute("aria-pressed")).toBe("true");
+  openTab("View");
+  press(control("Compact ribbon"));
+  expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("View");
+  expect(control("Compact ribbon").getAttribute("aria-pressed")).toBe("false");
+});
+
+it("renders the same commands as the toolbar for the same command flags", async () => {
+  const flags = { export: true, italic: false, sort: false };
+  const { grid, host, openTab } = await setup(false, undefined, { mode: "compact" });
+  grid.setConfig({ ribbon: true, ...flags });
+  await ribbonMounted(host);
+
+  const ribbonCommands = new Set<string>();
+  for (const tab of ["Home", "Insert", "Data", "View"]) {
+    openTab(tab);
+    for (const element of host.querySelectorAll<HTMLElement>(".sheetwrite-ribbon [data-command]")) {
+      ribbonCommands.add(element.dataset.command ?? "");
+    }
+  }
+
+  const toolbarHost = document.createElement("div");
+  document.body.appendChild(toolbarHost);
+  const toolbar = createToolbar(toolbarHost, grid, { flags });
+  const toolbarCommands = [...toolbar.element.querySelectorAll<HTMLElement>("[data-command]")].map(
+    (element) => element.dataset.command ?? "",
+  );
+  toolbar.destroy();
+
+  expect(new Set(toolbarCommands)).toEqual(ribbonCommands);
+  expect(toolbarCommands).toHaveLength(ribbonCommands.size);
+  expect(ribbonCommands.has("exportXlsx")).toBe(true);
+  expect(ribbonCommands.has("italic")).toBe(false);
+  expect(ribbonCommands.has("sortAsc")).toBe(false);
+});
 
 it("shows Bold pressed, unpressed or mixed for the selection", async () => {
   const { grid, control, select } = await setup();

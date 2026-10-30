@@ -697,8 +697,10 @@ describe("observable command state", () => {
     const store = new SheetwriteStore(workbook, makeColumnarData(2));
     const host = mountHost();
     const grid = new GridImpl(host, { workbook, config: { toolbar: true } }, store);
-    const bold = host.querySelector<HTMLButtonElement>(".sheetwrite-tb-bold");
-    const undo = host.querySelector<HTMLButtonElement>(".sheetwrite-tb-undo");
+    // The toolbar loads lazily; awaiting its module runs the grid's mount first.
+    await import("../src/ribbon/command-toolbar.js");
+    const bold = host.querySelector<HTMLButtonElement>('[data-command="bold"]');
+    const undo = host.querySelector<HTMLButtonElement>('[data-command="undo"]');
     if (!bold || !undo) throw new Error("toolbar controls missing");
 
     expect(grid.getCommandState("bold")).toEqual({ disabled: true, activity: "inactive" });

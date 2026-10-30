@@ -5,10 +5,11 @@ description: "ToolbarItem interface in @sheetwrite/core: Built-in, separator, or
 <!-- api-export:@sheetwrite/core|.|ToolbarItem -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Built-in, separator, or custom callback item in the grid toolbar.
+Built-in, separator, or custom callback item in the grid toolbar. A built-in
+`action` renders the same command, glyph and state as the ribbon.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L320"><code>packages/core/src/types/grid.ts#L320</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L323"><code>packages/core/src/types/grid.ts#L323</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>
@@ -45,7 +46,7 @@ icon?: ToolbarIcon;
 </details>
 
 <details class="api-member" id="toolbar-item-title" data-pagefind-weight="1">
-<summary><code>title</code> <span class="api-member-summary">Accessible tooltip.</span></summary>
+<summary><code>title</code> <span class="api-member-summary">Accessible name and tooltip; replaces the built-in command's label.</span></summary>
 
 ```ts generated
 title?: string;
