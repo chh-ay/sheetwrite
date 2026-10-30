@@ -78,31 +78,31 @@ function DocsOverview() {
 
         <section aria-labelledby="new-in-release">
           <div className="sw-doc-section-head">
-            <h2 id="new-in-release">New in 0.5.4</h2>
-            <Link to="/docs/$/" params={{ _splat: "releases/0.5.4" }}>
+            <h2 id="new-in-release">New in 0.6.0</h2>
+            <Link to="/docs/$/" params={{ _splat: "releases/0.6.0" }}>
               Read the release notes →
             </Link>
           </div>
           <div className="sw-doc-destinations">
-            <Link to="/docs/$/" params={{ _splat: "releases/0.5.4" }} hash="source-map-references">
-              <span className="sw-doc-eyebrow">Packages</span>
+            <Link to="/docs/$/" params={{ _splat: "releases/0.6.0" }} hash="charts">
+              <span className="sw-doc-eyebrow">Charts</span>
               <strong>
-                No missing source maps <span aria-hidden="true">→</span>
+                Charts in the grid <span aria-hidden="true">→</span>
               </strong>
-              <span>Debuggers no longer try to load map files the packages do not include.</span>
+              <span>
+                Seven chart kinds that follow their cell ranges, with an optional SVG renderer.
+              </span>
             </Link>
-            <Link
-              to="/docs/$/"
-              params={{ _splat: "releases/0.5.3" }}
-              hash="readable-published-javascript"
-            >
-              <span className="sw-doc-eyebrow">0.5.3</span>
+            <Link to="/docs/$/" params={{ _splat: "releases/0.6.0" }} hash="pivot-tables">
+              <span className="sw-doc-eyebrow">Analysis</span>
               <strong>
-                Readable package code <span aria-hidden="true">→</span>
+                Pivot tables <span aria-hidden="true">→</span>
               </strong>
-              <span>Stack traces point to real lines, and you can debug in node_modules.</span>
+              <span>
+                The full engine calculates them, and their field list opens beside the grid.
+              </span>
             </Link>
-            <Link to="/docs/$/" params={{ _splat: "releases/0.5.4" }} hash="upgrade-checklist">
+            <Link to="/docs/$/" params={{ _splat: "releases/0.6.0" }} hash="upgrade-checklist">
               <span className="sw-doc-eyebrow">Upgrade</span>
               <strong>
                 Upgrade checklist <span aria-hidden="true">→</span>

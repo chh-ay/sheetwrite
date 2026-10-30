@@ -9,8 +9,15 @@ results, and the steps to upgrade.
 
 <ol class="sw-release-list">
 <li>
+<a class="sw-release-list__card" href="/docs/releases/0.6.0/">
+<span class="sw-release-list__meta"><strong>0.6.0</strong><time datetime="2026-10-30">Oct 30, 2026</time><span class="sw-release-list__latest">Latest</span></span>
+<span class="sw-release-list__title">Charts and pivot tables</span>
+<span class="sw-release-list__points"><span>Charts with an optional SVG renderer</span><span>Pivot tables in the full engine</span><span>Reference operators, iterative calculation and the ribbon</span></span>
+</a>
+</li>
+<li>
 <a class="sw-release-list__card" href="/docs/releases/0.5.4/">
-<span class="sw-release-list__meta"><strong>0.5.4</strong><time datetime="2026-10-24">Oct 24, 2026</time><span class="sw-release-list__latest">Latest</span></span>
+<span class="sw-release-list__meta"><strong>0.5.4</strong><time datetime="2026-10-24">Oct 24, 2026</time></span>
 <span class="sw-release-list__title">No missing source maps</span>
 <span class="sw-release-list__points"><span>No references to unpublished source map files</span><span>Size charts in the release notes</span><span>All packages and the engine crate at one version</span></span>
 </a>
