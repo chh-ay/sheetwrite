@@ -125,6 +125,20 @@ it.each(["full", "compact"] as const)(
   },
 );
 
+it("keeps only tabs in the tablist and the layout buttons beside it", async () => {
+  const { host, control } = await setup();
+  const tablist = host.querySelector('.sheetwrite-ribbon [role="tablist"]');
+  if (tablist === null) throw new Error("no ribbon tablist");
+
+  const roles = [...tablist.children].map((child) => child.getAttribute("role"));
+  expect(roles).toEqual(["tab", "tab", "tab", "tab"]);
+  for (const label of ["Compact ribbon", "Collapse the ribbon"]) {
+    const button = control(label);
+    expect(tablist.contains(button), label).toBe(false);
+    expect(button.parentElement).toBe(tablist.parentElement);
+  }
+});
+
 it("switches layout without losing a value-box draft or the active tab", async () => {
   const { host, control, openTab, press } = await setup();
   const size = control<HTMLInputElement>("Font Size");

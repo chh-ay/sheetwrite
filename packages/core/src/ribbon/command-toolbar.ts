@@ -2,6 +2,7 @@
 // glyphs, state and keyboard. Commands that do not fit move, in order, into a
 // "More commands" popup, so every command stays reachable at any width.
 
+import type { IconName } from "../icons/icon-names.js";
 import { iconContentNode, iconNode } from "../icons/resolve.js";
 import type {
   CommandFlags,
@@ -42,14 +43,43 @@ export interface CommandToolbarOptions {
 }
 
 /**
- * Legacy toolbar actions that are items of a registry menu. A custom toolbar
- * that names one gets a one-click button for that exact item, as before 0.7.
- * Every other `ToolbarActionName` is the id of a registry command.
+ * Legacy toolbar actions that were one-click buttons before 0.7 and are now
+ * part of a registry menu or split button. A custom toolbar that names one
+ * keeps that one-click button; `command` lends it the registry command's
+ * availability. Every other `ToolbarActionName` is the id of a registry command.
  */
-const ACTION_COMMANDS: Partial<Record<ToolbarActionName, string>> = {
-  clearFormat: "clear",
-  merge: "mergeAndCenter",
-  unmerge: "mergeAndCenter",
+interface OneClickAction {
+  readonly command: string;
+  readonly label: string;
+  readonly icon: IconName;
+  readonly run: (grid: Grid) => unknown;
+}
+
+const ONE_CLICK_ACTIONS: Partial<Record<ToolbarActionName, OneClickAction>> = {
+  border: {
+    command: "border",
+    label: "Border",
+    icon: "border",
+    run: (grid) => grid.actions.toggleBorder(),
+  },
+  clearFormat: {
+    command: "clear",
+    label: "Clear Formats",
+    icon: "clearFormat",
+    run: (grid) => grid.actions.clearFormat(),
+  },
+  merge: {
+    command: "mergeAndCenter",
+    label: "Merge Cells",
+    icon: "merge",
+    run: (grid) => grid.actions.merge(),
+  },
+  unmerge: {
+    command: "mergeAndCenter",
+    label: "Unmerge Cells",
+    icon: "unmerge",
+    run: (grid) => grid.actions.unmerge(),
+  },
 };
 
 type ToolbarEntry =
@@ -62,8 +92,7 @@ type ToolbarEntry =
       readonly spec?: RibbonControlSpec;
     };
 
-function registryCommand(action: ToolbarActionName): RibbonControlSpec | undefined {
-  const id = ACTION_COMMANDS[action] ?? action;
+function registryCommand(id: string): RibbonControlSpec | undefined {
   return commandGroups(RIBBON_TABS)
     .flat()
     .find((spec) => spec.id === id);
@@ -88,21 +117,17 @@ function customEntries(items: readonly ToolbarItem[]): ToolbarEntry[] {
       continue;
     }
 
-    const spec = item.action === undefined ? undefined : registryCommand(item.action);
-    const menuItem =
-      spec?.kind === "menu" && item.action !== undefined && item.action in ACTION_COMMANDS
-        ? spec.items.find((entry) => entry.icon === item.action)
-        : undefined;
-    const onClick =
-      item.onClick ??
-      (menuItem === undefined ? undefined : (grid: Grid) => void menuItem.run(grid));
+    const oneClick = item.action === undefined ? undefined : ONE_CLICK_ACTIONS[item.action];
+    const spec =
+      item.action === undefined ? undefined : registryCommand(oneClick?.command ?? item.action);
+    const onClick = item.onClick ?? oneClick?.run;
     if (onClick !== undefined) {
-      // A menu item keeps its own name and glyph unless the item overrides them.
+      // A one-click action keeps its own name and glyph unless the item overrides them.
       const named =
-        menuItem === undefined ? item : { ...item, title: item.title ?? menuItem.label };
+        oneClick === undefined ? item : { ...item, title: item.title ?? oneClick.label };
       const shown =
-        spec !== undefined && menuItem?.icon !== undefined && spec.kind === "menu"
-          ? { ...spec, icon: menuItem.icon }
+        spec !== undefined && oneClick !== undefined && spec.kind !== "zoom"
+          ? { ...spec, icon: oneClick.icon }
           : spec;
       entries.push(
         shown === undefined

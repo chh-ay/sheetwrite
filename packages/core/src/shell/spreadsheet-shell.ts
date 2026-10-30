@@ -6,7 +6,11 @@
 
 import { createGridController, type GridController } from "../grid-controller.js";
 import { DEFAULT_THEME } from "../grid.js";
-import { assertRibbonConfig, RIBBON_EXPANDED_HEIGHT } from "../ribbon/ribbon-metrics.js";
+import {
+  assertRibbonConfig,
+  RIBBON_EXPANDED_HEIGHT,
+  TOOLBAR_HEIGHT,
+} from "../ribbon/ribbon-metrics.js";
 import { sheetNameKey } from "../sheet-name.js";
 import { SheetTabs } from "../sheet-tabs.js";
 import type { Selection, SheetId } from "../types/coordinates.js";
@@ -24,7 +28,6 @@ import type { ChangeEvent } from "../types/transaction.js";
 import { seedWidgetTheme } from "../widget-theme.js";
 import { createFormulaBar, createNameBox, type ShellPiece } from "./formula-controls.js";
 import { createSelectionStatus } from "./selection-status.js";
-import { createToolbar } from "./toolbar-factory.js";
 
 interface ShellChromeOptions {
   readonly focusGrid: () => void;
@@ -33,48 +36,35 @@ interface ShellChromeOptions {
   readonly icons: IconOverrides | undefined;
 }
 
-function mountToolbar(host: HTMLElement, grid: Grid, chrome: ShellChromeOptions): ShellPiece {
-  return createToolbar(host, grid, {
-    focusGrid: chrome.focusGrid,
-    flags: chrome.flags,
-    ...(chrome.items === undefined ? {} : { items: chrome.items }),
-    ...(chrome.icons === undefined ? {} : { icons: chrome.icons }),
-  });
-}
-
 /**
- * The ribbon class loads as its own chunk. Its row keeps the ribbon's height
- * meanwhile, so the grid does not move when it arrives; if the chunk fails,
- * the toolbar renders the same commands in its place and the error is still
- * reported.
+ * Mount chrome from its own chunk, so a shell downloads the command model only
+ * when it shows chrome, and never at module load. The row keeps the chrome's
+ * height meanwhile, so the grid does not move when it arrives. A chunk that
+ * arrives after destroy is dropped. If the chunk fails, `fallback` (when
+ * given) takes its place and the error is still reported.
  */
-function mountRibbonWhenLoaded(
+function mountWhenLoaded(
   host: HTMLElement,
-  grid: Grid,
-  chrome: ShellChromeOptions,
-  layout: RibbonConfig,
+  reservedHeight: number,
+  load: () => Promise<() => ShellPiece>,
+  fallback?: () => ShellPiece,
 ): ShellPiece {
   let piece: ShellPiece | null = null;
   let destroyed = false;
-  host.style.minHeight = `${RIBBON_EXPANDED_HEIGHT}px`;
+  host.style.minHeight = `${reservedHeight}px`;
 
-  void import("./ribbon-factory.js").then(
-    ({ createRibbon }) => {
+  void load().then(
+    (mount) => {
       if (destroyed) return;
 
       host.style.minHeight = "";
-      piece = createRibbon(host, grid, {
-        focusGrid: chrome.focusGrid,
-        flags: chrome.flags,
-        ...layout,
-        ...(chrome.icons === undefined ? {} : { icons: chrome.icons }),
-      });
+      piece = mount();
     },
     (error: unknown) => {
       if (destroyed) return;
 
       host.style.minHeight = "";
-      piece = mountToolbar(host, grid, chrome);
+      if (fallback !== undefined) piece = fallback();
       throw error;
     },
   );
@@ -86,6 +76,43 @@ function mountRibbonWhenLoaded(
       piece?.destroy();
     },
   };
+}
+
+function mountToolbar(host: HTMLElement, grid: Grid, chrome: ShellChromeOptions): ShellPiece {
+  return mountWhenLoaded(host, TOOLBAR_HEIGHT, async () => {
+    const { createToolbar } = await import("./toolbar-factory.js");
+    return () =>
+      createToolbar(host, grid, {
+        focusGrid: chrome.focusGrid,
+        flags: chrome.flags,
+        ...(chrome.items === undefined ? {} : { items: chrome.items }),
+        ...(chrome.icons === undefined ? {} : { icons: chrome.icons }),
+      });
+  });
+}
+
+/** The ribbon renders the same commands as the toolbar, which replaces it if its chunk fails. */
+function mountRibbon(
+  host: HTMLElement,
+  grid: Grid,
+  chrome: ShellChromeOptions,
+  layout: RibbonConfig,
+): ShellPiece {
+  return mountWhenLoaded(
+    host,
+    RIBBON_EXPANDED_HEIGHT,
+    async () => {
+      const { createRibbon } = await import("./ribbon-factory.js");
+      return () =>
+        createRibbon(host, grid, {
+          focusGrid: chrome.focusGrid,
+          flags: chrome.flags,
+          ...layout,
+          ...(chrome.icons === undefined ? {} : { icons: chrome.icons }),
+        });
+    },
+    () => mountToolbar(host, grid, chrome),
+  );
 }
 
 /** Host elements and feature options used to create a spreadsheet shell. */
@@ -201,7 +228,7 @@ export function createSpreadsheetShell(
   const pieces: ShellPiece[] = [];
   pieces.push(
     options.ribbon
-      ? mountRibbonWhenLoaded(
+      ? mountRibbon(
           toolbarRow,
           grid,
           { ...chrome, flags: gridConfig },

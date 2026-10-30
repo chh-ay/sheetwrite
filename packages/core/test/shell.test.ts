@@ -160,10 +160,15 @@ describe("createToolbar", () => {
     store.dispose();
   });
 
-  it("keeps one-click merge, unmerge and clear-format buttons in custom toolbars", async () => {
+  it("keeps one-click border, merge, unmerge and clear-format buttons in custom toolbars", async () => {
     const { grid, store, host } = makeGrid();
     const piece = createToolbar(host, grid, {
-      items: [{ action: "merge" }, { action: "unmerge" }, { action: "clearFormat" }],
+      items: [
+        { action: "border" },
+        { action: "merge" },
+        { action: "unmerge" },
+        { action: "clearFormat" },
+      ],
     });
     const click = async (action: string): Promise<void> => {
       const button = piece.element.querySelector<HTMLButtonElement>(`[data-command="${action}"]`);
@@ -175,6 +180,10 @@ describe("createToolbar", () => {
     grid.setSelection({ kind: "range", range });
     grid.styleRange(range, { bold: true });
 
+    await click("border");
+    // The pre-0.7 one-click toggle: an all-sides border on every selected cell.
+    expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).style.border?.all).toBeDefined();
+    expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).style.border?.all).toBeDefined();
     await click("merge");
     expect(grid.store.getWorkbook().sheets[0]?.merges ?? []).toHaveLength(1);
     await click("unmerge");
@@ -192,9 +201,9 @@ describe("createToolbar", () => {
     const piece = createToolbar(host, grid, {
       label: "Editing",
       items: [
-        { onClick: () => {}, title: "One" },
-        { onClick: () => {}, title: "Two" },
-        { onClick: () => {}, title: "Three" },
+        { onClick: () => { }, title: "One" },
+        { onClick: () => { }, title: "Two" },
+        { onClick: () => { }, title: "Three" },
       ],
     });
     try {
@@ -218,6 +227,49 @@ describe("createToolbar", () => {
       expect(piece.element.getAttribute("role")).toBe("toolbar");
       expect(piece.element.getAttribute("aria-label")).toBe("Editing");
     } finally {
+      piece.destroy();
+      grid.destroy();
+      store.dispose();
+    }
+  });
+
+  it("moves arrow focus past disabled controls and combo arrows", () => {
+    const { grid, store, host } = makeGrid();
+    const piece = createToolbar(host, grid, {
+      items: [
+        { onClick: () => { }, title: "One" },
+        { action: "undo" },
+        { onClick: () => { }, title: "Two" },
+      ],
+    });
+    const fullPiece = createToolbar(host, grid);
+    const key = (name: string): void => {
+      document.activeElement?.dispatchEvent(
+        new KeyboardEvent("keydown", { key: name, bubbles: true, cancelable: true }),
+      );
+    };
+    try {
+      grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
+      const [one, undo, two] = [...piece.element.querySelectorAll<HTMLButtonElement>("button")];
+      if (one === undefined || undo === undefined || two === undefined) {
+        throw new Error("custom toolbar buttons missing");
+      }
+      // A fresh grid has no history, so Undo is disabled between two enabled buttons.
+      expect(undo.disabled).toBe(true);
+      one.focus();
+      key("ArrowRight");
+      expect(document.activeElement).toBe(two);
+      key("Home");
+      expect(document.activeElement).toBe(one);
+
+      // Combo arrows have tabIndex -1: Left from Grow lands in the size box.
+      fullPiece.element.querySelector<HTMLButtonElement>('[data-command="fontGrow"]')?.focus();
+      key("ArrowLeft");
+      const landed = document.activeElement;
+      if (!(landed instanceof HTMLInputElement)) throw new Error("focus did not reach a box");
+      expect(landed.closest<HTMLElement>("[data-command]")?.dataset.command).toBe("fontSize");
+    } finally {
+      fullPiece.destroy();
       piece.destroy();
       grid.destroy();
       store.dispose();
@@ -395,7 +447,7 @@ describe("createSelectionStatus", () => {
 });
 
 describe("createSpreadsheetShell", () => {
-  it("composes one grid with shell chrome and no duplicate built-ins", () => {
+  it("composes one grid with shell chrome and no duplicate built-ins", async () => {
     const host = mountHost();
     const workbook = multiSheetWorkbook();
     const ready: Grid[] = [];
@@ -406,6 +458,9 @@ describe("createSpreadsheetShell", () => {
     });
 
     expect(ready).toEqual([shell.grid]);
+    // The shell toolbar loads lazily: wait for its module, then for the mount callback.
+    await import("../src/shell/toolbar-factory.js");
+    for (let turn = 0; turn < 8; turn += 1) await Promise.resolve();
     // One toolbar and one tab list: the grid's own built-ins are suppressed.
     expect(host.querySelectorAll('[role="toolbar"]')).toHaveLength(1);
     expect(host.querySelectorAll('[role="tablist"]')).toHaveLength(1);

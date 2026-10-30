@@ -104,8 +104,12 @@ export class Ribbon {
     this.element.setAttribute("role", "region");
     this.element.setAttribute("aria-label", "Ribbon");
 
+    // The tab row holds the tablist and, beside it, the layout buttons: a
+    // tablist may own only tabs, or screen readers miscount the tabs.
+    const tabRow = document.createElement("div");
+    tabRow.className = "sheetwrite-ribbon-tabs";
     this.tabList = document.createElement("div");
-    this.tabList.className = "sheetwrite-ribbon-tabs";
+    this.tabList.className = "sheetwrite-ribbon-tablist";
     this.tabList.setAttribute("role", "tablist");
     this.tabList.setAttribute("aria-label", "Ribbon tabs");
     this.tabSpecs.forEach((tab, index) => this.tabList.appendChild(this.createTab(tab, index)));
@@ -121,16 +125,15 @@ export class Ribbon {
       this.mode = this.compact ? "full" : "compact";
       this.updateLayout();
     });
-    this.tabList.appendChild(this.modeButton);
 
     this.minimizeButton = document.createElement("button");
     this.minimizeButton.type = "button";
     this.minimizeButton.className = "sheetwrite-ribbon-minimize";
     this.minimizeButton.addEventListener("mousedown", (event) => event.preventDefault());
     this.minimizeButton.addEventListener("click", () => this.setMinimized(!this.minimized));
-    this.tabList.appendChild(this.minimizeButton);
 
-    this.element.appendChild(this.tabList);
+    tabRow.append(this.tabList, this.modeButton, this.minimizeButton);
+    this.element.appendChild(tabRow);
     this.element.addEventListener("keydown", this.onKeydown);
     host.appendChild(this.element);
 
