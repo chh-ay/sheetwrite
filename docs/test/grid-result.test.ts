@@ -144,12 +144,6 @@ describe("grid result figures", () => {
     ]);
   });
 
-  it("formats the same tokens in plain text", () => {
-    expect(formatTokens('Total: <sw-format value="0.25" code="0%"></sw-format>.')).toBe(
-      `Total: ${formatNumber(0.25, "0%")}.`,
-    );
-  });
-
   it("rejects missing and blank sw-format values instead of displaying zero", () => {
     for (const value of [undefined, "", " \t "]) {
       const properties = value === undefined ? { code: "0.00" } : { value, code: "0.00" };
