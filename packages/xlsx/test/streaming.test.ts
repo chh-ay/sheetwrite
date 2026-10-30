@@ -404,28 +404,7 @@ describe("ZIP raw entries", () => {
       ),
     ).rejects.toMatchObject({ resource: "maxCompressionRatio" });
   });
-
-  it("checks the CRC and stored size of small buffered parts", async () => {
-    const context = createCodecContext("import");
-    const wrongCrc = patchEntries(rawZip({ "a.xml": "<a/>" }), (view, central, local) => {
-      view.setUint32(central + CENTRAL_CRC, 1, true);
-      view.setUint32(local + LOCAL_CRC, 1, true);
-    });
-    await expect((await ZipReader.open(wrongCrc, context)).read("a.xml")).rejects.toThrow(
-      "CRC mismatch for a.xml",
-    );
-
-    const wrongStoredSize = patchEntries(rawZip({ "a.xml": "<a/>" }, 0), (view, central, local) => {
-      const declared = view.getUint32(central + CENTRAL_UNCOMPRESSED_SIZE, true) + 1;
-      view.setUint32(central + CENTRAL_UNCOMPRESSED_SIZE, declared, true);
-      view.setUint32(local + LOCAL_UNCOMPRESSED_SIZE, declared, true);
-    });
-    await expect((await ZipReader.open(wrongStoredSize, context)).read("a.xml")).rejects.toThrow(
-      "stored size mismatch for a.xml",
-    );
-  });
 });
-
 const EOCD_SIGNATURE = 0x06054b50;
 const EOCD_BYTES = 22;
 const CENTRAL_HEADER_BYTES = 46;
@@ -435,6 +414,202 @@ const CENTRAL_LOCAL_OFFSET = 42;
 const LOCAL_CRC = 14;
 const LOCAL_UNCOMPRESSED_SIZE = 22;
 const ZIP64_SENTINEL = 0xffffffff;
+
+const CENTRAL_METHOD = 10;
+const LOCAL_METHOD = 8;
+const LOCAL_COMPRESSED_SIZE = 18;
+const DEFLATE_METHOD = 8;
+const ONE_STEP_READ_BYTES = 64 * 1024;
+/** A stored deflate block has a 1-byte header and two 16-bit length fields before its data. */
+const STORED_BLOCK_HEADER_BYTES = 5;
+const STORED_BLOCKS = 2;
+const LETTER_COUNT = 26;
+const LOWERCASE_A = 97;
+
+/** Deterministic lowercase text that deflate cannot shrink much. */
+function letters(length: number): string {
+  let seed = 1;
+  let text = "";
+  for (let index = 0; index < length; index++) {
+    seed = (Math.imul(seed, 1_103_515_245) + 12_345) >>> 0;
+    text += String.fromCharCode(LOWERCASE_A + ((seed >>> 16) % LETTER_COUNT));
+  }
+  return text;
+}
+
+/** Set the CRC in the central and local headers. */
+function declareCrc(crc: number): (view: DataView, central: number, local: number) => void {
+  return (view, central, local) => {
+    view.setUint32(central + CENTRAL_CRC, crc, true);
+    view.setUint32(local + LOCAL_CRC, crc, true);
+  };
+}
+
+/** Set the uncompressed size in the central and local headers. */
+function declareSize(size: number): (view: DataView, central: number, local: number) => void {
+  return (view, central, local) => {
+    view.setUint32(central + CENTRAL_UNCOMPRESSED_SIZE, size, true);
+    view.setUint32(local + LOCAL_UNCOMPRESSED_SIZE, size, true);
+  };
+}
+
+/**
+ * Make a one-part archive whose deflate stream has only stored blocks. Its compressed size is
+ * then exactly the text length plus the block headers.
+ */
+function storedBlockZip(text: string): Uint8Array {
+  const data = strToU8(text);
+  const split = Math.ceil(data.length / STORED_BLOCKS);
+  const stream = new Uint8Array(data.length + STORED_BLOCKS * STORED_BLOCK_HEADER_BYTES);
+  const view = new DataView(stream.buffer);
+  let offset = 0;
+
+  for (let block = 0; block < STORED_BLOCKS; block++) {
+    const part = data.subarray(block * split, (block + 1) * split);
+    // Bit 0 marks the final block; bits 1-2 stay 0 for a stored block.
+    stream[offset] = block === STORED_BLOCKS - 1 ? 1 : 0;
+    view.setUint16(offset + 1, part.length, true);
+    view.setUint16(offset + 3, part.length ^ 0xffff, true);
+    stream.set(part, offset + STORED_BLOCK_HEADER_BYTES);
+    offset += STORED_BLOCK_HEADER_BYTES + part.length;
+  }
+
+  // A stored copy of the text gives the CRC that the inflated part must match.
+  let crc = 0;
+  patchEntries(rawZip({ "a.xml": data }, 0), (headers, central) => {
+    crc = headers.getUint32(central + CENTRAL_CRC, true);
+  });
+  return patchEntries(rawZip({ "a.xml": stream }, 0), (headers, central, local) => {
+    headers.setUint16(central + CENTRAL_METHOD, DEFLATE_METHOD, true);
+    headers.setUint16(local + LOCAL_METHOD, DEFLATE_METHOD, true);
+    declareCrc(crc)(headers, central, local);
+    declareSize(data.length)(headers, central, local);
+    expect(headers.getUint32(local + LOCAL_COMPRESSED_SIZE, true)).toBe(stream.length);
+  });
+}
+
+// In-memory parts are read in one step when both sizes that the archive declares are 64 KiB or
+// less. The archive controls those sizes, so each limit must hold on both sides of the boundary.
+describe("ZIP one-step read boundary", () => {
+  for (const size of [ONE_STEP_READ_BYTES, ONE_STEP_READ_BYTES + 1]) {
+    describe(`at a declared uncompressed size of ${size} bytes`, () => {
+      it("reads stored and deflated parts", async () => {
+        const text = letters(size);
+        for (const level of [0, 6] as const) {
+          const reader = await ZipReader.open(
+            rawZip({ "a.xml": text }, level),
+            createCodecContext("import"),
+          );
+          const bytes = await reader.read("a.xml");
+          expect(bytes.byteLength).toBe(size);
+          expect(new TextDecoder().decode(bytes)).toBe(text);
+        }
+      });
+
+      it("rejects a compression ratio over the limit", async () => {
+        await expect(
+          ZipReader.open(rawZip({ "a.xml": "a".repeat(size) }), createCodecContext("import")),
+        ).rejects.toMatchObject({ resource: "maxCompressionRatio" });
+      });
+
+      it("rejects an entry over the size limit", async () => {
+        const context = createCodecContext("import", {
+          resourceLimits: { maxEntryUncompressedBytes: size - 1 },
+        });
+        await expect(
+          ZipReader.open(rawZip({ "a.xml": letters(size) }), context),
+        ).rejects.toMatchObject({ resource: "maxEntryUncompressedBytes" });
+      });
+
+      it("rejects XML deeper than the limit", async () => {
+        const depth = createCodecContext("import").limits.maxXmlDepth + 1;
+        // Varied text keeps the part under the compression-ratio limit.
+        const xml = `${"<a>".repeat(depth)}${letters(size - 7 * depth)}${"</a>".repeat(depth)}`;
+        expect(xml.length).toBe(size);
+        // The content types part is the first part that an import reads and parses.
+        await expect(
+          fromXlsxWorkbook(rawZip({ "[Content_Types].xml": xml })),
+        ).rejects.toMatchObject({ resource: "maxXmlDepth" });
+      });
+
+      it("rejects a CRC mismatch in stored and deflated parts", async () => {
+        for (const level of [0, 6] as const) {
+          const archive = patchEntries(rawZip({ "a.xml": letters(size) }, level), declareCrc(1));
+          const reader = await ZipReader.open(archive, createCodecContext("import"));
+          await expect(reader.read("a.xml")).rejects.toThrow("CRC mismatch for a.xml");
+        }
+      });
+
+      it("rejects stored data shorter than the declared size", async () => {
+        const archive = patchEntries(rawZip({ "a.xml": letters(size - 1) }, 0), declareSize(size));
+        const reader = await ZipReader.open(archive, createCodecContext("import"));
+        await expect(reader.read("a.xml")).rejects.toThrow("stored size mismatch for a.xml");
+      });
+
+      it("rejects inflated data longer or shorter than the declared size", async () => {
+        const longer = patchEntries(rawZip({ "a.xml": letters(size + 1) }), declareSize(size));
+        const longerReader = await ZipReader.open(longer, createCodecContext("import"));
+        await expect(longerReader.read("a.xml")).rejects.toThrow(
+          "inflated size exceeds declaration for a.xml",
+        );
+
+        const shorter = patchEntries(rawZip({ "a.xml": letters(size - 1) }), declareSize(size));
+        const shorterReader = await ZipReader.open(shorter, createCodecContext("import"));
+        await expect(shorterReader.read("a.xml")).rejects.toThrow(
+          "inflated size mismatch for a.xml",
+        );
+      });
+    });
+  }
+
+  // Stored deflate blocks make the compressed size exact while the part stays under 64 KiB.
+  for (const compressedSize of [ONE_STEP_READ_BYTES, ONE_STEP_READ_BYTES + 1]) {
+    describe(`at a declared compressed size of ${compressedSize} bytes`, () => {
+      const text = letters(compressedSize - STORED_BLOCKS * STORED_BLOCK_HEADER_BYTES);
+      const archive = storedBlockZip(text);
+
+      it("reads the part", async () => {
+        const reader = await ZipReader.open(archive, createCodecContext("import"));
+        expect(reader.entries.get("a.xml")?.compressedSize).toBe(compressedSize);
+        expect(new TextDecoder().decode(await reader.read("a.xml"))).toBe(text);
+      });
+
+      it("rejects a CRC mismatch", async () => {
+        const reader = await ZipReader.open(
+          patchEntries(archive, declareCrc(1)),
+          createCodecContext("import"),
+        );
+        await expect(reader.read("a.xml")).rejects.toThrow("CRC mismatch for a.xml");
+      });
+
+      it("rejects inflated data longer or shorter than the declared size", async () => {
+        const longer = await ZipReader.open(
+          patchEntries(archive, declareSize(text.length - 1)),
+          createCodecContext("import"),
+        );
+        await expect(longer.read("a.xml")).rejects.toThrow(
+          "inflated size exceeds declaration for a.xml",
+        );
+
+        const shorter = await ZipReader.open(
+          patchEntries(archive, declareSize(text.length + 1)),
+          createCodecContext("import"),
+        );
+        await expect(shorter.read("a.xml")).rejects.toThrow("inflated size mismatch for a.xml");
+      });
+
+      it("rejects a compression ratio over the limit", async () => {
+        // The part is a little smaller than its compressed form, so its ratio is just below 1.
+        const context = createCodecContext("import", {
+          resourceLimits: { maxCompressionRatio: 0.5 },
+        });
+        await expect(ZipReader.open(archive, context)).rejects.toMatchObject({
+          resource: "maxCompressionRatio",
+        });
+      });
+    });
+  }
+});
 
 /** Copy an archive and change the header fields of each entry in central-directory order. */
 function patchEntries(
