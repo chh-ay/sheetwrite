@@ -302,7 +302,21 @@ function syncStorageFailure(error: unknown, context?: SheetwriteErrorContext): S
   return normalizeSheetwriteError(error, "sync-storage-failed", "synchronize", context);
 }
 
-let nextMutation = 1;
+const MUTATION_ID_RANDOM_BYTES = 16;
+
+/**
+ * Random default mutation ID. Servers deduplicate by this ID, so two clients
+ * must never produce the same one; a clock and a per-page counter can collide.
+ * `getRandomValues` also works on pages without a secure context.
+ */
+function createDefaultMutationId(): string {
+  const bytes = new Uint8Array(MUTATION_ID_RANDOM_BYTES);
+  globalThis.crypto.getRandomValues(bytes);
+
+  let id = "sheetwrite-";
+  for (const byte of bytes) id += byte.toString(16).padStart(2, "0");
+  return id;
+}
 
 /**
  * Deterministic, transport-neutral optimistic sync. Local rendering is never
@@ -357,6 +371,8 @@ export class SyncCoordinator {
   private persistenceTail: Promise<void> = Promise.resolve();
   private flushPromise?: Promise<readonly PersistenceCommitResponse[]>;
   private connection: SyncConnectionState;
+  /** The host's last `setOnline` choice; remote subscriptions do not change it. */
+  private hostOnline: boolean;
   private version: number;
   private bufferedVersions = 0;
   private bufferedOperations = 0;
@@ -375,6 +391,7 @@ export class SyncCoordinator {
     assertVersion(options.serverVersion, "serverVersion");
     this.version = options.serverVersion;
     this.connection = options.initialConnection ?? "online";
+    this.hostOnline = this.connection === "online";
     this.hydrating = options.pendingStorage !== undefined;
     this.disposeGrid = registerGridTransactionAdmission(grid, {
       reserve: (operations) => this.reserveLocalTransaction(operations),
@@ -444,6 +461,7 @@ export class SyncCoordinator {
    */
   setOnline(online: boolean): void {
     if (this.destroyed) return;
+    this.hostOnline = online;
     const next: SyncConnectionState = online ? "online" : "offline";
     if (this.connection === next) return;
     this.connection = next;
@@ -492,9 +510,11 @@ export class SyncCoordinator {
         disposeSource = typeof dispose === "function" ? dispose : undefined;
       }
       this.disposeRemote = cleanup;
-      this.connection = "online";
+      // A subscription delivers remote versions; it does not override the host's
+      // offline flag, so queued work waits until the host calls `setOnline(true)`.
+      this.connection = this.hostOnline ? "online" : "offline";
       this.emitState();
-      void this.flush().catch(() => {});
+      if (this.hostOnline) void this.flush().catch(() => {});
       return cleanup;
     } catch (error) {
       cleanup();
@@ -839,8 +859,10 @@ export class SyncCoordinator {
    * rows or columns: the local Grid then already shows the server result plus
    * the pending work, so recovery applies the missed server versions and moves
    * the pending queue onto the new server version. Call `flush` afterwards to
-   * send it. In every other case nothing changes and the result names the
-   * reason; the host then reloads and calls `resumeAfterReload`.
+   * send it. In every other case the pending queue and its durable storage do
+   * not change and the result names the reason; the host then reloads and calls
+   * `resumeAfterReload`. When a missed server version is rejected, the Grid can
+   * already show earlier missed versions; the reload replaces them.
    *
    * @example
    * ```ts
@@ -849,7 +871,7 @@ export class SyncCoordinator {
    * async function recover(sync: SyncCoordinator) {
    *   const result = await sync.recoverConflict();
    *   if (result.status === "recovered") await sync.flush();
-   *   // A reload-required result leaves the document unchanged for host recovery.
+   *   // A reload-required result leaves the pending queue unchanged for host recovery.
    *   return result;
    * }
    * ```
@@ -913,8 +935,6 @@ export class SyncCoordinator {
       }
     }
 
-    const queue = await this.persistQueueOnto(response.currentVersion);
-    if (this.destroyed) return reload("rejected");
     for (const group of groupAtomicBatches(
       missed.filter((entry) => entry.version > appliedVersion),
     )) {
@@ -928,6 +948,10 @@ export class SyncCoordinator {
         this.emit({ type: "remote-applied", operation: cloneVersionedOperation(entry) });
       }
     }
+    // Storage moves only after every missed version applied, so a rejection
+    // leaves the durable queue on its old base for the reload.
+    const queue = await this.persistQueueOnto(response.currentVersion);
+    if (this.destroyed) return reload("rejected");
     this.outstandingConflict = undefined;
     this.adoptQueueBase(queue);
     for (const [version, input] of this.gapBuffer) {
@@ -1086,8 +1110,7 @@ export class SyncCoordinator {
     this.pendingEncodedByteTotal += encodedBytes;
 
     try {
-      const clientMutationId =
-        this.options.createMutationId?.() ?? `sheetwrite-${Date.now()}-${nextMutation++}`;
+      const clientMutationId = this.options.createMutationId?.() ?? createDefaultMutationId();
       assertMutationId(clientMutationId, this.limits);
       if (
         this.queue.has(clientMutationId) ||
