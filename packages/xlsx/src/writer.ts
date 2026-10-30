@@ -560,6 +560,75 @@ function tableXml(
   return xml.finish();
 }
 
+function hyperlinkRowStyles(
+  sheet: SheetSnapshot,
+): (row: number, cells: readonly AbsoluteCell[]) => readonly AbsoluteCell[] {
+  const pending = (sheet.hyperlinks ?? [])
+    .map((hyperlink, index) => ({
+      hyperlink,
+      index,
+      style: hyperlink.style,
+    }))
+    .sort((left, right) => left.hyperlink.range.start.row - right.hyperlink.range.start.row);
+  let next = 0;
+  let active: typeof pending = [];
+  return (row, cells) => {
+    active = active.filter(({ hyperlink }) => hyperlink.range.end.row >= row);
+    let added = false;
+    while (next < pending.length) {
+      const entry = pending[next];
+      if (!entry || entry.hyperlink.range.start.row > row) break;
+      next += 1;
+      if (entry.hyperlink.range.end.row < row) continue;
+      active.push(entry);
+      added = true;
+    }
+    // Preserve the same last-link-wins overlay order as the workbook renderer.
+    if (added) active.sort((left, right) => left.index - right.index);
+    if (active.length === 0 || cells.length === 0) return cells;
+    const overlays = new Map<number, AbsoluteCell>();
+    for (const { hyperlink, style } of active) {
+      let low = 0;
+      let high = cells.length;
+      while (low < high) {
+        const middle = Math.floor((low + high) / 2);
+        const cell = cells[middle];
+        if (cell && cell.col < hyperlink.range.start.col) low = middle + 1;
+        else high = middle;
+      }
+      for (let index = low; index < cells.length; index++) {
+        const cell = overlays.get(index) ?? cells[index];
+        if (!cell || cell.col > hyperlink.range.end.col) break;
+        overlays.set(index, {
+          ...cell,
+          source: {
+            ...cell.source,
+            style: {
+              color: "#0563C1",
+              underline: true,
+              ...sheet.columns[cell.col]?.cellStyle,
+              ...cell.source.style,
+              ...style,
+            },
+          },
+        });
+      }
+    }
+    return overlays.size === 0 ? cells : cells.map((cell, index) => overlays.get(index) ?? cell);
+  };
+}
+
+function* hyperlinkStyledRows(
+  sheet: SheetSnapshot,
+  rows: Iterable<{ row: number; cells: readonly AbsoluteCell[] }>,
+): Generator<{ row: number; cells: readonly AbsoluteCell[] }> {
+  const applyStyles = hyperlinkRowStyles(sheet);
+  for (const { row, cells } of rows) yield { row, cells: applyStyles(row, cells) };
+}
+
+const MAXIMUM_DIGIT_WIDTH_PX = 7;
+const COLUMN_WIDTH_FRACTIONS = 256;
+
 function* writeSheet(
   snapshot: WorkbookSnapshot,
   sheet: SheetSnapshot,
@@ -629,7 +698,10 @@ function* writeSheet(
     xml.append("<cols>");
     for (let index = 0; index < sheet.columns.length; index++) {
       const column = sheet.columns[index]!;
-      const width = Math.max(1, Math.round(((column.width - 5) / 7) * 100) / 100);
+      // The stored character width includes OOXML's five-pixel padding.
+      const width =
+        Math.floor((column.width / MAXIMUM_DIGIT_WIDTH_PX) * COLUMN_WIDTH_FRACTIONS) /
+        COLUMN_WIDTH_FRACTIONS;
       const styleId = styles.register(
         column.cellStyle,
         column.cellStyle?.numberFormat ?? column.numberFormat,
@@ -650,7 +722,8 @@ function* writeSheet(
         row,
         cells: (byRow.get(row) ?? []).sort((left, right) => left.col - right.col),
       }));
-  for (const { row, cells } of sourceRows) {
+  const styledRows = sheet.hyperlinks?.length ? hyperlinkStyledRows(sheet, sourceRows) : sourceRows;
+  for (const { row, cells } of styledRows) {
     const meta = rowMetadata.get(row);
     const hidden = meta?.hidden || collapsedOutlineRows.has(row);
     const outlineLevel = outlineLevels.get(row);

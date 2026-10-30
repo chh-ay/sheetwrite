@@ -263,6 +263,8 @@ function stylesByCell(snapshot: WorkbookSnapshot): Map<string, CellStyle> {
           italic: false,
           underline: false,
           strikethrough: false,
+          // Native center imports unset because the grid's default is middle.
+          verticalAlign: "middle",
           ...style,
           numberFormat: style.numberFormat ?? sheet.columns[col]?.numberFormat ?? "General",
         });

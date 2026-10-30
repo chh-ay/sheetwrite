@@ -450,7 +450,10 @@ describe("workbook OOXML fidelity", () => {
       }),
       { onWarning: (warning) => warnings.push(warning.code) },
     );
-    expect(imported.sheets[0]!.cells[0]!.cells[0]!.style).toEqual({ bold: true });
+    expect(imported.sheets[0]?.cells[0]?.cells[0]?.style).toEqual({
+      bold: true,
+      verticalAlign: "bottom",
+    });
     // Rows read before the late styles are styled again without reporting their warnings twice.
     expect(warnings).toEqual(["unsupported-cell-value"]);
   });

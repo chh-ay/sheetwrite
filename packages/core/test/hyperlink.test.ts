@@ -156,6 +156,31 @@ describe("hyperlink policy", () => {
     ).toThrow(SheetwriteError);
   });
 
+  it("paints explicit cell link fonts before defaults while retaining the default link look", () => {
+    const workbook = makeWorkbook(2);
+    const sheet = workbook.sheets[0];
+    if (!sheet) throw new Error("missing sheet");
+    const { style: _customStyle, ...link } = externalLink();
+    sheet.hyperlinks = [link];
+    const store = new SheetwriteStore(workbook);
+    const visibleStyle = () => {
+      const view = store.getVisibleWindow("s1", { start: 0, end: 1 }, [0]);
+      return view.styles[view.styleIds[0] ?? 0];
+    };
+
+    expect(visibleStyle()).toMatchObject({ color: "#0563C1", underline: true });
+    store.applyTransaction({
+      patches: [
+        {
+          op: "setRangeStyle",
+          range: link.range,
+          style: { color: "#123456", underline: false },
+        },
+      ],
+    });
+    expect(visibleStyle()).toMatchObject({ color: "#123456", underline: false });
+  });
+
   it("rejects unsafe mutations before document state changes", () => {
     const workbook = makeWorkbook(2);
     const store = new SheetwriteStore(workbook);

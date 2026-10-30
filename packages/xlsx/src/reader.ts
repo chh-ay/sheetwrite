@@ -916,6 +916,23 @@ function parseComments(
   return { comments, present: true };
 }
 
+const MAXIMUM_DIGIT_WIDTH_PX = 7;
+const COLUMN_WIDTH_FRACTIONS = 256;
+
+function columnWidthPixels(width: number): number {
+  // CT_Col width already includes the five pixels of padding. ECMA-376's
+  // half-digit rounding is truncated before converting character units to pixels.
+  return Math.max(
+    1,
+    Math.floor(
+      ((COLUMN_WIDTH_FRACTIONS * width +
+        Math.floor(COLUMN_WIDTH_FRACTIONS / 2 / MAXIMUM_DIGIT_WIDTH_PX)) /
+        COLUMN_WIDTH_FRACTIONS) *
+        MAXIMUM_DIGIT_WIDTH_PX,
+    ),
+  );
+}
+
 function parseColumns(
   root: XmlElement,
   styles: ParsedStyles,
@@ -948,8 +965,7 @@ function parseColumns(
       return readerFailure("column width is invalid");
     }
     const styleText = xmlAttribute(element, "style");
-    const style =
-      styleText === undefined ? undefined : styles.at(parseUnsigned(styleText, "column style"));
+    const style = styles.at(styleText === undefined ? 0 : parseUnsigned(styleText, "column style"));
     const type: Column["type"] | undefined = style?.date
       ? "date"
       : style?.numberFormat
@@ -959,11 +975,11 @@ function parseColumns(
         : undefined;
     for (let index = min - 1; index < max; index++) {
       columns.set(index, {
-        ...(widthChars !== undefined ? { width: Math.max(1, Math.round(widthChars * 7 + 5)) } : {}),
+        ...(widthChars !== undefined ? { width: columnWidthPixels(widthChars) } : {}),
         ...(xmlAttribute(element, "hidden") !== undefined
           ? { visible: !xmlBoolean(xmlAttribute(element, "hidden")) }
           : {}),
-        ...(style?.style ? { cellStyle: structuredClone(style.style) } : {}),
+        cellStyle: structuredClone(style.style ?? {}),
         ...(style?.numberFormat ? { numberFormat: style.numberFormat } : {}),
         ...(type ? { type } : {}),
       });
@@ -1287,6 +1303,10 @@ async function parseSheet(
     inferredRow = row + 1;
     maxRow = Math.max(maxRow, row);
     const heightPoints = Number(xmlAttribute(rowElement, "ht"));
+    const hasFixedHeight =
+      xmlBoolean(xmlAttribute(rowElement, "customHeight")) &&
+      Number.isFinite(heightPoints) &&
+      heightPoints > 0;
     const hidden = xmlBoolean(xmlAttribute(rowElement, "hidden"));
     const outlineLevel = Number(xmlAttribute(rowElement, "outlineLevel") ?? 0);
     if (!Number.isInteger(outlineLevel) || outlineLevel < 0 || outlineLevel > 7) {
@@ -1294,13 +1314,11 @@ async function parseSheet(
     }
     if (outlineLevel > 0) outlineLevels.set(row, outlineLevel);
     if (xmlBoolean(xmlAttribute(rowElement, "collapsed"))) collapsedRows.add(row);
-    if ((Number.isFinite(heightPoints) && heightPoints > 0) || hidden) {
+    if (hasFixedHeight || hidden) {
       rowMeta.push([
         row,
         {
-          ...(Number.isFinite(heightPoints) && heightPoints > 0
-            ? { height: (heightPoints * 96) / 72 }
-            : {}),
+          ...(hasFixedHeight ? { height: (heightPoints * 96) / 72 } : {}),
           ...(hidden ? { hidden: true } : {}),
         },
       ]);
@@ -1575,6 +1593,27 @@ async function parseSheet(
   const relationships = packageFile.relationships(reference.relationship.target);
   const hyperlinkCollection = xmlChild(root, "hyperlinks");
   const hyperlinks = parseHyperlinks(hyperlinkCollection, relationships, reference.name, context);
+  let missingDisplays: Map<string, number[]> | undefined;
+  for (const [index, hyperlink] of hyperlinks.entries()) {
+    if (hyperlink.display !== undefined) continue;
+    missingDisplays ??= new Map();
+    const key = `${hyperlink.range.start.row}:${hyperlink.range.start.col}`;
+    const indices = missingDisplays.get(key) ?? [];
+    indices.push(index);
+    missingDisplays.set(key, indices);
+  }
+  if (missingDisplays) {
+    for (const cell of cells) {
+      const indices = missingDisplays.get(`${cell.rowOffset}:${cell.colOffset}`);
+      if (!indices || cell.value.kind !== "literal" || cell.value.value === null) continue;
+      const display = String(cell.value.value);
+      if (display.length > MAX_HYPERLINK_DISPLAY_LENGTH) continue;
+      for (const index of indices) {
+        const hyperlink = hyperlinks[index];
+        if (hyperlink) hyperlinks[index] = { ...hyperlink, display };
+      }
+    }
+  }
   for (const hyperlink of hyperlinks) {
     maxRow = Math.max(maxRow, hyperlink.range.end.row);
     maxCol = Math.max(maxCol, hyperlink.range.end.col);
@@ -1718,13 +1757,16 @@ function columnFromParsed(
   const type: Column["type"] = mixed
     ? "number"
     : (definition?.type ?? onlyType ?? (hasNumericValue ? "number" : "text"));
+  const defaultStyle = definition?.cellStyle ?? styles.at(0).style;
   return {
     key,
     header: colToA1(col),
     width: definition?.width ?? 75,
     type,
     ...(numberFormat ? { numberFormat } : {}),
-    ...(definition?.cellStyle ? { cellStyle: structuredClone(definition.cellStyle) } : {}),
+    ...(defaultStyle && Object.keys(defaultStyle).length > 0
+      ? { cellStyle: structuredClone(defaultStyle) }
+      : {}),
     ...(definition?.visible === false ? { visible: false } : {}),
   };
 }
@@ -2179,10 +2221,23 @@ export async function readWorkbook(
         continue;
       }
       const column = structuredClone(metaColumn);
+      if (nativeColumn.cellStyle) column.cellStyle = nativeColumn.cellStyle;
+      else delete column.cellStyle;
       const definition = source.columns.get(col);
       if (definition) {
-        for (const property of ["width", "visible", "cellStyle", "numberFormat", "type"] as const) {
+        for (const property of ["width", "visible", "numberFormat", "type"] as const) {
           const value = definition[property];
+          // Preserve subpixel Sheetwrite widths only while the native column
+          // still represents the metadata width; native edits remain authoritative.
+          if (
+            property === "width" &&
+            value ===
+              columnWidthPixels(
+                Math.floor((metaColumn.width / MAXIMUM_DIGIT_WIDTH_PX) * COLUMN_WIDTH_FRACTIONS) /
+                  COLUMN_WIDTH_FRACTIONS,
+              )
+          )
+            continue;
           if (value !== undefined) Object.assign(column, { [property]: structuredClone(value) });
         }
       }
@@ -2207,7 +2262,15 @@ export async function readWorkbook(
       if (!cell) continue;
       const record = styles.at(source.cellStyles.at(index));
       // Parsed styles are typed `CellStyle`, and the copy keeps their shape.
-      const style = record.style ? (copyStyleData(record.style) as CellStyle) : undefined;
+      let style = record.style ? (copyStyleData(record.style) as CellStyle) : undefined;
+      // Native center is normally unset, but must override an inherited bottom.
+      if (
+        style?.verticalAlign === undefined &&
+        columns[cell.colOffset]?.cellStyle?.verticalAlign === "bottom"
+      ) {
+        style ??= {};
+        style.verticalAlign = "middle";
+      }
       const numberFormat = cellNumberFormatOverride(
         record,
         cell.value,
