@@ -1,7 +1,14 @@
-import { createRootRoute, HeadContent, Outlet, Scripts, ScriptOnce } from "@tanstack/react-router";
+import {
+  createRootRoute,
+  HeadContent,
+  Outlet,
+  Scripts,
+  ScriptOnce,
+  useLocation,
+} from "@tanstack/react-router";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useEffect, useLayoutEffect } from "react";
 import { installExpressiveCodeScripts } from "virtual:expressive-code-scripts";
 
 import corePackage from "../../../packages/core/package.json" with { type: "json" };
@@ -120,20 +127,33 @@ export const Route = createRootRoute({
 });
 
 function RootComponent() {
+  const path = useLocation({ select: (location) => location.pathname });
+  useLayoutEffect(() => {
+    // A client-side route change must not reuse the previous page's signal.
+    delete document.documentElement.dataset.hydrated;
+  }, [path]);
+
   useEffect(() => {
     const cleanup = initializeCodeEnhancements();
     // Copy buttons on every code block, also on pages reached client-side.
     installExpressiveCodeScripts();
     const uninstallReveal = installAnchorReveal();
     const uninstallScrollHints = installGridScrollHints();
-    // Deterministic signal for interaction tests: listeners are attached.
-    document.documentElement.dataset.hydrated = "true";
     return () => {
       cleanup();
       uninstallReveal();
       uninstallScrollHints();
     };
   }, []);
+
+  useEffect(() => {
+    // A documentation page has a nested Suspense boundary. Its prerendered
+    // controls are visible before their listeners hydrate; it marks readiness
+    // itself when that boundary commits.
+    if (!path.startsWith("/docs/") || path === "/docs/") {
+      document.documentElement.dataset.hydrated = "true";
+    }
+  }, [path]);
 
   return <Outlet />;
 }

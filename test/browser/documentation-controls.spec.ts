@@ -221,9 +221,13 @@ const AFTER_POPOVER_CLOSE_MS = 300;
 
 /** The first code trigger whose hover panel holds a link the reader can focus. */
 async function popoverWithLink(page: Page): Promise<{ trigger: Locator; panelId: string }> {
+  // The URL and shell can change before lazy MDX replaces the old article.
+  // Scope discovery to this page's example, never the outgoing page's triggers.
+  const example = page.getByRole("figure", { name: "Complete first grid", exact: true });
+  await expect(example).toBeVisible();
   const findPanelId = () =>
-    page.evaluate(() => {
-      for (const trigger of document.querySelectorAll<HTMLElement>(
+    example.evaluate((element) => {
+      for (const trigger of element.querySelectorAll<HTMLElement>(
         "[data-sw-code-popover-trigger]",
       )) {
         const id = trigger.dataset.swCodePopoverTrigger ?? "";

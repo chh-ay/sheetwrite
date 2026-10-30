@@ -94,6 +94,17 @@ function MovedDocument({ from }: Readonly<{ from: string }>) {
   );
 }
 
+/** Runs inside the content boundary, after its lazy MDX controls hydrate. */
+function DocumentReady() {
+  useEffect(() => {
+    document.documentElement.dataset.hydrated = "true";
+    return () => {
+      delete document.documentElement.dataset.hydrated;
+    };
+  }, []);
+  return null;
+}
+
 function DocumentRoute() {
   const params = Route.useParams();
   const activeHref = normalizeDocumentHref(params._splat);
@@ -130,6 +141,7 @@ function DocumentRoute() {
         }
       >
         <Content components={DOCUMENT_COMPONENTS} />
+        <DocumentReady key={activeHref} />
       </Suspense>
     </DocsShell>
   );
