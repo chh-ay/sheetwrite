@@ -1,44 +1,28 @@
 import type { Grid } from "@sheetwrite/core";
-import { createGrid, initSheetwrite } from "@sheetwrite/core";
 import workerRendererUrl from "@sheetwrite/core/worker?worker&url";
 import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import { isRepeatClick } from "../lib/action-guard.js";
-import { errorText } from "../lib/errors.js";
 import { ActionError, useAction } from "../lib/use-action.js";
 import { CapabilityHero } from "./CapabilityHero.js";
 import {
-  createEngineLiveWorkbook,
-  ENGINE_ACCOUNT_ROWS,
-  ENGINE_ACTUAL_ADJUSTMENT,
-  ENGINE_COLUMN_INDEX,
   ENGINE_COLUMN_LETTER,
   ENGINE_FORECAST_UPSIDE,
   ENGINE_LIVE_ROWS,
-  ENGINE_LIVE_SHEET,
-  ENGINE_LIVE_STORAGE,
+  type EngineColumnBand,
   ENGINE_PLAN_COLUMN,
   ENGINE_PLAN_KEY,
-  type EngineColumnBand,
-  engineAccountTotalRow,
 } from "./scenarios/engine-live-data.js";
 import {
-  bindEngineEvents,
-  createEngineHostSaver,
-  createEngineLiveDataSource,
-  createEngineTrace,
+  createEngineScenario,
   ENGINE_LOADING_MARKER,
   ENGINE_TRACE_LIMIT,
   type EngineAction,
   type EngineEvent,
-  type EngineEventBindings,
-  type EngineEventInput,
-  type EngineHostSaver,
-  type EngineRenderer,
-  type EngineTrace,
-  engineLiveTheme,
+  type EngineScenario,
+  type EngineScenarioSnapshot,
   formatEngineEvent,
   formatEngineValue,
 } from "./scenarios/engine-live.js";
@@ -96,550 +80,105 @@ const FOLLOW_STEPS = [
 /** A sub-millisecond step still gets a visible slice of the timing bar. */
 const MIN_STEP_SHARE = 0.02;
 
-/** Region, the column left of Actual: phones start with it at the left edge. */
-const REGION_COLUMN = ENGINE_COLUMN_INDEX.actual - 1;
-
 function carriesPlanBand(columns: readonly EngineColumnBand[]): boolean {
   return columns.some((band) => band.keys.includes(ENGINE_PLAN_KEY));
-}
-
-function nextEngineFrame(signal: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (signal.aborted) {
-      reject(signal.reason);
-      return;
-    }
-    const onAbort = () => {
-      cancelAnimationFrame(frame);
-      reject(signal.reason);
-    };
-    const frame = requestAnimationFrame(() => {
-      signal.removeEventListener("abort", onAbort);
-      resolve();
-    });
-    signal.addEventListener("abort", onAbort, { once: true });
-  });
 }
 
 export default function EngineShowcase() {
   const command = useAction();
   const { run: runCommand } = command;
   const hostRef = useRef<HTMLDivElement>(null);
-  const gridRef = useRef<Grid | null>(null);
-  const bindingsRef = useRef<EngineEventBindings | null>(null);
-  const currentRowRef = useRef(1);
+  const scenarioRef = useRef<EngineScenario | null>(null);
   const jumpInputRef = useRef("24001");
-  const requestedRendererRef = useRef<EngineRenderer>("canvas");
-  const mountedRef = useRef(true);
-  const passiveTraceTimerRef = useRef<number | null>(null);
-  const followControllerRef = useRef<AbortController | null>(null);
-  const followAnchorRef = useRef(24_000);
-  const planRequestRef = useRef<Extract<EngineEvent, { type: "datasource-request" }> | null>(null);
-
-  // One trace and one host boundary live as long as the page does.
-  const [trace] = useState<EngineTrace>(createEngineTrace);
-  const [saver] = useState<EngineHostSaver>(createEngineHostSaver);
-
-  const [events, setEvents] = useState<readonly EngineEvent[]>([]);
-  const [requestedRenderer, setRequestedRenderer] = useState<EngineRenderer>("canvas");
-  const [activeRenderer, setActiveRenderer] = useState<EngineRenderer>("canvas");
-  const [rendererFallback, setRendererFallback] = useState<string | null>(null);
-  const [generation, setGeneration] = useState(0);
-  const [ready, setReady] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [pendingOperations, setPendingOperations] = useState(0);
   const [jumpInput, setJumpInput] = useState("24001");
-  const [currentRow, setCurrentRow] = useState(1);
-  const [status, setStatus] = useState("Starting the calculation engine…");
-  const [following, setFollowing] = useState(false);
-  const [followDuration, setFollowDuration] = useState<number | null>(null);
-  const [followSteps, setFollowSteps] = useState<readonly number[] | null>(null);
-  const [rewriteDuration, setRewriteDuration] = useState<number | null>(null);
-
-  const emit = useCallback(
-    (input: EngineEventInput) => {
-      const event = trace.push(input);
-      if (event.type === "renderer") {
-        setActiveRenderer(event.active);
-        setRendererFallback(event.fallback);
-      }
-      if (
-        event.type === "datasource-request" &&
-        carriesPlanBand(event.columns) &&
-        currentRowRef.current >= event.start &&
-        currentRowRef.current < event.end
-      ) {
-        planRequestRef.current = event;
-      }
-      const passiveViewportEvent =
-        event.type === "visible-window" ||
-        event.type === "datasource-request" ||
-        event.type === "datasource-result" ||
-        (event.type === "page-resource" && event.reason === "load");
-      if (passiveViewportEvent) {
-        if (passiveTraceTimerRef.current !== null) {
-          window.clearTimeout(passiveTraceTimerRef.current);
-        }
-        passiveTraceTimerRef.current = window.setTimeout(() => {
-          passiveTraceTimerRef.current = null;
-          if (mountedRef.current) setEvents(trace.snapshot());
-        }, 120);
-        return;
-      }
-      if (passiveTraceTimerRef.current !== null) {
-        window.clearTimeout(passiveTraceTimerRef.current);
-        passiveTraceTimerRef.current = null;
-      }
-      setEvents(trace.snapshot());
-    },
-    [trace],
-  );
-
-  useEffect(() => {
-    requestedRendererRef.current = requestedRenderer;
-  }, [requestedRenderer]);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-      followControllerRef.current?.abort();
-      if (passiveTraceTimerRef.current !== null) {
-        window.clearTimeout(passiveTraceTimerRef.current);
-        passiveTraceTimerRef.current = null;
-      }
-    };
-  }, []);
+  const [snapshot, setSnapshot] = useState<EngineScenarioSnapshot | null>(null);
 
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
-    host.dataset.generation = String(generation);
-    let disposed = false;
-    let grid: Grid | null = null;
-    let bindings: EngineEventBindings | null = null;
-    let loadResourceTimer: number | null = null;
-    setReady(false);
-    setError(null);
-    setRendererFallback(null);
-    setStatus("Starting the calculation engine…");
-
-    void initSheetwrite()
-      .then(() => {
-        if (disposed) return;
-        const renderer = requestedRenderer;
-        const theme = engineLiveTheme("dark");
-        host.dataset.gridTheme = "dark";
-        host.style.backgroundColor = theme.bg ?? "";
-        grid = createGrid(host, {
-          workbook: createEngineLiveWorkbook(),
-          datasource: createEngineLiveDataSource(emit, () => {
-            if (loadResourceTimer !== null) window.clearTimeout(loadResourceTimer);
-            loadResourceTimer = window.setTimeout(() => {
-              loadResourceTimer = null;
-              if (!disposed) bindings?.sampleResource("load", "ingest");
-            }, 160);
-          }),
-          datasourceStorage: ENGINE_LIVE_STORAGE,
-          theme,
-          config: {
-            toolbar: false,
-            tabs: false,
-            contextMenu: [
-              { action: "copy", label: "Copy engine value" },
-              {
-                label: "Return to first data row",
-                onClick(instance) {
-                  const addr = {
-                    sheet: ENGINE_LIVE_SHEET,
-                    row: 1,
-                    col: ENGINE_COLUMN_INDEX.actual,
-                  };
-                  instance.setSelection({ kind: "cell", addr });
-                  instance.scrollToCell(addr);
-                },
-              },
-            ],
-          },
-          renderer,
-          ...(renderer === "worker" ? { workerUrl: workerRendererUrl } : {}),
-        });
-        const narrow = window.matchMedia(NARROW_VIEWPORT).matches;
-        grid.setFrozen(1, narrow ? 0 : 2);
-        const actualCell = {
-          sheet: ENGINE_LIVE_SHEET,
-          row: currentRowRef.current,
-          col: ENGINE_COLUMN_INDEX.actual,
-        };
-        grid.setSelection({ kind: "cell", addr: actualCell });
-        // Without frozen columns a phone shows only Month and Region; the demo
-        // is about Actual. scrollToCell moves as little as it can, and only a
-        // move to the left aligns a column with the left edge: scrolling past
-        // Region to Forecast and back puts Region at the edge and Actual fully
-        // in view, with no column cut in half.
-        if (narrow) {
-          grid.scrollToCell({ ...actualCell, col: ENGINE_COLUMN_INDEX.forecast });
-          grid.scrollToCell({ ...actualCell, col: REGION_COLUMN });
-        }
-        bindings = bindEngineEvents(grid, emit, setPendingOperations);
-        gridRef.current = grid;
-        bindingsRef.current = bindings;
-        bindings.announceRenderer(
-          renderer,
-          renderer === "worker" && grid.rendererKind() !== "worker"
-            ? "Worker drawing was unavailable during startup."
-            : null,
-        );
-        setReady(true);
-        setStatus(
-          `Live sheet ready. ${ENGINE_LIVE_ROWS.toLocaleString()} rows stay paged; only requested rows are loaded.`,
-        );
-      })
-      .catch((cause: unknown) => {
-        if (disposed) return;
-        const message = errorText(cause);
-        setError(message);
-        setStatus(`The calculation engine could not start: ${message}`);
-      });
-
-    return () => {
-      disposed = true;
-      followControllerRef.current?.abort();
-      setReady(false);
-      if (loadResourceTimer !== null) {
-        window.clearTimeout(loadResourceTimer);
-        loadResourceTimer = null;
-      }
-      bindings?.dispose();
-      if (bindingsRef.current === bindings) bindingsRef.current = null;
-      if (gridRef.current === grid) gridRef.current = null;
-      grid?.destroy();
-    };
-  }, [emit, generation, requestedRenderer]);
-
-  useEffect(() => {
     const viewport = window.matchMedia(NARROW_VIEWPORT);
-    const updateFrozenColumns = () => gridRef.current?.setFrozen(1, viewport.matches ? 0 : 2);
+    const scenario = createEngineScenario(host, {
+      workerUrl: workerRendererUrl,
+      narrow: () => viewport.matches,
+    });
+    scenarioRef.current = scenario;
+    let previousRow = scenario.snapshot().currentRow;
+    const update = () => {
+      const next = scenario.snapshot();
+      if (next.ready && next.currentRow !== previousRow) {
+        jumpInputRef.current = String(next.currentRow + 1);
+        setJumpInput(jumpInputRef.current);
+      }
+      previousRow = next.currentRow;
+      setSnapshot(next);
+    };
+    const unsubscribe = scenario.subscribe(update);
+    update();
+    const updateFrozenColumns = () => scenario.grid()?.setFrozen(1, viewport.matches ? 0 : 2);
     viewport.addEventListener("change", updateFrozenColumns);
-    return () => viewport.removeEventListener("change", updateFrozenColumns);
+    return () => {
+      viewport.removeEventListener("change", updateFrozenColumns);
+      unsubscribe();
+      scenario.dispose();
+      scenarioRef.current = null;
+    };
   }, []);
 
-  const executeAction = useCallback(
-    async (action: EngineAction, rowOverride?: number) => {
-      const grid = gridRef.current;
-      const bindings = bindingsRef.current;
-      if (!grid || !bindings) return;
-
-      switch (action) {
-        case "jump": {
-          const raw =
-            rowOverride === undefined ? jumpInputRef.current.trim() : String(rowOverride + 1);
-          if (!/^\d+$/.test(raw)) {
-            setStatus(`Enter a whole row from 1 to ${ENGINE_LIVE_ROWS.toLocaleString()}.`);
-            return;
-          }
-          const requested = Number(raw);
-          if (!Number.isSafeInteger(requested) || requested < 1 || requested > ENGINE_LIVE_ROWS) {
-            setStatus(`Enter a whole row from 1 to ${ENGINE_LIVE_ROWS.toLocaleString()}.`);
-            return;
-          }
-          const row = requested - 1;
-          grid.scrollToCell({ sheet: ENGINE_LIVE_SHEET, row, col: ENGINE_COLUMN_INDEX.actual });
-          grid.setSelection({
-            kind: "cell",
-            addr: { sheet: ENGINE_LIVE_SHEET, row, col: ENGINE_COLUMN_INDEX.actual },
-          });
-          currentRowRef.current = row;
-          jumpInputRef.current = String(requested);
-          setCurrentRow(row);
-          setJumpInput(String(requested));
-          bindings.sampleResource("jump", "scroll");
-          setStatus(
-            `Grid moved to row ${requested.toLocaleString()}; its page is loading if needed.`,
-          );
-          return;
-        }
-        case "edit": {
-          const row = currentRowRef.current;
-          const address = { sheet: ENGINE_LIVE_SHEET, row, col: ENGINE_COLUMN_INDEX.actual };
-          const current = grid.store.getCell(address).resolved;
-          if (
-            typeof current !== "number" ||
-            row === 0 ||
-            row >= ENGINE_LIVE_ROWS - 1 ||
-            (row - 1) % ENGINE_ACCOUNT_ROWS === ENGINE_ACCOUNT_ROWS - 1
-          ) {
-            bindings.announceResult("edit", "noop");
-            setStatus("Select a loaded financial data row before editing Actual.");
-            return;
-          }
-          const before = bindings.dependencySnapshot(row);
-          const result = grid.applyTransaction({
-            patches: [
-              {
-                op: "set",
-                addr: address,
-                value: { kind: "literal", value: current + ENGINE_ACTUAL_ADJUSTMENT },
-              },
-            ],
-          });
-          if (result.status === "applied") {
-            bindings.announceDependencies("edit", row, before);
-            grid.scrollToCell({
-              sheet: ENGINE_LIVE_SHEET,
-              row,
-              col: ENGINE_COLUMN_INDEX.variance,
-            });
-            grid.setSelection({
-              kind: "range",
-              range: {
-                sheet: ENGINE_LIVE_SHEET,
-                start: { row, col: ENGINE_COLUMN_INDEX.variance },
-                end: { row, col: ENGINE_COLUMN_INDEX.attainment },
-              },
-            });
-          } else {
-            bindings.announceResult("edit", result.status);
-          }
-          setStatus(
-            result.status === "applied"
-              ? `Actual C${row + 1} increased by $1,250. Variance, attainment and the account's annual totals followed.`
-              : `The edit returned ${result.status}.`,
-          );
-          return;
-        }
-        case "undo": {
-          if (grid.getCommandState("undo").disabled) {
-            bindings.announceResult("undo", "noop");
-            setStatus("There is no Grid edit to undo.");
-            return;
-          }
-          const row = currentRowRef.current;
-          const before = bindings.dependencySnapshot(row);
-          grid.undo();
-          bindings.announceDependencies("undo", row, before);
-          grid.setSelection({
-            kind: "range",
-            range: {
-              sheet: ENGINE_LIVE_SHEET,
-              start: { row, col: ENGINE_COLUMN_INDEX.variance },
-              end: { row, col: ENGINE_COLUMN_INDEX.attainment },
-            },
-          });
-          setStatus(`The Grid undid the edit; E${row + 1}:F${row + 1} show restored results.`);
-          return;
-        }
-        case "save": {
-          const operations = bindings.pendingOperations();
-          if (operations.length === 0) {
-            setStatus("The host has no new Grid changes to save.");
-            return;
-          }
-          const response = await saver.commit(operations);
-          if (!mountedRef.current || bindingsRef.current !== bindings) return;
-          bindings.acknowledgeHost(response, operations);
-          const version =
-            response.status === "conflict" ? response.currentVersion : response.version;
-          setStatus(
-            `The host acknowledged ${operations.length} change${operations.length === 1 ? "" : "s"} at version ${version}.`,
-          );
-          return;
-        }
-        case "renderer": {
-          const next = grid.rendererKind() === "canvas" ? "worker" : "canvas";
-          requestedRendererRef.current = next;
-          setRequestedRenderer(next);
-          return;
-        }
-      }
-    },
-    [saver],
-  );
-
   const runAction = useCallback(
-    async (action: EngineAction, rowOverride?: number) => {
+    async (action: EngineAction) => {
       await runCommand(
-        () => executeAction(action, rowOverride),
+        () =>
+          scenarioRef.current?.run(action, action === "jump" ? jumpInputRef.current : undefined),
         (cause) => `The engine action failed: ${String(cause)}. Try again.`,
       );
     },
-    [executeAction, runCommand],
+    [runCommand],
   );
-
-  const followChange = useCallback(async () => {
-    const grid = gridRef.current;
-    if (!grid || followControllerRef.current) return;
-    const controller = new AbortController();
-    followControllerRef.current = controller;
-    const startedAt = performance.now();
-    let loadedAt = startedAt;
-    let recalculatedAt = startedAt;
-    let paintedAt = startedAt;
-    const anchor = followAnchorRef.current;
-    followAnchorRef.current = anchor === 24_000 ? 40_000 : 24_000;
-    const totalRow = engineAccountTotalRow(anchor);
-    setFollowing(true);
-    setFollowDuration(null);
-    setFollowSteps(null);
-    try {
-      await executeAction("jump", anchor);
-      // The annual total sits twelve rows below the account's first month. Scrolling there
-      // keeps the whole account, its annual formulas, and the plan band in one window.
-      grid.scrollToCell({
-        sheet: ENGINE_LIVE_SHEET,
-        row: totalRow,
-        col: ENGINE_COLUMN_INDEX.actual,
-      });
-      const requiredCells = [
-        { row: anchor, col: ENGINE_COLUMN_INDEX.actual },
-        { row: anchor, col: ENGINE_COLUMN_INDEX.forecast },
-        { row: anchor, col: ENGINE_COLUMN_INDEX.variance },
-        { row: anchor, col: ENGINE_COLUMN_INDEX.attainment },
-        { row: totalRow, col: ENGINE_COLUMN_INDEX.actual },
-        { row: totalRow, col: ENGINE_COLUMN_INDEX.forecast },
-        { row: totalRow, col: ENGINE_COLUMN_INDEX.variance },
-        { row: totalRow, col: ENGINE_COLUMN_INDEX.attainment },
-      ];
-      while (
-        !requiredCells.every(
-          (cell) =>
-            typeof grid.store.getCell({ sheet: ENGINE_LIVE_SHEET, ...cell }).resolved === "number",
-        )
-      ) {
-        if (performance.now() - startedAt > 8_000)
-          throw new Error("The requested forecast page did not settle.");
-        await nextEngineFrame(controller.signal);
-      }
-      controller.signal.throwIfAborted();
-      loadedAt = performance.now();
-      await executeAction("edit");
-      grid.refresh();
-      recalculatedAt = performance.now();
-      const paintStartedAt = performance.now();
-      await nextEngineFrame(controller.signal);
-      await nextEngineFrame(controller.signal);
-      emit({ type: "browser-frame", durationMs: performance.now() - paintStartedAt });
-      paintedAt = performance.now();
-      await executeAction("save");
-      controller.signal.throwIfAborted();
-      const finishedAt = performance.now();
-      setFollowSteps([
-        loadedAt - startedAt,
-        recalculatedAt - loadedAt,
-        paintedAt - recalculatedAt,
-        finishedAt - paintedAt,
-      ]);
-      setFollowDuration(finishedAt - startedAt);
-    } catch (cause) {
-      if (!controller.signal.aborted && mountedRef.current) {
-        setStatus(errorText(cause));
-        setError(`Cannot follow the change: ${String(cause)}. Try again.`);
-      }
-    } finally {
-      if (followControllerRef.current === controller) {
-        followControllerRef.current = null;
-        if (mountedRef.current) setFollowing(false);
-      }
-    }
-  }, [emit, executeAction]);
-
-  const rewriteFormula = useCallback(() => {
-    const grid = gridRef.current;
-    const row = currentRowRef.current;
-    if (
-      !grid ||
-      row === 0 ||
-      row >= ENGINE_LIVE_ROWS - 1 ||
-      (row - 1) % ENGINE_ACCOUNT_ROWS === ENGINE_ACCOUNT_ROWS - 1
-    ) {
-      setStatus("Choose a monthly row before you rewrite its forecast formula.");
-      return;
-    }
-    const address = { sheet: ENGINE_LIVE_SHEET, row, col: ENGINE_COLUMN_INDEX.forecast };
-    const base = `=${ENGINE_PLAN_COLUMN}${row + 1}`;
-    const scenario = `${base}*${ENGINE_FORECAST_UPSIDE}`;
-    const current = grid.store.getFormula(address);
-    if (current !== base && current !== scenario) {
-      setStatus("This row no longer holds the plan formula. Undo or reset it first.");
-      return;
-    }
-    const src = current === scenario ? base : scenario;
-    const before = bindingsRef.current?.dependencySnapshot(row);
-    const startedAt = performance.now();
-    const result = grid.applyTransaction({
-      patches: [{ op: "set", addr: address, value: { kind: "formula", src } }],
-    });
-    const durationMs = performance.now() - startedAt;
-    if (result.status === "applied") {
-      if (before) bindingsRef.current?.announceDependencies("edit", row, before);
-      emit({ type: "formula-rewrite", address: `D${row + 1}`, formula: src, durationMs });
-      setRewriteDuration(durationMs);
-      setStatus(
-        `D${row + 1} is now ${src}. It reads the same cell (${ENGINE_PLAN_COLUMN}${row + 1}); this one-cell browser transaction took ${durationMs.toFixed(2)} ms.`,
-      );
-    } else {
-      setStatus(`The formula rewrite returned ${result.status}.`);
-    }
-  }, [emit]);
-
   const reset = useCallback(() => {
-    setReady(false);
-    followControllerRef.current?.abort();
-    followControllerRef.current = null;
-    planRequestRef.current = null;
-    setFollowing(false);
-    setFollowDuration(null);
-    setFollowSteps(null);
-    setRewriteDuration(null);
-    trace.clear();
-    saver.reset();
-    followAnchorRef.current = 24_000;
-    currentRowRef.current = 1;
     jumpInputRef.current = "24001";
-    requestedRendererRef.current = "canvas";
-    setEvents([]);
-    setPendingOperations(0);
-    setCurrentRow(1);
     setJumpInput("24001");
-    setRequestedRenderer("canvas");
-    setGeneration((value) => value + 1);
-  }, [trace, saver]);
+    scenarioRef.current?.reset();
+  }, []);
+  const followChange = () => scenarioRef.current?.followChange();
+  const rewriteFormula = () => scenarioRef.current?.rewriteFormula();
 
   useEffect(() => {
     const handle: EngineShowcaseHandle = {
-      grid: () => gridRef.current,
-      run: (action) => runAction(action),
+      grid: () => scenarioRef.current?.grid() ?? null,
+      run: runAction,
       reset,
-      traceLength: () => trace.size,
+      traceLength: () => scenarioRef.current?.traceLength() ?? 0,
     };
     window.__sheetwriteEngineShowcase = handle;
     return () => {
-      if (window.__sheetwriteEngineShowcase === handle) {
-        delete window.__sheetwriteEngineShowcase;
-      }
+      if (window.__sheetwriteEngineShowcase === handle) delete window.__sheetwriteEngineShowcase;
     };
-  }, [reset, runAction, trace]);
+  }, [reset, runAction]);
+
+  const {
+    events = [],
+    requestedRenderer = "canvas",
+    activeRenderer = "canvas",
+    rendererFallback = null,
+    ready = false,
+    error = null,
+    pendingOperations = 0,
+    currentRow = 1,
+    status = "Starting the calculation engine…",
+    following = false,
+    followDuration = null,
+    followSteps = null,
+    rewriteDuration = null,
+    planRequest = null,
+    varianceValue = null,
+    varianceFormula = null,
+    forecast = null,
+  } = snapshot ?? {};
 
   const latestFormula = eventOfType(events, "formula-update");
   const latestResource = eventOfType(events, "page-resource");
   const latestSave = eventOfType(events, "host-save");
-  const planRequest = planRequestRef.current;
   const rowLabel = currentRow + 1;
-  const varianceValue = gridRef.current?.store.getCell({
-    sheet: ENGINE_LIVE_SHEET,
-    row: currentRow,
-    col: ENGINE_COLUMN_INDEX.variance,
-  }).resolved;
-  const varianceFormula = gridRef.current?.store.getFormula({
-    sheet: ENGINE_LIVE_SHEET,
-    row: currentRow,
-    col: ENGINE_COLUMN_INDEX.variance,
-  });
-  const forecast = gridRef.current?.store.getCell({
-    sheet: ENGINE_LIVE_SHEET,
-    row: currentRow,
-    col: ENGINE_COLUMN_INDEX.forecast,
-  }).resolved;
   const offScreenRead = `${ENGINE_PLAN_COLUMN}${rowLabel}`;
   const offScreenResolved = typeof forecast === "number" && typeof varianceValue === "number";
   const money = new Intl.NumberFormat("en-US", {
@@ -955,10 +494,7 @@ export default function EngineShowcase() {
                         data-testid={`engine-renderer-${renderer}`}
                         disabled={disabled}
                         name="engine-renderer"
-                        onChange={() => {
-                          requestedRendererRef.current = renderer;
-                          setRequestedRenderer(renderer);
-                        }}
+                        onChange={() => scenarioRef.current?.requestRenderer(renderer)}
                         type="radio"
                         value={renderer}
                       />
