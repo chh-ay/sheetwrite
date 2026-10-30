@@ -1,6 +1,6 @@
 ---
 title: "PresenceTransport | @sheetwrite/core"
-description: "Host transport contract for ephemeral presence messages."
+description: "PresenceTransport interface in @sheetwrite/core: Host transport contract for ephemeral presence messages."
 ---
 <!-- api-export:@sheetwrite/core|.|PresenceTransport -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

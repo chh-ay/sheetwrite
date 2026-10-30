@@ -1,6 +1,6 @@
 ---
 title: "SheetLifecycleIssueCode | @sheetwrite/core"
-description: "Stable lifecycle rejection codes suitable for inline sheet-management UI."
+description: "SheetLifecycleIssueCode type in @sheetwrite/core: Stable lifecycle rejection codes suitable for inline sheet-management UI."
 ---
 <!-- api-export:@sheetwrite/core|.|SheetLifecycleIssueCode -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

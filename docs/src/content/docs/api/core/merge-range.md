@@ -1,6 +1,6 @@
 ---
 title: "MergeRange | @sheetwrite/core"
-description: "Inclusive merged-cell rectangle in data-row/column coordinates."
+description: "MergeRange interface in @sheetwrite/core: Inclusive merged-cell rectangle in data-row/column coordinates."
 ---
 <!-- api-export:@sheetwrite/core|.|MergeRange -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

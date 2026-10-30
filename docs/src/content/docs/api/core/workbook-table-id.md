@@ -1,6 +1,6 @@
 ---
 title: "WorkbookTableId | @sheetwrite/core"
-description: "Stable identity for a workbook table."
+description: "WorkbookTableId type in @sheetwrite/core: Stable identity for a workbook table."
 ---
 <!-- api-export:@sheetwrite/core|.|WorkbookTableId -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

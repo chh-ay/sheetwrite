@@ -1,6 +1,6 @@
 ---
 title: "PendingCommit | @sheetwrite/core"
-description: "Immutable local operation batch awaiting a host acknowledgement."
+description: "PendingCommit interface in @sheetwrite/core: Immutable local operation batch awaiting a host acknowledgement."
 ---
 <!-- api-export:@sheetwrite/core|.|PendingCommit -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

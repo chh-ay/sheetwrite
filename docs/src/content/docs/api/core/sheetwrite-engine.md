@@ -1,6 +1,6 @@
 ---
 title: "SheetwriteEngine | @sheetwrite/core"
-description: "A complete engine module from @sheetwrite/wasm or @sheetwrite/formulas."
+description: "SheetwriteEngine interface in @sheetwrite/core: A complete engine module from @sheetwrite/wasm or @sheetwrite/formulas."
 ---
 <!-- api-export:@sheetwrite/core|.|SheetwriteEngine -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "CellBlock | @sheetwrite/core"
-description: "Sparse row-major cells bounded by one rectangular block."
+description: "CellBlock interface in @sheetwrite/core: Sparse row-major cells bounded by one rectangular block."
 ---
 <!-- api-export:@sheetwrite/core|.|CellBlock -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

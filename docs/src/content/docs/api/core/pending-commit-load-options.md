@@ -1,6 +1,6 @@
 ---
 title: "PendingCommitLoadOptions | @sheetwrite/core"
-description: "Mandatory bounds for one durable pending-commit restore."
+description: "PendingCommitLoadOptions interface in @sheetwrite/core: Mandatory bounds for one durable pending-commit restore."
 ---
 <!-- api-export:@sheetwrite/core|.|PendingCommitLoadOptions -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

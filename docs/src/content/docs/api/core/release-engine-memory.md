@@ -1,6 +1,6 @@
 ---
 title: "releaseEngineMemory | @sheetwrite/core"
-description: "Move all live stores into a fresh WASM instance."
+description: "releaseEngineMemory function in @sheetwrite/core: Move all live stores into a fresh WASM instance."
 ---
 <!-- api-export:@sheetwrite/core|.|releaseEngineMemory -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
@@ -10,7 +10,7 @@ the main-thread pause scales with resident data and compact undo history.
 Preparation failures leave every live store and the selected instance unchanged.
 A larger replacement is discarded; the report then has zero migrated stores.
 
-### Examples
+## Examples
 
 ```ts compile
 import { initSheetwrite, releaseEngineMemory } from "@sheetwrite/core";
@@ -21,7 +21,7 @@ const report = await releaseEngineMemory();
 document.body.dataset.engineBytes = String(report.wasmBytesAfter);
 ```
 
-### See also
+## See also
 
 - [EngineMemoryReleaseReport](/docs/api/core/engine-memory-release-report/)
 

@@ -1,6 +1,6 @@
 ---
 title: "SyncMutationStatus | @sheetwrite/core"
-description: "Lifecycle state of one local mutation in the synchronization queue."
+description: "SyncMutationStatus type in @sheetwrite/core: Lifecycle state of one local mutation in the synchronization queue."
 ---
 <!-- api-export:@sheetwrite/core|.|SyncMutationStatus -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

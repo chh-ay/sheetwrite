@@ -1,6 +1,6 @@
 ---
 title: "SyncConnectionState | @sheetwrite/core"
-description: "Host-controlled online state reported by synchronization."
+description: "SyncConnectionState type in @sheetwrite/core: Host-controlled online state reported by synchronization."
 ---
 <!-- api-export:@sheetwrite/core|.|SyncConnectionState -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

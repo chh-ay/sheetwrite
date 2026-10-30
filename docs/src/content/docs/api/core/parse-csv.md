@@ -1,6 +1,6 @@
 ---
 title: "parseCsv | @sheetwrite/core"
-description: "Parse the fixed comma dialect: quoted delimiters/newlines, doubled quotes, bare CR, LF, or CRLF records, Unicode, trailing empty fields, and one optional leading UTF-8 BOM."
+description: "parseCsv function in @sheetwrite/core: Parse the fixed comma dialect: quoted delimiters/newlines, doubled quotes, bare CR, LF, or CRLF records, Unicode…"
 ---
 <!-- api-export:@sheetwrite/core|.|parseCsv -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

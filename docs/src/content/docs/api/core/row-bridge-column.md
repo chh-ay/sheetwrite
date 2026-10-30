@@ -1,6 +1,6 @@
 ---
 title: "RowBridgeColumn | @sheetwrite/core"
-description: "Semantic column key accepted by the row bridge."
+description: "RowBridgeColumn interface in @sheetwrite/core: Semantic column key accepted by the row bridge."
 ---
 <!-- api-export:@sheetwrite/core|.|RowBridgeColumn -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

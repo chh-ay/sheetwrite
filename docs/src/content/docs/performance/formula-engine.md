@@ -223,20 +223,20 @@ Reproduce with:
 bun run --filter @sheetwrite/bench bench:formula
 ```
 
-### Choose a formula engine
+## Choose a formula engine
 
 Shared functions use the same implementation in both builds. Choose by function coverage and download size, not small timing differences.
 
 <div class="sw-engine-choices">
-<div class="sw-engine-choice"><span>Default engine</span><h4><code>@sheetwrite/wasm</code></h4><p>Core spreadsheet functions, with the smaller download.</p><strong>250.1 KiB</strong><small>Brotli WASM · 856.4 KiB uncompressed</small></div>
-<div class="sw-engine-choice"><span>Full engine</span><h4><code>@sheetwrite/formulas</code></h4><p>Default functions, plus statistics, finance, LAMBDA, grouping, and other analysis functions.</p><strong>336.2 KiB</strong><small>Brotli WASM · 1.1 MiB uncompressed</small></div>
+<div class="sw-engine-choice"><span>Default engine</span><h3><code>@sheetwrite/wasm</code></h3><p>Core spreadsheet functions, with the smaller download.</p><strong>250.1 KiB</strong><small>Brotli WASM · 856.4 KiB uncompressed</small></div>
+<div class="sw-engine-choice"><span>Full engine</span><h3><code>@sheetwrite/formulas</code></h3><p>Default functions, plus statistics, finance, LAMBDA, grouping, and other analysis functions.</p><strong>336.2 KiB</strong><small>Brotli WASM · 1.1 MiB uncompressed</small></div>
 </div>
 
 [Browse functions by engine](/docs/reference/formula-functions/) · [Use the full engine](/docs/features/formulas/analysis-formulas/)
 
 <details class="bench-all"><summary>All measurements</summary>
 
-#### Analysis workloads
+### Analysis workloads
 
 Each workload has 1,000 formulas. It has one untimed warmup and five measured samples. Each sample uses a fresh store. The timer measures first recompute. Setup and output reads are outside the timer. Every result is read and summed as a checked checksum. The default engine does not run these analysis functions.
 

@@ -1,6 +1,6 @@
 ---
 title: "validWorkbookTable | @sheetwrite/core"
-description: "Validate one canonical table against sheet bounds and workbook-global identities."
+description: "validWorkbookTable function in @sheetwrite/core: Validate one canonical table against sheet bounds and workbook-global identities."
 ---
 <!-- api-export:@sheetwrite/core|.|validWorkbookTable -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

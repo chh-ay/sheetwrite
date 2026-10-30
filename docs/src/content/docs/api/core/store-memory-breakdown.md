@@ -1,6 +1,6 @@
 ---
 title: "StoreMemoryBreakdown | @sheetwrite/core"
-description: "Decoded, fail-closed retained-memory ownership report from the WASM store."
+description: "StoreMemoryBreakdown interface in @sheetwrite/core: Decoded, fail-closed retained-memory ownership report from the WASM store."
 ---
 <!-- api-export:@sheetwrite/core|.|StoreMemoryBreakdown -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

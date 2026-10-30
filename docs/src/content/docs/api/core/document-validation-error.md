@@ -1,6 +1,6 @@
 ---
 title: "DocumentValidationError | @sheetwrite/core"
-description: "Path-qualified validation failure for a document operation."
+description: "DocumentValidationError interface in @sheetwrite/core: Path-qualified validation failure for a document operation."
 ---
 <!-- api-export:@sheetwrite/core|.|DocumentValidationError -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

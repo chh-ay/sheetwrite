@@ -1,6 +1,6 @@
 ---
 title: Vue
-description: Integrate Sheetwrite with Vue events, exposed Grid state, and resets.
+description: "Use Sheetwrite in Vue: mount the grid component, listen to its events, read the exposed Grid state, and reset it when inputs change."
 ---
 
 `@sheetwrite/vue` wraps a Grid in a Vue component. It initializes WASM after the

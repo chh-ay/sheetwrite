@@ -1,6 +1,6 @@
 ---
 title: "CellEditorContext | @sheetwrite/core"
-description: "Immutable state and guarded completion callbacks for one mounted editor."
+description: "CellEditorContext interface in @sheetwrite/core: Immutable state and guarded completion callbacks for one mounted editor."
 ---
 <!-- api-export:@sheetwrite/core|.|CellEditorContext -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

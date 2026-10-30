@@ -1,6 +1,6 @@
 ---
 title: "SearchResult | @sheetwrite/core"
-description: "Ordered matches and active index produced by a grid search."
+description: "SearchResult interface in @sheetwrite/core: Ordered matches and active index produced by a grid search."
 ---
 <!-- api-export:@sheetwrite/core|.|SearchResult -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

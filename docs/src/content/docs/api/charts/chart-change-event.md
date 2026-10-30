@@ -1,6 +1,6 @@
 ---
 title: "ChartChangeEvent | @sheetwrite/charts"
-description: "Charts whose ChartView may differ after one store commit."
+description: "ChartChangeEvent interface in @sheetwrite/charts: Charts whose ChartView may differ after one store commit."
 ---
 <!-- api-export:@sheetwrite/charts|.|ChartChangeEvent -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/charts/">@sheetwrite/charts</a><span class="api-status" data-kind="interface">interface</span></div>

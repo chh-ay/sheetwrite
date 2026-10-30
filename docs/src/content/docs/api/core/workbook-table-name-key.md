@@ -1,6 +1,6 @@
 ---
 title: "workbookTableNameKey | @sheetwrite/core"
-description: "Locale-independent key used for table and table-column collision checks."
+description: "workbookTableNameKey function in @sheetwrite/core: Locale-independent key used for table and table-column collision checks."
 ---
 <!-- api-export:@sheetwrite/core|.|workbookTableNameKey -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS | @sheetwrite/core"
-description: "Independent metadata ceilings enforced before table arrays cross the WASM boundary."
+description: "DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS variable in @sheetwrite/core: Independent metadata ceilings enforced before table arrays cross the WASM boundary."
 ---
 <!-- api-export:@sheetwrite/core|.|DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="variable">variable</span></div>

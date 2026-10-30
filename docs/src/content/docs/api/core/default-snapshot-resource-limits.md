@@ -1,6 +1,6 @@
 ---
 title: "DEFAULT_SNAPSHOT_RESOURCE_LIMITS | @sheetwrite/core"
-description: "Conservative defaults that retain the million-row paged-sheet contract."
+description: "DEFAULT_SNAPSHOT_RESOURCE_LIMITS variable in @sheetwrite/core: Conservative defaults that retain the million-row paged-sheet contract."
 ---
 <!-- api-export:@sheetwrite/core|.|DEFAULT_SNAPSHOT_RESOURCE_LIMITS -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="variable">variable</span></div>

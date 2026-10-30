@@ -1,6 +1,6 @@
 ---
 title: "ToolbarOptions | @sheetwrite/core/shell"
-description: "Host element and configuration used to create the built-in toolbar."
+description: "ToolbarOptions interface in @sheetwrite/core/shell: Host element and configuration used to create the built-in toolbar."
 ---
 <!-- api-export:@sheetwrite/core|./shell|ToolbarOptions -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-shell/">@sheetwrite/core/shell</a><span class="api-status" data-kind="interface">interface</span></div>

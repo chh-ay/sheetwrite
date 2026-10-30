@@ -1,6 +1,6 @@
 ---
 title: "RebaseConflictCode | @sheetwrite/core"
-description: "Stable conservative-rebase conflict category."
+description: "RebaseConflictCode type in @sheetwrite/core: Stable conservative-rebase conflict category."
 ---
 <!-- api-export:@sheetwrite/core|.|RebaseConflictCode -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

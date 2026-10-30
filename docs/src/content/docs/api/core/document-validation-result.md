@@ -1,6 +1,6 @@
 ---
 title: "DocumentValidationResult | @sheetwrite/core"
-description: "Success or structured errors returned by document validation."
+description: "DocumentValidationResult type in @sheetwrite/core: Success or structured errors returned by document validation."
 ---
 <!-- api-export:@sheetwrite/core|.|DocumentValidationResult -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

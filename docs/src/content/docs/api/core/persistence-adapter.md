@@ -1,13 +1,13 @@
 ---
 title: "PersistenceAdapter | @sheetwrite/core"
-description: "Host load and commit contract for versioned workbook persistence."
+description: "PersistenceAdapter interface in @sheetwrite/core: Host load and commit contract for versioned workbook persistence."
 ---
 <!-- api-export:@sheetwrite/core|.|PersistenceAdapter -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Host load and commit contract for versioned workbook persistence.
 
-### Examples
+## Examples
 
 ```ts compile
 import { MemoryPersistenceAdapter, type PersistenceAdapter, type WorkbookSnapshot } from "@sheetwrite/core";
@@ -19,7 +19,7 @@ async function loadLocal(snapshot: WorkbookSnapshot) {
 }
 ```
 
-### See also
+## See also
 
 - [MemoryPersistenceAdapter](/docs/api/core/memory-persistence-adapter/)
 - [SyncCoordinator](/docs/api/core/sync-coordinator/)

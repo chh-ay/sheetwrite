@@ -1,6 +1,6 @@
 ---
 title: "CommentListResult | @sheetwrite/core"
-description: "Versioned comment-thread listing returned by a host adapter."
+description: "CommentListResult interface in @sheetwrite/core: Versioned comment-thread listing returned by a host adapter."
 ---
 <!-- api-export:@sheetwrite/core|.|CommentListResult -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

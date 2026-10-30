@@ -1,6 +1,6 @@
 ---
 title: "EngineInstance | @sheetwrite/formulas"
-description: "Engine objects and caches owned by one independently collectible WASM instance."
+description: "EngineInstance type in @sheetwrite/formulas: Engine objects and caches owned by one independently collectible WASM instance."
 ---
 <!-- api-export:@sheetwrite/formulas|.|EngineInstance -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/formulas/">@sheetwrite/formulas</a><span class="api-status" data-kind="type">type</span></div>

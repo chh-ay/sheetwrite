@@ -1,6 +1,6 @@
 ---
 title: "fromXlsxWorkbookFile | @sheetwrite/core"
-description: "Import a seekable File/Blob without first buffering the compressed workbook."
+description: "fromXlsxWorkbookFile function in @sheetwrite/core: Import a seekable File/Blob without first buffering the compressed workbook."
 ---
 <!-- api-export:@sheetwrite/core|.|fromXlsxWorkbookFile -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

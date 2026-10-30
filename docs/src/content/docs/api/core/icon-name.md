@@ -1,6 +1,6 @@
 ---
 title: "IconName | @sheetwrite/core"
-description: "The name of one glyph on the command icon sheet; the key of IconOverrides."
+description: "IconName type in @sheetwrite/core: The name of one glyph on the command icon sheet; the key of IconOverrides."
 ---
 <!-- api-export:@sheetwrite/core|.|IconName -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

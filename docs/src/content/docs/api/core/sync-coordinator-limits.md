@@ -1,6 +1,6 @@
 ---
 title: "SyncCoordinatorLimits | @sheetwrite/core"
-description: "Resource ceilings applied independently to remote collaboration input and local durability."
+description: "SyncCoordinatorLimits interface in @sheetwrite/core: Resource ceilings applied independently to remote collaboration input and local durability."
 ---
 <!-- api-export:@sheetwrite/core|.|SyncCoordinatorLimits -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

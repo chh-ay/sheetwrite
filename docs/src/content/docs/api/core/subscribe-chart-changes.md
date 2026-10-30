@@ -1,6 +1,6 @@
 ---
 title: "subscribeChartChanges | @sheetwrite/core"
-description: "Listen for commits that change any chart's ChartView."
+description: "subscribeChartChanges function in @sheetwrite/core: Listen for commits that change any chart's ChartView."
 ---
 <!-- api-export:@sheetwrite/core|.|subscribeChartChanges -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

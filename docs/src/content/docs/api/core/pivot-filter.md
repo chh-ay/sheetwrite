@@ -1,6 +1,6 @@
 ---
 title: "PivotFilter | @sheetwrite/core"
-description: "Keep-list filter: only source rows whose field value is in values contribute."
+description: "PivotFilter interface in @sheetwrite/core: Keep-list filter: only source rows whose field value is in values contribute."
 ---
 <!-- api-export:@sheetwrite/core|.|PivotFilter -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

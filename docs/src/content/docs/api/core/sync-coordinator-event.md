@@ -1,6 +1,6 @@
 ---
 title: "SyncCoordinatorEvent | @sheetwrite/core"
-description: "Queue, version, connection, or error transition emitted by synchronization."
+description: "SyncCoordinatorEvent type in @sheetwrite/core: Queue, version, connection, or error transition emitted by synchronization."
 ---
 <!-- api-export:@sheetwrite/core|.|SyncCoordinatorEvent -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

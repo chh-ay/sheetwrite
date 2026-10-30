@@ -1,6 +1,6 @@
 ---
 title: "MAX_HYPERLINK_ID_LENGTH | @sheetwrite/core"
-description: "Serialized identifier ceiling; IDs remain stable across history and snapshots."
+description: "MAX_HYPERLINK_ID_LENGTH variable in @sheetwrite/core: Serialized identifier ceiling; IDs remain stable across history and snapshots."
 ---
 <!-- api-export:@sheetwrite/core|.|MAX_HYPERLINK_ID_LENGTH -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="variable">variable</span></div>

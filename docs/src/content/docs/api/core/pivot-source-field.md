@@ -1,6 +1,6 @@
 ---
 title: "PivotSourceField | @sheetwrite/core"
-description: "One source field offered by the field list."
+description: "PivotSourceField interface in @sheetwrite/core: One source field offered by the field list."
 ---
 <!-- api-export:@sheetwrite/core|.|PivotSourceField -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

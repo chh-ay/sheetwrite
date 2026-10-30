@@ -1,6 +1,6 @@
 ---
 title: "CommentAnchor | @sheetwrite/core"
-description: "Document location to which a comment thread is attached."
+description: "CommentAnchor type in @sheetwrite/core: Document location to which a comment thread is attached."
 ---
 <!-- api-export:@sheetwrite/core|.|CommentAnchor -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

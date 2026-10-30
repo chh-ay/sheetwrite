@@ -1,6 +1,6 @@
 ---
 title: "toTsvStream | @sheetwrite/core"
-description: "Export canonical data-space TSV with pull-driven store reads and cancellation."
+description: "toTsvStream function in @sheetwrite/core: Export canonical data-space TSV with pull-driven store reads and cancellation."
 ---
 <!-- api-export:@sheetwrite/core|.|toTsvStream -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

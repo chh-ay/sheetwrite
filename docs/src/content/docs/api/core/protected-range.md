@@ -1,6 +1,6 @@
 ---
 title: "ProtectedRange | @sheetwrite/core"
-description: "Serializable client UX policy."
+description: "ProtectedRange interface in @sheetwrite/core: Serializable client UX policy."
 ---
 <!-- api-export:@sheetwrite/core|.|ProtectedRange -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "RowBridgeDelta | @sheetwrite/react"
-description: "Every possible projection produced by a row bridge."
+description: "RowBridgeDelta type in @sheetwrite/react: Every possible projection produced by a row bridge."
 ---
 <!-- api-export:@sheetwrite/react|.|RowBridgeDelta -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/react/">@sheetwrite/react</a><span class="api-status" data-kind="type">type</span></div>

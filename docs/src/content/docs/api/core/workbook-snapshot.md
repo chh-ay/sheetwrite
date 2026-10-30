@@ -1,6 +1,6 @@
 ---
 title: "WorkbookSnapshot | @sheetwrite/core"
-description: "Schema-versioned serializable workbook document."
+description: "WorkbookSnapshot interface in @sheetwrite/core: Schema-versioned serializable workbook document."
 ---
 <!-- api-export:@sheetwrite/core|.|WorkbookSnapshot -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

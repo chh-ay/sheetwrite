@@ -1,6 +1,6 @@
 ---
 title: "ChartDefinition | @sheetwrite/core"
-description: "Persisted chart definition; IDs are unique within the owning sheet."
+description: "ChartDefinition interface in @sheetwrite/core: Persisted chart definition; IDs are unique within the owning sheet."
 ---
 <!-- api-export:@sheetwrite/core|.|ChartDefinition -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

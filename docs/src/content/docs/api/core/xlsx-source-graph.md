@@ -1,6 +1,6 @@
 ---
 title: "XlsxSourceGraph | @sheetwrite/core"
-description: "One relationship from the package, workbook, or a sheet to a retained part graph."
+description: "XlsxSourceGraph interface in @sheetwrite/core: One relationship from the package, workbook, or a sheet to a retained part graph."
 ---
 <!-- api-export:@sheetwrite/core|.|XlsxSourceGraph -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

@@ -14,7 +14,7 @@ export const Route = createFileRoute("/showcases/")({
   head: () => ({
     meta: pageMeta(
       "Showcases — evaluate Sheetwrite by feature",
-      "Every public Sheetwrite feature with its owning live example: editing, formulas, validation, million-row scale, XLSX/CSV exchange, IndexedDB persistence, offline sync, and collaboration.",
+      "Live examples of every Sheetwrite feature: editing, formulas, pivot tables and charts, million-row scale, XLSX/CSV, offline sync and collaboration.",
     ),
     links: [{ rel: "stylesheet", href: hubStylesheet }],
   }),

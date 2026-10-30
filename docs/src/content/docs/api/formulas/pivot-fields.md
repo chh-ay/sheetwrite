@@ -1,6 +1,6 @@
 ---
 title: "PivotFields | @sheetwrite/formulas"
-description: "The names and types of a pivot's source fields, for the field list."
+description: "PivotFields class in @sheetwrite/formulas: The names and types of a pivot's source fields, for the field list."
 ---
 <!-- api-export:@sheetwrite/formulas|.|PivotFields -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/formulas/">@sheetwrite/formulas</a><span class="api-status" data-kind="class">class</span></div>

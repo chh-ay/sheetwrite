@@ -1,6 +1,6 @@
 ---
 title: "RibbonOptions | @sheetwrite/core/shell"
-description: "Options for createRibbon."
+description: "RibbonOptions interface in @sheetwrite/core/shell: Options for createRibbon."
 ---
 <!-- api-export:@sheetwrite/core|./shell|RibbonOptions -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-shell/">@sheetwrite/core/shell</a><span class="api-status" data-kind="interface">interface</span></div>

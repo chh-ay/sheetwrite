@@ -1,6 +1,6 @@
 ---
 title: "IncompleteDataError | @sheetwrite/core"
-description: "Error thrown when an operation requires datasource cells that are not loaded."
+description: "IncompleteDataError class in @sheetwrite/core: Error thrown when an operation requires datasource cells that are not loaded."
 ---
 <!-- api-export:@sheetwrite/core|.|IncompleteDataError -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="class">class</span></div>

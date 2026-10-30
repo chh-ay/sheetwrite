@@ -1,6 +1,6 @@
 ---
 title: "SheetwriteGridProps | @sheetwrite/vue"
-description: "Advanced Vue adapter props for workbook data or datasource ownership."
+description: "SheetwriteGridProps interface in @sheetwrite/vue: Advanced Vue adapter props for workbook data or datasource ownership."
 ---
 <!-- api-export:@sheetwrite/vue|.|SheetwriteGridProps -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/vue/">@sheetwrite/vue</a><span class="api-status" data-kind="interface">interface</span></div>

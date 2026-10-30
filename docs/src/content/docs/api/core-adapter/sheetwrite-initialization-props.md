@@ -1,6 +1,6 @@
 ---
 title: "SheetwriteInitializationProps | @sheetwrite/core/adapter"
-description: "Optional explicit WASM source and initialization error callback for adapters."
+description: "SheetwriteInitializationProps interface in @sheetwrite/core/adapter: Optional explicit WASM source and initialization error callback for adapters."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|SheetwriteInitializationProps -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="interface">interface</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "openChartViews | @sheetwrite/core"
-description: "Open cached chart views through the optional backend."
+description: "openChartViews function in @sheetwrite/core: Open cached chart views through the optional backend."
 ---
 <!-- api-export:@sheetwrite/core|.|openChartViews -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

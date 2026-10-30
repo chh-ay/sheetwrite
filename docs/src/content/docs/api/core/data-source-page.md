@@ -1,6 +1,6 @@
 ---
 title: "DataSourcePage | @sheetwrite/core"
-description: "One resolved rectangular page returned by a DataSource."
+description: "DataSourcePage interface in @sheetwrite/core: One resolved rectangular page returned by a DataSource."
 ---
 <!-- api-export:@sheetwrite/core|.|DataSourcePage -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

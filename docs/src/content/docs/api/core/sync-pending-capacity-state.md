@@ -1,6 +1,6 @@
 ---
 title: "SyncPendingCapacityState | @sheetwrite/core"
-description: "Whether the durable local queue can currently admit another transaction."
+description: "SyncPendingCapacityState type in @sheetwrite/core: Whether the durable local queue can currently admit another transaction."
 ---
 <!-- api-export:@sheetwrite/core|.|SyncPendingCapacityState -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

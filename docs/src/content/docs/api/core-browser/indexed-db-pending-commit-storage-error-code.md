@@ -1,6 +1,6 @@
 ---
 title: "IndexedDbPendingCommitStorageErrorCode | @sheetwrite/core/browser"
-description: "Stable category for an IndexedDB pending-storage failure."
+description: "IndexedDbPendingCommitStorageErrorCode type in @sheetwrite/core/browser: Stable category for an IndexedDB pending-storage failure."
 ---
 <!-- api-export:@sheetwrite/core|./browser|IndexedDbPendingCommitStorageErrorCode -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-browser/">@sheetwrite/core/browser</a><span class="api-status" data-kind="type">type</span></div>

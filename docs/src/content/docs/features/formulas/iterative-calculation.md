@@ -1,6 +1,6 @@
 ---
 title: Iterative calculation
-description: "Calculate circular references the way Excel does: turn on iterative calculation, set the maximum iterations and maximum change, and save the setting in snapshots and XLSX files."
+description: "Calculate circular references as Excel does: turn on iterative calculation, set the iteration limit and maximum change, and save it in XLSX files."
 ---
 
 Enable iterative calculation to let a circular formula run until its value settles.

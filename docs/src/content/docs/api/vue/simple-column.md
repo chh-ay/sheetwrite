@@ -1,6 +1,6 @@
 ---
 title: "SimpleColumn | @sheetwrite/vue"
-description: "Column definition accepted by the adapters’ simple row-object API."
+description: "SimpleColumn interface in @sheetwrite/vue: Column definition accepted by the adapters’ simple row-object API."
 ---
 <!-- api-export:@sheetwrite/vue|.|SimpleColumn -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/vue/">@sheetwrite/vue</a><span class="api-status" data-kind="interface">interface</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "GridCommandName | @sheetwrite/vue"
-description: "Built-in command names accepted by state queries and change events."
+description: "GridCommandName type in @sheetwrite/vue: Built-in command names accepted by state queries and change events."
 ---
 <!-- api-export:@sheetwrite/vue|.|GridCommandName -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/vue/">@sheetwrite/vue</a><span class="api-status" data-kind="type">type</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "validateSheetName | @sheetwrite/core"
-description: "Validate and canonicalize a SpreadsheetML worksheet name."
+description: "validateSheetName function in @sheetwrite/core: Validate and canonicalize a SpreadsheetML worksheet name."
 ---
 <!-- api-export:@sheetwrite/core|.|validateSheetName -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "functionNames | @sheetwrite/formulas"
-description: "Names accepted by the full engine, including aliases."
+description: "functionNames function in @sheetwrite/formulas: Names accepted by the full engine, including aliases."
 ---
 <!-- api-export:@sheetwrite/formulas|.|functionNames -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/formulas/">@sheetwrite/formulas</a><span class="api-status" data-kind="function">function</span></div>

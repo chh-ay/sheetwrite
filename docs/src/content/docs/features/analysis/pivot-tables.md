@@ -1,6 +1,6 @@
 ---
 title: Pivot tables
-description: "Summarize a range or a table into a pivot table: define rows, columns, values and filters, read the result for a field list, and keep the definition through edits, undo, snapshots and collaboration."
+description: "Summarize a range or table into a pivot table with rows, columns, values and filters, edit it from the field list, and keep it through undo and sync."
 ---
 
 ```ts prelude="core" partial="requires a full-engine grid with Month, Region and Revenue columns" title="Revenue by month and region"

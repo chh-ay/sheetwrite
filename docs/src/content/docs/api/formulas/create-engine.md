@@ -1,6 +1,6 @@
 ---
 title: "createEngine | @sheetwrite/formulas"
-description: "Initialize a fresh engine; a compiled module can be reused without retaining its memory."
+description: "createEngine function in @sheetwrite/formulas: Initialize a fresh engine; a compiled module can be reused without retaining its memory."
 ---
 <!-- api-export:@sheetwrite/formulas|.|createEngine -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/formulas/">@sheetwrite/formulas</a><span class="api-status" data-kind="function">function</span></div>

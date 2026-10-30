@@ -1,6 +1,6 @@
 ---
 title: "fromCsv | @sheetwrite/core"
-description: "Parse CSV into ColumnarData."
+description: "fromCsv function in @sheetwrite/core: Parse CSV into ColumnarData."
 ---
 <!-- api-export:@sheetwrite/core|.|fromCsv -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

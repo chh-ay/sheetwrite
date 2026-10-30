@@ -1,6 +1,6 @@
 ---
 title: "GridPublicationAdapter | @sheetwrite/core/adapter"
-description: "Inbound hooks implemented by framework adapters for scheduling and imperative-handle publication."
+description: "GridPublicationAdapter interface in @sheetwrite/core/adapter: Inbound hooks implemented by framework adapters for scheduling and imperative-handle publication."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|GridPublicationAdapter -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="interface">interface</span></div>

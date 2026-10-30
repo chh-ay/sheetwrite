@@ -1,6 +1,6 @@
 ---
 title: "SheetVisibility | @sheetwrite/core"
-description: "Native worksheet visibility preserved across workbook snapshots and tab rendering."
+description: "SheetVisibility type in @sheetwrite/core: Native worksheet visibility preserved across workbook snapshots and tab rendering."
 ---
 <!-- api-export:@sheetwrite/core|.|SheetVisibility -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

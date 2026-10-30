@@ -1,6 +1,6 @@
 ---
 title: "SheetwriteErrorEnvelope | @sheetwrite/core/adapter"
-description: "Structural form preserved across realms and JSON serialization."
+description: "SheetwriteErrorEnvelope interface in @sheetwrite/core/adapter: Structural form preserved across realms and JSON serialization."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|SheetwriteErrorEnvelope -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="interface">interface</span></div>

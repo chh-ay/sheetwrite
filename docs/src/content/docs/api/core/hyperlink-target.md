@@ -1,6 +1,6 @@
 ---
 title: "HyperlinkTarget | @sheetwrite/core"
-description: "Browser-safe external target or stable workbook-internal range target."
+description: "HyperlinkTarget type in @sheetwrite/core: Browser-safe external target or stable workbook-internal range target."
 ---
 <!-- api-export:@sheetwrite/core|.|HyperlinkTarget -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

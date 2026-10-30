@@ -1,13 +1,13 @@
 ---
 title: "fromXlsxWorkbook | @sheetwrite/core"
-description: "Formula-preserving, multi-sheet workbook import through the optional XLSX backend."
+description: "fromXlsxWorkbook function in @sheetwrite/core: Formula-preserving, multi-sheet workbook import through the optional XLSX backend."
 ---
 <!-- api-export:@sheetwrite/core|.|fromXlsxWorkbook -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
 
 Formula-preserving, multi-sheet workbook import through the optional XLSX backend.
 
-### Examples
+## Examples
 
 ```ts compile
 import { registerXlsxBackends } from "@sheetwrite/xlsx";
@@ -21,7 +21,7 @@ async function openWorkbook(host: HTMLElement, file: File) {
 }
 ```
 
-### See also
+## See also
 
 - [toXlsxWorkbook](/docs/api/core/to-xlsx-workbook/)
 

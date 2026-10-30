@@ -1,6 +1,6 @@
 ---
 title: "createAdapterGridController | @sheetwrite/core/adapter"
-description: "Owns initialization, replacement, publication, and retirement for framework adapters."
+description: "createAdapterGridController function in @sheetwrite/core/adapter: Owns initialization, replacement, publication, and retirement for framework adapters."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|createAdapterGridController -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="function">function</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "DEFAULT_DELIMITED_TEXT_RESOURCE_LIMITS | @sheetwrite/core"
-description: "Synchronous operations return one in-memory string, so byte/cell ceilings bound allocation while sheet-compatible dimensions remain independently valid."
+description: "DEFAULT_DELIMITED_TEXT_RESOURCE_LIMITS variable in @sheetwrite/core: Synchronous operations return one in-memory string, so byte/cell ceilings bound…"
 ---
 <!-- api-export:@sheetwrite/core|.|DEFAULT_DELIMITED_TEXT_RESOURCE_LIMITS -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="variable">variable</span></div>

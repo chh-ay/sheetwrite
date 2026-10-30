@@ -11,8 +11,9 @@ import {
   normalizeDocumentHref,
 } from "../lib/content.js";
 import { forwardedHeading, MOVED_PAGES, movedPageTarget } from "../lib/moved-pages.js";
+import { breadcrumbsFor } from "../lib/navigation.js";
 import { revealAnchoredMember } from "../lib/reveal-anchor.ts";
-import { pageMeta } from "../lib/seo.js";
+import { documentStructuredData, pageMeta, pageTitle } from "../lib/seo.js";
 
 /** Documentation content renders its site links through the router. */
 const DOCUMENT_COMPONENTS: DocumentComponents = {
@@ -26,24 +27,47 @@ export const Route = createFileRoute("/docs/$")({
     const href = normalizeDocumentHref(params._splat);
     const moved = MOVED_PAGES[href];
     if (moved !== undefined) {
-      return { title: "Page moved", description: "This page has a new address.", moved: href };
+      return {
+        title: "Page moved",
+        description: "This page has a new address.",
+        moved: href,
+        href,
+      };
     }
     // Dynamic import: the docs page index ships with docs routes, not every page.
     const { documentForSplat } = await import("../lib/content.js");
     const document = await documentForSplat(params._splat);
     if (document === undefined) throw notFound();
-    return { title: document.title, description: document.description, moved: undefined };
+    return { title: document.title, description: document.description, moved: undefined, href };
   },
-  head: ({ loaderData }) => ({
-    meta: [
-      ...pageMeta(
-        `${loaderData?.title ?? "Documentation"} — Sheetwrite`,
-        loaderData?.description ?? "Sheetwrite documentation.",
-      ),
-      // An old address must not compete with its new page in search results.
-      ...(loaderData?.moved === undefined ? [] : [{ name: "robots", content: "noindex, follow" }]),
-    ],
-  }),
+  head: ({ loaderData }) => {
+    const title = loaderData?.title ?? "Documentation";
+    const description = loaderData?.description ?? "Sheetwrite documentation.";
+
+    // An old address must not compete with its new page in search results.
+    if (loaderData === undefined || loaderData.moved !== undefined) {
+      return {
+        meta: [
+          ...pageMeta(pageTitle(title), description),
+          { name: "robots", content: "noindex, follow" },
+        ],
+      };
+    }
+
+    const structuredData = documentStructuredData({
+      title,
+      description,
+      href: loaderData.href,
+      trail: breadcrumbsFor(loaderData.href, title),
+    });
+    return {
+      meta: [
+        ...pageMeta(pageTitle(title), description),
+        { property: "og:type", content: "article" },
+      ],
+      scripts: [{ type: "application/ld+json", children: structuredData }],
+    };
+  },
   component: DocumentRoute,
   notFoundComponent: DocumentNotFound,
 });

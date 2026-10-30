@@ -1,6 +1,6 @@
 ---
 title: "SyncActivityState | @sheetwrite/core"
-description: "Current persistence activity reported by a sync coordinator."
+description: "SyncActivityState type in @sheetwrite/core: Current persistence activity reported by a sync coordinator."
 ---
 <!-- api-export:@sheetwrite/core|.|SyncActivityState -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

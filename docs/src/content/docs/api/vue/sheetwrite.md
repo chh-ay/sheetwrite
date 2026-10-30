@@ -1,13 +1,13 @@
 ---
 title: "Sheetwrite | @sheetwrite/vue"
-description: "Convenience component for local object rows with live option updates."
+description: "Sheetwrite variable in @sheetwrite/vue: Convenience component for local object rows with live option updates."
 ---
 <!-- api-export:@sheetwrite/vue|.|Sheetwrite -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/vue/">@sheetwrite/vue</a><span class="api-status" data-kind="variable">variable</span></div>
 
 Convenience component for local object rows with live option updates.
 
-### Examples
+## Examples
 
 ```ts compile
 import { createApp, h } from "vue";
@@ -22,7 +22,7 @@ app.mount(document.body);
 // Call app.unmount() before removing the host view.
 ```
 
-### See also
+## See also
 
 - [SheetwriteGrid](/docs/api/vue/sheetwrite-grid/)
 - [/docs/frameworks/vue/](/docs/frameworks/vue/)

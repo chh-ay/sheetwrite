@@ -1,6 +1,6 @@
 ---
 title: "RowBridgePasteDelta | @sheetwrite/core"
-description: "A paste transaction effect."
+description: "RowBridgePasteDelta interface in @sheetwrite/core: A paste transaction effect."
 ---
 <!-- api-export:@sheetwrite/core|.|RowBridgePasteDelta -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

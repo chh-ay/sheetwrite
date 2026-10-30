@@ -1,6 +1,6 @@
 ---
 title: "WorkbookTableResourceLimits | @sheetwrite/core"
-description: "Resource ceilings for canonical workbook-table metadata and identifiers."
+description: "WorkbookTableResourceLimits interface in @sheetwrite/core: Resource ceilings for canonical workbook-table metadata and identifiers."
 ---
 <!-- api-export:@sheetwrite/core|.|WorkbookTableResourceLimits -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

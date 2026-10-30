@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
+import { SITE_URL } from "../docs/src/lib/seo.js";
 import {
   ADAPTER_DOC_CONTRACT,
   adapterContractIssues,
@@ -10,10 +11,12 @@ import {
   landingDownloads,
   movedPageIssues,
   PERFORMANCE_PAGES,
+  renderCompatibilityResults,
   renderEntryPage,
   renderSymbolPage,
   runCompletionSummary,
   splitPerformancePages,
+  symbolDescription,
   unresolvedSiteLinks,
 } from "./docs.js";
 import type { ApiEntryPoint, ApiExport, ApiPackage, PublicApiManifest } from "./public-api.js";
@@ -139,6 +142,12 @@ describe("documentation generation", () => {
     expect(page).toContain("```ts compile\nconst count = 2;\n```");
     expect(page).toContain("[Commit reasons](/docs/api/core/commit-reason/)");
     expect(page).toContain("[https://example.com/guide](https://example.com/guide)");
+    // The symbol's own sections sit under the page title (H2); a member's sit
+    // under Members (H3). Neither may skip a heading level.
+    const summary = page.slice(0, page.indexOf("## Members"));
+    expect(summary).toMatch(/^## Examples$/m);
+    expect(summary).toMatch(/^## See also$/m);
+    expect(summary).not.toMatch(/^### /m);
     const member =
       /<details class="api-member" id="grid-apply-transaction"[\s\S]*?<\/details>/.exec(
         page,
@@ -154,16 +163,24 @@ describe("documentation generation", () => {
 
   it("keeps published package README links valid outside the monorepo", async () => {
     const root = resolve(import.meta.dir, "..");
+    const allowed = [`${SITE_URL}/`, "https://github.com/chh-ay/sheetwrite/"];
     for (const name of PUBLISHABLE_PACKAGE_ORDER) {
       const directory = name.slice("@sheetwrite/".length);
       const readme = await readFile(resolve(root, "packages", directory, "README.md"), "utf8");
       const links = [...readme.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)].map((match) => match[1]!);
       for (const link of links) {
-        expect(link).toMatch(
-          /^https:\/\/(?:sheetwrite\.vercel\.app\/|github\.com\/chh-ay\/sheetwrite\/)/,
-        );
+        // The link is in the compared value, so a failure names it.
+        expect({ link, allowed: allowed.some((prefix) => link.startsWith(prefix)) }).toEqual({
+          link,
+          allowed: true,
+        });
       }
     }
+  });
+
+  it("leaves the page title as the compatibility results page's only H1", () => {
+    // The docs shell renders the frontmatter title as the H1.
+    expect(renderCompatibilityResults()).not.toMatch(/^# /m);
   });
 
   it("never double-counts failed runs in the completion summary", () => {
@@ -316,6 +333,30 @@ describe("documentation generation", () => {
   });
 });
 
+describe("API symbol search descriptions", () => {
+  it("names the symbol, its kind and package, so re-exports from two packages differ", () => {
+    const summary = "Chart families that the document model supports.";
+    const core = symbolDescription("ChartKind", "type", "@sheetwrite/core", summary);
+    const charts = symbolDescription("ChartKind", "type", "@sheetwrite/charts", summary);
+
+    expect(core).toBe(`ChartKind type in @sheetwrite/core: ${summary}`);
+    expect(core).not.toBe(charts);
+  });
+
+  it("clips a long summary on a word, within what search results show", () => {
+    const long = symbolDescription(
+      "Grid",
+      "interface",
+      "@sheetwrite/core",
+      `The imperative grid handle. ${"It reads, edits and renders a workbook. ".repeat(8)}`,
+    );
+
+    expect(long.length).toBeLessThanOrEqual(160);
+    expect(long.endsWith("…")).toBe(true);
+    expect(long).not.toMatch(/\s…$/);
+  });
+});
+
 describe("moved pages and site links", () => {
   const contentRoot = resolve(import.meta.dir, "../docs/src/content/docs");
   const documents = [
@@ -390,6 +431,23 @@ describe("performance pages", () => {
     expect(memory).toContain("## Release retained engine memory");
     expect(memory).toContain("## Runtime resource ownership");
     expect(pages.get("performance/index.md")).toContain("](/docs/performance/memory/)");
+  });
+
+  it("lifts a one-section page's headings to sit right under its title", () => {
+    const fenced = "```md\n### Not a heading\n<h4>Literal</h4>\n```\n";
+    const nested = evidence
+      .replace("Render benchmark body.\n", `### Scale\n\n<h4>Card</h4>\n\n#### Detail\n\n${fenced}`)
+      .replace("Runtime resource ownership body.\n", "### Owners\n");
+    const pages = new Map(splitPerformancePages(nested).map((page) => [page.route, page.content]));
+
+    const render = pages.get("performance/render.md") ?? "";
+    expect(render).toMatch(/^## Scale$/m);
+    expect(render).toContain("<h3>Card</h3>");
+    expect(render).toMatch(/^### Detail$/m);
+    // Code shows its text as written.
+    expect(render).toContain(fenced);
+    // A page with several sections keeps their H2s, so nothing moves.
+    expect(pages.get("performance/memory.md")).toMatch(/^### Owners$/m);
   });
 
   it("rejects a section that no page lists", () => {

@@ -1,6 +1,6 @@
 ---
 title: "VisibleWindowView | @sheetwrite/core"
-description: "One rectangular window of resolved cells, returned by Store.getVisibleWindow in a single call."
+description: "VisibleWindowView interface in @sheetwrite/core: One rectangular window of resolved cells, returned by Store.getVisibleWindow in a single call."
 ---
 <!-- api-export:@sheetwrite/core|.|VisibleWindowView -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "sheetNameKey | @sheetwrite/core"
-description: "NFC and locale-independent Unicode lowercase key used for worksheet-name identity."
+description: "sheetNameKey function in @sheetwrite/core: NFC and locale-independent Unicode lowercase key used for worksheet-name identity."
 ---
 <!-- api-export:@sheetwrite/core|.|sheetNameKey -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

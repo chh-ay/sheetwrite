@@ -1,6 +1,6 @@
 ---
 title: "ChartChangeListener | @sheetwrite/core"
-description: "Listener for subscribeChartChanges and ChartViewProvider.subscribe."
+description: "ChartChangeListener type in @sheetwrite/core: Listener for subscribeChartChanges and ChartViewProvider.subscribe."
 ---
 <!-- api-export:@sheetwrite/core|.|ChartChangeListener -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

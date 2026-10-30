@@ -1,6 +1,6 @@
 ---
 title: "SyncProtocolError | @sheetwrite/core"
-description: "Typed rejection of malformed or resource-exhausting synchronization input."
+description: "SyncProtocolError class in @sheetwrite/core: Typed rejection of malformed or resource-exhausting synchronization input."
 ---
 <!-- api-export:@sheetwrite/core|.|SyncProtocolError -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="class">class</span></div>

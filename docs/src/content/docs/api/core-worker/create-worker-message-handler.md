@@ -1,6 +1,6 @@
 ---
 title: "createWorkerMessageHandler | @sheetwrite/core/worker"
-description: "Build the worker-side protocol handler."
+description: "createWorkerMessageHandler function in @sheetwrite/core/worker: Build the worker-side protocol handler."
 ---
 <!-- api-export:@sheetwrite/core|./worker|createWorkerMessageHandler -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-worker/">@sheetwrite/core/worker</a><span class="api-status" data-kind="function">function</span></div>

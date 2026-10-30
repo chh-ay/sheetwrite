@@ -1,6 +1,6 @@
 ---
 title: "RowBridgeClearDelta | @sheetwrite/core/adapter"
-description: "A clearRange effect expanded to its exact changed cells."
+description: "RowBridgeClearDelta interface in @sheetwrite/core/adapter: A clearRange effect expanded to its exact changed cells."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|RowBridgeClearDelta -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="interface">interface</span></div>

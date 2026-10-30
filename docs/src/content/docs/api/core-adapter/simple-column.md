@@ -1,6 +1,6 @@
 ---
 title: "SimpleColumn | @sheetwrite/core/adapter"
-description: "Column definition accepted by the adapters’ simple row-object API."
+description: "SimpleColumn interface in @sheetwrite/core/adapter: Column definition accepted by the adapters’ simple row-object API."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|SimpleColumn -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="interface">interface</span></div>

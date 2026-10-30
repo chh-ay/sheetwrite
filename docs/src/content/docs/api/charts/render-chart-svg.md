@@ -1,6 +1,6 @@
 ---
 title: "renderChartSvg | @sheetwrite/charts"
-description: "Draws a chart view as a standalone SVG element of size CSS pixels."
+description: "renderChartSvg function in @sheetwrite/charts: Draws a chart view as a standalone SVG element of size CSS pixels."
 ---
 <!-- api-export:@sheetwrite/charts|.|renderChartSvg -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/charts/">@sheetwrite/charts</a><span class="api-status" data-kind="function">function</span></div>
@@ -11,7 +11,7 @@ Series colors read `--sheetwrite-chart-1` to `--sheetwrite-chart-8`, and text
 reads the grid theme variables, so the chart follows the host theme. The
 function reads no cells and keeps no state.
 
-### Examples
+## Examples
 
 ```ts compile
 import { renderChartSvg, type ChartView } from "@sheetwrite/charts";

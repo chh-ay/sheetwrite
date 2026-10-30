@@ -1,6 +1,6 @@
 ---
 title: "RowBridgeFillDelta | @sheetwrite/core"
-description: "A fill-series transaction effect."
+description: "RowBridgeFillDelta interface in @sheetwrite/core: A fill-series transaction effect."
 ---
 <!-- api-export:@sheetwrite/core|.|RowBridgeFillDelta -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

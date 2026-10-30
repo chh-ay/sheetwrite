@@ -1,13 +1,13 @@
 ---
 title: "DataSource | @sheetwrite/core"
-description: "Host callback that asynchronously loads cancellable rectangular pages."
+description: "DataSource interface in @sheetwrite/core: Host callback that asynchronously loads cancellable rectangular pages."
 ---
 <!-- api-export:@sheetwrite/core|.|DataSource -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Host callback that asynchronously loads cancellable rectangular pages.
 
-### Examples
+## Examples
 
 ```ts compile
 import type { DataSource, RowData } from "@sheetwrite/core";
@@ -27,7 +27,7 @@ const datasource: DataSource = {
 };
 ```
 
-### See also
+## See also
 
 - [GridOptions.datasource](/docs/api/core/grid-options/#grid-options-datasource)
 - [DataSourceRequest](/docs/api/core/data-source-request/)

@@ -1,6 +1,6 @@
 ---
 title: "SnapshotResourceError | @sheetwrite/core"
-description: "Stable resource failure raised by direct workbook construction paths."
+description: "SnapshotResourceError class in @sheetwrite/core: Stable resource failure raised by direct workbook construction paths."
 ---
 <!-- api-export:@sheetwrite/core|.|SnapshotResourceError -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="class">class</span></div>

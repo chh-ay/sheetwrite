@@ -1,6 +1,6 @@
 ---
 title: "ProtectionRequest | @sheetwrite/core"
-description: "Local operation and protected-range context supplied to the host policy."
+description: "ProtectionRequest interface in @sheetwrite/core: Local operation and protected-range context supplied to the host policy."
 ---
 <!-- api-export:@sheetwrite/core|.|ProtectionRequest -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

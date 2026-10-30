@@ -1,6 +1,6 @@
 ---
 title: "RevisionCoordinator | @sheetwrite/core"
-description: "Coordinates listing and restoring host-owned workbook revisions."
+description: "RevisionCoordinator class in @sheetwrite/core: Coordinates listing and restoring host-owned workbook revisions."
 ---
 <!-- api-export:@sheetwrite/core|.|RevisionCoordinator -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="class">class</span></div>

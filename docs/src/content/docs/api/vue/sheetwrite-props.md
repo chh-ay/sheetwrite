@@ -1,6 +1,6 @@
 ---
 title: "SheetwriteProps | @sheetwrite/vue"
-description: "Simple Vue adapter props for columns and default row objects."
+description: "SheetwriteProps interface in @sheetwrite/vue: Simple Vue adapter props for columns and default row objects."
 ---
 <!-- api-export:@sheetwrite/vue|.|SheetwriteProps -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/vue/">@sheetwrite/vue</a><span class="api-status" data-kind="interface">interface</span></div>

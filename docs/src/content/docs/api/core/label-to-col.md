@@ -1,6 +1,6 @@
 ---
 title: "labelToCol | @sheetwrite/core"
-description: "A1 column label → 0-based column index (inverse of colToA1)."
+description: "labelToCol function in @sheetwrite/core: A1 column label → 0-based column index (inverse of colToA1)."
 ---
 <!-- api-export:@sheetwrite/core|.|labelToCol -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

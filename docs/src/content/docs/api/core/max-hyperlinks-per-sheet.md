@@ -1,6 +1,6 @@
 ---
 title: "MAX_HYPERLINKS_PER_SHEET | @sheetwrite/core"
-description: "Renderer/codec ceiling for one sheet's hyperlink metadata."
+description: "MAX_HYPERLINKS_PER_SHEET variable in @sheetwrite/core: Renderer/codec ceiling for one sheet's hyperlink metadata."
 ---
 <!-- api-export:@sheetwrite/core|.|MAX_HYPERLINKS_PER_SHEET -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="variable">variable</span></div>

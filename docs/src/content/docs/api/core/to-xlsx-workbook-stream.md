@@ -1,6 +1,6 @@
 ---
 title: "toXlsxWorkbookStream | @sheetwrite/core"
-description: "Stream formula-preserving workbook XLSX with backpressure and cancellation."
+description: "toXlsxWorkbookStream function in @sheetwrite/core: Stream formula-preserving workbook XLSX with backpressure and cancellation."
 ---
 <!-- api-export:@sheetwrite/core|.|toXlsxWorkbookStream -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

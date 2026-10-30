@@ -1,6 +1,6 @@
 ---
 title: "RuntimeResourcePhaseDelta | @sheetwrite/core"
-description: "Owner and runtime deltas between two phases of the same operation."
+description: "RuntimeResourcePhaseDelta interface in @sheetwrite/core: Owner and runtime deltas between two phases of the same operation."
 ---
 <!-- api-export:@sheetwrite/core|.|RuntimeResourcePhaseDelta -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

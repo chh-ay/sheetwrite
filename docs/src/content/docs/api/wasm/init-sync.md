@@ -1,6 +1,6 @@
 ---
 title: "initSync | @sheetwrite/wasm"
-description: "Instantiates the given module, which can either be bytes or a precompiled WebAssembly.Module."
+description: "initSync function in @sheetwrite/wasm: Instantiates the given module, which can either be bytes or a precompiled WebAssembly.Module."
 ---
 <!-- api-export:@sheetwrite/wasm|.|initSync -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/wasm/">@sheetwrite/wasm</a><span class="api-status" data-kind="function">function</span></div>

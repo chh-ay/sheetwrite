@@ -1,6 +1,6 @@
 ---
 title: "WorkbookTableNameValidationResult | @sheetwrite/core"
-description: "Result of validating and NFC-normalizing a workbook table name."
+description: "WorkbookTableNameValidationResult type in @sheetwrite/core: Result of validating and NFC-normalizing a workbook table name."
 ---
 <!-- api-export:@sheetwrite/core|.|WorkbookTableNameValidationResult -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

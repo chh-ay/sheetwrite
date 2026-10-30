@@ -1,6 +1,6 @@
 ---
 title: "isCellFontFamily | @sheetwrite/core"
-description: "Whether value is a valid cell fontFamily: 1-128 letters, digits, spaces, ., or -, starting with a letter or digit and not ending in a space."
+description: "isCellFontFamily function in @sheetwrite/core: Whether value is a valid cell fontFamily: 1-128 letters, digits, spaces, ., or -, starting with a letter or…"
 ---
 <!-- api-export:@sheetwrite/core|.|isCellFontFamily -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

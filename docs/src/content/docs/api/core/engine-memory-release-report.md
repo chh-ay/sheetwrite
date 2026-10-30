@@ -1,6 +1,6 @@
 ---
 title: "EngineMemoryReleaseReport | @sheetwrite/core"
-description: "Result of an explicit, all-store engine memory release."
+description: "EngineMemoryReleaseReport interface in @sheetwrite/core: Result of an explicit, all-store engine memory release."
 ---
 <!-- api-export:@sheetwrite/core|.|EngineMemoryReleaseReport -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "CommentMessage | @sheetwrite/core"
-description: "One immutable author message in a comment thread."
+description: "CommentMessage interface in @sheetwrite/core: One immutable author message in a comment thread."
 ---
 <!-- api-export:@sheetwrite/core|.|CommentMessage -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

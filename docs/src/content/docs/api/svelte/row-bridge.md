@@ -1,6 +1,6 @@
 ---
 title: "RowBridge | @sheetwrite/svelte"
-description: "Projects canonical document transactions into host-owned row changes."
+description: "RowBridge class in @sheetwrite/svelte: Projects canonical document transactions into host-owned row changes."
 ---
 <!-- api-export:@sheetwrite/svelte|.|RowBridge -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="class">class</span></div>

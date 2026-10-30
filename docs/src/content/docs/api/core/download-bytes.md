@@ -1,6 +1,6 @@
 ---
 title: "downloadBytes | @sheetwrite/core"
-description: "Trigger a browser download from in-memory bytes."
+description: "downloadBytes function in @sheetwrite/core: Trigger a browser download from in-memory bytes."
 ---
 <!-- api-export:@sheetwrite/core|.|downloadBytes -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

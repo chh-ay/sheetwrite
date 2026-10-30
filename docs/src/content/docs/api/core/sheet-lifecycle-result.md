@@ -1,6 +1,6 @@
 ---
 title: "SheetLifecycleResult | @sheetwrite/core"
-description: "Actionable transaction outcome for a stable sheet lifecycle target."
+description: "SheetLifecycleResult type in @sheetwrite/core: Actionable transaction outcome for a stable sheet lifecycle target."
 ---
 <!-- api-export:@sheetwrite/core|.|SheetLifecycleResult -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

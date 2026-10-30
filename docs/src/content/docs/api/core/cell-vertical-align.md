@@ -1,6 +1,6 @@
 ---
 title: "CellVerticalAlign | @sheetwrite/core"
-description: "Vertical text placement within a cell's height."
+description: "CellVerticalAlign type in @sheetwrite/core: Vertical text placement within a cell's height."
 ---
 <!-- api-export:@sheetwrite/core|.|CellVerticalAlign -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

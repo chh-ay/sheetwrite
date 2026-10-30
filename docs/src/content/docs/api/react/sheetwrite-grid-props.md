@@ -1,6 +1,6 @@
 ---
 title: "SheetwriteGridProps | @sheetwrite/react"
-description: "Advanced framework adapter props for workbook data or datasource ownership."
+description: "SheetwriteGridProps interface in @sheetwrite/react: Advanced framework adapter props for workbook data or datasource ownership."
 ---
 <!-- api-export:@sheetwrite/react|.|SheetwriteGridProps -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/react/">@sheetwrite/react</a><span class="api-status" data-kind="interface">interface</span></div>

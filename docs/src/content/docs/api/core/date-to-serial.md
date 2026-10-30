@@ -1,6 +1,6 @@
 ---
 title: "dateToSerial | @sheetwrite/core"
-description: "Convert a real UTC Date to the Excel 1900-system serial."
+description: "dateToSerial function in @sheetwrite/core: Convert a real UTC Date to the Excel 1900-system serial."
 ---
 <!-- api-export:@sheetwrite/core|.|dateToSerial -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

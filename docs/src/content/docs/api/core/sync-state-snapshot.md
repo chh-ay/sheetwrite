@@ -1,6 +1,6 @@
 ---
 title: "SyncStateSnapshot | @sheetwrite/core"
-description: "Immutable observable synchronization state."
+description: "SyncStateSnapshot interface in @sheetwrite/core: Immutable observable synchronization state."
 ---
 <!-- api-export:@sheetwrite/core|.|SyncStateSnapshot -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

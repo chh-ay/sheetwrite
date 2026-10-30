@@ -1,6 +1,13 @@
 import { describe, expect, it } from "bun:test";
 
-import { type NavigationItem, navigationBadge, navigationPages } from "../src/lib/navigation.js";
+import {
+  breadcrumbsFor,
+  documentNeighbours,
+  type NavigationItem,
+  navigationBadge,
+  navigationPages,
+} from "../src/lib/navigation.js";
+import { sectionPages } from "../src/lib/section-cards.js";
 
 const RELEASE = "0.6.0";
 
@@ -51,5 +58,33 @@ describe("navigationBadge", () => {
 
   it("marks an updated page that adds nothing new as updated", () => {
     expect(navigationBadge(volatile, RELEASE)).toBe("updated");
+  });
+});
+
+describe("section overview pages", () => {
+  it("link the section step in the trail of every page in the section", () => {
+    expect(breadcrumbsFor("/docs/start/installation/", "Installation")).toEqual([
+      { href: "/docs/", label: "Documentation" },
+      { href: "/docs/start/", label: "Getting started" },
+      { label: "Installation" },
+    ]);
+  });
+
+  it("end their own trail without linking to themselves", () => {
+    expect(breadcrumbsFor("/docs/start/", "Getting started")).toEqual([
+      { href: "/docs/", label: "Documentation" },
+      { label: "Getting started" },
+    ]);
+  });
+
+  it("come before their section's pages in the reading order", () => {
+    expect(documentNeighbours("/docs/start/").next?.href).toBe("/docs/start/installation/");
+    expect(documentNeighbours("/docs/start/installation/").previous?.href).toBe("/docs/start/");
+  });
+
+  it("list the section's pages as cards", () => {
+    expect(sectionPages("/docs/tutorials/").map((page) => page.href)).toContain(
+      "/docs/tutorials/excel-in-react/",
+    );
   });
 });

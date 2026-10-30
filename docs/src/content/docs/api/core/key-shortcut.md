@@ -1,6 +1,6 @@
 ---
 title: "KeyShortcut | @sheetwrite/core"
-description: "A compact modified key combination or a key object."
+description: "KeyShortcut type in @sheetwrite/core: A compact modified key combination or a key object."
 ---
 <!-- api-export:@sheetwrite/core|.|KeyShortcut -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

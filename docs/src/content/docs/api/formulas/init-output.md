@@ -1,6 +1,6 @@
 ---
 title: "InitOutput | @sheetwrite/formulas"
-description: "Result of module initialization: the instantiated exports plus the shared linear memory."
+description: "InitOutput interface in @sheetwrite/formulas: Result of module initialization: the instantiated exports plus the shared linear memory."
 ---
 <!-- api-export:@sheetwrite/formulas|.|InitOutput -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/formulas/">@sheetwrite/formulas</a><span class="api-status" data-kind="interface">interface</span></div>

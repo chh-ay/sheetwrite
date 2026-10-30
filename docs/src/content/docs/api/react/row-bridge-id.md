@@ -1,6 +1,6 @@
 ---
 title: "RowBridgeId | @sheetwrite/react"
-description: "A stable host identity for one data-space row."
+description: "RowBridgeId type in @sheetwrite/react: A stable host identity for one data-space row."
 ---
 <!-- api-export:@sheetwrite/react|.|RowBridgeId -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/react/">@sheetwrite/react</a><span class="api-status" data-kind="type">type</span></div>

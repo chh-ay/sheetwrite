@@ -1,6 +1,6 @@
 ---
 title: "GridEvents | @sheetwrite/core"
-description: "Payload map for events emitted by a Grid."
+description: "GridEvents interface in @sheetwrite/core: Payload map for events emitted by a Grid."
 ---
 <!-- api-export:@sheetwrite/core|.|GridEvents -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

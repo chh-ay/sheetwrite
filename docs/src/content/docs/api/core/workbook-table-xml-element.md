@@ -1,6 +1,6 @@
 ---
 title: "WorkbookTableXmlElement | @sheetwrite/core"
-description: "Bounded OOXML table-rule metadata."
+description: "WorkbookTableXmlElement interface in @sheetwrite/core: Bounded OOXML table-rule metadata."
 ---
 <!-- api-export:@sheetwrite/core|.|WorkbookTableXmlElement -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

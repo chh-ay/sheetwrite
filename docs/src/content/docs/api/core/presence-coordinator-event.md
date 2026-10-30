@@ -1,6 +1,6 @@
 ---
 title: "PresenceCoordinatorEvent | @sheetwrite/core"
-description: "Connection or actor transition emitted by presence coordination."
+description: "PresenceCoordinatorEvent type in @sheetwrite/core: Connection or actor transition emitted by presence coordination."
 ---
 <!-- api-export:@sheetwrite/core|.|PresenceCoordinatorEvent -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

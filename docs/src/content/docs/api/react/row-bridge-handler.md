@@ -1,6 +1,6 @@
 ---
 title: "RowBridgeHandler | @sheetwrite/react"
-description: "Callback accepted by imperative and framework adapters."
+description: "RowBridgeHandler type in @sheetwrite/react: Callback accepted by imperative and framework adapters."
 ---
 <!-- api-export:@sheetwrite/react|.|RowBridgeHandler -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/react/">@sheetwrite/react</a><span class="api-status" data-kind="type">type</span></div>

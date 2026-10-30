@@ -1,6 +1,6 @@
 ---
 title: "hyperlinkAt | @sheetwrite/core"
-description: "Return the first validated hyperlink covering an address, or null when none does."
+description: "hyperlinkAt function in @sheetwrite/core: Return the first validated hyperlink covering an address, or null when none does."
 ---
 <!-- api-export:@sheetwrite/core|.|hyperlinkAt -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

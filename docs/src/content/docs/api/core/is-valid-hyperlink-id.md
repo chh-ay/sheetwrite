@@ -1,6 +1,6 @@
 ---
 title: "isValidHyperlinkId | @sheetwrite/core"
-description: "Whether an identifier is bounded, non-empty, trimmed, and free of control characters."
+description: "isValidHyperlinkId function in @sheetwrite/core: Whether an identifier is bounded, non-empty, trimmed, and free of control characters."
 ---
 <!-- api-export:@sheetwrite/core|.|isValidHyperlinkId -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

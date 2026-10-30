@@ -1,6 +1,6 @@
 ---
 title: "load | @sheetwrite/wasm"
-description: "Initialize the WASM module."
+description: "load function in @sheetwrite/wasm: Initialize the WASM module."
 ---
 <!-- api-export:@sheetwrite/wasm|.|load -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/wasm/">@sheetwrite/wasm</a><span class="api-status" data-kind="function">function</span></div>
@@ -11,7 +11,7 @@ call rejects; a different-source call after success warns and no-ops; a
 rejected init is retryable. When `source` is omitted the loader picks the
 right strategy for the runtime.
 
-### Examples
+## Examples
 
 ```ts compile
 import { initSheetwrite } from "@sheetwrite/core";
@@ -19,7 +19,7 @@ import { initSheetwrite } from "@sheetwrite/core";
 await initSheetwrite();
 ```
 
-### See also
+## See also
 
 - [/docs/start/installation/](/docs/start/installation/)
 

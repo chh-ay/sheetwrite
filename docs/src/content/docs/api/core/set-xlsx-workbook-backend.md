@@ -1,6 +1,6 @@
 ---
 title: "setXlsxWorkbookBackend | @sheetwrite/core"
-description: "Registers the optional workbook XLSX implementation used by core."
+description: "setXlsxWorkbookBackend function in @sheetwrite/core: Registers the optional workbook XLSX implementation used by core."
 ---
 <!-- api-export:@sheetwrite/core|.|setXlsxWorkbookBackend -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

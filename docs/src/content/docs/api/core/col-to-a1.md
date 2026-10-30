@@ -1,6 +1,6 @@
 ---
 title: "colToA1 | @sheetwrite/core"
-description: "Column index (0-based) → A1 column label (0 → \"A\", 26 → \"AA\")."
+description: "colToA1 function in @sheetwrite/core: Column index (0-based) → A1 column label (0 → \"A\", 26 → \"AA\")."
 ---
 <!-- api-export:@sheetwrite/core|.|colToA1 -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

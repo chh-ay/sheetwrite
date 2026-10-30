@@ -1,6 +1,6 @@
 ---
 title: "RowBridgeUnprojectableDelta | @sheetwrite/core"
-description: "An explicit projection record for an operation with no row-space meaning."
+description: "RowBridgeUnprojectableDelta interface in @sheetwrite/core: An explicit projection record for an operation with no row-space meaning."
 ---
 <!-- api-export:@sheetwrite/core|.|RowBridgeUnprojectableDelta -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

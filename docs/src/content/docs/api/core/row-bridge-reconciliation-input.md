@@ -1,6 +1,6 @@
 ---
 title: "RowBridgeReconciliationInput | @sheetwrite/core"
-description: "Input to RowBridge.reconcile."
+description: "RowBridgeReconciliationInput interface in @sheetwrite/core: Input to RowBridge.reconcile."
 ---
 <!-- api-export:@sheetwrite/core|.|RowBridgeReconciliationInput -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

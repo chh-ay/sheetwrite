@@ -1,6 +1,6 @@
 ---
 title: "XlsxWorkbookOptions | @sheetwrite/core"
-description: "Shared options passed to every registered table and workbook XLSX backend."
+description: "XlsxWorkbookOptions interface in @sheetwrite/core: Shared options passed to every registered table and workbook XLSX backend."
 ---
 <!-- api-export:@sheetwrite/core|.|XlsxWorkbookOptions -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

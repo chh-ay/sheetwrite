@@ -1,6 +1,6 @@
 ---
 title: "initSheetwrite | @sheetwrite/core"
-description: "Load one WASM engine before createGrid."
+description: "initSheetwrite function in @sheetwrite/core: Load one WASM engine before createGrid."
 ---
 <!-- api-export:@sheetwrite/core|.|initSheetwrite -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
@@ -8,7 +8,7 @@ description: "Load one WASM engine before createGrid."
 Load one WASM engine before `createGrid`. The default is `@sheetwrite/wasm`.
 Pass the `@sheetwrite/formulas` module as the second argument to select the full engine.
 
-### Examples
+## Examples
 
 ```ts compile
 import { initSheetwrite } from "@sheetwrite/core";
@@ -17,7 +17,7 @@ import * as formulas from "@sheetwrite/formulas";
 await initSheetwrite(undefined, formulas);
 ```
 
-### See also
+## See also
 
 - [/docs/start/choose-an-engine/](/docs/start/choose-an-engine/)
 - [createGrid](/docs/api/core/create-grid/)

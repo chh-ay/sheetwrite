@@ -1,6 +1,6 @@
 ---
 title: "ChartAnchor | @sheetwrite/core"
-description: "Position in worksheet coordinates; dimensions and offsets use CSS pixels."
+description: "ChartAnchor interface in @sheetwrite/core: Position in worksheet coordinates; dimensions and offsets use CSS pixels."
 ---
 <!-- api-export:@sheetwrite/core|.|ChartAnchor -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

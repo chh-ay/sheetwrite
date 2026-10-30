@@ -1,6 +1,6 @@
 ---
 title: "createRibbon | @sheetwrite/core/shell"
-description: "Mount an Excel-style ribbon (Home, Insert, Data, View) bound to grid.actions, in normal document flow."
+description: "createRibbon function in @sheetwrite/core/shell: Mount an Excel-style ribbon (Home, Insert, Data, View) bound to grid.actions, in normal document flow."
 ---
 <!-- api-export:@sheetwrite/core|./shell|createRibbon -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-shell/">@sheetwrite/core/shell</a><span class="api-status" data-kind="function">function</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "CellEditorInstance | @sheetwrite/vue"
-description: "Retained lifecycle returned by a custom editor's mount method."
+description: "CellEditorInstance interface in @sheetwrite/vue: Retained lifecycle returned by a custom editor's mount method."
 ---
 <!-- api-export:@sheetwrite/vue|.|CellEditorInstance -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/vue/">@sheetwrite/vue</a><span class="api-status" data-kind="interface">interface</span></div>

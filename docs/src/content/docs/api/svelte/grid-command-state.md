@@ -1,6 +1,6 @@
 ---
 title: "GridCommandState | @sheetwrite/svelte"
-description: "Observable availability and selection-derived activity for one command."
+description: "GridCommandState interface in @sheetwrite/svelte: Observable availability and selection-derived activity for one command."
 ---
 <!-- api-export:@sheetwrite/svelte|.|GridCommandState -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="interface">interface</span></div>

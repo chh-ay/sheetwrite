@@ -1,6 +1,6 @@
 ---
 title: "ChartSeries | @sheetwrite/charts"
-description: "Sources are read in row-major order."
+description: "ChartSeries interface in @sheetwrite/charts: Sources are read in row-major order."
 ---
 <!-- api-export:@sheetwrite/charts|.|ChartSeries -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/charts/">@sheetwrite/charts</a><span class="api-status" data-kind="interface">interface</span></div>

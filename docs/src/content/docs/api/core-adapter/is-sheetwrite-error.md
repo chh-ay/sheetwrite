@@ -1,6 +1,6 @@
 ---
 title: "isSheetwriteError | @sheetwrite/core/adapter"
-description: "Narrow same-realm errors, cross-realm errors, and serialized failure envelopes."
+description: "isSheetwriteError function in @sheetwrite/core/adapter: Narrow same-realm errors, cross-realm errors, and serialized failure envelopes."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|isSheetwriteError -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="function">function</span></div>

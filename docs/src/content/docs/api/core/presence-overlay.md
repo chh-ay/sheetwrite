@@ -1,6 +1,6 @@
 ---
 title: "PresenceOverlay | @sheetwrite/core"
-description: "Ephemeral collaborator selection rendered above the grid."
+description: "PresenceOverlay interface in @sheetwrite/core: Ephemeral collaborator selection rendered above the grid."
 ---
 <!-- api-export:@sheetwrite/core|.|PresenceOverlay -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

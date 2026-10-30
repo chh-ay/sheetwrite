@@ -1,6 +1,6 @@
 ---
 title: Touch
-description: How the grid handles taps and drags from touch, pen, and mouse input.
+description: "How the Sheetwrite grid turns taps and drags from touch, pen and mouse into scrolling, selection, resizing and fill, and its gesture limits."
 ---
 
 The grid reads all input through Pointer Events, so mouse, touch, and pen share one code path, and a plain drag on touch scrolls the page natively.

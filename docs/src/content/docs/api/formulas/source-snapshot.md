@@ -1,6 +1,6 @@
 ---
 title: "SourceSnapshot | @sheetwrite/formulas"
-description: "Compact serializable projection of persisted derived-cell sources and spill identity in one range."
+description: "SourceSnapshot class in @sheetwrite/formulas: Compact serializable projection of persisted derived-cell sources and spill identity in one range."
 ---
 <!-- api-export:@sheetwrite/formulas|.|SourceSnapshot -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/formulas/">@sheetwrite/formulas</a><span class="api-status" data-kind="class">class</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "GridCommandName | @sheetwrite/react"
-description: "Built-in command names accepted by state queries and change events."
+description: "GridCommandName type in @sheetwrite/react: Built-in command names accepted by state queries and change events."
 ---
 <!-- api-export:@sheetwrite/react|.|GridCommandName -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/react/">@sheetwrite/react</a><span class="api-status" data-kind="type">type</span></div>

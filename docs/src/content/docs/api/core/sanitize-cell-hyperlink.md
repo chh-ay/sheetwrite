@@ -1,6 +1,6 @@
 ---
 title: "sanitizeCellHyperlink | @sheetwrite/core"
-description: "Sanitize one untrusted clipboard/snapshot value without cloning its object graph."
+description: "sanitizeCellHyperlink function in @sheetwrite/core: Sanitize one untrusted clipboard/snapshot value without cloning its object graph."
 ---
 <!-- api-export:@sheetwrite/core|.|sanitizeCellHyperlink -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

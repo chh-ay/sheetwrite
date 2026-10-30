@@ -1,6 +1,6 @@
 ---
 title: "ChartViewCache | @sheetwrite/charts"
-description: "Resolved chart views for one store, refreshed only by chart-change events."
+description: "ChartViewCache type in @sheetwrite/charts: Resolved chart views for one store, refreshed only by chart-change events."
 ---
 <!-- api-export:@sheetwrite/charts|.|ChartViewCache -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/charts/">@sheetwrite/charts</a><span class="api-status" data-kind="type">type</span></div>

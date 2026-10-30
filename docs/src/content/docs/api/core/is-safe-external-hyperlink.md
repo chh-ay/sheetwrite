@@ -1,6 +1,6 @@
 ---
 title: "isSafeExternalHyperlink | @sheetwrite/core"
-description: "Validate, but never activate or fetch, an external hyperlink target."
+description: "isSafeExternalHyperlink function in @sheetwrite/core: Validate, but never activate or fetch, an external hyperlink target."
 ---
 <!-- api-export:@sheetwrite/core|.|isSafeExternalHyperlink -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

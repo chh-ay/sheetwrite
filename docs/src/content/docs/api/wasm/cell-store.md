@@ -1,6 +1,6 @@
 ---
 title: "CellStore | @sheetwrite/wasm"
-description: "The workbook-wide store: every sheet, one string pool."
+description: "CellStore class in @sheetwrite/wasm: The workbook-wide store: every sheet, one string pool."
 ---
 <!-- api-export:@sheetwrite/wasm|.|CellStore -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/wasm/">@sheetwrite/wasm</a><span class="api-status" data-kind="class">class</span></div>

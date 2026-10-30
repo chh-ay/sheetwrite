@@ -7,7 +7,7 @@ description: "Import and export time and peak memory for XLSX files."
 
 Current and baseline are the same codec at different commits, measured in the same session. Baseline commit: <code title="87fadb72397947ea8c6ba576682925c7879579b8">87fadb723979</code>.
 
-#### Operation time
+## Operation time
 
 <figure class="bench-viz bench-ruled" data-pagefind-ignore style="--bench-segs:4">
 <div class="bench-viz__scale"><span class="bench-viz__lead">operation</span><span class="bench-viz__axis-note">log scale — every tick is 10× — shorter is faster</span><span class="bench-viz__legend"><i class="bench-legend-swatch" data-kind="median"></i>median<i class="bench-legend-swatch" data-kind="p95"></i>p95</span></div>
@@ -47,7 +47,7 @@ Current and baseline are the same codec at different commits, measured in the sa
 </div>
 </figure>
 
-#### Peak resident memory
+## Peak resident memory
 
 <figure class="bench-viz bench-ruled" data-pagefind-ignore style="--bench-segs:4">
 <div class="bench-viz__scale"><span class="bench-viz__lead">operation</span><span class="bench-viz__axis-note">linear scale — shorter uses less memory</span><span class="bench-viz__legend"><i class="bench-legend-swatch" data-kind="median"></i>median<i class="bench-legend-swatch" data-kind="p95"></i>p95</span></div>

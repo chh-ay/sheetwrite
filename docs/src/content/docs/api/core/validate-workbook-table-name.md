@@ -1,6 +1,6 @@
 ---
 title: "validateWorkbookTableName | @sheetwrite/core"
-description: "Validate and NFC-normalize an ECMA-compatible structured-reference name."
+description: "validateWorkbookTableName function in @sheetwrite/core: Validate and NFC-normalize an ECMA-compatible structured-reference name."
 ---
 <!-- api-export:@sheetwrite/core|.|validateWorkbookTableName -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

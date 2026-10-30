@@ -1,6 +1,6 @@
 ---
 title: "SyncCoordinatorOptions | @sheetwrite/core"
-description: "Document, version, durability, and online options for synchronization."
+description: "SyncCoordinatorOptions interface in @sheetwrite/core: Document, version, durability, and online options for synchronization."
 ---
 <!-- api-export:@sheetwrite/core|.|SyncCoordinatorOptions -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

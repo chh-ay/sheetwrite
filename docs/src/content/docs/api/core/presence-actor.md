@@ -1,6 +1,6 @@
 ---
 title: "PresenceActor | @sheetwrite/core"
-description: "Public collaborator identity attached to presence updates."
+description: "PresenceActor interface in @sheetwrite/core: Public collaborator identity attached to presence updates."
 ---
 <!-- api-export:@sheetwrite/core|.|PresenceActor -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

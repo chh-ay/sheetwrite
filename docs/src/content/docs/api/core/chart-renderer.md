@@ -1,6 +1,6 @@
 ---
 title: "ChartRenderer | @sheetwrite/core"
-description: "Draws charts into host elements that the grid's object layer owns."
+description: "ChartRenderer interface in @sheetwrite/core: Draws charts into host elements that the grid's object layer owns."
 ---
 <!-- api-export:@sheetwrite/core|.|ChartRenderer -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

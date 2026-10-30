@@ -1,6 +1,6 @@
 ---
 title: "RowMetadata | @sheetwrite/core"
-description: "Persistent display and grouping metadata for one document row."
+description: "RowMetadata interface in @sheetwrite/core: Persistent display and grouping metadata for one document row."
 ---
 <!-- api-export:@sheetwrite/core|.|RowMetadata -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

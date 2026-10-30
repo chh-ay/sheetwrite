@@ -1,6 +1,6 @@
 ---
 title: "SheetSnapshot | @sheetwrite/core"
-description: "Serializable complete state for one workbook sheet."
+description: "SheetSnapshot interface in @sheetwrite/core: Serializable complete state for one workbook sheet."
 ---
 <!-- api-export:@sheetwrite/core|.|SheetSnapshot -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "SHEETWRITE_CLIPBOARD_MIME | @sheetwrite/core"
-description: "Private-format MIME type used for rich Sheetwrite clipboard payloads."
+description: "SHEETWRITE_CLIPBOARD_MIME variable in @sheetwrite/core: Private-format MIME type used for rich Sheetwrite clipboard payloads."
 ---
 <!-- api-export:@sheetwrite/core|.|SHEETWRITE_CLIPBOARD_MIME -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="variable">variable</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "toCsv | @sheetwrite/core"
-description: "Export the current visible CSV view (UTF-8 BOM, CRLF): visible columns and view-ordered rows surviving sort, filter, hidden-row, and group state."
+description: "toCsv function in @sheetwrite/core: Export the current visible CSV view (UTF-8 BOM, CRLF): visible columns and view-ordered rows surviving sort, filter…"
 ---
 <!-- api-export:@sheetwrite/core|.|toCsv -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

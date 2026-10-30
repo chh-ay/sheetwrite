@@ -1,6 +1,6 @@
 ---
 title: "setChartRendererFactory | @sheetwrite/core"
-description: "Register the renderer that draws charts in the grid's object layer; null removes it."
+description: "setChartRendererFactory function in @sheetwrite/core: Register the renderer that draws charts in the grid's object layer; null removes it."
 ---
 <!-- api-export:@sheetwrite/core|.|setChartRendererFactory -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

@@ -18,16 +18,16 @@ The full engine adds these function families:
 | LAMBDA | `LAMBDA`, `MAP`, `REDUCE`, `SCAN`, `BYROW`, `MAKEARRAY` |
 | Grouping | `GROUPBY`, `PIVOTBY`, `PERCENTOF` |
 
-The [engine choice page](https://sheetwrite.vercel.app/docs/start/choose-an-engine/) describes the limits, and the [formula function contract](https://sheetwrite.vercel.app/docs/reference/formula-functions/) lists every function with its build. The [analysis formulas guide](https://sheetwrite.vercel.app/docs/features/formulas/analysis-formulas/) shows each family with examples, and the [formula analysis showcase](https://sheetwrite.vercel.app/showcases/formulas/) runs thirteen panels of them live.
+The [engine choice page](https://www.sheetwrite.dev/docs/start/choose-an-engine/) describes the limits, and the [formula function contract](https://www.sheetwrite.dev/docs/reference/formula-functions/) lists every function with its build. The [analysis formulas guide](https://www.sheetwrite.dev/docs/features/formulas/analysis-formulas/) shows each family with examples, and the [formula analysis showcase](https://www.sheetwrite.dev/showcases/formulas/) runs thirteen panels of them live.
 
 ## New in 0.6.0
 
 The full engine has every 0.6.0 engine feature of `@sheetwrite/wasm`:
 
-- volatile recalculation after each cell-changing transaction, and the new `RAND`, `RANDBETWEEN`, `FORMULATEXT`, `ISFORMULA`, `HYPERLINK` and `CELL` functions ([Volatile functions](https://sheetwrite.vercel.app/docs/features/formulas/volatile-functions/))
-- volatile, reference-valued `OFFSET` and `INDIRECT` ([OFFSET and INDIRECT](https://sheetwrite.vercel.app/docs/features/formulas/offset-and-indirect/))
-- intersection, union and 3-D references, `AREAS`, and the optional `INDEX` argument `area_num` ([Operators](https://sheetwrite.vercel.app/docs/features/formulas/operators/))
-- opt-in iterative calculation for circular references; multi-cell spills inside a cycle still return `#CYCLE!` ([Iterative calculation](https://sheetwrite.vercel.app/docs/features/formulas/iterative-calculation/))
+- volatile recalculation after each cell-changing transaction, and the new `RAND`, `RANDBETWEEN`, `FORMULATEXT`, `ISFORMULA`, `HYPERLINK` and `CELL` functions ([Volatile functions](https://www.sheetwrite.dev/docs/features/formulas/volatile-functions/))
+- volatile, reference-valued `OFFSET` and `INDIRECT` ([OFFSET and INDIRECT](https://www.sheetwrite.dev/docs/features/formulas/offset-and-indirect/))
+- intersection, union and 3-D references, `AREAS`, and the optional `INDEX` argument `area_num` ([Operators](https://www.sheetwrite.dev/docs/features/formulas/operators/))
+- opt-in iterative calculation for circular references; multi-cell spills inside a cycle still return `#CYCLE!` ([Iterative calculation](https://www.sheetwrite.dev/docs/features/formulas/iterative-calculation/))
 
 ## Reshaping functions
 

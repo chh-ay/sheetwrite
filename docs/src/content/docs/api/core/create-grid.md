@@ -1,13 +1,13 @@
 ---
 title: "createGrid | @sheetwrite/core"
-description: "Creates and mounts an imperative Grid in the supplied host element."
+description: "createGrid function in @sheetwrite/core: Creates and mounts an imperative Grid in the supplied host element."
 ---
 <!-- api-export:@sheetwrite/core|.|createGrid -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
 
 Creates and mounts an imperative Grid in the supplied host element.
 
-### Examples
+## Examples
 
 ```ts compile
 import { createGrid, initSheetwrite } from "@sheetwrite/core";
@@ -29,7 +29,7 @@ grid.scrollToCell({ sheet: "sales", row: 1, col: 0 });
 grid.destroy();
 ```
 
-### See also
+## See also
 
 - [Grid](/docs/api/core/grid/)
 - [GridOptions](/docs/api/core/grid-options/)

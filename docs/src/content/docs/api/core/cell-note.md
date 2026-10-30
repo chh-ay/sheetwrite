@@ -1,6 +1,6 @@
 ---
 title: "CellNote | @sheetwrite/core"
-description: "Serializable plain-text note anchored to a cell."
+description: "CellNote interface in @sheetwrite/core: Serializable plain-text note anchored to a cell."
 ---
 <!-- api-export:@sheetwrite/core|.|CellNote -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

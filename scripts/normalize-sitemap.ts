@@ -2,15 +2,18 @@
  * Normalizes the crawler-generated sitemap after `vite build`.
  *
  * The TanStack Start crawler records every discovered link verbatim, which
- * leaves three kinds of entries a sitemap must not contain: fragment URLs
- * (`/docs/api/core/grid/#grid-set-zoom`), slash/non-slash duplicates of the
- * same page, and routes that deliberately carry `noindex` (test fixtures,
- * the MDX proof page, and the 404 page). Canonical URLs on every page use the trailing-slash
- * form, so the sitemap does too.
+ * leaves entries a sitemap must not contain: fragment URLs
+ * (`/docs/api/core/grid/#grid-set-zoom`), query variants of one page, files
+ * such as `llms.txt`, slash/non-slash duplicates of the same page, and routes
+ * that deliberately carry `noindex` (test fixtures, the MDX proof page, and the
+ * 404 page). Canonical URLs on every page use the trailing-slash form, so the
+ * sitemap does too.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 
 const NOINDEX_ROUTES = [/^\/test\//, /^\/docs\/proof\/$/, /^\/404\/$/];
+/** A last path segment with an extension (`llms.txt`) is a file, not an HTML page. */
+const FILE_PATH = /\.[a-z0-9]+$/i;
 
 export function normalizeSitemap(xml: string): { xml: string; kept: number; dropped: number } {
   const entries = xml.match(/<url>[\s\S]*?<\/url>/g) ?? [];
@@ -25,6 +28,12 @@ export function normalizeSitemap(xml: string): { xml: string; kept: number; drop
     }
     const url = new URL(loc);
     if (url.hash !== "" || loc.includes("#")) {
+      dropped++;
+      continue;
+    }
+    // A query variant's page names the plain URL as canonical, so listing it
+    // would contradict the canonical and spend crawl budget on a duplicate.
+    if (url.search !== "" || FILE_PATH.test(url.pathname)) {
       dropped++;
       continue;
     }

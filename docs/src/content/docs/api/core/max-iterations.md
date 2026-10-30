@@ -1,6 +1,6 @@
 ---
 title: "MAX_ITERATIONS | @sheetwrite/core"
-description: "Largest iteration count Excel accepts."
+description: "MAX_ITERATIONS variable in @sheetwrite/core: Largest iteration count Excel accepts."
 ---
 <!-- api-export:@sheetwrite/core|.|MAX_ITERATIONS -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="variable">variable</span></div>

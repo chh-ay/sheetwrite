@@ -1,6 +1,6 @@
 ---
 title: "DEFAULT_MAX_ITERATIONS | @sheetwrite/core"
-description: "Excel's iteration count for a new workbook."
+description: "DEFAULT_MAX_ITERATIONS variable in @sheetwrite/core: Excel's iteration count for a new workbook."
 ---
 <!-- api-export:@sheetwrite/core|.|DEFAULT_MAX_ITERATIONS -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="variable">variable</span></div>

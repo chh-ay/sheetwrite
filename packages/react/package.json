@@ -9,7 +9,7 @@
     "url": "git+https://github.com/chh-ay/sheetwrite.git",
     "directory": "packages/react"
   },
-  "homepage": "https://sheetwrite.vercel.app/",
+  "homepage": "https://www.sheetwrite.dev/",
   "bugs": {
     "url": "https://github.com/chh-ay/sheetwrite/issues"
   },

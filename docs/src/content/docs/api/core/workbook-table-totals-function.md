@@ -1,6 +1,6 @@
 ---
 title: "WorkbookTableTotalsFunction | @sheetwrite/core"
-description: "Aggregate Excel offers for a totals-row cell."
+description: "WorkbookTableTotalsFunction type in @sheetwrite/core: Aggregate Excel offers for a totals-row cell."
 ---
 <!-- api-export:@sheetwrite/core|.|WorkbookTableTotalsFunction -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "parseCurrencyInput | @sheetwrite/core"
-description: "Parse a currency-formatted string into a plain number, or null when the remaining text is not numeric."
+description: "parseCurrencyInput function in @sheetwrite/core: Parse a currency-formatted string into a plain number, or null when the remaining text is not numeric."
 ---
 <!-- api-export:@sheetwrite/core|.|parseCurrencyInput -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

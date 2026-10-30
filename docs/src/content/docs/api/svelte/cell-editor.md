@@ -1,6 +1,6 @@
 ---
 title: "CellEditor | @sheetwrite/svelte"
-description: "Framework-neutral named editor definition registered through GridOptions.editors."
+description: "CellEditor interface in @sheetwrite/svelte: Framework-neutral named editor definition registered through GridOptions.editors."
 ---
 <!-- api-export:@sheetwrite/svelte|.|CellEditor -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="interface">interface</span></div>

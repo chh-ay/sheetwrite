@@ -1,6 +1,6 @@
 ---
 title: "LegacyRowPage | @sheetwrite/core"
-description: "Row-only page shape accepted by the full-width compatibility adapter."
+description: "LegacyRowPage interface in @sheetwrite/core: Row-only page shape accepted by the full-width compatibility adapter."
 ---
 <!-- api-export:@sheetwrite/core|.|LegacyRowPage -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

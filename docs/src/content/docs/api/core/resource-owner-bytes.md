@@ -1,6 +1,6 @@
 ---
 title: "ResourceOwnerBytes | @sheetwrite/core"
-description: "Retained logical payload and allocated capacity attributed to one exclusive owner."
+description: "ResourceOwnerBytes interface in @sheetwrite/core: Retained logical payload and allocated capacity attributed to one exclusive owner."
 ---
 <!-- api-export:@sheetwrite/core|.|ResourceOwnerBytes -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

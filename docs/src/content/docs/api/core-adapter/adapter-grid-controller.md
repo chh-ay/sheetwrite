@@ -1,6 +1,6 @@
 ---
 title: "AdapterGridController | @sheetwrite/core/adapter"
-description: "Owns adapter attachment and monotonically numbered Grid generations."
+description: "AdapterGridController interface in @sheetwrite/core/adapter: Owns adapter attachment and monotonically numbered Grid generations."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|AdapterGridController -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="interface">interface</span></div>

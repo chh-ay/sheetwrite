@@ -1,6 +1,6 @@
 ---
 title: "resolveHyperlinkTarget | @sheetwrite/core"
-description: "Revalidate at the final activation boundary; hosts never receive an unsafe URL."
+description: "resolveHyperlinkTarget function in @sheetwrite/core: Revalidate at the final activation boundary; hosts never receive an unsafe URL."
 ---
 <!-- api-export:@sheetwrite/core|.|resolveHyperlinkTarget -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

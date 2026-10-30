@@ -1,6 +1,6 @@
 ---
 title: "ConditionalFormatPredicate | @sheetwrite/core"
-description: "Predicate used to decide whether a conditional format applies."
+description: "ConditionalFormatPredicate type in @sheetwrite/core: Predicate used to decide whether a conditional format applies."
 ---
 <!-- api-export:@sheetwrite/core|.|ConditionalFormatPredicate -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

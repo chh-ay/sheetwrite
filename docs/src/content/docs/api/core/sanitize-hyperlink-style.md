@@ -1,6 +1,6 @@
 ---
 title: "sanitizeHyperlinkStyle | @sheetwrite/core"
-description: "Convert an untrusted style into one bounded, plain renderer-safe value."
+description: "sanitizeHyperlinkStyle function in @sheetwrite/core: Convert an untrusted style into one bounded, plain renderer-safe value."
 ---
 <!-- api-export:@sheetwrite/core|.|sanitizeHyperlinkStyle -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

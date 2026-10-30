@@ -1,6 +1,6 @@
 ---
 title: "XlsxSourceDependency | @sheetwrite/core"
-description: "What an opaque graph reads; any change to it drops the graph on save."
+description: "XlsxSourceDependency interface in @sheetwrite/core: What an opaque graph reads; any change to it drops the graph on save."
 ---
 <!-- api-export:@sheetwrite/core|.|XlsxSourceDependency -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

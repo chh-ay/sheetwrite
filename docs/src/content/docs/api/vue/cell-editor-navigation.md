@@ -1,6 +1,6 @@
 ---
 title: "CellEditorNavigation | @sheetwrite/vue"
-description: "Selection movement applied after a successful editor commit."
+description: "CellEditorNavigation type in @sheetwrite/vue: Selection movement applied after a successful editor commit."
 ---
 <!-- api-export:@sheetwrite/vue|.|CellEditorNavigation -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/vue/">@sheetwrite/vue</a><span class="api-status" data-kind="type">type</span></div>

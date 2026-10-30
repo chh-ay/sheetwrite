@@ -320,7 +320,7 @@ test.describe("documentation site", () => {
       expect(escapedRequests).toEqual([]);
       await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
         "href",
-        `https://sheetwrite.vercel.app/docs/${route}`,
+        `https://www.sheetwrite.dev/docs/${route}`,
       );
     });
   }

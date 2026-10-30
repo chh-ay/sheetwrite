@@ -3,8 +3,6 @@ title: "Detailed compatibility results"
 description: "Checked formula, workbook, clipboard, and XLSX examples with exact sources and limits."
 ---
 
-# Detailed compatibility results
-
 This page is generated from checked examples and evidence records. It states only what each named result proves; it is not a percentage or a blanket Excel, Google Sheets, LibreOffice, or OpenFormula compatibility claim.
 
 Result labels distinguish **evaluated** formulas or structures, **preserved** source or metadata, deliberately **flattened** interchange, explicit **warning** boundaries, and **unsupported** behavior.

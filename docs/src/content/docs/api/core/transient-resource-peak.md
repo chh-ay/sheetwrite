@@ -1,6 +1,6 @@
 ---
 title: "TransientResourcePeak | @sheetwrite/core"
-description: "Operation-scoped transient peak, excluded from retained owner totals."
+description: "TransientResourcePeak interface in @sheetwrite/core: Operation-scoped transient peak, excluded from retained owner totals."
 ---
 <!-- api-export:@sheetwrite/core|.|TransientResourcePeak -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

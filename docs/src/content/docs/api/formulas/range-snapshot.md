@@ -1,6 +1,6 @@
 ---
 title: "RangeSnapshot | @sheetwrite/formulas"
-description: "Opaque, store-local history payload for one dense rectangular cell block."
+description: "RangeSnapshot class in @sheetwrite/formulas: Opaque, store-local history payload for one dense rectangular cell block."
 ---
 <!-- api-export:@sheetwrite/formulas|.|RangeSnapshot -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/formulas/">@sheetwrite/formulas</a><span class="api-status" data-kind="class">class</span></div>

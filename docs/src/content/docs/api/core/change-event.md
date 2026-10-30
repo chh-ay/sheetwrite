@@ -1,6 +1,6 @@
 ---
 title: "ChangeEvent | @sheetwrite/core"
-description: "Payload of the change event; flows OUT for API submission/reconcile."
+description: "ChangeEvent interface in @sheetwrite/core: Payload of the change event; flows OUT for API submission/reconcile."
 ---
 <!-- api-export:@sheetwrite/core|.|ChangeEvent -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

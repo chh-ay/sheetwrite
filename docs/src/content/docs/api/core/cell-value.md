@@ -1,6 +1,6 @@
 ---
 title: "CellValue | @sheetwrite/core"
-description: "A cell's persisted input: a literal, a cross-reference, or a formula."
+description: "CellValue type in @sheetwrite/core: A cell's persisted input: a literal, a cross-reference, or a formula."
 ---
 <!-- api-export:@sheetwrite/core|.|CellValue -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

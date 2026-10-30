@@ -1,6 +1,6 @@
 ---
 title: "XlsxResourceLimits | @sheetwrite/core"
-description: "Resource dimensions bounded by every XLSX import and export path."
+description: "XlsxResourceLimits interface in @sheetwrite/core: Resource dimensions bounded by every XLSX import and export path."
 ---
 <!-- api-export:@sheetwrite/core|.|XlsxResourceLimits -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

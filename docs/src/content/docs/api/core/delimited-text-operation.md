@@ -1,6 +1,6 @@
 ---
 title: "DelimitedTextOperation | @sheetwrite/core"
-description: "Phase reported by a typed delimited-text resource failure."
+description: "DelimitedTextOperation type in @sheetwrite/core: Phase reported by a typed delimited-text resource failure."
 ---
 <!-- api-export:@sheetwrite/core|.|DelimitedTextOperation -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

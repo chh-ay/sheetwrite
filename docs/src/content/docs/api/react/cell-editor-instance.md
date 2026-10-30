@@ -1,6 +1,6 @@
 ---
 title: "CellEditorInstance | @sheetwrite/react"
-description: "Retained lifecycle returned by a custom editor's mount method."
+description: "CellEditorInstance interface in @sheetwrite/react: Retained lifecycle returned by a custom editor's mount method."
 ---
 <!-- api-export:@sheetwrite/react|.|CellEditorInstance -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/react/">@sheetwrite/react</a><span class="api-status" data-kind="interface">interface</span></div>

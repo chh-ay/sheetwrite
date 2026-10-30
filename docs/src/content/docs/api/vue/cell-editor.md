@@ -1,6 +1,6 @@
 ---
 title: "CellEditor | @sheetwrite/vue"
-description: "Framework-neutral named editor definition registered through GridOptions.editors."
+description: "CellEditor interface in @sheetwrite/vue: Framework-neutral named editor definition registered through GridOptions.editors."
 ---
 <!-- api-export:@sheetwrite/vue|.|CellEditor -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/vue/">@sheetwrite/vue</a><span class="api-status" data-kind="interface">interface</span></div>

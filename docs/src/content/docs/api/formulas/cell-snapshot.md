@@ -1,6 +1,6 @@
 ---
 title: "CellSnapshot | @sheetwrite/formulas"
-description: "Resolved values of a sparse coordinate batch, one entry per requested cell."
+description: "CellSnapshot class in @sheetwrite/formulas: Resolved values of a sparse coordinate batch, one entry per requested cell."
 ---
 <!-- api-export:@sheetwrite/formulas|.|CellSnapshot -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/formulas/">@sheetwrite/formulas</a><span class="api-status" data-kind="class">class</span></div>

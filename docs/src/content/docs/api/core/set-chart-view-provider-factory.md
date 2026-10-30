@@ -1,6 +1,6 @@
 ---
 title: "setChartViewProviderFactory | @sheetwrite/core"
-description: "Register an optional chart provider; null removes the current provider."
+description: "setChartViewProviderFactory function in @sheetwrite/core: Register an optional chart provider; null removes the current provider."
 ---
 <!-- api-export:@sheetwrite/core|.|setChartViewProviderFactory -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

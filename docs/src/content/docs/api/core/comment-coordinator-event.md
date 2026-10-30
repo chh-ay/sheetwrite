@@ -1,6 +1,6 @@
 ---
 title: "CommentCoordinatorEvent | @sheetwrite/core"
-description: "State transition emitted by the comment coordinator."
+description: "CommentCoordinatorEvent type in @sheetwrite/core: State transition emitted by the comment coordinator."
 ---
 <!-- api-export:@sheetwrite/core|.|CommentCoordinatorEvent -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

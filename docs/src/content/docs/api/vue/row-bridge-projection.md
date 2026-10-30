@@ -1,6 +1,6 @@
 ---
 title: "RowBridgeProjection | @sheetwrite/vue"
-description: "Result of projection or reconciliation."
+description: "RowBridgeProjection interface in @sheetwrite/vue: Result of projection or reconciliation."
 ---
 <!-- api-export:@sheetwrite/vue|.|RowBridgeProjection -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/vue/">@sheetwrite/vue</a><span class="api-status" data-kind="interface">interface</span></div>

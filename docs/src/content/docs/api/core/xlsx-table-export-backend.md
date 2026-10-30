@@ -1,6 +1,6 @@
 ---
 title: "XlsxTableExportBackend | @sheetwrite/core"
-description: "Pluggable first-row-header, first-sheet table export backend."
+description: "XlsxTableExportBackend interface in @sheetwrite/core: Pluggable first-row-header, first-sheet table export backend."
 ---
 <!-- api-export:@sheetwrite/core|.|XlsxTableExportBackend -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

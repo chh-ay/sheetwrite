@@ -1,6 +1,6 @@
 ---
 title: "ToolbarItem | @sheetwrite/core"
-description: "Built-in, separator, or custom callback item in the grid toolbar."
+description: "ToolbarItem interface in @sheetwrite/core: Built-in, separator, or custom callback item in the grid toolbar."
 ---
 <!-- api-export:@sheetwrite/core|.|ToolbarItem -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

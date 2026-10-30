@@ -1,6 +1,6 @@
 ---
 title: "TransactionResourceValidationResult | @sheetwrite/core"
-description: "Successful byte/count inspection or one structured transaction rejection."
+description: "TransactionResourceValidationResult type in @sheetwrite/core: Successful byte/count inspection or one structured transaction rejection."
 ---
 <!-- api-export:@sheetwrite/core|.|TransactionResourceValidationResult -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

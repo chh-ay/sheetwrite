@@ -1,6 +1,6 @@
 ---
 title: "RowBridgeProjection | @sheetwrite/react"
-description: "Result of projection or reconciliation."
+description: "RowBridgeProjection interface in @sheetwrite/react: Result of projection or reconciliation."
 ---
 <!-- api-export:@sheetwrite/react|.|RowBridgeProjection -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/react/">@sheetwrite/react</a><span class="api-status" data-kind="interface">interface</span></div>

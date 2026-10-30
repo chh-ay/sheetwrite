@@ -1,6 +1,6 @@
 ---
 title: "PivotSource | @sheetwrite/core"
-description: "Data a pivot summarizes. - A range source includes its header row: the first range row names the fields, and field i is the column range.start.col + i."
+description: "PivotSource type in @sheetwrite/core: Data a pivot summarizes. - A range source includes its header row: the first range row names the fields, and field i is…"
 ---
 <!-- api-export:@sheetwrite/core|.|PivotSource -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

@@ -1,6 +1,6 @@
 ---
 title: "initSync | @sheetwrite/formulas"
-description: "Instantiates the given module, which can either be bytes or a precompiled WebAssembly.Module."
+description: "initSync function in @sheetwrite/formulas: Instantiates the given module, which can either be bytes or a precompiled WebAssembly.Module."
 ---
 <!-- api-export:@sheetwrite/formulas|.|initSync -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/formulas/">@sheetwrite/formulas</a><span class="api-status" data-kind="function">function</span></div>

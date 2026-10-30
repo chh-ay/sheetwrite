@@ -1,6 +1,6 @@
 ---
 title: "WorkbookTableNameIssueCode | @sheetwrite/core"
-description: "Stable reason code returned when a workbook table name is rejected."
+description: "WorkbookTableNameIssueCode type in @sheetwrite/core: Stable reason code returned when a workbook table name is rejected."
 ---
 <!-- api-export:@sheetwrite/core|.|WorkbookTableNameIssueCode -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

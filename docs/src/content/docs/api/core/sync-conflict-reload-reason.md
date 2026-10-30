@@ -1,6 +1,6 @@
 ---
 title: "SyncConflictReloadReason | @sheetwrite/core"
-description: "Why a conflict cannot be recovered in place; the host reloads the document instead."
+description: "SyncConflictReloadReason type in @sheetwrite/core: Why a conflict cannot be recovered in place; the host reloads the document instead."
 ---
 <!-- api-export:@sheetwrite/core|.|SyncConflictReloadReason -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

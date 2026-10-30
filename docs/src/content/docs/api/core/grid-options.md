@@ -1,13 +1,13 @@
 ---
 title: "GridOptions | @sheetwrite/core"
-description: "Workbook, data, rendering, policy, and built-in UI options used to create a Grid."
+description: "GridOptions interface in @sheetwrite/core: Workbook, data, rendering, policy, and built-in UI options used to create a Grid."
 ---
 <!-- api-export:@sheetwrite/core|.|GridOptions -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Workbook, data, rendering, policy, and built-in UI options used to create a Grid.
 
-### Examples
+## Examples
 
 ```ts compile
 import type { GridOptions } from "@sheetwrite/core";
@@ -22,7 +22,7 @@ const options: GridOptions = {
 };
 ```
 
-### See also
+## See also
 
 - [createGrid](/docs/api/core/create-grid/)
 - [GridConfig](/docs/api/core/grid-config/)

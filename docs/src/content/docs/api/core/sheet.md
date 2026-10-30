@@ -1,6 +1,6 @@
 ---
 title: "Sheet | @sheetwrite/core"
-description: "Workbook sheet schema used when creating a live grid."
+description: "Sheet interface in @sheetwrite/core: Workbook sheet schema used when creating a live grid."
 ---
 <!-- api-export:@sheetwrite/core|.|Sheet -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

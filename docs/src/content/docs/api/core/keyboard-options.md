@@ -1,6 +1,6 @@
 ---
 title: "KeyboardOptions | @sheetwrite/core"
-description: "Overrides replace all default keys for an action; null disables that action's keys."
+description: "KeyboardOptions interface in @sheetwrite/core: Overrides replace all default keys for an action; null disables that action's keys."
 ---
 <!-- api-export:@sheetwrite/core|.|KeyboardOptions -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

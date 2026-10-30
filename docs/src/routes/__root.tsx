@@ -1,26 +1,27 @@
-import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
+import { createRootRoute, HeadContent, Outlet, Scripts, ScriptOnce } from "@tanstack/react-router";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import { type ReactNode, useEffect } from "react";
+import { installExpressiveCodeScripts } from "virtual:expressive-code-scripts";
 
 import corePackage from "../../../packages/core/package.json" with { type: "json" };
 import { SiteError, SiteNotFound } from "../components/RouteFallbacks.js";
 import { initializeCodeEnhancements } from "../lib/code-popovers.ts";
 import { installGridScrollHints } from "../lib/grid-scroll-hint.ts";
 import { installAnchorReveal } from "../lib/reveal-anchor.ts";
+import { SITE_URL } from "../lib/seo.js";
 
 import docsFiguresStylesheet from "../styles/docs-figures.css?url";
 import showcaseStylesheet from "../styles/showcase.css?url";
 import siteShellStylesheet from "../styles/site-shell.css?url";
 import siteStylesheet from "../styles/site.css?url";
-import tokensStylesheet from "../styles/tokens.css?url";
 // Expressive Code base and theme styles, shared by every page with code.
 import "virtual:expressive-code.css";
+import tokensStylesheet from "../styles/tokens.css?url";
 
 const THEME_SCRIPT =
   'document.documentElement.dataset.theme=localStorage.getItem("sheetwrite-theme")??(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark")';
 
-const SITE_URL = "https://sheetwrite.vercel.app";
 const SITE_TITLE = "Sheetwrite — Spreadsheet, data grid & multi-sheet workbook engine · XLSX/CSV";
 const SITE_DESCRIPTION =
   "Spreadsheet and data-grid engine for multi-sheet workbooks, with XLSX/CSV exchange, Rust/WASM core, and React/Vue/Svelte framework adapters.";
@@ -115,6 +116,8 @@ export const Route = createRootRoute({
 function RootComponent() {
   useEffect(() => {
     const cleanup = initializeCodeEnhancements();
+    // Copy buttons on every code block, also on pages reached client-side.
+    installExpressiveCodeScripts();
     const uninstallReveal = installAnchorReveal();
     const uninstallScrollHints = installGridScrollHints();
     // Deterministic signal for interaction tests: listeners are attached.
@@ -135,7 +138,10 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
     <html lang="en" data-theme="dark" suppressHydrationWarning>
       <head>
         <HeadContent />
-        <script>{THEME_SCRIPT}</script>
+        {/* Sets the theme before first paint. ScriptOnce renders it on the server
+            only, so a client re-render (after a browser extension edits the page
+            and breaks hydration) never creates a script element React refuses. */}
+        <ScriptOnce>{THEME_SCRIPT}</ScriptOnce>
       </head>
       <body>
         {children}

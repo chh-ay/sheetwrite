@@ -1,6 +1,6 @@
 ---
 title: "MAX_CONDITIONAL_FORMAT_RULES | @sheetwrite/core"
-description: "Maximum ordered conditional-format rules admitted per worksheet and encoded in one u32 match mask."
+description: "MAX_CONDITIONAL_FORMAT_RULES variable in @sheetwrite/core: Maximum ordered conditional-format rules admitted per worksheet and encoded in one u32 match mask."
 ---
 <!-- api-export:@sheetwrite/core|.|MAX_CONDITIONAL_FORMAT_RULES -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="variable">variable</span></div>

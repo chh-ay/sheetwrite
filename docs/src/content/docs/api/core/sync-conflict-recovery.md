@@ -1,6 +1,6 @@
 ---
 title: "SyncConflictRecovery | @sheetwrite/core"
-description: "Outcome of SyncCoordinator.recoverConflict."
+description: "SyncConflictRecovery type in @sheetwrite/core: Outcome of SyncCoordinator.recoverConflict."
 ---
 <!-- api-export:@sheetwrite/core|.|SyncConflictRecovery -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

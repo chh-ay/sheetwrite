@@ -1,6 +1,6 @@
 ---
 title: "PivotAggregation | @sheetwrite/core"
-description: "Aggregation applied to one value field."
+description: "PivotAggregation type in @sheetwrite/core: Aggregation applied to one value field."
 ---
 <!-- api-export:@sheetwrite/core|.|PivotAggregation -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

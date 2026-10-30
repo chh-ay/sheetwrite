@@ -1,6 +1,6 @@
 ---
 title: "DataValidationRule | @sheetwrite/core"
-description: "One stable, range-scoped data-entry rule."
+description: "DataValidationRule interface in @sheetwrite/core: One stable, range-scoped data-entry rule."
 ---
 <!-- api-export:@sheetwrite/core|.|DataValidationRule -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

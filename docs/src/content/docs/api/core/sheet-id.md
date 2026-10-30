@@ -1,6 +1,6 @@
 ---
 title: "SheetId | @sheetwrite/core"
-description: "Stable identifier used to address a workbook sheet."
+description: "SheetId type in @sheetwrite/core: Stable identifier used to address a workbook sheet."
 ---
 <!-- api-export:@sheetwrite/core|.|SheetId -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>

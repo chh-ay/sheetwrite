@@ -1,6 +1,6 @@
 ---
 title: "setXlsxTableExportBackend | @sheetwrite/core"
-description: "Registers the optional table XLSX export implementation used by core."
+description: "setXlsxTableExportBackend function in @sheetwrite/core: Registers the optional table XLSX export implementation used by core."
 ---
 <!-- api-export:@sheetwrite/core|.|setXlsxTableExportBackend -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

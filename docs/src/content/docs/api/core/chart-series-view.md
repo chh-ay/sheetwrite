@@ -1,6 +1,6 @@
 ---
 title: "ChartSeriesView | @sheetwrite/core"
-description: "Resolved plain data; the renderer does not read cells."
+description: "ChartSeriesView interface in @sheetwrite/core: Resolved plain data; the renderer does not read cells."
 ---
 <!-- api-export:@sheetwrite/core|.|ChartSeriesView -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

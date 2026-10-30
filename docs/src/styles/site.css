@@ -3956,8 +3956,11 @@ a.sw-code-popover__trigger {
   font-size: 0.8rem;
   color: var(--sw-fg-muted);
 }
-.sw-docs .sw-prose .sw-engine-choice h4 {
+/* The performance page lifts the card heading to h3; it keeps the h4 size. */
+.sw-docs .sw-prose .sw-engine-choice h3 {
   margin: 0.5rem 0;
+  font-size: 1rem;
+  letter-spacing: -0.01em;
 }
 .sw-prose .sw-engine-choice p {
   margin: 0.75rem 0 1.25rem;

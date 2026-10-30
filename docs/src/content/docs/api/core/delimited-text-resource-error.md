@@ -1,6 +1,6 @@
 ---
 title: "DelimitedTextResourceError | @sheetwrite/core"
-description: "Stable resource-limit failure raised before the next oversized parse or encode allocation."
+description: "DelimitedTextResourceError class in @sheetwrite/core: Stable resource-limit failure raised before the next oversized parse or encode allocation."
 ---
 <!-- api-export:@sheetwrite/core|.|DelimitedTextResourceError -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="class">class</span></div>

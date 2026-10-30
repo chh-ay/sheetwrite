@@ -1,6 +1,6 @@
 ---
 title: "createRuntimeResourceSnapshot | @sheetwrite/core"
-description: "Build and validate one operation-phase snapshot without double-counting runtime observations."
+description: "createRuntimeResourceSnapshot function in @sheetwrite/core: Build and validate one operation-phase snapshot without double-counting runtime observations."
 ---
 <!-- api-export:@sheetwrite/core|.|createRuntimeResourceSnapshot -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>

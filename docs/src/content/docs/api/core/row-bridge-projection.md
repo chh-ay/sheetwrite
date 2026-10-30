@@ -1,6 +1,6 @@
 ---
 title: "RowBridgeProjection | @sheetwrite/core"
-description: "Result of projection or reconciliation."
+description: "RowBridgeProjection interface in @sheetwrite/core: Result of projection or reconciliation."
 ---
 <!-- api-export:@sheetwrite/core|.|RowBridgeProjection -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

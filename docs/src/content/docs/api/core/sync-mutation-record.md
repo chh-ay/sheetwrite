@@ -1,6 +1,6 @@
 ---
 title: "SyncMutationRecord | @sheetwrite/core"
-description: "Pending commit paired with its current synchronization status."
+description: "SyncMutationRecord interface in @sheetwrite/core: Pending commit paired with its current synchronization status."
 ---
 <!-- api-export:@sheetwrite/core|.|SyncMutationRecord -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>

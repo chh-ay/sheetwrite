@@ -1,6 +1,6 @@
 ---
 title: "XlsxResourceError | @sheetwrite/core"
-description: "Stable resource-limit failure surfaced before an XLSX codec allocates unsafe data."
+description: "XlsxResourceError class in @sheetwrite/core: Stable resource-limit failure surfaced before an XLSX codec allocates unsafe data."
 ---
 <!-- api-export:@sheetwrite/core|.|XlsxResourceError -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="class">class</span></div>
