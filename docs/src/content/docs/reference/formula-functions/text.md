@@ -14,7 +14,7 @@ This page lists the 34 functions of the text family. Taxonomy/source: [Text func
 <table class="sw-formula-table"><thead><tr><th>Function (aliases)</th><th>Engine</th><th>Contract</th></tr></thead><tbody>
 <tr data-formula-name="ARRAYTOTEXT" data-engine="full"><td><code>ARRAYTOTEXT</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-array-to-text">Signature: <code>array-to-text</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-text-analysis">Implementation: <code>text-analysis</code></a></details></td></tr>
 <tr data-formula-name="DOLLAR" data-engine="full"><td><code>DOLLAR</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-text-dollar">Signature: <code>text-dollar</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-text-analysis">Implementation: <code>text-analysis</code></a></details></td></tr>
-<tr data-formula-name="FIXED" data-engine="full"><td><code>FIXED</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-text-fixed">Signature: <code>text-fixed</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-text-analysis">Implementation: <code>text-analysis</code></a></details></td></tr>
+<tr data-formula-name="FIXED" data-engine="full"><td><code>FIXED</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-text-fixed">Signature: <code>text-fixed</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-decimal-rounding">Dialect: <code>excel-decimal-rounding</code></a><br /><a href="#implementation-text-analysis">Implementation: <code>text-analysis</code></a></details></td></tr>
 <tr data-formula-name="REGEXEXTRACT" data-engine="full"><td><code>REGEXEXTRACT</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-regex-extract">Signature: <code>regex-extract</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-regex-lite-subset">Dialect: <code>regex-lite-subset</code></a><br /><a href="#implementation-text-analysis">Implementation: <code>text-analysis</code></a></details></td></tr>
 <tr data-formula-name="REGEXREPLACE" data-engine="full"><td><code>REGEXREPLACE</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-regex-replace">Signature: <code>regex-replace</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-regex-lite-subset">Dialect: <code>regex-lite-subset</code></a><br /><a href="#implementation-text-analysis">Implementation: <code>text-analysis</code></a></details></td></tr>
 <tr data-formula-name="REGEXTEST" data-engine="full"><td><code>REGEXTEST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-regex-test">Signature: <code>regex-test</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-regex-lite-subset">Dialect: <code>regex-lite-subset</code></a><br /><a href="#implementation-text-analysis">Implementation: <code>text-analysis</code></a></details></td></tr>
@@ -29,12 +29,12 @@ This page lists the 34 functions of the text family. Taxonomy/source: [Text func
 <tr data-formula-name="CONCAT CONCATENATE" data-engine="default"><td><code>CONCAT</code><small><code>CONCATENATE</code></small></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="UPPER" data-engine="default"><td><code>UPPER</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="LOWER" data-engine="default"><td><code>LOWER</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
-<tr data-formula-name="TRIM" data-engine="default"><td><code>TRIM</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
-<tr data-formula-name="TEXT" data-engine="default"><td><code>TEXT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-text-format">Signature: <code>text-format</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="TRIM" data-engine="default"><td><code>TRIM</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-trim-spaces">Dialect: <code>excel-trim-spaces</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="TEXT" data-engine="default"><td><code>TEXT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-text-format">Signature: <code>text-format</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-text-format">Dialect: <code>excel-text-format</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="EXACT" data-engine="default"><td><code>EXACT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-binary-number">Signature: <code>binary-number</code></a><br /><a href="#semantics-text-sensitive">Semantics: <code>text-sensitive</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="TEXTJOIN" data-engine="default"><td><code>TEXTJOIN</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-text-join">Signature: <code>text-join</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="SUBSTITUTE" data-engine="default"><td><code>SUBSTITUTE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-substitute">Signature: <code>substitute</code></a><br /><a href="#semantics-text-sensitive">Semantics: <code>text-sensitive</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
-<tr data-formula-name="REPLACE" data-engine="default"><td><code>REPLACE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-replace">Signature: <code>replace</code></a><br /><a href="#semantics-text-sensitive">Semantics: <code>text-sensitive</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="REPLACE" data-engine="default"><td><code>REPLACE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-replace">Signature: <code>replace</code></a><br /><a href="#semantics-text-sensitive">Semantics: <code>text-sensitive</code></a><br /><a href="#dialect-excel-replace-start">Dialect: <code>excel-replace-start</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="FIND" data-engine="default"><td><code>FIND</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-find-search">Signature: <code>find-search</code></a><br /><a href="#semantics-text-sensitive">Semantics: <code>text-sensitive</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="SEARCH" data-engine="default"><td><code>SEARCH</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-find-search">Signature: <code>find-search</code></a><br /><a href="#semantics-text-search">Semantics: <code>text-search</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="VALUE" data-engine="default"><td><code>VALUE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
@@ -378,6 +378,18 @@ Limitations: Google Sheets and OpenFormula results require producer evidence bef
 
 </details>
 
+<details id="dialect-excel-decimal-rounding"><summary>Dialect: excel-decimal-rounding</summary>
+
+| Dialect | Status |
+| --- | --- |
+| Microsoft Excel | divergent |
+| Google Sheets | unverified |
+| OpenFormula | unverified |
+
+Limitations: Decimal rounding exposes binary scaling error. =ROUND(1.005,2) returns 1; Excel returns 1.01 (#246).
+
+</details>
+
 <details id="dialect-regex-lite-subset"><summary>Dialect: regex-lite-subset</summary>
 
 | Dialect | Status |
@@ -387,6 +399,42 @@ Limitations: Google Sheets and OpenFormula results require producer evidence bef
 | OpenFormula | unverified |
 
 Limitations: REGEXTEST, REGEXEXTRACT, and REGEXREPLACE use the regex-lite syntax, not full PCRE2. Lookaround, backreferences, Unicode classes such as \p{L}, and other patterns the engine cannot compile return #VALUE!. \d, \s, and \w use ASCII character classes. \b uses ASCII word boundaries. As in Excel, caseSensitivity is 0 (case-sensitive, the default) or 1 (case-insensitive). Case-insensitive matching and the (?i) flag fold ASCII letters only. If caseSensitivity is 1 or the pattern enables an inline i flag, a pattern with a non-ASCII cased letter or a \x, \u, or \U escape returns #VALUE!. Regex programs are limited to 2 MiB. Text inputs and outputs are limited to 32,767 characters.
+
+</details>
+
+<details id="dialect-excel-trim-spaces"><summary>Dialect: excel-trim-spaces</summary>
+
+| Dialect | Status |
+| --- | --- |
+| Microsoft Excel | divergent |
+| Google Sheets | unverified |
+| OpenFormula | unverified |
+
+Limitations: All Unicode whitespace is collapsed. Excel removes only ordinary spaces, so a line feed in =TRIM("a"&CHAR(10)&"b") stays a line feed in Excel (#246).
+
+</details>
+
+<details id="dialect-excel-text-format"><summary>Dialect: excel-text-format</summary>
+
+| Dialect | Status |
+| --- | --- |
+| Microsoft Excel | divergent |
+| Google Sheets | unverified |
+| OpenFormula | unverified |
+
+Limitations: Numeric format codes are reduced to a decimal count. =TEXT(0.5,"0%") returns 0, grouping in "#,##0.00" is omitted, and =TEXT(2.5,"0") rounds half to even (#246).
+
+</details>
+
+<details id="dialect-excel-replace-start"><summary>Dialect: excel-replace-start</summary>
+
+| Dialect | Status |
+| --- | --- |
+| Microsoft Excel | divergent |
+| Google Sheets | unverified |
+| OpenFormula | unverified |
+
+Limitations: A start position after the end of the text returns #VALUE!. Excel appends the new text, as in =REPLACE("abc",5,1,"X") (#246).
 
 </details>
 

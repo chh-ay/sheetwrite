@@ -5,7 +5,7 @@ description: "Generated, source-linked formula names, signatures, semantics, dia
 
 This page is generated from the checked version 1 `sheetwrite.formula-capabilities` inventory. It publishes **100 required-supported target functions**, **63 incumbent functions**, and **145 optional analysis functions** (308 canonical functions total) without maintaining a second name list. Aliases share their canonical function's build availability.
 
-A function's presence means only the signature and semantic profiles linked in its row. Microsoft Excel documentation supplies the naming/family taxonomy; it is not a blanket Excel claim. Google Sheets and OpenFormula behavior is unverified unless a dialect profile says otherwise.
+A function's presence means only the signature and semantic profiles linked in its row. Microsoft Excel documentation supplies the naming/family taxonomy; it is not a blanket Excel claim. The [Excel function coverage](/docs/reference/excel-function-coverage/) page lists every Excel catalog name, including names that are not supported. Google Sheets and OpenFormula behavior is unverified unless a dialect profile says otherwise.
 
 ## Functions by family
 
