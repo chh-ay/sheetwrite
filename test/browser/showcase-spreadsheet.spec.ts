@@ -158,14 +158,14 @@ test("automatic ribbon layout follows host width until the user chooses a mode",
   expect(await panel.evaluate((element) => element.getBoundingClientRect().height)).toBeLessThan(
     fullHeight,
   );
-  const rows = await ribbon
-    .locator('.sheetwrite-ribbon-group:not([data-size="collapsed"]) [data-command]')
-    .evaluateAll((elements) =>
-      elements.map((element) => {
-        const box = element.getBoundingClientRect();
-        return Math.round(box.top + box.height / 2);
-      }),
-    );
+  // At this width every group may fold into its dropdown, so measure the
+  // groups themselves: the compact layout keeps all of them on one row.
+  const rows = await panel.locator(".sheetwrite-ribbon-group").evaluateAll((elements) =>
+    elements.map((element) => {
+      const box = element.getBoundingClientRect();
+      return Math.round(box.top + box.height / 2);
+    }),
+  );
   expect(rows.length).toBeGreaterThan(0);
   expect(Math.max(...rows) - Math.min(...rows)).toBeLessThanOrEqual(2);
 
