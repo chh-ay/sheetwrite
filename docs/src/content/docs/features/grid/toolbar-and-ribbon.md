@@ -245,7 +245,7 @@ Every toolbar option keeps working. These parts render differently because the t
 | `clearFormat` was one button. | The default toolbar shows the Clear menu. A custom item `{ action: "clearFormat" }` is still one Clear Formats button. | Pick "Clear Formats", or name the action in a custom list. |
 | `merge` and `unmerge` were two buttons. | The default toolbar shows one Merge & Center menu. Custom items `merge` and `unmerge` are still one-click buttons. | Pick "Merge Cells" or "Unmerge Cells", or name the actions in a custom list. |
 | Controls had `.sheetwrite-tb-<action>` classes. | Controls use the ribbon's classes. | Select `[data-command="<id>"]`. |
-| The toolbar mounted synchronously with the grid. | It loads with the ribbon's chunk. | Wait for the toolbar before you query its elements. |
+| The toolbar mounted synchronously with the grid and the shell. | The grid's toolbar and the `createSpreadsheetShell` toolbar load with their own chunk, with their height reserved. `createToolbar` still mounts at once. | Wait for the toolbar before you query its elements. |
 | A ribbon chunk that failed to load fell back to the flat toolbar. | The toolbar shares that chunk, so the grid shows no chrome. | Handle the reported load error. The shell still falls back to its toolbar. |
 
 ### Export buttons
