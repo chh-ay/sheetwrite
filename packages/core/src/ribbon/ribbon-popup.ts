@@ -4,6 +4,8 @@
 // placement and focus-return rules.
 
 const VIEWPORT_MARGIN = 8;
+/** Space between a popup and its trigger, so the two never read as one surface. */
+const TRIGGER_GAP = 4;
 
 /** Elements arrow keys move between inside an open popup. */
 const NAVIGABLE =
@@ -122,8 +124,8 @@ export class RibbonPopup {
     const origin = surface.getBoundingClientRect();
     const anchor = trigger.getBoundingClientRect();
     const maxLeft = window.innerWidth - origin.width - VIEWPORT_MARGIN;
-    const below = anchor.bottom;
-    const above = anchor.top - origin.height;
+    const below = anchor.bottom + TRIGGER_GAP;
+    const above = anchor.top - origin.height - TRIGGER_GAP;
     const fitsBelow = below + origin.height <= window.innerHeight - VIEWPORT_MARGIN;
     const left = Math.max(VIEWPORT_MARGIN, Math.min(anchor.left, maxLeft));
     const top = Math.max(VIEWPORT_MARGIN, fitsBelow || above < 0 ? below : above);

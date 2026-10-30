@@ -903,14 +903,20 @@
 
 .sheetwrite-ribbon-form {
   display: grid;
-  gap: 8px;
+  gap: 12px;
   width: 280px;
-  padding: 6px;
+  padding: 10px 12px 12px;
+  box-sizing: border-box;
 }
 
 .sheetwrite-ribbon-form label {
   display: grid;
   gap: 4px;
+}
+
+/* A field the current choice does not use reads as off, label included. */
+.sheetwrite-ribbon-form label:has(> .sheetwrite-ribbon-field:disabled) {
+  color: var(--sheetwrite-widget-muted, #6b7280);
 }
 
 .sheetwrite-ribbon-field {
@@ -926,6 +932,21 @@
   user-select: text;
 }
 
+.sheetwrite-ribbon-field::placeholder {
+  color: var(--sheetwrite-widget-muted, #6b7280);
+}
+
+.sheetwrite-ribbon-field:focus {
+  border-color: var(--sheetwrite-widget-accent, #2563eb);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--sheetwrite-widget-selection, #2563eb33);
+}
+
+.sheetwrite-ribbon-field:disabled {
+  background: var(--sheetwrite-menu-hover, #f3f4f6);
+  cursor: not-allowed;
+}
+
 textarea.sheetwrite-ribbon-field {
   min-height: 72px;
   resize: vertical;
@@ -936,16 +957,30 @@ textarea.sheetwrite-ribbon-field {
   color: var(--sheetwrite-widget-error, #b42318);
 }
 
+/* The form's one action: the accent border and weight mark it as the default
+   in any theme, with no fill colour that could lose contrast on dark ones. */
 .sheetwrite-ribbon-form-button {
   justify-self: end;
-  min-width: 64px;
+  min-width: 72px;
   height: 28px;
-  border: 1px solid var(--sheetwrite-widget-border, #d0d0d0);
+  padding: 0 14px;
+  border: 1px solid var(--sheetwrite-widget-accent, #2563eb);
   border-radius: 4px;
   background: var(--sheetwrite-widget-selection, #2563eb22);
   color: inherit;
   font: inherit;
+  font-weight: 600;
   cursor: pointer;
+}
+
+.sheetwrite-ribbon-form-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--sheetwrite-widget-accent, #2563eb) 24%, transparent);
+}
+
+/* Disabled while the optional panel code loads after OK. */
+.sheetwrite-ribbon-form-button:disabled {
+  cursor: progress;
+  opacity: 0.6;
 }
 
 /* A collapsed group's controls, lent to the popup, render at full size. */
@@ -956,16 +991,44 @@ textarea.sheetwrite-ribbon-field {
 /* The placement choice of Insert › PivotTable: radios in a borderless group. */
 .sheetwrite-ribbon-choices {
   display: grid;
-  gap: 4px;
+  gap: 6px;
   margin: 0;
   padding: 0;
   border: none;
 }
 
+.sheetwrite-ribbon-choices legend {
+  margin-bottom: 8px;
+  padding: 0;
+  font-weight: 600;
+}
+
+/* The row pads out by 4px and pulls back by the same, so the radios stay
+   aligned with the legend while the focus ring has room around the text. */
 .sheetwrite-ribbon-choices label {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  margin: 0 -4px;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.sheetwrite-ribbon-choices input[type="radio"] {
+  margin: 0;
+  accent-color: var(--sheetwrite-widget-accent, #2563eb);
+}
+
+/* Focus rings the whole option row. A native radio ignores border-radius, so
+   a ring on the radio itself (ours or a host page's) draws a square. */
+.sheetwrite-ribbon-choices input[type="radio"]:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.sheetwrite-ribbon-choices label:has(> input:focus-visible) {
+  outline: 2px solid var(--sheetwrite-widget-accent, #2563eb);
+  outline-offset: 2px;
 }
 
 /* Side panel (Chart panel, pivot field list), docked to the grid's right edge

@@ -176,16 +176,19 @@
   outline-offset: 3px;
 }
 
+/* Expressive Code owns the token colours; this only fits its frame to the column. */
 .sw-spreadsheet-code {
+  min-width: 0;
   margin: 0 0 1rem;
-  padding: 1rem;
-  overflow-x: auto;
-  border: 1px solid var(--sw-demo-border);
-  border-radius: 0.5rem;
-  background: var(--sw-demo-deep);
-  color: var(--sw-demo-fg);
-  font: 0.85rem / 1.6 var(--sw-font-mono);
-  white-space: pre;
+}
+
+.sw-spreadsheet-code .expressive-code {
+  margin: 0;
+}
+
+.sw-spreadsheet-code .expressive-code pre {
+  font-size: 0.8rem;
+  line-height: 1.6;
 }
 
 .sw-spreadsheet-keys {

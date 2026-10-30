@@ -546,6 +546,7 @@ function renderPlacement(spec: RibbonPlacementSpec, context: RibbonContext): Rib
     field.disabled = true;
     field.autocomplete = "off";
     field.spellcheck = false;
+    field.placeholder = "A1";
     location.appendChild(field);
     const pickExisting = (): void => {
       field.disabled = !existing.checked;

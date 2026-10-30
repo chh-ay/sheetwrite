@@ -19,6 +19,7 @@ import {
   STORY_ORDER_ROWS,
   STORY_MONTHS,
 } from "./scenarios/orders-story.js";
+import AnalysisSetupSnippet from "./snippets/analysis-setup.mdx";
 
 import "@sheetwrite/core/styles.css";
 import "@sheetwrite/core/shell.css";
@@ -173,18 +174,9 @@ export default function AnalysisShowcase() {
           </div>
           <div>
             <h2>How it is built</h2>
-            <pre className="sw-spreadsheet-code">
-              <code>
-                {"// Pivot tables need the full engine; charts draw through their package\n"}
-                {'await initSheetwrite(undefined, await import("@sheetwrite/formulas"));\n'}
-                {"registerChartsBackend();\n\n"}
-                {"grid.setPivot({ id, source, anchor,\n"}
-                {"  rows: [MONTH], columns: [REGION],\n"}
-                {'  values: [{ field: REVENUE, aggregation: "SUM" }] }, "summary");\n\n'}
-                {"// One line series per region, over the pivot's output cells\n"}
-                {'grid.setChart({ id, kind: "line", series, anchor }, "summary");'}
-              </code>
-            </pre>
+            <div className="sw-spreadsheet-code">
+              <AnalysisSetupSnippet />
+            </div>
             <p>
               The chart reads cells, not the pivot: point it at any range, and it redraws when those
               cells change.
