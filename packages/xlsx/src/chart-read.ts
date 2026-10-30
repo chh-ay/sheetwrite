@@ -4,6 +4,7 @@ import type {
   ChartKind,
   ChartRange,
   ChartSeries,
+  DocumentValidationResult,
   SheetSnapshot,
   WorkbookSnapshot,
 } from "@sheetwrite/core";
@@ -296,11 +297,14 @@ function readAnchor(element: XmlElement, sheet: SheetSnapshot): ChartAnchor | un
   const lastCol = anchorNumber(to, "col");
   const lastRow = anchorNumber(to, "row");
   if (!insideSheet(lastCol, MAX_COLUMNS) || !insideSheet(lastRow, MAX_ROWS)) return undefined;
-  for (let index = col; index < lastCol; index++)
-    width += sheet.columns[index]?.width ?? DEFAULT_COLUMN_PIXELS;
+  // Only stored columns and rows can differ from the default dimensions.
+  // Full-sheet spans must not walk all the implicit cells.
+  width += (lastCol - col) * DEFAULT_COLUMN_PIXELS;
+  for (let index = col; index < Math.min(lastCol, sheet.columns.length); index++) {
+    const columnWidth = sheet.columns[index]?.width;
+    if (columnWidth !== undefined) width += columnWidth - DEFAULT_COLUMN_PIXELS;
+  }
 
-  // Sum only the rows with their own height, so a span over the whole sheet
-  // costs one pass over the row metadata, not one step per row.
   height += (lastRow - row) * DEFAULT_ROW_PIXELS;
   for (const [index, meta] of sheet.rowMeta ?? []) {
     if (index >= row && index < lastRow && meta.height !== undefined) {
@@ -322,8 +326,8 @@ function admitChart(
   imported: readonly ChartDefinition[],
   { snapshot, extendSheet }: ChartReadInput,
   context: XlsxCodecContext,
-): ChartDefinition | undefined {
-  if (candidate === undefined) return undefined;
+): { chart?: ChartDefinition; atLimit: boolean } {
+  if (candidate === undefined) return { atLimit: false };
 
   const { anchor, series } = candidate;
   extendSheet(sheet, anchor.row, anchor.col);
@@ -335,6 +339,7 @@ function admitChart(
     }
   }
 
+  const candidates = [...imported, candidate];
   const probe = {
     schemaVersion: 1,
     workbook: { activeSheet: sheet.id },
@@ -345,13 +350,24 @@ function admitChart(
       rowCount: entry.rowCount,
       columns: entry.columns,
       cells: [],
-      ...(entry === sheet ? { charts: [...imported, candidate] } : {}),
+      ...(entry === sheet ? { charts: candidates } : {}),
     })),
   };
+
+  // Core keeps the per-sheet chart limit private, so its validation result is
+  // the signal. A probe with one more chart reports the array-level
+  // resource error when this sheet is full; its repeated ID is irrelevant.
+  const isFull = (result: DocumentValidationResult) =>
+    !result.ok &&
+    result.errors.some(
+      (error) => error.code === "resource-limit" && error.path.endsWith(".charts"),
+    );
   const checked = validateCodecSnapshot(probe, context);
-  return checked.ok
-    ? checked.value.sheets.find((entry) => entry.id === sheet.id)?.charts?.at(-1)
-    : undefined;
+  if (!checked.ok) return { atLimit: isFull(checked) };
+
+  candidates.push(candidate);
+  const chart = checked.value.sheets.find((entry) => entry.id === sheet.id)?.charts?.at(-1);
+  return { ...(chart ? { chart } : {}), atLimit: isFull(validateCodecSnapshot(probe, context)) };
 }
 
 function chartRelationship(
@@ -411,8 +427,11 @@ async function readDrawing(
 ): Promise<DrawingRead & { root: XmlElement; relationships: readonly OpcRelationship[] }> {
   const relationships = packageFile.relationships(drawingPart);
   const root = parseXml(await packageFile.readBytes(drawingPart), drawingPart, context);
-  const charts: ChartDefinition[] = [];
+  const charts: ChartDefinition[] = [...(sheet.charts ?? [])];
   const retained: XmlElement[] = [];
+  const readTargets = new Set<string>();
+  const retainedTargets = new Set<string>();
+  let atLimit = false;
   // Sheetwrite names each chart frame with its chart ID, so the sidecar matches by name.
   const sidecar = new Map(
     (input.metadata?.sheets.find((entry) => entry.id === sheet.id)?.charts ?? []).map((chart) => [
@@ -424,22 +443,31 @@ async function readDrawing(
   for (const anchorNode of root.children) {
     checkAbort(context);
     const relationship = chartRelationship(anchorNode, relationships);
-    const anchor = readAnchor(anchorNode, sheet);
-    const chartRoot =
-      relationship &&
-      parseXml(await packageFile.readBytes(relationship.target), relationship.target, context);
-    const frame = descendants(anchorNode, "cNvPr")[0];
-    const authored = sidecar.get((frame && xmlAttribute(frame, "name")) ?? "");
-    const id = authored?.id ?? `xlsx-chart-${sheetNumber}-${charts.length + 1}`;
-    const candidate =
-      chartRoot && anchor && xmlRootMatches(chartRoot, "chartSpace", CHART_NAMESPACES)
-        ? readDefinition(chartRoot, anchor, id, input.snapshot)
-        : undefined;
-    if (candidate && authored) reconcileAuthored(candidate, authored);
-    const chart = admitChart(candidate, sheet, charts, input, context);
+    let chart: ChartDefinition | undefined;
+    if (relationship && !readTargets.has(relationship.target) && !atLimit) {
+      readTargets.add(relationship.target);
+      const anchor = readAnchor(anchorNode, sheet);
+      const chartRoot = parseXml(
+        await packageFile.readBytes(relationship.target),
+        relationship.target,
+        context,
+      );
+      const frame = descendants(anchorNode, "cNvPr")[0];
+      const authored = sidecar.get((frame && xmlAttribute(frame, "name")) ?? "");
+      const id = authored?.id ?? `xlsx-chart-${sheetNumber}-${charts.length + 1}`;
+      const candidate =
+        anchor && xmlRootMatches(chartRoot, "chartSpace", CHART_NAMESPACES)
+          ? readDefinition(chartRoot, anchor, id, input.snapshot)
+          : undefined;
+      if (candidate && authored) reconcileAuthored(candidate, authored);
+      const admitted = admitChart(candidate, sheet, charts, input, context);
+      chart = admitted.chart;
+      atLimit = admitted.atLimit;
+    }
     if (!chart || !relationship) {
       retained.push(anchorNode);
       if (relationship) {
+        retainedTargets.add(relationship.target);
         emitWarning(context, {
           code: "unsupported-feature",
           message:
@@ -456,6 +484,9 @@ async function readDrawing(
     charts.push(chart);
     modelled.add(relationship.target);
   }
+  // A repeated frame still points at the original part, even when its first
+  // frame became editable. Keep that part and relationship for the opaque frame.
+  for (const target of retainedTargets) modelled.delete(target);
   return { charts, retained, root, relationships };
 }
 
@@ -489,7 +520,8 @@ export async function readCharts(
         continue;
 
       const read = await readDrawing(reader, drawing.target, sheet, index + 1);
-      if (read.charts.length === 0) continue;
+      // Earlier drawings may already fill `Sheet.charts`; untouched drawings keep their bytes.
+      if (read.charts.length === (sheet.charts?.length ?? 0)) continue;
       sheet.charts = read.charts;
       if (read.retained.length === 0) {
         modelled.add(drawing.target);

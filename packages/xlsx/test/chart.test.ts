@@ -285,6 +285,99 @@ describe("native XLSX charts", () => {
     );
   });
 
+  it("imports one chart per part when thousands of anchors repeat it or have no chart", async () => {
+    const parts = unzipSync(withoutSidecar(await toXlsxWorkbook(authored())));
+    const drawingPart = "xl/drawings/sheetwrite-drawing1.xml";
+    const drawing = strFromU8(parts[drawingPart] ?? new Uint8Array());
+    const anchor = drawing.match(/<xdr:oneCellAnchor\b[^>]*>[\s\S]*?<\/xdr:oneCellAnchor>/)?.[0];
+    if (!anchor) throw new Error("authored drawing has no one-cell anchor");
+    const repeats = 1_500;
+    const unlinked = anchor.replace(/<c:chart\b[^>]*\/>/, "");
+    parts[drawingPart] = strToU8(
+      drawing.replace(
+        "</xdr:wsDr>",
+        `${anchor.repeat(repeats)}${unlinked.repeat(repeats)}</xdr:wsDr>`,
+      ),
+    );
+    const { warnings, onWarning } = collect();
+
+    const imported = await fromXlsxWorkbook(zipSync(parts, { level: 0 }), { onWarning });
+
+    expect(imported.sheets[0]?.charts).toHaveLength(KINDS.length);
+    expect(warnings.filter((warning) => warning.code === "unsupported-feature")).toHaveLength(
+      repeats,
+    );
+    const exported = await toXlsxWorkbook(imported);
+    expect(packageProblems(exported)).toEqual([]);
+  }, 5_000);
+
+  it("sizes two-cell anchors from default and explicit column and row sizes", async () => {
+    const parts = unzipSync(withoutSidecar(await toXlsxWorkbook(authored())));
+    const drawingPart = "xl/drawings/sheetwrite-drawing1.xml";
+    const drawing = strFromU8(parts[drawingPart] ?? new Uint8Array());
+    const frame = drawing.match(/<xdr:graphicFrame\b[\s\S]*?<\/xdr:graphicFrame>/)?.[0];
+    if (!frame) throw new Error("authored drawing has no chart frame");
+    const marker = (row: number, col: number, offset: number) =>
+      `<xdr:col>${col}</xdr:col><xdr:colOff>${offset}</xdr:colOff><xdr:row>${row}</xdr:row><xdr:rowOff>${offset}</xdr:rowOff>`;
+    const namespaces = drawing.match(/<xdr:oneCellAnchor([^>]*)>/)?.[1] ?? "";
+    const anchor = `<xdr:twoCellAnchor${namespaces}><xdr:from>${marker(0, 0, 9525)}</xdr:from><xdr:to>${marker(1_000, 300, 19050)}</xdr:to>${frame}<xdr:clientData/></xdr:twoCellAnchor>`;
+    parts[drawingPart] = strToU8(
+      drawing.replace(/<xdr:oneCellAnchor\b[\s\S]*<\/xdr:oneCellAnchor>/, anchor),
+    );
+    parts["xl/worksheets/sheet1.xml"] = strToU8(
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="2" max="2" width="20" customWidth="1"/></cols><sheetData><row r="2" ht="30" customHeight="1"/></sheetData></worksheet>',
+    );
+
+    const imported = await fromXlsxWorkbook(zipSync(parts));
+
+    expect(imported.sheets[0]?.charts?.[0]?.anchor).toEqual({
+      row: 0,
+      col: 0,
+      offsetX: 1,
+      offsetY: 1,
+      width: 300 * 64 + (75 - 64) + (140 - 64) + 1,
+      height: 1_000 * 20 + (40 - 20) + 1,
+    });
+  });
+
+  it("does not parse further chart parts once the sheet chart limit is full", async () => {
+    const snapshot = authored();
+    const sheet = snapshot.sheets[0];
+    const chart = sheet?.charts?.[0];
+    if (!sheet || !chart) throw new Error("authored workbook has no chart");
+    sheet.charts = Array.from({ length: 100 }, (_, index) => ({ ...chart, id: `chart-${index}` }));
+    const parts = unzipSync(withoutSidecar(await toXlsxWorkbook(snapshot)));
+    const drawingPart = "xl/drawings/sheetwrite-drawing1.xml";
+    const drawing = strFromU8(parts[drawingPart] ?? new Uint8Array());
+    const anchor = drawing.match(/<xdr:oneCellAnchor\b[^>]*>[\s\S]*?<\/xdr:oneCellAnchor>/)?.[0];
+    if (!anchor) throw new Error("authored drawing has no chart anchor");
+    parts[drawingPart] = strToU8(
+      drawing.replace(
+        "</xdr:wsDr>",
+        `${anchor.replace('r:id="rId1"', 'r:id="overflow"')}</xdr:wsDr>`,
+      ),
+    );
+    const relationshipsPart = "xl/drawings/_rels/sheetwrite-drawing1.xml.rels";
+    parts[relationshipsPart] = strToU8(
+      strFromU8(parts[relationshipsPart] ?? new Uint8Array()).replace(
+        "</Relationships>",
+        '<Relationship Id="overflow" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="/xl/charts/overflow.xml"/></Relationships>',
+      ),
+    );
+    parts["xl/charts/overflow.xml"] = strToU8("<not-well-formed");
+    const { warnings, onWarning } = collect();
+
+    const imported = await fromXlsxWorkbook(zipSync(parts), { onWarning });
+
+    expect(imported.sheets[0]?.charts).toHaveLength(100);
+    expect(warnings).toContainEqual(
+      expect.objectContaining({ code: "unsupported-feature", part: "xl/charts/overflow.xml" }),
+    );
+    expect(imported.workbook.xlsxSource?.parts.map((part) => part.name)).toContain(
+      "xl/charts/overflow.xml",
+    );
+  });
+
   it("reads series ranges written with lower-case column letters", async () => {
     const parts = unzipSync(await toXlsxWorkbook(authored()));
     const expected = await fromXlsxWorkbook(withoutSidecar(zipSync(parts)));

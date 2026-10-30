@@ -180,6 +180,10 @@ and emits an `unsupported-feature` warning. Examples are 3-D, stacked and
 combination charts, and series that read literal values or several ranges. See
 [Kept parts and round trips](/docs/import-export/kept-parts-and-round-trips/).
 
+Import reads each chart part once per drawing. Repeated frames for that part
+stay opaque and emit the same warning. Once a sheet reaches its chart limit,
+further chart frames also stay opaque instead of being parsed into charts.
+
 Excel files do not store colors, fonts or styles from Sheetwrite. A chart that
 Sheetwrite exports has Excel's default style.
 
