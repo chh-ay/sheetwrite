@@ -8,6 +8,9 @@ export const MOVED_HEADINGS: Readonly<Record<string, Readonly<Record<string, str
       "/docs/concepts/documents-and-operations/#document-protocol-and-storage-transactions",
     "cell-values": "/docs/concepts/documents-and-operations/#cell-values",
   },
+  "/docs/performance/benchmark-protocol/": {
+    "release-comparison": "/docs/performance/release-comparison/",
+  },
 };
 
 /**

@@ -3,8 +3,11 @@ import {
   formatBytes,
   formatCaptureTime,
   formatCount,
+  formatMs,
+  formatRatio,
   html,
   provenanceList,
+  readableId,
   shortHash,
 } from "./evidence-format.js";
 
@@ -404,15 +407,135 @@ function comparisonCell(value: string): string {
   return html(value).replaceAll("|", "&#124;").replaceAll("\n", " ");
 }
 
+type ComparisonMetric = ReleaseComparisonEvidence["suites"][number]["metrics"][number];
+
+/** Key segments that only name a container, not what is measured. */
+const CONTAINER_SEGMENTS = new Set([
+  "analysis",
+  "cells",
+  "engines",
+  "queries",
+  "scenarios",
+  "shared",
+  "stat",
+  "summaries",
+  "timing",
+  "values",
+  "workloads",
+]);
+
+/**
+ * A metric key as words: `workloads[id=countif-100k;size=100000].allocationStat.retainedBytes`
+ * reads "Countif 100k · 100,000 · allocation stat · retained bytes". The raw key stays in the title.
+ */
+function metricLabel(key: string): string {
+  const parts: string[] = [];
+  for (const segment of key.split(/\.(?![^[]*\])/u)) {
+    const selector = /^\w+\[(.*)\]$/u.exec(segment);
+    if (selector === null) {
+      if (CONTAINER_SEGMENTS.has(segment)) continue;
+      parts.push(/^\d+$/u.test(segment) ? formatCount(Number(segment)) : segment);
+      continue;
+    }
+    for (const pair of (selector[1] ?? "").split(";")) {
+      // A value may itself contain "=" (`key=engine=handsontable`), so split at the first one.
+      const split = pair.indexOf("=");
+      const name = split === -1 ? "" : pair.slice(0, split);
+      const value = split === -1 ? pair : pair.slice(split + 1);
+      if (!/^\d+$/u.test(value)) parts.push(value.slice(value.lastIndexOf("=") + 1));
+      else
+        parts.push(
+          name === "rows" ? `${formatCount(Number(value))} rows` : formatCount(Number(value)),
+        );
+    }
+  }
+  return readableId(parts.join("."));
+}
+
+/** A value in the unit a reader expects: µs/ms/s, ns, MiB, whole counts. */
+function metricValue(value: number, unit: ComparisonMetric["unit"]): string {
+  if (unit === "ms") return formatMs(value);
+  if (unit === "ns")
+    return value < 1000 ? `${value.toFixed(value < 10 ? 2 : 1)} ns` : formatMs(value / 1e6);
+  if (unit === "bytes") return formatBytes(Math.round(value));
+  if (unit === "count") return formatCount(Math.round(value));
+  return value.toFixed(3);
+}
+
+function metricStat(stat: ComparisonMetric["base"], unit: ComparisonMetric["unit"]): string {
+  if (stat === null) return "—";
+  const median = metricValue(stat.median, unit);
+  const p95 = metricValue(stat.p95, unit);
+  return median === p95 ? median : `${median} / ${p95}`;
+}
+
+const VERDICT_LABELS: Readonly<Record<string, string>> = {
+  regression: "**Flagged**",
+  improvement: "Faster beyond noise",
+  "within-noise": "Within budget",
+  faster: "Faster",
+  slower: "Slower",
+  unchanged: "Unchanged",
+  "new-only": "New in 0.6",
+  removed: "Removed",
+};
+
+/**
+ * The verdict a reader can check against the shown values: an unbudgeted faster or
+ * slower row whose values are equal once rounded for display reads unchanged.
+ */
+function shownVerdict(metric: ComparisonMetric): string {
+  if (metric.verdict !== "faster" && metric.verdict !== "slower") return metric.verdict;
+  const same =
+    metricStat(metric.base, metric.unit) === metricStat(metric.candidate, metric.unit) &&
+    (metric.medianRatio === null || formatRatio(metric.medianRatio) === formatRatio(1));
+  return same ? "unchanged" : metric.verdict;
+}
+
+function metricRow(metric: ComparisonMetric, leading: string[] = []): string {
+  const label = `<span title="${html(metric.key)}">${comparisonCell(metricLabel(metric.key))}</span>`;
+  // A row can be flagged on its p95 alone, so show that ratio when it tells a different story.
+  const p95 =
+    metric.p95Ratio !== null &&
+    metric.medianRatio !== null &&
+    Math.abs(metric.p95Ratio - metric.medianRatio) >= 0.05
+      ? ` (p95 ${formatRatio(metric.p95Ratio)})`
+      : "";
+  const change = metric.medianRatio === null ? "—" : `${formatRatio(metric.medianRatio)}${p95}`;
+  // Bytes and counts get smaller or larger, not faster or slower.
+  const sized = metric.unit === "bytes" || metric.unit === "count";
+  const shown = shownVerdict(metric);
+  const verdictLabel =
+    sized && shown === "faster"
+      ? "Smaller"
+      : sized && shown === "slower"
+        ? "Larger"
+        : (VERDICT_LABELS[shown] ?? comparisonCell(shown));
+  const verdict = [
+    verdictLabel,
+    ...(metric.note === undefined ? [] : [comparisonCell(metric.note)]),
+    ...(metric.ceilingPassed === false ? ["ceiling failed"] : []),
+  ].join(" · ");
+  return `| ${[...leading, label, metricStat(metric.base, metric.unit), metricStat(metric.candidate, metric.unit), change, verdict].join(" | ")} |`;
+}
+
+/** A suite's artifact as a name: "formula-default-results.json" reads "Formula default". */
+function suiteName(artifact: string): string {
+  return readableId(artifact.replace(/(-results)?\.json$/u, ""));
+}
+
+/**
+ * Rows that do not measure a Sheetwrite change of their own: Handsontable control
+ * runs, and full-engine rows that repeat the formula tables' workloads.
+ */
+function isControlOrRepeat(key: string): boolean {
+  return /engine=handsontable/u.test(key) || /\.shared\.workloads\[/u.test(key);
+}
+
 export function renderReleaseComparisonSection(
   evidence: ReleaseComparisonEvidence,
   source: string,
 ): string[] {
-  const stat = (measurement: { median: number; p95: number } | null, unit: string): string =>
-    measurement === null
-      ? "Not captured"
-      : `${measurement.median.toPrecision(5)} / ${measurement.p95.toPrecision(5)} ${unit}`;
-  const ratio = (value: number | null): string => (value === null ? "—" : `${value.toFixed(3)}×`);
   // A text stamp may lack its own timestamp (the promoted render baseline); then
   // the receipt's scope start is the closest bound time, and is labeled as such.
   const captureLabel = (
@@ -425,70 +548,91 @@ export function renderReleaseComparisonSection(
     const origin = stamp.timestamp === null ? " · scope start" : "";
     return `${shortHash(stamp.commit)} · ${formatCaptureTime(timestamp)} UTC${origin}`;
   };
+  const count = (suite: ReleaseComparisonEvidence["suites"][number], ...verdicts: string[]) =>
+    suite.metrics.filter(
+      (metric) => !isControlOrRepeat(metric.key) && verdicts.includes(shownVerdict(metric)),
+    ).length;
+  const others = (suite: ReleaseComparisonEvidence["suites"][number]) =>
+    suite.metrics.filter((metric) => isControlOrRepeat(metric.key)).length;
   const flags = evidence.suites.flatMap((suite) =>
     suite.metrics
       .filter((metric) => metric.verdict === "regression")
-      .map((metric) => ({ artifact: suite.artifact, ...metric })),
+      .map((metric) => ({ suite, metric })),
   );
-  const newOnly = evidence.suites
-    .filter((suite) => suite.status === "new-only")
-    .map((suite) => `<code>${html(suite.artifact)}</code>`);
   const affinities = Object.entries(evidence.meta.effectiveCpuAffinityBySuite).sort(
     ([left], [right]) => left.localeCompare(right),
   );
+  const header = "| Measurement | 0.5.4 median / p95 | 0.6.0 median / p95 | Change | Result |";
 
   return [
     "## Release comparison",
     "",
     "### Sheetwrite 0.6.0 compared with a fresh 0.5.4 capture",
     "",
-    `**${flags.length} rows exceed their suite's recorded limit or noise test.** They are listed first, not removed or normalized against a control. The complete median/p95 and ratio tables follow. A descriptive comparison flag is not itself a controlled gate verdict; rows without a documented threshold are labeled slower or faster rather than assigned an invented noise limit.`,
+    "Each suite ran once on 0.5.4 and once on 0.6.0, on the same machine. Change is 0.6.0 / 0.5.4 for the median, with the p95 ratio in brackets when it differs: below 1× is faster or smaller, above 1× is slower or larger. A suite with a documented budget marks rows beyond it as flagged; rows without a budget are only marked faster, slower, smaller or larger.",
     "",
-    "| Artifact and metric | Baseline median / p95 | Candidate median / p95 | Median ratio | p95 ratio |",
-    "| --- | ---: | ---: | ---: | ---: |",
-    ...flags.map(
-      (metric) =>
-        `| <code>${comparisonCell(metric.artifact)} · ${comparisonCell(metric.key)}</code> | ${stat(metric.base, metric.unit)} | ${stat(metric.candidate, metric.unit)} | ${ratio(metric.medianRatio)} | ${ratio(metric.p95Ratio)} |`,
+    "The summary counts Sheetwrite's own measurements. **Lower** and **higher** cover time, memory and counts alike; **same** is unchanged or within budget; **new** has no 0.5.4 counterpart. **Apart** counts Handsontable control runs and full-engine rows that repeat the formula tables, so a change is not counted twice or credited to Sheetwrite.",
+    "",
+    "| Suite | Rows | Lower | Higher | Same | New | Flagged | Apart |",
+    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ...evidence.suites.map(
+      (suite) =>
+        `| ${suiteName(suite.artifact)} | ${suite.metrics.length} | ${count(suite, "faster", "improvement")} | ${count(suite, "slower")} | ${count(suite, "unchanged", "within-noise")} | ${count(suite, "new-only")} | ${count(suite, "regression")} | ${others(suite)} |`,
     ),
     "",
-    "### Capture conditions",
+    "### Flagged rows",
     "",
-    `Both releases were captured on the same machine and toolchain, one suite at a time, each in its own scope with a ${html(evidence.meta.memoryMax ?? "recorded")} memory cap. The parent slice's memory-high counter must stay unchanged during a suite. Each suite uses the same effective CPU mask on both sides; the comparison refuses a mismatch.`,
+    `${flags.length} rows exceed their suite's budget or noise test. They stay listed here, not removed or adjusted against a control. A flag compares one capture of each release; it is not a controlled gate verdict.`,
     "",
-    "| Suite | Effective CPU mask |",
-    "| --- | --- |",
-    ...affinities.map(([suite, mask]) => `| <code>${html(suite)}</code> | ${html(mask)} |`),
-    "",
-    "For data captures, a full garbage collection runs between samples, untimed. Each ingest sample also gets a fresh happy-dom document after the prior sample has released its store or grid. Both versions use data protocol v2. Mixed protocol versions are rejected.",
-    "",
-    "Formula tables compare the 0.5.4 engine (WASM) under the 0.6 core and harness with the 0.6 engine under that same core and harness. They isolate the engine difference only. The source records both commits and the hashes of the loaded binaries. Grid constant edits and Node initialization time current-core paths, so those measurements are 0.6-only and have no version ratio. A workload absent from the older engine is marked not in 0.5.4.",
-    "",
-    ...(newOnly.length === 0
-      ? []
-      : [`New in 0.6, with no 0.5.4 comparison: ${newOnly.join(", ")}.`, ""]),
-    ...provenance(evidence.meta, source, "Comparison generated"),
-    `Comparison base: <code>${html(evidence.base.ref)}</code> at ${shortHash(evidence.base.commit)}. Candidate: ${shortHash(evidence.candidate.commit)}. Ratios are candidate / 0.5.4: below 1 is lower; above 1 is higher. Median and p95 retain the artifact's units. New-only and removed measurements are not ratios.`,
+    "| Suite | Measurement | 0.5.4 median / p95 | 0.6.0 median / p95 | Change | Result |",
+    "| --- | --- | ---: | ---: | ---: | --- |",
+    ...flags.map(({ suite, metric }) =>
+      metricRow(metric, [
+        `${suiteName(suite.artifact)}${isControlOrRepeat(metric.key) ? (/engine=handsontable/u.test(metric.key) ? " · Handsontable control" : " · repeat of formula table") : ""}`,
+      ]),
+    ),
     "",
     ...evidence.captureMetadata.publicationNotes.flatMap((note) => [
       `### ${html(note.title)}`,
       "",
       ...note.paragraphs.flatMap((paragraph) => [html(paragraph), ""]),
     ]),
-    ...evidence.suites.flatMap((suite) => [
-      `### ${suite.artifact}`,
-      "",
-      `Status: **${suite.status}**. Baseline: **${html(suite.comparisonLabel)}**. Baseline capture: ${captureLabel(suite.base, suite.baselineCapture)}. Candidate capture: ${captureLabel(suite.candidate, suite.candidateCapture)}.`,
-      "",
-      `Threshold: **${html(suite.threshold.kind)}**. ${html(suite.threshold.description)} Source: <code>${html(suite.threshold.source)}</code>.`,
-      "",
-      "| Metric | Baseline median / p95 | Candidate median / p95 | Median ratio | p95 ratio | Verdict |",
-      "| --- | ---: | ---: | ---: | ---: | --- |",
-      ...suite.metrics.map(
-        (metric) =>
-          `| <code>${comparisonCell(metric.key)}</code> | ${stat(metric.base, metric.unit)} | ${stat(metric.candidate, metric.unit)} | ${ratio(metric.medianRatio)} | ${ratio(metric.p95Ratio)} | ${comparisonCell(metric.verdict)}${metric.note === undefined ? "" : ` · ${comparisonCell(metric.note)}`}${metric.ceilingPassed === false ? " · ceiling failed" : ""} |`,
-      ),
-      "",
-    ]),
+    "### Capture conditions",
+    "",
+    `Both releases were captured on the same machine and toolchain, one suite at a time, each in its own scope with a ${html(evidence.meta.memoryMax ?? "recorded")} memory cap. The parent slice's memory-high counter must stay unchanged during a suite. Each suite uses the same effective CPU mask on both sides; the comparison refuses a mismatch.`,
+    "",
+    "| Suite | Effective CPU mask |",
+    "| --- | --- |",
+    ...affinities.map(([suite, mask]) => `| ${suiteName(suite)} | ${html(mask)} |`),
+    "",
+    "For data captures, a full garbage collection runs between samples, untimed. Each ingest sample also gets a fresh happy-dom document after the prior sample has released its store or grid. Both versions use data protocol v2. Mixed protocol versions are rejected.",
+    "",
+    "Formula tables compare the 0.5.4 engine (WASM) under the 0.6 core and harness with the 0.6 engine under that same core and harness. They isolate the engine difference only. The source records both commits and the hashes of the loaded binaries. Grid constant edits and Node initialization time current-core paths, so those measurements are 0.6-only and have no version ratio.",
+    "",
+    ...provenance(evidence.meta, source, "Comparison generated"),
+    `Comparison base: <code>${html(evidence.base.ref)}</code> at ${shortHash(evidence.base.commit)}. Candidate: ${shortHash(evidence.candidate.commit)}.`,
+    "",
+    "### Every measurement",
+    "",
+    "Each suite's full table, closed. Hover a measurement for its key in the raw artifact.",
+    "",
+    ...evidence.suites.flatMap((suite) => {
+      const flagged = count(suite, "regression");
+      return [
+        `<details class="bench-all"><summary>${html(suiteName(suite.artifact))} · ${suite.metrics.length} measurements${flagged === 0 ? "" : ` · ${flagged} flagged`}</summary>`,
+        "",
+        `Artifact <code>bench/results/${html(suite.artifact)}</code>. Baseline: ${html(suite.comparisonLabel)}, ${captureLabel(suite.base, suite.baselineCapture)}. Candidate: ${captureLabel(suite.candidate, suite.candidateCapture)}.`,
+        "",
+        `Threshold: **${html(suite.threshold.kind)}**. ${html(suite.threshold.description)} Source: <code>${html(suite.threshold.source)}</code>.`,
+        "",
+        header,
+        "| --- | ---: | ---: | ---: | --- |",
+        ...suite.metrics.map((metric) => metricRow(metric)),
+        "",
+        "</details>",
+        "",
+      ];
+    }),
     "Generate from captured artifacts without running benchmarks:",
     "",
     '```sh verify title="Release comparison artifact"',
