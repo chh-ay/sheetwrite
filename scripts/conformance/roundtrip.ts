@@ -4,6 +4,10 @@ import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
+import {
+  DEFAULT_MAX_CHANGE,
+  DEFAULT_MAX_ITERATIONS,
+} from "../../packages/core/src/document-protocol.js";
 import type { XlsxWorkbookWarning } from "../../packages/core/src/export.js";
 import type { WorkbookSnapshot, XlsxSourceGraph } from "../../packages/core/src/types/document.js";
 import { sheetwriteWorkbookBackend } from "../../packages/xlsx/src/workbook.js";
@@ -12,6 +16,7 @@ import { canonicalJson } from "./normalize.js";
 const MAX_ROUNDTRIP_BYTES = 16 * 1024 * 1024;
 const ROUNDTRIP_OUTPUT = "test-results/conformance/libreoffice-workbook-roundtrips.json";
 const LIBREOFFICE_FIXTURE = "packages/xlsx/test/fixtures/libreoffice-rich.xlsx";
+const LIBREOFFICE_DEFAULT_MAX_CHANGE = 0.0001;
 
 export interface WorkbookRoundtripResaver {
   readonly producer: "libreoffice";
@@ -334,12 +339,26 @@ async function chain(
     ),
     ...retainedGraphLosses(expected, imported.snapshot),
   ];
-  // LibreOffice omits this OOXML flag. Keep the evidence visible in the artifact
-  // rather than claiming the conditional-format behavior survived unchanged.
-  const knownProducerDifferences = differences.filter((difference) =>
-    /^\$workbook\.sheets\[\d+\]\.conditionalFormats\[\d+\]\.stopIfTrue: true != undefined$/.test(
-      difference,
-    ),
+  // LibreOffice substitutes its own inactive default threshold for Excel's
+  // default. Record that exact rewrite; custom limits and enabled iteration
+  // remain strict even when the producer would treat them as inactive.
+  const originalCalculation = expected.workbook.calculation;
+  const importedCalculation = imported.snapshot.workbook.calculation;
+  const defaultIterationRewrite =
+    (originalCalculation === undefined ||
+      (!originalCalculation.iterate &&
+        originalCalculation.maxIterations === DEFAULT_MAX_ITERATIONS &&
+        originalCalculation.maxChange === DEFAULT_MAX_CHANGE)) &&
+    importedCalculation?.iterate === false &&
+    importedCalculation.maxIterations === DEFAULT_MAX_ITERATIONS &&
+    importedCalculation.maxChange === LIBREOFFICE_DEFAULT_MAX_CHANGE;
+  const knownProducerDifferences = differences.filter(
+    (difference) =>
+      /^\$workbook\.sheets\[\d+\]\.conditionalFormats\[\d+\]\.stopIfTrue: true != undefined$/.test(
+        difference,
+      ) ||
+      (defaultIterationRewrite &&
+        /^\$workbook\.workbook\.calculation(?:\.(?:maxIterations|maxChange))?:/.test(difference)),
   );
   const unexpectedDifferences = differences.filter(
     (difference) => !knownProducerDifferences.includes(difference),

@@ -94,6 +94,44 @@ describe("workbook producer roundtrip evidence", () => {
     });
   });
 
+  it("records inactive iteration-limit rewrites without accepting enabled iteration changes", async () => {
+    const customOff = linkedSnapshot();
+    customOff.workbook.calculation = { iterate: false, maxIterations: 50, maxChange: 0.02 };
+    const libreOfficeFixture = await sheetwriteWorkbookBackend.toXlsxWorkbook(customOff);
+    for (const iterate of [false, true]) {
+      const resaver: WorkbookRoundtripResaver = {
+        producer: "libreoffice",
+        producerVersion: "test-iteration-limits",
+        async resave(bytes) {
+          const snapshot = await sheetwriteWorkbookBackend.fromXlsxWorkbook(bytes);
+          snapshot.workbook.calculation = { iterate, maxIterations: 100, maxChange: 0.0001 };
+          return sheetwriteWorkbookBackend.toXlsxWorkbook(snapshot);
+        },
+      };
+      const artifact = await runWorkbookRoundtrips(resaver, { libreOfficeFixture });
+      const first = artifact.chains[0];
+      if (!first) throw new Error("missing Sheetwrite producer chain");
+      const customOffChain = artifact.chains[1];
+      if (!customOffChain) throw new Error("missing custom iteration-limit chain");
+      expect(customOffChain.status).toBe("divergent");
+      expect(
+        customOffChain.differences.some((difference) => difference.includes(".calculation")),
+      ).toBe(true);
+
+      if (iterate) {
+        expect(first.status).toBe("divergent");
+        expect(first.differences.some((difference) => difference.includes(".calculation:"))).toBe(
+          true,
+        );
+      } else {
+        expect(first.status).toBe("pass");
+        expect(first.knownProducerDifferences).toContainEqual(
+          expect.stringContaining("$workbook.workbook.calculation:"),
+        );
+      }
+    }
+  });
+
   it("binds both required local chain directions and preserves exact normalized semantics", async () => {
     const artifact = await runWorkbookRoundtrips(IDENTITY_RESAVER, {
       capturedAt: new Date("2026-07-22T12:00:00.000Z"),

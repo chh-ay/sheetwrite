@@ -505,6 +505,7 @@ function transformDirectTarget(
     case "removeProtectedRange":
     case "removeNamedRange":
     case "removeTable":
+    case "setCalculation":
       return null;
   }
 }
@@ -888,6 +889,9 @@ function operationIdentity(operation: DocumentOp): string {
       return `table:${operation.tableId}`;
     case "setSheetMeta":
       return `sheet-meta:${operation.sheet}`;
+    // Workbook-wide: concurrent calculation changes always conflict, nothing else does.
+    case "setCalculation":
+      return "calculation";
     default:
       return "";
   }

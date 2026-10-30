@@ -33,6 +33,8 @@ export function decodeWorkbookSnapshot(
     activeSheet: snapshot.workbook.activeSheet,
     namedRanges: cloneJsonValue(snapshot.workbook.namedRanges),
     xlsxSource: snapshot.workbook.xlsxSource,
+    // The engine copies non-default settings and drops defaults, so re-encoding never grows the snapshot.
+    calculation: snapshot.workbook.calculation,
     sheets: snapshot.sheets.map((source) => {
       const rowHeights = new Map<number, number>();
       const hiddenRows = new Set<number>();
@@ -174,6 +176,7 @@ export class StoreSnapshotCodec {
           : {}),
         // Frozen by the store, so every snapshot shares it instead of copying the payloads.
         ...(this.workbook.xlsxSource ? { xlsxSource: this.workbook.xlsxSource } : {}),
+        ...(this.workbook.calculation ? { calculation: { ...this.workbook.calculation } } : {}),
       },
       sheets,
     };

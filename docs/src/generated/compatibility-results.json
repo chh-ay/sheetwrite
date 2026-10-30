@@ -3,7 +3,7 @@
   "testSet": {
     "version": 1,
     "libraryVersion": "0.5.4",
-    "checksum": "3754a28a65a2b428366c308650c603434ac85e9070cd902b7905a7759f1404c6",
+    "checksum": "a016d93c9cdfaff84cf7f58e868d5cff91849246b3c399a5ae6ee51bad3e5751",
     "totalTests": 2350,
     "publishedExamples": 188,
     "formulaTests": 2000,
@@ -42,6 +42,10 @@
       {
         "value": "feature:workbook-round-trip",
         "label": "Feature · Workbook round-trip"
+      },
+      {
+        "value": "operator:multiply",
+        "label": "Operator · multiply"
       },
       {
         "value": "function:SUM",
@@ -684,10 +688,6 @@
         "label": "Operator · subtract"
       },
       {
-        "value": "operator:multiply",
-        "label": "Operator · multiply"
-      },
-      {
         "value": "operator:divide",
         "label": "Operator · divide"
       },
@@ -826,6 +826,14 @@
     {
       "authorship": "spec-derived",
       "license": "Spec metadata; MIT",
+      "section": "Change the number of times Excel iterates formulas",
+      "sha256": "a52319b1507daec1928604359b3a8b70bf55774897df48f06b87a2569428dbdd",
+      "title": "Remove or allow a circular reference in Excel",
+      "url": "https://support.microsoft.com/en-us/office/remove-or-allow-a-circular-reference-in-excel-8540bd0f-6e97-4483-bcf7-1b49cd50d123"
+    },
+    {
+      "authorship": "spec-derived",
+      "license": "Spec metadata; MIT",
       "section": "Math and trigonometry functions",
       "sha256": "efd7f0c45d47bfdb9700ad5cc54d5c2cfd0fa671a7b4418b67e570e6d505fe94",
       "title": "Excel functions (by category)",
@@ -955,6 +963,26 @@
       "basis": "property-invariant",
       "kind": "property",
       "description": "One create and one set operation yield one visible Canary sheet containing A1=2."
+    },
+    {
+      "basis": "documented-semantics",
+      "kind": "property",
+      "description": "A self-referencing running total adds one per iteration and stops adding at 100. It reaches 100 within the configured 100 iterations."
+    },
+    {
+      "basis": "documented-semantics",
+      "kind": "property",
+      "description": "Iterating x = x/2 + 1 from any start converges to its fixed point 2."
+    },
+    {
+      "basis": "documented-semantics",
+      "kind": "property",
+      "description": "Interest charged on a balance that includes it, i = r(p + i), has the closed form i = rp / (1 - r) = 100 / 0.9."
+    },
+    {
+      "basis": "documented-semantics",
+      "kind": "property",
+      "description": "Newton steps x - (x^2 - 2) / 2x on the cell's own value converge to the square root of 2."
     },
     {
       "basis": "documented-semantics",
@@ -1282,7 +1310,52 @@
       "observations": []
     },
     {
-      "position": 8,
+      "position": 10,
+      "id": "formula.iterative.interest-on-balance",
+      "label": "multiply · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "operator",
+      "behavior": "shared",
+      "featureValue": "operator:multiply",
+      "featureLabel": "Operator · multiply",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=B1*(A1+C1)",
+      "target": "C1",
+      "inputs": [
+        {
+          "cell": "A1",
+          "value": 1000
+        },
+        {
+          "cell": "B1",
+          "value": 0.1
+        }
+      ],
+      "expected": {
+        "tolerance": {
+          "kind": "absolute",
+          "value": 0.000001
+        },
+        "type": "number",
+        "value": 111.11111111111111
+      },
+      "tolerance": {
+        "kind": "absolute",
+        "value": 0.000001
+      },
+      "unsupported": false,
+      "sourceIndex": 7,
+      "evidenceIndex": 9,
+      "testChecksum": "41ea23a4b2c3032f2bb3400539a11370686c65b9ed5536f3b412fb052e13c0b5",
+      "observations": []
+    },
+    {
+      "position": 12,
       "id": "formula.function.sum.normal.1",
       "label": "SUM · Normal",
       "kind": "formula",
@@ -1307,13 +1380,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 7,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
       "testChecksum": "13e233419b98862c4f349790425b2992985b23c6ad53729aef32a8a0d80f8b3f",
       "observations": []
     },
     {
-      "position": 9,
+      "position": 13,
       "id": "formula.function.sum.empty.1",
       "label": "SUM · Empty",
       "kind": "formula",
@@ -1338,13 +1411,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 8,
+      "sourceIndex": 8,
+      "evidenceIndex": 12,
       "testChecksum": "7c110726683a74b76a77cba822679a54a9b6c07815a2610d5f4de096ade20a85",
       "observations": []
     },
     {
-      "position": 10,
+      "position": 14,
       "id": "formula.function.sum.mixed.1",
       "label": "SUM · Mixed",
       "kind": "formula",
@@ -1374,13 +1447,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 8,
+      "sourceIndex": 8,
+      "evidenceIndex": 12,
       "testChecksum": "047c9d9a701ac6002da1a82f19dadbfe01c3c716906bbe10f25cbd8e9b8f1fb6",
       "observations": []
     },
     {
-      "position": 14,
+      "position": 18,
       "id": "formula.function.average.normal.1",
       "label": "AVERAGE · Normal",
       "kind": "formula",
@@ -1405,13 +1478,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 8,
-      "evidenceIndex": 7,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
       "testChecksum": "7848c11eb685512f6a0a84d8154f7746a37f01192a20ed67d680d55c2469890a",
       "observations": []
     },
     {
-      "position": 20,
+      "position": 24,
       "id": "formula.function.min.normal.1",
       "label": "MIN · Normal",
       "kind": "formula",
@@ -1436,13 +1509,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 8,
-      "evidenceIndex": 7,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
       "testChecksum": "7ec49c196f8a91606ca8de5c997493f723d87f4210bdd96efc97420f1ca368ee",
       "observations": []
     },
     {
-      "position": 26,
+      "position": 30,
       "id": "formula.function.max.normal.1",
       "label": "MAX · Normal",
       "kind": "formula",
@@ -1467,13 +1540,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 8,
-      "evidenceIndex": 7,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
       "testChecksum": "f3050d0698e86ca6ccfb0864ac9465f20376fe4bbfa9f0bb612daf8c745d78d0",
       "observations": []
     },
     {
-      "position": 32,
+      "position": 36,
       "id": "formula.function.count.normal.1",
       "label": "COUNT · Normal",
       "kind": "formula",
@@ -1498,13 +1571,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 8,
-      "evidenceIndex": 7,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
       "testChecksum": "c5d2134cd8a04a2d00c55d27c048b8b32cf2da899536be64a67327816a38731c",
       "observations": []
     },
     {
-      "position": 44,
+      "position": 48,
       "id": "formula.function.abs.normal.1",
       "label": "ABS · Normal",
       "kind": "formula",
@@ -1529,13 +1602,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 7,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
       "testChecksum": "b52d90d45d6778fcf1a964623fe992001b7c8bef6bd5b9978faf9093aee1a9de",
       "observations": []
     },
     {
-      "position": 50,
+      "position": 54,
       "id": "formula.function.round.normal.1",
       "label": "ROUND · Normal",
       "kind": "formula",
@@ -1560,13 +1633,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 7,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
       "testChecksum": "1f63c15a5cf6f1a3e15a21817f9f3e074a73405d3a727f1156a809afc081ecde",
       "observations": []
     },
     {
-      "position": 56,
+      "position": 60,
       "id": "formula.function.sqrt.normal.1",
       "label": "SQRT · Normal",
       "kind": "formula",
@@ -1591,13 +1664,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 7,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
       "testChecksum": "44eb3a9e3a2eae49a8f78d86ae42d398095076f2edb97a6970afe754a75632a7",
       "observations": []
     },
     {
-      "position": 62,
+      "position": 66,
       "id": "formula.function.mod.normal.1",
       "label": "MOD · Normal",
       "kind": "formula",
@@ -1622,13 +1695,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 7,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
       "testChecksum": "47d5e6e47b45303c9a2b3c6ea0a5e505babc2cbaf73c69d7708aa3338c1e07e9",
       "observations": []
     },
     {
-      "position": 68,
+      "position": 72,
       "id": "formula.function.pow.normal.1",
       "label": "POW · Normal",
       "kind": "formula",
@@ -1653,13 +1726,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 7,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
       "testChecksum": "19e9a77fe6bb17014fe2c51d11ea29a8af393ad8d345d31b27dffb83d6291082",
       "observations": []
     },
     {
-      "position": 74,
+      "position": 78,
       "id": "formula.function.and.normal.1",
       "label": "AND · Normal",
       "kind": "formula",
@@ -1684,13 +1757,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 9,
-      "evidenceIndex": 7,
+      "sourceIndex": 10,
+      "evidenceIndex": 11,
       "testChecksum": "3e7f0156988f3796146153f6f45a9a19517e82a8186f3644100449e70bee4246",
       "observations": []
     },
     {
-      "position": 80,
+      "position": 84,
       "id": "formula.function.or.normal.1",
       "label": "OR · Normal",
       "kind": "formula",
@@ -1715,13 +1788,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 9,
-      "evidenceIndex": 7,
+      "sourceIndex": 10,
+      "evidenceIndex": 11,
       "testChecksum": "1eafd75579bf8169aa236f36340947d7fa4a01004f9f159d98d4c5b244198ca6",
       "observations": []
     },
     {
-      "position": 86,
+      "position": 90,
       "id": "formula.function.not.normal.1",
       "label": "NOT · Normal",
       "kind": "formula",
@@ -1746,13 +1819,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 9,
-      "evidenceIndex": 7,
+      "sourceIndex": 10,
+      "evidenceIndex": 11,
       "testChecksum": "2dca4425386b58263de89bd85043592889226545d967aa398b3dfccf0aa2e131",
       "observations": []
     },
     {
-      "position": 92,
+      "position": 96,
       "id": "formula.function.floor.normal.1",
       "label": "FLOOR · Normal",
       "kind": "formula",
@@ -1777,13 +1850,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 7,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
       "testChecksum": "724961c313a3ef9a2a1c0a2156af39af6b4db590fd394b776ed09cd376ec8fd0",
       "observations": []
     },
     {
-      "position": 98,
+      "position": 102,
       "id": "formula.function.ceiling.normal.1",
       "label": "CEILING · Normal",
       "kind": "formula",
@@ -1808,13 +1881,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 7,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
       "testChecksum": "257deb63d3b7b75dd853a826e06fec4628dd143803395467e0fd735a8c18f631",
       "observations": []
     },
     {
-      "position": 104,
+      "position": 108,
       "id": "formula.function.int.normal.1",
       "label": "INT · Normal",
       "kind": "formula",
@@ -1839,13 +1912,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 7,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
       "testChecksum": "98cd3656493408ee50bca4d5abf84da288fbb0258a344ee6536335cfa2494ef0",
       "observations": []
     },
     {
-      "position": 110,
+      "position": 114,
       "id": "formula.function.trunc.normal.1",
       "label": "TRUNC · Normal",
       "kind": "formula",
@@ -1870,13 +1943,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 7,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
       "testChecksum": "c566d78e515fc1ef04527dab371208e4fc16261301d97cfa95233b17ff1403e3",
       "observations": []
     },
     {
-      "position": 116,
+      "position": 120,
       "id": "formula.function.sign.normal.1",
       "label": "SIGN · Normal",
       "kind": "formula",
@@ -1901,13 +1974,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 7,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
       "testChecksum": "14f74122337db27e55c7f12587305b473c9f3cd816eef19044970f33491a692a",
       "observations": []
     },
     {
-      "position": 122,
+      "position": 126,
       "id": "formula.function.pi.normal.1",
       "label": "PI · Normal",
       "kind": "formula",
@@ -1932,13 +2005,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 7,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
       "testChecksum": "8a1516daa9ef289bdb7d0346847c66288e9eb956ac7ffbf776baee9b44e2083c",
       "observations": []
     },
     {
-      "position": 123,
+      "position": 127,
       "id": "formula.function.pi.empty.1",
       "label": "PI · Empty",
       "kind": "formula",
@@ -1961,13 +2034,13 @@
         "kind": "exact"
       },
       "unsupported": true,
-      "sourceIndex": 7,
-      "evidenceIndex": 9,
+      "sourceIndex": 8,
+      "evidenceIndex": 13,
       "testChecksum": "23bfbb0713d7d908e1d79d63b12900ffb9d07954b0eaf76fd53668a7a0024d8b",
       "observations": []
     },
     {
-      "position": 128,
+      "position": 132,
       "id": "formula.function.iferror.normal.1",
       "label": "IFERROR · Normal",
       "kind": "formula",
@@ -1992,13 +2065,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 10,
-      "evidenceIndex": 7,
+      "sourceIndex": 11,
+      "evidenceIndex": 11,
       "testChecksum": "a6da00137f9dd8635053a05aee993262f80535b3cfe0bfc19fdb21d19645b057",
       "observations": []
     },
     {
-      "position": 134,
+      "position": 138,
       "id": "formula.function.ifna.normal.1",
       "label": "IFNA · Normal",
       "kind": "formula",
@@ -2023,13 +2096,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 10,
-      "evidenceIndex": 7,
+      "sourceIndex": 11,
+      "evidenceIndex": 11,
       "testChecksum": "697ebda7f7853d2082434c6e4d685ef36d9ee0588bbadac028215dc8da1d82be",
       "observations": []
     },
     {
-      "position": 140,
+      "position": 144,
       "id": "formula.function.ifs.normal.1",
       "label": "IFS · Normal",
       "kind": "formula",
@@ -2054,13 +2127,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 9,
-      "evidenceIndex": 7,
+      "sourceIndex": 10,
+      "evidenceIndex": 11,
       "testChecksum": "6f6ab9b93735d3f75507cc50a3c40f10435dedea4d9efb970de44498ec6cad51",
       "observations": []
     },
     {
-      "position": 146,
+      "position": 150,
       "id": "formula.function.switch.normal.1",
       "label": "SWITCH · Normal",
       "kind": "formula",
@@ -2085,13 +2158,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 9,
-      "evidenceIndex": 7,
+      "sourceIndex": 10,
+      "evidenceIndex": 11,
       "testChecksum": "87959a9c84986419352e4ef3707e3773a4347bd92028627b8e7069569b3252c9",
       "observations": []
     },
     {
-      "position": 152,
+      "position": 156,
       "id": "formula.function.xor.normal.1",
       "label": "XOR · Normal",
       "kind": "formula",
@@ -2116,13 +2189,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 9,
-      "evidenceIndex": 7,
+      "sourceIndex": 10,
+      "evidenceIndex": 11,
       "testChecksum": "2a8984372ed23dee3cd306b4058efd05e31b85efdc90f65690efdf9e51f15223",
       "observations": []
     },
     {
-      "position": 158,
+      "position": 162,
       "id": "formula.function.true.normal.1",
       "label": "TRUE · Normal",
       "kind": "formula",
@@ -2147,13 +2220,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 9,
-      "evidenceIndex": 7,
+      "sourceIndex": 10,
+      "evidenceIndex": 11,
       "testChecksum": "70dd18acde893d4c008b8abd2c7043c88c4da704eaa9d08e08c0eb6dabec0d0c",
       "observations": []
     },
     {
-      "position": 164,
+      "position": 168,
       "id": "formula.function.false.normal.1",
       "label": "FALSE · Normal",
       "kind": "formula",
@@ -2178,13 +2251,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 9,
-      "evidenceIndex": 7,
+      "sourceIndex": 10,
+      "evidenceIndex": 11,
       "testChecksum": "5f162ca55ef8360effd4ae4f0eea3cd005f4ed5aec1265f0c448a515fcc3f36d",
       "observations": []
     },
     {
-      "position": 170,
+      "position": 174,
       "id": "formula.function.isblank.normal.1",
       "label": "ISBLANK · Normal",
       "kind": "formula",
@@ -2209,13 +2282,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 10,
-      "evidenceIndex": 7,
+      "sourceIndex": 11,
+      "evidenceIndex": 11,
       "testChecksum": "06376a3c5111e6b415f89fee28fce474cfec83e3124c56d11e9531004f168b1d",
       "observations": []
     },
     {
-      "position": 176,
+      "position": 180,
       "id": "formula.function.isnumber.normal.1",
       "label": "ISNUMBER · Normal",
       "kind": "formula",
@@ -2240,13 +2313,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 10,
-      "evidenceIndex": 7,
+      "sourceIndex": 11,
+      "evidenceIndex": 11,
       "testChecksum": "d84c71567c4dca810e59bc8d74445c655844f996651ac470cb478c5da2ddfad8",
       "observations": []
     },
     {
-      "position": 182,
+      "position": 186,
       "id": "formula.function.istext.normal.1",
       "label": "ISTEXT · Normal",
       "kind": "formula",
@@ -2271,13 +2344,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 10,
-      "evidenceIndex": 7,
+      "sourceIndex": 11,
+      "evidenceIndex": 11,
       "testChecksum": "afc6830c1609dba4ef1dd3e800a219a9911e4d611163123237aaa14e9a95e1f5",
       "observations": []
     },
     {
-      "position": 188,
+      "position": 192,
       "id": "formula.function.islogical.normal.1",
       "label": "ISLOGICAL · Normal",
       "kind": "formula",
@@ -2302,13 +2375,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 10,
-      "evidenceIndex": 7,
+      "sourceIndex": 11,
+      "evidenceIndex": 11,
       "testChecksum": "0c6ffe38831d062e837480a6319235f43b272bf8da7d4df2f53d7410cfb7c9fb",
       "observations": []
     },
     {
-      "position": 194,
+      "position": 198,
       "id": "formula.function.iserror.normal.1",
       "label": "ISERROR · Normal",
       "kind": "formula",
@@ -2333,13 +2406,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 10,
-      "evidenceIndex": 7,
+      "sourceIndex": 11,
+      "evidenceIndex": 11,
       "testChecksum": "dce3f6ba9e7c4b397b4b9ee80311a7d3fd644c13c48f4a961375e9a4170f61f0",
       "observations": []
     },
     {
-      "position": 200,
+      "position": 204,
       "id": "formula.function.iserr.normal.1",
       "label": "ISERR · Normal",
       "kind": "formula",
@@ -2364,13 +2437,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 10,
-      "evidenceIndex": 7,
+      "sourceIndex": 11,
+      "evidenceIndex": 11,
       "testChecksum": "d8dcc0a1a56150d3b993f83e7206e63a4715e4d1fde1cf348792d67b17da44d4",
       "observations": []
     },
     {
-      "position": 206,
+      "position": 210,
       "id": "formula.function.isna.normal.1",
       "label": "ISNA · Normal",
       "kind": "formula",
@@ -2395,13 +2468,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 10,
-      "evidenceIndex": 7,
+      "sourceIndex": 11,
+      "evidenceIndex": 11,
       "testChecksum": "22c13e5e5b4d1523dfdb6237bab080fc5ce37e0cdd228394848a17ba39ab713a",
       "observations": []
     },
     {
-      "position": 212,
+      "position": 216,
       "id": "formula.function.type.normal.1",
       "label": "TYPE · Normal",
       "kind": "formula",
@@ -2426,13 +2499,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 10,
-      "evidenceIndex": 7,
+      "sourceIndex": 11,
+      "evidenceIndex": 11,
       "testChecksum": "b91b4ab97f61634b8b3f0367fa0e43cd4cec708b91b03d24ec9e53fbcc1e0286",
       "observations": []
     },
     {
-      "position": 218,
+      "position": 222,
       "id": "formula.function.isformula.normal.1",
       "label": "ISFORMULA · Normal",
       "kind": "formula",
@@ -2482,13 +2555,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 10,
-      "evidenceIndex": 7,
+      "sourceIndex": 11,
+      "evidenceIndex": 11,
       "testChecksum": "b03c12d5b16d62b1bc15edbf8ae8037b5f8b5868c729e56e88df76dfb350620b",
       "observations": []
     },
     {
-      "position": 224,
+      "position": 228,
       "id": "formula.function.n.normal.1",
       "label": "N · Normal",
       "kind": "formula",
@@ -2513,13 +2586,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 10,
-      "evidenceIndex": 7,
+      "sourceIndex": 11,
+      "evidenceIndex": 11,
       "testChecksum": "280d5fcb10a398882cd08c750d63e4d65fbb74bea91610521885be25c5e3f7e9",
       "observations": []
     },
     {
-      "position": 230,
+      "position": 234,
       "id": "formula.function.t.normal.1",
       "label": "T · Normal",
       "kind": "formula",
@@ -2544,13 +2617,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 10,
-      "evidenceIndex": 7,
+      "sourceIndex": 11,
+      "evidenceIndex": 11,
       "testChecksum": "748cc8d73f7835a079393c7126a41993083f37b4a1b43ea5fcc42c297c9d5b72",
       "observations": []
     },
     {
-      "position": 236,
+      "position": 240,
       "id": "formula.function.counta.normal.1",
       "label": "COUNTA · Normal",
       "kind": "formula",
@@ -2575,13 +2648,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 8,
-      "evidenceIndex": 7,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
       "testChecksum": "8d47d37c5678f73fa70bd6fc5a16ee6c91896029f1a54bd651374248cbd88ed9",
       "observations": []
     },
     {
-      "position": 242,
+      "position": 246,
       "id": "formula.function.len.normal.1",
       "label": "LEN · Normal",
       "kind": "formula",
@@ -2606,13 +2679,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 11,
-      "evidenceIndex": 7,
+      "sourceIndex": 12,
+      "evidenceIndex": 11,
       "testChecksum": "7cb826066d7b48a5933fbefad8420f105d2cdabed929972d269d4efa98835ec4",
       "observations": []
     },
     {
-      "position": 248,
+      "position": 252,
       "id": "formula.function.left.normal.1",
       "label": "LEFT · Normal",
       "kind": "formula",
@@ -2637,13 +2710,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 11,
-      "evidenceIndex": 7,
+      "sourceIndex": 12,
+      "evidenceIndex": 11,
       "testChecksum": "fb68148633e52a8d10688b276a13479ae64d5981c63611480f8b3866f9d5f1e8",
       "observations": []
     },
     {
-      "position": 254,
+      "position": 258,
       "id": "formula.function.right.normal.1",
       "label": "RIGHT · Normal",
       "kind": "formula",
@@ -2668,13 +2741,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 11,
-      "evidenceIndex": 7,
+      "sourceIndex": 12,
+      "evidenceIndex": 11,
       "testChecksum": "92292ebf4fed4b2e456c22d0d792bac462e23275cbbb04154122390235275202",
       "observations": []
     },
     {
-      "position": 260,
+      "position": 264,
       "id": "formula.function.mid.normal.1",
       "label": "MID · Normal",
       "kind": "formula",
@@ -2699,13 +2772,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 11,
-      "evidenceIndex": 7,
+      "sourceIndex": 12,
+      "evidenceIndex": 11,
       "testChecksum": "b26ff637bb4f684f9699bf00b4754e5489321629e21e13d5bb8caa598385214c",
       "observations": []
     },
     {
-      "position": 266,
+      "position": 270,
       "id": "formula.function.concat.normal.1",
       "label": "CONCAT · Normal",
       "kind": "formula",
@@ -2730,13 +2803,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 11,
-      "evidenceIndex": 7,
+      "sourceIndex": 12,
+      "evidenceIndex": 11,
       "testChecksum": "b53528f0cfe2b975b0f19c636716f71b48c52b64416fb4bfdee9e9f06517b2dd",
       "observations": []
     },
     {
-      "position": 272,
+      "position": 276,
       "id": "formula.function.upper.normal.1",
       "label": "UPPER · Normal",
       "kind": "formula",
@@ -2761,13 +2834,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 11,
-      "evidenceIndex": 7,
+      "sourceIndex": 12,
+      "evidenceIndex": 11,
       "testChecksum": "31034c9d34c68963894150b91b2ebf4a0d83f4d3367228926d88800a5759ca2e",
       "observations": []
     },
     {
-      "position": 278,
+      "position": 282,
       "id": "formula.function.lower.normal.1",
       "label": "LOWER · Normal",
       "kind": "formula",
@@ -2792,13 +2865,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 11,
-      "evidenceIndex": 7,
+      "sourceIndex": 12,
+      "evidenceIndex": 11,
       "testChecksum": "7061033ea9a97eff951c53d69551fd5dbb5f7d8598596593c5fcc71c41377bf4",
       "observations": []
     },
     {
-      "position": 284,
+      "position": 288,
       "id": "formula.function.trim.normal.1",
       "label": "TRIM · Normal",
       "kind": "formula",
@@ -2823,13 +2896,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 11,
-      "evidenceIndex": 7,
+      "sourceIndex": 12,
+      "evidenceIndex": 11,
       "testChecksum": "0e8447e86fdaf27a8fc3f4225252102fb267ead025807772df04380e61af5e40",
       "observations": []
     },
     {
-      "position": 290,
+      "position": 294,
       "id": "formula.function.text.normal.1",
       "label": "TEXT · Normal",
       "kind": "formula",
@@ -2854,13 +2927,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 11,
-      "evidenceIndex": 7,
+      "sourceIndex": 12,
+      "evidenceIndex": 11,
       "testChecksum": "320cdbfa1efb3d0332ff628854976aab9eeac53f801caafea3c5e534ae04f046",
       "observations": []
     },
     {
-      "position": 296,
+      "position": 300,
       "id": "formula.function.exact.normal.1",
       "label": "EXACT · Normal",
       "kind": "formula",
@@ -2885,13 +2958,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 11,
-      "evidenceIndex": 7,
+      "sourceIndex": 12,
+      "evidenceIndex": 11,
       "testChecksum": "905304b0d588aa8fb54cc68c7b237ad5124f12431b7731f6f1ab4f8b2b9d66b4",
       "observations": []
     },
     {
-      "position": 302,
+      "position": 306,
       "id": "formula.function.date.normal.1",
       "label": "DATE · Normal",
       "kind": "formula",
@@ -2916,13 +2989,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 12,
-      "evidenceIndex": 7,
+      "sourceIndex": 13,
+      "evidenceIndex": 11,
       "testChecksum": "24a7d5f0fab4f9bf844330123cf0d5a13d85eb95fedab534fbf9ca657d14a8c4",
       "observations": []
     },
     {
-      "position": 308,
+      "position": 312,
       "id": "formula.function.datevalue.normal.1",
       "label": "DATEVALUE · Normal",
       "kind": "formula",
@@ -2947,13 +3020,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 12,
-      "evidenceIndex": 7,
+      "sourceIndex": 13,
+      "evidenceIndex": 11,
       "testChecksum": "9caf07e7302ea03386e31fe6f53bab55860c2bf88cd7bb4e3be35c77dfd2327b",
       "observations": []
     },
     {
-      "position": 314,
+      "position": 318,
       "id": "formula.function.day.normal.1",
       "label": "DAY · Normal",
       "kind": "formula",
@@ -2978,13 +3051,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 12,
-      "evidenceIndex": 7,
+      "sourceIndex": 13,
+      "evidenceIndex": 11,
       "testChecksum": "4beebb19dbbaa0ff325abe03f283d4938998c1d6f24012d3c9ce9192de268bce",
       "observations": []
     },
     {
-      "position": 320,
+      "position": 324,
       "id": "formula.function.month.normal.1",
       "label": "MONTH · Normal",
       "kind": "formula",
@@ -3009,13 +3082,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 12,
-      "evidenceIndex": 7,
+      "sourceIndex": 13,
+      "evidenceIndex": 11,
       "testChecksum": "206bd949a257cf51a34ba3a6d7744b1afb514eaba342145f1d629e9969b51bc5",
       "observations": []
     },
     {
-      "position": 326,
+      "position": 330,
       "id": "formula.function.year.normal.1",
       "label": "YEAR · Normal",
       "kind": "formula",
@@ -3040,13 +3113,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 12,
-      "evidenceIndex": 7,
+      "sourceIndex": 13,
+      "evidenceIndex": 11,
       "testChecksum": "1186e210a735697508fa0914434dcff4456b947b2b1904dbd8cab395e7593bfb",
       "observations": []
     },
     {
-      "position": 332,
+      "position": 336,
       "id": "formula.function.today.normal.1",
       "label": "TODAY · Normal",
       "kind": "formula",
@@ -3071,13 +3144,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 12,
-      "evidenceIndex": 7,
+      "sourceIndex": 13,
+      "evidenceIndex": 11,
       "testChecksum": "2790dd22926410579665548aa1f575be98d4dd234b9122d80cb93612796f4a93",
       "observations": []
     },
     {
-      "position": 338,
+      "position": 342,
       "id": "formula.function.now.normal.1",
       "label": "NOW · Normal",
       "kind": "formula",
@@ -3102,13 +3175,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 12,
-      "evidenceIndex": 7,
+      "sourceIndex": 13,
+      "evidenceIndex": 11,
       "testChecksum": "895e2e162e9b4714357add8db2d0b6683efa8387108da4223a26b41eda3bfd02",
       "observations": []
     },
     {
-      "position": 344,
+      "position": 348,
       "id": "formula.function.rand.normal.1",
       "label": "RAND · Normal",
       "kind": "formula",
@@ -3133,13 +3206,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 7,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
       "testChecksum": "17e46efbf7bfd4bf645c1029c597fabf9761d4a3b5de97e81fb5a8ceca883c16",
       "observations": []
     },
     {
-      "position": 350,
+      "position": 354,
       "id": "formula.function.randbetween.normal.1",
       "label": "RANDBETWEEN · Normal",
       "kind": "formula",
@@ -3164,13 +3237,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 7,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
       "testChecksum": "58a837a480e991498d9e39b5a82df57bc494a90608b5fdd8a9fc2d114764259c",
       "observations": []
     },
     {
-      "position": 362,
+      "position": 366,
       "id": "formula.function.countifs.normal.1",
       "label": "COUNTIFS · Normal",
       "kind": "formula",
@@ -3220,13 +3293,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 8,
-      "evidenceIndex": 7,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
       "testChecksum": "3273c62c91f153d699e91ebd5d36ebcc962e9c2d5d0b8f2b9c889c54532276d6",
       "observations": []
     },
     {
-      "position": 368,
+      "position": 372,
       "id": "formula.function.sumif.normal.1",
       "label": "SUMIF · Normal",
       "kind": "formula",
@@ -3276,13 +3349,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 7,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
       "testChecksum": "91a01e9bf221663c9a8f47796be42aece07b27ec5059ed18fbb5b12c5f805dc6",
       "observations": []
     },
     {
-      "position": 374,
+      "position": 378,
       "id": "formula.function.sumifs.normal.1",
       "label": "SUMIFS · Normal",
       "kind": "formula",
@@ -3332,13 +3405,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 7,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
       "testChecksum": "f321c1d88534d4c014bb1df4ad7d17ea0f11df12d80ec55b102c1808d36b0c1b",
       "observations": []
     },
     {
-      "position": 380,
+      "position": 384,
       "id": "formula.function.averageif.normal.1",
       "label": "AVERAGEIF · Normal",
       "kind": "formula",
@@ -3388,13 +3461,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 8,
-      "evidenceIndex": 7,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
       "testChecksum": "bec657bcc0add3711495db188ecb254ef830c6716db1134db00d06018b44962e",
       "observations": []
     },
     {
-      "position": 386,
+      "position": 390,
       "id": "formula.function.averageifs.normal.1",
       "label": "AVERAGEIFS · Normal",
       "kind": "formula",
@@ -3444,13 +3517,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 8,
-      "evidenceIndex": 7,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
       "testChecksum": "163a3fb227b51ee8b30fb8c37f48155db59c9b7d4ef5923de34a26ce81dce519",
       "observations": []
     },
     {
-      "position": 392,
+      "position": 396,
       "id": "formula.function.index.normal.1",
       "label": "INDEX · Normal",
       "kind": "formula",
@@ -3501,12 +3574,12 @@
       },
       "unsupported": false,
       "sourceIndex": 5,
-      "evidenceIndex": 7,
+      "evidenceIndex": 11,
       "testChecksum": "2ee61f9334704ded219f2a386de47fff3007157bf5b948ebecbc81b2c1b14eb5",
       "observations": []
     },
     {
-      "position": 398,
+      "position": 402,
       "id": "formula.function.match.normal.1",
       "label": "MATCH · Normal",
       "kind": "formula",
@@ -3557,12 +3630,12 @@
       },
       "unsupported": false,
       "sourceIndex": 5,
-      "evidenceIndex": 7,
+      "evidenceIndex": 11,
       "testChecksum": "f11a76b9b71848d83dced774fb8815bf0ba8826559adad2a5592c1432ced7bae",
       "observations": []
     },
     {
-      "position": 410,
+      "position": 414,
       "id": "formula.function.hlookup.normal.1",
       "label": "HLOOKUP · Normal",
       "kind": "formula",
@@ -3613,12 +3686,12 @@
       },
       "unsupported": false,
       "sourceIndex": 5,
-      "evidenceIndex": 7,
+      "evidenceIndex": 11,
       "testChecksum": "6ec5007971ddfde5e1b3cea9e5db7e473c1c936e687a1bfa5f01ce775fd9c956",
       "observations": []
     },
     {
-      "position": 416,
+      "position": 420,
       "id": "formula.function.xlookup.normal.1",
       "label": "XLOOKUP · Normal",
       "kind": "formula",
@@ -3669,12 +3742,12 @@
       },
       "unsupported": false,
       "sourceIndex": 5,
-      "evidenceIndex": 7,
+      "evidenceIndex": 11,
       "testChecksum": "946f436390ae4acab134968fa560d0460cecc8ef905e5ec200b2eaf4ead7bcad",
       "observations": []
     },
     {
-      "position": 422,
+      "position": 426,
       "id": "formula.function.na.normal.1",
       "label": "NA · Normal",
       "kind": "formula",
@@ -3699,13 +3772,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 10,
-      "evidenceIndex": 7,
+      "sourceIndex": 11,
+      "evidenceIndex": 11,
       "testChecksum": "99d684ecc5401959cc64938fdc11df8f83e04b1ef69615880ec462277ef670e5",
       "observations": []
     },
     {
-      "position": 434,
+      "position": 438,
       "id": "formula.function.sort.normal.1",
       "label": "SORT · Normal",
       "kind": "formula",
@@ -3756,12 +3829,12 @@
       },
       "unsupported": false,
       "sourceIndex": 5,
-      "evidenceIndex": 7,
+      "evidenceIndex": 11,
       "testChecksum": "4178a86025502fc9caf44e68f0b88b1c1a70b4f23ca7865ab38fc6eb5dc93064",
       "observations": []
     },
     {
-      "position": 440,
+      "position": 444,
       "id": "formula.function.unique.normal.1",
       "label": "UNIQUE · Normal",
       "kind": "formula",
@@ -3812,12 +3885,12 @@
       },
       "unsupported": false,
       "sourceIndex": 5,
-      "evidenceIndex": 7,
+      "evidenceIndex": 11,
       "testChecksum": "59f4bc2c3f95af8c14712c6667497b590028debc0989adae94c9dd5c300e089d",
       "observations": []
     },
     {
-      "position": 446,
+      "position": 450,
       "id": "formula.function.let.normal.1",
       "label": "LET · Normal",
       "kind": "formula",
@@ -3842,13 +3915,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 9,
-      "evidenceIndex": 7,
+      "sourceIndex": 10,
+      "evidenceIndex": 11,
       "testChecksum": "f5513a065461df6c54113691457c1121187c2250642c1789bbebb13a05b944b4",
       "observations": []
     },
     {
-      "position": 452,
+      "position": 456,
       "id": "formula.function.product.normal.1",
       "label": "PRODUCT · Normal",
       "kind": "formula",
@@ -3873,13 +3946,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 7,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
       "testChecksum": "6073478d7bd8e44eeab6eb8e9d3a932fc85e41b062e514c774fb151131cef186",
       "observations": []
     },
     {
-      "position": 458,
+      "position": 462,
       "id": "formula.function.sumproduct.normal.1",
       "label": "SUMPRODUCT · Normal",
       "kind": "formula",
@@ -3929,13 +4002,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 7,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
       "testChecksum": "87e5ab56285892486c4d965003e567e52b32712364745d5eb398e59895a1531d",
       "observations": []
     },
     {
-      "position": 464,
+      "position": 468,
       "id": "formula.function.power.normal.1",
       "label": "POWER · Normal",
       "kind": "formula",
@@ -3960,13 +4033,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 7,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
       "testChecksum": "f9fa8feacaac2f8212595eed3fdb4ff8dc91bd2c5c1ce86347dcf260ad074972",
       "observations": []
     },
     {
-      "position": 470,
+      "position": 474,
       "id": "formula.function.exp.normal.1",
       "label": "EXP · Normal",
       "kind": "formula",
@@ -3991,13 +4064,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 7,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
       "testChecksum": "dfe4591a970ef995fd666afb77f5ad14bdfe6d3026bb86402b6a4293e8871e12",
       "observations": []
     },
     {
-      "position": 476,
+      "position": 480,
       "id": "formula.function.ln.normal.1",
       "label": "LN · Normal",
       "kind": "formula",
@@ -4022,13 +4095,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 7,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
       "testChecksum": "ad7a24465c20af2badd3db8de9dca3f6c3a378ae10affed5afb728389618a250",
       "observations": []
     },
     {
-      "position": 482,
+      "position": 486,
       "id": "formula.function.log.normal.1",
       "label": "LOG · Normal",
       "kind": "formula",
@@ -4053,13 +4126,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 7,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
       "testChecksum": "a96a1080fbb239dda8c48275e48cb1b9d66735eae6a83b676c68c0b98cc66d90",
       "observations": []
     },
     {
-      "position": 488,
+      "position": 492,
       "id": "formula.function.log10.normal.1",
       "label": "LOG10 · Normal",
       "kind": "formula",
@@ -4084,13 +4157,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 7,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
       "testChecksum": "011899fd85f11be19b8e65ba8a511208e729af469b840d17dad2c24403e8b926",
       "observations": []
     },
     {
-      "position": 494,
+      "position": 498,
       "id": "formula.function.roundup.normal.1",
       "label": "ROUNDUP · Normal",
       "kind": "formula",
@@ -4115,13 +4188,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 7,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
       "testChecksum": "d1476ce571933be733a12a2bbdeedb2de48a577035d1866289550d7944cbc444",
       "observations": []
     },
     {
-      "position": 500,
+      "position": 504,
       "id": "formula.function.rounddown.normal.1",
       "label": "ROUNDDOWN · Normal",
       "kind": "formula",
@@ -4146,13 +4219,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 7,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
       "testChecksum": "9f58f774fcf4ac71ae2120429295059769ae1e0ff7b78d1bf92229dc47fcdab2",
       "observations": []
     },
     {
-      "position": 506,
+      "position": 510,
       "id": "formula.function.mround.normal.1",
       "label": "MROUND · Normal",
       "kind": "formula",
@@ -4177,13 +4250,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 7,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
       "testChecksum": "fc285a324edf5226ebf76f377a987e57d5f9fab8b87c6c369e02e32a725a2cb8",
       "observations": []
     },
     {
-      "position": 512,
+      "position": 516,
       "id": "formula.function.even.normal.1",
       "label": "EVEN · Normal",
       "kind": "formula",
@@ -4208,13 +4281,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 7,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
       "testChecksum": "2425120df4744c52d6a56bd0b4eb1a97d0166537f2c20703b88d5276fc69364f",
       "observations": []
     },
     {
-      "position": 518,
+      "position": 522,
       "id": "formula.function.odd.normal.1",
       "label": "ODD · Normal",
       "kind": "formula",
@@ -4239,13 +4312,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 7,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
       "testChecksum": "47b6a04808fd8ef268fe1318ed51f6b47b78a852bcb3bb88ae8e83c9c33457e9",
       "observations": []
     },
     {
-      "position": 524,
+      "position": 528,
       "id": "formula.function.quotient.normal.1",
       "label": "QUOTIENT · Normal",
       "kind": "formula",
@@ -4270,13 +4343,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 7,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
       "testChecksum": "f273a3ffebf4832ea4b10cce30142b7ed316704477d63bf75cdf0fb7d5b2b04c",
       "observations": []
     },
     {
-      "position": 530,
+      "position": 534,
       "id": "formula.function.gcd.normal.1",
       "label": "GCD · Normal",
       "kind": "formula",
@@ -4301,13 +4374,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 7,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
       "testChecksum": "dd319b9a103bc261b5bbfdf0c226ec521404517367117da32786d005851ea14f",
       "observations": []
     },
     {
-      "position": 536,
+      "position": 540,
       "id": "formula.function.lcm.normal.1",
       "label": "LCM · Normal",
       "kind": "formula",
@@ -4332,13 +4405,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 7,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
       "testChecksum": "f77afec2fba635933f9df156ee4726d5d947945dcc2b1fa97b6d8cbd9423d7bf",
       "observations": []
     },
     {
-      "position": 542,
+      "position": 546,
       "id": "formula.function.subtotal.normal.1",
       "label": "SUBTOTAL · Normal",
       "kind": "formula",
@@ -4388,13 +4461,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 7,
-      "evidenceIndex": 7,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
       "testChecksum": "1b2233d59e3f413451342c195cea5fc9d2a22730e5cec5d34668fe9aa58fb49b",
       "observations": []
     },
     {
-      "position": 548,
+      "position": 552,
       "id": "formula.function.textjoin.normal.1",
       "label": "TEXTJOIN · Normal",
       "kind": "formula",
@@ -4419,13 +4492,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 11,
-      "evidenceIndex": 7,
+      "sourceIndex": 12,
+      "evidenceIndex": 11,
       "testChecksum": "cc3733c9c5802379c6ad1873d92349baaefab68b5e3730420f0dff65f66c40b3",
       "observations": []
     },
     {
-      "position": 554,
+      "position": 558,
       "id": "formula.function.substitute.normal.1",
       "label": "SUBSTITUTE · Normal",
       "kind": "formula",
@@ -4450,13 +4523,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 11,
-      "evidenceIndex": 7,
+      "sourceIndex": 12,
+      "evidenceIndex": 11,
       "testChecksum": "d79ba1c1254b44c65b2667495c9a1150e57d876c22d77319b922d720157d56d3",
       "observations": []
     },
     {
-      "position": 560,
+      "position": 564,
       "id": "formula.function.replace.normal.1",
       "label": "REPLACE · Normal",
       "kind": "formula",
@@ -4481,13 +4554,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 11,
-      "evidenceIndex": 7,
+      "sourceIndex": 12,
+      "evidenceIndex": 11,
       "testChecksum": "e192c7d4a56fdcce3caeacd8cc109b99ff04d73c8e9c8b2fe73094e8f5200314",
       "observations": []
     },
     {
-      "position": 566,
+      "position": 570,
       "id": "formula.function.find.normal.1",
       "label": "FIND · Normal",
       "kind": "formula",
@@ -4512,13 +4585,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 11,
-      "evidenceIndex": 7,
+      "sourceIndex": 12,
+      "evidenceIndex": 11,
       "testChecksum": "61b6f1386f6b1fbe96f429772661025b88e99d9fa490af67426d81cfc04c781d",
       "observations": []
     },
     {
-      "position": 572,
+      "position": 576,
       "id": "formula.function.search.normal.1",
       "label": "SEARCH · Normal",
       "kind": "formula",
@@ -4543,13 +4616,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 11,
-      "evidenceIndex": 7,
+      "sourceIndex": 12,
+      "evidenceIndex": 11,
       "testChecksum": "e49ae69fd7954d0cf193ea8bf6c76c8c83a9b7cb4b9cbbe849ca8842db7f6b02",
       "observations": []
     },
     {
-      "position": 578,
+      "position": 582,
       "id": "formula.function.value.normal.1",
       "label": "VALUE · Normal",
       "kind": "formula",
@@ -4574,13 +4647,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 11,
-      "evidenceIndex": 7,
+      "sourceIndex": 12,
+      "evidenceIndex": 11,
       "testChecksum": "b1fb9bf00b9a70560845e5c06a589363577731ac7cf5a16e8dea1a99548379a7",
       "observations": []
     },
     {
-      "position": 584,
+      "position": 588,
       "id": "formula.function.clean.normal.1",
       "label": "CLEAN · Normal",
       "kind": "formula",
@@ -4605,13 +4678,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 11,
-      "evidenceIndex": 7,
+      "sourceIndex": 12,
+      "evidenceIndex": 11,
       "testChecksum": "8ee673d1dd141e33d5b6f8f361e3685a6be377bedb9474e2cb3e1b7e699269b3",
       "observations": []
     },
     {
-      "position": 590,
+      "position": 594,
       "id": "formula.function.rept.normal.1",
       "label": "REPT · Normal",
       "kind": "formula",
@@ -4636,13 +4709,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 11,
-      "evidenceIndex": 7,
+      "sourceIndex": 12,
+      "evidenceIndex": 11,
       "testChecksum": "00ddbb1e28353752041ce23958516fcfa202894f3b3092a1478d9790145b2128",
       "observations": []
     },
     {
-      "position": 596,
+      "position": 600,
       "id": "formula.function.char.normal.1",
       "label": "CHAR · Normal",
       "kind": "formula",
@@ -4667,13 +4740,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 11,
-      "evidenceIndex": 7,
+      "sourceIndex": 12,
+      "evidenceIndex": 11,
       "testChecksum": "79f3cebfbc2f146a4556a539ed0483a44924161b639c32c20f4ff5a3b530c4d2",
       "observations": []
     },
     {
-      "position": 602,
+      "position": 606,
       "id": "formula.function.code.normal.1",
       "label": "CODE · Normal",
       "kind": "formula",
@@ -4698,13 +4771,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 11,
-      "evidenceIndex": 7,
+      "sourceIndex": 12,
+      "evidenceIndex": 11,
       "testChecksum": "ac637b725b4b61ef8713621d835783343be5d81b70001bf12b48f3cff1ab02bc",
       "observations": []
     },
     {
-      "position": 608,
+      "position": 612,
       "id": "formula.function.unichar.normal.1",
       "label": "UNICHAR · Normal",
       "kind": "formula",
@@ -4729,13 +4802,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 11,
-      "evidenceIndex": 7,
+      "sourceIndex": 12,
+      "evidenceIndex": 11,
       "testChecksum": "b71413d2c9979bf6c25425bd62c1cb5c6b4b110c43ff6ad1a15ce8b492b78ef9",
       "observations": []
     },
     {
-      "position": 614,
+      "position": 618,
       "id": "formula.function.unicode.normal.1",
       "label": "UNICODE · Normal",
       "kind": "formula",
@@ -4760,13 +4833,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 11,
-      "evidenceIndex": 7,
+      "sourceIndex": 12,
+      "evidenceIndex": 11,
       "testChecksum": "78b2123b51306d5f0e740fc1698cd680064ece408c481bec605e3dbc8d1a7c3e",
       "observations": []
     },
     {
-      "position": 620,
+      "position": 624,
       "id": "formula.function.proper.normal.1",
       "label": "PROPER · Normal",
       "kind": "formula",
@@ -4791,13 +4864,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 11,
-      "evidenceIndex": 7,
+      "sourceIndex": 12,
+      "evidenceIndex": 11,
       "testChecksum": "e3dab284417dff5e848f7eba5e6f9425788e01bdf66848478388fb1505c33530",
       "observations": []
     },
     {
-      "position": 626,
+      "position": 630,
       "id": "formula.function.numbervalue.normal.1",
       "label": "NUMBERVALUE · Normal",
       "kind": "formula",
@@ -4822,13 +4895,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 11,
-      "evidenceIndex": 7,
+      "sourceIndex": 12,
+      "evidenceIndex": 11,
       "testChecksum": "23ba5b809754798f57384bc789a48a768f11d6b77deb09c05b1bf7bdc216c094",
       "observations": []
     },
     {
-      "position": 632,
+      "position": 636,
       "id": "formula.function.time.normal.1",
       "label": "TIME · Normal",
       "kind": "formula",
@@ -4853,13 +4926,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 12,
-      "evidenceIndex": 7,
+      "sourceIndex": 13,
+      "evidenceIndex": 11,
       "testChecksum": "bcf01e1a8d9f84dadaeaab938d4ab8fce5b5dbcf873e491a039bb6976de55359",
       "observations": []
     },
     {
-      "position": 638,
+      "position": 642,
       "id": "formula.function.timevalue.normal.1",
       "label": "TIMEVALUE · Normal",
       "kind": "formula",
@@ -4884,13 +4957,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 12,
-      "evidenceIndex": 7,
+      "sourceIndex": 13,
+      "evidenceIndex": 11,
       "testChecksum": "15f73e17fcb3ce53acbf76ded422e4b0f34e897417ed2df0f57d5aa50ded87f9",
       "observations": []
     },
     {
-      "position": 644,
+      "position": 648,
       "id": "formula.function.hour.normal.1",
       "label": "HOUR · Normal",
       "kind": "formula",
@@ -4915,13 +4988,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 12,
-      "evidenceIndex": 7,
+      "sourceIndex": 13,
+      "evidenceIndex": 11,
       "testChecksum": "6295e099a340b76624dac5306b9256377b5951b3ab16ba5ac4cf61ee564b3d4e",
       "observations": []
     },
     {
-      "position": 650,
+      "position": 654,
       "id": "formula.function.minute.normal.1",
       "label": "MINUTE · Normal",
       "kind": "formula",
@@ -4946,13 +5019,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 12,
-      "evidenceIndex": 7,
+      "sourceIndex": 13,
+      "evidenceIndex": 11,
       "testChecksum": "7af51dd8858dc4097fe9744fd858f51f7c4cd60ee8627e6079c77f8685a32c1c",
       "observations": []
     },
     {
-      "position": 656,
+      "position": 660,
       "id": "formula.function.second.normal.1",
       "label": "SECOND · Normal",
       "kind": "formula",
@@ -4977,13 +5050,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 12,
-      "evidenceIndex": 7,
+      "sourceIndex": 13,
+      "evidenceIndex": 11,
       "testChecksum": "acf95303268032f9d635a1587c5e179e6b27195b4673f1281a355244d47bae13",
       "observations": []
     },
     {
-      "position": 662,
+      "position": 666,
       "id": "formula.function.days.normal.1",
       "label": "DAYS · Normal",
       "kind": "formula",
@@ -5008,13 +5081,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 12,
-      "evidenceIndex": 7,
+      "sourceIndex": 13,
+      "evidenceIndex": 11,
       "testChecksum": "7850dd7a1276ed7a7109dbab07689592edbcc0800630926d2f55d84ba1b7462d",
       "observations": []
     },
     {
-      "position": 668,
+      "position": 672,
       "id": "formula.function.edate.normal.1",
       "label": "EDATE · Normal",
       "kind": "formula",
@@ -5039,13 +5112,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 12,
-      "evidenceIndex": 7,
+      "sourceIndex": 13,
+      "evidenceIndex": 11,
       "testChecksum": "6e6cec0ddd198b5d8e2375d5db100d390748da9c5d23d09598609dca05fd49d5",
       "observations": []
     },
     {
-      "position": 674,
+      "position": 678,
       "id": "formula.function.eomonth.normal.1",
       "label": "EOMONTH · Normal",
       "kind": "formula",
@@ -5070,13 +5143,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 12,
-      "evidenceIndex": 7,
+      "sourceIndex": 13,
+      "evidenceIndex": 11,
       "testChecksum": "4069388698bac0bdf8ac1324034f820c5651195adbfbc58c1b428e9af15bc54c",
       "observations": []
     },
     {
-      "position": 680,
+      "position": 684,
       "id": "formula.function.weekday.normal.1",
       "label": "WEEKDAY · Normal",
       "kind": "formula",
@@ -5101,13 +5174,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 12,
-      "evidenceIndex": 7,
+      "sourceIndex": 13,
+      "evidenceIndex": 11,
       "testChecksum": "1844d7efb0cb1d615705232f2e12a34694755dca5f957a7c4a5f561998c94a62",
       "observations": []
     },
     {
-      "position": 686,
+      "position": 690,
       "id": "formula.function.weeknum.normal.1",
       "label": "WEEKNUM · Normal",
       "kind": "formula",
@@ -5132,13 +5205,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 12,
-      "evidenceIndex": 7,
+      "sourceIndex": 13,
+      "evidenceIndex": 11,
       "testChecksum": "54def1b5958b4d0e052ac6ee1bf39ac90d763196f588ecf6b2ab73364ba287ff",
       "observations": []
     },
     {
-      "position": 692,
+      "position": 696,
       "id": "formula.function.workday.normal.1",
       "label": "WORKDAY · Normal",
       "kind": "formula",
@@ -5163,13 +5236,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 12,
-      "evidenceIndex": 7,
+      "sourceIndex": 13,
+      "evidenceIndex": 11,
       "testChecksum": "f3dee1325aceb0abce8601534c6bb704cf7d0948b303f120fc5c692b947c8725",
       "observations": []
     },
     {
-      "position": 698,
+      "position": 702,
       "id": "formula.function.networkdays.normal.1",
       "label": "NETWORKDAYS · Normal",
       "kind": "formula",
@@ -5194,13 +5267,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 12,
-      "evidenceIndex": 7,
+      "sourceIndex": 13,
+      "evidenceIndex": 11,
       "testChecksum": "49b57c874d3b298f3a66c42c8f1c98a617ff005a867a9bcfcbbf8608e6f4305e",
       "observations": []
     },
     {
-      "position": 704,
+      "position": 708,
       "id": "formula.function.yearfrac.normal.1",
       "label": "YEARFRAC · Normal",
       "kind": "formula",
@@ -5225,13 +5298,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 12,
-      "evidenceIndex": 7,
+      "sourceIndex": 13,
+      "evidenceIndex": 11,
       "testChecksum": "ec351db7e46376a79f4ee05b3e217f3d252e8aab16c71958b21203d276726873",
       "observations": []
     },
     {
-      "position": 710,
+      "position": 714,
       "id": "formula.function.days360.normal.1",
       "label": "DAYS360 · Normal",
       "kind": "formula",
@@ -5256,13 +5329,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 12,
-      "evidenceIndex": 7,
+      "sourceIndex": 13,
+      "evidenceIndex": 11,
       "testChecksum": "61c11a5f4f52a908c506b96d69af62b86515ed153b9287035eadddaa347e8341",
       "observations": []
     },
     {
-      "position": 716,
+      "position": 720,
       "id": "formula.function.median.normal.1",
       "label": "MEDIAN · Normal",
       "kind": "formula",
@@ -5287,13 +5360,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 8,
-      "evidenceIndex": 7,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
       "testChecksum": "92e3b297917f05e41e36a39328c1335a0f90e8ab3fc4720f5bb049e6dd0347be",
       "observations": []
     },
     {
-      "position": 722,
+      "position": 726,
       "id": "formula.function.mode.sngl.normal.1",
       "label": "MODE.SNGL · Normal",
       "kind": "formula",
@@ -5318,13 +5391,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 8,
-      "evidenceIndex": 7,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
       "testChecksum": "5cc9292ea4fd31c028e9dfc76eb8e920c202f231bb159e760ca0135cc35c5f57",
       "observations": []
     },
     {
-      "position": 728,
+      "position": 732,
       "id": "formula.function.large.normal.1",
       "label": "LARGE · Normal",
       "kind": "formula",
@@ -5374,13 +5447,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 8,
-      "evidenceIndex": 7,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
       "testChecksum": "3240683eeaff41df5f608b1b86565fa183105efc16067eed144494921bb80424",
       "observations": []
     },
     {
-      "position": 734,
+      "position": 738,
       "id": "formula.function.small.normal.1",
       "label": "SMALL · Normal",
       "kind": "formula",
@@ -5430,13 +5503,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 8,
-      "evidenceIndex": 7,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
       "testChecksum": "8c81f3a4925e11e7549f69796f1f458e60e2b30515ecc047ef7f0e63b0b02dcb",
       "observations": []
     },
     {
-      "position": 740,
+      "position": 744,
       "id": "formula.function.rank.eq.normal.1",
       "label": "RANK.EQ · Normal",
       "kind": "formula",
@@ -5486,13 +5559,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 8,
-      "evidenceIndex": 7,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
       "testChecksum": "f3d4e8b33517376e197cbfe249e94ad616803cf13fbdfeb297936301a8416947",
       "observations": []
     },
     {
-      "position": 746,
+      "position": 750,
       "id": "formula.function.percentile.inc.normal.1",
       "label": "PERCENTILE.INC · Normal",
       "kind": "formula",
@@ -5542,13 +5615,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 8,
-      "evidenceIndex": 7,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
       "testChecksum": "30defe17b49d35ceeaf91fc56d1d70ae21c0f6002a955491453666e2a2ed6308",
       "observations": []
     },
     {
-      "position": 752,
+      "position": 756,
       "id": "formula.function.quartile.inc.normal.1",
       "label": "QUARTILE.INC · Normal",
       "kind": "formula",
@@ -5598,13 +5671,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 8,
-      "evidenceIndex": 7,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
       "testChecksum": "2b32c7efcf65eec8fe815b537c860a9e9ed5d11b25af2907648ef33f6656a589",
       "observations": []
     },
     {
-      "position": 758,
+      "position": 762,
       "id": "formula.function.stdev.s.normal.1",
       "label": "STDEV.S · Normal",
       "kind": "formula",
@@ -5629,13 +5702,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 8,
-      "evidenceIndex": 7,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
       "testChecksum": "8d74cfa47118a7ac669249770a950d7c05775086e06669f27b192363fd78595a",
       "observations": []
     },
     {
-      "position": 764,
+      "position": 768,
       "id": "formula.function.stdev.p.normal.1",
       "label": "STDEV.P · Normal",
       "kind": "formula",
@@ -5660,13 +5733,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 8,
-      "evidenceIndex": 7,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
       "testChecksum": "ad03a685e636644baeaa98814bef5884f530b276c11d5f6c513f9ce29528894b",
       "observations": []
     },
     {
-      "position": 770,
+      "position": 774,
       "id": "formula.function.var.s.normal.1",
       "label": "VAR.S · Normal",
       "kind": "formula",
@@ -5691,13 +5764,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 8,
-      "evidenceIndex": 7,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
       "testChecksum": "6aef4fec393d5e930e7f0e089d7c8d9cb691e6f53a75fdad7eaafa74f466d7e2",
       "observations": []
     },
     {
-      "position": 776,
+      "position": 780,
       "id": "formula.function.var.p.normal.1",
       "label": "VAR.P · Normal",
       "kind": "formula",
@@ -5722,13 +5795,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 8,
-      "evidenceIndex": 7,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
       "testChecksum": "e87b5a25f3a377ab273e03aa4aeba7ebffa9f7811a6b58ad438c188abd73ab0b",
       "observations": []
     },
     {
-      "position": 782,
+      "position": 786,
       "id": "formula.function.geomean.normal.1",
       "label": "GEOMEAN · Normal",
       "kind": "formula",
@@ -5753,13 +5826,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 8,
-      "evidenceIndex": 7,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
       "testChecksum": "e29b8af5bbc010a523fd509e60f2700da3a9253c4f285034ca6954c5aa0ba1f1",
       "observations": []
     },
     {
-      "position": 788,
+      "position": 792,
       "id": "formula.function.correl.normal.1",
       "label": "CORREL · Normal",
       "kind": "formula",
@@ -5809,13 +5882,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 8,
-      "evidenceIndex": 7,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
       "testChecksum": "0d72faaad0ec295fa13c80ddb62da0d4e60adfe9018ff193687793cc99c05806",
       "observations": []
     },
     {
-      "position": 794,
+      "position": 798,
       "id": "formula.function.covariance.s.normal.1",
       "label": "COVARIANCE.S · Normal",
       "kind": "formula",
@@ -5865,13 +5938,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 8,
-      "evidenceIndex": 7,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
       "testChecksum": "da552e150fe88993857aabe4e993d6eec8785dfdc999d5f51c6820fc67cbea70",
       "observations": []
     },
     {
-      "position": 800,
+      "position": 804,
       "id": "formula.function.covariance.p.normal.1",
       "label": "COVARIANCE.P · Normal",
       "kind": "formula",
@@ -5921,13 +5994,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 8,
-      "evidenceIndex": 7,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
       "testChecksum": "c5bb00d3985ae4582072388cf5bfdf4ffe08776a5f1005e424a095c3fe89c342",
       "observations": []
     },
     {
-      "position": 806,
+      "position": 810,
       "id": "formula.function.countblank.normal.1",
       "label": "COUNTBLANK · Normal",
       "kind": "formula",
@@ -5977,13 +6050,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 8,
-      "evidenceIndex": 7,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
       "testChecksum": "eee2f4a0325a43e8b52811f196b9ae584205a979f739b75a13aa583defb93dd4",
       "observations": []
     },
     {
-      "position": 812,
+      "position": 816,
       "id": "formula.function.maxifs.normal.1",
       "label": "MAXIFS · Normal",
       "kind": "formula",
@@ -6033,13 +6106,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 8,
-      "evidenceIndex": 7,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
       "testChecksum": "f098cd09e7b1ba5b50d9501857a3c696b0bcefa951c882d5d12ddc641a6e69a5",
       "observations": []
     },
     {
-      "position": 818,
+      "position": 822,
       "id": "formula.function.minifs.normal.1",
       "label": "MINIFS · Normal",
       "kind": "formula",
@@ -6089,13 +6162,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 8,
-      "evidenceIndex": 7,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
       "testChecksum": "8cc482cc4ac5ad1832848e1bf8e230c0a14d8ae18743cf381a9947024fac9172",
       "observations": []
     },
     {
-      "position": 824,
+      "position": 828,
       "id": "formula.function.xmatch.normal.1",
       "label": "XMATCH · Normal",
       "kind": "formula",
@@ -6146,12 +6219,12 @@
       },
       "unsupported": false,
       "sourceIndex": 5,
-      "evidenceIndex": 7,
+      "evidenceIndex": 11,
       "testChecksum": "ec37710a6406f23991904982d6bf079a06d4d9a4573210136542fe88d8f9e0eb",
       "observations": []
     },
     {
-      "position": 830,
+      "position": 834,
       "id": "formula.function.choose.normal.1",
       "label": "CHOOSE · Normal",
       "kind": "formula",
@@ -6177,12 +6250,12 @@
       },
       "unsupported": false,
       "sourceIndex": 5,
-      "evidenceIndex": 7,
+      "evidenceIndex": 11,
       "testChecksum": "14f49cf7aae4478e2e5bb7f90801154d204fed11f8082202b62e941c5e191d0a",
       "observations": []
     },
     {
-      "position": 836,
+      "position": 840,
       "id": "formula.function.row.normal.1",
       "label": "ROW · Normal",
       "kind": "formula",
@@ -6233,12 +6306,12 @@
       },
       "unsupported": false,
       "sourceIndex": 5,
-      "evidenceIndex": 7,
+      "evidenceIndex": 11,
       "testChecksum": "028000e47ce687f6619067611de7a12b40e602e47b249f614334d9404e867647",
       "observations": []
     },
     {
-      "position": 842,
+      "position": 846,
       "id": "formula.function.rows.normal.1",
       "label": "ROWS · Normal",
       "kind": "formula",
@@ -6289,12 +6362,12 @@
       },
       "unsupported": false,
       "sourceIndex": 5,
-      "evidenceIndex": 7,
+      "evidenceIndex": 11,
       "testChecksum": "e3b057fadbccedac98ff6cf501e9ad689448d634720c53902634125ccb7522b5",
       "observations": []
     },
     {
-      "position": 848,
+      "position": 852,
       "id": "formula.function.column.normal.1",
       "label": "COLUMN · Normal",
       "kind": "formula",
@@ -6345,12 +6418,12 @@
       },
       "unsupported": false,
       "sourceIndex": 5,
-      "evidenceIndex": 7,
+      "evidenceIndex": 11,
       "testChecksum": "9310e577bf3f5f0b949d136dd54db5bae555da97b1d70f5fb25abbfa5c788d37",
       "observations": []
     },
     {
-      "position": 854,
+      "position": 858,
       "id": "formula.function.columns.normal.1",
       "label": "COLUMNS · Normal",
       "kind": "formula",
@@ -6401,12 +6474,12 @@
       },
       "unsupported": false,
       "sourceIndex": 5,
-      "evidenceIndex": 7,
+      "evidenceIndex": 11,
       "testChecksum": "77b383388a8f6f68c8ae8119c3fa0e3367f6617f867dfbf5d78c2568bce966ef",
       "observations": []
     },
     {
-      "position": 860,
+      "position": 864,
       "id": "formula.function.address.normal.1",
       "label": "ADDRESS · Normal",
       "kind": "formula",
@@ -6432,12 +6505,12 @@
       },
       "unsupported": false,
       "sourceIndex": 5,
-      "evidenceIndex": 7,
+      "evidenceIndex": 11,
       "testChecksum": "707c7d0b7ebab4f0b322f20b743bb126db1e7aa86eaad2613747b88ad325d3e7",
       "observations": []
     },
     {
-      "position": 866,
+      "position": 870,
       "id": "formula.function.offset.normal.1",
       "label": "OFFSET · Normal",
       "kind": "formula",
@@ -6488,12 +6561,12 @@
       },
       "unsupported": false,
       "sourceIndex": 5,
-      "evidenceIndex": 7,
+      "evidenceIndex": 11,
       "testChecksum": "cc2b7f8bcc258cf34c3880dd54ed7f242f8999f99755840c1ec48fb5dbac0464",
       "observations": []
     },
     {
-      "position": 872,
+      "position": 876,
       "id": "formula.function.indirect.normal.1",
       "label": "INDIRECT · Normal",
       "kind": "formula",
@@ -6544,12 +6617,12 @@
       },
       "unsupported": false,
       "sourceIndex": 5,
-      "evidenceIndex": 7,
+      "evidenceIndex": 11,
       "testChecksum": "c70cb7825a770e3383d9337321ac8d9be009cd0098f48098bed188f495775c7a",
       "observations": []
     },
     {
-      "position": 878,
+      "position": 882,
       "id": "formula.function.areas.normal.1",
       "label": "AREAS · Normal",
       "kind": "formula",
@@ -6600,12 +6673,12 @@
       },
       "unsupported": false,
       "sourceIndex": 5,
-      "evidenceIndex": 7,
+      "evidenceIndex": 11,
       "testChecksum": "81ceeaed12931379ba1eb95bfc7eb02e2f96d4297666ecd3458f2a049fe17157",
       "observations": []
     },
     {
-      "position": 884,
+      "position": 888,
       "id": "formula.function.formulatext.normal.1",
       "label": "FORMULATEXT · Normal",
       "kind": "formula",
@@ -6656,12 +6729,12 @@
       },
       "unsupported": false,
       "sourceIndex": 5,
-      "evidenceIndex": 7,
+      "evidenceIndex": 11,
       "testChecksum": "577a8dcfd38e56ab765590c0a8728aa66a0c5be02740a1d1a1a40f01d76d8923",
       "observations": []
     },
     {
-      "position": 890,
+      "position": 894,
       "id": "formula.function.hyperlink.normal.1",
       "label": "HYPERLINK · Normal",
       "kind": "formula",
@@ -6687,12 +6760,12 @@
       },
       "unsupported": false,
       "sourceIndex": 5,
-      "evidenceIndex": 7,
+      "evidenceIndex": 11,
       "testChecksum": "b18ff1d0c8aed67c504a86ee9446cd2dddb0ea058e3565bc52b0790d5651c1a5",
       "observations": []
     },
     {
-      "position": 896,
+      "position": 900,
       "id": "formula.function.cell.normal.1",
       "label": "CELL · Normal",
       "kind": "formula",
@@ -6742,13 +6815,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 10,
-      "evidenceIndex": 7,
+      "sourceIndex": 11,
+      "evidenceIndex": 11,
       "testChecksum": "46629e540476745e07515fde594d9df6fa3ddd43e9df47df7c4c42865ac7c9eb",
       "observations": []
     },
     {
-      "position": 902,
+      "position": 906,
       "id": "formula.function.transpose.normal.1",
       "label": "TRANSPOSE · Normal",
       "kind": "formula",
@@ -6799,12 +6872,12 @@
       },
       "unsupported": false,
       "sourceIndex": 5,
-      "evidenceIndex": 7,
+      "evidenceIndex": 11,
       "testChecksum": "22bee40564a8fc531e864534a062fa3a1632461d7f076b2c1dfced81f9881049",
       "observations": []
     },
     {
-      "position": 908,
+      "position": 912,
       "id": "formula.function.sequence.normal.1",
       "label": "SEQUENCE · Normal",
       "kind": "formula",
@@ -6830,12 +6903,12 @@
       },
       "unsupported": false,
       "sourceIndex": 5,
-      "evidenceIndex": 7,
+      "evidenceIndex": 11,
       "testChecksum": "c2bc3001082c56cc48f9ecede35f1775ab3d7e3aa031fb1a2e96144c53c8aed1",
       "observations": []
     },
     {
-      "position": 914,
+      "position": 918,
       "id": "formula.function.take.normal.1",
       "label": "TAKE · Normal",
       "kind": "formula",
@@ -6886,12 +6959,12 @@
       },
       "unsupported": false,
       "sourceIndex": 5,
-      "evidenceIndex": 7,
+      "evidenceIndex": 11,
       "testChecksum": "f98afbd611c2fc6202c5e84a7ee705f3f9801cce71eca238f84ce9627d59f85a",
       "observations": []
     },
     {
-      "position": 920,
+      "position": 924,
       "id": "formula.function.drop.normal.1",
       "label": "DROP · Normal",
       "kind": "formula",
@@ -6942,12 +7015,12 @@
       },
       "unsupported": false,
       "sourceIndex": 5,
-      "evidenceIndex": 7,
+      "evidenceIndex": 11,
       "testChecksum": "686acda3976bb28858a68456dedff866404cf16a55bfb0f3c8ecc5a23cfe04ab",
       "observations": []
     },
     {
-      "position": 926,
+      "position": 930,
       "id": "formula.function.choosecols.normal.1",
       "label": "CHOOSECOLS · Normal",
       "kind": "formula",
@@ -6998,12 +7071,12 @@
       },
       "unsupported": false,
       "sourceIndex": 5,
-      "evidenceIndex": 7,
+      "evidenceIndex": 11,
       "testChecksum": "4d6b4204a463f929bd93b3e187e5c8c05660cc4aa8a186e846e11bd26a5d65b7",
       "observations": []
     },
     {
-      "position": 932,
+      "position": 936,
       "id": "formula.function.chooserows.normal.1",
       "label": "CHOOSEROWS · Normal",
       "kind": "formula",
@@ -7054,12 +7127,12 @@
       },
       "unsupported": false,
       "sourceIndex": 5,
-      "evidenceIndex": 7,
+      "evidenceIndex": 11,
       "testChecksum": "e9affbba84ed12095669b13af60aa0d50ef7002536a7c42488b4eded04aa7fb7",
       "observations": []
     },
     {
-      "position": 938,
+      "position": 942,
       "id": "formula.function.pv.normal.1",
       "label": "PV · Normal",
       "kind": "formula",
@@ -7084,13 +7157,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 13,
-      "evidenceIndex": 7,
+      "sourceIndex": 14,
+      "evidenceIndex": 11,
       "testChecksum": "fda0203ccd15c8efff4b94c71a09a5d7983e32921991d33f74b15980fca5c0f0",
       "observations": []
     },
     {
-      "position": 944,
+      "position": 948,
       "id": "formula.function.fv.normal.1",
       "label": "FV · Normal",
       "kind": "formula",
@@ -7115,13 +7188,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 13,
-      "evidenceIndex": 7,
+      "sourceIndex": 14,
+      "evidenceIndex": 11,
       "testChecksum": "37f0837b0316ffa537f51cc03eafb29b2c1629dbb8a341a08c622995bf0570a0",
       "observations": []
     },
     {
-      "position": 950,
+      "position": 954,
       "id": "formula.function.pmt.normal.1",
       "label": "PMT · Normal",
       "kind": "formula",
@@ -7146,13 +7219,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 13,
-      "evidenceIndex": 7,
+      "sourceIndex": 14,
+      "evidenceIndex": 11,
       "testChecksum": "27ddad3c75afda8d0ebb11d0727b8cfc35832247f62a50326899dc219754d1f2",
       "observations": []
     },
     {
-      "position": 956,
+      "position": 960,
       "id": "formula.function.npv.normal.1",
       "label": "NPV · Normal",
       "kind": "formula",
@@ -7202,13 +7275,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 13,
-      "evidenceIndex": 7,
+      "sourceIndex": 14,
+      "evidenceIndex": 11,
       "testChecksum": "e389ff55848ab547e5fb4c03edab299a65741e3d40e0ce664848beecc8566246",
       "observations": []
     },
     {
-      "position": 962,
+      "position": 966,
       "id": "formula.function.irr.normal.1",
       "label": "IRR · Normal",
       "kind": "formula",
@@ -7258,13 +7331,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 13,
-      "evidenceIndex": 7,
+      "sourceIndex": 14,
+      "evidenceIndex": 11,
       "testChecksum": "c0279312f024c4afd989e521c9c125c3c48f8dc80342af133dbeaa97921236fb",
       "observations": []
     },
     {
-      "position": 968,
+      "position": 972,
       "id": "formula.function.rate.normal.1",
       "label": "RATE · Normal",
       "kind": "formula",
@@ -7289,13 +7362,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 13,
-      "evidenceIndex": 7,
+      "sourceIndex": 14,
+      "evidenceIndex": 11,
       "testChecksum": "eb4b27bdf2597bfdf41f82582b5bfd7c584219236f5851d2ffb0c6c6f2483487",
       "observations": []
     },
     {
-      "position": 974,
+      "position": 978,
       "id": "formula.function.ipmt.normal.1",
       "label": "IPMT · Normal",
       "kind": "formula",
@@ -7320,13 +7393,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 13,
-      "evidenceIndex": 7,
+      "sourceIndex": 14,
+      "evidenceIndex": 11,
       "testChecksum": "01c3cf827a716b7db30ce7c25da06dc260445d98a679be99756f7e187a64f1e8",
       "observations": []
     },
     {
-      "position": 980,
+      "position": 984,
       "id": "formula.function.ppmt.normal.1",
       "label": "PPMT · Normal",
       "kind": "formula",
@@ -7351,13 +7424,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 13,
-      "evidenceIndex": 7,
+      "sourceIndex": 14,
+      "evidenceIndex": 11,
       "testChecksum": "f0517d7d74aa737d4f572d1998e4f9922db5b67448c863cc70d1211eeb3ac016",
       "observations": []
     },
     {
-      "position": 992,
+      "position": 996,
       "id": "formula.operator.subtract.normal.1",
       "label": "subtract · Normal",
       "kind": "formula",
@@ -7383,43 +7456,12 @@
       },
       "unsupported": false,
       "sourceIndex": 0,
-      "evidenceIndex": 7,
+      "evidenceIndex": 11,
       "testChecksum": "4e8fecb50fed4f3623abb6bf63946dbdc5d7a4d159eae1f9055c84bcc29809d2",
       "observations": []
     },
     {
-      "position": 998,
-      "id": "formula.operator.multiply.normal.1",
-      "label": "multiply · Normal",
-      "kind": "formula",
-      "area": "formula",
-      "category": "normal",
-      "family": "operator",
-      "behavior": "shared",
-      "featureValue": "operator:multiply",
-      "featureLabel": "Operator · multiply",
-      "statusTags": [
-        "local-pass",
-        "result-unavailable"
-      ],
-      "formula": "=3*4=12",
-      "target": "D4",
-      "inputs": [],
-      "expected": {
-        "type": "boolean",
-        "value": true
-      },
-      "tolerance": {
-        "kind": "exact"
-      },
-      "unsupported": false,
-      "sourceIndex": 0,
-      "evidenceIndex": 7,
-      "testChecksum": "41ab000e335843d5f35a14f5b84d9425e980320019f3551af62e387aa3fc87b8",
-      "observations": []
-    },
-    {
-      "position": 1004,
+      "position": 1008,
       "id": "formula.operator.divide.normal.1",
       "label": "divide · Normal",
       "kind": "formula",
@@ -7445,12 +7487,12 @@
       },
       "unsupported": false,
       "sourceIndex": 0,
-      "evidenceIndex": 7,
+      "evidenceIndex": 11,
       "testChecksum": "6998effd178327cccb8ebc76644821f0e8b9f90842bbee494a9fffcc0ed65aac",
       "observations": []
     },
     {
-      "position": 1010,
+      "position": 1014,
       "id": "formula.operator.power.normal.1",
       "label": "power · Normal",
       "kind": "formula",
@@ -7476,12 +7518,12 @@
       },
       "unsupported": false,
       "sourceIndex": 0,
-      "evidenceIndex": 7,
+      "evidenceIndex": 11,
       "testChecksum": "b0394454d00be69349dd555248cc267ea1c8af017a4c3247d744418c9d2dfbee",
       "observations": []
     },
     {
-      "position": 1016,
+      "position": 1020,
       "id": "formula.operator.concatenate.normal.1",
       "label": "concatenate · Normal",
       "kind": "formula",
@@ -7506,13 +7548,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 14,
-      "evidenceIndex": 7,
+      "sourceIndex": 15,
+      "evidenceIndex": 11,
       "testChecksum": "a60011fa9ee350d64b5369419553824989c8fa2cf71a28388a337fae40f3bfa5",
       "observations": []
     },
     {
-      "position": 1022,
+      "position": 1026,
       "id": "formula.operator.equal.normal.1",
       "label": "equal · Normal",
       "kind": "formula",
@@ -7537,13 +7579,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 15,
-      "evidenceIndex": 7,
+      "sourceIndex": 16,
+      "evidenceIndex": 11,
       "testChecksum": "7f4eb695ce6cc21ffdf7120209174300b83d8d02ec7f31c8892734d10d2e4c9c",
       "observations": []
     },
     {
-      "position": 1028,
+      "position": 1032,
       "id": "formula.operator.not-equal.normal.1",
       "label": "not-equal · Normal",
       "kind": "formula",
@@ -7568,13 +7610,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 15,
-      "evidenceIndex": 7,
+      "sourceIndex": 16,
+      "evidenceIndex": 11,
       "testChecksum": "d8786b163ea55148e5c86d3af6e0017151b484fdeb1057e1aead37c796504c0e",
       "observations": []
     },
     {
-      "position": 1034,
+      "position": 1038,
       "id": "formula.operator.less-than.normal.1",
       "label": "less-than · Normal",
       "kind": "formula",
@@ -7599,13 +7641,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 15,
-      "evidenceIndex": 7,
+      "sourceIndex": 16,
+      "evidenceIndex": 11,
       "testChecksum": "6a2b0b1e3c6ed1596a1a644de9557ec4dbbebd18aa5cdda6a3676308b0ed7673",
       "observations": []
     },
     {
-      "position": 1040,
+      "position": 1044,
       "id": "formula.operator.less-than-or-equal.normal.1",
       "label": "less-than-or-equal · Normal",
       "kind": "formula",
@@ -7630,13 +7672,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 15,
-      "evidenceIndex": 7,
+      "sourceIndex": 16,
+      "evidenceIndex": 11,
       "testChecksum": "d9b89efbad927214a858fcfd01d425f9a6559557dc68b9cd37122d0e75865921",
       "observations": []
     },
     {
-      "position": 1046,
+      "position": 1050,
       "id": "formula.operator.greater-than.normal.1",
       "label": "greater-than · Normal",
       "kind": "formula",
@@ -7661,13 +7703,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 15,
-      "evidenceIndex": 7,
+      "sourceIndex": 16,
+      "evidenceIndex": 11,
       "testChecksum": "e662cab1ff26bf9e5174196f8d05ca043a5957ffb24837fff6ac96b823696a00",
       "observations": []
     },
     {
-      "position": 1052,
+      "position": 1056,
       "id": "formula.operator.greater-than-or-equal.normal.1",
       "label": "greater-than-or-equal · Normal",
       "kind": "formula",
@@ -7692,13 +7734,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 15,
-      "evidenceIndex": 7,
+      "sourceIndex": 16,
+      "evidenceIndex": 11,
       "testChecksum": "3a428c0d22ffa2bbaad0ac2bec60623530b763043b1167e342892b6d11722bad",
       "observations": []
     },
     {
-      "position": 1058,
+      "position": 1062,
       "id": "formula.operator.percent.normal.1",
       "label": "percent · Normal",
       "kind": "formula",
@@ -7724,12 +7766,12 @@
       },
       "unsupported": false,
       "sourceIndex": 0,
-      "evidenceIndex": 7,
+      "evidenceIndex": 11,
       "testChecksum": "fc4b2d0d5ace06cbe620dd17ba5e1df4991be205ab805a7acc8420f0922827bc",
       "observations": []
     },
     {
-      "position": 1064,
+      "position": 1068,
       "id": "formula.operator.unary-plus.normal.1",
       "label": "unary-plus · Normal",
       "kind": "formula",
@@ -7755,12 +7797,12 @@
       },
       "unsupported": false,
       "sourceIndex": 0,
-      "evidenceIndex": 7,
+      "evidenceIndex": 11,
       "testChecksum": "2b3d741ab9d6263cb7c664eb1014540618251024a1a34f1bed95fdc6bea539d3",
       "observations": []
     },
     {
-      "position": 1070,
+      "position": 1074,
       "id": "formula.operator.unary-minus.normal.1",
       "label": "unary-minus · Normal",
       "kind": "formula",
@@ -7786,12 +7828,12 @@
       },
       "unsupported": false,
       "sourceIndex": 0,
-      "evidenceIndex": 7,
+      "evidenceIndex": 11,
       "testChecksum": "5aee69629a3b16dccfbd132f5cdb5c6058621d7e77667aa8699badf0791add4c",
       "observations": []
     },
     {
-      "position": 1076,
+      "position": 1080,
       "id": "formula.operator.intersection.normal.1",
       "label": "intersection · Normal",
       "kind": "formula",
@@ -7841,13 +7883,13 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 16,
-      "evidenceIndex": 7,
+      "sourceIndex": 17,
+      "evidenceIndex": 11,
       "testChecksum": "7e9b0d8d19e1402afb33269e1cc66c00a0dfc3a0ebe54e642db2a20412416ef7",
       "observations": []
     },
     {
-      "position": 1082,
+      "position": 1086,
       "id": "formula.operator.union.normal.1",
       "label": "union · Normal",
       "kind": "formula",
@@ -7897,8 +7939,8 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 16,
-      "evidenceIndex": 7,
+      "sourceIndex": 17,
+      "evidenceIndex": 11,
       "testChecksum": "991c1a49d2cd81acc7b7d89a4eeae54ca0c6508b3694a4ab22a52e7b1edfc915",
       "observations": []
     },
@@ -7935,8 +7977,8 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 17,
-      "evidenceIndex": 10,
+      "sourceIndex": 18,
+      "evidenceIndex": 14,
       "testChecksum": "437d4066103b7968bb47f4b57dc87c70062b1a2841d5457f024fd6fe1cc96725",
       "observations": []
     },
@@ -7970,8 +8012,8 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 18,
-      "evidenceIndex": 11,
+      "sourceIndex": 19,
+      "evidenceIndex": 15,
       "testChecksum": "f3cc0a7b5692721e2d36f4a84d05855782e6e76c48a0f36dfaa47e7ab921a405",
       "observations": []
     },
@@ -8006,8 +8048,8 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 18,
-      "evidenceIndex": 11,
+      "sourceIndex": 19,
+      "evidenceIndex": 15,
       "testChecksum": "8477e87b2ca1ae584aeef33eda7c524ff41dc0d543bc2c5be34ea4ae41647481",
       "observations": []
     }

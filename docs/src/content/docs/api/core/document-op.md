@@ -8,10 +8,10 @@ description: "Exhaustive serializable operation union for workbook mutations."
 Exhaustive serializable operation union for workbook mutations.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L428"><code>packages/core/src/types/document.ts#L428</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L445"><code>packages/core/src/types/document.ts#L445</code></a></dd></div>
 </dl>
 
-## Variants <span class="api-count" data-pagefind-ignore>34</span>
+## Variants <span class="api-count" data-pagefind-ignore>35</span>
 
 <div class="api-variant-list" data-pagefind-ignore>
 <div class="api-variant">
@@ -341,6 +341,13 @@ Exhaustive serializable operation union for workbook mutations.
 ```
 
 </div>
+<div class="api-variant">
+
+```ts generated
+{ op: "setCalculation"; calculation: CalculationSettings }
+```
+
+</div>
 </div>
 
 ## Declaration
@@ -537,6 +544,10 @@ export type DocumentOp =
       op: "removeNamedRange";
       name: string;
       scope?: SheetId;
+    }
+  | {
+      op: "setCalculation";
+      calculation: CalculationSettings;
     };
 ```
 

@@ -4,6 +4,7 @@ import { remapFormulaA1Refs } from "../a1.js";
 import { parseCellLiteralInput } from "../cell-input.js";
 import { validConditionalRules } from "../conditional-format.js";
 import { dateToSerial } from "../date-serial.js";
+import { isValidCalculationSettings, storedCalculationSettings } from "../document-protocol.js";
 import { ENGINE_LOAD_HINT, getEngine, isEngineLoaded as isLoaded } from "../engine.js";
 import { SheetwriteError } from "../errors.js";
 import {
@@ -51,6 +52,7 @@ import type {
   RowData,
 } from "../types/data.js";
 import type {
+  CalculationSettings,
   ColumnFilter,
   DataValidationRule,
   DocumentOp,
@@ -449,6 +451,17 @@ export class StoreDataEngine {
         throw new Error(`invalid named range: ${namedRange.name}`);
       }
     }
+
+    // Before any cell is loaded, so formulas compute once under the stored limits.
+    // Defaults need no engine call and are dropped to keep snapshots unchanged.
+    const calculation = storedCalculationSettings(workbook.calculation);
+    if (calculation === undefined) delete workbook.calculation;
+    else if (this.syncCalculation(calculation)) workbook.calculation = calculation;
+    else {
+      this.wasm.free();
+      throw new Error("invalid calculation settings");
+    }
+
     if (data) {
       this.withResourceOperation("ingest", () => this.loadColumnar(workbook.activeSheet, data));
     }
@@ -712,6 +725,20 @@ export class StoreDataEngine {
       names.add(workbookTableNameKey(name));
       return { id, name };
     });
+  }
+
+  /**
+   * Hand settings to the engine. Checked here first because the binding
+   * truncates a fractional or out-of-range count to u32 instead of refusing it.
+   */
+  private syncCalculation(calculation: CalculationSettings): boolean {
+    if (!isValidCalculationSettings(calculation)) return false;
+
+    return this.wasm.setIterativeCalculation(
+      calculation.iterate,
+      calculation.maxIterations,
+      calculation.maxChange,
+    );
   }
 
   private syncNamedRange(namedRange: NamedRangeSnapshot): boolean {
@@ -1715,6 +1742,7 @@ export class StoreDataEngine {
         } else if (
           patch.op !== "setNamedRange" &&
           patch.op !== "removeNamedRange" &&
+          patch.op !== "setCalculation" &&
           patch.op !== "removeSheet"
         ) {
           touchedSheets.add(patch.op === "addSheet" ? patch.sheet.id : patch.sheet);
@@ -2467,6 +2495,11 @@ export class StoreDataEngine {
         this.workbook.namedRanges = ranges.filter(
           (range) => !this.sameNamedRange(range, patch.name, patch.scope),
         );
+        return true;
+      }
+      case "setCalculation": {
+        if (!this.syncCalculation(patch.calculation)) return false;
+        this.workbook.calculation = storedCalculationSettings(patch.calculation);
         return true;
       }
     }

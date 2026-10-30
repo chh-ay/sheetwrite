@@ -202,6 +202,13 @@ impl CellStore {
         store.volatile_serial = f64::from_bits(input.u64()?);
         store.random = RandomSource::from_state(input.u64()?);
         store.spill_owner_cell_limit = input.usize()?;
+        if input.bool()? {
+            let max_iterations = input.u32()?;
+            let max_change = f64::from_bits(input.u64()?);
+            let limits = IterationLimits::new(max_iterations, max_change)
+                .ok_or("invalid transferred iteration limits")?;
+            store.iteration = Some(Box::new(limits));
+        }
 
         let sheets = input.count()?;
 
@@ -297,6 +304,11 @@ impl CellStore {
         out.u64(self.volatile_serial.to_bits());
         out.u64(self.random.state());
         out.usize(self.spill_owner_cell_limit);
+        out.bool(self.iteration.is_some());
+        if let Some(limits) = &self.iteration {
+            out.u32(limits.max_iterations());
+            out.u64(limits.max_change().to_bits());
+        }
         out.usize(self.sheets.len());
         for (sheet, data) in self.sheets.iter().enumerate() {
             data.write_transfer(&mut out);
@@ -394,6 +406,22 @@ mod tests {
             replacement.get_cell(0, 0, 1).num().to_bits(),
             next_draw.to_bits()
         );
+    }
+
+    #[test]
+    fn memory_transfer_keeps_iterative_calculation() {
+        let mut original = CellStore::new();
+        original.add_sheet(2, 1);
+        original.set_number(0, 0, 1, 1.0, 0);
+        original.set_formula(0, 0, 0, "=A1+B1", 0);
+        assert!(original.set_iterative_calculation(true, 3, 0.0));
+        assert_eq!(original.get_cell(0, 0, 0).num(), 3.0);
+
+        let mut replacement =
+            CellStore::read_memory_state(&original.export_memory_state()).unwrap();
+        replacement.set_number(0, 0, 1, 2.0, 0);
+        replacement.recompute_changed();
+        assert_eq!(replacement.get_cell(0, 0, 0).num(), 9.0);
     }
 
     #[test]

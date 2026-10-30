@@ -8,7 +8,7 @@ description: "Result of module initialization: the instantiated exports plus the
 Result of module initialization: the instantiated exports plus the shared linear memory.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L511"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L511</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L519"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L519</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -110,6 +110,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-set-column-strings-packed"><code>cellstore_setColumnStringsPacked</code></a>
 <a href="#init-output-cellstore-set-conditional-rules"><code>cellstore_setConditionalRules</code></a>
 <a href="#init-output-cellstore-set-formula"><code>cellstore_setFormula</code></a>
+<a href="#init-output-cellstore-set-iterative-calculation"><code>cellstore_setIterativeCalculation</code></a>
 <a href="#init-output-cellstore-set-named-range"><code>cellstore_setNamedRange</code></a>
 <a href="#init-output-cellstore-set-number"><code>cellstore_setNumber</code></a>
 <a href="#init-output-cellstore-set-sheet-name"><code>cellstore_setSheetName</code></a>
@@ -161,7 +162,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-wbindgen-start"><code>__wbindgen_start</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>147</span>
+## Members <span class="api-count" data-pagefind-ignore>148</span>
 
 <div class="api-member-list">
 
@@ -1043,6 +1044,15 @@ readonly cellstore_setConditionalRules: (a: number, b: number, c: number, d: num
 
 ```ts generated
 readonly cellstore_setFormula: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => number;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-set-iterative-calculation" data-pagefind-weight="1">
+<summary><code>cellstore_setIterativeCalculation</code></summary>
+
+```ts generated
+readonly cellstore_setIterativeCalculation: (a: number, b: number, c: number, d: number) => number;
 ```
 
 </details>
@@ -2024,6 +2034,12 @@ export interface InitOutput {
     e: number,
     f: number,
     g: number,
+  ) => number;
+  readonly cellstore_setIterativeCalculation: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
   ) => number;
   readonly cellstore_setNamedRange: (
     a: number,

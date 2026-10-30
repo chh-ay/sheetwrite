@@ -37,6 +37,11 @@ The dependency index changes only when formula reads change. If you rewrite a
 formula and its cell and range reads stay the same, for example a new constant,
 the index stays valid.
 
+A formula that reads its own result, directly or through other formulas, is a
+circular reference and shows `#CYCLE!`. When the workbook turns on
+[iterative calculation](/docs/guides/iterative-calculation/), the engine
+calculates the cycle again until its values settle, as Excel does.
+
 ## Spills
 
 A formula that returns an array, such as `=SORT(A2:A100)` or `={1,2;3,4}`,

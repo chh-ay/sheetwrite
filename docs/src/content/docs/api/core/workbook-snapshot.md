@@ -8,7 +8,7 @@ description: "Schema-versioned serializable workbook document."
 Schema-versioned serializable workbook document.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L414"><code>packages/core/src/types/document.ts#L414</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L429"><code>packages/core/src/types/document.ts#L429</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>
@@ -46,7 +46,7 @@ version?: number;
 <summary><code>workbook</code></summary>
 
 ```ts generated
-workbook: { activeSheet: SheetId; namedRanges?: NamedRangeSnapshot[]; xlsxSource?: XlsxSourceSnapshot; };
+workbook: { activeSheet: SheetId; namedRanges?: NamedRangeSnapshot[]; xlsxSource?: XlsxSourceSnapshot; calculation?: CalculationSettings; };
 ```
 
 </details>
@@ -75,6 +75,7 @@ export interface WorkbookSnapshot {
     activeSheet: SheetId;
     namedRanges?: NamedRangeSnapshot[];
     xlsxSource?: XlsxSourceSnapshot;
+    calculation?: CalculationSettings;
   };
   sheets: SheetSnapshot[];
 }

@@ -8,7 +8,7 @@ description: "Conservative defaults that retain the million-row paged-sheet cont
 Conservative defaults that retain the million-row paged-sheet contract.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L303"><code>packages/core/src/document-protocol.ts#L303</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L354"><code>packages/core/src/document-protocol.ts#L354</code></a></dd></div>
 </dl>
 
 ## Declaration

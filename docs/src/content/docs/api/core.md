@@ -8,7 +8,7 @@ description: "API reference for @sheetwrite/core."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/index.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>336</dd></div>
+<div><dt>Exports</dt><dd>340</dd></div>
 </dl>
 
 Source entry: `packages/core/src/index.ts`
@@ -108,10 +108,11 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/workbook-table-name-key/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>workbookTableNameKey</code></span><span class="api-symbol-card__desc">Locale-independent key used for table and table-column collision checks.</span></a>
 </div>
 
-### Interfaces <span class="api-count" data-pagefind-ignore>148</span>
+### Interfaces <span class="api-count" data-pagefind-ignore>149</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/boundary-operation-stats/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>BoundaryOperationStats</code></span><span class="api-symbol-card__desc">Fixed-cardinality boundary crossing counters for one operation.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/calculation-settings/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>CalculationSettings</code></span><span class="api-symbol-card__desc">Workbook calculation options, mirroring Excel's &quot;Enable iterative calculation&quot;.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/cell-address/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>CellAddress</code></span><span class="api-symbol-card__desc">Zero-based address of one cell on a stable sheet ID.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/cell-block/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>CellBlock</code></span><span class="api-symbol-card__desc">Sparse row-major cells bounded by one rectangular block.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/cell-border/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>CellBorder</code></span><span class="api-symbol-card__desc">Visual border applied to one or more sides of a cell.</span></a>
@@ -349,10 +350,12 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/workbook-table-unsupported-feature/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>WorkbookTableUnsupportedFeature</code></span><span class="api-symbol-card__desc">OOXML table features outside the persisted rule subset are retained as explicit loss metadata rather than silently flattened into an ordinary range.</span></a>
 </div>
 
-### Variables <span class="api-count" data-pagefind-ignore>22</span>
+### Variables <span class="api-count" data-pagefind-ignore>25</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/default-delimited-text-resource-limits/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>DEFAULT_DELIMITED_TEXT_RESOURCE_LIMITS</code></span><span class="api-symbol-card__desc">Synchronous operations return one in-memory string, so byte/cell ceilings bound allocation while sheet-compatible dimensions remain independently valid.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/default-max-change/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>DEFAULT_MAX_CHANGE</code></span><span class="api-symbol-card__desc">Excel's convergence threshold for a new workbook.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/default-max-iterations/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>DEFAULT_MAX_ITERATIONS</code></span><span class="api-symbol-card__desc">Excel's iteration count for a new workbook.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/default-snapshot-resource-limits/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>DEFAULT_SNAPSHOT_RESOURCE_LIMITS</code></span><span class="api-symbol-card__desc">Conservative defaults that retain the million-row paged-sheet contract.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/default-sync-coordinator-limits/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>DEFAULT_SYNC_COORDINATOR_LIMITS</code></span><span class="api-symbol-card__desc">Security and durability defaults bound hostile remote versions, recovery buffers, acknowledgement memory, and the offline pending queue independently.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/default-theme/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>DEFAULT_THEME</code></span><span class="api-symbol-card__desc">Default canvas theme used before CSS and explicit theme overrides.</span></a>
@@ -365,6 +368,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/max-hyperlink-id-length/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>MAX_HYPERLINK_ID_LENGTH</code></span><span class="api-symbol-card__desc">Serialized identifier ceiling; IDs remain stable across history and snapshots.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/max-hyperlink-target-length/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>MAX_HYPERLINK_TARGET_LENGTH</code></span><span class="api-symbol-card__desc">External target ceiling, aligned with the bounded private clipboard payload.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/max-hyperlinks-per-sheet/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>MAX_HYPERLINKS_PER_SHEET</code></span><span class="api-symbol-card__desc">Renderer/codec ceiling for one sheet's hyperlink metadata.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/max-iterations/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>MAX_ITERATIONS</code></span><span class="api-symbol-card__desc">Largest iteration count Excel accepts.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/ref-cycle/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>REF_CYCLE</code></span><span class="api-symbol-card__desc">Sentinel shown for a reference that participates in a cycle.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/runtime-resource-schema-version/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>RUNTIME_RESOURCE_SCHEMA_VERSION</code></span><span class="api-symbol-card__desc">Stable protocol for runtime ownership and operation-cost reports.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/sheetwrite-clipboard-mime/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>SHEETWRITE_CLIPBOARD_MIME</code></span><span class="api-symbol-card__desc">Private-format MIME type used for rich Sheetwrite clipboard payloads.</span></a>

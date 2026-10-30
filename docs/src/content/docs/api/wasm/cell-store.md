@@ -92,6 +92,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-set-column-strings-packed"><code>setColumnStringsPacked</code></a>
 <a href="#cell-store-set-conditional-rules"><code>setConditionalRules</code></a>
 <a href="#cell-store-set-formula"><code>setFormula</code></a>
+<a href="#cell-store-set-iterative-calculation"><code>setIterativeCalculation</code></a>
 <a href="#cell-store-set-named-range"><code>setNamedRange</code></a>
 <a href="#cell-store-set-number"><code>setNumber</code></a>
 <a href="#cell-store-set-sheet-name"><code>setSheetName</code></a>
@@ -115,7 +116,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-import-memory-state"><code>importMemoryState</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>101</span>
+## Members <span class="api-count" data-pagefind-ignore>102</span>
 
 <div class="api-member-list">
 
@@ -959,6 +960,20 @@ keeps the cached index, so its next recompute visits just the edited
 formula and its dependents instead of every formula in the workbook.</p>
 </details>
 
+<details class="api-member" id="cell-store-set-iterative-calculation" data-pagefind-weight="1">
+<summary><code>setIterativeCalculation</code> <span class="api-member-summary">Turns iterative calculation on or off with Excel's limits: at most maxiterations (1 to 32,767) passes over each circular reference, stopping once no member changes by more than maxchange (finite, not negative).</span></summary>
+
+```ts generated
+setIterativeCalculation: (enabled: boolean, max_iterations: number, max_change: number) => boolean;
+```
+
+<p class="api-member-doc">Turns iterative calculation on or off with Excel's limits: at most
+`max_iterations` (1 to 32,767) passes over each circular reference,
+stopping once no member changes by more than `max_change` (finite, not
+negative). Rejects limits outside those ranges. Recalculates every
+formula when the setting changes.</p>
+</details>
+
 <details class="api-member" id="cell-store-set-named-range" data-pagefind-weight="1">
 <summary><code>setNamedRange</code></summary>
 
@@ -1502,6 +1517,11 @@ class CellStore {
     src: string,
     style: number,
   ) => number;
+  setIterativeCalculation: (
+    enabled: boolean,
+    max_iterations: number,
+    max_change: number,
+  ) => boolean;
   setNamedRange: (
     name: string,
     scope: number,
