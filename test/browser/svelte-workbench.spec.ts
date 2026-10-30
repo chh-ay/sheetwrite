@@ -151,6 +151,8 @@ test("svelte workbench boots synced, paints the dispatch model, and shows live p
   await page.emulateMedia({ reducedMotion: "reduce" });
   const errors = collectErrors(page);
   await bootWorkbench(page);
+  // The page owns the one main landmark; the workbench inside it adds none.
+  await expect(page.getByRole("main")).toHaveCount(1);
 
   const gridSurface = page.locator(".sw-svw .sw-demo-grid");
   await expect(gridSurface).toBeVisible();
@@ -172,6 +174,8 @@ test("svelte workbench boots synced, paints the dispatch model, and shows live p
   const toggle = page.getByTestId("connection-toggle");
   await expect(toggle).toHaveRole("switch");
   await expect(toggle).toHaveAttribute("aria-checked", "true");
+  // The visible action text is the accessible name, so voice users can say it.
+  await expect(toggle).toHaveAccessibleName("Connected · Go offline");
   await expect(page.getByTestId("sync-status")).toHaveRole("status");
   await expect(page.getByTestId("activity-feed")).toHaveAttribute("aria-live", "polite");
 
@@ -199,22 +203,13 @@ test("svelte workbench boots synced, paints the dispatch model, and shows live p
   });
 
   const initialTheme = await page.locator("html").getAttribute("data-theme");
-  const toolbarSwatches = page.locator(".sw-svw .sheetwrite-tb-color");
-  const readSwatches = () =>
-    toolbarSwatches.evaluateAll((inputs) =>
-      inputs.map((input) => (input as HTMLInputElement).value),
-    );
-  const lightSwatches = await readSwatches();
+  const toolbar = page.locator(".sw-svw .sheetwrite-command-toolbar");
+  const background = () => toolbar.evaluate((element) => getComputedStyle(element).backgroundColor);
+  const lightBackground = await background();
   await page.getByRole("button", { name: /Use (?:light|dark) theme/ }).click();
   await expect(page.locator("html")).not.toHaveAttribute("data-theme", initialTheme ?? "");
-  // theme-change reseeds the toolbar swatches with the colours the Grid now paints.
-  await expect.poll(readSwatches).not.toEqual(lightSwatches);
-  const resolvedTheme = await page.evaluate(() => {
-    const theme = window.__sheetwriteSvelteGrid?.getTheme();
-    if (!theme) throw new Error("svelte workbench grid handle missing");
-    return [theme.fg, theme.bg];
-  });
-  expect(await readSwatches()).toEqual(resolvedTheme);
+  // theme-change reseeds the toolbar palette with the colours the Grid now paints.
+  await expect.poll(background).not.toBe(lightBackground);
   await assertPresenceGeometry(page);
   await page.emulateMedia({ forcedColors: "active", reducedMotion: "reduce" });
   await assertPresenceGeometry(page);
@@ -237,6 +232,9 @@ test("offline edits queue durably and drain in order on reconnect", async ({ pag
 
   await page.getByTestId("connection-toggle").click();
   await expect(page.getByTestId("connection-toggle")).toHaveAttribute("aria-checked", "false");
+  await expect(page.getByTestId("connection-toggle")).toHaveAccessibleName(
+    /^Reconnect · \d+ queued$/,
+  );
   await expect(page.getByTestId("sync-status")).toContainText("Offline");
 
   await page.getByTestId("log-button").click();

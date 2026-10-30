@@ -48,7 +48,12 @@ import {
   type RuntimeResourcePhase,
   type RuntimeResourceSnapshot,
 } from "./resource-accounting.js";
-import { RIBBON_EXPANDED_HEIGHT } from "./ribbon/ribbon-metrics.js";
+import type { CommandToolbar } from "./ribbon/command-toolbar.js";
+import {
+  assertRibbonConfig,
+  RIBBON_EXPANDED_HEIGHT,
+  TOOLBAR_HEIGHT,
+} from "./ribbon/ribbon-metrics.js";
 import type { Ribbon } from "./ribbon/ribbon.js";
 import { SearchController } from "./search-controller.js";
 import { type CellRef, SelectionModel, type SelRect } from "./selection.js";
@@ -64,7 +69,6 @@ import {
   visibleSheetNeighbor,
 } from "./store/ranges.js";
 import { StyleActions } from "./style-actions.js";
-import { Toolbar } from "./toolbar.js";
 import { beginGridTransactionAdmission } from "./transaction-admission.js";
 import type {
   CellHyperlink,
@@ -478,9 +482,9 @@ export class GridImpl implements Grid {
   private keymap: Keymap;
   private zoom = 1;
   private baseTheme: Theme;
-  private toolbar: Toolbar | null = null;
+  private toolbar: CommandToolbar | null = null;
   private ribbon: Ribbon | null = null;
-  /** Bumped whenever chrome is rebuilt, so a ribbon chunk that loads late is dropped. */
+  /** Bumped whenever chrome is rebuilt, so a chrome chunk that loads late is dropped. */
   private chromeGeneration = 0;
   private findBar: FindBar | null = null;
   private readonly notes: NotePopover;
@@ -567,6 +571,7 @@ export class GridImpl implements Grid {
     store?: Store,
     ownsStore = store === undefined,
   ) {
+    assertRibbonConfig(opts.config?.ribbon);
     this.keymap = new Keymap(opts.config);
     this.transactionResourceLimits = resolveTransactionResourceLimits(
       opts.transactionResourceLimits,
@@ -2345,53 +2350,74 @@ export class GridImpl implements Grid {
     seedWidgetTheme(this.host, this.baseTheme);
   }
 
+  /**
+   * The toolbar and the ribbon render the command model, which loads as its
+   * own chunk: grids without chrome never download it. The chrome's height is
+   * reserved now, so the grid does not move when it arrives. A chunk that
+   * arrives after the chrome was rebuilt, or after destroy, is dropped.
+   */
   private createToolbar(config: GridConfig | undefined): void {
     this.chromeGeneration += 1;
     if (!config || config.toolbar === false) return;
-    if (config.ribbon !== true || Array.isArray(config.toolbar)) {
-      this.toolbar = new Toolbar(this.host, config, this.baseTheme, this);
-      this.toolbarHeight = Toolbar.height;
+
+    const generation = this.chromeGeneration;
+    const current = () => generation === this.chromeGeneration && !this.destroyed;
+    const failed = (error: unknown): void => {
+      if (!current()) return;
+
+      // Give the space back; the load error still reaches the host.
+      this.setToolbarHeight(0);
+      throw error;
+    };
+
+    if (!config.ribbon || Array.isArray(config.toolbar)) {
+      this.toolbarHeight = TOOLBAR_HEIGHT;
+      void import("./ribbon/command-toolbar.js").then(({ CommandToolbar: ToolbarClass }) => {
+        if (current()) this.mountToolbar(ToolbarClass, config);
+      }, failed);
       return;
     }
 
-    // The ribbon is opt-in and sizable, so it loads as its own chunk: grids
-    // without it never download it. Its height is reserved now, so the grid
-    // does not move when it arrives.
     this.toolbarHeight = RIBBON_EXPANDED_HEIGHT;
-    const generation = this.chromeGeneration;
-    const current = () => generation === this.chromeGeneration && !this.destroyed;
-    void import("./ribbon/ribbon.js").then(
-      ({ Ribbon }) => {
-        if (current()) this.mountRibbon(Ribbon);
-      },
-      (error: unknown) => {
-        if (!current()) return;
-        // Keep the grid usable with the flat toolbar, and still report why.
-        this.toolbar = new Toolbar(this.host, config, this.baseTheme, this);
-        this.setToolbarHeight(Toolbar.height);
-        throw error;
-      },
-    );
+    void import("./ribbon/ribbon.js").then(({ Ribbon: RibbonClass }) => {
+      if (current()) this.mountRibbon(RibbonClass, config);
+    }, failed);
   }
 
-  private mountRibbon(RibbonClass: typeof Ribbon): void {
+  /** Chrome sits first in the host, so keyboard users reach it before the grid. */
+  private placeChrome(element: HTMLElement): void {
     // The grid owns widget theming: seed now, reseed on every theme change.
     seedWidgetTheme(this.host, this.baseTheme);
-    const icons = this.config?.icons;
+
+    // Grid layout offsets the viewport by the chrome's height, so chrome must leave normal flow.
+    element.style.position = "absolute";
+    element.style.top = "0";
+    element.style.left = "0";
+    element.style.right = "0";
+    this.host.prepend(element);
+  }
+
+  private mountToolbar(ToolbarClass: typeof CommandToolbar, config: GridConfig): void {
+    const toolbar = new ToolbarClass(this.host, this, {
+      label: "Spreadsheet formatting",
+      className: "sheetwrite-toolbar",
+      flags: config,
+      ...(Array.isArray(config.toolbar) ? { items: config.toolbar } : {}),
+      ...(config.icons === undefined ? {} : { icons: config.icons }),
+    });
+    toolbar.element.style.height = `${TOOLBAR_HEIGHT}px`;
+    this.placeChrome(toolbar.element);
+    this.toolbar = toolbar;
+  }
+
+  private mountRibbon(RibbonClass: typeof Ribbon, config: GridConfig): void {
     const ribbon = new RibbonClass(this.host, this, {
       onHeightChange: (height) => this.setToolbarHeight(height),
-      ...(icons === undefined ? {} : { icons }),
+      flags: config,
+      ...(typeof config.ribbon === "object" ? config.ribbon : {}),
+      ...(config.icons === undefined ? {} : { icons: config.icons }),
     });
-
-    // Grid layout offsets the viewport by the ribbon's height, so chrome must leave normal flow.
-    const el = ribbon.element;
-    el.style.position = "absolute";
-    el.style.top = "0";
-    el.style.left = "0";
-    el.style.right = "0";
-    // First in the host, as in Excel: keyboard users reach the ribbon before
-    // the grid, whatever was mounted while its chunk loaded.
-    this.host.prepend(el);
+    this.placeChrome(ribbon.element);
     this.ribbon = ribbon;
     if (ribbon.height !== this.toolbarHeight) this.setToolbarHeight(ribbon.height);
   }
@@ -2452,6 +2478,7 @@ export class GridImpl implements Grid {
       this.config = config;
       return;
     }
+    assertRibbonConfig(config?.ribbon);
     const focus = this.selection.focusCell;
     const keymap = new Keymap(config, {
       cell: focus ? { sheet: this.activeSheet, ...focus } : null,
@@ -3764,8 +3791,10 @@ function padTarget(
 
 /**
  * Same configuration by shallow own-property comparison. Fresh-but-identical
- * flag objects from declarative hosts compare equal; arrays, functions, and
- * nested objects recreated inline compare different (conservatively rebuilding).
+ * flag objects from declarative hosts compare equal. Ribbon settings compare
+ * by field so a re-render does not reset the user's layout choice. Arrays,
+ * functions, and other nested objects recreated inline compare different
+ * (conservatively rebuilding).
  */
 function shallowEqualConfig(a: GridConfig | undefined, b: GridConfig | undefined): boolean {
   if (a === b) return true;
@@ -3776,7 +3805,15 @@ function shallowEqualConfig(a: GridConfig | undefined, b: GridConfig | undefined
   if (aKeys.length !== bKeys.length) return false;
 
   for (const key of aKeys) {
-    if (!Object.is(a[key], b[key])) return false;
+    if (key === "ribbon" ? !sameRibbonConfig(a.ribbon, b.ribbon) : !Object.is(a[key], b[key])) {
+      return false;
+    }
   }
   return true;
+}
+
+function sameRibbonConfig(a: GridConfig["ribbon"], b: GridConfig["ribbon"]): boolean {
+  if (typeof a !== "object" || typeof b !== "object") return Object.is(a, b);
+
+  return a.mode === b.mode && a.compactWidth === b.compactWidth;
 }

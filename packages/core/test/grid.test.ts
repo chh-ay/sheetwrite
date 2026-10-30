@@ -853,7 +853,7 @@ describe("Grid theme contract: setTheme merges, replaceTheme replaces", () => {
     grid.destroy();
   });
 
-  it("a theme change repaints the built-in toolbar, find bar, and menus", () => {
+  it("a theme change repaints the built-in toolbar, find bar, and menus", async () => {
     const workbook = makeWorkbook(10);
     const host = mountHost();
     const grid = new GridImpl(
@@ -861,6 +861,8 @@ describe("Grid theme contract: setTheme merges, replaceTheme replaces", () => {
       { workbook, config: { toolbar: true } },
       makeFakeStore(workbook),
     );
+    // The toolbar loads lazily; awaiting its module runs the grid's mount first.
+    await import("../src/ribbon/command-toolbar.js");
     expect(host.querySelector(".sheetwrite-toolbar")).not.toBeNull();
     // The built-in widgets read their palette from custom properties seeded on
     // the grid root (host CSS can still override them per widget).

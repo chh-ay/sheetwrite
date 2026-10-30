@@ -986,6 +986,12 @@ function UndoStory() {
 
 export function StoryReel() {
   const [active, setActive] = useState<Story["id"]>("analysis");
+  // The reel holds its story while focus is inside it, so a story change never
+  // removes the link or tab the reader is on, and while the reader pauses it.
+  // A held reel has no timer; the countdown starts again when the hold ends.
+  const [focusInside, setFocusInside] = useState(false);
+  const [pausedByReader, setPausedByReader] = useState(false);
+  const held = focusInside || pausedByReader;
   const { ref, epoch, sync } = useScenePlayback<HTMLDivElement>();
   useEffect(() => {
     void active;
@@ -997,6 +1003,10 @@ export function StoryReel() {
   return (
     <div
       className="sw-reel"
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setFocusInside(false);
+      }}
+      onFocus={() => setFocusInside(true)}
       ref={ref}
       style={{ "--sr-loop": `${STORY_SECONDS}s` } as CSSProperties}
     >
@@ -1029,7 +1039,7 @@ export function StoryReel() {
             type="button"
           >
             <span>{item.tab}</span>
-            {item.id === active ? (
+            {item.id === active && !held ? (
               <i
                 aria-hidden="true"
                 className="sw-reel__timer"
@@ -1051,6 +1061,14 @@ export function StoryReel() {
           <h3>{story.title}</h3>
           <p>{story.detail}</p>
           <a href={story.href}>{story.link} →</a>
+          <button
+            aria-pressed={pausedByReader}
+            className="sw-reel__pause"
+            onClick={() => setPausedByReader((paused) => !paused)}
+            type="button"
+          >
+            Pause stories
+          </button>
         </div>
         <div className="sw-reel__stage" data-story={story.id} key={`stage-${story.id}`}>
           {story.id === "analysis" ? <AnalysisStory /> : null}

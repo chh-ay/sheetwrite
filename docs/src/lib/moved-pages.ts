@@ -1,4 +1,5 @@
 import formulaHeadingTargets from "../generated/formula-heading-targets.json" with { type: "json" };
+import { fragmentId } from "./fragment.js";
 
 /** Pages that keep their address but move some headings to topic pages. */
 export const MOVED_HEADINGS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
@@ -93,7 +94,7 @@ export const MOVED_PAGES: Readonly<Record<string, MovedPage>> = {
       events: "/docs/reference/events/",
       "feature-flags": "/docs/features/grid/toolbar-and-ribbon/#feature-flags",
       "grid-instance": "/docs/features/grid/grid-methods/",
-      "gridconfig-toolbar": "/docs/features/grid/toolbar-and-ribbon/#gridconfig-toolbar",
+      "gridconfig-toolbar": "/docs/features/grid/toolbar-and-ribbon/#command-flags",
       gridoptions: "/docs/features/grid/options-and-presentation/#gridoptions",
       "host-owned-command-state":
         "/docs/features/grid/toolbar-and-ribbon/#host-owned-command-state",
@@ -184,7 +185,7 @@ export const MOVED_PAGES: Readonly<Record<string, MovedPage>> = {
       resizing: "/docs/features/grid/resize-merge-and-fill/#resizing",
       "selection-model": "/docs/features/grid/selection-and-keyboard/#selection-model",
       "temporary-highlights": "/docs/features/grid/context-menu/#temporary-highlights",
-      "toolbar-actions": "/docs/features/grid/toolbar-and-ribbon/#toolbar-actions",
+      "toolbar-actions": "/docs/features/grid/toolbar-and-ribbon/#custom-toolbar-items",
       touch: "/docs/features/grid/touch/",
       "undo-and-redo": "/docs/features/grid/editing-and-clipboard/#undo-and-redo",
       "validation-protection-and-notes": "/docs/features/data/validation-protection-and-notes/",
@@ -292,10 +293,6 @@ export const MOVED_PAGES: Readonly<Record<string, MovedPage>> = {
   },
 };
 
-function anchorOf(hash: string): string {
-  return decodeURIComponent(hash.replace(/^#/, ""));
-}
-
 /** The URL that replaces an old page and fragment, or undefined for a page that did not move. */
 export function movedPageTarget(
   href: string,
@@ -304,7 +301,7 @@ export function movedPageTarget(
 ): string | undefined {
   const page = movedPages[href];
   if (page === undefined) return undefined;
-  const anchor = anchorOf(hash);
+  const anchor = fragmentId(hash);
   if (anchor.length === 0) return page.to;
   return page.anchors[anchor] ?? `${page.to}#${anchor}`;
 }
@@ -318,7 +315,7 @@ export function forwardedHeading(
   hash: string,
   movedPages: Readonly<Record<string, MovedPage>> = MOVED_PAGES,
 ): string | undefined {
-  const anchor = anchorOf(hash);
+  const anchor = fragmentId(hash);
   if (anchor.length === 0) return undefined;
   const movedHeading = MOVED_HEADINGS[href]?.[anchor];
   if (movedHeading !== undefined) return movedHeading;

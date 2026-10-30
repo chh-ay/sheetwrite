@@ -6,12 +6,13 @@ description: "createRibbon function in @sheetwrite/core/shell: Mount an Excel-st
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-shell/">@sheetwrite/core/shell</a><span class="api-status" data-kind="function">function</span></div>
 
 Mount an Excel-style ribbon (Home, Insert, Data, View) bound to
-`grid.actions`, in normal document flow. Groups shrink, then collapse into
+`grid.actions`, in normal document flow. It renders the same commands as
+the toolbar, in a full or a compact layout. Groups shrink, then collapse into
 dropdowns, as the host narrows. Returns the piece with an idempotent
 `destroy`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/ribbon-factory.ts#L24"><code>packages/core/src/shell/ribbon-factory.ts#L24</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/ribbon-factory.ts#L27"><code>packages/core/src/shell/ribbon-factory.ts#L27</code></a></dd></div>
 </dl>
 
 ## Declaration

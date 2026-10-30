@@ -591,7 +591,7 @@ const App = defineComponent({
 
     return () =>
       h("section", { class: "sw-demo-app sw-vuewb-app", "data-framework": "vue" }, [
-        h("main", { class: "sw-demo-main sw-vuewb-main" }, [
+        h("div", { class: "sw-demo-main sw-vuewb-main" }, [
           h("header", { class: "sw-demo-controlbar sw-vuewb-controlbar" }, [
             h("div", { class: "sw-demo-controlbar__identity" }, [
               h("span", { class: "sw-demo-product__mark", "aria-hidden": "true" }, [
@@ -869,7 +869,6 @@ const App = defineComponent({
                   h("textarea", {
                     id: "vue-cell-note",
                     "data-testid": "note-input",
-                    "aria-label": "Cell note",
                     placeholder:
                       selected.value === null ? "Select a cell to annotate" : "Add a note…",
                     disabled: selected.value === null || readOnly.value,

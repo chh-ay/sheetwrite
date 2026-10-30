@@ -1,3 +1,5 @@
+import { fragmentId } from "./fragment.js";
+
 /**
  * Fragment navigation must actually show the target. Generated API members
  * are collapsed `<details>` rows, and two anchor forms point at them: the
@@ -13,7 +15,7 @@ function memberFor(target: Element): HTMLDetailsElement | null {
 }
 
 export function revealAnchoredMember(): void {
-  const id = decodeURIComponent(window.location.hash.slice(1));
+  const id = fragmentId(window.location.hash);
   if (!id) return;
   // Content mounts lazily after route transitions; retry briefly.
   const started = performance.now();

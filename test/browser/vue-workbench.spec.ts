@@ -116,6 +116,8 @@ test("boots the governed business workbook, paints, and stays accessible", async
   const errors = collectErrors(page);
   await page.setViewportSize({ width: 1568, height: 869 });
   await openWorkbench(page);
+  // The page owns the one main landmark; the workbench inside it adds none.
+  await expect(page.getByRole("main")).toHaveCount(1);
 
   // The frozen PO column stays out of the ARIA mirror window, so the first
   // mirrored body cell is the supplier column; PO-0001 is asserted from the
@@ -169,7 +171,8 @@ test("boots the governed business workbook, paints, and stays accessible", async
   await expect(page.getByRole("tab", { name: "Orders sheet" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Suppliers sheet" })).toBeVisible();
   await openTask(page, "Notes");
-  const noteEditor = page.getByRole("textbox", { name: "Cell note" });
+  // The textarea's accessible name is its visible label, so voice users can say it.
+  const noteEditor = page.getByRole("textbox", { name: "Selected-cell note", exact: true });
   await expect(noteEditor).toBeVisible();
   await expect(page.getByRole("list", { name: "Adapter events" })).toBeVisible();
   await expect(page.getByTestId("persistence")).toHaveAttribute("aria-live", "polite");
@@ -178,36 +181,70 @@ test("boots the governed business workbook, paints, and stays accessible", async
   expect(errors.console).toEqual([]);
 });
 
-test("0.5.0 toolbar swatches follow the site theme toggle", async ({ page }) => {
+test("the command toolbar follows the site theme toggle", async ({ page }) => {
   const errors = collectErrors(page);
   await openWorkbench(page);
 
-  const textColor = page.locator(`${GRID} .sheetwrite-tb-textColor`);
-  const fillColor = page.locator(`${GRID} .sheetwrite-tb-fillColor`);
-
-  // Both colour inputs seed from the theme the Grid resolves, not from black.
-  const initialSwatches = await Promise.all([textColor.inputValue(), fillColor.inputValue()]);
-  expect(initialSwatches[0]).toMatch(/^#[0-9a-f]{6}$/);
-  expect(initialSwatches[1]).toMatch(/^#[0-9a-f]{6}$/);
+  const toolbar = page.getByRole("toolbar", { name: "Spreadsheet formatting" });
+  const background = () => toolbar.evaluate((element) => getComputedStyle(element).backgroundColor);
+  // Font Color and Fill Color are the ribbon's palette commands, not raw color inputs.
+  await expect(toolbar.locator('[data-command="textColor"]')).toBeVisible();
+  await expect(toolbar.locator('[data-command="fillColor"]')).toBeVisible();
+  const initial = await background();
 
   await page.getByRole("button", { name: /Use (?:light|dark) theme/ }).click();
-  await expect
-    .poll(() => Promise.all([textColor.inputValue(), fillColor.inputValue()]))
-    .not.toEqual(initialSwatches);
-
-  // theme-change reseeds the swatches with the colours the Grid now paints.
-  const resolvedTheme = await page.evaluate(() => {
-    const handle = window.__sheetwriteVueWorkbench;
-    if (!handle) throw new Error("vue workbench grid handle missing");
-    return [handle.grid.getTheme().fg, handle.grid.getTheme().bg];
-  });
-  expect(await Promise.all([textColor.inputValue(), fillColor.inputValue()])).toEqual(
-    resolvedTheme,
-  );
+  // theme-change reseeds the toolbar palette with the colours the Grid now paints.
+  await expect.poll(background).not.toBe(initial);
 
   // The same workbench keeps several sheet tabs reachable from the strip.
   await expect(page.getByRole("tab", { name: "Orders sheet" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Suppliers sheet" })).toBeVisible();
+  expect(errors.page).toEqual([]);
+  expect(errors.console).toEqual([]);
+});
+
+test("the command toolbar keeps ribbon commands reachable by keyboard at any width @portability", async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await page.setViewportSize({ width: 1568, height: 869 });
+  await openWorkbench(page);
+
+  const toolbar = page.getByRole("toolbar", { name: "Spreadsheet formatting" });
+  const bold = toolbar.getByRole("button", { name: "Bold", exact: true });
+  await page.evaluate(() => {
+    const grid = window.__sheetwriteVueWorkbench?.grid;
+    if (!grid) throw new Error("grid handle missing");
+    grid.setActiveSheet("orders");
+    grid.setSelection({ kind: "cell", addr: { sheet: "orders", row: 1, col: 0 } });
+  });
+
+  // Arrow keys rove between controls; Space runs the toggle and reports its state.
+  await bold.focus();
+  await bold.press("ArrowRight");
+  await expect(toolbar.locator('[data-command="italic"]')).toBeFocused();
+  await page.keyboard.press("ArrowLeft");
+  await expect(bold).toBeFocused();
+  await bold.press("Space");
+  await expect(bold).toHaveAttribute("aria-pressed", "true");
+  await bold.press("Escape");
+  await expect(page.locator(GRID)).toBeFocused();
+
+  // A narrow window moves trailing commands into the More commands group.
+  await page.setViewportSize({ width: 640, height: 869 });
+  const more = toolbar.getByRole("button", { name: "More commands" });
+  await expect(more).toBeVisible();
+  await expect(toolbar.locator('[data-command="zoom"]')).toBeHidden();
+  await more.focus();
+  await more.press("Enter");
+  const overflow = page.getByRole("group", { name: "More commands" });
+  await expect(overflow).toBeVisible();
+  await expect(overflow.locator('[data-command="zoom"]')).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(overflow).toBeHidden();
+  await expect(more).toBeFocused();
+  await expect(more).toHaveAttribute("aria-expanded", "false");
+
   expect(errors.page).toEqual([]);
   expect(errors.console).toEqual([]);
 });
@@ -358,7 +395,9 @@ test("read-only is a live option that never rebuilds the grid", async ({ page })
   await expect(readOnly).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(GRID)).toHaveAttribute("aria-readonly", "true");
   await openTask(page, "Notes");
-  await expect(page.getByRole("textbox", { name: "Cell note" })).toBeDisabled();
+  await expect(
+    page.getByRole("textbox", { name: "Selected-cell note", exact: true }),
+  ).toBeDisabled();
   await expect(page.getByTestId("props")).toContainText("true");
   await expect(page.getByRole("button", { name: "Add sheet", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /^Options for / })).toHaveCount(0);

@@ -96,7 +96,7 @@ export default function ReactWorkbench() {
 
   return (
     <section className="sw-demo-app sw-rwb" data-framework="react">
-      <main className="sw-demo-main sw-rwb__main" id="workbench">
+      <div className="sw-demo-main sw-rwb__main" id="workbench">
         <header className="sw-demo-controlbar sw-rwb-commandbar">
           <div className="sw-demo-controlbar__identity">
             <span className="sw-demo-product__mark" aria-hidden="true">
@@ -455,7 +455,7 @@ export default function ReactWorkbench() {
             </section>
           </div>
         </details>
-      </main>
+      </div>
     </section>
   );
 }

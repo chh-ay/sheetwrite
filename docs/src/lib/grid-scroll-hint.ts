@@ -22,6 +22,7 @@ function updateEdges(scroller: HTMLElement): void {
   );
 }
 
+/** Watches one Grid viewport; the returned function stops every observation it started. */
 function watchScroller(scroller: HTMLElement, resize: ResizeObserver): () => void {
   const onScroll = () => updateEdges(scroller);
   scroller.addEventListener("scroll", onScroll, { passive: true });
@@ -30,7 +31,11 @@ function watchScroller(scroller: HTMLElement, resize: ResizeObserver): () => voi
   const sizer = scroller.firstElementChild;
   if (sizer !== null) resize.observe(sizer);
   updateEdges(scroller);
-  return () => scroller.removeEventListener("scroll", onScroll);
+  return () => {
+    scroller.removeEventListener("scroll", onScroll);
+    resize.unobserve(scroller);
+    if (sizer !== null) resize.unobserve(sizer);
+  };
 }
 
 /** Page-level wiring; returns the uninstall function. */
@@ -50,11 +55,11 @@ export function installGridScrollHints(root: HTMLElement = document.body): () =>
     for (const scroller of root.querySelectorAll<HTMLElement>(SCROLLER_SELECTOR)) {
       if (!watched.has(scroller)) watched.set(scroller, watchScroller(scroller, resize));
     }
-    // Destroyed Grids leave the document; drop their listeners with them.
+    // Destroyed Grids leave the document; drop their listeners and size
+    // observations with them.
     for (const [scroller, stop] of watched) {
       if (!scroller.isConnected) {
         stop();
-        resize.unobserve(scroller);
         watched.delete(scroller);
       }
     }

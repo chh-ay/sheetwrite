@@ -70,14 +70,18 @@ function mountHost(): HTMLDivElement {
 }
 
 // `config: {}` is truthy with no flag disabled, so the grid mounts the default
-// toolbar (buttons AND color inputs); the context menu and find bar are on by
-// default. A caller-supplied store keeps this WASM-light.
-function makeGrid(config: GridConfig = {}): { host: HTMLDivElement; grid: GridImpl } {
+// toolbar; the context menu and find bar are on by default. A caller-supplied
+// store keeps this WASM-light. The toolbar loads lazily: awaiting its module
+// runs the grid's mount callback first.
+async function makeGrid(
+  config: GridConfig = {},
+): Promise<{ host: HTMLDivElement; grid: GridImpl }> {
   const workbook = makeWorkbook();
   const store = new SheetwriteStore(workbook, makeColumnarData(50));
   const host = mountHost();
   const grid = new GridImpl(host, { workbook, config, theme: THEME }, store);
   mounted.push({ host, grid });
+  await import("../src/ribbon/command-toolbar.js");
   return { host, grid };
 }
 
@@ -101,8 +105,8 @@ describe("built-in widget styling", () => {
   // (the ancestor that parents each widget), verbatim from the resolved theme.
   // These are what styles.css reads via var(); if seeding drops or mismaps a
   // field the widgets silently lose their theme.
-  it("seeds the widget custom properties onto the host root from the theme", () => {
-    const { host } = makeGrid();
+  it("seeds the widget custom properties onto the host root from the theme", async () => {
+    const { host } = await makeGrid();
     const prop = (name: string): string => host.style.getPropertyValue(name);
 
     expect(prop("--sheetwrite-widget-bg")).toBe(THEME.bg);
@@ -121,10 +125,10 @@ describe("built-in widget styling", () => {
   // var() to the exact themed colors, AND a host rule setting the token on the
   // widget element wins over the ancestor-inherited value WITHOUT !important —
   // which is the whole point of seeding on the root, not the widget.
-  it("resolves seeded vars to themed colors and lets a host rule override without !important", () => {
+  it("resolves seeded vars to themed colors and lets a host rule override without !important", async () => {
     injectStyle(readFileSync(new URL("../styles.css", import.meta.url), "utf8"));
 
-    const { host } = makeGrid();
+    const { host } = await makeGrid();
 
     // Ctrl+F on the host flips the find bar from display:none to display:flex.
     host.dispatchEvent(new KeyboardEvent("keydown", { key: "f", ctrlKey: true, bubbles: true }));
@@ -160,11 +164,11 @@ describe("built-in widget styling", () => {
       expect(getComputedStyle(findEl).display).toBe("flex");
     }
   });
-  it("renders icon strings as text and supports reusable SVG nodes and factories", () => {
+  it("renders icon strings as text and supports reusable SVG nodes and factories", async () => {
     const shared = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     shared.setAttribute("data-icon", "shared");
 
-    const { host } = makeGrid({
+    const { host } = await makeGrid({
       toolbar: [
         { action: "bold", icon: '<img src=x onerror="alert(1)">' },
         { action: "italic", icon: shared },
@@ -180,18 +184,19 @@ describe("built-in widget styling", () => {
       ],
     });
 
-    const raw = mustFind<HTMLButtonElement>(host, ".sheetwrite-tb-bold");
+    const glyph = (command: string): HTMLElement =>
+      mustFind<HTMLElement>(host, `[data-command="${command}"] .sheetwrite-ribbon-icon`);
+
+    const raw = glyph("bold");
     expect(raw.textContent).toBe('<img src=x onerror="alert(1)">');
     expect(raw.children).toHaveLength(0);
 
-    const italic = mustFind<HTMLButtonElement>(host, ".sheetwrite-tb-italic");
-    const underline = mustFind<HTMLButtonElement>(host, ".sheetwrite-tb-underline");
+    const italic = glyph("italic");
+    const underline = glyph("underline");
     expect(italic.querySelector("svg[data-icon=shared]")).not.toBeNull();
     expect(underline.querySelector("svg[data-icon=shared]")).not.toBeNull();
     expect(italic.firstElementChild).not.toBe(underline.firstElementChild);
 
-    expect(
-      host.querySelector(".sheetwrite-tb-strikethrough svg[data-icon=factory]"),
-    ).not.toBeNull();
+    expect(glyph("strikethrough").querySelector("svg[data-icon=factory]")).not.toBeNull();
   });
 });

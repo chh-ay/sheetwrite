@@ -3,15 +3,17 @@ import {
   type DocumentOp,
   type Grid,
   type GridConfig,
+  type ProtectionResolver,
   type RowBridgeProjection,
 } from "@sheetwrite/core";
 import { createSimpleGridInput } from "@sheetwrite/core/adapter";
 import { SheetwriteGrid } from "@sheetwrite/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import { observeSiteTheme } from "../lib/site-theme.js";
 import { CapabilityHero } from "./CapabilityHero.js";
+import { applyHostProjection, type HostEntity } from "./host-rows-store.js";
 import { revenueAccountName } from "./revenue.js";
 import { siteGridTheme } from "./site-grid-theme.js";
 
@@ -27,15 +29,22 @@ const GRID_CONFIG: GridConfig = {
     { action: "exportCsv", label: "Export host accounts" },
   ],
 };
-
-interface HostEntity extends Record<string, string | number | boolean | null> {
-  id: string;
-  name: string;
-  amount: number;
-  region: string;
-  owner: string;
-  stage: string;
-}
+/** The ARR value the host asks the server to store for account-002. */
+const REQUESTED_OPERATIONS: DocumentOp[] = [
+  {
+    op: "set",
+    addr: { sheet: "sheet1", row: 1, col: 1 },
+    value: { kind: "literal", value: 79_950 },
+  },
+];
+/** The server rounds the requested ARR to the nearest 1,000 before it stores it. */
+const SERVER_NORMALIZED_OPERATIONS: DocumentOp[] = [
+  {
+    op: "set",
+    addr: { sheet: "sheet1", row: 1, col: 1 },
+    value: { kind: "literal", value: 80_000 },
+  },
+];
 
 // Widths sum to 1,080 px so every column is visible beside the page gutters
 // at desktop widths; a clipped last column reads as a broken layout.
@@ -86,6 +95,8 @@ export default function HostRowsShowcase() {
   const nextId = useRef(initialRows.length + 1);
   const denyNext = useRef(false);
   const logSequence = useRef(0);
+  const serverResponses = useRef(0);
+  const applyingServerResult = useRef(false);
   const [ready, setReady] = useState(false);
   const [entities, setEntities] = useState(() => new Map(initialRows.map((row) => [row.id, row])));
   const [log, setLog] = useState<Array<{ id: number; status: string; text: string }>>([]);
@@ -130,6 +141,15 @@ export default function HostRowsShowcase() {
   const applySiteTheme = () => grid.current?.replaceTheme({ ...siteGridTheme(), rowHeight: 36 });
   useEffect(() => observeSiteTheme(applySiteTheme), []);
 
+  // A changed protection resolver makes the adapter rebuild the Grid from its
+  // initial rows, which would undo every edit after each host render. Keep one
+  // resolver for the page's life; it reads the latest choice from a ref.
+  const protectionResolver = useCallback<ProtectionResolver>(() => {
+    if (!denyNext.current) return "allow";
+    denyNext.current = false;
+    return "deny";
+  }, []);
+
   const applyProjection = (projection: RowBridgeProjection<string>) => {
     const details = projection.deltas.slice(0, 3).map((delta) => {
       if (delta.kind === "cell") {
@@ -162,32 +182,32 @@ export default function HostRowsShowcase() {
         ...entries,
       ].slice(0, 8),
     );
-    setEntities((current) => {
-      const next = new Map(current);
-      for (const delta of projection.deltas) {
-        if (delta.kind === "cell") {
-          const { rowId, columnKey, next: value } = delta.cell;
-          const row = rowId === null ? undefined : next.get(rowId);
-          if (row && columnKey && value?.kind === "literal")
-            next.set(row.id, { ...row, [columnKey]: value.value });
-        } else if (delta.kind === "row-structure" && delta.action === "insert") {
-          for (const rowId of delta.inserted) {
-            if (rowId !== null)
-              next.set(rowId, {
-                id: rowId,
-                name: "New account",
-                amount: 0,
-                region: "North",
-                owner: "Ada Chen",
-                stage: "Qualification",
-              });
-          }
-        } else if (delta.kind === "row-structure" && delta.action === "delete") {
-          for (const rowId of delta.removed) if (rowId !== null) next.delete(rowId);
-        }
-      }
-      return next;
-    });
+    setEntities((current) => applyHostProjection(current, projection));
+  };
+  const transformedAccept = () => {
+    const active = grid.current;
+    if (!active) return;
+
+    // The server accepts the host's request in a normalized form. The Grid must
+    // show the stored result, so apply it first and report it to the host once,
+    // as the transformed acceptance, not also as a plain remote change.
+    applyingServerResult.current = true;
+    let applied = false;
+    try {
+      applied = active.applyRemoteOperations(SERVER_NORMALIZED_OPERATIONS).status === "applied";
+    } finally {
+      applyingServerResult.current = false;
+    }
+    if (!applied) return;
+
+    applyProjection(
+      bridge.reconcile({
+        status: "transformed",
+        transactionId: `server-normalized-${serverResponses.current++}`,
+        operations: SERVER_NORMALIZED_OPERATIONS,
+        requestedOperations: REQUESTED_OPERATIONS,
+      }),
+    );
   };
   const arr = [...entities.values()].reduce((total, row) => total + row.amount, 0);
   const remoteUpdate = () => {
@@ -349,25 +369,7 @@ export default function HostRowsShowcase() {
               >
                 Reject next edit
               </button>
-              <button
-                type="button"
-                disabled={!ready}
-                onClick={() =>
-                  applyProjection(
-                    bridge.reconcile({
-                      status: "transformed",
-                      transactionId: "server-normalized",
-                      operations: [
-                        {
-                          op: "set",
-                          addr: { sheet: "sheet1", row: 1, col: 1 },
-                          value: { kind: "literal", value: 80_000 },
-                        },
-                      ],
-                    }),
-                  )
-                }
-              >
+              <button type="button" disabled={!ready} onClick={transformedAccept}>
                 Transformed accept
               </button>
             </fieldset>
@@ -383,7 +385,9 @@ export default function HostRowsShowcase() {
               applySiteTheme();
               setReady(true);
             }}
-            onRowDelta={applyProjection}
+            onRowDelta={(projection) => {
+              if (!applyingServerResult.current) applyProjection(projection);
+            }}
             onMutationRejected={() =>
               applyProjection(
                 bridge.reconcile({
@@ -393,11 +397,7 @@ export default function HostRowsShowcase() {
                 }),
               )
             }
-            protectionResolver={() => {
-              if (!denyNext.current) return "allow";
-              denyNext.current = false;
-              return "deny";
-            }}
+            protectionResolver={protectionResolver}
             height={428}
           />
           <p className="host-row-stage__note">

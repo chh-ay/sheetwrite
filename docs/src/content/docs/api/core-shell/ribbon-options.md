@@ -11,7 +11,7 @@ Options for [`createRibbon`](/docs/api/core-shell/create-ribbon/).
 <div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/ribbon-factory.ts#L9"><code>packages/core/src/shell/ribbon-factory.ts#L9</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>3</span>
+## Members <span class="api-count" data-pagefind-ignore>6</span>
 
 <div class="api-member-list">
 
@@ -41,6 +41,34 @@ icons?: IconOverrides;
 ```
 
 </details>
+
+<details class="api-member" id="ribbon-options-flags" data-pagefind-weight="1">
+<summary><code>flags</code> <span class="api-member-summary">GridConfig switches that choose commands (default: all but Export).</span></summary>
+
+```ts generated
+flags?: CommandFlags;
+```
+
+</details>
+
+<details class="api-member" id="ribbon-options-mode" data-pagefind-weight="1">
+<summary><code>mode</code> <span class="api-member-summary">Initial layout (default full).</span></summary>
+
+```ts generated
+mode?: RibbonMode;
+```
+
+<p class="api-member-doc">Initial layout (default `full`). The ribbon's layout button changes it at run time.</p>
+</details>
+
+<details class="api-member" id="ribbon-options-compact-width" data-pagefind-weight="1">
+<summary><code>compactWidth</code> <span class="api-member-summary">Width in CSS pixels below which auto uses compact (default 768).</span></summary>
+
+```ts generated
+compactWidth?: number;
+```
+
+</details>
 </div>
 
 ## Declaration
@@ -53,6 +81,9 @@ export interface RibbonOptions {
   focusGrid?: () => void;
   onHeightChange?: (height: number) => void;
   icons?: IconOverrides;
+  flags?: CommandFlags;
+  mode?: RibbonMode;
+  compactWidth?: number;
 }
 ```
 

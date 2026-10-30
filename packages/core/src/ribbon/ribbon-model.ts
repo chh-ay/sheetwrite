@@ -1,6 +1,9 @@
-// What the ribbon shows, as data: tabs, groups and controls bound to the
-// public Grid API. The DOM side (ribbon-controls.ts) renders these specs and
-// never decides behavior itself, so Excel parity is reviewed here alone.
+// The command registry: tabs, groups and commands bound to the public Grid
+// API. Every renderer (full ribbon, compact ribbon, toolbar) reads this list,
+// so a new command is added here once. Add its glyph to scripts/icon-glyphs.ts
+// and run `bun scripts/icon-sheet.ts`; no renderer-specific entry is needed.
+// The DOM side (ribbon-controls.ts) never decides behavior, so Excel parity
+// is reviewed here. The redesign and new commands belong to #272.
 
 import { CHART_KINDS } from "../chart-kinds.js";
 import {
@@ -16,160 +19,21 @@ import {
 } from "../format-presets.js";
 import { createHyperlinkId, isSafeExternalHyperlink } from "../hyperlink.js";
 import type { IconName } from "../icons/icon-names.js";
-import type { PivotDestination } from "../panels/panel-controller.js";
 import { loadPanels, pivotsAvailable } from "../panels/panel-loader.js";
-import type { CellStyle } from "../types/cell.js";
 import type { ChartKind } from "../types/chart.js";
 import type { CellAddress } from "../types/coordinates.js";
-import type { BorderPreset, Grid, GridCommandName } from "../types/grid.js";
-
-/**
- * Where a control's disabled state comes from. `edit` borrows the state of a
- * selection-scoped edit command, which is disabled exactly when the grid is
- * read-only or nothing is selected; `view` controls never disable.
- */
-export type RibbonAvailability = GridCommandName | "edit" | "view";
-
-/** The command whose state stands in for every selection-scoped edit. */
-export const EDIT_STATE_COMMAND: GridCommandName = "clearFormat";
-
-interface RibbonMenuItem {
-  readonly label: string;
-  readonly icon?: IconName;
-  readonly run: (grid: Grid) => unknown;
-}
-
-/** A command button; `toggle` buttons reflect their command's activity. */
-export interface RibbonButtonSpec {
-  readonly kind: "button";
-  readonly label: string;
-  readonly icon: IconName;
-  readonly run: (grid: Grid) => unknown;
-  readonly availability: RibbonAvailability;
-  readonly toggle?: boolean;
-  readonly large?: boolean;
-}
-
-/**
- * A dropdown. With `run`, it is a split button: the face runs the default
- * command and the arrow opens the menu, as Excel's Paste and Borders do.
- */
-export interface RibbonMenuSpec {
-  readonly kind: "menu";
-  readonly label: string;
-  readonly icon: IconName;
-  readonly availability: RibbonAvailability;
-  readonly items: readonly RibbonMenuItem[];
-  readonly run?: (grid: Grid) => unknown;
-  readonly large?: boolean;
-}
-
-/**
- * What the value boxes show, read once per refresh instead of once per box:
- * the focus cell's effective style and the theme font unstyled cells use.
- */
-export interface RibbonFocus {
-  readonly style: CellStyle;
-  readonly themeFontFamily: string | undefined;
-  readonly themeFontPx: number | undefined;
-}
-
-/** An editable dropdown (font, size, number format). */
-export interface RibbonComboSpec {
-  readonly kind: "combo";
-  readonly label: string;
-  /** Width in CSS pixels; Excel sizes each box to its longest common value. */
-  readonly width: number;
-  readonly availability: RibbonAvailability;
-  readonly options: readonly string[];
-  /** Render each option in its own typeface, as Excel's font list does. */
-  readonly previewFont?: boolean;
-  readonly read: (focus: RibbonFocus) => string;
-  /** Apply typed or picked text; returns false when the text is not valid. */
-  readonly apply: (grid: Grid, value: string) => boolean;
-}
-
-/** Excel's font-color and fill-color split buttons with a palette menu. */
-export interface RibbonColorSpec {
-  readonly kind: "color";
-  readonly label: string;
-  readonly icon: IconName;
-  /** Palette entry that removes the color ("Automatic" / "No Fill"). */
-  readonly clearLabel: string;
-  /** Color the face applies before the user picks one, as in Excel. */
-  readonly initial: string;
-  readonly apply: (grid: Grid, color: string | null) => void;
-}
-
-/** A button that opens a one-field form at the focus cell (link, note). */
-export interface RibbonFormSpec {
-  readonly kind: "form";
-  readonly label: string;
-  readonly icon: IconName;
-  readonly field: string;
-  readonly multiline: boolean;
-  readonly read: (grid: Grid, cell: CellAddress) => string;
-  /** Save the value; returns an error message to show, or null on success. */
-  readonly submit: (grid: Grid, cell: CellAddress, value: string) => string | null;
-}
-
-/**
- * A button that opens Excel's "Choose where to place" form: a new sheet, or a
- * cell typed as A1 (Insert › Pivot table).
- */
-export interface RibbonPlacementSpec {
-  readonly kind: "placement";
-  readonly label: string;
-  readonly icon: IconName;
-  /** Why the command cannot run at all here, shown as the tooltip; null when it can. */
-  readonly unavailable: (grid: Grid) => string | null;
-  /** Run the command; returns an error message to show, or null on success. */
-  readonly submit: (grid: Grid, destination: PivotDestination) => Promise<string | null>;
-}
-/** Zoom out / current percent / zoom in, as in Excel's View > Zoom group. */
-interface RibbonZoomSpec {
-  readonly kind: "zoom";
-}
-
-export type RibbonControlSpec =
-  | RibbonButtonSpec
-  | RibbonMenuSpec
-  | RibbonComboSpec
-  | RibbonColorSpec
-  | RibbonFormSpec
-  | RibbonPlacementSpec
-  | RibbonZoomSpec;
-
-/**
- * One ribbon group. `flow` groups hold buttons that can shrink from large to
- * small before collapsing. `rows` groups are Excel's dense Font, Alignment and
- * Number layouts: their rows only ever collapse whole.
- */
-export type RibbonGroupSpec =
-  | {
-      readonly id: string;
-      readonly label: string;
-      readonly icon: IconName;
-      readonly layout: "flow";
-      readonly controls: readonly RibbonControlSpec[];
-    }
-  | {
-      readonly id: string;
-      readonly label: string;
-      readonly icon: IconName;
-      readonly layout: "rows";
-      readonly rows: readonly (readonly RibbonControlSpec[])[];
-    };
-
-export interface RibbonTabSpec {
-  readonly label: string;
-  readonly groups: readonly RibbonGroupSpec[];
-  /**
-   * Group ids in the order they give up space as the ribbon narrows. Excel
-   * shrinks the right-hand, less-used groups first.
-   */
-  readonly reduceOrder: readonly string[];
-}
+import type { BorderPreset, CommandFlags, Grid, GridCommandName } from "../types/grid.js";
+import type {
+  RibbonAvailability,
+  RibbonButtonSpec,
+  RibbonColorSpec,
+  RibbonComboSpec,
+  RibbonFormSpec,
+  RibbonMenuItem,
+  RibbonMenuSpec,
+  RibbonPlacementSpec,
+  RibbonTabSpec,
+} from "./command-spec.js";
 
 /** Zoom limits and step of `Grid.setZoom`, shown as percents. */
 const ZOOM_MIN = 0.5;
@@ -220,14 +84,32 @@ const button = (
   icon: IconName,
   run: (grid: Grid) => unknown,
   availability: RibbonAvailability = "edit",
-  options: { toggle?: boolean; large?: boolean } = {},
-): RibbonButtonSpec => ({ kind: "button", label, icon, run, availability, ...options });
+  options: {
+    toggle?: boolean;
+    large?: boolean;
+    flags?: readonly (keyof CommandFlags)[];
+  } = {},
+): RibbonButtonSpec => ({
+  kind: "button",
+  id: icon,
+  label,
+  icon,
+  run,
+  availability,
+  ...options,
+});
 
 const toggle = (
   label: string,
   icon: IconName & GridCommandName,
   run: (grid: Grid) => unknown,
-): RibbonButtonSpec => button(label, icon, run, icon, { toggle: true });
+  flags?: readonly (keyof CommandFlags)[],
+): RibbonButtonSpec =>
+  button(label, icon, run, icon, flags === undefined ? { toggle: true } : { toggle: true, flags });
+
+const ALIGN: readonly (keyof CommandFlags)[] = ["align"];
+const SORT: readonly (keyof CommandFlags)[] = ["sort"];
+const EXPORT: readonly (keyof CommandFlags)[] = ["export"];
 
 const item = (label: string, run: (grid: Grid) => unknown, icon?: IconName): RibbonMenuItem =>
   icon === undefined ? { label, run } : { label, icon, run };
@@ -270,6 +152,7 @@ const SORT_ITEMS: readonly RibbonMenuItem[] = [
 
 const fontFamily: RibbonComboSpec = {
   kind: "combo",
+  id: "fontFamily",
   label: "Font",
   width: 128,
   availability: "edit",
@@ -286,6 +169,7 @@ const fontFamily: RibbonComboSpec = {
 
 const fontSize: RibbonComboSpec = {
   kind: "combo",
+  id: "fontSize",
   label: "Font Size",
   width: 48,
   availability: "edit",
@@ -304,6 +188,7 @@ const fontSize: RibbonComboSpec = {
 
 const numberFormat: RibbonComboSpec = {
   kind: "combo",
+  id: "numberFormat",
   label: "Number Format",
   width: 112,
   availability: "edit",
@@ -319,6 +204,8 @@ const numberFormat: RibbonComboSpec = {
 
 const fontColor: RibbonColorSpec = {
   kind: "color",
+  id: "textColor",
+  flags: ["textColor"],
   label: "Font Color",
   icon: "textColor",
   clearLabel: "Automatic",
@@ -328,6 +215,8 @@ const fontColor: RibbonColorSpec = {
 
 const fillColor: RibbonColorSpec = {
   kind: "color",
+  id: "fillColor",
+  flags: ["fillColor"],
   label: "Fill Color",
   icon: "fillColor",
   clearLabel: "No Fill",
@@ -339,6 +228,7 @@ const HYPERLINK_ERROR = "Enter a full http, https or mailto address.";
 
 const hyperlink: RibbonFormSpec = {
   kind: "form",
+  id: "hyperlink",
   label: "Link",
   icon: "hyperlink",
   field: "Address",
@@ -367,6 +257,7 @@ const hyperlink: RibbonFormSpec = {
 
 const note: RibbonFormSpec = {
   kind: "form",
+  id: "note",
   label: "Note",
   icon: "note",
   field: "Note",
@@ -382,6 +273,7 @@ const PIVOT_NEEDS_FULL_ENGINE = "Pivot tables need the full engine (@sheetwrite/
 
 const pivotTable: RibbonPlacementSpec = {
   kind: "placement",
+  id: "pivotTable",
   label: "PivotTable",
   icon: "pivotTable",
   unavailable: (grid) => (pivotsAvailable(grid) ? null : PIVOT_NEEDS_FULL_ENGINE),
@@ -400,6 +292,7 @@ const insertChartOf =
  */
 const chart: RibbonMenuSpec = {
   kind: "menu",
+  id: "chart",
   label: "Chart",
   icon: "chart",
   availability: "edit",
@@ -428,7 +321,11 @@ export function steppedZoom(zoom: number, direction: 1 | -1): number {
   return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, next));
 }
 
-/** The ribbon's tabs, in Excel's order and with Excel's labels. */
+/**
+ * The command registry, grouped into tabs. IDs, labels, icons, run handlers
+ * and availability/toggle bindings belong here, not in a layout renderer.
+ * Full and compact layouts render these same live controls.
+ */
 export const RIBBON_TABS: readonly RibbonTabSpec[] = [
   {
     label: "Home",
@@ -440,8 +337,8 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
         icon: "undo",
         layout: "flow",
         controls: [
-          button("Undo", "undo", (grid) => grid.actions.undo(), "undo"),
-          button("Redo", "redo", (grid) => grid.actions.redo(), "redo"),
+          button("Undo", "undo", (grid) => grid.actions.undo(), "undo", { flags: ["undo"] }),
+          button("Redo", "redo", (grid) => grid.actions.redo(), "redo", { flags: ["undo"] }),
         ],
       },
       {
@@ -452,6 +349,7 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
         controls: [
           {
             kind: "menu",
+            id: "paste",
             label: "Paste",
             icon: "paste",
             availability: "edit",
@@ -479,12 +377,20 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
             button("Decrease Font Size", "fontShrink", (grid) => grid.actions.stepFontSize(-1)),
           ],
           [
-            toggle("Bold", "bold", (grid) => grid.actions.toggleBold()),
-            toggle("Italic", "italic", (grid) => grid.actions.toggleItalic()),
-            toggle("Underline", "underline", (grid) => grid.actions.toggleUnderline()),
-            toggle("Strikethrough", "strikethrough", (grid) => grid.actions.toggleStrikethrough()),
+            toggle("Bold", "bold", (grid) => grid.actions.toggleBold(), ["bold"]),
+            toggle("Italic", "italic", (grid) => grid.actions.toggleItalic(), ["italic"]),
+            toggle("Underline", "underline", (grid) => grid.actions.toggleUnderline(), [
+              "bold",
+              "italic",
+            ]),
+            toggle("Strikethrough", "strikethrough", (grid) => grid.actions.toggleStrikethrough(), [
+              "bold",
+              "italic",
+            ]),
             {
               kind: "menu",
+              id: "border",
+              flags: ["border"],
               label: "Borders",
               icon: "borderBottom",
               availability: "edit",
@@ -505,21 +411,29 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
         layout: "rows",
         rows: [
           [
-            toggle("Top Align", "alignTop", (grid) => grid.actions.setVerticalAlign("top")),
-            toggle("Middle Align", "alignMiddle", (grid) =>
-              grid.actions.setVerticalAlign("middle"),
+            toggle("Top Align", "alignTop", (grid) => grid.actions.setVerticalAlign("top"), ALIGN),
+            toggle(
+              "Middle Align",
+              "alignMiddle",
+              (grid) => grid.actions.setVerticalAlign("middle"),
+              ALIGN,
             ),
-            toggle("Bottom Align", "alignBottom", (grid) =>
-              grid.actions.setVerticalAlign("bottom"),
+            toggle(
+              "Bottom Align",
+              "alignBottom",
+              (grid) => grid.actions.setVerticalAlign("bottom"),
+              ALIGN,
             ),
             toggle("Wrap Text", "wrap", (grid) => grid.actions.toggleWrap()),
           ],
           [
-            toggle("Align Left", "alignLeft", (grid) => grid.actions.setAlign("left")),
-            toggle("Center", "alignCenter", (grid) => grid.actions.setAlign("center")),
-            toggle("Align Right", "alignRight", (grid) => grid.actions.setAlign("right")),
+            toggle("Align Left", "alignLeft", (grid) => grid.actions.setAlign("left"), ALIGN),
+            toggle("Center", "alignCenter", (grid) => grid.actions.setAlign("center"), ALIGN),
+            toggle("Align Right", "alignRight", (grid) => grid.actions.setAlign("right"), ALIGN),
             {
               kind: "menu",
+              id: "mergeAndCenter",
+              flags: ["merge"],
               label: "Merge & Center",
               icon: "mergeAndCenter",
               availability: "edit",
@@ -561,6 +475,7 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
         controls: [
           {
             kind: "menu",
+            id: "insert",
             label: "Insert",
             icon: "insert",
             availability: "edit",
@@ -569,6 +484,7 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
           },
           {
             kind: "menu",
+            id: "delete",
             label: "Delete",
             icon: "delete",
             availability: "edit",
@@ -577,6 +493,7 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
           },
           {
             kind: "menu",
+            id: "format",
             label: "Format",
             icon: "format",
             availability: "edit",
@@ -598,6 +515,8 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
           button("AutoSum", "autoSum", (grid) => grid.actions.autoSum()),
           {
             kind: "menu",
+            id: "clear",
+            flags: ["clearFormat"],
             label: "Clear",
             icon: "clear",
             availability: "edit",
@@ -609,6 +528,8 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
           },
           {
             kind: "menu",
+            id: "sortFilter",
+            flags: SORT,
             label: "Sort & Filter",
             icon: "sortFilter",
             availability: "edit",
@@ -631,6 +552,7 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
         controls: [
           {
             kind: "menu",
+            id: "insert",
             label: "Insert",
             icon: "insert",
             availability: "edit",
@@ -639,6 +561,7 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
           },
           {
             kind: "menu",
+            id: "delete",
             label: "Delete",
             icon: "delete",
             availability: "edit",
@@ -667,7 +590,7 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
   },
   {
     label: "Data",
-    reduceOrder: ["showHide", "outline", "sortFilter"],
+    reduceOrder: ["export", "showHide", "outline", "sortFilter"],
     groups: [
       {
         id: "sortFilter",
@@ -677,9 +600,11 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
         controls: [
           button("Sort A to Z", "sortAsc", (grid) => grid.actions.sort(true), "sortAsc", {
             large: true,
+            flags: SORT,
           }),
           button("Sort Z to A", "sortDesc", (grid) => grid.actions.sort(false), "sortDesc", {
             large: true,
+            flags: SORT,
           }),
           button("Clear Filter", "clearFilter", (grid) => grid.actions.clearFilter()),
         ],
@@ -703,6 +628,20 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
           button(visibility.label, visibility.icon ?? "format", visibility.run),
         ),
       },
+      {
+        id: "export",
+        label: "Export",
+        icon: "exportCsv",
+        layout: "flow",
+        controls: [
+          button("Export CSV", "exportCsv", (grid) => grid.actions.exportCsv(), "exportCsv", {
+            flags: EXPORT,
+          }),
+          button("Export XLSX", "exportXlsx", (grid) => grid.actions.exportXlsx(), "exportXlsx", {
+            flags: EXPORT,
+          }),
+        ],
+      },
     ],
   },
   {
@@ -717,6 +656,7 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
         controls: [
           {
             kind: "menu",
+            id: "freezePanes",
             label: "Freeze Panes",
             icon: "freeze",
             availability: "view",
@@ -730,7 +670,13 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
           },
         ],
       },
-      { id: "zoom", label: "Zoom", icon: "zoomIn", layout: "flow", controls: [{ kind: "zoom" }] },
+      {
+        id: "zoom",
+        label: "Zoom",
+        icon: "zoomIn",
+        layout: "flow",
+        controls: [{ kind: "zoom", id: "zoom" }],
+      },
     ],
   },
 ];
