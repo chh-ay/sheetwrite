@@ -15,12 +15,14 @@ let menuSerial = 0;
  * A button that opens a `role="menu"` list of `items()`, read on each open.
  * Arrow keys, Home and End move between entries; Enter or Space runs one;
  * Escape and Tab close the menu and return focus to the button. `focusKey`
- * lets a re-rendered panel put focus back on the new button.
+ * lets a re-rendered panel put focus back on the new button. `signal` is the
+ * panel's: when it aborts, an open menu stops listening on the document.
  */
 export function menuButton(
   label: string,
   focusKey: string,
   items: () => readonly PanelMenuItem[],
+  signal: AbortSignal,
 ): HTMLElement {
   menuSerial += 1;
   const menuId = `sheetwrite-panel-menu-${menuSerial}`;
@@ -105,7 +107,7 @@ export function menuButton(
     wrapper.appendChild(menu);
     button.setAttribute("aria-expanded", "true");
     button.setAttribute("aria-controls", menuId);
-    document.addEventListener("pointerdown", onOutsidePointer, true);
+    document.addEventListener("pointerdown", onOutsidePointer, { capture: true, signal });
     // A pointer user keeps focus on the button; a keyboard user lands on the first entry.
     if (keyboard) entries()[0]?.focus();
   };

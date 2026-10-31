@@ -107,6 +107,7 @@ interface InteractionDependencies {
   scheduleRender: () => void;
   undo: () => void;
   redo: () => void;
+  /** Clipboard shortcuts start the action; the grid handles how it ends. */
   copy: () => void;
   cut: () => void;
   paste: () => void;
@@ -866,16 +867,16 @@ export class InteractionSessions {
           this.deps.redo();
           break;
         case "copy":
-          void this.deps.copy();
+          this.deps.copy();
           break;
         case "cut":
-          void this.deps.cut();
+          this.deps.cut();
           break;
         case "paste":
-          void this.deps.paste();
+          this.deps.paste();
           break;
         case "pasteValues":
-          void this.deps.pasteValues();
+          this.deps.pasteValues();
           break;
         case "clearContents":
           this.deps.clearSelection();

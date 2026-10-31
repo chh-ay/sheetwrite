@@ -8,7 +8,7 @@ description: "XlsxResourceError class in @sheetwrite/core: Stable resource-limit
 Stable resource-limit failure surfaced before an XLSX codec allocates unsafe data.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/export.ts#L379"><code>packages/core/src/export.ts#L379</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/export.ts#L403"><code>packages/core/src/export.ts#L403</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>6</span>

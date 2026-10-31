@@ -10,7 +10,7 @@ Text nodes only; polite live region so screen readers announce changes
 without interrupting.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/shell/selection-status.ts#L48"><code>packages/core/src/shell/selection-status.ts#L48</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/shell/selection-status.ts#L49"><code>packages/core/src/shell/selection-status.ts#L49</code></a></dd></div>
 </dl>
 
 ## Declaration

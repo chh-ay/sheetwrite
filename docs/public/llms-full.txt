@@ -12267,8 +12267,9 @@ undoable transaction. Styles land in the store and paint in the canvas —
 unlike {@link highlightCells}, which draws a translucent overlay above it.
 - `summarizeSelection` — Totals for the current selection, for a status bar. Large selections are
 read in chunks between frames, so the page stays responsive; abort
-`signal` to stop early, which rejects with the signal's reason. Resolves
-null when nothing is selected.
+`signal` to stop early, which rejects with the signal's reason.
+`destroy()` stops every running summary the same way, with an
+`AbortError`. Resolves null when nothing is selected.
 - `trimMemory` — Drop the memory this grid can build again: decoded cell strings, rendered
 number text, compiled number formats, text measurement and unused overlay
 nodes, in the grid and in its worker renderer. Document data, undo history
@@ -17166,8 +17167,9 @@ undoable transaction. Styles land in the store and paint in the canvas —
 unlike {@link highlightCells}, which draws a translucent overlay above it.
 - `summarizeSelection` — Totals for the current selection, for a status bar. Large selections are
 read in chunks between frames, so the page stays responsive; abort
-`signal` to stop early, which rejects with the signal's reason. Resolves
-null when nothing is selected.
+`signal` to stop early, which rejects with the signal's reason.
+`destroy()` stops every running summary the same way, with an
+`AbortError`. Resolves null when nothing is selected.
 - `trimMemory` — Drop the memory this grid can build again: decoded cell strings, rendered
 number text, compiled number formats, text measurement and unused overlay
 nodes, in the grid and in its worker renderer. Document data, undo history
@@ -17749,8 +17751,9 @@ undoable transaction. Styles land in the store and paint in the canvas —
 unlike {@link highlightCells}, which draws a translucent overlay above it.
 - `summarizeSelection` — Totals for the current selection, for a status bar. Large selections are
 read in chunks between frames, so the page stays responsive; abort
-`signal` to stop early, which rejects with the signal's reason. Resolves
-null when nothing is selected.
+`signal` to stop early, which rejects with the signal's reason.
+`destroy()` stops every running summary the same way, with an
+`AbortError`. Resolves null when nothing is selected.
 - `trimMemory` — Drop the memory this grid can build again: decoded cell strings, rendered
 number text, compiled number formats, text measurement and unused overlay
 nodes, in the grid and in its worker renderer. Document data, undo history
@@ -18313,8 +18316,9 @@ undoable transaction. Styles land in the store and paint in the canvas —
 unlike {@link highlightCells}, which draws a translucent overlay above it.
 - `summarizeSelection` — Totals for the current selection, for a status bar. Large selections are
 read in chunks between frames, so the page stays responsive; abort
-`signal` to stop early, which rejects with the signal's reason. Resolves
-null when nothing is selected.
+`signal` to stop early, which rejects with the signal's reason.
+`destroy()` stops every running summary the same way, with an
+`AbortError`. Resolves null when nothing is selected.
 - `trimMemory` — Drop the memory this grid can build again: decoded cell strings, rendered
 number text, compiled number formats, text measurement and unused overlay
 nodes, in the grid and in its worker renderer. Document data, undo history

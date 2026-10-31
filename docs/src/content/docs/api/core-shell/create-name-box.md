@@ -11,7 +11,7 @@ accepted. Invalid or out-of-bounds references set `aria-invalid` and make
 no grid calls; Escape restores the displayed reference.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/shell/formula-controls.ts#L34"><code>packages/core/src/shell/formula-controls.ts#L34</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/shell/formula-controls.ts#L35"><code>packages/core/src/shell/formula-controls.ts#L35</code></a></dd></div>
 </dl>
 
 ## Declaration
