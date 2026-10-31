@@ -12,7 +12,6 @@ import {
   type FormulaDiagnostic,
   type FormulaReference,
 } from "./formula-analysis.js";
-import type { AssistDeps, FormulaEditorElement } from "./formula-assist.js";
 import { RANGE_FILL_ALPHA, referenceColor } from "./formula-colors.js";
 import { boxIn, layerParent, type MirrorMark, TextMirror } from "./formula-mirror.js";
 import { storeFunctions } from "./functions/registry.js";
@@ -21,6 +20,26 @@ import type { FormulaFunctionMetadata } from "./functions/types.js";
 import { sheetNameKey } from "./sheet-name.js";
 import type { HighlightRange, SheetId } from "./types/coordinates.js";
 import type { Theme } from "./types/render.js";
+import type { Store } from "./types/store.js";
+
+/** The text fields formula help works in: the cell editor and the formula bar. */
+export type FormulaEditorElement = HTMLInputElement | HTMLTextAreaElement;
+
+/**
+ * What formula help needs from the grid. Deliberately small, so the built-in
+ * editors stay thin defaults over public grid methods.
+ */
+export interface AssistDeps {
+  /**
+   * Paint (or, with `null`, clear) the ranges referenced by the formula being
+   * edited. Backed by `Grid.highlightCells`; per-range color is honored.
+   */
+  highlightCells: (ranges: HighlightRange[] | null) => void;
+  /** Sheet id the formula's unqualified references resolve against (the active sheet). */
+  sheet: () => SheetId;
+  /** The store whose sheets and functions the formula uses. */
+  store: Store;
+}
 
 /** The ARIA a text field gets while it controls the function list. */
 const FIELD_ATTRIBUTES = [

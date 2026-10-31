@@ -2,29 +2,8 @@
 // formula and only then loads formula-help.ts, which holds the analysis, the
 // function table and the DOM. Until the chunk arrives, keys go to the editor.
 
-import type { FormulaHelp } from "./formula-help.js";
-import type { HighlightRange, SheetId } from "./types/coordinates.js";
+import type { AssistDeps, FormulaEditorElement, FormulaHelp } from "./formula-help.js";
 import type { Theme } from "./types/render.js";
-import type { Store } from "./types/store.js";
-
-/** The text fields formula help works in: the cell editor and the formula bar. */
-export type FormulaEditorElement = HTMLInputElement | HTMLTextAreaElement;
-
-/**
- * What formula help needs from the grid. Deliberately small, so the built-in
- * editors stay thin defaults over public grid methods.
- */
-export interface AssistDeps {
-  /**
-   * Paint (or, with `null`, clear) the ranges referenced by the formula being
-   * edited. Backed by `Grid.highlightCells`; per-range color is honored.
-   */
-  highlightCells: (ranges: HighlightRange[] | null) => void;
-  /** Sheet id the formula's unqualified references resolve against (the active sheet). */
-  sheet: () => SheetId;
-  /** The store whose sheets and functions the formula uses. */
-  store: Store;
-}
 
 /**
  * Formula help for one editor. Attached to a field while it is edited and

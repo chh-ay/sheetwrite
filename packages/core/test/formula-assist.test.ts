@@ -1,7 +1,8 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
 
 import { EditController } from "../src/editor.js";
-import { type AssistDeps, FormulaAssist } from "../src/formula-assist.js";
+import { FormulaAssist } from "../src/formula-assist.js";
+import type { AssistDeps } from "../src/formula-help.js";
 import { DEFAULT_THEME, initSheetwrite, SheetwriteStore } from "../src/index.js";
 import type { HighlightRange } from "../src/types.js";
 import { makeWorkbook } from "./fixtures.js";
