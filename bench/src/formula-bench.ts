@@ -87,9 +87,10 @@ function formulaSourceFiles(enginePackage: FormulaEnginePackage): string[] {
 
 /**
  * The engine package named by a capture's provenance keys, after checking the
- * keys are exactly that package's set. Captures recorded before 0.7.0 file the
- * full engine's hashes under `packages/wasm/` keys too, so a `wasm` key set
- * names where the hashes are, and the hashes name the binary.
+ * keys are exactly that package's set. Older captures, such as the committed
+ * full-engine results, file the full engine's hashes under `packages/wasm/`
+ * keys too, so a `wasm` key set names where the hashes are, and the hashes
+ * name the binary.
  */
 export function formulaSourceEnginePackage(
   files: Readonly<Record<string, string>>,
