@@ -8,7 +8,7 @@ description: "buildXlsxModel function in @sheetwrite/xlsx: Build the active-shee
 Build the active-sheet table model used by the bounded OOXML writer.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/xlsx/src/table-export.ts#L31"><code>packages/xlsx/src/table-export.ts#L31</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/xlsx/src/table-export.ts#L34"><code>packages/xlsx/src/table-export.ts#L34</code></a></dd></div>
 </dl>
 
 ## Declaration

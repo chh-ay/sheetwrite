@@ -8,7 +8,7 @@ description: "rangeA1 function in @sheetwrite/core: Two cell corners → A1 rang
 Two cell corners → A1 range ("A1:B3"), collapsing to a single ref when equal.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/a1.ts#L30"><code>packages/core/src/a1.ts#L30</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/a1.ts#L38"><code>packages/core/src/a1.ts#L38</code></a></dd></div>
 </dl>
 
 ## Declaration

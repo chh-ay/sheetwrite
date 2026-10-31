@@ -8,7 +8,7 @@ description: "DelimitedTextOperation type in @sheetwrite/core: Phase reported by
 Phase reported by a typed delimited-text resource failure.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/delimited-text.ts#L51"><code>packages/core/src/delimited-text.ts#L51</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/delimited-text.ts#L54"><code>packages/core/src/delimited-text.ts#L54</code></a></dd></div>
 </dl>
 
 ## Declaration

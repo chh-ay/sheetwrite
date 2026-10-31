@@ -8,7 +8,7 @@ description: "CommentCoordinator class in @sheetwrite/core: Transport/auth-neutr
 Transport/auth-neutral comment state with server-owned author and timestamp fields.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/collaboration.ts#L500"><code>packages/core/src/collaboration.ts#L500</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/collaboration.ts#L502"><code>packages/core/src/collaboration.ts#L502</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>

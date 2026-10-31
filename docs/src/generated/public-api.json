@@ -459,7 +459,7 @@
               "owners": [
                 "src/a1.ts"
               ],
-              "source": "src/a1.ts#L25",
+              "source": "src/a1.ts#L33",
               "jsDocTags": [],
               "documentation": "0-based (row, col) → A1 cell reference (0, 0 → \"A1\").",
               "memberDocs": []
@@ -1119,7 +1119,7 @@
               "owners": [
                 "src/a1.ts"
               ],
-              "source": "src/a1.ts#L4",
+              "source": "src/a1.ts#L12",
               "jsDocTags": [],
               "documentation": "Column index (0-based) → A1 column label (0 → \"A\", 26 → \"AA\").",
               "memberDocs": []
@@ -1224,7 +1224,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L473",
+              "source": "src/collaboration.ts#L475",
               "jsDocTags": [],
               "documentation": "Host persistence contract for versioned comment threads.",
               "memberDocs": []
@@ -1236,7 +1236,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L402",
+              "source": "src/collaboration.ts#L404",
               "jsDocTags": [],
               "documentation": "Document location to which a comment thread is attached.",
               "memberDocs": []
@@ -1248,7 +1248,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L395",
+              "source": "src/collaboration.ts#L397",
               "jsDocTags": [],
               "documentation": "Stable host-provided identity displayed on a comment message.",
               "memberDocs": []
@@ -1260,7 +1260,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L500",
+              "source": "src/collaboration.ts#L502",
               "jsDocTags": [],
               "documentation": "Transport/auth-neutral comment state with server-owned author and timestamp fields.",
               "memberDocs": []
@@ -1272,7 +1272,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L490",
+              "source": "src/collaboration.ts#L492",
               "jsDocTags": [],
               "documentation": "State transition emitted by the comment coordinator.",
               "memberDocs": []
@@ -1284,7 +1284,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L484",
+              "source": "src/collaboration.ts#L486",
               "jsDocTags": [],
               "documentation": "Document identity and initial version for comment coordination.",
               "memberDocs": []
@@ -1296,7 +1296,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L460",
+              "source": "src/collaboration.ts#L462",
               "jsDocTags": [],
               "documentation": "Versioned comment-thread listing returned by a host adapter.",
               "memberDocs": []
@@ -1308,7 +1308,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L407",
+              "source": "src/collaboration.ts#L409",
               "jsDocTags": [],
               "documentation": "One immutable author message in a comment thread.",
               "memberDocs": []
@@ -1320,7 +1320,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L428",
+              "source": "src/collaboration.ts#L430",
               "jsDocTags": [],
               "documentation": "Serializable operation that creates or updates comment state.",
               "memberDocs": []
@@ -1332,7 +1332,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L440",
+              "source": "src/collaboration.ts#L442",
               "jsDocTags": [],
               "documentation": "Versioned comment mutation submitted to a host adapter.",
               "memberDocs": []
@@ -1344,7 +1344,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L449",
+              "source": "src/collaboration.ts#L451",
               "jsDocTags": [],
               "documentation": "Applied, duplicate, or conflict acknowledgement for a comment mutation.",
               "memberDocs": []
@@ -1356,7 +1356,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L416",
+              "source": "src/collaboration.ts#L418",
               "jsDocTags": [],
               "documentation": "Versioned discussion anchored to a document location.",
               "memberDocs": []
@@ -1776,7 +1776,7 @@
               "owners": [
                 "src/delimited-text.ts"
               ],
-              "source": "src/delimited-text.ts#L32",
+              "source": "src/delimited-text.ts#L35",
               "jsDocTags": [],
               "documentation": "Synchronous operations return one in-memory string, so byte/cell ceilings\nbound allocation while sheet-compatible dimensions remain independently valid.",
               "memberDocs": []
@@ -1788,7 +1788,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L60",
+              "source": "src/document-protocol.ts#L61",
               "jsDocTags": [],
               "documentation": "Excel's convergence threshold for a new workbook.",
               "memberDocs": []
@@ -1800,7 +1800,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L57",
+              "source": "src/document-protocol.ts#L58",
               "jsDocTags": [],
               "documentation": "Excel's iteration count for a new workbook.",
               "memberDocs": []
@@ -1812,7 +1812,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L366",
+              "source": "src/document-protocol.ts#L367",
               "jsDocTags": [],
               "documentation": "Conservative defaults that retain the million-row paged-sheet contract.",
               "memberDocs": []
@@ -1848,7 +1848,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L111",
+              "source": "src/document-protocol.ts#L112",
               "jsDocTags": [],
               "documentation": "Inclusive defaults for every atomic document transaction accepted by a\nStore or Grid. The count bounds object-heavy validation and dispatch; the\nexact UTF-8 JSON size bounds hostile or accidentally oversized payloads.",
               "memberDocs": []
@@ -1872,7 +1872,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L344",
+              "source": "src/export.ts#L352",
               "jsDocTags": [],
               "documentation": "Codec defaults combine SpreadsheetML worksheet dimensions with independent\nZIP/XML and aggregate-work ceilings for untrusted in-memory conversion.",
               "memberDocs": []
@@ -1884,7 +1884,7 @@
               "owners": [
                 "src/delimited-text.ts"
               ],
-              "source": "src/delimited-text.ts#L51",
+              "source": "src/delimited-text.ts#L54",
               "jsDocTags": [],
               "documentation": "Phase reported by a typed delimited-text resource failure.",
               "memberDocs": []
@@ -1906,7 +1906,7 @@
                 },
                 {
                   "name": "signal",
-                  "documentation": "Abort between bounded encode chunks or store windows."
+                  "documentation": "Checked once per chunk of records, store window and long field. After it\nfires, the operation rejects or throws with `signal.reason`."
                 }
               ]
             },
@@ -1917,7 +1917,7 @@
               "owners": [
                 "src/delimited-text.ts"
               ],
-              "source": "src/delimited-text.ts#L73",
+              "source": "src/delimited-text.ts#L76",
               "jsDocTags": [],
               "documentation": "Stable invalid-option failure for a delimited-text resource ceiling.",
               "memberDocs": []
@@ -1929,7 +1929,7 @@
               "owners": [
                 "src/delimited-text.ts"
               ],
-              "source": "src/delimited-text.ts#L54",
+              "source": "src/delimited-text.ts#L57",
               "jsDocTags": [],
               "documentation": "Stable resource-limit failure raised before the next oversized parse or encode allocation.",
               "memberDocs": []
@@ -2006,7 +2006,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L3451",
+              "source": "src/document-protocol.ts#L3452",
               "jsDocTags": [],
               "documentation": "Exhaustive stable target identity used by persistence/logging layers.",
               "memberDocs": []
@@ -2030,7 +2030,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L413",
+              "source": "src/document-protocol.ts#L414",
               "jsDocTags": [],
               "documentation": "Path-qualified validation failure for a document operation.",
               "memberDocs": []
@@ -2042,7 +2042,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L428",
+              "source": "src/document-protocol.ts#L429",
               "jsDocTags": [],
               "documentation": "Success or structured errors returned by document validation.",
               "memberDocs": []
@@ -2054,7 +2054,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L271",
+              "source": "src/export.ts#L279",
               "jsDocTags": [],
               "documentation": "Trigger a browser download from in-memory bytes. The temporary anchor is\nremoved and its object URL is scheduled for revocation even when DOM append or\nclick throws.",
               "memberDocs": []
@@ -2119,7 +2119,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L212",
+              "source": "src/export.ts#L214",
               "jsDocTags": [],
               "documentation": "Parse CSV into `ColumnarData`. The first record is consumed as a positional\nheader. Input fields project onto declared visible columns; hidden declared\ncolumns are initialized to `null`, matching the visible-column CSV export.\nExtra fields are ignored and missing fields become `null`. The returned\ncolumnar table is fully materialized in memory.",
               "memberDocs": []
@@ -2131,7 +2131,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L508",
+              "source": "src/export.ts#L553",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2146,7 +2146,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L710",
+              "source": "src/export.ts#L767",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2161,7 +2161,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L676",
+              "source": "src/export.ts#L731",
               "jsDocTags": [],
               "documentation": "Import a seekable File/Blob without first buffering the compressed workbook.",
               "memberDocs": []
@@ -3104,7 +3104,7 @@
               "owners": [
                 "src/a1.ts"
               ],
-              "source": "src/a1.ts#L18",
+              "source": "src/a1.ts#L26",
               "jsDocTags": [],
               "documentation": "A1 column label → 0-based column index (inverse of {@link colToA1}).",
               "memberDocs": []
@@ -3236,7 +3236,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L63",
+              "source": "src/document-protocol.ts#L64",
               "jsDocTags": [],
               "documentation": "Largest iteration count Excel accepts.",
               "memberDocs": []
@@ -3424,7 +3424,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L201",
+              "source": "src/export.ts#L203",
               "jsDocTags": [],
               "documentation": "Parse the fixed comma dialect: quoted delimiters/newlines, doubled quotes,\nbare CR, LF, or CRLF records, Unicode, trailing empty fields, and one optional\nleading UTF-8 BOM. The synchronous API consumes an existing in-memory string\nand returns an in-memory grid; it does not claim streaming. Scanning enforces\nresource ceilings before materializing the next oversized field or record.",
               "memberDocs": []
@@ -3985,7 +3985,7 @@
               "owners": [
                 "src/a1.ts"
               ],
-              "source": "src/a1.ts#L30",
+              "source": "src/a1.ts#L38",
               "jsDocTags": [],
               "documentation": "Two cell corners → A1 range (\"A1:B3\"), collapsing to a single ref when equal.",
               "memberDocs": []
@@ -4170,7 +4170,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L138",
+              "source": "src/document-protocol.ts#L139",
               "jsDocTags": [],
               "documentation": "Validate and merge transaction ceiling overrides without retaining the\ncaller-owned object. Every ceiling is an inclusive non-negative safe integer.",
               "memberDocs": []
@@ -4850,7 +4850,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L405",
+              "source": "src/export.ts#L413",
               "jsDocTags": [],
               "documentation": "Registers the optional table XLSX export implementation used by core.",
               "memberDocs": []
@@ -4862,7 +4862,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L486",
+              "source": "src/export.ts#L531",
               "jsDocTags": [],
               "documentation": "Registers the optional table XLSX import implementation used by core.",
               "memberDocs": []
@@ -4874,7 +4874,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L584",
+              "source": "src/export.ts#L635",
               "jsDocTags": [],
               "documentation": "Registers the optional workbook XLSX implementation used by core.",
               "memberDocs": []
@@ -5383,9 +5383,9 @@
               "owners": [
                 "src/a1.ts"
               ],
-              "source": "src/a1.ts#L46",
+              "source": "src/a1.ts#L56",
               "jsDocTags": [],
-              "documentation": "Shift relative A1 references in a formula by (dRow, dCol) — used when a\nformula is filled into other cells. Absolute parts ($A, A$1) stay fixed, and\ntokens preceded by an alphanumeric (function names, identifiers) are skipped.",
+              "documentation": "Shift relative A1 references in a formula by (dRow, dCol) — used when a\nformula is filled into other cells. Absolute parts ($A, A$1) stay fixed, and\ntokens preceded by an alphanumeric (function names, identifiers) are skipped.\nA reference shifted off the sheet becomes `#REF!`, and so does any range\nwith such a corner.",
               "memberDocs": []
             },
             {
@@ -5419,7 +5419,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L392",
+              "source": "src/document-protocol.ts#L393",
               "jsDocTags": [],
               "documentation": "Stable resource failure raised by direct workbook construction paths.",
               "memberDocs": []
@@ -5431,7 +5431,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L348",
+              "source": "src/document-protocol.ts#L349",
               "jsDocTags": [],
               "documentation": "Resource ceilings applied before snapshot normalization or store allocation.",
               "memberDocs": [
@@ -5472,7 +5472,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L345",
+              "source": "src/document-protocol.ts#L346",
               "jsDocTags": [],
               "documentation": "Allocation mode used when enforcing snapshot construction capacity.",
               "memberDocs": []
@@ -5484,7 +5484,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L433",
+              "source": "src/document-protocol.ts#L434",
               "jsDocTags": [],
               "documentation": "Path-qualified schema failure found while validating an untrusted snapshot.",
               "memberDocs": []
@@ -5496,7 +5496,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L384",
+              "source": "src/document-protocol.ts#L385",
               "jsDocTags": [],
               "documentation": "Validation and allocation policy for an untrusted workbook snapshot.",
               "memberDocs": [
@@ -5715,7 +5715,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L326",
+              "source": "src/sync.ts#L340",
               "jsDocTags": [
                 "example",
                 "see"
@@ -5732,7 +5732,7 @@
                 },
                 {
                   "name": "recoverConflict",
-                  "documentation": "Recover from the outstanding base-version conflict without reloading the\ndocument. This succeeds when the pending work and every server version it\ndid not see change different cells, and neither inserts, deletes, or moves\nrows or columns: the local Grid then already shows the server result plus\nthe pending work, so recovery applies the missed server versions and moves\nthe pending queue onto the new server version. Call `flush` afterwards to\nsend it. In every other case nothing changes and the result names the\nreason; the host then reloads and calls `resumeAfterReload`.\n@example\n```ts\nimport type { SyncCoordinator } from \"@sheetwrite/core\";\n\nasync function recover(sync: SyncCoordinator) {\n  const result = await sync.recoverConflict();\n  if (result.status === \"recovered\") await sync.flush();\n  // A reload-required result leaves the document unchanged for host recovery.\n  return result;\n}\n```\n@see\nSyncCoordinator.resumeAfterReload"
+                  "documentation": "Recover from the outstanding base-version conflict without reloading the\ndocument. This succeeds when the pending work and every server version it\ndid not see change different cells, and neither inserts, deletes, or moves\nrows or columns: the local Grid then already shows the server result plus\nthe pending work, so recovery applies the missed server versions and moves\nthe pending queue onto the new server version. Call `flush` afterwards to\nsend it. In every other case the pending queue and its durable storage do\nnot change and the result names the reason; the host then reloads and calls\n`resumeAfterReload`. When a missed server version is rejected, the Grid can\nalready show earlier missed versions; the reload replaces them.\n@example\n```ts\nimport type { SyncCoordinator } from \"@sheetwrite/core\";\n\nasync function recover(sync: SyncCoordinator) {\n  const result = await sync.recoverConflict();\n  if (result.status === \"recovered\") await sync.flush();\n  // A reload-required result leaves the pending queue unchanged for host recovery.\n  return result;\n}\n```\n@see\nSyncCoordinator.resumeAfterReload"
                 },
                 {
                   "name": "resumeAfterReload",
@@ -6069,7 +6069,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L95",
+              "source": "src/export.ts#L96",
               "jsDocTags": [
                 "link",
                 "throws"
@@ -6084,7 +6084,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L103",
+              "source": "src/export.ts#L104",
               "jsDocTags": [],
               "documentation": "Export UTF-8 CSV on demand, retaining only one store window and one byte chunk.",
               "memberDocs": []
@@ -6149,7 +6149,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L173",
+              "source": "src/export.ts#L175",
               "jsDocTags": [
                 "link",
                 "throws"
@@ -6164,7 +6164,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L180",
+              "source": "src/export.ts#L182",
               "jsDocTags": [],
               "documentation": "Export canonical data-space TSV with pull-driven store reads and cancellation.",
               "memberDocs": []
@@ -6176,7 +6176,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L437",
+              "source": "src/export.ts#L479",
               "jsDocTags": [
                 "example",
                 "see"
@@ -6191,7 +6191,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L455",
+              "source": "src/export.ts#L499",
               "jsDocTags": [],
               "documentation": "Stream table XLSX bytes without materializing the finished archive.",
               "memberDocs": []
@@ -6203,7 +6203,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L639",
+              "source": "src/export.ts#L690",
               "jsDocTags": [
                 "example",
                 "see"
@@ -6218,7 +6218,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L657",
+              "source": "src/export.ts#L711",
               "jsDocTags": [],
               "documentation": "Stream formula-preserving workbook XLSX with backpressure and cancellation.",
               "memberDocs": []
@@ -6300,7 +6300,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L118",
+              "source": "src/document-protocol.ts#L119",
               "jsDocTags": [],
               "documentation": "Successful byte/count inspection or one structured transaction rejection.",
               "memberDocs": []
@@ -6336,7 +6336,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L160",
+              "source": "src/document-protocol.ts#L161",
               "jsDocTags": [],
               "documentation": "Incrementally validate the operation count and exact encoded payload size\nwithout constructing a JSON string. Compact operation ranges are measured by\ntheir serialized fields; their logical cell area is deliberately irrelevant.",
               "memberDocs": []
@@ -6348,7 +6348,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L3413",
+              "source": "src/document-protocol.ts#L3414",
               "jsDocTags": [],
               "documentation": "Validate and canonically order a schema-1 snapshot without hydrating runtime state.",
               "memberDocs": []
@@ -6429,7 +6429,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L466",
+              "source": "src/collaboration.ts#L468",
               "jsDocTags": [],
               "documentation": "Comment mutation paired with its assigned server version.",
               "memberDocs": []
@@ -6600,7 +6600,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L54",
+              "source": "src/document-protocol.ts#L55",
               "jsDocTags": [],
               "documentation": "Current workbook snapshot schema version accepted by Sheetwrite.",
               "memberDocs": []
@@ -6823,7 +6823,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L371",
+              "source": "src/export.ts#L379",
               "jsDocTags": [],
               "documentation": "Stable resource-limit failure surfaced before an XLSX codec allocates unsafe data.",
               "memberDocs": []
@@ -6835,7 +6835,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L301",
+              "source": "src/export.ts#L309",
               "jsDocTags": [],
               "documentation": "Resource dimensions bounded by every XLSX import and export path.",
               "memberDocs": [
@@ -7008,7 +7008,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L392",
+              "source": "src/export.ts#L400",
               "jsDocTags": [],
               "documentation": "Pluggable first-row-header, first-sheet table export backend.",
               "memberDocs": []
@@ -7020,7 +7020,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L475",
+              "source": "src/export.ts#L520",
               "jsDocTags": [],
               "documentation": "Pluggable table import backend. Parses raw `.xlsx` bytes into the same\n`ColumnarData` shape `fromCsv` returns, so host ingestion code can stay\nformat-agnostic.",
               "memberDocs": []
@@ -7032,7 +7032,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L560",
+              "source": "src/export.ts#L611",
               "jsDocTags": [
                 "internal"
               ],
@@ -7046,7 +7046,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L544",
+              "source": "src/export.ts#L591",
               "jsDocTags": [],
               "documentation": "Shared options passed to every registered table and workbook XLSX backend.",
               "memberDocs": [
@@ -7060,7 +7060,7 @@
                 },
                 {
                   "name": "signal",
-                  "documentation": "Abort before or between bounded codec operations."
+                  "documentation": "Checked before the work and once per ZIP entry, worksheet and chunk of\ncells. After it fires, the call rejects (or the stream errors) with\n`signal.reason`, not with a `SheetwriteError`."
                 }
               ]
             },
@@ -7071,7 +7071,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L525",
+              "source": "src/export.ts#L572",
               "jsDocTags": [],
               "documentation": "Structured fidelity warning emitted during XLSX conversion.",
               "memberDocs": []
@@ -8035,7 +8035,7 @@
               "owners": [
                 "src/indexeddb.ts"
               ],
-              "source": "src/indexeddb.ts#L99",
+              "source": "src/indexeddb.ts#L100",
               "jsDocTags": [],
               "documentation": "Browser-only durable pending queue. Import it from `@sheetwrite/core/browser`;\nthe package's root entrypoint never evaluates IndexedDB globals.",
               "memberDocs": [
@@ -8052,7 +8052,7 @@
               "owners": [
                 "src/indexeddb.ts"
               ],
-              "source": "src/indexeddb.ts#L22",
+              "source": "src/indexeddb.ts#L23",
               "jsDocTags": [],
               "documentation": "Typed IndexedDB failure raised by durable pending-commit storage.",
               "memberDocs": []
@@ -8064,7 +8064,7 @@
               "owners": [
                 "src/indexeddb.ts"
               ],
-              "source": "src/indexeddb.ts#L11",
+              "source": "src/indexeddb.ts#L12",
               "jsDocTags": [],
               "documentation": "Stable category for an IndexedDB pending-storage failure.",
               "memberDocs": []
@@ -8076,7 +8076,7 @@
               "owners": [
                 "src/indexeddb.ts"
               ],
-              "source": "src/indexeddb.ts#L35",
+              "source": "src/indexeddb.ts#L36",
               "jsDocTags": [],
               "documentation": "Database and store naming options for durable pending commits.",
               "memberDocs": []
@@ -12364,7 +12364,7 @@
               "owners": [
                 "src/table-export.ts"
               ],
-              "source": "src/table-export.ts#L31",
+              "source": "src/table-export.ts#L34",
               "jsDocTags": [],
               "documentation": "Build the active-sheet table model used by the bounded OOXML writer.",
               "memberDocs": []
@@ -12391,7 +12391,7 @@
               "owners": [
                 "src/table-export.ts"
               ],
-              "source": "src/table-export.ts#L116",
+              "source": "src/table-export.ts#L120",
               "jsDocTags": [],
               "documentation": "Default bounded first-sheet table export backend.",
               "memberDocs": []
@@ -12427,7 +12427,7 @@
               "owners": [
                 "src/table-export.ts"
               ],
-              "source": "src/table-export.ts#L23",
+              "source": "src/table-export.ts#L26",
               "jsDocTags": [],
               "documentation": "Implementation-neutral first-sheet table export model.",
               "memberDocs": []
@@ -12439,7 +12439,7 @@
               "owners": [
                 "src/table-export.ts"
               ],
-              "source": "src/table-export.ts#L14",
+              "source": "src/table-export.ts#L17",
               "jsDocTags": [],
               "documentation": "Implementation-neutral cell in the first-sheet table export model.",
               "memberDocs": []

@@ -8,7 +8,7 @@ description: "setXlsxWorkbookBackend function in @sheetwrite/core: Registers the
 Registers the optional workbook XLSX implementation used by core.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L584"><code>packages/core/src/export.ts#L584</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L635"><code>packages/core/src/export.ts#L635</code></a></dd></div>
 </dl>
 
 ## Declaration

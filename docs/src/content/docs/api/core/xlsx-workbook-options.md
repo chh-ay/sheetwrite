@@ -8,7 +8,7 @@ description: "XlsxWorkbookOptions interface in @sheetwrite/core: Shared options 
 Shared options passed to every registered table and workbook XLSX backend.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L544"><code>packages/core/src/export.ts#L544</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L591"><code>packages/core/src/export.ts#L591</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>
@@ -16,12 +16,15 @@ Shared options passed to every registered table and workbook XLSX backend.
 <div class="api-member-list">
 
 <details class="api-member" id="xlsx-workbook-options-signal" data-pagefind-weight="1">
-<summary><code>signal</code> <span class="api-member-summary">Abort before or between bounded codec operations.</span></summary>
+<summary><code>signal</code> <span class="api-member-summary">Checked before the work and once per ZIP entry, worksheet and chunk of cells.</span></summary>
 
 ```ts generated
 signal?: AbortSignal;
 ```
 
+<p class="api-member-doc">Checked before the work and once per ZIP entry, worksheet and chunk of
+cells. After it fires, the call rejects (or the stream errors) with
+`signal.reason`, not with a `SheetwriteError`.</p>
 </details>
 
 <details class="api-member" id="xlsx-workbook-options-max-cells" data-pagefind-weight="1">

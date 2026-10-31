@@ -24,8 +24,12 @@ const MAX_ERROR_TEXT_BYTES = 8 * 1024;
 const ELLIPSIS = "…";
 /** UTF-8 bytes of `ELLIPSIS`. */
 const ELLIPSIS_BYTES = 3;
+/** UTF-8 bytes kept from each end of a cut text. */
+const KEPT_END_BYTES = Math.floor((MAX_ERROR_TEXT_BYTES - ELLIPSIS_BYTES) / 2);
 /** Most UTF-8 bytes that one UTF-16 code unit encodes to. */
 const MAX_UTF8_BYTES_PER_UNIT = 3;
+const LOW_SURROGATE_MIN = 0xdc00;
+const LOW_SURROGATE_MAX = 0xdfff;
 const ERROR_TEXT_ENCODER = new TextEncoder();
 
 const RESOURCE_KEYS = Object.keys(DEFAULT_XLSX_RESOURCE_LIMITS) as (keyof XlsxResourceLimits)[];
@@ -87,14 +91,21 @@ export function createCodecContext(
 /**
  * Cut file or host text that goes into an error to `MAX_ERROR_TEXT_BYTES` UTF-8
  * bytes, so a hostile part name or attribute cannot make an error large. The
- * cut never splits a code point.
+ * start and the end stay, because a message names the failure after the data
+ * it quotes. No cut splits a code point.
  */
 export function boundedErrorText(text: string): string {
   if (text.length * MAX_UTF8_BYTES_PER_UNIT <= MAX_ERROR_TEXT_BYTES) return text;
 
-  const kept = new Uint8Array(MAX_ERROR_TEXT_BYTES - ELLIPSIS_BYTES);
-  const { read } = ERROR_TEXT_ENCODER.encodeInto(text, kept);
-  return read === text.length ? text : `${text.slice(0, read)}${ELLIPSIS}`;
+  const whole = ERROR_TEXT_ENCODER.encodeInto(text, new Uint8Array(MAX_ERROR_TEXT_BYTES));
+  if (whole.read === text.length) return text;
+
+  const head = ERROR_TEXT_ENCODER.encodeInto(text, new Uint8Array(KEPT_END_BYTES));
+  // Each tail unit encodes to at most three bytes, so the tail fits in its half.
+  let tailStart = text.length - Math.floor(KEPT_END_BYTES / MAX_UTF8_BYTES_PER_UNIT);
+  const first = text.charCodeAt(tailStart);
+  if (first >= LOW_SURROGATE_MIN && first <= LOW_SURROGATE_MAX) tailStart += 1;
+  return `${text.slice(0, head.read)}${ELLIPSIS}${text.slice(tailStart)}`;
 }
 
 /**

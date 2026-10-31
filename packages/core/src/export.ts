@@ -9,7 +9,7 @@ import {
   resolveDelimitedTextResourceLimits,
   scanDelimitedText,
 } from "./delimited-text.js";
-import { boundedErrorText, normalizeSheetwriteError, SheetwriteError } from "./errors.js";
+import { normalizeSheetwriteError, SheetwriteError } from "./errors.js";
 import { readableBytes, utf8Chunks } from "./export-stream.js";
 import { IncompleteDataError, SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
@@ -426,6 +426,12 @@ function missingXlsxBackend(
   );
 }
 
+/**
+ * Characters of a registered backend name copied into a failure context. A name
+ * is an identifier, but it comes from the host, so a long one is cut.
+ */
+const MAX_BACKEND_NAME_LENGTH = 256;
+
 /** Which public XLSX call failed, through which registered backend. */
 interface XlsxCallSite {
   readonly operation: "xlsx-import" | "xlsx-export";
@@ -447,7 +453,10 @@ function xlsxCallFailure(
     error,
     site.operation === "xlsx-export" ? "export-failed" : "xlsx-import-failed",
     site.operation,
-    { backend: boundedErrorText(site.backend), functionName: site.functionName },
+    {
+      backend: site.backend.slice(0, MAX_BACKEND_NAME_LENGTH),
+      functionName: site.functionName,
+    },
   );
 }
 
@@ -580,7 +589,11 @@ export interface XlsxWorkbookWarning {
 
 /** Shared options passed to every registered table and workbook XLSX backend. */
 export interface XlsxWorkbookOptions {
-  /** Abort before or between bounded codec operations. */
+  /**
+   * Checked before the work and once per ZIP entry, worksheet and chunk of
+   * cells. After it fires, the call rejects (or the stream errors) with
+   * `signal.reason`, not with a `SheetwriteError`.
+   */
   signal?: AbortSignal;
   /** Cells accounted by the active conversion path; defaults to 1,000,000. */
   maxCells?: number;

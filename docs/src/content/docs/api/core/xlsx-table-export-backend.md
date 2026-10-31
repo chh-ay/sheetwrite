@@ -8,7 +8,7 @@ description: "XlsxTableExportBackend interface in @sheetwrite/core: Pluggable fi
 Pluggable first-row-header, first-sheet table export backend.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L392"><code>packages/core/src/export.ts#L392</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L400"><code>packages/core/src/export.ts#L400</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

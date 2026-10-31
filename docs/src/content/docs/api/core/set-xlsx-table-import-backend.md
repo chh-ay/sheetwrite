@@ -8,7 +8,7 @@ description: "setXlsxTableImportBackend function in @sheetwrite/core: Registers 
 Registers the optional table XLSX import implementation used by core.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L486"><code>packages/core/src/export.ts#L486</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L531"><code>packages/core/src/export.ts#L531</code></a></dd></div>
 </dl>
 
 ## Declaration

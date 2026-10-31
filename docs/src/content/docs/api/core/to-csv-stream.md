@@ -8,7 +8,7 @@ description: "toCsvStream function in @sheetwrite/core: Export UTF-8 CSV on dema
 Export UTF-8 CSV on demand, retaining only one store window and one byte chunk.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L103"><code>packages/core/src/export.ts#L103</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L104"><code>packages/core/src/export.ts#L104</code></a></dd></div>
 </dl>
 
 ## Declaration
