@@ -87,6 +87,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-set-column-strings-packed"><code>setColumnStringsPacked</code></a>
 <a href="#cell-store-set-conditional-rules"><code>setConditionalRules</code></a>
 <a href="#cell-store-set-formula"><code>setFormula</code></a>
+<a href="#cell-store-set-hidden-rows"><code>setHiddenRows</code></a>
 <a href="#cell-store-set-host-function"><code>setHostFunction</code></a>
 <a href="#cell-store-set-iterative-calculation"><code>setIterativeCalculation</code></a>
 <a href="#cell-store-set-named-range"><code>setNamedRange</code></a>
@@ -110,7 +111,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-import-memory-state"><code>importMemoryState</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>96</span>
+## Members <span class="api-count" data-pagefind-ignore>97</span>
 
 <div class="api-member-list">
 
@@ -910,6 +911,25 @@ keeps the cached index, so its next recompute visits just the edited
 formula and its dependents instead of every formula in the workbook.</p>
 </details>
 
+<details class="api-member" id="cell-store-set-hidden-rows" data-pagefind-weight="1">
+<summary><code>setHiddenRows</code> <span class="api-member-summary">Replaces the hidden rows of sheet.</span></summary>
+
+```ts generated
+setHiddenRows: (sheet: number, manual: Uint32Array, filtered: Uint32Array) => boolean;
+```
+
+<p class="api-member-doc">Replaces the hidden rows of `sheet`. `manual` holds the rows that the
+user or a collapsed row group hides, and `filtered` the rows that a
+filter hides. Each is packed `[first, last]` inclusive row pairs in
+ascending order without overlap. Returns `false`, and changes nothing,
+for a missing sheet or invalid pairs.
+
+A change marks dirty every SUBTOTAL or AGGREGATE formula that can read
+the sheet; no other formula recalculates. Inside a mutation or a page
+load, `commitSources` recalculates them with the other edits of the
+batch; otherwise this call does.</p>
+</details>
+
 <details class="api-member" id="cell-store-set-host-function" data-pagefind-weight="1">
 <summary><code>setHostFunction</code> <span class="api-member-summary">Adds, replaces or removes (callback absent) a host function.</span></summary>
 
@@ -1438,6 +1458,11 @@ class CellStore {
     src: string,
     style: number,
   ) => number;
+  setHiddenRows: (
+    sheet: number,
+    manual: Uint32Array,
+    filtered: Uint32Array,
+  ) => boolean;
   setHostFunction: (
     name: string,
     callback: Function | null | undefined,

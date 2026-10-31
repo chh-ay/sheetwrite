@@ -8,7 +8,7 @@ description: "SyncInitInput type in @sheetwrite/wasm: Sources accepted by synchr
 Sources accepted by synchronous initialization: raw module bytes or a precompiled `WebAssembly.Module`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/pkg/sheetwrite_wasm.d.ts#L720"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L720</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/pkg/sheetwrite_wasm.d.ts#L734"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L734</code></a></dd></div>
 </dl>
 
 ## Declaration
