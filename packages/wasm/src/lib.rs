@@ -41,6 +41,8 @@ mod pivot;
 #[cfg(feature = "formula-engine")]
 mod query;
 #[cfg(feature = "formula-engine")]
+mod row_visibility;
+#[cfg(feature = "formula-engine")]
 mod sheet;
 #[cfg(feature = "formula-engine")]
 mod spill;

@@ -29,6 +29,7 @@ use crate::types::{
 };
 use crate::window::ConditionalRules;
 
+mod hidden_rows;
 pub(crate) mod pivot_output;
 #[cfg(feature = "analysis")]
 mod pivots;

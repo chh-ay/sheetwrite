@@ -1,6 +1,7 @@
 //! Bounded math, rounding, and numeric aggregation functions.
 
 use crate::calc::Func;
+use crate::row_visibility::SkippedRows;
 use crate::types::{EvalResult, FormulaError, Value};
 
 use super::functions::{integer_arg, number_arg, require_arity, FuncAccumulator};
@@ -349,13 +350,37 @@ fn gcd(mut left: u64, mut right: u64) -> u64 {
     left
 }
 
+/// Codes 101 to 111 name the same functions as 1 to 11.
+const SKIPS_HIDDEN_ROWS_OFFSET: i64 = 100;
+
+/// SUBTOTAL's function (1 to 11) and the hidden rows it skips: every code
+/// skips rows that a filter hides, and codes 101 to 111 also skip rows hidden
+/// by hand or by a collapsed group.
+///
+/// Out of line: the evaluator calls this from `CellStore::eval_ast`, which in
+/// the default engine is close to 100,000 bytes of WASM. JavaScriptCore does
+/// not compile a larger function with its optimizing tier. A copy of this
+/// function inlined there pushed `eval_ast` over that limit, and a SUM over
+/// 100,000 rows recalculated 63% slower.
+#[inline(never)]
+pub(super) fn subtotal_function(
+    values: &FuncAccumulator,
+) -> Result<(i64, SkippedRows), FormulaError> {
+    match integer_arg(values, 0, None)? {
+        code @ 1..=11 => Ok((code, SkippedRows::Filtered)),
+        code @ 101..=111 => Ok((code - SKIPS_HIDDEN_ROWS_OFFSET, SkippedRows::Hidden)),
+        _ => Err(FormulaError::Value),
+    }
+}
+
+/// The evaluator has already left out the cells that SUBTOTAL skips (see
+/// `CellStore::push_range_values`), so this sees only the counted values.
 fn subtotal(values: &FuncAccumulator) -> Value {
     if let Err(error) = require_arity(values, 2, 254) {
         return Value::Error(error);
     }
-    let function = match integer_arg(values, 0, None) {
-        Ok(code @ 1..=11) => code,
-        Ok(_) => return Value::Error(FormulaError::Value),
+    let function = match subtotal_function(values) {
+        Ok((function, _)) => function,
         Err(error) => return Value::Error(error),
     };
     let entries = values.entries_from_arg(1);
@@ -750,10 +775,16 @@ mod tests {
 
         let hidden_row_code = accumulator(vec![
             (false, vec![Value::number(109.0)]),
+            (true, vec![Value::number(1.0), Value::number(2.0)]),
+        ]);
+        assert_number(apply(Func::Subtotal, &hidden_row_code).unwrap(), 3.0);
+
+        let past_hidden_row_codes = accumulator(vec![
+            (false, vec![Value::number(112.0)]),
             (true, vec![Value::number(1.0)]),
         ]);
         assert_eq!(
-            apply(Func::Subtotal, &hidden_row_code).unwrap(),
+            apply(Func::Subtotal, &past_hidden_row_codes).unwrap(),
             Value::Error(FormulaError::Value)
         );
     }

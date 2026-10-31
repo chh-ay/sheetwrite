@@ -14,6 +14,7 @@ export interface ImportGraphIssue {
 }
 
 const STORE_EDGES: Readonly<Record<string, readonly string[]>> = {
+  "engine-hidden-rows.ts": ["../types/coordinates.ts", "../types/document.ts", "wasm-contract.ts"],
   "mutation-policy.ts": [
     "../restore-block.ts",
     "../types/cell.ts",
@@ -36,6 +37,7 @@ const STORE_EDGES: Readonly<Record<string, readonly string[]>> = {
     "../types/cell.ts",
     "../types/coordinates.ts",
     "../types/document.ts",
+    "engine-hidden-rows.ts",
     "wasm-contract.ts",
     "../types/store.ts",
   ],

@@ -63,7 +63,7 @@ The full engine includes database functions with header-based fields and criteri
 
 The full engine also includes more math functions and matrix functions. `MMULT`, `MINVERSE`, and `MUNIT` return spill arrays and use the engine's shape, memory, and work limits. `MDETERM` returns a scalar.
 
-`AGGREGATE` supports reference-form and array-form operations and error-ignore options. The engine has no hidden-row state, so options that ignore hidden rows have no effect.
+`AGGREGATE` supports reference-form and array-form operations and all eight options. As in Excel, options 1, 3, 5, and 7 skip hidden rows: the rows that a filter hides, the rows that you hide, and the rows of a collapsed row group. When you use the engine without `@sheetwrite/core`, set the hidden rows of a sheet with `CellStore.setHiddenRows`.
 
 ## LAMBDA helpers
 

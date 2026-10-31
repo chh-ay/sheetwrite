@@ -227,6 +227,7 @@ const fn known_id(input: &str) -> u16 {
     panic!("analysis name is not registered");
 }
 
+pub(crate) const AGGREGATE_ID: u16 = known_id("AGGREGATE");
 pub(crate) const LAMBDA_ID: u16 = known_id("LAMBDA");
 pub(crate) const PERCENTILE_EXC_ID: u16 = known_id("PERCENTILE.EXC");
 pub(crate) const QUARTILE_EXC_ID: u16 = known_id("QUARTILE.EXC");
