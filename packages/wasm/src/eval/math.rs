@@ -356,6 +356,13 @@ const SKIPS_HIDDEN_ROWS_OFFSET: i64 = 100;
 /// SUBTOTAL's function (1 to 11) and the hidden rows it skips: every code
 /// skips rows that a filter hides, and codes 101 to 111 also skip rows hidden
 /// by hand or by a collapsed group.
+///
+/// Out of line: the evaluator calls this from `CellStore::eval_ast`, which in
+/// the default engine is close to 100,000 bytes of WASM. JavaScriptCore does
+/// not compile a larger function with its optimizing tier. A copy of this
+/// function inlined there pushed `eval_ast` over that limit, and a SUM over
+/// 100,000 rows recalculated 65% slower.
+#[inline(never)]
 pub(super) fn subtotal_function(
     values: &FuncAccumulator,
 ) -> Result<(i64, SkippedRows), FormulaError> {

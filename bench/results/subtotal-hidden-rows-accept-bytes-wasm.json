@@ -1,0 +1,270 @@
+{
+  "candidateEngineDigest": "b3ea481511d0496fb1ae825873160793ea644dc4e5da2e35dc613bffb83bf8aa",
+  "rows": [
+    {
+      "key": "workload=countif-100k;size=100000.allocation.retainedBytes",
+      "maximum": 2602729,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=criteria-multi-range-edit;size=100000.allocation.retainedBytes",
+      "maximum": 5203406,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=criteria-range-edit;size=100000.allocation.retainedBytes",
+      "maximum": 3902813,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=cross-sheet-range-edit;size=1000.allocation.retainedBytes",
+      "maximum": 616705,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=cycles;size=1000.allocation.retainedBytes",
+      "maximum": 699114,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=diamond-edit;size=32.allocation.retainedBytes",
+      "maximum": 37322,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=distinct-range-edit;size=1000.allocation.retainedBytes",
+      "maximum": 837225,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=error-propagation;size=1000.allocation.retainedBytes",
+      "maximum": 283239,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=formula-constant-edit;size=100000.allocation.retainedBytes",
+      "maximum": 55938777,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=incremental-dependency-closure-edit;size=100000.allocation.retainedBytes",
+      "maximum": 72063513,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=independent-first-recompute;size=1000.allocation.retainedBytes",
+      "maximum": 445341,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=independent-first-recompute;size=10000.allocation.retainedBytes",
+      "maximum": 4009710,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=independent-first-recompute;size=100000.allocation.retainedBytes",
+      "maximum": 36682655,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=independent-parse-load;size=1000.allocation.retainedBytes",
+      "maximum": 352581,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=independent-parse-load;size=10000.allocation.retainedBytes",
+      "maximum": 3171350,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=independent-parse-load;size=100000.allocation.retainedBytes",
+      "maximum": 29015495,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=iterative-finance;size=1000.allocation.retainedBytes",
+      "maximum": 872320,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=let-repeat;size=100000.allocation.retainedBytes",
+      "maximum": 5203326,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=let-reuse-edit;size=100000.allocation.retainedBytes",
+      "maximum": 2603119,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=linear-chain;size=16.allocation.retainedBytes",
+      "maximum": 8661,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=linear-chain;size=32.allocation.retainedBytes",
+      "maximum": 15705,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=linear-chain;size=64.allocation.retainedBytes",
+      "maximum": 29793,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=linear-chain;size=8.allocation.retainedBytes",
+      "maximum": 4287,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=lookup-range-edit;size=100000.allocation.retainedBytes",
+      "maximum": 5202971,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=percentile-covariance;size=100000.allocation.retainedBytes",
+      "maximum": 3903094,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=removed-sheet-ref;size=1000.allocation.retainedBytes",
+      "maximum": 196802,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=scalar-edit-affects-0;size=1000.allocation.retainedBytes",
+      "maximum": 396032,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=scalar-edit-affects-100000;size=100000.allocation.retainedBytes",
+      "maximum": 32088421,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=scalar-edit-affects-1000;size=1000.allocation.retainedBytes",
+      "maximum": 396032,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=scalar-edit-affects-1;size=1.allocation.retainedBytes",
+      "maximum": 2455,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=shared-range-edit;size=1000.allocation.retainedBytes",
+      "maximum": 503219,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=spill-filter-resize;size=100000.allocation.retainedBytes",
+      "maximum": 5852540,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=spill-sequence-admission;size=100000.allocation.retainedBytes",
+      "maximum": 3252095,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=sum-multi-range;size=100000.allocation.retainedBytes",
+      "maximum": 3902766,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=sumifs-3-criteria;size=100000.allocation.retainedBytes",
+      "maximum": 6503217,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=sumproduct-matrix-edit;size=100000.allocation.retainedBytes",
+      "maximum": 2732798,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=sumproduct-vector-edit;size=100000.allocation.retainedBytes",
+      "maximum": 3902800,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=text-lookup-many-edit;size=1000.allocation.retainedBytes",
+      "maximum": 1682838,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=text-lookup-many-sorted-edit;size=1000.allocation.retainedBytes",
+      "maximum": 1667550,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=text-lookup-many-sorted;size=1000.allocation.retainedBytes",
+      "maximum": 1667523,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=text-lookup-many;size=1000.allocation.retainedBytes",
+      "maximum": 1682811,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=topology-remove-add;size=10000.allocation.retainedBytes",
+      "maximum": 4009710,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=unicode-text-date-edit;size=1000.allocation.retainedBytes",
+      "maximum": 1191274,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=vlookup-many-edit;size=1000.allocation.retainedBytes",
+      "maximum": 1072582,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=vlookup-many-sorted-edit;size=1000.allocation.retainedBytes",
+      "maximum": 1071582,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=vlookup-many-sorted;size=1000.allocation.retainedBytes",
+      "maximum": 1071555,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=vlookup-many;size=1000.allocation.retainedBytes",
+      "maximum": 1072555,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=wide-fan-out-edit;size=1000.allocation.retainedBytes",
+      "maximum": 396032,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=wide-fan-out-edit;size=100000.allocation.retainedBytes",
+      "maximum": 32088421,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=xlookup-many-edit;size=1000.allocation.retainedBytes",
+      "maximum": 1086870,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=xlookup-many-sorted-edit;size=1000.allocation.retainedBytes",
+      "maximum": 1332870,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=xlookup-many-sorted;size=1000.allocation.retainedBytes",
+      "maximum": 1332843,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    },
+    {
+      "key": "workload=xlookup-many;size=1000.allocation.retainedBytes",
+      "maximum": 1086843,
+      "reason": "Default engine (SHEETWRITE_BENCH_ENGINE unset): SheetData holds two more null pointers, the hidden-row runs and the SUBTOTAL/AGGREGATE key set, so it grows from 336 to 344 B on wasm32 (measured with a size_of check). The sheet Vec reserves 4 slots, so a store with up to 4 sheets retains 32 B more, and each further sheet slot 8 B. Measured +32 B on every row; the growth does not depend on rows or formulas, and nothing is allocated until the first hidden row or SUBTOTAL/AGGREGATE formula."
+    }
+  ]
+}
