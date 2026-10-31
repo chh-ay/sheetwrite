@@ -8,7 +8,7 @@ description: "decodeStoreMemoryStats function in @sheetwrite/core: Decode the fl
 Decode the flat Rust protocol and fail closed on version/order/total drift.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/resource-accounting.ts#L242"><code>packages/core/src/resource-accounting.ts#L242</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/resource-accounting.ts#L242"><code>packages/core/src/resource-accounting.ts#L242</code></a></dd></div>
 </dl>
 
 ## Declaration

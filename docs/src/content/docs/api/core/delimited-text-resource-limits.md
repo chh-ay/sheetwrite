@@ -8,7 +8,7 @@ description: "DelimitedTextResourceLimits interface in @sheetwrite/core: Resourc
 Resource ceilings shared by synchronous CSV and TSV parsing and encoding.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/delimited-text.ts#L3"><code>packages/core/src/delimited-text.ts#L3</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/delimited-text.ts#L3"><code>packages/core/src/delimited-text.ts#L3</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>

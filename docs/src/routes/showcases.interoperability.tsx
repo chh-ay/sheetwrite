@@ -30,6 +30,7 @@ import compatibilityResultsUrl from "../generated/compatibility-results.json?url
 import compatibilityData from "../generated/compatibility.json";
 import { errorText } from "../lib/errors.js";
 import { formatBytes } from "../lib/format.js";
+import { repositorySourceUrl } from "../lib/repository.js";
 import { pageMeta } from "../lib/seo.js";
 import { observeSiteTheme } from "../lib/site-theme.js";
 import { ActionError, pendingProps, useAction } from "../lib/use-action.js";
@@ -1936,11 +1937,7 @@ function InteroperabilityRoute() {
                       <summary>Scope, limitations, and technical evidence</summary>
                       <p>{entry.detail}</p>
                       {entry.evidence.startsWith("packages/") ? (
-                        <a
-                          href={`https://github.com/chh-ay/sheetwrite/blob/main/${entry.evidence}`}
-                        >
-                          Open checked evidence file
-                        </a>
+                        <a href={repositorySourceUrl(entry.evidence)}>Open checked evidence file</a>
                       ) : (
                         <code>{entry.evidence}</code>
                       )}

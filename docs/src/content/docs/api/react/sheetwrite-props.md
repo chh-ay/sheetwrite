@@ -8,7 +8,7 @@ description: "SheetwriteProps type in @sheetwrite/react: Simple framework adapte
 Simple framework adapter props for columns and default row objects.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/react/src/index.tsx#L294"><code>packages/react/src/index.tsx#L294</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/react/src/index.tsx#L294"><code>packages/react/src/index.tsx#L294</code></a></dd></div>
 </dl>
 
 ## Declaration

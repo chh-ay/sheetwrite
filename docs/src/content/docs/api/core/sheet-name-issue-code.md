@@ -8,7 +8,7 @@ description: "SheetNameIssueCode type in @sheetwrite/core: Stable reason codes r
 Stable reason codes returned by worksheet-name validation.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L18"><code>packages/core/src/types/document.ts#L18</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L18"><code>packages/core/src/types/document.ts#L18</code></a></dd></div>
 </dl>
 
 ## Declaration

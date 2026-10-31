@@ -8,7 +8,7 @@ description: "workbookTableNameKey function in @sheetwrite/core: Locale-independ
 Locale-independent key used for table and table-column collision checks.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/workbook-table.ts#L63"><code>packages/core/src/workbook-table.ts#L63</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/workbook-table.ts#L63"><code>packages/core/src/workbook-table.ts#L63</code></a></dd></div>
 </dl>
 
 ## Declaration

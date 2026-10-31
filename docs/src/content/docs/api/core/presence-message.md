@@ -8,7 +8,7 @@ description: "PresenceMessage interface in @sheetwrite/core: Ephemeral collabora
 Ephemeral collaborator selection and activity update.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/collaboration.ts#L15"><code>packages/core/src/collaboration.ts#L15</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/collaboration.ts#L15"><code>packages/core/src/collaboration.ts#L15</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>

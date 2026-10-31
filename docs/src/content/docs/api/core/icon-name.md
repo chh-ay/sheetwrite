@@ -8,7 +8,7 @@ description: "IconName type in @sheetwrite/core: The name of one glyph on the co
 The name of one glyph on the command icon sheet; the key of `IconOverrides`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/icons/icon-names.ts#L95"><code>packages/core/src/icons/icon-names.ts#L95</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/icons/icon-names.ts#L95"><code>packages/core/src/icons/icon-names.ts#L95</code></a></dd></div>
 </dl>
 
 ## Declaration

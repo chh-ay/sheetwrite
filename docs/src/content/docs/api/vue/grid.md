@@ -28,7 +28,7 @@ function updateTotal(grid: Grid) {
 - [Grid.applyTransaction](/docs/api/vue/grid/#grid-apply-transaction)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/types/grid.d.ts#L633"><code>packages/core/dist/types/grid.d.ts#L633</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/grid.d.ts#L633"><code>packages/core/dist/types/grid.d.ts#L633</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>

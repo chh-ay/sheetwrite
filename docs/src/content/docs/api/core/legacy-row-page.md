@@ -8,7 +8,7 @@ description: "LegacyRowPage interface in @sheetwrite/core: Row-only page shape a
 Row-only page shape accepted by the full-width compatibility adapter.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/legacy-full-width-datasource.ts#L4"><code>packages/core/src/legacy-full-width-datasource.ts#L4</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/legacy-full-width-datasource.ts#L4"><code>packages/core/src/legacy-full-width-datasource.ts#L4</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

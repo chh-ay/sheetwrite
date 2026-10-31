@@ -8,7 +8,7 @@ description: "SheetwriteErrorOperation type in @sheetwrite/core/adapter: Exhaust
 Exhaustive stable operation discriminator for consumer-visible failures.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/errors.ts#L92"><code>packages/core/src/errors.ts#L92</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/errors.ts#L92"><code>packages/core/src/errors.ts#L92</code></a></dd></div>
 </dl>
 
 ## Declaration

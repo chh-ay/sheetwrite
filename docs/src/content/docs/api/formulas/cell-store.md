@@ -8,7 +8,7 @@ description: "CellStore class in @sheetwrite/formulas: The workbook-wide store: 
 The workbook-wide store: every sheet, one string pool.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/pkg/sheetwrite_wasm.d.ts#L41"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L41</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/formulas/pkg/sheetwrite_wasm.d.ts#L41"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L41</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
