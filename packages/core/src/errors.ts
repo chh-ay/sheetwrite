@@ -277,7 +277,7 @@ function utf8ByteLength(text: string): number {
  * because a message names the failure after the data it quotes. No cut splits
  * a code point.
  */
-export function boundedErrorText(text: string, maxBytes: number = MAX_ERROR_TEXT_BYTES): string {
+function boundedErrorText(text: string, maxBytes: number = MAX_ERROR_TEXT_BYTES): string {
   if (text.length * MAX_UTF8_BYTES_PER_UNIT <= maxBytes) return text;
 
   const whole = ERROR_TEXT_ENCODER.encodeInto(text, new Uint8Array(maxBytes));

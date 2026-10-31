@@ -1349,13 +1349,14 @@ CSV and XLSX. Use `code` and `operation` for control flow; `message` is
 diagnostic text and may become more specific. `context` contains
 serialization-safe identifiers and numbers, `retryable` is present only when
 Sheetwrite can determine it, and `cause` retains the original exception in the
-current realm. `toJSON()` omits `cause`. Only a bug in Sheetwrite itself
-throws a plain `Error`.
+current realm. `toJSON()` omits `cause`. A plain `Error` means a programmer
+error, in Sheetwrite or in the calling code.
 
 A failure stays small, whatever data the operation held. The message is cut
 to 8 KiB of UTF-8, and so is the sum of the strings in `context`; a cut keeps
-the start and the end of the text. A `context` with more than 1,024 entries
-becomes `{ truncated: true }`.
+the start and the end of the text. A `context` with more than 1,024 entries,
+more than 256 entries in one object or array, or more than 32 levels becomes
+`{ truncated: true }`.
 
 ```ts
 import { initSheetwrite, isSheetwriteError } from "@sheetwrite/core";
