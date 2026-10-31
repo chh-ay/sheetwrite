@@ -8,7 +8,7 @@ description: "RowBridgeMetadataDelta interface in @sheetwrite/core: A document o
 A document operation that changes workbook or column metadata.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/row-bridge.ts#L127"><code>packages/core/src/row-bridge.ts#L127</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/row-bridge.ts#L128"><code>packages/core/src/row-bridge.ts#L128</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>

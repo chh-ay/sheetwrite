@@ -358,6 +358,10 @@ it.each([
     "edits the full-engine field list with one setPivot per action",
     "./packages/core/test/pivot-panel-probe.ts",
   ],
+  [
+    "shows a failed ribbon load to the user and still reports it",
+    "./packages/core/test/ribbon-fallback-probe.ts",
+  ],
 ])("%s", async (_description, path) => {
   // Isolate process-wide engine selection and module loading mocks.
   const probe = Bun.spawn([process.execPath, "--preload", "./test-setup.ts", path], {

@@ -191,12 +191,15 @@ export function createFormulaBar(
       input.value = committed;
       dirty = false;
       options.focusGrid?.();
-    } else {
-      dirty = true;
     }
+  };
+  // Typing, paste, drop and IME all fire `input`; a key alone does not change the draft.
+  const onInput = (): void => {
+    dirty = true;
   };
 
   input.addEventListener("keydown", onKeydown);
+  input.addEventListener("input", onInput);
   const unsubscribes = [
     grid.on("selection", refresh),
     grid.on("change", refresh),
@@ -222,6 +225,7 @@ export function createFormulaBar(
       destroyed = true;
       for (const unsubscribe of unsubscribes) unsubscribe();
       input.removeEventListener("keydown", onKeydown);
+      input.removeEventListener("input", onInput);
       input.remove();
     },
   };
