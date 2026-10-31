@@ -1,5 +1,51 @@
 # @sheetwrite/formulas
 
+## 0.7.0
+
+### Minor Changes
+
+- [#286](https://github.com/chh-ay/sheetwrite/pull/286) [`a6eefc5`](https://github.com/chh-ay/sheetwrite/commit/a6eefc5842d994b1ebf3ed699c74cc762c87377b) Thanks [@chh-ay](https://github.com/chh-ay)! - Hosts can register synchronous JavaScript functions that formulas call, on the full engine (`@sheetwrite/formulas`). Import `registerFunction(store, metadata, implementation)` and `unregisterFunction(store, name)` from `@sheetwrite/core/functions`; an application that does not import that entry carries none of its JavaScript, and the default engine binary does not change. On the default engine, `registerFunction` throws a `SheetwriteError` with code `optional-backend-unavailable`. A thrown error or a result that is not a number, text, boolean or `null` shows `#VALUE!`. A workbook that calls a function that is not registered shows `#NAME?`. `listFunctions(store)` returns the metadata of the built-in functions of the active engine and of the host functions in one list.
+
+- [#301](https://github.com/chh-ay/sheetwrite/pull/301) [`08fbebf`](https://github.com/chh-ay/sheetwrite/commit/08fbebfd3b654070de6edbd15d4d72398eb5198d) Thanks [@chh-ay](https://github.com/chh-ay)! - Both engines export `formulaTokens(text)` and `checkFormulaSyntax(text)`. `formulaTokens` returns the tokens of formula text from the engine's own lexer as a `Uint32Array`, four numbers per token: the kind, the start and end as UTF-16 offsets, and 1 when whitespace comes before the token. It does not stop at an error: an open quote or bracket becomes one bad token to the end of the text. `checkFormulaSyntax` returns the first error of the engine's parser with its span, its message and an `incomplete` flag for a formula that ends too early, or `undefined`. Formula help in `@sheetwrite/core` uses them, so it marks exactly the formulas that the engine rejects. The parser's error messages are now sentences that a user can act on, such as "Add ) to close the (.".
+
+- [#306](https://github.com/chh-ay/sheetwrite/pull/306) [`e0c3655`](https://github.com/chh-ay/sheetwrite/commit/e0c3655b1fec3b8dd5771e234d8280a7bdf9cc4f) Thanks [@chh-ay](https://github.com/chh-ay)! - `SUBTOTAL` and `AGGREGATE` skip hidden rows, as in Excel:
+  
+  - `SUBTOTAL` accepts codes 101 to 111. All codes skip the rows that a filter hides. Codes 101 to 111 also skip the rows that you hide (`hideRows`) and the rows of a collapsed row group. Before, codes 101 to 111 returned `#VALUE!`.
+  - `SUBTOTAL` reads a cell argument, such as `A2` in `=SUBTOTAL(9,A2)`, as a reference: text in the cell is ignored, as in Excel, and the cell's row can be hidden.
+  - `SUBTOTAL` skips cells whose formula calls `SUBTOTAL` or `AGGREGATE`, as `AGGREGATE` already did, so a subtotal is not counted two times.
+  - `AGGREGATE` options 1, 3, 5 and 7 skip hidden rows. Before, they had no effect.
+  - When you hide or show rows, collapse or expand a row group, or change a filter, only the `SUBTOTAL` and `AGGREGATE` formulas that read the sheet calculate again. Core sends the hidden rows of a sheet in one engine call per transaction.
+  - New engine export `CellStore.setHiddenRows(sheet, manual, filtered)` sets the hidden rows of a sheet as packed `[first, last]` row ranges. A sheet without hidden rows uses no extra memory.
+
+### Patch Changes
+
+- [#307](https://github.com/chh-ay/sheetwrite/pull/307) [`5620780`](https://github.com/chh-ay/sheetwrite/commit/56207806761765cf486187dd1e72851813f75457) Thanks [@chh-ay](https://github.com/chh-ay)! - Paste, fill and conditional-format rules now rewrite formula references with the engine's own rules (part of [#246](https://github.com/chh-ay/sheetwrite/issues/246)). `=SUM(A:A)` pasted one column right becomes `=SUM(B:B)`, and a name such as `XYZ1`, past the last column, stays a name instead of becoming `#REF!`. A row or column insert, delete or move rewrites whole columns and rows in conditional-format formulas too. Only the references that change are rewritten, so the rest of the formula keeps its spacing and case.
+  
+  The engines export `translateFormula`, `shiftFormulaAxis` and `moveFormulaAxis`. `shiftA1Refs` from `@sheetwrite/core` now calls the engine, so it needs `initSheetwrite()` first. `rebaseDocumentOperations` needs it too when it moves a conditional format that has a formula.
+
+- [#300](https://github.com/chh-ay/sheetwrite/pull/300) [`cfc6d1f`](https://github.com/chh-ay/sheetwrite/commit/cfc6d1fae12c8e3fd6b68db0b93af83a1ccb531e) Thanks [@chh-ay](https://github.com/chh-ay)! - More functions give the Excel result:
+  
+  - `ROUND`, `ROUNDUP`, `ROUNDDOWN`, `FIXED` and `DOLLAR` round the decimal value that Excel shows: `=ROUND(1.005,2)` is 1.01.
+  - A number becomes text with 15 significant digits, as in Excel: `=(0.1+0.2)&""` is `0.3`.
+  - `TEXT` applies number format codes: percent, thousands separators, digit placeholders, scientific notation, quoted text and sections (`=TEXT(0.5,"0%")` is `50%`).
+  - `CHOOSE`, `INDEX`, `ADDRESS` and other position arguments ignore a fraction: `=CHOOSE(1.5,"a","b")` is `a`. `INDEX` with a zero row or column returns the whole column or row.
+  - `ADDRESS`, `MATCH`, `XMATCH` and `XLOOKUP` return an error from an argument instead of `#VALUE!`.
+  - `COUNTIF(range,"<>")` and other not-equal criteria count values of another type.
+  - `SUMIF` and `AVERAGEIF` read as many sum cells as the criteria range has, from the top-left sum cell.
+  - `YEAR(0)`, `MONTH(0)` and `DAY(0)` are 1900, 1 and 0. `DATE` before serial 0 and date parts of a negative serial are `#NUM!`.
+  - `FLOOR` and `CEILING` need two arguments, give `#NUM!` for a positive number with a negative significance, and `FLOOR(0.3,0.1)` is 0.3. `CEILING(x,0)` is 0.
+  - `REPLACE` with a start past the end appends the new text. `TRIM` removes only spaces, as in Excel.
+  - In the full engine, an error argument of a `LAMBDA` reaches its body, so `=LAMBDA(x,IFERROR(x,0))(1/0)` is 0.
+
+- [#300](https://github.com/chh-ay/sheetwrite/pull/300) [`cfc6d1f`](https://github.com/chh-ay/sheetwrite/commit/cfc6d1fae12c8e3fd6b68db0b93af83a1ccb531e) Thanks [@chh-ay](https://github.com/chh-ay)! - Formulas accept more Excel syntax:
+  
+  - Numbers with an exponent, such as `=1E3` and `=SUM(1.5E-3)`.
+  - Whole columns and rows, such as `=SUM(A:A)`, `=SUM($A:$C)` and `=SUM(Sheet2!1:1)`. They read only the rows and columns that the sheet has, keep their column or row through row and column edits and copies, and are written back in this short form. `ROWS(A:A)` is 1048576.
+  - A name such as `XYZ1` that is past column XFD or row 1048576 is a name, not a cell.
+  - A row or column edit keeps the text of a formula whose references it does not move, so `=A1+B1*2` stays as written.
+
+- [#300](https://github.com/chh-ay/sheetwrite/pull/300) [`cfc6d1f`](https://github.com/chh-ay/sheetwrite/commit/cfc6d1fae12c8e3fd6b68db0b93af83a1ccb531e) Thanks [@chh-ay](https://github.com/chh-ay)! - A row or column insert that a sheet cannot hold changes nothing. `addRows`, `removeRows`, `insertCols` and `removeCols` return `false` for a dense sheet that would pass its cell limit or a row count that overflows, and the store rejects the operation instead of moving formulas, charts or metadata for cells that did not move. `addPagedSheet` throws for a chunk size above 1048576 rows.
+
 ## 0.6.1
 
 ### Patch Changes
