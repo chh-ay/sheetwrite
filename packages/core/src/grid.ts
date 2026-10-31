@@ -22,9 +22,13 @@ import {
 import { DomOverlay } from "./dom-overlay.js";
 import {
   ENGINE_LOAD_HINT,
+  engineFailedError,
+  engineGeneration,
   isEngineLoaded as isLoaded,
   loadEngine,
+  onEngineFailure,
   type SheetwriteEngine,
+  stopEngine,
 } from "./engine.js";
 import { normalizeSheetwriteError, SheetwriteError } from "./errors.js";
 import { downloadBytes, toCsv, toXlsxTable } from "./export.js";
@@ -61,7 +65,7 @@ import { sheetNameKey, validateSheetName } from "./sheet-name.js";
 import { changesSheetTabs, SheetTabs } from "./sheet-tabs.js";
 import { mountSidePanel } from "./side-panel.js";
 import { IncompleteDataError, SheetwriteStore } from "./store.js";
-import { storeEngine } from "./store/engine-registry.js";
+import { storeEngine, storeGeneration } from "./store/engine-registry.js";
 import {
   addRowGroup,
   collapseRowGroup,
@@ -513,6 +517,7 @@ export class GridImpl implements Grid {
     "theme-change": new Set(),
     "chart-select": new Set(),
     "chart-activate": new Set(),
+    "engine-failed": new Set(),
   };
 
   /** Which renderer actually constructed; set by `createRenderer`. */
@@ -528,6 +533,11 @@ export class GridImpl implements Grid {
   private selection: SelectionModel;
   private readonly mutationRevisions = new MutationRevisionIndex();
   private destroyed = false;
+  /** Engine generation of this grid's store; traps from its reads stop that instance only. */
+  private readonly engineGeneration: number;
+  /** Set once the engine stopped; read-only stays on until the host recreates the grid. */
+  private engineFailure: SheetwriteError | null = null;
+  private readonly removeEngineFailureListener: () => void;
   private storeEpoch = 0;
   private windowContentRevision = 0;
   private sourceSheet: SheetId | null = null;
@@ -604,6 +614,8 @@ export class GridImpl implements Grid {
         transactionResourceLimits: this.transactionResourceLimits,
       });
     this.loadable = this.store instanceof SheetwriteStore ? this.store : null;
+    // A host store keeps the generation of the engine it was built on.
+    this.engineGeneration = storeGeneration(this.store) ?? engineGeneration();
     this.store.setProtectionResolver?.(opts.protectionResolver, opts.mutationPolicy);
     this.ownsStore = ownsStore;
     const virtualTarget = padTarget(host, opts.minColumns, this.presentation);
@@ -1020,6 +1032,9 @@ export class GridImpl implements Grid {
       emitScroll: (event) => {
         for (const fn of this.listeners.scroll) fn(event);
       },
+      onEngineTrap: (cause) => {
+        this.onEngineFailed(stopEngine(cause, this.engineGeneration));
+      },
     });
 
     if (this.tabBarHeight > 0) this.buildTabBar();
@@ -1213,7 +1228,35 @@ export class GridImpl implements Grid {
     }
     this.armResolutionListener();
     this.attachPanels();
+    // A host store built before an engine stop starts this grid read-only.
+    if (this.engineGeneration !== engineGeneration()) this.onEngineFailed(engineFailedError());
     this.render();
+    // Registered last: a constructor that throws earlier leaves no listener
+    // behind. A trap in the first paint reaches `onEngineFailed` through `onEngineTrap`.
+    this.removeEngineFailureListener = onEngineFailure((failure) => this.onEngineFailed(failure));
+  }
+
+  /**
+   * The engine stopped. Its instance can be half-written, so this grid keeps
+   * its last frame, refuses edits at once and never reads the store again.
+   * The chrome update and the event run one microtask later, so host code
+   * cannot replace the `engine-failed` error of the failing call.
+   */
+  private onEngineFailed(failure: SheetwriteError): void {
+    if (this.destroyed || this.engineFailure) return;
+
+    this.engineFailure = failure;
+    this.readOnly = true;
+    this.readWindows.freeze();
+    queueMicrotask(() => {
+      if (this.destroyed) return;
+
+      try {
+        this.syncReadOnlyChrome(true);
+      } finally {
+        for (const fn of this.listeners["engine-failed"]) fn({ error: failure });
+      }
+    });
   }
 
   /** Listen for first use without fetching the panel chunk on ordinary grids. */
@@ -2445,9 +2488,15 @@ export class GridImpl implements Grid {
   }
 
   setReadOnly(readOnly: boolean): void {
-    if (readOnly === this.readOnly) return;
+    // Only a new grid on a restarted engine can edit again.
+    if (this.engineFailure || readOnly === this.readOnly) return;
 
     this.readOnly = readOnly;
+    this.syncReadOnlyChrome(readOnly);
+  }
+
+  /** Bring editors, tabs, the find bar and command state in line with `readOnly`. */
+  private syncReadOnlyChrome(readOnly: boolean): void {
     this.sheetTabs?.setReadOnly(readOnly);
     if (readOnly) {
       this.cancelAutoFit();
@@ -3387,7 +3436,8 @@ export class GridImpl implements Grid {
     const summary: Partial<Record<GridCommandName, number>> = {};
     for (const command of COMMAND_STATE_ACTIVITY_COMMANDS) summary[command] = 0;
 
-    if (this.selection.isEmpty) return summary;
+    // A stopped engine cannot answer style reads; a read-only grid needs none.
+    if (this.selection.isEmpty || this.engineFailure) return summary;
 
     const coordinates: Array<{ row: number; col: number }> = [];
     let complete = true;
@@ -3715,6 +3765,7 @@ export class GridImpl implements Grid {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
+    this.removeEngineFailureListener();
     let failure: unknown;
     let failed = false;
     const cleanup = (operation: () => void): void => {

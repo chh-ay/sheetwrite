@@ -1,4 +1,10 @@
-import { assertResource, checkAbort, type XlsxCodecContext } from "./resources.js";
+import {
+  assertResource,
+  boundedErrorText,
+  checkAbort,
+  isAbort,
+  type XlsxCodecContext,
+} from "./resources.js";
 
 const UTF8 = new TextDecoder("utf-8", { fatal: true });
 const ENCODER = new TextEncoder();
@@ -37,8 +43,11 @@ export interface XmlChildStream {
   readonly child: (element: XmlElement, root: XmlElement) => void;
 }
 
-function xmlFailure(part: string, message: string): never {
-  throw new TypeError(`Sheetwrite: invalid XLSX XML in ${part}: ${message}`);
+function xmlFailure(part: string, message: string, cause?: unknown): never {
+  throw new TypeError(
+    boundedErrorText(`Sheetwrite: invalid XLSX XML in ${part}: ${message}`),
+    cause === undefined ? undefined : { cause },
+  );
 }
 
 function utf8Length(value: string): number {
@@ -222,8 +231,9 @@ export function parseXml(
   let xml: string;
   try {
     xml = UTF8.decode(bytes);
-  } catch {
-    return xmlFailure(part, "content is not valid UTF-8");
+  } catch (error) {
+    if (!(error instanceof TypeError)) throw error;
+    return xmlFailure(part, "content is not valid UTF-8", error);
   }
   if (/<!DOCTYPE|<!ENTITY/i.test(xml)) return xmlFailure(part, "DTDs and entities are forbidden");
   const roots: MutableXmlElement[] = [];
@@ -552,7 +562,7 @@ export async function parseXmlChunks(
       return bytes ? decoder.decode(bytes, { stream: true }) : decoder.decode();
     } catch (error) {
       if (!(error instanceof TypeError)) throw error;
-      return xmlFailure(part, "content is not valid UTF-8");
+      return xmlFailure(part, "content is not valid UTF-8", error);
     }
   };
   const accept = (text: string, final: boolean): void => {
@@ -596,6 +606,12 @@ export async function parseXmlChunks(
     }
     accept(decode(), true);
   } catch (error) {
+    // An abort stops at once; closing the entry iterator frees its inflater.
+    if (isAbort(context, error)) {
+      await iterator.return?.();
+      throw error;
+    }
+
     // A damaged entry must be reported as damage, not as the XML symptom its
     // corrupt prefix produced: finish inflating so size and CRC checks run.
     for (let next = await iterator.next(); !next.done; next = await iterator.next()) {

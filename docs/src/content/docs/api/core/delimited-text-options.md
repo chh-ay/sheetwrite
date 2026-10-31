@@ -26,12 +26,14 @@ resourceLimits?: Partial<DelimitedTextResourceLimits>;
 </details>
 
 <details class="api-member" id="delimited-text-options-signal" data-pagefind-weight="1">
-<summary><code>signal</code> <span class="api-member-summary">Abort between bounded encode chunks or store windows.</span></summary>
+<summary><code>signal</code> <span class="api-member-summary">Checked once per chunk of records, store window and long field.</span></summary>
 
 ```ts generated
 signal?: AbortSignal;
 ```
 
+<p class="api-member-doc">Checked once per chunk of records, store window and long field. After it
+fires, the operation rejects or throws with `signal.reason`.</p>
 </details>
 </div>
 

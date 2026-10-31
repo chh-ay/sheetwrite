@@ -22,7 +22,7 @@ import {
   relationshipTypeMatches,
   resolveRelationshipTarget,
 } from "./opc.js";
-import { checkAbort, emitWarning, type XlsxCodecContext } from "./resources.js";
+import { checkAbort, emitWarning, isAbort, type XlsxCodecContext } from "./resources.js";
 import type { WorkbookWriteHook } from "./writer.js";
 import {
   decodeXstring,
@@ -548,6 +548,7 @@ function verifyGraph(
       } catch (error) {
         // Corrupt or over-limit payloads drop only their graph, so a persisted
         // workbook still opens; abort errors still fail the whole operation.
+        if (isAbort(context, error)) throw error;
         if (error instanceof TypeError || error instanceof XlsxResourceError) return error.message;
         throw error;
       }

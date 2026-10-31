@@ -1510,7 +1510,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L434",
+              "source": "src/grid.ts#L438",
               "jsDocTags": [
                 "example",
                 "see"
@@ -1776,7 +1776,7 @@
               "owners": [
                 "src/delimited-text.ts"
               ],
-              "source": "src/delimited-text.ts#L32",
+              "source": "src/delimited-text.ts#L35",
               "jsDocTags": [],
               "documentation": "Synchronous operations return one in-memory string, so byte/cell ceilings\nbound allocation while sheet-compatible dimensions remain independently valid.",
               "memberDocs": []
@@ -1836,7 +1836,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L308",
+              "source": "src/grid.ts#L312",
               "jsDocTags": [],
               "documentation": "Default canvas theme used before CSS and explicit theme overrides.",
               "memberDocs": []
@@ -1872,7 +1872,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L344",
+              "source": "src/export.ts#L352",
               "jsDocTags": [],
               "documentation": "Codec defaults combine SpreadsheetML worksheet dimensions with independent\nZIP/XML and aggregate-work ceilings for untrusted in-memory conversion.",
               "memberDocs": []
@@ -1884,7 +1884,7 @@
               "owners": [
                 "src/delimited-text.ts"
               ],
-              "source": "src/delimited-text.ts#L51",
+              "source": "src/delimited-text.ts#L54",
               "jsDocTags": [],
               "documentation": "Phase reported by a typed delimited-text resource failure.",
               "memberDocs": []
@@ -1906,7 +1906,7 @@
                 },
                 {
                   "name": "signal",
-                  "documentation": "Abort between bounded encode chunks or store windows."
+                  "documentation": "Checked once per chunk of records, store window and long field. After it\nfires, the operation rejects or throws with `signal.reason`."
                 }
               ]
             },
@@ -1917,7 +1917,7 @@
               "owners": [
                 "src/delimited-text.ts"
               ],
-              "source": "src/delimited-text.ts#L73",
+              "source": "src/delimited-text.ts#L76",
               "jsDocTags": [],
               "documentation": "Stable invalid-option failure for a delimited-text resource ceiling.",
               "memberDocs": []
@@ -1929,7 +1929,7 @@
               "owners": [
                 "src/delimited-text.ts"
               ],
-              "source": "src/delimited-text.ts#L54",
+              "source": "src/delimited-text.ts#L57",
               "jsDocTags": [],
               "documentation": "Stable resource-limit failure raised before the next oversized parse or encode allocation.",
               "memberDocs": []
@@ -2054,7 +2054,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L271",
+              "source": "src/export.ts#L279",
               "jsDocTags": [],
               "documentation": "Trigger a browser download from in-memory bytes. The temporary anchor is\nremoved and its object URL is scheduled for revocation even when DOM append or\nclick throws.",
               "memberDocs": []
@@ -2078,7 +2078,7 @@
               "owners": [
                 "src/engine-memory.ts"
               ],
-              "source": "src/engine-memory.ts#L6",
+              "source": "src/engine-memory.ts#L16",
               "jsDocTags": [],
               "documentation": "Result of an explicit, all-store engine memory release.",
               "memberDocs": [
@@ -2119,7 +2119,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L212",
+              "source": "src/export.ts#L214",
               "jsDocTags": [],
               "documentation": "Parse CSV into `ColumnarData`. The first record is consumed as a positional\nheader. Input fields project onto declared visible columns; hidden declared\ncolumns are initialized to `null`, matching the visible-column CSV export.\nExtra fields are ignored and missing fields become `null`. The returned\ncolumnar table is fully materialized in memory.",
               "memberDocs": []
@@ -2131,7 +2131,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L508",
+              "source": "src/export.ts#L553",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2146,7 +2146,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L710",
+              "source": "src/export.ts#L767",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2161,7 +2161,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L676",
+              "source": "src/export.ts#L731",
               "jsDocTags": [],
               "documentation": "Import a seekable File/Blob without first buffering the compressed workbook.",
               "memberDocs": []
@@ -2173,7 +2173,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L774",
+              "source": "src/types/grid.ts#L783",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2426,7 +2426,7 @@
                 },
                 {
                   "name": "setReadOnly",
-                  "documentation": "Update editability without replacing the Grid or clearing session state."
+                  "documentation": "Update editability without replacing the Grid or clearing session state.\nHas no effect after `engine-failed`: that grid stays read-only."
                 },
                 {
                   "name": "setRowHeight",
@@ -2710,7 +2710,7 @@
             {
               "name": "GridEvents",
               "kind": "interface",
-              "signature": "export interface GridEvents { change: ChangeEvent; selection: { selection: Selection | null }; scroll: { scrollTop: number; firstRow: number; lastRow: number; scrollLeft: number; firstVisibleColumn: number | null; lastVisibleColumn: number | null; }; \"edit-begin\": { addr: CellAddress }; \"edit-commit\": { addr: CellAddress; value: CellValue }; search: SearchResult; \"command-state-change\": GridCommandStateChangeEvent; \"mutation-rejected\": { issues: MutationIssue[] }; \"active-sheet\": { sheet: SheetId }; \"hyperlink-activate\": HyperlinkActivationEvent; \"theme-change\": { theme: Theme }; \"renderer-fallback\": { requested: \"worker\"; error: SheetwriteError }; \"datasource-error\": { request: Omit<DataSourceRequest, \"signal\">; error: SheetwriteError; }; \"export-error\": { format: \"csv\" | \"xlsx\"; error: SheetwriteError }; \"chart-select\": ChartRef | null; \"chart-activate\": ChartRef; }",
+              "signature": "export interface GridEvents { change: ChangeEvent; selection: { selection: Selection | null }; scroll: { scrollTop: number; firstRow: number; lastRow: number; scrollLeft: number; firstVisibleColumn: number | null; lastVisibleColumn: number | null; }; \"edit-begin\": { addr: CellAddress }; \"edit-commit\": { addr: CellAddress; value: CellValue }; search: SearchResult; \"command-state-change\": GridCommandStateChangeEvent; \"mutation-rejected\": { issues: MutationIssue[] }; \"active-sheet\": { sheet: SheetId }; \"hyperlink-activate\": HyperlinkActivationEvent; \"theme-change\": { theme: Theme }; \"renderer-fallback\": { requested: \"worker\"; error: SheetwriteError }; \"datasource-error\": { request: Omit<DataSourceRequest, \"signal\">; error: SheetwriteError; }; \"export-error\": { format: \"csv\" | \"xlsx\"; error: SheetwriteError }; \"chart-select\": ChartRef | null; \"chart-activate\": ChartRef; \"engine-failed\": { error: SheetwriteError }; }",
               "owners": [
                 "src/types/grid.ts"
               ],
@@ -2735,12 +2735,16 @@
                   "documentation": "Command availability or formatting activity changed."
                 },
                 {
+                  "name": "engine-failed",
+                  "documentation": "Emitted once when the engine stopped after a WASM trap. `error.code` is\n`engine-failed`. The grid keeps its last frame, is read-only and does not\nread its store again; `setReadOnly(false)` does not undo this. To continue,\ndestroy the grid, `await initSheetwrite()` and create a new grid from a\nsaved document."
+                },
+                {
                   "name": "export-error",
                   "documentation": "Built-in toolbar/context-menu export failed after its action was dispatched."
                 },
                 {
                   "name": "renderer-fallback",
-                  "documentation": "Emitted once when the worker renderer could not be constructed and the\ngrid fell back to the main-thread canvas renderer."
+                  "documentation": "Emitted once when the worker renderer could not start or stopped and the\ngrid fell back to the main-thread canvas renderer. `error.context.failure`\nis `spawn`, `crash`, `protocol`, `timeout` or `fatal`."
                 },
                 {
                   "name": "theme-change",
@@ -2981,7 +2985,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L352",
+              "source": "src/grid.ts#L356",
               "jsDocTags": [
                 "example",
                 "see"
@@ -3020,7 +3024,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L326",
+              "source": "src/errors.ts#L328",
               "jsDocTags": [],
               "documentation": "Narrow same-realm errors, cross-realm errors, and serialized failure envelopes.",
               "memberDocs": []
@@ -3032,7 +3036,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L364",
+              "source": "src/grid.ts#L368",
               "jsDocTags": [],
               "documentation": "Whether `initSheetwrite` has completed — the single readiness source.",
               "memberDocs": []
@@ -3424,7 +3428,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L201",
+              "source": "src/export.ts#L203",
               "jsDocTags": [],
               "documentation": "Parse the fixed comma dialect: quoted delimiters/newlines, doubled quotes,\nbare CR, LF, or CRLF records, Unicode, trailing empty fields, and one optional\nleading UTF-8 BOM. The synchronous API consumes an existing in-memory string\nand returns an in-memory grid; it does not claim streaming. Scanning enforces\nresource ceilings before materializing the next oversized field or record.",
               "memberDocs": []
@@ -4045,12 +4049,12 @@
               "owners": [
                 "src/engine-memory.ts"
               ],
-              "source": "src/engine-memory.ts#L39",
+              "source": "src/engine-memory.ts#L52",
               "jsDocTags": [
                 "example",
                 "see"
               ],
-              "documentation": "Move all live stores into a fresh WASM instance. Call explicitly while idle;\nthe main-thread pause scales with resident data and compact undo history.\nPreparation failures leave every live store and the selected instance unchanged.\nA larger replacement is discarded; the report then has zero migrated stores.\n@example\n```ts\nimport { initSheetwrite, releaseEngineMemory } from \"@sheetwrite/core\";\n\nawait initSheetwrite();\n// Run between user actions, not in an input or render callback.\nconst report = await releaseEngineMemory();\ndocument.body.dataset.engineBytes = String(report.wasmBytesAfter);\n```\n@see\nEngineMemoryReleaseReport",
+              "documentation": "Move all live stores into a fresh WASM instance. Call explicitly while idle;\nthe main-thread pause scales with resident data and compact undo history.\nPreparation failures leave every live store and the selected instance unchanged;\nrunning out of memory for the copy rejects with `resource-limit`. A WASM trap\nduring preparation rejects with `engine-failed`: the live instance can be\nhalf-written, so it stops.\nA larger replacement is discarded; the report then has zero migrated stores.\n@example\n```ts\nimport { initSheetwrite, releaseEngineMemory } from \"@sheetwrite/core\";\n\nawait initSheetwrite();\n// Run between user actions, not in an input or render callback.\nconst report = await releaseEngineMemory();\ndocument.body.dataset.engineBytes = String(report.wasmBytesAfter);\n```\n@see\nEngineMemoryReleaseReport",
               "memberDocs": []
             },
             {
@@ -4158,7 +4162,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L369",
+              "source": "src/grid.ts#L373",
               "jsDocTags": [],
               "documentation": "Read `--sheetwrite-*` CSS custom properties into a partial theme.",
               "memberDocs": []
@@ -4850,7 +4854,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L405",
+              "source": "src/export.ts#L413",
               "jsDocTags": [],
               "documentation": "Registers the optional table XLSX export implementation used by core.",
               "memberDocs": []
@@ -4862,7 +4866,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L486",
+              "source": "src/export.ts#L531",
               "jsDocTags": [],
               "documentation": "Registers the optional table XLSX import implementation used by core.",
               "memberDocs": []
@@ -4874,7 +4878,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L584",
+              "source": "src/export.ts#L635",
               "jsDocTags": [],
               "documentation": "Registers the optional workbook XLSX implementation used by core.",
               "memberDocs": []
@@ -5100,7 +5104,7 @@
             {
               "name": "SHEETWRITE_ERROR_CODES",
               "kind": "variable",
-              "signature": "readonly [\"initialization-failed\", \"initialization-required\", \"datasource-request-failed\", \"renderer-fallback\", \"export-failed\", \"xlsx-import-failed\", \"optional-backend-unavailable\", \"delimited-text-resource-limit\", \"delimited-text-invalid-limit\", \"xlsx-resource-limit\", \"resource-limit\", \"invalid-snapshot\", \"aborted\", \"not-found\", \"commit-rejected\", \"unavailable\", \"blocked\", \"quota\", \"unsupported-schema\", \"transaction\", \"conflict\", \"limit\", \"invalid-limits\", \"invalid-version\", \"invalid-id\", \"invalid-operations\", \"operation-limit\", \"payload-limit\", \"response-id-mismatch\", \"future-distance-limit\", \"buffer-count-limit\", \"buffer-operation-limit\", \"buffer-byte-limit\", \"pending-count-limit\", \"pending-operation-limit\", \"pending-byte-limit\", \"late-echo\", \"remote-operations-rejected\", \"invalid-batch\", \"batch-limit\", \"pending-capacity\", \"presence-failed\", \"revision-failed\", \"comment-failed\", \"sync-failed\", \"sync-storage-failed\", \"incomplete-data\", \"xlsx-invalid-options\", \"unsafe-hyperlink\", \"invalid-shortcut\", \"shortcut-conflict\", \"invalid-function\"]",
+              "signature": "readonly [\"initialization-failed\", \"initialization-required\", \"engine-failed\", \"datasource-request-failed\", \"renderer-fallback\", \"export-failed\", \"xlsx-import-failed\", \"optional-backend-unavailable\", \"delimited-text-resource-limit\", \"delimited-text-invalid-limit\", \"xlsx-resource-limit\", \"resource-limit\", \"invalid-snapshot\", \"aborted\", \"not-found\", \"commit-rejected\", \"unavailable\", \"blocked\", \"quota\", \"unsupported-schema\", \"transaction\", \"conflict\", \"limit\", \"invalid-limits\", \"invalid-version\", \"invalid-id\", \"invalid-operations\", \"operation-limit\", \"payload-limit\", \"response-id-mismatch\", \"future-distance-limit\", \"buffer-count-limit\", \"buffer-operation-limit\", \"buffer-byte-limit\", \"pending-count-limit\", \"pending-operation-limit\", \"pending-byte-limit\", \"late-echo\", \"remote-operations-rejected\", \"invalid-batch\", \"batch-limit\", \"pending-capacity\", \"presence-failed\", \"revision-failed\", \"comment-failed\", \"sync-failed\", \"sync-storage-failed\", \"incomplete-data\", \"xlsx-invalid-options\", \"unsafe-hyperlink\", \"invalid-shortcut\", \"shortcut-conflict\", \"invalid-function\"]",
               "owners": [
                 "src/errors.ts"
               ],
@@ -5112,11 +5116,11 @@
             {
               "name": "SHEETWRITE_ERROR_OPERATIONS",
               "kind": "variable",
-              "signature": "readonly [\"initialize\", \"create-grid\", \"datasource-request\", \"renderer-worker\", \"export-xlsx\", \"xlsx-import\", \"xlsx-export\", \"delimited-parse\", \"delimited-import\", \"delimited-encode\", \"delimited-export\", \"delimited-options\", \"snapshot-validate\", \"snapshot-allocate\", \"persistence\", \"pending-storage\", \"synchronize\", \"presence\", \"revision\", \"comments\", \"query\", \"hyperlink-activate\", \"keyboard-configure\", \"chart-view\", \"host-function\"]",
+              "signature": "readonly [\"initialize\", \"create-grid\", \"engine\", \"datasource-request\", \"renderer-worker\", \"export-xlsx\", \"xlsx-import\", \"xlsx-export\", \"delimited-parse\", \"delimited-import\", \"delimited-encode\", \"delimited-export\", \"delimited-options\", \"snapshot-validate\", \"snapshot-allocate\", \"persistence\", \"pending-storage\", \"synchronize\", \"presence\", \"revision\", \"comments\", \"query\", \"hyperlink-activate\", \"keyboard-configure\", \"chart-view\", \"host-function\"]",
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L61",
+              "source": "src/errors.ts#L62",
               "jsDocTags": [],
               "documentation": "Stable operations at which a consumer-visible failure can surface.",
               "memberDocs": []
@@ -5128,7 +5132,7 @@
               "owners": [
                 "src/engine.ts"
               ],
-              "source": "src/engine.ts#L4",
+              "source": "src/engine.ts#L6",
               "jsDocTags": [],
               "documentation": "A complete engine module from `@sheetwrite/wasm` or `@sheetwrite/formulas`.",
               "memberDocs": [
@@ -5141,11 +5145,11 @@
             {
               "name": "SheetwriteError",
               "kind": "class",
-              "signature": "class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: \"aborted\" | \"batch-limit\" | \"blocked\" | \"buffer-byte-limit\" | \"buffer-count-limit\" | \"buffer-operation-limit\" | \"comment-failed\" | \"commit-rejected\" | \"conflict\" | \"datasource-request-failed\" | \"delimited-text-invalid-limit\" | \"delimited-text-resource-limit\" | \"export-failed\" | \"future-distance-limit\" | \"incomplete-data\" | \"initialization-failed\" | \"initialization-required\" | \"invalid-batch\" | \"invalid-function\" | \"invalid-id\" | \"invalid-limits\" | \"invalid-operations\" | \"invalid-shortcut\" | \"invalid-snapshot\" | \"invalid-version\" | \"late-echo\" | \"limit\" | \"not-found\" | \"operation-limit\" | \"optional-backend-unavailable\" | \"payload-limit\" | \"pending-byte-limit\" | \"pending-capacity\" | \"pending-count-limit\" | \"pending-operation-limit\" | \"presence-failed\" | \"quota\" | \"remote-operations-rejected\" | \"renderer-fallback\" | \"resource-limit\" | \"response-id-mismatch\" | \"revision-failed\" | \"shortcut-conflict\" | \"sync-failed\" | \"sync-storage-failed\" | \"transaction\" | \"unavailable\" | \"unsafe-hyperlink\" | \"unsupported-schema\" | \"xlsx-import-failed\" | \"xlsx-invalid-options\" | \"xlsx-resource-limit\"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: \"chart-view\" | \"comments\" | \"create-grid\" | \"datasource-request\" | \"delimited-encode\" | \"delimited-export\" | \"delimited-import\" | \"delimited-options\" | \"delimited-parse\" | \"export-xlsx\" | \"host-function\" | \"hyperlink-activate\" | \"initialize\" | \"keyboard-configure\" | \"pending-storage\" | \"persistence\" | \"presence\" | \"query\" | \"renderer-worker\" | \"revision\" | \"snapshot-allocate\" | \"snapshot-validate\" | \"synchronize\" | \"xlsx-export\" | \"xlsx-import\"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }",
+              "signature": "class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: \"aborted\" | \"batch-limit\" | \"blocked\" | \"buffer-byte-limit\" | \"buffer-count-limit\" | \"buffer-operation-limit\" | \"comment-failed\" | \"commit-rejected\" | \"conflict\" | \"datasource-request-failed\" | \"delimited-text-invalid-limit\" | \"delimited-text-resource-limit\" | \"engine-failed\" | \"export-failed\" | \"future-distance-limit\" | \"incomplete-data\" | \"initialization-failed\" | \"initialization-required\" | \"invalid-batch\" | \"invalid-function\" | \"invalid-id\" | \"invalid-limits\" | \"invalid-operations\" | \"invalid-shortcut\" | \"invalid-snapshot\" | \"invalid-version\" | \"late-echo\" | \"limit\" | \"not-found\" | \"operation-limit\" | \"optional-backend-unavailable\" | \"payload-limit\" | \"pending-byte-limit\" | \"pending-capacity\" | \"pending-count-limit\" | \"pending-operation-limit\" | \"presence-failed\" | \"quota\" | \"remote-operations-rejected\" | \"renderer-fallback\" | \"resource-limit\" | \"response-id-mismatch\" | \"revision-failed\" | \"shortcut-conflict\" | \"sync-failed\" | \"sync-storage-failed\" | \"transaction\" | \"unavailable\" | \"unsafe-hyperlink\" | \"unsupported-schema\" | \"xlsx-import-failed\" | \"xlsx-invalid-options\" | \"xlsx-resource-limit\"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: \"chart-view\" | \"comments\" | \"create-grid\" | \"datasource-request\" | \"delimited-encode\" | \"delimited-export\" | \"delimited-import\" | \"delimited-options\" | \"delimited-parse\" | \"engine\" | \"export-xlsx\" | \"host-function\" | \"hyperlink-activate\" | \"initialize\" | \"keyboard-configure\" | \"pending-storage\" | \"persistence\" | \"presence\" | \"query\" | \"renderer-worker\" | \"revision\" | \"snapshot-allocate\" | \"snapshot-validate\" | \"synchronize\" | \"xlsx-export\" | \"xlsx-import\"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }",
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L288",
+              "source": "src/errors.ts#L290",
               "jsDocTags": [],
               "documentation": "Canonical envelope for thrown and callback-delivered Sheetwrite failures.",
               "memberDocs": []
@@ -5157,7 +5161,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L58",
+              "source": "src/errors.ts#L59",
               "jsDocTags": [],
               "documentation": "Exhaustive stable discriminator for consumer-visible Sheetwrite failures.",
               "memberDocs": []
@@ -5169,7 +5173,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L102",
+              "source": "src/errors.ts#L104",
               "jsDocTags": [],
               "documentation": "Stable, serialization-safe diagnostic context.",
               "memberDocs": []
@@ -5181,7 +5185,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L93",
+              "source": "src/errors.ts#L95",
               "jsDocTags": [],
               "documentation": "JSON-safe values accepted in a public failure context.",
               "memberDocs": []
@@ -5193,7 +5197,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L105",
+              "source": "src/errors.ts#L107",
               "jsDocTags": [],
               "documentation": "Structural form preserved across realms and JSON serialization.",
               "memberDocs": []
@@ -5205,7 +5209,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L90",
+              "source": "src/errors.ts#L92",
               "jsDocTags": [],
               "documentation": "Exhaustive stable operation discriminator for consumer-visible failures.",
               "memberDocs": []
@@ -5217,7 +5221,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L115",
+              "source": "src/errors.ts#L117",
               "jsDocTags": [],
               "documentation": "Optional cause, diagnostic context, and boundary-known retryability.",
               "memberDocs": [
@@ -5234,7 +5238,7 @@
               "owners": [
                 "src/store.ts"
               ],
-              "source": "src/store.ts#L145",
+              "source": "src/store.ts#L146",
               "jsDocTags": [
                 "example",
                 "see"
@@ -5342,7 +5346,7 @@
               "owners": [
                 "src/store.ts"
               ],
-              "source": "src/store.ts#L76",
+              "source": "src/store.ts#L77",
               "jsDocTags": [],
               "documentation": "Storage layout plus snapshot and transaction resource ceilings for one store.",
               "memberDocs": [
@@ -6069,7 +6073,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L95",
+              "source": "src/export.ts#L96",
               "jsDocTags": [
                 "link",
                 "throws"
@@ -6084,7 +6088,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L103",
+              "source": "src/export.ts#L104",
               "jsDocTags": [],
               "documentation": "Export UTF-8 CSV on demand, retaining only one store window and one byte chunk.",
               "memberDocs": []
@@ -6149,7 +6153,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L173",
+              "source": "src/export.ts#L175",
               "jsDocTags": [
                 "link",
                 "throws"
@@ -6164,7 +6168,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L180",
+              "source": "src/export.ts#L182",
               "jsDocTags": [],
               "documentation": "Export canonical data-space TSV with pull-driven store reads and cancellation.",
               "memberDocs": []
@@ -6176,7 +6180,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L437",
+              "source": "src/export.ts#L479",
               "jsDocTags": [
                 "example",
                 "see"
@@ -6191,7 +6195,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L455",
+              "source": "src/export.ts#L499",
               "jsDocTags": [],
               "documentation": "Stream table XLSX bytes without materializing the finished archive.",
               "memberDocs": []
@@ -6203,7 +6207,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L639",
+              "source": "src/export.ts#L690",
               "jsDocTags": [
                 "example",
                 "see"
@@ -6218,7 +6222,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L657",
+              "source": "src/export.ts#L711",
               "jsDocTags": [],
               "documentation": "Stream formula-preserving workbook XLSX with backpressure and cancellation.",
               "memberDocs": []
@@ -6823,7 +6827,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L371",
+              "source": "src/export.ts#L379",
               "jsDocTags": [],
               "documentation": "Stable resource-limit failure surfaced before an XLSX codec allocates unsafe data.",
               "memberDocs": []
@@ -6835,7 +6839,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L301",
+              "source": "src/export.ts#L309",
               "jsDocTags": [],
               "documentation": "Resource dimensions bounded by every XLSX import and export path.",
               "memberDocs": [
@@ -7008,7 +7012,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L392",
+              "source": "src/export.ts#L400",
               "jsDocTags": [],
               "documentation": "Pluggable first-row-header, first-sheet table export backend.",
               "memberDocs": []
@@ -7020,7 +7024,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L475",
+              "source": "src/export.ts#L520",
               "jsDocTags": [],
               "documentation": "Pluggable table import backend. Parses raw `.xlsx` bytes into the same\n`ColumnarData` shape `fromCsv` returns, so host ingestion code can stay\nformat-agnostic.",
               "memberDocs": []
@@ -7032,7 +7036,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L560",
+              "source": "src/export.ts#L611",
               "jsDocTags": [
                 "internal"
               ],
@@ -7046,7 +7050,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L544",
+              "source": "src/export.ts#L591",
               "jsDocTags": [],
               "documentation": "Shared options passed to every registered table and workbook XLSX backend.",
               "memberDocs": [
@@ -7060,7 +7064,7 @@
                 },
                 {
                   "name": "signal",
-                  "documentation": "Abort before or between bounded codec operations."
+                  "documentation": "Checked before the work and once per ZIP entry, worksheet and chunk of\ncells. After it fires, the call rejects (or the stream errors) with\n`signal.reason`, not with a `SheetwriteError`."
                 }
               ]
             },
@@ -7071,7 +7075,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L525",
+              "source": "src/export.ts#L572",
               "jsDocTags": [],
               "documentation": "Structured fidelity warning emitted during XLSX conversion.",
               "memberDocs": []
@@ -7519,7 +7523,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L326",
+              "source": "src/errors.ts#L328",
               "jsDocTags": [],
               "documentation": "Narrow same-realm errors, cross-realm errors, and serialized failure envelopes.",
               "memberDocs": []
@@ -7830,7 +7834,7 @@
             {
               "name": "SHEETWRITE_ERROR_CODES",
               "kind": "variable",
-              "signature": "readonly [\"initialization-failed\", \"initialization-required\", \"datasource-request-failed\", \"renderer-fallback\", \"export-failed\", \"xlsx-import-failed\", \"optional-backend-unavailable\", \"delimited-text-resource-limit\", \"delimited-text-invalid-limit\", \"xlsx-resource-limit\", \"resource-limit\", \"invalid-snapshot\", \"aborted\", \"not-found\", \"commit-rejected\", \"unavailable\", \"blocked\", \"quota\", \"unsupported-schema\", \"transaction\", \"conflict\", \"limit\", \"invalid-limits\", \"invalid-version\", \"invalid-id\", \"invalid-operations\", \"operation-limit\", \"payload-limit\", \"response-id-mismatch\", \"future-distance-limit\", \"buffer-count-limit\", \"buffer-operation-limit\", \"buffer-byte-limit\", \"pending-count-limit\", \"pending-operation-limit\", \"pending-byte-limit\", \"late-echo\", \"remote-operations-rejected\", \"invalid-batch\", \"batch-limit\", \"pending-capacity\", \"presence-failed\", \"revision-failed\", \"comment-failed\", \"sync-failed\", \"sync-storage-failed\", \"incomplete-data\", \"xlsx-invalid-options\", \"unsafe-hyperlink\", \"invalid-shortcut\", \"shortcut-conflict\", \"invalid-function\"]",
+              "signature": "readonly [\"initialization-failed\", \"initialization-required\", \"engine-failed\", \"datasource-request-failed\", \"renderer-fallback\", \"export-failed\", \"xlsx-import-failed\", \"optional-backend-unavailable\", \"delimited-text-resource-limit\", \"delimited-text-invalid-limit\", \"xlsx-resource-limit\", \"resource-limit\", \"invalid-snapshot\", \"aborted\", \"not-found\", \"commit-rejected\", \"unavailable\", \"blocked\", \"quota\", \"unsupported-schema\", \"transaction\", \"conflict\", \"limit\", \"invalid-limits\", \"invalid-version\", \"invalid-id\", \"invalid-operations\", \"operation-limit\", \"payload-limit\", \"response-id-mismatch\", \"future-distance-limit\", \"buffer-count-limit\", \"buffer-operation-limit\", \"buffer-byte-limit\", \"pending-count-limit\", \"pending-operation-limit\", \"pending-byte-limit\", \"late-echo\", \"remote-operations-rejected\", \"invalid-batch\", \"batch-limit\", \"pending-capacity\", \"presence-failed\", \"revision-failed\", \"comment-failed\", \"sync-failed\", \"sync-storage-failed\", \"incomplete-data\", \"xlsx-invalid-options\", \"unsafe-hyperlink\", \"invalid-shortcut\", \"shortcut-conflict\", \"invalid-function\"]",
               "owners": [
                 "src/errors.ts"
               ],
@@ -7842,11 +7846,11 @@
             {
               "name": "SHEETWRITE_ERROR_OPERATIONS",
               "kind": "variable",
-              "signature": "readonly [\"initialize\", \"create-grid\", \"datasource-request\", \"renderer-worker\", \"export-xlsx\", \"xlsx-import\", \"xlsx-export\", \"delimited-parse\", \"delimited-import\", \"delimited-encode\", \"delimited-export\", \"delimited-options\", \"snapshot-validate\", \"snapshot-allocate\", \"persistence\", \"pending-storage\", \"synchronize\", \"presence\", \"revision\", \"comments\", \"query\", \"hyperlink-activate\", \"keyboard-configure\", \"chart-view\", \"host-function\"]",
+              "signature": "readonly [\"initialize\", \"create-grid\", \"engine\", \"datasource-request\", \"renderer-worker\", \"export-xlsx\", \"xlsx-import\", \"xlsx-export\", \"delimited-parse\", \"delimited-import\", \"delimited-encode\", \"delimited-export\", \"delimited-options\", \"snapshot-validate\", \"snapshot-allocate\", \"persistence\", \"pending-storage\", \"synchronize\", \"presence\", \"revision\", \"comments\", \"query\", \"hyperlink-activate\", \"keyboard-configure\", \"chart-view\", \"host-function\"]",
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L61",
+              "source": "src/errors.ts#L62",
               "jsDocTags": [],
               "documentation": "Stable operations at which a consumer-visible failure can surface.",
               "memberDocs": []
@@ -7854,11 +7858,11 @@
             {
               "name": "SheetwriteError",
               "kind": "class",
-              "signature": "class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: \"aborted\" | \"batch-limit\" | \"blocked\" | \"buffer-byte-limit\" | \"buffer-count-limit\" | \"buffer-operation-limit\" | \"comment-failed\" | \"commit-rejected\" | \"conflict\" | \"datasource-request-failed\" | \"delimited-text-invalid-limit\" | \"delimited-text-resource-limit\" | \"export-failed\" | \"future-distance-limit\" | \"incomplete-data\" | \"initialization-failed\" | \"initialization-required\" | \"invalid-batch\" | \"invalid-function\" | \"invalid-id\" | \"invalid-limits\" | \"invalid-operations\" | \"invalid-shortcut\" | \"invalid-snapshot\" | \"invalid-version\" | \"late-echo\" | \"limit\" | \"not-found\" | \"operation-limit\" | \"optional-backend-unavailable\" | \"payload-limit\" | \"pending-byte-limit\" | \"pending-capacity\" | \"pending-count-limit\" | \"pending-operation-limit\" | \"presence-failed\" | \"quota\" | \"remote-operations-rejected\" | \"renderer-fallback\" | \"resource-limit\" | \"response-id-mismatch\" | \"revision-failed\" | \"shortcut-conflict\" | \"sync-failed\" | \"sync-storage-failed\" | \"transaction\" | \"unavailable\" | \"unsafe-hyperlink\" | \"unsupported-schema\" | \"xlsx-import-failed\" | \"xlsx-invalid-options\" | \"xlsx-resource-limit\"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: \"chart-view\" | \"comments\" | \"create-grid\" | \"datasource-request\" | \"delimited-encode\" | \"delimited-export\" | \"delimited-import\" | \"delimited-options\" | \"delimited-parse\" | \"export-xlsx\" | \"host-function\" | \"hyperlink-activate\" | \"initialize\" | \"keyboard-configure\" | \"pending-storage\" | \"persistence\" | \"presence\" | \"query\" | \"renderer-worker\" | \"revision\" | \"snapshot-allocate\" | \"snapshot-validate\" | \"synchronize\" | \"xlsx-export\" | \"xlsx-import\"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }",
+              "signature": "class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: \"aborted\" | \"batch-limit\" | \"blocked\" | \"buffer-byte-limit\" | \"buffer-count-limit\" | \"buffer-operation-limit\" | \"comment-failed\" | \"commit-rejected\" | \"conflict\" | \"datasource-request-failed\" | \"delimited-text-invalid-limit\" | \"delimited-text-resource-limit\" | \"engine-failed\" | \"export-failed\" | \"future-distance-limit\" | \"incomplete-data\" | \"initialization-failed\" | \"initialization-required\" | \"invalid-batch\" | \"invalid-function\" | \"invalid-id\" | \"invalid-limits\" | \"invalid-operations\" | \"invalid-shortcut\" | \"invalid-snapshot\" | \"invalid-version\" | \"late-echo\" | \"limit\" | \"not-found\" | \"operation-limit\" | \"optional-backend-unavailable\" | \"payload-limit\" | \"pending-byte-limit\" | \"pending-capacity\" | \"pending-count-limit\" | \"pending-operation-limit\" | \"presence-failed\" | \"quota\" | \"remote-operations-rejected\" | \"renderer-fallback\" | \"resource-limit\" | \"response-id-mismatch\" | \"revision-failed\" | \"shortcut-conflict\" | \"sync-failed\" | \"sync-storage-failed\" | \"transaction\" | \"unavailable\" | \"unsafe-hyperlink\" | \"unsupported-schema\" | \"xlsx-import-failed\" | \"xlsx-invalid-options\" | \"xlsx-resource-limit\"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: \"chart-view\" | \"comments\" | \"create-grid\" | \"datasource-request\" | \"delimited-encode\" | \"delimited-export\" | \"delimited-import\" | \"delimited-options\" | \"delimited-parse\" | \"engine\" | \"export-xlsx\" | \"host-function\" | \"hyperlink-activate\" | \"initialize\" | \"keyboard-configure\" | \"pending-storage\" | \"persistence\" | \"presence\" | \"query\" | \"renderer-worker\" | \"revision\" | \"snapshot-allocate\" | \"snapshot-validate\" | \"synchronize\" | \"xlsx-export\" | \"xlsx-import\"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }",
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L288",
+              "source": "src/errors.ts#L290",
               "jsDocTags": [],
               "documentation": "Canonical envelope for thrown and callback-delivered Sheetwrite failures.",
               "memberDocs": []
@@ -7870,7 +7874,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L58",
+              "source": "src/errors.ts#L59",
               "jsDocTags": [],
               "documentation": "Exhaustive stable discriminator for consumer-visible Sheetwrite failures.",
               "memberDocs": []
@@ -7882,7 +7886,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L102",
+              "source": "src/errors.ts#L104",
               "jsDocTags": [],
               "documentation": "Stable, serialization-safe diagnostic context.",
               "memberDocs": []
@@ -7894,7 +7898,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L105",
+              "source": "src/errors.ts#L107",
               "jsDocTags": [],
               "documentation": "Structural form preserved across realms and JSON serialization.",
               "memberDocs": []
@@ -7906,7 +7910,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L90",
+              "source": "src/errors.ts#L92",
               "jsDocTags": [],
               "documentation": "Exhaustive stable operation discriminator for consumer-visible failures.",
               "memberDocs": []
@@ -9354,7 +9358,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L622",
+              "source": "../core/dist/types/grid.d.ts#L633",
               "jsDocTags": [
                 "example",
                 "see"
@@ -9607,7 +9611,7 @@
                 },
                 {
                   "name": "setReadOnly",
-                  "documentation": "Update editability without replacing the Grid or clearing session state."
+                  "documentation": "Update editability without replacing the Grid or clearing session state.\nHas no effect after `engine-failed`: that grid stays read-only."
                 },
                 {
                   "name": "setRowHeight",
@@ -10357,7 +10361,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L622",
+              "source": "../core/dist/types/grid.d.ts#L633",
               "jsDocTags": [
                 "example",
                 "see"
@@ -10610,7 +10614,7 @@
                 },
                 {
                   "name": "setReadOnly",
-                  "documentation": "Update editability without replacing the Grid or clearing session state."
+                  "documentation": "Update editability without replacing the Grid or clearing session state.\nHas no effect after `engine-failed`: that grid stays read-only."
                 },
                 {
                   "name": "setRowHeight",
@@ -11346,7 +11350,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L622",
+              "source": "../core/dist/types/grid.d.ts#L633",
               "jsDocTags": [
                 "example",
                 "see"
@@ -11599,7 +11603,7 @@
                 },
                 {
                   "name": "setReadOnly",
-                  "documentation": "Update editability without replacing the Grid or clearing session state."
+                  "documentation": "Update editability without replacing the Grid or clearing session state.\nHas no effect after `engine-failed`: that grid stays read-only."
                 },
                 {
                   "name": "setRowHeight",
@@ -12701,7 +12705,7 @@
               "owners": [
                 "src/table-export.ts"
               ],
-              "source": "src/table-export.ts#L31",
+              "source": "src/table-export.ts#L34",
               "jsDocTags": [],
               "documentation": "Build the active-sheet table model used by the bounded OOXML writer.",
               "memberDocs": []
@@ -12728,7 +12732,7 @@
               "owners": [
                 "src/table-export.ts"
               ],
-              "source": "src/table-export.ts#L116",
+              "source": "src/table-export.ts#L120",
               "jsDocTags": [],
               "documentation": "Default bounded first-sheet table export backend.",
               "memberDocs": []
@@ -12764,7 +12768,7 @@
               "owners": [
                 "src/table-export.ts"
               ],
-              "source": "src/table-export.ts#L23",
+              "source": "src/table-export.ts#L26",
               "jsDocTags": [],
               "documentation": "Implementation-neutral first-sheet table export model.",
               "memberDocs": []
@@ -12776,7 +12780,7 @@
               "owners": [
                 "src/table-export.ts"
               ],
-              "source": "src/table-export.ts#L14",
+              "source": "src/table-export.ts#L17",
               "jsDocTags": [],
               "documentation": "Implementation-neutral cell in the first-sheet table export model.",
               "memberDocs": []

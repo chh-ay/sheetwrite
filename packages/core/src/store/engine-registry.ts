@@ -10,19 +10,33 @@ import type { StoreDataEngine } from "./data-engine.js";
  */
 const ENGINES = new WeakMap<object, StoreDataEngine>();
 
-const LIVE_ENGINES = new Set<WeakRef<StoreDataEngine>>();
+/** Engine generation (see `engineGeneration`) of the instance each store was built on. */
+const GENERATIONS = new WeakMap<object, number>();
+
+/** Live engines and the engine generation each was built on. */
+const LIVE_ENGINES = new Map<WeakRef<StoreDataEngine>, number>();
 
 const finalized = new FinalizationRegistry<WeakRef<StoreDataEngine>>((ref) => {
   LIVE_ENGINES.delete(ref);
 });
 
 /** Record the engine behind a store facade. Called once per constructed store. */
-export function registerStoreEngine(store: object, engine: StoreDataEngine): void {
+export function registerStoreEngine(
+  store: object,
+  engine: StoreDataEngine,
+  generation: number,
+): void {
   ENGINES.set(store, engine);
+  GENERATIONS.set(store, generation);
 
   const ref = new WeakRef(engine);
-  LIVE_ENGINES.add(ref);
+  LIVE_ENGINES.set(ref, generation);
   finalized.register(engine, ref);
+}
+
+/** Engine generation of a registered store; `undefined` for any other object. */
+export function storeGeneration(store: object): number | undefined {
+  return GENERATIONS.get(store);
 }
 
 /**
@@ -39,15 +53,28 @@ export function storeEngine(store: object): StoreDataEngine | null {
   return engine ?? null;
 }
 
-/** Pin every currently live store for the duration of an atomic instance cutover. */
-export function liveStoreEngines(): StoreDataEngine[] {
+/**
+ * Pin every currently live store of the running engine (`generation`) for the
+ * duration of an atomic instance cutover. Stores of a stopped engine keep
+ * their dead instance, so they leave the live set and are never migrated.
+ */
+export function liveStoreEngines(generation: number): StoreDataEngine[] {
   const engines: StoreDataEngine[] = [];
 
-  for (const ref of LIVE_ENGINES) {
+  for (const [ref, built] of LIVE_ENGINES) {
     const engine = ref.deref();
-    if (engine) engines.push(engine);
+    if (engine && built === generation) engines.push(engine);
     else LIVE_ENGINES.delete(ref);
   }
 
   return engines;
+}
+
+/** Drop one store whose cell store can no longer answer, so memory release skips it. */
+export function forgetLiveStoreEngine(store: object): void {
+  const engine = ENGINES.get(store);
+
+  for (const ref of LIVE_ENGINES.keys()) {
+    if (ref.deref() === engine) LIVE_ENGINES.delete(ref);
+  }
 }

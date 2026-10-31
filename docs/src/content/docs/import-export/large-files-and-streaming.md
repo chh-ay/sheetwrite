@@ -20,6 +20,7 @@ await toXlsxWorkbookStream(store.exportSnapshot(), {
 | Destination receives bytes | Bounded `Uint8Array` chunks, not one complete file buffer. |
 | Destination slows down | Backpressure slows the producer. |
 | Reader cancels | Export stops reading the store. |
+| `controller.abort(reason)` | The stream errors with `reason` at the next ZIP entry, worksheet or chunk of cells. |
 
 The output contains the same XLSX parts as buffered export. ZIP entry order and container bytes can differ.
 
@@ -75,8 +76,8 @@ Every XLSX table/workbook path shares `XlsxWorkbookOptions`:
 | --- | --- |
 | `maxCells` | Logical accepted cells; default `1_000_000`. |
 | `resourceLimits` | Override specific input, archive, XML, dimension, preservation and output budgets. |
-| `signal` | Abort between bounded codec stages. |
-| `onWarning` | Surface structured fidelity losses. |
+| `signal` | Checked before the work and once per ZIP entry, worksheet and chunk of XML elements or cells, never once per cell. |
+| `onWarning` | Surface structured fidelity losses; one conversion reports at most 64 warnings. |
 
 Defaults are exported as `DEFAULT_XLSX_RESOURCE_LIMITS`:
 
@@ -101,6 +102,27 @@ Defaults are exported as `DEFAULT_XLSX_RESOURCE_LIMITS`:
 | XML text bytes | 16 MiB |
 
 Hard resource bounds are checked before unsafe decompression or allocation. Exceeding one rejects with `XlsxResourceError`, which names the resource, limit and observed value. The [kept-part budget](/docs/import-export/kept-parts-and-round-trips/#drops-and-warnings) instead drops over-budget graphs with warnings. Do not raise limits merely to suppress failures; budget for the resulting snapshot as well as the codec.
+
+## Abort
+
+An abort is not a failure. After `signal` fires, every import and export call rejects (and every stream errors) with `signal.reason` itself, not with a `SheetwriteError`. CSV and TSV parsing and export do the same with `DelimitedTextOptions.signal`, checked once per 1,024 records and once per store window. An aborted import keeps no partial snapshot, and an aborted export does not change the store. Compare the rejection with the reason to tell an abort from a failure:
+
+```ts compile title="Tell an abort from a failure"
+import { fromXlsxWorkbook, isSheetwriteError } from "@sheetwrite/core";
+import "@sheetwrite/xlsx/register";
+
+declare const bytes: Uint8Array;
+const controller = new AbortController();
+try {
+  await fromXlsxWorkbook(bytes, { signal: controller.signal });
+} catch (error) {
+  if (error === controller.signal.reason) console.info("Import cancelled");
+  else if (isSheetwriteError(error)) console.error(error.code, error.message);
+  else throw error;
+}
+```
+
+An XLSX error message keeps at most 8 KiB of text from the file, so a hostile part name or attribute cannot make a large error.
 
 ## Memory evidence and limits
 

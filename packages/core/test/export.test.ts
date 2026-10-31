@@ -564,7 +564,7 @@ describe("export", () => {
     });
     const sheet = store.getWorkbook().sheets[0]!;
     const controller = new AbortController();
-    controller.abort();
+    controller.abort(new Error("cancelled CSV stream"));
     const failureOf = async (stream: ReadableStream<Uint8Array>): Promise<unknown> => {
       const reader = stream.getReader();
       try {
@@ -574,8 +574,8 @@ describe("export", () => {
       }
       throw new Error("expected the stream to fail");
     };
-    expect(await failureOf(toCsvStream(sheet, store, { signal: controller.signal }))).toMatchObject(
-      { code: "aborted" },
+    expect(await failureOf(toCsvStream(sheet, store, { signal: controller.signal }))).toBe(
+      controller.signal.reason,
     );
     expect(
       await failureOf(toCsvStream(sheet, store, { resourceLimits: { maxOutputBytes: 8 } })),
