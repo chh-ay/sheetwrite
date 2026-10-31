@@ -24,7 +24,7 @@ test("the cell editor lists functions, picks one with the keyboard, and guides t
   page.on("pageerror", (error) => errors.push(error.message));
   await open(page);
 
-  await editCell(page, "J2", "=ROU");
+  await editCell(page, "G3", "=ROU");
   const editor = page.locator("textarea.sheetwrite-editor");
   const list = page.getByRole("listbox", { name: "Functions" });
   await expect(list.getByRole("option", { name: "ROUND", exact: true })).toBeVisible();
@@ -53,7 +53,7 @@ test("a click picks a function, references get colours, and errors show while ty
 }) => {
   await open(page);
 
-  await editCell(page, "J2", "=SU");
+  await editCell(page, "G3", "=SU");
   const option = page.getByRole("option", { name: "SUMIF", exact: true });
   await option.click();
   const editor = page.locator("textarea.sheetwrite-editor");
@@ -75,10 +75,11 @@ test("the formula bar is a combobox with the same help", async ({ page }) => {
   await open(page);
 
   const nameBox = page.getByRole("textbox", { name: "Cell reference" });
-  await nameBox.fill("J2");
+  await nameBox.fill("G3");
   await nameBox.press("Enter");
   const bar = page.getByRole("combobox", { name: "Formula bar" });
   await page.getByRole("textbox", { name: "Formula bar" }).click();
+  await page.keyboard.press("ControlOrMeta+A");
   await page.keyboard.type("=AVERAG");
 
   await expect(bar).toHaveAttribute("aria-expanded", "true");
@@ -92,18 +93,18 @@ test("the formula bar is a combobox with the same help", async ({ page }) => {
 test("Formulas › Explain Formula describes the formula in the focus cell", async ({ page }) => {
   await open(page);
 
-  await editCell(page, "J2", "=ROUND(G2, 1)");
+  await editCell(page, "G3", "=ROUND(E3, 1)");
   await page.keyboard.press("Enter");
   const nameBox = page.getByRole("textbox", { name: "Cell reference" });
-  await nameBox.fill("J2");
+  await nameBox.fill("G3");
   await nameBox.press("Enter");
 
   await page.getByRole("tab", { name: "Formulas" }).click();
   await page.getByRole("button", { name: "Explain Formula" }).click();
 
   const panel = page.getByRole("complementary", { name: "Explain Formula" });
-  await expect(panel).toContainText("Formula in J2");
+  await expect(panel).toContainText("Formula in G3");
   await expect(panel).toContainText("ROUND(number, digits)");
   await expect(panel).toContainText("digits: 1");
-  await expect(panel).toContainText("G2: 1 cell on this sheet");
+  await expect(panel).toContainText("E3: 1 cell on this sheet");
 });
