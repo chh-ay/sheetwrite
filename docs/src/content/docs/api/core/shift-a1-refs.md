@@ -8,9 +8,11 @@ description: "shiftA1Refs function in @sheetwrite/core: Shift relative A1 refere
 Shift relative A1 references in a formula by (dRow, dCol) — used when a
 formula is filled into other cells. Absolute parts ($A, A$1) stay fixed, and
 tokens preceded by an alphanumeric (function names, identifiers) are skipped.
+A reference shifted off the sheet becomes `#REF!`, and so does any range
+with such a corner.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/a1.ts#L46"><code>packages/core/src/a1.ts#L46</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/a1.ts#L56"><code>packages/core/src/a1.ts#L56</code></a></dd></div>
 </dl>
 
 ## Declaration

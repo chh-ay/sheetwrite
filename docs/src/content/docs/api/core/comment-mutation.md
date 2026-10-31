@@ -8,7 +8,7 @@ description: "CommentMutation type in @sheetwrite/core: Serializable operation t
 Serializable operation that creates or updates comment state.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/collaboration.ts#L428"><code>packages/core/src/collaboration.ts#L428</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/collaboration.ts#L430"><code>packages/core/src/collaboration.ts#L430</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>3</span>

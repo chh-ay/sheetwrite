@@ -45,6 +45,14 @@ const COLUMNS = "M7 20v-8h2.5v8M11.5 20V7H14v13M16 20V10h2.5v10";
 const COLUMNS_FILL = "M7 12h2.5v8H7ZM11.5 7H14v13h-2.5ZM16 10h2.5v10H16Z";
 const PIE = "M20 12a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z";
 
+/** A rectangle with the sheet's 1.5-unit corner radius, as most frames use. */
+function frame(x: number, y: number, width: number, height: number): string {
+  const r = 1.5;
+  const w = width - 2 * r;
+  const h = height - 2 * r;
+  return `M${x + r} ${y}h${w}a${r} ${r} 0 0 1 ${r} ${r}v${h}a${r} ${r} 0 0 1-${r} ${r}h-${w}a${r} ${r} 0 0 1-${r}-${r}v-${h}a${r} ${r} 0 0 1 ${r}-${r}Z`;
+}
+
 export const ICON_ROWS: readonly (readonly Glyph[])[] = [
   // History, clipboard and search.
   [
@@ -350,6 +358,145 @@ export const ICON_ROWS: readonly (readonly Glyph[])[] = [
         "M17 11.5V13a4 4 0 0 1-4 4h-1.5",
         "m13.5 15-2 2 2 2",
       ],
+    ],
+  ],
+  // Formulas: functions, names and formula help.
+  [
+    // Excel's fx: an f with a crossbar beside an x.
+    [
+      "insertFunction",
+      ["M13 4h-1.5A2.5 2.5 0 0 0 9 6.5V20", "M5.5 10H12", "m13.5 11 6.5 8.5m0-8.5-6.5 8.5"],
+    ],
+    // A name tag with the name written on it.
+    [
+      "defineName",
+      [
+        "M3.5 7.5A1.5 1.5 0 0 1 5 6h10.3a1.5 1.5 0 0 1 1.1.5l4 4.5a1.5 1.5 0 0 1 0 2l-4 4.5a1.5 1.5 0 0 1-1.1.5H5a1.5 1.5 0 0 1-1.5-1.5Z",
+        "M7 12h6",
+      ],
+    ],
+    // A list of names beside their references: the tint marks the name column.
+    [
+      "nameManager",
+      [
+        tint("M10.5 4v16h-5A1.5 1.5 0 0 1 4 18.5v-13A1.5 1.5 0 0 1 5.5 4Z"),
+        frame(4, 4, 16, 16),
+        "M10.5 4v16",
+        "M13.5 8.5h3.5M13.5 12h3.5M13.5 15.5h3.5",
+      ],
+    ],
+    // A question in a speech bubble: the formula explained in words.
+    [
+      "explainFormula",
+      [
+        "M5.5 3.5h13A1.5 1.5 0 0 1 20 5v10.5a1.5 1.5 0 0 1-1.5 1.5H11l-4 3.5V17H5.5A1.5 1.5 0 0 1 4 15.5V5a1.5 1.5 0 0 1 1.5-1.5Z",
+        "M9.5 8.5a2.5 2.5 0 1 1 3.4 2.3c-.5.2-.9.7-.9 1.2v.5",
+        bold("M12 14.6h.01"),
+      ],
+    ],
+  ],
+  // Data sources, links and the data model.
+  [
+    // A data source with an arrow into the sheet.
+    [
+      "getData",
+      [
+        "M4 6c0-1.4 2.7-2.5 6-2.5s6 1.1 6 2.5-2.7 2.5-6 2.5S4 7.4 4 6Z",
+        "M4 6v11c0 1.4 2.7 2.5 6 2.5M16 6v5.5",
+        "M4 11.5c0 1.4 2.7 2.5 6 2.5",
+        "M18.5 13v7.5m-3-3 3 3 3-3",
+      ],
+    ],
+    [
+      "refreshAll",
+      ["M5 12a7 7 0 0 1 13.06-3.5", "M18 4.5v4h-4", "M19 12a7 7 0 0 1-13.06 3.5", "M6 19.5v-4h4"],
+    ],
+    // A query is a source and a list of steps; the tint marks the output table.
+    [
+      "queries",
+      [
+        frame(6.5, 2.5, 11, 4.5),
+        frame(6.5, 9.75, 11, 4.5),
+        tint(frame(6.5, 17, 11, 4.5)),
+        frame(6.5, 17, 11, 4.5),
+        "M12 7v2.75M12 14.25V17",
+      ],
+    ],
+    // A sheet with an arrow out of it: cells that read another workbook.
+    [
+      "editLinks",
+      [
+        "M10 5H5.5A1.5 1.5 0 0 0 4 6.5v12A1.5 1.5 0 0 0 5.5 20h12a1.5 1.5 0 0 0 1.5-1.5V14",
+        "M14 4h6v6M20 4l-8.5 8.5",
+      ],
+    ],
+    // Two tables, header rows tinted, joined by one key.
+    [
+      "relationships",
+      [
+        tint("M3 6V4.5A1.5 1.5 0 0 1 4.5 3h5A1.5 1.5 0 0 1 11 4.5V6Z"),
+        tint("M13 16v-1.5a1.5 1.5 0 0 1 1.5-1.5h5a1.5 1.5 0 0 1 1.5 1.5V16Z"),
+        frame(3, 3, 8, 8),
+        frame(13, 13, 8, 8),
+        "M3 6h8M13 16h8",
+        "M7 11v6h6",
+      ],
+    ],
+    // A cube: the model that holds the related tables.
+    [
+      "dataModel",
+      [
+        tint("M12 3 20 7.5 12 12 4 7.5Z"),
+        "M12 3 20 7.5v9L12 21l-8-4.5v-9Z",
+        "M4 7.5 12 12l8-4.5M12 12v9",
+      ],
+    ],
+    // A calculator: a calculation saved once and reused.
+    [
+      "measure",
+      [
+        frame(5, 3, 14, 18),
+        tint("M8 6h8v3.5H8Z"),
+        "M8 6h8v3.5H8Z",
+        bold("M9.5 13.5h.01M14.5 13.5h.01M9.5 17.5h.01M14.5 17.5h.01"),
+      ],
+    ],
+  ],
+  // Dashboards and version history.
+  [
+    // Tiles of different sizes on one sheet.
+    [
+      "dashboard",
+      [
+        frame(4, 4, 7, 9),
+        tint(frame(13, 4, 7, 5)),
+        frame(13, 4, 7, 5),
+        frame(13, 11, 7, 9),
+        frame(4, 15, 7, 5),
+      ],
+    ],
+    // A filter panel: a header and its item buttons, the chosen one tinted.
+    [
+      "slicer",
+      [
+        frame(3.5, 3, 17, 18),
+        "M3.5 7.5h17",
+        tint(frame(6.5, 10, 11, 3.5)),
+        frame(6.5, 10, 11, 3.5),
+        frame(6.5, 15.5, 11, 3.5),
+      ],
+    ],
+    // A card with one figure's rising trend.
+    ["kpiCard", [frame(3, 5, 18, 14), "m7 15 3.5-3.5 2.5 2.5L17 9.5", "M14 9.5h3v3"]],
+    // A clock with an arrow that turns back.
+    [
+      "versionHistory",
+      ["M4.5 12A7.5 7.5 0 1 0 6.7 6.7L4.5 8.9", "M4.5 5.5v3.4h3.4", "M12 8v4l2.5 2.5"],
+    ],
+    // A bookmark with a plus: save this point in the history.
+    [
+      "saveVersion",
+      ["M6.5 3h11A1.5 1.5 0 0 1 19 4.5V21l-7-4.5L5 21V4.5A1.5 1.5 0 0 1 6.5 3Z", "M12 7v6M9 10h6"],
     ],
   ],
 ];

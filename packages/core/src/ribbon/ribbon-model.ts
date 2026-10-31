@@ -3,7 +3,9 @@
 // so a new command is added here once. Add its glyph to scripts/icon-glyphs.ts
 // and run `bun scripts/icon-sheet.ts`; no renderer-specific entry is needed.
 // The DOM side (ribbon-controls.ts) never decides behavior, so Excel parity
-// is reviewed here. The redesign and new commands belong to #272.
+// is reviewed here. A command is added only with the feature it runs. The
+// tab, group and glyph planned for each 0.7 feature are on the Toolbar and
+// ribbon docs page, so features that land separately still form one layout.
 
 import { CHART_KINDS } from "../chart-kinds.js";
 import {
