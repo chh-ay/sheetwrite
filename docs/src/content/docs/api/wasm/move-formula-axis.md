@@ -9,7 +9,7 @@ Follow `count` rows or columns moved from `from` to `to` on the formula's
 own sheet; `to` is the first index of the moved block after the move.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/pkg/sheetwrite_wasm.d.ts#L521"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L521</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/pkg/sheetwrite_wasm.d.ts#L564"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L564</code></a></dd></div>
 </dl>
 
 ## Declaration

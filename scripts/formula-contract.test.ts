@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { extractAssistSpellings, validateFormulaContractRepository } from "./formula-contract.js";
+import { validateFormulaContractRepository } from "./formula-contract.js";
 
 const ROOT = resolve(import.meta.dir, "..");
 const INVENTORY = JSON.parse(
@@ -99,6 +99,14 @@ const MUTATIONS: MutationCase[] = [
     },
     expectedIssue: "parser/inventory drift: missing NORM.DIST",
   },
+  {
+    name: "rejects a built function that formula help would not list",
+    mutate: (contract) => {
+      const formula = contract.functions.find((entry) => entry.canonical === "POW");
+      if (formula) formula.implementation = "parser-declared-target";
+    },
+    expectedIssue: "assist/inventory drift: missing POW",
+  },
 ];
 
 describe("formula capability contract", () => {
@@ -110,27 +118,9 @@ describe("formula capability contract", () => {
       requiredSupported: 100,
       unsupportedCategories: 5,
       parserSpellings: 165,
-      assistSpellings: 165,
+      assistSpellings: 311,
       formulasSpellings: 311,
     });
-  });
-
-  test("extracts only literal assist registry entries", () => {
-    const source = `
-      export const FORMULA_FUNCTIONS: readonly string[] = [
-        "AVERAGE",
-        "MODE.SNGL",
-      ];
-    `;
-    expect(extractAssistSpellings(source)).toEqual(["AVERAGE", "MODE.SNGL"]);
-    expect(() =>
-      extractAssistSpellings(`
-        export const FORMULA_FUNCTIONS: readonly string[] = [
-          "SUM",
-          injectedName,
-        ];
-      `),
-    ).toThrow("non-literal entries");
   });
 
   for (const mutation of MUTATIONS) {

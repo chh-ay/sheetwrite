@@ -4,6 +4,7 @@
 // the grid after Enter/Escape through the caller-provided callback.
 
 import { colToA1, labelToCol } from "../a1.js";
+import { FormulaAssist } from "../formula-assist.js";
 import type { CellInputSnapshot, Grid } from "../types/grid.js";
 import { commitCellInput, selectionFocus } from "./grid-binding.js";
 
@@ -145,7 +146,8 @@ export interface FormulaBarPiece extends ShellPiece {
  * undoable transaction path, targeting the data address captured with the
  * draft — correct even under an active sort/filter view. A focused, dirty
  * draft is never overwritten by selection/change events; Escape restores the
- * last stable text.
+ * last stable text. While focused, it shows formula help as the cell editor
+ * does.
  */
 export function createFormulaBar(
   host: HTMLElement,
@@ -159,6 +161,12 @@ export function createFormulaBar(
   input.autocomplete = "off";
   input.spellcheck = false;
 
+  const assist = new FormulaAssist({
+    highlightCells: (ranges) => grid.highlightCells(ranges),
+    sheet: () => grid.getActiveSheet(),
+    store: grid.store,
+  });
+
   let snapshot: CellInputSnapshot | null = null;
   let committed = "";
   let dirty = false;
@@ -171,6 +179,7 @@ export function createFormulaBar(
     committed = snapshot?.text ?? "";
     input.value = committed;
     dirty = false;
+    if (document.activeElement === input) assist.update();
   };
 
   const commit = (): void => {
@@ -181,7 +190,9 @@ export function createFormulaBar(
   };
 
   const onKeydown = (event: KeyboardEvent): void => {
-    if (event.key === "Enter") {
+    if (assist.handleKeyDown(event)) {
+      event.stopPropagation();
+    } else if (event.key === "Enter") {
       event.preventDefault();
       event.stopPropagation();
       commit();
@@ -193,13 +204,19 @@ export function createFormulaBar(
       options.focusGrid?.();
     }
   };
+
   // Typing, paste, drop and IME all fire `input`; a key alone does not change the draft.
   const onInput = (): void => {
     dirty = true;
+    assist.update();
   };
+  const onFocus = (): void => assist.attach(input, null);
+  const onBlur = (): void => assist.detach();
 
   input.addEventListener("keydown", onKeydown);
   input.addEventListener("input", onInput);
+  input.addEventListener("focus", onFocus);
+  input.addEventListener("blur", onBlur);
   const unsubscribes = [
     grid.on("selection", refresh),
     grid.on("change", refresh),
@@ -224,8 +241,11 @@ export function createFormulaBar(
       if (destroyed) return;
       destroyed = true;
       for (const unsubscribe of unsubscribes) unsubscribe();
+      assist.detach();
       input.removeEventListener("keydown", onKeydown);
       input.removeEventListener("input", onInput);
+      input.removeEventListener("focus", onFocus);
+      input.removeEventListener("blur", onBlur);
       input.remove();
     },
   };

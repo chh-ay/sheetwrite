@@ -8,7 +8,7 @@ description: "FormulaBarOptions interface in @sheetwrite/core/shell: Host elemen
 Host elements and callbacks used to bind a formula bar to a Grid.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/shell/formula-controls.ts#L130"><code>packages/core/src/shell/formula-controls.ts#L130</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/shell/formula-controls.ts#L131"><code>packages/core/src/shell/formula-controls.ts#L131</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>
