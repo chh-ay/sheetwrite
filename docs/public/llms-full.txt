@@ -1369,13 +1369,21 @@ transaction sources and framework readiness events.
 
 ## Stable failure envelope
 
-Every consumer-visible initialization, datasource, renderer, export, persistence,
-snapshot, synchronization, collaboration, CSV, and XLSX failure is a
-`SheetwriteError`. Use `code` and `operation` for control flow; `message` is
+Every consumer-visible failure of Sheetwrite is a `SheetwriteError`: bad
+input, a limit that is passed, and failures of initialization, datasources,
+the renderer, export, persistence, snapshots, synchronization, collaboration,
+CSV and XLSX. Use `code` and `operation` for control flow; `message` is
 diagnostic text and may become more specific. `context` contains
-serialization-safe boundary details, `retryable` is present only when
+serialization-safe identifiers and numbers, `retryable` is present only when
 Sheetwrite can determine it, and `cause` retains the original exception in the
-current realm. `toJSON()` omits `cause`.
+current realm. `toJSON()` omits `cause`. A plain `Error` means a programmer
+error, in Sheetwrite or in the calling code.
+
+A failure stays small, whatever data the operation held. The message is cut
+to 8 KiB of UTF-8, and so is the sum of the strings in `context`; a cut keeps
+the start and the end of the text. A `context` with more than 1,024 entries,
+more than 256 entries in one object or array, or more than 32 levels becomes
+`{ truncated: true }`.
 
 ```ts
 import { initSheetwrite, isSheetwriteError } from "@sheetwrite/core";
@@ -1394,9 +1402,13 @@ try {
 }
 ```
 
-The guard also recognizes validated cross-realm and serialized envelopes. A
-serialized envelope is structural; code that requires `Error` identity should
-construct or receive a live `SheetwriteError`.
+The guard checks the shape only: a string `name` and `message`, a non-empty
+string `code` and `operation`, and a JSON-safe `context` when present. It
+accepts cross-realm errors and serialized envelopes, and it does not compare
+`code` with a list, so a code from a newer release passes. Give a `switch` on
+`error.code` a `default` branch. A serialized envelope is structural; code
+that requires `Error` identity should construct or receive a live
+`SheetwriteError`.
 
 ```ts
 declare function retryVisibleRows(request: {
@@ -1440,10 +1452,19 @@ Start with [`SheetwriteError`](https://www.sheetwrite.dev/docs/api/core/sheetwri
 their structured fields are needed.
 
 The complete enums are [`SheetwriteErrorCode`](https://www.sheetwrite.dev/docs/api/core/sheetwrite-error-code/)
-and [`SheetwriteErrorOperation`](https://www.sheetwrite.dev/docs/api/core/sheetwrite-error-operation/);
-their runtime value sets are
+and [`SheetwriteErrorOperation`](https://www.sheetwrite.dev/docs/api/core/sheetwrite-error-operation/).
 [`SHEETWRITE_ERROR_CODES`](https://www.sheetwrite.dev/docs/api/core/sheetwrite-error-codes/) and
-[`SHEETWRITE_ERROR_OPERATIONS`](https://www.sheetwrite.dev/docs/api/core/sheetwrite-error-operations/).
+[`SHEETWRITE_ERROR_OPERATIONS`](https://www.sheetwrite.dev/docs/api/core/sheetwrite-error-operations/)
+list the same values at run time; Sheetwrite does not read them, so a bundle
+that does not import them does not contain them.
+
+Bad host input that has no boundary class has the code `invalid-argument`:
+simple columns (`create-grid`), row bridge options and row IDs
+(`row-bridge`), a custom `CellRenderer.dom()` result (`render`), store options
+(`store`) and resource reports (`resource-diagnostics`). A sheet ID that no
+sheet has is `not-found` with operation `store` and `context.sheet`. A limit
+override that is not a valid number is `invalid-limits` for transactions,
+snapshots, synchronization and IndexedDB loads.
 
 SnapshotValidationError Malformed workbook snapshot; inspect path-qualified errors. (https://www.sheetwrite.dev/docs/api/core/snapshot-validation-error/)
 SnapshotResourceError Workbook construction exceeded a configured resource ceiling. (https://www.sheetwrite.dev/docs/api/core/snapshot-resource-error/)
@@ -9067,7 +9088,7 @@ Framework `onGridChange` / `grid-change` callbacks carry the same committed even
 | `hyperlink-activate` | `HyperlinkActivationEvent` |
 | `theme-change` | `{ theme: Theme }`, after `setTheme` or `replaceTheme` changes the base theme. |
 | `renderer-fallback` | `{ requested: "worker"; error: SheetwriteError }`, once, when the worker renderer could not start or stopped. `error.context.failure` is `spawn`, `crash`, `protocol`, `timeout` or `fatal`. |
-| `datasource-error` | `{ request; error: SheetwriteError }`; `request` is the `DataSourceRequest` without its `signal`. |
+| `datasource-error` | `{ request; error: SheetwriteError }`; `request` is the `DataSourceRequest` without its `signal`. `error.context` holds the request numbers, `columnBandCount` and the `start` and `end` of the first 64 column bands; read the column keys from `request`. |
 | `export-error` | `{ format: "csv" \| "xlsx"; error: SheetwriteError }`, when a built-in toolbar or context-menu export fails. |
 | `engine-failed` | `{ error: SheetwriteError }`, once, when the engine stopped after a WASM trap. The grid stays read-only; see [Engine failure](https://www.sheetwrite.dev/docs/concepts/error-handling/#engine-failure). |
 
@@ -11848,7 +11869,7 @@ fires, the operation rejects or throws with `signal.reason`.
 ##### `DelimitedTextOptionsError` — class
 
 ```ts
-class DelimitedTextOptionsError extends SheetwriteError { constructor(resource: keyof DelimitedTextResourceLimits, value: unknown); name: "DelimitedTextOptionsError"; resource: keyof DelimitedTextResourceLimits; value: unknown }
+class DelimitedTextOptionsError extends SheetwriteError { constructor(resource: keyof DelimitedTextResourceLimits, value: unknown); code: "delimited-text-invalid-limit"; name: "DelimitedTextOptionsError"; resource: keyof DelimitedTextResourceLimits; value: unknown }
 ```
 
 Stable invalid-option failure for a delimited-text resource ceiling.
@@ -11856,7 +11877,7 @@ Stable invalid-option failure for a delimited-text resource ceiling.
 ##### `DelimitedTextResourceError` — class
 
 ```ts
-class DelimitedTextResourceError extends SheetwriteError { constructor(resource: keyof DelimitedTextResourceLimits, limit: number, actual: number, operation: DelimitedTextOperation); actual: number; limit: number; name: "DelimitedTextResourceError"; resource: keyof DelimitedTextResourceLimits }
+class DelimitedTextResourceError extends SheetwriteError { constructor(resource: keyof DelimitedTextResourceLimits, limit: number, actual: number, operation: DelimitedTextOperation); actual: number; code: "delimited-text-resource-limit"; limit: number; name: "DelimitedTextResourceError"; resource: keyof DelimitedTextResourceLimits }
 ```
 
 Stable resource-limit failure raised before the next oversized parse or encode allocation.
@@ -12593,7 +12614,7 @@ to a sheet drawn on the layout in `@sheetwrite/core/icons.json`.
 ##### `IncompleteDataError` — class
 
 ```ts
-class IncompleteDataError extends SheetwriteError { constructor(sheet: SheetId, capability: Extract<QueryCapability, { status: "incomplete"; }>); capability: { status: "incomplete"; loadedCells: number; totalCells: number; }; name: "IncompleteDataError" }
+class IncompleteDataError extends SheetwriteError { constructor(sheet: SheetId, capability: Extract<QueryCapability, { status: "incomplete"; }>); capability: { status: "incomplete"; loadedCells: number; totalCells: number; }; code: "incomplete-data"; name: "IncompleteDataError" }
 ```
 
 Error thrown when an operation requires datasource cells that are not loaded.
@@ -12642,7 +12663,11 @@ Validate, but never activate or fetch, an external hyperlink target.
 (value: unknown): value is SheetwriteErrorEnvelope
 ```
 
-Narrow same-realm errors, cross-realm errors, and serialized failure envelopes.
+Narrow same-realm errors, cross-realm errors, and serialized failure
+envelopes by shape: a string `name` and `message`, a non-empty string `code`
+and `operation`, and a JSON-safe `context` when present. The guard does not
+check `code` against a list, so a code from a newer Sheetwrite still passes;
+handle unknown codes in the `default` branch of a `switch`.
 
 ##### `isSheetwriteReady` — function
 
@@ -13083,7 +13108,7 @@ confirms the submitted operations unchanged; normalization must conflict.
 ##### `PersistenceError` — class
 
 ```ts
-class PersistenceError extends SheetwriteError { constructor(code: PersistenceErrorCode, message: string, options?: ErrorOptions); name: "PersistenceError" }
+class PersistenceError extends SheetwriteError { constructor(code: PersistenceErrorCode, message: string, options?: ErrorOptions); code: PersistenceErrorCode; name: "PersistenceError" }
 ```
 
 Typed failure raised by persistence and synchronization flows.
@@ -14077,18 +14102,21 @@ Private-format MIME type used for rich Sheetwrite clipboard payloads.
 ##### `SHEETWRITE_ERROR_CODES` — variable
 
 ```ts
-readonly ["initialization-failed", "initialization-required", "engine-failed", "datasource-request-failed", "renderer-fallback", "export-failed", "xlsx-import-failed", "optional-backend-unavailable", "delimited-text-resource-limit", "delimited-text-invalid-limit", "xlsx-resource-limit", "resource-limit", "invalid-snapshot", "aborted", "not-found", "commit-rejected", "unavailable", "blocked", "quota", "unsupported-schema", "transaction", "conflict", "limit", "invalid-limits", "invalid-version", "invalid-id", "invalid-operations", "operation-limit", "payload-limit", "response-id-mismatch", "future-distance-limit", "buffer-count-limit", "buffer-operation-limit", "buffer-byte-limit", "pending-count-limit", "pending-operation-limit", "pending-byte-limit", "late-echo", "remote-operations-rejected", "invalid-batch", "batch-limit", "pending-capacity", "presence-failed", "revision-failed", "comment-failed", "sync-failed", "sync-storage-failed", "incomplete-data", "xlsx-invalid-options", "unsafe-hyperlink", "invalid-shortcut", "shortcut-conflict", "invalid-function"]
+readonly ["initialization-failed", "initialization-required", "engine-failed", "datasource-request-failed", "renderer-fallback", "export-failed", "xlsx-import-failed", "optional-backend-unavailable", "delimited-text-resource-limit", "delimited-text-invalid-limit", "xlsx-resource-limit", "resource-limit", "invalid-snapshot", "invalid-argument", "aborted", "not-found", "commit-rejected", "unavailable", "blocked", "quota", "unsupported-schema", "transaction", "conflict", "limit", "invalid-limits", "invalid-version", "invalid-id", "invalid-operations", "operation-limit", "payload-limit", "response-id-mismatch", "future-distance-limit", "buffer-count-limit", "buffer-operation-limit", "buffer-byte-limit", "pending-count-limit", "pending-operation-limit", "pending-byte-limit", "late-echo", "remote-operations-rejected", "invalid-batch", "batch-limit", "pending-capacity", "presence-failed", "revision-failed", "comment-failed", "sync-failed", "sync-storage-failed", "incomplete-data", "xlsx-invalid-options", "unsafe-hyperlink", "invalid-shortcut", "shortcut-conflict", "invalid-function"]
 ```
 
-Stable public failure codes. Messages are diagnostic and are not API contracts.
+Every `SheetwriteErrorCode`, for hosts that list the codes at run time.
+Sheetwrite itself does not read this array, so a bundle that does not import
+it does not contain it.
 
 ##### `SHEETWRITE_ERROR_OPERATIONS` — variable
 
 ```ts
-readonly ["initialize", "create-grid", "engine", "datasource-request", "renderer-worker", "export-xlsx", "xlsx-import", "xlsx-export", "delimited-parse", "delimited-import", "delimited-encode", "delimited-export", "delimited-options", "snapshot-validate", "snapshot-allocate", "persistence", "pending-storage", "synchronize", "presence", "revision", "comments", "query", "hyperlink-activate", "keyboard-configure", "chart-view", "host-function"]
+readonly ["initialize", "create-grid", "engine", "store", "transaction", "render", "datasource-request", "renderer-worker", "xlsx-import", "xlsx-export", "delimited-parse", "delimited-import", "delimited-encode", "delimited-export", "delimited-options", "snapshot-validate", "snapshot-allocate", "persistence", "pending-storage", "synchronize", "presence", "revision", "comment", "query", "row-bridge", "resource-diagnostics", "hyperlink-activate", "keyboard-configure", "chart-view", "host-function"]
 ```
 
-Stable operations at which a consumer-visible failure can surface.
+Every `SheetwriteErrorOperation`, for hosts that list the operations at run
+time. Sheetwrite itself does not read this array.
 
 ##### `SheetwriteEngine` — interface
 
@@ -14104,18 +14132,23 @@ Members:
 ##### `SheetwriteError` — class
 
 ```ts
-class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: "aborted" | "batch-limit" | "blocked" | "buffer-byte-limit" | "buffer-count-limit" | "buffer-operation-limit" | "comment-failed" | "commit-rejected" | "conflict" | "datasource-request-failed" | "delimited-text-invalid-limit" | "delimited-text-resource-limit" | "engine-failed" | "export-failed" | "future-distance-limit" | "incomplete-data" | "initialization-failed" | "initialization-required" | "invalid-batch" | "invalid-function" | "invalid-id" | "invalid-limits" | "invalid-operations" | "invalid-shortcut" | "invalid-snapshot" | "invalid-version" | "late-echo" | "limit" | "not-found" | "operation-limit" | "optional-backend-unavailable" | "payload-limit" | "pending-byte-limit" | "pending-capacity" | "pending-count-limit" | "pending-operation-limit" | "presence-failed" | "quota" | "remote-operations-rejected" | "renderer-fallback" | "resource-limit" | "response-id-mismatch" | "revision-failed" | "shortcut-conflict" | "sync-failed" | "sync-storage-failed" | "transaction" | "unavailable" | "unsafe-hyperlink" | "unsupported-schema" | "xlsx-import-failed" | "xlsx-invalid-options" | "xlsx-resource-limit"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: "chart-view" | "comments" | "create-grid" | "datasource-request" | "delimited-encode" | "delimited-export" | "delimited-import" | "delimited-options" | "delimited-parse" | "engine" | "export-xlsx" | "host-function" | "hyperlink-activate" | "initialize" | "keyboard-configure" | "pending-storage" | "persistence" | "presence" | "query" | "renderer-worker" | "revision" | "snapshot-allocate" | "snapshot-validate" | "synchronize" | "xlsx-export" | "xlsx-import"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }
+class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: SheetwriteErrorCode; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: SheetwriteErrorOperation; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }
 ```
 
 Canonical envelope for thrown and callback-delivered Sheetwrite failures.
+The message is cut to an 8 KiB UTF-8 budget, and so is the sum of the
+context strings, because both can quote host or file data.
 
 ##### `SheetwriteErrorCode` — type
 
 ```ts
-export type SheetwriteErrorCode = (typeof SHEETWRITE_ERROR_CODES)[number];
+export type SheetwriteErrorCode = | "initialization-failed" | "initialization-required" | "engine-failed" | "datasource-request-failed" | "renderer-fallback" | "export-failed" | "xlsx-import-failed" | "optional-backend-unavailable" | "delimited-text-resource-limit" | "delimited-text-invalid-limit" | "xlsx-resource-limit" | "resource-limit" | "invalid-snapshot" | "invalid-argument" | "aborted" | "not-found" | "commit-rejected" | "unavailable" | "blocked" | "quota" | "unsupported-schema" | "transaction" | "conflict" | "limit" | "invalid-limits" | "invalid-version" | "invalid-id" | "invalid-operations" | "operation-limit" | "payload-limit" | "response-id-mismatch" | "future-distance-limit" | "buffer-count-limit" | "buffer-operation-limit" | "buffer-byte-limit" | "pending-count-limit" | "pending-operation-limit" | "pending-byte-limit" | "late-echo" | "remote-operations-rejected" | "invalid-batch" | "batch-limit" | "pending-capacity" | "presence-failed" | "revision-failed" | "comment-failed" | "sync-failed" | "sync-storage-failed" | "incomplete-data" | "xlsx-invalid-options" | "unsafe-hyperlink" | "invalid-shortcut" | "shortcut-conflict" | "invalid-function";
 ```
 
-Exhaustive stable discriminator for consumer-visible Sheetwrite failures.
+Stable discriminator for every consumer-visible Sheetwrite failure. Messages
+are diagnostic and are not API contracts. Each `SheetwriteError` subclass
+narrows `code` to its own codes; this union is the sum of all of them, so a
+host can `switch (error.code)`. The union costs no bytes at run time.
 
 ##### `SheetwriteErrorContext` — type
 
@@ -14144,10 +14177,10 @@ Structural form preserved across realms and JSON serialization.
 ##### `SheetwriteErrorOperation` — type
 
 ```ts
-export type SheetwriteErrorOperation = (typeof SHEETWRITE_ERROR_OPERATIONS)[number];
+export type SheetwriteErrorOperation = | "initialize" | "create-grid" | "engine" | "store" | "transaction" | "render" | "datasource-request" | "renderer-worker" | "xlsx-import" | "xlsx-export" | "delimited-parse" | "delimited-import" | "delimited-encode" | "delimited-export" | "delimited-options" | "snapshot-validate" | "snapshot-allocate" | "persistence" | "pending-storage" | "synchronize" | "presence" | "revision" | "comment" | "query" | "row-bridge" | "resource-diagnostics" | "hyperlink-activate" | "keyboard-configure" | "chart-view" | "host-function";
 ```
 
-Exhaustive stable operation discriminator for consumer-visible failures.
+Stable operation at which a consumer-visible failure can surface.
 
 ##### `SheetwriteErrorOptions` — interface
 
@@ -14284,7 +14317,7 @@ Grid creation options accepted when hydrating a validated snapshot.
 ##### `SnapshotResourceError` — class
 
 ```ts
-class SnapshotResourceError extends SheetwriteError { constructor(resource: keyof SnapshotResourceLimits, limit: number, actual: number, options?: ErrorOptions); actual: number; limit: number; name: "SnapshotResourceError"; resource: keyof SnapshotResourceLimits }
+class SnapshotResourceError extends SheetwriteError { constructor(resource: keyof SnapshotResourceLimits, limit: number, actual: number, options?: ErrorOptions); actual: number; code: "resource-limit"; limit: number; name: "SnapshotResourceError"; resource: keyof SnapshotResourceLimits }
 ```
 
 Stable resource failure raised by direct workbook construction paths.
@@ -14317,10 +14350,13 @@ Allocation mode used when enforcing snapshot construction capacity.
 ##### `SnapshotValidationError` — class
 
 ```ts
-class SnapshotValidationError extends SheetwriteError { constructor(errors: readonly DocumentValidationError[]); errors: readonly DocumentValidationError[]; name: "SnapshotValidationError" }
+class SnapshotValidationError extends SheetwriteError { constructor(errors: readonly DocumentValidationError[], options?: ErrorOptions); code: "invalid-snapshot"; errors: readonly DocumentValidationError[]; name: "SnapshotValidationError" }
 ```
 
 Path-qualified schema failure found while validating an untrusted snapshot.
+
+Members:
+- `errors` — The first 64 issues; `context.issueCount` counts all of them.
 
 ##### `SnapshotValidationOptions` — interface
 
@@ -14583,7 +14619,7 @@ Lifecycle state of one local mutation in the synchronization queue.
 ##### `SyncPendingCapacityError` — class
 
 ```ts
-class SyncPendingCapacityError extends SheetwriteError { constructor(issue: Extract<MutationIssue, { kind: "resource-limit"; }>); issue: { kind: "resource-limit"; severity: "error"; resource: "operations" | "encoded-bytes" | "batch-versions" | "pending-commits" | "pending-operations" | "pending-encoded-bytes" | "paged-dirty-cells" | "paged-reference-simulation"; actual: number; max: number; message: string; }; name: "SyncPendingCapacityError" }
+class SyncPendingCapacityError extends SheetwriteError { constructor(issue: Extract<MutationIssue, { kind: "resource-limit"; }>); code: "pending-capacity"; issue: { kind: "resource-limit"; severity: "error"; resource: "operations" | "encoded-bytes" | "batch-versions" | "pending-commits" | "pending-operations" | "pending-encoded-bytes" | "paged-dirty-cells" | "paged-reference-simulation"; actual: number; max: number; message: string; }; name: "SyncPendingCapacityError" }
 ```
 
 Typed local transaction rejection produced when the durable queue cannot reserve capacity.
@@ -14612,7 +14648,7 @@ Members:
 ##### `SyncProtocolError` — class
 
 ```ts
-class SyncProtocolError extends SheetwriteError { constructor(code: SyncProtocolErrorCode, message: string); name: "SyncProtocolError" }
+class SyncProtocolError extends SheetwriteError { constructor(code: SyncProtocolErrorCode, message: string, options?: ErrorOptions); code: SyncProtocolErrorCode; name: "SyncProtocolError" }
 ```
 
 Typed rejection of malformed or resource-exhausting synchronization input.
@@ -15169,7 +15205,7 @@ Members:
 ##### `XlsxResourceError` — class
 
 ```ts
-class XlsxResourceError extends SheetwriteError { constructor(resource: keyof XlsxResourceLimits, limit: number, actual: number, operation: "import" | "export"); actual: number; limit: number; name: "XlsxResourceError"; resource: keyof XlsxResourceLimits }
+class XlsxResourceError extends SheetwriteError { constructor(resource: keyof XlsxResourceLimits, limit: number, actual: number, operation: "import" | "export"); actual: number; code: "xlsx-resource-limit"; limit: number; name: "XlsxResourceError"; resource: keyof XlsxResourceLimits }
 ```
 
 Stable resource-limit failure surfaced before an XLSX codec allocates unsafe data.
@@ -15572,7 +15608,11 @@ Converts adapter size props into a host element style object.
 (value: unknown): value is SheetwriteErrorEnvelope
 ```
 
-Narrow same-realm errors, cross-realm errors, and serialized failure envelopes.
+Narrow same-realm errors, cross-realm errors, and serialized failure
+envelopes by shape: a string `name` and `message`, a non-empty string `code`
+and `operation`, and a JSON-safe `context` when present. The guard does not
+check `code` against a list, so a code from a newer Sheetwrite still passes;
+handle unknown codes in the `default` branch of a `switch`.
 
 ##### `OptionalGridSizeProps` — interface
 
@@ -15771,34 +15811,42 @@ An explicit projection record for an operation with no row-space meaning.
 ##### `SHEETWRITE_ERROR_CODES` — variable
 
 ```ts
-readonly ["initialization-failed", "initialization-required", "engine-failed", "datasource-request-failed", "renderer-fallback", "export-failed", "xlsx-import-failed", "optional-backend-unavailable", "delimited-text-resource-limit", "delimited-text-invalid-limit", "xlsx-resource-limit", "resource-limit", "invalid-snapshot", "aborted", "not-found", "commit-rejected", "unavailable", "blocked", "quota", "unsupported-schema", "transaction", "conflict", "limit", "invalid-limits", "invalid-version", "invalid-id", "invalid-operations", "operation-limit", "payload-limit", "response-id-mismatch", "future-distance-limit", "buffer-count-limit", "buffer-operation-limit", "buffer-byte-limit", "pending-count-limit", "pending-operation-limit", "pending-byte-limit", "late-echo", "remote-operations-rejected", "invalid-batch", "batch-limit", "pending-capacity", "presence-failed", "revision-failed", "comment-failed", "sync-failed", "sync-storage-failed", "incomplete-data", "xlsx-invalid-options", "unsafe-hyperlink", "invalid-shortcut", "shortcut-conflict", "invalid-function"]
+readonly ["initialization-failed", "initialization-required", "engine-failed", "datasource-request-failed", "renderer-fallback", "export-failed", "xlsx-import-failed", "optional-backend-unavailable", "delimited-text-resource-limit", "delimited-text-invalid-limit", "xlsx-resource-limit", "resource-limit", "invalid-snapshot", "invalid-argument", "aborted", "not-found", "commit-rejected", "unavailable", "blocked", "quota", "unsupported-schema", "transaction", "conflict", "limit", "invalid-limits", "invalid-version", "invalid-id", "invalid-operations", "operation-limit", "payload-limit", "response-id-mismatch", "future-distance-limit", "buffer-count-limit", "buffer-operation-limit", "buffer-byte-limit", "pending-count-limit", "pending-operation-limit", "pending-byte-limit", "late-echo", "remote-operations-rejected", "invalid-batch", "batch-limit", "pending-capacity", "presence-failed", "revision-failed", "comment-failed", "sync-failed", "sync-storage-failed", "incomplete-data", "xlsx-invalid-options", "unsafe-hyperlink", "invalid-shortcut", "shortcut-conflict", "invalid-function"]
 ```
 
-Stable public failure codes. Messages are diagnostic and are not API contracts.
+Every `SheetwriteErrorCode`, for hosts that list the codes at run time.
+Sheetwrite itself does not read this array, so a bundle that does not import
+it does not contain it.
 
 ##### `SHEETWRITE_ERROR_OPERATIONS` — variable
 
 ```ts
-readonly ["initialize", "create-grid", "engine", "datasource-request", "renderer-worker", "export-xlsx", "xlsx-import", "xlsx-export", "delimited-parse", "delimited-import", "delimited-encode", "delimited-export", "delimited-options", "snapshot-validate", "snapshot-allocate", "persistence", "pending-storage", "synchronize", "presence", "revision", "comments", "query", "hyperlink-activate", "keyboard-configure", "chart-view", "host-function"]
+readonly ["initialize", "create-grid", "engine", "store", "transaction", "render", "datasource-request", "renderer-worker", "xlsx-import", "xlsx-export", "delimited-parse", "delimited-import", "delimited-encode", "delimited-export", "delimited-options", "snapshot-validate", "snapshot-allocate", "persistence", "pending-storage", "synchronize", "presence", "revision", "comment", "query", "row-bridge", "resource-diagnostics", "hyperlink-activate", "keyboard-configure", "chart-view", "host-function"]
 ```
 
-Stable operations at which a consumer-visible failure can surface.
+Every `SheetwriteErrorOperation`, for hosts that list the operations at run
+time. Sheetwrite itself does not read this array.
 
 ##### `SheetwriteError` — class
 
 ```ts
-class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: "aborted" | "batch-limit" | "blocked" | "buffer-byte-limit" | "buffer-count-limit" | "buffer-operation-limit" | "comment-failed" | "commit-rejected" | "conflict" | "datasource-request-failed" | "delimited-text-invalid-limit" | "delimited-text-resource-limit" | "engine-failed" | "export-failed" | "future-distance-limit" | "incomplete-data" | "initialization-failed" | "initialization-required" | "invalid-batch" | "invalid-function" | "invalid-id" | "invalid-limits" | "invalid-operations" | "invalid-shortcut" | "invalid-snapshot" | "invalid-version" | "late-echo" | "limit" | "not-found" | "operation-limit" | "optional-backend-unavailable" | "payload-limit" | "pending-byte-limit" | "pending-capacity" | "pending-count-limit" | "pending-operation-limit" | "presence-failed" | "quota" | "remote-operations-rejected" | "renderer-fallback" | "resource-limit" | "response-id-mismatch" | "revision-failed" | "shortcut-conflict" | "sync-failed" | "sync-storage-failed" | "transaction" | "unavailable" | "unsafe-hyperlink" | "unsupported-schema" | "xlsx-import-failed" | "xlsx-invalid-options" | "xlsx-resource-limit"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: "chart-view" | "comments" | "create-grid" | "datasource-request" | "delimited-encode" | "delimited-export" | "delimited-import" | "delimited-options" | "delimited-parse" | "engine" | "export-xlsx" | "host-function" | "hyperlink-activate" | "initialize" | "keyboard-configure" | "pending-storage" | "persistence" | "presence" | "query" | "renderer-worker" | "revision" | "snapshot-allocate" | "snapshot-validate" | "synchronize" | "xlsx-export" | "xlsx-import"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }
+class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: SheetwriteErrorCode; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: SheetwriteErrorOperation; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }
 ```
 
 Canonical envelope for thrown and callback-delivered Sheetwrite failures.
+The message is cut to an 8 KiB UTF-8 budget, and so is the sum of the
+context strings, because both can quote host or file data.
 
 ##### `SheetwriteErrorCode` — type
 
 ```ts
-export type SheetwriteErrorCode = (typeof SHEETWRITE_ERROR_CODES)[number];
+export type SheetwriteErrorCode = | "initialization-failed" | "initialization-required" | "engine-failed" | "datasource-request-failed" | "renderer-fallback" | "export-failed" | "xlsx-import-failed" | "optional-backend-unavailable" | "delimited-text-resource-limit" | "delimited-text-invalid-limit" | "xlsx-resource-limit" | "resource-limit" | "invalid-snapshot" | "invalid-argument" | "aborted" | "not-found" | "commit-rejected" | "unavailable" | "blocked" | "quota" | "unsupported-schema" | "transaction" | "conflict" | "limit" | "invalid-limits" | "invalid-version" | "invalid-id" | "invalid-operations" | "operation-limit" | "payload-limit" | "response-id-mismatch" | "future-distance-limit" | "buffer-count-limit" | "buffer-operation-limit" | "buffer-byte-limit" | "pending-count-limit" | "pending-operation-limit" | "pending-byte-limit" | "late-echo" | "remote-operations-rejected" | "invalid-batch" | "batch-limit" | "pending-capacity" | "presence-failed" | "revision-failed" | "comment-failed" | "sync-failed" | "sync-storage-failed" | "incomplete-data" | "xlsx-invalid-options" | "unsafe-hyperlink" | "invalid-shortcut" | "shortcut-conflict" | "invalid-function";
 ```
 
-Exhaustive stable discriminator for consumer-visible Sheetwrite failures.
+Stable discriminator for every consumer-visible Sheetwrite failure. Messages
+are diagnostic and are not API contracts. Each `SheetwriteError` subclass
+narrows `code` to its own codes; this union is the sum of all of them, so a
+host can `switch (error.code)`. The union costs no bytes at run time.
 
 ##### `SheetwriteErrorContext` — type
 
@@ -15819,10 +15867,10 @@ Structural form preserved across realms and JSON serialization.
 ##### `SheetwriteErrorOperation` — type
 
 ```ts
-export type SheetwriteErrorOperation = (typeof SHEETWRITE_ERROR_OPERATIONS)[number];
+export type SheetwriteErrorOperation = | "initialize" | "create-grid" | "engine" | "store" | "transaction" | "render" | "datasource-request" | "renderer-worker" | "xlsx-import" | "xlsx-export" | "delimited-parse" | "delimited-import" | "delimited-encode" | "delimited-export" | "delimited-options" | "snapshot-validate" | "snapshot-allocate" | "persistence" | "pending-storage" | "synchronize" | "presence" | "revision" | "comment" | "query" | "row-bridge" | "resource-diagnostics" | "hyperlink-activate" | "keyboard-configure" | "chart-view" | "host-function";
 ```
 
-Exhaustive stable operation discriminator for consumer-visible failures.
+Stable operation at which a consumer-visible failure can surface.
 
 ##### `SheetwriteInitializationProps` — interface
 
@@ -15900,7 +15948,7 @@ the caller's expected view.
 ##### `IndexedDbPendingCommitStorageError` — class
 
 ```ts
-class IndexedDbPendingCommitStorageError extends SheetwriteError { constructor(code: IndexedDbPendingCommitStorageErrorCode, message: string, options?: ErrorOptions); name: "IndexedDbPendingCommitStorageError" }
+class IndexedDbPendingCommitStorageError extends SheetwriteError { constructor(code: IndexedDbPendingCommitStorageErrorCode, message: string, options?: ErrorOptions); code: IndexedDbPendingCommitStorageErrorCode; name: "IndexedDbPendingCommitStorageError" }
 ```
 
 Typed IndexedDB failure raised by durable pending-commit storage.
@@ -15908,7 +15956,7 @@ Typed IndexedDB failure raised by durable pending-commit storage.
 ##### `IndexedDbPendingCommitStorageErrorCode` — type
 
 ```ts
-export type IndexedDbPendingCommitStorageErrorCode = | "unavailable" | "blocked" | "aborted" | "quota" | "unsupported-schema" | "transaction" | "conflict" | "limit";
+export type IndexedDbPendingCommitStorageErrorCode = | "unavailable" | "blocked" | "aborted" | "quota" | "unsupported-schema" | "transaction" | "conflict" | "limit" | "invalid-limits";
 ```
 
 Stable category for an IndexedDB pending-storage failure.

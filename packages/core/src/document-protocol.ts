@@ -144,8 +144,11 @@ export function resolveTransactionResourceLimits(
     const value = overrides[resource];
     if (value === undefined) continue;
     if (!Number.isSafeInteger(value) || value < 0) {
-      throw new RangeError(
+      throw new SheetwriteError(
+        "invalid-limits",
+        "transaction",
         `Transaction resource limit ${resource} must be a non-negative safe integer`,
+        { context: { resource } },
       );
     }
     limits[resource] = value;
@@ -163,7 +166,11 @@ export function validateTransactionResources(
   limits: Readonly<TransactionResourceLimits> = DEFAULT_TRANSACTION_RESOURCE_LIMITS,
 ): TransactionResourceValidationResult {
   if (!Array.isArray(operations)) {
-    throw new TypeError("Transaction patches must be an array of DocumentOps");
+    throw new SheetwriteError(
+      "invalid-operations",
+      "transaction",
+      "Transaction patches must be an array of DocumentOps",
+    );
   }
   if (operations.length > limits.maxOperations) {
     return {
@@ -187,7 +194,7 @@ export function validateTransactionResources(
       }),
     };
   } catch (error) {
-    if (error instanceof JsonByteLengthError && error.code === "limit") {
+    if (error instanceof JsonByteLengthError && error.code === "payload-limit") {
       const actual = error.actual ?? limits.maxEncodedBytes + 1;
       return {
         ok: false,
@@ -392,6 +399,7 @@ export interface SnapshotValidationOptions {
 /** Stable resource failure raised by direct workbook construction paths. */
 export class SnapshotResourceError extends SheetwriteError {
   override readonly name = "SnapshotResourceError";
+  declare readonly code: "resource-limit";
 
   constructor(
     readonly resource: keyof SnapshotResourceLimits,
@@ -430,16 +438,24 @@ export type DocumentValidationResult =
   | { ok: true; value: WorkbookSnapshot }
   | { ok: false; errors: DocumentValidationError[] };
 
+/** Issues an error keeps; an untrusted snapshot can break every cell. */
+const MAX_REPORTED_VALIDATION_ISSUES = 64;
+
 /** Path-qualified schema failure found while validating an untrusted snapshot. */
 export class SnapshotValidationError extends SheetwriteError {
   override readonly name = "SnapshotValidationError";
+  declare readonly code: "invalid-snapshot";
 
-  constructor(readonly errors: readonly DocumentValidationError[]) {
+  /** The first 64 issues; `context.issueCount` counts all of them. */
+  readonly errors: readonly DocumentValidationError[];
+
+  constructor(errors: readonly DocumentValidationError[], options?: ErrorOptions) {
     super(
       "invalid-snapshot",
       "snapshot-validate",
       errors[0]?.message ?? "Invalid workbook snapshot",
       {
+        cause: options?.cause,
         context: {
           issueCount: errors.length,
           firstPath: errors[0]?.path ?? "$",
@@ -447,6 +463,10 @@ export class SnapshotValidationError extends SheetwriteError {
         },
       },
     );
+    this.errors =
+      errors.length > MAX_REPORTED_VALIDATION_ISSUES
+        ? errors.slice(0, MAX_REPORTED_VALIDATION_ISSUES)
+        : errors;
   }
 }
 
@@ -961,7 +981,12 @@ export function assertWorkbookAllocationLimits(
 ): void {
   const resolved = resolveSnapshotValidationOptions(options);
   if ("code" in resolved) {
-    throw new TypeError(resolved.message);
+    throw new SheetwriteError(
+      resolved.path === "options.storage" ? "invalid-argument" : "invalid-limits",
+      "snapshot-allocate",
+      resolved.message,
+      { context: { path: resolved.path } },
+    );
   }
   const { limits } = resolved;
   if (workbook.sheets.length > limits.maxSheets) {

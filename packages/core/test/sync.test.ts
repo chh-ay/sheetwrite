@@ -1148,6 +1148,50 @@ describe("sync coordinator", () => {
     grid.destroy();
   });
 
+  it("wraps a duplicate local mutation ID as sync-failed with the action", () => {
+    const { grid, coordinator, events } = harness(["m1", "m1"]);
+    grid.applyTransaction({ patches: [localSet(2)] });
+    try {
+      grid.applyTransaction({ patches: [localSet(3)] });
+    } catch (error) {
+      // The reservation failure may also reach the caller; the event is the contract.
+      expect(error).toMatchObject({ code: "sync-failed" });
+    }
+
+    const failure = events.find((event) => event.type === "error");
+    expect(failure?.type === "error" && failure.error).toMatchObject({
+      code: "sync-failed",
+      operation: "synchronize",
+      context: { action: "reserve-local" },
+      cause: expect.any(Error),
+    });
+    coordinator.destroy();
+    grid.destroy();
+  });
+
+  it("keeps the JSON failure as the cause of a rejected remote payload", async () => {
+    const { grid, coordinator, events } = harness();
+    const notJson = {
+      op: "set",
+      addr: { sheet: "s1", row: 0, col: 0 },
+      value: { kind: "literal", value: Number.NaN },
+    } as DocumentOp;
+
+    await coordinator.applyVersionedOperation({ version: 8, operations: [notJson] });
+
+    const failure = events.find((event) => event.type === "error");
+    expect(failure?.type === "error" && failure.error).toMatchObject({
+      code: "invalid-operations",
+      operation: "synchronize",
+    });
+    expect(failure?.type === "error" && failure.error.cause).toMatchObject({
+      code: "invalid-operations",
+      operation: "transaction",
+    });
+    coordinator.destroy();
+    grid.destroy();
+  });
+
   it("bounds retained acknowledgements and treats expired late echoes as reload violations", async () => {
     const { grid, coordinator, events } = harness(["m1", "m2", "m3"], {
       limits: { maxRecentAcknowledgements: 2 },

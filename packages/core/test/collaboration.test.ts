@@ -246,7 +246,12 @@ describe("revision coordinator", () => {
       { documentId: "collab-doc", serverVersion: 7 },
     );
 
-    await expect(coordinator.restore(3, "invalid-version")).rejects.toThrow();
+    await expect(coordinator.restore(3, "invalid-version")).rejects.toMatchObject({
+      code: "revision-failed",
+      operation: "revision",
+      context: expect.objectContaining({ action: "restore" }),
+      cause: expect.any(Error),
+    });
     expect(coordinator.serverVersion).toBe(7);
     coordinator.destroy();
   });
@@ -405,7 +410,12 @@ describe("comment coordinator", () => {
         "Bad",
         "comment-bad",
       ),
-    ).rejects.toThrow(Error);
+    ).rejects.toMatchObject({
+      code: "comment-failed",
+      operation: "comment",
+      context: expect.objectContaining({ action: "mutate" }),
+      cause: expect.any(Error),
+    });
     coordinator.destroy();
   });
 

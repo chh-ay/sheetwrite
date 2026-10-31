@@ -11,7 +11,7 @@ Stable resource-limit failure surfaced before an XLSX codec allocates unsafe dat
 <div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/export.ts#L379"><code>packages/core/src/export.ts#L379</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>5</span>
+## Members <span class="api-count" data-pagefind-ignore>6</span>
 
 <div class="api-member-list">
 
@@ -29,6 +29,15 @@ constructor(resource: keyof XlsxResourceLimits, limit: number, actual: number, o
 
 ```ts generated
 actual: number;
+```
+
+</details>
+
+<details class="api-member" id="xlsx-resource-error-code" data-pagefind-weight="1">
+<summary><code>code</code></summary>
+
+```ts generated
+code: "xlsx-resource-limit";
 ```
 
 </details>
@@ -75,6 +84,7 @@ class XlsxResourceError extends SheetwriteError {
     operation: "import" | "export",
   );
   actual: number;
+  code: "xlsx-resource-limit";
   limit: number;
   name: "XlsxResourceError";
   resource: keyof XlsxResourceLimits;

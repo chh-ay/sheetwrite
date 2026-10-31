@@ -1,3 +1,4 @@
+import { unknownSheetError } from "../errors.js";
 import { consumeSourceSnapshot } from "../reference.js";
 import type {
   BoundaryResourceAccounting,
@@ -62,7 +63,7 @@ export class PagedDirtyPreflight {
 
   private handleOf(sheet: SheetId): number {
     const handle = this.handles.get(sheet);
-    if (handle === undefined) throw new Error(`unknown sheet: ${sheet}`);
+    if (handle === undefined) throw unknownSheetError(sheet);
     return handle;
   }
 
@@ -235,7 +236,7 @@ export class PagedDirtyPreflight {
       if (!this.handles.has(sheet)) return undefined;
 
       const meta = this.workbook.sheets.find((candidate) => candidate.id === sheet);
-      if (!meta) throw new Error(`unknown sheet: ${sheet}`);
+      if (!meta) throw unknownSheetError(sheet);
 
       const state: PagedDirtyPreflightState = {
         handle: this.handleOf(sheet),

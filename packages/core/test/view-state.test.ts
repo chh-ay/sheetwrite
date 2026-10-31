@@ -101,7 +101,9 @@ describe("StoreViewState packed inverse index", () => {
     expect(view.viewRowOf("s1", 4)).toBeNull();
 
     const oversized = sortedView(0x1_0000_0000, [0]);
-    expect(() => oversized.view.viewRowOf("s1", 0)).toThrow(RangeError);
+    expect(() => oversized.view.viewRowOf("s1", 0)).toThrow(
+      expect.objectContaining({ code: "resource-limit", operation: "store" }),
+    );
   });
 
   it("isolates sheet caches and releases every retained index on removal and disposal", () => {

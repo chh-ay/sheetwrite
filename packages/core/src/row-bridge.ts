@@ -1,4 +1,5 @@
 import { capturedClearCells } from "./clear-capture.js";
+import { SheetwriteError } from "./errors.js";
 import { restoreBlockFacts } from "./restore-block.js";
 import type { CellScalar, CellValue } from "./types/cell.js";
 import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
@@ -412,24 +413,39 @@ export class RowBridge<
         ? DEFAULT_MAX_RECENT_TRANSACTIONS
         : options.maxRecentTransactions;
     if (!Number.isSafeInteger(maxRecentTransactions) || maxRecentTransactions <= 0) {
-      throw new RangeError("Sheetwrite: maxRecentTransactions must be a positive safe integer");
+      throw new SheetwriteError(
+        "invalid-argument",
+        "row-bridge",
+        "Sheetwrite: maxRecentTransactions must be a positive safe integer",
+      );
     }
     this.localFingerprints = new RecentIdentities(maxRecentTransactions);
     this.seenTransactionIds = new RecentIdentities(maxRecentTransactions);
     const columnKeys = options.columns.map((column) => column.key);
     if (new Set(columnKeys).size !== columnKeys.length) {
-      throw new TypeError("Sheetwrite: row bridge columns must have unique semantic keys");
+      throw new SheetwriteError(
+        "invalid-argument",
+        "row-bridge",
+        "Sheetwrite: row bridge columns must have unique semantic keys",
+      );
     }
     const rowIds: Array<Id | null> = [];
     const rowIdSet = new Set<Id>();
     for (let index = 0; index < options.defaultRows.length; index += 1) {
       const id = options.getRowId(options.defaultRows[index]!, index);
       if (id === undefined || id === null || (typeof id !== "string" && typeof id !== "number")) {
-        throw new TypeError(
+        throw new SheetwriteError(
+          "invalid-argument",
+          "row-bridge",
           `Sheetwrite: getRowId must return a stable string or number at row ${index}`,
         );
       }
-      if (rowIdSet.has(id)) throw new TypeError(`Sheetwrite: duplicate row ID "${String(id)}"`);
+      if (rowIdSet.has(id))
+        throw new SheetwriteError(
+          "invalid-argument",
+          "row-bridge",
+          `Sheetwrite: duplicate row ID "${String(id)}"`,
+        );
       rowIdSet.add(id);
       rowIds.push(id);
     }
@@ -777,10 +793,18 @@ export class RowBridge<
               transactionId: transaction.id,
             });
             if (typeof id !== "string" && typeof id !== "number") {
-              throw new TypeError("Sheetwrite: createRowId must return a stable string or number");
+              throw new SheetwriteError(
+                "invalid-argument",
+                "row-bridge",
+                "Sheetwrite: createRowId must return a stable string or number",
+              );
             }
             if (state?.rowIdSet.has(id) || insertedIds.has(id)) {
-              throw new TypeError(`Sheetwrite: duplicate inserted row ID "${String(id)}"`);
+              throw new SheetwriteError(
+                "invalid-argument",
+                "row-bridge",
+                `Sheetwrite: duplicate inserted row ID "${String(id)}"`,
+              );
             }
             insertedIds.add(id);
           }

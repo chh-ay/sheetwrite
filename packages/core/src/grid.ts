@@ -30,7 +30,12 @@ import {
   type SheetwriteEngine,
   stopEngine,
 } from "./engine.js";
-import { normalizeSheetwriteError, SheetwriteError } from "./errors.js";
+import {
+  isSheetwriteError,
+  normalizeSheetwriteError,
+  SheetwriteError,
+  unknownSheetError,
+} from "./errors.js";
 import { downloadBytes, toCsv, toXlsxTable } from "./export.js";
 import type { FindBar } from "./find-bar.js";
 import { stepFontSizePx, stepNumberFormatDecimals } from "./format-presets.js";
@@ -227,6 +232,8 @@ const COMMAND_STATE_CELL_LIMIT = 4_096;
  * work (measured ~10 ms for 64k cells), so huge selections yield between reads.
  */
 const SUMMARY_CELLS_PER_READ = 65_536;
+/** Column bands copied into a datasource failure; the full count goes beside them. */
+const MAX_DATASOURCE_ERROR_COLUMN_BANDS = 64;
 
 function isFormattingCommand(command: GridCommandName): boolean {
   return (
@@ -698,7 +705,7 @@ export class GridImpl implements Grid {
         datasource,
         columns: (sheetId) => {
           const liveSheet = this.sheetById(sheetId);
-          if (!liveSheet) throw new Error(`Sheetwrite: unknown sheet ${sheetId}`);
+          if (!liveSheet) throw unknownSheetError(sheetId);
           return liveSheet.columns;
         },
         loadable: this.loadable,
@@ -714,23 +721,31 @@ export class GridImpl implements Grid {
           this.scheduleRender();
         },
         onError: (request, error) => {
-          const failure = normalizeSheetwriteError(
-            error,
-            "datasource-request-failed",
-            "datasource-request",
-            {
-              protocol: request.protocol,
-              sheet: request.sheet,
-              start: request.start,
-              end: request.end,
-              revision: request.revision,
-              columns: request.columns.map(({ start, end, keys }) => ({
-                start,
-                end,
-                keys: [...keys],
-              })),
-            },
-          );
+          // Identifiers and numbers only: column keys are host text, and a wide
+          // request can hold thousands of bands.
+          const context = {
+            protocol: request.protocol,
+            sheet: request.sheet,
+            start: request.start,
+            end: request.end,
+            revision: request.revision,
+            columnBandCount: request.columns.length,
+            columns: request.columns
+              .slice(0, MAX_DATASOURCE_ERROR_COLUMN_BANDS)
+              .map(({ start, end }) => ({ start, end })),
+          };
+          // The controller's own page checks carry this code without the
+          // request, so they are wrapped once to add it; host failures with
+          // another code keep their identity.
+          const failure =
+            isSheetwriteError(error) && error.code !== "datasource-request-failed"
+              ? normalizeSheetwriteError(error, "datasource-request-failed", "datasource-request")
+              : new SheetwriteError(
+                  "datasource-request-failed",
+                  "datasource-request",
+                  error instanceof Error ? error.message : "Sheetwrite datasource-request failed",
+                  { cause: error, context },
+                );
           for (const fn of this.listeners["datasource-error"]) {
             fn({ request, error: failure });
           }
@@ -1416,7 +1431,7 @@ export class GridImpl implements Grid {
     if (id === this.activeSheet && this.activeSheetCache) return this.activeSheetCache;
 
     const stored = this.store.getWorkbook().sheets.find((sheet) => sheet.id === id);
-    if (!stored) throw new Error(`Sheetwrite: unknown sheet ${id}`);
+    if (!stored) throw unknownSheetError(id);
     const target = this.virtualColumnTargets.get(id) ?? stored.columns.length;
     const sheet =
       target > stored.columns.length ? { ...stored, columns: [...stored.columns] } : stored;
@@ -2228,7 +2243,11 @@ export class GridImpl implements Grid {
     runtime?: RuntimeMemoryObservation,
   ): RuntimeResourceSnapshot {
     if (!this.loadable) {
-      throw new Error("Runtime resource diagnostics require a SheetwriteStore");
+      throw new SheetwriteError(
+        "unavailable",
+        "resource-diagnostics",
+        "Runtime resource diagnostics require a SheetwriteStore",
+      );
     }
     const store = this.loadable.getRuntimeResourceSnapshot(operation, phase, runtime);
     return createRuntimeResourceSnapshot({
@@ -2627,7 +2646,11 @@ export class GridImpl implements Grid {
   exportSnapshot(): WorkbookSnapshot {
     const snapshot = this.store.exportSnapshot?.();
     if (!snapshot) {
-      throw new Error("Sheetwrite: the injected Store does not support snapshot export");
+      throw new SheetwriteError(
+        "unavailable",
+        "store",
+        "Sheetwrite: the injected Store does not support snapshot export",
+      );
     }
     if (snapshot.workbook.activeSheet === this.activeSheet) return snapshot;
     return {
@@ -3731,7 +3754,7 @@ export class GridImpl implements Grid {
 
   private emitExportError(error: unknown, format: "csv" | "xlsx"): void {
     if (this.destroyed) return;
-    const operation = format === "csv" ? "delimited-export" : "export-xlsx";
+    const operation = format === "csv" ? "delimited-export" : "xlsx-export";
     const failure = normalizeSheetwriteError(error, "export-failed", operation, { format });
     this.actionFeedback.show(`Export failed: ${failure.message} Try again.`);
     for (const listener of this.listeners["export-error"]) {

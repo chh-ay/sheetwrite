@@ -1,3 +1,4 @@
+import { datasourceFailure } from "./errors.js";
 import type { DataSource, DataSourcePage, DataSourceRequest, RowData } from "./types/data.js";
 
 /** Row-only page shape accepted by the full-width compatibility adapter. */
@@ -19,17 +20,19 @@ export function legacyFullWidthDataSource(loadRows: LegacyRowLoader): DataSource
       const pending = loadRows(request);
       return Promise.resolve(pending).then((page): DataSourcePage => {
         if (!page || !Number.isSafeInteger(page.start) || !Array.isArray(page.rows)) {
-          throw new RangeError("Legacy datasource page must contain a safe start and rows array");
+          throw datasourceFailure(
+            "Legacy datasource page must contain a safe start and rows array",
+          );
         }
         const declaredKeys = request.columns.flatMap((band) => [...band.keys]);
         const declared = new Set(declaredKeys);
         const rows = page.rows.map((row) => {
           if (row === null || typeof row !== "object" || Array.isArray(row)) {
-            throw new RangeError("Legacy datasource rows must be keyed objects");
+            throw datasourceFailure("Legacy datasource rows must be keyed objects");
           }
           for (const key of Reflect.ownKeys(row)) {
             if (typeof key !== "string" || !declared.has(key)) {
-              throw new RangeError("Legacy datasource row contains an undeclared key");
+              throw datasourceFailure("Legacy datasource row contains an undeclared key");
             }
           }
           const normalized: RowData = Object.create(null) as RowData;

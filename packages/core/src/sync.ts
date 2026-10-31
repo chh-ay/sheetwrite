@@ -205,15 +205,17 @@ export type SyncProtocolErrorCode =
 /** Typed rejection of malformed or resource-exhausting synchronization input. */
 export class SyncProtocolError extends SheetwriteError {
   override readonly name = "SyncProtocolError";
+  declare readonly code: SyncProtocolErrorCode;
 
-  constructor(code: SyncProtocolErrorCode, message: string) {
-    super(code, "synchronize", message);
+  constructor(code: SyncProtocolErrorCode, message: string, options?: ErrorOptions) {
+    super(code, "synchronize", message, { cause: options?.cause });
   }
 }
 
 /** Typed local transaction rejection produced when the durable queue cannot reserve capacity. */
 export class SyncPendingCapacityError extends SheetwriteError {
   override readonly name = "SyncPendingCapacityError";
+  declare readonly code: "pending-capacity";
 
   constructor(readonly issue: Extract<MutationIssue, { kind: "resource-limit" }>) {
     super("pending-capacity", "synchronize", issue.message, {
@@ -1074,7 +1076,7 @@ export class SyncCoordinator {
         this.limits.maxPendingEncodedBytes - this.pendingEncodedByteTotal,
       );
     } catch (error) {
-      if (error instanceof JsonByteLengthError && error.code === "limit") {
+      if (error instanceof JsonByteLengthError && error.code === "payload-limit") {
         return this.rejectPendingCapacity(
           "pending-encoded-bytes",
           this.pendingEncodedByteTotal +
@@ -2537,7 +2539,9 @@ function validReceivedVersion(value: unknown): number | undefined {
 function asSyncProtocolError(error: unknown): SyncProtocolError {
   return error instanceof SyncProtocolError
     ? error
-    : new SyncProtocolError("invalid-operations", "Synchronization input is invalid");
+    : new SyncProtocolError("invalid-operations", "Synchronization input is invalid", {
+        cause: error,
+      });
 }
 
 function utf8ByteLength(value: string, stopAfter: number): number {
@@ -2566,13 +2570,16 @@ function jsonEncodedByteLength(value: unknown, limit: number): number {
   try {
     return boundedJsonByteLength(value, limit);
   } catch (error) {
-    if (error instanceof JsonByteLengthError && error.code === "limit") {
+    if (error instanceof JsonByteLengthError && error.code === "payload-limit") {
       throw new SyncProtocolError(
         "payload-limit",
         `Encoded operation payload exceeds the ${limit} byte limit`,
+        { cause: error },
       );
     }
-    throw new SyncProtocolError("invalid-operations", "Operations must contain JSON-safe values");
+    throw new SyncProtocolError("invalid-operations", "Operations must contain JSON-safe values", {
+      cause: error,
+    });
   }
 }
 

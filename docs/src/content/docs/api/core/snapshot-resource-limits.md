@@ -8,7 +8,7 @@ description: "SnapshotResourceLimits interface in @sheetwrite/core: Resource cei
 Resource ceilings applied before snapshot normalization or store allocation.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/document-protocol.ts#L349"><code>packages/core/src/document-protocol.ts#L349</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/document-protocol.ts#L356"><code>packages/core/src/document-protocol.ts#L356</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>

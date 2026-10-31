@@ -8,7 +8,7 @@ description: "CommentCoordinatorOptions interface in @sheetwrite/core: Document 
 Document identity and initial version for comment coordination.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/collaboration.ts#L486"><code>packages/core/src/collaboration.ts#L486</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/collaboration.ts#L488"><code>packages/core/src/collaboration.ts#L488</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

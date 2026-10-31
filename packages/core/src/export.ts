@@ -378,6 +378,7 @@ export const DEFAULT_XLSX_RESOURCE_LIMITS: Readonly<XlsxResourceLimits> = Object
 /** Stable resource-limit failure surfaced before an XLSX codec allocates unsafe data. */
 export class XlsxResourceError extends SheetwriteError {
   override readonly name = "XlsxResourceError";
+  declare readonly code: "xlsx-resource-limit";
 
   constructor(
     readonly resource: keyof XlsxResourceLimits,

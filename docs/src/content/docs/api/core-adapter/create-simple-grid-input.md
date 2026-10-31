@@ -8,7 +8,7 @@ description: "createSimpleGridInput function in @sheetwrite/core/adapter: Conver
 Converts simple columns and row objects into canonical workbook and columnar input.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/adapter.ts#L459"><code>packages/core/src/adapter.ts#L459</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/adapter.ts#L463"><code>packages/core/src/adapter.ts#L463</code></a></dd></div>
 </dl>
 
 ## Declaration

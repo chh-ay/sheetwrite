@@ -8,10 +8,10 @@ description: "IncompleteDataError class in @sheetwrite/core: Error thrown when a
 Error thrown when an operation requires datasource cells that are not loaded.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/store/data-engine.ts#L355"><code>packages/core/src/store/data-engine.ts#L355</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/store/data-engine.ts#L370"><code>packages/core/src/store/data-engine.ts#L370</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>3</span>
+## Members <span class="api-count" data-pagefind-ignore>4</span>
 
 <div class="api-member-list">
 
@@ -29,6 +29,15 @@ constructor(sheet: SheetId, capability: Extract<QueryCapability, { status: "inco
 
 ```ts generated
 capability: { status: "incomplete"; loadedCells: number; totalCells: number; };
+```
+
+</details>
+
+<details class="api-member" id="incomplete-data-error-code" data-pagefind-weight="1">
+<summary><code>code</code></summary>
+
+```ts generated
+code: "incomplete-data";
 ```
 
 </details>
@@ -64,6 +73,7 @@ class IncompleteDataError extends SheetwriteError {
     loadedCells: number;
     totalCells: number;
   };
+  code: "incomplete-data";
   name: "IncompleteDataError";
 }
 ```

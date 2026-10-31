@@ -1,4 +1,5 @@
 import { blitVerticalScroll, paintFrame, paintFreezeDivider } from "./canvas-paint.js";
+import { SheetwriteError } from "./errors.js";
 import type {
   CellRenderer,
   PanePaint,
@@ -36,7 +37,13 @@ export class CanvasRenderer implements Renderer {
     canvas.style.pointerEvents = "none";
     host.appendChild(canvas);
     const ctx = canvas.getContext("2d", { alpha: false });
-    if (!ctx) throw new Error("Sheetwrite: 2D canvas context is unavailable");
+    if (!ctx) {
+      throw new SheetwriteError(
+        "unavailable",
+        "create-grid",
+        "Sheetwrite: 2D canvas context is unavailable",
+      );
+    }
     this.canvas = canvas;
     this.ctx = ctx;
   }
