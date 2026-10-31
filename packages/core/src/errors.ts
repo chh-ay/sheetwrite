@@ -52,6 +52,7 @@ export const SHEETWRITE_ERROR_CODES = [
   "unsafe-hyperlink",
   "invalid-shortcut",
   "shortcut-conflict",
+  "invalid-function",
 ] as const;
 
 /** Exhaustive stable discriminator for consumer-visible Sheetwrite failures. */
@@ -84,6 +85,7 @@ export const SHEETWRITE_ERROR_OPERATIONS = [
   "hyperlink-activate",
   "keyboard-configure",
   "chart-view",
+  "host-function",
 ] as const;
 
 /** Exhaustive stable operation discriminator for consumer-visible failures. */

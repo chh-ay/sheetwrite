@@ -8,7 +8,7 @@ description: "SheetwriteErrorContext type in @sheetwrite/core/adapter: Stable, s
 Stable, serialization-safe diagnostic context.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/errors.ts#L102"><code>packages/core/src/errors.ts#L102</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/errors.ts#L104"><code>packages/core/src/errors.ts#L104</code></a></dd></div>
 </dl>
 
 ## Declaration

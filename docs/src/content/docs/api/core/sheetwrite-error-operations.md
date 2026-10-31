@@ -8,7 +8,7 @@ description: "SHEETWRITE_ERROR_OPERATIONS variable in @sheetwrite/core: Stable o
 Stable operations at which a consumer-visible failure can surface.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/errors.ts#L61"><code>packages/core/src/errors.ts#L61</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/errors.ts#L62"><code>packages/core/src/errors.ts#L62</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -42,6 +42,7 @@ const SHEETWRITE_ERROR_OPERATIONS: readonly [
   "hyperlink-activate",
   "keyboard-configure",
   "chart-view",
+  "host-function",
 ]
 ```
 

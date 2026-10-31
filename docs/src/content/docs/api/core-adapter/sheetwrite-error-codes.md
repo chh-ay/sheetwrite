@@ -69,6 +69,7 @@ const SHEETWRITE_ERROR_CODES: readonly [
   "unsafe-hyperlink",
   "invalid-shortcut",
   "shortcut-conflict",
+  "invalid-function",
 ]
 ```
 

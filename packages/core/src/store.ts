@@ -144,7 +144,17 @@ function isSnapshotAllocationFailure(error: unknown): boolean {
  * @see createGrid
  */
 export class SheetwriteStore implements Store {
-  private readonly engine: StoreDataEngine;
+  private readonly dataEngine: StoreDataEngine;
+
+  /**
+   * Every store call reaches the engine through here, so one check refuses
+   * all of them while a host function from `@sheetwrite/core/functions` runs.
+   */
+  private get engine(): StoreDataEngine {
+    this.dataEngine.hostFunctions?.assertIdle();
+    return this.dataEngine;
+  }
+
   private readonly listeners = new Set<ChangeListener>();
   private epoch = 0;
   private detailedChangeCapture = false;
@@ -173,7 +183,7 @@ export class SheetwriteStore implements Store {
       resourceLimits: options.snapshotResourceLimits,
     });
     try {
-      this.engine = new StoreDataEngine(workbook, data, options);
+      this.dataEngine = new StoreDataEngine(workbook, data, options);
     } catch (error) {
       if (!isSnapshotAllocationFailure(error)) throw error;
       const resource = storage === "dense" ? "maxDenseCells" : "maxLogicalCellsPerSheet";
