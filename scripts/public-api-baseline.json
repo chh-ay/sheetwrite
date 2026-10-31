@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "6e69413c097e8bbae7d11c576ba7f55a1fdc2ad2ac04eb163a155359cb9319cf",
+  "sha256": "ae3887c43793a0f728dd755b1d920c0693191e4a80fb7ecf614407baaaf82cc0",
   "intentionalExports": [
     {
       "package": "@sheetwrite/charts",
@@ -536,7 +536,10 @@
         "createEngine",
         "initSync",
         "isLoaded",
-        "load"
+        "load",
+        "moveFormulaAxis",
+        "shiftFormulaAxis",
+        "translateFormula"
       ]
     },
     {
@@ -634,7 +637,10 @@
         "createEngine",
         "initSync",
         "isLoaded",
-        "load"
+        "load",
+        "moveFormulaAxis",
+        "shiftFormulaAxis",
+        "translateFormula"
       ]
     },
     {

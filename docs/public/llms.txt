@@ -146,11 +146,11 @@ Sheetwrite packages are released together at version 0.6.1. This index is genera
 - [API reference](https://www.sheetwrite.dev/docs/api/): Generated reference for every classified Sheetwrite package entry point.
 - [`@sheetwrite/charts`](https://www.sheetwrite.dev/docs/api/charts/): 18 exports across 2 entry points (primary entry point: supported).
 - [`@sheetwrite/core`](https://www.sheetwrite.dev/docs/api/core/): 378 exports across 11 entry points (primary entry point: supported).
-- [`@sheetwrite/formulas`](https://www.sheetwrite.dev/docs/api/formulas/): 17 exports across 2 entry points (primary entry point: internal).
+- [`@sheetwrite/formulas`](https://www.sheetwrite.dev/docs/api/formulas/): 20 exports across 2 entry points (primary entry point: internal).
 - [`@sheetwrite/react`](https://www.sheetwrite.dev/docs/api/react/): 19 exports across 2 entry points (primary entry point: supported).
 - [`@sheetwrite/svelte`](https://www.sheetwrite.dev/docs/api/svelte/): 19 exports across 2 entry points (primary entry point: supported).
 - [`@sheetwrite/vue`](https://www.sheetwrite.dev/docs/api/vue/): 22 exports across 2 entry points (primary entry point: supported).
-- [`@sheetwrite/wasm`](https://www.sheetwrite.dev/docs/api/wasm/): 15 exports across 2 entry points (primary entry point: internal).
+- [`@sheetwrite/wasm`](https://www.sheetwrite.dev/docs/api/wasm/): 18 exports across 2 entry points (primary entry point: internal).
 - [`@sheetwrite/xlsx`](https://www.sheetwrite.dev/docs/api/xlsx/): 7 exports across 2 entry points (primary entry point: supported).
 - [Public API declarations](https://www.sheetwrite.dev/llms-full.txt): every export signature grouped by package and entry point. Do not invent symbols absent from it.
 
