@@ -39,6 +39,8 @@ If the GitHub release step fails after npm publication, re-run that failed "Publ
 
 Benchmark baselines and delivery-size budgets are reviewed evidence, not knobs for making a regression pass. Change a baseline only in a standalone, measured review that records the reason; never weaken correctness sentinels. Coverage is gated only by aggregate per-language floors in `scripts/coverage-thresholds.json`; every runtime source file is scored unless it has a documented exclusion there.
 
+The landing page's first-load size comes from the committed `scripts/size-report.json`. It is release evidence: the package size history pull request that publication opens refreshes it from the CI run of the published commit, so pull requests do not commit it. CI runs `bun run docs:check`, so commit regenerated docs with the change that needs them.
+
 ## Code style
 
 oxfmt and rustfmt own formatting. Three rules they cannot check:

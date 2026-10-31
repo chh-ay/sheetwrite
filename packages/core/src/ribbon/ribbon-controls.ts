@@ -3,6 +3,7 @@
 // ribbon-popup.ts. The full ribbon, the compact ribbon and the toolbar all
 // render through `renderControl`, so they share look, state and keyboard.
 
+import { errorDetail } from "../action-feedback.js";
 import type { IconName } from "../icons/icon-names.js";
 import { iconNode } from "../icons/resolve.js";
 import { isKeyboardAction } from "../keymap.js";
@@ -22,7 +23,7 @@ import {
 } from "./command-spec.js";
 import { STANDARD_COLORS, THEME_COLOR_ROWS } from "./ribbon-colors.js";
 import { focusAddress, steppedZoom, ZOOM_RESET, zoomLabel } from "./ribbon-model.js";
-import type { RibbonPopup } from "./ribbon-popup.js";
+import { focusInSurface, type RibbonPopup, showInSurface } from "./ribbon-popup.js";
 
 /**
  * Command state lookup: backed by an event's snapshot when one arrived, else
@@ -318,7 +319,8 @@ function renderCombo(spec: RibbonComboSpec, context: RibbonContext): RibbonContr
     });
 
     context.popup.open(input, list, { role: "listbox", label: spec.label, focus });
-    list.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
+    const selected = list.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (selected !== null) showInSurface(list, selected);
   };
 
   arrow.addEventListener("click", () => {
@@ -501,7 +503,7 @@ function renderForm(spec: RibbonFormSpec, context: RibbonContext): RibbonControl
       if (message !== null) {
         error.textContent = message;
         error.hidden = false;
-        field.focus();
+        focusInSurface(form, field);
         return;
       }
       context.popup.closeAll(false);
@@ -563,7 +565,7 @@ function renderPlacement(spec: RibbonPlacementSpec, context: RibbonContext): Rib
     location.appendChild(field);
     const pickExisting = (): void => {
       field.disabled = !existing.checked;
-      if (existing.checked) field.focus();
+      if (existing.checked) focusInSurface(form, field);
     };
     newSheet.addEventListener("change", pickExisting);
     existing.addEventListener("change", pickExisting);
@@ -583,22 +585,26 @@ function renderPlacement(spec: RibbonPlacementSpec, context: RibbonContext): Rib
       // Enter may repeat while the optional panel chunk is still loading.
       if (save.disabled) return;
       save.disabled = true;
+      let message: string | null;
       try {
-        const message = await spec.submit(
+        message = await spec.submit(
           context.grid,
           existing.checked ? { kind: "cell", text: field.value } : { kind: "new-sheet" },
         );
-        if (message !== null) {
-          error.textContent = message;
-          error.hidden = false;
-          (existing.checked ? field : newSheet).focus();
-          return;
-        }
-        // The command moved focus into the panel it opened; leave it there.
-        context.popup.closeAll(false);
+      } catch (cause) {
+        // A failed panel-chunk load must reach the user, not become an unhandled rejection.
+        message = `${spec.label} could not run: ${errorDetail(cause)}`;
       } finally {
         save.disabled = false;
       }
+      if (message !== null) {
+        error.textContent = message;
+        error.hidden = false;
+        focusInSurface(form, existing.checked ? field : newSheet);
+        return;
+      }
+      // The command moved focus into the panel it opened; leave it there.
+      context.popup.closeAll(false);
     });
     context.popup.open(trigger, form, { role: "dialog", label: spec.label, focus: true });
   });

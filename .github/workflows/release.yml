@@ -27,12 +27,12 @@ jobs:
       ci_run_id: ${{ steps.preflight.outputs.ci_run_id }}
     steps:
       - name: Checkout dispatched develop commit
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
       - name: Setup Bun
-        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: ${{ env.BUN_VERSION }}
       - name: Validate successful CI release identity
@@ -55,19 +55,19 @@ jobs:
       id-token: write
     steps:
       - name: Checkout release commit
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.identity.outputs.commit }}
           fetch-depth: 0
       - name: Setup Node and npm registry
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           registry-url: https://registry.npmjs.org
       - name: Install pinned npm
         run: npm install --global "npm@$NPM_VERSION"
       - name: Setup Bun
-        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: ${{ env.BUN_VERSION }}
       - name: Install compatibility validation dependencies
@@ -99,14 +99,20 @@ jobs:
       - name: Generate published package size history
         id: size-history
         if: steps.publish.outputs.verified != '[]'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_RUN_ID: ${{ needs.identity.outputs.ci_run_id }}
         run: |
           VERSION="$(node -p "require('./packages/core/package.json').version")"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           bun run size:record --version="$VERSION"
+          # The landing page's first-load size is release evidence: take the
+          # measurement of the same CI run whose tarballs were published.
+          gh run download "$CI_RUN_ID" --name size-evidence --dir scripts
           bun run docs:generate
       - name: Open package size history pull request
         if: steps.publish.outputs.verified != '[]'
-        uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7.0.11
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
           token: ${{ github.token }}
           base: develop
@@ -119,3 +125,5 @@ jobs:
             scripts/size-history.json
             docs/src/content/docs/performance/delivery-size.md
             docs/src/generated/docs-contract.json
+            scripts/size-report.json
+            docs/src/generated/landing-bench.json

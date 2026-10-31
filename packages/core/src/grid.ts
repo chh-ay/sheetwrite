@@ -1,5 +1,5 @@
 import { colToA1 } from "./a1.js";
-import { type ActionFeedback, attachActionFeedback } from "./action-feedback.js";
+import { type ActionFeedback, attachActionFeedback, errorDetail } from "./action-feedback.js";
 import { AriaMirror } from "./aria-mirror.js";
 import {
   fontFor,
@@ -62,7 +62,7 @@ import type { Ribbon } from "./ribbon/ribbon.js";
 import { SearchController } from "./search-controller.js";
 import { type CellRef, SelectionModel, type SelRect } from "./selection.js";
 import { sheetNameKey, validateSheetName } from "./sheet-name.js";
-import { SheetTabs } from "./sheet-tabs.js";
+import { changesSheetTabs, SheetTabs } from "./sheet-tabs.js";
 import { mountSidePanel } from "./side-panel.js";
 import { IncompleteDataError, SheetwriteStore } from "./store.js";
 import { storeEngine, storeGeneration } from "./store/engine-registry.js";
@@ -1128,15 +1128,7 @@ export class GridImpl implements Grid {
         ) {
           shouldApplyLayout = true;
         }
-        if (
-          patch.op === "addSheet" ||
-          patch.op === "removeSheet" ||
-          patch.op === "renameSheet" ||
-          patch.op === "moveSheet" ||
-          patch.op === "setSheetVisibility"
-        ) {
-          sheetsChanged = true;
-        }
+        if (changesSheetTabs(patch)) sheetsChanged = true;
         if (patch.op === "addSheet") {
           sessionSheets.splice(patch.sheet.order, 0, {
             id: patch.sheet.id,
@@ -1988,10 +1980,13 @@ export class GridImpl implements Grid {
     if (!context) return;
 
     const mergeWidths = new Map<number, number>();
+    // Measurement walks view rows, so key each merge by the view row it shows on.
     for (const merge of sheet.merges ?? []) {
+      const viewRow = this.toViewRow(merge.r0);
+      if (viewRow === null) continue;
       let width = 0;
       for (let col = merge.c0; col <= merge.c1; col++) width += sheet.columns[col]?.width ?? 0;
-      mergeWidths.set(merge.r0 * sheet.columns.length + merge.c0, width);
+      mergeWidths.set(viewRow * sheet.columns.length + merge.c0, width);
     }
     const rowCount = r1 - r0 + 1;
     const columnCount = c1 - c0 + 1;
@@ -2405,15 +2400,19 @@ export class GridImpl implements Grid {
 
     const generation = this.chromeGeneration;
     const current = () => generation === this.chromeGeneration && !this.destroyed;
+    const ribbon = Boolean(config.ribbon) && !Array.isArray(config.toolbar);
     const failed = (error: unknown): void => {
       if (!current()) return;
 
-      // Give the space back; the load error still reaches the host.
+      // Give the space back and tell the user; the load error still reaches the host.
       this.setToolbarHeight(0);
+      this.actionFeedback.show(
+        `The ${ribbon ? "ribbon" : "toolbar"} could not load: ${errorDetail(error)}`,
+      );
       throw error;
     };
 
-    if (!config.ribbon || Array.isArray(config.toolbar)) {
+    if (!ribbon) {
       this.toolbarHeight = TOOLBAR_HEIGHT;
       void import("./ribbon/command-toolbar.js").then(({ CommandToolbar: ToolbarClass }) => {
         if (current()) this.mountToolbar(ToolbarClass, config);
@@ -3190,7 +3189,8 @@ export class GridImpl implements Grid {
       autoFitRows: () => {
         const focus = this.selection.focusCell;
         if (!focus) return;
-        const row = this.toDataRow(focus.row);
+        // `autoFitRows` takes view rows, the same space as the focus cell.
+        const row = focus.row;
         this.autoFitRows({
           sheet: this.activeSheet,
           start: { row, col: 0 },

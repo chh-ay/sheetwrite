@@ -8,7 +8,7 @@ description: "cellA1 function in @sheetwrite/core: 0-based (row, col) → A1 cel
 0-based (row, col) → A1 cell reference (0, 0 → "A1").
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/a1.ts#L33"><code>packages/core/src/a1.ts#L33</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/a1.ts#L46"><code>packages/core/src/a1.ts#L46</code></a></dd></div>
 </dl>
 
 ## Declaration

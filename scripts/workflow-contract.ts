@@ -68,16 +68,16 @@ export interface NamedWorkflow {
 }
 
 export const REVIEWED_ACTION_PINS: Readonly<Record<string, string>> = {
-  "actions/checkout": "11bd71901bbe5b1630ceea73d27597364c9af683",
-  "actions/setup-node": "249970729cb0ef3589644e2896645e5dc5ba9c38",
-  "oven-sh/setup-bun": "735343b667d3e6f658f44d0eca948eb6282f2b76",
-  "changesets/action": "a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d",
-  "actions/upload-artifact": "ea165f8d65b6e75b540449e92b4886f43607fa02",
-  "actions/download-artifact": "634f93cb2916e3fdff6788551b99b062d0335ce0",
+  "actions/checkout": "3d3c42e5aac5ba805825da76410c181273ba90b1",
+  "actions/setup-node": "949feb2413d6458794dcd2491c4babbbce0c15c1",
+  "oven-sh/setup-bun": "0c5077e51419868618aeaa5fe8019c62421857d6",
+  "changesets/action": "ae32849d5ba541f9ae29e40e22a623bc13562f51",
+  "actions/upload-artifact": "cf430e030ddbb5b0abf93d22962f4752f3646cd9",
+  "actions/download-artifact": "9000827ccba6bdab643e8b6fd33ac0654aef8333",
   // CI restores caches on every run and saves them only on develop.
-  "actions/cache/restore": "0057852bfaa89a56745cba8c7296529d2fc39830",
-  "actions/cache/save": "0057852bfaa89a56745cba8c7296529d2fc39830",
-  "peter-evans/create-pull-request": "22a9089034f40e5a961c8808d113e2c98fb63676",
+  "actions/cache/restore": "55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+  "actions/cache/save": "55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+  "peter-evans/create-pull-request": "5f6978faf089d4d20b00c7766989d076bb2fc7f1",
 };
 
 const SHA_40 = /^[0-9a-f]{40}$/;

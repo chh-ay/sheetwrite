@@ -1,6 +1,8 @@
 import { afterEach, beforeAll, beforeEach, expect, it } from "bun:test";
 
 import { GridImpl, initSheetwrite } from "../src/grid.js";
+import { renderControl } from "../src/ribbon/ribbon-controls.js";
+import { RibbonPopup } from "../src/ribbon/ribbon-popup.js";
 import { createToolbar } from "../src/shell.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
@@ -247,6 +249,130 @@ it("runs a border preset from the keyboard and returns focus to the menu button"
   expect(document.activeElement).toBe(options);
 });
 
+/**
+ * Emulate WebKit's focus scroll: it scrolls the document to show a focused
+ * element, even in a fixed popup, and the scroll moves `trigger`. Every focus
+ * that does not prevent the scroll does so. Returns a function that undoes it.
+ */
+function emulateFocusScroll(trigger: HTMLElement): () => void {
+  let scrolled = 0;
+  Object.defineProperty(trigger, "getBoundingClientRect", {
+    configurable: true,
+    value: () => new DOMRect(40, 500 - scrolled, 28, 24),
+  });
+  const focus = HTMLElement.prototype.focus;
+  HTMLElement.prototype.focus = function (this: HTMLElement, options?: FocusOptions) {
+    focus.call(this, options);
+    if (options?.preventScroll === true) return;
+
+    scrolled += 24;
+    document.dispatchEvent(new Event("scroll"));
+  };
+  return () => {
+    HTMLElement.prototype.focus = focus;
+  };
+}
+
+it("keeps a keyboard-opened menu open when focus would scroll the page", async () => {
+  const { host, control, key } = await setup();
+  const options = control("Borders options");
+  const restore = emulateFocusScroll(options);
+  try {
+    options.focus({ preventScroll: true });
+    key(options, "ArrowDown");
+    expect(document.activeElement?.textContent).toBe("Bottom Border");
+
+    key(document.activeElement as HTMLElement, "ArrowDown");
+    expect(document.activeElement?.textContent).toBe("Top Border");
+    expect(host.querySelector(".sheetwrite-ribbon-popup")?.getAttribute("aria-label")).toBe(
+      "Borders",
+    );
+  } finally {
+    restore();
+  }
+});
+
+it("keeps the parent popup open when Escape returns focus into it", async () => {
+  const { host, key, select } = await setup();
+  select(0, 0);
+  const groupButton = host.querySelector<HTMLButtonElement>(
+    '.sheetwrite-ribbon-group[aria-label="Number"] .sheetwrite-ribbon-group-button',
+  );
+  if (groupButton === null) throw new Error("no Number group button");
+  const click = (target: Element) =>
+    target.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 }));
+  const restore = emulateFocusScroll(groupButton);
+  try {
+    click(groupButton);
+    const listArrow = host.querySelector(
+      '.sheetwrite-ribbon-popup [aria-label="Number Format list"]',
+    );
+    if (listArrow === null) throw new Error("group popup does not hold the format box");
+    click(listArrow);
+    const option = host.querySelector<HTMLElement>('[role="listbox"] [role="option"]');
+    if (option === null) throw new Error("the format list did not open");
+
+    key(option, "Escape");
+    const popups = [...host.querySelectorAll(".sheetwrite-ribbon-popup")];
+    expect(popups.map((popup) => popup.getAttribute("role"))).toEqual(["group"]);
+    expect(popups[0]?.contains(document.activeElement)).toBe(true);
+  } finally {
+    restore();
+  }
+});
+
+it("keeps a form open when it moves focus to show an error or wrap Tab", async () => {
+  const { host, control, openTab, select, key, press } = await setup();
+  openTab("Insert");
+  select(0, 0);
+  const link = control("Link");
+  const restore = emulateFocusScroll(link);
+  try {
+    press(link);
+    const form = host.querySelector<HTMLFormElement>(".sheetwrite-ribbon-popup");
+    const field = form?.querySelector("input");
+    const ok = form?.querySelector<HTMLButtonElement>(".sheetwrite-ribbon-form-button");
+    if (!form || !field || !ok) throw new Error("the link form did not open");
+
+    field.value = "javascript:alert(1)";
+    form.dispatchEvent(new Event("submit", { cancelable: true }));
+    expect(form.querySelector('[role="alert"]')?.hasAttribute("hidden")).toBe(false);
+    expect(document.activeElement).toBe(field);
+
+    key(field, "Tab");
+    expect(document.activeElement).toBe(ok);
+    key(ok, "Tab");
+    expect(document.activeElement).toBe(field);
+    expect(host.querySelector(".sheetwrite-ribbon-popup")).toBe(form);
+  } finally {
+    restore();
+  }
+});
+
+it("keeps a menu open for a scroll that leaves its trigger in place", async () => {
+  const { host, control, key } = await setup();
+  const options = control("Borders options");
+  let triggerTop = 500;
+  Object.defineProperty(options, "getBoundingClientRect", {
+    configurable: true,
+    value: () => new DOMRect(40, triggerTop, 28, 24),
+  });
+  options.focus();
+  key(options, "ArrowDown");
+  const menu = () => host.querySelector('.sheetwrite-ribbon-popup[aria-label="Borders"]');
+  expect(menu()).not.toBeNull();
+
+  // WebKit can deliver the event of a page scroll that happened before the menu opened.
+  document.dispatchEvent(new Event("scroll"));
+  expect(menu()).not.toBeNull();
+  expect(document.activeElement?.textContent).toBe("Bottom Border");
+
+  // The page scrolls and the trigger moves: the placed menu would be wrong, so it closes.
+  triggerTop = 300;
+  document.dispatchEvent(new Event("scroll"));
+  expect(menu()).toBeNull();
+});
+
 it("disables editing controls while read-only but keeps view controls", async () => {
   const { grid, host, select, key, press } = await setup(true);
   select(0, 0);
@@ -426,6 +552,46 @@ it("keeps Tab inside a form popup, wrapping at both ends", async () => {
   );
   expect(document.activeElement).toBe(ok);
   expect(host.querySelector(".sheetwrite-ribbon-popup")).not.toBeNull();
+});
+
+it("shows a failed placement command in its form instead of rejecting", async () => {
+  const { grid } = await setup();
+  const popupHost = document.createElement("div");
+  document.body.appendChild(popupHost);
+  const submitted = Promise.withResolvers<string | null>();
+  const view = renderControl(
+    {
+      kind: "placement",
+      id: "pivotTable",
+      label: "PivotTable",
+      icon: "clear",
+      unavailable: () => null,
+      submit: () => submitted.promise,
+    },
+    {
+      grid,
+      popup: new RibbonPopup(popupHost),
+      focus: () => {
+        throw new Error("a placement form never reads the focus style");
+      },
+      focusGrid: () => {},
+      run: (_key, command) => command(),
+    },
+  );
+  popupHost.appendChild(view.element);
+  if (!(view.element instanceof HTMLButtonElement)) throw new Error("expected a trigger button");
+  view.element.click();
+  const form = popupHost.querySelector("form");
+  if (form === null) throw new Error("the placement form did not open");
+
+  form.dispatchEvent(new Event("submit", { cancelable: true }));
+  submitted.reject(new Error("the panel chunk failed to load"));
+  // The submit handler awaits the rejected promise, then runs its catch.
+  for (let turn = 0; turn < 4; turn++) await Promise.resolve();
+
+  const error = form.querySelector<HTMLElement>(".sheetwrite-ribbon-form-error");
+  expect(error?.hidden).toBe(false);
+  expect(error?.textContent).toContain("the panel chunk failed to load");
 });
 
 it("hides the Formulas tab without host functions, and arrow keys skip it", async () => {

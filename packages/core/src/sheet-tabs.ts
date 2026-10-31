@@ -1,4 +1,5 @@
 import type { SheetId } from "./types/coordinates.js";
+import type { DocumentOp } from "./types/document.js";
 import type { SheetLifecycleResult } from "./types/grid.js";
 
 /** One selectable sheet record; activation is by `id`, never by display name. */
@@ -6,6 +7,21 @@ export interface SheetTabRecord {
   id: SheetId;
   name: string;
   visibility?: "visible" | "hidden" | "veryHidden";
+}
+
+/**
+ * Whether an operation changes what tabs show (id, name, order or visibility).
+ * A tab update rebuilds the tabs and closes an open tab menu, so cell edits
+ * must not trigger one.
+ */
+export function changesSheetTabs(operation: DocumentOp): boolean {
+  return (
+    operation.op === "addSheet" ||
+    operation.op === "removeSheet" ||
+    operation.op === "renameSheet" ||
+    operation.op === "moveSheet" ||
+    operation.op === "setSheetVisibility"
+  );
 }
 
 export interface SheetTabsOptions {
