@@ -78,4 +78,30 @@ describe("llms document text", () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  it("keeps blank lines inside code and gives repeated guide titles their own anchors", async () => {
+    const root = await mkdtemp(join(tmpdir(), "sheetwrite-llms-"));
+    const contentRoot = join(root, "docs/src/content/docs");
+    const code = ["```ts", "const text = `first", "", "", "last`;", "```"].join("\n");
+    const guide = (body: string) => ["---", "title: Same title", "---", body].join("\n");
+    try {
+      await mkdir(join(contentRoot, "guides"), { recursive: true });
+      await writeFile(join(contentRoot, "guides/first.md"), guide(`Intro.\n\n\n\n${code}`));
+      await writeFile(join(contentRoot, "guides/second.md"), guide("Second."));
+
+      const files = await expectedLlmsFiles({ formatVersion: 2, packages: [] }, root, []);
+      const full = files.find((file) => file.path === join(root, LLMS_FULL_PATH));
+      if (full === undefined) throw new Error("Full-text endpoint is missing");
+
+      expect(full.content).toContain(`Intro.\n\n${code}`);
+      const links = [...full.content.matchAll(/^- \[Same title\]\(#([^)]+)\)$/gm)].map(
+        (match) => match[1],
+      );
+      expect(links).toHaveLength(2);
+      expect(new Set(links).size).toBe(2);
+      for (const anchor of links) expect(full.content).toContain(`<a id="${anchor}"></a>`);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 });

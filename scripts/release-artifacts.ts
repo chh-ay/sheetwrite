@@ -133,6 +133,15 @@ export function assertReleaseTreeClean(status: string): void {
   }
 }
 
+/**
+ * The tree status a release build checks. Untracked files count: the package
+ * builds compile every file under `src`, so an untracked source file would ship
+ * in a tarball that its manifest calls clean. Ignored build output does not count.
+ */
+export async function releaseTreeStatus(root = repositoryRoot): Promise<string> {
+  return run(["git", "status", "--porcelain", "--untracked-files=all"], root);
+}
+
 export function releaseModeDirty(mode: ReleaseArtifactMode, status: string): boolean {
   if (mode === "release") assertReleaseTreeClean(status);
   return status.trim().length > 0;
@@ -847,7 +856,7 @@ export async function buildReleaseArtifacts(
   mode: ReleaseArtifactMode = "verification",
 ): Promise<ReleaseArtifactManifest> {
   const outputRoot = resolve(artifactDirectory);
-  const status = await run(["git", "status", "--porcelain", "--untracked-files=no"]);
+  const status = await releaseTreeStatus();
   const dirty = releaseModeDirty(mode, status);
   await ensureEmptyOutput(outputRoot);
   const [sourceCommit, toolchain] = await Promise.all([

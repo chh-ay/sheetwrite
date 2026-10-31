@@ -229,12 +229,21 @@ export function validateResult(value: unknown, path: string, issues: string[]): 
     issues.push(`${path}.error: expected error sentinel`);
   }
   if (type === "array") {
-    if (!Array.isArray(value.value)) issues.push(`${path}.value: expected array`);
-    if (!Number.isSafeInteger(value.rows) || (value.rows as number) < 1) {
+    const rows = value.rows;
+    const columns = value.columns;
+    if (!Number.isSafeInteger(rows) || (rows as number) < 1) {
       issues.push(`${path}.rows: expected positive integer`);
     }
-    if (!Number.isSafeInteger(value.columns) || (value.columns as number) < 1) {
+    if (!Number.isSafeInteger(columns) || (columns as number) < 1) {
       issues.push(`${path}.columns: expected positive integer`);
+    }
+    if (!Array.isArray(value.value)) {
+      issues.push(`${path}.value: expected array`);
+    } else if (
+      value.value.length !== rows ||
+      value.value.some((line) => !Array.isArray(line) || line.length !== columns)
+    ) {
+      issues.push(`${path}.value: expected ${String(rows)} rows of ${String(columns)} columns`);
     }
   }
   if (type === "workbook" && !isObject(value.value)) {
