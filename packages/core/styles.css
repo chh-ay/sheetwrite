@@ -129,26 +129,52 @@
   height: 100%;
 }
 
-/* ── Formula assist (autocomplete popup) ──────────────────────────────────── */
-/* Owned by FormulaAssist (packages/core/src/formula-assist.ts). Colors come from
+/* ── Formula help (function list, argument guide, coloured references) ───── */
+/* Owned by FormulaHelp (packages/core/src/formula-help.ts). Colors come from
    --sheetwrite-assist-* custom properties, seeded from the active theme at
    runtime and falling back to the base grid vars — override either layer to
    restyle without forking the component. */
 
-.sheetwrite-assist {
+.sheetwrite-formula-help {
   position: absolute;
-  z-index: 4;
-  max-height: 220px;
-  min-width: 160px;
-  overflow-y: auto;
-  margin: 0;
-  padding: 4px 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 420px;
+  pointer-events: none;
   font: var(--sheetwrite-font);
   color: var(--sheetwrite-assist-fg, var(--sheetwrite-fg, #111));
+}
+
+.sheetwrite-formula-guide:not(:empty),
+.sheetwrite-assist {
+  box-sizing: border-box;
+  margin: 0;
   background: var(--sheetwrite-assist-bg, var(--sheetwrite-bg, #fff));
   border: 1px solid var(--sheetwrite-assist-border, var(--sheetwrite-selection-border, #2563eb));
   border-radius: 6px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  pointer-events: auto;
+}
+
+.sheetwrite-formula-guide:not(:empty) {
+  padding: 4px 8px;
+}
+
+.sheetwrite-formula-description {
+  opacity: 0.75;
+}
+
+.sheetwrite-formula-error {
+  color: #c5221f;
+}
+
+.sheetwrite-assist {
+  max-height: 220px;
+  min-width: 160px;
+  overflow-y: auto;
+  padding: 4px 0;
 }
 
 .sheetwrite-assist-item {
@@ -165,6 +191,29 @@
 
 .sheetwrite-assist-item[aria-selected="true"] {
   font-weight: 600;
+}
+
+/* The field's glyphs give way to the coloured copy drawn over them. */
+.sheetwrite-editor.sheetwrite-formula-text,
+.sheetwrite-shell-formula.sheetwrite-formula-text {
+  color: transparent;
+}
+
+.sheetwrite-formula-mirror {
+  position: absolute;
+  z-index: 4;
+  margin: 0;
+  overflow: hidden;
+  white-space: pre;
+  border-style: solid;
+  border-color: transparent;
+  background: transparent;
+  pointer-events: none;
+}
+
+.sheetwrite-formula-mirror-error {
+  text-decoration: underline wavy #c5221f;
+  text-decoration-skip-ink: none;
 }
 
 /* ── Built-in widgets (find bar / toolbar / context menu) ─────────────────── */
@@ -1238,6 +1287,33 @@ textarea.sheetwrite-ribbon-field {
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
+}
+
+/* Formulas › Explain Formula (panels/explain-panel.ts). */
+.sheetwrite-explain-text {
+  margin: 0;
+}
+
+.sheetwrite-explain-formula {
+  display: block;
+  padding: 6px 8px;
+  border: 1px solid var(--sheetwrite-widget-border, #d0d0d0);
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.sheetwrite-explain-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 16px;
+  overflow-wrap: anywhere;
+}
+
+.sheetwrite-explain-reference {
+  font-weight: 600;
 }
 
 .sheetwrite-panel-field {

@@ -8,7 +8,7 @@ description: "labelToCol function in @sheetwrite/core: A1 column label → 0-bas
 A1 column label → 0-based column index (inverse of [`colToA1`](/docs/api/core/col-to-a1/)).
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/a1.ts#L32"><code>packages/core/src/a1.ts#L32</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/a1.ts#L19"><code>packages/core/src/a1.ts#L19</code></a></dd></div>
 </dl>
 
 ## Declaration

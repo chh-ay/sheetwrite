@@ -86,6 +86,7 @@ export interface FormulaArgumentMetadata {
 <p class="api-consumers-label">Public exports naming <code>FormulaArgumentMetadata</code></p>
 
 <ul class="api-consumer-list">
+<li><a href="/docs/api/core-functions/formula-call/"><code>FormulaCall</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core-functions/formula-function-metadata/"><code>FormulaFunctionMetadata</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>

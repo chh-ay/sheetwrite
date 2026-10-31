@@ -1,8 +1,20 @@
-import { builtInFunctions, HostFunctionRegistry, invalidFunction } from "./functions/registry.js";
+import { HostFunctionRegistry, invalidFunction, storeFunctions } from "./functions/registry.js";
 import type { FormulaFunction, FormulaFunctionMetadata } from "./functions/types.js";
 import type { StoreDataEngine } from "./store/data-engine.js";
 import { storeEngine } from "./store/engine-registry.js";
 import type { Store } from "./types/store.js";
+
+export {
+  analyzeFormula,
+  type FormulaAnalysis,
+  type FormulaCall,
+  type FormulaCellPosition,
+  type FormulaCompletion,
+  type FormulaDiagnostic,
+  type FormulaReference,
+  type FormulaToken,
+  type FormulaTokenKind,
+} from "./formula-analysis.js";
 
 export type {
   FormulaArgument,
@@ -107,7 +119,8 @@ export function unregisterFunction(store: Store, name: string): boolean {
  * loads on the first call, so the result is a promise.
  */
 export async function listFunctions(store: Store): Promise<readonly FormulaFunctionMetadata[]> {
-  const hostFunctions = registries.get(engineOf(store))?.metadata() ?? [];
+  // Only a SheetwriteStore has an engine; for any other store this throws.
+  engineOf(store);
 
-  return [...(await builtInFunctions()), ...hostFunctions];
+  return storeFunctions(store);
 }
