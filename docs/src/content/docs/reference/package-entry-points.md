@@ -11,6 +11,7 @@ description: "Compiler-backed classification of every publishable Sheetwrite pac
 | `@sheetwrite/core` | `./dist/index.d.ts` | supported | [Reference](/docs/api/core/) |
 | `@sheetwrite/core/adapter` | `./dist/adapter.d.ts` | supported | [Reference](/docs/api/core-adapter/) |
 | `@sheetwrite/core/browser` | `./dist/indexeddb.d.ts` | supported | [Reference](/docs/api/core-browser/) |
+| `@sheetwrite/core/functions` | `./dist/functions.d.ts` | supported | [Reference](/docs/api/core-functions/) |
 | `@sheetwrite/core/icons.json` | `./dist/icons.json` | asset | [Reference](/docs/api/core-icons-json/) |
 | `@sheetwrite/core/icons.svg` | `./dist/icons.svg` | asset | [Reference](/docs/api/core-icons-svg/) |
 | `@sheetwrite/core/shell` | `./dist/shell.d.ts` | supported | [Reference](/docs/api/core-shell/) |

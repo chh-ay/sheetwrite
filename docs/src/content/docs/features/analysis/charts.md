@@ -158,6 +158,35 @@ On a read-only grid you can select a chart, but not change it.
 The grid emits `chart-select` with `{ sheet, id }`, or `null`, when the
 selection changes, and `chart-activate` when Enter is pressed on a chart.
 
+## Charts in XLSX files
+
+With `@sheetwrite/xlsx`, `fromXlsxWorkbook` reads Excel charts into
+`Sheet.charts`, and `toXlsxWorkbook` writes `Sheet.charts` as Excel chart
+parts. Excel and LibreOffice open these files with the charts shown.
+
+| Sheetwrite | Excel chart |
+| --- | --- |
+| `column`, `bar` | Clustered column or bar chart |
+| `line`, `area` | Standard line or area chart |
+| `pie`, `doughnut` | Pie or doughnut chart |
+| `scatter` | Scatter chart |
+| `title`, `axes`, `legend` | Chart title, axis titles, legend position |
+| `series` | Series name, categories (x values in a scatter chart) and values, each one cell range or a name |
+| `anchor` | The top-left cell, its offset and the chart size |
+
+Imported charts read the same cells as the Excel chart, so a cell edit updates
+them. Import keeps an Excel chart that this table cannot hold as an opaque part
+and emits an `unsupported-feature` warning. Examples are 3-D, stacked and
+combination charts, and series that read literal values or several ranges. See
+[Kept parts and round trips](/docs/import-export/kept-parts-and-round-trips/).
+
+Import reads each chart part once per drawing. Repeated frames for that part
+stay opaque and emit the same warning. Once a sheet reaches its chart limit,
+further chart frames also stay opaque instead of being parsed into charts.
+
+Excel files do not store colors, fonts or styles from Sheetwrite. A chart that
+Sheetwrite exports has Excel's default style.
+
 ## Colors
 
 Series take their colors in order from `--sheetwrite-chart-1` to

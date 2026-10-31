@@ -257,6 +257,34 @@ export function extractParserSpellings(source: string): string[] {
   return spellings;
 }
 
+/**
+ * Canonical names of the functions that `ast_is_volatile` in the engine treats
+ * as volatile. Reading the engine source keeps the published metadata in step
+ * with what the engine recalculates, instead of a second hand-written list.
+ */
+export function extractVolatileFunctions(typesSource: string, calcSource: string): string[] {
+  const arm = typesSource.match(
+    /fn ast_is_volatile\(ast: &Ast\) -> bool \{\s*match ast \{\s*Ast::Func\(\s*([^)]*?),\s*_,?\s*\)\s*=>\s*true,/,
+  );
+  const variants = arm?.[1]?.split("|").map((entry) => entry.trim().replace(/^Func::/, ""));
+  if (!variants || variants.some((variant) => !/^[A-Za-z][A-Za-z0-9_]*$/.test(variant))) {
+    throw new Error("volatile function arm not found in ast_is_volatile");
+  }
+
+  const canonical = new Map<string, string>();
+  for (const match of calcSource.matchAll(
+    /^\s*([A-Za-z][A-Za-z0-9_]*)\s*=>\s*"([A-Z][A-Z0-9.]*)";\s*$/gm,
+  )) {
+    if (match[1] && match[2]) canonical.set(match[1], match[2]);
+  }
+
+  return variants.map((variant) => {
+    const name = canonical.get(variant);
+    if (name === undefined) throw new Error(`volatile function ${variant} has no canonical name`);
+    return name;
+  });
+}
+
 export function extractAssistSpellings(source: string): string[] {
   const match = source.match(
     /(?:export )?const FORMULA_FUNCTIONS:\s*readonly string\[\]\s*=\s*\[([\s\S]*?)\n\s*\];/,
