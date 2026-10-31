@@ -35,6 +35,25 @@ interface CaptureOutput {
   observations: Array<{ caseId: string; result: Record<string, unknown> }>;
 }
 
+interface FakeOptions {
+  /**
+   * Also give the worksheet list the `getItems()` and `add()` of the Office
+   * Add-ins collection, which Office Scripts does not have. A runner that calls
+   * them then gets past setup, so a value test fails on the values it records.
+   */
+  readonly collectionMethods?: boolean;
+  /** The number format of each formula's case, keyed by formula. */
+  readonly numberFormats?: Readonly<Record<string, string>>;
+}
+
+/** What the runner asked the host to do, as the fake recorded it. */
+interface HostCalls {
+  /** The argument of each `setNumberFormat` call, keyed by `<sheet>!<address>`. */
+  numberFormats: Map<string, unknown>;
+  /** The argument of each `calculate` call. */
+  calculations: unknown[];
+}
+
 const EMPTY_CELL: FakeCell = { value: "", valueType: "empty", text: "" };
 
 beforeAll(() => {
@@ -72,9 +91,14 @@ function cellRange(cells: FakeCell[][], formula = ""): ExcelScript.Range {
  * A workbook that offers only the documented Office Scripts methods. Each
  * formula's result comes from `results` once the script asks for a full rebuild.
  */
-function fakeWorkbook(results: Record<string, FakeResult>): ExcelScript.Workbook {
+function fakeWorkbook(
+  results: Record<string, FakeResult>,
+  options: FakeOptions,
+): { workbook: ExcelScript.Workbook } & HostCalls {
   const sheets: ExcelScript.Worksheet[] = [];
   const formulas = new Map<string, string>();
+  const numberFormats = new Map<string, unknown>();
+  const calculations: unknown[] = [];
   const iteration = { enabled: false, maxIteration: 100, maxChange: 0.001 };
   let calculated = false;
 
@@ -87,6 +111,9 @@ function fakeWorkbook(results: Record<string, FakeResult>): ExcelScript.Workbook
         setFormula: (source: string) => {
           formulas.set(key, source);
         },
+        setNumberFormat: (format: unknown) => {
+          numberFormats.set(key, format);
+        },
       };
     }
     const spill = result.spill;
@@ -96,22 +123,26 @@ function fakeWorkbook(results: Record<string, FakeResult>): ExcelScript.Workbook
     };
   };
 
-  return {
-    getWorksheets: () => [...sheets],
-    addWorksheet: (name = `Sheet${sheets.length + 1}`) => {
-      const sheet: ExcelScript.Worksheet = {
-        getName: () => name,
-        delete: () => {
-          sheets.splice(sheets.indexOf(sheet), 1);
-        },
-        getRange: (address = "A1") => rangeAt(`${name}!${address}`),
-      };
-      sheets.push(sheet);
-      return sheet;
-    },
+  const addWorksheet = (name = `Sheet${sheets.length + 1}`): ExcelScript.Worksheet => {
+    const sheet: ExcelScript.Worksheet = {
+      getName: () => name,
+      delete: () => {
+        sheets.splice(sheets.indexOf(sheet), 1);
+      },
+      getRange: (address = "A1") => rangeAt(`${name}!${address}`),
+    };
+    sheets.push(sheet);
+    return sheet;
+  };
+  const workbook: ExcelScript.Workbook = {
+    getWorksheets: () =>
+      options.collectionMethods
+        ? Object.assign([...sheets], { getItems: () => [...sheets], add: addWorksheet })
+        : [...sheets],
+    addWorksheet,
     getApplication: () => ({
       calculate: (type) => {
-        expect(String(type)).toBe(CALCULATION_TYPE.fullRebuild);
+        calculations.push(type);
         calculated = true;
       },
       getIterativeCalculation: () => ({
@@ -130,10 +161,14 @@ function fakeWorkbook(results: Record<string, FakeResult>): ExcelScript.Workbook
       }),
     }),
   };
+  return { workbook, numberFormats, calculations };
 }
 
-function capture(results: Record<string, FakeResult>): CaptureOutput {
-  const workbook = fakeWorkbook(results);
+function capture(
+  results: Record<string, FakeResult>,
+  options: FakeOptions = { collectionMethods: true },
+): CaptureOutput & HostCalls {
+  const { workbook, ...calls } = fakeWorkbook(results, options);
   const payload = {
     protocol: 1,
     producerVersion: "16.0",
@@ -142,16 +177,35 @@ function capture(results: Record<string, FakeResult>): CaptureOutput {
       kind: "formula",
       formula,
       target: "A1",
+      numberFormat: options.numberFormats?.[formula],
     })),
   };
 
   const output = main(workbook, JSON.stringify(payload), "runner-sha");
 
   expect(workbook.getWorksheets()).toEqual([]);
-  return JSON.parse(output) as CaptureOutput;
+  return { ...(JSON.parse(output) as CaptureOutput), ...calls };
 }
 
+const ONE: FakeCell = { value: 1, valueType: "double", text: "1" };
+
 describe("Excel Office Script runner", () => {
+  it("uses only the Office Scripts workbook methods", () => {
+    const { observations, calculations } = capture({ "=1": { anchor: ONE } }, {});
+
+    expect(calculations).toEqual([CALCULATION_TYPE.fullRebuild]);
+    expect(observations.map(({ result }) => result.value)).toEqual([1]);
+  });
+
+  it("applies a case's number format as one format string", () => {
+    const { numberFormats } = capture(
+      { "=1": { anchor: ONE } },
+      { collectionMethods: true, numberFormats: { "=1": "0.00%" } },
+    );
+
+    expect([...numberFormats]).toEqual([["Case0001!A1", "0.00%"]]);
+  });
+
   it("tells text that looks like an error or a blank from real errors and blanks", () => {
     const { observations } = capture({
       '="#literal"': { anchor: { value: "#literal", valueType: "string", text: "#literal" } },
@@ -169,10 +223,9 @@ describe("Excel Office Script runner", () => {
   });
 
   it("records a spilled result as the whole array with its shape", () => {
-    const one: FakeCell = { value: 1, valueType: "double", text: "1" };
     const two: FakeCell = { value: 2, valueType: "double", text: "2" };
 
-    const { observations } = capture({ "=SEQUENCE(2,1)": { anchor: one, spill: [[one], [two]] } });
+    const { observations } = capture({ "=SEQUENCE(2,1)": { anchor: ONE, spill: [[ONE], [two]] } });
 
     expect(observations[0]?.result).toEqual({
       type: "array",
