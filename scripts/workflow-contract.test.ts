@@ -183,10 +183,11 @@ describe("CI and release workflow contracts", () => {
     if (versioning?.uses === undefined) throw new Error("Missing changesets version step");
 
     // @changesets/changelog-github reads each entry's pull request and author from GitHub.
-    expect(versioning.with?.version).toBe("bun run changeset:version");
+    expect(versioning.with?.["version-script"]).toBe("bun run changeset:version");
     expect(versioning.env?.GITHUB_TOKEN).toBe("${{ github.token }}");
-    // Release publication owns GitHub releases, one per version.
-    expect(versioning.with?.createGithubReleases).toBe(false);
+    // Release publication owns tags and GitHub releases, one per version.
+    expect(versioning.with?.["create-github-releases"]).toBe(false);
+    expect(versioning.with?.["push-git-tags"]).toBe(false);
   });
 
   it("publishes the version GitHub release from the commit and packages that npm verified", () => {
