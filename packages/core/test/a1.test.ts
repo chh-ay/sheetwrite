@@ -1,6 +1,11 @@
-import { describe, expect, it } from "bun:test";
+import { beforeAll, describe, expect, it } from "bun:test";
 
 import { cellA1, colToA1, rangeA1, remapFormulaA1Refs, shiftA1Refs } from "../src/a1.js";
+import { initSheetwrite } from "../src/grid.js";
+
+beforeAll(async () => {
+  await initSheetwrite();
+});
 
 describe("A1 column labels", () => {
   it("converts indices to labels across the 26-wrap boundary", () => {
@@ -61,36 +66,59 @@ describe("shiftA1Refs", () => {
       "=LOG10(A2)+BIN2DEC(B2)+A1_name",
     );
   });
+
+  it("moves whole columns and rows by the copy distance", () => {
+    expect(shiftA1Refs("=SUM(A:A)", 0, 1)).toBe("=SUM(B:B)");
+    expect(shiftA1Refs("=SUM(1:1)+SUM($A:A)", 2, 1)).toBe("=SUM(3:3)+SUM($A:B)");
+  });
+
+  it("keeps a name past the last column as a name", () => {
+    expect(shiftA1Refs("=XYZ1+A1", 1, 1)).toBe("=XYZ1+B2");
+  });
+
+  it("keeps the spacing and case of the references that do not change", () => {
+    expect(shiftA1Refs("= sum( a1 , $B$2 )", 1, 0)).toBe("= sum( A2 , $B$2 )");
+  });
 });
 
 describe("remapFormulaA1Refs", () => {
   it("turns deleted scalar references into #REF!", () => {
-    const removeColumn = (column: number) =>
-      column === 1 ? null : column > 1 ? column - 1 : column;
+    const removeColumn = { kind: "shift", at: 1, delta: -1 } as const;
     expect(remapFormulaA1Refs("=A1+B1+C1", "column", removeColumn)).toBe("=A1+#REF!+B1");
   });
 
   it("moves spill references with their anchor and drops the suffix when it is deleted", () => {
-    const removeRow = (row: number) => (row === 1 ? null : row > 1 ? row - 1 : row);
+    const removeRow = { kind: "shift", at: 1, delta: -1 } as const;
     expect(remapFormulaA1Refs("=SUM(A3#)", "row", removeRow)).toBe("=SUM(A2#)");
     expect(remapFormulaA1Refs("=SUM(A2#)", "row", removeRow)).toBe("=SUM(#REF!)");
   });
 
   it("shrinks a range whose corner is deleted and breaks one with no row left", () => {
-    const removeRows = (row: number) => (row <= 1 ? null : row - 2);
+    const removeRows = { kind: "shift", at: 0, delta: -2 } as const;
     expect(remapFormulaA1Refs("=SUM(A1:B4)", "row", removeRows)).toBe("=SUM(A1:B2)");
-    expect(remapFormulaA1Refs("=SUM(A4:B1)", "row", removeRows)).toBe("=SUM(A2:B1)");
+    expect(remapFormulaA1Refs("=SUM(A4:B1)", "row", removeRows)).toBe("=SUM(A1:B2)");
     expect(remapFormulaA1Refs("=SUM(A1:B2)+C3", "row", removeRows)).toBe("=SUM(#REF!)+C1");
   });
 
-  it("keeps function names intact during structural edits", () => {
-    expect(remapFormulaA1Refs("=LOG10(A1)+BIN2DEC(B1)", "row", (row) => row + 1)).toBe(
-      "=LOG10(A2)+BIN2DEC(B2)",
+  it("deletes a whole column with its column and keeps whole rows", () => {
+    const removeFirstColumn = { kind: "shift", at: 0, delta: -1 } as const;
+    expect(remapFormulaA1Refs("=SUM(B:B)+SUM(A:A)", "column", removeFirstColumn)).toBe(
+      "=SUM(A:A)+SUM(#REF!)",
     );
+    expect(remapFormulaA1Refs("=SUM(2:2)", "column", removeFirstColumn)).toBe("=SUM(2:2)");
   });
 
-  it("preserves array text while remapping adjacent references", () => {
-    expect(remapFormulaA1Refs('=A1&{"A1","B2";"C3","D4"}', "row", (row) => row + 1)).toBe(
+  it("moves references with moved rows", () => {
+    const move = { kind: "move", from: 0, count: 2, to: 1 } as const;
+    expect(remapFormulaA1Refs("=A1+A2+A4", "row", move)).toBe("=A2+A3+A4");
+  });
+
+  it("keeps function names and array text intact", () => {
+    const insertRow = { kind: "shift", at: 0, delta: 1 } as const;
+    expect(remapFormulaA1Refs("=LOG10(A1)+BIN2DEC(B1)", "row", insertRow)).toBe(
+      "=LOG10(A2)+BIN2DEC(B2)",
+    );
+    expect(remapFormulaA1Refs('=A1&{"A1","B2";"C3","D4"}', "row", insertRow)).toBe(
       '=A2&{"A1","B2";"C3","D4"}',
     );
   });
