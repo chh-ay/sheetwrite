@@ -67,7 +67,7 @@ async function release(): Promise<EngineMemoryReleaseReport> {
   for (;;) {
     const waits: Promise<void>[] = [];
 
-    for (const engine of liveStoreEngines()) {
+    for (const engine of liveStoreEngines(engineGeneration())) {
       const wait = engine.waitForPageLoads();
       if (wait) waits.push(wait);
     }
@@ -87,7 +87,7 @@ async function release(): Promise<EngineMemoryReleaseReport> {
   const previous = getEngine();
   const before = previous.getMemory().buffer.byteLength;
   const prepared: PreparedEngineMemoryRelease[] = [];
-  const engines = liveStoreEngines();
+  const engines = liveStoreEngines(owner);
 
   try {
     for (const engine of engines) {

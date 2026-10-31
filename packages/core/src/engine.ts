@@ -1,7 +1,6 @@
 import * as defaultEngine from "@sheetwrite/wasm";
 
 import { SheetwriteError } from "./errors.js";
-import { forgetLiveStoreEngines } from "./store/engine-registry.js";
 
 /** A complete engine module from `@sheetwrite/wasm` or `@sheetwrite/formulas`. */
 export interface SheetwriteEngine {
@@ -106,7 +105,6 @@ export function stopEngine(cause: unknown, owner: number): SheetwriteError {
   stoppedModule = engineInstance.getModule();
   engineInstance = undefined;
   generation += 1;
-  forgetLiveStoreEngines();
 
   for (const listener of [...failureListeners]) {
     try {

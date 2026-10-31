@@ -5132,7 +5132,7 @@
               "owners": [
                 "src/engine.ts"
               ],
-              "source": "src/engine.ts#L7",
+              "source": "src/engine.ts#L6",
               "jsDocTags": [],
               "documentation": "A complete engine module from `@sheetwrite/wasm` or `@sheetwrite/formulas`.",
               "memberDocs": [
