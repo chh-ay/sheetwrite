@@ -39,7 +39,7 @@ If the GitHub release step fails after npm publication, re-run that failed "Publ
 
 Benchmark baselines and delivery-size budgets are reviewed evidence, not knobs for making a regression pass. Change a baseline only in a standalone, measured review that records the reason; never weaken correctness sentinels. Coverage is gated only by aggregate per-language floors in `scripts/coverage-thresholds.json`; every runtime source file is scored unless it has a documented exclusion there.
 
-The docs render the committed `scripts/size-report.json`. A change that alters what the packages ship (code, styles, the engine, or package files) must also commit a new report: run `bun run size:report`, then `bun run docs:generate`, and commit both results. CI measures the canonical tarballs and fails "Delivery Size" when the committed report is out of date; compressed sizes may differ by up to 32 bytes, because one bundler orders its output differently between builds. CI also runs `bun run docs:check`, so generated docs must be committed up to date.
+The landing page's first-load size comes from the committed `scripts/size-report.json`. It is release evidence: the package size history pull request that publication opens refreshes it from the CI run of the published commit, so pull requests do not commit it. CI runs `bun run docs:check`, so commit regenerated docs with the change that needs them.
 
 ## Code style
 
