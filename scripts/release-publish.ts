@@ -6,6 +6,7 @@ import {
   type ReleasePackageArtifact,
   verifyReleaseArtifacts,
 } from "./release-artifacts.js";
+import { captureProcess } from "./script-io.js";
 
 export interface PackageIdentity {
   readonly name: string;
@@ -50,28 +51,11 @@ function registryAttempts(): number {
   return attempts;
 }
 
-function processEnvironment(): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(process.env).filter(
-      (entry): entry is [string, string] => entry[1] !== undefined,
-    ),
-  );
-}
-
 async function command(command: readonly [string, ...string[]]): Promise<string> {
-  const child = Bun.spawn([...command], {
-    env: processEnvironment(),
-    stdout: "pipe",
-    stderr: "pipe",
+  const stdout = await captureProcess(command, {
+    failure: ({ stdout, stderr, exitCode }) =>
+      `${command.join(" ")} failed (${exitCode}): ${stderr || stdout}`,
   });
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-    child.exited,
-  ]);
-  if (exitCode !== 0) {
-    throw new Error(`${command.join(" ")} failed (${exitCode}): ${stderr || stdout}`);
-  }
   return stdout.trim();
 }
 

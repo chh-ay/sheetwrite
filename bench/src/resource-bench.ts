@@ -24,6 +24,7 @@ import {
 } from "@sheetwrite/core";
 import { installCanvasTestStubs } from "@sheetwrite/core/testing";
 
+import { optionValue } from "./cli-options.js";
 import { COLUMNS, type ColumnarDataset, makeColumnar, toSheetwriteColumnar } from "./dataset.js";
 import type { BenchmarkMode } from "./gate-protocol.js";
 import {
@@ -573,11 +574,8 @@ async function runArtifact(mode: BenchmarkMode): Promise<void> {
 }
 
 if (import.meta.main) {
-  const scenarioIndex = process.argv.indexOf("--scenario");
-  const modeIndex = process.argv.indexOf("--mode");
-  const mode: BenchmarkMode =
-    (modeIndex >= 0 ? process.argv[modeIndex + 1] : undefined) === "full" ? "full" : "smoke";
-  const id = scenarioIndex >= 0 ? process.argv[scenarioIndex + 1] : undefined;
+  const mode: BenchmarkMode = optionValue(process.argv, "--mode") === "full" ? "full" : "smoke";
+  const id = optionValue(process.argv, "--scenario");
   if (id && RESOURCE_FULL_SCENARIOS.includes(id as ResourceScenarioId)) {
     console.log(JSON.stringify(await runScenario(id as ResourceScenarioId, mode)));
   } else {

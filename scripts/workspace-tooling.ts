@@ -9,18 +9,8 @@ export const WASM_TARGET = "wasm32-unknown-unknown";
 export const CARGO_AUDIT_VERSION = "0.22.2";
 export const CARGO_LLVM_COV_VERSION = "0.8.7";
 
+/** Dependency order of the published packages: build, typecheck and publish all follow it. */
 export const PUBLISHABLE_PACKAGE_ORDER = [
-  "@sheetwrite/wasm",
-  "@sheetwrite/formulas",
-  "@sheetwrite/core",
-  "@sheetwrite/xlsx",
-  "@sheetwrite/charts",
-  "@sheetwrite/react",
-  "@sheetwrite/vue",
-  "@sheetwrite/svelte",
-] as const;
-
-export const PACKAGE_TYPECHECK_ORDER = [
   "@sheetwrite/wasm",
   "@sheetwrite/formulas",
   "@sheetwrite/core",
@@ -55,8 +45,8 @@ export const PACKAGE_BUILD_NODES: readonly CommandNode[] = PUBLISHABLE_PACKAGE_O
   packageNode(name, "build"),
 );
 
-export const PACKAGE_TYPECHECK_NODES: readonly CommandNode[] = PACKAGE_TYPECHECK_ORDER.map((name) =>
-  packageNode(name, "typecheck"),
+export const PACKAGE_TYPECHECK_NODES: readonly CommandNode[] = PUBLISHABLE_PACKAGE_ORDER.map(
+  (name) => packageNode(name, "typecheck"),
 );
 
 export const EXAMPLE_BUILD_NODES: readonly CommandNode[] = [

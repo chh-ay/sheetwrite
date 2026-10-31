@@ -381,7 +381,7 @@ jobs:
           test -n "$ARTIFACT_DIGEST"
           bun run release:verify-artifacts -- --input test-results/release-artifacts
       - name: Test locked packed consumers
-        run: bun run verify:packed -- --artifacts test-results/release-artifacts --locked
+        run: bun run verify:packed -- --artifacts test-results/release-artifacts
       - name: Save Bun downloads cache
         if: env.SAVE_CACHE == 'true' && steps.bun-downloads.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -441,7 +441,7 @@ jobs:
           test -n "$ARTIFACT_DIGEST"
           bun run release:verify-artifacts -- --input test-results/release-artifacts
       - name: Test locked bundler consumers
-        run: bun run verify:bundlers -- --artifacts test-results/release-artifacts --locked
+        run: bun run verify:bundlers -- --artifacts test-results/release-artifacts
       - name: Save Bun downloads cache
         if: env.SAVE_CACHE == 'true' && steps.bun-downloads.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

@@ -1,5 +1,5 @@
 import { readdir, readFile } from "node:fs/promises";
-import { join, relative, sep } from "node:path";
+import { join, sep } from "node:path";
 
 import { formatTokens } from "../docs/src/lib/grid-result.js";
 import {
@@ -10,6 +10,7 @@ import {
 } from "../docs/src/lib/navigation.js";
 import { sectionCardsMarkdown } from "../docs/src/lib/section-cards.js";
 import { SITE_URL } from "../docs/src/lib/seo.js";
+import { entryLabel, entrySlug, routeForContentPath } from "./docs-paths.js";
 import { fenceBlocks } from "./markdown-fences.js";
 import type { ApiEntryPoint, ApiExport, ApiPackage, PublicApiManifest } from "./public-api.js";
 
@@ -103,10 +104,6 @@ export async function expectedLlmsFiles(
   ];
 }
 
-function toPosix(value: string): string {
-  return value.split(sep).join("/");
-}
-
 function siteUrl(route: string): string {
   return `${LLMS_SITE_BASE}${route}`;
 }
@@ -132,28 +129,6 @@ function parseFrontmatter(source: string): { data: ReadonlyMap<string, string>; 
     if (key !== undefined && rawValue !== undefined) data.set(key, unquote(rawValue.trim()));
   }
   return { data, body: source.slice(end + 4).replace(/^\n/, "") };
-}
-
-/** Mirrors `routeForContentPath` in scripts/docs.ts. */
-function routeForContentPath(repositoryRoot: string, path: string): string {
-  const relativePath = toPosix(relative(join(repositoryRoot, contentRoot), path)).replace(
-    /\.mdx?$/,
-    "",
-  );
-  const withoutIndex = relativePath === "index" ? "" : relativePath.replace(/\/index$/, "");
-  return `/docs/${withoutIndex}${withoutIndex.length === 0 ? "" : "/"}`;
-}
-
-/** Mirrors `entrySlug` in scripts/docs.ts; `/docs/api/<slug>/` is the generated page. */
-function entrySlug(packageName: string, subpath: string): string {
-  const packageSlug = packageName.replace("@sheetwrite/", "");
-  if (subpath === ".") return packageSlug;
-  return `${packageSlug}-${subpath.replace(/^\.\//, "").replace(/[^a-zA-Z0-9]+/g, "-")}`;
-}
-
-/** Mirrors `entryLabel` in scripts/docs.ts. */
-function entryLabel(pkg: ApiPackage, entry: ApiEntryPoint): string {
-  return entry.subpath === "." ? pkg.name : `${pkg.name}/${entry.subpath.slice(2)}`;
 }
 
 /**
@@ -186,7 +161,7 @@ async function generatedPage(
   file: LlmsGeneratedFile,
 ): Promise<GeneratedPage> {
   const { data } = parseFrontmatter(file.content ?? (await readFile(file.path, "utf8")));
-  const route = routeForContentPath(repositoryRoot, file.path);
+  const route = routeForContentPath(join(repositoryRoot, contentRoot), file.path);
   return { route, title: data.get("title") ?? route, description: data.get("description") ?? "" };
 }
 
@@ -229,7 +204,7 @@ async function authoredDocuments(
         continue;
       }
       if (!entry.isFile() || !/\.mdx?$/.test(entry.name) || generated.has(path)) continue;
-      const route = routeForContentPath(repositoryRoot, path);
+      const route = routeForContentPath(documentRoot, path);
       const { data, body } = parseFrontmatter(await readFile(path, "utf8"));
       documents.push({
         route,

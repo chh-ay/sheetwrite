@@ -2,6 +2,7 @@ import { createRequire } from "node:module";
 import { cpus } from "node:os";
 import { relative, resolve } from "node:path";
 
+import { optionValue } from "./cli-options.js";
 import { validateEngineVersions } from "./engine-versions.js";
 import { packageVersion, type ProtocolCaptureMeta, protocolCaptureMeta } from "./protocol-meta.js";
 import { counterbalancedOrder, summarizeFinite } from "./stats.js";
@@ -530,11 +531,6 @@ export async function runXlsxBenchmark(options: RunOptions): Promise<XlsxBenchma
     summaries,
     comparisons,
   });
-}
-
-function optionValue(args: readonly string[], name: string): string | undefined {
-  const index = args.indexOf(name);
-  return index < 0 ? undefined : args[index + 1];
 }
 
 if (import.meta.main) {

@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+import { optionValue } from "./cli-options.js";
 import { expectedFormulaWorkloadKeys, type FormulaGateCapture } from "./formula-bench.js";
-import { optionValue, validateExactMatrix } from "./gate-protocol.js";
-import { summarize } from "./stats.js";
+import { validateExactMatrix } from "./gate-protocol.js";
+import { summarize, upperMedian } from "./stats.js";
 
 /** The ratio limits below were measured at seven pairs; fewer pairs would make them too tight. */
 const MINIMUM_PAIRS = 7;
@@ -200,11 +201,6 @@ function acceptedByteRows(
   return accepted;
 }
 
-/** The middle value of an integer counter list; for an even count, the upper one. */
-function middleCounter(values: number[]): number {
-  return values.toSorted((left, right) => left - right)[Math.floor(values.length / 2)] ?? NaN;
-}
-
 /**
  * Compare paired medians: each pair is one base and one candidate capture run
  * back to back, so machine drift between pairs cancels in the ratio. Byte
@@ -252,9 +248,10 @@ export function compareFormulaPairs(
     // The counters are nearly deterministic, but a row can differ by a few
     // bytes between same-engine captures (topology-remove-add/10K, 105 B in
     // one of 14). Real growth appears in every capture, so the middle one
-    // catches it without failing on a single odd capture.
-    const base = middleCounter(pairs.map((pair) => pair.base.bytes[key] ?? NaN));
-    const candidate = middleCounter(pairs.map((pair) => pair.candidate.bytes[key] ?? NaN));
+    // catches it without failing on a single odd capture. The upper middle of
+    // an even count keeps the result a whole counter that a capture observed.
+    const base = upperMedian(pairs.map((pair) => pair.base.bytes[key] ?? NaN));
+    const candidate = upperMedian(pairs.map((pair) => pair.candidate.bytes[key] ?? NaN));
     if (
       !Number.isSafeInteger(base) ||
       base < 0 ||

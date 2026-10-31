@@ -4,7 +4,6 @@ import { MOVED_PAGES } from "../docs/src/lib/moved-pages.js";
 
 const repositoryRoot = resolve(import.meta.dir, "..");
 const outputRoot = resolve(repositoryRoot, process.env.DOCS_OUTPUT_DIR ?? "docs/dist/client");
-const base = "";
 const port = Number.parseInt(process.env.PORT ?? "4173", 10);
 const LOCAL_VERCEL_SCRIPTS = new Set([
   "/_vercel/insights/script.js",
@@ -12,8 +11,7 @@ const LOCAL_VERCEL_SCRIPTS = new Set([
 ]);
 
 function outputPath(pathname: string): string | null {
-  if (pathname !== base && !pathname.startsWith(`${base}/`)) return null;
-  const relative = pathname.slice(base.length).replace(/^\/+/, "");
+  const relative = pathname.replace(/^\/+/, "");
   const candidate = resolve(outputRoot, relative.endsWith("/") ? relative : relative || ".");
   if (candidate !== outputRoot && !candidate.startsWith(`${outputRoot}${sep}`)) return null;
   return relative === "" || relative.endsWith("/") ? resolve(candidate, "index.html") : candidate;
@@ -49,4 +47,4 @@ const server = Bun.serve({
   },
 });
 
-console.log(`Sheetwrite docs available at ${server.url}${base}/`);
+process.stdout.write(`Sheetwrite docs available at ${server.url}\n`);

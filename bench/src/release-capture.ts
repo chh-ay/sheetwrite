@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
+import { optionValue } from "./cli-options.js";
 import { CONTROLLED_BASELINE_MINIMUM_ROUNDS } from "./controlled-baseline.js";
 
 const BENCH_ROOT = new URL("..", import.meta.url).pathname;
@@ -254,7 +255,7 @@ function resolveCommands(
  * costs seconds, failing after the browser capture costs the whole run.
  */
 function requireXlsxBaselineRoot(argument: string | undefined): string {
-  if (argument === undefined || argument.startsWith("--")) {
+  if (argument === undefined) {
     throw new Error(
       `the release capture needs --xlsx-baseline-root: a checkout of ${XLSX_BASELINE_COMMIT} with its packages built, for example\n` +
         `  git worktree add ../sheetwrite-xlsx-baseline ${XLSX_BASELINE_COMMIT}\n` +
@@ -270,11 +271,10 @@ function requireXlsxBaselineRoot(argument: string | undefined): string {
 async function main(): Promise<void> {
   const args = process.argv.slice(2).filter((argument) => argument !== "--");
   const smoke = args.includes("--smoke");
-  const optionIndex = args.indexOf("--xlsx-baseline-root");
   const options: ReleaseOptions = {
     xlsxBaselineRoot: smoke
       ? ""
-      : requireXlsxBaselineRoot(optionIndex < 0 ? undefined : args[optionIndex + 1]),
+      : requireXlsxBaselineRoot(optionValue(args, "--xlsx-baseline-root")),
   };
   const commit = gitOutput(["rev-parse", "HEAD"]);
   const dirtyTree = gitOutput(["status", "--porcelain", "--untracked-files=no"]).length > 0;

@@ -17,8 +17,9 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
+import { optionValue } from "./cli-options.js";
 import { mulberry32 } from "./dataset.js";
-import { optionValue, validateExactMatrix } from "./gate-protocol.js";
+import { validateExactMatrix } from "./gate-protocol.js";
 import {
   READER_CASE_NAMES,
   READER_GROUPS,
@@ -26,7 +27,7 @@ import {
   type ReaderRunResult,
   selectedReaderCaseNames,
 } from "./reader-bench.js";
-import { summarize } from "./stats.js";
+import { median } from "./stats.js";
 
 /**
  * The pair count each limit is resampled at. A gate run needs at least this
@@ -170,10 +171,6 @@ function arrayOf(value: unknown, path: string): unknown[] {
   return value;
 }
 
-function median(values: readonly number[]): number {
-  return summarize(values).median;
-}
-
 /**
  * The limit for one reader: resample its A/A ratios into GATE_PAIRS-pair
  * medians, take the LIMIT_QUANTILE median, widen its excess over parity by
@@ -190,7 +187,8 @@ export function noiseFloorLimit(aaRatios: readonly number[]): number {
       draw[pair] = aaRatios[Math.floor(random() * aaRatios.length)] ?? Number.NaN;
     }
     draw.sort();
-    // GATE_PAIRS is even, so the median is the mean of the two middle draws, as in `summarize`.
+    // GATE_PAIRS is even, so the median is the mean of the two middle draws,
+    // the rule of `median` in stats.ts, computed in place on the typed buffer.
     medians[resample] = ((draw[middle - 1] ?? Number.NaN) + (draw[middle] ?? Number.NaN)) / 2;
   }
 
