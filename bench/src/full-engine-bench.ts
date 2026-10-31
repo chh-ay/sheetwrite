@@ -10,6 +10,7 @@ import {
   type CompleteFormulaBenchmarkResult,
   type CompleteFormulaWorkloadResult,
   collectFixture,
+  formulaSourceEnginePackage,
   validateFormulaCapture,
 } from "./formula-bench.js";
 import {
@@ -179,11 +180,16 @@ export function validateFullEngineResult(result: FullEngineResult): void {
       throw new Error("Unexpected shared baseline engine provenance");
     }
     exactKeys(capture.wasm, ["rawBytes", "brotliBytes", "sha256"], "engine wasm fields");
-    const wasmPath = `packages/${capture.engine === "full" ? "formulas" : "wasm"}/pkg/sheetwrite_wasm_bg.wasm`;
+    const enginePackage = capture.engine === "full" ? "formulas" : "wasm";
+    const wasmPath = `packages/${enginePackage}/pkg/sheetwrite_wasm_bg.wasm`;
+    // The shared capture keys its hashes by the package it loaded; older
+    // captures keyed both engines under `packages/wasm/`.
+    const sharedPackage = formulaSourceEnginePackage(capture.shared.source.files);
     if (
+      (sharedPackage !== "wasm" && sharedPackage !== enginePackage) ||
       capture.wasm.sha256 !== result.sourceFiles[wasmPath] ||
       capture.wasm.sha256 !==
-        capture.shared.source.files["packages/wasm/pkg/sheetwrite_wasm_bg.wasm"] ||
+        capture.shared.source.files[`packages/${sharedPackage}/pkg/sheetwrite_wasm_bg.wasm`] ||
       !Number.isSafeInteger(capture.wasm.rawBytes) ||
       !Number.isSafeInteger(capture.wasm.brotliBytes) ||
       capture.wasm.brotliBytes <= 0 ||
@@ -334,9 +340,9 @@ async function capture(): Promise<void> {
       stderr: "inherit",
     });
     if (child.exitCode !== 0) throw new Error(`${engine} shared capture failed`);
-    const lastLine = child.stdout.toString().trim().split("\n").at(-1);
-    if (!lastLine) throw new Error(`${engine} shared capture returned no evidence`);
-    const shared = JSON.parse(lastLine) as CompleteFormulaBenchmarkResult;
+    const output = child.stdout.toString();
+    if (output.trim() === "") throw new Error(`${engine} shared capture returned no evidence`);
+    const shared = JSON.parse(output) as CompleteFormulaBenchmarkResult;
 
     const bytes = readFileSync(
       benchmarkEnginePath(

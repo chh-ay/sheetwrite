@@ -292,7 +292,7 @@ async function main(): Promise<void> {
         : `writing evidence to ${resultsDir}`,
       smoke
         ? "the engine captures and the regression baseline have no smoke matrix and are skipped; run without --smoke for the release set"
-        : "run unpinned on an otherwise idle machine, with no concurrent builds or timing captures; the 0.4.0 and 0.5.0 captures both ran unpinned on the same machine",
+        : "run on an otherwise idle machine, with no concurrent builds or timing captures; release comparison evidence needs each suite captured on its own through src/capture-scope.ts with BENCH_MEMORY_MAX=8G (non-formula suites on one reserved CPU, formula suites on the full CPU mask under exclusive quiet-machine isolation), as bench/README.md describes",
       "",
     ].join("\n"),
   );

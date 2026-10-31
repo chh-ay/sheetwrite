@@ -180,8 +180,11 @@ The last file adds an engine dimension, checked analysis workloads, WASM raw
 and Brotli quality 11 sizes, and five fresh Node initialization samples.
 The shared captures keep the schema-v2 validator and use output mode. Their
 baseline gates stay blocked. These results are local measurements, not a
-passed timing regression gate. The legacy shared source keys name the WASM
-role; their hashes use the selected engine. The outer artifact records the
+passed timing regression gate. Each shared capture keys its engine hashes by
+the package it loaded: `packages/wasm/pkg/*` for the default engine and
+`packages/formulas/pkg/*` for the full engine. Older captures filed both
+engines under `packages/wasm/pkg/*` keys; the validators accept that key set
+and check its hashes against the engine binary. The outer artifact records the
 physical paths and binds each engine to its captured WASM hash.
 
 Build the packages first. Run one capture at a time from `bench/` on an
@@ -610,14 +613,14 @@ artifact above. `bench:release` captures render-scale, the interaction
 evidence, paged storage, data, core paths, chart tracking, pivot, formula,
 formula engines, matched engines, and XLSX, then records the render regression
 baseline last. Every capture stamps its artifact with the commit, tree state,
-and timestamp. For the 0.6.0 capture, run every benchmark through the
+and timestamp. For release comparison evidence, run every benchmark through the
 machine's benchmark runner, one capture at a time in its own memory scope.
 Non-formula suites use CPU 4. Formula, formula-engines and formula-matched
 use the full available mask `0-19` under exclusive quiet-machine isolation,
 with matching effective affinity on both versions. Builds and tests use the
-machine's build runner. Capture 0.5.4 and 0.6.0 afresh with the same pinned
-toolchain and `BENCH_MEMORY_MAX=8G`. Old committed results are history only,
-never comparison inputs.
+machine's build runner. Capture the previous release and the candidate afresh
+with the same pinned toolchain and `BENCH_MEMORY_MAX=8G`. Old committed results
+are history only, never comparison inputs.
 
 ```sh
 # Build first: every capture needs the built packages and WASM binaries.
@@ -658,20 +661,36 @@ reservation, not an override of that effective mask. Legacy records without
 an explicit override can use their recorded slot mask. The comparison rejects
 a same-suite affinity mismatch; different suites need not share one mask.
 
-Use the same recorder and cap for the fresh 0.5.4 checkout. Copy its complete
-results and records to `results/releases/0.5.4/`. The recorded
+Use the same recorder and cap for the fresh checkout of the previous release.
+Its engine captures (formula, formula-engines and formula-matched) measure
+that release's engine under the candidate's core and harness: run them from
+this checkout with `SHEETWRITE_BENCH_ENGINE_ROOT` set to the built previous
+release checkout and `SHEETWRITE_BENCH_BASELINE_VERSION` set to its version.
+The capture then checks that the engine packages there have that version,
+records a baseline context labelled
+`<version> engine (WASM) under <major.minor> core and harness`, and refuses a
+root that holds the current WASM. Without `SHEETWRITE_BENCH_BASELINE_VERSION`
+the root is only another engine checkout, as on either side of the paired
+formula gate, and the capture records no baseline context.
+
+Copy the previous release's complete results and records to
+`results/releases/<version>/`. The recorded
 `results/release-capture-metadata.json` names the immutable measurement commit,
 baseline commit and method notes. The comparison validates every receipt
 against those commits and separately records its own newer generator commit:
 
 ```sh
-bun src/release-comparison.ts --base-ref release/version-0.5.4 \
-  --baseline-results-dir results/releases/0.5.4 \
+bun src/release-comparison.ts --baseline-results-dir results/releases/<version> \
   --output results/release-comparison.json
 ```
 
+The comparison reads the baseline release from the context label of its engine
+captures, which must all name the same release. `--base-ref` labels the
+baseline in the output and defaults to `release/version-<version>`.
 Comparison refuses stale commits, missing suites, wrong caps, and records
-that report throttling. Chart tracking and pivots are new-only measurements.
+that report throttling. A suite with no scope receipt in the baseline result
+set is new in the candidate and is reported as a new-only measurement; a
+baseline artifact without its receipt is rejected.
 
 
 ### Chart tracking and pivot evidence
