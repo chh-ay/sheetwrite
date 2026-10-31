@@ -13,14 +13,14 @@
   "heroStats": {
     "millionRowScenarios": 14,
     "millionRowMedianMs": 0.6,
-    "millionRowHeapMb": 91
+    "millionRowHeapMb": 84
   },
   "sizes": [
     {
       "size": 1000,
       "comparedScenarios": 14,
-      "medianRatio": 7.9,
-      "bestRatio": 2019.5,
+      "medianRatio": 7.8,
+      "bestRatio": 2019.1,
       "bestScenario": "merge-heavy.paint",
       "handsontableIncomplete": 0
     },
@@ -28,23 +28,23 @@
       "size": 10000,
       "comparedScenarios": 14,
       "medianRatio": 7.8,
-      "bestRatio": 1931.9,
+      "bestRatio": 1930.2,
       "bestScenario": "merge-heavy.paint",
       "handsontableIncomplete": 0
     },
     {
       "size": 100000,
       "comparedScenarios": 14,
-      "medianRatio": 8.6,
-      "bestRatio": 1956.6,
+      "medianRatio": 8.2,
+      "bestRatio": 1951.8,
       "bestScenario": "merge-heavy.paint",
       "handsontableIncomplete": 0
     },
     {
       "size": 1000000,
       "comparedScenarios": 14,
-      "medianRatio": 7.7,
-      "bestRatio": 1988,
+      "medianRatio": 7,
+      "bestRatio": 1971.7,
       "bestScenario": "merge-heavy.paint",
       "handsontableIncomplete": 0
     }

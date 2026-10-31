@@ -21,6 +21,7 @@ import { API, type Diagnostic, type Project } from "typescript/unstable/async";
 
 import { validateEngineVersions } from "../bench/src/engine-versions.js";
 import { DATA_GATE_PROTOCOL_VERSION } from "../bench/src/gate-protocol.js";
+import { median } from "../bench/src/stats.js";
 import { MOVED_HEADINGS, MOVED_PAGES, type MovedPage } from "../docs/src/lib/moved-pages.js";
 import { DOCS_NAVIGATION, navigationPages } from "../docs/src/lib/navigation.js";
 import { repositorySourceUrl } from "../docs/src/lib/repository.js";
@@ -88,6 +89,7 @@ import {
   validateFullEngineArtifact,
   validateMatchedEngineArtifact,
 } from "./full-engine-docs.js";
+import { fenceBlocks } from "./markdown-fences.js";
 import {
   type ApiEntryPoint,
   type ApiExport,
@@ -1116,16 +1118,21 @@ function renderMembers(
   const memberDocs = new Map(item.memberDocs.map((member) => [member.name, member.documentation]));
   const documented = new Set<string>();
   const indexLinks: string[] = [];
-  const indexed = new Set<string>();
+  const usedIds = new Set<string>();
   const rows = members.map((member, index) => {
-    const id = `${anchor(item.name)}-${anchor(member.name) || index + 1}`;
-    if (!indexed.has(id)) {
-      indexed.add(id);
-      indexLinks.push(`<a href="#${id}"><code>${html(member.name)}</code></a>`);
-    }
-    const searchAnchor = searchTargets.has(member.name)
-      ? `<h3 id="${member.name.toLowerCase()}" class="api-search-anchor">${html(member.name)}</h3>`
-      : "";
+    // Overload rows repeat a member name. The first row keeps the member ID
+    // that the index and other pages link to; each later row gets a suffix,
+    // so no two elements share an ID.
+    const memberId = `${anchor(item.name)}-${anchor(member.name) || index + 1}`;
+    const firstRow = !usedIds.has(memberId);
+    let id = memberId;
+    for (let overload = 2; usedIds.has(id); overload += 1) id = `${memberId}-${overload}`;
+    usedIds.add(id);
+    if (firstRow) indexLinks.push(`<a href="#${id}"><code>${html(member.name)}</code></a>`);
+    const searchAnchor =
+      firstRow && searchTargets.has(member.name)
+        ? `<h3 id="${member.name.toLowerCase()}" class="api-search-anchor">${html(member.name)}</h3>`
+        : "";
     // Overload rows repeat a member name; the merged documentation renders once,
     // on the first row.
     const documentation = documented.has(member.name) ? undefined : memberDocs.get(member.name);
@@ -1685,10 +1692,6 @@ export function landingBenchPayload(
     `${JSON.stringify({ available: false, reason, ...downloadsField }, null, 2)}\n`;
   if (!("evidence" in scale)) return unavailable(scale.reason);
   const { evidence } = scale;
-  const mid = (values: number[]): number => {
-    const sorted = [...values].sort((a, b) => a - b);
-    return sorted[Math.floor(sorted.length / 2)] ?? Number.NaN;
-  };
   const successes = (size: number, engine: string, scenario: string): RenderEvidenceResult[] =>
     evidence.results.filter(
       (result) =>
@@ -1714,7 +1717,7 @@ export function landingBenchPayload(
         continue;
       ratios.push({
         scenario,
-        ratio: mid(theirs.map((r) => r.medianMs)) / mid(ours.map((r) => r.medianMs)),
+        ratio: median(theirs.map((r) => r.medianMs)) / median(ours.map((r) => r.medianMs)),
       });
     }
     if (ratios.length === 0) return [];
@@ -1723,7 +1726,7 @@ export function landingBenchPayload(
       {
         size,
         comparedScenarios: ratios.length,
-        medianRatio: round1(mid(ratios.map((r) => r.ratio))),
+        medianRatio: round1(median(ratios.map((r) => r.ratio))),
         bestRatio: round1(best.ratio),
         bestScenario: best.scenario,
         handsontableIncomplete,
@@ -1736,13 +1739,13 @@ export function landingBenchPayload(
     const bucket = successes(1_000_000, "sheetwrite", scenario);
     // Hero stats hold the same full-round bar as the ratio pairs.
     if (bucket.length < evidence.metadata.rounds) continue;
-    scenarioMedians.push(mid(bucket.map((r) => r.medianMs)));
-    scenarioHeaps.push(mid(bucket.map((r) => r.memory.afterBytes)));
+    scenarioMedians.push(median(bucket.map((r) => r.medianMs)));
+    scenarioHeaps.push(median(bucket.map((r) => r.memory.afterBytes)));
   }
   const heroStats = {
     millionRowScenarios: scenarioMedians.length,
-    millionRowMedianMs: round1(mid(scenarioMedians)),
-    millionRowHeapMb: Math.round(mid(scenarioHeaps) / 1_000_000),
+    millionRowMedianMs: round1(median(scenarioMedians)),
+    millionRowHeapMb: Math.round(median(scenarioHeaps) / 1_000_000),
   };
   const displayed = [
     ...sizes.flatMap((entry) => [entry.medianRatio, entry.bestRatio]),
@@ -1985,17 +1988,34 @@ interface DataEvidence {
   >;
 }
 
-function validateDataArtifact(value: Record<string, unknown>): DataEvidence | string {
+/** Sizes both engines complete headlessly; the data page compares the engines here. */
+const DATA_HEAD_TO_HEAD_ROWS = [1_000, 10_000] as const;
+/** Sizes the data page shows for Sheetwrite alone. */
+const DATA_SCALE_ROWS = [100_000, 500_000, 1_000_000] as const;
+const DATA_OPERATIONS = ["ingest", "windowRead", "edit", "sort", "filter", "aggregate"] as const;
+
+/**
+ * Accepts a data capture only when it holds every row and operation the data
+ * page renders, so "Validated evidence" never heads an empty or partial figure.
+ */
+export function validateDataArtifact(value: Record<string, unknown>): DataEvidence | string {
   const artifact = value as unknown as Partial<DataEvidence>;
   if (artifact.protocolVersion !== DATA_GATE_PROTOCOL_VERSION || artifact.mode !== "full") {
     return "artifact is not a full-mode data protocol capture";
   }
   validateEngineVersions(artifact.meta?.engineVersions, ["sheetwrite", "handsontable"]);
-  for (const engine of ["sheetwrite", "handsontable"] as const) {
+  const required = [
+    ["sheetwrite", [...DATA_HEAD_TO_HEAD_ROWS, ...DATA_SCALE_ROWS]],
+    ["handsontable", DATA_HEAD_TO_HEAD_ROWS],
+  ] as const;
+  for (const [engine, rowsList] of required) {
     const block = artifact[engine];
     if (block === undefined || typeof block !== "object") return `artifact lacks ${engine} results`;
-    for (const entry of Object.values(block)) {
-      for (const stat of Object.values(entry.stats)) {
+    for (const rows of rowsList) {
+      const stats = block[String(rows)]?.stats;
+      for (const operation of DATA_OPERATIONS) {
+        const stat = stats?.[operation];
+        if (stat === undefined) return `artifact lacks ${engine} ${operation} at ${rows} rows`;
         if (!Number.isFinite(stat.median) || !Number.isFinite(stat.p95)) {
           return "data medians carry non-finite samples";
         }
@@ -2229,10 +2249,6 @@ const FORMULA_METHOD = benchMethod(
 );
 
 function renderBenchWidget(evidence: ValidatedRenderEvidence): string {
-  const mid = (values: number[]): number => {
-    const sorted = [...values].sort((a, b) => a - b);
-    return sorted[Math.floor(sorted.length / 2)] ?? Number.NaN;
-  };
   const sizes = BENCH_SIZES.filter((size) => evidence.config.rows.includes(size));
   const parts: string[] = ['<figure class="bench-viz bench-widget" data-pagefind-ignore>'];
   for (const size of sizes) {
@@ -2275,13 +2291,16 @@ function renderBenchWidget(evidence: ValidatedRenderEvidence): string {
       const theirs = engines?.get("handsontable");
       const speedStat = (bucket?: RenderEvidenceResult[]): BenchPairStat | undefined =>
         bucket?.length
-          ? { main: mid(bucket.map((r) => r.medianMs)), faded: mid(bucket.map((r) => r.p95Ms)) }
+          ? {
+              main: median(bucket.map((r) => r.medianMs)),
+              faded: median(bucket.map((r) => r.p95Ms)),
+            }
           : undefined;
       const memoryStat = (bucket?: RenderEvidenceResult[]): BenchPairStat | undefined =>
         bucket?.length
           ? {
-              main: mid(bucket.map((r) => r.memory.afterBytes)),
-              faded: mid(bucket.map((r) => Math.max(0, r.memory.deltaBytes))),
+              main: median(bucket.map((r) => r.memory.afterBytes)),
+              faded: median(bucket.map((r) => Math.max(0, r.memory.deltaBytes))),
             }
           : undefined;
       speedPairs.push([scenario, speedStat(ours), speedStat(theirs)]);
@@ -3033,7 +3052,6 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
   lines.push("## Data engine benchmark", "");
   if ("evidence" in data) {
     const { evidence, source } = data;
-    const ops = ["ingest", "windowRead", "edit", "sort", "filter", "aggregate"] as const;
     lines.push(
       `<div class="evidence-available"><strong>Validated evidence.</strong> Head-to-head store operations at the sizes both engines complete headlessly; Sheetwrite additionally scales to 1M rows below.</div>`,
       "",
@@ -3059,12 +3077,12 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
       "</div>",
       "</div>",
     );
-    for (const rows of [1_000, 10_000]) {
+    for (const rows of DATA_HEAD_TO_HEAD_ROWS) {
       const ours = evidence.sheetwrite[String(rows)];
       const theirs = evidence.handsontable[String(rows)];
       if (!ours || !theirs) continue;
       const scale = benchLogScale(
-        ops.flatMap((op) =>
+        DATA_OPERATIONS.flatMap((op) =>
           [ours.stats[op], theirs.stats[op]].flatMap((s) => (s ? [s.median, s.p95] : [])),
         ),
       );
@@ -3073,7 +3091,7 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
         `<div class="bench-viz__scale"><span class="bench-viz__lead">operation</span><span class="bench-viz__axis-note">log scale — every tick is 10× — shorter is faster</span><span class="bench-viz__legend"><i class="bench-legend-swatch" data-kind="median"></i>median<i class="bench-legend-swatch" data-kind="p95"></i>p95</span></div>`,
         scale.ruler,
       );
-      for (const op of ops) {
+      for (const op of DATA_OPERATIONS) {
         const a = ours.stats[op];
         const b = theirs.stats[op];
         if (!a || !b) continue;
@@ -3097,9 +3115,9 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
       "",
       ...benchScaleFigure(
         "operation",
-        ops.map((op) => ({
+        DATA_OPERATIONS.map((op) => ({
           label: op,
-          entries: [100_000, 500_000, 1_000_000].flatMap((rows) => {
+          entries: DATA_SCALE_ROWS.flatMap((rows) => {
             const stat = evidence.sheetwrite[String(rows)]?.stats[op];
             return stat === undefined
               ? []
@@ -3759,32 +3777,38 @@ export async function unresolvedCssTokens(root: string): Promise<string[]> {
 }
 
 export function parseFences(content: string): Fence[] {
-  const fences: Fence[] = [];
   const lines = content.split("\n");
-  for (let index = 0; index < lines.length; index += 1) {
-    const match = /^```([^\s`]*)\s*(.*)$/.exec(lines[index] ?? "");
-    if (match === null) continue;
-    const language = match[1] ?? "";
-    const meta = match[2]?.trim() ?? "";
-    const start = index;
-    const body: string[] = [];
-    for (index += 1; index < lines.length && !/^```\s*$/.test(lines[index] ?? ""); index += 1) {
-      body.push(lines[index] ?? "");
-    }
-    if (index >= lines.length) throw new Error(`Unclosed code fence at line ${start + 1}`);
-    fences.push({ language, meta, code: body.join("\n"), line: start + 1 });
-  }
-  return fences;
+  return fenceBlocks(lines).map((block) => {
+    if (!block.closed) throw new Error(`Unclosed code fence at line ${block.start + 1}`);
+    const info = block.info.trim();
+    const language = /^\S*/.exec(info)?.[0] ?? "";
+    // CommonMark removes the opener's indent from each content line.
+    const code = lines
+      .slice(block.start + 1, block.end)
+      .map((line) => line.replace(new RegExp(`^ {0,${block.indent}}`), ""))
+      .join("\n");
+    return { language, meta: info.slice(language.length).trim(), code, line: block.start + 1 };
+  });
 }
+
 function fenceMetaValue(meta: string, name: string): string | undefined {
   const match = new RegExp(`(?:^|\\s)${name}=(?:"([^"]+)"|'([^']+)')`).exec(meta);
   return match?.[1] ?? match?.[2];
 }
 
+/** Blanks every fenced block, keeping line breaks so line numbers still match. */
+function maskFences(content: string): string {
+  const lines = content.split("\n");
+  for (const block of fenceBlocks(lines)) {
+    for (let index = block.start; index <= block.end; index += 1) {
+      lines[index] = " ".repeat(lines[index]?.length ?? 0);
+    }
+  }
+  return lines.join("\n");
+}
+
 function maskCode(content: string): string {
-  return content
-    .replace(/```[\s\S]*?```/g, (block) => block.replace(/[^\n]/g, " "))
-    .replace(/`[^`\n]*`/g, (code) => " ".repeat(code.length));
+  return maskFences(content).replace(/`[^`\n]*`/g, (code) => " ".repeat(code.length));
 }
 
 function routeForContentPath(path: string): string {
@@ -3801,15 +3825,24 @@ export function contentPathForRoute(
   return documents.find((document) => routeForContentPath(document.path) === normalizedRoute)?.path;
 }
 
+/**
+ * Every fragment the site gives a page. Explicit `id` attributes keep their
+ * value. Headings get the slug of their text, and a repeated slug gets `-1`,
+ * `-2` and so on in page order, as `rehype-slug` (github-slugger) does in
+ * `docs/vite.config.ts`.
+ */
 export function headingAnchors(content: string): Set<string> {
   const anchors = new Set<string>();
-  const masked = content.replace(/```[\s\S]*?```/g, (block) => block.replace(/[^\n]/g, " "));
-  for (const line of masked.split("\n")) {
+  const occurrences = new Map<string, number>();
+  for (const line of maskFences(content).split("\n")) {
     const explicit = /<[a-z][^>]*\sid=["']([^"']+)["']/i.exec(line);
     if (explicit !== null) anchors.add(explicit[1] ?? "");
-    const heading = /^#{1,6}\s+(.+?)\s*$/.exec(line);
-    if (heading === null) continue;
-    const slug = (heading[1] ?? "")
+    const heading =
+      /^#{1,6}\s+(.+?)\s*$/.exec(line)?.[1] ??
+      (explicit === null ? /<h[1-6](?:\s[^>]*)?>(.*?)<\/h[1-6]>/i.exec(line)?.[1] : undefined);
+    if (heading === undefined) continue;
+
+    const base = heading
       .replace(/<[^>]+>/g, "")
       .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
       .replace(/[`*_~]/g, "")
@@ -3817,6 +3850,13 @@ export function headingAnchors(content: string): Set<string> {
       .toLowerCase()
       .replace(/[^\p{L}\p{N}\s-]/gu, "")
       .replace(/\s/g, "-");
+    let slug = base;
+    while (occurrences.has(slug)) {
+      const count = (occurrences.get(base) ?? 0) + 1;
+      occurrences.set(base, count);
+      slug = `${base}-${count}`;
+    }
+    occurrences.set(slug, 0);
     if (slug.length > 0) anchors.add(slug);
   }
   return anchors;

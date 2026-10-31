@@ -12,6 +12,25 @@ function a1(cell: string): { row: number; col: number } {
   return { row: Number(match[2]) - 1, col: col - 1 };
 }
 
+/**
+ * Every error the engine can produce, as `FormulaError::sentinel` in
+ * `packages/wasm/src/types.rs` spells it. A resolved cell carries an error as
+ * this text, so any other text is a string result.
+ */
+const ENGINE_ERRORS: ReadonlySet<string> = new Set([
+  "#CYCLE!",
+  "#DIV/0!",
+  "#REF!",
+  "#NUM!",
+  "#VALUE!",
+  "#NAME?",
+  "#N/A",
+  "#SPILL!",
+  "#CALC!",
+  "#LOADING!",
+  "#NULL!",
+]);
+
 function classify(
   value: CellScalar,
   numberFormat: string | undefined,
@@ -24,9 +43,7 @@ function classify(
   if (value === null) return { type: "blank" };
   if (typeof value === "number") return { type: "number", value, displayedText };
   if (typeof value === "boolean") return { type: "boolean", value };
-  if (/^#(?:N\/A|REF!|VALUE!|DIV\/0!|NUM!|NULL!|SPILL!)$/.test(value)) {
-    return { type: "error", error: value };
-  }
+  if (ENGINE_ERRORS.has(value)) return { type: "error", error: value };
   return { type: "string", value };
 }
 

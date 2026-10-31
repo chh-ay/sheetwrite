@@ -1,12 +1,21 @@
 import { canonicalJson } from "./normalize.js";
 import type { ConformanceObservation, ConformanceResult, KnownDivergence } from "./types.js";
 
+const SIGN_BIT = 1n << 63n;
+
+/**
+ * Maps a float to an integer in the same order, so the distance between two
+ * mapped values counts the floats between them. Non-negative floats map to
+ * `SIGN_BIT + magnitude bits` and negative floats to `SIGN_BIT - magnitude
+ * bits`, so `-0` and `+0` share one point and every value fits in 64 bits.
+ */
 function orderedFloat(value: number): bigint {
   const bytes = new ArrayBuffer(8);
   const view = new DataView(bytes);
   view.setFloat64(0, value, false);
   const bits = view.getBigUint64(0, false);
-  return bits >> 63n ? ~bits : bits | (1n << 63n);
+  const magnitude = bits & (SIGN_BIT - 1n);
+  return bits & SIGN_BIT ? SIGN_BIT - magnitude : SIGN_BIT + magnitude;
 }
 
 export function compareResults(expected: ConformanceResult, actual: ConformanceResult): string[] {

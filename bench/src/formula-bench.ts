@@ -65,7 +65,7 @@ const ENGINE_PKG_URL =
     : pathToFileURL(`${resolve(ENGINE_ROOT, `packages/${ENGINE_PACKAGE}/pkg`)}/`);
 const WASM_PATH = new URL("sheetwrite_wasm_bg.wasm", ENGINE_PKG_URL);
 const ENGINE_GLUE_PATH = new URL("sheetwrite_wasm.js", ENGINE_PKG_URL);
-const FORMULA_SOURCE_URLS = {
+const HARNESS_SOURCE_URLS = {
   "bench/package.json": new URL("../package.json", import.meta.url),
   "bench/src/formula-bench.ts": new URL("./formula-bench.ts", import.meta.url),
   "bench/src/formula-dataset.ts": new URL("./formula-dataset.ts", import.meta.url),
@@ -73,13 +73,38 @@ const FORMULA_SOURCE_URLS = {
   "bench/src/protocol-meta.ts": new URL("./protocol-meta.ts", import.meta.url),
   "bench/src/stats.ts": new URL("./stats.ts", import.meta.url),
   "bun.lock": new URL("../../bun.lock", import.meta.url),
-  "packages/wasm/pkg/sheetwrite_wasm.js": ENGINE_GLUE_PATH,
-  "packages/wasm/pkg/sheetwrite_wasm_bg.wasm": WASM_PATH,
 } as const;
+const ENGINE_SOURCE_FILENAMES = ["sheetwrite_wasm.js", "sheetwrite_wasm_bg.wasm"] as const;
+type FormulaEnginePackage = "wasm" | "formulas";
+
+/** The provenance keys of a capture that measured the engine in `packages/<enginePackage>`. */
+function formulaSourceFiles(enginePackage: FormulaEnginePackage): string[] {
+  return [
+    ...Object.keys(HARNESS_SOURCE_URLS),
+    ...ENGINE_SOURCE_FILENAMES.map((filename) => `packages/${enginePackage}/pkg/${filename}`),
+  ].sort();
+}
+
+/**
+ * The engine package named by a capture's provenance keys, after checking the
+ * keys are exactly that package's set. Older captures, such as the committed
+ * full-engine results, file the full engine's hashes under `packages/wasm/`
+ * keys too, so a `wasm` key set names where the hashes are, and the hashes
+ * name the binary.
+ */
+export function formulaSourceEnginePackage(
+  files: Readonly<Record<string, string>>,
+): FormulaEnginePackage {
+  const enginePackage =
+    "packages/formulas/pkg/sheetwrite_wasm_bg.wasm" in files ? "formulas" : "wasm";
+  exactObjectKeys(files, formulaSourceFiles(enginePackage), "formula source provenance.files");
+  return enginePackage;
+}
 
 export const FORMULA_BENCHMARK_SCHEMA_VERSION = 2 as const;
 export const FORMULA_SIZES = [1_000, 10_000, 100_000] as const;
-export const FORMULA_SOURCE_FILES = Object.keys(FORMULA_SOURCE_URLS).sort();
+/** The provenance keys this process records, for the engine it loads. */
+export const FORMULA_SOURCE_FILES = formulaSourceFiles(ENGINE_PACKAGE);
 export const FORMULA_ARTIFACT_MAX_BYTES = 2 * 1024 * 1024;
 const DEFAULT_SAMPLES = 5;
 const SMOKE_SAMPLES = 2;
@@ -1940,11 +1965,16 @@ export function formulaSourceDigest(
 }
 
 function currentFormulaSourceProvenance(commit: string): FormulaSourceProvenance {
+  const urls: Readonly<Record<string, URL>> = {
+    ...HARNESS_SOURCE_URLS,
+    [`packages/${ENGINE_PACKAGE}/pkg/sheetwrite_wasm.js`]: ENGINE_GLUE_PATH,
+    [`packages/${ENGINE_PACKAGE}/pkg/sheetwrite_wasm_bg.wasm`]: WASM_PATH,
+  };
   const files: Record<string, string> = {};
   for (const path of FORMULA_SOURCE_FILES) {
-    files[path] = sha256(
-      readFileSync(FORMULA_SOURCE_URLS[path as keyof typeof FORMULA_SOURCE_URLS]),
-    );
+    const url = urls[path];
+    if (url === undefined) throw new Error(`formula source ${path} has no file`);
+    files[path] = sha256(readFileSync(url));
   }
   const baselineContext = captureEngineBaselineContext(commit, [ENGINE_PACKAGE]);
   return {
@@ -2128,8 +2158,8 @@ function validateProvenance(
   if (result.source.protocol !== FORMULA_PROTOCOL || result.source.commit !== result.meta.commit) {
     throw new Error("formula source provenance protocol/commit does not match metadata");
   }
-  exactObjectKeys(result.source.files, FORMULA_SOURCE_FILES, "formula source provenance.files");
-  for (const path of FORMULA_SOURCE_FILES) {
+  const recordedPackage = formulaSourceEnginePackage(result.source.files);
+  for (const path of formulaSourceFiles(recordedPackage)) {
     if (!/^[0-9a-f]{64}$/u.test(result.source.files[path] ?? "")) {
       throw new Error(`formula source provenance.files.${path} must be a SHA-256 digest`);
     }
@@ -2143,9 +2173,12 @@ function validateProvenance(
     if (packages.length !== 1) throw new Error("Formula baseline must identify one engine");
     validateEngineBaselineContext(result.source.baselineContext, result.source.commit, packages);
     const packageName = packages[0];
-    for (const filename of ["sheetwrite_wasm.js", "sheetwrite_wasm_bg.wasm"]) {
+    if (recordedPackage !== "wasm" && recordedPackage !== packageName) {
+      throw new Error("Formula baseline engine file binding mismatch");
+    }
+    for (const filename of ENGINE_SOURCE_FILENAMES) {
       if (
-        result.source.files[`packages/wasm/pkg/${filename}`] !==
+        result.source.files[`packages/${recordedPackage}/pkg/${filename}`] !==
         result.source.baselineContext.engineFiles[`packages/${packageName}/pkg/${filename}`]
       ) {
         throw new Error("Formula baseline engine file binding mismatch");
@@ -2791,8 +2824,12 @@ async function runBenchmark(
   validateFormulaCapture(result, baseline);
   const serialized = `${JSON.stringify(result, null, 2)}\n`;
   if (outputPath === "-") {
+    // Standard output carries the capture alone, so a caller can parse or save it as JSON.
     process.stdout.write(serialized);
-  } else if (outputPath !== undefined) {
+    process.stderr.write(`${markdown(result)}\n`);
+    return;
+  }
+  if (outputPath !== undefined) {
     await Bun.write(outputPath, serialized);
   } else if (!smoke) {
     await Bun.write(new URL("../results/formula-results.json", import.meta.url), serialized);

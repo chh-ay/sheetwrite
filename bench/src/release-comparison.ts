@@ -5,7 +5,7 @@ import { parseArgs } from "node:util";
 import { matchingCaptureAffinities, readCaptureArtifacts } from "./capture-scope.js";
 import { independentMedianDeltaLowerBound } from "./check.js";
 import { CONTROLLED_COMPARISON_POLICY } from "./controlled-baseline.js";
-import { DATA_GATE_PROTOCOL_VERSION } from "./gate-protocol.js";
+import { DATA_GATE_PROTOCOL_VERSION, parseEngineBaselineLabel } from "./gate-protocol.js";
 import { INTERACTION_CEILINGS } from "./interaction-gate.js";
 import { sourceTreeDirty } from "./protocol-meta.js";
 import { RELEASE_ARTIFACTS, RELEASE_SUITE_ARTIFACTS } from "./release-capture.js";
@@ -20,7 +20,6 @@ const CAPTURE_MEMORY_GIB = 8;
 const CAPTURE_MEMORY_MAX = `${CAPTURE_MEMORY_GIB}G`;
 const CAPTURE_MEMORY_BYTES = CAPTURE_MEMORY_GIB * 1024 ** 3;
 const CAPTURE_CPU_SLOT = 4;
-const NEW_ONLY_SUITES: Readonly<Record<string, true>> = { "chart-tracking": true, pivot: true };
 const ENGINE_ONLY_ARTIFACTS: Readonly<Record<string, true>> = {
   "formula-results.json": true,
   "formula-default-results.json": true,
@@ -28,7 +27,6 @@ const ENGINE_ONLY_ARTIFACTS: Readonly<Record<string, true>> = {
   "full-engine-results.json": true,
   "full-engine-matched-results.json": true,
 };
-const ENGINE_BASELINE_LABEL = "0.5.4 engine (WASM) under 0.6 core and harness";
 const IDENTITY_FIELDS = [
   "key",
   "engine",
@@ -43,9 +41,16 @@ const IDENTITY_FIELDS = [
   "source",
 ] as const;
 const INTERACTION_LIMITS = new Map(Object.entries(INTERACTION_CEILINGS));
-const ARTIFACTS = [
-  ...new Set([...RELEASE_ARTIFACTS, "pivot-results.json", "chart-tracking-results.json"]),
-];
+
+/** What the baseline engine artifacts say they measured; every engine artifact must agree. */
+interface BaselineIdentity {
+  /** The context label of the baseline engine captures. */
+  readonly engineLabel: string;
+  /** The release the baseline measures. */
+  readonly baseVersion: string;
+  /** The release line of the core and harness both sides ran under. */
+  readonly harnessVersion: string;
+}
 
 type RecordValue = Record<string, unknown>;
 type Verdict =
@@ -380,6 +385,11 @@ function stampOf(value: unknown): RecordValue | null {
   };
 }
 
+/**
+ * Reads the scope receipts of a result set. A candidate needs one receipt for
+ * every release suite. A baseline has a receipt for each suite its release
+ * measured; a suite without one is new in the candidate.
+ */
 async function readCaptureRecords(
   directory: string,
   engineCommit: string,
@@ -389,9 +399,7 @@ async function readCaptureRecords(
   const paths = readdirSync(resolve(directory, "capture-runs"))
     .filter((name) => name.endsWith(".json"))
     .sort();
-  const expected = new Set(
-    [...RELEASE_SUITE_ARTIFACTS.keys()].filter((suite) => !baseline || !NEW_ONLY_SUITES[suite]),
-  );
+  const expected = new Set(RELEASE_SUITE_ARTIFACTS.keys());
   const records: RecordValue[] = [];
   for (const path of paths) {
     const capture = record(await Bun.file(resolve(directory, "capture-runs", path)).json());
@@ -437,20 +445,53 @@ async function readCaptureRecords(
     }
     records.push(capture);
   }
-  if (expected.size > 0) throw new Error(`Missing capture records: ${[...expected].join(", ")}`);
+  if (!baseline && expected.size > 0) {
+    throw new Error(`Missing capture records: ${[...expected].join(", ")}`);
+  }
   return records;
 }
 
-function captureForArtifact(captures: readonly RecordValue[], artifact: string): RecordValue {
-  const capture = captures.find(
+function coveringCapture(
+  captures: readonly RecordValue[],
+  artifact: string,
+): RecordValue | undefined {
+  return captures.find(
     (capture) =>
       Array.isArray(capture.artifacts) &&
       capture.artifacts.some((proof: unknown) => record(proof)?.file === artifact),
   );
+}
+
+function captureForArtifact(captures: readonly RecordValue[], artifact: string): RecordValue {
+  const capture = coveringCapture(captures, artifact);
   if (capture === undefined) throw new Error(`No scope receipt covers ${artifact}`);
   const metadata = record(capture.metadata);
   if (metadata === undefined) throw new Error(`No capture metadata for ${artifact}`);
   return metadata;
+}
+
+function baselineContextOf(artifact: RecordValue | undefined): RecordValue | undefined {
+  return record(artifact?.baselineContext) ?? record(record(artifact?.source)?.baselineContext);
+}
+
+/**
+ * The baseline release, read from its engine captures: each records the older
+ * engine measured under the candidate's harness, and they must all agree.
+ */
+async function readBaselineIdentity(baselineDir: string): Promise<BaselineIdentity> {
+  const labels = new Set<string>();
+  for (const artifact of Object.keys(ENGINE_ONLY_ARTIFACTS)) {
+    const file = Bun.file(resolve(baselineDir, artifact));
+    if (!(await file.exists())) continue;
+    const label = baselineContextOf(record(await file.json()))?.label;
+    labels.add(typeof label === "string" ? label : "");
+  }
+  const [engineLabel] = labels;
+  const parsed = engineLabel === undefined ? undefined : parseEngineBaselineLabel(engineLabel);
+  if (labels.size !== 1 || engineLabel === undefined || parsed === undefined) {
+    throw new Error("Baseline engine captures do not name one frozen-harness baseline release");
+  }
+  return { engineLabel, baseVersion: parsed.engineVersion, harnessVersion: parsed.harnessVersion };
 }
 
 function assertMatchingConditions(
@@ -497,14 +538,17 @@ async function compareSuite(
   candidateCommit: string,
   baselineCaptures: readonly RecordValue[],
   candidateCaptures: readonly RecordValue[],
+  identity: BaselineIdentity,
 ) {
   const baseFile = Bun.file(resolve(baselineDir, artifact));
   const base: unknown = (await baseFile.exists()) ? await baseFile.json() : null;
   const candidateFile = Bun.file(resolve(resultsDir, artifact));
   const candidate: unknown = (await candidateFile.exists()) ? await candidateFile.json() : null;
-  const newOnly = artifact === "chart-tracking-results.json" || artifact === "pivot-results.json";
+  // The baseline release measured a suite exactly when its result set has that suite's receipt.
+  const newOnly = coveringCapture(baselineCaptures, artifact) === undefined;
   if (candidate === null || (base === null && !newOnly))
     throw new Error(`Missing fresh capture for ${artifact}`);
+  if (newOnly && base !== null) throw new Error(`No scope receipt covers baseline ${artifact}`);
   const candidateCapture = captureForArtifact(candidateCaptures, artifact);
   const baselineCapture = newOnly ? null : captureForArtifact(baselineCaptures, artifact);
   const baseStamp = stampOf(base);
@@ -537,12 +581,10 @@ async function compareSuite(
       );
     }
   }
-  if (ENGINE_ONLY_ARTIFACTS[artifact]) {
-    const context =
-      record(baselineObject?.baselineContext) ??
-      record(record(baselineObject?.source)?.baselineContext);
+  if (ENGINE_ONLY_ARTIFACTS[artifact] && !newOnly) {
+    const context = baselineContextOf(baselineObject);
     if (
-      context?.label !== ENGINE_BASELINE_LABEL ||
+      context?.label !== identity.engineLabel ||
       context.engineCommit !== baseCommit ||
       context.harnessCommit !== candidateCommit
     ) {
@@ -569,16 +611,17 @@ async function compareSuite(
       candidateMetrics.get(key),
       keys.length,
     );
-    if (coreOnlyKeys.has(key)) metric.note = "0.6-only: timed current-core path; no version ratio";
+    if (coreOnlyKeys.has(key))
+      metric.note = `${identity.harnessVersion}-only: timed current-core path; no version ratio`;
     else if (metric.verdict === "new-only" && ENGINE_ONLY_ARTIFACTS[artifact])
-      metric.note = "not in 0.5.4";
+      metric.note = `not in ${identity.baseVersion}`;
     return metric;
   });
   const count = (verdict: Verdict) => metrics.filter((metric) => metric.verdict === verdict).length;
   return {
     artifact,
     status: newOnly ? "new-only" : "compared",
-    comparisonLabel: ENGINE_ONLY_ARTIFACTS[artifact] ? ENGINE_BASELINE_LABEL : "0.5.4",
+    comparisonLabel: ENGINE_ONLY_ARTIFACTS[artifact] ? identity.engineLabel : identity.baseVersion,
     base: baseStamp,
     candidate: stampOf(candidate),
     baselineCapture,
@@ -605,8 +648,10 @@ async function main(): Promise<void> {
     args: process.argv.slice(2).filter((argument) => argument !== "--"),
     options: {
       // A label for the baseline in the output; the commit itself comes from the capture metadata.
-      "base-ref": { type: "string", default: "release/version-0.5.4" },
-      "baseline-results-dir": { type: "string", default: "results/releases/0.5.4" },
+      // It defaults to the release branch of the baseline release.
+      "base-ref": { type: "string" },
+      // The baseline release's result set, with its capture receipts.
+      "baseline-results-dir": { type: "string" },
       "results-dir": { type: "string", default: "results" },
       output: { type: "string", default: "results/release-comparison.json" },
     },
@@ -616,7 +661,10 @@ async function main(): Promise<void> {
   const generatedAt = new Date().toISOString();
   if (dirty) throw new Error("Comparison source tree must be clean");
   const resultsDir = resolve(BENCH_ROOT, values["results-dir"]);
-  const baselineDir = resolve(BENCH_ROOT, values["baseline-results-dir"]);
+  const baselineResultsDir = values["baseline-results-dir"];
+  if (baselineResultsDir === undefined) throw new Error("--baseline-results-dir is required");
+  const baselineDir = resolve(BENCH_ROOT, baselineResultsDir);
+  const identity = await readBaselineIdentity(baselineDir);
   // Both measured commits come from the capture metadata: captures run on frozen
   // commits, and this generator may run from a later tooling commit. They are
   // provenance only: receipts and artifacts are matched against them as strings,
@@ -641,7 +689,7 @@ async function main(): Promise<void> {
   // assertMatchingConditions proved these fields equal across every capture.
   const conditions = record(candidateCaptures[0]?.metadata);
   const suites = [];
-  for (const artifact of ARTIFACTS)
+  for (const artifact of RELEASE_ARTIFACTS)
     suites.push(
       await compareSuite(
         artifact,
@@ -651,6 +699,7 @@ async function main(): Promise<void> {
         candidateCommit,
         baselineCaptures,
         candidateCaptures,
+        identity,
       ),
     );
 
@@ -680,7 +729,11 @@ async function main(): Promise<void> {
       memoryMaxProof: `MemoryMax=${CAPTURE_MEMORY_BYTES}`,
       cpuSlot: CAPTURE_CPU_SLOT,
     },
-    base: { ref: values["base-ref"], commit: baseCommit, captureRecords: baselineCaptures },
+    base: {
+      ref: values["base-ref"] ?? `release/version-${identity.baseVersion}`,
+      commit: baseCommit,
+      captureRecords: baselineCaptures,
+    },
     candidate: { commit: candidateCommit, dirty, captureRecords: candidateCaptures },
     reduction:
       "Median of per-round medians and median of per-round p95s for repeated keys; single-record summaries are preserved. Round labels are not paired between independent captures. Missing metrics are never silently dropped. Ratios are candidate/base; zero base gives null except zero/zero = 1. Lower is better; faster/slower for byte/count/ratio metrics means decreased/increased. This artifact is descriptive release evidence, not controlled gate approval.",

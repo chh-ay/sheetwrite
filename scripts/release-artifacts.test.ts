@@ -13,6 +13,7 @@ import {
   RELEASE_BUILD_COMMAND,
   type ReleaseArtifactManifest,
   releaseModeDirty,
+  releaseTreeStatus,
   packBuiltPackages,
   serializeReleaseManifest,
   validateReleaseManifest,
@@ -283,6 +284,40 @@ describe("canonical release artifacts", () => {
     expect(() => releaseModeDirty("release", " M package.json\n")).toThrow("Release tree is dirty");
     expect(() => assertOutputDirectoryEmpty([])).not.toThrow();
     expect(() => assertOutputDirectoryEmpty(["stale.tgz"])).toThrow("not empty");
+  });
+
+  it("rejects a release build with an untracked source file", async () => {
+    const root = await mkdtemp(join(tmpdir(), "sheetwrite-release-tree-"));
+    try {
+      const git = (...args: string[]) => {
+        const result = Bun.spawnSync(["git", ...args], { cwd: root });
+        if (result.exitCode !== 0) throw new Error(result.stderr.toString());
+      };
+      git("init", "--quiet");
+      await writeFile(join(root, ".gitignore"), "dist/\n");
+      git("add", ".gitignore");
+      git(
+        "-c",
+        "user.name=test",
+        "-c",
+        "user.email=test@example.com",
+        "commit",
+        "--quiet",
+        "-m",
+        "init",
+      );
+      await mkdir(join(root, "dist"));
+      await writeFile(join(root, "dist/index.js"), "");
+      expect(await releaseTreeStatus(root)).toBe("");
+
+      await mkdir(join(root, "src"));
+      await writeFile(join(root, "src/extra.ts"), "export const extra = 1;\n");
+
+      const status = await releaseTreeStatus(root);
+      expect(() => releaseModeDirty("release", status)).toThrow("Release tree is dirty");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
   it("rejects duplicate, unknown, and out-of-order package identities", () => {
