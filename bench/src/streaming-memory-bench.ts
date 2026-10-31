@@ -11,6 +11,8 @@ import type {
   XlsxWorkbookBackend,
 } from "@sheetwrite/core";
 
+import { optionValue } from "./cli-options.js";
+
 type Operation = "csv" | "xlsx-export" | "xlsx-import" | "fixture";
 
 interface StreamingMemoryResult {
@@ -28,8 +30,7 @@ interface StreamingMemoryResult {
 const COLUMNS = 8;
 
 function option(name: string, fallback: string): string {
-  const index = process.argv.indexOf(name);
-  return index < 0 ? fallback : (process.argv[index + 1] ?? fallback);
+  return optionValue(process.argv, name) ?? fallback;
 }
 
 function maximumRssBytes(): number {

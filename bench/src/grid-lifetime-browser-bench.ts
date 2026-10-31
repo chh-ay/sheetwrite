@@ -4,7 +4,9 @@ import { fileURLToPath } from "node:url";
 
 import { type CDPSession, chromium } from "@playwright/test";
 
+import { optionValue } from "./cli-options.js";
 import lifetimePage from "./grid-lifetime-bench.html";
+import { median } from "./stats.js";
 
 // Grid lifetime memory gate in Chromium (#285, #178 decision 7). Each run
 // starts a fresh browser with `--expose-gc`. The page creates and destroys
@@ -56,22 +58,13 @@ interface LifetimeRun {
 }
 
 function numberArgument(args: readonly string[], name: string, fallback: number): number {
-  const index = args.indexOf(name);
-  if (index === -1) return fallback;
-  const value = Number(args[index + 1]);
+  const text = optionValue(args, name);
+  if (text === undefined) return fallback;
+  const value = Number(text);
   if (!Number.isSafeInteger(value) || value < 1)
     throw new Error(`${name} needs a positive integer.`);
 
   return value;
-}
-
-function median(values: readonly number[]): number {
-  const sorted = [...values].sort((left, right) => left - right);
-  const middle = Math.floor(sorted.length / 2);
-
-  return sorted.length % 2 === 1
-    ? (sorted[middle] ?? Number.NaN)
-    : ((sorted[middle - 1] ?? Number.NaN) + (sorted[middle] ?? Number.NaN)) / 2;
 }
 
 function retainedBytes(observation: HeapObservation): number {
@@ -189,8 +182,7 @@ async function runBenchmark(args: readonly string[]): Promise<void> {
     warmup: numberArgument(args, "--warmup", 50),
     cycles: numberArgument(args, "--cycles", 100),
   };
-  const outputIndex = args.indexOf("--output");
-  const outputPath = outputIndex === -1 ? undefined : args[outputIndex + 1];
+  const outputPath = optionValue(args, "--output");
 
   const server = Bun.serve({
     hostname: "127.0.0.1",

@@ -20,6 +20,7 @@ import type {
   RowData,
   Workbook,
 } from "../../packages/core/src/types.js";
+import { nearestRankPercentile, upperMedian } from "./stats.js";
 
 export const BILLION_CELL_BENCHMARK_SCHEMA_VERSION = 2 as const;
 export const BILLION_CELL_SAMPLE_RUNS = 5;
@@ -531,12 +532,15 @@ function diagonalPosition(
   };
 }
 
+// Schema version 2 fixes the upper median and the nearest-rank p95, and the
+// validator recomputes both from the stored samples. A new schema version
+// moves to `median` and `quantile` from stats.ts.
 function summarize(samples: readonly number[]): TimingSummary {
   if (samples.length === 0) throw new Error("timing summary requires at least one sample");
   const normalized = samples.map((sample) => Number(sample.toFixed(6)));
   const sorted = [...normalized].sort((left, right) => left - right);
-  const median = sorted[Math.floor(sorted.length / 2)]!;
-  const p95 = sorted[Math.max(0, Math.ceil(sorted.length * 0.95) - 1)]!;
+  const median = upperMedian(sorted);
+  const p95 = nearestRankPercentile(sorted, 0.95);
   return {
     samplesMs: normalized,
     medianMs: median,

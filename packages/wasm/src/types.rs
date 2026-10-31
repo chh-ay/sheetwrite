@@ -390,15 +390,16 @@ pub(crate) struct FormulaEntry {
     pub(crate) reads: ReadSet,
     // Low nibble: source-error slot + 1 (zero means none). Upper bits are
     // independent predicates. Keep this private to prevent invalid encodings.
-    flags: u8,
+    flags: u16,
 }
 
 impl FormulaEntry {
-    const ERROR_MASK: u8 = 0x0f;
-    const VOLATILE: u8 = 1 << 4;
-    const SPILL_REFS: u8 = 1 << 5;
-    const PRODUCES_ARRAY: u8 = 1 << 6;
-    const REFERENCE: u8 = 1 << 7;
+    const ERROR_MASK: u16 = 0x0f;
+    const VOLATILE: u16 = 1 << 4;
+    const SPILL_REFS: u16 = 1 << 5;
+    const PRODUCES_ARRAY: u16 = 1 << 6;
+    const REFERENCE: u16 = 1 << 7;
+    const CALLS_SUBTOTAL: u16 = 1 << 8;
 
     /// Source parse rejection; recalculation never mutates this value.
     pub(crate) fn source_error(&self) -> Option<FormulaError> {
@@ -411,7 +412,7 @@ impl FormulaEntry {
 
     pub(crate) fn set_source_error(&mut self, error: Option<FormulaError>) {
         self.flags =
-            (self.flags & !Self::ERROR_MASK) | error.map_or(0, |error| (error.slot() + 1) as u8);
+            (self.flags & !Self::ERROR_MASK) | error.map_or(0, |error| (error.slot() + 1) as u16);
     }
 
     pub(crate) fn volatile(&self) -> bool {
@@ -440,7 +441,14 @@ impl FormulaEntry {
         self.set_flag(Self::PRODUCES_ARRAY, produces_array);
     }
 
-    fn set_flag(&mut self, flag: u8, enabled: bool) {
+    /// Whether the formula calls SUBTOTAL or AGGREGATE. Such a formula reads
+    /// the hidden rows of the sheets it reads, and a SUBTOTAL or AGGREGATE
+    /// over its cell skips it, as Excel does to avoid double counting.
+    pub(crate) fn calls_subtotal(&self) -> bool {
+        self.flags & Self::CALLS_SUBTOTAL != 0
+    }
+
+    fn set_flag(&mut self, flag: u16, enabled: bool) {
         self.flags = (self.flags & !flag) | if enabled { flag } else { 0 };
     }
 
@@ -457,6 +465,7 @@ impl FormulaEntry {
         entry.set_volatile(volatile);
         entry.set_has_spill_refs(ast_contains_spill_ref(&ast));
         entry.set_produces_array(crate::eval::ast_produces_array(&ast));
+        entry.set_flag(Self::CALLS_SUBTOTAL, crate::eval::ast_calls_subtotal(&ast));
         entry.ast = Some(ast);
 
         entry
@@ -650,6 +659,7 @@ mod formula_entry_tests {
             has_spill_refs: bool,
             produces_array: bool,
             reference: bool,
+            calls_subtotal: bool,
         }
 
         assert!(size_of::<FormulaEntry>() <= size_of::<UnpackedEntry>());

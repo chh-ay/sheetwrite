@@ -15,6 +15,7 @@ import { tmpdir } from "node:os";
 import { basename, join, relative, resolve, sep } from "node:path";
 import { brotliCompressSync, constants, gzipSync } from "node:zlib";
 
+import { optionValue } from "../bench/src/cli-options.js";
 import {
   assertPublishedFilePolicy,
   packBuiltPackages,
@@ -720,20 +721,10 @@ export function buildAttributionFindings(
   };
 }
 
-function processEnvironment(): Record<string, string> {
-  const environment: Record<string, string> = {};
-  for (const [key, value] of Object.entries(process.env)) {
-    if (value !== undefined) environment[key] = value;
-  }
-  environment.CI = "1";
-  environment.NEXT_TELEMETRY_DISABLED = "1";
-  return environment;
-}
-
 async function runCommand(command: string[], cwd = repositoryRoot): Promise<string> {
   return captureProcess(command, {
     cwd,
-    env: processEnvironment(),
+    env: { ...process.env, CI: "1", NEXT_TELEMETRY_DISABLED: "1" },
     failure: ({ stdout, stderr, exitCode }) =>
       `${command.join(" ")} failed with exit code ${exitCode}\n${stdout.trim()}\n${stderr.trim()}`,
   });
@@ -1389,18 +1380,11 @@ async function writeFailure(error: unknown): Promise<void> {
   );
 }
 
-function optionValue(name: string): string | undefined {
-  const inline = process.argv.find((argument) => argument.startsWith(`${name}=`));
-  if (inline !== undefined) return inline.slice(name.length + 1);
-  const index = process.argv.indexOf(name);
-  return index < 0 ? undefined : process.argv[index + 1];
-}
-
 async function cli(): Promise<void> {
   const mode = process.argv[2] ?? "report";
   const reuseBundlers = process.argv.includes("--reuse-bundlers");
-  const artifactDirectory = optionValue("--artifacts");
   try {
+    const artifactDirectory = optionValue(process.argv, "--artifacts");
     if (mode !== "report" && mode !== "history" && mode !== "record") {
       throw new Error(`Unknown size-report mode: ${mode}`);
     }
@@ -1410,7 +1394,7 @@ async function cli(): Promise<void> {
       return;
     }
     if (mode === "record") {
-      const version = optionValue("--version");
+      const version = optionValue(process.argv, "--version");
       if (version === undefined) throw new Error("record mode requires --version");
       if (history.releases.some((release) => release.version === version)) {
         console.log(
@@ -1422,9 +1406,6 @@ async function cli(): Promise<void> {
       await recordRelease(history, release);
       console.log(`Recorded published v${version} in ${relative(repositoryRoot, historyPath)}`);
       return;
-    }
-    if (artifactDirectory?.startsWith("--")) {
-      throw new Error("--artifacts requires a directory");
     }
     const requiredArtifacts = process.env.SHEETWRITE_RELEASE_ARTIFACTS;
     if (process.env.SHEETWRITE_ARTIFACT_ONLY === "1" && artifactDirectory === undefined) {

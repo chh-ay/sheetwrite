@@ -62,6 +62,7 @@ import { loadCorpus } from "./conformance/corpus.js";
 import { readConformanceManifest } from "./conformance/generate.js";
 import { runOffline } from "./conformance/offline.js";
 import { expectedLlmsFiles } from "./docs-llms.js";
+import { entryLabel, entrySlug, routeForContentPath } from "./docs-paths.js";
 import {
   allMeasurements,
   evidenceHeadline,
@@ -388,12 +389,6 @@ function compatibilityResults(): Promise<CompatibilityResults> {
   return compatibilityResultsPromise;
 }
 
-export function entrySlug(packageName: string, subpath: string): string {
-  const packageSlug = packageName.replace("@sheetwrite/", "");
-  if (subpath === ".") return packageSlug;
-  return `${packageSlug}-${subpath.replace(/^\.\//, "").replace(/[^a-zA-Z0-9]+/g, "-")}`;
-}
-
 function packageSourcePath(packageName: string, source: string): string {
   const separator = source.indexOf("#");
   const file = separator === -1 ? source : source.slice(0, separator);
@@ -402,10 +397,6 @@ function packageSourcePath(packageName: string, source: string): string {
   if (packageDirectory === undefined) return source;
   const normalized = posix(normalize(join(packageDirectory, file)));
   return fragment === undefined ? normalized : `${normalized}#${fragment}`;
-}
-
-function entryLabel(pkg: ApiPackage, entry: ApiEntryPoint): string {
-  return entry.subpath === "." ? pkg.name : `${pkg.name}/${entry.subpath.slice(2)}`;
 }
 
 function frontmatter(title: string, description: string): string {
@@ -3839,18 +3830,14 @@ function maskCode(content: string): string {
   return maskFences(content).replace(/`[^`\n]*`/g, (code) => " ".repeat(code.length));
 }
 
-function routeForContentPath(path: string): string {
-  const relativePath = posix(relative(contentRoot, path)).replace(/\.mdx?$/, "");
-  const withoutIndex = relativePath === "index" ? "" : relativePath.replace(/\/index$/, "");
-  return `/docs/${withoutIndex}${withoutIndex.length === 0 ? "" : "/"}`;
-}
-
 export function contentPathForRoute(
   route: string,
   documents: readonly MarkdownDocument[],
 ): string | undefined {
   const normalizedRoute = route.endsWith("/") ? route : `${route}/`;
-  return documents.find((document) => routeForContentPath(document.path) === normalizedRoute)?.path;
+  return documents.find(
+    (document) => routeForContentPath(contentRoot, document.path) === normalizedRoute,
+  )?.path;
 }
 
 /**

@@ -4,6 +4,7 @@ import { hostname, tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { brotliCompressSync, gzipSync, constants as zlibConstants } from "node:zlib";
 
+import { optionValue, requiredOption } from "../bench/src/cli-options.js";
 import {
   assertCleanMatrixCapture,
   decideWasmProfile,
@@ -100,20 +101,6 @@ function successfulOutput(command: readonly string[], cwd = ROOT): string {
   return Buffer.from(result.stdout).toString("utf8").trim();
 }
 
-function argument(args: readonly string[], name: string): string {
-  const index = args.indexOf(name);
-  const value = index < 0 ? undefined : args[index + 1];
-  if (!value || value.startsWith("--")) throw new Error(`${name} is required`);
-  return value;
-}
-
-function optionalArgument(args: readonly string[], name: string): string | undefined {
-  const index = args.indexOf(name);
-  const value = index < 0 ? undefined : args[index + 1];
-  if (index >= 0 && (!value || value.startsWith("--"))) throw new Error(`${name} requires a value`);
-  return value;
-}
-
 function writeJson(path: string, value: unknown): void {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
@@ -194,8 +181,8 @@ function postLink(
 function captureBuild(args: readonly string[]): void {
   assertControlledCargoProfile();
   const commit = assertCleanTree();
-  const wasmOptPath = resolve(argument(args, "--wasm-opt"));
-  const output = resolve(argument(args, "--output"));
+  const wasmOptPath = resolve(requiredOption(args, "--wasm-opt"));
+  const output = resolve(requiredOption(args, "--output"));
   const outputRoot = dirname(output);
   const temporary = mkdtempSync(join(tmpdir(), "sheetwrite-wasm-profile-"));
   try {
@@ -256,7 +243,7 @@ function captureBuild(args: readonly string[]): void {
 
 function captureStoreOnlyProbe(args: readonly string[]): void {
   const commit = assertCleanTree();
-  const output = resolve(argument(args, "--output"));
+  const output = resolve(requiredOption(args, "--output"));
   const result = run(STORE_ONLY_COMMAND, WASM_CRATE);
   const stdoutText = Buffer.from(result.stdout).toString("utf8");
   const stderrText = Buffer.from(result.stderr).toString("utf8");
@@ -342,7 +329,7 @@ function assertCaptureFiles(build: BuildCapture, manifests: readonly GateCapture
 
 function assemble(args: readonly string[]): void {
   const build = JSON.parse(
-    readFileSync(resolve(argument(args, "--build")), "utf8"),
+    readFileSync(resolve(requiredOption(args, "--build")), "utf8"),
   ) as BuildCapture;
   if (
     build.schemaVersion !== 1 ||
@@ -351,10 +338,10 @@ function assemble(args: readonly string[]): void {
   ) {
     throw new Error("build input is not a WASM post-link build capture");
   }
-  const formula = readGateManifest(resolve(argument(args, "--formula-gates")), "formula");
-  const render = readGateManifest(resolve(argument(args, "--render-gates")), "render");
+  const formula = readGateManifest(resolve(requiredOption(args, "--formula-gates")), "formula");
+  const render = readGateManifest(resolve(requiredOption(args, "--render-gates")), "render");
   const storeOnlyProbe = JSON.parse(
-    readFileSync(resolve(argument(args, "--store-probe")), "utf8"),
+    readFileSync(resolve(requiredOption(args, "--store-probe")), "utf8"),
   ) as StoreOnlyProbe;
   if (
     storeOnlyProbe.provenance.dirty !== false ||
@@ -399,7 +386,7 @@ function assemble(args: readonly string[]): void {
     storeOnlyProbe,
   };
   const parsed = parseWasmProfileMatrix(matrix);
-  const output = resolve(argument(args, "--output"));
+  const output = resolve(requiredOption(args, "--output"));
   writeJson(output, parsed);
   const decision = decideWasmProfile(parsed);
   process.stdout.write(`${output}\n${JSON.stringify(decision, null, 2)}\n`);
@@ -407,11 +394,11 @@ function assemble(args: readonly string[]): void {
 }
 
 function decide(args: readonly string[]): void {
-  const input = resolve(argument(args, "--input"));
+  const input = resolve(requiredOption(args, "--input"));
   const raw = JSON.parse(readFileSync(input, "utf8")) as unknown;
   const evidence = parseWasmProfileMatrix(raw);
   const decision = decideWasmProfile(evidence);
-  const output = optionalArgument(args, "--output");
+  const output = optionValue(args, "--output");
   if (output) writeJson(resolve(output), decision);
   process.stdout.write(`${JSON.stringify(decision, null, 2)}\n`);
   if (decision.status === "blocked") process.exitCode = 1;

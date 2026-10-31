@@ -19,6 +19,7 @@ import { installCanvasTestStubs } from "../../packages/core/src/testing.js";
 import { SheetwriteGrid as ReactGrid } from "../../packages/react/src/index.js";
 import SvelteHarness from "../../packages/svelte/test/LifecycleHarness.svelte";
 import { SheetwriteGrid as VueGrid } from "../../packages/vue/src/index.js";
+import { median } from "./stats.js";
 
 // Run with the repository DOM and Svelte preloads. Timing excludes initialization
 // and uses real framework commits, real Grids, and discarded warmup samples.
@@ -86,13 +87,6 @@ async function svelteCycle(reset: boolean): Promise<void> {
   }
   await unmount(component);
   flushSvelte();
-}
-
-function median(samples: number[]): number {
-  const sorted = [...samples].sort((left, right) => left - right);
-  const middle = sorted[Math.floor(sorted.length / 2)];
-  if (middle === undefined) throw new Error("Benchmark requires samples");
-  return middle;
 }
 
 const workloads: Record<string, () => void | Promise<void>> = {

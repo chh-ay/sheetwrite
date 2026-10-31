@@ -5,7 +5,7 @@ description: "Every function in the pinned Microsoft Excel catalog, with full an
 
 This table covers **520 distinct Excel function names** from [Microsoft's category catalog](https://support.microsoft.com/en-us/excel/excel-functions-by-category), updated 2026-06-25 and retrieved 2026-10-30. It includes compatibility names and add-in functions. It is a pinned catalog, not a claim to cover functions Microsoft adds after that date.
 
-The full engine has **238 supported**, **71 partly supported**, and **211 not supported** names in this catalog. Aliases count as separate Excel names. Functions outside the catalog remain in the [function contract](/docs/reference/formula-functions/).
+The full engine has **240 supported**, **69 partly supported**, and **211 not supported** names in this catalog. Aliases count as separate Excel names. Functions outside the catalog remain in the [function contract](/docs/reference/formula-functions/).
 
 ## How to read the table
 
@@ -343,7 +343,7 @@ The full engine has **238 supported**, **71 partly supported**, and **211 not su
 | [`ACOSH`](https://support.microsoft.com/en-us/excel/functions/acosh-function) | Not supported | Not supported | Not registered in either engine. |
 | [`ACOT`](https://support.microsoft.com/en-us/excel/functions/acot-function) | Not supported | Not supported | Not registered in either engine. |
 | [`ACOTH`](https://support.microsoft.com/en-us/excel/functions/acoth-function) | Not supported | Not supported | Not registered in either engine. |
-| [`AGGREGATE`](https://support.microsoft.com/en-us/excel/functions/aggregate-function) | Partly supported | Not supported | Lite engine: not registered. Hidden rows are not part of the engine model. AGGREGATE row visibility options therefore have no effect. [Contract](/docs/reference/formula-functions/math/) |
+| [`AGGREGATE`](https://support.microsoft.com/en-us/excel/functions/aggregate-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/math/) |
 | [`ARABIC`](https://support.microsoft.com/en-us/excel/functions/arabic-function) | Not supported | Not supported | Not registered in either engine. |
 | [`ASIN`](https://support.microsoft.com/en-us/excel/functions/asin-function) | Not supported | Not supported | Not registered in either engine. |
 | [`ASINH`](https://support.microsoft.com/en-us/excel/functions/asinh-function) | Not supported | Not supported | Not registered in either engine. |
@@ -408,7 +408,7 @@ The full engine has **238 supported**, **71 partly supported**, and **211 not su
 | [`SINH`](https://support.microsoft.com/en-us/excel/functions/sinh-function) | Not supported | Not supported | Not registered in either engine. |
 | [`SQRT`](https://support.microsoft.com/en-us/excel/functions/sqrt-function) | Supported | Supported | [Contract](/docs/reference/formula-functions/math/) |
 | [`SQRTPI`](https://support.microsoft.com/en-us/excel/functions/sqrtpi-function) | Supported | Not supported | Lite engine: not registered. Matrix functions use engine resource limits. [Contract](/docs/reference/formula-functions/math/) |
-| [`SUBTOTAL`](https://support.microsoft.com/en-us/excel/functions/subtotal-function) | Partly supported | Partly supported | Only function codes 1 to 11 are accepted. Codes 101 to 111, which ignore hidden rows in Excel, return #VALUE! (#246). [Contract](/docs/reference/formula-functions/math/) |
+| [`SUBTOTAL`](https://support.microsoft.com/en-us/excel/functions/subtotal-function) | Supported | Supported | [Contract](/docs/reference/formula-functions/math/) |
 | [`SUM`](https://support.microsoft.com/en-us/excel/functions/sum-function) | Supported | Supported | [Contract](/docs/reference/formula-functions/math/) |
 | [`SUMIF`](https://support.microsoft.com/en-us/excel/functions/sumif-function) | Supported | Supported | [Contract](/docs/reference/formula-functions/math/) |
 | [`SUMIFS`](https://support.microsoft.com/en-us/excel/functions/sumifs-function) | Supported | Supported | [Contract](/docs/reference/formula-functions/math/) |

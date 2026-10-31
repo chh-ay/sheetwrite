@@ -17,7 +17,7 @@ constant, 4 name (a function, reference, defined name, table or sheet),
 9 `!`, 10 `#`, 11 `,`, 12 `;`, 13 `(`, 14 `)`, 15 `{`, 16 `}`, 17 bad text.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/pkg/sheetwrite_wasm.d.ts#L545"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L545</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/pkg/sheetwrite_wasm.d.ts#L558"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L558</code></a></dd></div>
 </dl>
 
 ## Declaration

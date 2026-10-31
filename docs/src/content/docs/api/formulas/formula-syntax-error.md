@@ -8,7 +8,7 @@ description: "FormulaSyntaxError class in @sheetwrite/formulas: The first syntax
 The first syntax error of a formula, as the engine's parser finds it.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/formulas/pkg/sheetwrite_wasm.d.ts#L464"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L464</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/formulas/pkg/sheetwrite_wasm.d.ts#L477"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L477</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>

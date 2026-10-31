@@ -3,6 +3,7 @@ import { cp, lstat, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/prom
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
+import { packageTargets } from "./package-targets.js";
 import { PUBLISHABLE_PACKAGE_ORDER, validateWorkspaceGraph } from "./workspace-tooling.js";
 
 interface PackageManifest {
@@ -11,6 +12,8 @@ interface PackageManifest {
   readonly main?: string;
   readonly module?: string;
   readonly types?: string;
+  readonly browser?: unknown;
+  readonly svelte?: string;
 }
 
 const GENERATED_OUTPUTS = [
@@ -42,17 +45,6 @@ function packageDirectories(root: string): readonly string[] {
     .map((entry) => resolve(root, "packages", entry.name));
 }
 
-function collectExportTargets(value: unknown, targets: string[]): void {
-  if (typeof value === "string") {
-    if (value.startsWith("./")) targets.push(value);
-    return;
-  }
-  if (value === null || typeof value !== "object" || Array.isArray(value)) return;
-  for (const nested of Object.values(value as Record<string, unknown>)) {
-    collectExportTargets(nested, targets);
-  }
-}
-
 export function assertGeneratedOutputsAbsent(root: string): void {
   const present = GENERATED_OUTPUTS.filter((path) => existsSync(resolve(root, path)));
   if (present.length > 0) {
@@ -70,16 +62,9 @@ export function validateExportTargets(root: string): readonly string[] {
       readFileSync(resolve(packageRoot, "package.json"), "utf8"),
     ) as PackageManifest;
     if (!manifest.name || !PUBLISHABLE_PACKAGE_ORDER.includes(manifest.name as never)) continue;
-    const targets: string[] = [];
-    collectExportTargets(manifest.exports, targets);
-    for (const field of [manifest.main, manifest.module, manifest.types]) {
-      if (field?.startsWith("./")) targets.push(field);
-    }
-    for (const target of new Set(targets)) {
-      const relativeTarget = target.slice(2);
-      checked.push(`${manifest.name}:${target}`);
-      if (!existsSync(resolve(packageRoot, relativeTarget)))
-        missing.push(`${manifest.name}:${target}`);
+    for (const target of packageTargets(manifest)) {
+      checked.push(`${manifest.name}:./${target}`);
+      if (!existsSync(resolve(packageRoot, target))) missing.push(`${manifest.name}:./${target}`);
     }
   }
   if (missing.length > 0) {

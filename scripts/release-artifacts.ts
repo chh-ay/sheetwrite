@@ -3,7 +3,9 @@ import { cp, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 
+import { requiredOption } from "../bench/src/cli-options.js";
 import { WASM_PACK_VERSION } from "./install-wasm-pack.js";
+import { packageTargets } from "./package-targets.js";
 import { captureProcess, readJson } from "./script-io.js";
 import {
   BUN_VERSION,
@@ -100,18 +102,9 @@ const PUBLISHABLE_PACKAGE_INDEXES: Readonly<Record<string, number>> = Object.fro
   PUBLISHABLE_PACKAGE_ORDER.map((name, index) => [name, index]),
 );
 
-function processEnvironment(): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(process.env).filter(
-      (entry): entry is [string, string] => entry[1] !== undefined,
-    ),
-  );
-}
-
 async function run(command: readonly [string, ...string[]], cwd = repositoryRoot): Promise<string> {
   const stdout = await captureProcess(command, {
     cwd,
-    env: processEnvironment(),
     failure: ({ stdout, stderr, exitCode }) =>
       `${command.join(" ")} failed with exit code ${exitCode}\n${stdout.trim()}\n${stderr.trim()}`,
   });
@@ -366,7 +359,8 @@ export function validateReleaseManifest(manifest: ReleaseArtifactManifest): void
   }
 }
 
-const REQUIRED_PACKAGE_FILES: Readonly<Record<string, readonly string[]>> = {
+/** Files every published tarball of a package must contain; consumer checks start from this list. */
+export const REQUIRED_PACKAGE_FILES: Readonly<Record<string, readonly string[]>> = {
   "@sheetwrite/wasm": [
     "README.md",
     "LICENSE",
@@ -413,30 +407,6 @@ const REQUIRED_PACKAGE_FILES: Readonly<Record<string, readonly string[]>> = {
   "@sheetwrite/vue": ["README.md", "LICENSE", "dist/index.d.ts", "dist/index.js", "styles.css"],
   "@sheetwrite/svelte": ["README.md", "LICENSE", "src/Grid.svelte", "src/index.ts", "styles.css"],
 };
-
-function packageTargets(manifest: PackageManifest): string[] {
-  const targets = new Set<string>();
-  const visit = (value: unknown): void => {
-    if (typeof value === "string") {
-      if (value.startsWith("./")) targets.add(value.slice(2));
-      return;
-    }
-    if (Array.isArray(value)) {
-      for (const item of value) visit(item);
-      return;
-    }
-    if (typeof value === "object" && value !== null) {
-      for (const item of Object.values(value)) visit(item);
-    }
-  };
-  visit(manifest.exports);
-  for (const field of ["types", "main", "module", "browser", "svelte"] as const) {
-    const value = manifest[field];
-    if (typeof value === "string") targets.add(value.replace(/^\.\//, ""));
-    else if (field === "browser") visit(value);
-  }
-  return [...targets];
-}
 
 function manifestEntryExists(entry: string, files: readonly string[]): boolean {
   const path = entry.replace(/^\.\//, "").replace(/\/$/, "");
@@ -893,14 +863,6 @@ export async function buildReleaseArtifacts(
   } finally {
     await rm(temporaryRoot, { force: true, recursive: true });
   }
-}
-
-function requiredOption(args: readonly string[], name: string): string {
-  const index = args.indexOf(name);
-  const value = index < 0 ? undefined : args[index + 1];
-  if (value === undefined || value.startsWith("--"))
-    throw new Error(`Missing required ${name} path`);
-  return value;
 }
 
 async function cli(): Promise<void> {

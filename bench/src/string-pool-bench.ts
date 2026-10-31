@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import type * as WasmModule from "@sheetwrite/wasm";
 import type { CellStore as WasmCellStore } from "@sheetwrite/wasm";
 
+import { median } from "./stats.js";
+
 const wasmRoot =
   process.env.STRING_POOL_WASM_ROOT ?? new URL("../../packages/wasm/", import.meta.url).pathname;
 const { CellStore, load } = (await import(`${wasmRoot}/loader-node.mjs`)) as typeof WasmModule;
@@ -14,11 +16,6 @@ const SAMPLES = 7;
 const mode = process.env.STRING_POOL_BENCH_MODE ?? "controls";
 
 await load(readFileSync(`${wasmRoot}/pkg/sheetwrite_wasm_bg.wasm`));
-
-function median(values: number[]): number {
-  const sorted = values.toSorted((left, right) => left - right);
-  return sorted[Math.floor(sorted.length / 2)] ?? 0;
-}
 
 function measure(operation: () => void): number {
   const start = performance.now();

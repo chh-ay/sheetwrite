@@ -85,6 +85,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-set-column-strings-packed"><code>setColumnStringsPacked</code></a>
 <a href="#cell-store-set-conditional-rules"><code>setConditionalRules</code></a>
 <a href="#cell-store-set-formula"><code>setFormula</code></a>
+<a href="#cell-store-set-hidden-rows"><code>setHiddenRows</code></a>
 <a href="#cell-store-set-iterative-calculation"><code>setIterativeCalculation</code></a>
 <a href="#cell-store-set-named-range"><code>setNamedRange</code></a>
 <a href="#cell-store-set-number"><code>setNumber</code></a>
@@ -107,7 +108,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-import-memory-state"><code>importMemoryState</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>93</span>
+## Members <span class="api-count" data-pagefind-ignore>94</span>
 
 <div class="api-member-list">
 
@@ -884,6 +885,25 @@ keeps the cached index, so its next recompute visits just the edited
 formula and its dependents instead of every formula in the workbook.</p>
 </details>
 
+<details class="api-member" id="cell-store-set-hidden-rows" data-pagefind-weight="1">
+<summary><code>setHiddenRows</code> <span class="api-member-summary">Replaces the hidden rows of sheet.</span></summary>
+
+```ts generated
+setHiddenRows: (sheet: number, manual: Uint32Array, filtered: Uint32Array) => boolean;
+```
+
+<p class="api-member-doc">Replaces the hidden rows of `sheet`. `manual` holds the rows that the
+user or a collapsed row group hides, and `filtered` the rows that a
+filter hides. Each is packed `[first, last]` inclusive row pairs in
+ascending order without overlap. Returns `false`, and changes nothing,
+for a missing sheet or invalid pairs.
+
+A change marks dirty every SUBTOTAL or AGGREGATE formula that can read
+the sheet; no other formula recalculates. Inside a mutation or a page
+load, `commitSources` recalculates them with the other edits of the
+batch; otherwise this call does.</p>
+</details>
+
 <details class="api-member" id="cell-store-set-iterative-calculation" data-pagefind-weight="1">
 <summary><code>setIterativeCalculation</code> <span class="api-member-summary">Turns iterative calculation on or off with Excel's limits: at most maxiterations (1 to 32,767) passes over each circular reference, stopping once no member changes by more than maxchange (finite, not negative).</span></summary>
 
@@ -1399,6 +1419,11 @@ class CellStore {
     src: string,
     style: number,
   ) => number;
+  setHiddenRows: (
+    sheet: number,
+    manual: Uint32Array,
+    filtered: Uint32Array,
+  ) => boolean;
   setIterativeCalculation: (
     enabled: boolean,
     max_iterations: number,

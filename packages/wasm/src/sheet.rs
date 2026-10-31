@@ -1,9 +1,11 @@
-//! One sheet: physical cells, formula sources and spill ownership, coordinated
-//! so that source writes detach spills and dirty the formulas that read them.
+//! One sheet: physical cells, formula sources, spill ownership and hidden
+//! rows, coordinated so that source writes detach spills and dirty the
+//! formulas that read them.
 
 use crate::cells::CellStorage;
 use crate::graph::SheetFormulas;
 use crate::memory::StoreMemoryStats;
+use crate::row_visibility::RowVisibility;
 use crate::spill::SpillState;
 use crate::transfer::Writer;
 #[cfg(any(target_arch = "wasm32", test))]
@@ -14,6 +16,7 @@ pub(crate) struct SheetData {
     pub(crate) cells: CellStorage,
     pub(crate) formulas: SheetFormulas,
     pub(crate) spill: SpillState,
+    pub(crate) visibility: RowVisibility,
 }
 
 impl SheetData {
@@ -46,6 +49,7 @@ impl SheetData {
             cells,
             formulas: SheetFormulas::default(),
             spill: SpillState::default(),
+            visibility: RowVisibility::default(),
         }
     }
 
@@ -131,6 +135,7 @@ impl SheetData {
         self.cells.insert_rows(at, count)?;
         if count != 0 {
             self.formulas.insert_rows(sheet, at as u32, count as u32);
+            self.visibility.insert_rows(at as u32, count as u32);
         }
         Ok(())
     }
@@ -150,6 +155,7 @@ impl SheetData {
         let count = count.min(extent - at);
         self.cells.delete_rows(at, count)?;
         self.formulas.delete_rows(sheet, at as u32, count as u32);
+        self.visibility.delete_rows(at as u32, count as u32);
         Ok(())
     }
 
@@ -190,6 +196,7 @@ impl SheetData {
         self.cells.add_memory_stats(stats);
         self.formulas.add_memory_stats(stats);
         self.spill.add_memory_stats(stats);
+        self.visibility.add_memory_stats(stats);
     }
 
     /// Resident state only: an unloaded clean datasource cell stays unloaded.
@@ -198,6 +205,7 @@ impl SheetData {
         self.cells.write_transfer(out);
         self.formulas.write_transfer(out);
         self.spill.write_transfer(out);
+        self.visibility.write_transfer(out);
     }
 
     #[cfg(any(target_arch = "wasm32", test))]
@@ -206,6 +214,7 @@ impl SheetData {
             cells: CellStorage::read_transfer(input)?,
             formulas: SheetFormulas::read_transfer(input)?,
             spill: SpillState::read_transfer(input)?,
+            visibility: RowVisibility::read_transfer(input)?,
         })
     }
 }

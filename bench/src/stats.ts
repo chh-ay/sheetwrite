@@ -47,10 +47,44 @@ function percentile(sorted: readonly number[], p: number): number {
  * even, `NaN` when the sample is empty. {@link summarize} uses the same rule.
  */
 export function median(samples: readonly number[]): number {
+  return medianOfSorted([...samples].sort((a, b) => a - b));
+}
+
+/** {@link median} of a sample the caller has already sorted ascending, without a copy. */
+export function medianOfSorted(sorted: readonly number[]): number {
+  return percentile(sorted, 0.5);
+}
+
+/**
+ * Linear-interpolated quantile of a sample (0 ≤ p ≤ 1), `NaN` when the sample
+ * is empty. `quantile(samples, 0.5)` is {@link median}; {@link summarize}
+ * reports `quantile(samples, 0.95)` as p95.
+ */
+export function quantile(samples: readonly number[], p: number): number {
   return percentile(
     [...samples].sort((a, b) => a - b),
-    0.5,
+    p,
   );
+}
+
+// Order-statistic rules. These return a value that the sample contains. Some
+// recorded protocols fixed them before they used the rules above, and their
+// validators recompute stored summaries from the raw samples, so the rule is
+// part of the protocol version: such a protocol keeps its rule until a new
+// version moves it to `median` and `quantile`. A timing summary in a new
+// protocol uses `median` and `quantile`; use these only where the result must
+// be an observed value, such as a byte counter.
+
+/** The upper of the two middle values when the count is even; `NaN` when empty. */
+export function upperMedian(samples: readonly number[]): number {
+  const sorted = [...samples].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)] ?? Number.NaN;
+}
+
+/** Nearest-rank percentile: the smallest sample with at least `p` of the sample at or below it. */
+export function nearestRankPercentile(samples: readonly number[], p: number): number {
+  const sorted = [...samples].sort((a, b) => a - b);
+  return sorted[Math.max(0, Math.ceil(sorted.length * p) - 1)] ?? Number.NaN;
 }
 
 /** Reduce a raw sample of per-iteration durations to a {@link Stat}. */

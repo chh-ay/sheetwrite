@@ -6,11 +6,14 @@ import { pathToFileURL } from "node:url";
 
 import { chromium } from "@playwright/test";
 
+import { optionValue } from "../bench/src/cli-options.js";
 import { assertPublishedDeclarations } from "./package-dist.js";
+import { packageTargets } from "./package-targets.js";
 import {
   assertPublishedFilePolicy,
   packBuiltPackages,
   readReleaseManifestDigest,
+  REQUIRED_PACKAGE_FILES,
   verifyReleaseArtifacts,
 } from "./release-artifacts.js";
 import { bindCanonicalTarballIntegrities } from "./release-lock-integrity.mjs";
@@ -35,7 +38,8 @@ interface PackResult {
 
 interface PackageSpec {
   directory: string;
-  requiredFiles: string[];
+  /** Files these consumer tests need beyond the release's required files. */
+  extraFiles?: string[];
   forbiddenFiles?: string[];
 }
 
@@ -69,13 +73,9 @@ const DIST_ONLY_PACKAGES: Readonly<Record<string, true>> = {
 const packageSpecs: PackageSpec[] = [
   {
     directory: "packages/core",
-    requiredFiles: [
-      "LICENSE",
-      "README.md",
+    extraFiles: [
       "dist/adapter.d.ts",
       "dist/adapter.js",
-      "dist/index.d.ts",
-      "dist/index.js",
       "dist/types/cell.d.ts",
       "dist/types/coordinates.d.ts",
       "dist/types/data.d.ts",
@@ -84,12 +84,8 @@ const packageSpecs: PackageSpec[] = [
       "dist/types/render.d.ts",
       "dist/types/store.d.ts",
       "dist/types/transaction.d.ts",
-      "dist/worker.d.ts",
-      "dist/worker.js",
       "dist/shell.d.ts",
       "dist/shell.js",
-      "shell.css",
-      "styles.css",
     ],
     forbiddenFiles: [
       "dist/types/cell.js",
@@ -110,40 +106,11 @@ const packageSpecs: PackageSpec[] = [
       "dist/types/transaction.js.map",
     ],
   },
-  {
-    directory: "packages/wasm",
-    requiredFiles: [
-      "LICENSE",
-      "README.md",
-      "loader.d.ts",
-      "loader.mjs",
-      "pkg/sheetwrite_wasm.d.ts",
-      "pkg/sheetwrite_wasm.js",
-      "pkg/sheetwrite_wasm_bg.wasm",
-    ],
-  },
-  {
-    directory: "packages/formulas",
-    requiredFiles: [
-      "LICENSE",
-      "README.md",
-      "loader.d.ts",
-      "loader.mjs",
-      "loader-browser.mjs",
-      "loader-node.mjs",
-      "loader-state.mjs",
-      "pkg/sheetwrite_wasm.d.ts",
-      "pkg/sheetwrite_wasm.js",
-      "pkg/sheetwrite_wasm_bg.wasm",
-    ],
-  },
+  { directory: "packages/wasm" },
+  { directory: "packages/formulas" },
   {
     directory: "packages/xlsx",
-    requiredFiles: [
-      "LICENSE",
-      "README.md",
-      "dist/index.d.ts",
-      "dist/index.js",
+    extraFiles: [
       "dist/register.d.ts",
       "dist/register.js",
       "dist/registration.d.ts",
@@ -158,60 +125,25 @@ const packageSpecs: PackageSpec[] = [
   },
   {
     directory: "packages/charts",
-    requiredFiles: [
-      "LICENSE",
-      "README.md",
-      "dist/index.d.ts",
-      "dist/index.js",
-      "dist/register.d.ts",
-      "dist/register.js",
+    extraFiles: [
       "dist/registration.d.ts",
       "dist/registration.js",
       "dist/view-cache.d.ts",
       "dist/view-cache.js",
     ],
   },
-  {
-    directory: "packages/react",
-    requiredFiles: ["LICENSE", "README.md", "dist/index.d.ts", "dist/index.js"],
-  },
-  {
-    directory: "packages/vue",
-    requiredFiles: ["LICENSE", "README.md", "dist/index.d.ts", "dist/index.js"],
-  },
-  {
-    directory: "packages/svelte",
-    requiredFiles: ["LICENSE", "README.md", "src/Grid.svelte", "src/index.ts"],
-  },
+  { directory: "packages/react" },
+  { directory: "packages/vue" },
+  { directory: "packages/svelte" },
 ];
 
 async function run(command: string[], cwd: string): Promise<string> {
   return captureProcess(command, {
     cwd,
-    env: processEnv(),
+    env: { ...process.env, CI: "1" },
     failure: ({ stdout, stderr }) =>
       `${command.join(" ")} failed in ${cwd}\n${stdout.trim()}\n${stderr.trim()}`,
   });
-}
-
-function processEnv(): Record<string, string> {
-  const environment: Record<string, string> = {};
-  for (const [key, value] of Object.entries(process.env)) {
-    if (value !== undefined) environment[key] = value;
-  }
-  environment.CI = "1";
-  return environment;
-}
-
-function collectExportTargets(value: unknown, targets: string[] = []): string[] {
-  if (typeof value === "string") {
-    if (value.startsWith("./")) targets.push(value.slice(2));
-    return targets;
-  }
-  if (value === null || typeof value !== "object") return targets;
-
-  for (const nested of Object.values(value)) collectExportTargets(nested, targets);
-  return targets;
 }
 
 async function assertWorkerBundle(packageRoot: string, manifest: PackageManifest): Promise<void> {
@@ -239,7 +171,11 @@ async function assertTarball(
 ): Promise<void> {
   const packedFiles = new Set(result.files.map((file) => file.path));
   assertPublishedFilePolicy(manifest.name, [...packedFiles]);
-  for (const requiredFile of spec.requiredFiles) {
+  const requiredFiles = [
+    ...(REQUIRED_PACKAGE_FILES[manifest.name] ?? []),
+    ...(spec.extraFiles ?? []),
+  ];
+  for (const requiredFile of requiredFiles) {
     if (!packedFiles.has(requiredFile)) {
       throw new Error(`${manifest.name} tarball is missing ${requiredFile}`);
     }
@@ -275,7 +211,7 @@ async function assertTarball(
     throw new Error(`${manifest.name} contains an unpublished workspace dependency range`);
   }
 
-  for (const target of collectExportTargets(packedManifest.exports)) {
+  for (const target of packageTargets(packedManifest)) {
     await access(join(packageRoot, target));
   }
   await assertPublishedDeclarations(packageRoot, [...packedFiles]);
@@ -503,19 +439,12 @@ async function verifyMountedFrameworkConsumers(consumerRoot: string): Promise<vo
   }
 }
 
-function optionValue(name: string): string | undefined {
-  const inline = process.argv.find((argument) => argument.startsWith(`${name}=`));
-  if (inline !== undefined) return inline.slice(name.length + 1);
-  const index = process.argv.indexOf(name);
-  return index < 0 ? undefined : process.argv[index + 1];
-}
-
 if (process.argv.includes("--help")) {
   process.stdout.write("Usage: bun scripts/verify-packed-consumer.ts [--artifacts <directory>]\n");
   process.exit(0);
 }
 
-const artifactDirectory = optionValue("--artifacts");
+const artifactDirectory = optionValue(process.argv, "--artifacts");
 const requiredArtifacts = process.env.SHEETWRITE_RELEASE_ARTIFACTS;
 if (process.env.SHEETWRITE_ARTIFACT_ONLY === "1" && artifactDirectory === undefined) {
   throw new Error("Artifact-only packed verification requires --artifacts");

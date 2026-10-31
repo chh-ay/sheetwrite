@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 
+import { optionValue } from "../bench/src/cli-options.js";
 import { buildReleaseArtifacts, verifyReleaseArtifacts } from "./release-artifacts.js";
 
 const repositoryRoot = resolve(import.meta.dir, "..");
@@ -74,15 +75,8 @@ export async function runReleaseVerification(
   return root;
 }
 
-function optionValue(name: string): string | undefined {
-  const inline = process.argv.find((argument) => argument.startsWith(`${name}=`));
-  if (inline !== undefined) return inline.slice(name.length + 1);
-  const index = process.argv.indexOf(name);
-  return index < 0 ? undefined : process.argv[index + 1];
-}
-
 async function cli(): Promise<void> {
-  const suppliedArtifacts = optionValue("--artifacts");
+  const suppliedArtifacts = optionValue(process.argv, "--artifacts");
   const artifactRoot = await runReleaseVerification(
     suppliedArtifacts ?? defaultArtifactRoot,
     suppliedArtifacts !== undefined,

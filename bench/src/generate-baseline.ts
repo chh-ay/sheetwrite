@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
 import { CONTROLLED_SAMPLING_FINGERPRINT } from "./check.js";
+import { optionValue } from "./cli-options.js";
 import {
   buildControlledBaseline,
   CONTROLLED_BASELINE_MINIMUM_ROUNDS,
@@ -25,11 +26,6 @@ const DEFAULT_CANDIDATE_PATH = resolve(
 );
 const DEFAULT_RAW_PATH = resolve(BENCH_ROOT, "results/candidates/render-baseline-raw.json");
 const DEFAULT_APPROVED_PATH = resolve(BENCH_ROOT, "results/render-baseline.json");
-
-function argumentValue(args: readonly string[], name: string): string | undefined {
-  const index = args.indexOf(name);
-  return index < 0 ? undefined : args[index + 1];
-}
 
 function gitOutput(args: readonly string[]): string {
   const result = Bun.spawnSync(["git", ...args], {
@@ -91,21 +87,21 @@ export async function generateBaseline(args: readonly string[]): Promise<string>
     throw new Error("an approved baseline cannot be written from a dirty tree");
   }
 
-  const approvedPath = resolve(argumentValue(args, "--approved") ?? DEFAULT_APPROVED_PATH);
-  const candidatePath = resolve(argumentValue(args, "--output") ?? DEFAULT_CANDIDATE_PATH);
+  const approvedPath = resolve(optionValue(args, "--approved") ?? DEFAULT_APPROVED_PATH);
+  const candidatePath = resolve(optionValue(args, "--output") ?? DEFAULT_CANDIDATE_PATH);
   const targetPath = writeBaseline ? approvedPath : candidatePath;
   if (!writeBaseline && targetPath === approvedPath) {
     throw new Error("refusing to overwrite the approved baseline without --write-baseline");
   }
-  const powerMode = argumentValue(args, "--power-mode") ?? "";
-  const concurrency = Number(argumentValue(args, "--concurrency") ?? Number.NaN);
-  const inputArgument = argumentValue(args, "--input");
+  const powerMode = optionValue(args, "--power-mode") ?? "";
+  const concurrency = Number(optionValue(args, "--concurrency") ?? Number.NaN);
+  const inputArgument = optionValue(args, "--input");
   let rawPath: string;
 
   if (inputArgument) {
     rawPath = resolve(inputArgument);
   } else {
-    rawPath = resolve(argumentValue(args, "--raw-output") ?? DEFAULT_RAW_PATH);
+    rawPath = resolve(optionValue(args, "--raw-output") ?? DEFAULT_RAW_PATH);
     const markdownPath = rawPath.replace(/\.json$/u, ".md");
     runCommand(["bun", "run", "bench:render:prepare"]);
     runCommand([
