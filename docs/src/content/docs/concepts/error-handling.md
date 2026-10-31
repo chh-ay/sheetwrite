@@ -110,7 +110,44 @@ their runtime value sets are
 - `SyncProtocolError` rejects malformed or resource-violating remote input. Fix the producer; do not replay the same payload.
 - `SyncPendingCapacityError` rejects a new local transaction before it can exceed the durable queue ceiling. Drain or reconcile pending work before retrying.
 
-Worker startup and capability failures switch to the canvas renderer and emit `renderer-fallback`; observe `grid.rendererKind` to report the active renderer, not the requested option.
+Worker failures switch to the canvas renderer and emit `renderer-fallback`; observe `grid.rendererKind` to report the active renderer, not the requested option. `error.context.failure` tells why the worker stopped: `spawn` (the script did not load or start), `crash` (an uncaught error after start), `protocol` (a message that one side cannot read, for example a `workerUrl` copy from another release), `timeout` (no `ready` reply in 10 seconds) or `fatal` (the worker lost its 2D context). The worker requests do not return promises, so no request stays pending after a failure or `destroy()`.
+
+## Engine failure
+
+A WASM trap, for example `RuntimeError: unreachable` after an internal engine
+panic, leaves the engine instance half-written. Sheetwrite never calls that
+instance again:
+
+- The call that trapped throws a `SheetwriteError` with code `engine-failed` and operation `engine`. Its `cause` is the trap.
+- Every grid on that instance emits `engine-failed` once. It keeps its last frame, becomes read-only and does not read its store again. `setReadOnly(false)` does not undo this.
+- Every store on that instance throws `engine-failed` from `applyTransaction`, `recalculateVolatile` and `loadPage`. `isSheetwriteReady()` returns `false`.
+- A trap while `releaseEngineMemory()` prepares its copy also stops the engine, because the trap can come from the live instance.
+
+To continue, destroy the grid, call `initSheetwrite()` again and create a new
+grid from a document that you saved, for example through persistence or sync.
+The restart uses the same compiled module and does not download it again. Do
+not read the failed grid or store to get the document: its engine state is not
+reliable.
+
+```ts prelude="wasm" partial="requires surrounding host state" title="Restart after an engine failure"
+import {
+  createGridFromSnapshot,
+  type Grid,
+  initSheetwrite,
+  type WorkbookSnapshot,
+} from "@sheetwrite/core";
+declare const host: HTMLElement;
+declare function lastSavedSnapshot(): Promise<WorkbookSnapshot>;
+declare function useGrid(next: Grid): void;
+declare function reportEngineFailure(code: string): void;
+
+grid.on("engine-failed", async ({ error }) => {
+  reportEngineFailure(error.code);
+  grid.destroy();
+  await initSheetwrite();
+  useGrid(createGridFromSnapshot(host, await lastSavedSnapshot()));
+});
+```
 
 - [`GridEvents`](/docs/api/core/grid-events/)
 - [`SnapshotValidationError`](/docs/api/core/snapshot-validation-error/)

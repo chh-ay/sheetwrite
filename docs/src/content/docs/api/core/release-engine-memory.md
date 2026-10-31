@@ -7,7 +7,10 @@ description: "releaseEngineMemory function in @sheetwrite/core: Move all live st
 
 Move all live stores into a fresh WASM instance. Call explicitly while idle;
 the main-thread pause scales with resident data and compact undo history.
-Preparation failures leave every live store and the selected instance unchanged.
+Preparation failures leave every live store and the selected instance unchanged;
+running out of memory for the copy rejects with `resource-limit`. A WASM trap
+during preparation rejects with `engine-failed`: the live instance can be
+half-written, so it stops.
 A larger replacement is discarded; the report then has zero migrated stores.
 
 ## Examples
@@ -26,7 +29,7 @@ document.body.dataset.engineBytes = String(report.wasmBytesAfter);
 - [EngineMemoryReleaseReport](/docs/api/core/engine-memory-release-report/)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/engine-memory.ts#L39"><code>packages/core/src/engine-memory.ts#L39</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/engine-memory.ts#L52"><code>packages/core/src/engine-memory.ts#L52</code></a></dd></div>
 </dl>
 
 ## Declaration

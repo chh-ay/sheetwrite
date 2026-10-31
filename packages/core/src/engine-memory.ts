@@ -1,4 +1,14 @@
-import { getEngine, prepareEngineInstance, replaceEngineInstance } from "./engine.js";
+import {
+  engineGeneration,
+  getEngine,
+  hasCause,
+  isEngineLoaded,
+  isEngineTrap,
+  prepareEngineInstance,
+  replaceEngineInstance,
+  stopEngine,
+} from "./engine.js";
+import { SheetwriteError } from "./errors.js";
 import type { PreparedEngineMemoryRelease } from "./store/data-engine.js";
 import { liveStoreEngines } from "./store/engine-registry.js";
 
@@ -22,7 +32,10 @@ let pendingRelease: Promise<EngineMemoryReleaseReport> | undefined;
 /**
  * Move all live stores into a fresh WASM instance. Call explicitly while idle;
  * the main-thread pause scales with resident data and compact undo history.
- * Preparation failures leave every live store and the selected instance unchanged.
+ * Preparation failures leave every live store and the selected instance unchanged;
+ * running out of memory for the copy rejects with `resource-limit`. A WASM trap
+ * during preparation rejects with `engine-failed`: the live instance can be
+ * half-written, so it stops.
  * A larger replacement is discarded; the report then has zero migrated stores.
  *
  * @example
@@ -54,7 +67,7 @@ async function release(): Promise<EngineMemoryReleaseReport> {
   for (;;) {
     const waits: Promise<void>[] = [];
 
-    for (const engine of liveStoreEngines()) {
+    for (const engine of liveStoreEngines(engineGeneration())) {
       const wait = engine.waitForPageLoads();
       if (wait) waits.push(wait);
     }
@@ -65,10 +78,16 @@ async function release(): Promise<EngineMemoryReleaseReport> {
   }
 
   const started = performance.now();
+  const owner = engineGeneration();
+  if (!isEngineLoaded()) {
+    // The engine stopped while page loads finished; `getEngine` reports why.
+    replacement.retire();
+  }
+
   const previous = getEngine();
   const before = previous.getMemory().buffer.byteLength;
   const prepared: PreparedEngineMemoryRelease[] = [];
-  const engines = liveStoreEngines();
+  const engines = liveStoreEngines(owner);
 
   try {
     for (const engine of engines) {
@@ -80,10 +99,21 @@ async function release(): Promise<EngineMemoryReleaseReport> {
 
     replacement.retire();
 
-    throw new Error(
-      "Sheetwrite: engine memory release preparation failed; live stores are unchanged",
-      { cause },
-    );
+    // Preparation reads every live store, so a trap can come from the live
+    // instance as well as from the replacement; only a stop is safe.
+    if (isEngineTrap(cause)) throw stopEngine(cause, owner);
+
+    const message =
+      "Sheetwrite: engine memory release preparation failed; live stores are unchanged";
+
+    // The copy allocates as much as every live store holds; that is the expected
+    // failure. History migration wraps it, so look through the causes.
+    if (hasCause(cause, (wrapped) => wrapped instanceof RangeError)) {
+      throw new SheetwriteError("resource-limit", "engine", message, { cause });
+    }
+
+    // Anything else is a broken engine export or import, a programmer bug.
+    throw new Error(message, { cause });
   }
 
   const after = replacement.getMemory().buffer.byteLength;

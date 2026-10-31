@@ -736,8 +736,9 @@ export interface GridEvents {
   /** Emitted after `setTheme` or `replaceTheme` changes the base theme. Holds a copy. */
   "theme-change": { theme: Theme };
   /**
-   * Emitted once when the worker renderer could not be constructed and the
-   * grid fell back to the main-thread canvas renderer.
+   * Emitted once when the worker renderer could not start or stopped and the
+   * grid fell back to the main-thread canvas renderer. `error.context.failure`
+   * is `spawn`, `crash`, `protocol`, `timeout` or `fatal`.
    */
   "renderer-fallback": { requested: "worker"; error: SheetwriteError };
   "datasource-error": {
@@ -750,6 +751,14 @@ export interface GridEvents {
   "chart-select": ChartRef | null;
   /** The user pressed Enter on a selected chart, for example to open its editor. */
   "chart-activate": ChartRef;
+  /**
+   * Emitted once when the engine stopped after a WASM trap. `error.code` is
+   * `engine-failed`. The grid keeps its last frame, is read-only and does not
+   * read its store again; `setReadOnly(false)` does not undo this. To continue,
+   * destroy the grid, `await initSheetwrite()` and create a new grid from a
+   * saved document.
+   */
+  "engine-failed": { error: SheetwriteError };
 }
 
 /**
@@ -827,7 +836,10 @@ export interface Grid {
   replaceTheme(theme: Partial<Theme> | undefined): void;
   /** The effective (post-zoom) theme the renderer is currently painting with. */
   getEffectiveTheme(): Theme;
-  /** Update editability without replacing the Grid or clearing session state. */
+  /**
+   * Update editability without replacing the Grid or clearing session state.
+   * Has no effect after `engine-failed`: that grid stays read-only.
+   */
   setReadOnly(readOnly: boolean): void;
   /**
    * Reconfigure built-in chrome and keyboard handling without replacing the

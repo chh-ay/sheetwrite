@@ -36,9 +36,10 @@ Framework `onGridChange` / `grid-change` callbacks carry the same committed even
 | `active-sheet` | `{ sheet: SheetId }`, after the visible sheet changes (direct call or cross-sheet scroll). |
 | `hyperlink-activate` | `HyperlinkActivationEvent` |
 | `theme-change` | `{ theme: Theme }`, after `setTheme` or `replaceTheme` changes the base theme. |
-| `renderer-fallback` | `{ requested: "worker"; error: SheetwriteError }`, once, when the worker renderer could not be constructed. |
+| `renderer-fallback` | `{ requested: "worker"; error: SheetwriteError }`, once, when the worker renderer could not start or stopped. `error.context.failure` is `spawn`, `crash`, `protocol`, `timeout` or `fatal`. |
 | `datasource-error` | `{ request; error: SheetwriteError }`; `request` is the `DataSourceRequest` without its `signal`. |
 | `export-error` | `{ format: "csv" \| "xlsx"; error: SheetwriteError }`, when a built-in toolbar or context-menu export fails. |
+| `engine-failed` | `{ error: SheetwriteError }`, once, when the engine stopped after a WASM trap. The grid stays read-only; see [Engine failure](/docs/concepts/error-handling/#engine-failure). |
 
 `commitReason` is one of `edit-blur`, `edit-enter`, `edit-tab`, `edit-programmatic`, `paste`, `cut`, `clear`, `fill`, `structure`, `style`, `replace`, `undo`, `redo` or `api`.
 
