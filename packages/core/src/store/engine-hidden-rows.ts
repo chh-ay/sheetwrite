@@ -39,6 +39,10 @@ export class EngineHiddenRows {
     this.pending.add(sheet);
   }
 
+  hasQueued(): boolean {
+    return this.pending.size !== 0;
+  }
+
   /**
    * Queue a sheet after its view was computed again. `filterSurvivors` holds
    * the ascending data rows that the active filters keep, or `null` when no
@@ -53,8 +57,6 @@ export class EngineHiddenRows {
 
   /** Send the queued sheets whose runs differ from what the engine holds. */
   flush(): void {
-    // Most transactions queue nothing. Creating the iterator of an empty set
-    // still cost about 0.13 µs per one-cell edit in the engine memory probe.
     if (this.pending.size === 0) return;
 
     for (const sheet of this.pending) {

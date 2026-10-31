@@ -84,6 +84,11 @@ export class StoreViewState {
     this.engineHiddenRows.queue(sheet);
   }
 
+  /** Whether a sheet waits for {@link flushHiddenRows}. */
+  hasQueuedHiddenRows(): boolean {
+    return this.engineHiddenRows.hasQueued();
+  }
+
   /** Send the hidden rows of the sheets changed since the last flush to the engine. */
   flushHiddenRows(): void {
     this.engineHiddenRows.flush();
