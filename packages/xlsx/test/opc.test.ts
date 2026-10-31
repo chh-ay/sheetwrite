@@ -38,9 +38,9 @@ describe("OPC package metadata", () => {
       context: { format: "xlsx" },
       retryable: false,
     };
-    const normalized = xlsxFailure(source, "import", "test");
+    const normalized = xlsxFailure(source, "import", "test", undefined);
     expect(normalized).not.toBe(source);
-    expect(normalized).toMatchObject(source);
-    expect(normalized.cause).toBe(source);
+    expect(normalized).toBeInstanceOf(SheetwriteError);
+    expect(normalized).toMatchObject({ ...source, cause: source });
   });
 });

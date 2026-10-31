@@ -45,6 +45,7 @@ import { readPivots } from "./pivot.js";
 import { capturePreserved, isRetainedRelationship } from "./preservation.js";
 import {
   assertResource,
+  boundedErrorText,
   checkAbort,
   emitWarning,
   validateCodecSnapshot,
@@ -113,10 +114,12 @@ class CellStyleIndices {
     this.#values[this.#length++] = styleIndex;
   }
 
+  get length(): number {
+    return this.#length;
+  }
+
+  /** Style index of one recorded cell; the caller checks `cellIndex < length` once per sheet. */
   at(cellIndex: number): number {
-    if (cellIndex >= this.#length) {
-      throw new RangeError(`Sheetwrite: XLSX cell ${cellIndex} has no recorded style`);
-    }
     return this.#values[cellIndex] ?? 0;
   }
 }
@@ -194,7 +197,7 @@ interface ReaderResourceUsage {
 }
 
 function readerFailure(message: string): never {
-  throw new TypeError(`Sheetwrite: invalid XLSX workbook: ${message}`);
+  throw new TypeError(boundedErrorText(`Sheetwrite: invalid XLSX workbook: ${message}`));
 }
 
 /**
@@ -668,23 +671,17 @@ function parseConditionalFormats(
         continue;
       }
       const rawDxf = xmlAttribute(element, "dxfId");
-      if (rawDxf !== undefined && !/^\d+$/.test(rawDxf)) {
+      const differential =
+        rawDxf !== undefined && /^\d+$/.test(rawDxf)
+          ? styles.differentialAt(Number(rawDxf))
+          : undefined;
+      if (rawDxf !== undefined && !differential) {
         dropped(
           `Excel conditional-format rule type ${type} has an invalid differential style and was dropped`,
         );
         continue;
       }
-      let style: CellStyle = {};
-      if (rawDxf !== undefined) {
-        try {
-          style = styles.differentialAt(Number(rawDxf));
-        } catch {
-          dropped(
-            `Excel conditional-format rule type ${type} has an invalid differential style and was dropped`,
-          );
-          continue;
-        }
-      }
+      const style: CellStyle = differential ?? {};
       for (const rangeText of ranges) {
         const range = parseRange(rangeText);
         parsed.push({
@@ -747,8 +744,10 @@ function parseHyperlinkLocation(
         end: { row: parsed.r1, col: parsed.c1 },
       },
     };
-  } catch {
-    return null;
+  } catch (error) {
+    // An unreadable internal location makes only this hyperlink unusable.
+    if (error instanceof TypeError) return null;
+    throw error;
   }
 }
 
@@ -1035,12 +1034,8 @@ function tableRuleMetadata(
     }
     const index = Number(value);
     if (!Number.isSafeInteger(index) || index < 0) return null;
-    try {
-      differentialStyle = styles.differentialAt(index);
-    } catch (error) {
-      if (error instanceof TypeError) return null;
-      throw error;
-    }
+    differentialStyle = styles.differentialAt(index);
+    if (!differentialStyle) return null;
   }
   const children: WorkbookTableXmlElement[] = [];
   for (const child of element.children) {
@@ -1727,11 +1722,12 @@ function metadataFromSheet(sheet: ParsedSheet, context: XlsxCodecContext): Workb
       json += cell.value.value;
   }
   try {
-    const parsed: unknown = JSON.parse(json);
-    const checked = validateCodecSnapshot(parsed, context);
+    const checked = validateCodecSnapshot(JSON.parse(json), context);
     if (checked.ok) return checked.value;
-  } catch {
-    // The stable warning below covers malformed JSON and invalid snapshots alike.
+  } catch (error) {
+    // Malformed or too deeply nested JSON gets the same warning as an invalid
+    // snapshot; any other error is a bug and fails the import.
+    if (!(error instanceof SyntaxError || error instanceof RangeError)) throw error;
   }
   emitWarning(context, {
     code: "invalid-metadata",
@@ -2255,6 +2251,7 @@ export async function readWorkbook(
   const usedTableNames = new Set<string>();
   const sheets: SheetSnapshot[] = [];
   for (let order = 0; order < sourceSheets.length; order++) {
+    checkAbort(context);
     const source = sourceSheets[order]!;
     const meta = resolvedMetadata[order];
     const id = resolvedIds[order]!;
@@ -2320,6 +2317,9 @@ export async function readWorkbook(
     // The parsed cells become the snapshot's cells: each gets its own style copy
     // now that every column default is known, and no second array is built.
     const snapshotCells = source.cells;
+    if (source.cellStyles.length !== snapshotCells.length) {
+      throw new RangeError("Sheetwrite: XLSX cell styles and cells are out of step");
+    }
     for (let index = 0; index < snapshotCells.length; index++) {
       const cell = snapshotCells[index];
       if (!cell) continue;
@@ -2618,7 +2618,9 @@ export async function readWorkbook(
   const checked = validateCodecSnapshot(snapshot, context);
   if (!checked.ok) {
     throw new TypeError(
-      `Sheetwrite: imported invalid workbook snapshot: ${checked.errors[0]?.message ?? "unknown error"}`,
+      boundedErrorText(
+        `Sheetwrite: imported invalid workbook snapshot: ${checked.errors[0]?.message ?? "unknown error"}`,
+      ),
     );
   }
   return checked.value;

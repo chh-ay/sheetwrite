@@ -129,12 +129,10 @@ describe("XLSX streaming", () => {
       ),
     ).toMatchObject({ code: "xlsx-resource-limit" });
     const controller = new AbortController();
-    controller.abort();
+    controller.abort(new Error("cancelled workbook stream"));
     expect(
       await failureOf(toXlsxWorkbookStream(largeSnapshot(10), { signal: controller.signal })),
-    ).toMatchObject({
-      code: "aborted",
-    });
+    ).toBe(controller.signal.reason);
   });
 
   it("streams the store-backed table export with the same entries as the buffered export", async () => {

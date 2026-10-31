@@ -1776,7 +1776,7 @@
               "owners": [
                 "src/delimited-text.ts"
               ],
-              "source": "src/delimited-text.ts#L32",
+              "source": "src/delimited-text.ts#L35",
               "jsDocTags": [],
               "documentation": "Synchronous operations return one in-memory string, so byte/cell ceilings\nbound allocation while sheet-compatible dimensions remain independently valid.",
               "memberDocs": []
@@ -1872,7 +1872,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L344",
+              "source": "src/export.ts#L352",
               "jsDocTags": [],
               "documentation": "Codec defaults combine SpreadsheetML worksheet dimensions with independent\nZIP/XML and aggregate-work ceilings for untrusted in-memory conversion.",
               "memberDocs": []
@@ -1884,7 +1884,7 @@
               "owners": [
                 "src/delimited-text.ts"
               ],
-              "source": "src/delimited-text.ts#L51",
+              "source": "src/delimited-text.ts#L54",
               "jsDocTags": [],
               "documentation": "Phase reported by a typed delimited-text resource failure.",
               "memberDocs": []
@@ -1906,7 +1906,7 @@
                 },
                 {
                   "name": "signal",
-                  "documentation": "Abort between bounded encode chunks or store windows."
+                  "documentation": "Checked once per chunk of records, store window and long field. After it\nfires, the operation rejects or throws with `signal.reason`."
                 }
               ]
             },
@@ -1917,7 +1917,7 @@
               "owners": [
                 "src/delimited-text.ts"
               ],
-              "source": "src/delimited-text.ts#L73",
+              "source": "src/delimited-text.ts#L76",
               "jsDocTags": [],
               "documentation": "Stable invalid-option failure for a delimited-text resource ceiling.",
               "memberDocs": []
@@ -1929,7 +1929,7 @@
               "owners": [
                 "src/delimited-text.ts"
               ],
-              "source": "src/delimited-text.ts#L54",
+              "source": "src/delimited-text.ts#L57",
               "jsDocTags": [],
               "documentation": "Stable resource-limit failure raised before the next oversized parse or encode allocation.",
               "memberDocs": []
@@ -2054,7 +2054,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L271",
+              "source": "src/export.ts#L279",
               "jsDocTags": [],
               "documentation": "Trigger a browser download from in-memory bytes. The temporary anchor is\nremoved and its object URL is scheduled for revocation even when DOM append or\nclick throws.",
               "memberDocs": []
@@ -2119,7 +2119,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L212",
+              "source": "src/export.ts#L214",
               "jsDocTags": [],
               "documentation": "Parse CSV into `ColumnarData`. The first record is consumed as a positional\nheader. Input fields project onto declared visible columns; hidden declared\ncolumns are initialized to `null`, matching the visible-column CSV export.\nExtra fields are ignored and missing fields become `null`. The returned\ncolumnar table is fully materialized in memory.",
               "memberDocs": []
@@ -2131,7 +2131,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L508",
+              "source": "src/export.ts#L553",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2146,7 +2146,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L710",
+              "source": "src/export.ts#L767",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2161,7 +2161,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L676",
+              "source": "src/export.ts#L731",
               "jsDocTags": [],
               "documentation": "Import a seekable File/Blob without first buffering the compressed workbook.",
               "memberDocs": []
@@ -3424,7 +3424,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L201",
+              "source": "src/export.ts#L203",
               "jsDocTags": [],
               "documentation": "Parse the fixed comma dialect: quoted delimiters/newlines, doubled quotes,\nbare CR, LF, or CRLF records, Unicode, trailing empty fields, and one optional\nleading UTF-8 BOM. The synchronous API consumes an existing in-memory string\nand returns an in-memory grid; it does not claim streaming. Scanning enforces\nresource ceilings before materializing the next oversized field or record.",
               "memberDocs": []
@@ -4850,7 +4850,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L405",
+              "source": "src/export.ts#L413",
               "jsDocTags": [],
               "documentation": "Registers the optional table XLSX export implementation used by core.",
               "memberDocs": []
@@ -4862,7 +4862,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L486",
+              "source": "src/export.ts#L531",
               "jsDocTags": [],
               "documentation": "Registers the optional table XLSX import implementation used by core.",
               "memberDocs": []
@@ -4874,7 +4874,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L584",
+              "source": "src/export.ts#L635",
               "jsDocTags": [],
               "documentation": "Registers the optional workbook XLSX implementation used by core.",
               "memberDocs": []
@@ -6069,7 +6069,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L95",
+              "source": "src/export.ts#L96",
               "jsDocTags": [
                 "link",
                 "throws"
@@ -6084,7 +6084,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L103",
+              "source": "src/export.ts#L104",
               "jsDocTags": [],
               "documentation": "Export UTF-8 CSV on demand, retaining only one store window and one byte chunk.",
               "memberDocs": []
@@ -6149,7 +6149,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L173",
+              "source": "src/export.ts#L175",
               "jsDocTags": [
                 "link",
                 "throws"
@@ -6164,7 +6164,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L180",
+              "source": "src/export.ts#L182",
               "jsDocTags": [],
               "documentation": "Export canonical data-space TSV with pull-driven store reads and cancellation.",
               "memberDocs": []
@@ -6176,7 +6176,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L437",
+              "source": "src/export.ts#L479",
               "jsDocTags": [
                 "example",
                 "see"
@@ -6191,7 +6191,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L455",
+              "source": "src/export.ts#L499",
               "jsDocTags": [],
               "documentation": "Stream table XLSX bytes without materializing the finished archive.",
               "memberDocs": []
@@ -6203,7 +6203,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L639",
+              "source": "src/export.ts#L690",
               "jsDocTags": [
                 "example",
                 "see"
@@ -6218,7 +6218,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L657",
+              "source": "src/export.ts#L711",
               "jsDocTags": [],
               "documentation": "Stream formula-preserving workbook XLSX with backpressure and cancellation.",
               "memberDocs": []
@@ -6823,7 +6823,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L371",
+              "source": "src/export.ts#L379",
               "jsDocTags": [],
               "documentation": "Stable resource-limit failure surfaced before an XLSX codec allocates unsafe data.",
               "memberDocs": []
@@ -6835,7 +6835,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L301",
+              "source": "src/export.ts#L309",
               "jsDocTags": [],
               "documentation": "Resource dimensions bounded by every XLSX import and export path.",
               "memberDocs": [
@@ -7008,7 +7008,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L392",
+              "source": "src/export.ts#L400",
               "jsDocTags": [],
               "documentation": "Pluggable first-row-header, first-sheet table export backend.",
               "memberDocs": []
@@ -7020,7 +7020,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L475",
+              "source": "src/export.ts#L520",
               "jsDocTags": [],
               "documentation": "Pluggable table import backend. Parses raw `.xlsx` bytes into the same\n`ColumnarData` shape `fromCsv` returns, so host ingestion code can stay\nformat-agnostic.",
               "memberDocs": []
@@ -7032,7 +7032,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L560",
+              "source": "src/export.ts#L611",
               "jsDocTags": [
                 "internal"
               ],
@@ -7046,7 +7046,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L544",
+              "source": "src/export.ts#L591",
               "jsDocTags": [],
               "documentation": "Shared options passed to every registered table and workbook XLSX backend.",
               "memberDocs": [
@@ -7060,7 +7060,7 @@
                 },
                 {
                   "name": "signal",
-                  "documentation": "Abort before or between bounded codec operations."
+                  "documentation": "Checked before the work and once per ZIP entry, worksheet and chunk of\ncells. After it fires, the call rejects (or the stream errors) with\n`signal.reason`, not with a `SheetwriteError`."
                 }
               ]
             },
@@ -7071,7 +7071,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L525",
+              "source": "src/export.ts#L572",
               "jsDocTags": [],
               "documentation": "Structured fidelity warning emitted during XLSX conversion.",
               "memberDocs": []
@@ -12495,7 +12495,7 @@
               "owners": [
                 "src/table-export.ts"
               ],
-              "source": "src/table-export.ts#L31",
+              "source": "src/table-export.ts#L34",
               "jsDocTags": [],
               "documentation": "Build the active-sheet table model used by the bounded OOXML writer.",
               "memberDocs": []
@@ -12522,7 +12522,7 @@
               "owners": [
                 "src/table-export.ts"
               ],
-              "source": "src/table-export.ts#L116",
+              "source": "src/table-export.ts#L120",
               "jsDocTags": [],
               "documentation": "Default bounded first-sheet table export backend.",
               "memberDocs": []
@@ -12558,7 +12558,7 @@
               "owners": [
                 "src/table-export.ts"
               ],
-              "source": "src/table-export.ts#L23",
+              "source": "src/table-export.ts#L26",
               "jsDocTags": [],
               "documentation": "Implementation-neutral first-sheet table export model.",
               "memberDocs": []
@@ -12570,7 +12570,7 @@
               "owners": [
                 "src/table-export.ts"
               ],
-              "source": "src/table-export.ts#L14",
+              "source": "src/table-export.ts#L17",
               "jsDocTags": [],
               "documentation": "Implementation-neutral cell in the first-sheet table export model.",
               "memberDocs": []

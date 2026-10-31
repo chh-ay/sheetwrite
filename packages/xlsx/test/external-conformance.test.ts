@@ -1,7 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
 import {
-  SheetwriteError,
   type WorkbookSnapshot,
   XlsxResourceError,
   type XlsxWorkbookWarning,
@@ -446,7 +445,7 @@ describe("local deterministic and adversarial XLSX gates", () => {
     }
   });
 
-  it("preserves exact abort reasons as canonical causes across codec stages", async () => {
+  it("rejects with the exact abort reason across codec stages", async () => {
     const centralReason = new Error("abort during central directory");
     let centralChecks = 0;
     const centralSignal = {
@@ -458,20 +457,12 @@ describe("local deterministic and adversarial XLSX gates", () => {
         return centralReason;
       },
     } as AbortSignal;
-    try {
-      await sheetwriteWorkbookBackend.fromXlsxWorkbook(
+    await expect(
+      sheetwriteWorkbookBackend.fromXlsxWorkbook(
         rawXlsx({ sheets: [{ xml: worksheet("<sheetData/>") }] }),
         { signal: centralSignal },
-      );
-      throw new Error("expected central-directory abort");
-    } catch (error) {
-      expect(error).toBeInstanceOf(SheetwriteError);
-      expect(error).toMatchObject({
-        code: "aborted",
-        operation: "xlsx-import",
-      });
-      expect((error as SheetwriteError).cause).toBe(centralReason);
-    }
+      ),
+    ).rejects.toBe(centralReason);
 
     const sharedReason = new Error("abort during shared strings");
     let sharedChecks = 0;
@@ -485,8 +476,8 @@ describe("local deterministic and adversarial XLSX gates", () => {
       },
     } as AbortSignal;
     const sharedWarnings: XlsxWorkbookWarning[] = [];
-    try {
-      await sheetwriteWorkbookBackend.fromXlsxWorkbook(
+    await expect(
+      sheetwriteWorkbookBackend.fromXlsxWorkbook(
         rawXlsx({
           sharedStrings: `<?xml version="1.0"?><sst xmlns="${TRANSITIONAL_MAIN}" count="5000" uniqueCount="5000">${Array.from({ length: 5_000 }, (_, index) => `<si><t>${index}</t></si>`).join("")}</sst>`,
           sheets: [
@@ -498,13 +489,9 @@ describe("local deterministic and adversarial XLSX gates", () => {
           ],
         }),
         { signal: sharedSignal, onWarning: (warning) => sharedWarnings.push(warning) },
-      );
-      throw new Error("expected shared-string abort");
-    } catch (error) {
-      expect(error).toBeInstanceOf(SheetwriteError);
-      expect((error as SheetwriteError).cause).toBe(sharedReason);
-      expect(sharedWarnings).toEqual([]);
-    }
+      ),
+    ).rejects.toBe(sharedReason);
+    expect(sharedWarnings).toEqual([]);
 
     const exportReason = new Error("abort during export part");
     let exportChecks = 0;
@@ -518,21 +505,13 @@ describe("local deterministic and adversarial XLSX gates", () => {
       },
     } as AbortSignal;
     const exportWarnings: XlsxWorkbookWarning[] = [];
-    try {
-      await sheetwriteWorkbookBackend.toXlsxWorkbook(minimalSnapshot(), {
+    await expect(
+      sheetwriteWorkbookBackend.toXlsxWorkbook(minimalSnapshot(), {
         signal: exportSignal,
         onWarning: (warning) => exportWarnings.push(warning),
-      });
-      throw new Error("expected export-part abort");
-    } catch (error) {
-      expect(error).toBeInstanceOf(SheetwriteError);
-      expect(error).toMatchObject({
-        code: "aborted",
-        operation: "xlsx-export",
-      });
-      expect((error as SheetwriteError).cause).toBe(exportReason);
-      expect(exportWarnings).toEqual([]);
-    }
+      }),
+    ).rejects.toBe(exportReason);
+    expect(exportWarnings).toEqual([]);
   });
 
   it("rejects ZIP local/central disagreements and duplicate raw or normalized logical entries", async () => {

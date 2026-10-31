@@ -1,7 +1,12 @@
 import type { CellBorder, CellStyle, CellVerticalAlign } from "@sheetwrite/core";
 import { isCellFontFamily } from "@sheetwrite/core";
 
-import { assertResource, emitWarning, type XlsxCodecContext } from "./resources.js";
+import {
+  assertResource,
+  boundedErrorText,
+  emitWarning,
+  type XlsxCodecContext,
+} from "./resources.js";
 import {
   assertXmlRoot,
   escapeXml,
@@ -667,7 +672,9 @@ function integerAttribute(element: XmlElement, name: string, fallback = 0): numb
   if (raw === undefined) return fallback;
   const value = Number(raw);
   if (!Number.isInteger(value) || value < 0) {
-    throw new TypeError(`Sheetwrite: invalid XLSX style ${name}=${JSON.stringify(raw)}`);
+    throw new TypeError(
+      boundedErrorText(`Sheetwrite: invalid XLSX style ${name}=${JSON.stringify(raw)}`),
+    );
   }
   return value;
 }
@@ -982,11 +989,8 @@ export class ParsedStyles {
     return style;
   }
 
-  differentialAt(index: number): CellStyle {
-    const style = this.#differentials[index];
-    if (!style) {
-      throw new TypeError(`Sheetwrite: XLSX differential style index ${index} is out of range`);
-    }
-    return style;
+  /** The differential style at `index`, or undefined when the file has none there. */
+  differentialAt(index: number): CellStyle | undefined {
+    return this.#differentials[index];
   }
 }
