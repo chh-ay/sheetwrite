@@ -13,6 +13,7 @@ import {
 import { deflateSync, strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 
 import { registerXlsxBackends } from "../src/index.js";
+import { packageProblems } from "./raw-opc.js";
 
 interface CorpusFixture {
   file: string;
@@ -25,7 +26,6 @@ const corpus = (await Bun.file(
   fixtures: CorpusFixture[];
 };
 const PACKAGE_RELATIONSHIPS = "http://schemas.openxmlformats.org/package/2006/relationships";
-const MACRO_WORKBOOK = "application/vnd.ms-excel.sheet.macroEnabled.main+xml";
 const EOCD_SIGNATURE = 0x06054b50;
 const EOCD_BYTES = 22;
 const CENTRAL_HEADER_BYTES = 46;
@@ -76,79 +76,6 @@ function rawEntries(
   return entries;
 }
 
-function resolveTarget(source: string, target: string): string {
-  if (target.startsWith("/")) return target.slice(1);
-  const segments = source.split("/").slice(0, -1);
-  for (const segment of target.split("/")) {
-    if (segment === "..") segments.pop();
-    else if (segment !== ".") segments.push(segment);
-  }
-  return segments.join("/");
-}
-
-/**
- * Structural checks Excel applies before it offers to repair a file: every
- * part has a content type, every internal relationship target exists, every
- * `r:` reference resolves, and a macro workbook keeps its macro content type.
- */
-function packageProblems(bytes: Uint8Array): string[] {
-  const files = unzipSync(bytes);
-  const problems: string[] = [];
-  const contentTypes = strFromU8(files["[Content_Types].xml"] ?? new Uint8Array());
-  const defaults = new Set(
-    [...contentTypes.matchAll(/<Default Extension="([^"]+)"/g)].map((match) =>
-      match[1]?.toLowerCase(),
-    ),
-  );
-  const overrides = new Map(
-    [...contentTypes.matchAll(/<Override PartName="\/([^"]+)" ContentType="([^"]+)"/g)].map(
-      (match) => [match[1], match[2]],
-    ),
-  );
-  for (const part of overrides.keys())
-    if (part && !files[part]) problems.push(`override for missing ${part}`);
-  for (const part of Object.keys(files)) {
-    if (part === "[Content_Types].xml" || part.endsWith("/")) continue;
-    const extension = part.slice(part.lastIndexOf(".") + 1).toLowerCase();
-    if (!overrides.has(part) && !defaults.has(extension))
-      problems.push(`${part} has no content type`);
-  }
-  const relationships = new Map<string, Set<string>>();
-  for (const [part, data] of Object.entries(files)) {
-    const match = /^(.*\/)?_rels\/([^/]+)\.rels$/.exec(part);
-    if (!match) continue;
-    const source = `${match[1] ?? ""}${match[2] ?? ""}`;
-    const ids = new Set<string>();
-    for (const relationship of strFromU8(data).matchAll(/<Relationship ([^>]+)\/>/g)) {
-      const attributes = relationship[1] ?? "";
-      const id = /Id="([^"]+)"/.exec(attributes)?.[1] ?? "";
-      if (ids.has(id)) problems.push(`duplicate ${id} in ${part}`);
-      ids.add(id);
-      if (attributes.includes('TargetMode="External"')) continue;
-      const target = resolveTarget(source, /Target="([^"]+)"/.exec(attributes)?.[1] ?? "");
-      if (!files[target]) problems.push(`${part} ${id} points at missing ${target}`);
-    }
-    relationships.set(source, ids);
-  }
-  if (!files["_rels/.rels"] || !strFromU8(files["_rels/.rels"]).includes("/officeDocument")) {
-    problems.push("no office document relationship");
-  }
-  for (const [part, data] of Object.entries(files)) {
-    if (!part.endsWith(".xml")) continue;
-    for (const reference of strFromU8(data).matchAll(/\br:(?:id|embed|link|pict)="([^"]*)"/g)) {
-      if (!relationships.get(part)?.has(reference[1] ?? ""))
-        problems.push(`${part} references unknown ${reference[1]}`);
-    }
-  }
-  if (
-    Boolean(files["xl/vbaProject.bin"]) !==
-    (overrides.get("xl/workbook.xml") === MACRO_WORKBOOK)
-  ) {
-    problems.push("workbook content type does not match its macro project");
-  }
-  return problems;
-}
-
 function withWarnings(): {
   warnings: XlsxWorkbookWarning[];
   onWarning: (warning: XlsxWorkbookWarning) => void;
@@ -179,8 +106,19 @@ function storeOf(snapshot: WorkbookSnapshot): SheetwriteStore {
 /** The pivot sample with values shown as "% of total", which no pivot definition can hold. */
 const OPAQUE_PIVOT_SAMPLE = "preserve-ExcelPivotTableSample.xlsx (% of total)";
 
-/** A corpus fixture, or the pivot sample rewritten so its pivots stay opaque parts. */
+/** The chart sample drawn in 3-D, which no chart definition can hold. */
+const OPAQUE_CHART_SAMPLE = "preserve-WithChart.xlsx (3-D line)";
+
+/** A corpus fixture, or a sample rewritten so its charts or pivots stay opaque parts. */
 async function load(file: string): Promise<Uint8Array> {
+  if (file === OPAQUE_CHART_SAMPLE) {
+    const files = unzipSync(await fixture("preserve-WithChart.xlsx"));
+    const chart = "xl/charts/chart1.xml";
+    files[chart] = strToU8(
+      strFromU8(files[chart] ?? new Uint8Array()).replaceAll("c:lineChart>", "c:line3DChart>"),
+    );
+    return zipSync(files);
+  }
   if (file !== OPAQUE_PIVOT_SAMPLE) return fixture(file);
   const files = unzipSync(await fixture("preserve-ExcelPivotTableSample.xlsx"));
   for (const part of ["xl/pivotTables/pivotTable1.xml", "xl/pivotTables/pivotTable2.xml"]) {
@@ -202,7 +140,7 @@ beforeAll(async () => {
 describe("XLSX unmodelled-part preservation", () => {
   const unchanged: [string, string[]][] = [
     [
-      "preserve-WithChart.xlsx",
+      OPAQUE_CHART_SAMPLE,
       [
         "xl/charts/chart1.xml",
         "xl/drawings/drawing1.xml",
@@ -266,7 +204,7 @@ describe("XLSX unmodelled-part preservation", () => {
 
   it("drops charts and pivots after a store edit on any sheet, with a warning", async () => {
     for (const [file, target] of [
-      ["preserve-WithChart.xlsx", "xl/drawings/drawing1.xml"],
+      [OPAQUE_CHART_SAMPLE, "xl/drawings/drawing1.xml"],
       [OPAQUE_PIVOT_SAMPLE, "xl/pivotCache/pivotCacheDefinition1.xml"],
     ] as const) {
       const store = storeOf(await fromXlsxWorkbook(await load(file)));
@@ -359,7 +297,7 @@ describe("XLSX unmodelled-part preservation", () => {
   });
 
   it("distinguishes formula source from a literal with identical text, including hydration", async () => {
-    const files = unzipSync(await fixture("preserve-WithChart.xlsx"));
+    const files = unzipSync(await load(OPAQUE_CHART_SAMPLE));
     const part = "xl/worksheets/sheet1.xml";
     const worksheet = files[part];
     if (!worksheet) throw new Error("chart fixture has no first worksheet");
@@ -393,7 +331,7 @@ describe("XLSX unmodelled-part preservation", () => {
   });
 
   it("fingerprints snapshots edited outside a store", async () => {
-    const snapshot = await fromXlsxWorkbook(await fixture("preserve-WithChart.xlsx"));
+    const snapshot = await fromXlsxWorkbook(await load(OPAQUE_CHART_SAMPLE));
     const edited = editFirstCell(snapshot, "edited outside");
 
     for (const input of [edited, { exportSnapshot: () => edited }]) {
@@ -406,7 +344,7 @@ describe("XLSX unmodelled-part preservation", () => {
   });
 
   it("reads a store-backed look-alike through the store, not its own snapshot", async () => {
-    const store = storeOf(await fromXlsxWorkbook(await fixture("preserve-WithChart.xlsx")));
+    const store = storeOf(await fromXlsxWorkbook(await load(OPAQUE_CHART_SAMPLE)));
     const edited = editFirstCell(store.exportSnapshot(), "edited outside");
 
     const lookAlike = {
@@ -488,10 +426,10 @@ describe("XLSX unmodelled-part preservation", () => {
 
   it("keeps charts and images through a JSON persistence reload of a store", async () => {
     for (const [file, part] of [
-      ["preserve-WithChart.xlsx", "xl/charts/chart1.xml"],
+      [OPAQUE_CHART_SAMPLE, "xl/charts/chart1.xml"],
       ["preserve-picture.xlsx", "xl/media/10000000000006450000032120C875D8.jpg"],
     ] as const) {
-      const store = storeOf(await fromXlsxWorkbook(await fixture(file)));
+      const store = storeOf(await fromXlsxWorkbook(await load(file)));
       const persisted = JSON.parse(JSON.stringify(store.exportSnapshot())) as WorkbookSnapshot;
       const { warnings, onWarning } = withWarnings();
 

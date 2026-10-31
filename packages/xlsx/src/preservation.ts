@@ -9,6 +9,13 @@ import type {
 import { XlsxResourceError } from "@sheetwrite/core";
 import { inflateSync } from "fflate";
 
+import type { DrawingChart } from "./chart-write.js";
+import {
+  CHART_REL,
+  elementXml,
+  PACKAGE_RELATIONSHIPS_NS,
+  relationshipsPartOf,
+} from "./chart-xml.js";
 import {
   type OpcPackage,
   type OpcRelationship,
@@ -17,17 +24,35 @@ import {
 } from "./opc.js";
 import { checkAbort, emitWarning, isAbort, type XlsxCodecContext } from "./resources.js";
 import type { WorkbookWriteHook } from "./writer.js";
-import { decodeXstring, escapeXml, parseXml, xmlAttribute, xmlChild, xmlChildren } from "./xml.js";
-import { markStoredEntryVerified, type StoredZipEntry, validateStoredEntry } from "./zip.js";
+import {
+  decodeXstring,
+  escapeXml,
+  parseXml,
+  type XmlElement,
+  xmlAttribute,
+  xmlChild,
+  xmlChildren,
+  xmlLocalName,
+} from "./xml.js";
+import {
+  markStoredEntryVerified,
+  storedEntryFromBytes,
+  type StoredZipEntry,
+  validateStoredEntry,
+} from "./zip.js";
 
 /*
- * Preservation contract (documented in docs/src/content/docs/guides/xlsx-export.mdx):
+ * Preservation contract (documented in docs/src/content/docs/import-export/kept-parts-and-round-trips.md):
  * - Parts Sheetwrite does not model are kept as their original compressed ZIP
  *   payloads and written back byte-for-byte; nothing is inflated or recompressed.
+ *   One exception: a drawing that also holds modelled charts is kept without
+ *   their anchors (chart-read.ts), and export adds Sheetwrite charts to a
+ *   kept drawing, because a worksheet has only one drawing.
  * - VBA, customXml and themes do not read cells and survive every edit.
  * - Images (drawings without charts) follow their sheet's row/column layout.
  * - Charts and pivots read cell values, so any edit to any sheet drops them.
- *   Pivots the reader maps to definitions (pivot.ts) are not retained here.
+ *   Charts and pivots the reader maps to definitions (chart-read.ts,
+ *   pivot.ts) are not retained here.
  * - Parts that point into worksheets, tables, styles or the workbook part,
  *   whose bytes Sheetwrite rewrites, are dropped with a warning.
  */
@@ -81,11 +106,6 @@ const relationshipTargetCache = new WeakMap<XlsxSourcePart, readonly string[]>()
 
 function relationshipKind(type: string): string {
   return type.slice(type.lastIndexOf("/") + 1);
-}
-
-function relationshipsPartOf(part: string): string {
-  const slash = part.lastIndexOf("/");
-  return `${part.slice(0, slash + 1)}_rels/${part.slice(slash + 1)}.rels`;
 }
 
 function sourcePartOfRelationships(part: string): string {
@@ -246,7 +266,11 @@ function graphRoots(
 }
 
 /** Internal parts reachable from `target`, or undefined when one is missing or rewritten. */
-function reachableParts(packageFile: OpcPackage, target: string): string[] | undefined {
+function reachableParts(
+  packageFile: OpcPackage,
+  target: string,
+  modelled: ReadonlySet<string>,
+): string[] | undefined {
   const members = new Set<string>();
   const pending = [target];
   for (let part = pending.pop(); part !== undefined; part = pending.pop()) {
@@ -256,7 +280,8 @@ function reachableParts(packageFile: OpcPackage, target: string): string[] | und
     const relationshipsPart = relationshipsPartOf(part);
     if (packageFile.archive.has(relationshipsPart)) members.add(relationshipsPart);
     for (const relationship of packageFile.relationships(part)) {
-      if (!relationship.external) pending.push(relationship.target);
+      if (!relationship.external && !modelled.has(relationship.target))
+        pending.push(relationship.target);
     }
   }
   return [...members];
@@ -272,6 +297,7 @@ export async function capturePreserved(
   snapshot: WorkbookSnapshot,
   context: XlsxCodecContext,
   modelled: ReadonlySet<string>,
+  replacements: ReadonlyMap<string, Uint8Array> = new Map(),
 ): Promise<void> {
   const workbookPart = packageFile.officeDocumentPart();
   const roots = graphRoots(
@@ -297,7 +323,7 @@ export async function capturePreserved(
   for (const root of roots) {
     checkAbort(context);
     if (modelled.has(root.relationship.target)) continue;
-    const parts = reachableParts(packageFile, root.relationship.target);
+    const parts = reachableParts(packageFile, root.relationship.target, modelled);
     if (!parts) {
       dropWarning(context, root.relationship.target, "it points at a missing or rewritten part");
       continue;
@@ -362,7 +388,10 @@ export async function capturePreserved(
     }
     retainedBytes += unitBytes;
     for (const part of unitParts) {
-      const entry = await packageFile.archive.stored(part);
+      const replacement = replacements.get(part);
+      const entry = replacement
+        ? storedEntryFromBytes(replacement)
+        : await packageFile.archive.stored(part);
       // Frozen so stores share the part and its verification result instead of copying it.
       retained.set(
         part,
@@ -423,6 +452,61 @@ function storedEntry(part: XlsxSourcePart): StoredZipEntry {
   };
 }
 
+function partBytes(part: XlsxSourcePart): Uint8Array {
+  const entry = storedEntry(part);
+  return entry.method === 0
+    ? entry.data
+    : inflateSync(entry.data, { out: new Uint8Array(entry.uncompressedSize) });
+}
+
+/** Largest `cNvPr` id; drawing object ids must stay unique within one drawing part. */
+function maxObjectId(element: XmlElement): number {
+  let maximum =
+    xmlLocalName(element.name) === "cNvPr" ? Number(xmlAttribute(element, "id")) || 0 : 0;
+  for (const child of element.children) maximum = Math.max(maximum, maxObjectId(child));
+  return maximum;
+}
+
+/**
+ * Rewrite a kept drawing and its relationships so they also hold `charts`.
+ * The kept anchors stay as parsed; new relationship ids skip the kept ones.
+ */
+function appendChartsToDrawing(
+  drawing: XlsxSourcePart,
+  relationships: XlsxSourcePart | undefined,
+  charts: readonly DrawingChart[],
+  context: XlsxCodecContext,
+): Map<string, Uint8Array> {
+  const relationshipsName = relationshipsPartOf(drawing.name);
+  const root = parseXml(partBytes(drawing), drawing.name, context);
+  const relationshipsRoot = relationships
+    ? parseXml(partBytes(relationships), relationshipsName, context)
+    : undefined;
+  const usedIds = new Set(
+    (relationshipsRoot?.children ?? []).map((entry) => xmlAttribute(entry, "Id")),
+  );
+
+  let objectId = maxObjectId(root);
+  let nextId = 1;
+  let anchors = "";
+  let added = "";
+  for (const chart of charts) {
+    while (usedIds.has(`rId${nextId}`)) nextId += 1;
+    const id = `rId${nextId++}`;
+    anchors += chart.anchorXml(++objectId, id);
+    added += `<Relationship Id="${id}" Type="${CHART_REL}" Target="${escapeXml(chart.target)}"/>`;
+  }
+
+  const relationshipsXml = relationshipsRoot
+    ? elementXml(relationshipsRoot, added)
+    : `<Relationships xmlns="${PACKAGE_RELATIONSHIPS_NS}">${added}</Relationships>`;
+  const encoder = new TextEncoder();
+  return new Map([
+    [drawing.name, encoder.encode(elementXml(root, anchors))],
+    [relationshipsName, encoder.encode(relationshipsXml)],
+  ]);
+}
+
 /** Internal targets of a `.rels` part; parsed once per frozen part. */
 function relationshipTargets(
   name: string,
@@ -431,11 +515,7 @@ function relationshipTargets(
 ): readonly string[] {
   const cached = relationshipTargetCache.get(part);
   if (cached) return cached;
-  const entry = storedEntry(part);
-  const bytes =
-    entry.method === 0
-      ? entry.data
-      : inflateSync(entry.data, { out: new Uint8Array(entry.uncompressedSize) });
+  const bytes = partBytes(part);
   const sourcePart = sourcePartOfRelationships(name);
   const targets = xmlChildren(parseXml(bytes, name, context), "Relationship").flatMap(
     (relationship) =>
@@ -564,6 +644,7 @@ export function preparePreserved(
   const parts = source.parts.filter((part) => counted.has(part.name));
   const workbookGraphs = graphs.filter((graph) => graph.owner === "workbook");
   const absolute = (graph: XlsxSourceGraph) => ({ type: graph.type, target: `/${graph.target}` });
+  const rewritten = new Map<string, Uint8Array>();
   return {
     rootRelationships: graphs.filter((graph) => graph.owner === "root").map(absolute),
     workbookRelationships: workbookGraphs.map(absolute),
@@ -576,6 +657,24 @@ export function preparePreserved(
             ],
       );
       return { pivotCaches };
+    },
+    appendCharts(sheet, charts) {
+      const graph = graphs.find(
+        (entry) => entry.sheetId === sheet.id && relationshipTypeMatches(entry.type, "drawing"),
+      );
+      const drawing = graph && partsByName.get(graph.target);
+      if (!drawing) return false;
+
+      const relationshipsPart = partsByName.get(relationshipsPartOf(drawing.name));
+      for (const [name, bytes] of appendChartsToDrawing(
+        drawing,
+        relationshipsPart,
+        charts,
+        context,
+      )) {
+        rewritten.set(name, bytes);
+      }
+      return true;
     },
     sheet(sheet) {
       const sheetGraphs = graphs.filter(
@@ -602,7 +701,9 @@ export function preparePreserved(
         : []),
     ],
     *parts() {
+      for (const [name, bytes] of rewritten) yield { name, data: bytes };
       for (const part of parts) {
+        if (rewritten.has(part.name)) continue;
         const stored = storedEntry(part);
         // verifyGraph checked these exact bytes; spare the writer a second inflate.
         markStoredEntryVerified(stored);

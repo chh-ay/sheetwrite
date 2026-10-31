@@ -17,6 +17,8 @@ import {
   validateSheetName,
 } from "@sheetwrite/core";
 
+import { chartDrawingParts, type DrawingChart, freePartName, writeCharts } from "./chart-write.js";
+import { DRAWING_REL } from "./chart-xml.js";
 import { formulaContainsExternalReference, spillReferencesToXlsx } from "./formula.js";
 import { type ContentTypeOverride, contentTypesXml, relationshipsXml } from "./opc.js";
 import { preparePivots } from "./pivot.js";
@@ -63,6 +65,8 @@ interface SheetWriteResult {
   readonly relationships?: Uint8Array;
   readonly comments?: Uint8Array;
   readonly vml?: Uint8Array;
+  readonly chartParts?: readonly ZipPart[];
+  readonly chartOverrides?: readonly ContentTypeOverride[];
   readonly tables: {
     readonly part: string;
     readonly xml: Uint8Array;
@@ -97,6 +101,11 @@ export interface WorkbookWriteHook {
     | undefined;
   /** Rows are sorted, unique, and consumed only once; used by store-backed table export. */
   cellRows?(sheet: SheetSnapshot): Iterable<{ row: number; cells: readonly AbsoluteCell[] }>;
+  /**
+   * Add charts to the sheet's kept drawing and return true. A worksheet has at
+   * most one `<drawing>`, so charts join a kept drawing instead of a new one.
+   */
+  appendCharts?(sheet: SheetSnapshot, charts: readonly DrawingChart[]): boolean;
   parts?(): Iterable<ZipPart>;
 }
 
@@ -917,6 +926,25 @@ function* writeSheet(
   for (const relationship of pivotRelationships) {
     relationshipEntries.push({ ...relationship, id: `rId${nextRelationshipId++}` });
   }
+  // Kept parts may use any name, including the ones generated for charts here.
+  const keptParts = new Set(
+    sheet.charts?.length
+      ? (hook?.contentTypeOverrides ?? []).map((override) => override.part.toLowerCase())
+      : [],
+  );
+  const charts = writeCharts(snapshot, sheet, sheetNumber, keptParts, context);
+  const chartParts: ZipPart[] = charts?.parts ?? [];
+  const chartOverrides: ContentTypeOverride[] = charts?.overrides ?? [];
+  if (charts && !hook?.appendCharts?.(sheet, charts.charts)) {
+    const drawingPart = freePartName(`xl/drawings/sheetwrite-drawing${sheetNumber}`, keptParts);
+    const drawing = chartDrawingParts(drawingPart, charts.charts, context);
+    chartParts.push(...drawing.parts);
+    chartOverrides.push(drawing.override);
+    const id = `rId${nextRelationshipId++}`;
+    relationshipEntries.push({ id, type: DRAWING_REL, target: `/${drawingPart}` });
+    // CT_Worksheet places `<drawing>` after `<hyperlinks>` and before `<legacyDrawing>`.
+    xml.append(`<drawing r:id="${id}"/>`);
+  }
   xml.append(sheetHook?.beforeLegacyDrawing?.(extraIds) ?? "");
   if (legacyDrawingId) xml.append(`<legacyDrawing r:id="${legacyDrawingId}"/>`);
   nextRelationshipId = Math.max(nextRelationshipId, 3);
@@ -947,7 +975,7 @@ function* writeSheet(
   xml.append("</worksheet>");
   const chunk = xml.drain(true);
   if (chunk) yield* chunk;
-  return { relationships, comments, vml, tables };
+  return { relationships, comments, vml, tables, chartParts, chartOverrides };
 }
 
 function metadataSheetXml(
@@ -1149,6 +1177,8 @@ function* writeWorkbookParts(
       overrides.push({ part: table.part, contentType: TABLE_CONTENT });
     }
     nextTableId += result.tables.length;
+    for (const part of result.chartParts ?? []) yield part;
+    overrides.push(...(result.chartOverrides ?? []));
   }
   for (const part of pivots?.parts ?? []) yield part;
   overrides.push(...(pivots?.overrides ?? []));
