@@ -114,14 +114,15 @@ function resetXlsxBackends(): void {
 describe("delimited-text abort", () => {
   it("parsing rejects with the reason before the scan and once per chunk of records", async () => {
     const csv = Array.from({ length: RECORD_COUNT }, (_unused, row) => `${row},x`).join("\r\n");
-    const maxChecks = 1 + Math.ceil(RECORD_COUNT / RECORDS_PER_CHECK);
+    // One check before the scan, then one per full chunk of records.
+    const expectedChecks = 1 + Math.floor(RECORD_COUNT / RECORDS_PER_CHECK);
 
-    expect(
-      await expectAbortAtEveryCheck((signal) => parseCsv(csv, { signal })),
-    ).toBeLessThanOrEqual(maxChecks);
-    expect(
-      await expectAbortAtEveryCheck((signal) => fromCsv(csv, columns, { signal })),
-    ).toBeLessThanOrEqual(maxChecks);
+    expect(await expectAbortAtEveryCheck((signal) => parseCsv(csv, { signal }))).toBe(
+      expectedChecks,
+    );
+    expect(await expectAbortAtEveryCheck((signal) => fromCsv(csv, columns, { signal }))).toBe(
+      expectedChecks,
+    );
   });
 
   it("CSV and TSV exports reject with the reason at every store window and leave the store unchanged", async () => {
