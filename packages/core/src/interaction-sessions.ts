@@ -478,6 +478,11 @@ export class InteractionSessions {
     return { x: r.x + r.w, y };
   }
 
+  /** Drop the text measurement context; the next autofit creates it again. */
+  trimMemory(): void {
+    this.measureCtx = null;
+  }
+
   destroy(): void {
     this.cancelPointer();
     this.cancelEditor();

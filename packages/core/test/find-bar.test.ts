@@ -51,11 +51,12 @@ describe("FindBar", () => {
       changes += 1;
     });
     const bar = new FindBar(host, DEFAULT_THEME, grid);
+    expect(host.querySelector(".sheetwrite-find")).toBeNull();
+
+    bar.open();
     const input = host.querySelector<HTMLInputElement>(".sheetwrite-find-input")!;
     const replacement = host.querySelector<HTMLInputElement>(".sheetwrite-find-replace-input")!;
     const count = host.querySelector<HTMLElement>(".sheetwrite-find-count")!;
-
-    bar.open();
     input.value = "Ada";
     input.dispatchEvent(new Event("input", { bubbles: true }));
     expect(count.textContent?.match(/\d+/g)).toEqual(["1", "2"]);

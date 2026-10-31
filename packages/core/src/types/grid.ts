@@ -1142,5 +1142,30 @@ export interface Grid {
   rendererKind(): "canvas" | "worker";
   on<E extends keyof GridEvents>(evt: E, fn: (e: GridEvents[E]) => void): () => void;
   refresh(): void;
+  /**
+   * Drop the memory this grid can build again: decoded cell strings, rendered
+   * number text, compiled number formats, text measurement and unused overlay
+   * nodes, in the grid and in its worker renderer. Document data, undo history
+   * and the visible output do not change. The next frame and the next use
+   * build again what they need. Call it on a memory signal or when the page
+   * goes to the background; it does nothing after `destroy()`.
+   *
+   * Number format caches are shared by all grids on the page, so a trim also
+   * drops them for the other grids. WebAssembly memory does not shrink; call
+   * `releaseEngineMemory()` for that.
+   *
+   * @example
+   * ```ts
+   * document.addEventListener("visibilitychange", () => {
+   *   if (document.visibilityState === "hidden") grid.trimMemory();
+   * });
+   * ```
+   */
+  trimMemory(): void;
+  /**
+   * Free everything this grid owns: its DOM, listeners, timers, renderer,
+   * worker and caches, and the store that it created. Call it when the host
+   * view is removed; a second call does nothing.
+   */
   destroy(): void;
 }

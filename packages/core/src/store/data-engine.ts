@@ -4192,6 +4192,11 @@ export class StoreDataEngine {
     return promise;
   }
 
+  /** Drop the window reader's rebuildable caches; cell data stays in the engine. */
+  trimMemory(): void {
+    this.windowReader.trim();
+  }
+
   onMemoryRelease(listener: () => void): () => void {
     this.memoryReleaseListeners.add(listener);
     return () => this.memoryReleaseListeners.delete(listener);

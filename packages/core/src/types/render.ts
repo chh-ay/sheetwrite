@@ -117,5 +117,11 @@ export interface Renderer {
   paintPanes?(panes: readonly PanePaint[], divider: { x: number | null; y: number | null }): void;
   setTheme(theme: Theme): void;
   setRenderers(renderers: ReadonlyMap<string, CellRenderer>): void;
+  /**
+   * Drop caches the renderer can build again (for example decoded strings).
+   * The grid calls it from `Grid.trimMemory` and then paints a freshly read
+   * window. Optional: a renderer without such caches omits it.
+   */
+  trimMemory?(): void;
   destroy(): void;
 }

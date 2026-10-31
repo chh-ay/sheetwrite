@@ -36,6 +36,7 @@ import { InteractionSessions } from "./interaction-sessions.js";
 import { Keymap } from "./keymap.js";
 import { MutationRevisionIndex, type MutationRevisionStats } from "./mutation-revision-index.js";
 import { type NoteCell, NotePopover } from "./note-popover.js";
+import { trimNumberFormatCaches } from "./number-format.js";
 import { ObjectLayer } from "./object-layer.js";
 import { OverlayPainter } from "./overlay-painter.js";
 import { attachPanelTriggers, showPivotFields } from "./panels/panel-loader.js";
@@ -3764,6 +3765,21 @@ export class GridImpl implements Grid {
       for (const listeners of Object.values(this.listeners)) listeners.clear();
     });
     if (failed) throw failure;
+  }
+
+  trimMemory(): void {
+    if (this.destroyed) return;
+
+    storeEngine(this.store)?.trimMemory();
+    trimNumberFormatCaches();
+    this.renderer.trimMemory?.();
+    this.interactions.trimMemory();
+    this.overlayPainter.trimMemory();
+
+    // The next frame reads its window again, so a worker renderer gets every
+    // string it paints, and the same cells paint the same output.
+    this.readWindows.invalidateData();
+    this.scheduleRender();
   }
 }
 

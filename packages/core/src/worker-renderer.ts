@@ -312,6 +312,17 @@ export class WorkerRenderer implements Renderer {
     worker.postMessage({ type: "paintPanes", panes: payload, divider }, transfers);
   }
 
+  /**
+   * Drop the worker's string cache and the shared paint regions. The worker
+   * still holds a region that it paints from, and the next frame allocates new
+   * ones. The caller must make the next frame read its window again, so the
+   * frame lists every string as a pool update.
+   */
+  trimMemory(): void {
+    this.worker?.postMessage({ type: "trim" });
+    this.sharedRegions.fill(undefined);
+  }
+
   destroy(): void {
     window.clearTimeout(this.readinessTimeout);
     this.readinessTimeout = undefined;

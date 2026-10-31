@@ -63,11 +63,9 @@ describe("config.keyboard: false (headless key policy)", () => {
     host.dispatchEvent(new KeyboardEvent("keydown", { key: "Delete", bubbles: true }));
     expect(store.getCell(A(2, 0)).resolved).toBe("Customer 2");
 
-    // Find is gated: Ctrl+F does not open the (constructed-but-hidden) find bar.
+    // Find is gated: Ctrl+F does not open the find bar, so its DOM is never built.
     host.dispatchEvent(new KeyboardEvent("keydown", { key: "f", ctrlKey: true, bubbles: true }));
-    const findBar = host.querySelector(".sheetwrite-find");
-    expect(findBar).toBeInstanceOf(HTMLElement);
-    expect((findBar as HTMLElement).style.display).toBe("none");
+    expect(host.querySelector(".sheetwrite-find")).toBeNull();
 
     grid.destroy();
   });
