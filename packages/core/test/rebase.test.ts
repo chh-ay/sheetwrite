@@ -1,5 +1,6 @@
-import { describe, expect, it } from "bun:test";
+import { beforeAll, describe, expect, it } from "bun:test";
 
+import { initSheetwrite } from "../src/grid.js";
 import {
   type CellAddress,
   type CellValue,
@@ -12,6 +13,11 @@ import {
   type SheetSnapshot,
 } from "../src/index.js";
 import { decodeRestoreBlock, encodeRestoreBlock } from "../src/restore-block.js";
+
+// A conditional-format formula is rewritten by the engine.
+beforeAll(async () => {
+  await initSheetwrite();
+});
 
 const SHEET = "s1";
 const OTHER_SHEET = "s2";
@@ -445,6 +451,28 @@ describe("metadata, identity, and sheet lifecycle", () => {
     };
     expectConflict([same], [structure("row", "insert")], "unsupported-structural");
     expectRebased([other], [structure("row", "insert")], [other]);
+  });
+
+  it("rewrites a conditional-format formula with the engine's reference rules", () => {
+    const rule = (col: number, source: string): DocumentOp => ({
+      op: "setSheetMeta",
+      sheet: SHEET,
+      patch: {
+        conditionalFormats: [
+          {
+            range: { sheet: SHEET, start: { row: 0, col }, end: { row: 4, col } },
+            when: { kind: "formula", source },
+            style: {},
+          },
+        ],
+      },
+    });
+
+    expectRebased(
+      [rule(2, "=SUM(B:B)+A3")],
+      [structure("column", "delete", 0, 1)],
+      [rule(1, "=SUM(A:A)+#REF!")],
+    );
   });
 
   it("keeps sheet lifecycle and stable remove-by-ID operations across structural edits", () => {

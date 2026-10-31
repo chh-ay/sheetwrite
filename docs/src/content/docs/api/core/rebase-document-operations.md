@@ -16,8 +16,11 @@ each remote operation after the remote operations before it. A remote
 operation is therefore carried forward through the local sequence: before it
 is compared with local operation k, it is moved past local operations 0..k-1.
 
+The engine rewrites the formula of a conditional format that a row or
+column edit moves, so such a rebase needs `initSheetwrite()` first.
+
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/rebase.ts#L59"><code>packages/core/src/rebase.ts#L59</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/rebase.ts#L62"><code>packages/core/src/rebase.ts#L62</code></a></dd></div>
 </dl>
 
 ## Declaration

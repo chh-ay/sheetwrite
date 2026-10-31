@@ -1,18 +1,17 @@
 ---
 title: "shiftA1Refs | @sheetwrite/core"
-description: "shiftA1Refs function in @sheetwrite/core: Shift relative A1 references in a formula by (dRow, dCol) — used when a formula is filled into other cells."
+description: "shiftA1Refs function in @sheetwrite/core: Shift relative A1 references in a formula by (dRow, dCol), as a copy or fill from one cell to another does."
 ---
 <!-- api-export:@sheetwrite/core|.|shiftA1Refs -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
 
-Shift relative A1 references in a formula by (dRow, dCol) — used when a
-formula is filled into other cells. Absolute parts ($A, A$1) stay fixed, and
-tokens preceded by an alphanumeric (function names, identifiers) are skipped.
-A reference shifted off the sheet becomes `#REF!`, and so does any range
-with such a corner.
+Shift relative A1 references in a formula by (dRow, dCol), as a copy or
+fill from one cell to another does. Absolute parts ($A, A$1) stay fixed, and
+a reference shifted off the sheet becomes `#REF!`. The engine owns the
+reference rules, so this needs `initSheetwrite()` first.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/a1.ts#L69"><code>packages/core/src/a1.ts#L69</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/a1.ts#L61"><code>packages/core/src/a1.ts#L61</code></a></dd></div>
 </dl>
 
 ## Declaration
