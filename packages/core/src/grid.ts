@@ -3770,9 +3770,14 @@ export class GridImpl implements Grid {
   trimMemory(): void {
     if (this.destroyed) return;
 
-    storeEngine(this.store)?.trimMemory();
+    // A worker drops its strings only when the host reader drops its own, so
+    // the next frame resends them. A store without an engine sends no pool ids.
+    const engine = storeEngine(this.store);
+    if (engine) {
+      engine.trimMemory();
+      this.renderer.trimMemory?.();
+    }
     trimNumberFormatCaches();
-    this.renderer.trimMemory?.();
     this.interactions.trimMemory();
     this.overlayPainter.trimMemory();
 

@@ -7,6 +7,7 @@ import { storeEngine } from "../src/store/engine-registry.js";
 import { NO_STRING } from "../src/store/wire-tags.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { Workbook } from "../src/types.js";
+import { WorkerRenderer } from "../src/worker-renderer.js";
 import { makeColumnarData } from "./fixtures.js";
 
 const ROWS = 4_000;
@@ -174,6 +175,38 @@ describe("Grid.trimMemory", () => {
     grid.destroy();
 
     expect(() => grid.trimMemory()).not.toThrow();
+  });
+
+  it("makes the next worker frame resend every visible string", () => {
+    const workbook = formattedWorkbook();
+    const store = new SheetwriteStore(workbook, makeColumnarData(ROWS));
+    const host = mountHost();
+    const grid = new GridImpl(host, { workbook }, store);
+    const messages: unknown[] = [];
+    const renderer = new WorkerRenderer();
+    Reflect.set(renderer, "worker", { postMessage: (message: unknown) => messages.push(message) });
+    expect(Reflect.set(grid, "renderer", renderer)).toBe(true);
+    scrollTo(host, 100 * 28);
+    scrollTo(host, 101 * 28);
+
+    messages.length = 0;
+    grid.trimMemory();
+    const paint = messages.find(
+      (message): message is { stringPoolIds: Uint32Array; stringPoolUpdateIds?: Uint32Array } =>
+        typeof message === "object" &&
+        message !== null &&
+        "type" in message &&
+        message.type === "paintPacked",
+    );
+    if (!paint) throw new Error("no packed paint after the trim");
+    const visible = new Set(paint.stringPoolIds);
+    visible.delete(NO_STRING);
+
+    expect(messages[0]).toEqual({ type: "trim" });
+    expect(visible.size).toBeGreaterThan(0);
+    expect(new Set(paint.stringPoolUpdateIds)).toEqual(visible);
+    Reflect.set(renderer, "worker", null);
+    grid.destroy();
   });
 });
 
