@@ -544,7 +544,10 @@ export class StoreDataEngine {
       this.handles.set(sheet.id, handle);
       this.sheetIdsByHandle[handle] = sheet.id;
       this.syncSpillBlockers(sheet);
+      this.view.queueHiddenRows(sheet.id);
     }
+    // Before any formula is loaded, so SUBTOTAL computes once with the saved hidden rows.
+    this.view.flushHiddenRows();
     for (const sheet of workbook.sheets) {
       for (const table of sheet.tables ?? []) {
         if (!this.syncTable(table)) {
@@ -2229,6 +2232,7 @@ export class StoreDataEngine {
 
       return { appliedPatches, changes, storageRevision };
     } finally {
+      this.view.flushHiddenRows();
       this.wasm.commitSources();
     }
   }
@@ -3553,6 +3557,7 @@ export class StoreDataEngine {
       if (meta.height !== undefined) sheet.rowHeights!.set(row, meta.height);
       if (meta.hidden) sheet.hiddenRows!.add(row);
     }
+    this.view.queueHiddenRows(snapshot.id);
     this.workbook.sheets.splice(snapshot.order, 0, sheet);
     this.syncSheetOrder();
     for (const table of sheet.tables ?? []) {

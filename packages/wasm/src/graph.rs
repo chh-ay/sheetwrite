@@ -119,14 +119,17 @@ impl Default for DirtyState {
 /// transaction-barrier recompute.
 ///
 /// `volatile` holds exactly the keys of entries whose formula calls a volatile
-/// function. Every entry mutation keeps it in step, so a recompute can seed
-/// volatile formulas in O(volatile cells) instead of scanning every entry.
-/// The set is boxed and exists only while the sheet holds a volatile formula,
-/// so every other sheet pays one null pointer and no heap.
+/// function, and `subtotals` the keys of entries that call SUBTOTAL or
+/// AGGREGATE, which read hidden rows. Every entry mutation keeps both in step,
+/// so a recompute seeds volatile formulas, and a hidden-row change seeds
+/// subtotals, in O(matching cells) instead of scanning every entry. Each set is
+/// boxed and exists only while the sheet holds such a formula, so every other
+/// sheet pays one null pointer and no heap.
 #[derive(Default)]
 pub(crate) struct SheetFormulas {
     entries: FxHashMap<CellKey, FormulaEntry>,
     volatile: Option<Box<FxHashSet<CellKey>>>,
+    subtotals: Option<Box<FxHashSet<CellKey>>>,
     dirty: DirtyState,
 }
 
@@ -174,30 +177,55 @@ impl SheetFormulas {
         self.volatile.iter().flat_map(|keys| keys.iter().copied())
     }
 
-    /// Records whether the entry now at `key` is volatile. The first volatile
-    /// entry allocates the set and removing the last one frees it, so a sheet
-    /// that once held RAND returns to no heap; removal skips the probe while
-    /// there is no set, which is the common case.
+    /// Keys of the entries that call SUBTOTAL or AGGREGATE, or `None` when
+    /// the sheet has none.
+    pub(crate) fn subtotal_keys(&self) -> Option<&FxHashSet<CellKey>> {
+        self.subtotals.as_deref()
+    }
+
+    /// Records whether the entry now at `key` belongs to a key set. The first
+    /// member allocates the set and removing the last one frees it, so a
+    /// sheet that once held RAND returns to no heap; removal skips the probe
+    /// while there is no set, which is the common case. Only that check is
+    /// inlined into the many entry writers; the set update is one shared
+    /// function, which keeps the engine binary small.
     #[inline]
-    fn track_volatile(
-        volatile_keys: &mut Option<Box<FxHashSet<CellKey>>>,
-        key: CellKey,
-        volatile: bool,
-    ) {
-        if volatile {
-            volatile_keys.get_or_insert_default().insert(key);
-        } else if let Some(keys) = volatile_keys {
-            keys.remove(&key);
-            if keys.is_empty() {
-                *volatile_keys = None;
+    fn track_key(keys: &mut Option<Box<FxHashSet<CellKey>>>, key: CellKey, is_member: bool) {
+        if is_member || keys.is_some() {
+            Self::update_key_set(keys, key, is_member);
+        }
+    }
+
+    #[inline(never)]
+    fn update_key_set(keys: &mut Option<Box<FxHashSet<CellKey>>>, key: CellKey, is_member: bool) {
+        if is_member {
+            keys.get_or_insert_default().insert(key);
+        } else if let Some(members) = keys {
+            members.remove(&key);
+            if members.is_empty() {
+                *keys = None;
             }
         }
+    }
+
+    #[inline]
+    fn track_entry(&mut self, key: CellKey, entry: Option<&FormulaEntry>) {
+        Self::track_key(
+            &mut self.volatile,
+            key,
+            entry.is_some_and(FormulaEntry::volatile),
+        );
+        Self::track_key(
+            &mut self.subtotals,
+            key,
+            entry.is_some_and(FormulaEntry::calls_subtotal),
+        );
     }
 
     /// Stores `entry` for a bulk load or a workbook-wide refresh whose caller
     /// invalidates the [`FormulaGraph`] itself.
     pub(crate) fn insert(&mut self, key: CellKey, entry: FormulaEntry) {
-        Self::track_volatile(&mut self.volatile, key, entry.volatile());
+        self.track_entry(key, Some(&entry));
         self.entries.insert(key, entry);
     }
 
@@ -205,7 +233,7 @@ impl SheetFormulas {
     pub(crate) fn remove(&mut self, key: CellKey) {
         if !self.entries.is_empty() {
             self.entries.remove(&key);
-            Self::track_volatile(&mut self.volatile, key, false);
+            self.track_entry(key, None);
         }
     }
 
@@ -215,12 +243,12 @@ impl SheetFormulas {
     fn replace(&mut self, key: CellKey, entry: Option<FormulaEntry>) -> Option<FormulaEntry> {
         match entry {
             Some(entry) => {
-                Self::track_volatile(&mut self.volatile, key, entry.volatile());
+                self.track_entry(key, Some(&entry));
                 self.entries.insert(key, entry)
             }
             None if self.entries.is_empty() => None,
             None => {
-                Self::track_volatile(&mut self.volatile, key, false);
+                self.track_entry(key, None);
                 self.entries.remove(&key)
             }
         }
@@ -228,13 +256,14 @@ impl SheetFormulas {
 
     /// Applies a workbook-level rewrite (rename, sheet removal, structural shift
     /// of another sheet, table change) to every entry. The caller decides which
-    /// cells the rewrite dirtied.
+    /// cells the rewrite dirtied. A rewrite changes references, never which
+    /// functions a formula calls, so the subtotal keys stay valid.
     pub(crate) fn rewrite_entries(&mut self, mut rewrite: impl FnMut(&mut FormulaEntry)) {
         for (&key, entry) in self.entries.iter_mut() {
             let was_volatile = entry.volatile();
             rewrite(entry);
             if entry.volatile() != was_volatile {
-                Self::track_volatile(&mut self.volatile, key, entry.volatile());
+                Self::track_key(&mut self.volatile, key, entry.volatile());
             }
         }
     }
@@ -296,12 +325,13 @@ impl SheetFormulas {
         mut relocate: impl FnMut(CellKey, &mut FormulaEntry) -> Option<CellKey>,
     ) {
         if !self.entries.is_empty() {
-            // Every key may move, so the volatile set is rebuilt alongside the
+            // Every key may move, so the key sets are rebuilt alongside the
             // entries; this pass already visits each entry once.
             self.volatile = None;
+            self.subtotals = None;
             for (key, mut entry) in std::mem::take(&mut self.entries) {
                 if let Some(key) = relocate(key, &mut entry) {
-                    Self::track_volatile(&mut self.volatile, key, entry.volatile());
+                    self.track_entry(key, Some(&entry));
                     self.entries.insert(key, entry);
                 }
             }
@@ -427,7 +457,7 @@ impl SheetFormulas {
         }
 
         let metadata = stats.owner_mut(SHEET_INDEXES_METADATA);
-        if let Some(keys) = &self.volatile {
+        for keys in [&self.volatile, &self.subtotals].into_iter().flatten() {
             metadata.add_payload(
                 std::mem::size_of::<FxHashSet<CellKey>>(),
                 std::mem::size_of::<FxHashSet<CellKey>>(),
@@ -504,6 +534,7 @@ impl SheetFormulas {
         Ok(Self {
             entries: FxHashMap::default(),
             volatile: None,
+            subtotals: None,
             dirty,
         })
     }

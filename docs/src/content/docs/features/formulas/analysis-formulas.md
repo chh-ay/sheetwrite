@@ -283,12 +283,24 @@ In a workbook, the table and the criteria are usually ranges, such as
 | `=MDETERM({4,7;2,6})` | 10 |
 | `=SUMSQ(C1:C3)` | 152 |
 
+## Aggregates that skip rows
+
+`AGGREGATE` applies one of 19 functions and can skip values as its options
+say. As in Excel, options 1, 3, 5, and 7 skip hidden rows: the rows that a
+filter hides, the rows that you hide, and the rows of a collapsed row group.
+Options 2, 3, 6, and 7 skip error values, and options 0 to 3 skip cells whose
+formula calls `SUBTOTAL` or `AGGREGATE`. Hidden columns do not change the
+result.
+
+| Formula | Result |
+| --- | --- |
+| `=AGGREGATE(9, 5, B2:B100)` | The sum of the rows of `B2:B100` that are not hidden |
+| `=AGGREGATE(4, 6, B2:B100)` | The largest value of `B2:B100`, without its error values |
+
 ## Limits
 
 - All these functions use the normal spill, shape, memory, and work limits. A
   result that does not fit returns an error, not a partial result.
-- `AGGREGATE` options that skip hidden rows have no effect, because formulas do
-  not see hidden-row state.
 - Each family's exact argument rules are in the
   [formula function contract](/docs/reference/formula-functions/).
 
@@ -324,5 +336,4 @@ Limits of the full engine:
 - `LAMBDA` parameters bind lexically, and `LET` can bind a `LAMBDA`. An uncalled `LAMBDA` returns `#CALC!`. A call with the wrong number of arguments returns `#VALUE!`. Calls are limited to a depth of 64 and 2,000,000 work units per outer helper; more returns `#NUM!`.
 - `GROUPBY` and `PIVOTBY` accept one built-in function name, such as `SUM`, or a `LAMBDA` with one or two parameters. A vector of functions, such as `HSTACK(SUM,AVERAGE)`, returns `#VALUE!`.
 - Regex functions do not support lookaround, backreferences, or Unicode classes. Such patterns return `#VALUE!`, never a wrong match.
-- `AGGREGATE` options that skip hidden rows have no effect, because formulas do not see hidden-row state.
 

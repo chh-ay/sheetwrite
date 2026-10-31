@@ -1,12 +1,14 @@
-//! AGGREGATE applies a built-in aggregate after it removes error values and
-//! nested SUBTOTAL or AGGREGATE results.
+//! AGGREGATE applies a built-in aggregate after it removes error values,
+//! hidden rows, and nested SUBTOTAL or AGGREGATE results, as its options say.
 
 use crate::calc::{Ast, Func};
+use crate::row_visibility::SkippedRows;
 use crate::store::CellStore;
 use crate::types::{EvalResult, FormulaError, Value};
 
 use super::super::functions::{apply_func, FuncAccumulator};
 use super::super::matrix::{optional_ast, range_from_ast, EvalMatrix};
+use super::super::subtotal::SkippedCells;
 use super::super::value::number_from_value;
 use super::super::EvalPass;
 
@@ -23,17 +25,20 @@ const FIRST_ARRAY_FORM_FUNCTION: i64 = 14;
 
 struct Options {
     ignores_errors: bool,
-    ignores_nested: bool,
+    skipped: SkippedCells,
 }
 
 impl Options {
     /// Options 0 to 3 ignore nested subtotals. Options 2, 3, 6, and 7 ignore
-    /// errors. The odd options also ignore hidden rows, which the engine
-    /// does not track.
+    /// errors. The odd options ignore hidden rows, whether a filter, a
+    /// collapsed group or the user hid them.
     fn from_code(code: i64) -> Option<Self> {
         (0..=7).contains(&code).then_some(Self {
             ignores_errors: matches!(code, 2 | 3 | 6 | 7),
-            ignores_nested: code <= 3,
+            skipped: SkippedCells {
+                rows: (code % 2 == 1).then_some(SkippedRows::Hidden),
+                nested_subtotals: code <= 3,
+            },
         })
     }
 }
@@ -137,7 +142,7 @@ fn aggregate(args: &[Ast], context: &mut Context<'_, '_>) -> Result<Value, Formu
 }
 
 /// Ignored cells become blanks, which every selectable function skips, so the
-/// argument keeps its shape.
+/// argument keeps its shape. Only a reference has rows and formulas to skip.
 fn push_data(
     ast: &Ast,
     options: &Options,
@@ -149,44 +154,23 @@ fn push_data(
         return Err(FormulaError::Value);
     }
     let matrix = context.matrix(ast)?;
-    let formulas = range.filter(|_| options.ignores_nested).and_then(|range| {
-        Some((
-            range,
-            &context.store.sheets.get(range.sheet as usize)?.formulas,
-        ))
-    });
+    let source =
+        range.and_then(|range| Some((range, context.store.sheets.get(range.sheet as usize)?)));
     values.reserve(matrix.values.len())?;
     for (index, value) in matrix.values.iter().enumerate() {
-        let is_nested = formulas.is_some_and(|(range, formulas)| {
+        let is_skipped = source.is_some_and(|(range, sheet)| {
             let row = range.row_start + (index / matrix.cols) as u32;
             let col = range.col_start + (index % matrix.cols) as u32;
-            formulas
-                .get((row, col))
-                .and_then(|formula| formula.ast.as_ref())
-                .is_some_and(contains_subtotal)
+            options.skipped.skips_row(sheet, row) || options.skipped.skips_cell(sheet, row, col)
         });
         let is_ignored_error = options.ignores_errors && matches!(value, Value::Error(_));
-        values.push_range(if is_nested || is_ignored_error {
+        values.push_range(if is_skipped || is_ignored_error {
             Value::Blank
         } else {
             value.clone()
         })?;
     }
     values.finish_arg_with_missing(matrix.rows, matrix.cols, false)
-}
-
-fn contains_subtotal(ast: &Ast) -> bool {
-    match ast {
-        Ast::Func(Func::Subtotal, _) => true,
-        Ast::Func(Func::Analysis(id), _) if NAMES.contains(&super::name(*id)) => true,
-        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => args.iter().any(contains_subtotal),
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-            contains_subtotal(left) || contains_subtotal(right)
-        }
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => contains_subtotal(inner),
-        Ast::LetSlot { expression, .. } => contains_subtotal(expression),
-        _ => false,
-    }
 }
 
 #[cfg(test)]
@@ -329,5 +313,32 @@ mod tests {
             actual,
             ["30", "30", "120", "#DIV/0!", "2", "30", "#VALUE!", "#VALUE!", "#VALUE!", "#VALUE!"]
         );
+    }
+
+    #[test]
+    fn odd_options_skip_rows_hidden_by_hand_or_by_a_filter() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(8, 12);
+        for (row, value) in [120.0, 10.0, 150.0, 23.0].into_iter().enumerate() {
+            store.set_number(sheet, row, 0, value, 0);
+        }
+        store.set_formula(sheet, 4, 0, "=1/0", 0);
+        // Row 2 is hidden by hand, rows 3 and 5 by a filter.
+        assert!(store.set_hidden_rows(sheet, &[1, 1], &[2, 2, 4, 4]));
+
+        let actual = results(
+            &mut store,
+            sheet,
+            &[
+                "=AGGREGATE(9,1,A1:A4)",
+                "=AGGREGATE(9,3,A1:A5)",
+                "=AGGREGATE(9,5,A1:A5)",
+                "=AGGREGATE(9,7,A1:A5)",
+                "=AGGREGATE(9,6,A1:A5)",
+                "=AGGREGATE(9,4,A1:A4)",
+                "=AGGREGATE(14,5,A1:A5,1)",
+            ],
+        );
+        assert_eq!(actual, ["143", "143", "143", "143", "303", "303", "120"]);
     }
 }

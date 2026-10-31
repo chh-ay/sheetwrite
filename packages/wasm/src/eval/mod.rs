@@ -25,6 +25,9 @@ mod random;
 mod range_reader;
 mod reference;
 mod statistics;
+mod subtotal;
+#[cfg(test)]
+mod subtotal_tests;
 mod text;
 mod value;
 
@@ -36,6 +39,7 @@ use std::rc::Rc;
 use crate::calc::{Ast, Func, SHEET_COLS, SHEET_ROWS};
 use crate::cells::{encode_num, encode_str_id, payload_num, payload_str_id, DenseSourceRun};
 use crate::graph::DirtySeeds;
+use crate::row_visibility::SkippedRows;
 use crate::sheet::{formula_error_with_entry, SheetData};
 use crate::spill::{spill_ownership_within_budget, SpillRange};
 use crate::store::CellStore;
@@ -71,6 +75,8 @@ use matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_BYTES};
 pub(crate) use random::RandomSource;
 use range_reader::RangeReader;
 use reference::{finish_runtime_reads, start_runtime_reads, RewriteScope, RuntimeReads};
+pub(crate) use subtotal::ast_calls_subtotal;
+use subtotal::SkippedCells;
 use value::{
     aggregate_number, bool_from_value, cached_formula_value, compare_values, text_from_value,
 };
@@ -715,6 +721,10 @@ impl CellStore {
     /// Every other recalculation reads the clock once, as Excel does, so all
     /// NOW and TODAY formulas of one pass see the same instant. A pass without
     /// volatile formulas never reads it.
+    ///
+    /// Out of line: each export that recalculates would otherwise hold its own
+    /// copy of this barrier, and one call per pass costs nothing.
+    #[inline(never)]
     pub(crate) fn recompute_seed_sheets(&mut self, seeds: &[usize]) {
         // Without formulas or pivot tables an edit can change no calculated
         // value, so the barrier only ends the pass. Doing that here keeps the
@@ -2038,7 +2048,7 @@ impl CellStore {
         }
 
         let mut values = FuncAccumulator::default();
-        for arg in args {
+        for (index, arg) in args.iter().enumerate() {
             let range = match arg {
                 Ast::Range(row_start, col_start, row_end, col_end, _) => Some(CellRange::new(
                     sheet as u32,
@@ -2065,10 +2075,25 @@ impl CellStore {
                     reference.col,
                 )),
                 Ast::Func(Func::Intersect, operands) => intersection_range(operands, sheet).ok(),
+                // SUBTOTAL reads a cell argument as a one-cell reference, so
+                // the cell's row can be hidden.
+                Ast::Cell(row, col, _) if func == Func::Subtotal && index > 0 => {
+                    Some(CellRange::new(sheet as u32, *row, *col, *row, *col))
+                }
+                Ast::AbsCell(sheet_ref, row, col, _) if func == Func::Subtotal && index > 0 => {
+                    Some(CellRange::new(sheet_ref.handle, *row, *col, *row, *col))
+                }
                 _ => None,
             };
             let shape = if let Some(range) = range {
-                match self.eval_range_values(range, pass, depth + 1, &mut values) {
+                let skipped = (func == Func::Subtotal && index > 0).then(|| SkippedCells {
+                    rows: Some(
+                        math::subtotal_function(&values)
+                            .map_or(SkippedRows::Filtered, |(_, rows)| rows),
+                    ),
+                    nested_subtotals: true,
+                });
+                match self.push_range_values(range, skipped, pass, depth + 1, &mut values) {
                     Ok(shape) => shape,
                     Err(error) => return Value::Error(error),
                 }
@@ -3075,6 +3100,19 @@ impl CellStore {
         depth: usize,
         values: &mut FuncAccumulator,
     ) -> Result<(usize, usize), FormulaError> {
+        self.push_range_values(range, None, pass, depth, values)
+    }
+
+    /// Pushes the cells of `range` as one argument. A cell that `skipped`
+    /// names is pushed as blank without evaluation, which keeps the shape.
+    fn push_range_values(
+        &self,
+        range: CellRange,
+        skipped: Option<SkippedCells>,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+        values: &mut FuncAccumulator,
+    ) -> Result<(usize, usize), FormulaError> {
         if depth > FORMULA_RECURSION_LIMIT {
             return Err(FormulaError::Num);
         }
@@ -3107,10 +3145,22 @@ impl CellStore {
         let literals = LiteralSources::new(s, depth);
 
         for row in row_start..=row_end {
+            if skipped.is_some_and(|skipped| skipped.skips_row(s, row as u32)) {
+                for _ in col_start..=col_end {
+                    values.push_range(Value::Blank)?;
+                }
+                continue;
+            }
+
             for col in col_start..=col_end {
                 if !s.cells.is_loaded(row, col) {
                     return Err(FormulaError::Loading);
                 }
+                if skipped.is_some_and(|skipped| skipped.skips_cell(s, row as u32, col as u32)) {
+                    values.push_range(Value::Blank)?;
+                    continue;
+                }
+
                 let i = s.cells.idx(row, col);
                 let value = if let Some(value) =
                     literals.and_then(|sources| sources.value_at(&self.strings, i))

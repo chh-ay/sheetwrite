@@ -2,6 +2,7 @@ import type { CellScalar } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
 import type { ColumnFilter, RowGroup, SortKey, Workbook } from "../types/document.js";
 import type { ResourceOwnerBytes } from "../types/store.js";
+import { EngineHiddenRows } from "./engine-hidden-rows.js";
 import type { RecomputingCellStore } from "./wasm-contract.js";
 
 const EMPTY_U32 = new Uint32Array(0);
@@ -63,15 +64,29 @@ export class StoreViewState {
   private readonly orderBySheet = new Map<SheetId, Uint32Array>();
   private readonly rowIndexBySheet = new Map<SheetId, PackedRowIndex>();
   private readonly stateBySheet = new Map<SheetId, ViewState>();
+  private readonly engineHiddenRows: EngineHiddenRows;
 
   constructor(
     private wasm: RecomputingCellStore,
     private readonly workbook: Workbook,
     private readonly handles: ReadonlyMap<SheetId, number>,
-  ) {}
+  ) {
+    this.engineHiddenRows = new EngineHiddenRows(wasm, workbook, handles);
+  }
 
   replaceEngine(wasm: RecomputingCellStore): void {
     this.wasm = wasm;
+    this.engineHiddenRows.replaceEngine(wasm);
+  }
+
+  /** Queue a sheet that was loaded or added with hidden rows of its own. */
+  queueHiddenRows(sheet: SheetId): void {
+    this.engineHiddenRows.queue(sheet);
+  }
+
+  /** Send the hidden rows of the sheets changed since the last flush to the engine. */
+  flushHiddenRows(): void {
+    this.engineHiddenRows.flush();
   }
 
   order(sheet: SheetId): Uint32Array | undefined {
@@ -196,6 +211,7 @@ export class StoreViewState {
     this.stateBySheet.delete(sheet);
     this.orderBySheet.delete(sheet);
     this.rowIndexBySheet.delete(sheet);
+    this.engineHiddenRows.removeSheet(sheet);
   }
 
   resourceOwners(): ResourceOwnerBytes[] {
@@ -251,6 +267,7 @@ export class StoreViewState {
     this.stateBySheet.clear();
     this.orderBySheet.clear();
     this.rowIndexBySheet.clear();
+    this.engineHiddenRows.dispose();
   }
 
   distinctValues(sheet: SheetId, col: number, limit: number): CellScalar[] {
@@ -279,20 +296,22 @@ export class StoreViewState {
     const hasSort = state !== undefined && state.sortKeys.length > 0;
     const hasFilters = state !== undefined && state.filters.size > 0;
     const hidden = state ? this.hiddenRowSet(state) : null;
+    const rowCount = this.sheetMeta(sheet).rowCount;
 
     if (!hasSort && !hasFilters && !hidden) {
+      this.engineHiddenRows.viewChanged(sheet, null, rowCount);
       this.dropOrder(sheet);
       return;
     }
 
     const handle = this.handleOf(sheet);
     let survivors: Uint32Array | null = hasFilters ? this.runFilters(handle, state!.filters) : null;
+    this.engineHiddenRows.viewChanged(sheet, survivors, rowCount);
 
     if (hidden) {
       if (survivors) {
         survivors = survivors.filter((row) => !hidden.has(row));
       } else {
-        const rowCount = this.sheetMeta(sheet).rowCount;
         const kept: number[] = [];
         for (let row = 0; row < rowCount; row++) if (!hidden.has(row)) kept.push(row);
         survivors = Uint32Array.from(kept);
