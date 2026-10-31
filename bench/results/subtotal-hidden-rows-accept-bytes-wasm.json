@@ -1,5 +1,5 @@
 {
-  "candidateEngineDigest": "b3ea481511d0496fb1ae825873160793ea644dc4e5da2e35dc613bffb83bf8aa",
+  "candidateEngineDigest": "24f634a179b050d0474c3162c8d917301ad530fe499638cfcb65052cbc955c40",
   "rows": [
     {
       "key": "workload=countif-100k;size=100000.allocation.retainedBytes",
