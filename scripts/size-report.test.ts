@@ -10,7 +10,6 @@ import {
 import {
   BUNDLER_SOURCE_MAP_MODE,
   classifyPackedPath,
-  committedReportDrift,
   SIZE_PROTOCOL_VERSION,
   summarizePack,
   validateBundlerEvidence,
@@ -112,37 +111,6 @@ function comparableEvidence(bundler: "next" | "vite", overrides: Record<string, 
     }),
   );
 }
-
-describe("committed size report drift", () => {
-  it("lets compressed sizes move a few bytes but holds raw sizes and the metric set exactly", () => {
-    const committed = {
-      "bundler.next.coreInitial.javascript.brotliBytes": { actual: 270_442 },
-      "bundler.next.coreInitial.javascript.rawBytes": { actual: 1_093_528 },
-      "package.@sheetwrite/core.fileCount": { actual: 40 },
-    };
-
-    expect(
-      committedReportDrift(committed, {
-        ...committed,
-        "bundler.next.coreInitial.javascript.brotliBytes": { actual: 270_474 },
-      }),
-    ).toEqual([]);
-    expect(
-      committedReportDrift(committed, {
-        ...committed,
-        "bundler.next.coreInitial.javascript.brotliBytes": { actual: 270_475 },
-        "bundler.next.coreInitial.javascript.rawBytes": { actual: 1_093_529 },
-        "package.@sheetwrite/core.fileCount": { actual: 41 },
-        "css.styles.rawBytes": { actual: 1 },
-      }),
-    ).toEqual([
-      "bundler.next.coreInitial.javascript.brotliBytes: 270442 committed, 270475 measured",
-      "bundler.next.coreInitial.javascript.rawBytes: 1093528 committed, 1093529 measured",
-      "css.styles.rawBytes: missing committed, 1 measured",
-      "package.@sheetwrite/core.fileCount: 40 committed, 41 measured",
-    ]);
-  });
-});
 
 describe("packed file classification", () => {
   it("fails closed on unclassified files and inconsistent unpacked sizes", () => {

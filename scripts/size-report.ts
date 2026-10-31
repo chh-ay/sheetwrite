@@ -1379,7 +1379,7 @@ const COMPRESSED_METRIC = /(?:gzip|brotli)Bytes$/;
  * build renders the committed report, so a disagreement means the published
  * size pages would show old numbers.
  */
-export function committedReportDrift(
+function committedReportDrift(
   committed: Readonly<Record<string, Pick<Metric, "actual">>>,
   measured: Readonly<Record<string, Pick<Metric, "actual">>>,
 ): string[] {
