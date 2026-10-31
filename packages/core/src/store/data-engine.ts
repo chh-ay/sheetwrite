@@ -2232,8 +2232,12 @@ export class StoreDataEngine {
 
       return { appliedPatches, changes, storageRevision };
     } finally {
-      this.view.flushHiddenRows();
-      this.wasm.commitSources();
+      // The barrier must close the mutation even when the engine rejects the runs.
+      try {
+        this.view.flushHiddenRows();
+      } finally {
+        this.wasm.commitSources();
+      }
     }
   }
 
