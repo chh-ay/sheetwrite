@@ -295,6 +295,7 @@ fn before_after(
         Err(FormulaError::Na)
     }
 }
+
 fn fixed(context: &mut Context<'_, '_>, name: &str, args: &[Ast]) -> Result<Value, FormulaError> {
     arity(args, 1, if name == "FIXED" { 3 } else { 2 })?;
     let number = number_from_value(&context.scalar(args, 0, Value::Blank))?;
@@ -322,6 +323,7 @@ fn fixed(context: &mut Context<'_, '_>, name: &str, args: &[Ast]) -> Result<Valu
     };
     text_value(format_number(rounded, &code).ok_or(FormulaError::Value)?)
 }
+
 /// Append directly so ARRAYTOTEXT does not allocate a string for each cell.
 fn serialize(output: &mut String, value: &Value, strict: bool) -> Result<(), FormulaError> {
     match value {
@@ -733,6 +735,8 @@ mod tests {
             ("=FIXED(1234.567,1)", "1,234.6"),
             ("=FIXED(1234.567,-1,TRUE)", "1230"),
             ("=DOLLAR(-1234.567,2)", "($1,234.57)"),
+            ("=FIXED(1.005,2)", "1.01"),
+            ("=DOLLAR(2.675)", "$2.68"),
             (r#"=VALUETOTEXT("a""b",1)"#, "\"a\"\"b\""),
             ("=VALUETOTEXT(1/0)", "#DIV/0!"),
         ]);

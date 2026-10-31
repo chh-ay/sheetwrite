@@ -4968,8 +4968,7 @@
       "openFormula": "unverified",
       "divergences": [
         "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?.",
-        "Database criteria use header names, AND across columns, and OR across rows. Custom formula predicates under headers that are not database fields are not supported.",
-        "A not-equal criterion does not match a value of a different type, so \"<>\" skips numbers in a field that Excel counts as nonblank (#246)."
+        "Database criteria use header names, AND across columns, and OR across rows. Custom formula predicates under headers that are not database fields are not supported."
       ]
     },
     "analysis-lambda": {
@@ -5037,14 +5036,6 @@
       "divergences": [
         "HYPERLINK returns its display value: the friendly name, or the link when there is no friendly name. The grid does not open the link. Use cell hyperlinks for links that open.",
         "Google Sheets and OpenFormula results require producer evidence before compatibility is claimed."
-      ]
-    },
-    "excel-criteria-mixed-types": {
-      "excel": "divergent",
-      "googleSheets": "unverified",
-      "openFormula": "unverified",
-      "divergences": [
-        "A not-equal criterion does not match a value of a different type. With 5, \"x\" and a blank cell, \"<>\" selects only the text cell; Excel selects both nonblank cells, as in =COUNTIF(A1:A3,\"<>\") (#246)."
       ]
     },
     "excel-subtotal-visible": {
@@ -6322,7 +6313,7 @@
       "contractStatus": "supported",
       "signature": "criteria-one",
       "semantics": "criteria",
-      "dialects": "excel-criteria-mixed-types",
+      "dialects": "excel-documented",
       "implementation": "implemented-assisted",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
@@ -6334,7 +6325,7 @@
       "contractStatus": "supported",
       "signature": "criteria-many",
       "semantics": "criteria",
-      "dialects": "excel-criteria-mixed-types",
+      "dialects": "excel-documented",
       "implementation": "implemented-assisted",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
@@ -6358,7 +6349,7 @@
       "contractStatus": "supported",
       "signature": "sumifs",
       "semantics": "criteria",
-      "dialects": "excel-criteria-mixed-types",
+      "dialects": "excel-documented",
       "implementation": "implemented-assisted",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
@@ -6382,7 +6373,7 @@
       "contractStatus": "supported",
       "signature": "sumifs",
       "semantics": "criteria",
-      "dialects": "excel-criteria-mixed-types",
+      "dialects": "excel-documented",
       "implementation": "implemented-assisted",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
@@ -7234,7 +7225,7 @@
       "contractStatus": "required-supported",
       "signature": "sumifs",
       "semantics": "criteria",
-      "dialects": "excel-criteria-mixed-types",
+      "dialects": "excel-documented",
       "implementation": "implemented-assisted",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
@@ -7246,7 +7237,7 @@
       "contractStatus": "required-supported",
       "signature": "sumifs",
       "semantics": "criteria",
-      "dialects": "excel-criteria-mixed-types",
+      "dialects": "excel-documented",
       "implementation": "implemented-assisted",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1

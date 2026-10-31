@@ -276,7 +276,7 @@ Limitations: Google Sheets and OpenFormula results require producer evidence bef
 | Google Sheets | unverified |
 | OpenFormula | unverified |
 
-Limitations: Available only in @sheetwrite/formulas. Named ranges are supported, but workbook-defined named formulas are not available. LAMBDA uses lexical parameters and LET bindings. Calls are limited to depth 64 and 2000000 work units. Helpers reject nested arrays. An error argument stops the call before the body runs. =LAMBDA(x,IFERROR(x,0))(1/0) returns #DIV/0!; Excel returns 0 (#246).
+Limitations: Available only in @sheetwrite/formulas. Named ranges are supported, but workbook-defined named formulas are not available. LAMBDA uses lexical parameters and LET bindings. Calls are limited to depth 64 and 2000000 work units. Helpers reject nested arrays.
 
 </details>
 

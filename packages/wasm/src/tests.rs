@@ -428,7 +428,6 @@ fn builtin_argument_errors_and_numeric_boundaries_propagate_without_panics() {
         ("=FLOOR(1,0)", "#DIV/0!"),
         ("=CEILING(\"x\",1)", "#VALUE!"),
         ("=CEILING(1,\"x\")", "#VALUE!"),
-        ("=FLOOR(1,0)", "#DIV/0!"),
         ("=TRUNC(\"x\",1)", "#VALUE!"),
         ("=TRUNC(1,\"x\")", "#VALUE!"),
         ("=TRUNC(1,400)", "#NUM!"),

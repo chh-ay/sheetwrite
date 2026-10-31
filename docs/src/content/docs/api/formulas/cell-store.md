@@ -133,10 +133,10 @@ addPagedSheet: (n_cols: number, row_count: number, chunk_rows: number, byte_budg
 </details>
 
 <details class="api-member" id="cell-store-add-rows" data-pagefind-weight="1">
-<summary><code>addRows</code></summary>
+<summary><code>addRows</code> <span class="api-member-summary">Insert count rows at at. Returns false and changes nothing when the sheet is missing or cannot hold the rows.</span></summary>
 
 ```ts generated
-addRows: (sheet: number, at: number, count: number) => void;
+addRows: (sheet: number, at: number, count: number) => boolean;
 ```
 
 </details>
@@ -469,7 +469,7 @@ importRangeMemoryState: (bytes: Uint8Array, sheet: number, row_start: number, co
 <summary><code>insertCols</code></summary>
 
 ```ts generated
-insertCols: (sheet: number, at: number, count: number) => void;
+insertCols: (sheet: number, at: number, count: number) => boolean;
 ```
 
 </details>
@@ -697,7 +697,7 @@ remapRangeStyles: (sheet: number, r0: number, c0: number, r1: number, c1: number
 <summary><code>removeCols</code></summary>
 
 ```ts generated
-removeCols: (sheet: number, at: number, count: number) => void;
+removeCols: (sheet: number, at: number, count: number) => boolean;
 ```
 
 </details>
@@ -715,7 +715,7 @@ removeNamedRange: (name: string, scope: number) => boolean;
 <summary><code>removeRows</code></summary>
 
 ```ts generated
-removeRows: (sheet: number, at: number, count: number) => void;
+removeRows: (sheet: number, at: number, count: number) => boolean;
 ```
 
 </details>
@@ -1149,7 +1149,7 @@ class CellStore {
     byte_budget: number,
     max_dirty_cells: number,
   ) => number;
-  addRows: (sheet: number, at: number, count: number) => void;
+  addRows: (sheet: number, at: number, count: number) => boolean;
   addSheet: (n_cols: number, row_count: number) => number;
   admitSourceRange: (
     sheet: number,
@@ -1274,7 +1274,7 @@ class CellStore {
     row_start: number,
     col_start: number,
   ) => RangeSnapshot;
-  insertCols: (sheet: number, at: number, count: number) => void;
+  insertCols: (sheet: number, at: number, count: number) => boolean;
   isFullyLoaded: (sheet: number) => boolean;
   isPaged: (sheet: number) => boolean;
   loadedSpans: (
@@ -1340,9 +1340,9 @@ class CellStore {
     old_ids: Uint32Array,
     new_ids: Uint32Array,
   ) => boolean;
-  removeCols: (sheet: number, at: number, count: number) => void;
+  removeCols: (sheet: number, at: number, count: number) => boolean;
   removeNamedRange: (name: string, scope: number) => boolean;
-  removeRows: (sheet: number, at: number, count: number) => void;
+  removeRows: (sheet: number, at: number, count: number) => boolean;
   removeSheet: (sheet: number) => boolean;
   removeTable: (id: string) => boolean;
   renameSheet: (sheet: number, id: string, name: string) => boolean;
