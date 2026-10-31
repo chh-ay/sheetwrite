@@ -1,12 +1,13 @@
-// Excel-style ribbon: a tab row over one panel of labeled groups. It reads
-// only the public Grid API, so the grid's built-in chrome and the composable
-// shell mount the same class. Owners place the element; the ribbon never
-// positions itself.
+// Excel-style ribbon: a tab row over one panel of labeled groups, in a full
+// or a compact (one row) layout. Both layouts render the same live controls
+// from the command registry. It reads only the public Grid API, so the grid's
+// built-in chrome and the composable shell mount the same class. Owners place
+// the element; the ribbon never positions itself.
 
-import { actionFeedbackFor } from "../action-feedback.js";
-import { fontShorthandParts } from "../format-presets.js";
 import { iconNode } from "../icons/resolve.js";
-import type { Grid, IconOverrides } from "../types/grid.js";
+import type { CommandFlags, Grid, IconOverrides, RibbonConfig, RibbonMode } from "../types/grid.js";
+import { shownTabs, type RibbonGroupSpec, type RibbonTabSpec } from "./command-spec.js";
+import { createCommandContext, refreshControls } from "./command-surface.js";
 import {
   renderControl,
   type RibbonCommandStates,
@@ -19,32 +20,25 @@ import {
   type RibbonFitGroup,
   type RibbonFitStep,
 } from "./ribbon-fit.js";
-import { RIBBON_PANEL_HEIGHT, RIBBON_TAB_ROW_HEIGHT } from "./ribbon-metrics.js";
 import {
-  RIBBON_TABS,
-  type RibbonFocus,
-  type RibbonGroupSpec,
-  type RibbonTabSpec,
-} from "./ribbon-model.js";
+  assertRibbonConfig,
+  RIBBON_COMPACT_PANEL_HEIGHT,
+  RIBBON_COMPACT_WIDTH,
+  RIBBON_PANEL_HEIGHT,
+  RIBBON_TAB_ROW_HEIGHT,
+} from "./ribbon-metrics.js";
+import { RIBBON_TABS } from "./ribbon-model.js";
 import { RibbonPopup } from "./ribbon-popup.js";
 
-/** One style read and one theme-font parse, shared by every value box. */
-function readFocus(grid: Grid): RibbonFocus {
-  const themeFont = fontShorthandParts(grid.getTheme().font);
-  return {
-    style: grid.getFocusCellStyle(),
-    themeFontFamily: themeFont.family,
-    themeFontPx: themeFont.px,
-  };
-}
-
-export interface RibbonOptions {
+export interface RibbonOptions extends RibbonConfig {
   /** Called after the ribbon is minimized to its tab row or expanded again. */
   readonly onHeightChange: (height: number) => void;
   /** Where keyboard focus goes back to; defaults to focusing the host. */
   readonly focusGrid?: () => void;
   /** Host glyph overrides, as `GridConfig.icons`. */
   readonly icons?: IconOverrides;
+  /** `GridConfig` switches that choose commands; defaults show every command but Export. */
+  readonly flags?: CommandFlags;
 }
 
 interface GroupView {
@@ -71,14 +65,18 @@ export class Ribbon {
   private readonly context: RibbonContext;
   private readonly popup: RibbonPopup;
   private readonly tabs: HTMLButtonElement[] = [];
+  private readonly tabSpecs: readonly RibbonTabSpec[];
   private readonly panels: (PanelView | undefined)[] = [];
   private readonly tabList: HTMLDivElement;
   private readonly minimizeButton: HTMLButtonElement;
+  private readonly modeButton: HTMLButtonElement;
   private readonly id: number;
   private readonly disposers: Array<() => void> = [];
   private readonly resizeObserver: ResizeObserver | null;
   private activeTab = 0;
   private minimized = false;
+  private mode: RibbonMode;
+  private compact = false;
   private fitFrame = 0;
   private fittedWidth = -1;
   private destroyed = false;
@@ -88,40 +86,54 @@ export class Ribbon {
     this.id = ribbonSerial;
     this.grid = grid;
     this.options = options;
+    assertRibbonConfig(options);
+    this.mode = options.mode ?? "full";
+    this.tabSpecs = shownTabs(RIBBON_TABS, options.flags ?? {});
+
     this.popup = new RibbonPopup(host);
-    const focusGrid = options.focusGrid ?? (() => host.focus());
-    this.context = {
+    this.context = createCommandContext({
       grid,
       popup: this.popup,
-      focus: () => readFocus(grid),
-      focusGrid,
+      focusGrid: options.focusGrid ?? (() => host.focus()),
       ...(options.icons === undefined ? {} : { icons: options.icons }),
-      run: (key, command, control) => {
-        const feedback = actionFeedbackFor(grid);
-        if (feedback) void feedback.run(`ribbon:${key}`, command, control);
-        else command();
-      },
-    };
+      feedbackScope: "ribbon",
+    });
 
     this.element = document.createElement("div");
     this.element.className = "sheetwrite-ribbon";
     this.element.setAttribute("role", "region");
     this.element.setAttribute("aria-label", "Ribbon");
 
+    // The tab row holds the tablist and, beside it, the layout buttons: a
+    // tablist may own only tabs, or screen readers miscount the tabs.
+    const tabRow = document.createElement("div");
+    tabRow.className = "sheetwrite-ribbon-tabs";
     this.tabList = document.createElement("div");
-    this.tabList.className = "sheetwrite-ribbon-tabs";
+    this.tabList.className = "sheetwrite-ribbon-tablist";
     this.tabList.setAttribute("role", "tablist");
     this.tabList.setAttribute("aria-label", "Ribbon tabs");
-    RIBBON_TABS.forEach((tab, index) => this.tabList.appendChild(this.createTab(tab, index)));
+    this.tabSpecs.forEach((tab, index) => this.tabList.appendChild(this.createTab(tab, index)));
+
+    this.modeButton = document.createElement("button");
+    this.modeButton.type = "button";
+    this.modeButton.className = "sheetwrite-ribbon-mode";
+    this.modeButton.textContent = "Compact";
+    this.modeButton.setAttribute("aria-label", "Compact ribbon");
+    this.modeButton.title = "Switch between the full and compact ribbon";
+    this.modeButton.addEventListener("mousedown", (event) => event.preventDefault());
+    this.modeButton.addEventListener("click", () => {
+      this.mode = this.compact ? "full" : "compact";
+      this.updateLayout();
+    });
 
     this.minimizeButton = document.createElement("button");
     this.minimizeButton.type = "button";
     this.minimizeButton.className = "sheetwrite-ribbon-minimize";
     this.minimizeButton.addEventListener("mousedown", (event) => event.preventDefault());
     this.minimizeButton.addEventListener("click", () => this.setMinimized(!this.minimized));
-    this.tabList.appendChild(this.minimizeButton);
 
-    this.element.appendChild(this.tabList);
+    tabRow.append(this.tabList, this.modeButton, this.minimizeButton);
+    this.element.appendChild(tabRow);
     this.element.addEventListener("keydown", this.onKeydown);
     host.appendChild(this.element);
 
@@ -134,12 +146,14 @@ export class Ribbon {
     this.resizeObserver?.observe(this.element);
 
     this.updateMinimizeButton();
+    this.updateLayout();
     this.selectTab(0, false);
   }
 
   /** Height the owner reserves above the grid. */
   get height(): number {
-    return RIBBON_TAB_ROW_HEIGHT + (this.minimized ? 0 : RIBBON_PANEL_HEIGHT);
+    const panelHeight = this.compact ? RIBBON_COMPACT_PANEL_HEIGHT : RIBBON_PANEL_HEIGHT;
+    return RIBBON_TAB_ROW_HEIGHT + (this.minimized ? 0 : panelHeight);
   }
 
   destroy(): void {
@@ -195,7 +209,7 @@ export class Ribbon {
     const existing = this.panels[index];
     if (existing !== undefined) return existing;
 
-    const spec = RIBBON_TABS[index];
+    const spec = this.tabSpecs[index];
     if (spec === undefined) throw new RangeError(`No ribbon tab ${index}`);
     const element = document.createElement("div");
     element.className = "sheetwrite-ribbon-panel";
@@ -307,17 +321,7 @@ export class Ribbon {
   }
 
   private refreshPanel(panel: PanelView, state: RibbonCommandStates): void {
-    // Read on first use: tabs without value boxes never pay for the style read.
-    const grid = this.grid;
-    let focus: RibbonFocus | undefined;
-    const snapshot = {
-      state,
-      get focus(): RibbonFocus {
-        focus ??= readFocus(grid);
-        return focus;
-      },
-    };
-    for (const control of panel.controls) control.refresh(snapshot);
+    refreshControls(panel.controls, this.grid, state);
   }
 
   private setMinimized(minimized: boolean): void {
@@ -345,7 +349,24 @@ export class Ribbon {
     });
   }
 
+  private updateLayout(): void {
+    const compact =
+      this.mode === "compact" ||
+      (this.mode === "auto" &&
+        this.element.clientWidth < (this.options.compactWidth ?? RIBBON_COMPACT_WIDTH));
+    this.modeButton.setAttribute("aria-pressed", String(compact));
+    this.element.dataset.mode = compact ? "compact" : "full";
+    if (compact === this.compact) return;
+
+    this.popup.closeAll(false);
+    this.compact = compact;
+    this.fittedWidth = -1;
+    this.options.onHeightChange(this.height);
+    this.scheduleFit();
+  }
+
   private fit(): void {
+    this.updateLayout();
     const panel = this.panels[this.activeTab];
     if (panel === undefined || this.minimized) return;
     const width = panel.element.clientWidth;
@@ -354,7 +375,9 @@ export class Ribbon {
 
     // Sizes are about to change, and a collapsed group's body may be on loan.
     this.popup.closeAll(false);
-    for (const group of panel.groups.values()) group.element.dataset.size = "large";
+    for (const group of panel.groups.values()) {
+      group.element.dataset.size = this.compact ? "medium" : "large";
+    }
     fitRibbon(
       panel.fitSteps,
       (step) => {

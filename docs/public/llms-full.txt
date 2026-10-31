@@ -1454,7 +1454,7 @@ Worker startup and capability failures switch to the canvas renderer and emit `r
 Source: https://www.sheetwrite.dev/docs/features/grid/
 
 - [Options and presentation](https://www.sheetwrite.dev/docs/features/grid/options-and-presentation/): Configure a grid with GridOptions and choose spreadsheet or data-grid headers.
-- [Toolbar and ribbon](https://www.sheetwrite.dev/docs/features/grid/toolbar-and-ribbon/): Show the built-in flat toolbar or the Excel-style ribbon, and drive host chrome from command state.
+- [Toolbar and ribbon](https://www.sheetwrite.dev/docs/features/grid/toolbar-and-ribbon/): Show the built-in toolbar or the Excel-style ribbon in a full or compact layout, all rendered from one command model, and drive host chrome from command state.
 - [Selection and keyboard](https://www.sheetwrite.dev/docs/features/grid/selection-and-keyboard/): Read and set the selection, navigate with the keyboard, and rebind or add shortcuts.
 - [Editing and clipboard](https://www.sheetwrite.dev/docs/features/grid/editing-and-clipboard/): Edit cells inline, copy and paste with other spreadsheet apps, and undo or redo changes.
 - [Custom editors](https://www.sheetwrite.dev/docs/features/grid/custom-editors/): Replace the stock cell editor with a host-supplied editor for a column.
@@ -1654,7 +1654,7 @@ Framework adapters also accept `wasmSource`. Initialization is process-wide and 
 
 Source: https://www.sheetwrite.dev/docs/features/grid/toolbar-and-ribbon/
 
-Set `config` to show the built-in toolbar, or `config: { ribbon: true }` to show an Excel-style ribbon instead.
+Set `config` to show the built-in toolbar, or `config: { ribbon: true }` to show an Excel-style ribbon instead. The toolbar, the full ribbon and the compact ribbon render one command model: the same commands, glyphs, enabled and pressed state, keyboard behavior and accessible names.
 
 ```ts
 const grid = createGrid(host, { workbook, config: { ribbon: true } });
@@ -1741,6 +1741,23 @@ Groups fold in Excel order. On Home, Editing folds first, then Cells, Number, Al
 
 Double-click a tab, or use the arrow at the right, to hide the panel and keep only the tab row. The grid takes the space back.
 
+### Compact ribbon
+
+The compact ribbon shows the selected tab's commands on one row, like Excel's simplified ribbon. It uses the same live controls as the full ribbon, so a value you type in a box and the selected tab stay when you switch.
+
+- The **Compact** button beside the tab list switches between the full and the compact layout. It is a toggle button: `aria-pressed` tells screen readers which layout is on.
+- `ribbon: { mode: "compact" }` starts compact. `ribbon: { mode: "auto" }` uses compact while the ribbon is narrower than `compactWidth` (default 768 CSS pixels) and full otherwise. When the user picks a layout with the button, the ribbon keeps that layout at every width.
+- Groups that do not fit on the row fold into dropdown buttons, as in the full ribbon.
+
+```ts
+const grid = createGrid(host, {
+  workbook,
+  config: { ribbon: { mode: "auto", compactWidth: 900 } },
+});
+```
+
+`compactWidth` must be a positive finite number; other values throw a `RangeError` when the grid is created or reconfigured.
+
 ### Keyboard
 
 | Key | Effect |
@@ -1753,15 +1770,15 @@ Double-click a tab, or use the arrow at the right, to hide the panel and keep on
 
 ### Loading
 
-The ribbon loads with `import()` as its own chunk, only when a grid asks for it. A grid without the ribbon does not download it; that is about 25 KB less minified JavaScript.
+The ribbon and the toolbar load with `import()` as their own chunk, only when a grid asks for one. A grid without chrome does not download it.
 
-- The grid reserves the ribbon's height while the chunk loads, so nothing moves when it arrives.
+- The grid reserves the chrome's height while the chunk loads, so nothing moves when it arrives.
 - A chunk that arrives after the chrome was rebuilt, or after the grid was destroyed, is dropped.
-- If the chunk fails to load, the grid shows the flat toolbar. The load error is still reported as an unhandled promise rejection; the host cannot catch it.
+- If the chunk fails to load, the grid gives the space back and shows no chrome. The load error is still reported as an unhandled promise rejection; the host cannot catch it.
 
 ### Ribbon outside the grid
 
-The composable shell mounts the same ribbon. Pass `ribbon: true` to `createSpreadsheetShell`, or call [`createRibbon`](https://www.sheetwrite.dev/docs/api/core-shell/create-ribbon/) to place it yourself:
+The composable shell mounts the same ribbon. Pass `ribbon: true` (or a `RibbonConfig` object) to `createSpreadsheetShell`, or call [`createRibbon`](https://www.sheetwrite.dev/docs/api/core-shell/create-ribbon/) to place it yourself:
 
 ```ts
 import { createRibbon } from "@sheetwrite/core/shell";
@@ -1780,45 +1797,63 @@ ribbon.destroy();
 | `RibbonOptions` field | Effect |
 | --- | --- |
 | `focusGrid` | Returns keyboard focus to the grid after a pick or Escape. By default the host gets focus. |
-| `onHeightChange` | Called with the new height after the ribbon is minimized or expanded. |
+| `onHeightChange` | Called with the new height after the ribbon is minimized or expanded, or changes layout. |
+| `mode`, `compactWidth` | The initial layout, as in `GridConfig.ribbon`. |
+| `flags` | The [command flags](#command-flags) that choose commands. By default every command shows except Export. |
 
-The ribbon styles itself from the same `--sheetwrite-widget-*`, `--sheetwrite-toolbar-*` and `--sheetwrite-menu-*` properties as the toolbar, so light, dark and host themes apply.
+The ribbon and the toolbar style themselves from the same `--sheetwrite-widget-*`, `--sheetwrite-toolbar-*` and `--sheetwrite-menu-*` properties, so light, dark and host themes apply.
 
-## GridConfig (toolbar)
+`createSpreadsheetShell` loads its toolbar or ribbon lazily too. It reserves the row height until the controls arrive. Importing the shell does not load the command model.
 
-Each flag toggles one control. When `config` is present, every flag except `export` and `ribbon` defaults to `true`. `toolbar: false` suppresses the toolbar entirely.
+## Toolbar
+
+The toolbar shows the ribbon's commands on one row, in ribbon order (Home, Insert, Data, View), with a separator between groups. Commands that do not fit move, in order, into a **More commands** button at the end of the row. It opens the remaining commands in a popup group, so every command stays reachable at any width.
 
 ```ts
-createGrid(host, { workbook, config: {} });                 // toolbar with the default controls
-createGrid(host, { workbook, config: { sort: false } });    // toolbar, no sort controls
-createGrid(host, { workbook, config: { export: true } });   // toolbar with CSV and XLSX buttons
+createGrid(host, { workbook, config: {} });                 // toolbar with the default commands
+createGrid(host, { workbook, config: { sort: false } });    // toolbar, no sort commands
+createGrid(host, { workbook, config: { export: true } });   // toolbar with Export CSV and Export XLSX
 createGrid(host, { workbook, config: { toolbar: false } }); // no toolbar
 createGrid(host, { workbook });                             // no toolbar (config omitted)
 ```
 
-| Flag | Type | Default | Control |
-| --- | --- | --- | --- |
-| `toolbar` | `boolean \| ToolbarItem[]` | `true`¹ | Master switch. `false` removes the toolbar. An item list replaces the default controls. |
-| `undo` | `boolean` | `true` | Undo / redo buttons (also bound to Ctrl+Z / Ctrl+Shift+Z). |
-| `bold` | `boolean` | `true` | Bold toggle. |
-| `italic` | `boolean` | `true` | Italic toggle. |
-| `align` | `boolean` | `true` | Left / center / right alignment. |
-| `textColor` | `boolean` | `true` | Text color picker. |
-| `fillColor` | `boolean` | `true` | Fill (background) color picker. |
-| `border` | `boolean` | `true` | Border control. |
-| `clearFormat` | `boolean` | `true` | Clear formatting. |
-| `merge` | `boolean` | `true` | Merge / unmerge selection. |
-| `sort` | `boolean` | `true` | Sort the selected column ascending / descending. |
-| `export` | `boolean` | `false` | CSV / XLSX export buttons. |
-| `ribbon` | `boolean` | `false` | Show the Excel-style ribbon instead of the flat toolbar. |
+| Key | Effect |
+| --- | --- |
+| Tab | Reaches the toolbar controls. The toolbar is first in the host. |
+| Left / Right, Home / End | Move between controls. A text box keeps these keys for its caret. |
+| Arrow Down | Opens a menu or split button's list, as in the ribbon. |
+| Escape | Closes a popup, or returns focus to the grid. |
+| Ctrl/Cmd shortcuts | Still reach the grid. |
+
+Each command keeps its accessible name, and its tooltip adds the keyboard shortcut when one is bound (for example "Undo (Ctrl+Z)"). Every command element has a `data-command` attribute with the command ID, for host styles and tests.
+
+### Command flags
+
+These `GridConfig` fields ([`CommandFlags`](https://www.sheetwrite.dev/docs/api/core/command-flags/)) choose built-in commands in every renderer: the toolbar, the full ribbon and the compact ribbon. When `config` is present, every flag except `export` defaults to `true`.
+
+| Flag | Default | Commands |
+| --- | --- | --- |
+| `toolbar` | `true`¹ | Master switch. `false` removes the toolbar and the ribbon. An item list replaces the default commands. |
+| `undo` | `true` | Undo and Redo (also bound to Ctrl+Z / Ctrl+Shift+Z). |
+| `bold` | `true` | Bold. Underline and Strikethrough show while `bold` or `italic` is on. |
+| `italic` | `true` | Italic. |
+| `align` | `true` | Align Left, Center, Align Right, and Top, Middle and Bottom Align. |
+| `textColor` | `true` | Font Color palette. |
+| `fillColor` | `true` | Fill Color palette. |
+| `border` | `true` | Borders. |
+| `clearFormat` | `true` | Clear (Clear All, Clear Formats, Clear Contents). |
+| `merge` | `true` | Merge & Center (also Merge Cells and Unmerge Cells). |
+| `sort` | `true` | Sort & Filter, Sort A to Z and Sort Z to A. |
+| `export` | `false` | Export CSV and Export XLSX, in the Data tab's Export group. |
+| `ribbon` | `false` | Show the ribbon instead of the toolbar. See [Compact ribbon](#compact-ribbon). |
 
 ¹ "Default `true`" means: when you supply a `config` object at all. With no `config` there is no toolbar.
 
-The underline and strikethrough toggles show when `bold` or `italic` is on.
+The shell's `createToolbar` shows Export by default; pass `flags` to change it.
 
-### Toolbar actions
+### Custom toolbar items
 
-Every control acts on the current selection; see [Interaction → Selection model](https://www.sheetwrite.dev/docs/features/grid/selection-and-keyboard/#selection-model). A custom `toolbar: ToolbarItem[]` list names built-in actions, separators, or `onClick(grid)` callbacks:
+A custom `toolbar: ToolbarItem[]` list names built-in actions, separators, or `onClick(grid)` callbacks. Every control acts on the current selection; see [Interaction → Selection model](https://www.sheetwrite.dev/docs/features/grid/selection-and-keyboard/#selection-model).
 
 ```ts
 createGrid(host, {
@@ -1835,7 +1870,21 @@ createGrid(host, {
 });
 ```
 
-Built-in action names: `bold`, `italic`, `underline`, `strikethrough`, `alignLeft`, `alignCenter`, `alignRight`, `alignTop`, `alignMiddle`, `alignBottom`, `wrap`, `textColor`, `fillColor`, `border`, `clearFormat`, `merge`, `unmerge`, `sortAsc`, `sortDesc`, `exportCsv`, `exportXlsx`, `undo`, `redo` and `separator`.
+Built-in action names: `bold`, `italic`, `underline`, `strikethrough`, `alignLeft`, `alignCenter`, `alignRight`, `alignTop`, `alignMiddle`, `alignBottom`, `wrap`, `textColor`, `fillColor`, `border`, `clearFormat`, `merge`, `unmerge`, `sortAsc`, `sortDesc`, `exportCsv`, `exportXlsx`, `undo`, `redo` and `separator`. A built-in action renders the ribbon's command with that ID; `title` and `icon` replace its name and glyph in that toolbar only.
+
+### Options that changed in 0.7
+
+Every toolbar option keeps working. These parts render differently because the toolbar now uses the ribbon's commands:
+
+| Before 0.7 | Now | Use instead |
+| --- | --- | --- |
+| `textColor` and `fillColor` were native color inputs. | Font Color and Fill Color are palette split buttons. | The palette, or `grid.actions.setTextColor` / `setFillColor` from host chrome. |
+| `border` toggled all borders. | Borders is a split button: the face adds a bottom border and the menu has every preset. | Pick "All Borders" from the menu, or call `grid.actions.setBorders("all")`. |
+| `clearFormat` was one button. | The default toolbar shows the Clear menu. A custom item `{ action: "clearFormat" }` is still one Clear Formats button. | Pick "Clear Formats", or name the action in a custom list. |
+| `merge` and `unmerge` were two buttons. | The default toolbar shows one Merge & Center menu. Custom items `merge` and `unmerge` are still one-click buttons. | Pick "Merge Cells" or "Unmerge Cells", or name the actions in a custom list. |
+| Controls had `.sheetwrite-tb-<action>` classes. | Controls use the ribbon's classes. | Select `[data-command="<id>"]`. |
+| The toolbar mounted synchronously with the grid and the shell. | The grid's toolbar and the `createSpreadsheetShell` toolbar load with their own chunk, with their height reserved. `createToolbar` still mounts at once. | Wait for the toolbar before you query its elements. |
+| A ribbon chunk that failed to load fell back to the flat toolbar. | The toolbar shares that chunk, so the grid shows no chrome. | Handle the reported load error. The shell still falls back to its toolbar. |
 
 ### Export buttons
 
@@ -1876,7 +1925,7 @@ stop();
 | `disabled` | Accounts for read-only mode, empty selections, and undo/redo history. |
 | `activity` | `"inactive"`, `"active"` or `"mixed"` across the current selection, for formatting commands. |
 
-The built-in toolbar uses the same contract, including native `disabled` and `aria-pressed="mixed"`.
+The built-in toolbar and ribbon use the same contract, including native `disabled` and `aria-pressed="mixed"`.
 
 ## Feature flags
 
@@ -1886,7 +1935,7 @@ These `GridConfig` fields enable behavior outside the toolbar row:
 | --- | --- | --- | --- |
 | `find` | `boolean` | `true` | Built-in **Ctrl+F** search box, next/previous controls, and live match count. See [Search](https://www.sheetwrite.dev/docs/features/grid/search/). |
 | `contextMenu` | `boolean \| ContextMenuItems` | `true` | Built-in right-click menu, disabled menu, static readonly rows, or a context-aware row factory. See [Context menu](https://www.sheetwrite.dev/docs/features/grid/context-menu/). |
-| `icons` | `Partial<Record<ToolbarActionName, ToolbarIcon>>` | `undefined` | Built-in toolbar icon overrides. Strings render as text; a DOM `Node` or `() => Node` supports SVG/HTML without `innerHTML`. |
+| `icons` | `IconOverrides` | `undefined` | Built-in command glyph overrides, in the toolbar, ribbon, ribbon menus and context menu. Strings render as text; a DOM `Node` or `() => Node` supports SVG/HTML without `innerHTML`. |
 | `tabs` | `boolean` | `true` | Bottom sheet-tab bar for multi-sheet workbooks. |
 | `keyboard` | `boolean \| KeyboardOptions \| function` | `true` | Built-in key bindings. See [Interaction → Keyboard navigation](https://www.sheetwrite.dev/docs/features/grid/selection-and-keyboard/#keyboard-navigation). |
 
@@ -1894,8 +1943,7 @@ Undo, redo and find are keyboard-driven and work without the toolbar: **Ctrl+Z**
 
 ## Edge cases and limits
 
-- The per-control flags apply to the flat toolbar only, not to the ribbon.
-- A custom `toolbar: [...]` item list still renders the flat toolbar, even with `ribbon: true`.
+- A custom `toolbar: [...]` item list still renders the toolbar, even with `ribbon: true`.
 - `toolbar: false` removes both the toolbar and the ribbon.
 - Command-state aggregation is bounded. Very large selections conservatively report `mixed` instead of forcing an unbounded cell walk.
 - `grid.setConfig(config)` reconfigures the built-in chrome without replacing the grid or clearing selection and history.
@@ -6398,6 +6446,35 @@ On a read-only grid you can select a chart, but not change it.
 The grid emits `chart-select` with `{ sheet, id }`, or `null`, when the
 selection changes, and `chart-activate` when Enter is pressed on a chart.
 
+## Charts in XLSX files
+
+With `@sheetwrite/xlsx`, `fromXlsxWorkbook` reads Excel charts into
+`Sheet.charts`, and `toXlsxWorkbook` writes `Sheet.charts` as Excel chart
+parts. Excel and LibreOffice open these files with the charts shown.
+
+| Sheetwrite | Excel chart |
+| --- | --- |
+| `column`, `bar` | Clustered column or bar chart |
+| `line`, `area` | Standard line or area chart |
+| `pie`, `doughnut` | Pie or doughnut chart |
+| `scatter` | Scatter chart |
+| `title`, `axes`, `legend` | Chart title, axis titles, legend position |
+| `series` | Series name, categories (x values in a scatter chart) and values, each one cell range or a name |
+| `anchor` | The top-left cell, its offset and the chart size |
+
+Imported charts read the same cells as the Excel chart, so a cell edit updates
+them. Import keeps an Excel chart that this table cannot hold as an opaque part
+and emits an `unsupported-feature` warning. Examples are 3-D, stacked and
+combination charts, and series that read literal values or several ranges. See
+[Kept parts and round trips](https://www.sheetwrite.dev/docs/import-export/kept-parts-and-round-trips/).
+
+Import reads each chart part once per drawing. Repeated frames for that part
+stay opaque and emit the same warning. Once a sheet reaches its chart limit,
+further chart frames also stay opaque instead of being parsed into charts.
+
+Excel files do not store colors, fonts or styles from Sheetwrite. A chart that
+Sheetwrite exports has Excel's default style.
+
 ## Colors
 
 Series take their colors in order from `--sheetwrite-chart-1` to
@@ -7457,9 +7534,9 @@ const saved = await toXlsxWorkbook(snapshot, options);
 console.log(snapshot.workbook.xlsxSource?.graphs.length ?? 0);
 ```
 
-The saved workbook retains its modelled cells. Eligible charts, pivots, images and macros travel alongside them as opaque package parts, not as flattened cell values.
+The saved workbook retains its modelled cells. Eligible charts, pivots, images and macros travel alongside them as opaque package parts, not as flattened cell values. Charts that the chart model can hold are not kept parts: import reads them into `Sheet.charts`, edits keep them, and export writes them again. See [Charts in XLSX files](https://www.sheetwrite.dev/docs/features/analysis/charts/#charts-in-xlsx-files).
 
-| Operation | Result for an eligible imported chart graph |
+| Operation | Result for a kept chart graph (a chart that the chart model cannot hold) |
 | --- | --- |
 | Open → save, no edits | Original compressed payload retained. |
 | Change a cell → save | Graph dropped; structured warning reports loss. |
@@ -7497,9 +7574,11 @@ The payload is base64-encoded for JSON-safe persistence: about four thirds of it
 | --- | --- |
 | VBA project (`.xlsm`), customXml items, XML maps, data connections, theme, core and custom document properties | Always: they do not read cells. Macro workbooks retain the macro content type. |
 | Images and other drawings without charts, single-cell XML tables | Their sheet still exists and no row or column on it was inserted, removed, moved, resized, hidden or merged. |
-| Charts and pivot tables, with their caches | No cell on any sheet changed, no sheet was renamed or removed, and no defined name changed. |
+| Charts that the chart model cannot hold, and pivot tables, with their caches | No cell on any sheet changed, no sheet was renamed or removed, and no defined name changed. |
 
 Shared parts such as a pivot and its cache form one graph: they are kept or dropped together.
+
+A drawing that holds both charts that Sheetwrite reads and other objects is split. The charts go to `Sheet.charts`, and the kept drawing keeps only the other anchors. On export, Sheetwrite charts go into the sheet's kept drawing, because a worksheet has only one drawing.
 
 ## Drops and warnings
 
@@ -8499,13 +8578,14 @@ The file buttons are host-owned. A successful table import destroys the old shel
 
 | Choice | Effect |
 | --- | --- |
-| `ribbon: true` | Shows Home, Insert, Data and View instead of the flat toolbar. |
+| `ribbon: true` | Shows Home, Insert, Data and View instead of the toolbar. Both render the same commands. |
+| `ribbon: { mode: "auto" }` | Uses the compact, one-row ribbon while the host is narrower than 768 px. The **Compact** button switches layout at any time. |
 | Narrow host | Labels shrink and groups fold into popup controls. |
 | Double-click a tab | Minimizes the ribbon to its tab row. |
 | Read-only Grid | Editing commands disable; view commands remain available. |
 | Host commands | Read `shell.grid.getCommandState(...)` and subscribe to `command-state-change`; do not derive availability from CSS. |
 
-The ribbon loads as a separate chunk. The shell reserves its height while loading and ignores a late chunk after destruction. A failed load falls back to the flat toolbar and still reports an unhandled promise rejection; the file-handler `try/catch` does not catch that asynchronous load failure. Keep chunk URLs available after deployment.
+The ribbon loads as a separate chunk. The shell reserves its height while loading and ignores a late chunk after destruction. A failed load falls back to the toolbar, which shows the same commands, and still reports an unhandled promise rejection; the file-handler `try/catch` does not catch that asynchronous load failure. Keep chunk URLs available after deployment.
 
 The built-in ribbon does not provide a chart-authoring API. Do not treat retained XLSX chart parts as editable charts.
 
@@ -10883,6 +10963,16 @@ export type ColumnFilter = | { kind: "values"; values: readonly CellScalar[] } |
 One column's filter predicate. All active column filters AND together;
 matching is against the cell's resolved value (text or number).
 
+##### `CommandFlags` — type
+
+```ts
+export type CommandFlags = Pick< GridConfig, | "undo" | "bold" | "italic" | "align" | "textColor" | "fillColor" | "border" | "clearFormat" | "merge" | "sort" | "export" >;
+```
+
+The `GridConfig` switches that choose built-in commands. They apply to every
+renderer of the command model: the toolbar, the full ribbon and the compact
+ribbon. Each defaults to true, except `export`.
+
 ##### `CommentAdapter` — interface
 
 ```ts
@@ -11878,7 +11968,7 @@ Complete command-state snapshot emitted whenever availability or activity can ch
 ##### `GridConfig` — interface
 
 ```ts
-export interface GridConfig { toolbar?: boolean | ToolbarItem[]; bold?: boolean; italic?: boolean; align?: boolean; textColor?: boolean; fillColor?: boolean; border?: boolean; clearFormat?: boolean; merge?: boolean; sort?: boolean; export?: boolean; ribbon?: boolean; icons?: IconOverrides; contextMenu?: boolean | ContextMenuItems; undo?: boolean; find?: boolean; tabs?: boolean; keyboard?: boolean | KeyboardOptions | ((e: KeyboardEvent, grid: Grid) => boolean); }
+export interface GridConfig { toolbar?: boolean | ToolbarItem[]; bold?: boolean; italic?: boolean; align?: boolean; textColor?: boolean; fillColor?: boolean; border?: boolean; clearFormat?: boolean; merge?: boolean; sort?: boolean; export?: boolean; ribbon?: boolean | RibbonConfig; icons?: IconOverrides; contextMenu?: boolean | ContextMenuItems; undo?: boolean; find?: boolean; tabs?: boolean; keyboard?: boolean | KeyboardOptions | ((e: KeyboardEvent, grid: Grid) => boolean); }
 ```
 
 Toolbar / feature configuration. When `config` is set the built-in toolbar is
@@ -11905,16 +11995,16 @@ Grid.setConfig
 ContextMenuItem
 
 Members:
-- `align` — Show left, center, and right alignment controls (default true).
-- `bold` — Show the bold control in the default toolbar (default true).
-- `border` — Show the border control in the default toolbar (default true).
-- `clearFormat` — Show the clear-format control in the default toolbar (default true).
+- `align` — Show the horizontal and vertical alignment commands (default true).
+- `bold` — Show Bold, and Underline and Strikethrough with Italic (default true). See {@link CommandFlags}.
+- `border` — Show the Borders command (default true).
+- `clearFormat` — Show the Clear command, which holds Clear Formats (default true).
 - `contextMenu` — Built-in menu, disabled menu, static rows, or a request-aware row factory.
-- `export` — Show CSV/XLSX export controls in the default toolbar (default false).
-- `fillColor` — Show the fill-color control in the default toolbar (default true).
+- `export` — Show the Export CSV and Export XLSX commands (default false).
+- `fillColor` — Show the Fill Color command (default true).
 - `find` — Built-in Ctrl+F find widget: enabled (true, default) or disabled (false).
 - `icons` — Replace built-in command icons by glyph name, in the toolbar, ribbon, ribbon menus and context menu. See {@link IconOverrides}.
-- `italic` — Show the italic control in the default toolbar (default true).
+- `italic` — Show Italic, and Underline and Strikethrough with Bold (default true).
 - `keyboard` — Built-in keyboard handling. `true` (default) keeps the stock Sheets-style
 bindings. An object replaces individual action bindings; omitted actions
 keep their defaults, and `null` disables an action's keys.
@@ -11922,15 +12012,18 @@ For example: `{ bindings: { copy: { key: "c", mod: true, shift: true } } }`.
 Menu hints and toolbar titles use these same bindings. `false` disables
 all built-in keys. A function intercepts each keydown before the defaults;
 return true to consume it, false to let the built-in handler continue.
-- `merge` — Show merge and unmerge controls in the default toolbar (default true).
+- `merge` — Show the Merge & Center command, which holds Merge and Unmerge (default true).
 - `ribbon` — Replace the built-in toolbar with an Excel-style ribbon (Home, Insert,
-Data and View tabs) that narrows its groups as the grid gets narrower.
-A custom `toolbar` item list still renders the flat toolbar instead.
-- `sort` — Show ascending and descending sort controls in the default toolbar (default true).
+Data and View tabs). Pass an object to choose its initial full, compact
+or automatic layout. A custom `toolbar` item list still renders the
+toolbar instead.
+- `sort` — Show Sort & Filter and the sort commands (default true).
 - `tabs` — Bottom sheet-tab bar for multi-sheet workbooks (default true).
-- `textColor` — Show the text-color control in the default toolbar (default true).
-- `toolbar` — Show the built-in toolbar (true), hide it (false), or supply a custom item list.
-- `undo` — Show undo/redo controls in the built-in toolbar (default true).
+- `textColor` — Show the Font Color command (default true).
+- `toolbar` — Show the built-in toolbar (true), hide it (false), or supply a custom item
+list. The toolbar shows the ribbon's commands on one row, with the rest in
+a "More commands" menu.
+- `undo` — Show Undo and Redo (default true).
 
 ##### `GridEvents` — interface
 
@@ -13094,6 +13187,26 @@ export interface RevisionSummary { version: number; createdAt: string; actor?: P
 
 Host-provided metadata describing a saved workbook revision.
 
+##### `RibbonConfig` — interface
+
+```ts
+export interface RibbonConfig { mode?: RibbonMode; compactWidth?: number; }
+```
+
+Initial layout settings for the built-in or composable ribbon.
+
+Members:
+- `compactWidth` — Width in CSS pixels below which `auto` uses compact (default 768).
+- `mode` — Initial layout (default `full`). The ribbon's layout button changes it at run time.
+
+##### `RibbonMode` — type
+
+```ts
+export type RibbonMode = "full" | "compact" | "auto";
+```
+
+Layout of the Excel-style ribbon. `auto` chooses compact below the configured width.
+
 ##### `RowBridge` — class
 
 ```ts
@@ -14204,14 +14317,15 @@ Text, DOM node, or node factory used as toolbar icon content.
 export interface ToolbarItem { action?: ToolbarActionName; onClick?: (grid: Grid) => void; icon?: ToolbarIcon; title?: string; }
 ```
 
-Built-in, separator, or custom callback item in the grid toolbar.
+Built-in, separator, or custom callback item in the grid toolbar. A built-in
+`action` renders the same command, glyph and state as the ribbon.
 
 Members:
 - `action` — Built-in action to bind (or "separator"). Omit when supplying `onClick`.
 - `icon` — Button icon/content. Strings render as plain text; pass a DOM `Node` or a
 factory returning one for SVG/HTML icons without using `innerHTML`.
 - `onClick` — Custom click handler; receives the grid handle. Overrides `action`.
-- `title` — Accessible tooltip.
+- `title` — Accessible name and tooltip; replaces the built-in command's label.
 
 ##### `toTsv` — function
 
@@ -15556,7 +15670,8 @@ no grid calls; Escape restores the displayed reference.
 ```
 
 Mount an Excel-style ribbon (Home, Insert, Data, View) bound to
-`grid.actions`, in normal document flow. Groups shrink, then collapse into
+`grid.actions`, in normal document flow. It renders the same commands as
+the toolbar, in a full or a compact layout. Groups shrink, then collapse into
 dropdowns, as the host narrows. Returns the piece with an idempotent
 `destroy`.
 
@@ -15588,10 +15703,11 @@ DOM, and is safe to call twice.
 (host: HTMLElement, grid: Grid, options?: ToolbarOptions): ShellPiece
 ```
 
-Mount a toolbar bound to `grid.actions` (custom items receive the grid).
-Mouse clicks never steal grid focus; keyboard users get local
-Left/Right/Home/End movement across the controls while the toolbar has
-focus. Returns the mounted piece with an idempotent `destroy`.
+Mount a toolbar bound to `grid.actions` (custom items receive the grid). It
+shows the ribbon's commands on one row, with the same glyphs, state and
+keyboard; commands that do not fit move into a "More commands" popup. Mouse
+clicks never steal grid focus; Left/Right/Home/End move between controls and
+Escape returns focus to the grid. Returns the piece with an idempotent `destroy`.
 
 ##### `describeSelection` — function
 
@@ -15636,14 +15752,17 @@ Members:
 ##### `RibbonOptions` — interface
 
 ```ts
-export interface RibbonOptions { focusGrid?: () => void; onHeightChange?: (height: number) => void; icons?: IconOverrides; }
+export interface RibbonOptions { focusGrid?: () => void; onHeightChange?: (height: number) => void; icons?: IconOverrides; flags?: CommandFlags; mode?: RibbonMode; compactWidth?: number; }
 ```
 
 Options for {@link createRibbon}.
 
 Members:
+- `compactWidth` — Width in CSS pixels below which `auto` uses compact (default 768).
+- `flags` — `GridConfig` switches that choose commands (default: all but Export).
 - `focusGrid` — Return keyboard focus to the grid after a pick or Escape (default: focus `host`).
 - `icons` — Replace built-in icons by glyph name, as `GridConfig.icons`.
+- `mode` — Initial layout (default `full`). The ribbon's layout button changes it at run time.
 - `onHeightChange` — Called with the new height after the ribbon is minimized or expanded.
 
 ##### `ShellPiece` — interface
@@ -15670,7 +15789,7 @@ Members:
 ##### `SpreadsheetShellOptions` — interface
 
 ```ts
-export interface SpreadsheetShellOptions { grid: GridOptions; toolbar?: readonly ToolbarItem[]; ribbon?: boolean; onChange?: (event: ChangeEvent) => void; onSelectionChange?: (selection: Selection | null) => void; onReady?: (grid: Grid) => void; }
+export interface SpreadsheetShellOptions { grid: GridOptions; toolbar?: readonly ToolbarItem[]; ribbon?: boolean | RibbonConfig; onChange?: (event: ChangeEvent) => void; onSelectionChange?: (selection: Selection | null) => void; onReady?: (grid: Grid) => void; }
 ```
 
 Host elements and feature options used to create a spreadsheet shell.
@@ -15678,20 +15797,22 @@ Host elements and feature options used to create a spreadsheet shell.
 Members:
 - `grid` — Options for the single grid the shell owns. `initSheetwrite` must already be awaited.
 - `onChange` — Event callbacks forwarded from the owned grid.
-- `ribbon` — Use an Excel-style ribbon instead of the flat toolbar.
-- `toolbar` — Toolbar items (default: the full built-in action set).
+- `ribbon` — Use an Excel-style ribbon instead of the toolbar; an object sets its layout.
+- `toolbar` — Toolbar items (default: every command the grid config's flags show, with Export).
 
 ##### `ToolbarOptions` — interface
 
 ```ts
-export interface ToolbarOptions { items?: readonly ToolbarItem[]; icons?: IconOverrides; label?: string; }
+export interface ToolbarOptions { items?: readonly ToolbarItem[]; flags?: CommandFlags; icons?: IconOverrides; label?: string; focusGrid?: () => void; }
 ```
 
 Host element and configuration used to create the built-in toolbar.
 
 Members:
+- `flags` — `GridConfig` switches that choose the default commands (default: all, with Export).
+- `focusGrid` — Return keyboard focus to the grid after a pick or Escape (default: focus `host`).
 - `icons` — Per-glyph icon overrides, exactly like `GridConfig.icons`.
-- `items` — Items to render; defaults to the full built-in action set.
+- `items` — Items to render; defaults to every command `flags` shows, in ribbon order.
 - `label` — Accessible toolbar label (default "Spreadsheet formatting").
 
 #### `@sheetwrite/core/shell.css` — asset

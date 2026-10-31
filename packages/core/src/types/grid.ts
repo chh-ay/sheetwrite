@@ -316,7 +316,10 @@ export type ToolbarIcon = string | Node | (() => Node);
  */
 export type IconOverrides = Partial<Record<IconName, ToolbarIcon>>;
 
-/** Built-in, separator, or custom callback item in the grid toolbar. */
+/**
+ * Built-in, separator, or custom callback item in the grid toolbar. A built-in
+ * `action` renders the same command, glyph and state as the ribbon.
+ */
 export interface ToolbarItem {
   /** Built-in action to bind (or "separator"). Omit when supplying `onClick`. */
   action?: ToolbarActionName;
@@ -327,9 +330,40 @@ export interface ToolbarItem {
    * factory returning one for SVG/HTML icons without using `innerHTML`.
    */
   icon?: ToolbarIcon;
-  /** Accessible tooltip. */
+  /** Accessible name and tooltip; replaces the built-in command's label. */
   title?: string;
 }
+
+/** Layout of the Excel-style ribbon. `auto` chooses compact below the configured width. */
+export type RibbonMode = "full" | "compact" | "auto";
+
+/** Initial layout settings for the built-in or composable ribbon. */
+export interface RibbonConfig {
+  /** Initial layout (default `full`). The ribbon's layout button changes it at run time. */
+  mode?: RibbonMode;
+  /** Width in CSS pixels below which `auto` uses compact (default 768). */
+  compactWidth?: number;
+}
+
+/**
+ * The `GridConfig` switches that choose built-in commands. They apply to every
+ * renderer of the command model: the toolbar, the full ribbon and the compact
+ * ribbon. Each defaults to true, except `export`.
+ */
+export type CommandFlags = Pick<
+  GridConfig,
+  | "undo"
+  | "bold"
+  | "italic"
+  | "align"
+  | "textColor"
+  | "fillColor"
+  | "border"
+  | "clearFormat"
+  | "merge"
+  | "sort"
+  | "export"
+>;
 
 /** Built-in action names accepted by custom context-menu rows. */
 export type ContextMenuActionName =
@@ -478,39 +512,44 @@ export type ContextMenuItems =
  * @see ContextMenuItem
  */
 export interface GridConfig {
-  /** Show the built-in toolbar (true), hide it (false), or supply a custom item list. */
+  /**
+   * Show the built-in toolbar (true), hide it (false), or supply a custom item
+   * list. The toolbar shows the ribbon's commands on one row, with the rest in
+   * a "More commands" menu.
+   */
   toolbar?: boolean | ToolbarItem[];
-  /** Show the bold control in the default toolbar (default true). */
+  /** Show Bold, and Underline and Strikethrough with Italic (default true). See {@link CommandFlags}. */
   bold?: boolean;
-  /** Show the italic control in the default toolbar (default true). */
+  /** Show Italic, and Underline and Strikethrough with Bold (default true). */
   italic?: boolean;
-  /** Show left, center, and right alignment controls (default true). */
+  /** Show the horizontal and vertical alignment commands (default true). */
   align?: boolean;
-  /** Show the text-color control in the default toolbar (default true). */
+  /** Show the Font Color command (default true). */
   textColor?: boolean;
-  /** Show the fill-color control in the default toolbar (default true). */
+  /** Show the Fill Color command (default true). */
   fillColor?: boolean;
-  /** Show the border control in the default toolbar (default true). */
+  /** Show the Borders command (default true). */
   border?: boolean;
-  /** Show the clear-format control in the default toolbar (default true). */
+  /** Show the Clear command, which holds Clear Formats (default true). */
   clearFormat?: boolean;
-  /** Show merge and unmerge controls in the default toolbar (default true). */
+  /** Show the Merge & Center command, which holds Merge and Unmerge (default true). */
   merge?: boolean;
-  /** Show ascending and descending sort controls in the default toolbar (default true). */
+  /** Show Sort & Filter and the sort commands (default true). */
   sort?: boolean;
-  /** Show CSV/XLSX export controls in the default toolbar (default false). */
+  /** Show the Export CSV and Export XLSX commands (default false). */
   export?: boolean;
   /**
    * Replace the built-in toolbar with an Excel-style ribbon (Home, Insert,
-   * Data and View tabs) that narrows its groups as the grid gets narrower.
-   * A custom `toolbar` item list still renders the flat toolbar instead.
+   * Data and View tabs). Pass an object to choose its initial full, compact
+   * or automatic layout. A custom `toolbar` item list still renders the
+   * toolbar instead.
    */
-  ribbon?: boolean;
+  ribbon?: boolean | RibbonConfig;
   /** Replace built-in command icons by glyph name, in the toolbar, ribbon, ribbon menus and context menu. See {@link IconOverrides}. */
   icons?: IconOverrides;
   /** Built-in menu, disabled menu, static rows, or a request-aware row factory. */
   contextMenu?: boolean | ContextMenuItems;
-  /** Show undo/redo controls in the built-in toolbar (default true). */
+  /** Show Undo and Redo (default true). */
   undo?: boolean;
   /** Built-in Ctrl+F find widget: enabled (true, default) or disabled (false). */
   find?: boolean;

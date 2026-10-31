@@ -17,9 +17,9 @@ const saved = await toXlsxWorkbook(snapshot, options);
 console.log(snapshot.workbook.xlsxSource?.graphs.length ?? 0);
 ```
 
-The saved workbook retains its modelled cells. Eligible charts, pivots, images and macros travel alongside them as opaque package parts, not as flattened cell values.
+The saved workbook retains its modelled cells. Eligible charts, pivots, images and macros travel alongside them as opaque package parts, not as flattened cell values. Charts that the chart model can hold are not kept parts: import reads them into `Sheet.charts`, edits keep them, and export writes them again. See [Charts in XLSX files](/docs/features/analysis/charts/#charts-in-xlsx-files).
 
-| Operation | Result for an eligible imported chart graph |
+| Operation | Result for a kept chart graph (a chart that the chart model cannot hold) |
 | --- | --- |
 | Open → save, no edits | Original compressed payload retained. |
 | Change a cell → save | Graph dropped; structured warning reports loss. |
@@ -60,9 +60,11 @@ The payload is base64-encoded for JSON-safe persistence: about four thirds of it
 | --- | --- |
 | VBA project (`.xlsm`), customXml items, XML maps, data connections, theme, core and custom document properties | Always: they do not read cells. Macro workbooks retain the macro content type. |
 | Images and other drawings without charts, single-cell XML tables | Their sheet still exists and no row or column on it was inserted, removed, moved, resized, hidden or merged. |
-| Charts and pivot tables, with their caches | No cell on any sheet changed, no sheet was renamed or removed, and no defined name changed. |
+| Charts that the chart model cannot hold, and pivot tables, with their caches | No cell on any sheet changed, no sheet was renamed or removed, and no defined name changed. |
 
 Shared parts such as a pivot and its cache form one graph: they are kept or dropped together.
+
+A drawing that holds both charts that Sheetwrite reads and other objects is split. The charts go to `Sheet.charts`, and the kept drawing keeps only the other anchors. On export, Sheetwrite charts go into the sheet's kept drawing, because a worksheet has only one drawing.
 
 ## Drops and warnings
 

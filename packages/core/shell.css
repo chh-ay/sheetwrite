@@ -29,26 +29,13 @@
   overflow-x: auto;
 }
 
-/* The ribbon fits its groups to its own width, so it must fill the row. If it
-   sized to its content, folded groups would keep it narrow and never unfold. */
-.sheetwrite-shell-toolbar-row > .sheetwrite-ribbon {
+/* The ribbon and the toolbar fit their commands to their own width, so they
+   must fill the row. If they sized to their content, folded groups and the
+   toolbar's More commands list would never unfold. Their look comes from
+   styles.css. */
+.sheetwrite-shell-toolbar-row > :is(.sheetwrite-ribbon, .sheetwrite-command-toolbar) {
   flex: 1 1 auto;
   min-width: 0;
-}
-
-/* The standalone toolbar reuses the built-in control classes
-   (.sheetwrite-tb-button / .sheetwrite-tb-color / .sheetwrite-tb-separator)
-   so it inherits their cosmetics from styles.css. */
-.sheetwrite-shell-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 4px 8px;
-  background: var(--sheetwrite-toolbar-bg, #f4ede1);
-  color: var(--sheetwrite-toolbar-fg, #6b4a1f);
-  border-bottom: 1px solid var(--sheetwrite-widget-border, #eeeeee);
-  min-width: 0;
-  flex: 1;
 }
 
 .sheetwrite-shell-formula-row {

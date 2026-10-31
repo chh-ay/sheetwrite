@@ -22,7 +22,7 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-function mount(toolbar: ToolbarItem[]): HTMLElement {
+async function mount(toolbar: ToolbarItem[]): Promise<HTMLElement> {
   const host = document.createElement("div");
   Object.defineProperties(host, { clientWidth: { value: 800 }, clientHeight: { value: 400 } });
   document.body.append(host);
@@ -31,6 +31,8 @@ function mount(toolbar: ToolbarItem[]): HTMLElement {
     data: makeColumnarData(3),
     config: { toolbar, contextMenu: [{ id: "copy", action: "copy" }], find: true },
   });
+  // The toolbar loads lazily; awaiting its module runs the grid's mount first.
+  await import("../src/ribbon/command-toolbar.js");
   return host;
 }
 
@@ -48,7 +50,7 @@ describe("built-in action feedback", () => {
   it("ignores a second start while a toolbar command is pending and restores the control", async () => {
     let finish: (() => void) | undefined;
     let starts = 0;
-    const host = mount([
+    const host = await mount([
       {
         title: "Save",
         icon: "Save",
@@ -79,7 +81,7 @@ describe("built-in action feedback", () => {
   it("shows a failed command in an alert and clears the message after its display interval", async () => {
     jest.useFakeTimers();
     try {
-      const host = mount([
+      const host = await mount([
         {
           title: "Save",
           onClick: () => {
@@ -102,7 +104,7 @@ describe("built-in action feedback", () => {
   });
 
   it("shows blocked clipboard access after a context-menu command closes the menu", async () => {
-    const host = mount([]);
+    const host = await mount([]);
     if (!grid) throw new Error("Grid did not mount");
     const copy = spyOn(grid.actions, "copy").mockResolvedValue("blocked");
     const menu = new ContextMenu(
@@ -132,7 +134,7 @@ describe("built-in action feedback", () => {
 
   for (const format of ["csv", "xlsx"] as const) {
     it(`shows ${format} export failures and emits the format without rejecting the action`, async () => {
-      const host = mount([{ action: format === "csv" ? "exportCsv" : "exportXlsx" }]);
+      const host = await mount([{ action: format === "csv" ? "exportCsv" : "exportXlsx" }]);
       if (!grid) throw new Error("Grid did not mount");
       const failure = new Error("Download failed");
       const exporter =

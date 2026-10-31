@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
-import { DEFAULT_THEME, GridImpl, initSheetwrite } from "../src/grid.js";
+import { GridImpl, initSheetwrite } from "../src/grid.js";
 import {
   createFormulaBar,
   createNameBox,
@@ -140,41 +140,68 @@ describe("createToolbar", () => {
     store.dispose();
   });
 
-  it("shows the theme's text and fill colors until the user picks one", () => {
+  it("shows the ribbon's commands with the default flags, Export included", () => {
     const { grid, store, host } = makeGrid();
-    grid.setTheme({ fg: "#123", bg: "rgb(250, 240, 230)" });
-    const piece = createToolbar(host, grid, {
-      items: [{ action: "textColor" }, { action: "fillColor" }],
-    });
-    const [text, fill] = [...piece.element.querySelectorAll<HTMLInputElement>("input")];
-    // An unseeded color input shows black, which is wrong for an unstyled fill.
-    expect(text!.value).toBe("#112233");
-    expect(fill!.value).toBe("#faf0e6");
+    const piece = createToolbar(host, grid, { flags: { export: true, italic: false } });
+    const command = (id: string) => piece.element.querySelector(`[data-command="${id}"]`);
 
-    // A theme switch (for example to dark) updates swatches the user has not used.
-    grid.setTheme({ fg: "#e5e7eb", bg: "#0b1220" });
-    expect(text!.value).toBe("#e5e7eb");
-    expect(fill!.value).toBe("#0b1220");
-
-    // Once the user picks a fill, that choice stays when the theme changes.
-    const addr = { sheet: "s1", row: 1, col: 0 };
-    grid.setSelection({ kind: "cell", addr });
-    fill!.value = "#ff0000";
-    fill!.dispatchEvent(new Event("change"));
-    fill!.dispatchEvent(new Event("blur"));
-    expect(store.getCell(addr).style.backgroundColor).toBe("#ff0000");
-    grid.replaceTheme(undefined);
-    expect(fill!.value).toBe("#ff0000");
-    // The text swatch was never picked, so it follows the reset to the default theme.
-    expect(text!.value).toBe(DEFAULT_THEME.fg);
+    // Commands from every ribbon tab, in ribbon order, each once.
+    for (const id of ["undo", "paste", "fontSize", "textColor", "insert", "chart", "zoom"]) {
+      expect(command(id), id).not.toBeNull();
+    }
+    expect(piece.element.querySelectorAll('[data-command="insert"]')).toHaveLength(1);
+    expect(command("exportCsv")).not.toBeNull();
+    expect(command("italic")).toBeNull();
+    // Underline shows while either Bold or Italic is on.
+    expect(command("underline")).not.toBeNull();
 
     piece.destroy();
     grid.destroy();
     store.dispose();
   });
+
+  it("keeps one-click border, merge, unmerge and clear-format buttons in custom toolbars", async () => {
+    const { grid, store, host } = makeGrid();
+    const piece = createToolbar(host, grid, {
+      items: [
+        { action: "border" },
+        { action: "merge" },
+        { action: "unmerge" },
+        { action: "clearFormat" },
+      ],
+    });
+    const click = async (action: string): Promise<void> => {
+      const button = piece.element.querySelector<HTMLButtonElement>(`[data-command="${action}"]`);
+      if (button === null) throw new Error(`no ${action} button`);
+      button.click();
+      for (let turn = 0; turn < 8; turn += 1) await Promise.resolve();
+    };
+    const range = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } };
+    grid.setSelection({ kind: "range", range });
+    grid.styleRange(range, { bold: true });
+
+    await click("border");
+    // The pre-0.7 one-click toggle: an all-sides border on every selected cell.
+    expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).style.border?.all).toBeDefined();
+    expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).style.border?.all).toBeDefined();
+    // A second click removes it again, so the item is a toggle, not a one-way setter.
+    await click("border");
+    expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).style.border?.all).toBeUndefined();
+    expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).style.border?.all).toBeUndefined();
+    await click("merge");
+    expect(grid.store.getWorkbook().sheets[0]?.merges ?? []).toHaveLength(1);
+    await click("unmerge");
+    expect(grid.store.getWorkbook().sheets[0]?.merges ?? []).toHaveLength(0);
+    await click("clearFormat");
+    expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).style.bold).not.toBe(true);
+
+    piece.destroy();
+    grid.destroy();
+    store.dispose();
+  });
+
   it("moves keyboard focus within toolbar bounds and ignores unrelated keys", () => {
-    const host = mountHost();
-    const grid = {} as Grid;
+    const { grid, store, host } = makeGrid();
     const piece = createToolbar(host, grid, {
       label: "Editing",
       items: [
@@ -205,7 +232,51 @@ describe("createToolbar", () => {
       expect(piece.element.getAttribute("aria-label")).toBe("Editing");
     } finally {
       piece.destroy();
-      host.remove();
+      grid.destroy();
+      store.dispose();
+    }
+  });
+
+  it("moves arrow focus past disabled controls and combo arrows", () => {
+    const { grid, store, host } = makeGrid();
+    const piece = createToolbar(host, grid, {
+      items: [
+        { onClick: () => {}, title: "One" },
+        { action: "undo" },
+        { onClick: () => {}, title: "Two" },
+      ],
+    });
+    const fullPiece = createToolbar(host, grid);
+    const key = (name: string): void => {
+      document.activeElement?.dispatchEvent(
+        new KeyboardEvent("keydown", { key: name, bubbles: true, cancelable: true }),
+      );
+    };
+    try {
+      grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
+      const [one, undo, two] = [...piece.element.querySelectorAll<HTMLButtonElement>("button")];
+      if (one === undefined || undo === undefined || two === undefined) {
+        throw new Error("custom toolbar buttons missing");
+      }
+      // A fresh grid has no history, so Undo is disabled between two enabled buttons.
+      expect(undo.disabled).toBe(true);
+      one.focus();
+      key("ArrowRight");
+      expect(document.activeElement).toBe(two);
+      key("Home");
+      expect(document.activeElement).toBe(one);
+
+      // Combo arrows have tabIndex -1: Left from Grow lands in the size box.
+      fullPiece.element.querySelector<HTMLButtonElement>('[data-command="fontGrow"]')?.focus();
+      key("ArrowLeft");
+      const landed = document.activeElement;
+      if (!(landed instanceof HTMLInputElement)) throw new Error("focus did not reach a box");
+      expect(landed.closest<HTMLElement>("[data-command]")?.dataset.command).toBe("fontSize");
+    } finally {
+      fullPiece.destroy();
+      piece.destroy();
+      grid.destroy();
+      store.dispose();
     }
   });
 });
@@ -380,7 +451,7 @@ describe("createSelectionStatus", () => {
 });
 
 describe("createSpreadsheetShell", () => {
-  it("composes one grid with shell chrome and no duplicate built-ins", () => {
+  it("composes one grid with shell chrome and no duplicate built-ins", async () => {
     const host = mountHost();
     const workbook = multiSheetWorkbook();
     const ready: Grid[] = [];
@@ -391,6 +462,9 @@ describe("createSpreadsheetShell", () => {
     });
 
     expect(ready).toEqual([shell.grid]);
+    // The shell toolbar loads lazily: wait for its module, then for the mount callback.
+    await import("../src/shell/toolbar-factory.js");
+    for (let turn = 0; turn < 8; turn += 1) await Promise.resolve();
     // One toolbar and one tab list: the grid's own built-ins are suppressed.
     expect(host.querySelectorAll('[role="toolbar"]')).toHaveLength(1);
     expect(host.querySelectorAll('[role="tablist"]')).toHaveLength(1);

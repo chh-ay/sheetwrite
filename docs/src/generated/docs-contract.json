@@ -68,7 +68,7 @@
         "events": "/docs/reference/events/",
         "feature-flags": "/docs/features/grid/toolbar-and-ribbon/#feature-flags",
         "grid-instance": "/docs/features/grid/grid-methods/",
-        "gridconfig-toolbar": "/docs/features/grid/toolbar-and-ribbon/#gridconfig-toolbar",
+        "gridconfig-toolbar": "/docs/features/grid/toolbar-and-ribbon/#command-flags",
         "gridoptions": "/docs/features/grid/options-and-presentation/#gridoptions",
         "host-owned-command-state": "/docs/features/grid/toolbar-and-ribbon/#host-owned-command-state",
         "host-supplied-editors": "/docs/features/grid/custom-editors/",
@@ -142,7 +142,7 @@
         "resizing": "/docs/features/grid/resize-merge-and-fill/#resizing",
         "selection-model": "/docs/features/grid/selection-and-keyboard/#selection-model",
         "temporary-highlights": "/docs/features/grid/context-menu/#temporary-highlights",
-        "toolbar-actions": "/docs/features/grid/toolbar-and-ribbon/#toolbar-actions",
+        "toolbar-actions": "/docs/features/grid/toolbar-and-ribbon/#custom-toolbar-items",
         "touch": "/docs/features/grid/touch/",
         "undo-and-redo": "/docs/features/grid/editing-and-clipboard/#undo-and-redo",
         "validation-protection-and-notes": "/docs/features/data/validation-protection-and-notes/"
@@ -250,9 +250,9 @@
     "toXlsxWorkbook"
   ],
   "entryPointCount": 25,
-  "exportCount": 582,
-  "symbolPageCount": 582,
-  "apiSha256": "0f309070a25987f833d6fc2190e3c73dc976c100229d2a65d8728ec15b0af961",
+  "exportCount": 585,
+  "symbolPageCount": 585,
+  "apiSha256": "eb2b899d09f3d8e469816abfcc8213549a250d3c808d0558bf1b9a1d44e683d3",
   "compatibilitySha256": "e143b934f76b766d7a143fe904aad4f3a4d974c26081d28010f5795e7c8fc4d2",
   "formulaContractSha256": "571bda78fb0dcea2b86a39a62a4c8d67f46ca485ac3636d54833617aeb42391c"
 }

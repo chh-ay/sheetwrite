@@ -45,8 +45,8 @@ test("semantic headers, editor lifecycle, focus, and command ARIA", async ({ pag
     page.locator(`${HOST} [role="row"][aria-rowindex="2"] [role="gridcell"]`).nth(1),
   ).toHaveText("Paused");
 
-  const bold = page.locator(`${HOST} .sheetwrite-tb-bold`);
-  const undo = page.locator(`${HOST} .sheetwrite-tb-undo`);
+  const bold = page.locator(`${HOST} [data-command="bold"]`);
+  const undo = page.locator(`${HOST} [data-command="undo"]`);
   await page.evaluate(() => {
     window.__sheetwriteSemanticGridFixture?.select(0, 0, 0);
     window.__sheetwriteSemanticGridFixture?.toggleBold();
