@@ -1366,65 +1366,6 @@ async function recordRelease(history: SizeHistory, release: SizeReleaseSnapshot)
   await runCommand(["bunx", "oxfmt", historyPath]);
 }
 
-/**
- * Compressed sizes of the Next.js bundle move by a few bytes between builds of
- * the same source, because Next emits the same code in a different order. Raw
- * sizes and counts must match exactly.
- */
-const COMPRESSED_DRIFT_BYTES = 32;
-const COMPRESSED_METRIC = /(?:gzip|brotli)Bytes$/;
-
-/**
- * Metrics where the committed report and a new measurement disagree. The docs
- * build renders the committed report, so a disagreement means the published
- * size pages would show old numbers.
- */
-function committedReportDrift(
-  committed: Readonly<Record<string, Pick<Metric, "actual">>>,
-  measured: Readonly<Record<string, Pick<Metric, "actual">>>,
-): string[] {
-  const names = new Set([...Object.keys(committed), ...Object.keys(measured)]);
-  const drift: string[] = [];
-
-  for (const name of [...names].sort()) {
-    const before = committed[name]?.actual;
-    const after = measured[name]?.actual;
-    if (before === undefined || after === undefined) {
-      drift.push(`${name}: ${before ?? "missing"} committed, ${after ?? "missing"} measured`);
-      continue;
-    }
-
-    const allowed = COMPRESSED_METRIC.test(name) ? COMPRESSED_DRIFT_BYTES : 0;
-    if (Math.abs(after - before) > allowed) {
-      drift.push(`${name}: ${before} committed, ${after} measured`);
-    }
-  }
-
-  return drift;
-}
-
-async function committedMetrics(): Promise<Record<string, Pick<Metric, "actual">>> {
-  const committed: unknown = JSON.parse(await readFile(reportPath, "utf8"));
-  if (typeof committed !== "object" || committed === null || !("metrics" in committed)) {
-    throw new Error("scripts/size-report.json has no metrics");
-  }
-  const { metrics } = committed;
-  if (typeof metrics !== "object" || metrics === null) {
-    throw new Error("scripts/size-report.json metrics must be an object");
-  }
-
-  return Object.fromEntries(
-    Object.entries(metrics).flatMap(([name, metric]: [string, unknown]) =>
-      typeof metric === "object" &&
-      metric !== null &&
-      "actual" in metric &&
-      typeof metric.actual === "number"
-        ? [[name, { actual: metric.actual }]]
-        : [],
-    ),
-  );
-}
-
 async function writeReport(report: SizeReport): Promise<void> {
   await rm(join(import.meta.dir, "size-report-failure.json"), { force: true });
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
@@ -1458,8 +1399,6 @@ function optionValue(name: string): string | undefined {
 async function cli(): Promise<void> {
   const mode = process.argv[2] ?? "report";
   const reuseBundlers = process.argv.includes("--reuse-bundlers");
-  // CI: the measurement must match the committed report that the docs render.
-  const checkCommitted = process.argv.includes("--check-committed");
   const artifactDirectory = optionValue("--artifacts");
   try {
     if (mode !== "report" && mode !== "history" && mode !== "record") {
@@ -1497,7 +1436,6 @@ async function cli(): Promise<void> {
     ) {
       throw new Error("Size report artifact input differs from the canonical artifact set");
     }
-    const committed = checkCommitted ? await committedMetrics() : undefined;
     const report = await buildSizeReport(reuseBundlers, artifactDirectory);
     await writeReport(report);
     console.log(formatTable(report));
@@ -1512,16 +1450,6 @@ async function cli(): Promise<void> {
       console.log(
         `Artifact manifest SHA-512: ${await readReleaseManifestDigest(artifactDirectory)}`,
       );
-    }
-    if (committed !== undefined) {
-      const drift = committedReportDrift(committed, report.metrics);
-      if (drift.length > 0) {
-        throw new Error(
-          `scripts/size-report.json is out of date (${drift.length} metrics). Run \`bun run size:report\` and commit scripts/size-report.json.\n${drift.slice(0, 40).join("\n")}`,
-        );
-      }
-
-      console.log("Committed size report matches this measurement");
     }
   } catch (error) {
     await writeFailure(error);

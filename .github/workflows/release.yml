@@ -99,10 +99,16 @@ jobs:
       - name: Generate published package size history
         id: size-history
         if: steps.publish.outputs.verified != '[]'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_RUN_ID: ${{ needs.identity.outputs.ci_run_id }}
         run: |
           VERSION="$(node -p "require('./packages/core/package.json').version")"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           bun run size:record --version="$VERSION"
+          # The landing page's first-load size is release evidence: take the
+          # measurement of the same CI run whose tarballs were published.
+          gh run download "$CI_RUN_ID" --name size-evidence --dir scripts
           bun run docs:generate
       - name: Open package size history pull request
         if: steps.publish.outputs.verified != '[]'
@@ -119,3 +125,5 @@ jobs:
             scripts/size-history.json
             docs/src/content/docs/performance/delivery-size.md
             docs/src/generated/docs-contract.json
+            scripts/size-report.json
+            docs/src/generated/landing-bench.json
