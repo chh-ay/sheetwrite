@@ -186,18 +186,9 @@ impl SheetFormulas {
     /// Records whether the entry now at `key` belongs to a key set. The first
     /// member allocates the set and removing the last one frees it, so a
     /// sheet that once held RAND returns to no heap; removal skips the probe
-    /// while there is no set, which is the common case. Only that check is
-    /// inlined into the many entry writers; the set update is one shared
-    /// function, which keeps the engine binary small.
+    /// while there is no set, which is the common case.
     #[inline]
     fn track_key(keys: &mut Option<Box<FxHashSet<CellKey>>>, key: CellKey, is_member: bool) {
-        if is_member || keys.is_some() {
-            Self::update_key_set(keys, key, is_member);
-        }
-    }
-
-    #[inline(never)]
-    fn update_key_set(keys: &mut Option<Box<FxHashSet<CellKey>>>, key: CellKey, is_member: bool) {
         if is_member {
             keys.get_or_insert_default().insert(key);
         } else if let Some(members) = keys {

@@ -721,10 +721,6 @@ impl CellStore {
     /// Every other recalculation reads the clock once, as Excel does, so all
     /// NOW and TODAY formulas of one pass see the same instant. A pass without
     /// volatile formulas never reads it.
-    ///
-    /// Out of line: each export that recalculates would otherwise hold its own
-    /// copy of this barrier, and one call per pass costs nothing.
-    #[inline(never)]
     pub(crate) fn recompute_seed_sheets(&mut self, seeds: &[usize]) {
         // Without formulas or pivot tables an edit can change no calculated
         // value, so the barrier only ends the pass. Doing that here keeps the
