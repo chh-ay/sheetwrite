@@ -8,7 +8,7 @@ description: "RowBridgeColumn interface in @sheetwrite/core/adapter: Semantic co
 Semantic column key accepted by the row bridge.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L11"><code>packages/core/src/row-bridge.ts#L11</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/row-bridge.ts#L11"><code>packages/core/src/row-bridge.ts#L11</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>1</span>

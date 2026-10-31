@@ -24,7 +24,7 @@ export function WorkbookView({ workbook }: { workbook: Workbook }) {
 - [/docs/frameworks/react/](/docs/frameworks/react/)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/react/src/index.tsx#L289"><code>packages/react/src/index.tsx#L289</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/react/src/index.tsx#L289"><code>packages/react/src/index.tsx#L289</code></a></dd></div>
 </dl>
 
 ## Declaration

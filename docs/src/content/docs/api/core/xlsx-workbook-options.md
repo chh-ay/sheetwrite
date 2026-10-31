@@ -8,7 +8,7 @@ description: "XlsxWorkbookOptions interface in @sheetwrite/core: Shared options 
 Shared options passed to every registered table and workbook XLSX backend.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L544"><code>packages/core/src/export.ts#L544</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/export.ts#L544"><code>packages/core/src/export.ts#L544</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>

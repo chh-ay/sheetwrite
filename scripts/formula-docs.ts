@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
+import { repositorySourceUrl } from "../docs/src/lib/repository.js";
 import { validateFormulaContractRepository } from "./formula-contract.js";
 
 const DEFAULT_INVENTORY_PATH = "test/conformance/formula-contract.inventory.json";
@@ -80,7 +81,7 @@ function anchor(value: string): string {
 }
 
 function sourceLink(path: string): string {
-  return `[\`${path}\`](https://github.com/chh-ay/sheetwrite/blob/main/${path})`;
+  return `[\`${path}\`](${repositorySourceUrl(path)})`;
 }
 
 function valueText(value: unknown): string {

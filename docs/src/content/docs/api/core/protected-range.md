@@ -8,7 +8,7 @@ description: "ProtectedRange interface in @sheetwrite/core: Serializable client 
 Serializable client UX policy. A host resolver decides whether a local mutation may proceed.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L208"><code>packages/core/src/types/document.ts#L208</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L208"><code>packages/core/src/types/document.ts#L208</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>

@@ -27,7 +27,7 @@ function mountWorkbook(target: HTMLElement, workbook: Workbook) {
 - [/docs/frameworks/svelte/](/docs/frameworks/svelte/)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/svelte/src/Grid.svelte.d.ts#L7"><code>packages/svelte/src/Grid.svelte.d.ts#L7</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/svelte/src/Grid.svelte.d.ts#L7"><code>packages/svelte/src/Grid.svelte.d.ts#L7</code></a></dd></div>
 </dl>
 
 ## Declaration

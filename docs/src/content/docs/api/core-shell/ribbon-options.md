@@ -8,7 +8,7 @@ description: "RibbonOptions interface in @sheetwrite/core/shell: Options for cre
 Options for [`createRibbon`](/docs/api/core-shell/create-ribbon/).
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/ribbon-factory.ts#L9"><code>packages/core/src/shell/ribbon-factory.ts#L9</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/shell/ribbon-factory.ts#L9"><code>packages/core/src/shell/ribbon-factory.ts#L9</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>6</span>

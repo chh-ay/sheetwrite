@@ -8,7 +8,7 @@ description: "ChartChangeListener type in @sheetwrite/core: Listener for subscri
 Listener for `subscribeChartChanges` and `ChartViewProvider.subscribe`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/chart.ts#L89"><code>packages/core/src/types/chart.ts#L89</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/chart.ts#L89"><code>packages/core/src/types/chart.ts#L89</code></a></dd></div>
 </dl>
 
 ## Declaration

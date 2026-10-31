@@ -20,7 +20,7 @@ shared object only from their commit lifecycle; mutating it during render can
 expose callbacks from work that never commits.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/grid-controller.ts#L108"><code>packages/core/src/grid-controller.ts#L108</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/grid-controller.ts#L108"><code>packages/core/src/grid-controller.ts#L108</code></a></dd></div>
 </dl>
 
 ## Declaration

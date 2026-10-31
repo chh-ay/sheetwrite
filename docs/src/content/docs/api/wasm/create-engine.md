@@ -8,7 +8,7 @@ description: "createEngine function in @sheetwrite/wasm: Initialize a fresh engi
 Initialize a fresh engine; a compiled module can be reused without retaining its memory.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/loader.d.ts#L67"><code>packages/wasm/loader.d.ts#L67</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/loader.d.ts#L67"><code>packages/wasm/loader.d.ts#L67</code></a></dd></div>
 </dl>
 
 ## Declaration

@@ -8,7 +8,7 @@ description: "DEFAULT_MAX_ITERATIONS variable in @sheetwrite/core: Excel's itera
 Excel's iteration count for a new workbook.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L58"><code>packages/core/src/document-protocol.ts#L58</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/document-protocol.ts#L58"><code>packages/core/src/document-protocol.ts#L58</code></a></dd></div>
 </dl>
 
 ## Declaration

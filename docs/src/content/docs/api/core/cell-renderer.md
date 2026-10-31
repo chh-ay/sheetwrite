@@ -8,7 +8,7 @@ description: "CellRenderer interface in @sheetwrite/core: Custom cell renderer h
 Custom cell renderer hooks for the main-thread canvas or retained DOM overlay.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/render.ts#L51"><code>packages/core/src/types/render.ts#L51</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/render.ts#L51"><code>packages/core/src/types/render.ts#L51</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>
