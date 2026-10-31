@@ -1,4 +1,7 @@
 import { beforeAll, describe, expect, it } from "bun:test";
+import { rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import {
   fromXlsxTable,
@@ -32,6 +35,11 @@ const MIN_CELLS_PER_ABORT_CHECK = 64;
 /** An error keeps at most 8 KiB of file or host text, plus its own short prefix. */
 const MAX_ERROR_MESSAGE_BYTES = 8 * 1024 + 256;
 const MAX_WARNINGS = 64;
+/** Text cells in `snapshot()`; a held import keeps (almost) all of them alive. */
+const TEXT_CELL_COUNT = ROWS_PER_SHEET * SHEET_COUNT;
+/** Cell strings counted on top of one snapshot's worth before a probe counts as a leak. */
+const RETAINED_CELL_TOLERANCE = 16;
+const RETENTION_PROBE = new URL("./abort-retention-probe.ts", import.meta.url).pathname;
 
 function snapshot(): WorkbookSnapshot {
   return {
@@ -57,7 +65,7 @@ function snapshot(): WorkbookSnapshot {
             colOffset: index % COLUMN_COUNT,
             value: {
               kind: "literal" as const,
-              value: index % COLUMN_COUNT === 0 ? `text ${sheet} ${index}` : index,
+              value: index % COLUMN_COUNT === 0 ? `kept-cell-${sheet}-${index}` : index,
             },
           })),
         },
@@ -108,6 +116,35 @@ async function expectAbortAtEveryCheck(
   return total;
 }
 
+/**
+ * Run one `abort-retention-probe.ts` scenario in a fresh process and return how
+ * many imported cell strings it found alive. A separate process keeps this test
+ * runner's objects, and the fixture's own strings, out of the count.
+ */
+async function retainedCellStrings(
+  scenario: "aborted" | "dropped" | "held",
+  path: string,
+  abortAt: number,
+): Promise<number> {
+  const probe = Bun.spawn([process.execPath, RETENTION_PROBE, scenario, path, String(abortAt)], {
+    stdout: "pipe",
+    stderr: "inherit",
+  });
+  const output = await new Response(probe.stdout).text();
+  if ((await probe.exited) !== 0) throw new Error(`retention probe ${scenario} failed`);
+
+  const result: unknown = JSON.parse(output);
+  if (
+    typeof result !== "object" ||
+    result === null ||
+    !("cellStrings" in result) ||
+    typeof result.cellStrings !== "number"
+  ) {
+    throw new Error(`retention probe ${scenario} printed ${output}`);
+  }
+  return result.cellStrings;
+}
+
 describe("XLSX abort", () => {
   it("rejects workbook and table imports with the reason at every check, never per cell", async () => {
     const bytes = await toXlsxWorkbook(snapshot());
@@ -137,6 +174,31 @@ describe("XLSX abort", () => {
     expect(tableChecks).toBeLessThan(CELL_COUNT / MIN_CELLS_PER_ABORT_CHECK);
     expect(JSON.stringify(store.exportSnapshot())).toBe(before);
     store.dispose();
+  });
+
+  it("leaves at most one import's cells alive after repeated aborted imports, as for completed ones", async () => {
+    const bytes = await toXlsxWorkbook(snapshot());
+    const counting = signalAbortingAt(Number.POSITIVE_INFINITY, new Error("never"));
+    await fromXlsxWorkbook(bytes, { signal: counting.signal });
+    const path = join(tmpdir(), `sheetwrite-abort-retention-${process.pid}.xlsx`);
+    await Bun.write(path, bytes);
+
+    try {
+      const [aborted, dropped, held] = await Promise.all([
+        retainedCellStrings("aborted", path, counting.checks()),
+        retainedCellStrings("dropped", path, 1),
+        retainedCellStrings("held", path, 1),
+      ]);
+
+      expect(held).toBeGreaterThan(TEXT_CELL_COUNT / 2);
+      // The probe repeats the aborted and the dropped import four times. A stray
+      // stack pointer can pin the last one, so one copy may stay alive; a leak
+      // keeps one copy per import.
+      expect(dropped).toBeLessThanOrEqual(held + RETAINED_CELL_TOLERANCE);
+      expect(aborted).toBeLessThanOrEqual(held + RETAINED_CELL_TOLERANCE);
+    } finally {
+      await rm(path, { force: true });
+    }
   });
 });
 
