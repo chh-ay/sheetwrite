@@ -8,7 +8,7 @@ description: "WorkerAcknowledgement type in @sheetwrite/core/worker: Lifecycle a
 Lifecycle and frame acknowledgements posted back to the sender.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/worker.ts#L258"><code>packages/core/src/worker.ts#L258</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/worker.ts#L259"><code>packages/core/src/worker.ts#L259</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>3</span>

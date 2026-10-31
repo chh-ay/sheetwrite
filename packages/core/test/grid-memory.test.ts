@@ -229,3 +229,55 @@ describe("window reader trim", () => {
     store.dispose();
   });
 });
+
+describe("grid selectors", () => {
+  // The browser keeps a parsed copy of each different selector text for the
+  // page, so a selector with a per-grid id leaves one entry for every grid.
+  it("uses the same selector texts for every grid", () => {
+    const queryMethods = ["querySelector", "querySelectorAll", "matches", "closest"] as const;
+    const patched: Array<{ target: object; name: string; own?: PropertyDescriptor }> = [];
+    let selectors = new Set<string>();
+    for (const target of [Element.prototype, Document.prototype, DocumentFragment.prototype]) {
+      for (const name of queryMethods) {
+        const original: unknown = Reflect.get(target, name);
+        if (typeof original !== "function") continue;
+
+        patched.push({ target, name, own: Object.getOwnPropertyDescriptor(target, name) });
+        Object.defineProperty(target, name, {
+          configurable: true,
+          writable: true,
+          value(this: unknown, selector: string) {
+            selectors.add(selector);
+            return Reflect.apply(original, this, [selector]);
+          },
+        });
+      }
+    }
+
+    const selectorsOfOneGrid = (): Set<string> => {
+      selectors = new Set();
+      const host = mountHost();
+      const grid = new GridImpl(host, {
+        workbook: formattedWorkbook(),
+        data: makeColumnarData(ROWS),
+      });
+      scrollTo(host, 100 * 28);
+      grid.destroy();
+      host.remove();
+      return selectors;
+    };
+
+    try {
+      const first = selectorsOfOneGrid();
+      const second = selectorsOfOneGrid();
+
+      expect(first.size).toBeGreaterThan(0);
+      expect([...second].sort()).toEqual([...first].sort());
+    } finally {
+      for (const { target, name, own } of patched.reverse()) {
+        if (own) Object.defineProperty(target, name, own);
+        else Reflect.deleteProperty(target, name);
+      }
+    }
+  });
+});

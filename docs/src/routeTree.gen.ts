@@ -31,6 +31,7 @@ import { Route as ShowcasesPerformanceRouteImport } from './routes/showcases.per
 import { Route as ShowcasesSpreadsheetRouteImport } from './routes/showcases.spreadsheet'
 import { Route as TestCollaborationRouteImport } from './routes/test.collaboration'
 import { Route as TestFormulasEngineRouteImport } from './routes/test.formulas-engine'
+import { Route as TestGridMemoryRouteImport } from './routes/test.grid-memory'
 import { Route as TestPrefetchRouteImport } from './routes/test.prefetch'
 import { Route as TestRenderersRouteImport } from './routes/test.renderers'
 import { Route as TestSemanticGridRouteImport } from './routes/test.semantic-grid'
@@ -148,6 +149,11 @@ const TestFormulasEngineRoute = TestFormulasEngineRouteImport.update({
   path: '/test/formulas-engine',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TestGridMemoryRoute = TestGridMemoryRouteImport.update({
+  id: '/test/grid-memory',
+  path: '/test/grid-memory',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TestPrefetchRoute = TestPrefetchRouteImport.update({
   id: '/test/prefetch',
   path: '/test/prefetch',
@@ -196,6 +202,7 @@ export interface FileRoutesByFullPath {
   '/showcases/spreadsheet': typeof ShowcasesSpreadsheetRoute
   '/test/collaboration': typeof TestCollaborationRoute
   '/test/formulas-engine': typeof TestFormulasEngineRoute
+  '/test/grid-memory': typeof TestGridMemoryRoute
   '/test/prefetch': typeof TestPrefetchRoute
   '/test/renderers': typeof TestRenderersRoute
   '/test/semantic-grid': typeof TestSemanticGridRoute
@@ -225,6 +232,7 @@ export interface FileRoutesByTo {
   '/showcases/spreadsheet': typeof ShowcasesSpreadsheetRoute
   '/test/collaboration': typeof TestCollaborationRoute
   '/test/formulas-engine': typeof TestFormulasEngineRoute
+  '/test/grid-memory': typeof TestGridMemoryRoute
   '/test/prefetch': typeof TestPrefetchRoute
   '/test/renderers': typeof TestRenderersRoute
   '/test/semantic-grid': typeof TestSemanticGridRoute
@@ -255,6 +263,7 @@ export interface FileRoutesById {
   '/showcases/spreadsheet': typeof ShowcasesSpreadsheetRoute
   '/test/collaboration': typeof TestCollaborationRoute
   '/test/formulas-engine': typeof TestFormulasEngineRoute
+  '/test/grid-memory': typeof TestGridMemoryRoute
   '/test/prefetch': typeof TestPrefetchRoute
   '/test/renderers': typeof TestRenderersRoute
   '/test/semantic-grid': typeof TestSemanticGridRoute
@@ -286,6 +295,7 @@ export interface FileRouteTypes {
     | '/showcases/spreadsheet'
     | '/test/collaboration'
     | '/test/formulas-engine'
+    | '/test/grid-memory'
     | '/test/prefetch'
     | '/test/renderers'
     | '/test/semantic-grid'
@@ -315,6 +325,7 @@ export interface FileRouteTypes {
     | '/showcases/spreadsheet'
     | '/test/collaboration'
     | '/test/formulas-engine'
+    | '/test/grid-memory'
     | '/test/prefetch'
     | '/test/renderers'
     | '/test/semantic-grid'
@@ -344,6 +355,7 @@ export interface FileRouteTypes {
     | '/showcases/spreadsheet'
     | '/test/collaboration'
     | '/test/formulas-engine'
+    | '/test/grid-memory'
     | '/test/prefetch'
     | '/test/renderers'
     | '/test/semantic-grid'
@@ -374,6 +386,7 @@ export interface RootRouteChildren {
   ShowcasesSpreadsheetRoute: typeof ShowcasesSpreadsheetRoute
   TestCollaborationRoute: typeof TestCollaborationRoute
   TestFormulasEngineRoute: typeof TestFormulasEngineRoute
+  TestGridMemoryRoute: typeof TestGridMemoryRoute
   TestPrefetchRoute: typeof TestPrefetchRoute
   TestRenderersRoute: typeof TestRenderersRoute
   TestSemanticGridRoute: typeof TestSemanticGridRoute
@@ -539,6 +552,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TestFormulasEngineRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/test/grid-memory': {
+      id: '/test/grid-memory'
+      path: '/test/grid-memory'
+      fullPath: '/test/grid-memory'
+      preLoaderRoute: typeof TestGridMemoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/test/prefetch': {
       id: '/test/prefetch'
       path: '/test/prefetch'
@@ -598,6 +618,7 @@ const rootRouteChildren: RootRouteChildren = {
   ShowcasesSpreadsheetRoute: ShowcasesSpreadsheetRoute,
   TestCollaborationRoute: TestCollaborationRoute,
   TestFormulasEngineRoute: TestFormulasEngineRoute,
+  TestGridMemoryRoute: TestGridMemoryRoute,
   TestPrefetchRoute: TestPrefetchRoute,
   TestRenderersRoute: TestRenderersRoute,
   TestSemanticGridRoute: TestSemanticGridRoute,
