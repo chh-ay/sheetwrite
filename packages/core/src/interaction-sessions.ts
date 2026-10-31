@@ -4,7 +4,6 @@ import { ContextMenu } from "./context-menu.js";
 import { CustomEditorController } from "./custom-editor.js";
 import { EditController, type EditNavigate } from "./editor.js";
 import { detectFillSeries, type FillSeries, type FillSourceCell } from "./fill-series.js";
-import type { FindBar } from "./find-bar.js";
 import type { Keymap } from "./keymap.js";
 import { autofitColumnWidth, MIN_COLUMN_WIDTH, MIN_ROW_HEIGHT, resizeTargetAt } from "./resize.js";
 import type { CellRef, SelectionModel, SelRect } from "./selection.js";
@@ -41,7 +40,8 @@ interface InteractionDependencies {
   editListeners: {
     readonly [K in "edit-begin" | "edit-commit"]: ReadonlySet<(payload: GridEvents[K]) => void>;
   };
-  findBar: () => FindBar | null;
+  /** Open the find bar; it may load first. `replace: true` focuses the replace field. */
+  openFind: (options?: { replace?: boolean }) => void;
   store: Store;
   loadable: SheetwriteStore | null;
   selection: () => SelectionModel;
@@ -853,10 +853,10 @@ export class InteractionSessions {
       e.preventDefault();
       switch (action) {
         case "find":
-          this.deps.findBar()?.open();
+          this.deps.openFind();
           break;
         case "replace":
-          this.deps.findBar()?.open({ replace: true });
+          this.deps.openFind({ replace: true });
           break;
         case "undo":
           this.deps.undo();

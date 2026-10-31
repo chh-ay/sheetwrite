@@ -12010,9 +12010,13 @@ drops them for the other grids. WebAssembly memory does not shrink; call
 `releaseEngineMemory()` for that.
 @example
 ```ts
-document.addEventListener("visibilitychange", () => {
+import type { Grid } from "@sheetwrite/core";
+
+function trimWhenHidden(grid: Grid) {
+ document.addEventListener("visibilitychange", () => {
  if (document.visibilityState === "hidden") grid.trimMemory();
-});
+ });
+}
 ```
 - `undo` — Undo the last recorded cell edit. If the restored data is above the
 transaction resource limits, nothing changes: the Grid emits
@@ -12052,7 +12056,8 @@ nothing on a read-only grid.
 - `exportCsv` — Download the active sheet as CSV. Never throws; a failure emits `export-error`.
 - `exportXlsx` — Download the active sheet as XLSX. Resolves when the download starts and never
 rejects; a failure emits `export-error`.
-- `find` — Open the built-in find bar when it is enabled.
+- `find` — Open the built-in find bar when it is enabled. The find bar is in its own
+chunk: the first call loads it, and the bar shows when the chunk arrives.
 - `freezePanes` — Freeze rows above and columns left of the focus cell in view coordinates.
 Does nothing without a selection; focusing A1 unfreezes both axes.
 - `mergeAndCenter` — Merge the selection and center its text, as one undoable step.
@@ -16730,9 +16735,13 @@ drops them for the other grids. WebAssembly memory does not shrink; call
 `releaseEngineMemory()` for that.
 @example
 ```ts
-document.addEventListener("visibilitychange", () => {
+import type { Grid } from "@sheetwrite/core";
+
+function trimWhenHidden(grid: Grid) {
+ document.addEventListener("visibilitychange", () => {
  if (document.visibilityState === "hidden") grid.trimMemory();
-});
+ });
+}
 ```
 - `undo` — Undo the last recorded cell edit. If the restored data is above the
 transaction resource limits, nothing changes: the Grid emits
@@ -17309,9 +17318,13 @@ drops them for the other grids. WebAssembly memory does not shrink; call
 `releaseEngineMemory()` for that.
 @example
 ```ts
-document.addEventListener("visibilitychange", () => {
+import type { Grid } from "@sheetwrite/core";
+
+function trimWhenHidden(grid: Grid) {
+ document.addEventListener("visibilitychange", () => {
  if (document.visibilityState === "hidden") grid.trimMemory();
-});
+ });
+}
 ```
 - `undo` — Undo the last recorded cell edit. If the restored data is above the
 transaction resource limits, nothing changes: the Grid emits
@@ -17869,9 +17882,13 @@ drops them for the other grids. WebAssembly memory does not shrink; call
 `releaseEngineMemory()` for that.
 @example
 ```ts
-document.addEventListener("visibilitychange", () => {
+import type { Grid } from "@sheetwrite/core";
+
+function trimWhenHidden(grid: Grid) {
+ document.addEventListener("visibilitychange", () => {
  if (document.visibilityState === "hidden") grid.trimMemory();
-});
+ });
+}
 ```
 - `undo` — Undo the last recorded cell edit. If the restored data is above the
 transaction resource limits, nothing changes: the Grid emits

@@ -249,6 +249,8 @@ autoSum(): void;
 find(): void;
 ```
 
+<p class="api-member-doc">Open the built-in find bar when it is enabled. The find bar is in its own
+chunk: the first call loads it, and the bar shows when the chunk arrives.</p>
 </details>
 
 <details class="api-member" id="grid-actions-freeze-panes" data-pagefind-weight="1">

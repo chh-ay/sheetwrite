@@ -173,7 +173,10 @@ export interface GridActions {
    * above it, or to its left when there are none above.
    */
   autoSum(): void;
-  /** Open the built-in find bar when it is enabled. */
+  /**
+   * Open the built-in find bar when it is enabled. The find bar is in its own
+   * chunk: the first call loads it, and the bar shows when the chunk arrives.
+   */
   find(): void;
   /**
    * Freeze rows above and columns left of the focus cell in view coordinates.
@@ -1168,9 +1171,13 @@ export interface Grid {
    *
    * @example
    * ```ts
-   * document.addEventListener("visibilitychange", () => {
-   *   if (document.visibilityState === "hidden") grid.trimMemory();
-   * });
+   * import type { Grid } from "@sheetwrite/core";
+   *
+   * function trimWhenHidden(grid: Grid) {
+   *   document.addEventListener("visibilitychange", () => {
+   *     if (document.visibilityState === "hidden") grid.trimMemory();
+   *   });
+   * }
    * ```
    */
   trimMemory(): void;

@@ -28,7 +28,7 @@ function updateTotal(grid: Grid) {
 - [Grid.applyTransaction](/docs/api/react/grid/#grid-apply-transaction)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/grid.d.ts#L633"><code>packages/core/dist/types/grid.d.ts#L633</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/grid.d.ts#L636"><code>packages/core/dist/types/grid.d.ts#L636</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -1257,9 +1257,13 @@ drops them for the other grids. WebAssembly memory does not shrink; call
 ### Examples
 
 ```ts compile
-document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "hidden") grid.trimMemory();
-});
+import type { Grid } from "@sheetwrite/core";
+
+function trimWhenHidden(grid: Grid) {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") grid.trimMemory();
+  });
+}
 ```
 
 </details>

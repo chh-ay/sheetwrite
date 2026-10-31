@@ -31,15 +31,18 @@ if (wasm.length !== 1) throw new Error(`Expected one webpack WASM asset, got ${w
 if (!publicFiles.includes("main.js")) throw new Error("webpack emitted no initial main.js");
 
 // `chunkFilename` names every lazy chunk `worker-*`, so tell the opt-in chrome
-// (the ribbon, the toolbar and the command model they share) and the chart and
-// pivot panels apart by content. Both must stay out of main.js, or every app
-// downloads them. Webpack may split the chrome into several chunks.
+// (the ribbon, the toolbar and the command model they share), the chart and
+// pivot panels and the find bar apart by content. All of them must stay out of
+// main.js, or every app downloads them. Webpack may split the chrome into
+// several chunks.
 const RIBBON_MARKER = "sheetwrite-ribbon-tabs";
 const TOOLBAR_MARKER = "sheetwrite-command-toolbar";
 const CHROME_MARKER = "sheetwrite-ribbon-";
 const PANEL_MARKER = "sheetwrite-panel-section";
+const FIND_MARKER = "sheetwrite-find-replace-row";
 const chromeChunks = [];
 const panelChunks = [];
+const findChunks = [];
 const workers = [];
 const chromeCode = [];
 for (const file of lazyChunks) {
@@ -48,7 +51,8 @@ for (const file of lazyChunks) {
   else if (code.includes(CHROME_MARKER) || code.includes(TOOLBAR_MARKER)) {
     chromeChunks.push(file);
     chromeCode.push(code);
-  } else workers.push(file);
+  } else if (code.includes(FIND_MARKER)) findChunks.push(file);
+  else workers.push(file);
 }
 if (workers.length !== 1)
   throw new Error(`Expected one webpack Worker chunk, got ${workers.length}`);
@@ -58,6 +62,8 @@ for (const marker of [RIBBON_MARKER, TOOLBAR_MARKER]) {
 }
 if (panelChunks.length !== 1)
   throw new Error(`Expected one lazy webpack panel chunk, got ${panelChunks.length}`);
+if (findChunks.length !== 1)
+  throw new Error(`Expected one lazy webpack find bar chunk, got ${findChunks.length}`);
 const mainCode = await readFile(resolve(root, "main.js"), "utf8");
 for (const marker of [CHROME_MARKER, TOOLBAR_MARKER]) {
   if (mainCode.includes(marker)) {
@@ -66,6 +72,9 @@ for (const marker of [CHROME_MARKER, TOOLBAR_MARKER]) {
 }
 if (mainCode.includes(PANEL_MARKER)) {
   throw new Error("The side panels are in webpack's main.js; they must load lazily");
+}
+if (mainCode.includes(FIND_MARKER)) {
+  throw new Error("The find bar is in webpack's main.js; it must load lazily");
 }
 
 const assets = publicFiles.map((file) => {
@@ -78,7 +87,11 @@ const assets = publicFiles.map((file) => {
   } else if (workers.includes(file)) {
     owner = "worker-async";
     roles = ["worker-async"];
-  } else if (chromeChunks.includes(file) || panelChunks.includes(file)) {
+  } else if (
+    chromeChunks.includes(file) ||
+    panelChunks.includes(file) ||
+    findChunks.includes(file)
+  ) {
     owner = "chrome-async";
     roles = ["chrome-async"];
   } else {

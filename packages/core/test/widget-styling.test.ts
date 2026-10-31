@@ -5,7 +5,7 @@ import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { GridConfig, Theme } from "../src/types.js";
-import { makeColumnarData, makeWorkbook } from "./fixtures.js";
+import { elementAdded, makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 // A full, deliberately un-themey palette. Passing every Theme field avoids
 // Partial-merge ambiguity, and the distinctive hex values make the seeded
@@ -130,10 +130,9 @@ describe("built-in widget styling", () => {
 
     const { host } = await makeGrid();
 
-    // Ctrl+F on the host flips the find bar from display:none to display:flex.
+    // Ctrl+F on the host loads the find bar's chunk and shows the bar.
     host.dispatchEvent(new KeyboardEvent("keydown", { key: "f", ctrlKey: true, bubbles: true }));
-
-    const findEl = mustFind<HTMLElement>(host, ".sheetwrite-find");
+    const findEl = await elementAdded(host, ".sheetwrite-find", HTMLDivElement);
     const toolbarEl = mustFind<HTMLElement>(host, ".sheetwrite-toolbar");
 
     // Capability probe: does this happy-dom resolve var() in getComputedStyle?

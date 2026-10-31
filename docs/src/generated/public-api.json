@@ -645,7 +645,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L696",
+              "source": "src/types/grid.ts#L699",
               "jsDocTags": [],
               "documentation": "View-aware editable snapshot of one cell, for hosts building a detached\nformula bar or cell inspector. `address` is the translated *data* address —\nthe correct target for `Grid.applyTransaction` even under an active\nsort/filter view — while the `(row, col)` inputs of\n{@link Grid.getCellInput} are active-sheet view coordinates.",
               "memberDocs": [
@@ -1212,7 +1212,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L353",
+              "source": "src/types/grid.ts#L356",
               "jsDocTags": [],
               "documentation": "The `GridConfig` switches that choose built-in commands. They apply to every\nrenderer of the command model: the toolbar, the full ribbon and the compact\nribbon. Each defaults to true, except `export`.",
               "memberDocs": []
@@ -1409,7 +1409,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L369",
+              "source": "src/types/grid.ts#L372",
               "jsDocTags": [],
               "documentation": "Built-in action names accepted by custom context-menu rows.",
               "memberDocs": []
@@ -1421,7 +1421,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L397",
+              "source": "src/types/grid.ts#L400",
               "jsDocTags": [],
               "documentation": "Cell and viewport coordinates resolved for one bundled context-menu opening.",
               "memberDocs": [
@@ -1446,7 +1446,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L458",
+              "source": "src/types/grid.ts#L461",
               "jsDocTags": [
                 "example",
                 "see"
@@ -1498,7 +1498,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L487",
+              "source": "src/types/grid.ts#L490",
               "jsDocTags": [],
               "documentation": "Static rows or a context-aware factory evaluated each time the menu opens.",
               "memberDocs": []
@@ -2173,7 +2173,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L783",
+              "source": "src/types/grid.ts#L786",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2478,7 +2478,7 @@
                 },
                 {
                   "name": "trimMemory",
-                  "documentation": "Drop the memory this grid can build again: decoded cell strings, rendered\nnumber text, compiled number formats, text measurement and unused overlay\nnodes, in the grid and in its worker renderer. Document data, undo history\nand the visible output do not change. The next frame and the next use\nbuild again what they need. Call it on a memory signal or when the page\ngoes to the background; it does nothing after `destroy()`.\n\nNumber format caches are shared by all grids on the page, so a trim also\ndrops them for the other grids. WebAssembly memory does not shrink; call\n`releaseEngineMemory()` for that.\n@example\n```ts\ndocument.addEventListener(\"visibilitychange\", () => {\n  if (document.visibilityState === \"hidden\") grid.trimMemory();\n});\n```"
+                  "documentation": "Drop the memory this grid can build again: decoded cell strings, rendered\nnumber text, compiled number formats, text measurement and unused overlay\nnodes, in the grid and in its worker renderer. Document data, undo history\nand the visible output do not change. The next frame and the next use\nbuild again what they need. Call it on a memory signal or when the page\ngoes to the background; it does nothing after `destroy()`.\n\nNumber format caches are shared by all grids on the page, so a trim also\ndrops them for the other grids. WebAssembly memory does not shrink; call\n`releaseEngineMemory()` for that.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction trimWhenHidden(grid: Grid) {\n  document.addEventListener(\"visibilitychange\", () => {\n    if (document.visibilityState === \"hidden\") grid.trimMemory();\n  });\n}\n```"
                 },
                 {
                   "name": "undo",
@@ -2535,7 +2535,7 @@
                 },
                 {
                   "name": "find",
-                  "documentation": "Open the built-in find bar when it is enabled."
+                  "documentation": "Open the built-in find bar when it is enabled. The find bar is in its own\nchunk: the first call loads it, and the bar shows when the chunk arrives."
                 },
                 {
                   "name": "freezePanes",
@@ -2598,7 +2598,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L265",
+              "source": "src/types/grid.ts#L268",
               "jsDocTags": [],
               "documentation": "Built-in command names accepted by state queries and change events.",
               "memberDocs": []
@@ -2610,7 +2610,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L268",
+              "source": "src/types/grid.ts#L271",
               "jsDocTags": [],
               "documentation": "Observable availability and selection-derived activity for one command.",
               "memberDocs": []
@@ -2622,7 +2622,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L274",
+              "source": "src/types/grid.ts#L277",
               "jsDocTags": [],
               "documentation": "Complete command-state snapshot emitted whenever availability or activity can change.",
               "memberDocs": []
@@ -2634,7 +2634,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L514",
+              "source": "src/types/grid.ts#L517",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2722,7 +2722,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L716",
+              "source": "src/types/grid.ts#L719",
               "jsDocTags": [],
               "documentation": "Payload map for events emitted by a Grid.",
               "memberDocs": [
@@ -2767,7 +2767,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L589",
+              "source": "src/types/grid.ts#L592",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2969,7 +2969,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L317",
+              "source": "src/types/grid.ts#L320",
               "jsDocTags": [],
               "documentation": "Per-glyph icon overrides, keyed by the names on the command icon sheet\n(`ICON_NAMES`). One override applies wherever the glyph shows: the flat\ntoolbar, the ribbon and ribbon menus, and the context menu. Strings render\nas plain text; DOM nodes and node factories support SVG or HTML icons. To\nreplace every glyph at once, set the `--sheetwrite-icon-sheet` CSS property\nto a sheet drawn on the layout in `@sheetwrite/core/icons.json`.",
               "memberDocs": []
@@ -3080,7 +3080,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L424",
+              "source": "src/types/grid.ts#L427",
               "jsDocTags": [],
               "documentation": "Built-in actions that can be rebound without replacing navigation.",
               "memberDocs": []
@@ -3092,7 +3092,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L437",
+              "source": "src/types/grid.ts#L440",
               "jsDocTags": [],
               "documentation": "Overrides replace all default keys for an action; null disables that action's keys.",
               "memberDocs": []
@@ -3104,7 +3104,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L412",
+              "source": "src/types/grid.ts#L415",
               "jsDocTags": [],
               "documentation": "A compact modified key combination or a key object. Modifiers may appear in\nany order before the final key, for example \"Mod+Shift+K\" or \"Ctrl+Alt+Delete\".\n`Mod`/`mod` means Command on macOS and Control elsewhere; Ctrl and Meta are literal.\nThe parser rejects unknown/repeated modifiers and missing keys.",
               "memberDocs": []
@@ -4101,7 +4101,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L682",
+              "source": "src/types/grid.ts#L685",
               "jsDocTags": [],
               "documentation": "Replacement count and refreshed search state returned by replace-all.",
               "memberDocs": [
@@ -4304,7 +4304,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L341",
+              "source": "src/types/grid.ts#L344",
               "jsDocTags": [],
               "documentation": "Initial layout settings for the built-in or composable ribbon.",
               "memberDocs": [
@@ -4325,7 +4325,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L338",
+              "source": "src/types/grid.ts#L341",
               "jsDocTags": [],
               "documentation": "Layout of the Excel-style ribbon. `auto` chooses compact below the configured width.",
               "memberDocs": []
@@ -4760,7 +4760,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L660",
+              "source": "src/types/grid.ts#L663",
               "jsDocTags": [],
               "documentation": "Case, whole-cell, sheet, and column constraints for grid search.",
               "memberDocs": [
@@ -4789,7 +4789,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L672",
+              "source": "src/types/grid.ts#L675",
               "jsDocTags": [],
               "documentation": "Ordered matches and active index produced by a grid search.",
               "memberDocs": [
@@ -5019,7 +5019,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L706",
+              "source": "src/types/grid.ts#L709",
               "jsDocTags": [],
               "documentation": "Actionable transaction outcome for a stable sheet lifecycle target.",
               "memberDocs": []
@@ -6108,7 +6108,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L238",
+              "source": "src/types/grid.ts#L241",
               "jsDocTags": [],
               "documentation": "Built-in action names accepted by custom toolbar items.",
               "memberDocs": []
@@ -6120,7 +6120,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L307",
+              "source": "src/types/grid.ts#L310",
               "jsDocTags": [],
               "documentation": "Text, DOM node, or node factory used as toolbar icon content.",
               "memberDocs": []
@@ -6132,7 +6132,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L323",
+              "source": "src/types/grid.ts#L326",
               "jsDocTags": [],
               "documentation": "Built-in, separator, or custom callback item in the grid toolbar. A built-in\n`action` renders the same command, glyph and state as the ribbon.",
               "memberDocs": [
@@ -9237,7 +9237,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L633",
+              "source": "../core/dist/types/grid.d.ts#L636",
               "jsDocTags": [
                 "example",
                 "see"
@@ -9542,7 +9542,7 @@
                 },
                 {
                   "name": "trimMemory",
-                  "documentation": "Drop the memory this grid can build again: decoded cell strings, rendered\nnumber text, compiled number formats, text measurement and unused overlay\nnodes, in the grid and in its worker renderer. Document data, undo history\nand the visible output do not change. The next frame and the next use\nbuild again what they need. Call it on a memory signal or when the page\ngoes to the background; it does nothing after `destroy()`.\n\nNumber format caches are shared by all grids on the page, so a trim also\ndrops them for the other grids. WebAssembly memory does not shrink; call\n`releaseEngineMemory()` for that.\n@example\n```ts\ndocument.addEventListener(\"visibilitychange\", () => {\n  if (document.visibilityState === \"hidden\") grid.trimMemory();\n});\n```"
+                  "documentation": "Drop the memory this grid can build again: decoded cell strings, rendered\nnumber text, compiled number formats, text measurement and unused overlay\nnodes, in the grid and in its worker renderer. Document data, undo history\nand the visible output do not change. The next frame and the next use\nbuild again what they need. Call it on a memory signal or when the page\ngoes to the background; it does nothing after `destroy()`.\n\nNumber format caches are shared by all grids on the page, so a trim also\ndrops them for the other grids. WebAssembly memory does not shrink; call\n`releaseEngineMemory()` for that.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction trimWhenHidden(grid: Grid) {\n  document.addEventListener(\"visibilitychange\", () => {\n    if (document.visibilityState === \"hidden\") grid.trimMemory();\n  });\n}\n```"
                 },
                 {
                   "name": "undo",
@@ -9561,7 +9561,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L179",
+              "source": "../core/dist/types/grid.d.ts#L182",
               "jsDocTags": [],
               "documentation": "Built-in command names accepted by state queries and change events.",
               "memberDocs": []
@@ -9573,7 +9573,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L181",
+              "source": "../core/dist/types/grid.d.ts#L184",
               "jsDocTags": [],
               "documentation": "Observable availability and selection-derived activity for one command.",
               "memberDocs": []
@@ -10248,7 +10248,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L633",
+              "source": "../core/dist/types/grid.d.ts#L636",
               "jsDocTags": [
                 "example",
                 "see"
@@ -10553,7 +10553,7 @@
                 },
                 {
                   "name": "trimMemory",
-                  "documentation": "Drop the memory this grid can build again: decoded cell strings, rendered\nnumber text, compiled number formats, text measurement and unused overlay\nnodes, in the grid and in its worker renderer. Document data, undo history\nand the visible output do not change. The next frame and the next use\nbuild again what they need. Call it on a memory signal or when the page\ngoes to the background; it does nothing after `destroy()`.\n\nNumber format caches are shared by all grids on the page, so a trim also\ndrops them for the other grids. WebAssembly memory does not shrink; call\n`releaseEngineMemory()` for that.\n@example\n```ts\ndocument.addEventListener(\"visibilitychange\", () => {\n  if (document.visibilityState === \"hidden\") grid.trimMemory();\n});\n```"
+                  "documentation": "Drop the memory this grid can build again: decoded cell strings, rendered\nnumber text, compiled number formats, text measurement and unused overlay\nnodes, in the grid and in its worker renderer. Document data, undo history\nand the visible output do not change. The next frame and the next use\nbuild again what they need. Call it on a memory signal or when the page\ngoes to the background; it does nothing after `destroy()`.\n\nNumber format caches are shared by all grids on the page, so a trim also\ndrops them for the other grids. WebAssembly memory does not shrink; call\n`releaseEngineMemory()` for that.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction trimWhenHidden(grid: Grid) {\n  document.addEventListener(\"visibilitychange\", () => {\n    if (document.visibilityState === \"hidden\") grid.trimMemory();\n  });\n}\n```"
                 },
                 {
                   "name": "undo",
@@ -10572,7 +10572,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L179",
+              "source": "../core/dist/types/grid.d.ts#L182",
               "jsDocTags": [],
               "documentation": "Built-in command names accepted by state queries and change events.",
               "memberDocs": []
@@ -10584,7 +10584,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L181",
+              "source": "../core/dist/types/grid.d.ts#L184",
               "jsDocTags": [],
               "documentation": "Observable availability and selection-derived activity for one command.",
               "memberDocs": []
@@ -11245,7 +11245,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L633",
+              "source": "../core/dist/types/grid.d.ts#L636",
               "jsDocTags": [
                 "example",
                 "see"
@@ -11550,7 +11550,7 @@
                 },
                 {
                   "name": "trimMemory",
-                  "documentation": "Drop the memory this grid can build again: decoded cell strings, rendered\nnumber text, compiled number formats, text measurement and unused overlay\nnodes, in the grid and in its worker renderer. Document data, undo history\nand the visible output do not change. The next frame and the next use\nbuild again what they need. Call it on a memory signal or when the page\ngoes to the background; it does nothing after `destroy()`.\n\nNumber format caches are shared by all grids on the page, so a trim also\ndrops them for the other grids. WebAssembly memory does not shrink; call\n`releaseEngineMemory()` for that.\n@example\n```ts\ndocument.addEventListener(\"visibilitychange\", () => {\n  if (document.visibilityState === \"hidden\") grid.trimMemory();\n});\n```"
+                  "documentation": "Drop the memory this grid can build again: decoded cell strings, rendered\nnumber text, compiled number formats, text measurement and unused overlay\nnodes, in the grid and in its worker renderer. Document data, undo history\nand the visible output do not change. The next frame and the next use\nbuild again what they need. Call it on a memory signal or when the page\ngoes to the background; it does nothing after `destroy()`.\n\nNumber format caches are shared by all grids on the page, so a trim also\ndrops them for the other grids. WebAssembly memory does not shrink; call\n`releaseEngineMemory()` for that.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction trimWhenHidden(grid: Grid) {\n  document.addEventListener(\"visibilitychange\", () => {\n    if (document.visibilityState === \"hidden\") grid.trimMemory();\n  });\n}\n```"
                 },
                 {
                   "name": "undo",
@@ -11569,7 +11569,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L179",
+              "source": "../core/dist/types/grid.d.ts#L182",
               "jsDocTags": [],
               "documentation": "Built-in command names accepted by state queries and change events.",
               "memberDocs": []
@@ -11581,7 +11581,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L181",
+              "source": "../core/dist/types/grid.d.ts#L184",
               "jsDocTags": [],
               "documentation": "Observable availability and selection-derived activity for one command.",
               "memberDocs": []

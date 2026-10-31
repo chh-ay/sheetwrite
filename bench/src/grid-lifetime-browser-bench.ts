@@ -12,7 +12,8 @@ import lifetimePage from "./grid-lifetime-bench.html";
 // DOM counters after a full collection, the page creates and destroys
 // `--cycles` more grids, and the driver records them again. The verdict is the
 // median heap growth of `--runs` runs, and it must be at most 5%; no run may
-// keep a DOM node or event listener.
+// keep a DOM node, an event listener or an object that a destroyed grid owned
+// (counted with weak references in the page).
 //
 // The warm-up matters: V8 compiles the grid code during the first few dozen
 // grids, and its compiled code, feedback vectors and inline caches are heap
@@ -48,6 +49,10 @@ interface LifetimeRun {
   readonly baseline: HeapObservation;
   readonly after: HeapObservation;
   readonly growthPercent: number;
+  /** Weak references to grid-owned objects that the page made in both phases. */
+  readonly trackedObjects: number;
+  /** Tracked objects still alive after the last full collection. */
+  readonly liveObjects: number;
 }
 
 function numberArgument(args: readonly string[], name: string, fallback: number): number {
@@ -129,6 +134,10 @@ async function measureRun(
     const baseline = await observeRetainedHeap(session);
     await runPhase("done");
     const after = await observeRetainedHeap(session);
+    await runPhase("counted");
+    const statusElement = page.locator("#bench-status");
+    const trackedObjects = Number(await statusElement.getAttribute("data-tracked-objects"));
+    const liveObjects = Number(await statusElement.getAttribute("data-live-objects"));
 
     return {
       run,
@@ -136,6 +145,8 @@ async function measureRun(
       after,
       growthPercent:
         ((retainedBytes(after) - retainedBytes(baseline)) / retainedBytes(baseline)) * 100,
+      trackedObjects,
+      liveObjects,
     };
   } finally {
     await browser.close();
@@ -149,7 +160,7 @@ function markdownTable(
 ): string {
   const mib = (bytes: number): string => (bytes / 1024 / 1024).toFixed(2);
   const pair = (before: string | number, after: string | number): string => `${before} → ${after}`;
-  const rows = runs.map(({ run, baseline, after, growthPercent }) =>
+  const rows = runs.map(({ run, baseline, after, growthPercent, trackedObjects, liveObjects }) =>
     [
       run,
       pair(mib(baseline.jsBytes), mib(after.jsBytes)),
@@ -158,16 +169,17 @@ function markdownTable(
       `${growthPercent.toFixed(2)}%`,
       pair(baseline.nodes, after.nodes),
       pair(baseline.jsEventListeners, after.jsEventListeners),
+      `${liveObjects} of ${trackedObjects}`,
     ].join(" | "),
   );
 
   return [
     `Retained heap after ${options.cycles} grids were created and destroyed, against the heap after ${options.warmup} warm-up grids (Chromium, fresh browser per run, full GC):`,
     "",
-    "| Run | V8 heap MiB | Blink heap MiB | Total MiB | Growth | DOM nodes | JS listeners |",
-    "| --- | --- | --- | --- | --- | --- | --- |",
+    "| Run | V8 heap MiB | Blink heap MiB | Total MiB | Growth | DOM nodes | JS listeners | Live grid objects |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ...rows.map((row) => `| ${row} |`),
-    `| Median | | | | ${verdict.toFixed(2)}% | | |`,
+    `| Median | | | | ${verdict.toFixed(2)}% | | | |`,
   ].join("\n");
 }
 
@@ -221,12 +233,14 @@ async function runBenchmark(args: readonly string[]): Promise<void> {
     );
   }
   const retainingRun = results.find(
-    ({ baseline, after }) =>
-      after.nodes > baseline.nodes || after.jsEventListeners > baseline.jsEventListeners,
+    ({ baseline, after, liveObjects }) =>
+      liveObjects > 0 ||
+      after.nodes > baseline.nodes ||
+      after.jsEventListeners > baseline.jsEventListeners,
   );
   if (retainingRun) {
     throw new Error(
-      `Run ${retainingRun.run} kept DOM nodes or event listeners of destroyed grids.`,
+      `Run ${retainingRun.run} kept grid objects, DOM nodes or event listeners of destroyed grids.`,
     );
   }
 }
