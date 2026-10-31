@@ -1,5 +1,7 @@
 import { resolve } from "node:path";
 
+import { optionValue } from "./cli-options.js";
+
 const BENCH_ROOT = resolve(import.meta.dir, "..");
 
 /**
@@ -8,11 +10,5 @@ const BENCH_ROOT = resolve(import.meta.dir, "..");
  * smoke pipeline) so a rehearsal can never overwrite published evidence.
  */
 export function resultsDirectory(args: readonly string[]): string {
-  const index = args.indexOf("--results-dir");
-  if (index < 0) return resolve(BENCH_ROOT, "results");
-  const requested = args[index + 1];
-  if (requested === undefined || requested.startsWith("--")) {
-    throw new TypeError("--results-dir requires a path");
-  }
-  return resolve(BENCH_ROOT, requested);
+  return resolve(BENCH_ROOT, optionValue(args, "--results-dir") ?? "results");
 }

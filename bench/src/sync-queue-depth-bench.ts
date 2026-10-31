@@ -33,6 +33,7 @@ import {
   type WorkbookSnapshot,
 } from "../../packages/core/src/index.js";
 import { installCanvasTestStubs } from "../../packages/core/src/testing.js";
+import { optionValue } from "./cli-options.js";
 import { collect, forceGc, summarize } from "./stats.js";
 
 const WASM_PATH = new URL("../../packages/wasm/pkg/sheetwrite_wasm_bg.wasm", import.meta.url);
@@ -66,10 +67,8 @@ function fail(message: string): never {
 }
 
 function parseDepths(argv: readonly string[]): readonly number[] {
-  const index = argv.indexOf("--depths");
-  if (index < 0) return DEFAULT_DEPTHS;
-  const value = argv[index + 1];
-  if (value === undefined) fail("--depths needs a comma-separated list");
+  const value = optionValue(argv, "--depths");
+  if (value === undefined) return DEFAULT_DEPTHS;
   return value.split(",").map((part) => {
     const depth = Number(part);
     if (!Number.isInteger(depth) || depth < 0) fail(`invalid depth ${part}`);
@@ -210,9 +209,9 @@ function spawnWorker(depth: number): string {
 }
 
 const argv = process.argv.slice(2);
-const workerIndex = argv.indexOf("--worker");
-if (workerIndex >= 0) {
-  const depth = Number(argv[workerIndex + 1]);
+const worker = optionValue(argv, "--worker");
+if (worker !== undefined) {
+  const depth = Number(worker);
   process.stdout.write(`${JSON.stringify(await runWorker(depth))}\n`);
 } else {
   for (const depth of parseDepths(argv)) process.stdout.write(spawnWorker(depth));

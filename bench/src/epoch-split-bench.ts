@@ -19,6 +19,7 @@ import {
   type DocumentOp,
 } from "../../packages/core/src/index.js";
 import { installCanvasTestStubs } from "../../packages/core/src/testing.js";
+import { optionValue } from "./cli-options.js";
 import { collect, summarize } from "./stats.js";
 
 const ROWS = 100_000;
@@ -40,8 +41,8 @@ const SCENARIOS = [
   "search-formula-offscreen",
 ];
 // One scenario per process keeps JIT warmth from earlier scenarios out of the result.
-const scenarioArg = process.argv.indexOf("--scenario");
-const selectedScenarios = scenarioArg < 0 ? SCENARIOS : [process.argv[scenarioArg + 1]];
+const scenario = optionValue(process.argv, "--scenario");
+const selectedScenarios = scenario === undefined ? SCENARIOS : [scenario];
 const WASM_PATH = new URL("../../packages/wasm/pkg/sheetwrite_wasm_bg.wasm", import.meta.url);
 await initSheetwrite(readFileSync(WASM_PATH));
 const restoreCanvas = installCanvasTestStubs();

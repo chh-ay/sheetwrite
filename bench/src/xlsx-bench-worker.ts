@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 
 import type { WorkbookSnapshot, XlsxWorkbookBackend } from "@sheetwrite/core";
 
+import { requiredOption } from "./cli-options.js";
 import { createXlsxCorpus, type XlsxCorpusMode, type XlsxCorpusScenario } from "./xlsx-corpus.js";
 
 interface WorkerResult {
@@ -24,13 +25,6 @@ interface WorkerResult {
   readonly outputBytes: number;
   readonly checksum: string;
   readonly rejection?: string;
-}
-
-function argument(name: string): string {
-  const index = process.argv.indexOf(name);
-  const value = index < 0 ? undefined : process.argv[index + 1];
-  if (!value || value.startsWith("--")) throw new Error(`missing ${name}`);
-  return value;
 }
 
 function maximumRssBytes(): number {
@@ -176,12 +170,13 @@ function retainedUsage(): Promise<NodeJS.MemoryUsage> {
 }
 
 async function main(): Promise<WorkerResult> {
-  const engine = argument("--engine") as "current" | "baseline";
-  const operation = argument("--operation") as "import" | "export" | "reject";
-  const scenario = argument("--scenario");
-  const mode = argument("--mode") as XlsxCorpusMode;
-  const root = argument("--root");
-  const fixture = argument("--fixture");
+  const args = process.argv.slice(2);
+  const engine = requiredOption(args, "--engine") as "current" | "baseline";
+  const operation = requiredOption(args, "--operation") as "import" | "export" | "reject";
+  const scenario = requiredOption(args, "--scenario");
+  const mode = requiredOption(args, "--mode") as XlsxCorpusMode;
+  const root = requiredOption(args, "--root");
+  const fixture = requiredOption(args, "--fixture");
   if (engine !== "current" && engine !== "baseline") throw new Error(`invalid engine ${engine}`);
   if (!(["import", "export", "reject"] as const).includes(operation)) {
     throw new Error(`invalid operation ${operation}`);

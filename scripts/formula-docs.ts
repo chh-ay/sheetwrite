@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import { repositorySourceUrl } from "../docs/src/lib/repository.js";
+import { html } from "./evidence-format.js";
 import { validateFormulaContractRepository } from "./formula-contract.js";
 
 const DEFAULT_INVENTORY_PATH = "test/conformance/formula-contract.inventory.json";
@@ -63,14 +64,6 @@ function recordMap(value: unknown, label: string): Record<string, JsonObject> {
 
 function cell(value: string): string {
   return value.replaceAll("|", "\\|").replaceAll("\n", " ").trim();
-}
-
-function html(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
 }
 
 function anchor(value: string): string {

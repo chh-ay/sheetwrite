@@ -143,10 +143,15 @@ its WASM store consumes); Handsontable ingests the same logical rows as a
 
 Every workload is **warmed up** (untimed iterations to reach JIT/allocator/cache
 steady state), then a larger set of **timed iterations** is collected and reduced
-to **median + p95** (nearest-rank) rather than a mean — a single GC pause or
-scheduler hiccup cannot dominate the headline number. Cheap operations sample
-hundreds of times; expensive ones (1M-row ingest) fewer. Iteration counts are
-encoded in `plan()` (data bench) and per scenario (render bench).
+to **median + p95** rather than a mean — a single GC pause or scheduler hiccup
+cannot dominate the headline number. The median is the mean of the two middle
+values of an even sample, and p95 is linearly interpolated between the two
+nearest ranks (`median` and `quantile`). A few recorded protocols keep the
+nearest-rank or upper-middle rule that their stored evidence was validated
+with; `stats.ts` names those rules, and a new protocol version moves to the
+shared ones. Cheap operations sample hundreds of times; expensive ones (1M-row
+ingest) fewer. Iteration counts are encoded in `plan()` (data bench) and per
+scenario (render bench).
 
 ### What's measured, and why
 

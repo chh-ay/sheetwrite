@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 
 import { type Browser, chromium, type Page } from "@playwright/test";
 
+import { optionValue } from "./cli-options.js";
 import {
   INTERACTION_CEILING_KEYS,
   INTERACTION_CEILINGS,
@@ -480,12 +481,7 @@ function methodNotes(): InteractionPerformanceArtifact["method"] {
 async function main(): Promise<void> {
   const args = process.argv.slice(2).filter((argument) => argument !== "--");
   const mode = args.includes("--smoke") ? "smoke" : "full";
-  const outputIndex = args.indexOf("--output");
-  const outputArgument = outputIndex >= 0 ? args[outputIndex + 1] : undefined;
-  if (outputIndex >= 0 && (outputArgument === undefined || outputArgument.startsWith("--"))) {
-    throw new Error("interaction capture needs a path after --output");
-  }
-  const outputPath = resolve(BENCH_ROOT, outputArgument ?? DEFAULT_OUTPUT);
+  const outputPath = resolve(BENCH_ROOT, optionValue(args, "--output") ?? DEFAULT_OUTPUT);
   const route = `http://127.0.0.1:${DOCS_PORT}${ROUTE_PATH}`;
   const samples = INTERACTION_SAMPLE_COUNTS[mode];
 

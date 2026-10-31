@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+import { captureProcess } from "./script-io.js";
 import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
 
 const STABLE_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
@@ -60,17 +61,10 @@ export function isGeneratedPackageSizeHistoryChange(paths: readonly string[]): b
 }
 
 async function changedFilesSince(comparison: ChangesetComparison): Promise<string[]> {
-  const child = Bun.spawn(["git", "diff", "--name-only", comparison.diffRange], {
+  const stdout = await captureProcess(["git", "diff", "--name-only", comparison.diffRange], {
     cwd: REPOSITORY_ROOT,
-    stdout: "pipe",
-    stderr: "pipe",
+    failure: ({ stderr }) => `Unable to inspect package size history diff: ${stderr}`,
   });
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-    child.exited,
-  ]);
-  if (exitCode !== 0) throw new Error(`Unable to inspect package size history diff: ${stderr}`);
   return stdout
     .split("\n")
     .map((path) => path.trim())

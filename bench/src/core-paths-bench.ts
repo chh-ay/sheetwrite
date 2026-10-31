@@ -63,6 +63,7 @@ import {
 } from "../../packages/core/src/index.js";
 import { encodeRestoreBlock } from "../../packages/core/src/restore-block.js";
 import { installCanvasTestStubs } from "../../packages/core/src/testing.js";
+import { optionValue } from "./cli-options.js";
 import { assertFiniteNonNegative, type BenchmarkMode, validateRawStat } from "./gate-protocol.js";
 import { type ProtocolCaptureMeta, protocolCaptureMeta } from "./protocol-meta.js";
 import { collect, forceGc, now, type Stat, summarize } from "./stats.js";
@@ -1548,11 +1549,6 @@ export async function runCorePathsBenchmark(
   validateCorePathsBenchmark(artifact, mode, scenarioIds);
 
   return artifact;
-}
-
-function optionValue(args: readonly string[], name: string): string | undefined {
-  const index = args.indexOf(name);
-  return index < 0 ? undefined : args[index + 1];
 }
 
 function parseScenarioIds(value: string | undefined): readonly CorePathScenarioId[] {

@@ -1,14 +1,14 @@
 {
   "protocol": "formula-corrected-baseline-matched-v1",
-  "harnessSha256": "027d0b7401a3bc40964b08f8bdbfb83750e6390edcd6e9e4bf8b1533fb4f44b6",
+  "harnessSha256": "f31b2c895b6285b738010a83a232b8e4ab93472892c4a5f4ad23fc49014dc46d",
   "sides": {
     "baseline": {
       "commit": "77c41983b53f09c393c6f8b82a4033283c0f9830",
-      "pkg": "/tmp/sheetwrite-formula-evidence-final/.formula-evidence/pre77/packages/wasm/pkg"
+      "pkg": ".formula-evidence/pre77/packages/wasm/pkg"
     },
     "post94": {
       "commit": "27be3443e3e8fa9404f522ad161b5c04adbc0987",
-      "pkg": "/tmp/sheetwrite-formula-evidence-final/packages/wasm/pkg"
+      "pkg": "packages/wasm/pkg"
     }
   },
   "releaseBuild": {
