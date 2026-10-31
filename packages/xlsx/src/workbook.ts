@@ -18,7 +18,7 @@ export const sheetwriteWorkbookBackend: XlsxWorkbookBackend = {
         preparePreserved(validated, context, exportContext?.sourceTracked === true),
       );
     } catch (error) {
-      throw xlsxFailure(error, "export", "sheetwrite-ooxml");
+      throw xlsxFailure(error, "export", "sheetwrite-ooxml", options?.signal);
     }
   },
   async *toXlsxWorkbookStream(snapshot, options, exportContext) {
@@ -28,21 +28,21 @@ export const sheetwriteWorkbookBackend: XlsxWorkbookBackend = {
         preparePreserved(validated, context, exportContext?.sourceTracked === true),
       );
     } catch (error) {
-      throw xlsxFailure(error, "export", "sheetwrite-ooxml");
+      throw xlsxFailure(error, "export", "sheetwrite-ooxml", options?.signal);
     }
   },
   async fromXlsxWorkbookFile(file, options) {
     try {
       return await readWorkbook(file, createCodecContext("import", options));
     } catch (error) {
-      throw xlsxFailure(error, "import", "sheetwrite-ooxml");
+      throw xlsxFailure(error, "import", "sheetwrite-ooxml", options?.signal);
     }
   },
   async fromXlsxWorkbook(data, options) {
     try {
       return await readWorkbook(data, createCodecContext("import", options));
     } catch (error) {
-      throw xlsxFailure(error, "import", "sheetwrite-ooxml");
+      throw xlsxFailure(error, "import", "sheetwrite-ooxml", options?.signal);
     }
   },
 };

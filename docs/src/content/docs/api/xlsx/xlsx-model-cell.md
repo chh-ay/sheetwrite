@@ -8,7 +8,7 @@ description: "XlsxModelCell interface in @sheetwrite/xlsx: Implementation-neutra
 Implementation-neutral cell in the first-sheet table export model.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/xlsx/src/table-export.ts#L14"><code>packages/xlsx/src/table-export.ts#L14</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/xlsx/src/table-export.ts#L17"><code>packages/xlsx/src/table-export.ts#L17</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>

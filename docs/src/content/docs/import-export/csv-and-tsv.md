@@ -78,7 +78,9 @@ Clipboard formulas and references retain rich behavior only when copied/cut and 
 
 ## Options and edge cases
 
-Delimited functions accept `DelimitedTextOptions` for bounded resources. See the [API contract](/docs/api/core/delimited-text-options/) and the [hostile-input lab](/showcases/interoperability/#limits). These plain-text formats do not carry workbook styles, formula source, names or multiple worksheets.
+Delimited functions accept `DelimitedTextOptions` for bounded resources and cancellation. See the [API contract](/docs/api/core/delimited-text-options/) and the [hostile-input lab](/showcases/interoperability/#limits). These plain-text formats do not carry workbook styles, formula source, names or multiple worksheets.
+
+`signal` is checked before parsing, once per 1,024 records and once per store window, never once per field. After it fires, parsing and synchronous export throw `signal.reason`, and streams error with it, so an abort is never a `SheetwriteError`. See [Abort](/docs/import-export/large-files-and-streaming/#abort).
 
 Built-in toolbar/context-menu download failures show an alert and emit `export-error` with `{ format: "csv", error }`. See [export error handling](/docs/import-export/xlsx-export/#errors-and-built-in-actions).
 

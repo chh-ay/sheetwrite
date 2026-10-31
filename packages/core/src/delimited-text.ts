@@ -21,7 +21,10 @@ export interface DelimitedTextResourceLimits {
 export interface DelimitedTextOptions {
   /** Positive safe-integer overrides merged over `DEFAULT_DELIMITED_TEXT_RESOURCE_LIMITS`. */
   resourceLimits?: Partial<DelimitedTextResourceLimits>;
-  /** Abort between bounded encode chunks or store windows. */
+  /**
+   * Checked once per chunk of records, store window and long field. After it
+   * fires, the operation rejects or throws with `signal.reason`.
+   */
   signal?: AbortSignal;
 }
 
@@ -85,7 +88,10 @@ export class DelimitedTextOptionsError extends SheetwriteError {
         context: {
           format: "delimited-text",
           resource,
-          value: typeof value === "number" && Number.isFinite(value) ? value : String(value),
+          // Only a number is copied: any other option value can be large host data.
+          ...(typeof value === "number" && Number.isFinite(value)
+            ? { value }
+            : { valueType: typeof value }),
         },
       },
     );
@@ -130,6 +136,8 @@ const CARRIAGE_RETURN_CODE_UNIT = 0x0d;
 const LINE_FEED_CODE_UNIT = 0x0a;
 /** UTF-16 code unit of a leading byte-order mark. */
 const BOM_CODE_UNIT = 0xfeff;
+/** Records scanned or encoded between two abort checks; never one check per field. */
+const ABORT_CHECK_RECORDS = 1024;
 
 function utf8WidthAt(text: string, index: number): { bytes: number; advance: number } {
   const first = text.charCodeAt(index);
@@ -214,13 +222,16 @@ export interface DelimitedTextScanSink {
  * in-memory string; scanning is incremental and checks UTF-8 byte, field, row,
  * column, and cell ceilings before materializing the next oversized value.
  * Fields at or past `sink.fieldLimit` are counted but not built into strings.
+ * `signal` is checked before the scan and once per `ABORT_CHECK_RECORDS` records.
  */
 export function scanDelimitedText(
   text: string,
   delimiter: "," | "\t",
   limits: Readonly<DelimitedTextResourceLimits>,
   sink: DelimitedTextScanSink,
+  signal: AbortSignal | undefined,
 ): void {
+  signal?.throwIfAborted();
   const inputBytes = boundedUtf8InputBytes(text, limits.maxInputBytes);
   if (inputBytes > limits.maxInputBytes) {
     failResource("maxInputBytes", limits.maxInputBytes, inputBytes, "parse");
@@ -280,6 +291,7 @@ export function scanDelimitedText(
     sink.row(rowCount, rowFields);
     rowCount = nextRows;
     rowFields = 0;
+    if (rowCount % ABORT_CHECK_RECORDS === 0) signal?.throwIfAborted();
   };
 
   const countFieldCodePoint = (): void => {
@@ -393,16 +405,22 @@ export function parseDelimitedText(
   const limits = resolveDelimitedTextResourceLimits(options);
   const rows: string[][] = [];
   let row: string[] = [];
-  scanDelimitedText(text, delimiter, limits, {
-    fieldLimit: Number.POSITIVE_INFINITY,
-    field: (_row, _column, value) => {
-      row.push(value);
+  scanDelimitedText(
+    text,
+    delimiter,
+    limits,
+    {
+      fieldLimit: Number.POSITIVE_INFINITY,
+      field: (_row, _column, value) => {
+        row.push(value);
+      },
+      row: () => {
+        rows.push(row);
+        row = [];
+      },
     },
-    row: () => {
-      rows.push(row);
-      row = [];
-    },
-  });
+    options.signal,
+  );
   return rows;
 }
 
@@ -441,18 +459,6 @@ function planEncodedField(
   return { text, quote, quoteCount, bytes };
 }
 
-function abortDelimited(options: DelimitedTextOptions, operation: DelimitedTextOperation): void {
-  if (!options.signal?.aborted) return;
-  throw new SheetwriteError(
-    "aborted",
-    `delimited-${operation}`,
-    "Sheetwrite: delimited-text operation aborted",
-    {
-      cause: options.signal.reason,
-    },
-  );
-}
-
 /** Enforce every row ceiling before any encoded byte of that row is emitted. */
 function* plannedRows(
   rows: Iterable<readonly string[]>,
@@ -470,7 +476,7 @@ function* plannedRows(
   }
 
   for (const row of rows) {
-    abortDelimited(options, operation);
+    if (rowCount % ABORT_CHECK_RECORDS === 0) options.signal?.throwIfAborted();
     const nextRows = rowCount + 1;
     if (nextRows > limits.maxRows) {
       failResource("maxRows", limits.maxRows, nextRows, operation);
@@ -523,7 +529,6 @@ export function* encodeDelimitedTextChunks(
   options: DelimitedTextOptions = {},
   config: { bom?: boolean; operation?: DelimitedTextOperation } = {},
 ): Generator<string> {
-  const operation = config.operation ?? "encode";
   let first = true;
   for (const plans of plannedRows(rows, delimiter, options, config)) {
     const separator = first ? (config.bom ? "\ufeff" : "") : "\r\n";
@@ -538,13 +543,12 @@ export function* encodeDelimitedTextChunks(
       continue;
     }
     yield separator;
-    for (let column = 0; column < plans.length; column++) {
-      const plan = plans[column];
-      if (!plan) throw new Error("Sheetwrite: missing delimited field plan");
+    for (const [column, plan] of plans.entries()) {
       if (column > 0) yield delimiter;
       if (plan.quote) yield '"';
       for (let offset = 0; offset < plan.text.length;) {
-        abortDelimited(options, operation);
+        // A long field is checked between its slices; a short one never adds a check.
+        if (offset > 0) options.signal?.throwIfAborted();
         let end = Math.min(plan.text.length, offset + FIELD_CHUNK_CHARACTERS);
         const last = plan.text.charCodeAt(end - 1);
         if (end < plan.text.length && last >= 0xd800 && last <= 0xdbff) end--;

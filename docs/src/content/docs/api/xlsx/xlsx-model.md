@@ -8,7 +8,7 @@ description: "XlsxModel interface in @sheetwrite/xlsx: Implementation-neutral fi
 Implementation-neutral first-sheet table export model.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/xlsx/src/table-export.ts#L23"><code>packages/xlsx/src/table-export.ts#L23</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/xlsx/src/table-export.ts#L26"><code>packages/xlsx/src/table-export.ts#L26</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>
