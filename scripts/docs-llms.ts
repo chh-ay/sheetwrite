@@ -10,6 +10,7 @@ import {
 } from "../docs/src/lib/navigation.js";
 import { sectionCardsMarkdown } from "../docs/src/lib/section-cards.js";
 import { SITE_URL } from "../docs/src/lib/seo.js";
+import { fenceBlocks } from "./markdown-fences.js";
 import type { ApiEntryPoint, ApiExport, ApiPackage, PublicApiManifest } from "./public-api.js";
 
 /**
@@ -382,7 +383,7 @@ function renderFullText(
   documents: readonly AuthoredDocument[],
   version: string,
 ): string {
-  const anchors = uniqueAnchors(documents.map((document) => document.title));
+  const anchors = uniqueAnchors(documents);
   const descriptions = new Map(documents.map((document) => [document.route, document.description]));
   const lines: string[] = [
     "# Sheetwrite — full documentation text",
@@ -397,12 +398,22 @@ function renderFullText(
     "",
   ];
   for (const document of documents) {
-    lines.push(`- [${document.title}](#${anchors.get(document.title) ?? ""})`);
+    lines.push(`- [${document.title}](#${anchors.get(document.route) ?? ""})`);
   }
   lines.push("- [Public API declarations](#public-api-declarations)", "", "## Authored guides");
 
   for (const document of documents) {
-    lines.push("", `### ${document.title}`, "", `Source: ${siteUrl(document.route)}`, "");
+    // Markdown renderers slug headings by different rules and give repeated
+    // titles different suffixes, so each guide carries its Contents anchor.
+    lines.push(
+      "",
+      `<a id="${anchors.get(document.route) ?? ""}"></a>`,
+      "",
+      `### ${document.title}`,
+      "",
+      `Source: ${siteUrl(document.route)}`,
+      "",
+    );
     const body = document.body.replace(/<div class="sw-section-cards"><\/div>/g, () =>
       sectionCardsMarkdown(document.route, (href) => descriptions.get(href), siteUrl),
     );
@@ -457,11 +468,11 @@ function renderExport(item: ApiExport): string[] {
   return lines;
 }
 
-/** Titles are unique in practice; the map keeps Contents anchors stable if one repeats. */
-function uniqueAnchors(titles: readonly string[]): ReadonlyMap<string, string> {
+/** One Contents anchor per guide route; a repeated title gets a numbered suffix. */
+function uniqueAnchors(documents: readonly AuthoredDocument[]): ReadonlyMap<string, string> {
   const anchors = new Map<string, string>();
-  const used = new Set<string>();
-  for (const title of titles) {
+  const used = new Set<string>(["contents", "authored-guides", "public-api-declarations"]);
+  for (const { route, title } of documents) {
     const base = title
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
@@ -471,54 +482,46 @@ function uniqueAnchors(titles: readonly string[]): ReadonlyMap<string, string> {
     let counter = 2;
     while (used.has(anchor)) anchor = `${stem}-${counter++}`;
     used.add(anchor);
-    anchors.set(title, anchor);
+    anchors.set(route, anchor);
   }
   return anchors;
 }
 
-const FENCE_PATTERN = /^\s*(`{3,}|~{3,})(.*)$/;
 const LANGUAGE_PATTERN = /^[A-Za-z][A-Za-z0-9+#.-]*$/;
 
 /**
  * Reads one authored document as plain text: fenced code is preserved verbatim
  * (only the info string is reduced to its language), MDX chrome is dropped or
- * flattened, and inline HTML keeps its visible text.
+ * flattened, and inline HTML keeps its visible text. Dropped chrome leaves
+ * blank lines, so a run of blank prose lines becomes one; blank lines inside
+ * code stay as written.
  */
 function convertDocumentBody(body: string): string {
+  const lines = body.split("\n");
+  const blocks = fenceBlocks(lines);
   const output: string[] = [];
-  let fence: string | undefined;
-  for (const line of body.split("\n")) {
-    const match = FENCE_PATTERN.exec(line);
-    if (fence === undefined) {
-      if (match === null) {
-        output.push(convertProseLine(formatTokens(line)));
-        continue;
-      }
-      const [, opener, info] = match;
-      if (opener === undefined) throw new Error("Fence line is missing its marker");
-      fence = opener;
-      const language = info?.trim().split(/\s+/)[0] ?? "";
-      output.push(`${opener}${LANGUAGE_PATTERN.test(language) ? language : ""}`);
+  let blockIndex = 0;
+  let previousProseBlank = true;
+  for (let index = 0; index < lines.length; index += 1) {
+    const block = blocks[blockIndex];
+    if (block?.start === index) {
+      const language = block.info.trim().split(/\s+/)[0] ?? "";
+      output.push(`${block.marker}${LANGUAGE_PATTERN.test(language) ? language : ""}`);
+      output.push(...lines.slice(index + 1, block.closed ? block.end : block.end + 1));
+      if (block.closed) output.push(lines[block.end]?.trim() ?? block.marker);
+      index = block.end;
+      blockIndex += 1;
+      previousProseBlank = false;
       continue;
     }
-    const closer = match?.[1];
-    const closerInfo = match?.[2];
-    if (
-      closer !== undefined &&
-      closerInfo !== undefined &&
-      closer.startsWith(fence.charAt(0)) &&
-      closerInfo.trim() === ""
-    ) {
-      fence = undefined;
-      output.push(closer);
-      continue;
-    }
-    output.push(line);
+
+    const prose = convertProseLine(formatTokens(lines[index] ?? ""));
+    const blank = prose.trim() === "";
+    if (!(blank && previousProseBlank)) output.push(blank ? "" : prose);
+    previousProseBlank = blank;
   }
-  return output
-    .join("\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+  if (output.at(-1) === "") output.pop();
+  return output.join("\n");
 }
 
 function convertProseLine(line: string): string {

@@ -42,6 +42,17 @@ function percentile(sorted: readonly number[], p: number): number {
   return lower + (upper - lower) * (pos - lowerIdx);
 }
 
+/**
+ * Median of a sample: the mean of the two middle values when the count is
+ * even, `NaN` when the sample is empty. {@link summarize} uses the same rule.
+ */
+export function median(samples: readonly number[]): number {
+  return percentile(
+    [...samples].sort((a, b) => a - b),
+    0.5,
+  );
+}
+
 /** Reduce a raw sample of per-iteration durations to a {@link Stat}. */
 export function summarize(samples: readonly number[]): Stat {
   if (samples.length === 0) {

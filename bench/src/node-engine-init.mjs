@@ -17,12 +17,19 @@ const engineDirectory =
 const wasmBytes = readFileSync(new URL("pkg/sheetwrite_wasm_bg.wasm", engineDirectory));
 const wasmSha256 = createHash("sha256").update(wasmBytes).digest("hex");
 const manifest = JSON.parse(readFileSync(new URL("package.json", engineDirectory), "utf8"));
-if (root !== undefined && manifest.version === "0.5.4") {
+// SHEETWRITE_BENCH_BASELINE_VERSION names the older release the root holds (see gate-protocol.ts).
+const baselineVersion = process.env.SHEETWRITE_BENCH_BASELINE_VERSION;
+if (root !== undefined && baselineVersion !== undefined) {
+  if (manifest.version !== baselineVersion) {
+    throw new Error(
+      `Baseline Node initialization loaded ${manifest.version}, not ${baselineVersion}`,
+    );
+  }
   const currentBytes = readFileSync(
     new URL(`../../packages/${packageName}/pkg/sheetwrite_wasm_bg.wasm`, import.meta.url),
   );
   if (wasmSha256 === createHash("sha256").update(currentBytes).digest("hex")) {
-    throw new Error("Baseline Node initialization loaded current 0.6 WASM");
+    throw new Error("Baseline Node initialization loaded the current WASM");
   }
 }
 // The selected checkout is only known at runtime; core remains the current harness.

@@ -164,7 +164,7 @@ it.each(["wasm", "formulas"])("rejects a baseline that records current %s WASM",
   const path = `packages/${name}/pkg/sheetwrite_wasm_bg.wasm`;
   context.currentWasmFiles[path] = TEST_SOURCE_DIGEST;
   expect(() => validateMatchedEngineResult(captureWithDigest(capture))).toThrow(
-    `Baseline loaded current 0.6 WASM: ${path}`,
+    `Baseline loaded the current WASM: ${path}`,
   );
 });
 
