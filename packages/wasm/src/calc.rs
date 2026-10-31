@@ -1165,28 +1165,9 @@ pub(crate) fn lex_token<'a>(
                 .next()
                 .is_some_and(char::is_alphabetic))
     {
-        let start = *index;
-        while *index < bytes.len() {
-            let ch = src[*index..].chars().next().expect("valid UTF-8 source");
-            if ch.is_alphanumeric() || matches!(ch, '$' | '_' | '.' | '\\') {
-                *index += ch.len_utf8();
-            } else {
-                break;
-            }
-        }
-        Tok::Ident(Cow::Borrowed(&src[start..*index]), false)
+        ident_token(src, index)
     } else if c == b'<' || c == b'>' || c == b'=' {
-        let next = bytes.get(*index + 1).copied();
-        let (op, len) = match (c, next) {
-            (b'<', Some(b'=')) => (CmpOp::Le, 2),
-            (b'>', Some(b'=')) => (CmpOp::Ge, 2),
-            (b'<', Some(b'>')) => (CmpOp::Ne, 2),
-            (b'=', _) => (CmpOp::Eq, 1),
-            (b'<', _) => (CmpOp::Lt, 1),
-            _ => (CmpOp::Gt, 1),
-        };
-        *index += len;
-        Tok::Cmp(op)
+        comparison_token(bytes, index)
     } else if let Some(tok) = punctuation_token(c) {
         *index += 1;
         tok
@@ -1202,6 +1183,37 @@ pub(crate) fn lex_token<'a>(
     };
 
     Ok(Some(tok))
+}
+
+/// The name at `*index`: letters, digits, `$`, `_`, `.` and `\`.
+fn ident_token<'a>(src: &'a str, index: &mut usize) -> Tok<'a> {
+    let start = *index;
+
+    while *index < src.len() {
+        let ch = src[*index..].chars().next().expect("valid UTF-8 source");
+        if ch.is_alphanumeric() || matches!(ch, '$' | '_' | '.' | '\\') {
+            *index += ch.len_utf8();
+        } else {
+            break;
+        }
+    }
+
+    Tok::Ident(Cow::Borrowed(&src[start..*index]), false)
+}
+
+/// `<`, `<=`, `<>`, `>`, `>=` or `=` at `*index`.
+fn comparison_token(bytes: &[u8], index: &mut usize) -> Tok<'static> {
+    let (op, len) = match (bytes[*index], bytes.get(*index + 1)) {
+        (b'<', Some(b'=')) => (CmpOp::Le, 2),
+        (b'>', Some(b'=')) => (CmpOp::Ge, 2),
+        (b'<', Some(b'>')) => (CmpOp::Ne, 2),
+        (b'=', _) => (CmpOp::Eq, 1),
+        (b'<', _) => (CmpOp::Lt, 1),
+        _ => (CmpOp::Gt, 1),
+    };
+
+    *index += len;
+    Tok::Cmp(op)
 }
 
 /// The `[...]` at `*index`, nested brackets included.
