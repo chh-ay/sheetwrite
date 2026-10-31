@@ -1215,6 +1215,7 @@ fn comparison_token(bytes: &[u8], index: &mut usize) -> Tok<'static> {
     *index += len;
     Tok::Cmp(op)
 }
+
 /// The `[...]` at `*index`, nested brackets included.
 fn structured_token(src: &str, index: &mut usize) -> Result<String, String> {
     let bytes = src.as_bytes();
