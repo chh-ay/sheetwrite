@@ -21,7 +21,7 @@ Shared by the grid's inline editor and any host-built formula bar, so input
 parsing is identical everywhere instead of re-derived per consumer.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/cell-input.ts#L40"><code>packages/core/src/cell-input.ts#L40</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/cell-input.ts#L40"><code>packages/core/src/cell-input.ts#L40</code></a></dd></div>
 </dl>
 
 ## Declaration

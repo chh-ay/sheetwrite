@@ -8,7 +8,7 @@ description: "GRID_OPTION_POLICY variable in @sheetwrite/core/adapter: Classific
 Classification of adapter options as live-updatable or reset-sensitive.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/adapter.ts#L69"><code>packages/core/src/adapter.ts#L69</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/adapter.ts#L69"><code>packages/core/src/adapter.ts#L69</code></a></dd></div>
 </dl>
 
 ## Declaration

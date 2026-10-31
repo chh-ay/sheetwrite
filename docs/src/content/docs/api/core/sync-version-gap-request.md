@@ -8,7 +8,7 @@ description: "SyncVersionGapRequest interface in @sheetwrite/core: Contiguous-ve
 Contiguous-version recovery request produced when remote input skips ahead.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L105"><code>packages/core/src/sync.ts#L105</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/sync.ts#L105"><code>packages/core/src/sync.ts#L105</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>

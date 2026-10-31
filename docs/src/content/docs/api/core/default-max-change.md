@@ -8,7 +8,7 @@ description: "DEFAULT_MAX_CHANGE variable in @sheetwrite/core: Excel's convergen
 Excel's convergence threshold for a new workbook.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L61"><code>packages/core/src/document-protocol.ts#L61</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/document-protocol.ts#L61"><code>packages/core/src/document-protocol.ts#L61</code></a></dd></div>
 </dl>
 
 ## Declaration

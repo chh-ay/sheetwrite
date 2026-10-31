@@ -8,7 +8,7 @@ description: "CellScalar type in @sheetwrite/react: A scalar that can be display
 A scalar that can be displayed directly.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/types/cell.d.ts#L112"><code>packages/core/dist/types/cell.d.ts#L112</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/cell.d.ts#L112"><code>packages/core/dist/types/cell.d.ts#L112</code></a></dd></div>
 </dl>
 
 ## Declaration

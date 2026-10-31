@@ -8,7 +8,7 @@ description: "RevisionCoordinatorEvent type in @sheetwrite/core: State or restor
 State or restore transition emitted by revision coordination.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/collaboration.ts#L287"><code>packages/core/src/collaboration.ts#L287</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/collaboration.ts#L287"><code>packages/core/src/collaboration.ts#L287</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>3</span>

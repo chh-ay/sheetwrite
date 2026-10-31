@@ -11,7 +11,7 @@ currency rules as [`parseCellInput`](/docs/api/core/parse-cell-input/). Unlike i
 date serial so delimited export/import preserves numeric dates.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/cell-input.ts#L89"><code>packages/core/src/cell-input.ts#L89</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/cell-input.ts#L89"><code>packages/core/src/cell-input.ts#L89</code></a></dd></div>
 </dl>
 
 ## Declaration

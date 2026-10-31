@@ -27,7 +27,7 @@ async function openTable(file: File) {
 - [toXlsxTable](/docs/api/core/to-xlsx-table/)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L508"><code>packages/core/src/export.ts#L508</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/export.ts#L508"><code>packages/core/src/export.ts#L508</code></a></dd></div>
 </dl>
 
 ## Declaration

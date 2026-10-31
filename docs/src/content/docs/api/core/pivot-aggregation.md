@@ -8,7 +8,7 @@ description: "PivotAggregation type in @sheetwrite/core: Aggregation applied to 
 Aggregation applied to one value field. Semantics match PIVOTBY's aggregations.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/pivot.ts#L9"><code>packages/core/src/types/pivot.ts#L9</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/pivot.ts#L9"><code>packages/core/src/types/pivot.ts#L9</code></a></dd></div>
 </dl>
 
 ## Declaration

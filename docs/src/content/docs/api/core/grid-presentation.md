@@ -8,7 +8,7 @@ description: "GridPresentation type in @sheetwrite/core: Header semantics used b
 Header semantics used by the retained canvas and accessibility mirror.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L135"><code>packages/core/src/types/grid.ts#L135</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/grid.ts#L135"><code>packages/core/src/types/grid.ts#L135</code></a></dd></div>
 </dl>
 
 ## Declaration
