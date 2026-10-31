@@ -8,7 +8,7 @@ description: "SnapshotGridOptions type in @sheetwrite/core: Grid creation option
 Grid creation options accepted when hydrating a validated snapshot.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/persistence.ts#L38"><code>packages/core/src/persistence.ts#L38</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/persistence.ts#L37"><code>packages/core/src/persistence.ts#L37</code></a></dd></div>
 </dl>
 
 ## Declaration

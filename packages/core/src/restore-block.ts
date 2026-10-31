@@ -2,7 +2,12 @@ import { deflateSync } from "fflate";
 
 import { validateDocumentOperationShape } from "./document-protocol.js";
 import { boundedJsonByteLength, JsonByteLengthError } from "./errors.js";
-import { MAX_RESTORE_BLOCK_CELLS, MAX_RESTORE_BLOCK_DECODED_BYTES } from "./restore-block-codec.js";
+import {
+  invalidRestoreBlock,
+  MAX_RESTORE_BLOCK_CELLS,
+  MAX_RESTORE_BLOCK_DECODED_BYTES,
+  restoreBlockLimit,
+} from "./restore-block-codec.js";
 import { preparedRestore } from "./transaction-preparation.js";
 import type { Range } from "./types/coordinates.js";
 import type { DocumentOp, PackedCellBlock } from "./types/document.js";
@@ -11,25 +16,22 @@ export { MAX_RESTORE_BLOCK_DECODED_BYTES };
 
 type RestoreBlock = Extract<DocumentOp, { op: "restoreBlock" }>;
 
-function invalid(): never {
-  throw new Error("Invalid restore block");
-}
-
 function assertCellLimit(block: PackedCellBlock): void {
   if (block.rowCount > Math.floor(MAX_RESTORE_BLOCK_CELLS / block.colCount)) {
-    throw new RangeError("Restore block exceeds the cell limit");
+    throw restoreBlockLimit("Restore block exceeds the cell limit");
   }
 }
 
 function assertBlock(range: Range, block: PackedCellBlock): void {
   assertCellLimit(block);
-  if (validateDocumentOperationShape({ op: "setBlock", range, block }).length) invalid();
+  if (validateDocumentOperationShape({ op: "setBlock", range, block }).length)
+    invalidRestoreBlock();
   if (
     block.rowCount !== Math.abs(range.end.row - range.start.row) + 1 ||
     block.colCount !== Math.abs(range.end.col - range.start.col) + 1 ||
     (block.styleIds !== undefined && block.styleTable === undefined)
   )
-    invalid();
+    invalidRestoreBlock();
 }
 
 export function encodeRestoreBlock(range: Range, block: PackedCellBlock): RestoreBlock {
@@ -40,10 +42,10 @@ export function encodeRestoreBlock(range: Range, block: PackedCellBlock): Restor
       omitUndefinedProperties: true,
     });
   } catch (error) {
-    if (error instanceof JsonByteLengthError && error.code === "limit") {
-      throw new RangeError("Restore block exceeds the decoded byte limit");
+    if (error instanceof JsonByteLengthError && error.code === "payload-limit") {
+      throw restoreBlockLimit("Restore block exceeds the decoded byte limit");
     }
-    throw new Error("Invalid restore block JSON", { cause: error });
+    invalidRestoreBlock(error);
   }
   return encodeMeasuredRestoreBlock(range, block, undefined);
 }
@@ -56,11 +58,11 @@ export function encodeMeasuredRestoreBlock(
 ): RestoreBlock {
   assertCellLimit(block);
   if (decodedBytes !== undefined && decodedBytes > MAX_RESTORE_BLOCK_DECODED_BYTES) {
-    throw new RangeError("Restore block exceeds the decoded byte limit");
+    throw restoreBlockLimit("Restore block exceeds the decoded byte limit");
   }
   const bytes = new TextEncoder().encode(JSON.stringify(block));
   if (bytes.length > MAX_RESTORE_BLOCK_DECODED_BYTES) {
-    throw new RangeError("Restore block exceeds the decoded byte limit");
+    throw restoreBlockLimit("Restore block exceeds the decoded byte limit");
   }
   // The fastest level: undo data is mostly numbers and text that higher levels
   // shrink by under 5 percent at two to three times the cost.
@@ -110,14 +112,14 @@ export function estimateRestoreBlockBytes(block: PackedCellBlock): number {
 
 export function restoreBlockFacts(operation: RestoreBlock) {
   const prepared = preparedRestore(operation, validateDocumentOperationShape);
-  if (prepared.errors.length > 0) invalid();
+  if (prepared.errors.length > 0) invalidRestoreBlock();
   const block = prepared.block;
   if (
     block.rowCount !== Math.abs(operation.range.end.row - operation.range.start.row) + 1 ||
     block.colCount !== Math.abs(operation.range.end.col - operation.range.start.col) + 1 ||
     (block.styleIds !== undefined && block.styleTable === undefined)
   )
-    invalid();
+    invalidRestoreBlock();
   return prepared;
 }
 

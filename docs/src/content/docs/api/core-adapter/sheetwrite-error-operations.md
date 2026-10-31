@@ -1,14 +1,15 @@
 ---
 title: "SHEETWRITE_ERROR_OPERATIONS | @sheetwrite/core/adapter"
-description: "SHEETWRITE_ERROR_OPERATIONS variable in @sheetwrite/core/adapter: Stable operations at which a consumer-visible failure can surface."
+description: "SHEETWRITE_ERROR_OPERATIONS variable in @sheetwrite/core/adapter: Every SheetwriteErrorOperation, for hosts that list the operations at run time."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|SHEETWRITE_ERROR_OPERATIONS -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="variable">variable</span></div>
 
-Stable operations at which a consumer-visible failure can surface.
+Every `SheetwriteErrorOperation`, for hosts that list the operations at run
+time. Sheetwrite itself does not read this array.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/errors.ts#L62"><code>packages/core/src/errors.ts#L62</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/errors.ts#L162"><code>packages/core/src/errors.ts#L162</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -20,9 +21,11 @@ const SHEETWRITE_ERROR_OPERATIONS: readonly [
   "initialize",
   "create-grid",
   "engine",
+  "store",
+  "transaction",
+  "render",
   "datasource-request",
   "renderer-worker",
-  "export-xlsx",
   "xlsx-import",
   "xlsx-export",
   "delimited-parse",
@@ -37,8 +40,10 @@ const SHEETWRITE_ERROR_OPERATIONS: readonly [
   "synchronize",
   "presence",
   "revision",
-  "comments",
+  "comment",
   "query",
+  "row-bridge",
+  "resource-diagnostics",
   "hyperlink-activate",
   "keyboard-configure",
   "chart-view",
@@ -66,7 +71,6 @@ const SHEETWRITE_ERROR_OPERATIONS: readonly [
 <p class="api-consumers-label">Public exports naming <code>SHEETWRITE_ERROR_OPERATIONS</code></p>
 
 <ul class="api-consumer-list">
-<li><a href="/docs/api/core/sheetwrite-error-operation/"><code>SheetwriteErrorOperation</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li><a href="/docs/api/core-adapter/sheetwrite-error-operation/"><code>SheetwriteErrorOperation</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li>None.</li>
 </ul>
 </div>

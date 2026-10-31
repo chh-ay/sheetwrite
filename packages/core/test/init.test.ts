@@ -21,7 +21,11 @@ describe("initSheetwrite readiness and re-entrancy", () => {
     const result = await runProbe("lifecycle");
 
     expect(result.readyBefore).toBe(false);
-    expect(result.preInitStore).toMatchObject({ status: "rejected", name: "Error" });
+    expect(result.preInitStore).toMatchObject({
+      status: "rejected",
+      code: "initialization-required",
+      operation: "store",
+    });
     expect(result.concurrentDifferentSource).toMatchObject({
       status: "rejected",
       code: "initialization-failed",

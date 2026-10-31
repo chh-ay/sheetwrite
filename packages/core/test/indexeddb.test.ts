@@ -231,6 +231,9 @@ describe("IndexedDbPendingCommitStorage", () => {
         code: "limit",
       });
     }
+    await expect(
+      storage.load("document-a", { maxRecords: -1, maxOperations: 2, maxBytes: bytes }),
+    ).rejects.toMatchObject({ code: "invalid-limits", operation: "pending-storage" });
     expect(await storedRecords("bounded-cursor")).toHaveLength(2);
     await expect(
       storage.load("document-a", {

@@ -11,7 +11,7 @@ Stable resource-limit failure raised before the next oversized parse or encode a
 <div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/delimited-text.ts#L57"><code>packages/core/src/delimited-text.ts#L57</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>5</span>
+## Members <span class="api-count" data-pagefind-ignore>6</span>
 
 <div class="api-member-list">
 
@@ -29,6 +29,15 @@ constructor(resource: keyof DelimitedTextResourceLimits, limit: number, actual: 
 
 ```ts generated
 actual: number;
+```
+
+</details>
+
+<details class="api-member" id="delimited-text-resource-error-code" data-pagefind-weight="1">
+<summary><code>code</code></summary>
+
+```ts generated
+code: "delimited-text-resource-limit";
 ```
 
 </details>
@@ -75,6 +84,7 @@ class DelimitedTextResourceError extends SheetwriteError {
     operation: DelimitedTextOperation,
   );
   actual: number;
+  code: "delimited-text-resource-limit";
   limit: number;
   name: "DelimitedTextResourceError";
   resource: keyof DelimitedTextResourceLimits;

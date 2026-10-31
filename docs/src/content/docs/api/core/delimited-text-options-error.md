@@ -8,10 +8,10 @@ description: "DelimitedTextOptionsError class in @sheetwrite/core: Stable invali
 Stable invalid-option failure for a delimited-text resource ceiling.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/delimited-text.ts#L76"><code>packages/core/src/delimited-text.ts#L76</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/delimited-text.ts#L77"><code>packages/core/src/delimited-text.ts#L77</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>4</span>
+## Members <span class="api-count" data-pagefind-ignore>5</span>
 
 <div class="api-member-list">
 
@@ -20,6 +20,15 @@ Stable invalid-option failure for a delimited-text resource ceiling.
 
 ```ts generated
 constructor(resource: keyof DelimitedTextResourceLimits, value: unknown);
+```
+
+</details>
+
+<details class="api-member" id="delimited-text-options-error-code" data-pagefind-weight="1">
+<summary><code>code</code></summary>
+
+```ts generated
+code: "delimited-text-invalid-limit";
 ```
 
 </details>
@@ -60,6 +69,7 @@ value: unknown
 ```ts generated
 class DelimitedTextOptionsError extends SheetwriteError {
   constructor(resource: keyof DelimitedTextResourceLimits, value: unknown);
+  code: "delimited-text-invalid-limit";
   name: "DelimitedTextOptionsError";
   resource: keyof DelimitedTextResourceLimits;
   value: unknown;

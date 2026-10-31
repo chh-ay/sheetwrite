@@ -92,10 +92,10 @@ export function measureOperationBytes(operations: readonly DocumentOp[], limit: 
         omitUndefinedProperties: true,
       });
     } catch (error) {
-      if (error instanceof JsonByteLengthError && error.code === "limit") {
+      if (error instanceof JsonByteLengthError && error.code === "payload-limit") {
         const actual = total + separator + (error.actual ?? 0);
         throw new JsonByteLengthError(
-          "limit",
+          "payload-limit",
           `Encoded JSON exceeds the ${limit} byte limit`,
           actual,
           limit,
@@ -107,7 +107,7 @@ export function measureOperationBytes(operations: readonly DocumentOp[], limit: 
   }
   if (total > limit) {
     throw new JsonByteLengthError(
-      "limit",
+      "payload-limit",
       `Encoded JSON exceeds the ${limit} byte limit`,
       total,
       limit,
@@ -324,7 +324,7 @@ function measureOperation(operation: DocumentOp, limit: number): number | null {
   try {
     return boundedJsonByteLength(operation, limit, { omitUndefinedProperties: true });
   } catch (error) {
-    if (error instanceof JsonByteLengthError && error.code === "limit") return null;
+    if (error instanceof JsonByteLengthError && error.code === "payload-limit") return null;
     throw error;
   }
 }

@@ -1,14 +1,14 @@
 ---
 title: "SheetwriteErrorOperation | @sheetwrite/core"
-description: "SheetwriteErrorOperation type in @sheetwrite/core: Exhaustive stable operation discriminator for consumer-visible failures."
+description: "SheetwriteErrorOperation type in @sheetwrite/core: Stable operation at which a consumer-visible failure can surface."
 ---
 <!-- api-export:@sheetwrite/core|.|SheetwriteErrorOperation -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
 
-Exhaustive stable operation discriminator for consumer-visible failures.
+Stable operation at which a consumer-visible failure can surface.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/errors.ts#L92"><code>packages/core/src/errors.ts#L92</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/errors.ts#L126"><code>packages/core/src/errors.ts#L126</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -17,7 +17,36 @@ Exhaustive stable operation discriminator for consumer-visible failures.
 
 ```ts generated
 export type SheetwriteErrorOperation =
-  (typeof SHEETWRITE_ERROR_OPERATIONS)[number];
+  | "initialize"
+  | "create-grid"
+  | "engine"
+  | "store"
+  | "transaction"
+  | "render"
+  | "datasource-request"
+  | "renderer-worker"
+  | "xlsx-import"
+  | "xlsx-export"
+  | "delimited-parse"
+  | "delimited-import"
+  | "delimited-encode"
+  | "delimited-export"
+  | "delimited-options"
+  | "snapshot-validate"
+  | "snapshot-allocate"
+  | "persistence"
+  | "pending-storage"
+  | "synchronize"
+  | "presence"
+  | "revision"
+  | "comment"
+  | "query"
+  | "row-bridge"
+  | "resource-diagnostics"
+  | "hyperlink-activate"
+  | "keyboard-configure"
+  | "chart-view"
+  | "host-function";
 ```
 
 </div>

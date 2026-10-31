@@ -8,7 +8,7 @@ description: "createRuntimeResourceSnapshot function in @sheetwrite/core: Build 
 Build and validate one operation-phase snapshot without double-counting runtime observations.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/resource-accounting.ts#L320"><code>packages/core/src/resource-accounting.ts#L320</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/resource-accounting.ts#L328"><code>packages/core/src/resource-accounting.ts#L328</code></a></dd></div>
 </dl>
 
 ## Declaration

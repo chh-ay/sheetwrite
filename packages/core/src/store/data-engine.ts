@@ -17,7 +17,13 @@ import { validConditionalRules } from "../conditional-format.js";
 import { dateToSerial } from "../date-serial.js";
 import { isValidCalculationSettings, storedCalculationSettings } from "../document-protocol.js";
 import { ENGINE_LOAD_HINT, getEngine, isEngineLoaded as isLoaded } from "../engine.js";
-import { SheetwriteError } from "../errors.js";
+import {
+  datasourceFailure,
+  SheetwriteError,
+  type SheetwriteErrorCode,
+  type SheetwriteErrorContext,
+  unknownSheetError,
+} from "../errors.js";
 import type { FormulaFunctionMetadata } from "../functions/types.js";
 import {
   cloneCellHyperlink,
@@ -351,9 +357,19 @@ function rebaseConditionalFormatMove(
   };
 }
 
+/** A store failure caused by the workbook, options or call the host gave. */
+function storeFailure(
+  code: SheetwriteErrorCode,
+  message: string,
+  context?: SheetwriteErrorContext,
+): SheetwriteError {
+  return new SheetwriteError(code, "store", message, context === undefined ? {} : { context });
+}
+
 /** Error thrown when an operation requires datasource cells that are not loaded. */
 export class IncompleteDataError extends SheetwriteError {
   override readonly name = "IncompleteDataError";
+  declare readonly code: "incomplete-data";
   readonly capability: Extract<QueryCapability, { status: "incomplete" }>;
 
   constructor(sheet: SheetId, capability: Extract<QueryCapability, { status: "incomplete" }>) {
@@ -499,7 +515,8 @@ export class StoreDataEngine {
 
   constructor(workbook: Workbook, data?: ColumnarData, options: SheetwriteStoreOptions = {}) {
     if (!isLoaded()) {
-      throw new Error(
+      throw storeFailure(
+        "initialization-required",
         `Sheetwrite: await initSheetwrite() before constructing SheetwriteStore. ${ENGINE_LOAD_HINT}`,
       );
     }
@@ -508,10 +525,13 @@ export class StoreDataEngine {
       (!Number.isSafeInteger(options.referenceSimulationLimit) ||
         options.referenceSimulationLimit <= 0)
     ) {
-      throw new Error("Sheetwrite: referenceSimulationLimit must be a positive safe integer");
+      throw storeFailure(
+        "invalid-argument",
+        "Sheetwrite: referenceSimulationLimit must be a positive safe integer",
+      );
     }
     if (data && options.storage === "paged") {
-      throw new Error("Sheetwrite: ColumnarData requires dense storage");
+      throw storeFailure("invalid-argument", "Sheetwrite: ColumnarData requires dense storage");
     }
     assertWorkbookTables(
       workbook.sheets,
@@ -556,14 +576,18 @@ export class StoreDataEngine {
       for (const table of sheet.tables ?? []) {
         if (!this.syncTable(table)) {
           this.wasm.free();
-          throw new Error(`invalid workbook table: ${table.id}`);
+          throw storeFailure("invalid-snapshot", `invalid workbook table: ${table.id}`, {
+            table: table.id,
+          });
         }
       }
     }
     for (const namedRange of workbook.namedRanges ?? []) {
       if (!this.syncNamedRange(namedRange)) {
         this.wasm.free();
-        throw new Error(`invalid named range: ${namedRange.name}`);
+        throw storeFailure("invalid-snapshot", `invalid named range: ${namedRange.name}`, {
+          name: namedRange.name,
+        });
       }
     }
     this.loadPivots();
@@ -575,7 +599,7 @@ export class StoreDataEngine {
     else if (this.syncCalculation(calculation)) workbook.calculation = calculation;
     else {
       this.wasm.free();
-      throw new Error("invalid calculation settings");
+      throw storeFailure("invalid-snapshot", "invalid calculation settings");
     }
 
     if (data) {
@@ -715,7 +739,7 @@ export class StoreDataEngine {
 
   private handleOf(sheet: SheetId): number {
     const handle = this.handles.get(sheet);
-    if (handle === undefined) throw new Error(`unknown sheet: ${sheet}`);
+    if (handle === undefined) throw unknownSheetError(sheet);
     return handle;
   }
   private syncSpillBlockers(sheet: Sheet): void {
@@ -732,7 +756,11 @@ export class StoreDataEngine {
       bounds.push(range.start.row, range.start.col, range.end.row, range.end.col);
     }
     if (!this.wasm.setSpillBlockers(this.handleOf(sheet.id), Uint32Array.from(bounds))) {
-      throw new RangeError(`spill blocker resource limit exceeded for sheet: ${sheet.id}`);
+      throw storeFailure(
+        "resource-limit",
+        `spill blocker resource limit exceeded for sheet: ${sheet.id}`,
+        { sheet: sheet.id },
+      );
     }
   }
 
@@ -753,7 +781,14 @@ export class StoreDataEngine {
         if (ids.has(pivot.id) || ids.size >= MAX_PIVOTS_PER_WORKBOOK || issues.length > 0) {
           this.wasm.free();
           const reason = issues[0]?.message ?? "Pivot IDs must be unique within the limit";
-          throw new Error(`invalid pivot ${sheet.id}.pivots[${index}]: ${reason}`);
+          throw storeFailure(
+            "invalid-snapshot",
+            `invalid pivot ${sheet.id}.pivots[${index}]: ${reason}`,
+            {
+              sheet: sheet.id,
+              pivotIndex: index,
+            },
+          );
         }
         ids.add(pivot.id);
       }
@@ -800,7 +835,13 @@ export class StoreDataEngine {
       const handle = this.handleOf(sheet.id);
       const { layout, kinds, numbers, text, textLengths } = saved;
       if (!wasm.setSavedPivots(handle, layout, kinds, numbers, text, textLengths)) {
-        throw new RangeError(`saved pivot payload rejected for sheet: ${sheet.id}`);
+        throw storeFailure(
+          "resource-limit",
+          `saved pivot payload rejected for sheet: ${sheet.id}`,
+          {
+            sheet: sheet.id,
+          },
+        );
       }
       return;
     }
@@ -813,7 +854,9 @@ export class StoreDataEngine {
       "bulk",
     );
     if (!wasm.setPivots(this.handleOf(sheet.id), payload.numbers, payload.strings)) {
-      throw new RangeError(`pivot payload rejected for sheet: ${sheet.id}`);
+      throw storeFailure("resource-limit", `pivot payload rejected for sheet: ${sheet.id}`, {
+        sheet: sheet.id,
+      });
     }
   }
 
@@ -1122,7 +1165,7 @@ export class StoreDataEngine {
 
   private sheetMeta(sheet: SheetId) {
     const meta = this.workbook.sheets.find((s) => s.id === sheet);
-    if (!meta) throw new Error(`unknown sheet: ${sheet}`);
+    if (!meta) throw unknownSheetError(sheet);
     return meta;
   }
 
@@ -1472,7 +1515,9 @@ export class StoreDataEngine {
 
   recomputeVolatile(now: Date): void {
     const milliseconds = now.getTime();
-    if (!Number.isFinite(milliseconds)) throw new RangeError("invalid volatile recalculation date");
+    if (!Number.isFinite(milliseconds)) {
+      throw storeFailure("invalid-argument", "invalid volatile recalculation date");
+    }
     this.wasm.recomputeVolatile(dateToSerial(now));
   }
 
@@ -1710,7 +1755,7 @@ export class StoreDataEngine {
 
     const additions = columns.slice(meta.columns.length);
     if (!this.wasm.insertCols(this.handleOf(sheet), meta.columns.length, additions.length)) {
-      throw new RangeError("the engine cannot hold the added columns");
+      throw storeFailure("resource-limit", "the engine cannot hold the added columns");
     }
     meta.columns.push(...additions);
   }
@@ -4059,7 +4104,7 @@ export class StoreDataEngine {
     const rowCount = Math.min(rows.length, Math.max(0, meta.rowCount - start));
     if (rowCount === 0) return;
     if (!Number.isSafeInteger(start) || start < 0) {
-      throw new Error("datasource page contains an invalid row start");
+      throw datasourceFailure("datasource page contains an invalid row start");
     }
 
     let previousEnd = -1;
@@ -4074,12 +4119,12 @@ export class StoreDataEngine {
         band.end > meta.columns.length ||
         band.keys.length !== band.end - band.start
       ) {
-        throw new Error("datasource page contains invalid column bounds");
+        throw datasourceFailure("datasource page contains invalid column bounds");
       }
       for (let offset = 0; offset < band.keys.length; offset++) {
         const key = band.keys[offset]!;
         if (meta.columns[band.start + offset]?.key !== key || declaredKeys.has(key)) {
-          throw new Error("datasource page contains invalid column keys");
+          throw datasourceFailure("datasource page contains invalid column keys");
         }
         declaredKeys.add(key);
       }
@@ -4089,12 +4134,12 @@ export class StoreDataEngine {
       const row = rows[rowOffset]!;
       for (const key of declaredKeys) {
         if (!Object.hasOwn(row, key)) {
-          throw new Error("datasource page omits declared cell data");
+          throw datasourceFailure("datasource page omits declared cell data");
         }
       }
       for (const key of Object.keys(row)) {
         if (!declaredKeys.has(key))
-          throw new Error("datasource page contains undeclared cell data");
+          throw datasourceFailure("datasource page contains undeclared cell data");
       }
     }
 

@@ -930,11 +930,15 @@ describe("transaction resource protocol", () => {
       maxEncodedBytes: 8 * 1024 * 1024,
     });
     for (const invalid of [-1, 0.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      const invalidLimit = expect.objectContaining({
+        code: "invalid-limits",
+        operation: "transaction",
+      });
       expect(() => resolveTransactionResourceLimits({ maxOperations: invalid })).toThrow(
-        RangeError,
+        invalidLimit,
       );
       expect(() => resolveTransactionResourceLimits({ maxEncodedBytes: invalid })).toThrow(
-        RangeError,
+        invalidLimit,
       );
     }
   });

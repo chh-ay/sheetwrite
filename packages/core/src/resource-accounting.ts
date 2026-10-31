@@ -1,3 +1,4 @@
+import { SheetwriteError } from "./errors.js";
 import type { ResourceOwnerBytes } from "./types/store.js";
 
 export type { ResourceOwnerBytes } from "./types/store.js";
@@ -8,6 +9,11 @@ export const RUNTIME_RESOURCE_SCHEMA_VERSION = 2 as const;
 export const STORE_MEMORY_PROTOCOL_VERSION = 3 as const;
 /** Version of the deterministic hash-table capacity estimate used by store owners. */
 export const STORE_MEMORY_HASH_ESTIMATE_VERSION = 1 as const;
+
+/** A resource report or store-memory encoding that breaks its protocol. */
+function invalidResourceReport(message: string): SheetwriteError {
+  return new SheetwriteError("invalid-argument", "resource-diagnostics", message);
+}
 
 /** Stable ordered owner list encoded by the WASM store-memory protocol. */
 export const WASM_MEMORY_OWNERS = [
@@ -245,18 +251,20 @@ export function decodeStoreMemoryStats(
 ): StoreMemoryBreakdown {
   const expectedLength = 5 + WASM_MEMORY_OWNERS.length * 3;
   if (encoded.length !== expectedLength) {
-    throw new Error(`Store memory protocol length ${encoded.length}; expected ${expectedLength}`);
+    throw invalidResourceReport(
+      `Store memory protocol length ${encoded.length}; expected ${expectedLength}`,
+    );
   }
   if (encoded[0] !== STORE_MEMORY_PROTOCOL_VERSION) {
-    throw new Error(`Unsupported store memory protocol ${encoded[0]}`);
+    throw invalidResourceReport(`Unsupported store memory protocol ${encoded[0]}`);
   }
   if (encoded[1] !== WASM_MEMORY_OWNERS.length) {
-    throw new Error(
+    throw invalidResourceReport(
       `Store memory owner count ${encoded[1]}; expected ${WASM_MEMORY_OWNERS.length}`,
     );
   }
   if (encoded[2] !== STORE_MEMORY_HASH_ESTIMATE_VERSION) {
-    throw new Error(`Unsupported hash-table estimate ${encoded[2]}`);
+    throw invalidResourceReport(`Unsupported hash-table estimate ${encoded[2]}`);
   }
 
   const owners: ResourceOwnerBytes[] = [];
@@ -289,7 +297,7 @@ export function decodeStoreMemoryStats(
   const ownerLogical = sumOwnerBytes(owners, "logicalBytes");
   const ownerAllocated = sumOwnerBytes(owners, "allocatedBytes");
   if (logicalLiveBytes !== ownerLogical || allocatedCapacityBytes !== ownerAllocated) {
-    throw new Error(
+    throw invalidResourceReport(
       `Store memory totals drift: encoded ${logicalLiveBytes}/${allocatedCapacityBytes}, owners ${ownerLogical}/${ownerAllocated}`,
     );
   }
@@ -352,17 +360,18 @@ export function createRuntimeResourceSnapshot(input: {
 /** Reject overlap, negative values, and attempts to fold runtime observations into owner totals. */
 export function assertRuntimeResourceSnapshot(snapshot: RuntimeResourceSnapshot): void {
   if (snapshot.schemaVersion !== RUNTIME_RESOURCE_SCHEMA_VERSION) {
-    throw new Error(`Unsupported runtime resource schema ${snapshot.schemaVersion}`);
+    throw invalidResourceReport(`Unsupported runtime resource schema ${snapshot.schemaVersion}`);
   }
   const owners = [...snapshot.wasm.owners, ...snapshot.jsOwners];
   const seen = new Set<string>();
   for (const owner of owners) {
-    if (seen.has(owner.owner)) throw new Error(`Resource owner counted twice: ${owner.owner}`);
+    if (seen.has(owner.owner))
+      throw invalidResourceReport(`Resource owner counted twice: ${owner.owner}`);
     seen.add(owner.owner);
     assertOwnerValues(owner.owner, owner.logicalBytes, owner.allocatedBytes, owner.entries);
   }
   if (snapshot.wasm.unaccountedBytes !== 0) {
-    throw new Error(`Unaccounted WASM bytes: ${snapshot.wasm.unaccountedBytes}`);
+    throw invalidResourceReport(`Unaccounted WASM bytes: ${snapshot.wasm.unaccountedBytes}`);
   }
   const logical = sumOwnerBytes(owners, "logicalBytes");
   const allocated = sumOwnerBytes(owners, "allocatedBytes");
@@ -370,7 +379,7 @@ export function assertRuntimeResourceSnapshot(snapshot: RuntimeResourceSnapshot)
     snapshot.totals.logicalLiveBytes !== logical ||
     snapshot.totals.allocatedCapacityBytes !== allocated
   ) {
-    throw new Error(
+    throw invalidResourceReport(
       `Runtime resource totals double-count or omit bytes: ${snapshot.totals.logicalLiveBytes}/${snapshot.totals.allocatedCapacityBytes} != ${logical}/${allocated}`,
     );
   }
@@ -382,7 +391,7 @@ export function diffRuntimeResourcePhases(
   after: RuntimeResourceSnapshot,
 ): RuntimeResourcePhaseDelta {
   if (before.operation !== after.operation) {
-    throw new Error(`Cannot diff ${before.operation} against ${after.operation}`);
+    throw invalidResourceReport(`Cannot diff ${before.operation} against ${after.operation}`);
   }
   assertRuntimeResourceSnapshot(before);
   assertRuntimeResourceSnapshot(after);
@@ -462,18 +471,20 @@ function assertOwnerValues(
   allocatedBytes: number,
   entries: number,
 ): void {
-  if (!owner) throw new Error("Resource owner name must not be empty");
+  if (!owner) throw invalidResourceReport("Resource owner name must not be empty");
   assertNonNegativeSafeInteger(logicalBytes, `${owner} logical bytes`);
   assertNonNegativeSafeInteger(allocatedBytes, `${owner} allocated bytes`);
   assertNonNegativeSafeInteger(entries, `${owner} entries`);
   if (allocatedBytes < logicalBytes) {
-    throw new Error(`${owner} allocated bytes ${allocatedBytes} are below logical ${logicalBytes}`);
+    throw invalidResourceReport(
+      `${owner} allocated bytes ${allocatedBytes} are below logical ${logicalBytes}`,
+    );
   }
 }
 
 function assertNonNegativeSafeInteger(value: number, name: string): void {
   if (!Number.isSafeInteger(value) || value < 0) {
-    throw new Error(`${name} must be a non-negative safe integer; received ${value}`);
+    throw invalidResourceReport(`${name} must be a non-negative safe integer; received ${value}`);
   }
 }
 
@@ -483,7 +494,8 @@ function finiteObservation(value: number | undefined): number | null {
 
 function safeCounterSum(current: number, increment: number, name: string): number {
   const value = current + increment;
-  if (!Number.isSafeInteger(value)) throw new Error(`${name} exceeded Number.MAX_SAFE_INTEGER`);
+  if (!Number.isSafeInteger(value))
+    throw invalidResourceReport(`${name} exceeded Number.MAX_SAFE_INTEGER`);
   return value;
 }
 

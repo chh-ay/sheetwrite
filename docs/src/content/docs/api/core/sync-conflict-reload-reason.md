@@ -8,7 +8,7 @@ description: "SyncConflictReloadReason type in @sheetwrite/core: Why a conflict 
 Why a conflict cannot be recovered in place; the host reloads the document instead.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/sync.ts#L274"><code>packages/core/src/sync.ts#L274</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/sync.ts#L276"><code>packages/core/src/sync.ts#L276</code></a></dd></div>
 </dl>
 
 ## Declaration
