@@ -8,7 +8,7 @@ description: "InitOutput interface in @sheetwrite/wasm: Result of module initial
 Result of module initialization: the instantiated exports plus the shared linear memory.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/pkg/sheetwrite_wasm.d.ts#L506"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L506</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/pkg/sheetwrite_wasm.d.ts#L526"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L526</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -125,6 +125,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-distinctcolumn-take-kinds"><code>distinctcolumn_takeKinds</code></a>
 <a href="#init-output-distinctcolumn-take-numbers"><code>distinctcolumn_takeNumbers</code></a>
 <a href="#init-output-distinctcolumn-take-texts"><code>distinctcolumn_takeTexts</code></a>
+<a href="#init-output-move-formula-axis"><code>moveFormulaAxis</code></a>
 <a href="#init-output-rangesnapshot-byte-length"><code>rangesnapshot_byteLength</code></a>
 <a href="#init-output-rangesnapshot-export-memory-state"><code>rangesnapshot_exportMemoryState</code></a>
 <a href="#init-output-rangesnapshot-formula-offsets"><code>rangesnapshot_formulaOffsets</code></a>
@@ -133,11 +134,13 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-rangesnapshot-reference-offsets"><code>rangesnapshot_referenceOffsets</code></a>
 <a href="#init-output-rangesnapshot-reference-targets"><code>rangesnapshot_referenceTargets</code></a>
 <a href="#init-output-rangesnapshot-style-ids"><code>rangesnapshot_styleIds</code></a>
+<a href="#init-output-shift-formula-axis"><code>shiftFormulaAxis</code></a>
 <a href="#init-output-sourcesnapshot-formula-offsets"><code>sourcesnapshot_formulaOffsets</code></a>
 <a href="#init-output-sourcesnapshot-formula-sources"><code>sourcesnapshot_formulaSources</code></a>
 <a href="#init-output-sourcesnapshot-reference-offsets"><code>sourcesnapshot_referenceOffsets</code></a>
 <a href="#init-output-sourcesnapshot-reference-targets"><code>sourcesnapshot_referenceTargets</code></a>
 <a href="#init-output-sourcesnapshot-spill-derived"><code>sourcesnapshot_spillDerived</code></a>
+<a href="#init-output-translate-formula"><code>translateFormula</code></a>
 <a href="#init-output-windowview-n-cols"><code>windowview_nCols</code></a>
 <a href="#init-output-windowview-n-rows"><code>windowview_nRows</code></a>
 <a href="#init-output-windowview-take-strings"><code>windowview_takeStrings</code></a>
@@ -152,7 +155,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-wbindgen-start"><code>__wbindgen_start</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>138</span>
+## Members <span class="api-count" data-pagefind-ignore>141</span>
 
 <div class="api-member-list">
 
@@ -1173,6 +1176,15 @@ readonly distinctcolumn_takeTexts: (a: number) => [number, number];
 
 </details>
 
+<details class="api-member" id="init-output-move-formula-axis" data-pagefind-weight="1">
+<summary><code>moveFormulaAxis</code></summary>
+
+```ts generated
+readonly moveFormulaAxis: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number];
+```
+
+</details>
+
 <details class="api-member" id="init-output-rangesnapshot-byte-length" data-pagefind-weight="1">
 <summary><code>rangesnapshot_byteLength</code></summary>
 
@@ -1245,6 +1257,15 @@ readonly rangesnapshot_styleIds: (a: number) => [number, number];
 
 </details>
 
+<details class="api-member" id="init-output-shift-formula-axis" data-pagefind-weight="1">
+<summary><code>shiftFormulaAxis</code></summary>
+
+```ts generated
+readonly shiftFormulaAxis: (a: number, b: number, c: number, d: number, e: number) => [number, number];
+```
+
+</details>
+
 <details class="api-member" id="init-output-sourcesnapshot-formula-offsets" data-pagefind-weight="1">
 <summary><code>sourcesnapshot_formulaOffsets</code></summary>
 
@@ -1286,6 +1307,15 @@ readonly sourcesnapshot_referenceTargets: (a: number) => [number, number];
 
 ```ts generated
 readonly sourcesnapshot_spillDerived: (a: number) => [number, number];
+```
+
+</details>
+
+<details class="api-member" id="init-output-translate-formula" data-pagefind-weight="1">
+<summary><code>translateFormula</code></summary>
+
+```ts generated
+readonly translateFormula: (a: number, b: number, c: number, d: number) => [number, number];
 ```
 
 </details>
@@ -2041,6 +2071,14 @@ export interface InitOutput {
   readonly distinctcolumn_takeKinds: (a: number) => [number, number];
   readonly distinctcolumn_takeNumbers: (a: number) => [number, number];
   readonly distinctcolumn_takeTexts: (a: number) => [number, number];
+  readonly moveFormulaAxis: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+  ) => [number, number];
   readonly rangesnapshot_byteLength: (a: number) => number;
   readonly rangesnapshot_exportMemoryState: (
     a: number,
@@ -2052,11 +2090,24 @@ export interface InitOutput {
   readonly rangesnapshot_referenceOffsets: (a: number) => [number, number];
   readonly rangesnapshot_referenceTargets: (a: number) => [number, number];
   readonly rangesnapshot_styleIds: (a: number) => [number, number];
+  readonly shiftFormulaAxis: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+  ) => [number, number];
   readonly sourcesnapshot_formulaOffsets: (a: number) => [number, number];
   readonly sourcesnapshot_formulaSources: (a: number) => [number, number];
   readonly sourcesnapshot_referenceOffsets: (a: number) => [number, number];
   readonly sourcesnapshot_referenceTargets: (a: number) => [number, number];
   readonly sourcesnapshot_spillDerived: (a: number) => [number, number];
+  readonly translateFormula: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+  ) => [number, number];
   readonly windowview_nCols: (a: number) => number;
   readonly windowview_nRows: (a: number) => number;
   readonly windowview_takeStrings: (a: number) => [number, number];
