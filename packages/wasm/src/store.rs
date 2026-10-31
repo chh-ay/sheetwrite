@@ -453,6 +453,23 @@ impl CellStore {
         byte_budget: usize,
         max_dirty_cells: usize,
     ) -> usize {
+        match self.try_add_paged_sheet(n_cols, row_count, chunk_rows, byte_budget, max_dirty_cells)
+        {
+            Ok(index) => index,
+            Err(error) => wasm_bindgen::throw_str(&error),
+        }
+    }
+
+    /// Like [`Self::add_paged_sheet`], with an unsupported chunk size as an
+    /// error instead of a JavaScript exception.
+    pub(crate) fn try_add_paged_sheet(
+        &mut self,
+        n_cols: usize,
+        row_count: usize,
+        chunk_rows: usize,
+        byte_budget: usize,
+        max_dirty_cells: usize,
+    ) -> Result<usize, String> {
         let index = self.sheets.len();
         self.sheets.push(SheetData::new_paged(
             n_cols,
@@ -468,14 +485,14 @@ impl CellStore {
             } else {
                 max_dirty_cells
             },
-        ));
+        )?);
         self.sheet_names.push(String::new());
         self.sheet_alive.push(true);
         if let Some(order) = &mut self.sheet_order {
             order.push(index as u32);
         }
 
-        index
+        Ok(index)
     }
 
     #[wasm_bindgen(js_name = isPaged)]
@@ -1927,19 +1944,27 @@ impl CellStore {
         }
     }
 
+    /// Insert `count` rows at `at`. Returns `false` and changes nothing when
+    /// the sheet is missing or cannot hold the rows.
     #[wasm_bindgen(js_name = addRows)]
-    pub fn add_rows(&mut self, sheet: usize, at: usize, count: usize) {
-        let Some(row_count) = self.sheets.get(sheet).map(|s| s.cells.row_count()) else {
-            return;
+    pub fn add_rows(&mut self, sheet: usize, at: usize, count: usize) -> bool {
+        let Some(data) = self.sheets.get(sheet) else {
+            return false;
+        };
+        let rows = data.cells.row_count();
+        let cols = data.cells.n_cols();
+        let Some(new_rows) = rows.checked_add(count) else {
+            return false;
         };
         if count == 0 {
-            return;
+            return true;
         }
-        let at = at.min(row_count);
-        let data = &mut self.sheets[sheet];
-        data.spill.clear_all(&mut data.cells);
-        data.cells.invalidate_derived();
-        self.sheets[sheet].insert_rows(sheet as u32, at, count);
+        let at = at.min(rows);
+        if !self.begin_structural_edit(sheet, new_rows, cols)
+            || !self.finish_cell_edit(sheet, |data| data.insert_rows(sheet as u32, at, count))
+        {
+            return false;
+        }
         self.rewrite_formula_rows(sheet as u32, at as u32, count as i64);
         self.graph.invalidate();
         self.shift_pivots(
@@ -1948,21 +1973,24 @@ impl CellStore {
             at as u32,
             count as i64,
         );
+        true
     }
 
     #[wasm_bindgen(js_name = removeRows)]
-    pub fn remove_rows(&mut self, sheet: usize, at: usize, count: usize) {
-        let Some(row_count) = self.sheets.get(sheet).map(|s| s.cells.row_count()) else {
-            return;
+    pub fn remove_rows(&mut self, sheet: usize, at: usize, count: usize) -> bool {
+        let Some(data) = self.sheets.get(sheet) else {
+            return false;
         };
-        if count == 0 || at >= row_count {
-            return;
+        let (rows, cols) = (data.cells.row_count(), data.cells.n_cols());
+        if count == 0 || at >= rows {
+            return true;
         }
-        let count = count.min(row_count - at);
-        let data = &mut self.sheets[sheet];
-        data.spill.clear_all(&mut data.cells);
-        data.cells.invalidate_derived();
-        self.sheets[sheet].delete_rows(sheet as u32, at, count);
+        let count = count.min(rows - at);
+        if !self.begin_structural_edit(sheet, rows - count, cols)
+            || !self.finish_cell_edit(sheet, |data| data.delete_rows(sheet as u32, at, count))
+        {
+            return false;
+        }
         self.rewrite_formula_rows(sheet as u32, at as u32, -(count as i64));
         self.graph.invalidate();
         self.shift_pivots(
@@ -1971,21 +1999,27 @@ impl CellStore {
             at as u32,
             -(count as i64),
         );
+        true
     }
 
     #[wasm_bindgen(js_name = insertCols)]
-    pub fn insert_cols(&mut self, sheet: usize, at: usize, count: usize) {
-        let Some(col_count) = self.sheets.get(sheet).map(|s| s.cells.n_cols()) else {
-            return;
+    pub fn insert_cols(&mut self, sheet: usize, at: usize, count: usize) -> bool {
+        let Some(data) = self.sheets.get(sheet) else {
+            return false;
+        };
+        let (rows, cols) = (data.cells.row_count(), data.cells.n_cols());
+        let Some(new_cols) = cols.checked_add(count) else {
+            return false;
         };
         if count == 0 {
-            return;
+            return true;
         }
-        let at = at.min(col_count);
-        let data = &mut self.sheets[sheet];
-        data.spill.clear_all(&mut data.cells);
-        data.cells.invalidate_derived();
-        self.sheets[sheet].insert_cols(sheet as u32, at, count);
+        let at = at.min(cols);
+        if !self.begin_structural_edit(sheet, rows, new_cols)
+            || !self.finish_cell_edit(sheet, |data| data.insert_cols(sheet as u32, at, count))
+        {
+            return false;
+        }
         self.rewrite_formula_cols(sheet as u32, at as u32, count as i64);
         self.graph.invalidate();
         self.shift_pivots(
@@ -1994,21 +2028,24 @@ impl CellStore {
             at as u32,
             count as i64,
         );
+        true
     }
 
     #[wasm_bindgen(js_name = removeCols)]
-    pub fn remove_cols(&mut self, sheet: usize, at: usize, count: usize) {
-        let Some(col_count) = self.sheets.get(sheet).map(|s| s.cells.n_cols()) else {
-            return;
+    pub fn remove_cols(&mut self, sheet: usize, at: usize, count: usize) -> bool {
+        let Some(data) = self.sheets.get(sheet) else {
+            return false;
         };
-        if count == 0 || at >= col_count {
-            return;
+        let (rows, cols) = (data.cells.row_count(), data.cells.n_cols());
+        if count == 0 || at >= cols {
+            return true;
         }
-        let count = count.min(col_count - at);
-        let data = &mut self.sheets[sheet];
-        data.spill.clear_all(&mut data.cells);
-        data.cells.invalidate_derived();
-        self.sheets[sheet].delete_cols(sheet as u32, at, count);
+        let count = count.min(cols - at);
+        if !self.begin_structural_edit(sheet, rows, cols - count)
+            || !self.finish_cell_edit(sheet, |data| data.delete_cols(sheet as u32, at, count))
+        {
+            return false;
+        }
         self.rewrite_formula_cols(sheet as u32, at as u32, -(count as i64));
         self.graph.invalidate();
         self.shift_pivots(
@@ -2017,6 +2054,36 @@ impl CellStore {
             at as u32,
             -(count as i64),
         );
+        true
+    }
+
+    /// Checks that the sheet can take its new size, then detaches spills and
+    /// drops calculated values, which the edit moves. Changes nothing when the
+    /// size is over the sheet's limit.
+    fn begin_structural_edit(&mut self, sheet: usize, rows: usize, cols: usize) -> bool {
+        let data = &mut self.sheets[sheet];
+        if data.cells.check_dimensions(rows, cols).is_err() {
+            return false;
+        }
+        data.spill.clear_all(&mut data.cells);
+        data.cells.invalidate_derived();
+        true
+    }
+
+    /// Applies the cell move. When memory runs out the cells and formulas stay
+    /// where they were, and every formula of the sheet recalculates, since the
+    /// spills it showed were already detached.
+    fn finish_cell_edit(
+        &mut self,
+        sheet: usize,
+        edit: impl FnOnce(&mut SheetData) -> Result<(), String>,
+    ) -> bool {
+        let data = &mut self.sheets[sheet];
+        if edit(data).is_err() {
+            data.formulas.mark_all_dirty();
+            return false;
+        }
+        true
     }
 
     /// Single-cell read for interactions/tests — never the render hot path.

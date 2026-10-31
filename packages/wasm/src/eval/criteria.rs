@@ -2,8 +2,8 @@
 
 use std::cmp::Ordering;
 
-use crate::calc::CmpOp;
-use crate::types::{FormulaError, Value};
+use crate::calc::{CmpOp, SHEET_COLS, SHEET_ROWS};
+use crate::types::{CellRange, FormulaError, Value};
 
 use super::matrix::EvalMatrix;
 use super::value::compare_text_case_insensitive;
@@ -81,8 +81,28 @@ impl Criterion {
         } else {
             criterion_compare(candidate, &self.operand)
         };
-        ordering.is_some_and(|ordering| ordering_matches(ordering, self.op))
+        // Values of different types are never equal, so `<>` matches them
+        // and every ordering operator rejects them.
+        match ordering {
+            Some(ordering) => ordering_matches(ordering, self.op),
+            None => self.op == CmpOp::Ne,
+        }
     }
+}
+
+/// The sum range of SUMIF and AVERAGEIF. Excel reads as many rows and columns
+/// as the criteria range has, from the sum range's top-left cell, whatever
+/// size the sum range is written with; the sheet edge cuts it short.
+pub(crate) fn sum_range_extent(sum: CellRange, rows: u32, cols: u32) -> CellRange {
+    let row_end = sum
+        .row_start
+        .saturating_add(rows.saturating_sub(1))
+        .min(SHEET_ROWS - 1);
+    let col_end = sum
+        .col_start
+        .saturating_add(cols.saturating_sub(1))
+        .min(SHEET_COLS - 1);
+    CellRange::new(sum.sheet, sum.row_start, sum.col_start, row_end, col_end)
 }
 
 fn wildcard_tokens(pattern: &str) -> Option<Vec<WildcardToken>> {

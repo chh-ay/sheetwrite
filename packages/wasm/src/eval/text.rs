@@ -21,9 +21,11 @@ pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> 
         Func::Concat | Func::Concatenate => concat(values),
         Func::Upper => unary_text(values, |text| change_case(text, true)),
         Func::Lower => unary_text(values, |text| change_case(text, false)),
+        // Excel's TRIM removes only the space character (U+0020); line feeds,
+        // tabs and no-break spaces stay.
         Func::Trim => unary_text(values, |text| {
             let mut output = String::new();
-            for (index, part) in text.split_whitespace().enumerate() {
+            for (index, part) in text.split(' ').filter(|part| !part.is_empty()).enumerate() {
                 if index > 0 {
                     checked_push(&mut output, " ")?;
                 }
@@ -350,9 +352,8 @@ fn replace(values: &FuncAccumulator) -> Value {
         Ok(value) => value,
         Err(error) => return Value::Error(error),
     };
-    let Some(start_byte) = code_point_byte_offset(&text, start) else {
-        return Value::Error(FormulaError::Value);
-    };
+    // A start past the end appends the replacement, as in Excel.
+    let start_byte = code_point_byte_offset(&text, start).unwrap_or(text.len());
     let end_byte = code_point_byte_offset(&text[start_byte..], count)
         .map(|offset| start_byte + offset)
         .unwrap_or(text.len());
@@ -833,7 +834,7 @@ mod tests {
                     Value::text("x"),
                 ],
             ),
-            Value::Error(FormulaError::Value)
+            Value::text("abcx")
         );
         assert_eq!(
             evaluate(

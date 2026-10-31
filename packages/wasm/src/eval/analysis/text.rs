@@ -1,12 +1,12 @@
 //! Text functions for the full engine. Regex uses the bounded `regex-lite` syntax.
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
-use std::fmt::Write;
 use std::rc::Rc;
 
 use regex_lite::{Captures, Regex, RegexBuilder};
 
 use super::super::matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_CELLS};
+use super::super::number_format::{format_number, general_text, round_decimal, Rounding};
 use super::super::value::{bool_from_value, number_from_value, text_from_value};
 use super::super::EvalPass;
 use crate::calc::Ast;
@@ -295,6 +295,7 @@ fn before_after(
         Err(FormulaError::Na)
     }
 }
+
 fn fixed(context: &mut Context<'_, '_>, name: &str, args: &[Ast]) -> Result<Value, FormulaError> {
     arity(args, 1, if name == "FIXED" { 3 } else { 2 })?;
     let number = number_from_value(&context.scalar(args, 0, Value::Blank))?;
@@ -303,35 +304,26 @@ fn fixed(context: &mut Context<'_, '_>, name: &str, args: &[Ast]) -> Result<Valu
         return Err(FormulaError::Value);
     }
     let no_commas = name == "FIXED" && context.boolean(args, 2, false)?;
-    let scale = 10f64.powi(decimals as i32);
-    let rounded = (number * scale).round() / scale;
+    let rounded = round_decimal(number, decimals as i32, Rounding::Nearest);
     if !rounded.is_finite() {
         return Err(FormulaError::Num);
     }
-    let digits = format!("{:.*}", decimals.max(0) as usize, rounded.abs());
-    let (whole, fraction) = digits.split_once('.').unwrap_or((&digits, ""));
-    let mut output = String::new();
-    if rounded < 0.0 {
-        output.push(if name == "DOLLAR" { '(' } else { '-' });
-    }
-    if name == "DOLLAR" {
-        output.push('$');
-    }
-    for (index, digit) in whole.chars().enumerate() {
-        if !no_commas && index != 0 && (whole.len() - index).is_multiple_of(3) {
-            output.push(',');
-        }
-        output.push(digit);
-    }
-    if !fraction.is_empty() {
-        output.push('.');
-        output.push_str(fraction);
-    }
-    if rounded < 0.0 && name == "DOLLAR" {
-        output.push(')');
-    }
-    text_value(output)
+    let places = decimals.max(0) as usize;
+    let digits = if places == 0 {
+        String::from("0")
+    } else {
+        format!("0.{}", "0".repeat(places))
+    };
+    let code = if name == "DOLLAR" {
+        format!("$#,##{digits};($#,##{digits})")
+    } else if no_commas {
+        digits
+    } else {
+        format!("#,##{digits}")
+    };
+    text_value(format_number(rounded, &code).ok_or(FormulaError::Value)?)
 }
+
 /// Append directly so ARRAYTOTEXT does not allocate a string for each cell.
 fn serialize(output: &mut String, value: &Value, strict: bool) -> Result<(), FormulaError> {
     match value {
@@ -349,7 +341,7 @@ fn serialize(output: &mut String, value: &Value, strict: bool) -> Result<(), For
         Value::Error(error) => output.push_str(error.sentinel()),
         Value::Blank if strict => output.push_str("\"\""),
         Value::Number(number) if number.is_finite() => {
-            write!(output, "{number}").map_err(|_| FormulaError::Value)?;
+            output.push_str(&general_text(*number));
         }
         Value::Number(_) => return Err(FormulaError::Num),
         Value::Bool(boolean) => output.push_str(if *boolean { "TRUE" } else { "FALSE" }),
@@ -743,6 +735,8 @@ mod tests {
             ("=FIXED(1234.567,1)", "1,234.6"),
             ("=FIXED(1234.567,-1,TRUE)", "1230"),
             ("=DOLLAR(-1234.567,2)", "($1,234.57)"),
+            ("=FIXED(1.005,2)", "1.01"),
+            ("=DOLLAR(2.675)", "$2.68"),
             (r#"=VALUETOTEXT("a""b",1)"#, "\"a\"\"b\""),
             ("=VALUETOTEXT(1/0)", "#DIV/0!"),
         ]);

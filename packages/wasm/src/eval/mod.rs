@@ -9,13 +9,17 @@ mod criteria;
 pub(crate) mod custom;
 mod date;
 mod dependency;
+#[cfg(test)]
+mod excel_results_tests;
 mod financial;
 mod functions;
+mod index;
 mod info;
 mod iteration;
 mod lookup;
 mod math;
 mod matrix;
+mod number_format;
 mod operators;
 mod random;
 mod range_reader;
@@ -29,7 +33,7 @@ use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::rc::Rc;
 
-use crate::calc::{Ast, Func};
+use crate::calc::{Ast, Func, SHEET_COLS, SHEET_ROWS};
 use crate::cells::{encode_num, encode_str_id, payload_num, payload_str_id, DenseSourceRun};
 use crate::graph::DirtySeeds;
 use crate::sheet::{formula_error_with_entry, SheetData};
@@ -43,6 +47,7 @@ use crate::types::{
 
 pub(crate) use array::ast_produces_array;
 use array::dynamic_recompute_within_limit;
+pub(crate) use criteria::sum_range_extent;
 use criteria::{aggregate_if, extreme_if, Criterion, IfExtreme, IfSum};
 use date::host_clock_serial;
 #[cfg(test)]
@@ -56,10 +61,11 @@ use functions::{apply_func, treats_cell_as_reference, FuncAccumulator, Reduction
 pub(crate) use iteration::IterationLimits;
 use iteration::IterationPassGuard;
 use lookup::{
-    find_match_index_indexed, integer_arg, list_reuse, positive_index, remember_list,
+    find_match_index_indexed, list_reuse, option_code, positive_index, remember_list,
     remember_result, remember_table, result_reuse, table_reuse, CachedList, CachedResult,
     CachedTable, LookupPassGuard, LookupReuse, ReuseEntry, TablePart,
 };
+pub(crate) use matrix::range_from_ast as static_range;
 pub(crate) use matrix::{intersection_range, matrix_resource_stats, reset_matrix_resource_stats};
 use matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_BYTES};
 pub(crate) use random::RandomSource;
@@ -403,6 +409,25 @@ fn expand_let_node<'a>(
     })
 }
 
+/// The match and search modes of XMATCH and XLOOKUP. A missing argument takes
+/// its default, and an argument error is returned unchanged.
+fn lookup_modes(
+    match_mode: Option<Value>,
+    search_mode: Option<Value>,
+) -> Result<(i32, i32), FormulaError> {
+    let match_mode = match match_mode.as_ref().map(option_code).transpose()? {
+        None => 0,
+        Some(mode @ -1..=2) => mode,
+        Some(_) => return Err(FormulaError::Value),
+    };
+    let search_mode = match search_mode.as_ref().map(option_code).transpose()? {
+        None => 1,
+        Some(mode @ (-2 | -1 | 1 | 2)) => mode,
+        Some(_) => return Err(FormulaError::Value),
+    };
+    Ok((match_mode, search_mode))
+}
+
 fn address_text(
     row: usize,
     col: usize,
@@ -410,7 +435,7 @@ fn address_text(
     a1: bool,
     sheet: Option<&str>,
 ) -> Result<String, FormulaError> {
-    if row >= 1_048_576 || col >= 16_384 {
+    if row >= SHEET_ROWS as usize || col >= SHEET_COLS as usize {
         return Err(FormulaError::Value);
     }
     let mut output = String::new();
@@ -1694,6 +1719,19 @@ impl CellStore {
             if args.len() != 1 {
                 return Value::Error(FormulaError::Value);
             }
+            // A written reference has its shape without its cells, which
+            // keeps `ROWS(A:A)` at 1048576 instead of the used rows.
+            if let Some(range) = range_from_ast(&args[0], sheet) {
+                if self.sheets.get(range.sheet as usize).is_none() {
+                    return Value::Error(FormulaError::Ref);
+                }
+                let (start, end) = if func == Func::Rows {
+                    (range.row_start, range.row_end)
+                } else {
+                    (range.col_start, range.col_end)
+                };
+                return Value::number(f64::from(end - start) + 1.0);
+            }
             let matrix = match self.eval_matrix_arg(&args[0], sheet, pass, depth + 1) {
                 Ok(matrix) => matrix,
                 Err(error) => return Value::Error(error),
@@ -1720,9 +1758,10 @@ impl CellStore {
                 Err(error) => return Value::Error(error),
             };
             let abs = match optional_ast(args, 2) {
-                Some(ast) => match integer_arg(&scalar(ast, pass)) {
+                Some(ast) => match option_code(&scalar(ast, pass)) {
                     Ok(value @ 1..=4) => value,
-                    _ => return Value::Error(FormulaError::Value),
+                    Ok(_) => return Value::Error(FormulaError::Value),
+                    Err(error) => return Value::Error(error),
                 },
                 None => 1,
             };
@@ -2107,15 +2146,24 @@ impl CellStore {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<EvalMatrix, FormulaError> {
-        if range_from_ast(ast, formula_sheet).is_none() {
+        let Some(range) = range_from_ast(ast, formula_sheet) else {
             let Some(result) = self.eval_dynamic_array(ast, formula_sheet, pass, depth + 1) else {
                 return Err(FormulaError::Value);
             };
             let matrix = result?;
             matrix.validate_copies(2)?;
             return Ok(matrix);
-        }
-        let range = range_from_ast(ast, formula_sheet).ok_or(FormulaError::Value)?;
+        };
+        self.eval_range_matrix(range, pass, depth)
+    }
+
+    /// The values of a written range, up to the sheet's used extent.
+    fn eval_range_matrix(
+        &self,
+        range: CellRange,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> Result<EvalMatrix, FormulaError> {
         let sheet = range.sheet as usize;
         let Some(data) = self.sheets.get(sheet) else {
             return Err(FormulaError::Ref);
@@ -2357,7 +2405,11 @@ impl CellStore {
             Err(error) => return Some(Value::Error(error)),
         };
         let value_range = match args.get(2) {
-            Some(ast) => range_from_ast(ast, sheet)?,
+            Some(ast) => sum_range_extent(
+                range_from_ast(ast, sheet)?,
+                criteria_range.row_end - criteria_range.row_start + 1,
+                criteria_range.col_end - criteria_range.col_start + 1,
+            ),
             None => criteria_range,
         };
         let mut value_reader = match RangeReader::new(self, value_range, depth + 1) {
@@ -2543,7 +2595,21 @@ impl CellStore {
                     Err(error) => return Value::Error(error),
                 };
                 let value_range = if let Some(ast) = args.get(2) {
-                    match self.eval_matrix_arg(ast, sheet, pass, depth + 1) {
+                    let matrix = match range_from_ast(ast, sheet) {
+                        Some(range) => {
+                            let (rows, cols) = match range_from_ast(&args[0], sheet) {
+                                Some(criteria) => (
+                                    criteria.row_end - criteria.row_start + 1,
+                                    criteria.col_end - criteria.col_start + 1,
+                                ),
+                                None => (criteria_range.rows as u32, criteria_range.cols as u32),
+                            };
+                            let range = sum_range_extent(range, rows, cols);
+                            self.eval_range_matrix(range, pass, depth + 1)
+                        }
+                        None => self.eval_matrix_arg(ast, sheet, pass, depth + 1),
+                    };
+                    match matrix {
                         Ok(range) => range,
                         Err(error) => return Value::Error(error),
                     }
@@ -2760,50 +2826,7 @@ impl CellStore {
         let scalar =
             |ast: &Ast, pass: &mut EvalPass<'_>| self.eval_ast(ast, sheet, pass, depth + 1);
         match func {
-            Func::Index => {
-                if !(2..=4).contains(&args.len()) {
-                    return Value::Error(FormulaError::Value);
-                }
-                let area = match self.index_area(&args[0], args.get(3), sheet, pass, depth + 1) {
-                    Ok(area) => area,
-                    Err(error) => return Value::Error(error),
-                };
-                let matrix = match self.eval_matrix_arg(area, sheet, pass, depth + 1) {
-                    Ok(matrix) => matrix,
-                    Err(error) => return Value::Error(error),
-                };
-                let first = scalar(&args[1], pass);
-                let first = match positive_index(&first) {
-                    Ok(index) => index,
-                    Err(error) => return Value::Error(error),
-                };
-                // With area_num, an empty column argument is omitted, as when
-                // only the row is given.
-                let col_arg = if args.len() == 4 {
-                    optional_ast(args, 2)
-                } else {
-                    args.get(2)
-                };
-                let (row, col) = if matrix.rows == 1 && col_arg.is_none() {
-                    (0, first)
-                } else if matrix.cols == 1 && col_arg.is_none() {
-                    (first, 0)
-                } else {
-                    let Some(col_arg) = col_arg else {
-                        return Value::Error(FormulaError::Value);
-                    };
-                    let col = scalar(col_arg, pass);
-                    let col = match positive_index(&col) {
-                        Ok(index) => index,
-                        Err(error) => return Value::Error(error),
-                    };
-                    (first, col)
-                };
-                matrix
-                    .get(row, col)
-                    .cloned()
-                    .unwrap_or(Value::Error(FormulaError::Ref))
-            }
+            Func::Index => self.eval_index(args, sheet, pass, depth),
             Func::Match => {
                 if !(2..=3).contains(&args.len()) {
                     return Value::Error(FormulaError::Value);
@@ -2822,10 +2845,11 @@ impl CellStore {
                 }
                 let mode = optional_ast(args, 2)
                     .map(|arg| scalar(arg, pass))
-                    .map_or(Ok(1), |value| integer_arg(&value));
+                    .map_or(Ok(1), |value| option_code(&value));
                 let mode = match mode {
                     Ok(mode @ (-1..=1)) => mode,
-                    _ => return Value::Error(FormulaError::Value),
+                    Ok(_) => return Value::Error(FormulaError::Value),
+                    Err(error) => return Value::Error(error),
                 };
                 let (match_mode, search_mode) = match mode {
                     1 => (-1, 2),
@@ -2854,19 +2878,13 @@ impl CellStore {
                 if lookup_rows != 1 && lookup_cols != 1 {
                     return Value::Error(FormulaError::Value);
                 }
-                let match_mode = match optional_ast(args, 2) {
-                    Some(arg) => match integer_arg(&scalar(arg, pass)) {
-                        Ok(mode @ (-1..=2)) => mode,
-                        _ => return Value::Error(FormulaError::Value),
-                    },
-                    None => 0,
-                };
-                let search_mode = match optional_ast(args, 3) {
-                    Some(arg) => match integer_arg(&scalar(arg, pass)) {
-                        Ok(mode @ (-2 | -1 | 1 | 2)) => mode,
-                        _ => return Value::Error(FormulaError::Value),
-                    },
-                    None => 1,
+                let modes = lookup_modes(
+                    optional_ast(args, 2).map(|arg| scalar(arg, pass)),
+                    optional_ast(args, 3).map(|arg| scalar(arg, pass)),
+                );
+                let (match_mode, search_mode) = match modes {
+                    Ok(modes) => modes,
+                    Err(error) => return Value::Error(error),
                 };
                 match find_match_index_indexed(lookup.search(), &key, match_mode, search_mode) {
                     Ok(Some(index)) => Value::number((index + 1) as f64),
@@ -2942,19 +2960,13 @@ impl CellStore {
                 {
                     return Value::Error(FormulaError::Value);
                 }
-                let match_mode = match optional_ast(args, 4) {
-                    Some(arg) => match integer_arg(&scalar(arg, pass)) {
-                        Ok(mode @ (-1..=2)) => mode,
-                        _ => return Value::Error(FormulaError::Value),
-                    },
-                    None => 0,
-                };
-                let search_mode = match optional_ast(args, 5) {
-                    Some(arg) => match integer_arg(&scalar(arg, pass)) {
-                        Ok(mode @ (-2 | -1 | 1 | 2)) => mode,
-                        _ => return Value::Error(FormulaError::Value),
-                    },
-                    None => 1,
+                let modes = lookup_modes(
+                    optional_ast(args, 4).map(|arg| scalar(arg, pass)),
+                    optional_ast(args, 5).map(|arg| scalar(arg, pass)),
+                );
+                let (match_mode, search_mode) = match modes {
+                    Ok(modes) => modes,
+                    Err(error) => return Value::Error(error),
                 };
                 match find_match_index_indexed(lookup.search(), &key, match_mode, search_mode) {
                     Ok(Some(index)) => result

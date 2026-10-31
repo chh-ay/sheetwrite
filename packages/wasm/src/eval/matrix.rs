@@ -1,6 +1,6 @@
 //! Matrix values and AST-to-range conversion helpers.
 
-use crate::calc::{Ast, Func};
+use crate::calc::{Ast, Func, SHEET_COLS, SHEET_ROWS};
 use crate::types::{CellRange, FormulaError, Value};
 use std::cell::Cell;
 use std::mem::size_of;
@@ -20,8 +20,8 @@ pub(crate) fn reset_matrix_resource_stats() {
         stats.set([current, current, 0]);
     });
 }
-pub(super) const SPILL_MAX_ROWS: usize = 1_048_576;
-pub(super) const SPILL_MAX_COLS: usize = 16_384;
+pub(super) const SPILL_MAX_ROWS: usize = SHEET_ROWS as usize;
+pub(super) const SPILL_MAX_COLS: usize = SHEET_COLS as usize;
 pub(super) const SPILL_MAX_CELLS: usize = 1_000_000;
 pub(super) const SPILL_MAX_BYTES: usize = 64 * 1024 * 1024;
 pub(super) const SPILL_MAX_RECOMPUTE_CELLS: usize = 2_000_000;
@@ -139,7 +139,7 @@ pub(super) fn optional_ast(args: &[Ast], index: usize) -> Option<&Ast> {
     }
 }
 
-pub(super) fn range_from_ast(ast: &Ast, formula_sheet: usize) -> Option<CellRange> {
+pub(crate) fn range_from_ast(ast: &Ast, formula_sheet: usize) -> Option<CellRange> {
     match ast {
         Ast::LetSlot { expression, .. } => range_from_ast(expression, formula_sheet),
         Ast::Cell(row, col, _) => {

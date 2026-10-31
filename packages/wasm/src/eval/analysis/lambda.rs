@@ -358,11 +358,9 @@ impl Context<'_, '_> {
                         values: Rc::new(std::mem::take(&mut matrix.values)),
                     });
                 }
-                let value = self.scalar(argument);
-                if let Value::Error(error) = value {
-                    return Err(error);
-                }
-                Ok(literal(&value))
+                // An error argument is bound as a value, so the body can
+                // handle it (`LAMBDA(x,IFERROR(x,0))(1/0)` is 0).
+                Ok(literal(&self.scalar(argument)))
             })
             .collect::<Result<Vec<_>, _>>()?;
         apply(function, &evaluated)
