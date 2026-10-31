@@ -11,6 +11,7 @@ Fix more bugs from the 0.6.0 audit:
 - A cell edit no longer closes an open sheet tab menu in the spreadsheet shell.
 - Auto-fit row height from the menu fits the selected row under a sort or filter.
 - Search over a custom store reports data rows when the store offers `getDataWindow`.
-- A failed PivotTable placement shows its error in the form, and a ribbon that cannot load shows why next to the basic toolbar. Neither is an unhandled rejection now.
+- A failed PivotTable placement shows its error in the form instead of an unhandled rejection.
+- A toolbar or ribbon that cannot load tells the user why in the grid's alert. The load error still reaches the host.
 - A row bridge clear lists only the cells that changed, so clearing whole columns no longer creates one object per empty cell.
 - Disposing a store ends an engine memory release that was waiting for its page loads.

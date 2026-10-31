@@ -92,6 +92,8 @@ describe("declarative keyboard bindings", () => {
         },
       });
       const shellToolbar = createToolbar(host, grid, { items: [{ action: "undo" }] });
+      // The built-in toolbar loads lazily; awaiting its module runs the mount first.
+      await import("../src/ribbon/command-toolbar.js");
       try {
         const addr = { sheet: "s1", row: 0, col: 0 };
         grid.setSelection({ kind: "cell", addr });
@@ -120,8 +122,10 @@ describe("declarative keyboard bindings", () => {
             '[data-context-menu-item="paste"] .sheetwrite-context-menu-shortcut',
           ).textContent,
         ).toBe(pasteLabel);
-        expect(requiredElement(host, ".sheetwrite-tb-undo").title).toBe(`Undo (${undoLabel})`);
-        expect(requiredElement(host, ".sheetwrite-shell-toolbar .sheetwrite-tb-undo").title).toBe(
+        expect(requiredElement(host, '.sheetwrite-toolbar [data-command="undo"]').title).toBe(
+          `Undo (${undoLabel})`,
+        );
+        expect(requiredElement(host, '.sheetwrite-shell-toolbar [data-command="undo"]').title).toBe(
           `Undo (${undoLabel})`,
         );
         grid.setSelection({ kind: "cell", addr });
@@ -152,7 +156,7 @@ describe("declarative keyboard bindings", () => {
           contextMenu: [{ id: "copy", action: "copy" }],
         });
         expect(grid.getShortcutLabel("copy")).toBe("");
-        expect(requiredElement(host, ".sheetwrite-shell-toolbar .sheetwrite-tb-undo").title).toBe(
+        expect(requiredElement(host, '.sheetwrite-shell-toolbar [data-command="undo"]').title).toBe(
           platform === "MacIntel" ? "Undo (⌘Z)" : "Undo (Ctrl+Z)",
         );
         press("c");

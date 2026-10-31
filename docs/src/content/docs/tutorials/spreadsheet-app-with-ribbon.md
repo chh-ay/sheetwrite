@@ -133,13 +133,14 @@ The file buttons are host-owned. A successful table import destroys the old shel
 
 | Choice | Effect |
 | --- | --- |
-| `ribbon: true` | Shows Home, Insert, Data and View instead of the flat toolbar. |
+| `ribbon: true` | Shows Home, Insert, Data and View instead of the toolbar. Both render the same commands. |
+| `ribbon: { mode: "auto" }` | Uses the compact, one-row ribbon while the host is narrower than 768 px. The **Compact** button switches layout at any time. |
 | Narrow host | Labels shrink and groups fold into popup controls. |
 | Double-click a tab | Minimizes the ribbon to its tab row. |
 | Read-only Grid | Editing commands disable; view commands remain available. |
 | Host commands | Read `shell.grid.getCommandState(...)` and subscribe to `command-state-change`; do not derive availability from CSS. |
 
-The ribbon loads as a separate chunk. The shell reserves its height while loading and ignores a late chunk after destruction. A failed load falls back to the flat toolbar and still reports an unhandled promise rejection; the file-handler `try/catch` does not catch that asynchronous load failure. Keep chunk URLs available after deployment.
+The ribbon loads as a separate chunk. The shell reserves its height while loading and ignores a late chunk after destruction. A failed load falls back to the toolbar, which shows the same commands, and still reports an unhandled promise rejection; the file-handler `try/catch` does not catch that asynchronous load failure. Keep chunk URLs available after deployment.
 
 The built-in ribbon does not provide a chart-authoring API. Do not treat retained XLSX chart parts as editable charts.
 

@@ -359,7 +359,7 @@ it.each([
     "./packages/core/test/pivot-panel-probe.ts",
   ],
   [
-    "falls back to the flat toolbar and reports a failed ribbon load",
+    "shows a failed ribbon load to the user and still reports it",
     "./packages/core/test/ribbon-fallback-probe.ts",
   ],
 ])("%s", async (_description, path) => {

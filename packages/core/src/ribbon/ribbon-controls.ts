@@ -1,17 +1,14 @@
-// DOM for each ribbon control spec. Controls only render and dispatch: what a
+// DOM for each command spec. Controls only render and dispatch: what a
 // control does lives in ribbon-model.ts, and the popup rules in
-// ribbon-popup.ts.
+// ribbon-popup.ts. The full ribbon, the compact ribbon and the toolbar all
+// render through `renderControl`, so they share look, state and keyboard.
 
 import type { IconName } from "../icons/icon-names.js";
 import { iconNode } from "../icons/resolve.js";
+import { isKeyboardAction } from "../keymap.js";
 import type { Grid, GridCommandName, GridCommandState, IconOverrides } from "../types/grid.js";
-import { STANDARD_COLORS, THEME_COLOR_ROWS } from "./ribbon-colors.js";
 import {
   EDIT_STATE_COMMAND,
-  focusAddress,
-  steppedZoom,
-  ZOOM_RESET,
-  zoomLabel,
   type RibbonAvailability,
   type RibbonButtonSpec,
   type RibbonColorSpec,
@@ -21,7 +18,9 @@ import {
   type RibbonFormSpec,
   type RibbonMenuSpec,
   type RibbonPlacementSpec,
-} from "./ribbon-model.js";
+} from "./command-spec.js";
+import { STANDARD_COLORS, THEME_COLOR_ROWS } from "./ribbon-colors.js";
+import { focusAddress, steppedZoom, ZOOM_RESET, zoomLabel } from "./ribbon-model.js";
 import type { RibbonPopup } from "./ribbon-popup.js";
 
 /**
@@ -64,7 +63,7 @@ const keepFocus = (event: Event): void => event.preventDefault();
 /** A click with `detail` 0 came from the keyboard (Enter or Space). */
 const fromKeyboard = (event: MouseEvent): boolean => event.detail === 0;
 
-function isDisabled(availability: RibbonAvailability, states: RibbonCommandStates): boolean {
+export function isDisabled(availability: RibbonAvailability, states: RibbonCommandStates): boolean {
   if (availability === "view") return false;
   return states(availability === "edit" ? EDIT_STATE_COMMAND : availability).disabled;
 }
@@ -114,10 +113,18 @@ function commandButton(
   return button;
 }
 
+/** The tooltip: the label, and the shortcut when the grid binds one to the command. */
+function commandTitle(spec: RibbonButtonSpec, grid: Grid): string {
+  if (!isKeyboardAction(spec.id)) return spec.label;
+
+  const shortcut = grid.getShortcutLabel(spec.id);
+  return shortcut === "" ? spec.label : `${spec.label} (${shortcut})`;
+}
+
 function renderButton(spec: RibbonButtonSpec, context: RibbonContext): RibbonControlView {
   const button = commandButton(spec.label, spec.icon, spec.large === true, context.icons);
   button.addEventListener("click", () =>
-    context.run(spec.label, () => spec.run(context.grid), button),
+    context.run(spec.id, () => spec.run(context.grid), button),
   );
 
   // Written only on change: every selection move refreshes every toggle.
@@ -126,6 +133,9 @@ function renderButton(spec: RibbonButtonSpec, context: RibbonContext): RibbonCon
     element: button,
     refresh({ state }) {
       button.disabled = isDisabled(spec.availability, state);
+      const title = commandTitle(spec, context.grid);
+      if (button.title !== title) button.title = title;
+
       const pressedBy = spec.toggle ? spec.availability : "view";
       if (pressedBy === "edit" || pressedBy === "view") return;
 
@@ -203,7 +213,7 @@ function renderMenu(spec: RibbonMenuSpec, context: RibbonContext): RibbonControl
   split.className = "sheetwrite-ribbon-split";
   if (large) split.dataset.large = "";
   const face = commandButton(spec.label, spec.icon, large, context.icons);
-  face.addEventListener("click", () => context.run(spec.label, () => run(context.grid), face));
+  face.addEventListener("click", () => context.run(spec.id, () => run(context.grid), face));
   const arrow = document.createElement("button");
   arrow.type = "button";
   arrow.className = "sheetwrite-ribbon-split-arrow";
@@ -380,11 +390,11 @@ function renderColor(spec: RibbonColorSpec, context: RibbonContext): RibbonContr
       current = color;
       bar.style.backgroundColor = color;
     }
-    context.run(spec.label, () => spec.apply(context.grid, color));
+    context.run(spec.id, () => spec.apply(context.grid, color));
     context.focusGrid();
   };
   face.addEventListener("click", () =>
-    context.run(spec.label, () => spec.apply(context.grid, current), face),
+    context.run(spec.id, () => spec.apply(context.grid, current), face),
   );
 
   const arrow = document.createElement("button");
@@ -665,6 +675,12 @@ function renderZoom(context: RibbonContext): RibbonControlView {
 }
 
 export function renderControl(spec: RibbonControlSpec, context: RibbonContext): RibbonControlView {
+  const view = renderSpec(spec, context);
+  view.element.dataset.command = spec.id;
+  return view;
+}
+
+function renderSpec(spec: RibbonControlSpec, context: RibbonContext): RibbonControlView {
   switch (spec.kind) {
     case "button":
       return renderButton(spec, context);

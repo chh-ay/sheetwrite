@@ -8,7 +8,7 @@ description: "API reference for @sheetwrite/core."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/index.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>375</dd></div>
+<div><dt>Exports</dt><dd>378</dd></div>
 </dl>
 
 Source entry: `packages/core/src/index.ts`
@@ -113,7 +113,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/workbook-table-name-key/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>workbookTableNameKey</code></span><span class="api-symbol-card__desc">Locale-independent key used for table and table-column collision checks.</span></a>
 </div>
 
-### Interfaces <span class="api-count" data-pagefind-ignore>166</span>
+### Interfaces <span class="api-count" data-pagefind-ignore>167</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/boundary-operation-stats/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>BoundaryOperationStats</code></span><span class="api-symbol-card__desc">Fixed-cardinality boundary crossing counters for one operation.</span></a>
@@ -214,6 +214,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/revision-coordinator-options/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>RevisionCoordinatorOptions</code></span><span class="api-symbol-card__desc">Document identity and version options for revision coordination.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/revision-restore-request/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>RevisionRestoreRequest</code></span><span class="api-symbol-card__desc">Versioned restore request submitted to a revision adapter.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/revision-summary/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>RevisionSummary</code></span><span class="api-symbol-card__desc">Host-provided metadata describing a saved workbook revision.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/ribbon-config/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>RibbonConfig</code></span><span class="api-symbol-card__desc">Initial layout settings for the built-in or composable ribbon.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/row-bridge-cell/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>RowBridgeCell</code></span><span class="api-symbol-card__desc">A cell effect with semantic column and host row identity.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/row-bridge-clear-delta/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>RowBridgeClearDelta</code></span><span class="api-symbol-card__desc">A clearRange effect expanded to its exact changed cells.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/row-bridge-column/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>RowBridgeColumn</code></span><span class="api-symbol-card__desc">Semantic column key accepted by the row bridge.</span></a>
@@ -284,7 +285,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/xlsx-workbook-warning/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>XlsxWorkbookWarning</code></span><span class="api-symbol-card__desc">Structured fidelity warning emitted during XLSX conversion.</span></a>
 </div>
 
-### Types <span class="api-count" data-pagefind-ignore>94</span>
+### Types <span class="api-count" data-pagefind-ignore>96</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/aggregate-op/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>AggregateOp</code></span><span class="api-symbol-card__desc">Column aggregate operation for Grid.aggregate / Store data ops.</span></a>
@@ -304,6 +305,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/chart-renderer-factory/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>ChartRendererFactory</code></span><span class="api-symbol-card__desc">Creates the chart renderer of one grid.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/chart-view-provider-factory/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>ChartViewProviderFactory</code></span><span class="api-symbol-card__desc">Creates a chart provider owned and disposed by one renderer or host.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/column-filter/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>ColumnFilter</code></span><span class="api-symbol-card__desc">One column's filter predicate.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/command-flags/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>CommandFlags</code></span><span class="api-symbol-card__desc">The GridConfig switches that choose built-in commands.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/comment-anchor/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>CommentAnchor</code></span><span class="api-symbol-card__desc">Document location to which a comment thread is attached.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/comment-coordinator-event/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>CommentCoordinatorEvent</code></span><span class="api-symbol-card__desc">State transition emitted by the comment coordinator.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/comment-mutation/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>CommentMutation</code></span><span class="api-symbol-card__desc">Serializable operation that creates or updates comment state.</span></a>
@@ -343,6 +345,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/resolved-hyperlink-target/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>ResolvedHyperlinkTarget</code></span><span class="api-symbol-card__desc">Host-safe target resolved immediately before hyperlink activation.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/revision-coordinator-event/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>RevisionCoordinatorEvent</code></span><span class="api-symbol-card__desc">State or restore transition emitted by revision coordination.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/revision-restore-response/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>RevisionRestoreResponse</code></span><span class="api-symbol-card__desc">Applied or conflict acknowledgement for a revision restore.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/ribbon-mode/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>RibbonMode</code></span><span class="api-symbol-card__desc">Layout of the Excel-style ribbon.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/row-bridge-delta/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>RowBridgeDelta</code></span><span class="api-symbol-card__desc">Every possible projection produced by a row bridge.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/row-bridge-handler/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>RowBridgeHandler</code></span><span class="api-symbol-card__desc">Callback accepted by imperative and framework adapters.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/row-bridge-id/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>RowBridgeId</code></span><span class="api-symbol-card__desc">A stable host identity for one data-space row.</span></a>

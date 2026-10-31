@@ -5,13 +5,14 @@ description: "createToolbar function in @sheetwrite/core/shell: Mount a toolbar 
 <!-- api-export:@sheetwrite/core|./shell|createToolbar -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-shell/">@sheetwrite/core/shell</a><span class="api-status" data-kind="function">function</span></div>
 
-Mount a toolbar bound to `grid.actions` (custom items receive the grid).
-Mouse clicks never steal grid focus; keyboard users get local
-Left/Right/Home/End movement across the controls while the toolbar has
-focus. Returns the mounted piece with an idempotent `destroy`.
+Mount a toolbar bound to `grid.actions` (custom items receive the grid). It
+shows the ribbon's commands on one row, with the same glyphs, state and
+keyboard; commands that do not fit move into a "More commands" popup. Mouse
+clicks never steal grid focus; Left/Right/Home/End move between controls and
+Escape returns focus to the grid. Returns the piece with an idempotent `destroy`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/toolbar-factory.ts#L25"><code>packages/core/src/shell/toolbar-factory.ts#L25</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/toolbar-factory.ts#L29"><code>packages/core/src/shell/toolbar-factory.ts#L29</code></a></dd></div>
 </dl>
 
 ## Declaration
