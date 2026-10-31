@@ -8,7 +8,7 @@ description: "InitInput type in @sheetwrite/wasm: Sources accepted by asynchrono
 Sources accepted by asynchronous initialization: a fetchable URL/request/response, raw module bytes, or a precompiled `WebAssembly.Module`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/pkg/sheetwrite_wasm.d.ts#L547"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L547</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/pkg/sheetwrite_wasm.d.ts#L524"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L524</code></a></dd></div>
 </dl>
 
 ## Declaration

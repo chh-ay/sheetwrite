@@ -29,6 +29,8 @@ mod eval;
 #[cfg(feature = "formula-engine")]
 mod formula_reads;
 #[cfg(feature = "formula-engine")]
+mod formula_rewrite;
+#[cfg(feature = "formula-engine")]
 mod formula_tokens;
 #[cfg(feature = "formula-engine")]
 mod graph;
@@ -51,6 +53,8 @@ mod types;
 #[cfg(feature = "formula-engine")]
 mod window;
 
+#[cfg(all(test, feature = "formula-engine"))]
+mod formula_rewrite_tests;
 #[cfg(all(test, feature = "formula-engine"))]
 mod formula_syntax_tests;
 #[cfg(all(test, feature = "formula-engine"))]

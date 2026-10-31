@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "4fd764b663a47229bfb72ba4a80041d9d8217766310b5428a591c155b183618f",
+  "sha256": "ae3887c43793a0f728dd755b1d920c0693191e4a80fb7ecf614407baaaf82cc0",
   "intentionalExports": [
     {
       "package": "@sheetwrite/charts",
@@ -30,7 +30,9 @@
     {
       "package": "@sheetwrite/charts",
       "entryPoint": "./register",
-      "exports": ["registerChartsBackend"]
+      "exports": [
+        "registerChartsBackend"
+      ]
     },
     {
       "package": "@sheetwrite/core",
@@ -524,7 +526,10 @@
     {
       "package": "@sheetwrite/core",
       "entryPoint": "./worker",
-      "exports": ["WorkerAcknowledgement", "createWorkerMessageHandler"]
+      "exports": [
+        "WorkerAcknowledgement",
+        "createWorkerMessageHandler"
+      ]
     },
     {
       "package": "@sheetwrite/formulas",
@@ -548,7 +553,10 @@
         "formulaTokens",
         "initSync",
         "isLoaded",
-        "load"
+        "load",
+        "moveFormulaAxis",
+        "shiftFormulaAxis",
+        "translateFormula"
       ]
     },
     {
@@ -649,7 +657,10 @@
         "formulaTokens",
         "initSync",
         "isLoaded",
-        "load"
+        "load",
+        "moveFormulaAxis",
+        "shiftFormulaAxis",
+        "translateFormula"
       ]
     },
     {
@@ -668,7 +679,9 @@
     {
       "package": "@sheetwrite/xlsx",
       "entryPoint": "./register",
-      "exports": ["registerXlsxBackends"]
+      "exports": [
+        "registerXlsxBackends"
+      ]
     }
   ]
 }

@@ -55,6 +55,9 @@ interface TransformFailure {
  * each remote operation after the remote operations before it. A remote
  * operation is therefore carried forward through the local sequence: before it
  * is compared with local operation k, it is moved past local operations 0..k-1.
+ *
+ * The engine rewrites the formula of a conditional format that a row or
+ * column edit moves, so such a rebase needs `initSheetwrite()` first.
  */
 export function rebaseDocumentOperations(
   localOperations: readonly DocumentOp[],
@@ -495,9 +498,11 @@ function transformDirectTarget(
           if (!mapped && originalSheet === change.sheet) return overlappingStructure(operation.op);
           if (mapped) rule.range = mapped;
           if (originalSheet === change.sheet && rule.when.kind === "formula") {
-            rule.when.source = remapFormulaA1Refs(rule.when.source, change.axis, (index) =>
-              transformIndex(index, change),
-            );
+            rule.when.source = remapFormulaA1Refs(rule.when.source, change.axis, {
+              kind: "shift",
+              at: change.at,
+              delta: change.kind === "insert" ? change.count : -change.count,
+            });
           }
         }
       }

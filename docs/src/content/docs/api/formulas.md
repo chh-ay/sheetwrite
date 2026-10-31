@@ -15,30 +15,30 @@ Source entry: `packages/formulas/loader.d.ts`
 
 ## Exported symbols
 
-### Classes <span class="api-count" data-pagefind-ignore>9</span>
+### Classes <span class="api-count" data-pagefind-ignore>8</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/formulas/cell-out/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>CellOut</code></span><span class="api-symbol-card__desc">Result of a single-cell read.</span></a>
 <a class="api-symbol-card" href="/docs/api/formulas/cell-snapshot/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>CellSnapshot</code></span><span class="api-symbol-card__desc">Resolved values of a sparse coordinate batch, one entry per requested cell.</span></a>
 <a class="api-symbol-card" href="/docs/api/formulas/cell-store/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>CellStore</code></span><span class="api-symbol-card__desc">The workbook-wide store: every sheet, one string pool.</span></a>
 <a class="api-symbol-card" href="/docs/api/formulas/distinct-column/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>DistinctColumn</code></span><span class="api-symbol-card__desc">Distinct-value scan result for one column: parallel kind/number/text arrays whose buffers are surrendered once through the take accessors.</span></a>
-<a class="api-symbol-card" href="/docs/api/formulas/formula-syntax-error/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>FormulaSyntaxError</code></span><span class="api-symbol-card__desc">The first syntax error of a formula, as the engine's parser finds it.</span></a>
 <a class="api-symbol-card" href="/docs/api/formulas/pivot-fields/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>PivotFields</code></span><span class="api-symbol-card__desc">The names and types of a pivot's source fields, for the field list.</span></a>
 <a class="api-symbol-card" href="/docs/api/formulas/range-snapshot/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>RangeSnapshot</code></span><span class="api-symbol-card__desc">Opaque, store-local history payload for one dense rectangular cell block.</span></a>
 <a class="api-symbol-card" href="/docs/api/formulas/source-snapshot/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>SourceSnapshot</code></span><span class="api-symbol-card__desc">Compact serializable projection of persisted derived-cell sources and spill identity in one range.</span></a>
 <a class="api-symbol-card" href="/docs/api/formulas/window-view/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>WindowView</code></span><span class="api-symbol-card__desc">A bulk window of resolved cells, row-major over nrows x ncols.</span></a>
 </div>
 
-### Functions <span class="api-count" data-pagefind-ignore>7</span>
+### Functions <span class="api-count" data-pagefind-ignore>8</span>
 
 <div class="api-symbol-grid">
-<a class="api-symbol-card" href="/docs/api/formulas/check-formula-syntax/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>checkFormulaSyntax</code></span><span class="api-symbol-card__desc">The first syntax error in formula text, or undefined when the engine's parser reads the whole formula.</span></a>
 <a class="api-symbol-card" href="/docs/api/formulas/create-engine/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>createEngine</code></span><span class="api-symbol-card__desc">Initialize a fresh engine; a compiled module can be reused without retaining its memory.</span></a>
-<a class="api-symbol-card" href="/docs/api/formulas/formula-tokens/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>formulaTokens</code></span><span class="api-symbol-card__desc">The tokens of formula text: four u32 per token, kind, from and to (UTF-16 offsets into src) and space (1 when whitespace comes before the token).</span></a>
 <a class="api-symbol-card" href="/docs/api/formulas/function-names/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>functionNames</code></span><span class="api-symbol-card__desc">Names accepted by the full engine, including aliases.</span></a>
 <a class="api-symbol-card" href="/docs/api/formulas/init-sync/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>initSync</code></span><span class="api-symbol-card__desc">Instantiates the given module, which can either be bytes or a precompiled WebAssembly.Module.</span></a>
 <a class="api-symbol-card" href="/docs/api/formulas/is-loaded/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>isLoaded</code></span><span class="api-symbol-card__desc">Whether the WASM module has finished initializing.</span></a>
 <a class="api-symbol-card" href="/docs/api/formulas/load/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>load</code></span><span class="api-symbol-card__desc">Initialize the WASM module.</span></a>
+<a class="api-symbol-card" href="/docs/api/formulas/move-formula-axis/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>moveFormulaAxis</code></span><span class="api-symbol-card__desc">Follow count rows or columns moved from from to to on the formula's own sheet; to is the first index of the moved block after the move.</span></a>
+<a class="api-symbol-card" href="/docs/api/formulas/shift-formula-axis/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>shiftFormulaAxis</code></span><span class="api-symbol-card__desc">Follow delta rows or columns inserted (positive) or deleted (negative) at at on the formula's own sheet.</span></a>
+<a class="api-symbol-card" href="/docs/api/formulas/translate-formula/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>translateFormula</code></span><span class="api-symbol-card__desc">Move the relative references of a copied formula by the distance from its source cell to its target cell.</span></a>
 </div>
 
 ### Interfaces <span class="api-count" data-pagefind-ignore>1</span>

@@ -8,7 +8,7 @@ description: "InitOutput interface in @sheetwrite/wasm: Result of module initial
 Result of module initialization: the instantiated exports plus the shared linear memory.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/pkg/sheetwrite_wasm.d.ts#L549"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L549</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/pkg/sheetwrite_wasm.d.ts#L526"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L526</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -17,7 +17,6 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-wbg-cellsnapshot-free"><code>__wbg_cellsnapshot_free</code></a>
 <a href="#init-output-wbg-cellstore-free"><code>__wbg_cellstore_free</code></a>
 <a href="#init-output-wbg-distinctcolumn-free"><code>__wbg_distinctcolumn_free</code></a>
-<a href="#init-output-wbg-formulasyntaxerror-free"><code>__wbg_formulasyntaxerror_free</code></a>
 <a href="#init-output-wbg-rangesnapshot-free"><code>__wbg_rangesnapshot_free</code></a>
 <a href="#init-output-wbg-sourcesnapshot-free"><code>__wbg_sourcesnapshot_free</code></a>
 <a href="#init-output-wbg-windowview-free"><code>__wbg_windowview_free</code></a>
@@ -123,15 +122,10 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-spill-derived-mask"><code>cellstore_spillDerivedMask</code></a>
 <a href="#init-output-cellstore-string-pool-epoch"><code>cellstore_stringPoolEpoch</code></a>
 <a href="#init-output-cellstore-wasm-committed-bytes"><code>cellstore_wasmCommittedBytes</code></a>
-<a href="#init-output-check-formula-syntax"><code>checkFormulaSyntax</code></a>
 <a href="#init-output-distinctcolumn-take-kinds"><code>distinctcolumn_takeKinds</code></a>
 <a href="#init-output-distinctcolumn-take-numbers"><code>distinctcolumn_takeNumbers</code></a>
 <a href="#init-output-distinctcolumn-take-texts"><code>distinctcolumn_takeTexts</code></a>
-<a href="#init-output-formula-tokens"><code>formulaTokens</code></a>
-<a href="#init-output-formulasyntaxerror-from"><code>formulasyntaxerror_from</code></a>
-<a href="#init-output-formulasyntaxerror-incomplete"><code>formulasyntaxerror_incomplete</code></a>
-<a href="#init-output-formulasyntaxerror-message"><code>formulasyntaxerror_message</code></a>
-<a href="#init-output-formulasyntaxerror-to"><code>formulasyntaxerror_to</code></a>
+<a href="#init-output-move-formula-axis"><code>moveFormulaAxis</code></a>
 <a href="#init-output-rangesnapshot-byte-length"><code>rangesnapshot_byteLength</code></a>
 <a href="#init-output-rangesnapshot-export-memory-state"><code>rangesnapshot_exportMemoryState</code></a>
 <a href="#init-output-rangesnapshot-formula-offsets"><code>rangesnapshot_formulaOffsets</code></a>
@@ -140,11 +134,13 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-rangesnapshot-reference-offsets"><code>rangesnapshot_referenceOffsets</code></a>
 <a href="#init-output-rangesnapshot-reference-targets"><code>rangesnapshot_referenceTargets</code></a>
 <a href="#init-output-rangesnapshot-style-ids"><code>rangesnapshot_styleIds</code></a>
+<a href="#init-output-shift-formula-axis"><code>shiftFormulaAxis</code></a>
 <a href="#init-output-sourcesnapshot-formula-offsets"><code>sourcesnapshot_formulaOffsets</code></a>
 <a href="#init-output-sourcesnapshot-formula-sources"><code>sourcesnapshot_formulaSources</code></a>
 <a href="#init-output-sourcesnapshot-reference-offsets"><code>sourcesnapshot_referenceOffsets</code></a>
 <a href="#init-output-sourcesnapshot-reference-targets"><code>sourcesnapshot_referenceTargets</code></a>
 <a href="#init-output-sourcesnapshot-spill-derived"><code>sourcesnapshot_spillDerived</code></a>
+<a href="#init-output-translate-formula"><code>translateFormula</code></a>
 <a href="#init-output-windowview-n-cols"><code>windowview_nCols</code></a>
 <a href="#init-output-windowview-n-rows"><code>windowview_nRows</code></a>
 <a href="#init-output-windowview-take-strings"><code>windowview_takeStrings</code></a>
@@ -159,7 +155,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-wbindgen-start"><code>__wbindgen_start</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>145</span>
+## Members <span class="api-count" data-pagefind-ignore>141</span>
 
 <div class="api-member-list">
 
@@ -204,15 +200,6 @@ readonly __wbg_cellstore_free: (a: number, b: number) => void;
 
 ```ts generated
 readonly __wbg_distinctcolumn_free: (a: number, b: number) => void;
-```
-
-</details>
-
-<details class="api-member" id="init-output-wbg-formulasyntaxerror-free" data-pagefind-weight="1">
-<summary><code>__wbg_formulasyntaxerror_free</code></summary>
-
-```ts generated
-readonly __wbg_formulasyntaxerror_free: (a: number, b: number) => void;
 ```
 
 </details>
@@ -1162,15 +1149,6 @@ readonly cellstore_wasmCommittedBytes: (a: number) => number;
 
 </details>
 
-<details class="api-member" id="init-output-check-formula-syntax" data-pagefind-weight="1">
-<summary><code>checkFormulaSyntax</code></summary>
-
-```ts generated
-readonly checkFormulaSyntax: (a: number, b: number) => number;
-```
-
-</details>
-
 <details class="api-member" id="init-output-distinctcolumn-take-kinds" data-pagefind-weight="1">
 <summary><code>distinctcolumn_takeKinds</code></summary>
 
@@ -1198,47 +1176,11 @@ readonly distinctcolumn_takeTexts: (a: number) => [number, number];
 
 </details>
 
-<details class="api-member" id="init-output-formula-tokens" data-pagefind-weight="1">
-<summary><code>formulaTokens</code></summary>
+<details class="api-member" id="init-output-move-formula-axis" data-pagefind-weight="1">
+<summary><code>moveFormulaAxis</code></summary>
 
 ```ts generated
-readonly formulaTokens: (a: number, b: number) => [number, number];
-```
-
-</details>
-
-<details class="api-member" id="init-output-formulasyntaxerror-from" data-pagefind-weight="1">
-<summary><code>formulasyntaxerror_from</code></summary>
-
-```ts generated
-readonly formulasyntaxerror_from: (a: number) => number;
-```
-
-</details>
-
-<details class="api-member" id="init-output-formulasyntaxerror-incomplete" data-pagefind-weight="1">
-<summary><code>formulasyntaxerror_incomplete</code></summary>
-
-```ts generated
-readonly formulasyntaxerror_incomplete: (a: number) => number;
-```
-
-</details>
-
-<details class="api-member" id="init-output-formulasyntaxerror-message" data-pagefind-weight="1">
-<summary><code>formulasyntaxerror_message</code></summary>
-
-```ts generated
-readonly formulasyntaxerror_message: (a: number) => [number, number];
-```
-
-</details>
-
-<details class="api-member" id="init-output-formulasyntaxerror-to" data-pagefind-weight="1">
-<summary><code>formulasyntaxerror_to</code></summary>
-
-```ts generated
-readonly formulasyntaxerror_to: (a: number) => number;
+readonly moveFormulaAxis: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number];
 ```
 
 </details>
@@ -1315,6 +1257,15 @@ readonly rangesnapshot_styleIds: (a: number) => [number, number];
 
 </details>
 
+<details class="api-member" id="init-output-shift-formula-axis" data-pagefind-weight="1">
+<summary><code>shiftFormulaAxis</code></summary>
+
+```ts generated
+readonly shiftFormulaAxis: (a: number, b: number, c: number, d: number, e: number) => [number, number];
+```
+
+</details>
+
 <details class="api-member" id="init-output-sourcesnapshot-formula-offsets" data-pagefind-weight="1">
 <summary><code>sourcesnapshot_formulaOffsets</code></summary>
 
@@ -1356,6 +1307,15 @@ readonly sourcesnapshot_referenceTargets: (a: number) => [number, number];
 
 ```ts generated
 readonly sourcesnapshot_spillDerived: (a: number) => [number, number];
+```
+
+</details>
+
+<details class="api-member" id="init-output-translate-formula" data-pagefind-weight="1">
+<summary><code>translateFormula</code></summary>
+
+```ts generated
+readonly translateFormula: (a: number, b: number, c: number, d: number) => [number, number];
 ```
 
 </details>
@@ -1481,7 +1441,6 @@ export interface InitOutput {
   readonly __wbg_cellsnapshot_free: (a: number, b: number) => void;
   readonly __wbg_cellstore_free: (a: number, b: number) => void;
   readonly __wbg_distinctcolumn_free: (a: number, b: number) => void;
-  readonly __wbg_formulasyntaxerror_free: (a: number, b: number) => void;
   readonly __wbg_rangesnapshot_free: (a: number, b: number) => void;
   readonly __wbg_sourcesnapshot_free: (a: number, b: number) => void;
   readonly __wbg_windowview_free: (a: number, b: number) => void;
@@ -2109,15 +2068,17 @@ export interface InitOutput {
   ) => [number, number];
   readonly cellstore_stringPoolEpoch: (a: number) => number;
   readonly cellstore_wasmCommittedBytes: (a: number) => number;
-  readonly checkFormulaSyntax: (a: number, b: number) => number;
   readonly distinctcolumn_takeKinds: (a: number) => [number, number];
   readonly distinctcolumn_takeNumbers: (a: number) => [number, number];
   readonly distinctcolumn_takeTexts: (a: number) => [number, number];
-  readonly formulaTokens: (a: number, b: number) => [number, number];
-  readonly formulasyntaxerror_from: (a: number) => number;
-  readonly formulasyntaxerror_incomplete: (a: number) => number;
-  readonly formulasyntaxerror_message: (a: number) => [number, number];
-  readonly formulasyntaxerror_to: (a: number) => number;
+  readonly moveFormulaAxis: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+  ) => [number, number];
   readonly rangesnapshot_byteLength: (a: number) => number;
   readonly rangesnapshot_exportMemoryState: (
     a: number,
@@ -2129,11 +2090,24 @@ export interface InitOutput {
   readonly rangesnapshot_referenceOffsets: (a: number) => [number, number];
   readonly rangesnapshot_referenceTargets: (a: number) => [number, number];
   readonly rangesnapshot_styleIds: (a: number) => [number, number];
+  readonly shiftFormulaAxis: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+  ) => [number, number];
   readonly sourcesnapshot_formulaOffsets: (a: number) => [number, number];
   readonly sourcesnapshot_formulaSources: (a: number) => [number, number];
   readonly sourcesnapshot_referenceOffsets: (a: number) => [number, number];
   readonly sourcesnapshot_referenceTargets: (a: number) => [number, number];
   readonly sourcesnapshot_spillDerived: (a: number) => [number, number];
+  readonly translateFormula: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+  ) => [number, number];
   readonly windowview_nCols: (a: number) => number;
   readonly windowview_nRows: (a: number) => number;
   readonly windowview_takeStrings: (a: number) => [number, number];

@@ -793,7 +793,7 @@ fn row_index(row_number: u32) -> Option<u32> {
 /// One end of an area reference: a cell (`B2`), a whole column (`$B`) or a
 /// whole row (`2`).
 #[derive(Clone, Copy)]
-enum AreaEnd {
+pub(crate) enum AreaEnd {
     Cell(u32, u32, RefFlags),
     Column(u32, bool),
     Row(u32, bool),
@@ -801,7 +801,7 @@ enum AreaEnd {
 
 impl AreaEnd {
     /// A row number arrives as a number token unless it has a `$` marker.
-    fn of(token: &Tok<'_>) -> Option<Self> {
+    pub(crate) fn of(token: &Tok<'_>) -> Option<Self> {
         match token {
             Tok::Ident(name, _) => Self::of_name(name),
             Tok::Num(number) if number.fract() == 0.0 && *number <= f64::from(SHEET_ROWS) => {
@@ -831,7 +831,7 @@ impl AreaEnd {
 }
 
 /// The range between two ends of one kind; `A:1` and `A1:B` have none.
-fn area(start: AreaEnd, end: AreaEnd) -> Option<(u32, u32, u32, u32, RangeFlags)> {
+pub(crate) fn area(start: AreaEnd, end: AreaEnd) -> Option<(u32, u32, u32, u32, RangeFlags)> {
     let whole_axis = |col_abs, row_abs| RefFlags { row_abs, col_abs };
     Some(match (start, end) {
         (AreaEnd::Cell(row, col, flags), AreaEnd::Cell(end_row, end_col, end_flags)) => {
@@ -1215,7 +1215,6 @@ fn comparison_token(bytes: &[u8], index: &mut usize) -> Tok<'static> {
     *index += len;
     Tok::Cmp(op)
 }
-
 /// The `[...]` at `*index`, nested brackets included.
 fn structured_token(src: &str, index: &mut usize) -> Result<String, String> {
     let bytes = src.as_bytes();
@@ -2336,7 +2335,7 @@ fn translate_relative_refs_inner(ast: &mut Ast, row_delta: i64, col_delta: i64) 
 }
 
 #[derive(Clone, Copy)]
-enum Axis {
+pub(crate) enum Axis {
     Row,
     Col,
 }
@@ -2366,13 +2365,21 @@ enum Moved {
     Deleted,
 }
 
-/// `delta` rows or columns inserted (positive) or deleted (negative) at `at`
-/// on `edited_sheet`, applied to a formula on `formula_sheet`.
+/// What a row or column edit does to the indices of its axis.
+#[derive(Clone, Copy)]
+pub(crate) enum AxisChange {
+    /// `delta` rows or columns inserted (positive) or deleted (negative) at `at`.
+    Shift { at: u32, delta: i64 },
+    /// `count` rows or columns moved from `from`. `to` is the first index of
+    /// the moved block after the move.
+    Move { from: u32, count: u32, to: u32 },
+}
+
+/// One axis change on `edited_sheet`, applied to a formula on `formula_sheet`.
 #[derive(Clone, Copy)]
 struct AxisEdit {
     axis: Axis,
-    at: u32,
-    delta: i64,
+    change: AxisChange,
     formula_sheet: u32,
     edited_sheet: u32,
 }
@@ -2380,7 +2387,11 @@ struct AxisEdit {
 impl AxisEdit {
     /// A cell pushed past the last row or column is deleted, as in Excel.
     fn move_index(self, coord: &mut u32) -> Moved {
-        match shift_index(*coord, self.at, self.delta).filter(|&index| index < self.axis.len()) {
+        let target = match self.change {
+            AxisChange::Shift { at, delta } => shift_index(*coord, at, delta),
+            AxisChange::Move { from, count, to } => Some(moved_index(*coord, from, count, to)),
+        };
+        match target.filter(|&index| index < self.axis.len()) {
             Some(shifted) if shifted == *coord => Moved::Unchanged,
             Some(shifted) => {
                 *coord = shifted;
@@ -2398,7 +2409,17 @@ impl AxisEdit {
             return Moved::Unchanged;
         }
 
-        match shift_range(*start, *end, self.at, self.delta) {
+        let span = match self.change {
+            AxisChange::Shift { at, delta } => shift_range(*start, *end, at, delta),
+            // A move deletes nothing. When the block moves past one end, the
+            // ends can swap, and the range keeps the cells between them.
+            AxisChange::Move { from, count, to } => {
+                let first = moved_index(*start, from, count, to);
+                let second = moved_index(*end, from, count, to);
+                Some((first.min(second), first.max(second)))
+            }
+        };
+        match span {
             Some((shifted_start, shifted_end)) if shifted_start <= last => {
                 let shifted_end = shifted_end.min(last);
                 if (shifted_start, shifted_end) == (*start, *end) {
@@ -2426,8 +2447,7 @@ pub fn shift_rows(
         ast,
         AxisEdit {
             axis: Axis::Row,
-            at,
-            delta,
+            change: AxisChange::Shift { at, delta },
             formula_sheet,
             edited_sheet,
         },
@@ -2447,10 +2467,23 @@ pub fn shift_cols(
         ast,
         AxisEdit {
             axis: Axis::Col,
-            at,
-            delta,
+            change: AxisChange::Shift { at, delta },
             formula_sheet,
             edited_sheet,
+        },
+    )
+}
+
+/// Rewrite the references of a formula on the sheet that `change` edits.
+/// Returns whether any reference changed.
+pub(crate) fn rewrite_own_sheet_axis(ast: &mut Ast, axis: Axis, change: AxisChange) -> bool {
+    rewrite_axis(
+        ast,
+        AxisEdit {
+            axis,
+            change,
+            formula_sheet: 0,
+            edited_sheet: 0,
         },
     )
 }
@@ -2501,6 +2534,22 @@ fn shift_index(index: u32, at: u32, delta: i64) -> Option<u32> {
         return None;
     }
     Some(clamp_index(i64::from(index) + delta))
+}
+
+/// Where `index` is after `count` indices move from `from` to `to`; `to` is
+/// the first index of the moved block after the move.
+fn moved_index(index: u32, from: u32, count: u32, to: u32) -> u32 {
+    let block_end = from.saturating_add(count);
+    if (from..block_end).contains(&index) {
+        return to + (index - from);
+    }
+
+    let without_block = if index < from { index } else { index - count };
+    if without_block >= to {
+        without_block + count
+    } else {
+        without_block
+    }
 }
 
 /// Shift or contract an inclusive range; deleting every target invalidates it.
@@ -2699,7 +2748,7 @@ fn write_structured_ref(
     }
 }
 
-fn write_ast(ast: &Ast, out: &mut String) {
+pub(crate) fn write_ast(ast: &Ast, out: &mut String) {
     match ast {
         Ast::Num(value) => out.push_str(&value.to_string()),
         Ast::Str(value) => write_text(value, out),
