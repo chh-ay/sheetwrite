@@ -449,12 +449,13 @@ export class SnapshotValidationError extends SheetwriteError {
   /** The first 64 issues; `context.issueCount` counts all of them. */
   readonly errors: readonly DocumentValidationError[];
 
-  constructor(errors: readonly DocumentValidationError[]) {
+  constructor(errors: readonly DocumentValidationError[], options?: ErrorOptions) {
     super(
       "invalid-snapshot",
       "snapshot-validate",
       errors[0]?.message ?? "Invalid workbook snapshot",
       {
+        cause: options?.cause,
         context: {
           issueCount: errors.length,
           firstPath: errors[0]?.path ?? "$",

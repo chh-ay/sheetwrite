@@ -239,13 +239,16 @@ export class SheetwriteStore implements Store {
       }
 
       if (isSnapshotAllocationFailure(error)) {
-        throw new SnapshotValidationError([
-          {
-            path: "$",
-            code: "resource-limit",
-            message: error instanceof Error ? error.message : "Snapshot allocation failed",
-          },
-        ]);
+        throw new SnapshotValidationError(
+          [
+            {
+              path: "$",
+              code: "resource-limit",
+              message: error instanceof Error ? error.message : "Snapshot allocation failed",
+            },
+          ],
+          { cause: error },
+        );
       }
       throw error;
     }

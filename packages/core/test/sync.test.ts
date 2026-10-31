@@ -1148,6 +1148,27 @@ describe("sync coordinator", () => {
     grid.destroy();
   });
 
+  it("wraps a duplicate local mutation ID as sync-failed with the action", () => {
+    const { grid, coordinator, events } = harness(["m1", "m1"]);
+    grid.applyTransaction({ patches: [localSet(2)] });
+    try {
+      grid.applyTransaction({ patches: [localSet(3)] });
+    } catch (error) {
+      // The reservation failure may also reach the caller; the event is the contract.
+      expect(error).toMatchObject({ code: "sync-failed" });
+    }
+
+    const failure = events.find((event) => event.type === "error");
+    expect(failure?.type === "error" && failure.error).toMatchObject({
+      code: "sync-failed",
+      operation: "synchronize",
+      context: { action: "reserve-local" },
+      cause: expect.any(Error),
+    });
+    coordinator.destroy();
+    grid.destroy();
+  });
+
   it("keeps the JSON failure as the cause of a rejected remote payload", async () => {
     const { grid, coordinator, events } = harness();
     const notJson = {
