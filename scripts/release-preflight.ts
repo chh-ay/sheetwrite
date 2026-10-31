@@ -1,23 +1,16 @@
 import { appendFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
+import { captureProcess } from "./script-io.js";
+
 const repositoryRoot = resolve(import.meta.dir, "..");
 
 async function run(command: readonly string[]): Promise<string> {
-  const child = Bun.spawn([...command], {
+  const stdout = await captureProcess(command, {
     cwd: repositoryRoot,
-    env: process.env,
-    stdout: "pipe",
-    stderr: "pipe",
+    failure: ({ stdout, stderr, exitCode }) =>
+      `${command.join(" ")} failed (${exitCode}): ${stderr || stdout}`,
   });
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-    child.exited,
-  ]);
-  if (exitCode !== 0) {
-    throw new Error(`${command.join(" ")} failed (${exitCode}): ${stderr || stdout}`);
-  }
   return stdout.trim();
 }
 

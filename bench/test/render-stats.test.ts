@@ -1,6 +1,14 @@
 import { describe, expect, test } from "bun:test";
 
-import { counterbalancedOrder, median, summarizeFinite } from "../src/stats.js";
+import {
+  counterbalancedOrder,
+  median,
+  medianOfSorted,
+  nearestRankPercentile,
+  quantile,
+  summarizeFinite,
+  upperMedian,
+} from "../src/stats.js";
 
 describe("auditable render statistics", () => {
   test("summarizes odd and even sample sizes", () => {
@@ -23,6 +31,22 @@ describe("auditable render statistics", () => {
     expect(median([8, 1, 4, 2])).toBe(3);
     expect(median([5, 1, 3])).toBe(3);
     expect(median([])).toBeNaN();
+  });
+
+  test("interpolates quantiles with the rule of the summary p95", () => {
+    const sample = [9, 1, 5, 3, 7];
+    expect(quantile(sample, 0.95)).toBe(summarizeFinite(sample).p95);
+    expect(quantile(sample, 0.1)).toBeCloseTo(1.8);
+    expect(medianOfSorted([1, 2, 4, 8])).toBe(median([8, 1, 4, 2]));
+  });
+
+  // Recorded protocols keep these rules; each returns a value from the sample.
+  test("keeps the order-statistic rules distinct from the median and quantile", () => {
+    expect(upperMedian([8, 1, 4, 2])).toBe(4);
+    expect(upperMedian([])).toBeNaN();
+    expect(nearestRankPercentile([9, 1, 5, 3, 7], 0.95)).toBe(9);
+    expect(nearestRankPercentile([9, 1, 5, 3, 7], 0.5)).toBe(5);
+    expect(nearestRankPercentile([4, 2], 0.5)).toBe(2);
   });
 
   test("balances three engines across positions while retaining seed sensitivity", () => {

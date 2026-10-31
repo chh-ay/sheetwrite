@@ -10,6 +10,7 @@ import type * as Wasm from "@sheetwrite/wasm";
 
 import type * as Core from "../../packages/core/src/index.js";
 import type { CompactRangeHistory } from "../../packages/core/src/store/data-engine.js";
+import { median } from "./stats.js";
 
 // Pin the parent to one idle core; children inherit that affinity and run one at a time.
 // Runtime-selected modules isolate initialization across compared worktrees.
@@ -56,14 +57,6 @@ const READS_PER_SAMPLE = 2048;
 const RECALCULATIONS_PER_SAMPLE = 32;
 const WINDOW_ROWS = 64;
 const GC_TURNS = 5;
-
-function median(samples: readonly number[]): number {
-  const sorted = [...samples].sort((left, right) => left - right);
-  const middle = Math.floor(sorted.length / 2);
-  const center = sorted[middle];
-  if (center === undefined) throw new Error("Cannot summarize an empty sample");
-  return sorted.length % 2 ? center : (center + (sorted[middle - 1] ?? center)) / 2;
-}
 
 async function collectGarbage(): Promise<void> {
   for (let turn = 0; turn < GC_TURNS; turn++) {

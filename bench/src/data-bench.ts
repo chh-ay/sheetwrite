@@ -46,6 +46,7 @@ import type { CellValue, GridSettings, HotInstance } from "handsontable";
 
 import { getEngine } from "../../packages/core/src/engine.js";
 import { initSheetwrite, SheetwriteStore } from "../../packages/core/src/index.js";
+import { optionValue } from "./cli-options.js";
 import {
   AGG_COL,
   COL,
@@ -1817,11 +1818,6 @@ async function runFullBench(outputPath: string | undefined): Promise<void> {
   await writeDataArtifact(result, report, outputPath);
 }
 
-function argumentValue(args: readonly string[], name: string): string | undefined {
-  const index = args.indexOf(name);
-  return index < 0 ? undefined : args[index + 1];
-}
-
 /**
  * Writes the `--heap-trace` diagnostic: post-GC heap readings after every
  * timed sample and engine run. It is never a benchmark result and is kept out
@@ -1843,8 +1839,8 @@ async function writeHeapTrace(trace: HeapTrace, path: string, mode: BenchmarkMod
 
 if (import.meta.main) {
   const args = process.argv.slice(2).filter((argument) => argument !== "--");
-  const outputPath = argumentValue(args, "--output");
-  const heapTracePath = argumentValue(args, "--heap-trace");
+  const outputPath = optionValue(args, "--output");
+  const heapTracePath = optionValue(args, "--heap-trace");
   if (heapTracePath !== undefined && heapTracePath === outputPath) {
     throw new Error("--heap-trace must not overwrite the --output result artifact");
   }

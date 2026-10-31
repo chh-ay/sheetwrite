@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+import { optionValue } from "./cli-options.js";
 import {
   CONTROLLED_COMPARISON_POLICY,
   type ControlledRenderBaseline,
@@ -17,7 +18,7 @@ import {
 } from "./gate-protocol.js";
 import { validateRenderGateArtifact } from "./render-gate.js";
 import type { RenderBenchmarkArtifact } from "./render-protocol.js";
-import { ms, summarizeFinite } from "./stats.js";
+import { medianOfSorted, ms, summarizeFinite } from "./stats.js";
 
 const BENCH_ROOT = new URL("..", import.meta.url).pathname;
 const REPOSITORY_ROOT = resolve(BENCH_ROOT, "..");
@@ -71,11 +72,10 @@ function sampleMedian(source: readonly number[], random: () => number, scratch: 
   for (let index = 0; index < source.length; index++) {
     scratch[index] = source[Math.floor(random() * source.length)]!;
   }
+  // The bootstrap draws thousands of resamples; sorting a reused buffer in
+  // place keeps each draw free of allocation.
   scratch.sort((left, right) => left - right);
-  const middle = Math.floor(scratch.length / 2);
-  return scratch.length % 2 === 0
-    ? (scratch[middle - 1]! + scratch[middle]!) / 2
-    : scratch[middle]!;
+  return medianOfSorted(scratch);
 }
 
 /**
@@ -179,11 +179,6 @@ export function compareControlledRender(
   return rows.sort((left, right) => left.key.localeCompare(right.key));
 }
 
-function argumentValue(args: readonly string[], name: string): string | undefined {
-  const index = args.indexOf(name);
-  return index < 0 ? undefined : args[index + 1];
-}
-
 function controlledRunner(
   fresh: RenderBenchmarkArtifact,
   powerMode: string,
@@ -243,10 +238,10 @@ export async function runCheck(args: readonly string[]): Promise<number> {
   }
 
   try {
-    const baselinePath = resolve(argumentValue(args, "--baseline") ?? DEFAULT_BASELINE_PATH);
-    const freshPath = resolve(argumentValue(args, "--fresh") ?? DEFAULT_FRESH_PATH);
-    const powerMode = argumentValue(args, "--power-mode") ?? "";
-    const concurrency = Number(argumentValue(args, "--concurrency") ?? Number.NaN);
+    const baselinePath = resolve(optionValue(args, "--baseline") ?? DEFAULT_BASELINE_PATH);
+    const freshPath = resolve(optionValue(args, "--fresh") ?? DEFAULT_FRESH_PATH);
+    const powerMode = optionValue(args, "--power-mode") ?? "";
+    const concurrency = Number(optionValue(args, "--concurrency") ?? Number.NaN);
     const baselineJson = readFileSync(baselinePath, "utf8");
     const freshJson = readFileSync(freshPath, "utf8");
     const baseline = parseControlledBaseline(JSON.parse(baselineJson) as unknown);

@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { type Browser, chromium, type Page } from "@playwright/test";
 
+import { optionValue } from "./cli-options.js";
 import { DEFAULT_SEED, datasetChecksum, makeColumnar } from "./dataset.js";
 import type { BenchmarkMode } from "./gate-protocol.js";
 import { packageVersion, sourceTreeDirty } from "./protocol-meta.js";
@@ -111,13 +112,8 @@ interface RuntimeDiagnostics {
   readonly pageErrors: readonly string[];
 }
 
-function argumentValue(args: readonly string[], name: string): string | undefined {
-  const index = args.indexOf(name);
-  return index >= 0 ? args[index + 1] : undefined;
-}
-
 function positiveIntegerArgument(args: readonly string[], name: string, fallback: number): number {
-  const raw = argumentValue(args, name);
+  const raw = optionValue(args, name);
   if (raw === undefined) return fallback;
   const parsed = Number(raw);
   if (!Number.isInteger(parsed) || parsed <= 0) {
@@ -131,7 +127,7 @@ function nonNegativeIntegerArgument(
   name: string,
   fallback: number,
 ): number {
-  const raw = argumentValue(args, name);
+  const raw = optionValue(args, name);
   if (raw === undefined) return fallback;
   const parsed = Number(raw);
   if (!Number.isInteger(parsed) || parsed < 0) {
@@ -142,7 +138,7 @@ function nonNegativeIntegerArgument(
 
 function parseConfiguration(args: readonly string[]): DriverConfiguration {
   const smoke = args.includes("--smoke");
-  const scenarioSet = argumentValue(args, "--scenario-set") ?? "gate";
+  const scenarioSet = optionValue(args, "--scenario-set") ?? "gate";
   if (scenarioSet !== "gate" && scenarioSet !== "diagnostic") {
     throw new TypeError("--scenario-set must be gate or diagnostic");
   }
@@ -150,7 +146,7 @@ function parseConfiguration(args: readonly string[]): DriverConfiguration {
   const scenarios = diagnostic
     ? DIAGNOSTIC_RENDER_SCENARIOS.map((scenario) => scenario.id)
     : RENDER_SCENARIOS.map((scenario) => scenario.id);
-  const engineArg = argumentValue(args, "--engine");
+  const engineArg = optionValue(args, "--engine");
   const engines: readonly EngineId[] =
     engineArg === undefined
       ? diagnostic
@@ -166,7 +162,7 @@ function parseConfiguration(args: readonly string[]): DriverConfiguration {
   if (diagnostic && engines.some((engine) => engine !== "sheetwrite")) {
     throw new TypeError("the diagnostic scenario set currently supports only sheetwrite");
   }
-  const rowsArg = argumentValue(args, "--rows");
+  const rowsArg = optionValue(args, "--rows");
   const rows = rowsArg
     ? rowsArg.split(",").map((entry) => {
         const parsed = Number(entry);
@@ -179,8 +175,8 @@ function parseConfiguration(args: readonly string[]): DriverConfiguration {
   if (new Set(rows).size !== rows.length) throw new TypeError("--rows values must be unique");
 
   const compactSamples = args.includes("--compact-samples");
-  const outputArg = argumentValue(args, "--output");
-  const markdownArg = argumentValue(args, "--markdown-output");
+  const outputArg = optionValue(args, "--output");
+  const markdownArg = optionValue(args, "--markdown-output");
   const outputPath =
     outputArg ?? (smoke ? undefined : diagnostic ? DIAGNOSTIC_JSON_PATH : DEFAULT_JSON_PATH);
   const markdownPath =
@@ -206,7 +202,7 @@ function parseConfiguration(args: readonly string[]): DriverConfiguration {
       positiveIntegerArgument(args, "--minimum-sample-ms", RENDER_MINIMUM_SAMPLE_MS),
     ),
     timeoutMs: positiveIntegerArgument(args, "--timeout-ms", smoke ? 120_000 : 300_000),
-    browserExecutable: argumentValue(args, "--browser-executable"),
+    browserExecutable: optionValue(args, "--browser-executable"),
     outputPath,
     markdownPath,
     compactSamples,
@@ -605,9 +601,9 @@ async function validateExistingArtifact(
 }
 
 async function runDriver(args: readonly string[]): Promise<void> {
-  const validatePath = argumentValue(args, "--validate");
+  const validatePath = optionValue(args, "--validate");
   if (validatePath) {
-    const modeArgument = argumentValue(args, "--gate-mode");
+    const modeArgument = optionValue(args, "--gate-mode");
     const gateMode =
       modeArgument === undefined
         ? undefined

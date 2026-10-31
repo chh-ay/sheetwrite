@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { cpus, release } from "node:os";
 import { resolve } from "node:path";
 
+import { optionValue } from "./cli-options.js";
 import {
   AGGREGATED_SAMPLE_MAX_ITERATIONS,
   type AggregatedWorkloadSample,
@@ -20,7 +21,7 @@ import {
 } from "./gate-protocol.js";
 import { type ProtocolCaptureMeta, protocolCaptureMeta } from "./protocol-meta.js";
 import { resultsDirectory } from "./results-dir.js";
-import { type Stat, summarize } from "./stats.js";
+import { quantile, type Stat, summarize } from "./stats.js";
 
 export const MATCHED_ENGINE_WORKLOADS = [
   { id: "independent-parse-load", size: 1_000 },
@@ -81,14 +82,6 @@ export interface MatchedEngineResult {
 }
 /** Floating-point slack when a sample's mean is recomputed from its total and iteration count. */
 const SAMPLE_MEAN_TOLERANCE_MS = 1e-6;
-function percentile(samples: readonly number[], fraction: number): number {
-  const ordered = [...samples].sort((left, right) => left - right);
-  const position = (ordered.length - 1) * fraction;
-  const lower = ordered[Math.floor(position)];
-  const upper = ordered[Math.ceil(position)];
-  if (lower === undefined || upper === undefined) throw new Error("Missing percentile samples");
-  return lower + (upper - lower) * (position - Math.floor(position));
-}
 function hash(bytes: string | Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
@@ -215,7 +208,7 @@ export function validateMatchedEngineResult(result: MatchedEngineResult): void {
     validateRawStat(defaultSamples, row.defaultStat, "matched default summary");
     validateRawStat(fullSamples, row.fullStat, "matched full summary");
     validateRawStat(ratios, row.ratioStat, "matched ratio summary");
-    if (row.ratioP10 !== percentile(ratios, 0.1) || row.ratioP90 !== percentile(ratios, 0.9))
+    if (row.ratioP10 !== quantile(ratios, 0.1) || row.ratioP90 !== quantile(ratios, 0.9))
       throw new Error("Matched spread does not match samples");
   }
 }
@@ -274,8 +267,8 @@ async function captureMatchedEngines(rounds: number, resultsDir: string): Promis
       defaultStat: summarize(defaultSamples),
       fullStat: summarize(fullSamples),
       ratioStat: summarize(ratios),
-      ratioP10: percentile(ratios, 0.1),
-      ratioP90: percentile(ratios, 0.9),
+      ratioP10: quantile(ratios, 0.1),
+      ratioP90: quantile(ratios, 0.9),
     });
   }
   const sourceFiles = Object.fromEntries(
@@ -318,9 +311,8 @@ async function captureMatchedEngines(rounds: number, resultsDir: string): Promis
 
 if (import.meta.main) {
   const args = process.argv.slice(2).filter((argument) => argument !== "--");
-  const roundsIndex = args.indexOf("--rounds");
-  const requestedRounds = roundsIndex < 0 ? undefined : Number(args[roundsIndex + 1]);
-  const rounds = requestedRounds ?? DEFAULT_ROUNDS;
+  const roundsText = optionValue(args, "--rounds");
+  const rounds = roundsText === undefined ? DEFAULT_ROUNDS : Number(roundsText);
   if (!Number.isInteger(rounds) || rounds < MINIMUM_ROUNDS) {
     throw new TypeError(`--rounds must be an integer >= ${MINIMUM_ROUNDS}`);
   }

@@ -6,11 +6,16 @@ interface ProcessOutput {
   exitCode: number;
 }
 
+/**
+ * Run `command`, drain both pipes while it runs, and return its stdout.
+ * A nonzero exit throws the caller's `failure` text. Without `env` the child
+ * gets this process's environment.
+ */
 export async function captureProcess(
   command: readonly string[],
   options: {
-    cwd: string;
-    env?: Record<string, string>;
+    cwd?: string;
+    env?: Record<string, string | undefined>;
     stdin?: "ignore";
     failure: (output: ProcessOutput) => string;
   },

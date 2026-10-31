@@ -28,6 +28,7 @@ const { CellStore, initSync } = engine;
 // Fixtures run on either provider, so they use the store type both share.
 type CellStore = InstanceType<defaultEngine.EngineInstance["CellStore"]>;
 
+import { optionValue } from "./cli-options.js";
 import {
   dependencyClosureFormulas,
   diamondFormulas,
@@ -2869,13 +2870,11 @@ if (import.meta.main) {
     };
     const factory = id === undefined ? undefined : factories[id];
     assert(id !== undefined && factory, "unknown single-sample workload");
-    const aggregateIndex = process.argv.indexOf("--aggregate-ms");
-    const aggregateMs =
-      aggregateIndex < 0 ? SAMPLE_AGGREGATE_MS : Number(process.argv[aggregateIndex + 1]);
+    const aggregateText = optionValue(process.argv, "--aggregate-ms");
+    const aggregateMs = aggregateText === undefined ? SAMPLE_AGGREGATE_MS : Number(aggregateText);
     assert(Number.isFinite(aggregateMs) && aggregateMs > 0, "invalid sample aggregation floor");
-    const warmupIndex = process.argv.indexOf("--warmup-fixtures");
-    const warmupFixtures =
-      warmupIndex < 0 ? SAMPLE_WARMUP_FIXTURES : Number(process.argv[warmupIndex + 1]);
+    const warmupText = optionValue(process.argv, "--warmup-fixtures");
+    const warmupFixtures = warmupText === undefined ? SAMPLE_WARMUP_FIXTURES : Number(warmupText);
     assert(
       Number.isInteger(warmupFixtures) && warmupFixtures > 0,
       "invalid sample warm-up fixture count",
@@ -2892,18 +2891,14 @@ if (import.meta.main) {
       )}\n`,
     );
   } else {
-    const memoryIndex = process.argv.indexOf("--memory");
-    if (memoryIndex >= 0) {
-      const formulas = Number(process.argv[memoryIndex + 1]);
+    const memoryText = optionValue(process.argv, "--memory");
+    if (memoryText !== undefined) {
+      const formulas = Number(memoryText);
       assert(Number.isInteger(formulas) && formulas > 0, "invalid memory formula count");
       console.log(JSON.stringify(runMemoryMode(formulas)));
     } else {
       const args = process.argv.slice(2).filter((argument) => argument !== "--");
-      const outputIndex = args.indexOf("--output");
-      const outputPath = outputIndex < 0 ? undefined : args[outputIndex + 1];
-      if (outputIndex >= 0 && (outputPath === undefined || outputPath.startsWith("--"))) {
-        throw new Error("--output requires a path");
-      }
+      const outputPath = optionValue(args, "--output");
       // A capture written outside the tracked results file is recorded as an output capture; it
       // skips the baseline comparison too, so the gate stays blocked.
       let captureKind: FormulaCaptureKind = "gated";

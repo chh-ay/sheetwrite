@@ -103,6 +103,9 @@ function signedSizes(value: unknown, label: string): FirstPaintSizes {
   return input as unknown as FirstPaintSizes;
 }
 
+// These rules repeat the Node fixture runner (`test/bundler-fixtures/first-paint/run.mjs`)
+// operation for operation, because the stored summary must equal its recomputation
+// exactly. The runner is plain Node and cannot import `bench/src/stats.ts`.
 function percentile(sorted: readonly number[], fraction: number): number {
   return sorted[Math.max(0, Math.ceil(sorted.length * fraction) - 1)]!;
 }

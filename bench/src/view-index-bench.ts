@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { StoreViewState } from "../../packages/core/src/store/view-state.js";
 import type { RecomputingCellStore } from "../../packages/core/src/store/wasm-contract.js";
 import type { Workbook } from "../../packages/core/src/types.js";
-import { forceGc, now, summarize } from "./stats.js";
+import { forceGc, median, now, summarize } from "./stats.js";
 
 const ROWS = 1_000_000;
 const ABSENT_ROW = 314_159;
@@ -205,11 +205,6 @@ function runWorker(engine: Engine): IndexMetrics {
     rebuildMs,
     actualBackingBytes,
   };
-}
-
-function median(values: readonly number[]): number {
-  const sorted = [...values].sort((left, right) => left - right);
-  return sorted[Math.floor(sorted.length / 2)]!;
 }
 
 function aggregate(samples: readonly IndexMetrics[]): IndexMetrics {

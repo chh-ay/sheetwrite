@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
+import { optionValue } from "../bench/src/cli-options.js";
 import { verifyReleaseArtifacts } from "./release-artifacts.js";
 
 const repositoryRoot = resolve(import.meta.dir, "..");
@@ -53,15 +54,8 @@ function findingCount(report: NpmAuditReport): number {
     .reduce((total, [, count]) => total + count, 0);
 }
 
-function optionValue(name: string): string | undefined {
-  const inline = process.argv.find((argument) => argument.startsWith(`${name}=`));
-  if (inline !== undefined) return inline.slice(name.length + 1);
-  const index = process.argv.indexOf(name);
-  return index < 0 ? undefined : process.argv[index + 1];
-}
-
 async function cli(): Promise<void> {
-  const artifactDirectory = optionValue("--artifacts");
+  const artifactDirectory = optionValue(process.argv, "--artifacts");
   if (artifactDirectory === undefined) throw new Error("Release audit requires --artifacts");
   await verifyReleaseArtifacts(resolve(artifactDirectory));
   await mkdir(evidenceRoot, { recursive: true });

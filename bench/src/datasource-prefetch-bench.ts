@@ -13,6 +13,7 @@ import type {
   RowData,
   Workbook,
 } from "../../packages/core/src/types.js";
+import { nearestRankPercentile } from "./stats.js";
 
 const FRAME_MS = 16.7;
 const SOURCE_LATENCY_MS = 90;
@@ -193,12 +194,6 @@ async function flushRequests(): Promise<void> {
   await Promise.resolve();
   await Promise.resolve();
   await Promise.resolve();
-}
-
-function percentile(values: readonly number[], quantile: number): number {
-  if (values.length === 0) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  return sorted[Math.max(0, Math.ceil(sorted.length * quantile) - 1)]!;
 }
 
 async function runRepetition(repetition: number): Promise<PrefetchTraceRepetition> {
@@ -445,11 +440,13 @@ export function validateDatasourcePrefetchReport(value: PrefetchBenchmarkReport)
   }
   const residency = value.repetitions.map((result) => result.residencyRatio);
   const waits = value.repetitions.map((result) => result.p95VisibleWaitMs);
+  // The report protocol fixes nearest-rank summaries over the repetitions; a
+  // new protocol version moves to `median` and `quantile` from stats.ts.
   for (const [field, observed, expected] of [
-    ["medianResidencyRatio", value.medianResidencyRatio, percentile(residency, 0.5)],
-    ["p95ResidencyRatio", value.p95ResidencyRatio, percentile(residency, 0.95)],
-    ["medianP95VisibleWaitMs", value.medianP95VisibleWaitMs, percentile(waits, 0.5)],
-    ["p95VisibleWaitMs", value.p95VisibleWaitMs, percentile(waits, 0.95)],
+    ["medianResidencyRatio", value.medianResidencyRatio, nearestRankPercentile(residency, 0.5)],
+    ["p95ResidencyRatio", value.p95ResidencyRatio, nearestRankPercentile(residency, 0.95)],
+    ["medianP95VisibleWaitMs", value.medianP95VisibleWaitMs, nearestRankPercentile(waits, 0.5)],
+    ["p95VisibleWaitMs", value.p95VisibleWaitMs, nearestRankPercentile(waits, 0.95)],
   ] as const) {
     if (observed !== expected) {
       throw new Error(`Datasource prefetch ${field} does not match raw repetitions`);
@@ -537,10 +534,10 @@ export async function runDatasourcePrefetchBenchmark(): Promise<PrefetchBenchmar
     },
     repetitions,
     sparseBookkeeping: sparseBookkeepingEvidence(),
-    medianResidencyRatio: percentile(residency, 0.5),
-    p95ResidencyRatio: percentile(residency, 0.95),
-    medianP95VisibleWaitMs: percentile(waits, 0.5),
-    p95VisibleWaitMs: percentile(waits, 0.95),
+    medianResidencyRatio: nearestRankPercentile(residency, 0.5),
+    p95ResidencyRatio: nearestRankPercentile(residency, 0.95),
+    medianP95VisibleWaitMs: nearestRankPercentile(waits, 0.5),
+    p95VisibleWaitMs: nearestRankPercentile(waits, 0.95),
   };
   validateDatasourcePrefetchReport(report);
   return report;
