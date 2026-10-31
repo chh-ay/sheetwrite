@@ -1463,9 +1463,23 @@ describe("paged datasource storage", () => {
         operation,
         { ...operation, addr: { sheet: "missing", row: 0, col: 0 } },
       ]),
-    ).toThrow("unknown sheet");
+    ).toThrow(
+      expect.objectContaining({
+        code: "not-found",
+        operation: "store",
+        context: { sheet: "missing" },
+      }),
+    );
     expect(store.getPagedStats("s1").dirtyCells).toBe(0);
     store.dispose();
+  });
+
+  it("rejects store options that cannot work together with a typed failure", () => {
+    const data = { columns: [new Float64Array(0)], rowCount: 0 } as never;
+
+    expect(() => new SheetwriteStore(makeWorkbook(2), data, { storage: "paged" })).toThrow(
+      expect.objectContaining({ code: "invalid-argument", operation: "store" }),
+    );
   });
 
   it("acknowledges matching sparse runs without cleaning newer values, sources or styles", () => {

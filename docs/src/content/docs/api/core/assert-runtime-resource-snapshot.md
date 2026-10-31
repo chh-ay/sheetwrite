@@ -8,7 +8,7 @@ description: "assertRuntimeResourceSnapshot function in @sheetwrite/core: Reject
 Reject overlap, negative values, and attempts to fold runtime observations into owner totals.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/resource-accounting.ts#L353"><code>packages/core/src/resource-accounting.ts#L353</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/resource-accounting.ts#L361"><code>packages/core/src/resource-accounting.ts#L361</code></a></dd></div>
 </dl>
 
 ## Declaration

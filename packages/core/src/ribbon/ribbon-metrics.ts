@@ -4,6 +4,7 @@
 // `.sheetwrite-ribbon-tabs`, `.sheetwrite-ribbon-panel` and
 // `.sheetwrite-command-toolbar` in styles.css.
 
+import { SheetwriteError } from "../errors.js";
 import type { GridConfig } from "../types/grid.js";
 
 /** Tab row height in CSS pixels. */
@@ -32,5 +33,9 @@ export function assertRibbonConfig(config: GridConfig["ribbon"]): void {
   if (typeof config !== "object" || config.compactWidth === undefined) return;
   if (Number.isFinite(config.compactWidth) && config.compactWidth > 0) return;
 
-  throw new RangeError("Ribbon compactWidth must be a positive finite number");
+  throw new SheetwriteError(
+    "invalid-argument",
+    "create-grid",
+    "Ribbon compactWidth must be a positive finite number",
+  );
 }

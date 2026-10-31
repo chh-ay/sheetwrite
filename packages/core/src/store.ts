@@ -12,6 +12,7 @@ import {
   validateDocumentOperationShape,
 } from "./document-protocol.js";
 import { engineFailedError, engineGeneration, isEngineTrap, stopEngine } from "./engine.js";
+import { SheetwriteError, unknownSheetError } from "./errors.js";
 import { clonePivots, pivotOwner, withoutSavedOutput } from "./pivot.js";
 import type {
   RuntimeMemoryObservation,
@@ -110,7 +111,8 @@ const XLSX_LAYOUT_OPS: ReadonlySet<DocumentOp["op"]> = new Set([
 ]);
 
 function isSnapshotAllocationFailure(error: unknown): boolean {
-  if (error instanceof SnapshotResourceError || error instanceof RangeError) return true;
+  if (error instanceof RangeError) return true;
+  if (error instanceof SheetwriteError && error.code === "resource-limit") return true;
   if (typeof error === "string") {
     return /allocation|capacity|memory|resource limit|out of bounds memory access/i.test(error);
   }
@@ -999,7 +1001,7 @@ export class SheetwriteStore implements Store {
 
   private sheetMeta(sheet: SheetId) {
     const meta = this.engine.getWorkbook().sheets.find((candidate) => candidate.id === sheet);
-    if (!meta) throw new Error(`unknown sheet: ${sheet}`);
+    if (!meta) throw unknownSheetError(sheet);
     return meta;
   }
 }

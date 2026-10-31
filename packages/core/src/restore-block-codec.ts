@@ -1,13 +1,25 @@
 import { inflateSync } from "fflate";
 
+import { SheetwriteError } from "./errors.js";
 import type { DocumentOp, PackedCellBlock } from "./types/document.js";
 
 export const MAX_RESTORE_BLOCK_DECODED_BYTES = 64 * 1024 * 1024;
 export const MAX_RESTORE_BLOCK_CELLS = 4_000_000;
 type RestoreBlock = Extract<DocumentOp, { op: "restoreBlock" }>;
 
-function invalid(): never {
-  throw new Error("Invalid restore block");
+/** A restore block that does not encode a valid cell block. */
+export function invalidRestoreBlock(cause?: unknown): never {
+  throw new SheetwriteError(
+    "invalid-operations",
+    "transaction",
+    "Invalid restore block",
+    cause === undefined ? {} : { cause },
+  );
+}
+
+/** A restore block above its cell or decoded byte limit. */
+export function restoreBlockLimit(message: string): SheetwriteError {
+  return new SheetwriteError("resource-limit", "transaction", message);
 }
 
 /** Decode bounded JSON; callers must validate the packed cell fields before use. */
@@ -23,28 +35,28 @@ export function decodeRestoreBlockPayload(operation: RestoreBlock): PackedCellBl
     operation.data.length % 4 !== 0 ||
     !/^[A-Za-z0-9+/]*={0,2}$/.test(operation.data)
   )
-    invalid();
+    invalidRestoreBlock();
   const binary = atob(operation.data);
-  if (btoa(binary) !== operation.data) invalid();
+  if (btoa(binary) !== operation.data) invalidRestoreBlock();
   const compressed = Uint8Array.from(binary, (char) => char.charCodeAt(0));
   // fflate's fixed output buffer does not report truncation. Independently walk
   // the stream first, checking its exact expansion without allocating output.
   inspectDeflate(compressed, operation.decodedBytes);
   const bytes = inflateSync(compressed, { out: new Uint8Array(operation.decodedBytes) });
-  if (bytes.length !== operation.decodedBytes) invalid();
+  if (bytes.length !== operation.decodedBytes) invalidRestoreBlock();
   const block = JSON.parse(
     new TextDecoder("utf-8", { fatal: true }).decode(bytes),
   ) as PackedCellBlock;
-  if (!block || typeof block !== "object") invalid();
+  if (!block || typeof block !== "object") invalidRestoreBlock();
   if (block.rowCount > Math.floor(MAX_RESTORE_BLOCK_CELLS / block.colCount)) {
-    throw new RangeError("Restore block exceeds the cell limit");
+    throw restoreBlockLimit("Restore block exceeds the cell limit");
   }
   if (
     block.rowCount !== Math.abs(operation.range.end.row - operation.range.start.row) + 1 ||
     block.colCount !== Math.abs(operation.range.end.col - operation.range.start.col) + 1 ||
     (block.styleIds !== undefined && block.styleTable === undefined)
   )
-    invalid();
+    invalidRestoreBlock();
   return block;
 }
 
@@ -52,14 +64,14 @@ type Huffman = { codes: Map<number, number>[]; max: number };
 function huffman(lengths: readonly number[], allowSingleOrEmpty = false): Huffman {
   const counts = new Array<number>(16).fill(0);
   for (const length of lengths) {
-    if (length < 0 || length > 15) invalid();
+    if (length < 0 || length > 15) invalidRestoreBlock();
     if (length) counts[length] = (counts[length] ?? 0) + 1;
   }
   const next = new Array<number>(16).fill(0);
   let left = 1;
   for (let length = 1; length <= 15; length++) {
     left = left * 2 - (counts[length] ?? 0);
-    if (left < 0) invalid();
+    if (left < 0) invalidRestoreBlock();
     next[length] = ((next[length - 1] ?? 0) + (counts[length - 1] ?? 0)) * 2;
   }
   const codes = Array.from({ length: 16 }, () => new Map<number, number>());
@@ -69,11 +81,11 @@ function huffman(lengths: readonly number[], allowSingleOrEmpty = false): Huffma
     max = Math.max(max, length);
     const level = codes[length];
     const code = next[length];
-    if (!level || code === undefined) invalid();
+    if (!level || code === undefined) invalidRestoreBlock();
     level.set(code, symbol);
     next[length] = code + 1;
   });
-  if (left !== 0 && !(allowSingleOrEmpty && max <= 1)) invalid();
+  if (left !== 0 && !(allowSingleOrEmpty && max <= 1)) invalidRestoreBlock();
   return { codes, max };
 }
 
@@ -104,7 +116,7 @@ function inspectDeflate(data: Uint8Array, expected: number): void {
   let bit = 0;
   let output = 0;
   const bits = (count: number): number => {
-    if (bit + count > data.length * 8) invalid();
+    if (bit + count > data.length * 8) invalidRestoreBlock();
     let value = 0;
     for (let i = 0; i < count; i++, bit++)
       value |= (((data[bit >>> 3] ?? 0) >>> (bit & 7)) & 1) << i;
@@ -117,11 +129,11 @@ function inspectDeflate(data: Uint8Array, expected: number): void {
       const result = tree.codes[length]?.get(code);
       if (result !== undefined) return result;
     }
-    return invalid();
+    return invalidRestoreBlock();
   };
   const add = (count: number): void => {
     output += count;
-    if (output > expected || output > MAX_RESTORE_BLOCK_DECODED_BYTES) invalid();
+    if (output > expected || output > MAX_RESTORE_BLOCK_DECODED_BYTES) invalidRestoreBlock();
   };
   let final = false;
   do {
@@ -130,24 +142,24 @@ function inspectDeflate(data: Uint8Array, expected: number): void {
     if (kind === 0) {
       bit = Math.ceil(bit / 8) * 8;
       const length = bits(16);
-      if ((length ^ bits(16)) !== 65535) invalid();
+      if ((length ^ bits(16)) !== 65535) invalidRestoreBlock();
       add(length);
-      if (bit + length * 8 > data.length * 8) invalid();
+      if (bit + length * 8 > data.length * 8) invalidRestoreBlock();
       bit += length * 8;
       continue;
     }
-    if (kind === 3) invalid();
+    if (kind === 3) invalidRestoreBlock();
     let literal = FIXED_LITERAL;
     let distance = FIXED_DISTANCE;
     if (kind === 2) {
       const literals = bits(5) + 257;
       const distances = bits(5) + 1;
-      if (literals > 286) invalid();
+      if (literals > 286) invalidRestoreBlock();
       const count = bits(4) + 4;
       const lengths = new Array<number>(19).fill(0);
       for (let i = 0; i < count; i++) {
         const index = CODE_ORDER[i];
-        if (index === undefined) invalid();
+        if (index === undefined) invalidRestoreBlock();
         lengths[index] = bits(3);
       }
       const tree = huffman(lengths);
@@ -156,14 +168,14 @@ function inspectDeflate(data: Uint8Array, expected: number): void {
         const value = symbol(tree);
         if (value < 16) all.push(value);
         else {
-          if (value === 16 && all.length === 0) invalid();
+          if (value === 16 && all.length === 0) invalidRestoreBlock();
           const repeat = value === 16 ? bits(2) + 3 : value === 17 ? bits(3) + 3 : bits(7) + 11;
-          const length = value === 16 ? (all[all.length - 1] ?? invalid()) : 0;
-          if (all.length + repeat > literals + distances) invalid();
+          const length = value === 16 ? (all[all.length - 1] ?? invalidRestoreBlock()) : 0;
+          if (all.length + repeat > literals + distances) invalidRestoreBlock();
           for (let i = 0; i < repeat; i++) all.push(length);
         }
       }
-      if (all[256] === 0) invalid();
+      if (all[256] === 0) invalidRestoreBlock();
       literal = huffman(all.slice(0, literals), true);
       distance = huffman(all.slice(literals), true);
     }
@@ -172,16 +184,22 @@ function inspectDeflate(data: Uint8Array, expected: number): void {
       if (value < 256) add(1);
       else if (value === 256) break;
       else {
-        if (value > 285) invalid();
+        if (value > 285) invalidRestoreBlock();
         const index = value - 257;
-        const length = (LENGTH_BASE[index] ?? invalid()) + bits(LENGTH_BITS[index] ?? invalid());
+        const length =
+          (LENGTH_BASE[index] ?? invalidRestoreBlock()) +
+          bits(LENGTH_BITS[index] ?? invalidRestoreBlock());
         const dist = symbol(distance);
-        if (dist > 29) invalid();
-        if ((DISTANCE_BASE[dist] ?? invalid()) + bits(DISTANCE_BITS[dist] ?? invalid()) > output)
-          invalid();
+        if (dist > 29) invalidRestoreBlock();
+        if (
+          (DISTANCE_BASE[dist] ?? invalidRestoreBlock()) +
+            bits(DISTANCE_BITS[dist] ?? invalidRestoreBlock()) >
+          output
+        )
+          invalidRestoreBlock();
         add(length);
       }
     }
   } while (!final);
-  if (Math.ceil(bit / 8) !== data.length || output !== expected) invalid();
+  if (Math.ceil(bit / 8) !== data.length || output !== expected) invalidRestoreBlock();
 }

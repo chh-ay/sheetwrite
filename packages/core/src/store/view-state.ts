@@ -1,3 +1,4 @@
+import { SheetwriteError, unknownSheetError } from "../errors.js";
 import type { CellScalar } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
 import type { ColumnFilter, RowGroup, SortKey, Workbook } from "../types/document.js";
@@ -445,8 +446,11 @@ export class StoreViewState {
     reusable: PackedRowIndex | undefined,
   ): PackedRowIndex {
     if (logicalRows > ABSENT_VIEW_ROW || order.length > ABSENT_VIEW_ROW) {
-      throw new RangeError(
+      throw new SheetwriteError(
+        "resource-limit",
+        "store",
         `sheet ${sheet} exceeds the packed inverse row limit of ${ABSENT_VIEW_ROW}`,
+        { context: { sheet, limit: ABSENT_VIEW_ROW } },
       );
     }
 
@@ -543,13 +547,13 @@ export class StoreViewState {
 
   private handleOf(sheet: SheetId): number {
     const handle = this.handles.get(sheet);
-    if (handle === undefined) throw new Error(`unknown sheet: ${sheet}`);
+    if (handle === undefined) throw unknownSheetError(sheet);
     return handle;
   }
 
   private sheetMeta(sheet: SheetId) {
     const meta = this.workbook.sheets.find((candidate) => candidate.id === sheet);
-    if (!meta) throw new Error(`unknown sheet: ${sheet}`);
+    if (!meta) throw unknownSheetError(sheet);
     return meta;
   }
 }

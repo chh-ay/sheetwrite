@@ -1148,6 +1148,29 @@ describe("sync coordinator", () => {
     grid.destroy();
   });
 
+  it("keeps the JSON failure as the cause of a rejected remote payload", async () => {
+    const { grid, coordinator, events } = harness();
+    const notJson = {
+      op: "set",
+      addr: { sheet: "s1", row: 0, col: 0 },
+      value: { kind: "literal", value: Number.NaN },
+    } as DocumentOp;
+
+    await coordinator.applyVersionedOperation({ version: 8, operations: [notJson] });
+
+    const failure = events.find((event) => event.type === "error");
+    expect(failure?.type === "error" && failure.error).toMatchObject({
+      code: "invalid-operations",
+      operation: "synchronize",
+    });
+    expect(failure?.type === "error" && failure.error.cause).toMatchObject({
+      code: "invalid-operations",
+      operation: "transaction",
+    });
+    coordinator.destroy();
+    grid.destroy();
+  });
+
   it("bounds retained acknowledgements and treats expired late echoes as reload violations", async () => {
     const { grid, coordinator, events } = harness(["m1", "m2", "m3"], {
       limits: { maxRecentAcknowledgements: 2 },

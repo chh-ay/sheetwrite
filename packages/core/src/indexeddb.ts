@@ -17,11 +17,13 @@ export type IndexedDbPendingCommitStorageErrorCode =
   | "unsupported-schema"
   | "transaction"
   | "conflict"
-  | "limit";
+  | "limit"
+  | "invalid-limits";
 
 /** Typed IndexedDB failure raised by durable pending-commit storage. */
 export class IndexedDbPendingCommitStorageError extends SheetwriteError {
   override readonly name = "IndexedDbPendingCommitStorageError";
+  declare readonly code: IndexedDbPendingCommitStorageErrorCode;
 
   constructor(
     code: IndexedDbPendingCommitStorageErrorCode,
@@ -466,7 +468,7 @@ function assertLoadOptions(options: PendingCommitLoadOptions): void {
     options.maxBytes < 0
   ) {
     throw new IndexedDbPendingCommitStorageError(
-      "limit",
+      "invalid-limits",
       "Pending commit load limits must be nonnegative safe integers",
     );
   }
@@ -511,7 +513,7 @@ function accountStoredRecord(
   try {
     bytes = boundedJsonByteLength(record.operations, options.maxBytes - stats.bytes);
   } catch (error) {
-    if (error instanceof JsonByteLengthError && error.code === "limit") {
+    if (error instanceof JsonByteLengthError && error.code === "payload-limit") {
       throw new IndexedDbPendingCommitStorageError(
         "limit",
         `Pending queue exceeds the ${options.maxBytes} byte limit`,

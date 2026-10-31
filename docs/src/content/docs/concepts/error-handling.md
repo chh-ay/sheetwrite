@@ -9,13 +9,20 @@ transaction sources and framework readiness events.
 
 ## Stable failure envelope
 
-Every consumer-visible initialization, datasource, renderer, export, persistence,
-snapshot, synchronization, collaboration, CSV, and XLSX failure is a
-`SheetwriteError`. Use `code` and `operation` for control flow; `message` is
+Every consumer-visible failure of Sheetwrite is a `SheetwriteError`: bad
+input, a limit that is passed, and failures of initialization, datasources,
+the renderer, export, persistence, snapshots, synchronization, collaboration,
+CSV and XLSX. Use `code` and `operation` for control flow; `message` is
 diagnostic text and may become more specific. `context` contains
-serialization-safe boundary details, `retryable` is present only when
+serialization-safe identifiers and numbers, `retryable` is present only when
 Sheetwrite can determine it, and `cause` retains the original exception in the
-current realm. `toJSON()` omits `cause`.
+current realm. `toJSON()` omits `cause`. Only a bug in Sheetwrite itself
+throws a plain `Error`.
+
+A failure stays small, whatever data the operation held. The message is cut
+to 8 KiB of UTF-8, and so is the sum of the strings in `context`; a cut keeps
+the start and the end of the text. A `context` with more than 1,024 entries
+becomes `{ truncated: true }`.
 
 ```ts prelude="wasm" partial="requires application-specific WASM URLs" title="Initialization recovery"
 import { initSheetwrite, isSheetwriteError } from "@sheetwrite/core";
@@ -34,9 +41,13 @@ try {
 }
 ```
 
-The guard also recognizes validated cross-realm and serialized envelopes. A
-serialized envelope is structural; code that requires `Error` identity should
-construct or receive a live `SheetwriteError`.
+The guard checks the shape only: a string `name` and `message`, a non-empty
+string `code` and `operation`, and a JSON-safe `context` when present. It
+accepts cross-realm errors and serialized envelopes, and it does not compare
+`code` with a list, so a code from a newer release passes. Give a `switch` on
+`error.code` a `default` branch. A serialized envelope is structural; code
+that requires `Error` identity should construct or receive a live
+`SheetwriteError`.
 
 ```ts prelude="wasm" partial="requires surrounding host state" title="Operational recovery"
 declare function retryVisibleRows(request: {
@@ -80,10 +91,19 @@ Start with [`SheetwriteError`](/docs/api/core/sheetwrite-error/) and
 their structured fields are needed.
 
 The complete enums are [`SheetwriteErrorCode`](/docs/api/core/sheetwrite-error-code/)
-and [`SheetwriteErrorOperation`](/docs/api/core/sheetwrite-error-operation/);
-their runtime value sets are
+and [`SheetwriteErrorOperation`](/docs/api/core/sheetwrite-error-operation/).
 [`SHEETWRITE_ERROR_CODES`](/docs/api/core/sheetwrite-error-codes/) and
-[`SHEETWRITE_ERROR_OPERATIONS`](/docs/api/core/sheetwrite-error-operations/).
+[`SHEETWRITE_ERROR_OPERATIONS`](/docs/api/core/sheetwrite-error-operations/)
+list the same values at run time; Sheetwrite does not read them, so a bundle
+that does not import them does not contain them.
+
+Bad host input that has no boundary class has the code `invalid-argument`:
+simple columns (`create-grid`), row bridge options and row IDs
+(`row-bridge`), a custom `CellRenderer.dom()` result (`render`), store options
+(`store`) and resource reports (`resource-diagnostics`). A sheet ID that no
+sheet has is `not-found` with operation `store` and `context.sheet`. A limit
+override that is not a valid number is `invalid-limits` for transactions,
+snapshots, synchronization and IndexedDB loads.
 
 <div class="error-catalog">
 <a href="/docs/api/core/snapshot-validation-error/"><code>SnapshotValidationError</code><span>Malformed workbook snapshot; inspect path-qualified <code>errors</code>.</span></a>

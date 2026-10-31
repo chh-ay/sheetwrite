@@ -4,6 +4,7 @@ import {
   type PreparedMergeIndex,
   prepareMergeIndex,
 } from "./canvas-paint.js";
+import { SheetwriteError } from "./errors.js";
 import type { GeometryLayoutController } from "./geometry-layout-controller.js";
 import type { CellScalar, CellStyle } from "./types/cell.js";
 import type {
@@ -515,7 +516,11 @@ export class DomOverlay {
   ): DomEntry {
     const node = renderer.dom!(context);
     if (!(node instanceof HTMLElement)) {
-      throw new TypeError("Sheetwrite: CellRenderer.dom() must return an HTMLElement");
+      throw new SheetwriteError(
+        "invalid-argument",
+        "render",
+        "Sheetwrite: CellRenderer.dom() must return an HTMLElement",
+      );
     }
     this.claimRendererNode(node);
 
@@ -592,7 +597,11 @@ export class DomOverlay {
     } else if (needsLegacyRefresh) {
       const next = entry.renderer.dom!(context);
       if (!(next instanceof HTMLElement)) {
-        throw new TypeError("Sheetwrite: CellRenderer.dom() must return an HTMLElement");
+        throw new SheetwriteError(
+          "invalid-argument",
+          "render",
+          "Sheetwrite: CellRenderer.dom() must return an HTMLElement",
+        );
       }
       this.claimRendererNode(next);
       const previous = entry.node;
@@ -714,12 +723,16 @@ export class DomOverlay {
 
   private claimRendererNode(node: HTMLElement): void {
     if (this.ownedNodes.has(node)) {
-      throw new TypeError(
+      throw new SheetwriteError(
+        "invalid-argument",
+        "render",
         "Sheetwrite: CellRenderer.dom() must return a unique HTMLElement for each cell",
       );
     }
     if (node.parentNode !== null || node.isConnected) {
-      throw new TypeError(
+      throw new SheetwriteError(
+        "invalid-argument",
+        "render",
         "Sheetwrite: CellRenderer.dom() must return a fresh detached HTMLElement",
       );
     }

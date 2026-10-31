@@ -1,14 +1,16 @@
 ---
 title: "SHEETWRITE_ERROR_CODES | @sheetwrite/core/adapter"
-description: "SHEETWRITE_ERROR_CODES variable in @sheetwrite/core/adapter: Stable public failure codes."
+description: "SHEETWRITE_ERROR_CODES variable in @sheetwrite/core/adapter: Every SheetwriteErrorCode, for hosts that list the codes at run time."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|SHEETWRITE_ERROR_CODES -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="variable">variable</span></div>
 
-Stable public failure codes. Messages are diagnostic and are not API contracts.
+Every `SheetwriteErrorCode`, for hosts that list the codes at run time.
+Sheetwrite itself does not read this array, so a bundle that does not import
+it does not contain it.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/errors.ts#L2"><code>packages/core/src/errors.ts#L2</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/errors.ts#L68"><code>packages/core/src/errors.ts#L68</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -30,6 +32,7 @@ const SHEETWRITE_ERROR_CODES: readonly [
   "xlsx-resource-limit",
   "resource-limit",
   "invalid-snapshot",
+  "invalid-argument",
   "aborted",
   "not-found",
   "commit-rejected",
@@ -93,7 +96,6 @@ const SHEETWRITE_ERROR_CODES: readonly [
 <p class="api-consumers-label">Public exports naming <code>SHEETWRITE_ERROR_CODES</code></p>
 
 <ul class="api-consumer-list">
-<li><a href="/docs/api/core/sheetwrite-error-code/"><code>SheetwriteErrorCode</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li><a href="/docs/api/core-adapter/sheetwrite-error-code/"><code>SheetwriteErrorCode</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li>None.</li>
 </ul>
 </div>

@@ -1,4 +1,4 @@
-import type { SheetwriteError } from "./errors.js";
+import { SheetwriteError } from "./errors.js";
 import { initSheetwrite, isSheetwriteReady } from "./grid.js";
 
 export {
@@ -455,16 +455,23 @@ export interface SimpleGridInput {
   presentation: "data-grid";
 }
 
+function invalidSimpleColumn(message: string): SheetwriteError {
+  return new SheetwriteError("invalid-argument", "create-grid", message);
+}
+
 /** Converts simple columns and row objects into canonical workbook and columnar input. */
 export function createSimpleGridInput<Row extends Record<string, CellScalar>>(
   options: SimpleSheetwriteOptions<Row>,
 ): SimpleGridInput {
   const keys = new Set<string>();
   const columns = options.columns.map((column) => {
-    if (!column.key) throw new Error("Sheetwrite: every simple column requires a non-empty key");
-    if (!column.title) throw new Error("Sheetwrite: every simple column requires a title");
+    if (!column.key) {
+      throw invalidSimpleColumn("Sheetwrite: every simple column requires a non-empty key");
+    }
+    if (!column.title)
+      throw invalidSimpleColumn("Sheetwrite: every simple column requires a title");
     if (keys.has(column.key)) {
-      throw new Error(`Sheetwrite: duplicate simple column key "${column.key}"`);
+      throw invalidSimpleColumn(`Sheetwrite: duplicate simple column key "${column.key}"`);
     }
     keys.add(column.key);
     return {

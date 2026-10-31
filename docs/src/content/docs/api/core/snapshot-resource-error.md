@@ -8,10 +8,10 @@ description: "SnapshotResourceError class in @sheetwrite/core: Stable resource f
 Stable resource failure raised by direct workbook construction paths.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/document-protocol.ts#L393"><code>packages/core/src/document-protocol.ts#L393</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/document-protocol.ts#L400"><code>packages/core/src/document-protocol.ts#L400</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>5</span>
+## Members <span class="api-count" data-pagefind-ignore>6</span>
 
 <div class="api-member-list">
 
@@ -29,6 +29,15 @@ constructor(resource: keyof SnapshotResourceLimits, limit: number, actual: numbe
 
 ```ts generated
 actual: number;
+```
+
+</details>
+
+<details class="api-member" id="snapshot-resource-error-code" data-pagefind-weight="1">
+<summary><code>code</code></summary>
+
+```ts generated
+code: "resource-limit";
 ```
 
 </details>
@@ -75,6 +84,7 @@ class SnapshotResourceError extends SheetwriteError {
     options?: ErrorOptions,
   );
   actual: number;
+  code: "resource-limit";
   limit: number;
   name: "SnapshotResourceError";
   resource: keyof SnapshotResourceLimits;

@@ -1,5 +1,6 @@
 import type { SourceSnapshot, WindowView } from "@sheetwrite/wasm";
 
+import { unknownSheetError } from "../errors.js";
 import type { StyleDictionary } from "../style-dictionary.js";
 import type { CellScalar, CellStyle, ConditionalFormatRule } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
@@ -901,13 +902,13 @@ export class StoreWindowReader {
 
   private handleOf(sheet: SheetId): number {
     const handle = this.handles.get(sheet);
-    if (handle === undefined) throw new Error(`unknown sheet: ${sheet}`);
+    if (handle === undefined) throw unknownSheetError(sheet);
     return handle;
   }
 
   private sheetMeta(sheet: SheetId) {
     const meta = this.workbook.sheets.find((candidate) => candidate.id === sheet);
-    if (!meta) throw new Error(`unknown sheet: ${sheet}`);
+    if (!meta) throw unknownSheetError(sheet);
     return meta;
   }
 }

@@ -8,10 +8,10 @@ description: "SyncPendingCapacityError class in @sheetwrite/core: Typed local tr
 Typed local transaction rejection produced when the durable queue cannot reserve capacity.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/sync.ts#L215"><code>packages/core/src/sync.ts#L215</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/sync.ts#L216"><code>packages/core/src/sync.ts#L216</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>3</span>
+## Members <span class="api-count" data-pagefind-ignore>4</span>
 
 <div class="api-member-list">
 
@@ -20,6 +20,15 @@ Typed local transaction rejection produced when the durable queue cannot reserve
 
 ```ts generated
 constructor(issue: Extract<MutationIssue, { kind: "resource-limit"; }>);
+```
+
+</details>
+
+<details class="api-member" id="sync-pending-capacity-error-code" data-pagefind-weight="1">
+<summary><code>code</code></summary>
+
+```ts generated
+code: "pending-capacity";
 ```
 
 </details>
@@ -58,6 +67,7 @@ class SyncPendingCapacityError extends SheetwriteError {
       }
     >,
   );
+  code: "pending-capacity";
   issue: {
     kind: "resource-limit";
     severity: "error";

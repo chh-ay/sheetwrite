@@ -56,6 +56,7 @@ export type DelimitedTextOperation = "parse" | "import" | "encode" | "export";
 /** Stable resource-limit failure raised before the next oversized parse or encode allocation. */
 export class DelimitedTextResourceError extends SheetwriteError {
   override readonly name = "DelimitedTextResourceError";
+  declare readonly code: "delimited-text-resource-limit";
 
   constructor(
     readonly resource: keyof DelimitedTextResourceLimits,
@@ -75,6 +76,7 @@ export class DelimitedTextResourceError extends SheetwriteError {
 /** Stable invalid-option failure for a delimited-text resource ceiling. */
 export class DelimitedTextOptionsError extends SheetwriteError {
   override readonly name = "DelimitedTextOptionsError";
+  declare readonly code: "delimited-text-invalid-limit";
 
   constructor(
     readonly resource: keyof DelimitedTextResourceLimits,

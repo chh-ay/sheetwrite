@@ -8,10 +8,10 @@ description: "SnapshotValidationError class in @sheetwrite/core: Path-qualified 
 Path-qualified schema failure found while validating an untrusted snapshot.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/document-protocol.ts#L434"><code>packages/core/src/document-protocol.ts#L434</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/document-protocol.ts#L445"><code>packages/core/src/document-protocol.ts#L445</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>3</span>
+## Members <span class="api-count" data-pagefind-ignore>4</span>
 
 <div class="api-member-list">
 
@@ -24,8 +24,17 @@ constructor(errors: readonly DocumentValidationError[]);
 
 </details>
 
+<details class="api-member" id="snapshot-validation-error-code" data-pagefind-weight="1">
+<summary><code>code</code></summary>
+
+```ts generated
+code: "invalid-snapshot";
+```
+
+</details>
+
 <details class="api-member" id="snapshot-validation-error-errors" data-pagefind-weight="1">
-<summary><code>errors</code></summary>
+<summary><code>errors</code> <span class="api-member-summary">The first 64 issues; context.issueCount counts all of them.</span></summary>
 
 ```ts generated
 errors: readonly DocumentValidationError[];
@@ -51,6 +60,7 @@ name: "SnapshotValidationError"
 ```ts generated
 class SnapshotValidationError extends SheetwriteError {
   constructor(errors: readonly DocumentValidationError[]);
+  code: "invalid-snapshot";
   errors: readonly DocumentValidationError[];
   name: "SnapshotValidationError";
 }

@@ -1,4 +1,4 @@
-import { normalizeSheetwriteError, type SheetwriteError } from "./errors.js";
+import { normalizeSheetwriteError, SheetwriteError } from "./errors.js";
 import { createGridFromSnapshot, type SnapshotGridOptions } from "./persistence.js";
 import type { PresenceOverlay, Range, Selection } from "./types/coordinates.js";
 import type { Sheet, WorkbookSnapshot } from "./types/document.js";
@@ -95,7 +95,9 @@ export class PresenceCoordinator {
     private readonly transport: PresenceTransport,
     private readonly options: PresenceCoordinatorOptions,
   ) {
-    if (!options.actor.id) throw new Error("Presence actor ID is required");
+    if (!options.actor.id) {
+      throw new SheetwriteError("invalid-argument", "presence", "Presence actor ID is required");
+    }
     this.now = options.now ?? Date.now;
     this.heartbeatMs = options.heartbeatMs ?? DEFAULT_PRESENCE_HEARTBEAT_MS;
     this.timeoutMs = options.timeoutMs ?? DEFAULT_PRESENCE_TIMEOUT_MS;
@@ -554,7 +556,7 @@ export class CommentCoordinator {
       this.emit({ type: "loaded", version: this.version, threads });
       return threads;
     } catch (error) {
-      const failure = normalizeSheetwriteError(error, "comment-failed", "comments", {
+      const failure = normalizeSheetwriteError(error, "comment-failed", "comment", {
         action: "load",
       });
       if (!this.destroyed) this.emit({ type: "error", error: failure });
@@ -629,7 +631,7 @@ export class CommentCoordinator {
       }
       return response;
     } catch (error) {
-      const failure = normalizeSheetwriteError(error, "comment-failed", "comments", {
+      const failure = normalizeSheetwriteError(error, "comment-failed", "comment", {
         action: "mutate",
         mutation: mutation.kind,
       });
@@ -666,7 +668,7 @@ export class CommentCoordinator {
     } catch (error) {
       this.emit({
         type: "error",
-        error: normalizeSheetwriteError(error, "comment-failed", "comments", {
+        error: normalizeSheetwriteError(error, "comment-failed", "comment", {
           action: "receive",
         }),
       });

@@ -32,6 +32,7 @@ const STORE_EDGES: Readonly<Record<string, readonly string[]>> = {
     "window-reader.ts",
   ],
   "view-state.ts": [
+    "../errors.ts",
     "../types/cell.ts",
     "../types/coordinates.ts",
     "../types/document.ts",
@@ -41,6 +42,7 @@ const STORE_EDGES: Readonly<Record<string, readonly string[]>> = {
   "wasm-contract.ts": [],
   "wire-tags.ts": [],
   "window-reader.ts": [
+    "../errors.ts",
     "../style-dictionary.ts",
     "../types/cell.ts",
     "../types/coordinates.ts",

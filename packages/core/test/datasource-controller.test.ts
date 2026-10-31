@@ -1174,7 +1174,10 @@ it("bounds empty-page retries and releases no-progress ownership", async () => {
   await flushRequest();
   expect(calls).toBe(2);
   expect(errors).toHaveLength(1);
-  expect(errors[0]).toBeInstanceOf(RangeError);
+  expect(errors[0]).toMatchObject({
+    code: "datasource-request-failed",
+    operation: "datasource-request",
+  });
   expect(controller.getTelemetry()).toMatchObject({ activeRequests: 0, ownedBands: 0 });
   expect(store.getCellLoadState({ sheet: "s1", row: 0, col: 0 })).toBe("unloaded");
 
@@ -1295,7 +1298,7 @@ it("adapts legacy rows through full-width protocol 2 with explicit blank keys", 
       signal: new AbortController().signal,
       revision: 0,
     }),
-  ).rejects.toThrow(RangeError);
+  ).rejects.toMatchObject({ code: "datasource-request-failed", operation: "datasource-request" });
 
   controller.destroy();
   store.dispose();

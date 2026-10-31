@@ -1,5 +1,4 @@
 import {
-  SnapshotResourceError,
   type SnapshotResourceLimits,
   SnapshotValidationError,
   validateWorkbookSnapshot,
@@ -51,6 +50,7 @@ export type PersistenceErrorCode =
 /** Typed failure raised by persistence and synchronization flows. */
 export class PersistenceError extends SheetwriteError {
   override readonly name = "PersistenceError";
+  declare readonly code: PersistenceErrorCode;
 
   constructor(code: PersistenceErrorCode, message: string, options?: ErrorOptions) {
     super(code, "persistence", message, { cause: options?.cause });
@@ -93,7 +93,10 @@ export function createGridFromSnapshot(
     return new GridImpl(host, { ...gridOptions, workbook: store.getWorkbook() }, store, true);
   } catch (error) {
     store.dispose();
-    if (error instanceof SnapshotResourceError || error instanceof RangeError) {
+    if (
+      (error instanceof SheetwriteError && error.code === "resource-limit") ||
+      error instanceof RangeError
+    ) {
       throw new PersistenceError("resource-limit", error.message, { cause: error });
     }
     throw error;
@@ -283,7 +286,7 @@ function splitBatchVersions(request: PersistenceBatchCommitRequest): DocumentOp[
     } catch (error) {
       if (!(error instanceof JsonByteLengthError)) throw error;
       reject(
-        error.code === "limit"
+        error.code === "payload-limit"
           ? `a version exceeds ${limits.maxVersionPayloadBytes} bytes`
           : "its operations are not JSON",
       );

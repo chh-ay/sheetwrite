@@ -8,7 +8,7 @@ description: "RevisionRestoreResponse type in @sheetwrite/core: Applied or confl
 Applied or conflict acknowledgement for a revision restore.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/collaboration.ts#L261"><code>packages/core/src/collaboration.ts#L261</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/collaboration.ts#L263"><code>packages/core/src/collaboration.ts#L263</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>3</span>

@@ -11,7 +11,7 @@ Typed rejection of malformed or resource-exhausting synchronization input.
 <div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/sync.ts#L206"><code>packages/core/src/sync.ts#L206</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>2</span>
+## Members <span class="api-count" data-pagefind-ignore>3</span>
 
 <div class="api-member-list">
 
@@ -19,7 +19,16 @@ Typed rejection of malformed or resource-exhausting synchronization input.
 <summary><code>constructor</code></summary>
 
 ```ts generated
-constructor(code: SyncProtocolErrorCode, message: string);
+constructor(code: SyncProtocolErrorCode, message: string, options?: ErrorOptions);
+```
+
+</details>
+
+<details class="api-member" id="sync-protocol-error-code" data-pagefind-weight="1">
+<summary><code>code</code></summary>
+
+```ts generated
+code: SyncProtocolErrorCode;
 ```
 
 </details>
@@ -41,7 +50,12 @@ name: "SyncProtocolError"
 
 ```ts generated
 class SyncProtocolError extends SheetwriteError {
-  constructor(code: SyncProtocolErrorCode, message: string);
+  constructor(
+    code: SyncProtocolErrorCode,
+    message: string,
+    options?: ErrorOptions,
+  );
+  code: SyncProtocolErrorCode;
   name: "SyncProtocolError";
 }
 ```

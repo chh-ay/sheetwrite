@@ -8,10 +8,10 @@ description: "PersistenceError class in @sheetwrite/core: Typed failure raised b
 Typed failure raised by persistence and synchronization flows.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/persistence.ts#L52"><code>packages/core/src/persistence.ts#L52</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/persistence.ts#L51"><code>packages/core/src/persistence.ts#L51</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>2</span>
+## Members <span class="api-count" data-pagefind-ignore>3</span>
 
 <div class="api-member-list">
 
@@ -20,6 +20,15 @@ Typed failure raised by persistence and synchronization flows.
 
 ```ts generated
 constructor(code: PersistenceErrorCode, message: string, options?: ErrorOptions);
+```
+
+</details>
+
+<details class="api-member" id="persistence-error-code" data-pagefind-weight="1">
+<summary><code>code</code></summary>
+
+```ts generated
+code: PersistenceErrorCode;
 ```
 
 </details>
@@ -46,6 +55,7 @@ class PersistenceError extends SheetwriteError {
     message: string,
     options?: ErrorOptions,
   );
+  code: PersistenceErrorCode;
   name: "PersistenceError";
 }
 ```

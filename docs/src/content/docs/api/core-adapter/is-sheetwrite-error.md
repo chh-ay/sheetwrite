@@ -1,14 +1,18 @@
 ---
 title: "isSheetwriteError | @sheetwrite/core/adapter"
-description: "isSheetwriteError function in @sheetwrite/core/adapter: Narrow same-realm errors, cross-realm errors, and serialized failure envelopes."
+description: "isSheetwriteError function in @sheetwrite/core/adapter: Narrow same-realm errors, cross-realm errors, and serialized failure envelopes by shape: a string name…"
 ---
 <!-- api-export:@sheetwrite/core|./adapter|isSheetwriteError -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="function">function</span></div>
 
-Narrow same-realm errors, cross-realm errors, and serialized failure envelopes.
+Narrow same-realm errors, cross-realm errors, and serialized failure
+envelopes by shape: a string `name` and `message`, a non-empty string `code`
+and `operation`, and a JSON-safe `context` when present. The guard does not
+check `code` against a list, so a code from a newer Sheetwrite still passes;
+handle unknown codes in the `default` branch of a `switch`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/errors.ts#L328"><code>packages/core/src/errors.ts#L328</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/errors.ts#L521"><code>packages/core/src/errors.ts#L521</code></a></dd></div>
 </dl>
 
 ## Declaration
