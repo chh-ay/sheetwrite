@@ -189,6 +189,10 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
             label: "Custom functions",
             href: "/docs/features/formulas/custom-functions/",
           },
+          {
+            label: "Formula help",
+            href: "/docs/features/formulas/formula-help/",
+          },
         ],
       },
       {

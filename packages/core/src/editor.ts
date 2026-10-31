@@ -47,7 +47,7 @@ export class EditController {
 
   constructor(host: HTMLElement, assist?: AssistDeps) {
     this.host = host;
-    this.assist = assist ? new FormulaAssist(host, assist) : null;
+    this.assist = assist ? new FormulaAssist(assist) : null;
   }
 
   get isEditing(): boolean {

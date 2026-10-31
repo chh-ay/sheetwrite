@@ -428,22 +428,23 @@ it("keeps Tab inside a form popup, wrapping at both ends", async () => {
   expect(host.querySelector(".sheetwrite-ribbon-popup")).not.toBeNull();
 });
 
-it("hides the Formulas tab without host functions, and arrow keys skip it", async () => {
+it("shows the Formulas tab with Explain Formula, and hides Insert Function without host functions", async () => {
   const { host, key } = await setup();
   const tabs = [...host.querySelectorAll<HTMLElement>('.sheetwrite-ribbon [role="tab"]')];
   const formulas = tabs.find((tab) => tab.textContent === "Formulas");
   const insert = tabs.find((tab) => tab.textContent === "Insert");
-  const data = tabs.find((tab) => tab.textContent === "Data");
-  if (formulas === undefined || insert === undefined || data === undefined) {
-    throw new Error("missing ribbon tabs");
-  }
-  expect(formulas.hidden).toBe(true);
+  if (formulas === undefined || insert === undefined) throw new Error("missing ribbon tabs");
+  expect(formulas.hidden).toBe(false);
+
+  formulas.click();
+  const command = (id: string): HTMLElement | null =>
+    host.querySelector<HTMLElement>(`.sheetwrite-ribbon [data-command="${id}"]`);
+  expect(command("insertFunction")?.hidden).toBe(true);
+  expect(command("explainFormula")?.hidden).toBe(false);
 
   insert.focus();
   key(insert, "ArrowRight");
-  expect(document.activeElement).toBe(data);
-  key(data, "ArrowLeft");
-  expect(document.activeElement).toBe(insert);
+  expect(document.activeElement).toBe(formulas);
 });
 
 it("shows Insert Function with host functions on the full engine, in its own process", async () => {
