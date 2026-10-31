@@ -8,7 +8,7 @@ description: "STORE_MEMORY_HASH_ESTIMATE_VERSION variable in @sheetwrite/core: V
 Version of the deterministic hash-table capacity estimate used by store owners.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/resource-accounting.ts#L10"><code>packages/core/src/resource-accounting.ts#L10</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/resource-accounting.ts#L10"><code>packages/core/src/resource-accounting.ts#L10</code></a></dd></div>
 </dl>
 
 ## Declaration

@@ -8,7 +8,7 @@ description: "SyncPendingCapacityState type in @sheetwrite/core: Whether the dur
 Whether the durable local queue can currently admit another transaction.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L81"><code>packages/core/src/sync.ts#L81</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/sync.ts#L81"><code>packages/core/src/sync.ts#L81</code></a></dd></div>
 </dl>
 
 ## Declaration

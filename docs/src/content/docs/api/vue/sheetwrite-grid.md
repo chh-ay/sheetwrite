@@ -27,7 +27,7 @@ function mountWorkbook(host: HTMLElement, workbook: Workbook) {
 - [/docs/frameworks/vue/](/docs/frameworks/vue/)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/vue/src/index.ts#L385"><code>packages/vue/src/index.ts#L385</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/vue/src/index.ts#L385"><code>packages/vue/src/index.ts#L385</code></a></dd></div>
 </dl>
 
 ## Declaration

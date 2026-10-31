@@ -8,7 +8,7 @@ description: "RevisionRestoreRequest interface in @sheetwrite/core: Versioned re
 Versioned restore request submitted to a revision adapter.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/collaboration.ts#L252"><code>packages/core/src/collaboration.ts#L252</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/collaboration.ts#L252"><code>packages/core/src/collaboration.ts#L252</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>

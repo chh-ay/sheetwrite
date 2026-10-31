@@ -8,7 +8,7 @@ description: "AdapterGridInput interface in @sheetwrite/core/adapter: Committed 
 Committed inputs to a framework adapter lifetime.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/adapter.ts#L219"><code>packages/core/src/adapter.ts#L219</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/adapter.ts#L219"><code>packages/core/src/adapter.ts#L219</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

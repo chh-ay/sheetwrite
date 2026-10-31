@@ -8,7 +8,7 @@ description: "GridPanel interface in @sheetwrite/core: One side panel that Grid.
 One side panel that `Grid.openPanel` shows on the grid's right edge.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L67"><code>packages/core/src/types/grid.ts#L67</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/grid.ts#L67"><code>packages/core/src/types/grid.ts#L67</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

@@ -8,7 +8,7 @@ description: "sheetNameKey function in @sheetwrite/core: NFC and locale-independ
 NFC and locale-independent Unicode lowercase key used for worksheet-name identity.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sheet-name.ts#L12"><code>packages/core/src/sheet-name.ts#L12</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/sheet-name.ts#L12"><code>packages/core/src/sheet-name.ts#L12</code></a></dd></div>
 </dl>
 
 ## Declaration

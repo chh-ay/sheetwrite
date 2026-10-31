@@ -396,10 +396,10 @@ Limitations: REGEXTEST, REGEXEXTRACT, and REGEXREPLACE use the regex-lite syntax
 
 | Layer | Status and source/evidence |
 | --- | --- |
-| Parser | implemented<br />[`packages/wasm/src/eval/analysis/mod.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/mod.rs) |
-| Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/text.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/text.rs) |
-| Formula assist | implemented<br />[`packages/wasm/src/eval/analysis/mod.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/mod.rs) |
-| Evidence | behavior-tested<br />[`packages/wasm/src/eval/analysis/text.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/text.rs) |
+| Parser | implemented<br />[`packages/wasm/src/eval/analysis/mod.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/analysis/mod.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/text.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/analysis/text.rs) |
+| Formula assist | implemented<br />[`packages/wasm/src/eval/analysis/mod.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/analysis/mod.rs) |
+| Evidence | behavior-tested<br />[`packages/wasm/src/eval/analysis/text.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/analysis/text.rs) |
 
 </details>
 
@@ -407,9 +407,9 @@ Limitations: REGEXTEST, REGEXEXTRACT, and REGEXREPLACE use the regex-lite syntax
 
 | Layer | Status and source/evidence |
 | --- | --- |
-| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/calc.rs) |
-| Evaluator | implemented<br />[`packages/wasm/src/eval/mod.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/mod.rs)<br />[`packages/wasm/src/eval/functions.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/functions.rs) |
-| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
-| Evidence | source-linked<br />[`packages/wasm/src/tests.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/tests.rs)<br />[`packages/core/test/formula-assist.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/test/formula-assist.test.ts) |
+| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/calc.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/mod.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/mod.rs)<br />[`packages/wasm/src/eval/functions.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/functions.rs) |
+| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/formula-assist.ts) |
+| Evidence | source-linked<br />[`packages/wasm/src/tests.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/tests.rs)<br />[`packages/core/test/formula-assist.test.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/test/formula-assist.test.ts) |
 
 </details>

@@ -13,7 +13,7 @@ Values that are not numbers (text, booleans, errors, empty cells) become
 Call it after a [`subscribeChartChanges`](/docs/api/core/subscribe-chart-changes/) event names the chart, not per frame.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/charts-live.ts#L152"><code>packages/core/src/charts-live.ts#L152</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/charts-live.ts#L152"><code>packages/core/src/charts-live.ts#L152</code></a></dd></div>
 </dl>
 
 ## Declaration

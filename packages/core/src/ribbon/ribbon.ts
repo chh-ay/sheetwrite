@@ -6,7 +6,14 @@
 
 import { iconNode } from "../icons/resolve.js";
 import type { CommandFlags, Grid, IconOverrides, RibbonConfig, RibbonMode } from "../types/grid.js";
-import { shownTabs, type RibbonGroupSpec, type RibbonTabSpec } from "./command-spec.js";
+import {
+  commandAvailable,
+  shownTabs,
+  tabAvailable,
+  type RibbonControlSpec,
+  type RibbonGroupSpec,
+  type RibbonTabSpec,
+} from "./command-spec.js";
 import { createCommandContext, refreshControls } from "./command-surface.js";
 import {
   renderControl,
@@ -45,6 +52,10 @@ interface GroupView {
   readonly spec: RibbonGroupSpec;
   readonly element: HTMLElement;
   readonly body: HTMLElement;
+  readonly controls: readonly {
+    readonly spec: RibbonControlSpec;
+    readonly view: RibbonControlView;
+  }[];
 }
 
 /** One tab's DOM, built the first time the tab is shown. */
@@ -147,7 +158,8 @@ export class Ribbon {
 
     this.updateMinimizeButton();
     this.updateLayout();
-    this.selectTab(0, false);
+    this.updateAvailability();
+    this.selectTab(this.firstShownTab(), false);
   }
 
   /** Height the owner reserves above the grid. */
@@ -225,6 +237,7 @@ export class Ribbon {
       groups.set(group.id, view);
       element.appendChild(view.element);
     }
+    for (const group of groups.values()) this.showAvailable(group);
 
     const reduceOrder: RibbonFitGroup[] = [];
     for (const id of spec.reduceOrder) {
@@ -239,6 +252,7 @@ export class Ribbon {
   }
 
   private createGroup(spec: RibbonGroupSpec, controls: RibbonControlView[]): GroupView {
+    const groupControls: { spec: RibbonControlSpec; view: RibbonControlView }[] = [];
     const element = document.createElement("div");
     element.className = "sheetwrite-ribbon-group";
     element.dataset.size = "large";
@@ -258,6 +272,7 @@ export class Ribbon {
       for (const control of row) {
         const view = renderControl(control, this.context);
         controls.push(view);
+        groupControls.push({ spec: control, view });
         line.appendChild(view.element);
       }
     }
@@ -290,7 +305,7 @@ export class Ribbon {
     label.setAttribute("aria-hidden", "true");
 
     element.append(body, collapsed, label);
-    return { spec, element, body };
+    return { spec, element, body, controls: groupControls };
   }
 
   /** Lend the group's live controls to a popup, then put them back. */
@@ -316,8 +331,60 @@ export class Ribbon {
   }
 
   private refresh(states: RibbonCommandStates): void {
+    this.updateAvailability();
     const panel = this.panels[this.activeTab];
     if (panel !== undefined && !this.minimized) this.refreshPanel(panel, states);
+  }
+
+  /**
+   * Hide the commands the grid cannot run now (see `available`), and the
+   * groups and tabs they leave empty. A tab that disappears while selected
+   * hands the selection to the first tab still shown.
+   */
+  private updateAvailability(): void {
+    let changed = false;
+    this.tabSpecs.forEach((spec, index) => {
+      const tab = this.tabs[index];
+      const hidden = !tabAvailable(spec, this.grid);
+      if (tab === undefined || tab.hidden === hidden) return;
+      tab.hidden = hidden;
+      changed = true;
+    });
+    for (const panel of this.panels) {
+      for (const group of panel?.groups.values() ?? [])
+        changed = this.showAvailable(group) || changed;
+    }
+    if (!changed) return;
+
+    if (this.tabs[this.activeTab]?.hidden === true) this.selectTab(this.firstShownTab(), false);
+    this.fittedWidth = -1;
+    this.scheduleFit();
+  }
+
+  /** Show a group's available controls, and the group while it has any; true on change. */
+  private showAvailable(group: GroupView): boolean {
+    let changed = false;
+    let shown = 0;
+    for (const { spec, view } of group.controls) {
+      const hidden = !commandAvailable(spec, this.grid);
+      if (!hidden) shown += 1;
+      if (view.element.hidden === hidden) continue;
+      view.element.hidden = hidden;
+      changed = true;
+    }
+    const hidden = shown === 0;
+    if (group.element.hidden !== hidden) {
+      group.element.hidden = hidden;
+      changed = true;
+    }
+    return changed;
+  }
+
+  private firstShownTab(): number {
+    return Math.max(
+      0,
+      this.tabs.findIndex((tab) => !tab.hidden),
+    );
   }
 
   private refreshPanel(panel: PanelView, state: RibbonCommandStates): void {
@@ -400,12 +467,15 @@ export class Ribbon {
     }
     const index = this.tabs.findIndex((tab) => tab === event.target);
     if (index === -1) return;
-    const count = this.tabs.length;
-    const targets: Record<string, number> = {
-      ArrowRight: (index + 1) % count,
-      ArrowLeft: (index + count - 1) % count,
-      Home: 0,
-      End: count - 1,
+    // Arrows and Home/End move among the tabs shown now, wrapping at the ends.
+    const shown = this.tabs.flatMap((tab, tabIndex) => (tab.hidden ? [] : [tabIndex]));
+    const position = shown.indexOf(index);
+    const count = shown.length;
+    const targets: Record<string, number | undefined> = {
+      ArrowRight: shown[(position + 1) % count],
+      ArrowLeft: shown[(position + count - 1) % count],
+      Home: shown[0],
+      End: shown[count - 1],
     };
     const next = targets[event.key];
     if (next === undefined) return;

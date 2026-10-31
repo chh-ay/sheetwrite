@@ -8,7 +8,7 @@ description: "GridSizeProps type in @sheetwrite/core/adapter: Explicit width and
 Explicit width and height accepted by framework adapters.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/adapter.ts#L148"><code>packages/core/src/adapter.ts#L148</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/adapter.ts#L148"><code>packages/core/src/adapter.ts#L148</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>2</span>

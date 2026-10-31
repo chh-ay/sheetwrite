@@ -8,7 +8,7 @@ description: "SheetLifecycleIssueCode type in @sheetwrite/core: Stable lifecycle
 Stable lifecycle rejection codes suitable for inline sheet-management UI.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L260"><code>packages/core/src/types/document.ts#L260</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L260"><code>packages/core/src/types/document.ts#L260</code></a></dd></div>
 </dl>
 
 ## Declaration

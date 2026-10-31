@@ -10,7 +10,7 @@ spaces, `.`, `_` or `-`, starting with a letter or digit and not ending in a
 space. The same rule guards snapshots, hyperlinks, clipboard and XLSX import.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/cell-style-fields.ts#L19"><code>packages/core/src/cell-style-fields.ts#L19</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/cell-style-fields.ts#L19"><code>packages/core/src/cell-style-fields.ts#L19</code></a></dd></div>
 </dl>
 
 ## Declaration

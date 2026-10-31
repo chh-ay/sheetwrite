@@ -8,7 +8,7 @@ description: "OperationSource type in @sheetwrite/core: Whether a committed chan
 Whether a committed change originated locally or from remote host input.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/transaction.ts#L69"><code>packages/core/src/types/transaction.ts#L69</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/transaction.ts#L69"><code>packages/core/src/types/transaction.ts#L69</code></a></dd></div>
 </dl>
 
 ## Declaration

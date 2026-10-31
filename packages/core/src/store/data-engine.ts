@@ -17,6 +17,7 @@ import { dateToSerial } from "../date-serial.js";
 import { isValidCalculationSettings, storedCalculationSettings } from "../document-protocol.js";
 import { ENGINE_LOAD_HINT, getEngine, isEngineLoaded as isLoaded } from "../engine.js";
 import { SheetwriteError } from "../errors.js";
+import type { FormulaFunctionMetadata } from "../functions/types.js";
 import {
   cloneCellHyperlink,
   MAX_HYPERLINKS_PER_SHEET,
@@ -430,6 +431,8 @@ export interface HostFunctionHooks {
   restore(wasm: RecomputingCellStore): void;
   /** Makes `wasm` the store that later registrations change; called once it is live. */
   adopt(wasm: RecomputingCellStore): void;
+  /** The registered functions, for chrome that lists them (Formulas › Insert Function). */
+  metadata(): readonly FormulaFunctionMetadata[];
 }
 
 /**

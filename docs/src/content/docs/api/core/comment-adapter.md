@@ -8,7 +8,7 @@ description: "CommentAdapter interface in @sheetwrite/core: Host persistence con
 Host persistence contract for versioned comment threads.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/collaboration.ts#L475"><code>packages/core/src/collaboration.ts#L475</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/collaboration.ts#L475"><code>packages/core/src/collaboration.ts#L475</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

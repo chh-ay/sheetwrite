@@ -8,7 +8,7 @@ description: "WasmMemoryOwner type in @sheetwrite/core: One retained-memory owne
 One retained-memory owner reported by the WASM cell store.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/resource-accounting.ts#L36"><code>packages/core/src/resource-accounting.ts#L36</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/resource-accounting.ts#L36"><code>packages/core/src/resource-accounting.ts#L36</code></a></dd></div>
 </dl>
 
 ## Declaration

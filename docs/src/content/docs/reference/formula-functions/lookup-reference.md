@@ -323,10 +323,10 @@ Limitations: HYPERLINK returns its display value: the friendly name, or the link
 
 | Layer | Status and source/evidence |
 | --- | --- |
-| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/calc.rs) |
-| Evaluator | implemented<br />[`packages/wasm/src/eval/mod.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/mod.rs)<br />[`packages/wasm/src/eval/functions.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/functions.rs) |
-| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
-| Evidence | source-linked<br />[`packages/wasm/src/tests.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/tests.rs)<br />[`packages/core/test/formula-assist.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/test/formula-assist.test.ts) |
+| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/calc.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/mod.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/mod.rs)<br />[`packages/wasm/src/eval/functions.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/functions.rs) |
+| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/formula-assist.ts) |
+| Evidence | source-linked<br />[`packages/wasm/src/tests.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/tests.rs)<br />[`packages/core/test/formula-assist.test.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/test/formula-assist.test.ts) |
 
 </details>
 
@@ -334,10 +334,10 @@ Limitations: HYPERLINK returns its display value: the friendly name, or the link
 
 | Layer | Status and source/evidence |
 | --- | --- |
-| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/calc.rs) |
-| Evaluator | implemented<br />[`packages/wasm/src/eval/reference.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/reference.rs)<br />[`packages/wasm/src/eval/dependency.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/dependency.rs) |
-| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
-| Evidence | source-linked<br />[`packages/wasm/src/tests.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/tests.rs)<br />[`scripts/conformance/formula-evidence.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/conformance/formula-evidence.ts) |
+| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/calc.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/reference.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/reference.rs)<br />[`packages/wasm/src/eval/dependency.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/dependency.rs) |
+| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/formula-assist.ts) |
+| Evidence | source-linked<br />[`packages/wasm/src/tests.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/tests.rs)<br />[`scripts/conformance/formula-evidence.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/scripts/conformance/formula-evidence.ts) |
 
 </details>
 
@@ -345,10 +345,10 @@ Limitations: HYPERLINK returns its display value: the friendly name, or the link
 
 | Layer | Status and source/evidence |
 | --- | --- |
-| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/calc.rs) |
-| Evaluator | implemented<br />[`packages/wasm/src/eval/areas.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/areas.rs)<br />[`packages/wasm/src/eval/matrix.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/matrix.rs)<br />[`packages/wasm/src/store.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/store.rs) |
-| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
-| Evidence | source-linked<br />[`packages/wasm/src/tests.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/tests.rs)<br />[`packages/xlsx/test/formula-source-preservation.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/xlsx/test/formula-source-preservation.test.ts)<br />[`scripts/conformance/formula-evidence.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/conformance/formula-evidence.ts) |
+| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/calc.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/areas.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/areas.rs)<br />[`packages/wasm/src/eval/matrix.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/matrix.rs)<br />[`packages/wasm/src/store.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/store.rs) |
+| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/formula-assist.ts) |
+| Evidence | source-linked<br />[`packages/wasm/src/tests.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/tests.rs)<br />[`packages/xlsx/test/formula-source-preservation.test.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/xlsx/test/formula-source-preservation.test.ts)<br />[`scripts/conformance/formula-evidence.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/scripts/conformance/formula-evidence.ts) |
 
 </details>
 
@@ -356,9 +356,9 @@ Limitations: HYPERLINK returns its display value: the friendly name, or the link
 
 | Layer | Status and source/evidence |
 | --- | --- |
-| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/calc.rs) |
-| Evaluator | implemented<br />[`packages/wasm/src/eval/info.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/info.rs) |
-| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
-| Evidence | source-linked<br />[`packages/wasm/src/tests.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/tests.rs)<br />[`packages/core/test/formula-assist.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/test/formula-assist.test.ts) |
+| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/calc.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/info.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/info.rs) |
+| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/formula-assist.ts) |
+| Evidence | source-linked<br />[`packages/wasm/src/tests.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/tests.rs)<br />[`packages/core/test/formula-assist.test.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/test/formula-assist.test.ts) |
 
 </details>

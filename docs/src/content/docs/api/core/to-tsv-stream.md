@@ -8,7 +8,7 @@ description: "toTsvStream function in @sheetwrite/core: Export canonical data-sp
 Export canonical data-space TSV with pull-driven store reads and cancellation.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L180"><code>packages/core/src/export.ts#L180</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/export.ts#L180"><code>packages/core/src/export.ts#L180</code></a></dd></div>
 </dl>
 
 ## Declaration

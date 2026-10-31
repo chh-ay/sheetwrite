@@ -8,7 +8,7 @@ description: "CellOut class in @sheetwrite/wasm: Result of a single-cell read."
 Result of a single-cell read.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L7"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L7</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/pkg/sheetwrite_wasm.d.ts#L7"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L7</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>

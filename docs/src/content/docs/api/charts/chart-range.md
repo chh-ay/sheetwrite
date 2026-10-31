@@ -8,7 +8,7 @@ description: "ChartRange type in @sheetwrite/charts: A deleted source remains ex
 A deleted source remains explicit instead of silently reading another cell.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/types/chart.d.ts#L5"><code>packages/core/dist/types/chart.d.ts#L5</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/chart.d.ts#L5"><code>packages/core/dist/types/chart.d.ts#L5</code></a></dd></div>
 </dl>
 
 ## Declaration
