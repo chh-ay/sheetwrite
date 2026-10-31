@@ -5,6 +5,8 @@ pub(crate) mod analysis;
 mod areas;
 mod array;
 mod criteria;
+#[cfg(feature = "host-functions")]
+pub(crate) mod custom;
 mod date;
 mod dependency;
 mod financial;
@@ -644,9 +646,10 @@ impl CellStore {
     }
 
     /// The edit barrier. Any source change recalculates every volatile formula
-    /// in the workbook, so sheets that hold volatile formulas join the seeds
-    /// even when only another sheet changed. A barrier without changes does
-    /// no work, volatile formulas included.
+    /// in the workbook, host functions registered as volatile included, so
+    /// sheets that hold volatile formulas join the seeds even when only
+    /// another sheet changed. A barrier without changes does no work,
+    /// volatile formulas included.
     pub(crate) fn recompute_changed(&mut self) {
         let mut seeds: Vec<usize> = self
             .sheets
@@ -659,6 +662,10 @@ impl CellStore {
             seeds.extend(self.sheets.iter().enumerate().filter_map(|(sheet, data)| {
                 (data.formulas.has_volatile() && !data.formulas.has_dirty()).then_some(sheet)
             }));
+            #[cfg(feature = "host-functions")]
+            {
+                seeds = self.with_custom_volatile_seeds(seeds);
+            }
         }
 
         self.recompute_seed_sheets(&seeds);
@@ -674,6 +681,8 @@ impl CellStore {
             .enumerate()
             .filter_map(|(sheet, data)| data.formulas.has_volatile().then_some(sheet))
             .collect();
+        #[cfg(feature = "host-functions")]
+        let seeds = self.with_custom_volatile_seeds(seeds);
 
         self.recompute_at_volatile_serial(&seeds);
     }
@@ -1485,6 +1494,14 @@ impl CellStore {
                     value
                 }
             },
+            #[cfg(feature = "host-functions")]
+            Ast::UnknownFunc(name, arguments) => {
+                self.eval_custom_function(name, arguments, sheet, pass, depth + 1)
+            }
+            // With host functions the arm above takes every unknown call; the
+            // default engine keeps this arm as it was, so its binary does not
+            // change.
+            #[cfg_attr(feature = "host-functions", allow(unreachable_patterns))]
             Ast::Name(_) | Ast::UnresolvedStructured(_) | Ast::UnknownFunc(..) => {
                 Value::Error(FormulaError::Name)
             }

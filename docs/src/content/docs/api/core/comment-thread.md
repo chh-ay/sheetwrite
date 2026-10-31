@@ -8,7 +8,7 @@ description: "CommentThread interface in @sheetwrite/core: Versioned discussion 
 Versioned discussion anchored to a document location.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/collaboration.ts#L416"><code>packages/core/src/collaboration.ts#L416</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/collaboration.ts#L418"><code>packages/core/src/collaboration.ts#L418</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>

@@ -13,7 +13,10 @@ name = "sheetwrite_wasm"
 [features]
 default = ["formula-engine"]
 formula-engine = []
-analysis = ["formula-engine", "dep:regex-lite"]
+analysis = ["formula-engine", "host-functions", "dep:regex-lite"]
+# Formulas that call JavaScript functions the host registers. Only the full
+# engine (`@sheetwrite/formulas`, built with `analysis`) carries it.
+host-functions = ["formula-engine"]
 
 [dependencies]
 wasm-bindgen = "0.2"

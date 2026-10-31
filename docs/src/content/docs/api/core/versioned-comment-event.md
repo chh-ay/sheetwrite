@@ -8,7 +8,7 @@ description: "VersionedCommentEvent interface in @sheetwrite/core: Comment mutat
 Comment mutation paired with its assigned server version.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/collaboration.ts#L466"><code>packages/core/src/collaboration.ts#L466</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/collaboration.ts#L468"><code>packages/core/src/collaboration.ts#L468</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

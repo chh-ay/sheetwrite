@@ -422,6 +422,16 @@ class PackedTextBuffer {
   }
 }
 
+/** What `@sheetwrite/core/functions` installs on an engine; core only calls it. */
+export interface HostFunctionHooks {
+  /** Throws while a host function runs, so no store call reaches the busy engine. */
+  assertIdle(): void;
+  /** Registers every host function on a replacement WASM store without recalculating. */
+  restore(wasm: RecomputingCellStore): void;
+  /** Makes `wasm` the store that later registrations change; called once it is live. */
+  adopt(wasm: RecomputingCellStore): void;
+}
+
 /**
  * Owns the raw workbook/WASM state and returns typed effects to the public
  * transaction facade. It never owns public listeners, epochs, or policy.
@@ -455,6 +465,9 @@ export class StoreDataEngine {
   private pageIdleWaiters: Array<() => void> | undefined;
 
   private readonly memoryReleaseListeners = new Set<() => void>();
+
+  /** Hooks of `@sheetwrite/core/functions`; `undefined` until a host function is registered. */
+  hostFunctions: HostFunctionHooks | undefined;
 
   /** Paged sheets hydrated from a snapshot treat omitted cells as known empty. */
   private readonly authoritativeSnapshotSheets = new Set<SheetId>();
@@ -1450,6 +1463,16 @@ export class StoreDataEngine {
     const milliseconds = now.getTime();
     if (!Number.isFinite(milliseconds)) throw new RangeError("invalid volatile recalculation date");
     this.wasm.recomputeVolatile(dateToSerial(now));
+  }
+
+  /**
+   * Gives `@sheetwrite/core/functions` the WASM store. Core holds only this
+   * slot, so a bundle that never registers a host function carries no
+   * registry code.
+   */
+  installHostFunctions(hooks: HostFunctionHooks): void {
+    this.hostFunctions = hooks;
+    hooks.adopt(this.wasm);
   }
 
   /** Map a displayed row position to the backing data row under sort/filter. */
@@ -4164,6 +4187,10 @@ export class StoreDataEngine {
       }
 
       // The JS definitions survive the release; the new instance gets them again.
+      // Host functions come first: the pivot pass below can calculate formulas
+      // that call them. The registry switches to the replacement only in
+      // commit, so an aborted release leaves it on the live store.
+      this.hostFunctions?.restore(replacement);
       for (const sheet of this.workbook.sheets) {
         if (sheet.pivots?.length) this.syncPivots(sheet, replacement);
       }
@@ -4184,6 +4211,7 @@ export class StoreDataEngine {
       commit: () => {
         const previous = this.wasm;
         this.wasm = replacement;
+        this.hostFunctions?.adopt(replacement);
         this.view.replaceEngine(replacement);
         this.windowReader.replaceEngine(replacement);
         this.pagedDirtyPreflight?.replaceEngine(replacement);
