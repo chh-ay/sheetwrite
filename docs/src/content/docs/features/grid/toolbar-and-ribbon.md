@@ -82,16 +82,57 @@ console.log(grid.getCommandState("undo").disabled); // true: no history yet
 
 ## Ribbon
 
-The ribbon has four tabs with Excel's group names, labels and order:
+The ribbon has these tabs, with Excel's group names, labels and order:
 
 | Tab | Groups and controls |
 | --- | --- |
 | Home | **Undo**. **Clipboard**: Paste split button. **Font**: font name and size boxes, grow and shrink, bold, italic, underline, strikethrough, Borders, Fill Color and Font Color palettes. **Alignment**: top, middle, bottom, wrap, left, center, right, Merge & Center. **Number**: format box, currency, percent, comma, more and fewer decimals. **Cells**: Insert, Delete, Format. **Editing**: AutoSum, Clear, Sort & Filter, Find. |
-| Insert | **Rows & Columns**: Insert (rows above or below, columns left or right), Delete (rows or columns). **Links**: link form. **Notes**: note form. |
-| Data | **Sort & Filter**: Sort A to Z, Sort Z to A, Clear Filter. **Outline**: Group and Ungroup rows. **Show/Hide**: Hide Rows, Unhide Rows, Hide Columns, Unhide Columns. |
+| Insert | **Rows & Columns**: Insert (rows above or below, columns left or right), Delete (rows or columns). **Tables**: PivotTable. **Charts**: Chart split button (column, bar, line, area, pie, doughnut, scatter). **Links**: link form. **Notes**: note form. |
+| Formulas | **Function Library**: Insert Function. Shows only while the store has [custom functions](/docs/features/formulas/custom-functions/), which need the full engine. |
+| Data | **Sort & Filter**: Sort A to Z, Sort Z to A, Clear Filter. **Outline**: Group and Ungroup rows. **Show/Hide**: Hide Rows, Unhide Rows, Hide Columns, Unhide Columns. **Export**: Export CSV, Export XLSX (with the `export` flag). |
 | View | **Window**: Freeze Panes, Freeze Top Row, Freeze First Column, Unfreeze Panes. **Zoom**: zoom out, current percent, zoom in. |
 
 Every control reads the same `getCommandState` contract as host chrome. It disables while the grid is read-only.
+
+**Insert Function** lists the functions registered with `registerFunction`, with each signature and description as the tooltip. Pick one to start `=NAME(` in the focus cell's editor, then type the arguments. The Formulas tab, and Insert Function in the toolbar, appear when the first function is registered and go away when the last one is removed. Built-in functions are offered by formula autocomplete as you type.
+
+### Layout for the 0.7 features
+
+The 0.7 features get their commands in the places below. Insert Function is in the ribbon now; each other command appears in the full ribbon, the compact ribbon and the toolbar when its feature ships. The glyphs are on the icon sheet now, so `IconOverrides` and replacement sheets can use their names.
+
+Two tabs are new, in Excel's order: **Formulas** goes after Insert, and **Review** goes after Data. Groups fold in the order of the last column, first group first.
+
+| Tab | Group | Command | Glyph | Feature |
+| --- | --- | --- | --- | --- |
+| Insert | Dashboard | New Dashboard | <span class="sheetwrite-icon" data-icon="dashboard" aria-hidden="true"></span> `dashboard` | Dashboards ([#231](https://github.com/chh-ay/sheetwrite/issues/231)) |
+| Insert | Dashboard | KPI Card | <span class="sheetwrite-icon" data-icon="kpiCard" aria-hidden="true"></span> `kpiCard` | Dashboards ([#231](https://github.com/chh-ay/sheetwrite/issues/231)) |
+| Insert | Filters | Slicer | <span class="sheetwrite-icon" data-icon="slicer" aria-hidden="true"></span> `slicer` | Dashboards ([#231](https://github.com/chh-ay/sheetwrite/issues/231)) |
+| Formulas | Function Library | Insert Function | <span class="sheetwrite-icon" data-icon="insertFunction" aria-hidden="true"></span> `insertFunction` | Custom functions ([#220](https://github.com/chh-ay/sheetwrite/issues/220)) |
+| Formulas | Defined Names | Name Manager | <span class="sheetwrite-icon" data-icon="nameManager" aria-hidden="true"></span> `nameManager` | Named LAMBDAs ([#224](https://github.com/chh-ay/sheetwrite/issues/224)) |
+| Formulas | Defined Names | Define Name | <span class="sheetwrite-icon" data-icon="defineName" aria-hidden="true"></span> `defineName` | Named LAMBDAs ([#224](https://github.com/chh-ay/sheetwrite/issues/224)) |
+| Formulas | Formula Auditing | Explain Formula | <span class="sheetwrite-icon" data-icon="explainFormula" aria-hidden="true"></span> `explainFormula` | Formula help ([#221](https://github.com/chh-ay/sheetwrite/issues/221)) |
+| Data | Get & Transform Data | Get Data | <span class="sheetwrite-icon" data-icon="getData" aria-hidden="true"></span> `getData` | Query layer ([#227](https://github.com/chh-ay/sheetwrite/issues/227)) |
+| Data | Queries & Connections | Refresh All | <span class="sheetwrite-icon" data-icon="refreshAll" aria-hidden="true"></span> `refreshAll` | Query layer ([#227](https://github.com/chh-ay/sheetwrite/issues/227)); also refreshes external links ([#226](https://github.com/chh-ay/sheetwrite/issues/226)) |
+| Data | Queries & Connections | Queries & Connections | <span class="sheetwrite-icon" data-icon="queries" aria-hidden="true"></span> `queries` | Query layer ([#227](https://github.com/chh-ay/sheetwrite/issues/227)) |
+| Data | Queries & Connections | Edit Links | <span class="sheetwrite-icon" data-icon="editLinks" aria-hidden="true"></span> `editLinks` | External workbook links ([#226](https://github.com/chh-ay/sheetwrite/issues/226)) |
+| Data | Data Tools | Manage Data Model | <span class="sheetwrite-icon" data-icon="dataModel" aria-hidden="true"></span> `dataModel` | Data model ([#229](https://github.com/chh-ay/sheetwrite/issues/229)) |
+| Data | Data Tools | Relationships | <span class="sheetwrite-icon" data-icon="relationships" aria-hidden="true"></span> `relationships` | Data model ([#229](https://github.com/chh-ay/sheetwrite/issues/229)) |
+| Data | Data Tools | Measures | <span class="sheetwrite-icon" data-icon="measure" aria-hidden="true"></span> `measure` | Measures ([#230](https://github.com/chh-ay/sheetwrite/issues/230)) |
+| Review | Version History | Version History | <span class="sheetwrite-icon" data-icon="versionHistory" aria-hidden="true"></span> `versionHistory` | Version history ([#228](https://github.com/chh-ay/sheetwrite/issues/228)) |
+| Review | Version History | Save Version | <span class="sheetwrite-icon" data-icon="saveVersion" aria-hidden="true"></span> `saveVersion` | Version history ([#228](https://github.com/chh-ay/sheetwrite/issues/228)) |
+
+| Tab | Group order, left to right | Folds first to last |
+| --- | --- | --- |
+| Insert | Rows & Columns, Tables, Charts, Dashboard, Filters, Links, Notes | Notes, Links, Filters, Dashboard, Charts, Tables, Rows & Columns |
+| Formulas | Function Library, Defined Names, Formula Auditing | Formula Auditing, Defined Names, Function Library |
+| Data | Get & Transform Data, Queries & Connections, Sort & Filter, Data Tools, Outline, Show/Hide, Export | Export, Show/Hide, Outline, Data Tools, Queries & Connections, Get & Transform Data, Sort & Filter |
+| Review | Version History | Version History |
+
+Three 0.7 features add no ribbon command, because the user reaches them in cells or files that the ribbon already covers:
+
+- Formula autocomplete and the argument guide ([#221](https://github.com/chh-ay/sheetwrite/issues/221)) work in the cell and formula bar editors.
+- Array formula editing ([#225](https://github.com/chh-ay/sheetwrite/issues/225)) changes how edits inside a spill behave.
+- XLSX chart import and export ([#215](https://github.com/chh-ay/sheetwrite/issues/215)) use Insert › Charts and Export XLSX.
 
 ### Narrow widths
 
@@ -102,6 +143,8 @@ As the grid narrows, the ribbon shrinks the way Excel does:
 3. Whole groups fold into one dropdown button that opens the group in a popup.
 
 Groups fold in Excel order. On Home, Editing folds first, then Cells, Number, Alignment, Clipboard, Font and Undo.
+
+When the tabs do not fit beside the **Compact** and minimize buttons, the tab row scrolls sideways. Arrow keys, Home and End move focus to any tab and scroll it into view; on touch screens, swipe the tab row.
 
 Double-click a tab, or use the arrow at the right, to hide the panel and keep only the tab row. The grid takes the space back.
 

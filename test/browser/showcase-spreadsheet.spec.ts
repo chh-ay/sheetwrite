@@ -89,6 +89,30 @@ test("the ribbon follows the site theme and the page fits a phone", async ({ pag
   expect(backgrounds[0]).not.toBe(backgrounds[1]);
 });
 
+test("at 320 px the tabs scroll beside the layout buttons instead of under them @portability", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  await open(page);
+  const ribbon = page.getByRole("region", { name: "Ribbon" });
+  const home = ribbon.getByRole("tab", { name: "Home", exact: true });
+  const view = ribbon.getByRole("tab", { name: "View", exact: true });
+  const layout = ribbon.getByRole("button", { name: "Compact ribbon" });
+
+  await home.focus();
+  await home.press("End");
+  await expect(view).toBeFocused();
+
+  const tab = await view.boundingBox();
+  const button = await layout.boundingBox();
+  if (tab === null || button === null)
+    throw new Error("The View tab or the layout button is not shown");
+  expect(tab.x + tab.width).toBeLessThanOrEqual(button.x);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+});
+
 for (const mode of ["full", "compact"] as const) {
   test(`${mode} ribbon keeps tab, menu and toggle keyboard semantics @portability`, async ({
     page,

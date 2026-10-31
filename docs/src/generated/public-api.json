@@ -2933,7 +2933,7 @@
             {
               "name": "ICON_NAMES",
               "kind": "variable",
-              "signature": "readonly [\"undo\", \"redo\", \"paste\", \"cut\", \"copy\", \"find\", \"zoomIn\", \"zoomOut\", \"autoSum\", \"clear\", \"bold\", \"italic\", \"underline\", \"strikethrough\", \"textColor\", \"fillColor\", \"fontGrow\", \"fontShrink\", \"clearFormat\", \"separator\", \"alignLeft\", \"alignCenter\", \"alignRight\", \"alignTop\", \"alignMiddle\", \"alignBottom\", \"wrap\", \"merge\", \"unmerge\", \"mergeAndCenter\", \"border\", \"borderAll\", \"borderOutside\", \"borderThickOutside\", \"borderTop\", \"borderBottom\", \"borderLeft\", \"borderRight\", \"borderNone\", \"currency\", \"percent\", \"comma\", \"decimalIncrease\", \"decimalDecrease\", \"hyperlink\", \"note\", \"exportCsv\", \"exportXlsx\", \"insert\", \"delete\", \"format\", \"hideRows\", \"unhideRows\", \"hideColumns\", \"unhideColumns\", \"freeze\", \"groupRows\", \"ungroupRows\", \"sortAsc\", \"sortDesc\", \"sortFilter\", \"clearFilter\", \"chart\", \"chartColumn\", \"chartBar\", \"chartLine\", \"chartArea\", \"chartPie\", \"chartDoughnut\", \"chartScatter\", \"pivotTable\"]",
+              "signature": "readonly [\"undo\", \"redo\", \"paste\", \"cut\", \"copy\", \"find\", \"zoomIn\", \"zoomOut\", \"autoSum\", \"clear\", \"bold\", \"italic\", \"underline\", \"strikethrough\", \"textColor\", \"fillColor\", \"fontGrow\", \"fontShrink\", \"clearFormat\", \"separator\", \"alignLeft\", \"alignCenter\", \"alignRight\", \"alignTop\", \"alignMiddle\", \"alignBottom\", \"wrap\", \"merge\", \"unmerge\", \"mergeAndCenter\", \"border\", \"borderAll\", \"borderOutside\", \"borderThickOutside\", \"borderTop\", \"borderBottom\", \"borderLeft\", \"borderRight\", \"borderNone\", \"currency\", \"percent\", \"comma\", \"decimalIncrease\", \"decimalDecrease\", \"hyperlink\", \"note\", \"exportCsv\", \"exportXlsx\", \"insert\", \"delete\", \"format\", \"hideRows\", \"unhideRows\", \"hideColumns\", \"unhideColumns\", \"freeze\", \"groupRows\", \"ungroupRows\", \"sortAsc\", \"sortDesc\", \"sortFilter\", \"clearFilter\", \"chart\", \"chartColumn\", \"chartBar\", \"chartLine\", \"chartArea\", \"chartPie\", \"chartDoughnut\", \"chartScatter\", \"pivotTable\", \"insertFunction\", \"defineName\", \"nameManager\", \"explainFormula\", \"getData\", \"refreshAll\", \"queries\", \"editLinks\", \"relationships\", \"dataModel\", \"measure\", \"dashboard\", \"slicer\", \"kpiCard\", \"versionHistory\", \"saveVersion\"]",
               "owners": [
                 "src/icons/icon-names.ts"
               ],
@@ -2949,7 +2949,7 @@
               "owners": [
                 "src/icons/icon-names.ts"
               ],
-              "source": "src/icons/icon-names.ts#L79",
+              "source": "src/icons/icon-names.ts#L95",
               "jsDocTags": [],
               "documentation": "The name of one glyph on the command icon sheet; the key of `IconOverrides`.",
               "memberDocs": []
@@ -2973,7 +2973,7 @@
               "owners": [
                 "src/store/data-engine.ts"
               ],
-              "source": "src/store/data-engine.ts#L346",
+              "source": "src/store/data-engine.ts#L347",
               "jsDocTags": [],
               "documentation": "Error thrown when an operation requires datasource cells that are not loaded.",
               "memberDocs": []

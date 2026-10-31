@@ -288,6 +288,70 @@
     "pivotTable": {
       "column": 8,
       "row": 7
+    },
+    "insertFunction": {
+      "column": 0,
+      "row": 8
+    },
+    "defineName": {
+      "column": 1,
+      "row": 8
+    },
+    "nameManager": {
+      "column": 2,
+      "row": 8
+    },
+    "explainFormula": {
+      "column": 3,
+      "row": 8
+    },
+    "getData": {
+      "column": 0,
+      "row": 9
+    },
+    "refreshAll": {
+      "column": 1,
+      "row": 9
+    },
+    "queries": {
+      "column": 2,
+      "row": 9
+    },
+    "editLinks": {
+      "column": 3,
+      "row": 9
+    },
+    "relationships": {
+      "column": 4,
+      "row": 9
+    },
+    "dataModel": {
+      "column": 5,
+      "row": 9
+    },
+    "measure": {
+      "column": 6,
+      "row": 9
+    },
+    "dashboard": {
+      "column": 0,
+      "row": 10
+    },
+    "slicer": {
+      "column": 1,
+      "row": 10
+    },
+    "kpiCard": {
+      "column": 2,
+      "row": 10
+    },
+    "versionHistory": {
+      "column": 3,
+      "row": 10
+    },
+    "saveVersion": {
+      "column": 4,
+      "row": 10
     }
   }
 }

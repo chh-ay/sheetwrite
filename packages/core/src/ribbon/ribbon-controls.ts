@@ -16,6 +16,7 @@ import {
   type RibbonControlSpec,
   type RibbonFocus,
   type RibbonFormSpec,
+  type RibbonMenuItem,
   type RibbonMenuSpec,
   type RibbonPlacementSpec,
 } from "./command-spec.js";
@@ -149,7 +150,7 @@ function renderButton(spec: RibbonButtonSpec, context: RibbonContext): RibbonCon
 }
 
 /** A `role="menu"` surface whose items run once and close the menu. */
-function menuSurface(items: RibbonMenuSpec["items"], context: RibbonContext): HTMLElement {
+function menuSurface(items: readonly RibbonMenuItem[], context: RibbonContext): HTMLElement {
   const menu = document.createElement("div");
   menu.className = "sheetwrite-ribbon-menu";
   for (const entry of items) {
@@ -158,6 +159,7 @@ function menuSurface(items: RibbonMenuSpec["items"], context: RibbonContext): HT
     item.className = "sheetwrite-ribbon-menu-item";
     item.setAttribute("role", "menuitem");
     item.tabIndex = -1;
+    if (entry.description !== undefined) item.title = entry.description;
     if (entry.icon !== undefined) item.appendChild(icon(entry.icon, context.icons));
     item.append(entry.label);
     item.addEventListener("mousedown", keepFocus);
@@ -179,7 +181,8 @@ function renderMenu(spec: RibbonMenuSpec, context: RibbonContext): RibbonControl
       context.popup.closeFrom(trigger, keyboard);
       return;
     }
-    context.popup.open(trigger, menuSurface(spec.items, context), {
+    const items = typeof spec.items === "function" ? spec.items(context.grid) : spec.items;
+    context.popup.open(trigger, menuSurface(items, context), {
       role: "menu",
       label: spec.label,
       focus: keyboard,

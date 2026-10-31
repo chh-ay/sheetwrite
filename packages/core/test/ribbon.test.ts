@@ -131,7 +131,8 @@ it("keeps only tabs in the tablist and the layout buttons beside it", async () =
   if (tablist === null) throw new Error("no ribbon tablist");
 
   const roles = [...tablist.children].map((child) => child.getAttribute("role"));
-  expect(roles).toEqual(["tab", "tab", "tab", "tab"]);
+  // Formulas is in the list but hidden while the store has no host functions.
+  expect(roles).toEqual(["tab", "tab", "tab", "tab", "tab"]);
   for (const label of ["Compact ribbon", "Collapse the ribbon"]) {
     const button = control(label);
     expect(tablist.contains(button), label).toBe(false);
@@ -170,9 +171,10 @@ it("renders the same commands as the toolbar for the same command flags", async 
   const toolbarHost = document.createElement("div");
   document.body.appendChild(toolbarHost);
   const toolbar = createToolbar(toolbarHost, grid, { flags });
-  const toolbarCommands = [...toolbar.element.querySelectorAll<HTMLElement>("[data-command]")].map(
-    (element) => element.dataset.command ?? "",
-  );
+  // Commands the grid cannot run now (Insert Function without host functions) are hidden in both.
+  const toolbarCommands = [...toolbar.element.querySelectorAll<HTMLElement>("[data-command]")]
+    .filter((element) => !element.hidden)
+    .map((element) => element.dataset.command ?? "");
   toolbar.destroy();
 
   expect(new Set(toolbarCommands)).toEqual(ribbonCommands);
@@ -424,4 +426,36 @@ it("keeps Tab inside a form popup, wrapping at both ends", async () => {
   );
   expect(document.activeElement).toBe(ok);
   expect(host.querySelector(".sheetwrite-ribbon-popup")).not.toBeNull();
+});
+
+it("hides the Formulas tab without host functions, and arrow keys skip it", async () => {
+  const { host, key } = await setup();
+  const tabs = [...host.querySelectorAll<HTMLElement>('.sheetwrite-ribbon [role="tab"]')];
+  const formulas = tabs.find((tab) => tab.textContent === "Formulas");
+  const insert = tabs.find((tab) => tab.textContent === "Insert");
+  const data = tabs.find((tab) => tab.textContent === "Data");
+  if (formulas === undefined || insert === undefined || data === undefined) {
+    throw new Error("missing ribbon tabs");
+  }
+  expect(formulas.hidden).toBe(true);
+
+  insert.focus();
+  key(insert, "ArrowRight");
+  expect(document.activeElement).toBe(data);
+  key(data, "ArrowLeft");
+  expect(document.activeElement).toBe(insert);
+});
+
+it("shows Insert Function with host functions on the full engine, in its own process", async () => {
+  // Engine selection is process-wide, so the full-engine checks run apart.
+  const probe = Bun.spawn(
+    [process.execPath, "test", "./packages/core/test/ribbon-functions.full-engine.ts"],
+    { cwd: new URL("../../..", import.meta.url).pathname, stdout: "pipe", stderr: "pipe" },
+  );
+  const [exitCode, stderr] = await Promise.all([probe.exited, new Response(probe.stderr).text()]);
+
+  expect({ exitCode, failures: stderr.match(/^\(fail\).*$/gmu) ?? [] }).toEqual({
+    exitCode: 0,
+    failures: [],
+  });
 });
