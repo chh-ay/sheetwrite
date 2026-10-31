@@ -88,6 +88,22 @@ const ICON_NAMES: readonly [
   "chartDoughnut",
   "chartScatter",
   "pivotTable",
+  "insertFunction",
+  "defineName",
+  "nameManager",
+  "explainFormula",
+  "getData",
+  "refreshAll",
+  "queries",
+  "editLinks",
+  "relationships",
+  "dataModel",
+  "measure",
+  "dashboard",
+  "slicer",
+  "kpiCard",
+  "versionHistory",
+  "saveVersion",
 ]
 ```
 

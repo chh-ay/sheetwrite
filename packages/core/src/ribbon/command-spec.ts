@@ -21,6 +21,8 @@ export const EDIT_STATE_COMMAND: GridCommandName = "clearFormat";
 export interface RibbonMenuItem {
   readonly label: string;
   readonly icon?: IconName;
+  /** Tooltip with more than the label says, such as a function's description. */
+  readonly description?: string;
   readonly run: (grid: Grid) => unknown;
 }
 
@@ -33,6 +35,12 @@ interface CommandIdentity {
   readonly id: string;
   /** `GridConfig` switches that show the command; any one enabled shows it. */
   readonly flags?: readonly (keyof CommandFlags)[];
+  /**
+   * Whether the grid has what the command needs (for example host functions).
+   * Renderers leave the command out while this is false, and read it again on
+   * every command state change, because the answer can change at run time.
+   */
+  readonly available?: (grid: Grid) => boolean;
 }
 
 /** A command button; `toggle` buttons reflect their command's activity. */
@@ -55,7 +63,8 @@ export interface RibbonMenuSpec extends CommandIdentity {
   readonly label: string;
   readonly icon: IconName;
   readonly availability: RibbonAvailability;
-  readonly items: readonly RibbonMenuItem[];
+  /** Read each time the menu opens, for lists that change at run time. */
+  readonly items: readonly RibbonMenuItem[] | ((grid: Grid) => readonly RibbonMenuItem[]);
   readonly run?: (grid: Grid) => unknown;
   readonly large?: boolean;
 }
@@ -195,6 +204,20 @@ export function shownTabs(tabs: readonly RibbonTabSpec[], flags: CommandFlags): 
     ...tab,
     groups: tab.groups.flatMap((group) => shownGroup(group, flags)),
   }));
+}
+
+/** Whether the grid can show `spec` now; see `available`. */
+export function commandAvailable(spec: RibbonControlSpec, grid: Grid): boolean {
+  return spec.available?.(grid) ?? true;
+}
+
+/** Whether any command of `tab` can show now, so the tab itself shows. */
+export function tabAvailable(tab: RibbonTabSpec, grid: Grid): boolean {
+  return tab.groups.some((group) =>
+    (group.layout === "flow" ? group.controls : group.rows.flat()).some((control) =>
+      commandAvailable(control, grid),
+    ),
+  );
 }
 
 /**
