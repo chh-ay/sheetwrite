@@ -41,6 +41,10 @@
       "types": "./dist/indexeddb.d.ts",
       "default": "./dist/indexeddb.js"
     },
+    "./functions": {
+      "types": "./dist/functions.d.ts",
+      "default": "./dist/functions.js"
+    },
     "./shell": {
       "types": "./dist/shell.d.ts",
       "default": "./dist/shell.js"

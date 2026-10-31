@@ -19,6 +19,7 @@
     "**/*.svelte",
     "bench/results",
     "docs/src/generated",
+    "packages/core/src/generated",
     "docs/src/routeTree.gen.ts",
     "**/*.md",
     "**/*.mdx",

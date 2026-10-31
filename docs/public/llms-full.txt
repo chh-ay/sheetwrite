@@ -53,6 +53,7 @@ Packages: 0.6.1. Canonical HTML: https://www.sheetwrite.dev/docs/
 - [Iterative calculation](#iterative-calculation)
 - [Lookup, criteria, and financial formulas](#lookup-criteria-and-financial-formulas)
 - [Analysis formulas](#analysis-formulas)
+- [Custom functions](#custom-functions)
 - [Analysis](#analysis)
 - [Pivot tables](#pivot-tables)
 - [Charts](#charts)
@@ -4731,6 +4732,7 @@ Source: https://www.sheetwrite.dev/docs/features/formulas/
 - [Iterative calculation](https://www.sheetwrite.dev/docs/features/formulas/iterative-calculation/): Calculate circular references as Excel does: turn on iterative calculation, set the iteration limit and maximum change, and save it in XLSX files.
 - [Lookup, criteria and financial rules](https://www.sheetwrite.dev/docs/features/formulas/lookup-criteria-and-financial/): Find values, aggregate matching cells, and calculate cash flows with explicit shape and error rules.
 - [Analysis formulas (full engine)](https://www.sheetwrite.dev/docs/features/formulas/analysis-formulas/): Summarize, forecast, and clean data with the full formula engine. Worked examples for every function family in @sheetwrite/formulas.
+- [Custom functions](https://www.sheetwrite.dev/docs/features/formulas/custom-functions/): Register synchronous JavaScript functions that formulas can call, with metadata that formula help reads.
 
 ### Authoring and references
 
@@ -5914,6 +5916,127 @@ Limits of the full engine:
 - `GROUPBY` and `PIVOTBY` accept one built-in function name, such as `SUM`, or a `LAMBDA` with one or two parameters. A vector of functions, such as `HSTACK(SUM,AVERAGE)`, returns `#VALUE!`.
 - Regex functions do not support lookaround, backreferences, or Unicode classes. Such patterns return `#VALUE!`, never a wrong match.
 - `AGGREGATE` options that skip hidden rows have no effect, because formulas do not see hidden-row state.
+
+### Custom functions
+
+Source: https://www.sheetwrite.dev/docs/features/formulas/custom-functions/
+
+```ts
+import { registerFunction } from "@sheetwrite/core/functions";
+
+registerFunction(
+  grid.store,
+  {
+    name: "TAXRATE",
+    description: "Sales tax rate of a region.",
+    arguments: [{ name: "region", types: ["text"] }],
+    returnKind: "number",
+    examples: ['=TAXRATE("EU")'],
+  },
+  (region) => (region === "EU" ? 0.2 : 0.07),
+);
+grid.store.applyTransaction({
+  patches: [
+    { op: "set", addr: { sheet: "sheet1", row: 0, col: 0 }, value: { kind: "literal", value: "EU" } },
+    { op: "set", addr: { sheet: "sheet1", row: 0, col: 1 },
+      value: { kind: "formula", src: "=TAXRATE(A1)*100" } },
+  ],
+});
+```
+
+| EU | **20** |
+| --- | --- |
+
+Full setup
+
+```ts
+import { createGrid, initSheetwrite } from "@sheetwrite/core";
+import { registerFunction } from "@sheetwrite/core/functions";
+import * as formulas from "@sheetwrite/formulas";
+import "@sheetwrite/core/styles.css";
+
+const host = document.querySelector<HTMLElement>("#grid");
+if (host === null) throw new Error("Missing #grid host");
+host.style.height = "320px";
+
+await initSheetwrite(undefined, formulas);
+const grid = createGrid(host, {
+  workbook: {
+    activeSheet: "sheet1",
+    sheets: [{
+      id: "sheet1", name: "Sheet1", rowCount: 1,
+      columns: [
+        { key: "region", header: "Region", type: "text", width: 120 },
+        { key: "rate", header: "Rate %", type: "number", width: 120 },
+      ],
+    }],
+  },
+  data: { rowCount: 1, columns: { region: [null], rate: [null] } },
+});
+
+registerFunction(
+  grid.store,
+  {
+    name: "TAXRATE",
+    description: "Sales tax rate of a region.",
+    arguments: [{ name: "region", types: ["text"] }],
+    returnKind: "number",
+    examples: ['=TAXRATE("EU")'],
+  },
+  (region) => (region === "EU" ? 0.2 : 0.07),
+);
+grid.store.applyTransaction({
+  patches: [
+    { op: "set", addr: { sheet: "sheet1", row: 0, col: 0 }, value: { kind: "literal", value: "EU" } },
+    { op: "set", addr: { sheet: "sheet1", row: 0, col: 1 },
+      value: { kind: "formula", src: "=TAXRATE(A1)*100" } },
+  ],
+});
+```
+
+## Registration
+
+Host functions need the full engine. Select it with `initSheetwrite(undefined, formulas)`, where `formulas` is `import * as formulas from "@sheetwrite/formulas"`, before you create the store. On the default engine, `registerFunction` throws a `SheetwriteError` with code `optional-backend-unavailable`, so the default engine binary does not grow.
+
+Import the functions from `@sheetwrite/core/functions`. An application that does not import this entry carries none of its JavaScript.
+
+`registerFunction(store, metadata, implementation)` adds a function to one store and recalculates every formula. Registering the same name again replaces the function. `unregisterFunction(store, name)` removes it, and formulas that call it show `#NAME?`. Names are not case-sensitive.
+
+A name must start with a letter or `_` and contain only letters, digits, `_` and `.`. The store refuses a name that is a built-in function of the active engine or a cell reference, such as `A1` or `R1C1`. A refused name or malformed metadata throws a `SheetwriteError` with code `invalid-function`.
+
+## Arguments and results
+
+The function is synchronous. The engine calls it during recalculation.
+
+- A scalar argument or a single cell arrives as a number, text, boolean, or `null` for an empty cell.
+- A range or an array of more than one cell arrives as an array of rows.
+- An omitted argument arrives as `null`.
+- An argument that is an error, or a range that contains an error, skips the call. The formula shows that error.
+
+The function returns a number, text, boolean, or `null` for an empty result. A thrown error, a promise, or any other value shows `#VALUE!`. A number that is not finite shows `#NUM!`. A failure never stops recalculation.
+
+The function must not read calculated cells or change the store. The store is busy while it calculates. Reads that need the engine, such as `getCell`, and changes such as `applyTransaction` throw a `SheetwriteError` with code `blocked` before they reach the engine. If the function does not catch it, the formula shows `#VALUE!`. The document stays as it was. Use the arguments instead.
+
+## Volatility
+
+Set `volatile: true` in the metadata for a function whose result can change without a change in its arguments. A volatile function runs again on every edit and on `store.recalculateVolatile()`, as [`RAND`](https://www.sheetwrite.dev/docs/features/formulas/volatile-functions/) does. Other functions run again only when their arguments change.
+
+## Snapshots and collaboration
+
+Snapshots, history and collaboration keep only the formula text. A store loaded from a snapshot shows `#NAME?` for a host function until the host registers it again. Each client calculates host functions locally, so each client must register the same functions to show the same values.
+
+## Function metadata
+
+`await listFunctions(store)` returns one list of `FormulaFunctionMetadata`: the built-in functions of the active engine, then the host functions of the store in registration order. The table of built-in functions loads on the first call, so an application that never asks for it does not download it. Built-in and host functions use the same fields:
+
+| Field | Meaning |
+| --- | --- |
+| `name` | Upper-case function name. |
+| `description` | One sentence about the function. For a built-in function, it names the function family. |
+| `arguments` | `name`, `types`, `optional` and `repeating` for each argument. |
+| `returnKind` | The kind of result, for example `number` or `text`. |
+| `examples` | Optional example formulas. |
+| `volatile` | Whether the function runs again on every edit. |
 
 ### Analysis
 
@@ -13581,7 +13704,7 @@ Private-format MIME type used for rich Sheetwrite clipboard payloads.
 ##### `SHEETWRITE_ERROR_CODES` — variable
 
 ```ts
-readonly ["initialization-failed", "initialization-required", "datasource-request-failed", "renderer-fallback", "export-failed", "xlsx-import-failed", "optional-backend-unavailable", "delimited-text-resource-limit", "delimited-text-invalid-limit", "xlsx-resource-limit", "resource-limit", "invalid-snapshot", "aborted", "not-found", "commit-rejected", "unavailable", "blocked", "quota", "unsupported-schema", "transaction", "conflict", "limit", "invalid-limits", "invalid-version", "invalid-id", "invalid-operations", "operation-limit", "payload-limit", "response-id-mismatch", "future-distance-limit", "buffer-count-limit", "buffer-operation-limit", "buffer-byte-limit", "pending-count-limit", "pending-operation-limit", "pending-byte-limit", "late-echo", "remote-operations-rejected", "invalid-batch", "batch-limit", "pending-capacity", "presence-failed", "revision-failed", "comment-failed", "sync-failed", "sync-storage-failed", "incomplete-data", "xlsx-invalid-options", "unsafe-hyperlink", "invalid-shortcut", "shortcut-conflict"]
+readonly ["initialization-failed", "initialization-required", "datasource-request-failed", "renderer-fallback", "export-failed", "xlsx-import-failed", "optional-backend-unavailable", "delimited-text-resource-limit", "delimited-text-invalid-limit", "xlsx-resource-limit", "resource-limit", "invalid-snapshot", "aborted", "not-found", "commit-rejected", "unavailable", "blocked", "quota", "unsupported-schema", "transaction", "conflict", "limit", "invalid-limits", "invalid-version", "invalid-id", "invalid-operations", "operation-limit", "payload-limit", "response-id-mismatch", "future-distance-limit", "buffer-count-limit", "buffer-operation-limit", "buffer-byte-limit", "pending-count-limit", "pending-operation-limit", "pending-byte-limit", "late-echo", "remote-operations-rejected", "invalid-batch", "batch-limit", "pending-capacity", "presence-failed", "revision-failed", "comment-failed", "sync-failed", "sync-storage-failed", "incomplete-data", "xlsx-invalid-options", "unsafe-hyperlink", "invalid-shortcut", "shortcut-conflict", "invalid-function"]
 ```
 
 Stable public failure codes. Messages are diagnostic and are not API contracts.
@@ -13589,7 +13712,7 @@ Stable public failure codes. Messages are diagnostic and are not API contracts.
 ##### `SHEETWRITE_ERROR_OPERATIONS` — variable
 
 ```ts
-readonly ["initialize", "create-grid", "datasource-request", "renderer-worker", "export-xlsx", "xlsx-import", "xlsx-export", "delimited-parse", "delimited-import", "delimited-encode", "delimited-export", "delimited-options", "snapshot-validate", "snapshot-allocate", "persistence", "pending-storage", "synchronize", "presence", "revision", "comments", "query", "hyperlink-activate", "keyboard-configure", "chart-view"]
+readonly ["initialize", "create-grid", "datasource-request", "renderer-worker", "export-xlsx", "xlsx-import", "xlsx-export", "delimited-parse", "delimited-import", "delimited-encode", "delimited-export", "delimited-options", "snapshot-validate", "snapshot-allocate", "persistence", "pending-storage", "synchronize", "presence", "revision", "comments", "query", "hyperlink-activate", "keyboard-configure", "chart-view", "host-function"]
 ```
 
 Stable operations at which a consumer-visible failure can surface.
@@ -13608,7 +13731,7 @@ Members:
 ##### `SheetwriteError` — class
 
 ```ts
-class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: "aborted" | "batch-limit" | "blocked" | "buffer-byte-limit" | "buffer-count-limit" | "buffer-operation-limit" | "comment-failed" | "commit-rejected" | "conflict" | "datasource-request-failed" | "delimited-text-invalid-limit" | "delimited-text-resource-limit" | "export-failed" | "future-distance-limit" | "incomplete-data" | "initialization-failed" | "initialization-required" | "invalid-batch" | "invalid-id" | "invalid-limits" | "invalid-operations" | "invalid-shortcut" | "invalid-snapshot" | "invalid-version" | "late-echo" | "limit" | "not-found" | "operation-limit" | "optional-backend-unavailable" | "payload-limit" | "pending-byte-limit" | "pending-capacity" | "pending-count-limit" | "pending-operation-limit" | "presence-failed" | "quota" | "remote-operations-rejected" | "renderer-fallback" | "resource-limit" | "response-id-mismatch" | "revision-failed" | "shortcut-conflict" | "sync-failed" | "sync-storage-failed" | "transaction" | "unavailable" | "unsafe-hyperlink" | "unsupported-schema" | "xlsx-import-failed" | "xlsx-invalid-options" | "xlsx-resource-limit"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: "chart-view" | "comments" | "create-grid" | "datasource-request" | "delimited-encode" | "delimited-export" | "delimited-import" | "delimited-options" | "delimited-parse" | "export-xlsx" | "hyperlink-activate" | "initialize" | "keyboard-configure" | "pending-storage" | "persistence" | "presence" | "query" | "renderer-worker" | "revision" | "snapshot-allocate" | "snapshot-validate" | "synchronize" | "xlsx-export" | "xlsx-import"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }
+class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: "aborted" | "batch-limit" | "blocked" | "buffer-byte-limit" | "buffer-count-limit" | "buffer-operation-limit" | "comment-failed" | "commit-rejected" | "conflict" | "datasource-request-failed" | "delimited-text-invalid-limit" | "delimited-text-resource-limit" | "export-failed" | "future-distance-limit" | "incomplete-data" | "initialization-failed" | "initialization-required" | "invalid-batch" | "invalid-function" | "invalid-id" | "invalid-limits" | "invalid-operations" | "invalid-shortcut" | "invalid-snapshot" | "invalid-version" | "late-echo" | "limit" | "not-found" | "operation-limit" | "optional-backend-unavailable" | "payload-limit" | "pending-byte-limit" | "pending-capacity" | "pending-count-limit" | "pending-operation-limit" | "presence-failed" | "quota" | "remote-operations-rejected" | "renderer-fallback" | "resource-limit" | "response-id-mismatch" | "revision-failed" | "shortcut-conflict" | "sync-failed" | "sync-storage-failed" | "transaction" | "unavailable" | "unsafe-hyperlink" | "unsupported-schema" | "xlsx-import-failed" | "xlsx-invalid-options" | "xlsx-resource-limit"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: "chart-view" | "comments" | "create-grid" | "datasource-request" | "delimited-encode" | "delimited-export" | "delimited-import" | "delimited-options" | "delimited-parse" | "export-xlsx" | "host-function" | "hyperlink-activate" | "initialize" | "keyboard-configure" | "pending-storage" | "persistence" | "presence" | "query" | "renderer-worker" | "revision" | "snapshot-allocate" | "snapshot-validate" | "synchronize" | "xlsx-export" | "xlsx-import"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }
 ```
 
 Canonical envelope for thrown and callback-delivered Sheetwrite failures.
@@ -15276,7 +15399,7 @@ An explicit projection record for an operation with no row-space meaning.
 ##### `SHEETWRITE_ERROR_CODES` — variable
 
 ```ts
-readonly ["initialization-failed", "initialization-required", "datasource-request-failed", "renderer-fallback", "export-failed", "xlsx-import-failed", "optional-backend-unavailable", "delimited-text-resource-limit", "delimited-text-invalid-limit", "xlsx-resource-limit", "resource-limit", "invalid-snapshot", "aborted", "not-found", "commit-rejected", "unavailable", "blocked", "quota", "unsupported-schema", "transaction", "conflict", "limit", "invalid-limits", "invalid-version", "invalid-id", "invalid-operations", "operation-limit", "payload-limit", "response-id-mismatch", "future-distance-limit", "buffer-count-limit", "buffer-operation-limit", "buffer-byte-limit", "pending-count-limit", "pending-operation-limit", "pending-byte-limit", "late-echo", "remote-operations-rejected", "invalid-batch", "batch-limit", "pending-capacity", "presence-failed", "revision-failed", "comment-failed", "sync-failed", "sync-storage-failed", "incomplete-data", "xlsx-invalid-options", "unsafe-hyperlink", "invalid-shortcut", "shortcut-conflict"]
+readonly ["initialization-failed", "initialization-required", "datasource-request-failed", "renderer-fallback", "export-failed", "xlsx-import-failed", "optional-backend-unavailable", "delimited-text-resource-limit", "delimited-text-invalid-limit", "xlsx-resource-limit", "resource-limit", "invalid-snapshot", "aborted", "not-found", "commit-rejected", "unavailable", "blocked", "quota", "unsupported-schema", "transaction", "conflict", "limit", "invalid-limits", "invalid-version", "invalid-id", "invalid-operations", "operation-limit", "payload-limit", "response-id-mismatch", "future-distance-limit", "buffer-count-limit", "buffer-operation-limit", "buffer-byte-limit", "pending-count-limit", "pending-operation-limit", "pending-byte-limit", "late-echo", "remote-operations-rejected", "invalid-batch", "batch-limit", "pending-capacity", "presence-failed", "revision-failed", "comment-failed", "sync-failed", "sync-storage-failed", "incomplete-data", "xlsx-invalid-options", "unsafe-hyperlink", "invalid-shortcut", "shortcut-conflict", "invalid-function"]
 ```
 
 Stable public failure codes. Messages are diagnostic and are not API contracts.
@@ -15284,7 +15407,7 @@ Stable public failure codes. Messages are diagnostic and are not API contracts.
 ##### `SHEETWRITE_ERROR_OPERATIONS` — variable
 
 ```ts
-readonly ["initialize", "create-grid", "datasource-request", "renderer-worker", "export-xlsx", "xlsx-import", "xlsx-export", "delimited-parse", "delimited-import", "delimited-encode", "delimited-export", "delimited-options", "snapshot-validate", "snapshot-allocate", "persistence", "pending-storage", "synchronize", "presence", "revision", "comments", "query", "hyperlink-activate", "keyboard-configure", "chart-view"]
+readonly ["initialize", "create-grid", "datasource-request", "renderer-worker", "export-xlsx", "xlsx-import", "xlsx-export", "delimited-parse", "delimited-import", "delimited-encode", "delimited-export", "delimited-options", "snapshot-validate", "snapshot-allocate", "persistence", "pending-storage", "synchronize", "presence", "revision", "comments", "query", "hyperlink-activate", "keyboard-configure", "chart-view", "host-function"]
 ```
 
 Stable operations at which a consumer-visible failure can surface.
@@ -15292,7 +15415,7 @@ Stable operations at which a consumer-visible failure can surface.
 ##### `SheetwriteError` — class
 
 ```ts
-class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: "aborted" | "batch-limit" | "blocked" | "buffer-byte-limit" | "buffer-count-limit" | "buffer-operation-limit" | "comment-failed" | "commit-rejected" | "conflict" | "datasource-request-failed" | "delimited-text-invalid-limit" | "delimited-text-resource-limit" | "export-failed" | "future-distance-limit" | "incomplete-data" | "initialization-failed" | "initialization-required" | "invalid-batch" | "invalid-id" | "invalid-limits" | "invalid-operations" | "invalid-shortcut" | "invalid-snapshot" | "invalid-version" | "late-echo" | "limit" | "not-found" | "operation-limit" | "optional-backend-unavailable" | "payload-limit" | "pending-byte-limit" | "pending-capacity" | "pending-count-limit" | "pending-operation-limit" | "presence-failed" | "quota" | "remote-operations-rejected" | "renderer-fallback" | "resource-limit" | "response-id-mismatch" | "revision-failed" | "shortcut-conflict" | "sync-failed" | "sync-storage-failed" | "transaction" | "unavailable" | "unsafe-hyperlink" | "unsupported-schema" | "xlsx-import-failed" | "xlsx-invalid-options" | "xlsx-resource-limit"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: "chart-view" | "comments" | "create-grid" | "datasource-request" | "delimited-encode" | "delimited-export" | "delimited-import" | "delimited-options" | "delimited-parse" | "export-xlsx" | "hyperlink-activate" | "initialize" | "keyboard-configure" | "pending-storage" | "persistence" | "presence" | "query" | "renderer-worker" | "revision" | "snapshot-allocate" | "snapshot-validate" | "synchronize" | "xlsx-export" | "xlsx-import"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }
+class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: "aborted" | "batch-limit" | "blocked" | "buffer-byte-limit" | "buffer-count-limit" | "buffer-operation-limit" | "comment-failed" | "commit-rejected" | "conflict" | "datasource-request-failed" | "delimited-text-invalid-limit" | "delimited-text-resource-limit" | "export-failed" | "future-distance-limit" | "incomplete-data" | "initialization-failed" | "initialization-required" | "invalid-batch" | "invalid-function" | "invalid-id" | "invalid-limits" | "invalid-operations" | "invalid-shortcut" | "invalid-snapshot" | "invalid-version" | "late-echo" | "limit" | "not-found" | "operation-limit" | "optional-backend-unavailable" | "payload-limit" | "pending-byte-limit" | "pending-capacity" | "pending-count-limit" | "pending-operation-limit" | "presence-failed" | "quota" | "remote-operations-rejected" | "renderer-fallback" | "resource-limit" | "response-id-mismatch" | "revision-failed" | "shortcut-conflict" | "sync-failed" | "sync-storage-failed" | "transaction" | "unavailable" | "unsafe-hyperlink" | "unsupported-schema" | "xlsx-import-failed" | "xlsx-invalid-options" | "xlsx-resource-limit"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: "chart-view" | "comments" | "create-grid" | "datasource-request" | "delimited-encode" | "delimited-export" | "delimited-import" | "delimited-options" | "delimited-parse" | "export-xlsx" | "host-function" | "hyperlink-activate" | "initialize" | "keyboard-configure" | "pending-storage" | "persistence" | "presence" | "query" | "renderer-worker" | "revision" | "snapshot-allocate" | "snapshot-validate" | "synchronize" | "xlsx-export" | "xlsx-import"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }
 ```
 
 Canonical envelope for thrown and callback-delivered Sheetwrite failures.
@@ -15425,6 +15548,107 @@ export interface IndexedDbPendingCommitStorageOptions { databaseName?: string; s
 ```
 
 Database and store naming options for durable pending commits.
+
+#### `@sheetwrite/core/functions` — supported
+
+Declaration target: `./dist/functions.d.ts`
+Source entry: `src/functions.ts`
+Page: https://www.sheetwrite.dev/docs/api/core-functions/
+
+##### `FormulaArgument` — type
+
+```ts
+export type FormulaArgument = FormulaScalar | readonly (readonly FormulaScalar[])[];
+```
+
+Ranges use row-major nested arrays. Scalar expressions use a scalar.
+
+##### `FormulaArgumentMetadata` — interface
+
+```ts
+export interface FormulaArgumentMetadata { readonly name: string; readonly types: readonly string[]; readonly optional?: boolean; readonly repeating?: boolean; }
+```
+
+Argument documentation used by built-in and host functions. Types are descriptive, not coercion rules.
+
+##### `FormulaFunction` — type
+
+```ts
+export type FormulaFunction = (...arguments_: readonly FormulaArgument[]) => FormulaScalar;
+```
+
+A synchronous host function. Promises and other non-scalar results become `#VALUE!`.
+
+##### `FormulaFunctionMetadata` — interface
+
+```ts
+export interface FormulaFunctionMetadata { readonly name: string; readonly description: string; readonly arguments: readonly FormulaArgumentMetadata[]; readonly returnKind: string; readonly examples?: readonly string[]; readonly volatile?: boolean; }
+```
+
+One metadata format for built-in and host functions.
+
+##### `FormulaScalar` — type
+
+```ts
+export type FormulaScalar = number | string | boolean | null;
+```
+
+A scalar passed to or returned from a synchronous host formula function.
+
+##### `listFunctions` — function
+
+```ts
+(store: Store): Promise<readonly FormulaFunctionMetadata[]>
+```
+
+Metadata of every function that formulas in `store` can call: the built-in
+functions of the active engine, then the host functions of `store` in
+registration order. Formula help reads this one list. The built-in table
+loads on the first call, so the result is a promise.
+
+##### `registerFunction` — function
+
+```ts
+(store: Store, metadata: FormulaFunctionMetadata, implementation: FormulaFunction): void
+```
+
+Registers a synchronous JavaScript function that formulas in `store` can
+call, then recalculates every formula. Registering a name again replaces the
+function. The function receives each argument as a scalar, or as row arrays
+for a block of more than one cell, and returns a number, text, boolean, or
+`null` for an empty result. A thrown error or any other result shows
+`#VALUE!`. The function must not read calculated cells or change the store:
+calls that need the engine throw a `blocked` error. Snapshots keep only
+formula text, so register the function after loading.
+@example
+```ts
+import type { Store } from "@sheetwrite/core";
+import { registerFunction } from "@sheetwrite/core/functions";
+
+function addTaxRate(store: Store) {
+ registerFunction(
+ store,
+ {
+ name: "TAXRATE",
+ description: "Sales tax rate of a region.",
+ arguments: [{ name: "region", types: ["text"] }],
+ returnKind: "number",
+ },
+ (region) => (region === "EU" ? 0.2 : 0.07),
+ );
+}
+```
+@see
+/docs/features/formulas/custom-functions/
+
+##### `unregisterFunction` — function
+
+```ts
+(store: Store, name: string): boolean
+```
+
+Removes a host function from `store`. Formulas that call it show `#NAME?`.
+Returns whether the function existed.
 
 #### `@sheetwrite/core/icons.json` — asset
 

@@ -185,6 +185,10 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
             label: "Analysis formulas (full engine)",
             href: "/docs/features/formulas/analysis-formulas/",
           },
+          {
+            label: "Custom functions",
+            href: "/docs/features/formulas/custom-functions/",
+          },
         ],
       },
       {

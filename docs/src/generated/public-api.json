@@ -3020,7 +3020,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L324",
+              "source": "src/errors.ts#L326",
               "jsDocTags": [],
               "documentation": "Narrow same-realm errors, cross-realm errors, and serialized failure envelopes.",
               "memberDocs": []
@@ -5100,7 +5100,7 @@
             {
               "name": "SHEETWRITE_ERROR_CODES",
               "kind": "variable",
-              "signature": "readonly [\"initialization-failed\", \"initialization-required\", \"datasource-request-failed\", \"renderer-fallback\", \"export-failed\", \"xlsx-import-failed\", \"optional-backend-unavailable\", \"delimited-text-resource-limit\", \"delimited-text-invalid-limit\", \"xlsx-resource-limit\", \"resource-limit\", \"invalid-snapshot\", \"aborted\", \"not-found\", \"commit-rejected\", \"unavailable\", \"blocked\", \"quota\", \"unsupported-schema\", \"transaction\", \"conflict\", \"limit\", \"invalid-limits\", \"invalid-version\", \"invalid-id\", \"invalid-operations\", \"operation-limit\", \"payload-limit\", \"response-id-mismatch\", \"future-distance-limit\", \"buffer-count-limit\", \"buffer-operation-limit\", \"buffer-byte-limit\", \"pending-count-limit\", \"pending-operation-limit\", \"pending-byte-limit\", \"late-echo\", \"remote-operations-rejected\", \"invalid-batch\", \"batch-limit\", \"pending-capacity\", \"presence-failed\", \"revision-failed\", \"comment-failed\", \"sync-failed\", \"sync-storage-failed\", \"incomplete-data\", \"xlsx-invalid-options\", \"unsafe-hyperlink\", \"invalid-shortcut\", \"shortcut-conflict\"]",
+              "signature": "readonly [\"initialization-failed\", \"initialization-required\", \"datasource-request-failed\", \"renderer-fallback\", \"export-failed\", \"xlsx-import-failed\", \"optional-backend-unavailable\", \"delimited-text-resource-limit\", \"delimited-text-invalid-limit\", \"xlsx-resource-limit\", \"resource-limit\", \"invalid-snapshot\", \"aborted\", \"not-found\", \"commit-rejected\", \"unavailable\", \"blocked\", \"quota\", \"unsupported-schema\", \"transaction\", \"conflict\", \"limit\", \"invalid-limits\", \"invalid-version\", \"invalid-id\", \"invalid-operations\", \"operation-limit\", \"payload-limit\", \"response-id-mismatch\", \"future-distance-limit\", \"buffer-count-limit\", \"buffer-operation-limit\", \"buffer-byte-limit\", \"pending-count-limit\", \"pending-operation-limit\", \"pending-byte-limit\", \"late-echo\", \"remote-operations-rejected\", \"invalid-batch\", \"batch-limit\", \"pending-capacity\", \"presence-failed\", \"revision-failed\", \"comment-failed\", \"sync-failed\", \"sync-storage-failed\", \"incomplete-data\", \"xlsx-invalid-options\", \"unsafe-hyperlink\", \"invalid-shortcut\", \"shortcut-conflict\", \"invalid-function\"]",
               "owners": [
                 "src/errors.ts"
               ],
@@ -5112,11 +5112,11 @@
             {
               "name": "SHEETWRITE_ERROR_OPERATIONS",
               "kind": "variable",
-              "signature": "readonly [\"initialize\", \"create-grid\", \"datasource-request\", \"renderer-worker\", \"export-xlsx\", \"xlsx-import\", \"xlsx-export\", \"delimited-parse\", \"delimited-import\", \"delimited-encode\", \"delimited-export\", \"delimited-options\", \"snapshot-validate\", \"snapshot-allocate\", \"persistence\", \"pending-storage\", \"synchronize\", \"presence\", \"revision\", \"comments\", \"query\", \"hyperlink-activate\", \"keyboard-configure\", \"chart-view\"]",
+              "signature": "readonly [\"initialize\", \"create-grid\", \"datasource-request\", \"renderer-worker\", \"export-xlsx\", \"xlsx-import\", \"xlsx-export\", \"delimited-parse\", \"delimited-import\", \"delimited-encode\", \"delimited-export\", \"delimited-options\", \"snapshot-validate\", \"snapshot-allocate\", \"persistence\", \"pending-storage\", \"synchronize\", \"presence\", \"revision\", \"comments\", \"query\", \"hyperlink-activate\", \"keyboard-configure\", \"chart-view\", \"host-function\"]",
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L60",
+              "source": "src/errors.ts#L61",
               "jsDocTags": [],
               "documentation": "Stable operations at which a consumer-visible failure can surface.",
               "memberDocs": []
@@ -5141,11 +5141,11 @@
             {
               "name": "SheetwriteError",
               "kind": "class",
-              "signature": "class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: \"aborted\" | \"batch-limit\" | \"blocked\" | \"buffer-byte-limit\" | \"buffer-count-limit\" | \"buffer-operation-limit\" | \"comment-failed\" | \"commit-rejected\" | \"conflict\" | \"datasource-request-failed\" | \"delimited-text-invalid-limit\" | \"delimited-text-resource-limit\" | \"export-failed\" | \"future-distance-limit\" | \"incomplete-data\" | \"initialization-failed\" | \"initialization-required\" | \"invalid-batch\" | \"invalid-id\" | \"invalid-limits\" | \"invalid-operations\" | \"invalid-shortcut\" | \"invalid-snapshot\" | \"invalid-version\" | \"late-echo\" | \"limit\" | \"not-found\" | \"operation-limit\" | \"optional-backend-unavailable\" | \"payload-limit\" | \"pending-byte-limit\" | \"pending-capacity\" | \"pending-count-limit\" | \"pending-operation-limit\" | \"presence-failed\" | \"quota\" | \"remote-operations-rejected\" | \"renderer-fallback\" | \"resource-limit\" | \"response-id-mismatch\" | \"revision-failed\" | \"shortcut-conflict\" | \"sync-failed\" | \"sync-storage-failed\" | \"transaction\" | \"unavailable\" | \"unsafe-hyperlink\" | \"unsupported-schema\" | \"xlsx-import-failed\" | \"xlsx-invalid-options\" | \"xlsx-resource-limit\"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: \"chart-view\" | \"comments\" | \"create-grid\" | \"datasource-request\" | \"delimited-encode\" | \"delimited-export\" | \"delimited-import\" | \"delimited-options\" | \"delimited-parse\" | \"export-xlsx\" | \"hyperlink-activate\" | \"initialize\" | \"keyboard-configure\" | \"pending-storage\" | \"persistence\" | \"presence\" | \"query\" | \"renderer-worker\" | \"revision\" | \"snapshot-allocate\" | \"snapshot-validate\" | \"synchronize\" | \"xlsx-export\" | \"xlsx-import\"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }",
+              "signature": "class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: \"aborted\" | \"batch-limit\" | \"blocked\" | \"buffer-byte-limit\" | \"buffer-count-limit\" | \"buffer-operation-limit\" | \"comment-failed\" | \"commit-rejected\" | \"conflict\" | \"datasource-request-failed\" | \"delimited-text-invalid-limit\" | \"delimited-text-resource-limit\" | \"export-failed\" | \"future-distance-limit\" | \"incomplete-data\" | \"initialization-failed\" | \"initialization-required\" | \"invalid-batch\" | \"invalid-function\" | \"invalid-id\" | \"invalid-limits\" | \"invalid-operations\" | \"invalid-shortcut\" | \"invalid-snapshot\" | \"invalid-version\" | \"late-echo\" | \"limit\" | \"not-found\" | \"operation-limit\" | \"optional-backend-unavailable\" | \"payload-limit\" | \"pending-byte-limit\" | \"pending-capacity\" | \"pending-count-limit\" | \"pending-operation-limit\" | \"presence-failed\" | \"quota\" | \"remote-operations-rejected\" | \"renderer-fallback\" | \"resource-limit\" | \"response-id-mismatch\" | \"revision-failed\" | \"shortcut-conflict\" | \"sync-failed\" | \"sync-storage-failed\" | \"transaction\" | \"unavailable\" | \"unsafe-hyperlink\" | \"unsupported-schema\" | \"xlsx-import-failed\" | \"xlsx-invalid-options\" | \"xlsx-resource-limit\"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: \"chart-view\" | \"comments\" | \"create-grid\" | \"datasource-request\" | \"delimited-encode\" | \"delimited-export\" | \"delimited-import\" | \"delimited-options\" | \"delimited-parse\" | \"export-xlsx\" | \"host-function\" | \"hyperlink-activate\" | \"initialize\" | \"keyboard-configure\" | \"pending-storage\" | \"persistence\" | \"presence\" | \"query\" | \"renderer-worker\" | \"revision\" | \"snapshot-allocate\" | \"snapshot-validate\" | \"synchronize\" | \"xlsx-export\" | \"xlsx-import\"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }",
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L286",
+              "source": "src/errors.ts#L288",
               "jsDocTags": [],
               "documentation": "Canonical envelope for thrown and callback-delivered Sheetwrite failures.",
               "memberDocs": []
@@ -5157,7 +5157,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L57",
+              "source": "src/errors.ts#L58",
               "jsDocTags": [],
               "documentation": "Exhaustive stable discriminator for consumer-visible Sheetwrite failures.",
               "memberDocs": []
@@ -5169,7 +5169,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L100",
+              "source": "src/errors.ts#L102",
               "jsDocTags": [],
               "documentation": "Stable, serialization-safe diagnostic context.",
               "memberDocs": []
@@ -5181,7 +5181,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L91",
+              "source": "src/errors.ts#L93",
               "jsDocTags": [],
               "documentation": "JSON-safe values accepted in a public failure context.",
               "memberDocs": []
@@ -5193,7 +5193,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L103",
+              "source": "src/errors.ts#L105",
               "jsDocTags": [],
               "documentation": "Structural form preserved across realms and JSON serialization.",
               "memberDocs": []
@@ -5205,7 +5205,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L88",
+              "source": "src/errors.ts#L90",
               "jsDocTags": [],
               "documentation": "Exhaustive stable operation discriminator for consumer-visible failures.",
               "memberDocs": []
@@ -5217,7 +5217,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L113",
+              "source": "src/errors.ts#L115",
               "jsDocTags": [],
               "documentation": "Optional cause, diagnostic context, and boundary-known retryability.",
               "memberDocs": [
@@ -7519,7 +7519,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L324",
+              "source": "src/errors.ts#L326",
               "jsDocTags": [],
               "documentation": "Narrow same-realm errors, cross-realm errors, and serialized failure envelopes.",
               "memberDocs": []
@@ -7830,7 +7830,7 @@
             {
               "name": "SHEETWRITE_ERROR_CODES",
               "kind": "variable",
-              "signature": "readonly [\"initialization-failed\", \"initialization-required\", \"datasource-request-failed\", \"renderer-fallback\", \"export-failed\", \"xlsx-import-failed\", \"optional-backend-unavailable\", \"delimited-text-resource-limit\", \"delimited-text-invalid-limit\", \"xlsx-resource-limit\", \"resource-limit\", \"invalid-snapshot\", \"aborted\", \"not-found\", \"commit-rejected\", \"unavailable\", \"blocked\", \"quota\", \"unsupported-schema\", \"transaction\", \"conflict\", \"limit\", \"invalid-limits\", \"invalid-version\", \"invalid-id\", \"invalid-operations\", \"operation-limit\", \"payload-limit\", \"response-id-mismatch\", \"future-distance-limit\", \"buffer-count-limit\", \"buffer-operation-limit\", \"buffer-byte-limit\", \"pending-count-limit\", \"pending-operation-limit\", \"pending-byte-limit\", \"late-echo\", \"remote-operations-rejected\", \"invalid-batch\", \"batch-limit\", \"pending-capacity\", \"presence-failed\", \"revision-failed\", \"comment-failed\", \"sync-failed\", \"sync-storage-failed\", \"incomplete-data\", \"xlsx-invalid-options\", \"unsafe-hyperlink\", \"invalid-shortcut\", \"shortcut-conflict\"]",
+              "signature": "readonly [\"initialization-failed\", \"initialization-required\", \"datasource-request-failed\", \"renderer-fallback\", \"export-failed\", \"xlsx-import-failed\", \"optional-backend-unavailable\", \"delimited-text-resource-limit\", \"delimited-text-invalid-limit\", \"xlsx-resource-limit\", \"resource-limit\", \"invalid-snapshot\", \"aborted\", \"not-found\", \"commit-rejected\", \"unavailable\", \"blocked\", \"quota\", \"unsupported-schema\", \"transaction\", \"conflict\", \"limit\", \"invalid-limits\", \"invalid-version\", \"invalid-id\", \"invalid-operations\", \"operation-limit\", \"payload-limit\", \"response-id-mismatch\", \"future-distance-limit\", \"buffer-count-limit\", \"buffer-operation-limit\", \"buffer-byte-limit\", \"pending-count-limit\", \"pending-operation-limit\", \"pending-byte-limit\", \"late-echo\", \"remote-operations-rejected\", \"invalid-batch\", \"batch-limit\", \"pending-capacity\", \"presence-failed\", \"revision-failed\", \"comment-failed\", \"sync-failed\", \"sync-storage-failed\", \"incomplete-data\", \"xlsx-invalid-options\", \"unsafe-hyperlink\", \"invalid-shortcut\", \"shortcut-conflict\", \"invalid-function\"]",
               "owners": [
                 "src/errors.ts"
               ],
@@ -7842,11 +7842,11 @@
             {
               "name": "SHEETWRITE_ERROR_OPERATIONS",
               "kind": "variable",
-              "signature": "readonly [\"initialize\", \"create-grid\", \"datasource-request\", \"renderer-worker\", \"export-xlsx\", \"xlsx-import\", \"xlsx-export\", \"delimited-parse\", \"delimited-import\", \"delimited-encode\", \"delimited-export\", \"delimited-options\", \"snapshot-validate\", \"snapshot-allocate\", \"persistence\", \"pending-storage\", \"synchronize\", \"presence\", \"revision\", \"comments\", \"query\", \"hyperlink-activate\", \"keyboard-configure\", \"chart-view\"]",
+              "signature": "readonly [\"initialize\", \"create-grid\", \"datasource-request\", \"renderer-worker\", \"export-xlsx\", \"xlsx-import\", \"xlsx-export\", \"delimited-parse\", \"delimited-import\", \"delimited-encode\", \"delimited-export\", \"delimited-options\", \"snapshot-validate\", \"snapshot-allocate\", \"persistence\", \"pending-storage\", \"synchronize\", \"presence\", \"revision\", \"comments\", \"query\", \"hyperlink-activate\", \"keyboard-configure\", \"chart-view\", \"host-function\"]",
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L60",
+              "source": "src/errors.ts#L61",
               "jsDocTags": [],
               "documentation": "Stable operations at which a consumer-visible failure can surface.",
               "memberDocs": []
@@ -7854,11 +7854,11 @@
             {
               "name": "SheetwriteError",
               "kind": "class",
-              "signature": "class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: \"aborted\" | \"batch-limit\" | \"blocked\" | \"buffer-byte-limit\" | \"buffer-count-limit\" | \"buffer-operation-limit\" | \"comment-failed\" | \"commit-rejected\" | \"conflict\" | \"datasource-request-failed\" | \"delimited-text-invalid-limit\" | \"delimited-text-resource-limit\" | \"export-failed\" | \"future-distance-limit\" | \"incomplete-data\" | \"initialization-failed\" | \"initialization-required\" | \"invalid-batch\" | \"invalid-id\" | \"invalid-limits\" | \"invalid-operations\" | \"invalid-shortcut\" | \"invalid-snapshot\" | \"invalid-version\" | \"late-echo\" | \"limit\" | \"not-found\" | \"operation-limit\" | \"optional-backend-unavailable\" | \"payload-limit\" | \"pending-byte-limit\" | \"pending-capacity\" | \"pending-count-limit\" | \"pending-operation-limit\" | \"presence-failed\" | \"quota\" | \"remote-operations-rejected\" | \"renderer-fallback\" | \"resource-limit\" | \"response-id-mismatch\" | \"revision-failed\" | \"shortcut-conflict\" | \"sync-failed\" | \"sync-storage-failed\" | \"transaction\" | \"unavailable\" | \"unsafe-hyperlink\" | \"unsupported-schema\" | \"xlsx-import-failed\" | \"xlsx-invalid-options\" | \"xlsx-resource-limit\"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: \"chart-view\" | \"comments\" | \"create-grid\" | \"datasource-request\" | \"delimited-encode\" | \"delimited-export\" | \"delimited-import\" | \"delimited-options\" | \"delimited-parse\" | \"export-xlsx\" | \"hyperlink-activate\" | \"initialize\" | \"keyboard-configure\" | \"pending-storage\" | \"persistence\" | \"presence\" | \"query\" | \"renderer-worker\" | \"revision\" | \"snapshot-allocate\" | \"snapshot-validate\" | \"synchronize\" | \"xlsx-export\" | \"xlsx-import\"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }",
+              "signature": "class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: \"aborted\" | \"batch-limit\" | \"blocked\" | \"buffer-byte-limit\" | \"buffer-count-limit\" | \"buffer-operation-limit\" | \"comment-failed\" | \"commit-rejected\" | \"conflict\" | \"datasource-request-failed\" | \"delimited-text-invalid-limit\" | \"delimited-text-resource-limit\" | \"export-failed\" | \"future-distance-limit\" | \"incomplete-data\" | \"initialization-failed\" | \"initialization-required\" | \"invalid-batch\" | \"invalid-function\" | \"invalid-id\" | \"invalid-limits\" | \"invalid-operations\" | \"invalid-shortcut\" | \"invalid-snapshot\" | \"invalid-version\" | \"late-echo\" | \"limit\" | \"not-found\" | \"operation-limit\" | \"optional-backend-unavailable\" | \"payload-limit\" | \"pending-byte-limit\" | \"pending-capacity\" | \"pending-count-limit\" | \"pending-operation-limit\" | \"presence-failed\" | \"quota\" | \"remote-operations-rejected\" | \"renderer-fallback\" | \"resource-limit\" | \"response-id-mismatch\" | \"revision-failed\" | \"shortcut-conflict\" | \"sync-failed\" | \"sync-storage-failed\" | \"transaction\" | \"unavailable\" | \"unsafe-hyperlink\" | \"unsupported-schema\" | \"xlsx-import-failed\" | \"xlsx-invalid-options\" | \"xlsx-resource-limit\"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: \"chart-view\" | \"comments\" | \"create-grid\" | \"datasource-request\" | \"delimited-encode\" | \"delimited-export\" | \"delimited-import\" | \"delimited-options\" | \"delimited-parse\" | \"export-xlsx\" | \"host-function\" | \"hyperlink-activate\" | \"initialize\" | \"keyboard-configure\" | \"pending-storage\" | \"persistence\" | \"presence\" | \"query\" | \"renderer-worker\" | \"revision\" | \"snapshot-allocate\" | \"snapshot-validate\" | \"synchronize\" | \"xlsx-export\" | \"xlsx-import\"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }",
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L286",
+              "source": "src/errors.ts#L288",
               "jsDocTags": [],
               "documentation": "Canonical envelope for thrown and callback-delivered Sheetwrite failures.",
               "memberDocs": []
@@ -7870,7 +7870,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L57",
+              "source": "src/errors.ts#L58",
               "jsDocTags": [],
               "documentation": "Exhaustive stable discriminator for consumer-visible Sheetwrite failures.",
               "memberDocs": []
@@ -7882,7 +7882,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L100",
+              "source": "src/errors.ts#L102",
               "jsDocTags": [],
               "documentation": "Stable, serialization-safe diagnostic context.",
               "memberDocs": []
@@ -7894,7 +7894,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L103",
+              "source": "src/errors.ts#L105",
               "jsDocTags": [],
               "documentation": "Structural form preserved across realms and JSON serialization.",
               "memberDocs": []
@@ -7906,7 +7906,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L88",
+              "source": "src/errors.ts#L90",
               "jsDocTags": [],
               "documentation": "Exhaustive stable operation discriminator for consumer-visible failures.",
               "memberDocs": []
@@ -8079,6 +8079,117 @@
               "source": "src/indexeddb.ts#L36",
               "jsDocTags": [],
               "documentation": "Database and store naming options for durable pending commits.",
+              "memberDocs": []
+            }
+          ]
+        },
+        {
+          "subpath": "./functions",
+          "target": "./dist/functions.d.ts",
+          "source": "src/functions.ts",
+          "kind": "typescript",
+          "classification": "supported",
+          "exports": [
+            {
+              "name": "FormulaArgument",
+              "kind": "type",
+              "signature": "export type FormulaArgument = FormulaScalar | readonly (readonly FormulaScalar[])[];",
+              "owners": [
+                "src/functions/types.ts"
+              ],
+              "source": "src/functions/types.ts#L5",
+              "jsDocTags": [],
+              "documentation": "Ranges use row-major nested arrays. Scalar expressions use a scalar.",
+              "memberDocs": []
+            },
+            {
+              "name": "FormulaArgumentMetadata",
+              "kind": "interface",
+              "signature": "export interface FormulaArgumentMetadata { readonly name: string; readonly types: readonly string[]; readonly optional?: boolean; readonly repeating?: boolean; }",
+              "owners": [
+                "src/functions/types.ts"
+              ],
+              "source": "src/functions/types.ts#L8",
+              "jsDocTags": [],
+              "documentation": "Argument documentation used by built-in and host functions. Types are descriptive, not coercion rules.",
+              "memberDocs": []
+            },
+            {
+              "name": "FormulaFunction",
+              "kind": "type",
+              "signature": "export type FormulaFunction = (...arguments_: readonly FormulaArgument[]) => FormulaScalar;",
+              "owners": [
+                "src/functions/types.ts"
+              ],
+              "source": "src/functions/types.ts#L26",
+              "jsDocTags": [],
+              "documentation": "A synchronous host function. Promises and other non-scalar results become `#VALUE!`.",
+              "memberDocs": []
+            },
+            {
+              "name": "FormulaFunctionMetadata",
+              "kind": "interface",
+              "signature": "export interface FormulaFunctionMetadata { readonly name: string; readonly description: string; readonly arguments: readonly FormulaArgumentMetadata[]; readonly returnKind: string; readonly examples?: readonly string[]; readonly volatile?: boolean; }",
+              "owners": [
+                "src/functions/types.ts"
+              ],
+              "source": "src/functions/types.ts#L16",
+              "jsDocTags": [],
+              "documentation": "One metadata format for built-in and host functions.",
+              "memberDocs": []
+            },
+            {
+              "name": "FormulaScalar",
+              "kind": "type",
+              "signature": "export type FormulaScalar = number | string | boolean | null;",
+              "owners": [
+                "src/functions/types.ts"
+              ],
+              "source": "src/functions/types.ts#L2",
+              "jsDocTags": [],
+              "documentation": "A scalar passed to or returned from a synchronous host formula function.",
+              "memberDocs": []
+            },
+            {
+              "name": "listFunctions",
+              "kind": "function",
+              "signature": "(store: Store): Promise<readonly FormulaFunctionMetadata[]>",
+              "owners": [
+                "src/functions.ts"
+              ],
+              "source": "src/functions.ts#L109",
+              "jsDocTags": [],
+              "documentation": "Metadata of every function that formulas in `store` can call: the built-in\nfunctions of the active engine, then the host functions of `store` in\nregistration order. Formula help reads this one list. The built-in table\nloads on the first call, so the result is a promise.",
+              "memberDocs": []
+            },
+            {
+              "name": "registerFunction",
+              "kind": "function",
+              "signature": "(store: Store, metadata: FormulaFunctionMetadata, implementation: FormulaFunction): void",
+              "owners": [
+                "src/functions.ts"
+              ],
+              "source": "src/functions.ts#L70",
+              "jsDocTags": [
+                "example",
+                "see",
+                "throws"
+              ],
+              "documentation": "Registers a synchronous JavaScript function that formulas in `store` can\ncall, then recalculates every formula. Registering a name again replaces the\nfunction. The function receives each argument as a scalar, or as row arrays\nfor a block of more than one cell, and returns a number, text, boolean, or\n`null` for an empty result. A thrown error or any other result shows\n`#VALUE!`. The function must not read calculated cells or change the store:\ncalls that need the engine throw a `blocked` error. Snapshots keep only\nformula text, so register the function after loading.\n@example\n```ts\nimport type { Store } from \"@sheetwrite/core\";\nimport { registerFunction } from \"@sheetwrite/core/functions\";\n\nfunction addTaxRate(store: Store) {\n  registerFunction(\n    store,\n    {\n      name: \"TAXRATE\",\n      description: \"Sales tax rate of a region.\",\n      arguments: [{ name: \"region\", types: [\"text\"] }],\n      returnKind: \"number\",\n    },\n    (region) => (region === \"EU\" ? 0.2 : 0.07),\n  );\n}\n```\n@see\n/docs/features/formulas/custom-functions/",
+              "memberDocs": []
+            },
+            {
+              "name": "unregisterFunction",
+              "kind": "function",
+              "signature": "(store: Store, name: string): boolean",
+              "owners": [
+                "src/functions.ts"
+              ],
+              "source": "src/functions.ts#L96",
+              "jsDocTags": [
+                "throws"
+              ],
+              "documentation": "Removes a host function from `store`. Formulas that call it show `#NAME?`.\nReturns whether the function existed.",
               "memberDocs": []
             }
           ]
