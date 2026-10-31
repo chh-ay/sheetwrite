@@ -12,7 +12,7 @@ import {
   TOOLBAR_HEIGHT,
 } from "../ribbon/ribbon-metrics.js";
 import { sheetNameKey } from "../sheet-name.js";
-import { SheetTabs } from "../sheet-tabs.js";
+import { changesSheetTabs, SheetTabs } from "../sheet-tabs.js";
 import type { Selection, SheetId } from "../types/coordinates.js";
 import type {
   CommandFlags,
@@ -287,7 +287,10 @@ export function createSpreadsheetShell(
 
   const unsubscribes: Array<() => void> = [
     grid.on("active-sheet", () => refreshTabs()),
-    grid.on("change", () => refreshTabs()),
+    // A tab update closes an open tab menu; a collaborator's cell edit must not.
+    grid.on("change", (event) => {
+      if (event.transaction.patches.some(changesSheetTabs)) refreshTabs();
+    }),
   ];
   pieces.push(createSelectionStatus(bottomRow, grid));
 

@@ -14,6 +14,9 @@ const REQUIRED_PACKAGE_SIZE_HISTORY_FILES = new Set([
 const ALLOWED_PACKAGE_SIZE_HISTORY_FILES = new Set([
   ...REQUIRED_PACKAGE_SIZE_HISTORY_FILES,
   "docs/src/generated/docs-contract.json",
+  // The release's measured size report and the landing data built from it.
+  "scripts/size-report.json",
+  "docs/src/generated/landing-bench.json",
 ]);
 
 export interface ChangesetComparison {
