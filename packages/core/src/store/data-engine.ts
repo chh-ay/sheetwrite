@@ -307,13 +307,15 @@ function rebaseHyperlinkAxis(
         : { kind: "internal", range: targetRange },
   };
 }
-function rebaseConditionalFormatAxis(
+/** Carry a conditional format through rows or columns moved on `editedSheet`. */
+function rebaseConditionalFormatMove(
   rule: ConditionalFormatRule,
   editedSheet: SheetId,
   axis: "row" | "column",
-  remap: (index: number) => number | null,
+  move: { readonly from: number; readonly count: number; readonly to: number },
 ): ConditionalFormatRule | null {
   if (rule.range.sheet !== editedSheet) return rule;
+  const remap = (index: number) => moveIndex(index, move.from, move.count, move.to);
   const span =
     axis === "row"
       ? remapSpan(rule.range.start.row, rule.range.end.row, remap)
@@ -338,7 +340,12 @@ function rebaseConditionalFormatAxis(
       rule.when.kind === "formula"
         ? {
             ...rule.when,
-            source: remapFormulaA1Refs(rule.when.source, axis, remap),
+            source: remapFormulaA1Refs(rule.when.source, axis, {
+              kind: "move",
+              from: move.from,
+              count: move.count,
+              to: move.to,
+            }),
           }
         : rule.when,
   };
@@ -2500,7 +2507,10 @@ export class StoreDataEngine {
         // The engine refuses a grid it cannot hold; the patch then changes nothing.
         if (!this.wasm.addRows(this.handleOf(patch.sheet), patch.at, patch.count)) return false;
         meta.rowCount += patch.count;
-        this.rebaseSheetRows(patch.sheet, (row) => (row >= patch.at ? row + patch.count : row));
+        this.rebaseSheetRows(patch.sheet, (row) => (row >= patch.at ? row + patch.count : row), {
+          at: patch.at,
+          delta: patch.count,
+        });
         this.rebaseCharts({
           kind: "insert",
           sheet: patch.sheet,
@@ -2521,8 +2531,10 @@ export class StoreDataEngine {
         }
         if (!this.wasm.removeRows(this.handleOf(patch.sheet), patch.at, patch.count)) return false;
         meta.rowCount -= patch.count;
-        this.rebaseSheetRows(patch.sheet, (row) =>
-          row < patch.at ? row : row < patch.at + patch.count ? null : row - patch.count,
+        this.rebaseSheetRows(
+          patch.sheet,
+          (row) => (row < patch.at ? row : row < patch.at + patch.count ? null : row - patch.count),
+          { at: patch.at, delta: -patch.count },
         );
         this.rebaseCharts({
           kind: "delete",
@@ -3216,7 +3228,7 @@ export class StoreDataEngine {
       addr: { ...note.addr, row: moveRow(note.addr.row) },
     }));
     sheet.conditionalFormats = movedConditionalFormats
-      .map((rule) => rebaseConditionalFormatAxis(rule, patch.sheet, "row", moveRow))
+      .map((rule) => rebaseConditionalFormatMove(rule, patch.sheet, "row", patch))
       .filter((rule): rule is ConditionalFormatRule => rule !== null);
     for (const [ownerId, hyperlinks] of movedHyperlinks) {
       const owner = this.workbook.sheets.find((candidate) => candidate.id === ownerId);
@@ -3336,7 +3348,7 @@ export class StoreDataEngine {
       addr: { ...note.addr, col: moveCol(note.addr.col) },
     }));
     sheet.conditionalFormats = movedConditionalFormats
-      .map((rule) => rebaseConditionalFormatAxis(rule, patch.sheet, "column", moveCol))
+      .map((rule) => rebaseConditionalFormatMove(rule, patch.sheet, "column", patch))
       .filter((rule): rule is ConditionalFormatRule => rule !== null);
     for (const [ownerId, hyperlinks] of movedHyperlinks) {
       const owner = this.workbook.sheets.find((candidate) => candidate.id === ownerId);
@@ -3632,7 +3644,11 @@ export class StoreDataEngine {
     return true;
   }
 
-  private rebaseSheetRows(sheet: SheetId, remap: (row: number) => number | null): void {
+  private rebaseSheetRows(
+    sheet: SheetId,
+    remap: (row: number) => number | null,
+    edit: { at: number; delta: number },
+  ): void {
     const meta = this.sheetMeta(sheet);
     if (meta.rowHeights) {
       const next = new Map<number, number>();
@@ -3692,7 +3708,7 @@ export class StoreDataEngine {
               ...rule,
               when: {
                 ...rule.when,
-                source: remapFormulaA1Refs(rule.when.source, "row", remap),
+                source: remapFormulaA1Refs(rule.when.source, "row", { kind: "shift", ...edit }),
               },
             }
           : rule,
@@ -3796,7 +3812,11 @@ export class StoreDataEngine {
               ...rule,
               when: {
                 ...rule.when,
-                source: remapFormulaA1Refs(rule.when.source, "column", remap),
+                source: remapFormulaA1Refs(rule.when.source, "column", {
+                  kind: "shift",
+                  at: edit.at,
+                  delta: edit.delta,
+                }),
               },
             }
           : rule,

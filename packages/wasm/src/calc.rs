@@ -793,7 +793,7 @@ fn row_index(row_number: u32) -> Option<u32> {
 /// One end of an area reference: a cell (`B2`), a whole column (`$B`) or a
 /// whole row (`2`).
 #[derive(Clone, Copy)]
-enum AreaEnd {
+pub(crate) enum AreaEnd {
     Cell(u32, u32, RefFlags),
     Column(u32, bool),
     Row(u32, bool),
@@ -801,7 +801,7 @@ enum AreaEnd {
 
 impl AreaEnd {
     /// A row number arrives as a number token unless it has a `$` marker.
-    fn of(token: &Tok<'_>) -> Option<Self> {
+    pub(crate) fn of(token: &Tok<'_>) -> Option<Self> {
         match token {
             Tok::Ident(name, _) => Self::of_name(name),
             Tok::Num(number) if number.fract() == 0.0 && *number <= f64::from(SHEET_ROWS) => {
@@ -831,7 +831,7 @@ impl AreaEnd {
 }
 
 /// The range between two ends of one kind; `A:1` and `A1:B` have none.
-fn area(start: AreaEnd, end: AreaEnd) -> Option<(u32, u32, u32, u32, RangeFlags)> {
+pub(crate) fn area(start: AreaEnd, end: AreaEnd) -> Option<(u32, u32, u32, u32, RangeFlags)> {
     let whole_axis = |col_abs, row_abs| RefFlags { row_abs, col_abs };
     Some(match (start, end) {
         (AreaEnd::Cell(row, col, flags), AreaEnd::Cell(end_row, end_col, end_flags)) => {
@@ -922,7 +922,7 @@ fn normalize_range(
 }
 
 #[derive(Clone, Debug, PartialEq)]
-enum Tok<'a> {
+pub(crate) enum Tok<'a> {
     Num(f64),
     Str(String),
     Ident(Cow<'a, str>, bool),
@@ -1023,6 +1023,17 @@ struct Tokens<'a> {
     sheet_qualifiers: bool,
 }
 
+impl<'a> Tokens<'a> {
+    fn push(&mut self, tok: Tok<'a>) {
+        match tok {
+            Tok::Intersect => self.intersections = true,
+            Tok::Bang => self.sheet_qualifiers = true,
+            _ => {}
+        }
+        self.toks.push(tok);
+    }
+}
+
 /// Reads the number at `*index`: digits with one optional decimal point, then
 /// an optional exponent (`E3`, `e-3`, `E+03`). An `E` without exponent digits
 /// is left for the next token.
@@ -1059,156 +1070,158 @@ fn number_token(src: &str, index: &mut usize) -> Result<f64, String> {
 }
 
 fn tokenize(src: &str) -> Result<Tokens<'_>, String> {
-    let mut toks = Vec::new();
-    let mut intersections = false;
-    let mut sheet_qualifiers = false;
-    let bytes = src.as_bytes();
-    let mut i = 0;
+    let mut tokens = Tokens {
+        toks: Vec::new(),
+        intersections: false,
+        sheet_qualifiers: false,
+    };
+    let mut index = 0;
 
-    while i < bytes.len() {
-        let c = bytes[i];
-        if c.is_ascii_whitespace() {
-            while bytes.get(i).is_some_and(u8::is_ascii_whitespace) {
-                i += 1;
-            }
-            if separates_references(toks.last(), &src[i..]) {
-                toks.push(Tok::Intersect);
-                intersections = true;
-            }
-        } else if c == b'"' {
-            toks.push(Tok::Str(quoted_token(
-                src,
-                &mut i,
-                b'"',
-                "unterminated string literal",
-            )?));
-        } else if c.is_ascii_digit()
-            || (c == b'.' && bytes.get(i + 1).is_some_and(u8::is_ascii_digit))
-        {
-            toks.push(Tok::Num(number_token(src, &mut i)?));
-        } else if c == b'\'' {
-            toks.push(Tok::Ident(
-                Cow::Owned(quoted_token(src, &mut i, b'\'', "unterminated sheet name")?),
-                true,
-            ));
-        } else if let Some((literal, error)) = ERROR_LITERALS.iter().find(|(literal, _)| {
-            bytes[i..]
-                .get(..literal.len())
-                .is_some_and(|text| text.eq_ignore_ascii_case(literal.as_bytes()))
-        }) {
-            toks.push(Tok::Error(*error));
-            i += literal.len();
-        } else if c == b'[' {
-            let start = i;
-            let mut depth = 0usize;
-            while i < bytes.len() {
-                match bytes[i] {
-                    b'[' => depth += 1,
-                    b']' => {
-                        if depth == 0 {
-                            return Err("unexpected ]".into());
-                        }
-                        depth -= 1;
-                    }
-                    _ => {}
-                }
-                i += 1;
-                if depth == 0 {
-                    break;
-                }
-            }
-            if depth != 0 {
-                return Err("unterminated structured reference".into());
-            }
-            toks.push(Tok::Structured(src[start..i].to_string()));
-        } else if c == b'$'
-            || c == b'_'
-            || c == b'\\'
-            || c.is_ascii_alphabetic()
-            || (!c.is_ascii() && src[i..].chars().next().is_some_and(char::is_alphabetic))
-        {
-            let start = i;
-            while i < bytes.len() {
-                let ch = src[i..].chars().next().expect("valid UTF-8 source");
-                if ch.is_alphanumeric() || matches!(ch, '$' | '_' | '.' | '\\') {
-                    i += ch.len_utf8();
-                } else {
-                    break;
-                }
-            }
-            toks.push(Tok::Ident(Cow::Borrowed(&src[start..i]), false));
-        } else if c == b'!' {
-            toks.push(Tok::Bang);
-            sheet_qualifiers = true;
-            i += 1;
-        } else if c == b'<' || c == b'>' || c == b'=' {
-            let next = bytes.get(i + 1).copied();
-            let (op, len) = match (c, next) {
-                (b'<', Some(b'=')) => (CmpOp::Le, 2),
-                (b'>', Some(b'=')) => (CmpOp::Ge, 2),
-                (b'<', Some(b'>')) => (CmpOp::Ne, 2),
-                (b'=', _) => (CmpOp::Eq, 1),
-                (b'<', _) => (CmpOp::Lt, 1),
-                _ => (CmpOp::Gt, 1),
-            };
-            toks.push(Tok::Cmp(op));
-            i += len;
-        } else {
-            match c {
-                b'+' | b'-' | b'*' | b'/' | b'^' | b'&' | b'%' => {
-                    toks.push(Tok::Op(c as char));
-                    i += 1;
-                }
-                b'(' => {
-                    toks.push(Tok::LParen);
-                    i += 1;
-                }
-                b')' => {
-                    toks.push(Tok::RParen);
-                    i += 1;
-                }
-                b',' => {
-                    toks.push(Tok::Comma);
-                    i += 1;
-                }
-                b';' => {
-                    toks.push(Tok::Semicolon);
-                    i += 1;
-                }
-                b'{' => {
-                    toks.push(Tok::LBrace);
-                    i += 1;
-                }
-                b'}' => {
-                    toks.push(Tok::RBrace);
-                    i += 1;
-                }
-                b':' => {
-                    toks.push(Tok::Colon);
-                    i += 1;
-                }
-                b'#' => {
-                    toks.push(Tok::Hash);
-                    i += 1;
-                }
-                _ if !c.is_ascii() => {
-                    let ch = src[i..].chars().next().expect("valid UTF-8 source");
-                    if ch.is_whitespace() {
-                        i += ch.len_utf8();
-                    } else {
-                        return Err(format!("unexpected char: {ch}"));
-                    }
-                }
-                _ => return Err(format!("unexpected char: {}", c as char)),
-            }
+    while index < src.len() {
+        if let Some(tok) = lex_token(src, &mut index, tokens.toks.last())? {
+            tokens.push(tok);
         }
     }
 
-    Ok(Tokens {
-        toks,
-        intersections,
-        sheet_qualifiers,
+    Ok(tokens)
+}
+
+/// The token of one ASCII punctuation byte, or `None` for any other byte.
+fn punctuation_token(byte: u8) -> Option<Tok<'static>> {
+    Some(match byte {
+        b'+' | b'-' | b'*' | b'/' | b'^' | b'&' | b'%' => Tok::Op(byte as char),
+        b'(' => Tok::LParen,
+        b')' => Tok::RParen,
+        b',' => Tok::Comma,
+        b';' => Tok::Semicolon,
+        b'{' => Tok::LBrace,
+        b'}' => Tok::RBrace,
+        b':' => Tok::Colon,
+        b'!' => Tok::Bang,
+        b'#' => Tok::Hash,
+        _ => return None,
     })
+}
+
+/// Reads the token at `*index` and moves `*index` past it. Whitespace gives
+/// `Ok(None)`, except where it is the intersection operator after `previous`.
+/// The parser's `tokenize` and every other reader of formula text lex with
+/// this one step, so they cannot disagree about where a token ends. After an
+/// error, `*index` is past the bad text when its end is known: an open quote
+/// or bracket runs to the end of `src`; an unknown character is not consumed.
+#[inline(always)]
+pub(crate) fn lex_token<'a>(
+    src: &'a str,
+    index: &mut usize,
+    previous: Option<&Tok<'a>>,
+) -> Result<Option<Tok<'a>>, String> {
+    let bytes = src.as_bytes();
+    let c = bytes[*index];
+
+    let tok = if c.is_ascii_whitespace() {
+        while bytes.get(*index).is_some_and(u8::is_ascii_whitespace) {
+            *index += 1;
+        }
+        if !separates_references(previous, &src[*index..]) {
+            return Ok(None);
+        }
+        Tok::Intersect
+    } else if c == b'"' {
+        Tok::Str(quoted_token(
+            src,
+            index,
+            b'"',
+            "unterminated string literal",
+        )?)
+    } else if c.is_ascii_digit()
+        || (c == b'.' && bytes.get(*index + 1).is_some_and(u8::is_ascii_digit))
+    {
+        Tok::Num(number_token(src, index)?)
+    } else if c == b'\'' {
+        Tok::Ident(
+            Cow::Owned(quoted_token(src, index, b'\'', "unterminated sheet name")?),
+            true,
+        )
+    } else if let Some((literal, error)) = ERROR_LITERALS.iter().find(|(literal, _)| {
+        bytes[*index..]
+            .get(..literal.len())
+            .is_some_and(|text| text.eq_ignore_ascii_case(literal.as_bytes()))
+    }) {
+        *index += literal.len();
+        Tok::Error(*error)
+    } else if c == b'[' {
+        Tok::Structured(structured_token(src, index)?)
+    } else if c == b'$'
+        || c == b'_'
+        || c == b'\\'
+        || c.is_ascii_alphabetic()
+        || (!c.is_ascii()
+            && src[*index..]
+                .chars()
+                .next()
+                .is_some_and(char::is_alphabetic))
+    {
+        let start = *index;
+        while *index < bytes.len() {
+            let ch = src[*index..].chars().next().expect("valid UTF-8 source");
+            if ch.is_alphanumeric() || matches!(ch, '$' | '_' | '.' | '\\') {
+                *index += ch.len_utf8();
+            } else {
+                break;
+            }
+        }
+        Tok::Ident(Cow::Borrowed(&src[start..*index]), false)
+    } else if c == b'<' || c == b'>' || c == b'=' {
+        let next = bytes.get(*index + 1).copied();
+        let (op, len) = match (c, next) {
+            (b'<', Some(b'=')) => (CmpOp::Le, 2),
+            (b'>', Some(b'=')) => (CmpOp::Ge, 2),
+            (b'<', Some(b'>')) => (CmpOp::Ne, 2),
+            (b'=', _) => (CmpOp::Eq, 1),
+            (b'<', _) => (CmpOp::Lt, 1),
+            _ => (CmpOp::Gt, 1),
+        };
+        *index += len;
+        Tok::Cmp(op)
+    } else if let Some(tok) = punctuation_token(c) {
+        *index += 1;
+        tok
+    } else if !c.is_ascii() {
+        let ch = src[*index..].chars().next().expect("valid UTF-8 source");
+        if !ch.is_whitespace() {
+            return Err(format!("unexpected char: {ch}"));
+        }
+        *index += ch.len_utf8();
+        return Ok(None);
+    } else {
+        return Err(format!("unexpected char: {}", c as char));
+    };
+
+    Ok(Some(tok))
+}
+
+/// The `[...]` at `*index`, nested brackets included.
+fn structured_token(src: &str, index: &mut usize) -> Result<String, String> {
+    let bytes = src.as_bytes();
+    let start = *index;
+    let mut depth = 0usize;
+
+    while *index < bytes.len() {
+        match bytes[*index] {
+            b'[' => depth += 1,
+            b']' => depth -= 1,
+            _ => {}
+        }
+        *index += 1;
+        if depth == 0 {
+            break;
+        }
+    }
+
+    if depth != 0 {
+        return Err("unterminated structured reference".into());
+    }
+    Ok(src[start..*index].to_string())
 }
 
 fn parse_structured_ref(raw: String, table_name: Option<String>) -> Result<Ast, String> {
@@ -2266,7 +2279,7 @@ fn translate_relative_refs_inner(ast: &mut Ast, row_delta: i64, col_delta: i64) 
 }
 
 #[derive(Clone, Copy)]
-enum Axis {
+pub(crate) enum Axis {
     Row,
     Col,
 }
@@ -2296,13 +2309,21 @@ enum Moved {
     Deleted,
 }
 
-/// `delta` rows or columns inserted (positive) or deleted (negative) at `at`
-/// on `edited_sheet`, applied to a formula on `formula_sheet`.
+/// What a row or column edit does to the indices of its axis.
+#[derive(Clone, Copy)]
+pub(crate) enum AxisChange {
+    /// `delta` rows or columns inserted (positive) or deleted (negative) at `at`.
+    Shift { at: u32, delta: i64 },
+    /// `count` rows or columns moved from `from`. `to` is the first index of
+    /// the moved block after the move.
+    Move { from: u32, count: u32, to: u32 },
+}
+
+/// One axis change on `edited_sheet`, applied to a formula on `formula_sheet`.
 #[derive(Clone, Copy)]
 struct AxisEdit {
     axis: Axis,
-    at: u32,
-    delta: i64,
+    change: AxisChange,
     formula_sheet: u32,
     edited_sheet: u32,
 }
@@ -2310,7 +2331,11 @@ struct AxisEdit {
 impl AxisEdit {
     /// A cell pushed past the last row or column is deleted, as in Excel.
     fn move_index(self, coord: &mut u32) -> Moved {
-        match shift_index(*coord, self.at, self.delta).filter(|&index| index < self.axis.len()) {
+        let target = match self.change {
+            AxisChange::Shift { at, delta } => shift_index(*coord, at, delta),
+            AxisChange::Move { from, count, to } => Some(moved_index(*coord, from, count, to)),
+        };
+        match target.filter(|&index| index < self.axis.len()) {
             Some(shifted) if shifted == *coord => Moved::Unchanged,
             Some(shifted) => {
                 *coord = shifted;
@@ -2328,7 +2353,17 @@ impl AxisEdit {
             return Moved::Unchanged;
         }
 
-        match shift_range(*start, *end, self.at, self.delta) {
+        let span = match self.change {
+            AxisChange::Shift { at, delta } => shift_range(*start, *end, at, delta),
+            // A move deletes nothing. When the block moves past one end, the
+            // ends can swap, and the range keeps the cells between them.
+            AxisChange::Move { from, count, to } => {
+                let first = moved_index(*start, from, count, to);
+                let second = moved_index(*end, from, count, to);
+                Some((first.min(second), first.max(second)))
+            }
+        };
+        match span {
             Some((shifted_start, shifted_end)) if shifted_start <= last => {
                 let shifted_end = shifted_end.min(last);
                 if (shifted_start, shifted_end) == (*start, *end) {
@@ -2356,8 +2391,7 @@ pub fn shift_rows(
         ast,
         AxisEdit {
             axis: Axis::Row,
-            at,
-            delta,
+            change: AxisChange::Shift { at, delta },
             formula_sheet,
             edited_sheet,
         },
@@ -2377,10 +2411,23 @@ pub fn shift_cols(
         ast,
         AxisEdit {
             axis: Axis::Col,
-            at,
-            delta,
+            change: AxisChange::Shift { at, delta },
             formula_sheet,
             edited_sheet,
+        },
+    )
+}
+
+/// Rewrite the references of a formula on the sheet that `change` edits.
+/// Returns whether any reference changed.
+pub(crate) fn rewrite_own_sheet_axis(ast: &mut Ast, axis: Axis, change: AxisChange) -> bool {
+    rewrite_axis(
+        ast,
+        AxisEdit {
+            axis,
+            change,
+            formula_sheet: 0,
+            edited_sheet: 0,
         },
     )
 }
@@ -2431,6 +2478,22 @@ fn shift_index(index: u32, at: u32, delta: i64) -> Option<u32> {
         return None;
     }
     Some(clamp_index(i64::from(index) + delta))
+}
+
+/// Where `index` is after `count` indices move from `from` to `to`; `to` is
+/// the first index of the moved block after the move.
+fn moved_index(index: u32, from: u32, count: u32, to: u32) -> u32 {
+    let block_end = from.saturating_add(count);
+    if (from..block_end).contains(&index) {
+        return to + (index - from);
+    }
+
+    let without_block = if index < from { index } else { index - count };
+    if without_block >= to {
+        without_block + count
+    } else {
+        without_block
+    }
 }
 
 /// Shift or contract an inclusive range; deleting every target invalidates it.
@@ -2629,7 +2692,7 @@ fn write_structured_ref(
     }
 }
 
-fn write_ast(ast: &Ast, out: &mut String) {
+pub(crate) fn write_ast(ast: &Ast, out: &mut String) {
     match ast {
         Ast::Num(value) => out.push_str(&value.to_string()),
         Ast::Str(value) => write_text(value, out),

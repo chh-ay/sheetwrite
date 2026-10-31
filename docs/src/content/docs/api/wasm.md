@@ -8,7 +8,7 @@ description: "API reference for @sheetwrite/wasm."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./loader.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>15</dd></div>
+<div><dt>Exports</dt><dd>18</dd></div>
 </dl>
 
 Source entry: `packages/wasm/loader.d.ts`
@@ -27,13 +27,16 @@ Source entry: `packages/wasm/loader.d.ts`
 <a class="api-symbol-card" href="/docs/api/wasm/window-view/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>WindowView</code></span><span class="api-symbol-card__desc">A bulk window of resolved cells, row-major over nrows x ncols.</span></a>
 </div>
 
-### Functions <span class="api-count" data-pagefind-ignore>4</span>
+### Functions <span class="api-count" data-pagefind-ignore>7</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/wasm/create-engine/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>createEngine</code></span><span class="api-symbol-card__desc">Initialize a fresh engine; a compiled module can be reused without retaining its memory.</span></a>
 <a class="api-symbol-card" href="/docs/api/wasm/init-sync/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>initSync</code></span><span class="api-symbol-card__desc">Instantiates the given module, which can either be bytes or a precompiled WebAssembly.Module.</span></a>
 <a class="api-symbol-card" href="/docs/api/wasm/is-loaded/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>isLoaded</code></span><span class="api-symbol-card__desc">Whether the WASM module has finished initializing.</span></a>
 <a class="api-symbol-card" href="/docs/api/wasm/load/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>load</code></span><span class="api-symbol-card__desc">Initialize the WASM module.</span></a>
+<a class="api-symbol-card" href="/docs/api/wasm/move-formula-axis/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>moveFormulaAxis</code></span><span class="api-symbol-card__desc">Follow count rows or columns moved from from to to on the formula's own sheet; to is the first index of the moved block after the move.</span></a>
+<a class="api-symbol-card" href="/docs/api/wasm/shift-formula-axis/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>shiftFormulaAxis</code></span><span class="api-symbol-card__desc">Follow delta rows or columns inserted (positive) or deleted (negative) at at on the formula's own sheet.</span></a>
+<a class="api-symbol-card" href="/docs/api/wasm/translate-formula/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>translateFormula</code></span><span class="api-symbol-card__desc">Move the relative references of a copied formula by the distance from its source cell to its target cell.</span></a>
 </div>
 
 ### Interfaces <span class="api-count" data-pagefind-ignore>1</span>
