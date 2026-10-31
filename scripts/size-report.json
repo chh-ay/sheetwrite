@@ -6,15 +6,15 @@
     "version": "2.0.0"
   },
   "meta": {
-    "commit": "993812166c2bd1fa1036df763e340c6aba6a49e0",
-    "dirty": true,
-    "timestamp": "2026-10-31T00:51:11.778Z"
+    "commit": "78c7add6361ab48dcfba74688620be1e03d29a56",
+    "dirty": false,
+    "timestamp": "2026-10-30T03:48:42.829Z"
   },
   "toolchain": {
     "bun": "1.4.4",
     "next": "15.5.9",
     "node": "26.12.1",
-    "npm": "11.20.0",
+    "npm": "11.19.1",
     "vite": "7.2.2",
     "webpack": "5.102.1"
   },
@@ -38,7 +38,7 @@
       "owner": "next:@sheetwrite/core"
     },
     "attribution.next.coreFirstPaint.sheetwriteRawBytes": {
-      "actual": 576680,
+      "actual": 580617,
       "unit": "bytes",
       "category": "browser-module-attribution",
       "owner": "next:@sheetwrite/core"
@@ -98,7 +98,7 @@
       "owner": "vite:@sheetwrite/core"
     },
     "attribution.vite.coreFirstPaint.sheetwriteRawBytes": {
-      "actual": 584333,
+      "actual": 588287,
       "unit": "bytes",
       "category": "browser-module-attribution",
       "owner": "vite:@sheetwrite/core"
@@ -140,121 +140,121 @@
       "owner": "vite:@sheetwrite/core/sync"
     },
     "bundler.next.coreAttributionInitial.css.brotliBytes": {
-      "actual": 9459,
+      "actual": 8354,
       "unit": "bytes",
       "category": "browser-css",
       "owner": "next:core-attribution-initial"
     },
     "bundler.next.coreAttributionInitial.css.gzipBytes": {
-      "actual": 10711,
+      "actual": 9398,
       "unit": "bytes",
       "category": "browser-css",
       "owner": "next:core-attribution-initial"
     },
     "bundler.next.coreAttributionInitial.css.rawBytes": {
-      "actual": 66092,
+      "actual": 57218,
       "unit": "bytes",
       "category": "browser-css",
       "owner": "next:core-attribution-initial"
     },
     "bundler.next.coreAttributionInitial.javascript.brotliBytes": {
-      "actual": 264576,
+      "actual": 265649,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "next:core-attribution-initial"
     },
     "bundler.next.coreAttributionInitial.javascript.gzipBytes": {
-      "actual": 317332,
+      "actual": 318389,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "next:core-attribution-initial"
     },
     "bundler.next.coreAttributionInitial.javascript.rawBytes": {
-      "actual": 1073543,
+      "actual": 1077437,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "next:core-attribution-initial"
     },
     "bundler.next.coreInitial.css.brotliBytes": {
-      "actual": 9459,
+      "actual": 8354,
       "unit": "bytes",
       "category": "browser-css",
       "owner": "next:core-initial"
     },
     "bundler.next.coreInitial.css.gzipBytes": {
-      "actual": 10711,
+      "actual": 9398,
       "unit": "bytes",
       "category": "browser-css",
       "owner": "next:core-initial"
     },
     "bundler.next.coreInitial.css.rawBytes": {
-      "actual": 66092,
+      "actual": 57218,
       "unit": "bytes",
       "category": "browser-css",
       "owner": "next:core-initial"
     },
     "bundler.next.coreInitial.javascript.brotliBytes": {
-      "actual": 270375,
+      "actual": 271446,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "next:core-initial"
     },
     "bundler.next.coreInitial.javascript.gzipBytes": {
-      "actual": 323751,
+      "actual": 324805,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "next:core-initial"
     },
     "bundler.next.coreInitial.javascript.rawBytes": {
-      "actual": 1093528,
+      "actual": 1097420,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "next:core-initial"
     },
     "bundler.next.coreInitial.wasm.brotliBytes": {
-      "actual": 298064,
+      "actual": 297771,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "next:core-initial"
     },
     "bundler.next.coreInitial.wasm.gzipBytes": {
-      "actual": 388517,
+      "actual": 388099,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "next:core-initial"
     },
     "bundler.next.coreInitial.wasm.rawBytes": {
-      "actual": 1016792,
+      "actual": 1015419,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "next:core-initial"
     },
     "bundler.next.nextAsync.javascript.brotliBytes": {
-      "actual": 109805,
+      "actual": 105607,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "next:next-async"
     },
     "bundler.next.nextAsync.javascript.gzipBytes": {
-      "actual": 127150,
+      "actual": 122402,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "next:next-async"
     },
     "bundler.next.nextAsync.javascript.rawBytes": {
-      "actual": 401931,
+      "actual": 389784,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "next:next-async"
     },
     "bundler.vite.chartsAsync.javascript.brotliBytes": {
-      "actual": 7528,
+      "actual": 7546,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:charts-async"
     },
     "bundler.vite.chartsAsync.javascript.gzipBytes": {
-      "actual": 8260,
+      "actual": 8266,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:charts-async"
@@ -266,7 +266,7 @@
       "owner": "vite:charts-async"
     },
     "bundler.vite.chartsLoaderInitial.javascript.brotliBytes": {
-      "actual": 1202,
+      "actual": 1203,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:charts-loader-initial"
@@ -284,289 +284,235 @@
       "owner": "vite:charts-loader-initial"
     },
     "bundler.vite.chromeAsync.javascript.brotliBytes": {
-      "actual": 21252,
+      "actual": 16373,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:chrome-async"
     },
     "bundler.vite.chromeAsync.javascript.gzipBytes": {
-      "actual": 23783,
+      "actual": 18249,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:chrome-async"
     },
     "bundler.vite.chromeAsync.javascript.rawBytes": {
-      "actual": 69010,
+      "actual": 55556,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:chrome-async"
     },
     "bundler.vite.coreInitial.css.brotliBytes": {
-      "actual": 9636,
+      "actual": 8513,
       "unit": "bytes",
       "category": "browser-css",
       "owner": "vite:core-initial"
     },
     "bundler.vite.coreInitial.css.gzipBytes": {
-      "actual": 10912,
+      "actual": 9615,
       "unit": "bytes",
       "category": "browser-css",
       "owner": "vite:core-initial"
     },
     "bundler.vite.coreInitial.css.rawBytes": {
-      "actual": 68239,
+      "actual": 59570,
       "unit": "bytes",
       "category": "browser-css",
       "owner": "vite:core-initial"
     },
     "bundler.vite.coreInitial.javascript.brotliBytes": {
-      "actual": 157496,
+      "actual": 158225,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:core-initial"
     },
     "bundler.vite.coreInitial.javascript.gzipBytes": {
-      "actual": 186072,
+      "actual": 187017,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:core-initial"
     },
     "bundler.vite.coreInitial.javascript.rawBytes": {
-      "actual": 628936,
+      "actual": 632781,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:core-initial"
     },
     "bundler.vite.coreInitial.wasm.brotliBytes": {
-      "actual": 298064,
+      "actual": 297771,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "vite:core-initial"
     },
     "bundler.vite.coreInitial.wasm.gzipBytes": {
-      "actual": 388517,
+      "actual": 388099,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "vite:core-initial"
     },
     "bundler.vite.coreInitial.wasm.rawBytes": {
-      "actual": 1016792,
+      "actual": 1015419,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "vite:core-initial"
     },
     "bundler.vite.reactInitial.css.brotliBytes": {
-      "actual": 9437,
+      "actual": 8315,
       "unit": "bytes",
       "category": "browser-css",
       "owner": "vite:react-initial"
     },
     "bundler.vite.reactInitial.css.gzipBytes": {
-      "actual": 10689,
+      "actual": 9374,
       "unit": "bytes",
       "category": "browser-css",
       "owner": "vite:react-initial"
     },
     "bundler.vite.reactInitial.css.rawBytes": {
-      "actual": 66478,
+      "actual": 57583,
       "unit": "bytes",
       "category": "browser-css",
       "owner": "vite:react-initial"
     },
     "bundler.vite.reactInitial.javascript.brotliBytes": {
-      "actual": 214555,
+      "actual": 215074,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:react-initial"
     },
     "bundler.vite.reactInitial.javascript.gzipBytes": {
-      "actual": 251959,
+      "actual": 252709,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:react-initial"
     },
     "bundler.vite.reactInitial.javascript.rawBytes": {
-      "actual": 835505,
+      "actual": 839243,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:react-initial"
     },
     "bundler.vite.reactInitial.wasm.brotliBytes": {
-      "actual": 298064,
+      "actual": 297771,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "vite:react-initial"
     },
     "bundler.vite.reactInitial.wasm.gzipBytes": {
-      "actual": 388517,
+      "actual": 388099,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "vite:react-initial"
     },
     "bundler.vite.reactInitial.wasm.rawBytes": {
-      "actual": 1016792,
+      "actual": 1015419,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "vite:react-initial"
     },
-    "bundler.vite.shellInitial.css.brotliBytes": {
-      "actual": 9636,
-      "unit": "bytes",
-      "category": "browser-css",
-      "owner": "vite:shell-initial"
-    },
-    "bundler.vite.shellInitial.css.gzipBytes": {
-      "actual": 10912,
-      "unit": "bytes",
-      "category": "browser-css",
-      "owner": "vite:shell-initial"
-    },
-    "bundler.vite.shellInitial.css.rawBytes": {
-      "actual": 68239,
-      "unit": "bytes",
-      "category": "browser-css",
-      "owner": "vite:shell-initial"
-    },
-    "bundler.vite.shellInitial.javascript.brotliBytes": {
-      "actual": 160655,
-      "unit": "bytes",
-      "category": "browser-javascript",
-      "owner": "vite:shell-initial"
-    },
-    "bundler.vite.shellInitial.javascript.gzipBytes": {
-      "actual": 189564,
-      "unit": "bytes",
-      "category": "browser-javascript",
-      "owner": "vite:shell-initial"
-    },
-    "bundler.vite.shellInitial.javascript.rawBytes": {
-      "actual": 638218,
-      "unit": "bytes",
-      "category": "browser-javascript",
-      "owner": "vite:shell-initial"
-    },
-    "bundler.vite.shellInitial.wasm.brotliBytes": {
-      "actual": 298064,
-      "unit": "bytes",
-      "category": "browser-wasm",
-      "owner": "vite:shell-initial"
-    },
-    "bundler.vite.shellInitial.wasm.gzipBytes": {
-      "actual": 388517,
-      "unit": "bytes",
-      "category": "browser-wasm",
-      "owner": "vite:shell-initial"
-    },
-    "bundler.vite.shellInitial.wasm.rawBytes": {
-      "actual": 1016792,
-      "unit": "bytes",
-      "category": "browser-wasm",
-      "owner": "vite:shell-initial"
-    },
     "bundler.vite.svelteInitial.css.brotliBytes": {
-      "actual": 9437,
+      "actual": 8315,
       "unit": "bytes",
       "category": "browser-css",
       "owner": "vite:svelte-initial"
     },
     "bundler.vite.svelteInitial.css.gzipBytes": {
-      "actual": 10689,
+      "actual": 9374,
       "unit": "bytes",
       "category": "browser-css",
       "owner": "vite:svelte-initial"
     },
     "bundler.vite.svelteInitial.css.rawBytes": {
-      "actual": 66478,
+      "actual": 57583,
       "unit": "bytes",
       "category": "browser-css",
       "owner": "vite:svelte-initial"
     },
     "bundler.vite.svelteInitial.javascript.brotliBytes": {
-      "actual": 177290,
+      "actual": 177866,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:svelte-initial"
     },
     "bundler.vite.svelteInitial.javascript.gzipBytes": {
-      "actual": 207831,
+      "actual": 208576,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:svelte-initial"
     },
     "bundler.vite.svelteInitial.javascript.rawBytes": {
-      "actual": 686870,
+      "actual": 690608,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:svelte-initial"
     },
     "bundler.vite.svelteInitial.wasm.brotliBytes": {
-      "actual": 298064,
+      "actual": 297771,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "vite:svelte-initial"
     },
     "bundler.vite.svelteInitial.wasm.gzipBytes": {
-      "actual": 388517,
+      "actual": 388099,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "vite:svelte-initial"
     },
     "bundler.vite.svelteInitial.wasm.rawBytes": {
-      "actual": 1016792,
+      "actual": 1015419,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "vite:svelte-initial"
     },
     "bundler.vite.vueInitial.css.brotliBytes": {
-      "actual": 9437,
+      "actual": 8315,
       "unit": "bytes",
       "category": "browser-css",
       "owner": "vite:vue-initial"
     },
     "bundler.vite.vueInitial.css.gzipBytes": {
-      "actual": 10689,
+      "actual": 9374,
       "unit": "bytes",
       "category": "browser-css",
       "owner": "vite:vue-initial"
     },
     "bundler.vite.vueInitial.css.rawBytes": {
-      "actual": 66478,
+      "actual": 57583,
       "unit": "bytes",
       "category": "browser-css",
       "owner": "vite:vue-initial"
     },
     "bundler.vite.vueInitial.javascript.brotliBytes": {
-      "actual": 186329,
+      "actual": 186896,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:vue-initial"
     },
     "bundler.vite.vueInitial.javascript.gzipBytes": {
-      "actual": 217873,
+      "actual": 218620,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:vue-initial"
     },
     "bundler.vite.vueInitial.javascript.rawBytes": {
-      "actual": 711910,
+      "actual": 715648,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:vue-initial"
     },
     "bundler.vite.vueInitial.wasm.brotliBytes": {
-      "actual": 298064,
+      "actual": 297771,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "vite:vue-initial"
     },
     "bundler.vite.vueInitial.wasm.gzipBytes": {
-      "actual": 388517,
+      "actual": 388099,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "vite:vue-initial"
     },
     "bundler.vite.vueInitial.wasm.rawBytes": {
-      "actual": 1016792,
+      "actual": 1015419,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "vite:vue-initial"
@@ -608,31 +554,31 @@
       "owner": "vite:worker-loader-initial"
     },
     "bundler.vite.xlsxAsync.javascript.brotliBytes": {
-      "actual": 47976,
+      "actual": 43429,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:xlsx-async"
     },
     "bundler.vite.xlsxAsync.javascript.gzipBytes": {
-      "actual": 55601,
+      "actual": 50175,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:xlsx-async"
     },
     "bundler.vite.xlsxAsync.javascript.rawBytes": {
-      "actual": 160261,
+      "actual": 146040,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:xlsx-async"
     },
     "bundler.vite.xlsxLoaderInitial.javascript.brotliBytes": {
-      "actual": 1187,
+      "actual": 1186,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:xlsx-loader-initial"
     },
     "bundler.vite.xlsxLoaderInitial.javascript.gzipBytes": {
-      "actual": 1443,
+      "actual": 1442,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:xlsx-loader-initial"
@@ -644,55 +590,55 @@
       "owner": "vite:xlsx-loader-initial"
     },
     "bundler.webpack.chromeAsync.javascript.brotliBytes": {
-      "actual": 21302,
+      "actual": 16778,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "webpack:chrome-async"
     },
     "bundler.webpack.chromeAsync.javascript.gzipBytes": {
-      "actual": 23908,
+      "actual": 18769,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "webpack:chrome-async"
     },
     "bundler.webpack.chromeAsync.javascript.rawBytes": {
-      "actual": 71108,
+      "actual": 58169,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "webpack:chrome-async"
     },
     "bundler.webpack.coreInitial.javascript.brotliBytes": {
-      "actual": 8348,
+      "actual": 8285,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "webpack:core-initial"
     },
     "bundler.webpack.coreInitial.javascript.gzipBytes": {
-      "actual": 9511,
+      "actual": 9450,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "webpack:core-initial"
     },
     "bundler.webpack.coreInitial.javascript.rawBytes": {
-      "actual": 35661,
+      "actual": 35572,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "webpack:core-initial"
     },
     "bundler.webpack.coreInitial.wasm.brotliBytes": {
-      "actual": 298064,
+      "actual": 297771,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "webpack:core-initial"
     },
     "bundler.webpack.coreInitial.wasm.gzipBytes": {
-      "actual": 388517,
+      "actual": 388099,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "webpack:core-initial"
     },
     "bundler.webpack.coreInitial.wasm.rawBytes": {
-      "actual": 1016792,
+      "actual": 1015419,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "webpack:core-initial"
@@ -716,7 +662,7 @@
       "owner": "webpack:worker-async"
     },
     "closure.core-charts.logicalBytes": {
-      "actual": 4007620,
+      "actual": 3889744,
       "unit": "bytes",
       "category": "install-closure",
       "owner": "core-charts"
@@ -740,7 +686,7 @@
       "owner": "core-xlsx"
     },
     "closure.core-xlsx.logicalBytes": {
-      "actual": 4317956,
+      "actual": 4164522,
       "unit": "bytes",
       "category": "install-closure",
       "owner": "core-xlsx"
@@ -758,7 +704,7 @@
       "owner": "core"
     },
     "closure.core.logicalBytes": {
-      "actual": 3956059,
+      "actual": 3838183,
       "unit": "bytes",
       "category": "install-closure",
       "owner": "core"
@@ -782,7 +728,7 @@
       "owner": "react"
     },
     "closure.react.logicalBytes": {
-      "actual": 4147565,
+      "actual": 4029689,
       "unit": "bytes",
       "category": "install-closure",
       "owner": "react"
@@ -806,7 +752,7 @@
       "owner": "svelte"
     },
     "closure.svelte.logicalBytes": {
-      "actual": 9008727,
+      "actual": 8890851,
       "unit": "bytes",
       "category": "install-closure",
       "owner": "svelte"
@@ -830,7 +776,7 @@
       "owner": "vue"
     },
     "closure.vue.logicalBytes": {
-      "actual": 20836788,
+      "actual": 20718912,
       "unit": "bytes",
       "category": "install-closure",
       "owner": "vue"
@@ -848,37 +794,37 @@
       "owner": "vue"
     },
     "css.shell.brotliBytes": {
-      "actual": 794,
+      "actual": 848,
       "unit": "bytes",
       "category": "browser-css",
       "owner": "@sheetwrite/core/shell.css"
     },
     "css.shell.gzipBytes": {
-      "actual": 988,
+      "actual": 1047,
       "unit": "bytes",
       "category": "browser-css",
       "owner": "@sheetwrite/core/shell.css"
     },
     "css.shell.rawBytes": {
-      "actual": 2833,
+      "actual": 3207,
       "unit": "bytes",
       "category": "browser-css",
       "owner": "@sheetwrite/core/shell.css"
     },
     "css.styles.brotliBytes": {
-      "actual": 12190,
+      "actual": 10685,
       "unit": "bytes",
       "category": "browser-css",
       "owner": "@sheetwrite/core/styles.css"
     },
     "css.styles.gzipBytes": {
-      "actual": 14145,
+      "actual": 12339,
       "unit": "bytes",
       "category": "browser-css",
       "owner": "@sheetwrite/core/styles.css"
     },
     "css.styles.rawBytes": {
-      "actual": 80329,
+      "actual": 69795,
       "unit": "bytes",
       "category": "browser-css",
       "owner": "@sheetwrite/core/styles.css"
@@ -950,25 +896,25 @@
       "owner": "@sheetwrite/charts"
     },
     "package.@sheetwrite/core.assetsBytes": {
-      "actual": 24803,
+      "actual": 18537,
       "unit": "bytes",
       "category": "package-unpacked-assets",
       "owner": "@sheetwrite/core"
     },
     "package.@sheetwrite/core.cssBytes": {
-      "actual": 83162,
+      "actual": 73002,
       "unit": "bytes",
       "category": "package-unpacked-css",
       "owner": "@sheetwrite/core"
     },
     "package.@sheetwrite/core.declarationsBytes": {
-      "actual": 316025,
+      "actual": 305766,
       "unit": "bytes",
       "category": "package-unpacked-declarations",
       "owner": "@sheetwrite/core"
     },
     "package.@sheetwrite/core.fileCount": {
-      "actual": 197,
+      "actual": 187,
       "unit": "count",
       "category": "package-files",
       "owner": "@sheetwrite/core"
@@ -980,13 +926,13 @@
       "owner": "@sheetwrite/core"
     },
     "package.@sheetwrite/core.metadataBytes": {
-      "actual": 8953,
+      "actual": 8846,
       "unit": "bytes",
       "category": "package-unpacked-metadata",
       "owner": "@sheetwrite/core"
     },
     "package.@sheetwrite/core.runtimeJsBytes": {
-      "actual": 1577730,
+      "actual": 1488019,
       "unit": "bytes",
       "category": "package-unpacked-runtime-js",
       "owner": "@sheetwrite/core"
@@ -998,13 +944,13 @@
       "owner": "@sheetwrite/core"
     },
     "package.@sheetwrite/core.tarballBytes": {
-      "actual": 447735,
+      "actual": 429805,
       "unit": "bytes",
       "category": "package-tarball",
       "owner": "@sheetwrite/core"
     },
     "package.@sheetwrite/core.unpackedBytes": {
-      "actual": 2010673,
+      "actual": 1894170,
       "unit": "bytes",
       "category": "package-unpacked",
       "owner": "@sheetwrite/core"
@@ -1028,7 +974,7 @@
       "owner": "@sheetwrite/formulas"
     },
     "package.@sheetwrite/formulas.declarationsBytes": {
-      "actual": 42512,
+      "actual": 41865,
       "unit": "bytes",
       "category": "package-unpacked-declarations",
       "owner": "@sheetwrite/formulas"
@@ -1052,7 +998,7 @@
       "owner": "@sheetwrite/formulas"
     },
     "package.@sheetwrite/formulas.runtimeJsBytes": {
-      "actual": 88886,
+      "actual": 87270,
       "unit": "bytes",
       "category": "package-unpacked-runtime-js",
       "owner": "@sheetwrite/formulas"
@@ -1064,19 +1010,19 @@
       "owner": "@sheetwrite/formulas"
     },
     "package.@sheetwrite/formulas.tarballBytes": {
-      "actual": 590080,
+      "actual": 584943,
       "unit": "bytes",
       "category": "package-tarball",
       "owner": "@sheetwrite/formulas"
     },
     "package.@sheetwrite/formulas.unpackedBytes": {
-      "actual": 1574156,
+      "actual": 1559185,
       "unit": "bytes",
       "category": "package-unpacked",
       "owner": "@sheetwrite/formulas"
     },
     "package.@sheetwrite/formulas.wasmBytes": {
-      "actual": 1426763,
+      "actual": 1414055,
       "unit": "bytes",
       "category": "package-unpacked-wasm",
       "owner": "@sheetwrite/formulas"
@@ -1130,7 +1076,7 @@
       "owner": "@sheetwrite/react"
     },
     "package.@sheetwrite/react.tarballBytes": {
-      "actual": 6436,
+      "actual": 6435,
       "unit": "bytes",
       "category": "package-tarball",
       "owner": "@sheetwrite/react"
@@ -1196,7 +1142,7 @@
       "owner": "@sheetwrite/svelte"
     },
     "package.@sheetwrite/svelte.tarballBytes": {
-      "actual": 6474,
+      "actual": 6473,
       "unit": "bytes",
       "category": "package-tarball",
       "owner": "@sheetwrite/svelte"
@@ -1262,7 +1208,7 @@
       "owner": "@sheetwrite/vue"
     },
     "package.@sheetwrite/vue.tarballBytes": {
-      "actual": 7457,
+      "actual": 7456,
       "unit": "bytes",
       "category": "package-tarball",
       "owner": "@sheetwrite/vue"
@@ -1328,19 +1274,19 @@
       "owner": "@sheetwrite/wasm"
     },
     "package.@sheetwrite/wasm.tarballBytes": {
-      "actual": 415178,
+      "actual": 414764,
       "unit": "bytes",
       "category": "package-tarball",
       "owner": "@sheetwrite/wasm"
     },
     "package.@sheetwrite/wasm.unpackedBytes": {
-      "actual": 1148644,
+      "actual": 1147271,
       "unit": "bytes",
       "category": "package-unpacked",
       "owner": "@sheetwrite/wasm"
     },
     "package.@sheetwrite/wasm.wasmBytes": {
-      "actual": 1016792,
+      "actual": 1015419,
       "unit": "bytes",
       "category": "package-unpacked-wasm",
       "owner": "@sheetwrite/wasm"
@@ -1364,7 +1310,7 @@
       "owner": "@sheetwrite/xlsx"
     },
     "package.@sheetwrite/xlsx.fileCount": {
-      "actual": 29,
+      "actual": 26,
       "unit": "count",
       "category": "package-files",
       "owner": "@sheetwrite/xlsx"
@@ -1376,13 +1322,13 @@
       "owner": "@sheetwrite/xlsx"
     },
     "package.@sheetwrite/xlsx.metadataBytes": {
-      "actual": 6868,
+      "actual": 6584,
       "unit": "bytes",
       "category": "package-unpacked-metadata",
       "owner": "@sheetwrite/xlsx"
     },
     "package.@sheetwrite/xlsx.runtimeJsBytes": {
-      "actual": 352865,
+      "actual": 317591,
       "unit": "bytes",
       "category": "package-unpacked-runtime-js",
       "owner": "@sheetwrite/xlsx"
@@ -1394,13 +1340,13 @@
       "owner": "@sheetwrite/xlsx"
     },
     "package.@sheetwrite/xlsx.tarballBytes": {
-      "actual": 93878,
+      "actual": 83656,
       "unit": "bytes",
       "category": "package-tarball",
       "owner": "@sheetwrite/xlsx"
     },
     "package.@sheetwrite/xlsx.unpackedBytes": {
-      "actual": 361897,
+      "actual": 326339,
       "unit": "bytes",
       "category": "package-unpacked",
       "owner": "@sheetwrite/xlsx"
@@ -1431,39 +1377,39 @@
     },
     {
       "name": "@sheetwrite/core",
-      "tarballBytes": 447735,
-      "unpackedBytes": 2010673,
-      "fileCount": 197,
+      "tarballBytes": 429805,
+      "unpackedBytes": 1894170,
+      "fileCount": 187,
       "categories": {
-        "assets": 24803,
-        "css": 83162,
-        "declarations": 316025,
+        "assets": 18537,
+        "css": 73002,
+        "declarations": 305766,
         "maps": 0,
-        "metadata": 8953,
-        "runtime-js": 1577730,
+        "metadata": 8846,
+        "runtime-js": 1488019,
         "runtime-source": 0,
         "wasm": 0
       }
     },
     {
       "name": "@sheetwrite/formulas",
-      "tarballBytes": 590080,
-      "unpackedBytes": 1574156,
+      "tarballBytes": 584943,
+      "unpackedBytes": 1559185,
       "fileCount": 12,
       "categories": {
         "assets": 0,
         "css": 0,
-        "declarations": 42512,
+        "declarations": 41865,
         "maps": 0,
         "metadata": 15995,
-        "runtime-js": 88886,
+        "runtime-js": 87270,
         "runtime-source": 0,
-        "wasm": 1426763
+        "wasm": 1414055
       }
     },
     {
       "name": "@sheetwrite/react",
-      "tarballBytes": 6436,
+      "tarballBytes": 6435,
       "unpackedBytes": 19902,
       "fileCount": 6,
       "categories": {
@@ -1479,7 +1425,7 @@
     },
     {
       "name": "@sheetwrite/svelte",
-      "tarballBytes": 6474,
+      "tarballBytes": 6473,
       "unpackedBytes": 17806,
       "fileCount": 10,
       "categories": {
@@ -1495,7 +1441,7 @@
     },
     {
       "name": "@sheetwrite/vue",
-      "tarballBytes": 7457,
+      "tarballBytes": 7456,
       "unpackedBytes": 22191,
       "fileCount": 6,
       "categories": {
@@ -1511,8 +1457,8 @@
     },
     {
       "name": "@sheetwrite/wasm",
-      "tarballBytes": 415178,
-      "unpackedBytes": 1148644,
+      "tarballBytes": 414764,
+      "unpackedBytes": 1147271,
       "fileCount": 12,
       "categories": {
         "assets": 0,
@@ -1522,21 +1468,21 @@
         "metadata": 5564,
         "runtime-js": 85010,
         "runtime-source": 0,
-        "wasm": 1016792
+        "wasm": 1015419
       }
     },
     {
       "name": "@sheetwrite/xlsx",
-      "tarballBytes": 93878,
-      "unpackedBytes": 361897,
-      "fileCount": 29,
+      "tarballBytes": 83656,
+      "unpackedBytes": 326339,
+      "fileCount": 26,
       "categories": {
         "assets": 0,
         "css": 0,
         "declarations": 2164,
         "maps": 0,
-        "metadata": 6868,
-        "runtime-js": 352865,
+        "metadata": 6584,
+        "runtime-js": 317591,
         "runtime-source": 0,
         "wasm": 0
       }
@@ -1546,39 +1492,39 @@
     {
       "name": "core",
       "packageCount": 3,
-      "logicalBytes": 3956059,
-      "packages": ["@sheetwrite/core@0.6.1", "@sheetwrite/wasm@0.6.1", "fflate@0.8.3"]
+      "logicalBytes": 3838183,
+      "packages": ["@sheetwrite/core@0.6.0", "@sheetwrite/wasm@0.6.0", "fflate@0.8.3"]
     },
     {
       "name": "core-charts",
       "packageCount": 4,
-      "logicalBytes": 4007620,
+      "logicalBytes": 3889744,
       "packages": [
-        "@sheetwrite/charts@0.6.1",
-        "@sheetwrite/core@0.6.1",
-        "@sheetwrite/wasm@0.6.1",
+        "@sheetwrite/charts@0.6.0",
+        "@sheetwrite/core@0.6.0",
+        "@sheetwrite/wasm@0.6.0",
         "fflate@0.8.3"
       ]
     },
     {
       "name": "core-xlsx",
       "packageCount": 4,
-      "logicalBytes": 4317956,
+      "logicalBytes": 4164522,
       "packages": [
-        "@sheetwrite/core@0.6.1",
-        "@sheetwrite/wasm@0.6.1",
-        "@sheetwrite/xlsx@0.6.1",
+        "@sheetwrite/core@0.6.0",
+        "@sheetwrite/wasm@0.6.0",
+        "@sheetwrite/xlsx@0.6.0",
         "fflate@0.8.3"
       ]
     },
     {
       "name": "react",
       "packageCount": 5,
-      "logicalBytes": 4147565,
+      "logicalBytes": 4029689,
       "packages": [
-        "@sheetwrite/core@0.6.1",
-        "@sheetwrite/react@0.6.1",
-        "@sheetwrite/wasm@0.6.1",
+        "@sheetwrite/core@0.6.0",
+        "@sheetwrite/react@0.6.0",
+        "@sheetwrite/wasm@0.6.0",
         "fflate@0.8.3",
         "react@19.2.7"
       ]
@@ -1586,16 +1532,16 @@
     {
       "name": "svelte",
       "packageCount": 24,
-      "logicalBytes": 9008727,
+      "logicalBytes": 8890851,
       "packages": [
         "@jridgewell/gen-mapping@0.3.13",
         "@jridgewell/remapping@2.3.5",
         "@jridgewell/resolve-uri@3.1.2",
         "@jridgewell/sourcemap-codec@1.5.5",
         "@jridgewell/trace-mapping@0.3.31",
-        "@sheetwrite/core@0.6.1",
-        "@sheetwrite/svelte@0.6.1",
-        "@sheetwrite/wasm@0.6.1",
+        "@sheetwrite/core@0.6.0",
+        "@sheetwrite/svelte@0.6.0",
+        "@sheetwrite/wasm@0.6.0",
         "@sveltejs/acorn-typescript@1.0.11",
         "@types/estree@1.0.9",
         "@types/trusted-types@2.0.7",
@@ -1617,16 +1563,16 @@
     {
       "name": "vue",
       "packageCount": 27,
-      "logicalBytes": 20836788,
+      "logicalBytes": 20718912,
       "packages": [
         "@babel/helper-string-parser@7.29.7",
         "@babel/helper-validator-identifier@7.29.7",
         "@babel/parser@7.29.7",
         "@babel/types@7.29.7",
         "@jridgewell/sourcemap-codec@1.5.5",
-        "@sheetwrite/core@0.6.1",
-        "@sheetwrite/vue@0.6.1",
-        "@sheetwrite/wasm@0.6.1",
+        "@sheetwrite/core@0.6.0",
+        "@sheetwrite/vue@0.6.0",
+        "@sheetwrite/wasm@0.6.0",
         "@vue/compiler-core@3.5.39",
         "@vue/compiler-dom@3.5.39",
         "@vue/compiler-sfc@3.5.39",
@@ -1680,35 +1626,35 @@
               "sha256": "2c752a401191671d5bbbe7514f5828bbb0a7cc50bfbe77ddaf1b1ccba4412ed2"
             },
             {
-              "path": "test/bundler-fixtures/next/.next/static/chunks/59-37ad7f97fc249e7c.js",
-              "sha256": "ee3c28b1b43d6aa54c24eb0f68a323981f29305742ed41459523dd4c24929115"
+              "path": "test/bundler-fixtures/next/.next/static/chunks/719-d21b2892a67a8cb5.js",
+              "sha256": "43cba533215ee33a3b2126889a1e81482a90605ffae970f01ed6eb2723330c54"
             },
             {
-              "path": "test/bundler-fixtures/next/.next/static/chunks/app/attribution/page-770aaf629a3a19f4.js",
-              "sha256": "3b71e758d8e9ac0ec7724f667c78a47514add14b7dedc459877cd5fa8f1f1e2c"
+              "path": "test/bundler-fixtures/next/.next/static/chunks/app/attribution/page-5fcb36ef53246a19.js",
+              "sha256": "0a83a1414dcf5f34f75b89260f41175ae7782819a74917bf6f9a07bb6c629734"
             },
             {
-              "path": "test/bundler-fixtures/next/.next/static/chunks/main-app-baa34fb599e3e298.js",
-              "sha256": "25bf671740a85bc962009d5e2d21fd9bf2f6a6e0bd2f63fda110309a464678f2"
+              "path": "test/bundler-fixtures/next/.next/static/chunks/main-app-3ae098419adfd3b5.js",
+              "sha256": "01b816fe567415187f5da78cd757f4f50cbc28109ce070f1fa39e81b5d882187"
             },
             {
               "path": "test/bundler-fixtures/next/.next/static/chunks/polyfills-42372ed130431b0a.js",
               "sha256": "0973c1d64c88adc8e3c950410cb58b288f72118d5965b78049438deb8f2f9683"
             },
             {
-              "path": "test/bundler-fixtures/next/.next/static/chunks/webpack-886e189effc71be7.js",
-              "sha256": "01c8076ba69c97ce1c04b92dfc86c9093cd2f7607625e774ef2931f3705139e1"
+              "path": "test/bundler-fixtures/next/.next/static/chunks/webpack-66f2605f8b21fed9.js",
+              "sha256": "7f000ac9d2e795fe43ccbf4d1db9325f193bd63b1299f5c93ce01cdff07c8b05"
             }
           ],
-          "generatedBytes": 1073543,
+          "generatedBytes": 1077437,
           "modules": [
             {
               "id": "@sheetwrite/core/dist/a1.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 1580,
-              "gzipBytes": 698,
-              "brotliBytes": 630
+              "rawBytes": 1310,
+              "gzipBytes": 645,
+              "brotliBytes": 580
             },
             {
               "id": "@sheetwrite/core/dist/action-feedback.js",
@@ -1722,49 +1668,49 @@
               "id": "@sheetwrite/core/dist/aria-mirror.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 4397,
-              "gzipBytes": 1585,
-              "brotliBytes": 1380
+              "rawBytes": 4320,
+              "gzipBytes": 1423,
+              "brotliBytes": 1232
             },
             {
               "id": "@sheetwrite/core/dist/atomic-batch.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 2218,
+              "rawBytes": 2219,
               "gzipBytes": 1071,
-              "brotliBytes": 981
+              "brotliBytes": 983
             },
             {
               "id": "@sheetwrite/core/dist/canvas-paint.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 11171,
-              "gzipBytes": 4715,
-              "brotliBytes": 4292
+              "rawBytes": 11173,
+              "gzipBytes": 4721,
+              "brotliBytes": 4291
             },
             {
               "id": "@sheetwrite/core/dist/canvas-renderer.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 1975,
+              "rawBytes": 1973,
               "gzipBytes": 789,
-              "brotliBytes": 673
+              "brotliBytes": 672
             },
             {
               "id": "@sheetwrite/core/dist/cell-input.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 1294,
-              "gzipBytes": 523,
-              "brotliBytes": 449
+              "rawBytes": 1291,
+              "gzipBytes": 524,
+              "brotliBytes": 451
             },
             {
               "id": "@sheetwrite/core/dist/cell-style-fields.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 334,
-              "gzipBytes": 236,
-              "brotliBytes": 204
+              "rawBytes": 472,
+              "gzipBytes": 320,
+              "brotliBytes": 277
             },
             {
               "id": "@sheetwrite/core/dist/chart-backend.js",
@@ -1786,17 +1732,17 @@
               "id": "@sheetwrite/core/dist/clipboard-controller.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 13595,
-              "gzipBytes": 4697,
-              "brotliBytes": 4245
+              "rawBytes": 13435,
+              "gzipBytes": 4618,
+              "brotliBytes": 4160
             },
             {
               "id": "@sheetwrite/core/dist/clipboard.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 226,
-              "gzipBytes": 179,
-              "brotliBytes": 160
+              "rawBytes": 233,
+              "gzipBytes": 183,
+              "brotliBytes": 163
             },
             {
               "id": "@sheetwrite/core/dist/column-index.js",
@@ -1810,9 +1756,9 @@
               "id": "@sheetwrite/core/dist/command-icons.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 142,
-              "gzipBytes": 133,
-              "brotliBytes": 82
+              "rawBytes": 215,
+              "gzipBytes": 183,
+              "brotliBytes": 131
             },
             {
               "id": "@sheetwrite/core/dist/conditional-format.js",
@@ -1826,16 +1772,16 @@
               "id": "@sheetwrite/core/dist/context-menu.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 10299,
-              "gzipBytes": 3221,
-              "brotliBytes": 2864
+              "rawBytes": 10261,
+              "gzipBytes": 3207,
+              "brotliBytes": 2850
             },
             {
               "id": "@sheetwrite/core/dist/custom-editor.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 4708,
-              "gzipBytes": 1639,
+              "gzipBytes": 1637,
               "brotliBytes": 1413
             },
             {
@@ -1843,8 +1789,8 @@
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 26688,
-              "gzipBytes": 7317,
-              "brotliBytes": 6654
+              "gzipBytes": 7316,
+              "brotliBytes": 6649
             },
             {
               "id": "@sheetwrite/core/dist/date-serial.js",
@@ -1858,33 +1804,33 @@
               "id": "@sheetwrite/core/dist/delimited-text.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 4762,
-              "gzipBytes": 1872,
-              "brotliBytes": 1699
+              "rawBytes": 4760,
+              "gzipBytes": 1871,
+              "brotliBytes": 1697
             },
             {
               "id": "@sheetwrite/core/dist/document-controller.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 20790,
-              "gzipBytes": 5568,
-              "brotliBytes": 5050
+              "rawBytes": 20789,
+              "gzipBytes": 5566,
+              "brotliBytes": 5053
             },
             {
               "id": "@sheetwrite/core/dist/document-protocol.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 48816,
-              "gzipBytes": 14009,
-              "brotliBytes": 12427
+              "rawBytes": 48770,
+              "gzipBytes": 13992,
+              "brotliBytes": 12430
             },
             {
               "id": "@sheetwrite/core/dist/dom-overlay.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 10107,
-              "gzipBytes": 3476,
-              "brotliBytes": 3083
+              "gzipBytes": 3479,
+              "brotliBytes": 3079
             },
             {
               "id": "@sheetwrite/core/dist/editor.js",
@@ -1892,47 +1838,47 @@
               "attribution": "source-map",
               "rawBytes": 3074,
               "gzipBytes": 1137,
-              "brotliBytes": 990
+              "brotliBytes": 960
             },
             {
               "id": "@sheetwrite/core/dist/engine.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 810,
-              "gzipBytes": 446,
-              "brotliBytes": 375
+              "rawBytes": 809,
+              "gzipBytes": 444,
+              "brotliBytes": 369
             },
             {
               "id": "@sheetwrite/core/dist/errors.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 7069,
-              "gzipBytes": 2621,
-              "brotliBytes": 2349
+              "rawBytes": 7034,
+              "gzipBytes": 2613,
+              "brotliBytes": 2344
             },
             {
               "id": "@sheetwrite/core/dist/export.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 1956,
-              "gzipBytes": 1072,
-              "brotliBytes": 891
+              "rawBytes": 1951,
+              "gzipBytes": 1070,
+              "brotliBytes": 889
             },
             {
               "id": "@sheetwrite/core/dist/fenwick.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 2834,
-              "gzipBytes": 929,
-              "brotliBytes": 849
+              "gzipBytes": 928,
+              "brotliBytes": 847
             },
             {
               "id": "@sheetwrite/core/dist/fill-series.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 529,
+              "rawBytes": 527,
               "gzipBytes": 332,
-              "brotliBytes": 301
+              "brotliBytes": 290
             },
             {
               "id": "@sheetwrite/core/dist/find-bar.js",
@@ -1940,47 +1886,47 @@
               "attribution": "source-map",
               "rawBytes": 3261,
               "gzipBytes": 1145,
-              "brotliBytes": 976
+              "brotliBytes": 977
             },
             {
               "id": "@sheetwrite/core/dist/format-presets.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 2277,
-              "gzipBytes": 1180,
-              "brotliBytes": 1072
+              "rawBytes": 2209,
+              "gzipBytes": 1137,
+              "brotliBytes": 1031
             },
             {
               "id": "@sheetwrite/core/dist/formula-assist.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 5214,
-              "gzipBytes": 2264,
-              "brotliBytes": 1969
+              "gzipBytes": 2263,
+              "brotliBytes": 1970
             },
             {
               "id": "@sheetwrite/core/dist/geometry-layout-controller.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 6828,
-              "gzipBytes": 1938,
-              "brotliBytes": 1775
+              "rawBytes": 6797,
+              "gzipBytes": 1915,
+              "brotliBytes": 1757
             },
             {
               "id": "@sheetwrite/core/dist/grid.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 66458,
-              "gzipBytes": 18054,
-              "brotliBytes": 15996
+              "rawBytes": 65718,
+              "gzipBytes": 17799,
+              "brotliBytes": 15767
             },
             {
               "id": "@sheetwrite/core/dist/history.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 4051,
-              "gzipBytes": 1414,
-              "brotliBytes": 1325
+              "gzipBytes": 1415,
+              "brotliBytes": 1326
             },
             {
               "id": "@sheetwrite/core/dist/hyperlink.js",
@@ -1988,46 +1934,46 @@
               "attribution": "source-map",
               "rawBytes": 4164,
               "gzipBytes": 1612,
-              "brotliBytes": 1449
+              "brotliBytes": 1448
             },
             {
               "id": "@sheetwrite/core/dist/icons/resolve.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 301,
-              "gzipBytes": 233,
-              "brotliBytes": 195
+              "rawBytes": 175,
+              "gzipBytes": 151,
+              "brotliBytes": 117
             },
             {
               "id": "@sheetwrite/core/dist/interaction-sessions.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 20120,
-              "gzipBytes": 5842,
-              "brotliBytes": 5274
+              "rawBytes": 20147,
+              "gzipBytes": 5854,
+              "brotliBytes": 5280
             },
             {
               "id": "@sheetwrite/core/dist/keymap.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 4192,
-              "gzipBytes": 1998,
-              "brotliBytes": 1762
+              "rawBytes": 4237,
+              "gzipBytes": 2024,
+              "brotliBytes": 1780
             },
             {
               "id": "@sheetwrite/core/dist/mutation-revision-index.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 1888,
-              "gzipBytes": 721,
-              "brotliBytes": 641
+              "gzipBytes": 716,
+              "brotliBytes": 637
             },
             {
               "id": "@sheetwrite/core/dist/note-popover.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 3357,
-              "gzipBytes": 1159,
+              "gzipBytes": 1157,
               "brotliBytes": 978
             },
             {
@@ -2043,24 +1989,24 @@
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 11267,
-              "gzipBytes": 3919,
-              "brotliBytes": 3495
+              "gzipBytes": 3923,
+              "brotliBytes": 3498
             },
             {
               "id": "@sheetwrite/core/dist/overlay-painter.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 16528,
-              "gzipBytes": 5278,
-              "brotliBytes": 4685
+              "gzipBytes": 5280,
+              "brotliBytes": 4692
             },
             {
               "id": "@sheetwrite/core/dist/panels/panel-loader.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 2154,
-              "gzipBytes": 912,
-              "brotliBytes": 862
+              "rawBytes": 2251,
+              "gzipBytes": 980,
+              "brotliBytes": 920
             },
             {
               "id": "@sheetwrite/core/dist/pivot.js",
@@ -2074,152 +2020,152 @@
               "id": "@sheetwrite/core/dist/plain-data.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 1090,
-              "gzipBytes": 587,
-              "brotliBytes": 536
+              "rawBytes": 990,
+              "gzipBytes": 531,
+              "brotliBytes": 479
             },
             {
               "id": "@sheetwrite/core/dist/read-window-controller.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 12037,
-              "gzipBytes": 3495,
-              "brotliBytes": 3211
+              "rawBytes": 11965,
+              "gzipBytes": 3480,
+              "brotliBytes": 3188
             },
             {
               "id": "@sheetwrite/core/dist/reference.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 1299,
-              "gzipBytes": 524,
-              "brotliBytes": 472
+              "gzipBytes": 523,
+              "brotliBytes": 471
             },
             {
               "id": "@sheetwrite/core/dist/resize.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 225,
-              "gzipBytes": 173,
-              "brotliBytes": 159
+              "rawBytes": 228,
+              "gzipBytes": 174,
+              "brotliBytes": 152
             },
             {
               "id": "@sheetwrite/core/dist/resource-accounting.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 4697,
-              "gzipBytes": 1893,
-              "brotliBytes": 1690
+              "rawBytes": 4688,
+              "gzipBytes": 1889,
+              "brotliBytes": 1684
             },
             {
               "id": "@sheetwrite/core/dist/restore-block-codec.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 2836,
-              "gzipBytes": 1506,
-              "brotliBytes": 1402
+              "rawBytes": 2887,
+              "gzipBytes": 1538,
+              "brotliBytes": 1417
             },
             {
               "id": "@sheetwrite/core/dist/restore-block.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 1773,
-              "gzipBytes": 787,
-              "brotliBytes": 697
+              "rawBytes": 1736,
+              "gzipBytes": 764,
+              "brotliBytes": 681
             },
             {
               "id": "@sheetwrite/core/dist/ribbon/ribbon-metrics.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 298,
-              "gzipBytes": 236,
-              "brotliBytes": 202
+              "rawBytes": 81,
+              "gzipBytes": 91,
+              "brotliBytes": 71
             },
             {
               "id": "@sheetwrite/core/dist/search-controller.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 6607,
-              "gzipBytes": 2281,
-              "brotliBytes": 2073
+              "rawBytes": 6535,
+              "gzipBytes": 2261,
+              "brotliBytes": 2055
             },
             {
               "id": "@sheetwrite/core/dist/search-replace.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 552,
-              "gzipBytes": 287,
-              "brotliBytes": 254
+              "rawBytes": 351,
+              "gzipBytes": 217,
+              "brotliBytes": 185
             },
             {
               "id": "@sheetwrite/core/dist/selection.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 2765,
-              "gzipBytes": 927,
-              "brotliBytes": 831
+              "gzipBytes": 928,
+              "brotliBytes": 835
             },
             {
               "id": "@sheetwrite/core/dist/sheet-lifecycle.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 3010,
-              "gzipBytes": 1010,
-              "brotliBytes": 926
+              "rawBytes": 3036,
+              "gzipBytes": 1016,
+              "brotliBytes": 923
             },
             {
               "id": "@sheetwrite/core/dist/sheet-name.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 561,
-              "gzipBytes": 392,
-              "brotliBytes": 337
+              "rawBytes": 505,
+              "gzipBytes": 355,
+              "brotliBytes": 306
             },
             {
               "id": "@sheetwrite/core/dist/sheet-tabs.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 19138,
-              "gzipBytes": 5002,
-              "brotliBytes": 4492
+              "rawBytes": 19142,
+              "gzipBytes": 5006,
+              "brotliBytes": 4488
             },
             {
               "id": "@sheetwrite/core/dist/side-panel.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 1095,
-              "gzipBytes": 518,
-              "brotliBytes": 411
+              "rawBytes": 1084,
+              "gzipBytes": 513,
+              "brotliBytes": 408
             },
             {
               "id": "@sheetwrite/core/dist/store.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 13745,
-              "gzipBytes": 4190,
-              "brotliBytes": 3754
+              "rawBytes": 13664,
+              "gzipBytes": 4159,
+              "brotliBytes": 3723
             },
             {
               "id": "@sheetwrite/core/dist/store/data-engine.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 65016,
-              "gzipBytes": 17442,
-              "brotliBytes": 15241
+              "rawBytes": 65241,
+              "gzipBytes": 17483,
+              "brotliBytes": 15298
             },
             {
               "id": "@sheetwrite/core/dist/store/engine-registry.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 388,
-              "gzipBytes": 285,
-              "brotliBytes": 250
+              "rawBytes": 313,
+              "gzipBytes": 246,
+              "brotliBytes": 209
             },
             {
               "id": "@sheetwrite/core/dist/store/mutation-policy.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 8641,
-              "gzipBytes": 2692,
+              "gzipBytes": 2694,
               "brotliBytes": 2438
             },
             {
@@ -2227,16 +2173,16 @@
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 9576,
-              "gzipBytes": 3220,
-              "brotliBytes": 2935
+              "gzipBytes": 3223,
+              "brotliBytes": 2936
             },
             {
               "id": "@sheetwrite/core/dist/store/ranges.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 5989,
-              "gzipBytes": 2027,
-              "brotliBytes": 1826
+              "gzipBytes": 2028,
+              "brotliBytes": 1832
             },
             {
               "id": "@sheetwrite/core/dist/store/snapshot-codec.js",
@@ -2244,39 +2190,39 @@
               "attribution": "source-map",
               "rawBytes": 3623,
               "gzipBytes": 1285,
-              "brotliBytes": 1146
+              "brotliBytes": 1145
             },
             {
               "id": "@sheetwrite/core/dist/store/view-state.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 7160,
-              "gzipBytes": 2465,
-              "brotliBytes": 2221
+              "gzipBytes": 2468,
+              "brotliBytes": 2220
             },
             {
               "id": "@sheetwrite/core/dist/store/window-reader.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 13540,
-              "gzipBytes": 4270,
-              "brotliBytes": 3868
+              "rawBytes": 13502,
+              "gzipBytes": 4275,
+              "brotliBytes": 3862
             },
             {
               "id": "@sheetwrite/core/dist/store/wire-tags.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 43,
-              "gzipBytes": 50,
-              "brotliBytes": 39
+              "rawBytes": 81,
+              "gzipBytes": 64,
+              "brotliBytes": 54
             },
             {
               "id": "@sheetwrite/core/dist/style-actions.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 6680,
-              "gzipBytes": 2313,
-              "brotliBytes": 2106
+              "rawBytes": 6695,
+              "gzipBytes": 2326,
+              "brotliBytes": 2121
             },
             {
               "id": "@sheetwrite/core/dist/style-dictionary.js",
@@ -2284,7 +2230,15 @@
               "attribution": "source-map",
               "rawBytes": 1031,
               "gzipBytes": 527,
-              "brotliBytes": 437
+              "brotliBytes": 443
+            },
+            {
+              "id": "@sheetwrite/core/dist/toolbar.js",
+              "owner": "@sheetwrite/core",
+              "attribution": "source-map",
+              "rawBytes": 5779,
+              "gzipBytes": 2192,
+              "brotliBytes": 1936
             },
             {
               "id": "@sheetwrite/core/dist/transaction-admission.js",
@@ -2298,25 +2252,25 @@
               "id": "@sheetwrite/core/dist/transaction-preparation.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 2780,
-              "gzipBytes": 1268,
-              "brotliBytes": 1144
+              "rawBytes": 2760,
+              "gzipBytes": 1258,
+              "brotliBytes": 1130
             },
             {
               "id": "@sheetwrite/core/dist/validation-editor.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 5121,
-              "gzipBytes": 1687,
-              "brotliBytes": 1444
+              "gzipBytes": 1684,
+              "brotliBytes": 1441
             },
             {
               "id": "@sheetwrite/core/dist/virtualization.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 459,
-              "gzipBytes": 242,
-              "brotliBytes": 216
+              "rawBytes": 468,
+              "gzipBytes": 245,
+              "brotliBytes": 215
             },
             {
               "id": "@sheetwrite/core/dist/widget-theme.js",
@@ -2332,55 +2286,55 @@
               "attribution": "source-map",
               "rawBytes": 7032,
               "gzipBytes": 2709,
-              "brotliBytes": 2464
+              "brotliBytes": 2466
             },
             {
               "id": "@sheetwrite/core/dist/worker-renderer.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 6154,
-              "gzipBytes": 2137,
-              "brotliBytes": 1857
+              "gzipBytes": 2138,
+              "brotliBytes": 1868
             },
             {
               "id": "@sheetwrite/core/dist/xlsx-source.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 384,
-              "gzipBytes": 267,
-              "brotliBytes": 231
+              "rawBytes": 377,
+              "gzipBytes": 262,
+              "brotliBytes": 228
             },
             {
               "id": "@sheetwrite/wasm/loader-browser.mjs",
               "owner": "@sheetwrite/wasm",
               "attribution": "source-map",
-              "rawBytes": 249,
-              "gzipBytes": 176,
-              "brotliBytes": 149
+              "rawBytes": 253,
+              "gzipBytes": 180,
+              "brotliBytes": 151
             },
             {
               "id": "@sheetwrite/wasm/loader-state.mjs",
               "owner": "@sheetwrite/wasm",
               "attribution": "source-map",
-              "rawBytes": 502,
-              "gzipBytes": 299,
-              "brotliBytes": 243
+              "rawBytes": 498,
+              "gzipBytes": 297,
+              "brotliBytes": 238
             },
             {
               "id": "@sheetwrite/wasm/pkg/sheetwrite_wasm_factory.js",
               "owner": "@sheetwrite/wasm",
               "attribution": "source-map",
               "rawBytes": 24596,
-              "gzipBytes": 5296,
-              "brotliBytes": 4589
+              "gzipBytes": 5297,
+              "brotliBytes": 4591
             },
             {
               "id": "@sheetwrite/wasm/pkg/sheetwrite_wasm.js",
               "owner": "@sheetwrite/wasm",
               "attribution": "source-map",
               "rawBytes": 151,
-              "gzipBytes": 133,
-              "brotliBytes": 112
+              "gzipBytes": 135,
+              "brotliBytes": 114
             },
             {
               "id": "@swc/helpers/esm/_class_private_field_loose_base.js",
@@ -2419,16 +2373,16 @@
               "owner": "fflate",
               "attribution": "source-map",
               "rawBytes": 8207,
-              "gzipBytes": 4204,
+              "gzipBytes": 4205,
               "brotliBytes": 3818
             },
             {
               "id": "fixture/app/attribution/page.tsx",
               "owner": "fixture",
               "attribution": "source-map",
-              "rawBytes": 145,
-              "gzipBytes": 149,
-              "brotliBytes": 120
+              "rawBytes": 190,
+              "gzipBytes": 182,
+              "brotliBytes": 153
             },
             {
               "id": "fixture/src/client/add-base-path.ts",
@@ -3418,9 +3372,9 @@
               "id": "next:runtime",
               "owner": "next:runtime",
               "attribution": "source-map",
-              "rawBytes": 1275,
-              "gzipBytes": 461,
-              "brotliBytes": 403
+              "rawBytes": 1232,
+              "gzipBytes": 451,
+              "brotliBytes": 413
             },
             {
               "id": "next:runtime/webpack/bootstrap",
@@ -3435,8 +3389,8 @@
               "owner": "next:runtime",
               "attribution": "source-map",
               "rawBytes": 347,
-              "gzipBytes": 257,
-              "brotliBytes": 234
+              "gzipBytes": 258,
+              "brotliBytes": 235
             },
             {
               "id": "next:runtime/webpack/runtime/create fake namespace object",
@@ -3466,9 +3420,9 @@
               "id": "next:runtime/webpack/runtime/get javascript chunk filename",
               "owner": "next:runtime",
               "attribution": "source-map",
-              "rawBytes": 157,
-              "gzipBytes": 148,
-              "brotliBytes": 133
+              "rawBytes": 112,
+              "gzipBytes": 122,
+              "brotliBytes": 116
             },
             {
               "id": "next:runtime/webpack/runtime/get mini-css chunk filename",
@@ -3500,7 +3454,7 @@
               "attribution": "source-map",
               "rawBytes": 835,
               "gzipBytes": 540,
-              "brotliBytes": 488
+              "brotliBytes": 482
             },
             {
               "id": "next:runtime/webpack/runtime/load script",
@@ -3508,7 +3462,7 @@
               "attribution": "source-map",
               "rawBytes": 739,
               "gzipBytes": 444,
-              "brotliBytes": 354
+              "brotliBytes": 350
             },
             {
               "id": "next:runtime/webpack/runtime/make namespace object",
@@ -3707,46 +3661,6 @@
       ],
       "assets": [
         {
-          "path": "test/bundler-fixtures/next/.next/static/ao7CZH9rhIYzo_L82AG0j/_buildManifest.js",
-          "kind": "javascript",
-          "owner": "next-async",
-          "roles": ["next-async"],
-          "rawBytes": 543,
-          "gzipBytes": 306,
-          "brotliBytes": 262,
-          "sha256": "9de87d6d2d392f8791be55e547eb3eb7764d034dcc178ed624a3c5a339f35807"
-        },
-        {
-          "path": "test/bundler-fixtures/next/.next/static/ao7CZH9rhIYzo_L82AG0j/_ssgManifest.js",
-          "kind": "javascript",
-          "owner": "next-async",
-          "roles": ["next-async"],
-          "rawBytes": 80,
-          "gzipBytes": 64,
-          "brotliBytes": 67,
-          "sha256": "678f6ce2cb80b1fe72fc67e7412be6e2ab6ada083111b64f7c40d35e3cba5e00"
-        },
-        {
-          "path": "test/bundler-fixtures/next/.next/static/chunks/10.2c0c0609ffccba40.js",
-          "kind": "javascript",
-          "owner": "next-async",
-          "roles": ["next-async"],
-          "rawBytes": 8963,
-          "gzipBytes": 2934,
-          "brotliBytes": 2609,
-          "sha256": "86e31bf1a994d854aab31bdba0c1002dbae02af1e82eb9beaa5d27bbaa5f4885"
-        },
-        {
-          "path": "test/bundler-fixtures/next/.next/static/chunks/240.dc2d251e3bda6ebc.js",
-          "kind": "javascript",
-          "owner": "next-async",
-          "roles": ["next-async"],
-          "rawBytes": 6824,
-          "gzipBytes": 2535,
-          "brotliBytes": 2243,
-          "sha256": "c03014430c81717eb78651bbc3636fbae5bca713a1bdbbd81596bdd6725930bf"
-        },
-        {
           "path": "test/bundler-fixtures/next/.next/static/chunks/255-293e44824f2ec188.js",
           "kind": "javascript",
           "owner": "shared:core-initial+core-attribution-initial",
@@ -3755,16 +3669,6 @@
           "gzipBytes": 46193,
           "brotliBytes": 37794,
           "sha256": "4ba8283a24d0bdae7333962d50de4b47a38fdd3b3f6c5125103c8a4bd00d9fc6"
-        },
-        {
-          "path": "test/bundler-fixtures/next/.next/static/chunks/452.7349be8620329dc5.js",
-          "kind": "javascript",
-          "owner": "next-async",
-          "roles": ["next-async"],
-          "rawBytes": 27875,
-          "gzipBytes": 8540,
-          "brotliBytes": 7648,
-          "sha256": "a7e1b2b6ee1f8d61744e89085103113de95ad4825f94e14efaad55d3048df1dd"
         },
         {
           "path": "test/bundler-fixtures/next/.next/static/chunks/4bd1b696-c023c6e3521b1417.js",
@@ -3787,64 +3691,74 @@
           "sha256": "82dff8919709fbf4cc75db630f8ef1d0d52cce61aa52f591f6064ef05186f860"
         },
         {
-          "path": "test/bundler-fixtures/next/.next/static/chunks/59-37ad7f97fc249e7c.js",
+          "path": "test/bundler-fixtures/next/.next/static/chunks/719-d21b2892a67a8cb5.js",
           "kind": "javascript",
           "owner": "shared:core-initial+core-attribution-initial",
           "roles": ["core-attribution-initial", "core-initial"],
-          "rawBytes": 610649,
-          "gzipBytes": 174756,
-          "brotliBytes": 142690,
-          "sha256": "ee3c28b1b43d6aa54c24eb0f68a323981f29305742ed41459523dd4c24929115"
+          "rawBytes": 614587,
+          "gzipBytes": 175852,
+          "brotliBytes": 143797,
+          "sha256": "43cba533215ee33a3b2126889a1e81482a90605ffae970f01ed6eb2723330c54"
         },
         {
-          "path": "test/bundler-fixtures/next/.next/static/chunks/774.3722546d7d26252f.js",
+          "path": "test/bundler-fixtures/next/.next/static/chunks/729.340cdd6d9bc0a6ca.js",
+          "kind": "javascript",
+          "owner": "next-async",
+          "roles": ["next-async"],
+          "rawBytes": 31515,
+          "gzipBytes": 9263,
+          "brotliBytes": 8302,
+          "sha256": "4a8e6f2c1e1facdff7058affe710b7172723a32ea0a952212298ed116cfc5e50"
+        },
+        {
+          "path": "test/bundler-fixtures/next/.next/static/chunks/774.16b599cf216ddeef.js",
           "kind": "javascript",
           "owner": "next-async",
           "roles": ["next-async"],
           "rawBytes": 22838,
-          "gzipBytes": 8137,
+          "gzipBytes": 8136,
           "brotliBytes": 7300,
-          "sha256": "ad60e697cc265606959fe3f118b084991c4739248790787ab12a69f756da4bc3"
+          "sha256": "5c58e13a16f584998115bc1dce16a0ecb95c24f788dc941a5ef60c1639bf2f46"
         },
         {
-          "path": "test/bundler-fixtures/next/.next/static/chunks/app/_not-found/page-4e4d35e47763d2de.js",
+          "path": "test/bundler-fixtures/next/.next/static/chunks/app/_not-found/page-62035d96398e52b0.js",
           "kind": "javascript",
           "owner": "next-async",
           "roles": ["next-async"],
           "rawBytes": 2670,
           "gzipBytes": 999,
           "brotliBytes": 823,
-          "sha256": "de12705aabce8cf5b64efcc99bfec2cd3075ed4c4024eb0ad65c3646209f30fb"
+          "sha256": "55553bafdf957d2446ac0516c52c5a06dce69d2482bd21fe730b3d35a3f72e6b"
         },
         {
-          "path": "test/bundler-fixtures/next/.next/static/chunks/app/attribution/page-770aaf629a3a19f4.js",
+          "path": "test/bundler-fixtures/next/.next/static/chunks/app/attribution/page-5fcb36ef53246a19.js",
           "kind": "javascript",
           "owner": "core-attribution-initial",
           "roles": ["core-attribution-initial"],
-          "rawBytes": 389,
-          "gzipBytes": 304,
-          "brotliBytes": 259,
-          "sha256": "3b71e758d8e9ac0ec7724f667c78a47514add14b7dedc459877cd5fa8f1f1e2c"
+          "rawBytes": 390,
+          "gzipBytes": 306,
+          "brotliBytes": 261,
+          "sha256": "0a83a1414dcf5f34f75b89260f41175ae7782819a74917bf6f9a07bb6c629734"
         },
         {
-          "path": "test/bundler-fixtures/next/.next/static/chunks/app/layout-de98e7e35c283574.js",
+          "path": "test/bundler-fixtures/next/.next/static/chunks/app/layout-4f6a9f0f11bc772f.js",
           "kind": "javascript",
           "owner": "next-async",
           "roles": ["next-async"],
           "rawBytes": 195,
-          "gzipBytes": 170,
+          "gzipBytes": 169,
           "brotliBytes": 162,
-          "sha256": "3029afe667ed47c9f54848ac81e5ee5f8856050078babacfab322254db208ea0"
+          "sha256": "d65f289556130542c44875cce345a5258474099d94bd9c056203e494881c7fd7"
         },
         {
-          "path": "test/bundler-fixtures/next/.next/static/chunks/app/page-9cb507f604545c55.js",
+          "path": "test/bundler-fixtures/next/.next/static/chunks/app/page-6eb0b2b5b72c9d37.js",
           "kind": "javascript",
           "owner": "core-initial",
           "roles": ["core-initial"],
-          "rawBytes": 20374,
-          "gzipBytes": 6723,
+          "rawBytes": 20373,
+          "gzipBytes": 6722,
           "brotliBytes": 6058,
-          "sha256": "c6396143631efd6380c53a21768facc8f6c55e5c9d73fb17f788e70cd9e465ec"
+          "sha256": "b55767f6560eb082c437ef997ede94c9adbeea0a03717d50a6ef6b66d6952704"
         },
         {
           "path": "test/bundler-fixtures/next/.next/static/chunks/framework-acd67e14855de5a2.js",
@@ -3867,14 +3781,14 @@
           "sha256": "bf9d75ff4e23b0cfa620adc48dc19d4ad62e48bb34d5f7925e33d09c583ab7e1"
         },
         {
-          "path": "test/bundler-fixtures/next/.next/static/chunks/main-app-baa34fb599e3e298.js",
+          "path": "test/bundler-fixtures/next/.next/static/chunks/main-app-3ae098419adfd3b5.js",
           "kind": "javascript",
           "owner": "shared:core-initial+core-attribution-initial",
           "roles": ["core-attribution-initial", "core-initial"],
           "rawBytes": 557,
-          "gzipBytes": 227,
-          "brotliBytes": 202,
-          "sha256": "25bf671740a85bc962009d5e2d21fd9bf2f6a6e0bd2f63fda110309a464678f2"
+          "gzipBytes": 226,
+          "brotliBytes": 206,
+          "sha256": "01b816fe567415187f5da78cd757f4f50cbc28109ce070f1fa39e81b5d882187"
         },
         {
           "path": "test/bundler-fixtures/next/.next/static/chunks/pages/_app-7d307437aca18ad4.js",
@@ -3907,34 +3821,54 @@
           "sha256": "0973c1d64c88adc8e3c950410cb58b288f72118d5965b78049438deb8f2f9683"
         },
         {
-          "path": "test/bundler-fixtures/next/.next/static/chunks/webpack-886e189effc71be7.js",
+          "path": "test/bundler-fixtures/next/.next/static/chunks/webpack-66f2605f8b21fed9.js",
           "kind": "javascript",
           "owner": "shared:core-initial+core-attribution-initial",
           "roles": ["core-attribution-initial", "core-initial"],
-          "rawBytes": 3797,
-          "gzipBytes": 1935,
-          "brotliBytes": 1724,
-          "sha256": "01c8076ba69c97ce1c04b92dfc86c9093cd2f7607625e774ef2931f3705139e1"
+          "rawBytes": 3752,
+          "gzipBytes": 1895,
+          "brotliBytes": 1684,
+          "sha256": "7f000ac9d2e795fe43ccbf4d1db9325f193bd63b1299f5c93ce01cdff07c8b05"
         },
         {
-          "path": "test/bundler-fixtures/next/.next/static/css/07815baf21a6fd64.css",
+          "path": "test/bundler-fixtures/next/.next/static/css/bcaaab2a280e4b5d.css",
           "kind": "css",
           "owner": "shared:core-initial+core-attribution-initial",
           "roles": ["core-attribution-initial", "core-initial"],
-          "rawBytes": 66092,
-          "gzipBytes": 10711,
-          "brotliBytes": 9459,
-          "sha256": "57890c229ffe3bfa73d3e1b924666d8474aa105f25122925d30a637efd8261f6"
+          "rawBytes": 57218,
+          "gzipBytes": 9398,
+          "brotliBytes": 8354,
+          "sha256": "381ec7036aeff566037af647c50807afc89bf737a4fbc0aa94e525f89c419665"
         },
         {
-          "path": "test/bundler-fixtures/next/.next/static/media/sheetwrite_wasm_bg.a6349cf5.wasm",
+          "path": "test/bundler-fixtures/next/.next/static/media/sheetwrite_wasm_bg.38d3b0b4.wasm",
           "kind": "wasm",
           "owner": "core-initial",
           "roles": ["core-initial"],
-          "rawBytes": 1016792,
-          "gzipBytes": 388517,
-          "brotliBytes": 298064,
-          "sha256": "ce437c461d1b8faee3d164eb7849c680ac7b38a235c35528d90a598d4c9e9b85"
+          "rawBytes": 1015419,
+          "gzipBytes": 388099,
+          "brotliBytes": 297771,
+          "sha256": "ddd25ef7a3077104252b57355040fb54bbb4609f7bb13560634f42b9dcb8e4a0"
+        },
+        {
+          "path": "test/bundler-fixtures/next/.next/static/QBI1vYfFYNLxz5SnLHHMJ/_buildManifest.js",
+          "kind": "javascript",
+          "owner": "next-async",
+          "roles": ["next-async"],
+          "rawBytes": 543,
+          "gzipBytes": 306,
+          "brotliBytes": 262,
+          "sha256": "9de87d6d2d392f8791be55e547eb3eb7764d034dcc178ed624a3c5a339f35807"
+        },
+        {
+          "path": "test/bundler-fixtures/next/.next/static/QBI1vYfFYNLxz5SnLHHMJ/_ssgManifest.js",
+          "kind": "javascript",
+          "owner": "next-async",
+          "roles": ["next-async"],
+          "rawBytes": 80,
+          "gzipBytes": 64,
+          "brotliBytes": 67,
+          "sha256": "678f6ce2cb80b1fe72fc67e7412be6e2ab6ada083111b64f7c40d35e3cba5e00"
         }
       ]
     },
@@ -3960,24 +3894,24 @@
           "eagerImports": ["@sheetwrite/core#createGrid", "@sheetwrite/core#initSheetwrite"],
           "assets": [
             {
-              "path": "test/bundler-fixtures/vite/dist/assets/chart-definition-cUvFKT1O.js",
-              "sha256": "9492ccfabf55722bb81426ead8cd3089976f5bdb39b2d616e0de82b757775f48"
+              "path": "test/bundler-fixtures/vite/dist/assets/chart-definition-BJUtT0XG.js",
+              "sha256": "99e6af59e2ca94d0fb00dec7b47f9ffcb9d000ee5d2706935bcb4cce4fb7caab"
             },
             {
-              "path": "test/bundler-fixtures/vite/dist/assets/core-c3vYpm9t.js",
-              "sha256": "a9fa0a32a4384f501f0ae1f5b20ee4d06a49385602012255d0911aac95d62db8"
+              "path": "test/bundler-fixtures/vite/dist/assets/core-LJ3UbeUq.js",
+              "sha256": "76bcee4a24e1b8edce10920f5deeea3733dc7d75dec969c90dc2f67172d59ba7"
             },
             {
-              "path": "test/bundler-fixtures/vite/dist/assets/engine-registry-BtWZaBa1.js",
-              "sha256": "5c191427cf268c1b5c24e144dda16e98aedb1603a77709c43e32ea0b68cf699e"
+              "path": "test/bundler-fixtures/vite/dist/assets/engine-registry-Y5wD8JOx.js",
+              "sha256": "83b0802aee0522b16aff3f1eb14dbe9d886e5c153c65a52ed1797bace7969db7"
             },
             {
-              "path": "test/bundler-fixtures/vite/dist/assets/export-BYL2LhlM.js",
-              "sha256": "e36307a30e5f14e42b07ff972bd9041136ccdf5075465c17fcc6127031f6afed"
+              "path": "test/bundler-fixtures/vite/dist/assets/export-Q_DUddyZ.js",
+              "sha256": "967c9cf873e709fdaae3908b07361ea61422099c698f9079ceb920f151948c33"
             },
             {
-              "path": "test/bundler-fixtures/vite/dist/assets/grid-BkQ2HNg7.js",
-              "sha256": "c499e675bc64cec850bcbc2c71233d67824e9d523384f48d197985d081714750"
+              "path": "test/bundler-fixtures/vite/dist/assets/grid-Ch60udE7.js",
+              "sha256": "b583d978432a7058b0eeffe06f2b5e5ab2359a86ef671924cde05e062ab38637"
             },
             {
               "path": "test/bundler-fixtures/vite/dist/assets/modulepreload-polyfill-B5Qt9EMX.js",
@@ -3988,47 +3922,47 @@
               "sha256": "d887044e7c17fd90344fc4f74f53cac686584daf2a458ab2136d36f1946e9ab6"
             }
           ],
-          "generatedBytes": 628936,
+          "generatedBytes": 632781,
           "modules": [
             {
               "id": "@sheetwrite/core/dist/a1.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 1589,
-              "gzipBytes": 705,
-              "brotliBytes": 641
+              "rawBytes": 1238,
+              "gzipBytes": 604,
+              "brotliBytes": 549
             },
             {
               "id": "@sheetwrite/core/dist/action-feedback.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 1619,
-              "gzipBytes": 772,
-              "brotliBytes": 626
+              "gzipBytes": 771,
+              "brotliBytes": 624
             },
             {
               "id": "@sheetwrite/core/dist/aria-mirror.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 4431,
-              "gzipBytes": 1576,
-              "brotliBytes": 1375
+              "rawBytes": 4335,
+              "gzipBytes": 1439,
+              "brotliBytes": 1242
             },
             {
               "id": "@sheetwrite/core/dist/atomic-batch.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 2288,
-              "gzipBytes": 1105,
-              "brotliBytes": 1007
+              "gzipBytes": 1102,
+              "brotliBytes": 1012
             },
             {
               "id": "@sheetwrite/core/dist/canvas-paint.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 11819,
-              "gzipBytes": 4975,
-              "brotliBytes": 4581
+              "rawBytes": 11821,
+              "gzipBytes": 4979,
+              "brotliBytes": 4574
             },
             {
               "id": "@sheetwrite/core/dist/canvas-renderer.js",
@@ -4051,7 +3985,7 @@
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 327,
-              "gzipBytes": 238,
+              "gzipBytes": 236,
               "brotliBytes": 201
             },
             {
@@ -4066,32 +4000,32 @@
               "id": "@sheetwrite/core/dist/chart-definition.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 4933,
-              "gzipBytes": 1983,
-              "brotliBytes": 1818
+              "rawBytes": 4925,
+              "gzipBytes": 1979,
+              "brotliBytes": 1812
             },
             {
               "id": "@sheetwrite/core/dist/clipboard-controller.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 13810,
-              "gzipBytes": 4817,
-              "brotliBytes": 4386
+              "rawBytes": 13661,
+              "gzipBytes": 4738,
+              "brotliBytes": 4302
             },
             {
               "id": "@sheetwrite/core/dist/clipboard.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 224,
-              "gzipBytes": 179,
-              "brotliBytes": 150
+              "gzipBytes": 180,
+              "brotliBytes": 151
             },
             {
               "id": "@sheetwrite/core/dist/column-index.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 1055,
-              "gzipBytes": 484,
+              "gzipBytes": 483,
               "brotliBytes": 439
             },
             {
@@ -4099,15 +4033,15 @@
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 147,
-              "gzipBytes": 138,
-              "brotliBytes": 87
+              "gzipBytes": 137,
+              "brotliBytes": 86
             },
             {
               "id": "@sheetwrite/core/dist/conditional-format.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 622,
-              "gzipBytes": 326,
+              "gzipBytes": 325,
               "brotliBytes": 276
             },
             {
@@ -4115,64 +4049,64 @@
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 10371,
-              "gzipBytes": 3208,
-              "brotliBytes": 2877
+              "gzipBytes": 3206,
+              "brotliBytes": 2879
             },
             {
               "id": "@sheetwrite/core/dist/custom-editor.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 4732,
-              "gzipBytes": 1641,
-              "brotliBytes": 1413
+              "rawBytes": 4724,
+              "gzipBytes": 1643,
+              "brotliBytes": 1411
             },
             {
               "id": "@sheetwrite/core/dist/datasource-controller.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 27142,
-              "gzipBytes": 7593,
-              "brotliBytes": 6864
+              "gzipBytes": 7592,
+              "brotliBytes": 6868
             },
             {
               "id": "@sheetwrite/core/dist/date-serial.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 958,
-              "gzipBytes": 474,
-              "brotliBytes": 431
+              "gzipBytes": 473,
+              "brotliBytes": 432
             },
             {
               "id": "@sheetwrite/core/dist/delimited-text.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 5012,
-              "gzipBytes": 2007,
-              "brotliBytes": 1824
+              "gzipBytes": 2006,
+              "brotliBytes": 1821
             },
             {
               "id": "@sheetwrite/core/dist/document-controller.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 20752,
-              "gzipBytes": 5662,
-              "brotliBytes": 5145
+              "gzipBytes": 5660,
+              "brotliBytes": 5146
             },
             {
               "id": "@sheetwrite/core/dist/document-protocol.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 49734,
-              "gzipBytes": 14414,
-              "brotliBytes": 12816
+              "rawBytes": 49733,
+              "gzipBytes": 14409,
+              "brotliBytes": 12840
             },
             {
               "id": "@sheetwrite/core/dist/dom-overlay.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 10254,
-              "gzipBytes": 3538,
-              "brotliBytes": 3139
+              "gzipBytes": 3539,
+              "brotliBytes": 3133
             },
             {
               "id": "@sheetwrite/core/dist/editor.js",
@@ -4180,23 +4114,23 @@
               "attribution": "source-map",
               "rawBytes": 3149,
               "gzipBytes": 1125,
-              "brotliBytes": 956
+              "brotliBytes": 954
             },
             {
               "id": "@sheetwrite/core/dist/engine.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 846,
-              "gzipBytes": 461,
-              "brotliBytes": 389
+              "gzipBytes": 459,
+              "brotliBytes": 394
             },
             {
               "id": "@sheetwrite/core/dist/errors.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 7155,
-              "gzipBytes": 2647,
-              "brotliBytes": 2386
+              "rawBytes": 7120,
+              "gzipBytes": 2640,
+              "brotliBytes": 2376
             },
             {
               "id": "@sheetwrite/core/dist/export.js",
@@ -4204,7 +4138,7 @@
               "attribution": "source-map",
               "rawBytes": 3294,
               "gzipBytes": 1684,
-              "brotliBytes": 1405
+              "brotliBytes": 1425
             },
             {
               "id": "@sheetwrite/core/dist/fenwick.js",
@@ -4219,15 +4153,15 @@
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 580,
-              "gzipBytes": 348,
-              "brotliBytes": 338
+              "gzipBytes": 351,
+              "brotliBytes": 336
             },
             {
               "id": "@sheetwrite/core/dist/find-bar.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 3294,
-              "gzipBytes": 1176,
+              "gzipBytes": 1175,
               "brotliBytes": 997
             },
             {
@@ -4235,16 +4169,16 @@
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 2273,
-              "gzipBytes": 1171,
-              "brotliBytes": 1055
+              "gzipBytes": 1169,
+              "brotliBytes": 1052
             },
             {
               "id": "@sheetwrite/core/dist/formula-assist.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 5258,
-              "gzipBytes": 2282,
-              "brotliBytes": 1997
+              "gzipBytes": 2281,
+              "brotliBytes": 1995
             },
             {
               "id": "@sheetwrite/core/dist/geometry-layout-controller.js",
@@ -4252,31 +4186,31 @@
               "attribution": "source-map",
               "rawBytes": 6802,
               "gzipBytes": 1899,
-              "brotliBytes": 1751
+              "brotliBytes": 1750
             },
             {
               "id": "@sheetwrite/core/dist/grid.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 67217,
-              "gzipBytes": 18631,
-              "brotliBytes": 16561
+              "rawBytes": 66398,
+              "gzipBytes": 18356,
+              "brotliBytes": 16337
             },
             {
               "id": "@sheetwrite/core/dist/history.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 4111,
-              "gzipBytes": 1417,
-              "brotliBytes": 1324
+              "gzipBytes": 1418,
+              "brotliBytes": 1330
             },
             {
               "id": "@sheetwrite/core/dist/hyperlink.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 4033,
-              "gzipBytes": 1548,
-              "brotliBytes": 1392
+              "gzipBytes": 1547,
+              "brotliBytes": 1391
             },
             {
               "id": "@sheetwrite/core/dist/icons/resolve.js",
@@ -4284,15 +4218,15 @@
               "attribution": "source-map",
               "rawBytes": 171,
               "gzipBytes": 151,
-              "brotliBytes": 129
+              "brotliBytes": 118
             },
             {
               "id": "@sheetwrite/core/dist/interaction-sessions.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 20382,
-              "gzipBytes": 5979,
-              "brotliBytes": 5386
+              "rawBytes": 20410,
+              "gzipBytes": 5990,
+              "brotliBytes": 5392
             },
             {
               "id": "@sheetwrite/core/dist/keymap.js",
@@ -4300,15 +4234,15 @@
               "attribution": "source-map",
               "rawBytes": 4329,
               "gzipBytes": 2044,
-              "brotliBytes": 1799
+              "brotliBytes": 1806
             },
             {
               "id": "@sheetwrite/core/dist/mutation-revision-index.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 1931,
-              "gzipBytes": 758,
-              "brotliBytes": 677
+              "gzipBytes": 756,
+              "brotliBytes": 675
             },
             {
               "id": "@sheetwrite/core/dist/note-popover.js",
@@ -4316,7 +4250,7 @@
               "attribution": "source-map",
               "rawBytes": 3400,
               "gzipBytes": 1171,
-              "brotliBytes": 992
+              "brotliBytes": 990
             },
             {
               "id": "@sheetwrite/core/dist/number-format.js",
@@ -4324,71 +4258,71 @@
               "attribution": "source-map",
               "rawBytes": 6316,
               "gzipBytes": 2524,
-              "brotliBytes": 2301
+              "brotliBytes": 2296
             },
             {
               "id": "@sheetwrite/core/dist/object-layer.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 11439,
-              "gzipBytes": 4017,
-              "brotliBytes": 3593
+              "gzipBytes": 4018,
+              "brotliBytes": 3588
             },
             {
               "id": "@sheetwrite/core/dist/overlay-painter.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 16879,
-              "gzipBytes": 5451,
-              "brotliBytes": 4875
+              "gzipBytes": 5448,
+              "brotliBytes": 4867
             },
             {
               "id": "@sheetwrite/core/dist/panels/panel-loader.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 2228,
-              "gzipBytes": 971,
-              "brotliBytes": 908
+              "gzipBytes": 969,
+              "brotliBytes": 905
             },
             {
               "id": "@sheetwrite/core/dist/pivot.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 14343,
-              "gzipBytes": 4944,
-              "brotliBytes": 4506
+              "gzipBytes": 4942,
+              "brotliBytes": 4509
             },
             {
               "id": "@sheetwrite/core/dist/plain-data.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 1033,
-              "gzipBytes": 554,
-              "brotliBytes": 506
+              "rawBytes": 994,
+              "gzipBytes": 535,
+              "brotliBytes": 487
             },
             {
               "id": "@sheetwrite/core/dist/read-window-controller.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 12140,
-              "gzipBytes": 3591,
-              "brotliBytes": 3298
+              "rawBytes": 12068,
+              "gzipBytes": 3574,
+              "brotliBytes": 3280
             },
             {
               "id": "@sheetwrite/core/dist/reference.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 1316,
-              "gzipBytes": 529,
-              "brotliBytes": 472
+              "gzipBytes": 531,
+              "brotliBytes": 473
             },
             {
               "id": "@sheetwrite/core/dist/resize.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 260,
-              "gzipBytes": 194,
-              "brotliBytes": 172
+              "gzipBytes": 195,
+              "brotliBytes": 174
             },
             {
               "id": "@sheetwrite/core/dist/resource-accounting.js",
@@ -4396,63 +4330,63 @@
               "attribution": "source-map",
               "rawBytes": 4800,
               "gzipBytes": 1931,
-              "brotliBytes": 1724
+              "brotliBytes": 1720
             },
             {
               "id": "@sheetwrite/core/dist/restore-block-codec.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 2984,
-              "gzipBytes": 1560,
-              "brotliBytes": 1441
+              "gzipBytes": 1566,
+              "brotliBytes": 1440
             },
             {
               "id": "@sheetwrite/core/dist/restore-block.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 1741,
-              "gzipBytes": 752,
+              "gzipBytes": 751,
               "brotliBytes": 682
             },
             {
               "id": "@sheetwrite/core/dist/ribbon/ribbon-metrics.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 242,
-              "gzipBytes": 200,
-              "brotliBytes": 164
+              "rawBytes": 27,
+              "gzipBytes": 47,
+              "brotliBytes": 31
             },
             {
               "id": "@sheetwrite/core/dist/search-controller.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 6716,
-              "gzipBytes": 2351,
-              "brotliBytes": 2126
+              "rawBytes": 6654,
+              "gzipBytes": 2332,
+              "brotliBytes": 2114
             },
             {
               "id": "@sheetwrite/core/dist/search-replace.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 566,
-              "gzipBytes": 304,
-              "brotliBytes": 264
+              "rawBytes": 360,
+              "gzipBytes": 227,
+              "brotliBytes": 198
             },
             {
               "id": "@sheetwrite/core/dist/selection.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 2782,
-              "gzipBytes": 932,
-              "brotliBytes": 842
+              "gzipBytes": 931,
+              "brotliBytes": 843
             },
             {
               "id": "@sheetwrite/core/dist/sheet-lifecycle.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 2896,
-              "gzipBytes": 985,
-              "brotliBytes": 899
+              "rawBytes": 2922,
+              "gzipBytes": 996,
+              "brotliBytes": 910
             },
             {
               "id": "@sheetwrite/core/dist/sheet-name.js",
@@ -4460,54 +4394,54 @@
               "attribution": "source-map",
               "rawBytes": 474,
               "gzipBytes": 332,
-              "brotliBytes": 314
+              "brotliBytes": 312
             },
             {
               "id": "@sheetwrite/core/dist/sheet-tabs.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 19292,
+              "rawBytes": 19294,
               "gzipBytes": 5103,
-              "brotliBytes": 4581
+              "brotliBytes": 4578
             },
             {
               "id": "@sheetwrite/core/dist/side-panel.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 1129,
-              "gzipBytes": 542,
-              "brotliBytes": 428
+              "gzipBytes": 545,
+              "brotliBytes": 430
             },
             {
               "id": "@sheetwrite/core/dist/store.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 13705,
-              "gzipBytes": 4177,
-              "brotliBytes": 3744
+              "rawBytes": 13617,
+              "gzipBytes": 4141,
+              "brotliBytes": 3707
             },
             {
               "id": "@sheetwrite/core/dist/store/data-engine.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 64884,
-              "gzipBytes": 18358,
-              "brotliBytes": 16040
+              "rawBytes": 65133,
+              "gzipBytes": 18412,
+              "brotliBytes": 16101
             },
             {
               "id": "@sheetwrite/core/dist/store/engine-registry.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 264,
-              "gzipBytes": 201,
-              "brotliBytes": 177
+              "rawBytes": 223,
+              "gzipBytes": 176,
+              "brotliBytes": 154
             },
             {
               "id": "@sheetwrite/core/dist/store/mutation-policy.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 8548,
-              "gzipBytes": 2766,
+              "gzipBytes": 2762,
               "brotliBytes": 2511
             },
             {
@@ -4516,15 +4450,15 @@
               "attribution": "source-map",
               "rawBytes": 9715,
               "gzipBytes": 3383,
-              "brotliBytes": 3052
+              "brotliBytes": 3050
             },
             {
               "id": "@sheetwrite/core/dist/store/ranges.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 5792,
-              "gzipBytes": 1900,
-              "brotliBytes": 1715
+              "gzipBytes": 1897,
+              "brotliBytes": 1714
             },
             {
               "id": "@sheetwrite/core/dist/store/snapshot-codec.js",
@@ -4532,7 +4466,7 @@
               "attribution": "source-map",
               "rawBytes": 3627,
               "gzipBytes": 1354,
-              "brotliBytes": 1217
+              "brotliBytes": 1216
             },
             {
               "id": "@sheetwrite/core/dist/store/view-state.js",
@@ -4540,15 +4474,15 @@
               "attribution": "source-map",
               "rawBytes": 7254,
               "gzipBytes": 2547,
-              "brotliBytes": 2296
+              "brotliBytes": 2298
             },
             {
               "id": "@sheetwrite/core/dist/store/window-reader.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 13850,
-              "gzipBytes": 4592,
-              "brotliBytes": 4118
+              "gzipBytes": 4591,
+              "brotliBytes": 4114
             },
             {
               "id": "@sheetwrite/core/dist/store/wire-tags.js",
@@ -4564,15 +4498,23 @@
               "attribution": "source-map",
               "rawBytes": 6739,
               "gzipBytes": 2454,
-              "brotliBytes": 2241
+              "brotliBytes": 2242
             },
             {
               "id": "@sheetwrite/core/dist/style-dictionary.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 1035,
-              "gzipBytes": 519,
-              "brotliBytes": 437
+              "gzipBytes": 520,
+              "brotliBytes": 431
+            },
+            {
+              "id": "@sheetwrite/core/dist/toolbar.js",
+              "owner": "@sheetwrite/core",
+              "attribution": "source-map",
+              "rawBytes": 5837,
+              "gzipBytes": 2217,
+              "brotliBytes": 1939
             },
             {
               "id": "@sheetwrite/core/dist/transaction-admission.js",
@@ -4587,8 +4529,8 @@
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 2555,
-              "gzipBytes": 1129,
-              "brotliBytes": 1014
+              "gzipBytes": 1127,
+              "brotliBytes": 1025
             },
             {
               "id": "@sheetwrite/core/dist/validation-editor.js",
@@ -4596,7 +4538,7 @@
               "attribution": "source-map",
               "rawBytes": 5176,
               "gzipBytes": 1687,
-              "brotliBytes": 1463
+              "brotliBytes": 1459
             },
             {
               "id": "@sheetwrite/core/dist/virtualization.js",
@@ -4604,14 +4546,14 @@
               "attribution": "source-map",
               "rawBytes": 506,
               "gzipBytes": 255,
-              "brotliBytes": 225
+              "brotliBytes": 224
             },
             {
               "id": "@sheetwrite/core/dist/widget-theme.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 456,
-              "gzipBytes": 221,
+              "gzipBytes": 222,
               "brotliBytes": 180
             },
             {
@@ -4619,31 +4561,31 @@
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 7188,
-              "gzipBytes": 2778,
-              "brotliBytes": 2543
+              "gzipBytes": 2773,
+              "brotliBytes": 2538
             },
             {
               "id": "@sheetwrite/core/dist/worker-renderer.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 6332,
-              "gzipBytes": 2221,
-              "brotliBytes": 1957
+              "gzipBytes": 2223,
+              "brotliBytes": 1953
             },
             {
               "id": "@sheetwrite/core/dist/xlsx-source.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 134,
-              "gzipBytes": 128,
-              "brotliBytes": 106
+              "gzipBytes": 129,
+              "brotliBytes": 103
             },
             {
               "id": "@sheetwrite/wasm/loader-browser.mjs",
               "owner": "@sheetwrite/wasm",
               "attribution": "source-map",
               "rawBytes": 494,
-              "gzipBytes": 331,
+              "gzipBytes": 330,
               "brotliBytes": 282
             },
             {
@@ -4652,31 +4594,31 @@
               "attribution": "source-map",
               "rawBytes": 542,
               "gzipBytes": 319,
-              "brotliBytes": 266
+              "brotliBytes": 271
             },
             {
               "id": "@sheetwrite/wasm/pkg/sheetwrite_wasm_factory.js",
               "owner": "@sheetwrite/wasm",
               "attribution": "source-map",
               "rawBytes": 25338,
-              "gzipBytes": 5427,
-              "brotliBytes": 4729
+              "gzipBytes": 5425,
+              "brotliBytes": 4728
             },
             {
               "id": "@sheetwrite/wasm/pkg/sheetwrite_wasm.js",
               "owner": "@sheetwrite/wasm",
               "attribution": "source-map",
               "rawBytes": 151,
-              "gzipBytes": 137,
-              "brotliBytes": 117
+              "gzipBytes": 138,
+              "brotliBytes": 118
             },
             {
               "id": "fflate/esm/browser.js",
               "owner": "fflate",
               "attribution": "source-map",
               "rawBytes": 14177,
-              "gzipBytes": 6290,
-              "brotliBytes": 5744
+              "gzipBytes": 6293,
+              "brotliBytes": 5762
             },
             {
               "id": "fixture/src/main.ts",
@@ -4690,29 +4632,23 @@
               "id": "vite:runtime",
               "owner": "vite:runtime",
               "attribution": "source-map",
-              "rawBytes": 3801,
-              "gzipBytes": 1815,
-              "brotliBytes": 1549
+              "rawBytes": 3692,
+              "gzipBytes": 1760,
+              "brotliBytes": 1517
             }
           ]
         }
       ],
       "assets": [
         {
-          "path": "test/bundler-fixtures/vite/dist/assets/chart-definition-cUvFKT1O.js",
+          "path": "test/bundler-fixtures/vite/dist/assets/chart-definition-BJUtT0XG.js",
           "kind": "javascript",
           "owner": "shared-initial",
-          "roles": [
-            "core-initial",
-            "react-initial",
-            "shell-initial",
-            "svelte-initial",
-            "vue-initial"
-          ],
-          "rawBytes": 26187,
-          "gzipBytes": 9112,
-          "brotliBytes": 8202,
-          "sha256": "9492ccfabf55722bb81426ead8cd3089976f5bdb39b2d616e0de82b757775f48"
+          "roles": ["core-initial", "react-initial", "svelte-initial", "vue-initial"],
+          "rawBytes": 26105,
+          "gzipBytes": 9081,
+          "brotliBytes": 8157,
+          "sha256": "99e6af59e2ca94d0fb00dec7b47f9ffcb9d000ee5d2706935bcb4cce4fb7caab"
         },
         {
           "path": "test/bundler-fixtures/vite/dist/assets/chart-kinds-c1W5sjW6.js",
@@ -4725,142 +4661,113 @@
           "sha256": "178b525ac7369f7fe8e989fdd84b7b3b5368ecab5d2b4a3d78fd35789573a5fb"
         },
         {
-          "path": "test/bundler-fixtures/vite/dist/assets/charts-DYF34aHH.js",
+          "path": "test/bundler-fixtures/vite/dist/assets/charts-BQzvlUFo.js",
           "kind": "javascript",
           "owner": "charts-loader-initial",
           "roles": ["charts-loader-initial"],
           "rawBytes": 592,
           "gzipBytes": 413,
-          "brotliBytes": 338,
-          "sha256": "2f7c567c765f91543f7892ca96a0219d99358634ee804270e7d53e38464f2a30"
+          "brotliBytes": 339,
+          "sha256": "4690c41627d72e62d911028690d45e3d338f9eda11471435dcdff5409f0ccb5e"
         },
         {
-          "path": "test/bundler-fixtures/vite/dist/assets/charts-live-N__YPVJK.js",
+          "path": "test/bundler-fixtures/vite/dist/assets/charts-live-CLYhL3kP.js",
           "kind": "javascript",
           "owner": "charts-async",
           "roles": ["charts-async"],
           "rawBytes": 6727,
-          "gzipBytes": 2605,
-          "brotliBytes": 2388,
-          "sha256": "e8721c02f03fdfa05683126f5a4d425adf10cee1ccc6af8526696e308cbacc2e"
+          "gzipBytes": 2610,
+          "brotliBytes": 2392,
+          "sha256": "db1744764f1e81ccd1e7459e83c18fd39aec3f1029081a38bc0137a096bbe3d6"
         },
         {
-          "path": "test/bundler-fixtures/vite/dist/assets/command-toolbar-COZue-aw.js",
-          "kind": "javascript",
-          "owner": "chrome-async",
-          "roles": ["chrome-async"],
-          "rawBytes": 6998,
-          "gzipBytes": 2593,
-          "brotliBytes": 2322,
-          "sha256": "8f411f851c29e50fb2b9315fe79cbd9fc80256c96b9fdc6133615f139770c435"
+          "path": "test/bundler-fixtures/vite/dist/assets/core-Fo3-P3rg.css",
+          "kind": "css",
+          "owner": "core-initial",
+          "roles": ["core-initial"],
+          "rawBytes": 59570,
+          "gzipBytes": 9615,
+          "brotliBytes": 8513,
+          "sha256": "8f7918bb5619efdafeade2969c336ab07778e2b9cd713d431ddd50b77781c1b1"
         },
         {
-          "path": "test/bundler-fixtures/vite/dist/assets/core-c3vYpm9t.js",
+          "path": "test/bundler-fixtures/vite/dist/assets/core-LJ3UbeUq.js",
           "kind": "javascript",
           "owner": "core-initial",
           "roles": ["core-initial"],
-          "rawBytes": 363,
-          "gzipBytes": 268,
-          "brotliBytes": 209,
-          "sha256": "a9fa0a32a4384f501f0ae1f5b20ee4d06a49385602012255d0911aac95d62db8"
+          "rawBytes": 334,
+          "gzipBytes": 253,
+          "brotliBytes": 199,
+          "sha256": "76bcee4a24e1b8edce10920f5deeea3733dc7d75dec969c90dc2f67172d59ba7"
         },
         {
-          "path": "test/bundler-fixtures/vite/dist/assets/engine-registry-BtWZaBa1.js",
+          "path": "test/bundler-fixtures/vite/dist/assets/engine-registry-Y5wD8JOx.js",
           "kind": "javascript",
           "owner": "shared-initial",
-          "roles": [
-            "core-initial",
-            "react-initial",
-            "shell-initial",
-            "svelte-initial",
-            "vue-initial"
-          ],
-          "rawBytes": 326,
-          "gzipBytes": 226,
-          "brotliBytes": 202,
-          "sha256": "5c191427cf268c1b5c24e144dda16e98aedb1603a77709c43e32ea0b68cf699e"
+          "roles": ["core-initial", "react-initial", "svelte-initial", "vue-initial"],
+          "rawBytes": 285,
+          "gzipBytes": 202,
+          "brotliBytes": 182,
+          "sha256": "83b0802aee0522b16aff3f1eb14dbe9d886e5c153c65a52ed1797bace7969db7"
         },
         {
-          "path": "test/bundler-fixtures/vite/dist/assets/export-BYL2LhlM.js",
+          "path": "test/bundler-fixtures/vite/dist/assets/export-Q_DUddyZ.js",
           "kind": "javascript",
           "owner": "shared-initial",
-          "roles": [
-            "core-initial",
-            "react-initial",
-            "shell-initial",
-            "svelte-initial",
-            "vue-initial"
-          ],
-          "rawBytes": 246895,
-          "gzipBytes": 73721,
-          "brotliBytes": 62570,
-          "sha256": "e36307a30e5f14e42b07ff972bd9041136ccdf5075465c17fcc6127031f6afed"
+          "roles": ["core-initial", "react-initial", "svelte-initial", "vue-initial"],
+          "rawBytes": 246810,
+          "gzipBytes": 73676,
+          "brotliBytes": 62497,
+          "sha256": "967c9cf873e709fdaae3908b07361ea61422099c698f9079ceb920f151948c33"
         },
         {
-          "path": "test/bundler-fixtures/vite/dist/assets/grid-BkQ2HNg7.js",
+          "path": "test/bundler-fixtures/vite/dist/assets/grid-Ch60udE7.js",
           "kind": "javascript",
           "owner": "shared-initial",
-          "roles": [
-            "core-initial",
-            "react-initial",
-            "shell-initial",
-            "svelte-initial",
-            "vue-initial"
-          ],
-          "rawBytes": 353344,
-          "gzipBytes": 101693,
-          "brotliBytes": 85449,
-          "sha256": "c499e675bc64cec850bcbc2c71233d67824e9d523384f48d197985d081714750"
+          "roles": ["core-initial", "react-initial", "svelte-initial", "vue-initial"],
+          "rawBytes": 357426,
+          "gzipBytes": 102753,
+          "brotliBytes": 86326,
+          "sha256": "b583d978432a7058b0eeffe06f2b5e5ab2359a86ef671924cde05e062ab38637"
         },
         {
-          "path": "test/bundler-fixtures/vite/dist/assets/grid-controller-DSG78wT9.js",
-          "kind": "javascript",
-          "owner": "shared-initial",
-          "roles": ["react-initial", "shell-initial", "svelte-initial", "vue-initial"],
-          "rawBytes": 1338,
-          "gzipBytes": 614,
-          "brotliBytes": 548,
-          "sha256": "3c67eb976983c547b32884732b7df13a74b33ff05ead45dbc6ba52173c81915a"
-        },
-        {
-          "path": "test/bundler-fixtures/vite/dist/assets/index-CdeRKq58.js",
-          "kind": "javascript",
-          "owner": "xlsx-async",
-          "roles": ["xlsx-async"],
-          "rawBytes": 160261,
-          "gzipBytes": 55601,
-          "brotliBytes": 47976,
-          "sha256": "ef29363a60065c66c24944e8b0678a1f66bdb2ca426f29164fa910af69d7d740"
-        },
-        {
-          "path": "test/bundler-fixtures/vite/dist/assets/index-CSpGZO7Z.js",
+          "path": "test/bundler-fixtures/vite/dist/assets/index-Bueaa_g7.js",
           "kind": "javascript",
           "owner": "charts-async",
           "roles": ["charts-async"],
           "rawBytes": 14300,
-          "gzipBytes": 5655,
-          "brotliBytes": 5140,
-          "sha256": "bb53fcfaf326aba1b177765f2a42e87d254d01d517143f541156b51096da474c"
+          "gzipBytes": 5656,
+          "brotliBytes": 5154,
+          "sha256": "1d9ba3a3552a9cd53aafee36830a10fccd38c46d249fd2797487c830ecc47ccd"
         },
         {
-          "path": "test/bundler-fixtures/vite/dist/assets/lifecycle-BQM9ub1p.js",
+          "path": "test/bundler-fixtures/vite/dist/assets/index-CWeCmhxf.js",
+          "kind": "javascript",
+          "owner": "xlsx-async",
+          "roles": ["xlsx-async"],
+          "rawBytes": 146040,
+          "gzipBytes": 50175,
+          "brotliBytes": 43429,
+          "sha256": "537176116d3fc2a70b5ea6ccfa2c863ce9222a6de316c968e5ea6613bb6fef4e"
+        },
+        {
+          "path": "test/bundler-fixtures/vite/dist/assets/lifecycle-Bn3WjdWQ.js",
           "kind": "javascript",
           "owner": "shared-initial",
           "roles": ["react-initial", "svelte-initial", "vue-initial"],
-          "rawBytes": 16154,
-          "gzipBytes": 5536,
-          "brotliBytes": 4993,
-          "sha256": "5fee564675cf8ba95ebcbb3117cf4ce9f393b4b30a623ef0fdda885a734086e6"
+          "rawBytes": 17394,
+          "gzipBytes": 5955,
+          "brotliBytes": 5355,
+          "sha256": "a321e98a1767b5dc44e21d45f1c6bfd572f4228397ad327ba6ba7785e584381a"
         },
         {
           "path": "test/bundler-fixtures/vite/dist/assets/modulepreload-polyfill-B5Qt9EMX.js",
           "kind": "javascript",
-          "owner": "shared:charts-loader-initial+core-initial+react-initial+shell-initial+svelte-initial+vue-initial+worker-loader-initial+xlsx-loader-initial",
+          "owner": "shared:charts-loader-initial+core-initial+react-initial+svelte-initial+vue-initial+worker-loader-initial+xlsx-loader-initial",
           "roles": [
             "charts-loader-initial",
             "core-initial",
             "react-initial",
-            "shell-initial",
             "svelte-initial",
             "vue-initial",
             "worker-loader-initial",
@@ -4872,24 +4779,23 @@
           "sha256": "d2a32840421496e872ade591618d2fa5c33797605d1aec04301717e5a90757d0"
         },
         {
-          "path": "test/bundler-fixtures/vite/dist/assets/panel-controller-Cl2AXqDR.js",
+          "path": "test/bundler-fixtures/vite/dist/assets/panel-controller-DRa167cz.js",
           "kind": "javascript",
           "owner": "chrome-async",
           "roles": ["chrome-async"],
-          "rawBytes": 23265,
-          "gzipBytes": 8508,
-          "brotliBytes": 7636,
-          "sha256": "70276fe2d570e06f253d3fd3a29daad94bf708fd0be718ea9afd69083b9cb999"
+          "rawBytes": 23266,
+          "gzipBytes": 8511,
+          "brotliBytes": 7641,
+          "sha256": "05fb1ed1254dd0597615883fe13625e57625e7723b35a7c051a84781383a31f8"
         },
         {
           "path": "test/bundler-fixtures/vite/dist/assets/preload-helper-BXl3LOEh.js",
           "kind": "javascript",
-          "owner": "shared:charts-loader-initial+core-initial+react-initial+shell-initial+svelte-initial+vue-initial+xlsx-loader-initial",
+          "owner": "shared:charts-loader-initial+core-initial+react-initial+svelte-initial+vue-initial+xlsx-loader-initial",
           "roles": [
             "charts-loader-initial",
             "core-initial",
             "react-initial",
-            "shell-initial",
             "svelte-initial",
             "vue-initial",
             "xlsx-loader-initial"
@@ -4900,120 +4806,64 @@
           "sha256": "d887044e7c17fd90344fc4f74f53cac686584daf2a458ab2136d36f1946e9ab6"
         },
         {
-          "path": "test/bundler-fixtures/vite/dist/assets/react-BKidWD9C.css",
-          "kind": "css",
-          "owner": "shared-initial",
-          "roles": ["react-initial", "svelte-initial", "vue-initial"],
-          "rawBytes": 66478,
-          "gzipBytes": 10689,
-          "brotliBytes": 9437,
-          "sha256": "8f3b82a4264bc066e0d9be4c9c6f5fd129711ee621dc4784b248d55e7ba9ce71"
-        },
-        {
-          "path": "test/bundler-fixtures/vite/dist/assets/react-DQxDZmL-.js",
+          "path": "test/bundler-fixtures/vite/dist/assets/react-CXsyZQYl.js",
           "kind": "javascript",
           "owner": "react-initial",
           "roles": ["react-initial"],
-          "rawBytes": 189440,
-          "gzipBytes": 60005,
-          "brotliBytes": 51727,
-          "sha256": "d9063e73a75ad62cb43e31047a752f4338aacaf846ddcbac39aa9cc084a426ca"
+          "rawBytes": 189402,
+          "gzipBytes": 59990,
+          "brotliBytes": 51693,
+          "sha256": "546aba7d77b7e6fe17c4b620a3969be4147f99c20955c767e97a04147c715f8a"
         },
         {
-          "path": "test/bundler-fixtures/vite/dist/assets/ribbon-factory-BZ74fgrd.js",
-          "kind": "javascript",
-          "owner": "chrome-async",
-          "roles": ["chrome-async"],
-          "rawBytes": 669,
-          "gzipBytes": 377,
-          "brotliBytes": 334,
-          "sha256": "0cf387cd6651d5e2179dc5a817efb4749aa55faa2b85796635cac7613ec38af5"
-        },
-        {
-          "path": "test/bundler-fixtures/vite/dist/assets/ribbon-pjGP7sMY.js",
-          "kind": "javascript",
-          "owner": "chrome-async",
-          "roles": ["chrome-async"],
-          "rawBytes": 9183,
-          "gzipBytes": 3011,
-          "brotliBytes": 2679,
-          "sha256": "2f2388adc7970a3846312121324129628a5a4b7409cddcd724664140b63998d4"
-        },
-        {
-          "path": "test/bundler-fixtures/vite/dist/assets/ribbon-popup-B6iv72Do.js",
-          "kind": "javascript",
-          "owner": "chrome-async",
-          "roles": ["chrome-async"],
-          "rawBytes": 27885,
-          "gzipBytes": 8720,
-          "brotliBytes": 7768,
-          "sha256": "1cf9bb0410f9bc4c8e83366ab1ccfe17b8020faf2fde199efd712c00b0f3dd30"
-        },
-        {
-          "path": "test/bundler-fixtures/vite/dist/assets/sheetwrite_wasm_bg-CvdIBplO.wasm",
-          "kind": "wasm",
-          "owner": "shared-initial",
-          "roles": [
-            "core-initial",
-            "react-initial",
-            "shell-initial",
-            "svelte-initial",
-            "vue-initial"
-          ],
-          "rawBytes": 1016792,
-          "gzipBytes": 388517,
-          "brotliBytes": 298064,
-          "sha256": "ce437c461d1b8faee3d164eb7849c680ac7b38a235c35528d90a598d4c9e9b85"
-        },
-        {
-          "path": "test/bundler-fixtures/vite/dist/assets/shell-C7Y8xzWs.js",
-          "kind": "javascript",
-          "owner": "shell-initial",
-          "roles": ["shell-initial"],
-          "rawBytes": 8307,
-          "gzipBytes": 3146,
-          "brotliBytes": 2820,
-          "sha256": "1e9aaca0170570d5704f618a3afe734b96435c39e3416e5ec838c6298691efc1"
-        },
-        {
-          "path": "test/bundler-fixtures/vite/dist/assets/styles-CyHRqpfU.css",
+          "path": "test/bundler-fixtures/vite/dist/assets/react-DxTd0Q2a.css",
           "kind": "css",
           "owner": "shared-initial",
-          "roles": ["core-initial", "shell-initial"],
-          "rawBytes": 68239,
-          "gzipBytes": 10912,
-          "brotliBytes": 9636,
-          "sha256": "ea3a8fdb640986986d353f8d8f4d8f61d5117cbacb60302c044ba5af425b01f6"
+          "roles": ["react-initial", "svelte-initial", "vue-initial"],
+          "rawBytes": 57583,
+          "gzipBytes": 9374,
+          "brotliBytes": 8315,
+          "sha256": "6483e85a4de710ad3e25286a78c832abfe15aae2c377f5dac4e8e3750a390546"
         },
         {
-          "path": "test/bundler-fixtures/vite/dist/assets/svelte-DdO0Yqz0.js",
+          "path": "test/bundler-fixtures/vite/dist/assets/ribbon-BZHzX05N.js",
+          "kind": "javascript",
+          "owner": "chrome-async",
+          "roles": ["chrome-async"],
+          "rawBytes": 31935,
+          "gzipBytes": 9568,
+          "brotliBytes": 8574,
+          "sha256": "8b380ca2f98e5b24653a5448623ba86be1bd1ab8f27ef48e1acbdb27d7f24dc5"
+        },
+        {
+          "path": "test/bundler-fixtures/vite/dist/assets/sheetwrite_wasm_bg-BUjKqnyl.wasm",
+          "kind": "wasm",
+          "owner": "shared-initial",
+          "roles": ["core-initial", "react-initial", "svelte-initial", "vue-initial"],
+          "rawBytes": 1015419,
+          "gzipBytes": 388099,
+          "brotliBytes": 297771,
+          "sha256": "ddd25ef7a3077104252b57355040fb54bbb4609f7bb13560634f42b9dcb8e4a0"
+        },
+        {
+          "path": "test/bundler-fixtures/vite/dist/assets/svelte-DB5xzP_8.js",
           "kind": "javascript",
           "owner": "svelte-initial",
           "roles": ["svelte-initial"],
-          "rawBytes": 40805,
-          "gzipBytes": 15877,
-          "brotliBytes": 14462,
-          "sha256": "ea0fd3ff1394781698ce91eeddd6a9b2e892d3c514be4d0af824d188a3e04adc"
+          "rawBytes": 40767,
+          "gzipBytes": 15857,
+          "brotliBytes": 14485,
+          "sha256": "77aa1e3880a5fcb72dc9f001b6a2abe1443ccb3df93fb762dbdbc71316440514"
         },
         {
-          "path": "test/bundler-fixtures/vite/dist/assets/toolbar-factory-CB5_Cr-H.js",
-          "kind": "javascript",
-          "owner": "chrome-async",
-          "roles": ["chrome-async"],
-          "rawBytes": 655,
-          "gzipBytes": 404,
-          "brotliBytes": 355,
-          "sha256": "8804ee46c15a27ad41c70149a0833697c7a33ede300ec67c01d577faef42e616"
-        },
-        {
-          "path": "test/bundler-fixtures/vite/dist/assets/vue-B88jJ2zS.js",
+          "path": "test/bundler-fixtures/vite/dist/assets/vue-RTHmG-HL.js",
           "kind": "javascript",
           "owner": "vue-initial",
           "roles": ["vue-initial"],
-          "rawBytes": 65845,
-          "gzipBytes": 25919,
-          "brotliBytes": 23501,
-          "sha256": "90bcc35e6ed6cdbe0ea6e7f8f8f5cc67d72fdbad5ca76d7287ada848545b4b42"
+          "rawBytes": 65807,
+          "gzipBytes": 25901,
+          "brotliBytes": 23515,
+          "sha256": "0b19f168122963a97c4ec3a45d2ca14c08a96fdbbec3b1c8836d20724a6aef5d"
         },
         {
           "path": "test/bundler-fixtures/vite/dist/assets/worker-DvePMIcR.js",
@@ -5026,14 +4876,14 @@
           "sha256": "e8824eae5edb8859bd7e2663fbf5a38aff6a7500d0e7ee0e41d189444514f392"
         },
         {
-          "path": "test/bundler-fixtures/vite/dist/assets/xlsx-CUjokt7V.js",
+          "path": "test/bundler-fixtures/vite/dist/assets/xlsx-CQCt4uxI.js",
           "kind": "javascript",
           "owner": "xlsx-loader-initial",
           "roles": ["xlsx-loader-initial"],
           "rawBytes": 544,
-          "gzipBytes": 391,
-          "brotliBytes": 323,
-          "sha256": "4bfc68bc52ee9a2d576289a948f9434b30593f474d7850c1554a04f7261c4ae7"
+          "gzipBytes": 390,
+          "brotliBytes": 322,
+          "sha256": "4bee51cd7642cab0c096d94cb087eef2234e298f183350645955e37bd0660288"
         },
         {
           "path": "test/bundler-fixtures/vite/dist/recipe-worker-DG4Z2H_8.js",
@@ -5070,10 +4920,10 @@
           "assets": [
             {
               "path": "test/bundler-fixtures/webpack/dist/main.js",
-              "sha256": "08b7a88f362e96b800277d263c58a7ea4abce5071ecdd7f4203437c229105076"
+              "sha256": "a998eb40c8d9a9959e9f6cfc7c0720ec2c8ecad76e27b6b3d0eeac2750501291"
             }
           ],
-          "generatedBytes": 35661,
+          "generatedBytes": 35572,
           "modules": [
             {
               "id": "@sheetwrite/core/dist/engine.js",
@@ -5087,9 +4937,9 @@
               "id": "@sheetwrite/core/dist/errors.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 5082,
-              "gzipBytes": 1940,
-              "brotliBytes": 1727
+              "rawBytes": 5047,
+              "gzipBytes": 1933,
+              "brotliBytes": 1714
             },
             {
               "id": "@sheetwrite/core/dist/grid.js",
@@ -5183,9 +5033,9 @@
               "id": "webpack:runtime/webpack/runtime/get javascript chunk filename",
               "owner": "webpack:runtime",
               "attribution": "source-map",
-              "rawBytes": 169,
-              "gzipBytes": 152,
-              "brotliBytes": 137
+              "rawBytes": 115,
+              "gzipBytes": 121,
+              "brotliBytes": 109
             },
             {
               "id": "webpack:runtime/webpack/runtime/global",
@@ -5248,44 +5098,34 @@
       ],
       "assets": [
         {
-          "path": "test/bundler-fixtures/webpack/dist/assets/sheetwrite_wasm_bg-ead1279b4d27e1bb9fab.wasm",
+          "path": "test/bundler-fixtures/webpack/dist/assets/sheetwrite_wasm_bg-ebbd93659c50bc70d2bb.wasm",
           "kind": "wasm",
           "owner": "core-initial",
           "roles": ["core-initial"],
-          "rawBytes": 1016792,
-          "gzipBytes": 388517,
-          "brotliBytes": 298064,
-          "sha256": "ce437c461d1b8faee3d164eb7849c680ac7b38a235c35528d90a598d4c9e9b85"
+          "rawBytes": 1015419,
+          "gzipBytes": 388099,
+          "brotliBytes": 297771,
+          "sha256": "ddd25ef7a3077104252b57355040fb54bbb4609f7bb13560634f42b9dcb8e4a0"
         },
         {
           "path": "test/bundler-fixtures/webpack/dist/main.js",
           "kind": "javascript",
           "owner": "core-initial",
           "roles": ["core-initial"],
-          "rawBytes": 35661,
-          "gzipBytes": 9511,
-          "brotliBytes": 8348,
-          "sha256": "08b7a88f362e96b800277d263c58a7ea4abce5071ecdd7f4203437c229105076"
+          "rawBytes": 35572,
+          "gzipBytes": 9450,
+          "brotliBytes": 8285,
+          "sha256": "a998eb40c8d9a9959e9f6cfc7c0720ec2c8ecad76e27b6b3d0eeac2750501291"
         },
         {
-          "path": "test/bundler-fixtures/webpack/dist/worker-107-d111d4873ca764d4958a.js",
+          "path": "test/bundler-fixtures/webpack/dist/worker-290-1929190ef13c939a8bb9.js",
           "kind": "javascript",
           "owner": "chrome-async",
           "roles": ["chrome-async"],
-          "rawBytes": 31507,
-          "gzipBytes": 10058,
-          "brotliBytes": 8963,
-          "sha256": "c07530987e20ba7c893eb4410086a81f8d500e6a345380d734ae634da36ddada"
-        },
-        {
-          "path": "test/bundler-fixtures/webpack/dist/worker-233-21a8877df3499ea44c83.js",
-          "kind": "javascript",
-          "owner": "chrome-async",
-          "roles": ["chrome-async"],
-          "rawBytes": 6872,
-          "gzipBytes": 2516,
-          "brotliBytes": 2235,
-          "sha256": "a9664e21684b9a32ecd1e9537588993179a9dac78fb16002e672fa93d6d2bd2e"
+          "rawBytes": 34663,
+          "gzipBytes": 10425,
+          "brotliBytes": 9323,
+          "sha256": "42a3f3c5a357534500b9747558245e60a80bde08ef6138c426b60c7fdb0983f1"
         },
         {
           "path": "test/bundler-fixtures/webpack/dist/worker-361-57fd770f693cb313b44f.js",
@@ -5306,16 +5146,6 @@
           "gzipBytes": 8379,
           "brotliBytes": 7613,
           "sha256": "0bc0dbdc2a326d79d3cd84a3550704caa482d0a6dca1d115a1b29dd02a44f3e9"
-        },
-        {
-          "path": "test/bundler-fixtures/webpack/dist/worker-684-6b4b523ec6b39de97532.js",
-          "kind": "javascript",
-          "owner": "chrome-async",
-          "roles": ["chrome-async"],
-          "rawBytes": 9223,
-          "gzipBytes": 2990,
-          "brotliBytes": 2649,
-          "sha256": "6749dfaa7dc5e90fd7180c66069c78bfe1018a724a2b1551d68c214187b62126"
         }
       ]
     }
@@ -5343,13 +5173,13 @@
         {
           "bundler": "next",
           "eagerImports": ["@sheetwrite/core#createGrid", "@sheetwrite/core#initSheetwrite"],
-          "nonSheetwriteRawBytes": 496863,
+          "nonSheetwriteRawBytes": 496820,
           "opaqueFrameworkRawBytes": 112594
         },
         {
           "bundler": "vite",
           "eagerImports": ["@sheetwrite/core#createGrid", "@sheetwrite/core#initSheetwrite"],
-          "nonSheetwriteRawBytes": 44603,
+          "nonSheetwriteRawBytes": 44494,
           "opaqueFrameworkRawBytes": 0
         }
       ]
@@ -5357,15 +5187,15 @@
     "firstPaint": [
       {
         "bundler": "next",
-        "generatedBytes": 1073543,
-        "sheetwriteRawBytes": 576680,
+        "generatedBytes": 1077437,
+        "sheetwriteRawBytes": 580617,
         "rootBarrelRawBytes": 0,
         "eagerImports": ["@sheetwrite/core#createGrid", "@sheetwrite/core#initSheetwrite"]
       },
       {
         "bundler": "vite",
-        "generatedBytes": 628936,
-        "sheetwriteRawBytes": 584333,
+        "generatedBytes": 632781,
+        "sheetwriteRawBytes": 588287,
         "rootBarrelRawBytes": 0,
         "eagerImports": ["@sheetwrite/core#createGrid", "@sheetwrite/core#initSheetwrite"]
       }
