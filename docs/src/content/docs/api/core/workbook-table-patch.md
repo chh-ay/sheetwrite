@@ -8,7 +8,7 @@ description: "WorkbookTablePatch interface in @sheetwrite/core: Mutable table fi
 Mutable table fields accepted by the explicit update operation.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/table.ts#L94"><code>packages/core/src/types/table.ts#L94</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/table.ts#L94"><code>packages/core/src/types/table.ts#L94</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>

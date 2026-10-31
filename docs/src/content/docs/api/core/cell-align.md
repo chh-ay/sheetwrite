@@ -8,7 +8,7 @@ description: "CellAlign type in @sheetwrite/core: Horizontal text alignment supp
 Horizontal text alignment supported by cell styles.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/cell.ts#L7"><code>packages/core/src/types/cell.ts#L7</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/cell.ts#L7"><code>packages/core/src/types/cell.ts#L7</code></a></dd></div>
 </dl>
 
 ## Declaration

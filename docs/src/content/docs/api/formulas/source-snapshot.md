@@ -10,7 +10,7 @@ identity in one range. Offsets are row-major and sorted; reference targets
 are packed `[sheet_handle, row, col]` triples.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/pkg/sheetwrite_wasm.d.ts#L494"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L494</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/formulas/pkg/sheetwrite_wasm.d.ts#L503"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L503</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>6</span>

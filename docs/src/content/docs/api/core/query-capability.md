@@ -8,7 +8,7 @@ description: "QueryCapability type in @sheetwrite/core: Whether a query is compl
 Whether a query is complete for the currently loaded datasource pages.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/store.ts#L143"><code>packages/core/src/types/store.ts#L143</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/store.ts#L143"><code>packages/core/src/types/store.ts#L143</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>2</span>

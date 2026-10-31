@@ -8,7 +8,7 @@ description: "PivotSort interface in @sheetwrite/core: Sort of one axis field by
 Sort of one axis field by its labels. Fields without a sort key sort ascending.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/pivot.ts#L51"><code>packages/core/src/types/pivot.ts#L51</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/pivot.ts#L51"><code>packages/core/src/types/pivot.ts#L51</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

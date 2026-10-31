@@ -33,7 +33,7 @@ const datasource: DataSource = {
 - [DataSourceRequest](/docs/api/core/data-source-request/)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/data.ts#L89"><code>packages/core/src/types/data.ts#L89</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/data.ts#L89"><code>packages/core/src/types/data.ts#L89</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

@@ -12,7 +12,7 @@ clicks never steal grid focus; Left/Right/Home/End move between controls and
 Escape returns focus to the grid. Returns the piece with an idempotent `destroy`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/toolbar-factory.ts#L29"><code>packages/core/src/shell/toolbar-factory.ts#L29</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/shell/toolbar-factory.ts#L29"><code>packages/core/src/shell/toolbar-factory.ts#L29</code></a></dd></div>
 </dl>
 
 ## Declaration

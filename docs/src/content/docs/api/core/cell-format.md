@@ -11,7 +11,7 @@ rendered by a date `numberFormat`, and `currency` as a plain number rendered by
 a currency `numberFormat` (e.g. `$#,##0.00`).
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/cell.ts#L107"><code>packages/core/src/types/cell.ts#L107</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/cell.ts#L107"><code>packages/core/src/types/cell.ts#L107</code></a></dd></div>
 </dl>
 
 ## Declaration

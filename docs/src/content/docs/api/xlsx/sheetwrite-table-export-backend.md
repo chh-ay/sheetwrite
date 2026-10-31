@@ -8,7 +8,7 @@ description: "sheetwriteTableExportBackend variable in @sheetwrite/xlsx: Default
 Default bounded first-sheet table export backend.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/xlsx/src/table-export.ts#L120"><code>packages/xlsx/src/table-export.ts#L120</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/xlsx/src/table-export.ts#L116"><code>packages/xlsx/src/table-export.ts#L116</code></a></dd></div>
 </dl>
 
 ## Declaration

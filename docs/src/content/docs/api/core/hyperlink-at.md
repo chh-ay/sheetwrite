@@ -8,7 +8,7 @@ description: "hyperlinkAt function in @sheetwrite/core: Return the first validat
 Return the first validated hyperlink covering an address, or null when none does.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/hyperlink.ts#L226"><code>packages/core/src/hyperlink.ts#L226</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/hyperlink.ts#L226"><code>packages/core/src/hyperlink.ts#L226</code></a></dd></div>
 </dl>
 
 ## Declaration

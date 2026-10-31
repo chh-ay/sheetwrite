@@ -8,7 +8,7 @@ description: "FormulaArgument type in @sheetwrite/core/functions: Ranges use row
 Ranges use row-major nested arrays. Scalar expressions use a scalar.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/functions/types.ts#L5"><code>packages/core/src/functions/types.ts#L5</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/functions/types.ts#L5"><code>packages/core/src/functions/types.ts#L5</code></a></dd></div>
 </dl>
 
 ## Declaration

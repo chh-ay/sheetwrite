@@ -8,7 +8,7 @@ description: "SearchOptions interface in @sheetwrite/core: Case, whole-cell, she
 Case, whole-cell, sheet, and column constraints for grid search.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L660"><code>packages/core/src/types/grid.ts#L660</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/grid.ts#L660"><code>packages/core/src/types/grid.ts#L660</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>

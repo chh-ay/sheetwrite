@@ -8,7 +8,7 @@ description: "REF_CYCLE variable in @sheetwrite/core: Sentinel shown for a refer
 Sentinel shown for a reference that participates in a cycle.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/reference.ts#L6"><code>packages/core/src/reference.ts#L6</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/reference.ts#L6"><code>packages/core/src/reference.ts#L6</code></a></dd></div>
 </dl>
 
 ## Declaration

@@ -8,7 +8,7 @@ description: "cellScalarToText function in @sheetwrite/core: Spreadsheet display
 Spreadsheet display text for a resolved scalar.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/cell-input.ts#L6"><code>packages/core/src/cell-input.ts#L6</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/cell-input.ts#L6"><code>packages/core/src/cell-input.ts#L6</code></a></dd></div>
 </dl>
 
 ## Declaration

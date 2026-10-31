@@ -8,7 +8,7 @@ description: "GridReadyReason type in @sheetwrite/core/adapter: Reason an adapte
 Reason an adapter published a ready Grid generation.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/adapter.ts#L93"><code>packages/core/src/adapter.ts#L93</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/adapter.ts#L93"><code>packages/core/src/adapter.ts#L93</code></a></dd></div>
 </dl>
 
 ## Declaration

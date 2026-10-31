@@ -8,7 +8,7 @@ description: "ICON_NAMES variable in @sheetwrite/core: Every glyph on the comman
 Every glyph on the command icon sheet.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/icons/icon-names.ts#L4"><code>packages/core/src/icons/icon-names.ts#L4</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/icons/icon-names.ts#L4"><code>packages/core/src/icons/icon-names.ts#L4</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -88,6 +88,22 @@ const ICON_NAMES: readonly [
   "chartDoughnut",
   "chartScatter",
   "pivotTable",
+  "insertFunction",
+  "defineName",
+  "nameManager",
+  "explainFormula",
+  "getData",
+  "refreshAll",
+  "queries",
+  "editLinks",
+  "relationships",
+  "dataModel",
+  "measure",
+  "dashboard",
+  "slicer",
+  "kpiCard",
+  "versionHistory",
+  "saveVersion",
 ]
 ```
 
