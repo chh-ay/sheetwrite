@@ -16,7 +16,9 @@ which holds the active engine's built-in functions and the store's host
 functions. With an empty list, completion is empty and no name is reported
 as unknown.
 
-The analysis never calculates: it reads text and metadata only.
+The tokens and the syntax error come from the engine's own lexer and
+parser, so call it after `initSheetwrite`. The analysis never calculates:
+it reads text and metadata only.
 
 ## Examples
 
@@ -35,7 +37,7 @@ async function currentArgument(store: Store, text: string, cursor: number) {
 - [/docs/features/formulas/formula-help/](/docs/features/formulas/formula-help/)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/formula-analysis.ts#L379"><code>packages/core/src/formula-analysis.ts#L379</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/formula-analysis.ts#L362"><code>packages/core/src/formula-analysis.ts#L362</code></a></dd></div>
 </dl>
 
 ## Declaration

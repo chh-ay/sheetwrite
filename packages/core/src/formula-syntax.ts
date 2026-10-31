@@ -1,6 +1,6 @@
 // What formula help reads from the engine: the tokens of a formula and its
 // first syntax error. Both come from the engine's own lexer and parser
-// (`formulaTokens` and `formulaSyntaxError`, packages/wasm/src/formula_tokens.rs),
+// (`formulaTokens` and `checkFormulaSyntax`, packages/wasm/src/formula_tokens.rs),
 // so formula help cannot disagree with the engine about the syntax. This file
 // adds only what needs function metadata: the calls, their argument counts,
 // and the names the active engine and the store do not know.
@@ -77,7 +77,7 @@ export function formulaTokens(text: string): RawToken[] {
 
 /** The engine parser's first error in `text`, or null when it reads the whole formula. */
 export function syntaxError(text: string): FormulaDiagnostic | null {
-  const error = getEngine().formulaSyntaxError(text);
+  const error = getEngine().checkFormulaSyntax(text);
   if (error === undefined) return null;
 
   try {
@@ -102,7 +102,8 @@ interface CallSpan {
   closed: boolean;
 }
 
-type Frame = { readonly call: CallSpan } | { readonly call: null };
+/** An open `(` or `{`: a call, or a group that is not a call. */
+type Frame = { readonly call: CallSpan | null };
 
 /** Whether the token at `index` is a name that a `(` follows: a function call. */
 export function isCallName(tokens: readonly RawToken[], index: number): boolean {
@@ -137,7 +138,7 @@ export function scanCalls(
       frames.push({ call: null });
     } else if (token.kind === "rparen" || token.kind === "rbrace") {
       const closed = frames.pop()?.call;
-      if (closed !== null && closed !== undefined) closed.closed = true;
+      if (closed) closed.closed = true;
     } else if (token.kind === "comma" && top?.call) {
       top.call.commas += 1;
     }

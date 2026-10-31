@@ -11,7 +11,7 @@ references share one `colorIndex`, so an editor gives each distinct
 reference one colour in the text and on the grid.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/formula-analysis.ts#L48"><code>packages/core/src/formula-analysis.ts#L48</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/formula-analysis.ts#L56"><code>packages/core/src/formula-analysis.ts#L56</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>6</span>

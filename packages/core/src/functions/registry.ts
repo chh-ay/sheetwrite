@@ -82,7 +82,7 @@ function frozenMetadata(metadata: FormulaFunctionMetadata): FormulaFunctionMetad
  * table in every bundle that includes the store, so it loads on the first
  * call and bundlers split it into its own chunk.
  */
-export async function builtInFunctions(): Promise<FormulaFunctionMetadata[]> {
+async function builtInFunctions(): Promise<FormulaFunctionMetadata[]> {
   const { BUILT_IN_FUNCTIONS } = await import("../generated/function-metadata.js");
   const engineFlag =
     engineFunctionNames === undefined ? FUNCTION_FLAG_DEFAULT_ENGINE : FUNCTION_FLAG_FULL_ENGINE;

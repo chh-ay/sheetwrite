@@ -15,7 +15,7 @@ const NAME_CHARACTER = /[A-Za-z0-9_]/;
  * a letter, digit or `_` touches it on either side, or `(` follows it, as in
  * `LOG10(` or `BIN2DEC`.
  */
-export function isGluedToName(text: string, offset: number, length: number): boolean {
+function isGluedToName(text: string, offset: number, length: number): boolean {
   const before = offset > 0 ? text.charAt(offset - 1) : "";
   const after = text.charAt(offset + length);
   return NAME_CHARACTER.test(before) || after === "(" || NAME_CHARACTER.test(after);

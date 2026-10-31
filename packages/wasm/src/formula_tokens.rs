@@ -163,10 +163,16 @@ impl<'a> Utf16Offsets<'a> {
     }
 }
 
-/// The tokens of formula text: four `u32` per token, `kind` (the order of
-/// [`TokenKind`]), `from` and `to` (UTF-16 offsets into `src`) and `space`
-/// (1 when whitespace comes before the token). A leading `=` is not a token.
-/// The lexer never stops at an error; text it cannot read is a bad token.
+/// The tokens of formula text: four `u32` per token, `kind`, `from` and `to`
+/// (UTF-16 offsets into `src`) and `space` (1 when whitespace comes before the
+/// token). A leading `=` is not a token. The lexer never stops at an error:
+/// text it cannot read is a bad token, and an open quote or bracket runs to
+/// the end of the text.
+///
+/// `kind` is 0 number, 1 text, 2 `TRUE` or `FALSE` as a value, 3 error
+/// constant, 4 name (a function, reference, defined name, table or sheet),
+/// 5 quoted sheet name, 6 table reference in brackets, 7 operator, 8 `:`,
+/// 9 `!`, 10 `#`, 11 `,`, 12 `;`, 13 `(`, 14 `)`, 15 `{`, 16 `}`, 17 bad text.
 #[wasm_bindgen(js_name = formulaTokens)]
 pub fn formula_tokens(src: &str) -> Vec<u32> {
     let tokens = lex_tolerant(src);
@@ -259,8 +265,8 @@ fn first_error(src: &str) -> Option<(usize, usize, bool, String)> {
 
 /// The first syntax error in formula text, or `undefined` when the engine's
 /// parser reads the whole formula. A leading `=` is optional, as for a cell.
-#[wasm_bindgen(js_name = formulaSyntaxError)]
-pub fn formula_syntax_error(src: &str) -> Option<FormulaSyntaxError> {
+#[wasm_bindgen(js_name = checkFormulaSyntax)]
+pub fn check_formula_syntax(src: &str) -> Option<FormulaSyntaxError> {
     let (start, end, incomplete, message) = first_error(src)?;
     let mut offsets = Utf16Offsets::new(src);
 

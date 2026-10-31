@@ -8,7 +8,7 @@ description: "FormulaTokenKind type in @sheetwrite/core/functions: What a token 
 What a token is; editors use it for syntax colours.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/formula-analysis.ts#L15"><code>packages/core/src/formula-analysis.ts#L15</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/formula-analysis.ts#L23"><code>packages/core/src/formula-analysis.ts#L23</code></a></dd></div>
 </dl>
 
 ## Declaration

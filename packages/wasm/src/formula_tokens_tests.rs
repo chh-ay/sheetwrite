@@ -1,7 +1,7 @@
 //! Formula help's tokens and syntax errors (`formula_tokens.rs`).
 
 use crate::calc::parse;
-use crate::formula_tokens::{formula_syntax_error, formula_tokens, TokenKind};
+use crate::formula_tokens::{check_formula_syntax, formula_tokens, TokenKind};
 
 /// One decoded token: kind, UTF-16 `from` and `to`, and whitespace before it.
 type Token = (TokenKind, u32, u32, bool);
@@ -44,7 +44,7 @@ fn kinds(src: &str) -> Vec<TokenKind> {
 
 /// The error as `(from, to, incomplete, message)`.
 fn error(src: &str) -> Option<(u32, u32, bool, String)> {
-    formula_syntax_error(src).map(|error| {
+    check_formula_syntax(src).map(|error| {
         (
             error.from(),
             error.to(),

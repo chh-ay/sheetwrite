@@ -73,7 +73,7 @@ The result has these fields. Every `from` and `to` is a UTF-16 offset into the t
 
 Commas inside strings, array constants such as `{1, 2}` and union groups such as `(A1, B1)` do not count as argument separators. A repeating argument, such as the numbers of `SUM`, takes every later position. The argument count of a call is checked only after its `)`. With an empty function list, `completion` is `null` and no name is reported as unknown.
 
-The engine packages export the two reads that `analyzeFormula` uses: `formulaTokens(text)` returns four numbers per token (kind, start offset, end offset, and 1 when whitespace comes before the token), and `formulaSyntaxError(text)` returns the first syntax error, or `undefined`.
+The engine packages export the two reads that `analyzeFormula` uses: `formulaTokens(text)` returns four numbers per token (kind, start offset, end offset, and 1 when whitespace comes before the token), and `checkFormulaSyntax(text)` returns the first syntax error, or `undefined`.
 
 ## Limits
 

@@ -10,7 +10,7 @@ The innermost function call around the cursor. `argumentIndex` is 0-based;
 arguments than the function takes or the function is unknown.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/formula-analysis.ts#L62"><code>packages/core/src/formula-analysis.ts#L62</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/formula-analysis.ts#L70"><code>packages/core/src/formula-analysis.ts#L70</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>6</span>

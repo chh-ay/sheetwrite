@@ -9,7 +9,7 @@ Instantiates the given `module`, which can either be bytes or
 a precompiled `WebAssembly.Module`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/formulas/pkg/sheetwrite_wasm.d.ts#L704"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L704</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/formulas/pkg/sheetwrite_wasm.d.ts#L754"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L754</code></a></dd></div>
 </dl>
 
 ## Declaration
