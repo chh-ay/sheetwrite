@@ -19,7 +19,7 @@ Path-qualified schema failure found while validating an untrusted snapshot.
 <summary><code>constructor</code></summary>
 
 ```ts generated
-constructor(errors: readonly DocumentValidationError[]);
+constructor(errors: readonly DocumentValidationError[], options?: ErrorOptions);
 ```
 
 </details>
@@ -59,7 +59,10 @@ name: "SnapshotValidationError"
 
 ```ts generated
 class SnapshotValidationError extends SheetwriteError {
-  constructor(errors: readonly DocumentValidationError[]);
+  constructor(
+    errors: readonly DocumentValidationError[],
+    options?: ErrorOptions,
+  );
   code: "invalid-snapshot";
   errors: readonly DocumentValidationError[];
   name: "SnapshotValidationError";

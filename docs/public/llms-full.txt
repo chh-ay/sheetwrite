@@ -14076,7 +14076,7 @@ Allocation mode used when enforcing snapshot construction capacity.
 ##### `SnapshotValidationError` — class
 
 ```ts
-class SnapshotValidationError extends SheetwriteError { constructor(errors: readonly DocumentValidationError[]); code: "invalid-snapshot"; errors: readonly DocumentValidationError[]; name: "SnapshotValidationError" }
+class SnapshotValidationError extends SheetwriteError { constructor(errors: readonly DocumentValidationError[], options?: ErrorOptions); code: "invalid-snapshot"; errors: readonly DocumentValidationError[]; name: "SnapshotValidationError" }
 ```
 
 Path-qualified schema failure found while validating an untrusted snapshot.

@@ -2006,7 +2006,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L3476",
+              "source": "src/document-protocol.ts#L3477",
               "jsDocTags": [],
               "documentation": "Exhaustive stable target identity used by persistence/logging layers.",
               "memberDocs": []
@@ -5484,7 +5484,7 @@
             {
               "name": "SnapshotValidationError",
               "kind": "class",
-              "signature": "class SnapshotValidationError extends SheetwriteError { constructor(errors: readonly DocumentValidationError[]); code: \"invalid-snapshot\"; errors: readonly DocumentValidationError[]; name: \"SnapshotValidationError\" }",
+              "signature": "class SnapshotValidationError extends SheetwriteError { constructor(errors: readonly DocumentValidationError[], options?: ErrorOptions); code: \"invalid-snapshot\"; errors: readonly DocumentValidationError[]; name: \"SnapshotValidationError\" }",
               "owners": [
                 "src/document-protocol.ts"
               ],
@@ -6357,7 +6357,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L3438",
+              "source": "src/document-protocol.ts#L3439",
               "jsDocTags": [],
               "documentation": "Validate and canonically order a schema-1 snapshot without hydrating runtime state.",
               "memberDocs": []
