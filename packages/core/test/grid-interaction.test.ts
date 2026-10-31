@@ -14,7 +14,7 @@ import type {
   RowData,
   Viewport,
 } from "../src/types.js";
-import { makeColumnarData, makeWorkbook } from "./fixtures.js";
+import { elementAdded, makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 const originalRaf = globalThis.requestAnimationFrame;
 let restoreStubs: () => void;
@@ -81,7 +81,7 @@ function scrollerOf(host: HTMLElement): HTMLDivElement {
 }
 
 describe("find-bar keystroke isolation", () => {
-  it("does not clear the selected cell when Backspace is pressed in the find input", () => {
+  it("does not clear the selected cell when Backspace is pressed in the find input", async () => {
     const workbook = makeWorkbook(10);
     const store = new SheetwriteStore(workbook, makeColumnarData(10));
     const host = mountHost();
@@ -91,8 +91,8 @@ describe("find-bar keystroke isolation", () => {
     grid.setSelection({ kind: "cell", addr });
 
     host.dispatchEvent(new KeyboardEvent("keydown", { key: "f", ctrlKey: true, bubbles: true }));
-    const findInput = host.querySelector(".sheetwrite-find-input");
-    if (!(findInput instanceof HTMLInputElement)) throw new Error("find input not mounted");
+    // The find bar's chunk loads on the first open.
+    const findInput = await elementAdded(host, ".sheetwrite-find-input", HTMLInputElement);
 
     findInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Backspace", bubbles: true }));
 

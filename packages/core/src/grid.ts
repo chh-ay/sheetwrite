@@ -37,7 +37,7 @@ import {
   unknownSheetError,
 } from "./errors.js";
 import { downloadBytes, toCsv, toXlsxTable } from "./export.js";
-import { FindBar } from "./find-bar.js";
+import type { FindBar } from "./find-bar.js";
 import { stepFontSizePx, stepNumberFormatDecimals } from "./format-presets.js";
 import { GeometryLayoutController } from "./geometry-layout-controller.js";
 import { hyperlinkAt, resolveHyperlinkTarget, sanitizeCellHyperlink } from "./hyperlink.js";
@@ -45,6 +45,7 @@ import { InteractionSessions } from "./interaction-sessions.js";
 import { Keymap } from "./keymap.js";
 import { MutationRevisionIndex, type MutationRevisionStats } from "./mutation-revision-index.js";
 import { type NoteCell, NotePopover } from "./note-popover.js";
+import { trimNumberFormatCaches } from "./number-format.js";
 import { ObjectLayer } from "./object-layer.js";
 import { OverlayPainter } from "./overlay-painter.js";
 import { attachPanelTriggers, showPivotFields } from "./panels/panel-loader.js";
@@ -497,7 +498,10 @@ export class GridImpl implements Grid {
   private ribbon: Ribbon | null = null;
   /** Bumped whenever chrome is rebuilt, so a chrome chunk that loads late is dropped. */
   private chromeGeneration = 0;
+  /** The loaded find bar; `null` until its first open, and again after a reset. */
   private findBar: FindBar | null = null;
+  /** Bumped by `resetFindBar`, so a find bar chunk that arrives after a reset is dropped. */
+  private findBarGeneration = 0;
   private readonly notes: NotePopover;
   private readonly actionFeedback: ActionFeedback;
   private config: GridConfig | undefined;
@@ -805,10 +809,6 @@ export class GridImpl implements Grid {
     const config = this.config;
     this.createToolbar(config);
 
-    if (config?.find !== false) {
-      this.findBar = new FindBar(host, this.theme, this, this.readOnly);
-    }
-
     this.viewportEl = document.createElement("div");
     this.viewportEl.className = "sheetwrite-viewport";
     this.viewportEl.style.cssText = `position:absolute;left:0;right:0;top:${this.toolbarHeight}px;bottom:${this.tabBarHeight}px;`;
@@ -842,7 +842,7 @@ export class GridImpl implements Grid {
       columnHeader: (col) => this.columnHeader(col),
       toViewRow: (row) => this.toViewRow(row),
       editListeners: this.listeners,
-      findBar: () => this.findBar,
+      openFind: (options) => this.openFindBar(options),
       store: this.store,
       loadable: this.loadable,
       selection: () => this.selection,
@@ -2445,6 +2445,42 @@ export class GridImpl implements Grid {
     }, failed);
   }
 
+  /**
+   * Open the find bar. Its code is in its own chunk, loaded on the first open,
+   * so a grid that never searches does not download or build it. A chunk that
+   * arrives after a reset or after destroy is dropped.
+   */
+  private openFindBar(options?: { replace?: boolean }): void {
+    if (this.config?.find === false || this.destroyed) return;
+    if (this.findBar) {
+      this.findBar.open(options);
+      return;
+    }
+
+    const generation = this.findBarGeneration;
+    const current = () => generation === this.findBarGeneration && !this.destroyed;
+    void import("./find-bar.js").then(
+      ({ FindBar: FindBarClass }) => {
+        if (!current()) return;
+        this.findBar ??= new FindBarClass(this.host, this.baseTheme, this, this.readOnly);
+        this.findBar.open(options);
+      },
+      (error: unknown) => {
+        if (!current()) return;
+        // Tell the user; the load error still reaches the host.
+        this.actionFeedback.show(`The find bar could not load: ${errorDetail(error)}`);
+        throw error;
+      },
+    );
+  }
+
+  /** Drop the find bar, so the next open builds it for the current config and read-only state. */
+  private resetFindBar(): void {
+    this.findBarGeneration += 1;
+    this.findBar?.destroy();
+    this.findBar = null;
+  }
+
   /** Chrome sits first in the host, so keyboard users reach it before the grid. */
   private placeChrome(element: HTMLElement): void {
     // The grid owns widget theming: seed now, reseed on every theme change.
@@ -2525,11 +2561,7 @@ export class GridImpl implements Grid {
     if (readOnly) this.host.setAttribute("aria-readonly", "true");
     else this.host.removeAttribute("aria-readonly");
 
-    this.findBar?.destroy();
-    this.findBar =
-      this.config?.find === false
-        ? null
-        : new FindBar(this.host, this.baseTheme, this, this.readOnly);
+    this.resetFindBar();
     this.emitCommandStateChange();
     // Object handles show only while the grid can be edited.
     this.scheduleRender();
@@ -2568,9 +2600,7 @@ export class GridImpl implements Grid {
 
     this.interactions.configureMenu(config, this.baseTheme);
 
-    this.findBar?.destroy();
-    this.findBar =
-      config?.find === false ? null : new FindBar(this.host, this.baseTheme, this, this.readOnly);
+    this.resetFindBar();
 
     this.sheetTabs?.destroy();
     this.sheetTabs = null;
@@ -3166,7 +3196,7 @@ export class GridImpl implements Grid {
       mergeAndCenter: () => this.styleActions.mergeSelection(true),
       clearAll: () => this.styleActions.clearAll(),
       autoSum: () => this.autoSum(),
-      find: () => this.findBar?.open(),
+      find: () => this.openFindBar(),
       freezePanes: () => {
         const focus = this.selection.focusCell;
         if (focus) this.setFrozen(focus.row, focus.col);
@@ -3838,6 +3868,26 @@ export class GridImpl implements Grid {
       for (const listeners of Object.values(this.listeners)) listeners.clear();
     });
     if (failed) throw failure;
+  }
+
+  trimMemory(): void {
+    if (this.destroyed) return;
+
+    // A worker drops its strings only when the host reader drops its own, so
+    // the next frame resends them. A store without an engine sends no pool ids.
+    const engine = storeEngine(this.store);
+    if (engine) {
+      engine.trimMemory();
+      this.renderer.trimMemory?.();
+    }
+    trimNumberFormatCaches();
+    this.interactions.trimMemory();
+    this.overlayPainter.trimMemory();
+
+    // The next frame reads its window again, so a worker renderer gets every
+    // string it paints, and the same cells paint the same output.
+    this.readWindows.invalidateData();
+    this.scheduleRender();
   }
 }
 

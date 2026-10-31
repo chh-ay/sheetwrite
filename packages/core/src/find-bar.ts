@@ -12,33 +12,73 @@ function formatCount(result: SearchResult): string {
   return `${result.active + 1} of ${result.matches.length}`;
 }
 
+/** The find bar's DOM, built on first open. */
+interface FindBarElements {
+  readonly el: HTMLDivElement;
+  readonly input: HTMLInputElement;
+  readonly count: HTMLSpanElement;
+  readonly replaceInput: HTMLInputElement | null;
+}
+
 /**
  * Google-Sheets-style floating find/replace box pinned to the top-right of the
  * grid host. Two stacked rows: find (query + counter + nav) and replace
- * (replacement + Replace/All). The DOM is built once in the constructor;
- * `open`/`close` only toggle visibility and focus. Typing searches;
- * Enter/Shift+Enter cycle matches; Enter in the replace field replaces the
- * active match; Esc closes. The replace row is omitted entirely on a read-only
- * grid. When `config.find === false` the whole widget (find and replace) is
- * never constructed.
+ * (replacement + Replace/All). The DOM is built on the first `open`, so a grid
+ * that never searches pays nothing for it; after that `open`/`close` only
+ * toggle visibility and focus. Typing searches; Enter/Shift+Enter cycle
+ * matches; Enter in the replace field replaces the active match; Esc closes.
+ * The replace row is omitted entirely on a read-only grid. When
+ * `config.find === false` the whole widget (find and replace) is never
+ * constructed.
  */
 export class FindBar {
   private readonly host: HTMLElement;
   private readonly grid: Grid;
-
-  private readonly el: HTMLDivElement;
-  private readonly input: HTMLInputElement;
-  private readonly count: HTMLSpanElement;
-  private readonly replaceInput: HTMLInputElement | null;
-
+  private readonly readOnly: boolean;
+  private elements: FindBarElements | null = null;
   private _open = false;
 
   constructor(host: HTMLElement, theme: Theme, grid: Grid, readOnly = false) {
     this.host = host;
     this.grid = grid;
+    this.readOnly = readOnly;
 
     seedWidgetTheme(host, theme);
+  }
 
+  /** Show the bar. `replace: true` focuses the replace field (Ctrl/Cmd+H). */
+  open(opts: { replace?: boolean } = {}): void {
+    const elements = this.elements ?? this.build();
+    elements.el.style.display = "flex";
+    this._open = true;
+
+    const field = opts.replace && elements.replaceInput ? elements.replaceInput : elements.input;
+    field.focus();
+    field.select();
+
+    if (elements.input.value) {
+      this.update(this.grid.search(elements.input.value));
+    }
+  }
+
+  close(): void {
+    if (this.elements) this.elements.el.style.display = "none";
+    this._open = false;
+
+    this.grid.clearSearch();
+    this.host.focus();
+  }
+
+  get isOpen(): boolean {
+    return this._open;
+  }
+
+  destroy(): void {
+    this.elements?.el.remove();
+    this.elements = null;
+  }
+
+  private build(): FindBarElements {
     const el = document.createElement("div");
     el.className = "sheetwrite-find";
     // Anchoring + visibility are behavior; everything cosmetic lives in styles.css.
@@ -115,96 +155,64 @@ export class FindBar {
     findRow.append(field, prev, next, close);
     el.appendChild(findRow);
 
-    let replaceInput: HTMLInputElement | null = null;
-    if (!readOnly) {
-      const replaceRow = this.row("sheetwrite-find-replace-row");
+    const replaceInput = this.readOnly ? null : this.buildReplaceRow(el);
+    this.host.appendChild(el);
 
-      const replacementInput = document.createElement("input");
-      replaceInput = replacementInput;
-      replaceInput.className = "sheetwrite-find-replace-input";
-      replaceInput.placeholder = "Replace with";
-      replaceInput.setAttribute("aria-label", "Replace with");
-
-      const replaceBtn = this.button(
-        "sheetwrite-find-replace",
-        "sheetwrite-find-text-btn",
-        "Replace",
-        "Replace",
-        () => {
-          this.update(this.grid.replaceCurrent(replacementInput.value));
-        },
-      );
-
-      const allBtn = this.button(
-        "sheetwrite-find-replace-all",
-        "sheetwrite-find-text-btn",
-        "Replace all",
-        "Replace all",
-        () => {
-          this.update(this.grid.replaceAll(replacementInput.value).result);
-        },
-      );
-
-      replaceInput.addEventListener("keydown", (e) => {
-        if (this.handleFieldShortcut(e)) return;
-
-        if (e.key === "Enter") {
-          e.stopPropagation();
-          e.preventDefault();
-          replaceBtn.click();
-          return;
-        }
-
-        if (e.key === "Escape") {
-          e.stopPropagation();
-          this.close();
-        }
-      });
-
-      replaceRow.append(replaceInput, replaceBtn, allBtn);
-      el.appendChild(replaceRow);
-    }
-
-    host.appendChild(el);
-
-    this.el = el;
-    this.input = input;
-    this.count = count;
-    this.replaceInput = replaceInput;
+    this.elements = { el, input, count, replaceInput };
+    return this.elements;
   }
 
-  /** Show the bar. `replace: true` focuses the replace field (Ctrl/Cmd+H). */
-  open(opts: { replace?: boolean } = {}): void {
-    this.el.style.display = "flex";
-    this._open = true;
+  private buildReplaceRow(el: HTMLDivElement): HTMLInputElement {
+    const replaceRow = this.row("sheetwrite-find-replace-row");
 
-    const field = opts.replace && this.replaceInput ? this.replaceInput : this.input;
-    field.focus();
-    field.select();
+    const replaceInput = document.createElement("input");
+    replaceInput.className = "sheetwrite-find-replace-input";
+    replaceInput.placeholder = "Replace with";
+    replaceInput.setAttribute("aria-label", "Replace with");
 
-    if (this.input.value) {
-      this.update(this.grid.search(this.input.value));
-    }
-  }
+    const replaceBtn = this.button(
+      "sheetwrite-find-replace",
+      "sheetwrite-find-text-btn",
+      "Replace",
+      "Replace",
+      () => {
+        this.update(this.grid.replaceCurrent(replaceInput.value));
+      },
+    );
 
-  close(): void {
-    this.el.style.display = "none";
-    this._open = false;
+    const allBtn = this.button(
+      "sheetwrite-find-replace-all",
+      "sheetwrite-find-text-btn",
+      "Replace all",
+      "Replace all",
+      () => {
+        this.update(this.grid.replaceAll(replaceInput.value).result);
+      },
+    );
 
-    this.grid.clearSearch();
-    this.host.focus();
-  }
+    replaceInput.addEventListener("keydown", (e) => {
+      if (this.handleFieldShortcut(e)) return;
 
-  get isOpen(): boolean {
-    return this._open;
-  }
+      if (e.key === "Enter") {
+        e.stopPropagation();
+        e.preventDefault();
+        replaceBtn.click();
+        return;
+      }
 
-  destroy(): void {
-    this.el.remove();
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        this.close();
+      }
+    });
+
+    replaceRow.append(replaceInput, replaceBtn, allBtn);
+    el.appendChild(replaceRow);
+    return replaceInput;
   }
 
   private update(result: SearchResult): void {
-    this.count.textContent = formatCount(result);
+    if (this.elements) this.elements.count.textContent = formatCount(result);
   }
 
   /**

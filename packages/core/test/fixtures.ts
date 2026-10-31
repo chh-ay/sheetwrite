@@ -45,3 +45,28 @@ export function sheet(id: string, rowCount = 10): Sheet {
 export function range(sheetId: string, r0: number, c0: number, r1: number, c1: number): Range {
   return { sheet: sheetId, start: { row: r0, col: c0 }, end: { row: r1, col: c1 } };
 }
+
+/**
+ * Resolve with the first element under `host` that matches `selector`, now or
+ * when it is added. Use it for chrome that loads its own chunk, such as the
+ * find bar, instead of a guessed delay.
+ */
+export function elementAdded<T extends Element>(
+  host: HTMLElement,
+  selector: string,
+  type: new () => T,
+): Promise<T> {
+  return new Promise((resolve) => {
+    const match = (): boolean => {
+      const element = host.querySelector(selector);
+      if (!(element instanceof type)) return false;
+      resolve(element);
+      return true;
+    };
+    if (match()) return;
+    const observer = new MutationObserver(() => {
+      if (match()) observer.disconnect();
+    });
+    observer.observe(host, { childList: true, subtree: true });
+  });
+}
