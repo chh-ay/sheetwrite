@@ -11,7 +11,7 @@ cannot represent as a Date. Construct calendar dates with `Date.UTC(...)`
 (or via [`parseDateInput`](/docs/api/core/parse-date-input/)) to avoid host-timezone shifts.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/date-serial.ts#L27"><code>packages/core/src/date-serial.ts#L27</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/date-serial.ts#L27"><code>packages/core/src/date-serial.ts#L27</code></a></dd></div>
 </dl>
 
 ## Declaration

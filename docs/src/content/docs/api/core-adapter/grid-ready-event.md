@@ -8,7 +8,7 @@ description: "GridReadyEvent interface in @sheetwrite/core/adapter: Grid handle,
 Grid handle, generation, and reason published after adapter initialization.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/adapter.ts#L96"><code>packages/core/src/adapter.ts#L96</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/adapter.ts#L96"><code>packages/core/src/adapter.ts#L96</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

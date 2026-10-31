@@ -8,7 +8,7 @@ description: "ChartRef interface in @sheetwrite/core: Stable identity of one cha
 Stable identity of one chart: the sheet that owns it and its ID on that sheet.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/chart.ts#L68"><code>packages/core/src/types/chart.ts#L68</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/chart.ts#L68"><code>packages/core/src/types/chart.ts#L68</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

@@ -8,7 +8,7 @@ description: "ChartSize interface in @sheetwrite/charts: Box size in CSS pixels.
 Box size in CSS pixels.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/charts/src/chart-svg.ts#L13"><code>packages/charts/src/chart-svg.ts#L13</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/charts/src/chart-svg.ts#L13"><code>packages/charts/src/chart-svg.ts#L13</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

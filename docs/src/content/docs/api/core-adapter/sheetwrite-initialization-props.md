@@ -8,7 +8,7 @@ description: "SheetwriteInitializationProps interface in @sheetwrite/core/adapte
 Optional explicit WASM source and initialization error callback for adapters.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/adapter.ts#L140"><code>packages/core/src/adapter.ts#L140</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/adapter.ts#L140"><code>packages/core/src/adapter.ts#L140</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

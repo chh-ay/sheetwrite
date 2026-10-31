@@ -8,7 +8,7 @@ description: "AggregateOp type in @sheetwrite/core: Column aggregate operation f
 Column aggregate operation for `Grid.aggregate` / `Store` data ops.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/data.ts#L8"><code>packages/core/src/types/data.ts#L8</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/data.ts#L8"><code>packages/core/src/types/data.ts#L8</code></a></dd></div>
 </dl>
 
 ## Declaration

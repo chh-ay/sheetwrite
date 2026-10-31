@@ -10,7 +10,7 @@ renderer of the command model: the toolbar, the full ribbon and the compact
 ribbon. Each defaults to true, except `export`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L353"><code>packages/core/src/types/grid.ts#L353</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/grid.ts#L353"><code>packages/core/src/types/grid.ts#L353</code></a></dd></div>
 </dl>
 
 ## Declaration

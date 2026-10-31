@@ -8,7 +8,7 @@ description: "MAX_CONDITIONAL_FORMAT_FORMULA_LENGTH variable in @sheetwrite/core
 Maximum serialized formula predicate source; parsing/evaluation stays bounded per visible cell.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/conditional-format.ts#L8"><code>packages/core/src/conditional-format.ts#L8</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/conditional-format.ts#L8"><code>packages/core/src/conditional-format.ts#L8</code></a></dd></div>
 </dl>
 
 ## Declaration

@@ -8,7 +8,7 @@ description: "CellScalar type in @sheetwrite/core: A scalar that can be displaye
 A scalar that can be displayed directly.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/cell.ts#L110"><code>packages/core/src/types/cell.ts#L110</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/cell.ts#L110"><code>packages/core/src/types/cell.ts#L110</code></a></dd></div>
 </dl>
 
 ## Declaration

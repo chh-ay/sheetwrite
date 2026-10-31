@@ -8,7 +8,7 @@ description: "sanitizeHyperlinkStyle function in @sheetwrite/core: Convert an un
 Convert an untrusted style into one bounded, plain renderer-safe value.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/hyperlink.ts#L118"><code>packages/core/src/hyperlink.ts#L118</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/hyperlink.ts#L118"><code>packages/core/src/hyperlink.ts#L118</code></a></dd></div>
 </dl>
 
 ## Declaration

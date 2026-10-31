@@ -8,7 +8,7 @@ description: "PivotFieldType type in @sheetwrite/core: Inferred type of one sour
 Inferred type of one source field from its data rows.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/pivot.ts#L121"><code>packages/core/src/types/pivot.ts#L121</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/pivot.ts#L121"><code>packages/core/src/types/pivot.ts#L121</code></a></dd></div>
 </dl>
 
 ## Declaration

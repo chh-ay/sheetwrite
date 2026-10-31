@@ -8,7 +8,7 @@ description: "SHEETWRITE_ERROR_CODES variable in @sheetwrite/core: Stable public
 Stable public failure codes. Messages are diagnostic and are not API contracts.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/errors.ts#L2"><code>packages/core/src/errors.ts#L2</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/errors.ts#L2"><code>packages/core/src/errors.ts#L2</code></a></dd></div>
 </dl>
 
 ## Declaration

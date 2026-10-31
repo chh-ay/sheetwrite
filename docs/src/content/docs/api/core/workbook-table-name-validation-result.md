@@ -8,7 +8,7 @@ description: "WorkbookTableNameValidationResult type in @sheetwrite/core: Result
 Result of validating and NFC-normalizing a workbook table name.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/workbook-table.ts#L43"><code>packages/core/src/workbook-table.ts#L43</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/workbook-table.ts#L43"><code>packages/core/src/workbook-table.ts#L43</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>2</span>

@@ -8,7 +8,7 @@ description: "GridCommandName type in @sheetwrite/core: Built-in command names a
 Built-in command names accepted by state queries and change events.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L265"><code>packages/core/src/types/grid.ts#L265</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/grid.ts#L265"><code>packages/core/src/types/grid.ts#L265</code></a></dd></div>
 </dl>
 
 ## Declaration
