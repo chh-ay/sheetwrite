@@ -28,7 +28,17 @@ export interface PopupOptions {
 interface OpenPopup {
   readonly surface: HTMLElement;
   readonly trigger: HTMLElement;
+  /** Viewport position of the trigger when the popup was placed. */
+  readonly anchor: { readonly left: number; readonly top: number };
   readonly onClose: (() => void) | undefined;
+}
+
+/** Whether the trigger left the position its popup was placed against. */
+function triggerMoved(popup: OpenPopup): boolean {
+  const rect = popup.trigger.getBoundingClientRect();
+  return (
+    Math.abs(rect.left - popup.anchor.left) >= 0.5 || Math.abs(rect.top - popup.anchor.top) >= 0.5
+  );
 }
 
 /**
@@ -56,7 +66,8 @@ export class RibbonPopup {
   constructor(private readonly host: HTMLElement) {
     const signal = this.listeners.signal;
     document.addEventListener("pointerdown", this.onOutsidePointer, { capture: true, signal });
-    // A scroll or resize would leave popups floating away from their triggers.
+    // A resize, or a scroll that moves a trigger, would leave popups floating
+    // away from their triggers.
     window.addEventListener("resize", () => this.closeAll(false), { signal });
     document.addEventListener("scroll", this.onScroll, { capture: true, signal });
   }
@@ -83,9 +94,16 @@ export class RibbonPopup {
     trigger.setAttribute("aria-expanded", "true");
     trigger.setAttribute("aria-controls", surface.id);
 
-    this.stack.push({ surface, trigger, onClose: options.onClose });
+    // A fixed surface does not move the trigger, so this is also its placed position.
+    const anchor = trigger.getBoundingClientRect();
     this.host.appendChild(surface);
-    this.place(trigger, surface);
+    this.stack.push({
+      surface,
+      trigger,
+      anchor: { left: anchor.left, top: anchor.top },
+      onClose: options.onClose,
+    });
+    this.place(anchor, surface);
 
     const first = options.focus ? surface.querySelector<HTMLElement>(NAVIGABLE) : null;
     if (first !== null) focusInSurface(surface, first);
@@ -133,12 +151,11 @@ export class RibbonPopup {
    * transformed ancestor would make "fixed" relative to that ancestor instead
    * of the viewport, so measure where (0, 0) actually lands and subtract it.
    */
-  private place(trigger: HTMLElement, surface: HTMLElement): void {
+  private place(anchor: DOMRect, surface: HTMLElement): void {
     surface.style.position = "fixed";
     surface.style.left = "0px";
     surface.style.top = "0px";
     const origin = surface.getBoundingClientRect();
-    const anchor = trigger.getBoundingClientRect();
     const maxLeft = window.innerWidth - origin.width - VIEWPORT_MARGIN;
     const below = anchor.bottom + TRIGGER_GAP;
     const above = anchor.top - origin.height - TRIGGER_GAP;
@@ -164,13 +181,15 @@ export class RibbonPopup {
     this.closeAbove(keep, false);
   };
 
-  private readonly onScroll = (event: Event): void => {
-    // Scrolling inside a popup (a long font list) must not close it.
-    const target = event.target;
-    if (target instanceof Node && this.stack.some((popup) => popup.surface.contains(target))) {
-      return;
-    }
-    this.closeAll(false);
+  /**
+   * Close the popups whose trigger moved. A scroll that leaves every trigger
+   * in place keeps them open: a scroll inside a popup (a long font list), or
+   * a page scroll event that WebKit delivers after the popup opened, for a
+   * scroll that happened before.
+   */
+  private readonly onScroll = (): void => {
+    const moved = this.stack.findIndex(triggerMoved);
+    if (moved !== -1) this.closeAbove(moved, false);
   };
 
   private readonly onKeydown = (event: KeyboardEvent): void => {

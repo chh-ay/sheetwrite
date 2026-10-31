@@ -251,15 +251,24 @@ it("runs a border preset from the keyboard and returns focus to the menu button"
 
 it("keeps a keyboard-opened menu open when focus would scroll the page", async () => {
   const { host, control, key } = await setup();
+  const options = control("Borders options");
   // WebKit scrolls the document to show a focused menu item, even in a fixed
-  // popup. Emulate that scroll for every focus that does not prevent it.
+  // popup, and the scroll moves the trigger. Emulate that scroll for every
+  // focus that does not prevent it.
+  let scrolled = 0;
+  Object.defineProperty(options, "getBoundingClientRect", {
+    configurable: true,
+    value: () => new DOMRect(40, 500 - scrolled, 28, 24),
+  });
   const focus = HTMLElement.prototype.focus;
-  HTMLElement.prototype.focus = function (this: HTMLElement, options?: FocusOptions) {
-    focus.call(this, options);
-    if (options?.preventScroll !== true) document.dispatchEvent(new Event("scroll"));
+  HTMLElement.prototype.focus = function (this: HTMLElement, focusOptions?: FocusOptions) {
+    focus.call(this, focusOptions);
+    if (focusOptions?.preventScroll === true) return;
+
+    scrolled += 24;
+    document.dispatchEvent(new Event("scroll"));
   };
   try {
-    const options = control("Borders options");
     options.focus({ preventScroll: true });
     key(options, "ArrowDown");
     expect(document.activeElement?.textContent).toBe("Bottom Border");
@@ -272,6 +281,30 @@ it("keeps a keyboard-opened menu open when focus would scroll the page", async (
   } finally {
     HTMLElement.prototype.focus = focus;
   }
+});
+
+it("keeps a menu open for a scroll that leaves its trigger in place", async () => {
+  const { host, control, key } = await setup();
+  const options = control("Borders options");
+  let triggerTop = 500;
+  Object.defineProperty(options, "getBoundingClientRect", {
+    configurable: true,
+    value: () => new DOMRect(40, triggerTop, 28, 24),
+  });
+  options.focus();
+  key(options, "ArrowDown");
+  const menu = () => host.querySelector('.sheetwrite-ribbon-popup[aria-label="Borders"]');
+  expect(menu()).not.toBeNull();
+
+  // WebKit can deliver the event of a page scroll that happened before the menu opened.
+  document.dispatchEvent(new Event("scroll"));
+  expect(menu()).not.toBeNull();
+  expect(document.activeElement?.textContent).toBe("Bottom Border");
+
+  // The page scrolls and the trigger moves: the placed menu would be wrong, so it closes.
+  triggerTop = 300;
+  document.dispatchEvent(new Event("scroll"));
+  expect(menu()).toBeNull();
 });
 
 it("disables editing controls while read-only but keeps view controls", async () => {
