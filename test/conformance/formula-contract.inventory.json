@@ -4954,12 +4954,11 @@
       ]
     },
     "analysis-aggregate": {
-      "excel": "divergent",
+      "excel": "documented",
       "googleSheets": "unverified",
       "openFormula": "unverified",
       "divergences": [
-        "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?.",
-        "Hidden rows are not part of the engine model. AGGREGATE row visibility options therefore have no effect."
+        "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?."
       ]
     },
     "analysis-database": {
@@ -5036,14 +5035,6 @@
       "divergences": [
         "HYPERLINK returns its display value: the friendly name, or the link when there is no friendly name. The grid does not open the link. Use cell hyperlinks for links that open.",
         "Google Sheets and OpenFormula results require producer evidence before compatibility is claimed."
-      ]
-    },
-    "excel-subtotal-visible": {
-      "excel": "divergent",
-      "googleSheets": "unverified",
-      "openFormula": "unverified",
-      "divergences": [
-        "Only function codes 1 to 11 are accepted. Codes 101 to 111, which ignore hidden rows in Excel, return #VALUE! (#246)."
       ]
     },
     "analysis-lambda-call": {
@@ -6685,7 +6676,7 @@
       "contractStatus": "required-supported",
       "signature": "subtotal",
       "semantics": "aggregate",
-      "dialects": "excel-subtotal-visible",
+      "dialects": "excel-documented",
       "implementation": "implemented-assisted",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1

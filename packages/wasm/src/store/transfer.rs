@@ -406,6 +406,27 @@ mod tests {
     }
 
     #[test]
+    fn memory_transfer_keeps_hidden_rows_and_the_subtotals_that_read_them() {
+        let mut original = CellStore::new();
+        original.add_sheet(2, 4);
+        for (row, value) in [1.0, 2.0, 4.0].into_iter().enumerate() {
+            original.set_number(0, row, 0, value, 0);
+        }
+        original.set_formula(0, 0, 1, "=SUBTOTAL(109,A1:A3)", 0);
+        original.recompute_changed();
+        assert!(original.set_hidden_rows(0, &[0, 0], &[2, 2]));
+
+        let mut replacement =
+            CellStore::read_memory_state(&original.export_memory_state()).unwrap();
+        replacement.set_number(0, 1, 0, 8.0, 0);
+        replacement.recompute_changed();
+        assert_eq!(replacement.get_cell(0, 0, 1).num(), 8.0);
+
+        assert!(replacement.set_hidden_rows(0, &[], &[]));
+        assert_eq!(replacement.get_cell(0, 0, 1).num(), 13.0);
+    }
+
+    #[test]
     fn memory_transfer_keeps_the_tab_order_of_three_d_references() {
         let mut original = CellStore::new();
         for (name, value) in [("First", 1.0), ("Middle", 10.0), ("Last", 100.0)] {
