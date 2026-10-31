@@ -92,6 +92,8 @@ Packages: 0.6.1. Canonical HTML: https://www.sheetwrite.dev/docs/
 
 ## Authored guides
 
+<a id="installation"></a>
+
 ### Installation
 
 Source: https://www.sheetwrite.dev/docs/start/installation/
@@ -238,6 +240,8 @@ Worker rendering and XLSX stay explicit. Import the Worker entry from `@sheetwri
 - [Configure Worker rendering](https://www.sheetwrite.dev/docs/features/worker-rendering/)
 - [Configure XLSX import and export](https://www.sheetwrite.dev/docs/import-export/xlsx-export/)
 
+<a id="your-first-grid"></a>
+
 ### Your first grid
 
 Source: https://www.sheetwrite.dev/docs/start/first-grid/
@@ -330,6 +334,8 @@ For a server, save each change as an ordered operation instead of whole snapshot
 - Read [what is new in 0.5.0](https://www.sheetwrite.dev/docs/releases/0.5.0/).
 - Browse the generated [`@sheetwrite/core` API](https://www.sheetwrite.dev/docs/api/core/).
 
+<a id="choose-an-engine"></a>
+
 ### Choose an engine
 
 Source: https://www.sheetwrite.dev/docs/start/choose-an-engine/
@@ -388,6 +394,8 @@ package alone does not select it.
 - [Installation](https://www.sheetwrite.dev/docs/start/installation/) for explicit WASM sources and framework setup.
 - [Calculation engine](https://www.sheetwrite.dev/docs/concepts/calculation-engine/) for recalculation, spills, and limits.
 - [Analysis formulas](https://www.sheetwrite.dev/docs/features/formulas/analysis-formulas/) for full-engine examples.
+
+<a id="upgrade-to-0-6-0"></a>
 
 ### Upgrade to 0.6.0
 
@@ -490,6 +498,8 @@ Package output is smaller but remains readable. Use exported entry points rather
 than internal declaration files that are no longer published. Wrapped text
 breaks at grapheme boundaries, including emoji and combining marks.
 
+<a id="vanilla-javascript"></a>
+
 ### Vanilla JavaScript
 
 Source: https://www.sheetwrite.dev/docs/frameworks/vanilla/
@@ -556,6 +566,8 @@ browser lacks a capability or the worker fails to start; listen to
 Example Run the Vanilla example (https://www.sheetwrite.dev/vanilla/)
 Setup Installation and WASM sources (https://www.sheetwrite.dev/docs/start/installation/)
 Reference @sheetwrite/core API (https://www.sheetwrite.dev/docs/api/core/)
+
+<a id="react"></a>
 
 ### React
 
@@ -630,6 +642,8 @@ that render on the server, mount it in a client component.
 Example Run the React example (https://www.sheetwrite.dev/react/)
 Lifecycle Updates and resets (https://www.sheetwrite.dev/docs/frameworks/lifecycle/)
 Reference @sheetwrite/react API (https://www.sheetwrite.dev/docs/api/react/)
+
+<a id="vue"></a>
 
 ### Vue
 
@@ -708,6 +722,8 @@ or another server-rendered host, use a client-only boundary.
 Example Run the Vue example (https://www.sheetwrite.dev/vue/)
 Lifecycle Updates and resets (https://www.sheetwrite.dev/docs/frameworks/lifecycle/)
 Reference @sheetwrite/vue API (https://www.sheetwrite.dev/docs/api/vue/)
+
+<a id="svelte"></a>
 
 ### Svelte
 
@@ -788,6 +804,8 @@ boundary.
 Example Run the Svelte example (https://www.sheetwrite.dev/svelte/)
 Lifecycle Updates and resets (https://www.sheetwrite.dev/docs/frameworks/lifecycle/)
 Reference @sheetwrite/svelte API (https://www.sheetwrite.dev/docs/api/svelte/)
+
+<a id="adapter-lifecycle"></a>
 
 ### Adapter lifecycle
 
@@ -946,6 +964,8 @@ Importing an adapter during SSR is safe, but the grid initializes only after a b
 - SvelteKit: a browser-only branch or client-mounted component.
 
 No framework owns the global runtime. All adapters converge on the same monotonic initializer.
+
+<a id="runtime-ownership"></a>
 
 ### Runtime ownership
 
@@ -1106,6 +1126,8 @@ provide a title row.
 - [Configuration](https://www.sheetwrite.dev/docs/features/grid/options-and-presentation/) for the option and method reference.
 - [Data operations](https://www.sheetwrite.dev/docs/features/data/data-operations/) for sort/filter views built on the same window read.
 
+<a id="calculation-engine"></a>
+
 ### Calculation engine
 
 Source: https://www.sheetwrite.dev/docs/concepts/calculation-engine/
@@ -1217,6 +1239,8 @@ their runtime-selected targets current; a runtime dependency cycle returns
 `#CYCLE!` when iteration is off. See
 [OFFSET and INDIRECT](https://www.sheetwrite.dev/docs/features/formulas/offset-and-indirect/)
 for notation, bounds, and reference-text rewrite rules.
+
+<a id="documents-and-operations"></a>
 
 ### Documents and operations
 
@@ -1333,6 +1357,8 @@ type CellValue =
   | { kind: "formula"; src: string }; // authoritative source; "=" is optional at storage
 ```
 
+<a id="error-handling"></a>
+
 ### Error handling
 
 Source: https://www.sheetwrite.dev/docs/concepts/error-handling/
@@ -1355,6 +1381,7 @@ import { initSheetwrite, isSheetwriteError } from "@sheetwrite/core";
 declare const wasmUrl: URL;
 declare const correctedWasmUrl: URL;
 declare function showInitializationError(message: string): void;
+
 
 try {
   await initSheetwrite(wasmUrl);
@@ -1486,6 +1513,8 @@ grid.on("engine-failed", async ({ error }) => {
 - [`isSheetwriteError`](https://www.sheetwrite.dev/docs/api/core/is-sheetwrite-error/)
 - [Framework lifecycle](https://www.sheetwrite.dev/docs/frameworks/lifecycle/)
 
+<a id="grid"></a>
+
 ### Grid
 
 Source: https://www.sheetwrite.dev/docs/features/grid/
@@ -1501,6 +1530,8 @@ Source: https://www.sheetwrite.dev/docs/features/grid/
 - [Status bar](https://www.sheetwrite.dev/docs/features/grid/status-bar/): Show Excel-style Average, Count and Sum for the selected cells, or read the totals yourself.
 - [Touch](https://www.sheetwrite.dev/docs/features/grid/touch/): How the Sheetwrite grid turns taps and drags from touch, pen and mouse into scrolling, selection, resizing and fill, and its gesture limits.
 - [Grid methods](https://www.sheetwrite.dev/docs/features/grid/grid-methods/): The imperative Grid handle that createGrid returns, grouped by task: document and sheets, selection and editing, views, layout and lifecycle.
+
+<a id="grid-options-and-presentation"></a>
 
 ### Grid options and presentation
 
@@ -1686,6 +1717,8 @@ Framework adapters also accept `wasmSource`. Initialization is process-wide and 
 - [Grid methods](https://www.sheetwrite.dev/docs/features/grid/grid-methods/)
 - [Framework lifecycle](https://www.sheetwrite.dev/docs/frameworks/lifecycle/)
 - Generated [`GridOptions`](https://www.sheetwrite.dev/docs/api/core/grid-options/) and [`CellRenderer`](https://www.sheetwrite.dev/docs/api/core/cell-renderer/) contracts
+
+<a id="toolbar-and-ribbon"></a>
 
 ### Toolbar and ribbon
 
@@ -2036,6 +2069,8 @@ Undo, redo and find are keyboard-driven and work without the toolbar: **Ctrl+Z**
 - [Styling → Widget and context-menu styling](https://www.sheetwrite.dev/docs/features/formatting/styles/#widget-and-context-menu-styling)
 - Generated [`GridConfig`](https://www.sheetwrite.dev/docs/api/core/grid-config/), [`GridActions`](https://www.sheetwrite.dev/docs/api/core/grid-actions/), [`GridCommandState`](https://www.sheetwrite.dev/docs/api/core/grid-command-state/) and [`createRibbon`](https://www.sheetwrite.dev/docs/api/core-shell/create-ribbon/) contracts
 
+<a id="selection-and-keyboard"></a>
+
 ### Selection and keyboard
 
 Source: https://www.sheetwrite.dev/docs/features/grid/selection-and-keyboard/
@@ -2223,6 +2258,8 @@ The actions you can rebind are `copy`, `cut`, `paste`, `pasteValues`, `undo`, `r
 - [Context menu](https://www.sheetwrite.dev/docs/features/grid/context-menu/)
 - [`Grid` API](https://www.sheetwrite.dev/docs/api/core/grid/)
 
+<a id="editing-and-clipboard"></a>
+
 ### Editing and clipboard
 
 Source: https://www.sheetwrite.dev/docs/features/grid/editing-and-clipboard/
@@ -2384,6 +2421,8 @@ grid.on("mutation-rejected", ({ issues }) => {
 - [Validation, protection and notes](https://www.sheetwrite.dev/docs/features/data/validation-protection-and-notes/): rules that every edit and paste passes through
 - [Collaboration](https://www.sheetwrite.dev/docs/features/collaboration/)
 - [`GridActions` API](https://www.sheetwrite.dev/docs/api/core/grid-actions/)
+
+<a id="custom-editors"></a>
 
 ### Custom editors
 
@@ -2588,6 +2627,8 @@ An asynchronous commit stays bound to the data row captured at `mount`. This hol
 - [Interaction → Inline editing](https://www.sheetwrite.dev/docs/features/grid/editing-and-clipboard/#inline-editing)
 - Generated [`CellEditor`](https://www.sheetwrite.dev/docs/api/core/cell-editor/), [`CellEditorContext`](https://www.sheetwrite.dev/docs/api/core/cell-editor-context/) and [`CellEditorInstance`](https://www.sheetwrite.dev/docs/api/core/cell-editor-instance/) contracts
 
+<a id="resize-merge-and-fill"></a>
+
 ### Resize, merge and fill
 
 Source: https://www.sheetwrite.dev/docs/features/grid/resize-merge-and-fill/
@@ -2699,6 +2740,8 @@ See [Formulas → Point mode and reference rewriting](https://www.sheetwrite.dev
 - [Touch](https://www.sheetwrite.dev/docs/features/grid/touch/): resize and fill on a touch screen
 - [Editing and clipboard](https://www.sheetwrite.dev/docs/features/grid/editing-and-clipboard/#undo-and-redo)
 - [`Grid` API](https://www.sheetwrite.dev/docs/api/core/grid/)
+
+<a id="context-menu"></a>
 
 ### Context menu
 
@@ -2830,6 +2873,8 @@ The Vanilla workbench offers **Clear highlight** in its context menu. Right-clic
 - [Styling → Widget and context-menu styling](https://www.sheetwrite.dev/docs/features/formatting/styles/#widget-and-context-menu-styling) for the bundled menu CSS hooks
 - Generated [`ContextMenuContext`](https://www.sheetwrite.dev/docs/api/core/context-menu-context/), [`ContextMenuItems`](https://www.sheetwrite.dev/docs/api/core/context-menu-items/), [`ContextMenuItem`](https://www.sheetwrite.dev/docs/api/core/context-menu-item/), and [`Grid.getCellAtPoint`](https://www.sheetwrite.dev/docs/api/core/grid/#grid-get-cell-at-point) contracts
 
+<a id="search"></a>
+
 ### Search
 
 Source: https://www.sheetwrite.dev/docs/features/grid/search/
@@ -2914,6 +2959,8 @@ interface SearchResult {
 - [Grid methods](https://www.sheetwrite.dev/docs/features/grid/grid-methods/#selection-editing-and-search)
 - [Events](https://www.sheetwrite.dev/docs/reference/events/)
 - Generated [`SearchOptions`](https://www.sheetwrite.dev/docs/api/core/search-options/), [`SearchResult`](https://www.sheetwrite.dev/docs/api/core/search-result/) and [`ReplaceResult`](https://www.sheetwrite.dev/docs/api/core/replace-result/) contracts
+
+<a id="status-bar"></a>
 
 ### Status bar
 
@@ -3073,6 +3120,8 @@ With B1:B3 from the first example selected, this logs `Min: 4 · Max: 12`.
 - [`createSpreadsheetShell` API](https://www.sheetwrite.dev/docs/api/core-shell/create-spreadsheet-shell/)
 - [`Grid.summarizeSelection` API](https://www.sheetwrite.dev/docs/api/core/grid/#grid-summarize-selection)
 
+<a id="touch"></a>
+
 ### Touch
 
 Source: https://www.sheetwrite.dev/docs/features/grid/touch/
@@ -3157,6 +3206,8 @@ Touch has no options of its own. The gestures above follow the same settings as 
 - [Selection and keyboard](https://www.sheetwrite.dev/docs/features/grid/selection-and-keyboard/#selection-model)
 - [Resize, merge and fill](https://www.sheetwrite.dev/docs/features/grid/resize-merge-and-fill/)
 - [Accessibility](https://www.sheetwrite.dev/docs/features/accessibility/)
+
+<a id="grid-methods"></a>
 
 ### Grid methods
 
@@ -3362,6 +3413,8 @@ interface Grid {
 - [Search](https://www.sheetwrite.dev/docs/features/grid/search/)
 - [Toolbar and ribbon](https://www.sheetwrite.dev/docs/features/grid/toolbar-and-ribbon/)
 
+<a id="formatting"></a>
+
 ### Formatting
 
 Source: https://www.sheetwrite.dev/docs/features/formatting/
@@ -3370,6 +3423,8 @@ Source: https://www.sheetwrite.dev/docs/features/formatting/
 - [Fonts and alignment](https://www.sheetwrite.dev/docs/features/formatting/fonts-and-alignment/): Set the font family, size, emphasis, horizontal and vertical alignment, and text wrap of cells.
 - [Number formats](https://www.sheetwrite.dev/docs/features/formatting/number-formats/): Show numbers and dates with Excel-style format codes and an explicit locale.
 - [Conditional formats](https://www.sheetwrite.dev/docs/features/formatting/conditional-formats/): Style cells from their values with ordered comparison, text, blank and formula rules.
+
+<a id="styles-and-themes"></a>
 
 ### Styles and themes
 
@@ -3703,6 +3758,8 @@ const style: CellStyle = {
 - [Concepts](https://www.sheetwrite.dev/docs/concepts/runtime-ownership/#headers-letters-vs-field-names) for the styled row-0 field-header pattern.
 - [`Theme`](https://www.sheetwrite.dev/docs/api/core/theme/) and [`CellStyle`](https://www.sheetwrite.dev/docs/api/core/cell-style/) API reference.
 
+<a id="fonts-and-alignment"></a>
+
 ### Fonts and alignment
 
 Source: https://www.sheetwrite.dev/docs/features/formatting/fonts-and-alignment/
@@ -3894,6 +3951,8 @@ Fonts on import: only fonts other than the workbook default become a cell `fontF
 - [XLSX export](https://www.sheetwrite.dev/docs/import-export/xlsx-export/)
 - [`GridActions`](https://www.sheetwrite.dev/docs/api/core/grid-actions/), [`CellStyle`](https://www.sheetwrite.dev/docs/api/core/cell-style/) and [`isCellFontFamily`](https://www.sheetwrite.dev/docs/api/core/is-cell-font-family/) API reference.
 
+<a id="number-formats"></a>
+
 ### Number formats
 
 Source: https://www.sheetwrite.dev/docs/features/formatting/number-formats/
@@ -4050,6 +4109,8 @@ UTC fields make date rendering the same in every host timezone. Locale-specific 
 - [Conditional formats](https://www.sheetwrite.dev/docs/features/formatting/conditional-formats/)
 - [`formatNumber`](https://www.sheetwrite.dev/docs/api/core/format-number/) API reference.
 - [Live formatting showcase](https://www.sheetwrite.dev/showcases/formatting/) — try the number-format controls; column G shows seven mixed formats.
+
+<a id="conditional-formats"></a>
 
 ### Conditional formats
 
@@ -4227,6 +4288,8 @@ Vertical alignment in a differential style maps as described in [Fonts and align
 - [Compatibility results](https://www.sheetwrite.dev/docs/reference/compatibility-results/) for the checked conditional-format evidence.
 - [`ConditionalFormatRule`](https://www.sheetwrite.dev/docs/api/core/conditional-format-rule/), [`ConditionalFormatPredicate`](https://www.sheetwrite.dev/docs/api/core/conditional-format-predicate/) and [`MAX_CONDITIONAL_FORMAT_RULES`](https://www.sheetwrite.dev/docs/api/core/max-conditional-format-rules/) API reference.
 
+<a id="data"></a>
+
 ### Data
 
 Source: https://www.sheetwrite.dev/docs/features/data/
@@ -4236,6 +4299,8 @@ Source: https://www.sheetwrite.dev/docs/features/data/
 - [Host-owned rows](https://www.sheetwrite.dev/docs/features/data/host-owned-rows/): Keep application row objects in your store while Sheetwrite projects edits through stable row IDs.
 - [Validation, protection and notes](https://www.sheetwrite.dev/docs/features/data/validation-protection-and-notes/): Restrict what users can enter, protect ranges from local edits, and attach plain-text notes to cells.
 - [Persistence](https://www.sheetwrite.dev/docs/features/data/persistence/): Persist versioned snapshots and durable pending mutations without confusing session state with document state.
+
+<a id="data-operations"></a>
 
 ### Data operations
 
@@ -4380,6 +4445,8 @@ and fonts; workbook widths/heights remain in base units.
 - [Interaction](https://www.sheetwrite.dev/docs/features/grid/selection-and-keyboard/) for clipboard TSV and the toolbar sort control.
 - [Concepts](https://www.sheetwrite.dev/docs/concepts/documents-and-operations/#document-protocol-and-storage-transactions) for row/column `DocumentOp` transactions.
 
+<a id="datasources"></a>
+
 ### Datasources
 
 Source: https://www.sheetwrite.dev/docs/features/data/datasources/
@@ -4503,6 +4570,8 @@ A visible formula can read cells outside the visible window. For example, a vari
 - [Events](https://www.sheetwrite.dev/docs/reference/events/)
 - [Compatibility and limits](https://www.sheetwrite.dev/docs/reference/compatibility-limits/#rendering-interaction-and-paged-data)
 - Generated [`DataSource`](https://www.sheetwrite.dev/docs/api/core/data-source/), [`DataSourceRequest`](https://www.sheetwrite.dev/docs/api/core/data-source-request/), [`DataSourcePage`](https://www.sheetwrite.dev/docs/api/core/data-source-page/) and [`DataSourceStorageOptions`](https://www.sheetwrite.dev/docs/api/core/data-source-storage-options/) contracts
+
+<a id="keep-app-rows-in-your-store"></a>
 
 ### Keep app rows in your store
 
@@ -4628,6 +4697,8 @@ const bridge = createRowBridge({
 });
 ```
 
+<a id="validation-protection-and-notes"></a>
+
 ### Validation, protection and notes
 
 Source: https://www.sheetwrite.dev/docs/features/data/validation-protection-and-notes/
@@ -4707,6 +4778,8 @@ Sheets can also carry `validationRules`, `protectedRanges` and `notes` in the wo
 - [Editing and clipboard](https://www.sheetwrite.dev/docs/features/grid/editing-and-clipboard/)
 - [Collaboration](https://www.sheetwrite.dev/docs/features/collaboration/)
 - [Accessibility](https://www.sheetwrite.dev/docs/features/accessibility/)
+
+<a id="persistence-and-recovery"></a>
 
 ### Persistence and recovery
 
@@ -4800,6 +4873,8 @@ Undo of a large clear can be larger than one transaction allows. Sheetwrite 0.5.
 - [`@sheetwrite/core/browser`](https://www.sheetwrite.dev/docs/api/core-browser/)
 - [Database showcase](https://www.sheetwrite.dev/showcases/database/): IndexedDB persistence, reload recovery, and compaction, live.
 
+<a id="formulas"></a>
+
 ### Formulas
 
 Source: https://www.sheetwrite.dev/docs/features/formulas/
@@ -4813,6 +4888,8 @@ Source: https://www.sheetwrite.dev/docs/features/formulas/
 - [Lookup, criteria and financial rules](https://www.sheetwrite.dev/docs/features/formulas/lookup-criteria-and-financial/): Find values, aggregate matching cells, and calculate cash flows with explicit shape and error rules.
 - [Analysis formulas (full engine)](https://www.sheetwrite.dev/docs/features/formulas/analysis-formulas/): Summarize, forecast, and clean data with the full formula engine. Worked examples for every function family in @sheetwrite/formulas.
 - [Custom functions](https://www.sheetwrite.dev/docs/features/formulas/custom-functions/): Register synchronous JavaScript functions that formulas can call, with metadata that formula help reads.
+
+<a id="authoring-and-references"></a>
 
 ### Authoring and references
 
@@ -5021,6 +5098,8 @@ shiftA1Refs("A1 + $B$1", 0, 1); // "B1 + $B$1"
 
 A1 address helpers are exported as `cellA1`, `colToA1`, `labelToCol`, and `rangeA1`.
 
+<a id="operators"></a>
+
 ### Operators
 
 Source: https://www.sheetwrite.dev/docs/features/formulas/operators/
@@ -5173,6 +5252,8 @@ XLSX import and export keep the Excel formula text of intersections, unions and 
 - [Formula function reference](https://www.sheetwrite.dev/docs/reference/formula-functions/)
 - [Reference-operator pull request](https://github.com/chh-ay/sheetwrite/pull/187)
 
+<a id="dynamic-arrays-and-spills"></a>
+
 ### Dynamic arrays and spills
 
 Source: https://www.sheetwrite.dev/docs/features/formulas/dynamic-arrays-and-spills/
@@ -5294,6 +5375,8 @@ colliding shapes return an explicit error rather than truncating.
 
 The admission check happens before materialization when the shape is statically knowable and is repeated before spill ownership is installed. It accounts source/result copies and per-item auxiliary storage; a shape that could exceed a ceiling is rejected rather than optimistically allocated. A recompute either atomically replaces the complete previous spill or leaves no projected children.
 
+<a id="offset-and-indirect"></a>
+
 ### OFFSET and INDIRECT
 
 Source: https://www.sheetwrite.dev/docs/features/formulas/offset-and-indirect/
@@ -5365,6 +5448,8 @@ Runtime targets are not added to the static dependency graph. These functions us
 A one-cell result is a plain scalar, not a one-cell spill, and uses no spill budget. Merged runtime reads do not create a false cycle.
 
 See [volatile functions](https://www.sheetwrite.dev/docs/features/formulas/volatile-functions/) for explicit recalculation and [dynamic arrays and spills](https://www.sheetwrite.dev/docs/features/formulas/dynamic-arrays-and-spills/) for limits.
+
+<a id="volatile-functions"></a>
 
 ### Volatile functions
 
@@ -5439,6 +5524,8 @@ An unused `LET` binding does not mark a formula volatile. See [LET bindings](htt
 Volatile functions inside an iterative cycle run on each iteration. Random values can keep a cycle from settling. See [iterative calculation](https://www.sheetwrite.dev/docs/features/formulas/iterative-calculation/).
 
 `OFFSET` and `INDIRECT` select targets at runtime. See [OFFSET and INDIRECT](https://www.sheetwrite.dev/docs/features/formulas/offset-and-indirect/).
+
+<a id="iterative-calculation"></a>
 
 ### Iterative calculation
 
@@ -5590,6 +5677,8 @@ iterations.
 - Volatile functions such as `RAND` inside a cycle draw new values on each
 iteration. Such a cycle can reach `maxIterations` without settling.
 
+<a id="lookup-criteria-and-financial-formulas"></a>
+
 ### Lookup, criteria, and financial formulas
 
 Source: https://www.sheetwrite.dev/docs/features/formulas/lookup-criteria-and-financial/
@@ -5677,6 +5766,8 @@ A mismatch or malformed pair list returns `#VALUE!`. Matching result-range error
 - `XLOOKUP` supports exact, next-smaller (`-1`), next-larger (`1`), and wildcard (`2`) match modes; forward/reverse and ordered binary-search modes are accepted. `if_not_found` is optional. If it is omitted—including via an interior empty argument—the result is `#N/A`.
 
 Lookup errors in the scanned range propagate. Approximate modes validate ordering and do not silently return a result from unsorted input.
+
+<a id="analysis-formulas"></a>
 
 ### Analysis formulas
 
@@ -5998,6 +6089,8 @@ Limits of the full engine:
 - Regex functions do not support lookaround, backreferences, or Unicode classes. Such patterns return `#VALUE!`, never a wrong match.
 - `AGGREGATE` options that skip hidden rows have no effect, because formulas do not see hidden-row state.
 
+<a id="custom-functions"></a>
+
 ### Custom functions
 
 Source: https://www.sheetwrite.dev/docs/features/formulas/custom-functions/
@@ -6123,12 +6216,16 @@ While the store has a registered function, the ribbon shows a **Formulas** tab w
 | `examples` | Optional example formulas. |
 | `volatile` | Whether the function runs again on every edit. |
 
+<a id="analysis"></a>
+
 ### Analysis
 
 Source: https://www.sheetwrite.dev/docs/features/analysis/
 
 - [Pivot tables](https://www.sheetwrite.dev/docs/features/analysis/pivot-tables/): Summarize a range or table into a pivot table with rows, columns, values and filters, edit it from the field list, and keep it through undo and sync.
 - [Charts](https://www.sheetwrite.dev/docs/features/analysis/charts/): Add column, bar, line, area, pie, doughnut and scatter charts that read cell ranges and redraw when those cells change; place, move and edit them in the grid.
+
+<a id="pivot-tables"></a>
 
 ### Pivot tables
 
@@ -6379,6 +6476,8 @@ preserved only while the workbook is unchanged. Editing the workbook drops those
 opaque parts under the XLSX preservation policy (#179), with a warning. This does
 not drop represented pivot definitions.
 
+<a id="charts"></a>
+
 ### Charts
 
 Source: https://www.sheetwrite.dev/docs/features/analysis/charts/
@@ -6573,6 +6672,8 @@ A host that draws its own charts can read the same live data.
 the values, categories and number formats of each series. It notifies its
 listeners when a chart's data changes, and gives no notice for edits to other
 cells.
+
+<a id="collaboration-and-offline-work"></a>
 
 ### Collaboration and offline work
 
@@ -6997,6 +7098,8 @@ Sheetwrite uses deterministic server ordering plus conservative rebase, not a CR
 
 This choice preserves stable sheet IDs and authoritative formula source without lossy adapters. A CRDT/OT dependency is not justified by current scenarios: short-lived offline and online collaboration converge under server sequencing, while long-lived offline concurrent structural edits require product-level conflict UX and spreadsheet-specific formula/range semantics that generic sequence CRDTs do not supply. Revisit only if requirements demand automatic preservation of those ambiguous edits and scenario tests define the intended result for every structural/formula case.
 
+<a id="worker-rendering"></a>
+
 ### Worker rendering
 
 Source: https://www.sheetwrite.dev/docs/features/worker-rendering/
@@ -7128,6 +7231,8 @@ use the main-thread `canvas` renderer.
 
 - [Configuration](https://www.sheetwrite.dev/docs/features/grid/options-and-presentation/#gridoptions) for `renderer` and `workerUrl`.
 - [Concepts](https://www.sheetwrite.dev/docs/concepts/runtime-ownership/#canvas-rendering-and-the-wasm-columnar-store) for the transferable window snapshot.
+
+<a id="accessibility"></a>
 
 ### Accessibility
 
@@ -7295,6 +7400,8 @@ window. Use the grid's keyboard navigation (arrows, Page Up/Down, Home/End — s
 [Interaction](https://www.sheetwrite.dev/docs/features/grid/selection-and-keyboard/#keyboard-navigation)) to move focus; that scrolls
 new rows into view and into the mirror, and updates `aria-activedescendant`.
 
+<a id="xlsx-import"></a>
+
 ### XLSX import
 
 Source: https://www.sheetwrite.dev/docs/import-export/xlsx-import/
@@ -7395,6 +7502,8 @@ Every import path uses `XlsxWorkbookOptions`. Missing registration and codec err
 - [XLSX export](https://www.sheetwrite.dev/docs/import-export/xlsx-export/)
 - [Large files and streaming](https://www.sheetwrite.dev/docs/import-export/large-files-and-streaming/)
 - [LibreOffice compatibility](https://www.sheetwrite.dev/docs/import-export/libreoffice-compatibility/)
+
+<a id="xlsx-export"></a>
 
 ### XLSX export
 
@@ -7517,6 +7626,8 @@ All XLSX paths share `XlsxWorkbookOptions`: `maxCells`, `resourceLimits`, `signa
 - [`@sheetwrite/xlsx/register` API](https://www.sheetwrite.dev/docs/api/xlsx-register/)
 - [`toXlsxWorkbook`](https://www.sheetwrite.dev/docs/api/core/to-xlsx-workbook/)
 
+<a id="csv-and-tsv"></a>
+
 ### CSV and TSV
 
 Source: https://www.sheetwrite.dev/docs/import-export/csv-and-tsv/
@@ -7602,6 +7713,8 @@ Built-in toolbar/context-menu download failures show an alert and emit `export-e
 - [`fromCsv`](https://www.sheetwrite.dev/docs/api/core/from-csv/)
 - [`toCsv`](https://www.sheetwrite.dev/docs/api/core/to-csv/)
 - [`toTsv`](https://www.sheetwrite.dev/docs/api/core/to-tsv/)
+
+<a id="kept-parts-and-round-trips"></a>
 
 ### Kept parts and round trips
 
@@ -7692,6 +7805,8 @@ Import and store hydration verify payload CRCs and sizes by inflating and discar
 - [LibreOffice comparison limits](https://www.sheetwrite.dev/docs/import-export/libreoffice-compatibility/#what-the-comparison-proves)
 - [Resource limits](https://www.sheetwrite.dev/docs/import-export/large-files-and-streaming/#resource-limits)
 - [Preservation and streaming implementation details (PR #179)](https://github.com/chh-ay/sheetwrite/pull/179)
+
+<a id="large-files-and-streaming"></a>
 
 ### Large files and streaming
 
@@ -7836,6 +7951,8 @@ These are measured workloads with adjusted budgets, not default-limit promises. 
 - [`XlsxWorkbookOptions`](https://www.sheetwrite.dev/docs/api/core/xlsx-workbook-options/)
 - [`XlsxResourceLimits`](https://www.sheetwrite.dev/docs/api/core/xlsx-resource-limits/)
 
+<a id="libreoffice-compatibility"></a>
+
 ### LibreOffice compatibility
 
 Source: https://www.sheetwrite.dev/docs/import-export/libreoffice-compatibility/
@@ -7916,6 +8033,8 @@ The reported pass is for the pinned fixtures and LibreOffice 26.8 in PR #190. It
 - [XLSX import warnings](https://www.sheetwrite.dev/docs/import-export/xlsx-import/#warnings)
 - [Workbook export fidelity](https://www.sheetwrite.dev/docs/import-export/xlsx-export/#workbook-interchange)
 - [Kept parts and round trips](https://www.sheetwrite.dev/docs/import-export/kept-parts-and-round-trips/)
+
+<a id="excel-in-javascript"></a>
 
 ### Excel in JavaScript
 
@@ -8050,6 +8169,8 @@ Initialization errors appear in the host. Codec errors appear beside the control
 Import builds the full result in memory. The Blob workbook importer avoids an initial full-file buffer, but still returns an in-memory snapshot; it is not an unbounded-data reader. Use [workbook interchange](https://www.sheetwrite.dev/docs/import-export/xlsx-export/#workbook-interchange) instead of table import when you must retain sheets, formulas, styles and kept parts. Surface its `onWarning` messages when fidelity matters. Resource failures are `XlsxResourceError` values and also satisfy `isSheetwriteError`.
 
 See [Vanilla lifecycle](https://www.sheetwrite.dev/docs/frameworks/vanilla/) and [XLSX API](https://www.sheetwrite.dev/docs/api/xlsx/).
+
+<a id="excel-in-react"></a>
 
 ### Excel in React
 
@@ -8192,6 +8313,8 @@ Import builds the full result in memory. The Blob workbook importer avoids an in
 
 See [adapter lifecycle](https://www.sheetwrite.dev/docs/frameworks/lifecycle/) and the [React adapter](https://www.sheetwrite.dev/docs/frameworks/react/).
 
+<a id="excel-in-vue"></a>
+
 ### Excel in Vue
 
 Source: https://www.sheetwrite.dev/docs/tutorials/excel-in-vue/
@@ -8330,6 +8453,8 @@ Import builds the full result in memory. The Blob workbook importer avoids an in
 
 See [adapter lifecycle](https://www.sheetwrite.dev/docs/frameworks/lifecycle/) and the [Vue adapter](https://www.sheetwrite.dev/docs/frameworks/vue/).
 
+<a id="excel-in-svelte"></a>
+
 ### Excel in Svelte
 
 Source: https://www.sheetwrite.dev/docs/tutorials/excel-in-svelte/
@@ -8461,6 +8586,8 @@ Import builds the full result in memory. The Blob workbook importer avoids an in
 
 See [adapter lifecycle](https://www.sheetwrite.dev/docs/frameworks/lifecycle/) and the [Svelte adapter](https://www.sheetwrite.dev/docs/frameworks/svelte/).
 
+<a id="excel-in-node-js"></a>
+
 ### Excel in Node.js
 
 Source: https://www.sheetwrite.dev/docs/tutorials/excel-in-nodejs/
@@ -8559,6 +8686,8 @@ The script never substitutes a mock workbook. Missing or invalid files fail. `fl
 The stat check is not a security boundary for a file another process can modify. The codec also checks the bytes it actually receives. ZIP expansion, entry count, compression ratio and XML depth retain their default limits. `XlsxResourceError` also satisfies `isSheetwriteError`; report its stable code and resource details rather than parsing a message.
 
 Buffered import holds input bytes and the resulting snapshot; buffered export also holds output bytes. Streaming workbook export can bound output chunks, but it does not make the snapshot disappear. Do not promise constant-memory processing for large workbooks. See [streaming](https://www.sheetwrite.dev/docs/import-export/large-files-and-streaming/#streaming-functions) and [kept-part rules](https://www.sheetwrite.dev/docs/import-export/kept-parts-and-round-trips/#parts-sheetwrite-does-not-model) before using this as a fidelity-sensitive round trip. An unchanged chart or pivot graph can be kept; that is not a chart-authoring or pivot-calculation API.
+
+<a id="spreadsheet-app-with-a-ribbon"></a>
 
 ### Spreadsheet app with a ribbon
 
@@ -8711,6 +8840,8 @@ Import builds the full result in memory. The Blob workbook importer avoids an in
 
 See [toolbar and ribbon](https://www.sheetwrite.dev/docs/features/grid/toolbar-and-ribbon/) and [shell API](https://www.sheetwrite.dev/docs/api/core-shell/).
 
+<a id="public-api-contract"></a>
+
 ### Public API contract
 
 Source: https://www.sheetwrite.dev/docs/reference/api-contract/
@@ -8759,6 +8890,8 @@ The API manifest describes type compatibility. Runtime behavior remains protecte
 | `@sheetwrite/wasm`, `@sheetwrite/formulas` | Removed `CellStore.canDirtyCell`, `dirtyRevision`, `markCellCleanRevision`, `spillOwnerCoordinates`, `isSheetAlive` | None (no caller) | 0.6.0 |
 | `@sheetwrite/wasm`, `@sheetwrite/formulas` | Removed `SourceSnapshot.byteLength` | None (no caller); `RangeSnapshot.byteLength` is unchanged | 0.6.0 |
 
+<a id="document-operations"></a>
+
 ### Document operations
 
 Source: https://www.sheetwrite.dev/docs/reference/document-operations/
@@ -8804,6 +8937,8 @@ Validate untrusted JSON with the snapshot validator before hydration. `SnapshotV
 - [`ApplyTransactionResult`](https://www.sheetwrite.dev/docs/api/core/apply-transaction-result/)
 - [`WorkbookSnapshot`](https://www.sheetwrite.dev/docs/api/core/workbook-snapshot/)
 - [Persistence and recovery](https://www.sheetwrite.dev/docs/features/data/persistence/)
+
+<a id="events"></a>
 
 ### Events
 
@@ -8893,6 +9028,8 @@ sync.destroy();
 - [Persistence](https://www.sheetwrite.dev/docs/features/data/persistence/)
 - [Error handling](https://www.sheetwrite.dev/docs/concepts/error-handling/)
 - Generated [`GridEvents`](https://www.sheetwrite.dev/docs/api/core/grid-events/), [`ChangeEvent`](https://www.sheetwrite.dev/docs/api/core/change-event/) and [`SyncCoordinatorEvent`](https://www.sheetwrite.dev/docs/api/core/sync-coordinator-event/) contracts
+
+<a id="compatibility-and-limits"></a>
 
 ### Compatibility and limits
 
@@ -9066,6 +9203,8 @@ Table and workbook conversions account cells according to the active path (for e
 - [Collaboration and presence](https://www.sheetwrite.dev/docs/features/collaboration/)
 - [Worker fallback](https://www.sheetwrite.dev/docs/features/worker-rendering/)
 
+<a id="releases"></a>
+
 ### Releases
 
 Source: https://www.sheetwrite.dev/docs/releases/
@@ -9104,6 +9243,8 @@ Optional full formula engine with analysis functionsSpill references and array c
 
 Releases before 0.5.0 are listed in each package's `CHANGELOG.md` in the
 [repository](https://github.com/chh-ay/sheetwrite).
+
+<a id="sheetwrite-0-6-1"></a>
 
 ### Sheetwrite 0.6.1
 
@@ -9179,6 +9320,8 @@ Install 0.6.1 for each `@sheetwrite/*` package that you use. Packages from diffe
 If you upgrade from 0.5.xAlso do
 Complete the 0.6.0 steps first
 Read the 0.6.0 upgrade checklist (https://www.sheetwrite.dev/docs/releases/0.6.0/#upgrade-checklist).
+
+<a id="sheetwrite-0-6-0"></a>
 
 ### Sheetwrite 0.6.0
 
@@ -9421,6 +9564,8 @@ Read the 0.5.2 (https://www.sheetwrite.dev/docs/releases/0.5.2/#upgrade-checklis
 
 The full list of changes is in each package's `CHANGELOG.md`.
 
+<a id="sheetwrite-0-5-4"></a>
+
 ### Sheetwrite 0.5.4
 
 Source: https://www.sheetwrite.dev/docs/releases/0.5.4/
@@ -9465,6 +9610,8 @@ Install 0.5.4 for each `@sheetwrite/*` package that you use. Packages from diffe
 If you upgrade from before 0.5.3Also do
 Complete the earlier steps first
 Read the 0.5.2 (https://www.sheetwrite.dev/docs/releases/0.5.2/#upgrade-checklist), 0.5.1 (https://www.sheetwrite.dev/docs/releases/0.5.1/#upgrade-checklist), and 0.5.0 (https://www.sheetwrite.dev/docs/releases/0.5.0/#upgrade-checklist) upgrade checklists. 0.5.3 has no extra steps.
+
+<a id="sheetwrite-0-5-3"></a>
 
 ### Sheetwrite 0.5.3
 
@@ -9585,6 +9732,8 @@ Install 0.5.3 for each `@sheetwrite/*` package that you use. Packages from diffe
 If you upgrade from before 0.5.2Also do
 Complete the earlier steps first
 Read the 0.5.2 upgrade checklist (https://www.sheetwrite.dev/docs/releases/0.5.2/#upgrade-checklist), then the 0.5.1 (https://www.sheetwrite.dev/docs/releases/0.5.1/#upgrade-checklist) and 0.5.0 (https://www.sheetwrite.dev/docs/releases/0.5.0/#upgrade-checklist) checklists.
+
+<a id="sheetwrite-0-5-2"></a>
 
 ### Sheetwrite 0.5.2
 
@@ -9736,6 +9885,8 @@ If you upgrade from before 0.5.1Also do
 Complete the earlier steps first
 Read the 0.5.1 upgrade checklist (https://www.sheetwrite.dev/docs/releases/0.5.1/#upgrade-checklist) and, before that, the 0.5.0 upgrade checklist (https://www.sheetwrite.dev/docs/releases/0.5.0/#upgrade-checklist).
 
+<a id="sheetwrite-0-5-1"></a>
+
 ### Sheetwrite 0.5.1
 
 Source: https://www.sheetwrite.dev/docs/releases/0.5.1/
@@ -9847,6 +9998,8 @@ The event `format` is now `"csv"` or `"xlsx"`.
 If you upgrade from before 0.5.0Also do
 Complete the 0.5.0 steps first
 Read the 0.5.0 upgrade checklist (https://www.sheetwrite.dev/docs/releases/0.5.0/#upgrade-checklist). It covers `initSheetwrite()`, the server `restoreBlock` operation, and the breaking `CellStore.setBlock` change.
+
+<a id="sheetwrite-0-5-0"></a>
 
 ### Sheetwrite 0.5.0
 
@@ -10203,6 +10356,8 @@ Expect `fflate` 0.8.3
 
 The full list of changes is in each package's `CHANGELOG.md`.
 
+<a id="concepts"></a>
+
 ### Concepts
 
 Source: https://www.sheetwrite.dev/docs/concepts/
@@ -10216,6 +10371,8 @@ collaboration.
 - [Calculation engine](https://www.sheetwrite.dev/docs/concepts/calculation-engine/): Understand engine builds, incremental recalculation, spills, paged data, formula errors, volatility, and iteration.
 - [Documents and operations](https://www.sheetwrite.dev/docs/concepts/documents-and-operations/): Understand authoritative workbook snapshots, document operations, storage transactions, and cell inputs.
 - [Error handling](https://www.sheetwrite.dev/docs/concepts/error-handling/): Typed failures, stable codes, recovery paths, event direction, validation, and incomplete-data behavior.
+
+<a id="import-and-export"></a>
 
 ### Import and export
 
@@ -10232,6 +10389,8 @@ what it reports as a fidelity warning.
 - [Large files and streaming](https://www.sheetwrite.dev/docs/import-export/large-files-and-streaming/): Read seekable files and write bounded chunks while retaining explicit XLSX resource limits.
 - [LibreOffice compatibility](https://www.sheetwrite.dev/docs/import-export/libreoffice-compatibility/): Understand the checked LibreOffice round trips, display fixes and known producer differences.
 
+<a id="getting-started"></a>
+
 ### Getting started
 
 Source: https://www.sheetwrite.dev/docs/start/
@@ -10244,6 +10403,8 @@ you move to a new release.
 - [First grid](https://www.sheetwrite.dev/docs/start/first-grid/): Initialize Sheetwrite, create a workbook, and observe committed changes.
 - [Choose an engine](https://www.sheetwrite.dev/docs/start/choose-an-engine/): Use the default engine for standard formulas or select the full engine for analysis functions.
 - [Upgrade to 0.6.0](https://www.sheetwrite.dev/docs/start/upgrade-to-0-6-0/): Review formula recalculation, document protocol, XLSX fidelity, and optional UI changes before upgrading.
+
+<a id="tutorials"></a>
 
 ### Tutorials
 
