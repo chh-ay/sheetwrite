@@ -74,15 +74,15 @@ function tab(host: HTMLElement, name: string): HTMLElement {
 it("Formulas › Insert Function shows only while host functions exist, and starts a formula", async () => {
   const { grid, host, store } = await setup({ ribbon: true });
   const formulasTab = tab(host, "Formulas");
-  expect(formulasTab.hidden).toBe(true);
-
-  registerFunction(store, TAX_RATE, () => 0.2);
-  await settled();
-  expect(formulasTab.hidden).toBe(false);
-
   formulasTab.click();
   const insert = host.querySelector<HTMLButtonElement>('[data-command="insertFunction"]');
   if (insert === null) throw new Error("no Insert Function command");
+  expect(insert.hidden).toBe(true);
+
+  registerFunction(store, TAX_RATE, () => 0.2);
+  await settled();
+  expect(insert.hidden).toBe(false);
+
   grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 0 } });
   await settled();
   insert.click();
@@ -97,11 +97,11 @@ it("Formulas › Insert Function shows only while host functions exist, and star
     "=TAXRATE(",
   );
 
-  // The last function going away hides the tab and gives the selection back to Home.
+  // The last function going away hides the command; Explain Formula keeps the tab.
   unregisterFunction(store, "TAXRATE");
   await settled();
-  expect(formulasTab.hidden).toBe(true);
-  expect(tab(host, "Home").getAttribute("aria-selected")).toBe("true");
+  expect(insert.hidden).toBe(true);
+  expect(formulasTab.hidden).toBe(false);
 });
 
 it("the toolbar shows Insert Function only while host functions exist", async () => {

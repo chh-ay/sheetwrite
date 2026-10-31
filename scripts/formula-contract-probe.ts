@@ -4,9 +4,8 @@ import { readFileSync } from "node:fs";
 import * as formulas from "@sheetwrite/formulas";
 import * as defaultEngine from "@sheetwrite/wasm";
 
-import { FormulaAssist } from "../packages/core/src/formula-assist.js";
+import { analyzeFormula, listFunctions } from "../packages/core/src/functions.js";
 import { initSheetwrite, SheetwriteStore } from "../packages/core/src/index.js";
-import type { Theme } from "../packages/core/src/types.js";
 import { makeWorkbook } from "../packages/core/test/fixtures.js";
 
 const ENGINE_SWITCH_ERROR =
@@ -53,22 +52,6 @@ const DISTRIBUTION_CASES: readonly (readonly [string, number])[] = [
 ];
 const DOMAIN_ERRORS = ["=NORM.INV(0,0,1)", "=GAMMA.DIST(1,0,1,TRUE)", "=BETA.INV(-1,1,1)"];
 const NUMERICAL_TOLERANCE = 1e-8;
-const ASSIST_THEME: Theme = {
-  font: "13px sans-serif",
-  bg: "#fff",
-  fg: "#111",
-  gridLine: "#eee",
-  headerBg: "#eee",
-  headerFg: "#111",
-  selection: "#abc",
-  selectionBorder: "#123",
-  rowHeight: 28,
-  headerHeight: 28,
-  rowHeaderWidth: 48,
-  searchMatch: "#abc",
-  searchActiveMatch: "#abc",
-  highlight: "#abc",
-};
 
 const build = process.argv[2];
 assert.ok(
@@ -149,28 +132,14 @@ try {
     "both builds must retain base functions",
   );
 
-  const host = document.createElement("div");
-  const textarea = document.createElement("textarea");
-  host.append(textarea);
-  document.body.append(host);
-  const assist = new FormulaAssist(host, { highlightCells: () => {}, sheet: () => "s1" });
-  try {
-    textarea.value = "=NORM.";
-    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
-    assist.attach(textarea, ASSIST_THEME);
-    const suggestions = [...host.querySelectorAll(".sheetwrite-assist-item")].map(
-      (element) => element.textContent,
-    );
-    assert.deepEqual(
-      suggestions,
-      // Assist lists shorter names first, then names in alphabetical order.
-      isAnalysis ? ["NORM.INV", "NORM.DIST", "NORM.S.INV", "NORM.S.DIST"] : [],
-      "autocomplete must use the selected engine's distribution names",
-    );
-  } finally {
-    assist.detach();
-    host.remove();
-  }
+  // Formula help completes names from this analysis of the store's function list.
+  const completion = analyzeFormula("=NORM.", 6, await listFunctions(store)).completion;
+  assert.deepEqual(
+    completion?.matches.map((fn) => fn.name) ?? [],
+    // Completion lists shorter names first, then names in alphabetical order.
+    isAnalysis ? ["NORM.INV", "NORM.DIST", "NORM.S.INV", "NORM.S.DIST"] : [],
+    "autocomplete must use the selected engine's distribution names",
+  );
 } finally {
   store.dispose();
 }

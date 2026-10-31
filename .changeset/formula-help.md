@@ -1,0 +1,5 @@
+---
+"@sheetwrite/core": minor
+---
+
+Formula help in the cell editor and the formula bar. Autocomplete lists the built-in functions of the active engine and the store's custom functions; an argument guide shows the signature of the function around the caret with the current argument in bold; syntax errors, unknown names and wrong argument counts are underlined while you type; and each reference gets a colour in the text and the same colour on its range in the grid. **Formulas › Formula Auditing › Explain Formula** opens a side panel that describes the formula in the focus cell from function metadata. The function list is an ARIA listbox, and the guide is a polite live region. Formula help loads on the first formula edit, and the panel on first use, so they add almost nothing to the grid's first download. Host editors can use the same analysis: `analyzeFormula(text, cursor, functions)` from `@sheetwrite/core/functions` returns the tokens, references, call at the cursor, completions and problems of a formula. The Formulas tab now always shows; Insert Function in it still needs custom functions.

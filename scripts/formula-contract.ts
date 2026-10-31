@@ -7,7 +7,6 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = resolve(HERE, "..");
 const INVENTORY_PATH = "test/conformance/formula-contract.inventory.json";
 const SCHEMA_PATH = "test/conformance/formula-contract.schema.json";
-const ASSIST_PATH = "packages/core/src/formula-assist.ts";
 const ANALYSIS_PATH = "packages/wasm/src/eval/analysis";
 const REQUIRED_TARGET_HASH = "3efef696839478b92b59a004537f9ede7fa803f9749042bb830b664086495e80";
 const UNSUPPORTED_CATEGORY_HASH =
@@ -285,27 +284,6 @@ export function extractVolatileFunctions(typesSource: string, calcSource: string
   });
 }
 
-export function extractAssistSpellings(source: string): string[] {
-  const match = source.match(
-    /(?:export )?const FORMULA_FUNCTIONS:\s*readonly string\[\]\s*=\s*\[([\s\S]*?)\n\s*\];/,
-  );
-  const body = match?.[1];
-  if (body === undefined) throw new Error("formula assist registry not found");
-  const names: string[] = [];
-  for (const entry of body.matchAll(/"([A-Z][A-Z0-9.]*)"/g)) {
-    const name = entry[1];
-    if (name === undefined) {
-      throw new Error("formula assist registry contains an invalid literal");
-    }
-    names.push(name);
-  }
-  const residue = body.replaceAll(/"[A-Z][A-Z0-9.]*"/g, "").replaceAll(/[\s,]/g, "");
-  if (residue.length > 0 || names.length === 0) {
-    throw new Error("formula assist registry contains non-literal entries");
-  }
-  return names;
-}
-
 function validateReferencesAndNames(inventory: JsonObject, issues: string[]): void {
   const sources = stringMap(inventory.sources);
   const families = stringMap(inventory.families);
@@ -409,21 +387,25 @@ function validateReferencesAndNames(inventory: JsonObject, issues: string[]): vo
   }
 }
 
-function expectedAssistNames(inventory: JsonObject, issues: string[]): Set<string> {
-  const expected = new Set<string>();
+/**
+ * The names whose implementation profile marks formula help as implemented.
+ * Formula help completes every built-in name of the active engine from the
+ * generated function table, so this set must equal the names of every build.
+ */
+function assistNames(inventory: JsonObject, issues: string[]): Set<string> {
+  const names = new Set<string>();
   const implementations = stringMap(inventory.implementationProfiles);
   const functions = Array.isArray(inventory.functions) ? inventory.functions.filter(isObject) : [];
   for (const [index, entry] of functions.entries()) {
-    if (!Array.isArray(entry.builds) || !entry.builds.includes("@sheetwrite/wasm")) continue;
     const profile = objectProperty(implementations, entry.implementation);
     const assist = profile ? objectProperty(profile, "assist") : undefined;
     if (assist?.status === "implemented") {
-      for (const spelling of namesFromFunction(entry)) expected.add(spelling);
+      for (const spelling of namesFromFunction(entry)) names.add(spelling);
     } else if (assist?.status !== "missing" && assist?.status !== "declared") {
       issues.push(`contract.functions[${index}].implementation: invalid assist status`);
     }
   }
-  return expected;
+  return names;
 }
 
 function inventoryParserNames(inventory: JsonObject, build = "@sheetwrite/wasm"): Set<string> {
@@ -560,14 +542,12 @@ export async function validateFormulaContractRepository(
   root = REPOSITORY_ROOT,
   inventoryOverride?: unknown,
 ): Promise<FormulaContractValidation> {
-  const [schemaSource, inventorySource, parserSource, assistSource, analysisSources] =
-    await Promise.all([
-      readFile(resolve(root, SCHEMA_PATH), "utf8"),
-      inventoryOverride === undefined ? readFile(resolve(root, INVENTORY_PATH), "utf8") : undefined,
-      readFile(resolve(root, "packages/wasm/src/calc.rs"), "utf8"),
-      readFile(resolve(root, ASSIST_PATH), "utf8"),
-      readAnalysisSources(root),
-    ]);
+  const [schemaSource, inventorySource, parserSource, analysisSources] = await Promise.all([
+    readFile(resolve(root, SCHEMA_PATH), "utf8"),
+    inventoryOverride === undefined ? readFile(resolve(root, INVENTORY_PATH), "utf8") : undefined,
+    readFile(resolve(root, "packages/wasm/src/calc.rs"), "utf8"),
+    readAnalysisSources(root),
+  ]);
   let schema: unknown;
   let inventory: unknown = inventoryOverride;
   const issues: string[] = [];
@@ -606,22 +586,14 @@ export async function validateFormulaContractRepository(
   issues.push(...validateFormulaContractData(inventory, schema));
 
   let parserSpellings: string[] = [];
-  let assistSpellings: string[] = [];
+  let assistSpellings = new Set<string>();
   try {
     parserSpellings = extractParserSpellings(parserSource);
   } catch (error) {
     issues.push(`parser drift extraction failed: ${String(error)}`);
   }
-  try {
-    assistSpellings = extractAssistSpellings(assistSource);
-  } catch (error) {
-    issues.push(`assist drift extraction failed: ${String(error)}`);
-  }
   if (new Set(parserSpellings).size !== parserSpellings.length) {
     issues.push("parser drift extraction found duplicate spellings");
-  }
-  if (new Set(assistSpellings).size !== assistSpellings.length) {
-    issues.push("assist drift extraction found duplicate spellings");
   }
   const extensionSpellings = extractAnalysisSpellings(analysisSources, issues);
   if (isObject(inventory)) {
@@ -631,9 +603,13 @@ export async function validateFormulaContractRepository(
       "parser/inventory drift",
       issues,
     );
+    assistSpellings = assistNames(inventory, issues);
     compareNameSets(
-      new Set(assistSpellings),
-      expectedAssistNames(inventory, issues),
+      assistSpellings,
+      new Set([
+        ...inventoryParserNames(inventory),
+        ...inventoryParserNames(inventory, "@sheetwrite/formulas"),
+      ]),
       "assist/inventory drift",
       issues,
     );
@@ -662,7 +638,7 @@ export async function validateFormulaContractRepository(
         .length,
       unsupportedCategories: unsupported.length,
       parserSpellings: new Set(parserSpellings).size,
-      assistSpellings: new Set(assistSpellings).size,
+      assistSpellings: assistSpellings.size,
       formulasSpellings: new Set([...parserSpellings, ...extensionSpellings]).size,
     },
   };

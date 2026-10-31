@@ -1,507 +1,83 @@
-import { isGluedToName, labelToCol } from "./a1.js";
-import { engineFunctionNames } from "./engine.js";
-import type { HighlightRange, SheetId } from "./types/coordinates.js";
+// The part of formula help that every editor carries: it waits for the first
+// formula and only then loads formula-help.ts, which holds the analysis, the
+// function table and the DOM. Until the chunk arrives, keys go to the editor.
+
+import type { AssistDeps, FormulaEditorElement, FormulaHelp } from "./formula-help.js";
 import type { Theme } from "./types/render.js";
 
 /**
- * Every function name the calc engine accepts, mirrored from the parser's match
- * table in `packages/wasm/src/calc.rs` (~L365-398). Rust is the source of truth
- * for what evaluates; keep this list in sync when the engine gains, renames, or
- * drops a function. Every alias is listed (AVG/AVERAGE, CONCAT/CONCATENATE) so
- * autocomplete only ever offers spellings the parser will actually accept.
- */
-const FORMULA_FUNCTIONS: readonly string[] = [
-  "ABS",
-  "ADDRESS",
-  "AND",
-  "AREAS",
-  "AVERAGE",
-  "AVERAGEIF",
-  "AVERAGEIFS",
-  "AVG",
-  "CEILING",
-  "CELL",
-  "CHAR",
-  "CHOOSE",
-  "CHOOSECOLS",
-  "CHOOSEROWS",
-  "CLEAN",
-  "CODE",
-  "COLUMN",
-  "COLUMNS",
-  "CONCAT",
-  "CONCATENATE",
-  "CORREL",
-  "COUNT",
-  "COUNTA",
-  "COUNTBLANK",
-  "COUNTIF",
-  "COUNTIFS",
-  "COVARIANCE.P",
-  "COVARIANCE.S",
-  "DATE",
-  "DATEVALUE",
-  "DAY",
-  "DAYS",
-  "DAYS360",
-  "DROP",
-  "EDATE",
-  "EOMONTH",
-  "EVEN",
-  "EXACT",
-  "EXP",
-  "FALSE",
-  "FILTER",
-  "FIND",
-  "FLOOR",
-  "FORMULATEXT",
-  "FV",
-  "GCD",
-  "GEOMEAN",
-  "HLOOKUP",
-  "HOUR",
-  "HYPERLINK",
-  "IF",
-  "IFERROR",
-  "IFNA",
-  "IFS",
-  "INDEX",
-  "INDIRECT",
-  "INT",
-  "IPMT",
-  "IRR",
-  "ISBLANK",
-  "ISERR",
-  "ISERROR",
-  "ISFORMULA",
-  "ISLOGICAL",
-  "ISNA",
-  "ISNUMBER",
-  "ISTEXT",
-  "LARGE",
-  "LCM",
-  "LEFT",
-  "LEN",
-  "LET",
-  "LN",
-  "LOG",
-  "LOG10",
-  "LOWER",
-  "MATCH",
-  "MAX",
-  "MAXIFS",
-  "MEDIAN",
-  "MID",
-  "MIN",
-  "MINIFS",
-  "MINUTE",
-  "MOD",
-  "MODE.SNGL",
-  "MONTH",
-  "MROUND",
-  "N",
-  "NA",
-  "NETWORKDAYS",
-  "NOT",
-  "NOW",
-  "NPV",
-  "NUMBERVALUE",
-  "ODD",
-  "OFFSET",
-  "OR",
-  "PERCENTILE.INC",
-  "PI",
-  "PMT",
-  "POW",
-  "POWER",
-  "PPMT",
-  "PRODUCT",
-  "PROPER",
-  "PV",
-  "QUARTILE.INC",
-  "QUOTIENT",
-  "RAND",
-  "RANDBETWEEN",
-  "RANK.EQ",
-  "RATE",
-  "REPLACE",
-  "REPT",
-  "RIGHT",
-  "ROUND",
-  "ROUNDDOWN",
-  "ROUNDUP",
-  "ROW",
-  "ROWS",
-  "SEARCH",
-  "SECOND",
-  "SEQUENCE",
-  "SIGN",
-  "SMALL",
-  "SORT",
-  "SQRT",
-  "STDEV.P",
-  "STDEV.S",
-  "SUBSTITUTE",
-  "SUBTOTAL",
-  "SUM",
-  "SUMIF",
-  "SUMIFS",
-  "SUMPRODUCT",
-  "SWITCH",
-  "T",
-  "TAKE",
-  "TEXT",
-  "TEXTJOIN",
-  "TIME",
-  "TIMEVALUE",
-  "TODAY",
-  "TRANSPOSE",
-  "TRIM",
-  "TRUE",
-  "TRUNC",
-  "TYPE",
-  "UNICHAR",
-  "UNICODE",
-  "UNIQUE",
-  "UPPER",
-  "VALUE",
-  "VAR.P",
-  "VAR.S",
-  "VLOOKUP",
-  "WEEKDAY",
-  "WEEKNUM",
-  "WORKDAY",
-  "XLOOKUP",
-  "XMATCH",
-  "XOR",
-  "YEAR",
-  "YEARFRAC",
-];
-
-/**
- * Distinct fills cycled across the A1 references in the active formula so each
- * ref/range draws in its own color, Sheets-style. Semi-transparent so the
- * underlying cell content stays legible; passed through as per-range
- * {@link HighlightRange.color}.
- */
-const REF_PALETTE: readonly string[] = [
-  "#4285f455",
-  "#ea433555",
-  "#f9ab0055",
-  "#34a85355",
-  "#a142f455",
-  "#00acc155",
-];
-
-/**
- * The trailing run of letters ending at `caret` — the function name being typed.
- * Returns `null` when the caret does not sit right after a letter (e.g. after a
- * digit, operator, or paren), which is exactly when no function suggestion is
- * wanted.
- */
-function functionTokenAt(text: string, caret: number): string | null {
-  const match = /([A-Za-z][A-Za-z0-9.]*)$/.exec(text.slice(0, caret));
-  return match?.[1] ?? null;
-}
-
-/** Parse one A1 cell reference ("A1", "$B$2") into 0-based row/col, or null. */
-function parseCell(ref: string): { row: number; col: number } | null {
-  const match = /^\$?([A-Za-z]{1,3})\$?(\d+)$/.exec(ref);
-  const letters = match?.[1];
-  const digits = match?.[2];
-  if (!letters || !digits) return null;
-
-  const col = labelToCol(letters.toUpperCase());
-  const row = Number(digits) - 1;
-  if (row < 0 || col < 0) return null;
-
-  return { row, col };
-}
-
-/**
- * Parse every A1 cell/range reference out of a formula, cycling {@link REF_PALETTE}
- * so each reference gets its own color. Mirrors the ref regex used by
- * `shiftA1Refs` in a1.ts: text in double quotes and quoted sheet names are
- * skipped whole, and so are tokens glued to an alphanumeric (function names).
- * A reference after `!` names another sheet, so it is not highlighted here.
- */
-function parseFormulaRefs(text: string, sheet: SheetId): HighlightRange[] {
-  const re =
-    /"(?:[^"]|"")*"|'(?:[^']|'')*'|(\$?[A-Za-z]{1,3}\$?\d+)(?::(\$?[A-Za-z]{1,3}\$?\d+))?/g;
-  const out: HighlightRange[] = [];
-
-  let m: RegExpExecArray | null = re.exec(text);
-  while (m !== null) {
-    const prev = m.index > 0 ? text.charAt(m.index - 1) : "";
-    const head = m[1];
-    // `!` means the reference names another sheet; glued text is a function name.
-    if (head && prev !== "!" && !isGluedToName(text, m.index, m[0].length)) {
-      const start = parseCell(head);
-      const end = m[2] ? parseCell(m[2]) : start;
-      if (start && end) {
-        const color = REF_PALETTE[out.length % REF_PALETTE.length] as string;
-        out.push({ sheet, start, end, color });
-      }
-    }
-    m = re.exec(text);
-  }
-
-  return out;
-}
-
-/** Parse a CSS px length ("12px") into a number, defaulting to 0. */
-function parsePx(value: string): number {
-  const n = Number.parseFloat(value);
-  return Number.isFinite(n) ? n : 0;
-}
-
-/**
- * Host-provided hooks the formula assist needs from the grid. Deliberately tiny
- * so the built-in editor stays a thin, replaceable default over public grid
- * methods rather than the only way to drive these features.
- */
-export interface AssistDeps {
-  /**
-   * Paint (or, with `null`, clear) the ranges referenced by the formula being
-   * edited. Backed by `Grid.highlightCells`; per-range color is honored.
-   */
-  highlightCells: (ranges: HighlightRange[] | null) => void;
-  /** Sheet id the formula's A1 references resolve against (the active sheet). */
-  sheet: () => SheetId;
-}
-
-/**
- * A styleable layer over the active formula editor: an autocomplete popup for
- * engine functions plus live A1 reference highlighting. Owns only its own popup
- * DOM; everything data-plane goes through {@link AssistDeps}. Attached to a
- * textarea while a formula is edited and detached on teardown.
+ * Formula help for one editor. Attached to a field while it is edited and
+ * detached on teardown; the help chunk loads when the field first holds a
+ * formula (text that starts with `=`).
  */
 export class FormulaAssist {
-  private readonly host: HTMLElement;
   private readonly deps: AssistDeps;
-
-  private textarea: HTMLTextAreaElement | null = null;
+  private help: FormulaHelp | null = null;
+  private loading: Promise<FormulaHelp> | null = null;
+  private field: FormulaEditorElement | null = null;
   private theme: Theme | null = null;
-  private popup: HTMLElement | null = null;
-  private items: string[] = [];
-  private activeIndex = 0;
 
-  constructor(host: HTMLElement, deps: AssistDeps) {
-    this.host = host;
+  constructor(deps: AssistDeps) {
     this.deps = deps;
   }
 
-  /** Bind to a freshly opened editor textarea and paint any initial state. */
-  attach(textarea: HTMLTextAreaElement, theme: Theme): void {
-    this.textarea = textarea;
-    this.theme = theme;
-    this.update();
+  get isOpen(): boolean {
+    return this.help?.isOpen ?? false;
   }
 
-  /** Release the textarea, close the popup, and clear ref highlights. */
+  /** Bind to an editor field and show help for its text. */
+  attach(field: FormulaEditorElement, theme: Theme | null): void {
+    this.field = field;
+    this.theme = theme;
+    if (this.help !== null) this.help.attach(field, theme);
+    else this.update();
+  }
+
+  /** Release the field, close the help and clear the reference colours. */
   detach(): void {
-    this.close();
-    this.deps.highlightCells(null);
-    this.textarea = null;
+    this.help?.detach();
+    this.field = null;
     this.theme = null;
   }
 
-  get isOpen(): boolean {
-    return this.popup !== null;
-  }
-
-  /**
-   * Recompute ref highlights and the autocomplete popup from the live text and
-   * caret. Highlights and suggestions apply only to formulas (text starting
-   * with `=`); anything else clears both.
-   */
+  /** Show help for the field's current text; the first formula loads the help chunk. */
   update(): void {
-    const ta = this.textarea;
-    if (!ta) return;
-
-    const text = ta.value;
-    if (!text.startsWith("=")) {
-      this.deps.highlightCells(null);
-      this.close();
+    if (this.help !== null) {
+      this.help.update();
       return;
     }
 
-    const refs = parseFormulaRefs(text, this.deps.sheet());
-    this.deps.highlightCells(refs.length > 0 ? refs : null);
+    if (this.field?.value.startsWith("=") === true) void this.load();
+  }
 
-    const caret = ta.selectionStart ?? text.length;
-    const token = functionTokenAt(text, caret);
-    if (token === null) {
-      this.close();
-      return;
-    }
+  /** Keys for the open function list; false while the help is not loaded. */
+  handleKeyDown(event: KeyboardEvent): boolean {
+    return this.help?.handleKeyDown(event) ?? false;
+  }
 
-    const upper = token.toUpperCase();
-    const functions = engineFunctionNames ?? FORMULA_FUNCTIONS;
-    const matches = functions
-      .filter((fn) => fn.startsWith(upper))
-      .sort((left, right) => {
-        const lengthOrder = left.length - right.length;
-        if (lengthOrder !== 0) return lengthOrder;
-        return left < right ? -1 : left > right ? 1 : 0;
-      });
-    if (matches.length === 0) {
-      this.close();
-      return;
-    }
-
-    this.show(matches);
+  /** Follow the field after it moves; called by the editor on scroll. */
+  reposition(): void {
+    this.help?.reposition();
   }
 
   /**
-   * Consume popup navigation/acceptance keys. Returns `true` only when the popup
-   * is open and the key drove it, so the editor's own Enter/Tab/Esc handling
-   * falls through untouched when the popup is closed.
+   * Load the help chunk once. A failed load is not cached, so the next
+   * formula edit tries again; the rejection stays observable to the host.
    */
-  handleKeyDown(e: KeyboardEvent): boolean {
-    if (!this.isOpen) return false;
+  private load(): Promise<FormulaHelp> {
+    this.loading ??= import("./formula-help.js").then(
+      ({ FormulaHelp }) => {
+        const help = new FormulaHelp(this.deps);
+        this.help = help;
+        if (this.field !== null) help.attach(this.field, this.theme);
+        return help;
+      },
+      (error: unknown) => {
+        this.loading = null;
+        throw error;
+      },
+    );
 
-    switch (e.key) {
-      case "ArrowDown":
-        e.preventDefault();
-        this.move(1);
-        return true;
-      case "ArrowUp":
-        e.preventDefault();
-        this.move(-1);
-        return true;
-      case "Enter":
-      case "Tab":
-        e.preventDefault();
-        this.accept();
-        return true;
-      case "Escape":
-        e.preventDefault();
-        this.close();
-        return true;
-      default:
-        return false;
-    }
-  }
-
-  /** Re-anchor the popup under the editor; called by the editor on scroll. */
-  reposition(): void {
-    const popup = this.popup;
-    const ta = this.textarea;
-    if (!popup || !ta) return;
-
-    const left = parsePx(ta.style.left);
-    const top = parsePx(ta.style.top);
-    const height = parsePx(ta.style.height);
-    popup.style.left = `${left}px`;
-    popup.style.top = `${top + height}px`;
-    if (ta.style.width) popup.style.minWidth = ta.style.width;
-  }
-
-  private move(delta: number): void {
-    const n = this.items.length;
-    if (n === 0) return;
-    this.activeIndex = (this.activeIndex + delta + n) % n;
-    this.renderActive();
-  }
-
-  private accept(): void {
-    const ta = this.textarea;
-    const name = this.items[this.activeIndex];
-    if (!ta || name === undefined) return;
-
-    const caret = ta.selectionStart ?? ta.value.length;
-    const token = functionTokenAt(ta.value, caret) ?? "";
-    const start = caret - token.length;
-    const insert = `${name}(`;
-
-    ta.value = ta.value.slice(0, start) + insert + ta.value.slice(caret);
-    const next = start + insert.length;
-    ta.setSelectionRange(next, next);
-    ta.focus();
-
-    // Re-derive highlights/popup from the inserted "(": the token is now empty,
-    // so this also closes the popup.
-    this.update();
-  }
-
-  private show(matches: string[]): void {
-    this.items = matches;
-    this.activeIndex = 0;
-    this.ensurePopup();
-    this.renderItems();
-    this.reposition();
-  }
-
-  private ensurePopup(): HTMLElement {
-    if (this.popup) return this.popup;
-
-    const popup = document.createElement("div");
-    popup.className = "sheetwrite-assist";
-    popup.setAttribute("role", "listbox");
-
-    // Seed the popup's CSS custom properties from the active theme so the default
-    // styling tracks the theme; a host can still override the class or the vars.
-    const theme = this.theme;
-    if (theme) {
-      popup.style.setProperty("--sheetwrite-assist-bg", theme.bg);
-      popup.style.setProperty("--sheetwrite-assist-fg", theme.fg);
-      popup.style.setProperty("--sheetwrite-assist-border", theme.selectionBorder);
-      popup.style.setProperty("--sheetwrite-assist-selected", theme.selection);
-    }
-
-    this.host.appendChild(popup);
-    this.popup = popup;
-    return popup;
-  }
-
-  private renderItems(): void {
-    const popup = this.popup;
-    if (!popup) return;
-
-    popup.textContent = "";
-    this.items.forEach((name, i) => {
-      const el = document.createElement("div");
-      el.className = "sheetwrite-assist-item";
-      el.setAttribute("role", "option");
-      el.textContent = name;
-      if (i === this.activeIndex) el.setAttribute("aria-selected", "true");
-
-      // mousedown (not click) so the pick lands before the textarea blurs;
-      // preventDefault keeps focus in the editor.
-      el.addEventListener("mousedown", (ev) => {
-        ev.preventDefault();
-        this.activeIndex = i;
-        this.accept();
-      });
-
-      popup.appendChild(el);
-    });
-  }
-
-  private renderActive(): void {
-    const popup = this.popup;
-    if (!popup) return;
-
-    const children = popup.children;
-    for (let i = 0; i < children.length; i++) {
-      const el = children[i];
-      if (!(el instanceof HTMLElement)) continue;
-      if (i === this.activeIndex) el.setAttribute("aria-selected", "true");
-      else el.removeAttribute("aria-selected");
-    }
-
-    const active = children[this.activeIndex];
-    if (active instanceof HTMLElement && typeof active.scrollIntoView === "function") {
-      active.scrollIntoView({ block: "nearest" });
-    }
-  }
-
-  private close(): void {
-    if (!this.popup) return;
-    this.popup.remove();
-    this.popup = null;
-    this.items = [];
-    this.activeIndex = 0;
+    return this.loading;
   }
 }

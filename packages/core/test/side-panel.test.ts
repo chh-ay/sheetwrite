@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, beforeEach, expect, it } from "bun:test";
 
+import { listFunctions } from "../src/functions.js";
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { loadPanels } from "../src/panels/panel-loader.js";
 import { SheetwriteStore } from "../src/store.js";
@@ -350,6 +351,37 @@ it("disables Insert › PivotTable on the default engine and says why", async ()
   expect(pivot.disabled).toBe(true);
   expect(pivot.title).toBe("Pivot tables need the full engine (@sheetwrite/formulas).");
   expect(pivot.getAttribute("aria-description")).toBe(pivot.title);
+});
+
+it("explains the formula in the focus cell from metadata and follows the selection", async () => {
+  const { grid, control, openTab, panel, press } = await setup();
+  const formula = "=ROUND(SUM(B2:C3), 1)+NOPE(B2)";
+  grid.applyTransaction({
+    patches: [
+      {
+        op: "set",
+        addr: { sheet: "s1", row: 0, col: 3 },
+        value: { kind: "formula", src: formula },
+      },
+    ],
+  });
+  grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 3 } });
+  openTab("Formulas");
+  press(control("Explain Formula"));
+  await loadPanels(grid);
+  // The panel reads the function list on open; this awaits the same table load.
+  await listFunctions(grid.store);
+  await Promise.resolve();
+
+  const text = panel()?.textContent ?? "";
+  expect(text).toContain("Formula in D1");
+  expect(text).toContain("ROUND(number, digits)");
+  expect(text).toContain("digits: 1");
+  expect(text).toContain("B2:C3: 4 cells on this sheet");
+  expect(text).toContain("NOPE is not a known function. The cell shows #NAME?.");
+
+  grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
+  expect(panel()?.textContent).toContain("Select a cell with a formula to explain it.");
 });
 
 it.each([

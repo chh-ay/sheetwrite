@@ -1,19 +1,6 @@
 import { getEngine } from "./engine.js";
 import type { CellRef } from "./selection.js";
 
-const NAME_CHARACTER = /[A-Za-z0-9_]/;
-
-/**
- * Whether A1-shaped text at `offset` is part of a longer name, not a reference:
- * a letter, digit or `_` touches it on either side, or `(` follows it, as in
- * `LOG10(` or `BIN2DEC`.
- */
-export function isGluedToName(text: string, offset: number, length: number): boolean {
-  const before = offset > 0 ? text.charAt(offset - 1) : "";
-  const after = text.charAt(offset + length);
-  return NAME_CHARACTER.test(before) || after === "(" || NAME_CHARACTER.test(after);
-}
-
 /** Column index (0-based) → A1 column label (0 → "A", 26 → "AA"). */
 export function colToA1(col: number): string {
   let c = col + 1;
