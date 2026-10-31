@@ -21,9 +21,10 @@ function tableSource(
     workbook.sheets[0];
   if (!activeSheet) return undefined;
   const sheet = activeSheet;
-  const columns = sheet.columns.flatMap((column, index) =>
-    column.visible === false ? [] : [index],
+  const visible = sheet.columns.flatMap((column, index) =>
+    column.visible === false ? [] : [{ index, column }],
   );
+  const columns = visible.map(({ index }) => index);
   assertResource(context, "maxRowsPerSheet", sheet.rowCount + 1);
   assertResource(context, "maxColumnsPerSheet", columns.length);
   assertResource(context, "maxCells", (sheet.rowCount + 1) * columns.length);
@@ -59,17 +60,13 @@ function tableSource(
         name: sheet.name,
         order: 0,
         rowCount: sheet.rowCount + 1,
-        columns: columns.map((columnIndex, index) => {
-          const column = sheet.columns[columnIndex];
-          if (!column) throw new TypeError("Sheetwrite: table export column disappeared");
-          return {
-            key: `column${index + 1}`,
-            header: `Column ${index + 1}`,
-            width: column.width,
-            type: "text" as const,
-            ...(column.numberFormat ? { numberFormat: column.numberFormat } : {}),
-          };
-        }),
+        columns: visible.map(({ column }, index) => ({
+          key: `column${index + 1}`,
+          header: `Column ${index + 1}`,
+          width: column.width,
+          type: "text" as const,
+          ...(column.numberFormat ? { numberFormat: column.numberFormat } : {}),
+        })),
         cells: [],
         merges,
         rowMeta,
@@ -77,20 +74,16 @@ function tableSource(
     ],
   };
   function* rows(): Generator<{ row: number; cells: readonly AbsoluteCell[] }> {
-    const header = columns.map((columnIndex, col): AbsoluteCell => {
-      const column = sheet.columns[columnIndex];
-      if (!column) throw new TypeError("Sheetwrite: table export column disappeared");
-      return {
-        row: 0,
-        col,
-        source: {
-          rowOffset: 0,
-          colOffset: col,
-          value: { kind: "literal", value: column.header },
-          ...(column.headerStyle ? { style: column.headerStyle } : {}),
-        },
-      };
-    });
+    const header = visible.map(({ column }, col): AbsoluteCell => ({
+      row: 0,
+      col,
+      source: {
+        rowOffset: 0,
+        colOffset: col,
+        value: { kind: "literal", value: column.header },
+        ...(column.headerStyle ? { style: column.headerStyle } : {}),
+      },
+    }));
     yield { row: 0, cells: header };
     const windowRows = Math.min(
       WINDOW_ROWS,
@@ -122,11 +115,8 @@ function tableSource(
         for (const merge of activeMerges)
           covered.fill(1, merge.c0 + (merge.r0 === outputRow ? 1 : 0), merge.c1 + 1);
         const cells: AbsoluteCell[] = [];
-        for (let col = 0; col < columns.length; col++) {
+        for (const [col, { column }] of visible.entries()) {
           if (covered[col]) continue;
-          const columnIndex = columns[col];
-          const column = columnIndex === undefined ? undefined : sheet.columns[columnIndex];
-          if (!column) throw new TypeError("Sheetwrite: table export column disappeared");
           const flat = (row - start) * columns.length + col;
           const style: CellStyle = {
             ...column.cellStyle,

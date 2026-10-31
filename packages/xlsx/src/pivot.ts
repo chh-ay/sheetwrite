@@ -19,7 +19,7 @@ import {
   relationshipsXml,
   relationshipTypeMatches,
 } from "./opc.js";
-import { checkAbort, emitWarning, type XlsxCodecContext } from "./resources.js";
+import { checkAbort, emitWarning, isAbort, type XlsxCodecContext } from "./resources.js";
 import {
   decodeXstring,
   encodeXstring,
@@ -496,7 +496,7 @@ async function readPivotXml(
   } catch (error) {
     // A malformed pivot part only stops that pivot from being modelled; the
     // caller reports it. Resource limits and aborts still fail the import.
-    if (error instanceof TypeError) return undefined;
+    if (error instanceof TypeError && !isAbort(context, error)) return undefined;
     throw error;
   }
   return xmlLocalName(parsed.name) === root ? parsed : undefined;

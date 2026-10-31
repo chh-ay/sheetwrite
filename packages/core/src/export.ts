@@ -58,6 +58,7 @@ function csvRows(
     yield cols.map((column) => safeHeader(sheet.columns[column]!.header));
     for (let start = 0; start < viewRows; start += limits.maxWriterWindowRows) {
       const end = Math.min(viewRows, start + limits.maxWriterWindowRows);
+      options.signal?.throwIfAborted();
       if (store.viewRowCount(sheet.id) !== viewRows) {
         throw new SheetwriteError(
           "export-failed",
@@ -139,6 +140,7 @@ function tsvRows(
       chunkStart += limits.maxWriterWindowRows
     ) {
       const chunkEnd = Math.min(endRow + 1, chunkStart + limits.maxWriterWindowRows);
+      options.signal?.throwIfAborted();
       const window = store.getDataWindow?.(
         range.sheet,
         { start: chunkStart, end: chunkEnd },
@@ -219,30 +221,36 @@ export function fromCsv(
   const values: CellScalar[][] = Array.from({ length: projected.length }, () => []);
   let scannedRows = 0;
   let cursor = 0;
-  scanDelimitedText(text, ",", limits, {
-    fieldLimit: projected.length,
-    field: (row, column, value) => {
-      if (row === 0) return;
-      const target = projected[column];
-      if (target === undefined) return;
-      while (cursor < column) {
-        values[cursor]?.push(null);
-        cursor += 1;
-      }
-      values[column]?.push(parseCellLiteralInput(value, target.type));
-      cursor = column + 1;
-    },
-    row: (row) => {
-      if (row > 0) {
-        while (cursor < projected.length) {
+  scanDelimitedText(
+    text,
+    ",",
+    limits,
+    {
+      fieldLimit: projected.length,
+      field: (row, column, value) => {
+        if (row === 0) return;
+        const target = projected[column];
+        if (target === undefined) return;
+        while (cursor < column) {
           values[cursor]?.push(null);
           cursor += 1;
         }
-        cursor = 0;
-      }
-      scannedRows = row + 1;
+        values[column]?.push(parseCellLiteralInput(value, target.type));
+        cursor = column + 1;
+      },
+      row: (row) => {
+        if (row > 0) {
+          while (cursor < projected.length) {
+            values[cursor]?.push(null);
+            cursor += 1;
+          }
+          cursor = 0;
+        }
+        scannedRows = row + 1;
+      },
     },
-  });
+    options.signal,
+  );
 
   const rowCount = Math.max(0, scannedRows - 1);
   assertDelimitedTextDimensions(rowCount, columns.length, limits, "import");
@@ -419,6 +427,40 @@ function missingXlsxBackend(
 }
 
 /**
+ * Characters of a registered backend name copied into a failure context. A name
+ * is an identifier, but it comes from the host, so a long one is cut.
+ */
+const MAX_BACKEND_NAME_LENGTH = 256;
+
+/** Which public XLSX call failed, through which registered backend. */
+interface XlsxCallSite {
+  readonly operation: "xlsx-import" | "xlsx-export";
+  readonly backend: string;
+  readonly functionName: string;
+}
+
+/**
+ * The rejection of a failed XLSX call. An abort is not a failure: once the
+ * caller's signal fired, the result is `signal.reason`, unwrapped.
+ */
+function xlsxCallFailure(
+  error: unknown,
+  signal: AbortSignal | undefined,
+  site: XlsxCallSite,
+): unknown {
+  if (signal?.aborted) return signal.reason;
+  return normalizeSheetwriteError(
+    error,
+    site.operation === "xlsx-export" ? "export-failed" : "xlsx-import-failed",
+    site.operation,
+    {
+      backend: site.backend.slice(0, MAX_BACKEND_NAME_LENGTH),
+      functionName: site.functionName,
+    },
+  );
+}
+
+/**
  * Exports a table model through the registered optional XLSX backend.
  *
  * @example
@@ -442,9 +484,11 @@ export async function toXlsxTable(
   const backend = tableExportBackend;
   if (!backend) throw missingXlsxBackend("toXlsxTable", "xlsx-export");
   try {
+    options?.signal?.throwIfAborted();
     return await backend.toXlsxTable(workbook, store, options);
   } catch (error) {
-    throw normalizeSheetwriteError(error, "export-failed", "xlsx-export", {
+    throw xlsxCallFailure(error, options?.signal, {
+      operation: "xlsx-export",
       backend: backend.name,
       functionName: "toXlsxTable",
     });
@@ -460,7 +504,8 @@ export function toXlsxTableStream(
   const backend = tableExportBackend;
   if (!backend?.toXlsxTableStream) throw missingXlsxBackend("toXlsxTableStream", "xlsx-export");
   return readableBytes(backend.toXlsxTableStream(workbook, store, options), (error) =>
-    normalizeSheetwriteError(error, "export-failed", "xlsx-export", {
+    xlsxCallFailure(error, options?.signal, {
+      operation: "xlsx-export",
       backend: backend.name,
       functionName: "toXlsxTableStream",
     }),
@@ -512,9 +557,11 @@ export async function fromXlsxTable(
   const backend = tableImportBackend;
   if (!backend) throw missingXlsxBackend("fromXlsxTable", "xlsx-import");
   try {
+    options?.signal?.throwIfAborted();
     return await backend.fromXlsxTable(data, options);
   } catch (error) {
-    throw normalizeSheetwriteError(error, "xlsx-import-failed", "xlsx-import", {
+    throw xlsxCallFailure(error, options?.signal, {
+      operation: "xlsx-import",
       backend: backend.name,
       functionName: "fromXlsxTable",
     });
@@ -542,7 +589,11 @@ export interface XlsxWorkbookWarning {
 
 /** Shared options passed to every registered table and workbook XLSX backend. */
 export interface XlsxWorkbookOptions {
-  /** Abort before or between bounded codec operations. */
+  /**
+   * Checked before the work and once per ZIP entry, worksheet and chunk of
+   * cells. After it fires, the call rejects (or the stream errors) with
+   * `signal.reason`, not with a `SheetwriteError`.
+   */
   signal?: AbortSignal;
   /** Cells accounted by the active conversion path; defaults to 1,000,000. */
   maxCells?: number;
@@ -643,10 +694,13 @@ export async function toXlsxWorkbook(
   const backend = workbookBackend;
   if (!backend) throw missingXlsxBackend("toXlsxWorkbook", "xlsx-export");
   try {
+    // Checked before the snapshot is built, which is the largest step on this side.
+    options?.signal?.throwIfAborted();
     const source = workbookSnapshotOf(input);
     return await backend.toXlsxWorkbook(source.snapshot, options, source.context);
   } catch (error) {
-    throw normalizeSheetwriteError(error, "export-failed", "xlsx-export", {
+    throw xlsxCallFailure(error, options?.signal, {
+      operation: "xlsx-export",
       backend: backend.name,
       functionName: "toXlsxWorkbook",
     });
@@ -665,7 +719,8 @@ export function toXlsxWorkbookStream(
   return readableBytes(
     backend.toXlsxWorkbookStream(source.snapshot, options, source.context),
     (error) =>
-      normalizeSheetwriteError(error, "export-failed", "xlsx-export", {
+      xlsxCallFailure(error, options?.signal, {
+        operation: "xlsx-export",
         backend: backend.name,
         functionName: "toXlsxWorkbookStream",
       }),
@@ -681,9 +736,11 @@ export async function fromXlsxWorkbookFile(
   if (!backend?.fromXlsxWorkbookFile)
     throw missingXlsxBackend("fromXlsxWorkbookFile", "xlsx-import");
   try {
+    options?.signal?.throwIfAborted();
     return await backend.fromXlsxWorkbookFile(file, options);
   } catch (error) {
-    throw normalizeSheetwriteError(error, "xlsx-import-failed", "xlsx-import", {
+    throw xlsxCallFailure(error, options?.signal, {
+      operation: "xlsx-import",
       backend: backend.name,
       functionName: "fromXlsxWorkbookFile",
     });
@@ -714,9 +771,11 @@ export async function fromXlsxWorkbook(
   const backend = workbookBackend;
   if (!backend) throw missingXlsxBackend("fromXlsxWorkbook", "xlsx-import");
   try {
+    options?.signal?.throwIfAborted();
     return await backend.fromXlsxWorkbook(data, options);
   } catch (error) {
-    throw normalizeSheetwriteError(error, "xlsx-import-failed", "xlsx-import", {
+    throw xlsxCallFailure(error, options?.signal, {
+      operation: "xlsx-import",
       backend: backend.name,
       functionName: "fromXlsxWorkbook",
     });
