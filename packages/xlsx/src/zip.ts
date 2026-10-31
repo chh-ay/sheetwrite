@@ -45,6 +45,22 @@ export function markStoredEntryVerified(entry: StoredZipEntry): void {
   verifiedEntries.add(entry);
 }
 
+/** Build a stored entry when only part of an opaque XML drawing is modelled. */
+export function storedEntryFromBytes(data: Uint8Array): StoredZipEntry {
+  let checksum = 0xffffffff;
+  for (const byte of data) {
+    checksum = (CRC_TABLE[(checksum ^ byte) & 0xff] ?? 0) ^ (checksum >>> 8);
+  }
+
+  return {
+    method: 0,
+    crc32: (checksum ^ 0xffffffff) >>> 0,
+    compressedSize: data.length,
+    uncompressedSize: data.length,
+    data,
+  };
+}
+
 /** Validate persisted compressed entries without allocating their inflated payload. */
 export function validateStoredEntry(entry: StoredZipEntry, context: XlsxCodecContext): void {
   if (

@@ -1,4 +1,4 @@
-import { strToU8, zipSync } from "fflate";
+import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 
 export const FIXED_ZIP_TIME = new Date(1980, 0, 1);
 export const PACKAGE_REL = "http://schemas.openxmlformats.org/package/2006/relationships";
@@ -7,6 +7,80 @@ const STRICT_MAIN = "http://purl.oclc.org/ooxml/spreadsheetml/main";
 export const TRANSITIONAL_REL =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const STRICT_REL = "http://purl.oclc.org/ooxml/officeDocument/relationships";
+const MACRO_WORKBOOK = "application/vnd.ms-excel.sheet.macroEnabled.main+xml";
+
+function resolveTarget(source: string, target: string): string {
+  if (target.startsWith("/")) return target.slice(1);
+  const segments = source.split("/").slice(0, -1);
+  for (const segment of target.split("/")) {
+    if (segment === "..") segments.pop();
+    else if (segment !== ".") segments.push(segment);
+  }
+  return segments.join("/");
+}
+
+/**
+ * Structural checks Excel applies before it offers to repair a file: every
+ * part has a content type, every internal relationship target exists, every
+ * `r:` reference resolves, and a macro workbook keeps its macro content type.
+ */
+export function packageProblems(bytes: Uint8Array): string[] {
+  const files = unzipSync(bytes);
+  const problems: string[] = [];
+  const contentTypes = strFromU8(files["[Content_Types].xml"] ?? new Uint8Array());
+  const defaults = new Set(
+    [...contentTypes.matchAll(/<Default Extension="([^"]+)"/g)].map((match) =>
+      match[1]?.toLowerCase(),
+    ),
+  );
+  const overrides = new Map(
+    [...contentTypes.matchAll(/<Override PartName="\/([^"]+)" ContentType="([^"]+)"/g)].map(
+      (match) => [match[1], match[2]],
+    ),
+  );
+  for (const part of overrides.keys())
+    if (part && !files[part]) problems.push(`override for missing ${part}`);
+  for (const part of Object.keys(files)) {
+    if (part === "[Content_Types].xml" || part.endsWith("/")) continue;
+    const extension = part.slice(part.lastIndexOf(".") + 1).toLowerCase();
+    if (!overrides.has(part) && !defaults.has(extension))
+      problems.push(`${part} has no content type`);
+  }
+  const relationships = new Map<string, Set<string>>();
+  for (const [part, data] of Object.entries(files)) {
+    const match = /^(.*\/)?_rels\/([^/]+)\.rels$/.exec(part);
+    if (!match) continue;
+    const source = `${match[1] ?? ""}${match[2] ?? ""}`;
+    const ids = new Set<string>();
+    for (const relationship of strFromU8(data).matchAll(/<Relationship ([^>]+)\/>/g)) {
+      const attributes = relationship[1] ?? "";
+      const id = /Id="([^"]+)"/.exec(attributes)?.[1] ?? "";
+      if (ids.has(id)) problems.push(`duplicate ${id} in ${part}`);
+      ids.add(id);
+      if (attributes.includes('TargetMode="External"')) continue;
+      const target = resolveTarget(source, /Target="([^"]+)"/.exec(attributes)?.[1] ?? "");
+      if (!files[target]) problems.push(`${part} ${id} points at missing ${target}`);
+    }
+    relationships.set(source, ids);
+  }
+  if (!files["_rels/.rels"] || !strFromU8(files["_rels/.rels"]).includes("/officeDocument")) {
+    problems.push("no office document relationship");
+  }
+  for (const [part, data] of Object.entries(files)) {
+    if (!part.endsWith(".xml")) continue;
+    for (const reference of strFromU8(data).matchAll(/\br:(?:id|embed|link|pict)="([^"]*)"/g)) {
+      if (!relationships.get(part)?.has(reference[1] ?? ""))
+        problems.push(`${part} references unknown ${reference[1]}`);
+    }
+  }
+  if (
+    Boolean(files["xl/vbaProject.bin"]) !==
+    (overrides.get("xl/workbook.xml") === MACRO_WORKBOOK)
+  ) {
+    problems.push("workbook content type does not match its macro project");
+  }
+  return problems;
+}
 
 interface RawSheet {
   name?: string;
