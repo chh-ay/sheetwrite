@@ -136,12 +136,15 @@ search: SearchResult;
 </details>
 
 <details class="api-member" id="grid-events-renderer-fallback" data-pagefind-weight="1">
-<summary><code>renderer-fallback</code> <span class="api-member-summary">Emitted once when the worker renderer could not be constructed and the grid fell back to the main-thread canvas renderer.</span></summary>
+<summary><code>renderer-fallback</code> <span class="api-member-summary">Emitted once when the worker renderer could not start or stopped and the grid fell back to the main-thread canvas renderer.</span></summary>
 
 ```ts generated
 "renderer-fallback": { requested: "worker"; error: SheetwriteError };
 ```
 
+<p class="api-member-doc">Emitted once when the worker renderer could not start or stopped and the
+grid fell back to the main-thread canvas renderer. `error.context.failure`
+is `spawn`, `crash`, `protocol`, `timeout` or `fatal`.</p>
 </details>
 
 <details class="api-member" id="grid-events-datasource-error" data-pagefind-weight="1">

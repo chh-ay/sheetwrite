@@ -1510,7 +1510,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L437",
+              "source": "src/grid.ts#L438",
               "jsDocTags": [
                 "example",
                 "see"
@@ -1836,7 +1836,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L311",
+              "source": "src/grid.ts#L312",
               "jsDocTags": [],
               "documentation": "Default canvas theme used before CSS and explicit theme overrides.",
               "memberDocs": []
@@ -2078,7 +2078,7 @@
               "owners": [
                 "src/engine-memory.ts"
               ],
-              "source": "src/engine-memory.ts#L15",
+              "source": "src/engine-memory.ts#L16",
               "jsDocTags": [],
               "documentation": "Result of an explicit, all-store engine memory release.",
               "memberDocs": [
@@ -2173,7 +2173,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L782",
+              "source": "src/types/grid.ts#L783",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2744,7 +2744,7 @@
                 },
                 {
                   "name": "renderer-fallback",
-                  "documentation": "Emitted once when the worker renderer could not be constructed and the\ngrid fell back to the main-thread canvas renderer."
+                  "documentation": "Emitted once when the worker renderer could not start or stopped and the\ngrid fell back to the main-thread canvas renderer. `error.context.failure`\nis `spawn`, `crash`, `protocol`, `timeout` or `fatal`."
                 },
                 {
                   "name": "theme-change",
@@ -2985,7 +2985,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L355",
+              "source": "src/grid.ts#L356",
               "jsDocTags": [
                 "example",
                 "see"
@@ -3036,7 +3036,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L367",
+              "source": "src/grid.ts#L368",
               "jsDocTags": [],
               "documentation": "Whether `initSheetwrite` has completed — the single readiness source.",
               "memberDocs": []
@@ -4049,7 +4049,7 @@
               "owners": [
                 "src/engine-memory.ts"
               ],
-              "source": "src/engine-memory.ts#L51",
+              "source": "src/engine-memory.ts#L52",
               "jsDocTags": [
                 "example",
                 "see"
@@ -4162,7 +4162,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L372",
+              "source": "src/grid.ts#L373",
               "jsDocTags": [],
               "documentation": "Read `--sheetwrite-*` CSS custom properties into a partial theme.",
               "memberDocs": []
@@ -9074,7 +9074,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L599",
+              "source": "../core/dist/types/grid.d.ts#L633",
               "jsDocTags": [
                 "example",
                 "see"
@@ -9327,7 +9327,7 @@
                 },
                 {
                   "name": "setReadOnly",
-                  "documentation": "Update editability without replacing the Grid or clearing session state."
+                  "documentation": "Update editability without replacing the Grid or clearing session state.\nHas no effect after `engine-failed`: that grid stays read-only."
                 },
                 {
                   "name": "setRowHeight",
@@ -10077,7 +10077,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L599",
+              "source": "../core/dist/types/grid.d.ts#L633",
               "jsDocTags": [
                 "example",
                 "see"
@@ -10330,7 +10330,7 @@
                 },
                 {
                   "name": "setReadOnly",
-                  "documentation": "Update editability without replacing the Grid or clearing session state."
+                  "documentation": "Update editability without replacing the Grid or clearing session state.\nHas no effect after `engine-failed`: that grid stays read-only."
                 },
                 {
                   "name": "setRowHeight",
@@ -11066,7 +11066,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L599",
+              "source": "../core/dist/types/grid.d.ts#L633",
               "jsDocTags": [
                 "example",
                 "see"
@@ -11319,7 +11319,7 @@
                 },
                 {
                   "name": "setReadOnly",
-                  "documentation": "Update editability without replacing the Grid or clearing session state."
+                  "documentation": "Update editability without replacing the Grid or clearing session state.\nHas no effect after `engine-failed`: that grid stays read-only."
                 },
                 {
                   "name": "setRowHeight",

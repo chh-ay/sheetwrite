@@ -11960,8 +11960,9 @@ read its store again; `setReadOnly(false)` does not undo this. To continue,
 destroy the grid, `await initSheetwrite()` and create a new grid from a
 saved document.
 - `export-error` — Built-in toolbar/context-menu export failed after its action was dispatched.
-- `renderer-fallback` — Emitted once when the worker renderer could not be constructed and the
-grid fell back to the main-thread canvas renderer.
+- `renderer-fallback` — Emitted once when the worker renderer could not start or stopped and the
+grid fell back to the main-thread canvas renderer. `error.context.failure`
+is `spawn`, `crash`, `protocol`, `timeout` or `fatal`.
 - `theme-change` — Emitted after `setTheme` or `replaceTheme` changes the base theme. Holds a copy.
 
 ##### `GridOptions` — interface
@@ -16330,6 +16331,7 @@ that holds the pivot's ID, then to the active sheet. The pivot's
 `savedOutput` is removed, because it does not match a changed definition.
 - `setPresenceOverlays` — Replace ephemeral remote-presence overlays; null clears every collaborator.
 - `setReadOnly` — Update editability without replacing the Grid or clearing session state.
+Has no effect after `engine-failed`: that grid stays read-only.
 - `setRowHeight` — Set one row's persistent display height through document history.
 - `setSheetVisibility` — Set host-visible worksheet state; stock UI never offers `veryHidden`.
 - `setSort` — Persisted multi-key sort of the active sheet.
@@ -16889,6 +16891,7 @@ that holds the pivot's ID, then to the active sheet. The pivot's
 `savedOutput` is removed, because it does not match a changed definition.
 - `setPresenceOverlays` — Replace ephemeral remote-presence overlays; null clears every collaborator.
 - `setReadOnly` — Update editability without replacing the Grid or clearing session state.
+Has no effect after `engine-failed`: that grid stays read-only.
 - `setRowHeight` — Set one row's persistent display height through document history.
 - `setSheetVisibility` — Set host-visible worksheet state; stock UI never offers `veryHidden`.
 - `setSort` — Persisted multi-key sort of the active sheet.
@@ -17429,6 +17432,7 @@ that holds the pivot's ID, then to the active sheet. The pivot's
 `savedOutput` is removed, because it does not match a changed definition.
 - `setPresenceOverlays` — Replace ephemeral remote-presence overlays; null clears every collaborator.
 - `setReadOnly` — Update editability without replacing the Grid or clearing session state.
+Has no effect after `engine-failed`: that grid stays read-only.
 - `setRowHeight` — Set one row's persistent display height through document history.
 - `setSheetVisibility` — Set host-visible worksheet state; stock UI never offers `veryHidden`.
 - `setSort` — Persisted multi-key sort of the active sheet.

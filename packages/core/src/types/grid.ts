@@ -736,8 +736,9 @@ export interface GridEvents {
   /** Emitted after `setTheme` or `replaceTheme` changes the base theme. Holds a copy. */
   "theme-change": { theme: Theme };
   /**
-   * Emitted once when the worker renderer could not be constructed and the
-   * grid fell back to the main-thread canvas renderer.
+   * Emitted once when the worker renderer could not start or stopped and the
+   * grid fell back to the main-thread canvas renderer. `error.context.failure`
+   * is `spawn`, `crash`, `protocol`, `timeout` or `fatal`.
    */
   "renderer-fallback": { requested: "worker"; error: SheetwriteError };
   "datasource-error": {

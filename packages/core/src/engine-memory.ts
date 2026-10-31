@@ -1,6 +1,7 @@
 import {
   engineGeneration,
   getEngine,
+  hasCause,
   isEngineLoaded,
   isEngineTrap,
   prepareEngineInstance,
@@ -105,8 +106,9 @@ async function release(): Promise<EngineMemoryReleaseReport> {
     const message =
       "Sheetwrite: engine memory release preparation failed; live stores are unchanged";
 
-    // The copy allocates as much as every live store holds; that is the expected failure.
-    if (cause instanceof RangeError) {
+    // The copy allocates as much as every live store holds; that is the expected
+    // failure. History migration wraps it, so look through the causes.
+    if (hasCause(cause, (wrapped) => wrapped instanceof RangeError)) {
       throw new SheetwriteError("resource-limit", "engine", message, { cause });
     }
 

@@ -46,8 +46,8 @@ export function engineFailedError(cause?: unknown): SheetwriteError {
   );
 }
 
-/** How deep `isEngineTrap` follows `cause`: engine layers wrap a trap at most twice. */
-const TRAP_CAUSE_DEPTH = 3;
+/** How deep `hasCause` follows `cause`: engine layers wrap a failure at most twice. */
+const CAUSE_DEPTH = 3;
 
 export function getEngine(): defaultEngine.EngineInstance {
   if (!engineInstance) {
@@ -71,6 +71,18 @@ export function engineGeneration(): number {
   return generation;
 }
 
+/** Whether `error` or one of the causes it wraps (engine layers wrap with `cause`) passes `test`. */
+export function hasCause(error: unknown, test: (cause: Error) => boolean): boolean {
+  let current = error;
+
+  for (let depth = 0; depth < CAUSE_DEPTH && current instanceof Error; depth++) {
+    if (test(current)) return true;
+    current = current.cause;
+  }
+
+  return false;
+}
+
 /**
  * A WASM trap (`unreachable` after a Rust panic, out-of-bounds access) stops
  * the call with its Rust state half-written: borrow flags stay set and
@@ -78,14 +90,7 @@ export function engineGeneration(): number {
  * be trusted, so a trap is never retried.
  */
 export function isEngineTrap(error: unknown): boolean {
-  let current = error;
-
-  for (let depth = 0; depth < TRAP_CAUSE_DEPTH && current instanceof Error; depth++) {
-    if (current instanceof WebAssembly.RuntimeError) return true;
-    current = current.cause;
-  }
-
-  return false;
+  return hasCause(error, (cause) => cause instanceof WebAssembly.RuntimeError);
 }
 
 /**
@@ -103,7 +108,17 @@ export function stopEngine(cause: unknown, owner: number): SheetwriteError {
   generation += 1;
   forgetLiveStoreEngines();
 
-  for (const listener of [...failureListeners]) listener(failure);
+  for (const listener of [...failureListeners]) {
+    try {
+      listener(failure);
+    } catch (error) {
+      // One broken listener must not skip the others or replace `failure`
+      // for the caller; report it as an uncaught error instead.
+      queueMicrotask(() => {
+        throw error;
+      });
+    }
+  }
 
   return failure;
 }

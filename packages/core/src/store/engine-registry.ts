@@ -10,6 +10,9 @@ import type { StoreDataEngine } from "./data-engine.js";
  */
 const ENGINES = new WeakMap<object, StoreDataEngine>();
 
+/** Engine generation (see `engineGeneration`) of the instance each store was built on. */
+const GENERATIONS = new WeakMap<object, number>();
+
 const LIVE_ENGINES = new Set<WeakRef<StoreDataEngine>>();
 
 const finalized = new FinalizationRegistry<WeakRef<StoreDataEngine>>((ref) => {
@@ -17,12 +20,22 @@ const finalized = new FinalizationRegistry<WeakRef<StoreDataEngine>>((ref) => {
 });
 
 /** Record the engine behind a store facade. Called once per constructed store. */
-export function registerStoreEngine(store: object, engine: StoreDataEngine): void {
+export function registerStoreEngine(
+  store: object,
+  engine: StoreDataEngine,
+  generation: number,
+): void {
   ENGINES.set(store, engine);
+  GENERATIONS.set(store, generation);
 
   const ref = new WeakRef(engine);
   LIVE_ENGINES.add(ref);
   finalized.register(engine, ref);
+}
+
+/** Engine generation of a registered store; `undefined` for any other object. */
+export function storeGeneration(store: object): number | undefined {
+  return GENERATIONS.get(store);
 }
 
 /**
@@ -54,4 +67,13 @@ export function liveStoreEngines(): StoreDataEngine[] {
  */
 export function forgetLiveStoreEngines(): void {
   LIVE_ENGINES.clear();
+}
+
+/** Drop one store whose cell store can no longer answer, so memory release skips it. */
+export function forgetLiveStoreEngine(store: object): void {
+  const engine = ENGINES.get(store);
+
+  for (const ref of LIVE_ENGINES) {
+    if (ref.deref() === engine) LIVE_ENGINES.delete(ref);
+  }
 }

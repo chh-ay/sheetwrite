@@ -28,7 +28,7 @@ import {
   StoreDataEngine,
   type SheetwriteStoreOptions as StoreDataEngineOptions,
 } from "./store/data-engine.js";
-import { registerStoreEngine } from "./store/engine-registry.js";
+import { forgetLiveStoreEngine, registerStoreEngine } from "./store/engine-registry.js";
 import { StoreMutationPolicy } from "./store/mutation-policy.js";
 import { addRowGroup, collapseRowGroup, patchSheetId, removeRowGroup } from "./store/ranges.js";
 import { decodeWorkbookSnapshot, freezeXlsxSource } from "./store/snapshot-codec.js";
@@ -192,7 +192,7 @@ export class SheetwriteStore implements Store {
     this.policy = new StoreMutationPolicy(workbook, (sheet) => this.engine.pivotOutputs(sheet));
     this.protectionResolver = options.protectionResolver;
     this.mutationPolicy = options.mutationPolicy ?? "atomic";
-    registerStoreEngine(this, this.engine);
+    registerStoreEngine(this, this.engine, this.generation);
   }
 
   static fromSnapshot(input: unknown, options: SheetwriteStoreOptions = {}): SheetwriteStore {
@@ -217,7 +217,15 @@ export class SheetwriteStore implements Store {
       }
       return store;
     } catch (error) {
-      store?.dispose();
+      if (store && isEngineTrap(error)) {
+        // A trap (in practice an allocation abort) leaves this store's cell
+        // store borrowed, so every later call into it throws. Disposing it
+        // would replace this error; memory release must not migrate it either.
+        forgetLiveStoreEngine(store);
+      } else {
+        store?.dispose();
+      }
+
       if (isSnapshotAllocationFailure(error)) {
         throw new SnapshotValidationError([
           {
