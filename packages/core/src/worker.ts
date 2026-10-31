@@ -292,7 +292,11 @@ export function createWorkerMessageHandler(
   };
 
   return (input: unknown): void => {
-    if (input === null || typeof input !== "object" || !("type" in input)) return;
+    if (input === null || typeof input !== "object" || !("type" in input)) {
+      reportFatal("Sheetwrite: paint worker received a request it cannot read");
+      return;
+    }
+
     const msg = input as WorkerMessage;
     switch (msg.type) {
       case "init": {
@@ -359,6 +363,10 @@ export function createWorkerMessageHandler(
         state.canvas = null;
         state.lastViewport = null;
         break;
+      default:
+        // A renderer from another release (a stale `workerUrl` copy) can send
+        // requests this worker does not know; painting on would be guesswork.
+        reportFatal("Sheetwrite: paint worker received an unknown request");
     }
   };
 }
@@ -366,4 +374,8 @@ export function createWorkerMessageHandler(
 const handleWorkerMessage = createWorkerMessageHandler((message) => postMessage(message));
 addEventListener("message", (event: MessageEvent) => {
   handleWorkerMessage(event.data);
+});
+// A request that cannot be deserialized takes the unreadable-request path.
+addEventListener("messageerror", () => {
+  handleWorkerMessage(null);
 });

@@ -8,7 +8,7 @@ description: "DEFAULT_THEME variable in @sheetwrite/core: Default canvas theme u
 Default canvas theme used before CSS and explicit theme overrides.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/grid.ts#L308"><code>packages/core/src/grid.ts#L308</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/grid.ts#L311"><code>packages/core/src/grid.ts#L311</code></a></dd></div>
 </dl>
 
 ## Declaration

@@ -11,6 +11,7 @@ import {
   takeAdmittedTransactionResources,
   validateDocumentOperationShape,
 } from "./document-protocol.js";
+import { engineFailedError, engineGeneration, isEngineTrap, stopEngine } from "./engine.js";
 import { clonePivots, pivotOwner, withoutSavedOutput } from "./pivot.js";
 import type {
   RuntimeMemoryObservation,
@@ -153,6 +154,8 @@ export class SheetwriteStore implements Store {
   private readonly transactionResourceLimits: Readonly<TransactionResourceLimits>;
   private documentId?: string;
   private documentVersion?: number;
+  /** Engine generation at construction; a different current value means the instance stopped. */
+  private readonly generation = engineGeneration();
 
   constructor(
     private readonly workbook: Workbook,
@@ -367,7 +370,13 @@ export class SheetwriteStore implements Store {
   }
 
   recalculateVolatile(now = new Date()): void {
-    this.engine.recomputeVolatile(now);
+    this.assertEngineRunning();
+    try {
+      this.engine.recomputeVolatile(now);
+    } catch (error) {
+      throw this.stopOnTrap(error);
+    }
+
     this.epoch += 1;
     const event: ChangeEvent = {
       transaction: { patches: [] },
@@ -584,6 +593,7 @@ export class SheetwriteStore implements Store {
     tx: Transaction,
     reasonOrOptions: CommitReason | TransactionApplicationOptions = {},
   ): ApplyTransactionResult {
+    this.assertEngineRunning();
     const preparation = new TransactionPreparation(tx.patches);
     try {
       // A transaction built and measured by an engine layer carries its resource
@@ -710,6 +720,10 @@ export class SheetwriteStore implements Store {
         ...(policyWarnings.length > 0 ? { warnings: policyWarnings } : {}),
         ...(policyRejections.length > 0 ? { rejections: policyRejections } : {}),
       };
+    } catch (error) {
+      // Change listeners run inside this call too: a trap in a listener's
+      // engine read stops the engine the same way.
+      throw this.stopOnTrap(error);
     } finally {
       preparation.dispose();
     }
@@ -799,11 +813,29 @@ export class SheetwriteStore implements Store {
     rows: readonly RowData[],
     protect?: (addr: CellAddress) => boolean,
   ): void {
-    this.engine.loadPage(sheet, start, columns, rows, protect);
+    this.assertEngineRunning();
+    try {
+      this.engine.loadPage(sheet, start, columns, rows, protect);
+    } catch (error) {
+      throw this.stopOnTrap(error);
+    }
   }
 
   dispose(): void {
+    // A stopped instance can throw from any call, even `free`. Its linear
+    // memory goes with the instance when the last of its stores is collected.
+    if (this.generation !== engineGeneration()) return;
+
     this.engine.dispose();
+  }
+
+  /** Refuse work once the engine stopped: its instance can be half-written. */
+  private assertEngineRunning(): void {
+    if (this.generation !== engineGeneration()) throw engineFailedError();
+  }
+
+  private stopOnTrap(error: unknown): unknown {
+    return isEngineTrap(error) ? stopEngine(error, this.generation) : error;
   }
 
   private validateTransactionOperations(tx: Transaction): ApplyTransactionResult | undefined {

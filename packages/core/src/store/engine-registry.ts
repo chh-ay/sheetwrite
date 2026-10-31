@@ -46,3 +46,12 @@ export function liveStoreEngines(): StoreDataEngine[] {
 
   return engines;
 }
+
+/**
+ * Drop every store from the live set after the engine stops. Those stores keep
+ * their dead instance, so `releaseEngineMemory()` must never migrate them. A
+ * later finalizer callback for a dropped entry deletes nothing.
+ */
+export function forgetLiveStoreEngines(): void {
+  LIVE_ENGINES.clear();
+}

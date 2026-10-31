@@ -22,9 +22,12 @@ import {
 import { DomOverlay } from "./dom-overlay.js";
 import {
   ENGINE_LOAD_HINT,
+  engineGeneration,
   isEngineLoaded as isLoaded,
   loadEngine,
+  onEngineFailure,
   type SheetwriteEngine,
+  stopEngine,
 } from "./engine.js";
 import { normalizeSheetwriteError, SheetwriteError } from "./errors.js";
 import { downloadBytes, toCsv, toXlsxTable } from "./export.js";
@@ -513,6 +516,7 @@ export class GridImpl implements Grid {
     "theme-change": new Set(),
     "chart-select": new Set(),
     "chart-activate": new Set(),
+    "engine-failed": new Set(),
   };
 
   /** Which renderer actually constructed; set by `createRenderer`. */
@@ -528,6 +532,11 @@ export class GridImpl implements Grid {
   private selection: SelectionModel;
   private readonly mutationRevisions = new MutationRevisionIndex();
   private destroyed = false;
+  /** Engine generation at construction; traps from this grid's reads stop that instance only. */
+  private readonly engineGeneration = engineGeneration();
+  /** Set once the engine stopped; read-only stays on until the host recreates the grid. */
+  private engineFailure: SheetwriteError | null = null;
+  private readonly removeEngineFailureListener: () => void;
   private storeEpoch = 0;
   private windowContentRevision = 0;
   private sourceSheet: SheetId | null = null;
@@ -1020,6 +1029,9 @@ export class GridImpl implements Grid {
       emitScroll: (event) => {
         for (const fn of this.listeners.scroll) fn(event);
       },
+      onEngineTrap: (cause) => {
+        stopEngine(cause, this.engineGeneration);
+      },
     });
 
     if (this.tabBarHeight > 0) this.buildTabBar();
@@ -1222,6 +1234,27 @@ export class GridImpl implements Grid {
     this.armResolutionListener();
     this.attachPanels();
     this.render();
+    // Registered last: a constructor that throws earlier leaves no listener behind.
+    this.removeEngineFailureListener = onEngineFailure((failure) => this.onEngineFailed(failure));
+  }
+
+  /**
+   * The engine stopped. Its instance can be half-written, so this grid keeps
+   * its last frame and never reads the store again; the store already refuses
+   * edits. The read-only switch and the event run one microtask later, so a
+   * host listener cannot replace the `engine-failed` error of the failing call.
+   */
+  private onEngineFailed(failure: SheetwriteError): void {
+    if (this.destroyed || this.engineFailure) return;
+
+    this.engineFailure = failure;
+    this.readWindows.freeze();
+    queueMicrotask(() => {
+      if (this.destroyed) return;
+
+      this.applyReadOnly(true);
+      for (const fn of this.listeners["engine-failed"]) fn({ error: failure });
+    });
   }
 
   /** Listen for first use without fetching the panel chunk on ordinary grids. */
@@ -2446,6 +2479,13 @@ export class GridImpl implements Grid {
   }
 
   setReadOnly(readOnly: boolean): void {
+    // Only a new grid on a restarted engine can edit again.
+    if (this.engineFailure) return;
+
+    this.applyReadOnly(readOnly);
+  }
+
+  private applyReadOnly(readOnly: boolean): void {
     if (readOnly === this.readOnly) return;
 
     this.readOnly = readOnly;
@@ -3387,7 +3427,8 @@ export class GridImpl implements Grid {
     const summary: Partial<Record<GridCommandName, number>> = {};
     for (const command of COMMAND_STATE_ACTIVITY_COMMANDS) summary[command] = 0;
 
-    if (this.selection.isEmpty) return summary;
+    // A stopped engine cannot answer style reads; a read-only grid needs none.
+    if (this.selection.isEmpty || this.engineFailure) return summary;
 
     const coordinates: Array<{ row: number; col: number }> = [];
     let complete = true;
@@ -3715,6 +3756,7 @@ export class GridImpl implements Grid {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
+    this.removeEngineFailureListener();
     let failure: unknown;
     let failed = false;
     const cleanup = (operation: () => void): void => {

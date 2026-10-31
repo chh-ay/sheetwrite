@@ -19,6 +19,7 @@ Stable public failure codes. Messages are diagnostic and are not API contracts.
 const SHEETWRITE_ERROR_CODES: readonly [
   "initialization-failed",
   "initialization-required",
+  "engine-failed",
   "datasource-request-failed",
   "renderer-fallback",
   "export-failed",

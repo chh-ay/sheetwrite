@@ -8,7 +8,7 @@ description: "isSheetwriteReady function in @sheetwrite/core: Whether initSheetw
 Whether `initSheetwrite` has completed — the single readiness source.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/grid.ts#L364"><code>packages/core/src/grid.ts#L364</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/grid.ts#L367"><code>packages/core/src/grid.ts#L367</code></a></dd></div>
 </dl>
 
 ## Declaration

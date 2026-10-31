@@ -750,6 +750,14 @@ export interface GridEvents {
   "chart-select": ChartRef | null;
   /** The user pressed Enter on a selected chart, for example to open its editor. */
   "chart-activate": ChartRef;
+  /**
+   * Emitted once when the engine stopped after a WASM trap. `error.code` is
+   * `engine-failed`. The grid keeps its last frame, is read-only and does not
+   * read its store again; `setReadOnly(false)` does not undo this. To continue,
+   * destroy the grid, `await initSheetwrite()` and create a new grid from a
+   * saved document.
+   */
+  "engine-failed": { error: SheetwriteError };
 }
 
 /**
@@ -827,7 +835,10 @@ export interface Grid {
   replaceTheme(theme: Partial<Theme> | undefined): void;
   /** The effective (post-zoom) theme the renderer is currently painting with. */
   getEffectiveTheme(): Theme;
-  /** Update editability without replacing the Grid or clearing session state. */
+  /**
+   * Update editability without replacing the Grid or clearing session state.
+   * Has no effect after `engine-failed`: that grid stays read-only.
+   */
   setReadOnly(readOnly: boolean): void;
   /**
    * Reconfigure built-in chrome and keyboard handling without replacing the

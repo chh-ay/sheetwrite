@@ -2,6 +2,7 @@
 export const SHEETWRITE_ERROR_CODES = [
   "initialization-failed",
   "initialization-required",
+  "engine-failed",
   "datasource-request-failed",
   "renderer-fallback",
   "export-failed",
@@ -60,6 +61,7 @@ export type SheetwriteErrorCode = (typeof SHEETWRITE_ERROR_CODES)[number];
 export const SHEETWRITE_ERROR_OPERATIONS = [
   "initialize",
   "create-grid",
+  "engine",
   "datasource-request",
   "renderer-worker",
   "export-xlsx",
