@@ -10,10 +10,11 @@ formula source, else literal text) and commits on Enter through the grid's
 undoable transaction path, targeting the data address captured with the
 draft — correct even under an active sort/filter view. A focused, dirty
 draft is never overwritten by selection/change events; Escape restores the
-last stable text.
+last stable text. While focused, it shows formula help as the cell editor
+does.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/shell/formula-controls.ts#L150"><code>packages/core/src/shell/formula-controls.ts#L150</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/shell/formula-controls.ts#L152"><code>packages/core/src/shell/formula-controls.ts#L152</code></a></dd></div>
 </dl>
 
 ## Declaration

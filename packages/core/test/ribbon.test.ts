@@ -161,10 +161,10 @@ it("renders the same commands as the toolbar for the same command flags", async 
   await ribbonMounted(host);
 
   const ribbonCommands = new Set<string>();
-  for (const tab of ["Home", "Insert", "Data", "View"]) {
+  for (const tab of ["Home", "Insert", "Formulas", "Data", "View"]) {
     openTab(tab);
     for (const element of host.querySelectorAll<HTMLElement>(".sheetwrite-ribbon [data-command]")) {
-      ribbonCommands.add(element.dataset.command ?? "");
+      if (!element.hidden) ribbonCommands.add(element.dataset.command ?? "");
     }
   }
 

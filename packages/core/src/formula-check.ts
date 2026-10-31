@@ -40,7 +40,7 @@ interface CheckedCall {
   readonly argumentCount: number;
 }
 
-/** Minimum and maximum argument counts that `fn`'s metadata allows. */
+/** Minimum and maximum argument counts that a function's argument metadata allows. */
 function arity(args: readonly FormulaArgumentMetadata[]): { min: number; max: number } {
   let min = 0;
   for (const argument of args) {

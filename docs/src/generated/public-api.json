@@ -8091,6 +8091,33 @@
           "classification": "supported",
           "exports": [
             {
+              "name": "analyzeFormula",
+              "kind": "function",
+              "signature": "(text: string, cursor: number, functions: readonly FormulaFunctionMetadata[]): FormulaAnalysis",
+              "owners": [
+                "src/formula-analysis.ts"
+              ],
+              "source": "src/formula-analysis.ts#L379",
+              "jsDocTags": [
+                "example",
+                "see"
+              ],
+              "documentation": "Reads a formula as formula help needs it: its tokens, the references to\ncolour, the function call and argument at `cursor`, the functions that\ncomplete the name at `cursor`, and syntax and call errors.\n\n`text` is the whole editor text, starting with `=`; any other text is not a\nformula and gives an empty result. `cursor` and every `from` and `to` are\nUTF-16 offsets into `text`. `functions` is the list from `listFunctions`,\nwhich holds the active engine's built-in functions and the store's host\nfunctions. With an empty list, completion is empty and no name is reported\nas unknown.\n\nThe analysis never calculates: it reads text and metadata only.\n@example\n```ts\nimport type { Store } from \"@sheetwrite/core\";\nimport { analyzeFormula, listFunctions } from \"@sheetwrite/core/functions\";\n\nasync function currentArgument(store: Store, text: string, cursor: number) {\n  const analysis = analyzeFormula(text, cursor, await listFunctions(store));\n  return analysis.call?.argument?.name ?? null;\n}\n```\n@see\n/docs/features/formulas/formula-help/",
+              "memberDocs": []
+            },
+            {
+              "name": "FormulaAnalysis",
+              "kind": "interface",
+              "signature": "export interface FormulaAnalysis { readonly tokens: readonly FormulaToken[]; readonly references: readonly FormulaReference[]; readonly call: FormulaCall | null; readonly completion: FormulaCompletion | null; readonly diagnostics: readonly FormulaDiagnostic[]; }",
+              "owners": [
+                "src/formula-analysis.ts"
+              ],
+              "source": "src/formula-analysis.ts#L79",
+              "jsDocTags": [],
+              "documentation": "Everything formula help shows for one formula text and cursor offset.",
+              "memberDocs": []
+            },
+            {
               "name": "FormulaArgument",
               "kind": "type",
               "signature": "export type FormulaArgument = FormulaScalar | readonly (readonly FormulaScalar[])[];",
@@ -8113,6 +8140,59 @@
               "jsDocTags": [],
               "documentation": "Argument documentation used by built-in and host functions. Types are descriptive, not coercion rules.",
               "memberDocs": []
+            },
+            {
+              "name": "FormulaCall",
+              "kind": "interface",
+              "signature": "export interface FormulaCall { readonly name: string; readonly from: number; readonly to: number; readonly argumentIndex: number; readonly function: FormulaFunctionMetadata | undefined; readonly argument: FormulaArgumentMetadata | undefined; }",
+              "owners": [
+                "src/formula-analysis.ts"
+              ],
+              "source": "src/formula-analysis.ts#L62",
+              "jsDocTags": [],
+              "documentation": "The innermost function call around the cursor. `argumentIndex` is 0-based;\n`argument` is its metadata, and is undefined when the call has more\narguments than the function takes or the function is unknown.",
+              "memberDocs": []
+            },
+            {
+              "name": "FormulaCellPosition",
+              "kind": "interface",
+              "signature": "export interface FormulaCellPosition { readonly row: number; readonly col: number; }",
+              "owners": [
+                "src/formula-analysis.ts"
+              ],
+              "source": "src/formula-analysis.ts#L37",
+              "jsDocTags": [],
+              "documentation": "A 0-based cell position.",
+              "memberDocs": []
+            },
+            {
+              "name": "FormulaCompletion",
+              "kind": "interface",
+              "signature": "export interface FormulaCompletion { readonly from: number; readonly to: number; readonly matches: readonly FormulaFunctionMetadata[]; }",
+              "owners": [
+                "src/formula-analysis.ts"
+              ],
+              "source": "src/formula-analysis.ts#L72",
+              "jsDocTags": [],
+              "documentation": "Functions whose names start with the name at the cursor, and the span to replace.",
+              "memberDocs": []
+            },
+            {
+              "name": "FormulaDiagnostic",
+              "kind": "interface",
+              "signature": "export interface FormulaDiagnostic { readonly from: number; readonly to: number; readonly message: string; readonly incomplete: boolean; }",
+              "owners": [
+                "src/formula-check.ts"
+              ],
+              "source": "src/formula-check.ts#L11",
+              "jsDocTags": [],
+              "documentation": "A problem in a formula, with the span of text it marks.",
+              "memberDocs": [
+                {
+                  "name": "incomplete",
+                  "documentation": "The formula ends before it is complete (a missing `)` or value at the end).\nEditors can hold these back while the caret is at the end of the text."
+                }
+              ]
             },
             {
               "name": "FormulaFunction",
@@ -8139,6 +8219,18 @@
               "memberDocs": []
             },
             {
+              "name": "FormulaReference",
+              "kind": "interface",
+              "signature": "export interface FormulaReference { readonly from: number; readonly to: number; readonly sheet: string | null; readonly start: FormulaCellPosition; readonly end: FormulaCellPosition; readonly colorIndex: number; }",
+              "owners": [
+                "src/formula-analysis.ts"
+              ],
+              "source": "src/formula-analysis.ts#L48",
+              "jsDocTags": [],
+              "documentation": "A cell, range, whole-column or whole-row reference. `sheet` is the sheet\nname as written, without quotes, or null for the formula's own sheet. Equal\nreferences share one `colorIndex`, so an editor gives each distinct\nreference one colour in the text and on the grid.",
+              "memberDocs": []
+            },
+            {
               "name": "FormulaScalar",
               "kind": "type",
               "signature": "export type FormulaScalar = number | string | boolean | null;",
@@ -8151,13 +8243,37 @@
               "memberDocs": []
             },
             {
+              "name": "FormulaToken",
+              "kind": "interface",
+              "signature": "export interface FormulaToken { readonly kind: FormulaTokenKind; readonly from: number; readonly to: number; }",
+              "owners": [
+                "src/formula-analysis.ts"
+              ],
+              "source": "src/formula-analysis.ts#L30",
+              "jsDocTags": [],
+              "documentation": "One token of a formula. `from` and `to` are UTF-16 offsets into the text.",
+              "memberDocs": []
+            },
+            {
+              "name": "FormulaTokenKind",
+              "kind": "type",
+              "signature": "export type FormulaTokenKind = | \"number\" | \"string\" | \"boolean\" | \"error\" | \"function\" | \"reference\" | \"sheet\" | \"name\" | \"operator\" | \"separator\" | \"paren\" | \"invalid\";",
+              "owners": [
+                "src/formula-analysis.ts"
+              ],
+              "source": "src/formula-analysis.ts#L15",
+              "jsDocTags": [],
+              "documentation": "What a token is; editors use it for syntax colours.",
+              "memberDocs": []
+            },
+            {
               "name": "listFunctions",
               "kind": "function",
               "signature": "(store: Store): Promise<readonly FormulaFunctionMetadata[]>",
               "owners": [
                 "src/functions.ts"
               ],
-              "source": "src/functions.ts#L109",
+              "source": "src/functions.ts#L121",
               "jsDocTags": [],
               "documentation": "Metadata of every function that formulas in `store` can call: the built-in\nfunctions of the active engine, then the host functions of `store` in\nregistration order. Formula help reads this one list. The built-in table\nloads on the first call, so the result is a promise.",
               "memberDocs": []
@@ -8169,7 +8285,7 @@
               "owners": [
                 "src/functions.ts"
               ],
-              "source": "src/functions.ts#L70",
+              "source": "src/functions.ts#L82",
               "jsDocTags": [
                 "example",
                 "see",
@@ -8185,7 +8301,7 @@
               "owners": [
                 "src/functions.ts"
               ],
-              "source": "src/functions.ts#L96",
+              "source": "src/functions.ts#L108",
               "jsDocTags": [
                 "throws"
               ],
@@ -8222,9 +8338,9 @@
               "owners": [
                 "src/shell/formula-controls.ts"
               ],
-              "source": "src/shell/formula-controls.ts#L150",
+              "source": "src/shell/formula-controls.ts#L152",
               "jsDocTags": [],
-              "documentation": "Detached formula bar: mirrors the focused cell's editable text (exact\nformula source, else literal text) and commits on Enter through the grid's\nundoable transaction path, targeting the data address captured with the\ndraft — correct even under an active sort/filter view. A focused, dirty\ndraft is never overwritten by selection/change events; Escape restores the\nlast stable text.",
+              "documentation": "Detached formula bar: mirrors the focused cell's editable text (exact\nformula source, else literal text) and commits on Enter through the grid's\nundoable transaction path, targeting the data address captured with the\ndraft — correct even under an active sort/filter view. A focused, dirty\ndraft is never overwritten by selection/change events; Escape restores the\nlast stable text. While focused, it shows formula help as the cell editor\ndoes.",
               "memberDocs": []
             },
             {
@@ -8234,7 +8350,7 @@
               "owners": [
                 "src/shell/formula-controls.ts"
               ],
-              "source": "src/shell/formula-controls.ts#L33",
+              "source": "src/shell/formula-controls.ts#L34",
               "jsDocTags": [],
               "documentation": "A1 jump box, like Excel's name box: shows the focused cell's reference, and\non Enter selects the typed cell (`B7`) or range (`B2:D9`); `$` markers are\naccepted. Invalid or out-of-bounds references set `aria-invalid` and make\nno grid calls; Escape restores the displayed reference.",
               "memberDocs": []
@@ -8306,7 +8422,7 @@
               "owners": [
                 "src/shell/formula-controls.ts"
               ],
-              "source": "src/shell/formula-controls.ts#L130",
+              "source": "src/shell/formula-controls.ts#L131",
               "jsDocTags": [],
               "documentation": "Host elements and callbacks used to bind a formula bar to a Grid.",
               "memberDocs": [
@@ -8327,7 +8443,7 @@
               "owners": [
                 "src/shell/formula-controls.ts"
               ],
-              "source": "src/shell/formula-controls.ts#L138",
+              "source": "src/shell/formula-controls.ts#L139",
               "jsDocTags": [],
               "documentation": "A formula bar piece; `setReadOnly` blocks commits without unmounting.",
               "memberDocs": []
@@ -8339,7 +8455,7 @@
               "owners": [
                 "src/shell/formula-controls.ts"
               ],
-              "source": "src/shell/formula-controls.ts#L17",
+              "source": "src/shell/formula-controls.ts#L18",
               "jsDocTags": [],
               "documentation": "Host elements and callbacks used to bind a name box to a Grid.",
               "memberDocs": [
@@ -8397,7 +8513,7 @@
               "owners": [
                 "src/shell/formula-controls.ts"
               ],
-              "source": "src/shell/formula-controls.ts#L11",
+              "source": "src/shell/formula-controls.ts#L12",
               "jsDocTags": [],
               "documentation": "A mounted shell piece: its root element plus an idempotent teardown.",
               "memberDocs": []

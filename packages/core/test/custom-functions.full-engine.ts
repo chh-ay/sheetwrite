@@ -5,6 +5,7 @@ import { beforeAll, describe, expect, it } from "bun:test";
 import * as formulas from "@sheetwrite/formulas";
 
 import {
+  analyzeFormula,
   type FormulaArgument,
   type FormulaFunctionMetadata,
   listFunctions,
@@ -202,6 +203,13 @@ describe("host formula functions", () => {
         examples: TAX_RATE.examples,
         volatile: false,
       });
+
+      // Formula help reads this list, so it completes and guides host functions.
+      const analysis = analyzeFormula("=TAXR", 5, functions);
+      expect(analysis.completion?.matches.map((entry) => entry.name)).toEqual(["TAXRATE"]);
+      expect(analyzeFormula('=TAXRATE("EU", 1)', 0, functions).diagnostics).toEqual([
+        expect.objectContaining({ message: "TAXRATE takes at most 1 argument." }),
+      ]);
 
       for (const name of ["SUM", "A1", "R1C1", "BAD NAME", ""]) {
         let failure: unknown;

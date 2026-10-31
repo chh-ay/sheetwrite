@@ -54,6 +54,7 @@ Packages: 0.6.1. Canonical HTML: https://www.sheetwrite.dev/docs/
 - [Lookup, criteria, and financial formulas](#lookup-criteria-and-financial-formulas)
 - [Analysis formulas](#analysis-formulas)
 - [Custom functions](#custom-functions)
+- [Formula help](#formula-help)
 - [Analysis](#analysis)
 - [Pivot tables](#pivot-tables)
 - [Charts](#charts)
@@ -1724,17 +1725,19 @@ The ribbon has these tabs, with Excel's group names, labels and order:
 | --- | --- |
 | Home | **Undo**. **Clipboard**: Paste split button. **Font**: font name and size boxes, grow and shrink, bold, italic, underline, strikethrough, Borders, Fill Color and Font Color palettes. **Alignment**: top, middle, bottom, wrap, left, center, right, Merge & Center. **Number**: format box, currency, percent, comma, more and fewer decimals. **Cells**: Insert, Delete, Format. **Editing**: AutoSum, Clear, Sort & Filter, Find. |
 | Insert | **Rows & Columns**: Insert (rows above or below, columns left or right), Delete (rows or columns). **Tables**: PivotTable. **Charts**: Chart split button (column, bar, line, area, pie, doughnut, scatter). **Links**: link form. **Notes**: note form. |
-| Formulas | **Function Library**: Insert Function. Shows only while the store has [custom functions](https://www.sheetwrite.dev/docs/features/formulas/custom-functions/), which need the full engine. |
+| Formulas | **Function Library**: Insert Function. Shows only while the store has [custom functions](https://www.sheetwrite.dev/docs/features/formulas/custom-functions/), which need the full engine. **Formula Auditing**: Explain Formula. |
 | Data | **Sort & Filter**: Sort A to Z, Sort Z to A, Clear Filter. **Outline**: Group and Ungroup rows. **Show/Hide**: Hide Rows, Unhide Rows, Hide Columns, Unhide Columns. **Export**: Export CSV, Export XLSX (with the `export` flag). |
 | View | **Window**: Freeze Panes, Freeze Top Row, Freeze First Column, Unfreeze Panes. **Zoom**: zoom out, current percent, zoom in. |
 
 Every control reads the same `getCommandState` contract as host chrome. It disables while the grid is read-only.
 
-**Insert Function** lists the functions registered with `registerFunction`, with each signature and description as the tooltip. Pick one to start `=NAME(` in the focus cell's editor, then type the arguments. The Formulas tab, and Insert Function in the toolbar, appear when the first function is registered and go away when the last one is removed. Built-in functions are offered by formula autocomplete as you type.
+**Insert Function** lists the functions registered with `registerFunction`, with each signature and description as the tooltip. Pick one to start `=NAME(` in the focus cell's editor, then type the arguments. Insert Function, in the ribbon and in the toolbar, appears when the first function is registered and goes away when the last one is removed. Built-in functions are offered by [formula autocomplete](https://www.sheetwrite.dev/docs/features/formulas/formula-help/) as you type.
+
+**Explain Formula** opens a side panel that describes the formula in the focus cell: its functions, their arguments, its references and its problems. See [Formula help](https://www.sheetwrite.dev/docs/features/formulas/formula-help/#explain-formula).
 
 ### Layout for the 0.7 features
 
-The 0.7 features get their commands in the places below. Insert Function is in the ribbon now; each other command appears in the full ribbon, the compact ribbon and the toolbar when its feature ships. The glyphs are on the icon sheet now, so `IconOverrides` and replacement sheets can use their names.
+The 0.7 features get their commands in the places below. Insert Function and Explain Formula are in the ribbon now; each other command appears in the full ribbon, the compact ribbon and the toolbar when its feature ships. The glyphs are on the icon sheet now, so `IconOverrides` and replacement sheets can use their names.
 
 Two tabs are new, in Excel's order: **Formulas** goes after Insert, and **Review** goes after Data. Groups fold in the order of the last column, first group first.
 
@@ -4776,6 +4779,7 @@ Source: https://www.sheetwrite.dev/docs/features/formulas/
 - [Lookup, criteria and financial rules](https://www.sheetwrite.dev/docs/features/formulas/lookup-criteria-and-financial/): Find values, aggregate matching cells, and calculate cash flows with explicit shape and error rules.
 - [Analysis formulas (full engine)](https://www.sheetwrite.dev/docs/features/formulas/analysis-formulas/): Summarize, forecast, and clean data with the full formula engine. Worked examples for every function family in @sheetwrite/formulas.
 - [Custom functions](https://www.sheetwrite.dev/docs/features/formulas/custom-functions/): Register synchronous JavaScript functions that formulas can call, with metadata that formula help reads.
+- [Formula help](https://www.sheetwrite.dev/docs/features/formulas/formula-help/): Function autocomplete, the argument guide, live errors, coloured references and Explain Formula, and the analyzeFormula API that they use.
 
 ### Authoring and references
 
@@ -6070,7 +6074,7 @@ Snapshots, history and collaboration keep only the formula text. A store loaded 
 
 ## In the ribbon and toolbar
 
-While the store has a registered function, the ribbon shows a **Formulas** tab with **Insert Function**, and the toolbar shows the same command. It lists the host functions with their signature and description; a pick starts `=NAME(` in the focus cell. See [Toolbar and ribbon](https://www.sheetwrite.dev/docs/features/grid/toolbar-and-ribbon/#ribbon).
+While the store has a registered function, the ribbon's **Formulas** tab shows **Insert Function**, and the toolbar shows the same command. It lists the host functions with their signature and description; a pick starts `=NAME(` in the focus cell. Formula autocomplete and the argument guide list host functions with the built-in functions; see [Formula help](https://www.sheetwrite.dev/docs/features/formulas/formula-help/). See [Toolbar and ribbon](https://www.sheetwrite.dev/docs/features/grid/toolbar-and-ribbon/#ribbon).
 
 ## Function metadata
 
@@ -6084,6 +6088,87 @@ While the store has a registered function, the ribbon shows a **Formulas** tab w
 | `returnKind` | The kind of result, for example `number` or `text`. |
 | `examples` | Optional example formulas. |
 | `volatile` | Whether the function runs again on every edit. |
+
+### Formula help
+
+Source: https://www.sheetwrite.dev/docs/features/formulas/formula-help/
+
+When a cell editor or the formula bar holds a formula (text that starts with `=`), the grid shows formula help:
+
+- **Autocomplete.** A list of the functions whose names start with the name at the caret. It lists the built-in functions of the active engine and the [custom functions](https://www.sheetwrite.dev/docs/features/formulas/custom-functions/) of the store, shorter names first.
+- **Argument guide.** The signature of the function around the caret, for example `ROUND(number, digits)`, with the current argument in bold, and the function's description.
+- **Live errors.** Syntax errors, unknown function names and wrong argument counts are underlined in the text, and the guide shows the first one. An error that only says the formula is not finished, such as a missing `)`, waits while the caret is at the end of the text.
+- **Coloured references.** Each reference gets a colour in the text, and its range on the grid gets a fill in the same colour. Equal references share one colour.
+
+Formula help does not calculate. It reads the text and the function metadata only, so it never runs a volatile or host function.
+
+## Keys
+
+While the function list is open:
+
+| Key | Action |
+| --- | --- |
+| Arrow Down, Arrow Up | Move through the list. The list wraps at both ends. |
+| Enter, Tab | Replace the name at the caret with the selected function and type `(`. |
+| Escape | Close the list. The list stays closed until the text changes. |
+
+While the list is closed, the keys do what the editor does: Enter commits, Tab moves, and Escape cancels the edit. A click on a list item picks it.
+
+## Accessibility
+
+- The editor field has `aria-autocomplete="list"`, `aria-controls` names the list, and `aria-activedescendant` names the selected item. The formula bar is an ARIA combobox with `aria-expanded`. The cell editor is a multi-line text field, which cannot take the combobox role, so it uses the same attributes without it.
+- The list is an ARIA listbox with one option per function.
+- The argument guide is a polite live region (`role="status"`) and describes the field (`aria-describedby`). A screen reader reads the guide when the function, the argument or the first error changes.
+- The field has `aria-invalid="true"` while it shows an error.
+
+## Explain Formula
+
+**Formulas › Formula Auditing › Explain Formula** opens a side panel for the formula in the focus cell. The panel shows:
+
+- the formula, with each reference in its colour;
+- each function call, with its signature, its description and the text of each argument;
+- each distinct reference, with its size and its sheet;
+- the problems that formula help finds.
+
+The panel follows the selection and the edits. The text comes from the function metadata; the panel does not calculate.
+
+## Loading
+
+Formula help is not in the grid's first download. The cell editor and the formula bar load it, with the function table, on the first edit of a formula. The Explain Formula panel loads when it first opens. A grid that never edits a formula never downloads them.
+
+## analyzeFormula
+
+Host editors can use the same analysis. Import `analyzeFormula` from `@sheetwrite/core/functions`, and give it the text, the caret offset and the list from [`listFunctions`](https://www.sheetwrite.dev/docs/features/formulas/custom-functions/#function-metadata).
+
+```ts
+import { analyzeFormula, listFunctions } from "@sheetwrite/core/functions";
+
+const functions = await listFunctions(grid.store);
+const text = "=ROUND(A1, ";
+const analysis = analyzeFormula(text, text.length, functions);
+
+console.log(analysis.call?.name); // "ROUND"
+console.log(analysis.call?.argument?.name); // "digits"
+```
+
+The result has these fields. Every `from` and `to` is a UTF-16 offset into the text.
+
+| Field | Contents |
+| --- | --- |
+| `tokens` | Each token with its kind (`number`, `string`, `function`, `reference`, `operator` and so on), for syntax colours. |
+| `references` | Each cell, range, whole-column or whole-row reference: its sheet name as written (or `null` for the formula's own sheet), its 0-based `start` and `end`, and a `colorIndex` that equal references share. |
+| `call` | The innermost function call around the caret: its name, the 0-based `argumentIndex`, and the metadata of the function and of the argument. `null` outside every call. |
+| `completion` | The functions that complete the name at the caret, and the span to replace. `null` when there is no name to complete. |
+| `diagnostics` | Each problem with its span and message. `incomplete` marks a problem at the end of an unfinished formula. |
+
+Commas inside strings, array constants such as `{1, 2}` and union groups such as `(A1, B1)` do not count as argument separators. A repeating argument, such as the numbers of `SUM`, takes every later position. With an empty function list, `completion` is `null` and no name is reported as unknown.
+
+## Limits
+
+- Formula help does not show the result of the formula while you type.
+- There is no multi-line formula editor.
+- Reference colours repeat after six distinct references.
+- A reference to a sheet that the workbook does not have gets a colour in the text but no fill on the grid.
 
 ### Analysis
 
@@ -15575,6 +15660,45 @@ Declaration target: `./dist/functions.d.ts`
 Source entry: `src/functions.ts`
 Page: https://www.sheetwrite.dev/docs/api/core-functions/
 
+##### `analyzeFormula` — function
+
+```ts
+(text: string, cursor: number, functions: readonly FormulaFunctionMetadata[]): FormulaAnalysis
+```
+
+Reads a formula as formula help needs it: its tokens, the references to
+colour, the function call and argument at `cursor`, the functions that
+complete the name at `cursor`, and syntax and call errors.
+
+`text` is the whole editor text, starting with `=`; any other text is not a
+formula and gives an empty result. `cursor` and every `from` and `to` are
+UTF-16 offsets into `text`. `functions` is the list from `listFunctions`,
+which holds the active engine's built-in functions and the store's host
+functions. With an empty list, completion is empty and no name is reported
+as unknown.
+
+The analysis never calculates: it reads text and metadata only.
+@example
+```ts
+import type { Store } from "@sheetwrite/core";
+import { analyzeFormula, listFunctions } from "@sheetwrite/core/functions";
+
+async function currentArgument(store: Store, text: string, cursor: number) {
+ const analysis = analyzeFormula(text, cursor, await listFunctions(store));
+ return analysis.call?.argument?.name ?? null;
+}
+```
+@see
+/docs/features/formulas/formula-help/
+
+##### `FormulaAnalysis` — interface
+
+```ts
+export interface FormulaAnalysis { readonly tokens: readonly FormulaToken[]; readonly references: readonly FormulaReference[]; readonly call: FormulaCall | null; readonly completion: FormulaCompletion | null; readonly diagnostics: readonly FormulaDiagnostic[]; }
+```
+
+Everything formula help shows for one formula text and cursor offset.
+
 ##### `FormulaArgument` — type
 
 ```ts
@@ -15590,6 +15714,44 @@ export interface FormulaArgumentMetadata { readonly name: string; readonly types
 ```
 
 Argument documentation used by built-in and host functions. Types are descriptive, not coercion rules.
+
+##### `FormulaCall` — interface
+
+```ts
+export interface FormulaCall { readonly name: string; readonly from: number; readonly to: number; readonly argumentIndex: number; readonly function: FormulaFunctionMetadata | undefined; readonly argument: FormulaArgumentMetadata | undefined; }
+```
+
+The innermost function call around the cursor. `argumentIndex` is 0-based;
+`argument` is its metadata, and is undefined when the call has more
+arguments than the function takes or the function is unknown.
+
+##### `FormulaCellPosition` — interface
+
+```ts
+export interface FormulaCellPosition { readonly row: number; readonly col: number; }
+```
+
+A 0-based cell position.
+
+##### `FormulaCompletion` — interface
+
+```ts
+export interface FormulaCompletion { readonly from: number; readonly to: number; readonly matches: readonly FormulaFunctionMetadata[]; }
+```
+
+Functions whose names start with the name at the cursor, and the span to replace.
+
+##### `FormulaDiagnostic` — interface
+
+```ts
+export interface FormulaDiagnostic { readonly from: number; readonly to: number; readonly message: string; readonly incomplete: boolean; }
+```
+
+A problem in a formula, with the span of text it marks.
+
+Members:
+- `incomplete` — The formula ends before it is complete (a missing `)` or value at the end).
+Editors can hold these back while the caret is at the end of the text.
 
 ##### `FormulaFunction` — type
 
@@ -15607,6 +15769,17 @@ export interface FormulaFunctionMetadata { readonly name: string; readonly descr
 
 One metadata format for built-in and host functions.
 
+##### `FormulaReference` — interface
+
+```ts
+export interface FormulaReference { readonly from: number; readonly to: number; readonly sheet: string | null; readonly start: FormulaCellPosition; readonly end: FormulaCellPosition; readonly colorIndex: number; }
+```
+
+A cell, range, whole-column or whole-row reference. `sheet` is the sheet
+name as written, without quotes, or null for the formula's own sheet. Equal
+references share one `colorIndex`, so an editor gives each distinct
+reference one colour in the text and on the grid.
+
 ##### `FormulaScalar` — type
 
 ```ts
@@ -15614,6 +15787,22 @@ export type FormulaScalar = number | string | boolean | null;
 ```
 
 A scalar passed to or returned from a synchronous host formula function.
+
+##### `FormulaToken` — interface
+
+```ts
+export interface FormulaToken { readonly kind: FormulaTokenKind; readonly from: number; readonly to: number; }
+```
+
+One token of a formula. `from` and `to` are UTF-16 offsets into the text.
+
+##### `FormulaTokenKind` — type
+
+```ts
+export type FormulaTokenKind = | "number" | "string" | "boolean" | "error" | "function" | "reference" | "sheet" | "name" | "operator" | "separator" | "paren" | "invalid";
+```
+
+What a token is; editors use it for syntax colours.
 
 ##### `listFunctions` — function
 
@@ -15697,7 +15886,8 @@ formula source, else literal text) and commits on Enter through the grid's
 undoable transaction path, targeting the data address captured with the
 draft — correct even under an active sort/filter view. A focused, dirty
 draft is never overwritten by selection/change events; Escape restores the
-last stable text.
+last stable text. While focused, it shows formula help as the cell editor
+does.
 
 ##### `createNameBox` — function
 

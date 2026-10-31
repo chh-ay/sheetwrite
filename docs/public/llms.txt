@@ -88,6 +88,7 @@ Sheetwrite packages are released together at version 0.6.1. This index is genera
 - [Lookup, criteria, and financial formulas](https://www.sheetwrite.dev/docs/features/formulas/lookup-criteria-and-financial/): Find values, aggregate matching cells, and calculate cash flows with explicit shape and error rules.
 - [Analysis formulas](https://www.sheetwrite.dev/docs/features/formulas/analysis-formulas/): Summarize, forecast, and clean data with the full formula engine. Worked examples for every function family in @sheetwrite/formulas.
 - [Custom functions](https://www.sheetwrite.dev/docs/features/formulas/custom-functions/): Register synchronous JavaScript functions that formulas can call, with metadata that formula help reads.
+- [Formula help](https://www.sheetwrite.dev/docs/features/formulas/formula-help/): Function autocomplete, the argument guide, live errors, coloured references and Explain Formula, and the analyzeFormula API that they use.
 
 ### Analysis
 
