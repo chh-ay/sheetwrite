@@ -1,298 +1,257 @@
-import { afterEach, describe, expect, it } from "bun:test";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
 
 import { EditController } from "../src/editor.js";
-import { type AssistDeps, FormulaAssist } from "../src/formula-assist.js";
-import type { HighlightRange, Theme } from "../src/types.js";
+import { FormulaAssist } from "../src/formula-assist.js";
+import type { AssistDeps } from "../src/formula-help.js";
+import { DEFAULT_THEME, initSheetwrite, SheetwriteStore } from "../src/index.js";
+import type { HighlightRange } from "../src/types.js";
+import { makeWorkbook } from "./fixtures.js";
 
-// A full Theme so `attach`/`begin` type-check; only the color fields matter here.
-const THEME: Theme = {
-  font: "13px sans-serif",
-  bg: "#ffffff",
-  fg: "#111111",
-  gridLine: "#eeeeee",
-  headerBg: "#f4ede1",
-  headerFg: "#6b4a1f",
-  selection: "#2563eb33",
-  selectionBorder: "#2563eb",
-  rowHeight: 28,
-  headerHeight: 28,
-  rowHeaderWidth: 48,
-  searchMatch: "#fff47580",
-  searchActiveMatch: "#fbbc04",
-  highlight: "#e8f0fe99",
-};
+/** Formula help loads its chunk and the function table asynchronously. */
+const LOAD_TIMEOUT_MS = 2_000;
+const POLL_MS = 5;
 
-function keydown(key: string): KeyboardEvent {
-  return new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
-}
+let store: SheetwriteStore;
 
-// A textarea mounted in a host, with the inline geometry the editor sets so the
-// popup can anchor under it.
-function mountTextarea(): { host: HTMLElement; ta: HTMLTextAreaElement } {
-  const host = document.createElement("div");
-  document.body.appendChild(host);
-  const ta = document.createElement("textarea");
-  ta.style.left = "10px";
-  ta.style.top = "20px";
-  ta.style.width = "80px";
-  ta.style.height = "24px";
-  host.appendChild(ta);
-  return { host, ta };
-}
+beforeAll(async () => {
+  await initSheetwrite();
+  store = new SheetwriteStore(makeWorkbook(2));
+});
 
-function itemsOf(host: HTMLElement): string[] {
-  return [...host.querySelectorAll('[role="option"]')].map((el) => el.textContent ?? "");
-}
-
-function selectedItem(host: HTMLElement): string | null {
-  return host.querySelector('[role="option"][aria-selected="true"]')?.textContent ?? null;
-}
-
-/** Highlight colors must be visible and tell different references apart. */
-function expectDistinctColors(ranges: readonly HighlightRange[]): void {
-  const colors = ranges.map((range) => range.color);
-  for (const color of colors) expect(color).toBeTruthy();
-  expect(new Set(colors).size).toBe(colors.length);
-}
-
-const noopDeps = (): AssistDeps => ({ highlightCells: () => {}, sheet: () => "s1" });
+afterAll(() => {
+  store.dispose();
+});
 
 afterEach(() => {
   document.body.innerHTML = "";
 });
 
-// The parser and assist name lists are kept in step by scripts/formula-contract.test.ts.
+async function waitFor(isReady: () => boolean, what: string): Promise<void> {
+  const deadline = Date.now() + LOAD_TIMEOUT_MS;
+  while (!isReady()) {
+    if (Date.now() > deadline) throw new Error(`timed out waiting for ${what}`);
+    await Bun.sleep(POLL_MS);
+  }
+}
 
-describe("FormulaAssist autocomplete", () => {
-  it("filters the popup by the caret token", () => {
-    const { host, ta } = mountTextarea();
-    const assist = new FormulaAssist(host, noopDeps());
+function keydown(key: string): KeyboardEvent {
+  return new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+}
 
-    ta.value = "=SU";
-    ta.setSelectionRange(3, 3);
-    assist.attach(ta, THEME);
+// The help layer goes to the field's offset parent, which is the body in tests.
+function itemsOf(): string[] {
+  return [...document.querySelectorAll('[role="option"]')].map((el) => el.textContent ?? "");
+}
 
-    expect(assist.isOpen).toBe(true);
-    const su = itemsOf(host);
-    expect(su).toContain("SUM");
-    expect(su.every((name) => name.startsWith("SU"))).toBe(true);
+function selectedItem(): string | null {
+  return document.querySelector('[role="option"][aria-selected="true"]')?.textContent ?? null;
+}
 
-    ta.value = "=CO";
-    ta.setSelectionRange(3, 3);
-    assist.update();
-    const co = itemsOf(host);
-    expect(co).toContain("COUNT");
-    expect(co.every((name) => name.startsWith("CO"))).toBe(true);
+function guideOf(): HTMLElement {
+  const guide = document.querySelector<HTMLElement>(".sheetwrite-formula-guide");
+  if (guide === null) throw new Error("no argument guide");
+  return guide;
+}
 
-    // No name to complete: right after "(", or an empty formula.
-    for (const [text, caret] of [
-      ["=SUM(", 5],
-      ["=", 1],
-    ] as const) {
-      ta.value = text;
-      ta.setSelectionRange(caret, caret);
-      assist.update();
-      expect(assist.isOpen).toBe(false);
-    }
+function deps(highlights: (HighlightRange[] | null)[] = []): AssistDeps {
+  return {
+    highlightCells: (ranges) => {
+      highlights.push(ranges);
+    },
+    sheet: () => "s1",
+    store,
+  };
+}
+
+/** A cell editor with formula help, as the grid builds it, after `begin`. */
+function beginEdit(): {
+  editor: EditController;
+  textarea: HTMLTextAreaElement;
+  state: { cancelled: boolean; committed: string | null; highlights: (HighlightRange[] | null)[] };
+} {
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const state = {
+    cancelled: false,
+    committed: null as string | null,
+    highlights: [] as (HighlightRange[] | null)[],
+  };
+
+  const editor = new EditController(host, deps(state.highlights));
+  editor.begin({
+    row: 0,
+    col: 0,
+    type: "text",
+    initial: "",
+    selectAll: false,
+    rect: { x: 10, y: 20, w: 80, h: 24 },
+    label: "Edit A, row 1",
+    theme: DEFAULT_THEME,
+    onCommit: (value) => {
+      state.committed = value;
+    },
+    onCancel: () => {
+      state.cancelled = true;
+    },
   });
 
-  it("completes dotted parser names without treating leading decimals as names", () => {
-    const { host, ta } = mountTextarea();
-    const assist = new FormulaAssist(host, noopDeps());
+  const textarea = document.querySelector("textarea.sheetwrite-editor");
+  if (!(textarea instanceof HTMLTextAreaElement)) throw new Error("editor textarea missing");
+  return { editor, textarea, state };
+}
 
-    ta.value = "=MODE.";
-    ta.setSelectionRange(6, 6);
-    assist.attach(ta, THEME);
-    expect(itemsOf(host)).toEqual(["MODE.SNGL"]);
-    expect(assist.handleKeyDown(keydown("Enter"))).toBe(true);
-    expect(ta.value).toBe("=MODE.SNGL(");
+function type(textarea: HTMLTextAreaElement, text: string, caret = text.length): void {
+  textarea.value = text;
+  textarea.setSelectionRange(caret, caret);
+  textarea.dispatchEvent(new Event("input"));
+}
 
-    ta.value = "=.5";
-    ta.setSelectionRange(3, 3);
-    assist.update();
+/** Type `text` and wait until the help lists `name`. */
+async function typeUntilListed(
+  textarea: HTMLTextAreaElement,
+  text: string,
+  name: string,
+): Promise<void> {
+  type(textarea, text);
+  await waitFor(() => itemsOf().includes(name), `${name} in the function list`);
+}
+
+describe("formula help loading", () => {
+  it("loads nothing for text that is not a formula", async () => {
+    const { textarea } = beginEdit();
+
+    type(textarea, "SU");
+    // Nothing signals that a load did not start, so give a wrong load time to show.
+    await Bun.sleep(POLL_MS * 4);
+
+    expect(document.querySelector(".sheetwrite-formula-help")).toBeNull();
+    expect(textarea.hasAttribute("aria-autocomplete")).toBe(false);
+  });
+
+  it("lets keys through to the editor until the help has loaded", () => {
+    const assist = new FormulaAssist(deps());
+    expect(assist.handleKeyDown(keydown("Enter"))).toBe(false);
     expect(assist.isOpen).toBe(false);
-  });
-
-  it("replaces only the token at a mid-string caret", () => {
-    const { host, ta } = mountTextarea();
-    const assist = new FormulaAssist(host, noopDeps());
-
-    ta.value = "=SU)";
-    ta.setSelectionRange(3, 3); // caret right after "SU", before ")"
-    assist.attach(ta, THEME);
-
-    expect(assist.handleKeyDown(keydown("Tab"))).toBe(true);
-    expect(ta.value).toBe("=SUM()");
-    expect(ta.selectionStart).toBe(5);
-  });
-
-  it("navigates with Up/Down only while open and accepts the highlighted item", () => {
-    const { host, ta } = mountTextarea();
-    const assist = new FormulaAssist(host, noopDeps());
-
-    ta.value = "=CO";
-    ta.setSelectionRange(3, 3);
-    assist.attach(ta, THEME);
-    const items = itemsOf(host);
-    expect(items.length).toBeGreaterThan(2);
-    expect(selectedItem(host)).toBe(items[0]!);
-
-    expect(assist.handleKeyDown(keydown("ArrowDown"))).toBe(true);
-    expect(selectedItem(host)).toBe(items[1]!);
-
-    expect(assist.handleKeyDown(keydown("ArrowUp"))).toBe(true);
-    expect(assist.handleKeyDown(keydown("ArrowUp"))).toBe(true); // wraps to last
-    expect(selectedItem(host)).toBe(items.at(-1)!);
-
-    assist.handleKeyDown(keydown("Enter"));
-    expect(ta.value).toBe(`=${items.at(-1)}(`);
-
-    // Closed: arrow keys belong to the editor again.
-    expect(assist.isOpen).toBe(false);
-    expect(assist.handleKeyDown(keydown("ArrowDown"))).toBe(false);
-    expect(ta.value).toBe(`=${items.at(-1)}(`);
   });
 });
 
-describe("FormulaAssist ref highlighting", () => {
-  it("calls the highlight dep with parsed, colored ranges and clears on detach", () => {
-    const calls: (HighlightRange[] | null)[] = [];
-    const { host, ta } = mountTextarea();
-    const assist = new FormulaAssist(host, {
-      highlightCells: (ranges) => calls.push(ranges),
-      sheet: () => "s1",
-    });
+describe("function list", () => {
+  it("lists the active engine's functions that start with the typed name", async () => {
+    const { textarea } = beginEdit();
 
-    ta.value = "=SUM(A1:B2)+C3+$D$4";
-    ta.setSelectionRange(ta.value.length, ta.value.length);
-    assist.attach(ta, THEME);
+    await typeUntilListed(textarea, "=SU", "SUM");
 
-    const ranges = calls.at(-1) ?? [];
+    const names = itemsOf();
+    expect(names.every((name) => name.startsWith("SU"))).toBe(true);
+    // The default engine has no distribution functions.
+    type(textarea, "=NORM.");
+    expect(itemsOf()).toEqual([]);
+  });
+
+  it("links the field and the list as an ARIA combobox and listbox", async () => {
+    const { textarea } = beginEdit();
+
+    await typeUntilListed(textarea, "=CO", "COUNT");
+
+    const list = document.querySelector('[role="listbox"]');
+    expect(textarea.getAttribute("aria-autocomplete")).toBe("list");
+    expect(textarea.getAttribute("aria-controls")).toBe(list?.id ?? "missing");
+    const active = textarea.getAttribute("aria-activedescendant") ?? "";
+    expect(document.querySelector(`#${active}`)?.getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("moves with the arrow keys, wraps, and accepts with Enter", async () => {
+    const { textarea } = beginEdit();
+    await typeUntilListed(textarea, "=CO", "COUNT");
+    const items = itemsOf();
+    expect(items.length).toBeGreaterThan(2);
+
+    textarea.dispatchEvent(keydown("ArrowDown"));
+    expect(selectedItem()).toBe(items[1] ?? "missing");
+    textarea.dispatchEvent(keydown("ArrowUp"));
+    textarea.dispatchEvent(keydown("ArrowUp"));
+    expect(selectedItem()).toBe(items.at(-1) ?? "missing");
+
+    textarea.dispatchEvent(keydown("Enter"));
+    expect(textarea.value).toBe(`=${items.at(-1)}(`);
+    expect(document.querySelector('[role="listbox"]')).toBeNull();
+  });
+
+  it("replaces the whole name at a caret inside it and keeps an existing (", async () => {
+    const { textarea } = beginEdit();
+
+    type(textarea, "=SUX(A1)", 3);
+    await waitFor(() => itemsOf().includes("SUM"), "SUM in the function list");
+    textarea.dispatchEvent(keydown("Tab"));
+
+    expect(textarea.value).toBe("=SUM(A1)");
+    expect(textarea.selectionStart).toBe(5);
+  });
+
+  it("closes on the first Escape and cancels the edit on the second", async () => {
+    const { editor, textarea, state } = beginEdit();
+    await typeUntilListed(textarea, "=SUM(A", "ABS");
+
+    textarea.dispatchEvent(keydown("Escape"));
+    expect(document.querySelector('[role="listbox"]')).toBeNull();
+    expect(editor.isEditing).toBe(true);
+
+    textarea.dispatchEvent(keydown("Escape"));
+    expect(state.cancelled).toBe(true);
+    expect(state.highlights.at(-1)).toBeNull();
+  });
+});
+
+describe("argument guide", () => {
+  it("shows the call at the caret with its current argument in bold, in a polite live region", async () => {
+    const { textarea } = beginEdit();
+    await typeUntilListed(textarea, "=ROUN", "ROUND");
+    textarea.dispatchEvent(keydown("Enter"));
+
+    type(textarea, "=ROUND(A1, ");
+
+    const guide = guideOf();
+    expect(guide.getAttribute("role")).toBe("status");
+    expect(textarea.getAttribute("aria-describedby")).toBe(guide.id);
+    expect(guide.querySelector(".sheetwrite-formula-signature")?.textContent).toMatch(/^ROUND\(/);
+    expect(guide.querySelector("strong")?.textContent).toBe("digits");
+  });
+
+  it("shows the first error and marks the field invalid", async () => {
+    const { textarea } = beginEdit();
+    await typeUntilListed(textarea, "=SU", "SUM");
+
+    type(textarea, "=SUM(1))");
+
+    expect(guideOf().textContent).toContain("This ) has no matching (.");
+    expect(textarea.getAttribute("aria-invalid")).toBe("true");
+  });
+});
+
+describe("reference colours", () => {
+  it("fills each referenced range in the colour of its text, and clears on commit", async () => {
+    const { editor, textarea, state } = beginEdit();
+    await typeUntilListed(textarea, "=SU", "SUM");
+
+    type(textarea, "=SUM(A1:B2)+C3+'Sheet 1'!A1:B2+Missing!A1");
+
+    const ranges = state.highlights.at(-1) ?? [];
     expect(ranges.map(({ sheet, start, end }) => ({ sheet, start, end }))).toEqual([
       { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } },
       { sheet: "s1", start: { row: 2, col: 2 }, end: { row: 2, col: 2 } },
-      { sheet: "s1", start: { row: 3, col: 3 }, end: { row: 3, col: 3 } },
+      { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } },
     ]);
-    expectDistinctColors(ranges);
+    const [first, second, sameSheet] = ranges;
+    expect(first?.color).not.toBe(second?.color);
+    expect(sameSheet?.color).not.toBe(first?.color);
 
-    assist.detach();
-    expect(calls.at(-1)).toBeNull();
-  });
-
-  it("skips text literals and references to other sheets", () => {
-    const calls: (HighlightRange[] | null)[] = [];
-    const { host, ta } = mountTextarea();
-    const assist = new FormulaAssist(host, {
-      highlightCells: (ranges) => calls.push(ranges),
-      sheet: () => "s1",
-    });
-
-    // `LOG10` is a function name, not column LOG row 10.
-    ta.value = `="A1"&'Q1'!B2+Data!C3+LOG10(D4)`;
-    ta.setSelectionRange(ta.value.length, ta.value.length);
-    assist.attach(ta, THEME);
-
-    expect(calls.at(-1)?.map(({ start, end }) => ({ start, end }))).toEqual([
-      { start: { row: 3, col: 3 }, end: { row: 3, col: 3 } },
-    ]);
-    assist.detach();
-  });
-});
-
-describe("EditController with assist deps", () => {
-  function begin(): {
-    editor: EditController;
-    host: HTMLElement;
-    ta: HTMLTextAreaElement;
-    state: {
-      cancelled: boolean;
-      committed: string | null;
-      highlights: (HighlightRange[] | null)[];
-    };
-  } {
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    const state = {
-      cancelled: false,
-      committed: null as string | null,
-      highlights: [] as (HighlightRange[] | null)[],
-    };
-
-    const editor = new EditController(host, {
-      highlightCells: (ranges) => state.highlights.push(ranges),
-      sheet: () => "s1",
-    });
-
-    editor.begin({
-      row: 0,
-      col: 0,
-      type: "text",
-      initial: "",
-      selectAll: false,
-      rect: { x: 10, y: 20, w: 80, h: 24 },
-      label: "Edit A, row 1",
-      theme: THEME,
-      onCommit: (value) => {
-        state.committed = value;
-      },
-      onCancel: () => {
-        state.cancelled = true;
-      },
-    });
-
-    const ta = host.querySelector("textarea.sheetwrite-editor");
-    if (!(ta instanceof HTMLTextAreaElement)) throw new Error("editor textarea missing");
-    return { editor, host, ta, state };
-  }
-
-  it("opens the popup on formula input and highlights refs", () => {
-    const { host, ta, state } = begin();
-
-    ta.value = "=SUM(A1)";
-    ta.setSelectionRange(5, 5); // after "=SUM(", token empty → no popup, but refs highlight
-    ta.dispatchEvent(new Event("input"));
-    const ranges = state.highlights.at(-1) ?? [];
-    expect(ranges.map(({ sheet, start, end }) => ({ sheet, start, end }))).toEqual([
-      { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
-    ]);
-    expectDistinctColors(ranges);
-
-    ta.value = "=SU";
-    ta.setSelectionRange(3, 3);
-    ta.dispatchEvent(new Event("input"));
-    expect(host.querySelector('[role="listbox"]')).not.toBeNull();
-    expect(itemsOf(host)).toContain("SUM");
-  });
-
-  it("first Escape closes the popup, second cancels the edit and clears highlights", () => {
-    const { editor, host, ta, state } = begin();
-
-    ta.value = "=SUM(A1)";
-    ta.setSelectionRange(6, 6); // caret after "A" → token "A" opens popup
-    ta.dispatchEvent(new Event("input"));
-    expect(host.querySelector(".sheetwrite-assist")).not.toBeNull();
-
-    ta.dispatchEvent(keydown("Escape"));
-    expect(host.querySelector(".sheetwrite-assist")).toBeNull();
-    expect(editor.isEditing).toBe(true);
-    expect(state.cancelled).toBe(false);
-
-    ta.dispatchEvent(keydown("Escape"));
-    expect(state.cancelled).toBe(true);
-    expect(editor.isEditing).toBe(false);
-    expect(state.highlights.at(-1)).toBeNull(); // cleared on teardown
-  });
-
-  it("clears highlights on commit", () => {
-    const { editor, ta, state } = begin();
-
-    ta.value = "=SUM(A1)";
-    ta.setSelectionRange(8, 8);
-    ta.dispatchEvent(new Event("input"));
-    expect(state.highlights.at(-1)).not.toBeNull();
+    const mirrored = [...document.querySelectorAll<HTMLElement>(".sheetwrite-formula-mirror span")];
+    const a1b2 = mirrored.find((span) => span.textContent === "A1:B2");
+    expect(first?.color?.startsWith(a1b2?.style.color ?? "missing")).toBe(true);
 
     editor.commit("down");
-    expect(state.committed).toBe("=SUM(A1)");
+    expect(state.committed).toBe("=SUM(A1:B2)+C3+'Sheet 1'!A1:B2+Missing!A1");
     expect(state.highlights.at(-1)).toBeNull();
+    expect(document.querySelector(".sheetwrite-formula-mirror")).toBeNull();
   });
 });

@@ -319,9 +319,17 @@ export function fingerprintMismatches<T extends object>(
 
 export type BenchmarkEnginePackage = "wasm" | "formulas";
 
-/** The frozen harness remains current; only these engine files come from 0.5.4. */
+/**
+ * The release whose engine `SHEETWRITE_BENCH_ENGINE_ROOT` holds when a capture
+ * measures an older release's engine under the current harness. Unset, the
+ * root is only another engine checkout, such as a side of the paired gate.
+ */
+export const BASELINE_VERSION_VARIABLE = "SHEETWRITE_BENCH_BASELINE_VERSION";
+
+/** The frozen harness remains current; only these engine files come from the baseline release. */
 export interface EngineBaselineContext {
-  label: "0.5.4 engine (WASM) under 0.6 core and harness";
+  /** `<release> engine (WASM) under <major.minor> core and harness`. */
+  label: string;
   engineCommit: string;
   harnessCommit: string;
   engineFiles: Record<string, string>;
@@ -335,7 +343,17 @@ const ENGINE_RUNTIME_FILES = [
   "pkg/sheetwrite_wasm_factory.js",
   "pkg/sheetwrite_wasm_bg.wasm",
 ] as const;
-const BASELINE_ENGINE_LABEL = "0.5.4 engine (WASM) under 0.6 core and harness";
+const BASELINE_LABEL = /^(\d+\.\d+\.\d+) engine \(WASM\) under (\d+\.\d+) core and harness$/u;
+const RELEASE_VERSION = /^(\d+)\.(\d+)\.\d+$/u;
+
+/** The baseline engine release and the harness release line a context label names. */
+export function parseEngineBaselineLabel(
+  label: string,
+): { engineVersion: string; harnessVersion: string } | undefined {
+  const match = BASELINE_LABEL.exec(label);
+  if (match?.[1] === undefined || match[2] === undefined) return undefined;
+  return { engineVersion: match[1], harnessVersion: match[2] };
+}
 
 export function benchmarkEnginePath(path: string): string {
   return resolve(process.env.SHEETWRITE_BENCH_ENGINE_ROOT ?? REPOSITORY_ROOT, path);
@@ -352,7 +370,7 @@ export function validateEngineBaselineContext(
     Object.keys(context),
   );
   if (
-    context.label !== BASELINE_ENGINE_LABEL ||
+    parseEngineBaselineLabel(context.label) === undefined ||
     !/^[0-9a-f]{40}$/u.test(context.engineCommit) ||
     context.harnessCommit !== harnessCommit ||
     !/^[0-9a-f]{40}$/u.test(harnessCommit)
@@ -377,7 +395,7 @@ export function validateEngineBaselineContext(
   }
   for (const path of wasmPaths) {
     if (context.engineFiles[path] === context.currentWasmFiles[path]) {
-      throw new Error(`Baseline loaded current 0.6 WASM: ${path}`);
+      throw new Error(`Baseline loaded the current WASM: ${path}`);
     }
   }
 }
@@ -387,17 +405,24 @@ export function captureEngineBaselineContext(
   packages: readonly BenchmarkEnginePackage[],
 ): EngineBaselineContext | undefined {
   const root = process.env.SHEETWRITE_BENCH_ENGINE_ROOT;
+  const baselineVersion = process.env[BASELINE_VERSION_VARIABLE];
   // The paired gate also points the root at this checkout; that side is the candidate, not a baseline.
-  if (root === undefined || resolve(root) === REPOSITORY_ROOT) return undefined;
-  const versions = packages.map((name) => {
-    const manifest = JSON.parse(
-      readFileSync(resolve(root, `packages/${name}/package.json`), "utf8"),
-    ) as { version?: unknown };
-    return manifest.version;
-  });
-  if (!versions.includes("0.5.4")) return undefined;
-  if (versions.some((version) => version !== "0.5.4"))
-    throw new Error("Mixed baseline engine versions");
+  if (root === undefined || resolve(root) === REPOSITORY_ROOT || baselineVersion === undefined) {
+    return undefined;
+  }
+  const versionOf = (checkout: string, name: string): unknown => {
+    const manifest: unknown = JSON.parse(
+      readFileSync(resolve(checkout, `packages/${name}/package.json`), "utf8"),
+    );
+    return typeof manifest === "object" && manifest !== null && "version" in manifest
+      ? manifest.version
+      : undefined;
+  };
+  if (packages.some((name) => versionOf(root, name) !== baselineVersion)) {
+    throw new Error(`Baseline engine packages are not version ${baselineVersion}`);
+  }
+  const harnessRelease = RELEASE_VERSION.exec(String(versionOf(REPOSITORY_ROOT, "core")));
+  if (harnessRelease === null) throw new Error("Cannot read the harness release version");
 
   const ref = process.env.SHEETWRITE_BENCH_ENGINE_REF ?? "HEAD";
   const commit = Bun.spawnSync(["git", "rev-parse", "--verify", `${ref}^{commit}`], {
@@ -416,7 +441,7 @@ export function captureEngineBaselineContext(
   if (engineDiff.exitCode !== 0)
     throw new Error("Baseline packages differ from the claimed engine ref");
   const context: EngineBaselineContext = {
-    label: BASELINE_ENGINE_LABEL,
+    label: `${baselineVersion} engine (WASM) under ${harnessRelease[1]}.${harnessRelease[2]} core and harness`,
     engineCommit,
     harnessCommit,
     engineFiles: Object.fromEntries(

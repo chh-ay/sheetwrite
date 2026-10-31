@@ -8,7 +8,7 @@ description: "SyncInitInput type in @sheetwrite/formulas: Sources accepted by sy
 Sources accepted by synchronous initialization: raw module bytes or a precompiled `WebAssembly.Module`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/formulas/pkg/sheetwrite_wasm.d.ts#L717"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L717</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/formulas/pkg/sheetwrite_wasm.d.ts#L767"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L767</code></a></dd></div>
 </dl>
 
 ## Declaration

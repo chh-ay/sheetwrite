@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { counterbalancedOrder, summarizeFinite } from "../src/stats.js";
+import { counterbalancedOrder, median, summarizeFinite } from "../src/stats.js";
 
 describe("auditable render statistics", () => {
   test("summarizes odd and even sample sizes", () => {
@@ -15,6 +15,14 @@ describe("auditable render statistics", () => {
     expect(even.p95).toBeCloseTo(3.85);
     expect(even.mad).toBe(1);
     expect(even.iters).toBe(4);
+  });
+
+  test("takes the mean of the two middle values of an even sample", () => {
+    // An unsorted sample whose two middle values differ: picking either one is wrong.
+    expect(median([3, 1])).toBe(2);
+    expect(median([8, 1, 4, 2])).toBe(3);
+    expect(median([5, 1, 3])).toBe(3);
+    expect(median([])).toBeNaN();
   });
 
   test("balances three engines across positions while retaining seed sensitivity", () => {

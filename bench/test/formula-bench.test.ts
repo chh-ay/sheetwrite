@@ -286,3 +286,29 @@ describe("formula regression gate", () => {
     expect(() => validateFormulaRegression(candidate, baseline)).not.toThrow();
   });
 });
+
+describe("formula capture on standard output", () => {
+  it("writes one JSON capture that keys engine hashes by the loaded package", () => {
+    const child = Bun.spawnSync(
+      ["bun", "run", "src/formula-bench.ts", "--smoke", "--output", "-"],
+      {
+        cwd: new URL("..", import.meta.url).pathname,
+        env: { ...process.env, SHEETWRITE_BENCH_ENGINE: "full" },
+        stdout: "pipe",
+        stderr: "pipe",
+      },
+    );
+    if (child.exitCode !== 0) throw new Error(child.stderr.toString());
+
+    const capture = JSON.parse(child.stdout.toString()) as CompleteFormulaBenchmarkResult;
+
+    expect(capture.mode).toBe("smoke");
+    expect(Object.keys(capture.source.files)).toContain(
+      "packages/formulas/pkg/sheetwrite_wasm_bg.wasm",
+    );
+    expect(Object.keys(capture.source.files)).not.toContain(
+      "packages/wasm/pkg/sheetwrite_wasm_bg.wasm",
+    );
+    expect(() => validateFormulaCapture(capture)).not.toThrow();
+  });
+});

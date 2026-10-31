@@ -1,4 +1,5 @@
-import { type AssistDeps, FormulaAssist } from "./formula-assist.js";
+import { FormulaAssist } from "./formula-assist.js";
+import type { AssistDeps } from "./formula-help.js";
 import type { CellFormat } from "./types/cell.js";
 import type { Theme } from "./types/render.js";
 
@@ -47,7 +48,7 @@ export class EditController {
 
   constructor(host: HTMLElement, assist?: AssistDeps) {
     this.host = host;
-    this.assist = assist ? new FormulaAssist(host, assist) : null;
+    this.assist = assist ? new FormulaAssist(assist) : null;
   }
 
   get isEditing(): boolean {

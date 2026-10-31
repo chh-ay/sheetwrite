@@ -144,6 +144,7 @@ export class InteractionSessions {
     this.editor = new EditController(deps.viewportEl, {
       highlightCells: deps.highlightCells,
       sheet: deps.activeSheet,
+      store: deps.store,
     });
     this.validationEditor = new ValidationEditor(deps.viewportEl);
     this.customEditor = new CustomEditorController(deps.viewportEl);

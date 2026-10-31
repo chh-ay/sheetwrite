@@ -106,6 +106,9 @@ export interface FormulaFunctionMetadata {
 <p class="api-consumers-label">Public exports naming <code>FormulaFunctionMetadata</code></p>
 
 <ul class="api-consumer-list">
+<li><a href="/docs/api/core-functions/analyze-formula/"><code>analyzeFormula</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core-functions/formula-call/"><code>FormulaCall</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core-functions/formula-completion/"><code>FormulaCompletion</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core-functions/list-functions/"><code>listFunctions</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core-functions/register-function/"><code>registerFunction</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>

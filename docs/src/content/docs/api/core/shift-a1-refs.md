@@ -11,7 +11,7 @@ a reference shifted off the sheet becomes `#REF!`. The engine owns the
 reference rules, so this needs `initSheetwrite()` first.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/a1.ts#L61"><code>packages/core/src/a1.ts#L61</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/a1.ts#L48"><code>packages/core/src/a1.ts#L48</code></a></dd></div>
 </dl>
 
 ## Declaration

@@ -1,7 +1,9 @@
 import { engineFunctionNames } from "../engine.js";
 import { SheetwriteError } from "../errors.js";
 import type { HostFunctionHooks } from "../store/data-engine.js";
+import { storeEngine } from "../store/engine-registry.js";
 import type { RecomputingCellStore } from "../store/wasm-contract.js";
+import type { Store } from "../types/store.js";
 import { type HostCall, hostCall } from "./host-call.js";
 import type { FormulaFunction, FormulaFunctionMetadata } from "./types.js";
 
@@ -80,7 +82,7 @@ function frozenMetadata(metadata: FormulaFunctionMetadata): FormulaFunctionMetad
  * table in every bundle that includes the store, so it loads on the first
  * call and bundlers split it into its own chunk.
  */
-export async function builtInFunctions(): Promise<FormulaFunctionMetadata[]> {
+async function builtInFunctions(): Promise<FormulaFunctionMetadata[]> {
   const { BUILT_IN_FUNCTIONS } = await import("../generated/function-metadata.js");
   const engineFlag =
     engineFunctionNames === undefined ? FUNCTION_FLAG_DEFAULT_ENGINE : FUNCTION_FLAG_FULL_ENGINE;
@@ -103,6 +105,17 @@ export async function builtInFunctions(): Promise<FormulaFunctionMetadata[]> {
       },
     ];
   });
+}
+
+/**
+ * The built-in functions of the active engine, then the host functions of
+ * `store` in registration order. A store without an engine has only the
+ * built-in functions.
+ */
+export async function storeFunctions(store: Store): Promise<FormulaFunctionMetadata[]> {
+  const hostFunctions = storeEngine(store)?.hostFunctions?.metadata() ?? [];
+
+  return [...(await builtInFunctions()), ...hostFunctions];
 }
 
 type HostFunctionSetter = (

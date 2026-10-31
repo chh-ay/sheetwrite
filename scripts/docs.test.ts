@@ -7,10 +7,12 @@ import {
   ADAPTER_DOC_CONTRACT,
   adapterContractIssues,
   documentationLinkRoutes,
+  headingAnchors,
   landingBenchPayload,
   landingDownloads,
   movedPageIssues,
   PERFORMANCE_PAGES,
+  parseFences,
   renderCompatibilityResults,
   renderEntryPage,
   renderSymbolPage,
@@ -18,6 +20,7 @@ import {
   splitPerformancePages,
   symbolDescription,
   unresolvedSiteLinks,
+  validateDataArtifact,
 } from "./docs.js";
 import type { ApiEntryPoint, ApiExport, ApiPackage, PublicApiManifest } from "./public-api.js";
 import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
@@ -95,6 +98,66 @@ describe("documentation generation", () => {
     expect(changeEventPage).toContain(
       '<a href="/docs/api/core/commit-reason/"><code>CommitReason</code></a>',
     );
+  });
+
+  it("gives each overload row its own ID and keeps the member ID on the first", async () => {
+    const parser: ApiExport = {
+      name: "Parser",
+      kind: "interface",
+      signature: "interface Parser { parse(x: string): number; parse(x: number): number; }",
+      owners: ["src/types/parser.ts"],
+      source: "src/types/parser.ts#L1",
+      jsDocTags: [],
+      documentation: "Parses input.",
+      memberDocs: [],
+    };
+
+    const page = await renderSymbolPage(corePackage, coreEntry, parser);
+
+    const ids = [...page.matchAll(/<details class="api-member" id="([^"]+)"/gu)].map(
+      (match) => match[1],
+    );
+    expect(ids).toHaveLength(2);
+    expect(ids[0]).toBe("parser-parse");
+    expect(new Set(ids).size).toBe(2);
+  });
+
+  it("reads fences the way the site's Markdown parser does", () => {
+    const content = [
+      "````md compile",
+      "```ts",
+      "inner",
+      "```",
+      "````",
+      "",
+      "~~~ts compile",
+      "const value: number = 'text';",
+      "~~~",
+      "",
+      "Inline ```code``` is not a fence.",
+    ].join("\n");
+
+    expect(parseFences(content)).toEqual([
+      { language: "md", meta: "compile", code: "```ts\ninner\n```", line: 1 },
+      { language: "ts", meta: "compile", code: "const value: number = 'text';", line: 7 },
+    ]);
+  });
+
+  it("knows the suffixed anchor of a repeated heading", () => {
+    const anchors = headingAnchors("## Example\n\nText.\n\n## Example\n\n## Example\n");
+
+    expect([...anchors]).toEqual(["example", "example-1", "example-2"]);
+  });
+
+  it("rejects a data capture whose engine blocks are empty", async () => {
+    const committed = JSON.parse(
+      await readFile(resolve(import.meta.dir, "../bench/results/data-results.json"), "utf8"),
+    ) as Record<string, unknown>;
+    expect(typeof validateDataArtifact(committed)).toBe("object");
+
+    const emptied = { ...committed, sheetwrite: {}, handsontable: {} };
+
+    expect(typeof validateDataArtifact(emptied)).toBe("string");
   });
 
   it("renders examples and related links on symbols and member rows", async () => {
@@ -282,6 +345,24 @@ describe("documentation generation", () => {
     });
     expect(JSON.parse(none).available).toBe(false);
     expect(none).not.toContain("null");
+  });
+
+  it("takes the mean of the two middle rounds as the median of an even sample", () => {
+    const results = [
+      benchResult("sheetwrite", "a", 1, 1_000, 1),
+      benchResult("sheetwrite", "a", 2, 1_000, 3),
+      benchResult("handsontable", "a", 1, 1_000, 4),
+      benchResult("handsontable", "a", 2, 1_000, 8),
+      benchResult("sheetwrite", "a", 1, 1_000_000, 1),
+      benchResult("sheetwrite", "a", 2, 1_000_000, 3),
+    ];
+    const evidence = benchEvidence(results);
+    evidence.config.scenarios = ["a"];
+
+    const payload = JSON.parse(landingBenchPayload({ evidence, source: "x" }));
+
+    expect(payload.sizes[0]).toMatchObject({ size: 1_000, medianRatio: 3 });
+    expect(payload.heroStats).toMatchObject({ millionRowMedianMs: 2 });
   });
 
   const viteFirstLoad = (javascript: number, wasm: number, css: number) => ({

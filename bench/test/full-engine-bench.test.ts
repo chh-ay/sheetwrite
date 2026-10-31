@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 
+import { formulaSourceDigest } from "../src/formula-bench.js";
 import { type FullEngineResult, validateFullEngineResult } from "../src/full-engine-bench.js";
 
 function recordedCapture(): FullEngineResult {
@@ -18,9 +19,36 @@ function firstAnalysis(result: FullEngineResult) {
   if (!workload) throw new Error("Missing recorded analysis workload");
   return workload;
 }
+/** Files the shared capture's engine hashes under `packages/<enginePackage>/`, as a new capture does. */
+function rekeyShared(result: FullEngineResult, engineId: string, enginePackage: string): void {
+  const capture = result.engines.find((engine) => engine.engine === engineId);
+  const source = capture?.shared.source;
+  if (!source) throw new Error(`Missing ${engineId} shared source`);
+  source.files = Object.fromEntries(
+    Object.entries(source.files)
+      .map(([path, digest]) => [
+        path.replace("packages/wasm/", `packages/${enginePackage}/`),
+        digest,
+      ])
+      .sort(([left = ""], [right = ""]) => left.localeCompare(right)),
+  );
+  source.digest = formulaSourceDigest(source.commit, source.files, source.baselineContext);
+}
 describe("full engine benchmark evidence", () => {
   it("accepts the complete recorded engine matrix", () => {
     expect(() => validateFullEngineResult(recordedCapture())).not.toThrow();
+  });
+  it("accepts engine hashes keyed by the package the shared capture loaded", () => {
+    const result = recordedCapture();
+    rekeyShared(result, "full", "formulas");
+
+    expect(() => validateFullEngineResult(result)).not.toThrow();
+  });
+  it("rejects default-engine hashes keyed by the full engine package", () => {
+    const result = recordedCapture();
+    rekeyShared(result, "default", "formulas");
+
+    expect(() => validateFullEngineResult(result)).toThrow();
   });
   it.each(["missing", "duplicate", "unknown"])("rejects %s engines", (fault) => {
     const result = recordedCapture();

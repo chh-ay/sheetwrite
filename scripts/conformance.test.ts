@@ -19,6 +19,7 @@ import {
   sha256Bytes,
   validateCorpus,
   validateExcelCapture,
+  validateResult,
   verifyCaptureArtifacts,
 } from "./conformance.js";
 
@@ -312,6 +313,51 @@ describe("offline typed comparison", () => {
     const issues = validateExcelCapture(capture, corpus, capture.producerVersion, "runner-sha");
     expect(hasIssue(issues, "runner drift")).toBe(true);
     expect(hasIssue(issues, "missing, extra, or reordered")).toBe(true);
+  });
+
+  it("counts ULPs across zero within 64 bits", () => {
+    const ulps = (value: number) =>
+      ({ type: "number", value: 0, tolerance: { kind: "ulp", value } }) as const;
+
+    expect(compareResults(ulps(0), { type: "number", value: -0 })).toEqual([]);
+    expect(compareResults(ulps(1), { type: "number", value: -Number.MIN_VALUE })).toEqual([]);
+    expect(compareResults(ulps(1), { type: "number", value: Number.MIN_VALUE })).toEqual([]);
+    expect(compareResults(ulps(1), { type: "number", value: -2 * Number.MIN_VALUE })).not.toEqual(
+      [],
+    );
+    expect(
+      compareResults(
+        { type: "number", value: -Number.MIN_VALUE, tolerance: { kind: "ulp", value: 2 } },
+        { type: "number", value: Number.MIN_VALUE },
+      ),
+    ).toEqual([]);
+  });
+
+  it("rejects an array result whose matrix does not match its shape", () => {
+    const issuesOf = (value: unknown) => {
+      const issues: string[] = [];
+      validateResult(value, "result", issues);
+      return issues;
+    };
+
+    expect(issuesOf({ type: "array", value: [[1, 2]], rows: 1, columns: 2 })).toEqual([]);
+    expect(issuesOf({ type: "array", value: [[1]], rows: 1, columns: 2 })).not.toEqual([]);
+    expect(issuesOf({ type: "array", value: [[1, 2], [3]], rows: 2, columns: 2 })).not.toEqual([]);
+    expect(issuesOf({ type: "array", value: [[1, 2]], rows: 2, columns: 2 })).not.toEqual([]);
+  });
+
+  it("reports every engine error as an error result", async () => {
+    const corpus = await loadCorpus();
+    const template = corpus.cases.find(
+      (entry) => entry.kind === "formula" && !entry.unsupported && !entry.calculation,
+    );
+    if (!template) throw new Error("The corpus has no plain formula case");
+    const run = (formula: string) =>
+      runSheetwriteCase({ ...structuredClone(template), inputs: [], formula, target: "A1" });
+
+    expect(await run("=A1")).toMatchObject({ type: "error", error: "#CYCLE!" });
+    expect(await run("=NOSUCHFUNCTION(1)")).toMatchObject({ type: "error", error: "#NAME?" });
+    expect(await run('="#literal"')).toMatchObject({ type: "string", value: "#literal" });
   });
 
   it("runs every supported case and preserves the seven-canary metric", async () => {
