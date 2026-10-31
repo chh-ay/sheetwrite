@@ -8,7 +8,7 @@ description: "RowBridgeHostActionDelta interface in @sheetwrite/core: A document
 A document operation that needs a host-side action rather than row mutation.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L148"><code>packages/core/src/row-bridge.ts#L148</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L149"><code>packages/core/src/row-bridge.ts#L149</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>

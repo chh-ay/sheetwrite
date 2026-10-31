@@ -459,7 +459,7 @@
               "owners": [
                 "src/a1.ts"
               ],
-              "source": "src/a1.ts#L33",
+              "source": "src/a1.ts#L46",
               "jsDocTags": [],
               "documentation": "0-based (row, col) → A1 cell reference (0, 0 → \"A1\").",
               "memberDocs": []
@@ -1119,7 +1119,7 @@
               "owners": [
                 "src/a1.ts"
               ],
-              "source": "src/a1.ts#L12",
+              "source": "src/a1.ts#L25",
               "jsDocTags": [],
               "documentation": "Column index (0-based) → A1 column label (0 → \"A\", 26 → \"AA\").",
               "memberDocs": []
@@ -1537,7 +1537,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L987",
+              "source": "src/row-bridge.ts#L997",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2969,7 +2969,7 @@
               "owners": [
                 "src/store/data-engine.ts"
               ],
-              "source": "src/store/data-engine.ts#L347",
+              "source": "src/store/data-engine.ts#L348",
               "jsDocTags": [],
               "documentation": "Error thrown when an operation requires datasource cells that are not loaded.",
               "memberDocs": []
@@ -3104,7 +3104,7 @@
               "owners": [
                 "src/a1.ts"
               ],
-              "source": "src/a1.ts#L26",
+              "source": "src/a1.ts#L39",
               "jsDocTags": [],
               "documentation": "A1 column label → 0-based column index (inverse of {@link colToA1}).",
               "memberDocs": []
@@ -3985,7 +3985,7 @@
               "owners": [
                 "src/a1.ts"
               ],
-              "source": "src/a1.ts#L38",
+              "source": "src/a1.ts#L51",
               "jsDocTags": [],
               "documentation": "Two cell corners → A1 range (\"A1:B3\"), collapsing to a single ref when equal.",
               "memberDocs": []
@@ -4325,7 +4325,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L398",
+              "source": "src/row-bridge.ts#L399",
               "jsDocTags": [],
               "documentation": "Projects canonical document transactions into host-owned row changes.\n\nThe bridge only owns compact data-space identity arrays. It never writes to\n`defaultRows`, never renders, and never creates a second document store.",
               "memberDocs": [
@@ -4354,7 +4354,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L40",
+              "source": "src/row-bridge.ts#L41",
               "jsDocTags": [],
               "documentation": "A cell effect with semantic column and host row identity.",
               "memberDocs": []
@@ -4366,7 +4366,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L85",
+              "source": "src/row-bridge.ts#L86",
               "jsDocTags": [],
               "documentation": "A clearRange effect expanded to its exact changed cells.",
               "memberDocs": []
@@ -4378,7 +4378,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L11",
+              "source": "src/row-bridge.ts#L12",
               "jsDocTags": [],
               "documentation": "Semantic column key accepted by the row bridge.",
               "memberDocs": []
@@ -4390,7 +4390,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L169",
+              "source": "src/row-bridge.ts#L170",
               "jsDocTags": [],
               "documentation": "Every possible projection produced by a row bridge.",
               "memberDocs": []
@@ -4402,7 +4402,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L103",
+              "source": "src/row-bridge.ts#L104",
               "jsDocTags": [],
               "documentation": "A fill-series transaction effect.",
               "memberDocs": []
@@ -4414,7 +4414,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L212",
+              "source": "src/row-bridge.ts#L213",
               "jsDocTags": [],
               "documentation": "Callback accepted by imperative and framework adapters.",
               "memberDocs": []
@@ -4426,7 +4426,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L148",
+              "source": "src/row-bridge.ts#L149",
               "jsDocTags": [],
               "documentation": "A document operation that needs a host-side action rather than row mutation.",
               "memberDocs": []
@@ -4438,7 +4438,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L8",
+              "source": "src/row-bridge.ts#L9",
               "jsDocTags": [],
               "documentation": "A stable host identity for one data-space row.",
               "memberDocs": []
@@ -4450,7 +4450,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L16",
+              "source": "src/row-bridge.ts#L17",
               "jsDocTags": [],
               "documentation": "Context supplied when a canonical row insertion needs a host identity.",
               "memberDocs": []
@@ -4462,7 +4462,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L127",
+              "source": "src/row-bridge.ts#L128",
               "jsDocTags": [],
               "documentation": "A document operation that changes workbook or column metadata.",
               "memberDocs": []
@@ -4474,7 +4474,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L24",
+              "source": "src/row-bridge.ts#L25",
               "jsDocTags": [],
               "documentation": "Options for the framework-neutral, opt-in row bridge.",
               "memberDocs": [
@@ -4499,7 +4499,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L94",
+              "source": "src/row-bridge.ts#L95",
               "jsDocTags": [],
               "documentation": "A paste transaction effect. A paste can contain multiple canonical patches.",
               "memberDocs": []
@@ -4511,7 +4511,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L205",
+              "source": "src/row-bridge.ts#L206",
               "jsDocTags": [],
               "documentation": "Result of projection or reconciliation.",
               "memberDocs": []
@@ -4523,7 +4523,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L76",
+              "source": "src/row-bridge.ts#L77",
               "jsDocTags": [],
               "documentation": "A setRange/setBlock/restoreBlock effect expanded to its exact changed cells.",
               "memberDocs": []
@@ -4535,7 +4535,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L190",
+              "source": "src/row-bridge.ts#L191",
               "jsDocTags": [],
               "documentation": "Input to {@link RowBridge.reconcile}.",
               "memberDocs": [
@@ -4556,7 +4556,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L181",
+              "source": "src/row-bridge.ts#L182",
               "jsDocTags": [],
               "documentation": "Reconciliation status for a canonical transaction response.",
               "memberDocs": []
@@ -4568,7 +4568,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L112",
+              "source": "src/row-bridge.ts#L113",
               "jsDocTags": [],
               "documentation": "Stable row identity effects for insert, delete, and move operations.",
               "memberDocs": []
@@ -4580,7 +4580,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L51",
+              "source": "src/row-bridge.ts#L52",
               "jsDocTags": [],
               "documentation": "The canonical transaction identity carried by each projected delta.",
               "memberDocs": []
@@ -4592,7 +4592,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L995",
+              "source": "src/row-bridge.ts#L1005",
               "jsDocTags": [],
               "documentation": "Compute a deterministic identity for a canonical transaction.",
               "memberDocs": []
@@ -4604,7 +4604,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L161",
+              "source": "src/row-bridge.ts#L162",
               "jsDocTags": [],
               "documentation": "An explicit projection record for an operation with no row-space meaning.",
               "memberDocs": []
@@ -5383,7 +5383,7 @@
               "owners": [
                 "src/a1.ts"
               ],
-              "source": "src/a1.ts#L56",
+              "source": "src/a1.ts#L69",
               "jsDocTags": [],
               "documentation": "Shift relative A1 references in a formula by (dRow, dCol) — used when a\nformula is filled into other cells. Absolute parts ($A, A$1) stay fixed, and\ntokens preceded by an alphanumeric (function names, identifiers) are skipped.\nA reference shifted off the sheet becomes `#REF!`, and so does any range\nwith such a corner.",
               "memberDocs": []
@@ -7159,7 +7159,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L987",
+              "source": "src/row-bridge.ts#L997",
               "jsDocTags": [
                 "example",
                 "see"
@@ -7543,7 +7543,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L398",
+              "source": "src/row-bridge.ts#L399",
               "jsDocTags": [],
               "documentation": "Projects canonical document transactions into host-owned row changes.\n\nThe bridge only owns compact data-space identity arrays. It never writes to\n`defaultRows`, never renders, and never creates a second document store.",
               "memberDocs": [
@@ -7572,7 +7572,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L40",
+              "source": "src/row-bridge.ts#L41",
               "jsDocTags": [],
               "documentation": "A cell effect with semantic column and host row identity.",
               "memberDocs": []
@@ -7584,7 +7584,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L85",
+              "source": "src/row-bridge.ts#L86",
               "jsDocTags": [],
               "documentation": "A clearRange effect expanded to its exact changed cells.",
               "memberDocs": []
@@ -7596,7 +7596,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L11",
+              "source": "src/row-bridge.ts#L12",
               "jsDocTags": [],
               "documentation": "Semantic column key accepted by the row bridge.",
               "memberDocs": []
@@ -7608,7 +7608,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L169",
+              "source": "src/row-bridge.ts#L170",
               "jsDocTags": [],
               "documentation": "Every possible projection produced by a row bridge.",
               "memberDocs": []
@@ -7620,7 +7620,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L103",
+              "source": "src/row-bridge.ts#L104",
               "jsDocTags": [],
               "documentation": "A fill-series transaction effect.",
               "memberDocs": []
@@ -7632,7 +7632,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L212",
+              "source": "src/row-bridge.ts#L213",
               "jsDocTags": [],
               "documentation": "Callback accepted by imperative and framework adapters.",
               "memberDocs": []
@@ -7644,7 +7644,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L148",
+              "source": "src/row-bridge.ts#L149",
               "jsDocTags": [],
               "documentation": "A document operation that needs a host-side action rather than row mutation.",
               "memberDocs": []
@@ -7656,7 +7656,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L8",
+              "source": "src/row-bridge.ts#L9",
               "jsDocTags": [],
               "documentation": "A stable host identity for one data-space row.",
               "memberDocs": []
@@ -7668,7 +7668,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L16",
+              "source": "src/row-bridge.ts#L17",
               "jsDocTags": [],
               "documentation": "Context supplied when a canonical row insertion needs a host identity.",
               "memberDocs": []
@@ -7680,7 +7680,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L127",
+              "source": "src/row-bridge.ts#L128",
               "jsDocTags": [],
               "documentation": "A document operation that changes workbook or column metadata.",
               "memberDocs": []
@@ -7692,7 +7692,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L24",
+              "source": "src/row-bridge.ts#L25",
               "jsDocTags": [],
               "documentation": "Options for the framework-neutral, opt-in row bridge.",
               "memberDocs": [
@@ -7717,7 +7717,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L94",
+              "source": "src/row-bridge.ts#L95",
               "jsDocTags": [],
               "documentation": "A paste transaction effect. A paste can contain multiple canonical patches.",
               "memberDocs": []
@@ -7729,7 +7729,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L205",
+              "source": "src/row-bridge.ts#L206",
               "jsDocTags": [],
               "documentation": "Result of projection or reconciliation.",
               "memberDocs": []
@@ -7741,7 +7741,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L76",
+              "source": "src/row-bridge.ts#L77",
               "jsDocTags": [],
               "documentation": "A setRange/setBlock/restoreBlock effect expanded to its exact changed cells.",
               "memberDocs": []
@@ -7753,7 +7753,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L190",
+              "source": "src/row-bridge.ts#L191",
               "jsDocTags": [],
               "documentation": "Input to {@link RowBridge.reconcile}.",
               "memberDocs": [
@@ -7774,7 +7774,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L181",
+              "source": "src/row-bridge.ts#L182",
               "jsDocTags": [],
               "documentation": "Reconciliation status for a canonical transaction response.",
               "memberDocs": []
@@ -7786,7 +7786,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L112",
+              "source": "src/row-bridge.ts#L113",
               "jsDocTags": [],
               "documentation": "Stable row identity effects for insert, delete, and move operations.",
               "memberDocs": []
@@ -7798,7 +7798,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L51",
+              "source": "src/row-bridge.ts#L52",
               "jsDocTags": [],
               "documentation": "The canonical transaction identity carried by each projected delta.",
               "memberDocs": []
@@ -7810,7 +7810,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L995",
+              "source": "src/row-bridge.ts#L1005",
               "jsDocTags": [],
               "documentation": "Compute a deterministic identity for a canonical transaction.",
               "memberDocs": []
@@ -7822,7 +7822,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L161",
+              "source": "src/row-bridge.ts#L162",
               "jsDocTags": [],
               "documentation": "An explicit projection record for an operation with no row-space meaning.",
               "memberDocs": []

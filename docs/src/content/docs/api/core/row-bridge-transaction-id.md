@@ -8,7 +8,7 @@ description: "rowBridgeTransactionId function in @sheetwrite/core: Compute a det
 Compute a deterministic identity for a canonical transaction.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L995"><code>packages/core/src/row-bridge.ts#L995</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L1005"><code>packages/core/src/row-bridge.ts#L1005</code></a></dd></div>
 </dl>
 
 ## Declaration

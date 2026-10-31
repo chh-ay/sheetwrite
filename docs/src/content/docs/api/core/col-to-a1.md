@@ -8,7 +8,7 @@ description: "colToA1 function in @sheetwrite/core: Column index (0-based) → A
 Column index (0-based) → A1 column label (0 → "A", 26 → "AA").
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/a1.ts#L12"><code>packages/core/src/a1.ts#L12</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/a1.ts#L25"><code>packages/core/src/a1.ts#L25</code></a></dd></div>
 </dl>
 
 ## Declaration

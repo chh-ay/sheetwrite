@@ -8,7 +8,7 @@ description: "RowBridgeId type in @sheetwrite/core: A stable host identity for o
 A stable host identity for one data-space row.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L8"><code>packages/core/src/row-bridge.ts#L8</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L9"><code>packages/core/src/row-bridge.ts#L9</code></a></dd></div>
 </dl>
 
 ## Declaration
