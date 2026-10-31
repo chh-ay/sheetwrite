@@ -23,7 +23,7 @@ import {
 } from "./command-spec.js";
 import { STANDARD_COLORS, THEME_COLOR_ROWS } from "./ribbon-colors.js";
 import { focusAddress, steppedZoom, ZOOM_RESET, zoomLabel } from "./ribbon-model.js";
-import type { RibbonPopup } from "./ribbon-popup.js";
+import { focusInSurface, type RibbonPopup, showInSurface } from "./ribbon-popup.js";
 
 /**
  * Command state lookup: backed by an event's snapshot when one arrived, else
@@ -319,7 +319,8 @@ function renderCombo(spec: RibbonComboSpec, context: RibbonContext): RibbonContr
     });
 
     context.popup.open(input, list, { role: "listbox", label: spec.label, focus });
-    list.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
+    const selected = list.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (selected !== null) showInSurface(list, selected);
   };
 
   arrow.addEventListener("click", () => {
@@ -502,7 +503,7 @@ function renderForm(spec: RibbonFormSpec, context: RibbonContext): RibbonControl
       if (message !== null) {
         error.textContent = message;
         error.hidden = false;
-        field.focus();
+        focusInSurface(form, field);
         return;
       }
       context.popup.closeAll(false);
@@ -564,7 +565,7 @@ function renderPlacement(spec: RibbonPlacementSpec, context: RibbonContext): Rib
     location.appendChild(field);
     const pickExisting = (): void => {
       field.disabled = !existing.checked;
-      if (existing.checked) field.focus();
+      if (existing.checked) focusInSurface(form, field);
     };
     newSheet.addEventListener("change", pickExisting);
     existing.addEventListener("change", pickExisting);
@@ -599,7 +600,7 @@ function renderPlacement(spec: RibbonPlacementSpec, context: RibbonContext): Rib
       if (message !== null) {
         error.textContent = message;
         error.hidden = false;
-        (existing.checked ? field : newSheet).focus();
+        focusInSurface(form, existing.checked ? field : newSheet);
         return;
       }
       // The command moved focus into the panel it opened; leave it there.

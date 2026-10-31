@@ -42,18 +42,22 @@ function triggerMoved(popup: OpenPopup): boolean {
 }
 
 /**
- * Focus an element of a popup without a focus scroll. WebKit scrolls the
- * document to show a focused element even inside a fixed surface, and the
- * document scroll closes every popup. Only the surface scrolls, to show the
- * element when the surface is taller than its maximum height.
+ * Scroll only the surface to show an element of a popup, when the surface is
+ * taller than its maximum height. `scrollIntoView` and a focus scroll can also
+ * scroll the document (WebKit does, even for a fixed surface); that moves the
+ * trigger, which closes the popup.
  */
-function focusInSurface(surface: HTMLElement, element: HTMLElement): void {
-  element.focus({ preventScroll: true });
-
+export function showInSurface(surface: HTMLElement, element: HTMLElement): void {
   const shown = surface.getBoundingClientRect();
   const box = element.getBoundingClientRect();
   if (box.top < shown.top) surface.scrollTop -= shown.top - box.top;
   else if (box.bottom > shown.bottom) surface.scrollTop += box.bottom - shown.bottom;
+}
+
+/** Focus an element of a popup without a document scroll; see `showInSurface`. */
+export function focusInSurface(surface: HTMLElement, element: HTMLElement): void {
+  element.focus({ preventScroll: true });
+  showInSurface(surface, element);
 }
 
 let popupSerial = 0;
@@ -128,7 +132,8 @@ export class RibbonPopup {
   /**
    * Close popups from the top down until `keep` remain. With `returnFocus`,
    * focus goes to the trigger of the last popup closed, which is still on
-   * screen because everything above it is gone.
+   * screen because everything above it is gone. The trigger can be in a parent
+   * popup, so the focus must not scroll the page (see `focusInSurface`).
    */
   private closeAbove(keep: number, returnFocus: boolean): void {
     let focusTarget: HTMLElement | null = null;
@@ -142,7 +147,7 @@ export class RibbonPopup {
       popup.onClose?.();
       focusTarget = popup.trigger;
     }
-    if (returnFocus) focusTarget?.focus();
+    if (returnFocus) focusTarget?.focus({ preventScroll: true });
   }
 
   /**
@@ -200,14 +205,21 @@ export class RibbonPopup {
     if (!(surface instanceof HTMLElement) || this.stack.at(-1)?.surface !== surface) return;
 
     // A form keeps Tab inside itself, wrapping at the ends; menus and lists
-    // close on Tab, as Excel's do.
+    // close on Tab, as Excel's do. The form moves focus itself, because a
+    // native Tab can scroll the page as well (see `focusInSurface`).
     if (event.key === "Tab" && surface.getAttribute("role") === "dialog") {
       const stops = [...surface.querySelectorAll<HTMLElement>(DIALOG_TAB_STOPS)];
-      const edge = event.shiftKey ? stops[0] : stops.at(-1);
-      if (document.activeElement === edge) {
-        event.preventDefault();
-        (event.shiftKey ? stops.at(-1) : stops[0])?.focus();
-      }
+      if (stops.length === 0) return;
+
+      event.preventDefault();
+      // From outside the stops, Tab starts at the first one and Shift+Tab at the last.
+      const current = stops.findIndex((stop) => stop === document.activeElement);
+      const offset = event.shiftKey ? -1 : 1;
+      let next: number;
+      if (current === -1) next = event.shiftKey ? stops.length - 1 : 0;
+      else next = (current + offset + stops.length) % stops.length;
+      const target = stops[next];
+      if (target !== undefined) focusInSurface(surface, target);
       return;
     }
     if (event.key === "Escape" || event.key === "Tab") {
