@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "b88a74d90beb62949379096b6decc55a92fe9b17afd98ef778c0e81541f8ab1f",
+  "sha256": "a4a81e7283ed1713f2b95dde23cb98016b65084be891a75a10fe12545a0cff66",
   "intentionalExports": [
     {
       "package": "@sheetwrite/charts",
@@ -471,20 +471,11 @@
       "package": "@sheetwrite/core",
       "entryPoint": "./functions",
       "exports": [
-        "FormulaAnalysis",
         "FormulaArgument",
         "FormulaArgumentMetadata",
-        "FormulaCall",
-        "FormulaCellPosition",
-        "FormulaCompletion",
-        "FormulaDiagnostic",
         "FormulaFunction",
         "FormulaFunctionMetadata",
-        "FormulaReference",
         "FormulaScalar",
-        "FormulaToken",
-        "FormulaTokenKind",
-        "analyzeFormula",
         "listFunctions",
         "registerFunction",
         "unregisterFunction"

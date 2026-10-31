@@ -10,7 +10,8 @@ use crate::store::CellStore;
 use crate::types::{FormulaError, Value};
 
 use super::expand_let_ast;
-use super::lookup::integer_arg;
+use super::index::index_selects_whole_axis;
+use super::lookup::{integer_arg, option_code};
 use super::matrix::{
     intersection_range, optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_CELLS,
     SPILL_MAX_RECOMPUTE_CELLS,
@@ -19,7 +20,7 @@ use super::reference::RewriteScope;
 use super::value::{bool_from_value, compare_values, number_from_value};
 use super::{with_let_slots, EvalPass};
 
-fn static_integer(ast: Option<&Ast>) -> Option<i64> {
+pub(super) fn static_integer(ast: Option<&Ast>) -> Option<i64> {
     match ast? {
         Ast::Num(value)
             if value.is_finite() && *value >= i64::MIN as f64 && *value <= i64::MAX as f64 =>
@@ -71,6 +72,7 @@ pub(crate) fn ast_produces_array(ast: &Ast) -> bool {
             _,
         ) => true,
         Ast::Func(Func::Let, args) => args.iter().any(ast_produces_array),
+        Ast::Func(Func::Index, args) => index_selects_whole_axis(args),
         Ast::Func(Func::Choose, args) => args
             .get(1..)
             .is_some_and(|choices| choices.iter().any(ast_produces_array)),
@@ -217,6 +219,11 @@ impl CellStore {
                     .map(|(_, _, cells)| cells),
             ),
             Ast::LetSlot { expression, .. } => self.dynamic_array_bound(expression, formula_sheet),
+            // The selection is at most the whole area; an area that has no
+            // shape before evaluation is charged at the spill limit.
+            Ast::Func(Func::Index, args) if index_selects_whole_axis(args) => Some(Ok(self
+                .matrix_shape(&args[0], formula_sheet)
+                .map_or(SPILL_MAX_CELLS, |(_, _, cells)| cells))),
             Ast::Func(Func::Let, args) => match expand_let_ast(args) {
                 Ok((expanded, _)) => self.dynamic_array_bound(&expanded, formula_sheet),
                 Err(_) => None,
@@ -376,6 +383,9 @@ impl CellStore {
                 self.eval_choose_axis(args, true, sheet, pass, depth + 1)
             }
             Ast::Func(Func::Choose, args) => self.eval_choose(args, sheet, pass, depth + 1),
+            Ast::Func(Func::Index, args) if index_selects_whole_axis(args) => {
+                self.eval_index_array(args, sheet, pass, depth + 1)
+            }
             _ => return None,
         };
         Some(result.and_then(|matrix| {
@@ -673,7 +683,7 @@ impl CellStore {
             return Err(FormulaError::Value);
         }
         let order = match optional_ast(args, 2) {
-            Some(ast) => integer_arg(&self.scalar_array_arg(ast, sheet, pass, depth + 1))?,
+            Some(ast) => option_code(&self.scalar_array_arg(ast, sheet, pass, depth + 1))?,
             None => 1,
         };
         if !matches!(order, -1 | 1) {

@@ -12,18 +12,18 @@ This page lists the 17 functions of the lookup and reference family. Taxonomy/so
 <section class="sw-formula-family">
 
 <table class="sw-formula-table"><thead><tr><th>Function (aliases)</th><th>Engine</th><th>Contract</th></tr></thead><tbody>
-<tr data-formula-name="INDEX" data-engine="default"><td><code>INDEX</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-index">Signature: <code>index</code></a><br /><a href="#semantics-lookup">Semantics: <code>lookup</code></a><br /><a href="#dialect-excel-index-arguments">Dialect: <code>excel-index-arguments</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="INDEX" data-engine="default"><td><code>INDEX</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-index">Signature: <code>index</code></a><br /><a href="#semantics-lookup">Semantics: <code>lookup</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="MATCH" data-engine="default"><td><code>MATCH</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-match">Signature: <code>match</code></a><br /><a href="#semantics-lookup">Semantics: <code>lookup</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="VLOOKUP" data-engine="default"><td><code>VLOOKUP</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-table-lookup">Signature: <code>table-lookup</code></a><br /><a href="#semantics-lookup">Semantics: <code>lookup</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="HLOOKUP" data-engine="default"><td><code>HLOOKUP</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-table-lookup">Signature: <code>table-lookup</code></a><br /><a href="#semantics-lookup">Semantics: <code>lookup</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="XLOOKUP" data-engine="default"><td><code>XLOOKUP</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-xlookup">Signature: <code>xlookup</code></a><br /><a href="#semantics-lookup">Semantics: <code>lookup</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="XMATCH" data-engine="default"><td><code>XMATCH</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-xmatch">Signature: <code>xmatch</code></a><br /><a href="#semantics-lookup">Semantics: <code>lookup</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
-<tr data-formula-name="CHOOSE" data-engine="default"><td><code>CHOOSE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-choose">Signature: <code>choose</code></a><br /><a href="#semantics-lookup">Semantics: <code>lookup</code></a><br /><a href="#dialect-excel-fractional-index">Dialect: <code>excel-fractional-index</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="CHOOSE" data-engine="default"><td><code>CHOOSE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-choose">Signature: <code>choose</code></a><br /><a href="#semantics-lookup">Semantics: <code>lookup</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="ROW" data-engine="default"><td><code>ROW</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-optional-reference">Signature: <code>optional-reference</code></a><br /><a href="#semantics-lookup">Semantics: <code>lookup</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="ROWS" data-engine="default"><td><code>ROWS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-lookup">Semantics: <code>lookup</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="COLUMN" data-engine="default"><td><code>COLUMN</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-optional-reference">Signature: <code>optional-reference</code></a><br /><a href="#semantics-lookup">Semantics: <code>lookup</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="COLUMNS" data-engine="default"><td><code>COLUMNS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-lookup">Semantics: <code>lookup</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
-<tr data-formula-name="ADDRESS" data-engine="default"><td><code>ADDRESS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-address">Signature: <code>address</code></a><br /><a href="#semantics-lookup">Semantics: <code>lookup</code></a><br /><a href="#dialect-excel-address-arguments">Dialect: <code>excel-address-arguments</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="ADDRESS" data-engine="default"><td><code>ADDRESS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-address">Signature: <code>address</code></a><br /><a href="#semantics-lookup">Semantics: <code>lookup</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="OFFSET" data-engine="default"><td><code>OFFSET</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-offset">Signature: <code>offset</code></a><br /><a href="#semantics-dynamic-reference">Semantics: <code>dynamic-reference</code></a><br /><a href="#dialect-excel-dynamic-reference">Dialect: <code>excel-dynamic-reference</code></a><br /><a href="#implementation-implemented-dynamic-reference">Implementation: <code>implemented-dynamic-reference</code></a></details></td></tr>
 <tr data-formula-name="INDIRECT" data-engine="default"><td><code>INDIRECT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-indirect">Signature: <code>indirect</code></a><br /><a href="#semantics-dynamic-reference">Semantics: <code>dynamic-reference</code></a><br /><a href="#dialect-excel-dynamic-reference">Dialect: <code>excel-dynamic-reference</code></a><br /><a href="#implementation-implemented-dynamic-reference">Implementation: <code>implemented-dynamic-reference</code></a></details></td></tr>
 <tr data-formula-name="AREAS" data-engine="default"><td><code>AREAS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-required-reference">Signature: <code>required-reference</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-reference-operators">Dialect: <code>excel-reference-operators</code></a><br /><a href="#implementation-implemented-reference-operators">Implementation: <code>implemented-reference-operators</code></a></details></td></tr>
@@ -257,18 +257,6 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 
 ## Dialect profiles
 
-<details id="dialect-excel-index-arguments"><summary>Dialect: excel-index-arguments</summary>
-
-| Dialect | Status |
-| --- | --- |
-| Microsoft Excel | divergent |
-| Google Sheets | unverified |
-| OpenFormula | unverified |
-
-Limitations: Fractional row and column numbers return #VALUE!. Excel truncates them, as in =INDEX(A1:A5,2.9) (#246). Row or column number 0 returns #VALUE!. Excel returns the whole column or row, as in =SUM(INDEX(A1:B5,0,1)) (#246).
-
-</details>
-
 <details id="dialect-excel-documented"><summary>Dialect: excel-documented</summary>
 
 | Dialect | Status |
@@ -278,30 +266,6 @@ Limitations: Fractional row and column numbers return #VALUE!. Excel truncates t
 | OpenFormula | unverified |
 
 Limitations: Google Sheets and OpenFormula results require producer evidence before compatibility is claimed.
-
-</details>
-
-<details id="dialect-excel-fractional-index"><summary>Dialect: excel-fractional-index</summary>
-
-| Dialect | Status |
-| --- | --- |
-| Microsoft Excel | divergent |
-| Google Sheets | unverified |
-| OpenFormula | unverified |
-
-Limitations: Fractional index arguments return #VALUE!. Excel truncates them, as in =CHOOSE(1.5,"a","b") (#246).
-
-</details>
-
-<details id="dialect-excel-address-arguments"><summary>Dialect: excel-address-arguments</summary>
-
-| Dialect | Status |
-| --- | --- |
-| Microsoft Excel | divergent |
-| Google Sheets | unverified |
-| OpenFormula | unverified |
-
-Limitations: Fractional row and column numbers return #VALUE!. Excel truncates them, as in =ADDRESS(2.5,1) (#246). Some argument errors become #VALUE!. Excel keeps the original error, as in =ADDRESS(1,1,NA()) (#246).
 
 </details>
 

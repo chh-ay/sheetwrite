@@ -52,8 +52,10 @@ export async function discoverRuntimePaths(
   language: CoverageLanguage,
 ): Promise<readonly string[]> {
   if (language === "rust") {
+    // `tests.rs` and `*_tests.rs` hold only #[cfg(test)] modules. cargo-llvm-cov
+    // leaves such files out of its report, so they are not runtime sources.
     return (await filesRecursively(resolve(root, "packages/wasm/src")))
-      .filter((path) => extname(path) === ".rs" && !path.endsWith("/tests.rs"))
+      .filter((path) => extname(path) === ".rs" && !/(?:\/|_)tests\.rs$/u.test(path))
       .map((path) => path.slice(resolve(root).length + 1).replaceAll("\\", "/"))
       .sort();
   }

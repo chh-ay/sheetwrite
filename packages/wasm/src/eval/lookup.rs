@@ -10,18 +10,27 @@ use crate::types::{CellRange, FormulaError, Value};
 use super::criteria::WildcardPattern;
 use super::value::{compare_text_case_insensitive, compare_values, number_from_value};
 
+/// A position or count argument. Excel truncates its fraction, so
+/// `CHOOSE(1.5,…)` picks the first choice.
 pub(super) fn integer_arg(value: &Value) -> Result<i32, FormulaError> {
-    let number = number_from_value(value)?;
-    if !number.is_finite()
-        || number.fract() != 0.0
-        || number < i32::MIN as f64
-        || number > i32::MAX as f64
-    {
+    let number = number_from_value(value)?.trunc();
+    if number < f64::from(i32::MIN) || number > f64::from(i32::MAX) {
         return Err(FormulaError::Value);
     }
     Ok(number as i32)
 }
 
+/// An argument that selects one of a few modes, such as a match type. Only
+/// a whole number names a mode; an argument error is returned unchanged.
+pub(super) fn option_code(value: &Value) -> Result<i32, FormulaError> {
+    let number = number_from_value(value)?;
+    if number.fract() != 0.0 || number < f64::from(i32::MIN) || number > f64::from(i32::MAX) {
+        return Err(FormulaError::Value);
+    }
+    Ok(number as i32)
+}
+
+/// A 1-based position, truncated, as a 0-based index.
 pub(super) fn positive_index(value: &Value) -> Result<usize, FormulaError> {
     let index = integer_arg(value)?;
     if index <= 0 {
