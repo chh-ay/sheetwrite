@@ -19,10 +19,11 @@ import {
   pixelsToPoints,
   pointsToPixels,
 } from "../format-presets.js";
+import { signature } from "../functions/signature.js";
 import type { FormulaFunctionMetadata } from "../functions/types.js";
 import { createHyperlinkId, isSafeExternalHyperlink } from "../hyperlink.js";
 import type { IconName } from "../icons/icon-names.js";
-import { loadPanels, pivotsAvailable } from "../panels/panel-loader.js";
+import { loadPanels, pivotsAvailable, showFormulaExplanation } from "../panels/panel-loader.js";
 import { storeEngine } from "../store/engine-registry.js";
 import type { ChartKind } from "../types/chart.js";
 import type { CellAddress } from "../types/coordinates.js";
@@ -317,15 +318,6 @@ function outline(group: boolean): (grid: Grid) => void {
 /** Functions the host registered on the grid's store; none without the full engine. */
 function hostFunctions(grid: Grid): readonly FormulaFunctionMetadata[] {
   return storeEngine(grid.store)?.hostFunctions?.metadata() ?? [];
-}
-
-/** `NAME(first, [optional], more...)`, as Excel's function tooltips write it. */
-function signature(fn: FormulaFunctionMetadata): string {
-  const parameters = fn.arguments.map((argument) => {
-    const name = argument.repeating === true ? `${argument.name}...` : argument.name;
-    return argument.optional === true ? `[${name}]` : name;
-  });
-  return `${fn.name}(${parameters.join(", ")})`;
 }
 
 /**
@@ -639,7 +631,7 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
   },
   {
     label: "Formulas",
-    reduceOrder: ["functionLibrary"],
+    reduceOrder: ["formulaAuditing", "functionLibrary"],
     groups: [
       {
         id: "functionLibrary",
@@ -647,6 +639,17 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
         icon: "insertFunction",
         layout: "flow",
         controls: [insertFunction],
+      },
+      {
+        id: "formulaAuditing",
+        label: "Formula Auditing",
+        icon: "explainFormula",
+        layout: "flow",
+        controls: [
+          button("Explain Formula", "explainFormula", showFormulaExplanation, "view", {
+            large: true,
+          }),
+        ],
       },
     ],
   },

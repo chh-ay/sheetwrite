@@ -14,6 +14,7 @@ import type {
   insertChart,
   insertPivot,
   openChartPanel,
+  openExplainPanel,
   openPivotPanel,
   syncPivotPanel,
 } from "./panel-controller.js";
@@ -24,6 +25,7 @@ interface PanelController {
   insertChart: typeof insertChart;
   insertPivot: typeof insertPivot;
   openChartPanel: typeof openChartPanel;
+  openExplainPanel: typeof openExplainPanel;
   openPivotPanel: typeof openPivotPanel;
   syncPivotPanel: typeof syncPivotPanel;
 }
@@ -113,6 +115,11 @@ function requestPanel(grid: Grid, open: (controller: PanelController) => void): 
     state.pending = null;
     if (run !== null && !state.disposed) run(controller);
   });
+}
+
+/** Formulas › Explain Formula: open its panel, loading the panels on first use. */
+export function showFormulaExplanation(grid: Grid): void {
+  requestPanel(grid, (controller) => controller.openExplainPanel(grid));
 }
 
 /** The focus cell of a selection; whole rows and columns are never inside a pivot. */

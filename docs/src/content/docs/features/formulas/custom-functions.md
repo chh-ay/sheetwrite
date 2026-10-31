@@ -116,7 +116,7 @@ Snapshots, history and collaboration keep only the formula text. A store loaded 
 
 ## In the ribbon and toolbar
 
-While the store has a registered function, the ribbon shows a **Formulas** tab with **Insert Function**, and the toolbar shows the same command. It lists the host functions with their signature and description; a pick starts `=NAME(` in the focus cell. See [Toolbar and ribbon](/docs/features/grid/toolbar-and-ribbon/#ribbon).
+While the store has a registered function, the ribbon's **Formulas** tab shows **Insert Function**, and the toolbar shows the same command. It lists the host functions with their signature and description; a pick starts `=NAME(` in the focus cell. Formula autocomplete and the argument guide list host functions with the built-in functions; see [Formula help](/docs/features/formulas/formula-help/). See [Toolbar and ribbon](/docs/features/grid/toolbar-and-ribbon/#ribbon).
 
 ## Function metadata
 

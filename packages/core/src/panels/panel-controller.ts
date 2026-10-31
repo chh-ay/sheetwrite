@@ -1,7 +1,7 @@
-// Opens the Chart panel and the pivot field list, and runs the Insert ›
-// Chart and Insert › PivotTable commands. This module is the panel chunk:
-// panel-loader.ts loads it on first use and attaches it once per grid.
-// Everything goes through the public Grid API.
+// Opens the Chart panel, the pivot field list and the Explain Formula panel,
+// and runs the Insert › Chart and Insert › PivotTable commands. This module
+// is the panel chunk: panel-loader.ts loads it on first use and attaches it
+// once per grid. Everything goes through the public Grid API.
 
 import { colToA1 } from "../a1.js";
 import { sheetNameKey } from "../sheet-name.js";
@@ -12,17 +12,16 @@ import type { Grid, IconOverrides } from "../types/grid.js";
 import type { PivotDefinition } from "../types/pivot.js";
 import { chartFromRange, nextChartId, selectionRange } from "./chart-model.js";
 import { chartPanel } from "./chart-panel.js";
+import { explainPanel } from "./explain-panel.js";
 import { rejectionMessage } from "./panel-dom.js";
 import { nextPivotIdentity, pivotSourceFor } from "./pivot-model.js";
 import { pivotPanel } from "./pivot-panel.js";
 import { parseRangeText } from "./range-text.js";
 
 /** What the open panel shows, so selection changes can switch or close it. */
-interface OpenPanel {
-  readonly kind: "chart" | "pivot";
-  readonly sheet: SheetId;
-  readonly id: string;
-}
+type OpenPanel =
+  | { readonly kind: "chart" | "pivot"; readonly sheet: SheetId; readonly id: string }
+  | { readonly kind: "explain" };
 
 interface PanelState {
   icons: IconOverrides | undefined;
@@ -67,6 +66,17 @@ export function openPivotPanel(grid: Grid, sheet: SheetId, id: string, focus = t
   const state = stateOf(grid);
   const open: OpenPanel = { kind: "pivot", sheet, id };
   const panel = pivotPanel(grid, sheet, id, focus);
+  grid.openPanel({
+    ...panel,
+    render: (body) => trackOpen(state, open, panel.render(body)),
+  });
+}
+
+/** Show Formulas › Explain Formula for the focus cell; the panel follows the selection. */
+export function openExplainPanel(grid: Grid): void {
+  const state = stateOf(grid);
+  const open: OpenPanel = { kind: "explain" };
+  const panel = explainPanel(grid);
   grid.openPanel({
     ...panel,
     render: (body) => trackOpen(state, open, panel.render(body)),

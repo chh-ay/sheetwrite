@@ -11,7 +11,7 @@ registration order. Formula help reads this one list. The built-in table
 loads on the first call, so the result is a promise.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/functions.ts#L109"><code>packages/core/src/functions.ts#L109</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/functions.ts#L121"><code>packages/core/src/functions.ts#L121</code></a></dd></div>
 </dl>
 
 ## Declaration
