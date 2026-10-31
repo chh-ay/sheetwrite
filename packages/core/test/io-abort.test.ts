@@ -3,6 +3,7 @@ import { beforeAll, describe, expect, it } from "bun:test";
 import {
   DelimitedTextOptionsError,
   type DelimitedTextResourceLimits,
+  encodeDelimitedTextChunks,
 } from "../src/delimited-text.js";
 import { SheetwriteError } from "../src/errors.js";
 import {
@@ -33,6 +34,9 @@ const RECORDS_PER_CHECK = 1024;
 const RECORD_COUNT = 3_000;
 const EXPORT_ROWS = 10;
 const WINDOW_ROWS = 3;
+/** Characters the encoder writes per slice of a long field. */
+const FIELD_SLICE_CHARACTERS = 16 * 1024;
+const SHORT_FIELDS = Array.from({ length: 20 }, (_unused, column) => `short ${column}`);
 /** An error keeps at most 8 KiB of host text. */
 const MAX_ERROR_TEXT_BYTES = 8 * 1024;
 
@@ -146,11 +150,27 @@ describe("delimited-text abort", () => {
       (signal: AbortSignal) => drain(toCsvStream(sheet, source, { signal, resourceLimits })),
       (signal: AbortSignal) => drain(toTsvStream(range, source, { signal, resourceLimits })),
     ]) {
-      expect(await expectAbortAtEveryCheck(exportOnce)).toBeGreaterThanOrEqual(windows);
+      const checks = await expectAbortAtEveryCheck(exportOnce);
+      expect(checks).toBeGreaterThanOrEqual(windows);
+      // One check per cell would be at least one per row and column.
+      expect(checks).toBeLessThan(EXPORT_ROWS * columns.length);
     }
 
     expect(JSON.stringify(source.exportSnapshot())).toBe(before);
     source.dispose();
+  });
+
+  it("a long field adds a check between its slices, and short fields in its row add none", async () => {
+    const slices = 3;
+    const row = ["x".repeat(slices * FIELD_SLICE_CHARACTERS), ...SHORT_FIELDS];
+    // One check for the first chunk of records, then one before each later slice.
+    const expectedChecks = 1 + (slices - 1);
+
+    expect(
+      await expectAbortAtEveryCheck((signal) => [
+        ...encodeDelimitedTextChunks([row], ",", { signal }),
+      ]),
+    ).toBe(expectedChecks);
   });
 
   it("an invalid option keeps only its type, never a copy of the value", () => {

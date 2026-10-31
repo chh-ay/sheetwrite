@@ -547,7 +547,8 @@ export function* encodeDelimitedTextChunks(
       if (column > 0) yield delimiter;
       if (plan.quote) yield '"';
       for (let offset = 0; offset < plan.text.length;) {
-        options.signal?.throwIfAborted();
+        // A long field is checked between its slices; a short one never adds a check.
+        if (offset > 0) options.signal?.throwIfAborted();
         let end = Math.min(plan.text.length, offset + FIELD_CHUNK_CHARACTERS);
         const last = plan.text.charCodeAt(end - 1);
         if (end < plan.text.length && last >= 0xd800 && last <= 0xdbff) end--;
