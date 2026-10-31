@@ -116,6 +116,7 @@ Coercion follows these documented rules:
 - Direct scalar boolean/text arguments may be coerced by numeric functions. Text/booleans reached through a range are ignored by numeric aggregates, matching common spreadsheet behavior.
 - Empty scalar arithmetic behaves as zero. Empty range cells are skipped.
 - Comparisons are case-insensitive for text and use spreadsheet type ordering.
+- A number that becomes text, as in `=(0.1+0.2)&""`, keeps 15 significant digits, as in Excel: the result is `0.3`. Exponents from -9 to 14 give plain digits, and other numbers use scientific notation, such as `1E+15`.
 - `AND`, `OR`, `NOT`, and `IF` accept booleans, numbers, and the text `TRUE`/`FALSE`.
 
 ## LET bindings
@@ -128,7 +129,7 @@ One `LET` admits at most 126 bindings. Expansion admits at most 16,384 AST nodes
 
 ## References, ranges, and named ranges
 
-A1 cells (`A1`, `$B12`, `AA$3`), rectangular ranges (`A1:B3`), and cross-sheet references (`Sales!E2`, `'Sales 2026'!E2:E10`) are supported. Absolute markers affect fill/structural rewriting; they do not change evaluation.
+A1 cells (`A1`, `$B12`, `AA$3`), rectangular ranges (`A1:B3`), whole columns and rows (`A:C`, `$2:$5`), and cross-sheet references (`Sales!E2`, `'Sales 2026'!E2:E10`, `Sales!E:E`) are supported. A reference must be inside column `XFD` and row 1048576; a token past them, such as `XYZ1`, is a name. A whole column or row reads only the cells that the sheet has, and a row or column edit keeps it whole. Numbers can have an exponent, such as `1E3` or `1.5E-3`. Absolute markers affect fill/structural rewriting; they do not change evaluation.
 
 Named ranges are document operations and snapshot metadata:
 

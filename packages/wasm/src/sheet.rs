@@ -31,14 +31,14 @@ impl SheetData {
         chunk_rows: usize,
         byte_budget: usize,
         max_dirty_cells: usize,
-    ) -> Self {
-        Self::with_cells(CellStorage::new_paged(
+    ) -> Result<Self, String> {
+        Ok(Self::with_cells(CellStorage::new_paged(
             n_cols,
             row_count,
             chunk_rows,
             byte_budget,
             max_dirty_cells,
-        ))
+        )?))
     }
 
     fn with_cells(cells: CellStorage) -> Self {
@@ -120,51 +120,70 @@ impl SheetData {
     }
 
     /// Shift rows `[at, row_count)` down by `count`, opening a blank gap.
-    pub(crate) fn insert_rows(&mut self, sheet: u32, at: usize, count: usize) {
-        let extent = self.cells.row_count();
-        if count == 0 || extent.checked_add(count).is_none() {
-            return;
+    /// Formulas move only after the cells did; on error nothing changes.
+    pub(crate) fn insert_rows(
+        &mut self,
+        sheet: u32,
+        at: usize,
+        count: usize,
+    ) -> Result<(), String> {
+        let at = at.min(self.cells.row_count());
+        self.cells.insert_rows(at, count)?;
+        if count != 0 {
+            self.formulas.insert_rows(sheet, at as u32, count as u32);
         }
-
-        let at = at.min(extent);
-        self.cells.insert_rows(at, count);
-        self.formulas.insert_rows(sheet, at as u32, count as u32);
+        Ok(())
     }
 
     /// Delete `count` rows starting at `at`, closing the gap.
-    pub(crate) fn delete_rows(&mut self, sheet: u32, at: usize, count: usize) {
+    pub(crate) fn delete_rows(
+        &mut self,
+        sheet: u32,
+        at: usize,
+        count: usize,
+    ) -> Result<(), String> {
         let extent = self.cells.row_count();
         if count == 0 || at >= extent {
-            return;
+            return Ok(());
         }
 
         let count = count.min(extent - at);
-        self.cells.delete_rows(at, count);
+        self.cells.delete_rows(at, count)?;
         self.formulas.delete_rows(sheet, at as u32, count as u32);
+        Ok(())
     }
 
     /// Shift columns `[at, n_cols)` right by `count`, opening blank columns.
-    pub(crate) fn insert_cols(&mut self, sheet: u32, at: usize, count: usize) {
-        let extent = self.cells.n_cols();
-        if count == 0 || extent.checked_add(count).is_none() {
-            return;
+    pub(crate) fn insert_cols(
+        &mut self,
+        sheet: u32,
+        at: usize,
+        count: usize,
+    ) -> Result<(), String> {
+        let at = at.min(self.cells.n_cols());
+        self.cells.insert_cols(at, count)?;
+        if count != 0 {
+            self.formulas.insert_cols(sheet, at as u32, count as u32);
         }
-
-        let at = at.min(extent);
-        self.cells.insert_cols(at, count);
-        self.formulas.insert_cols(sheet, at as u32, count as u32);
+        Ok(())
     }
 
     /// Delete `count` columns starting at `at`, closing the gap.
-    pub(crate) fn delete_cols(&mut self, sheet: u32, at: usize, count: usize) {
+    pub(crate) fn delete_cols(
+        &mut self,
+        sheet: u32,
+        at: usize,
+        count: usize,
+    ) -> Result<(), String> {
         let extent = self.cells.n_cols();
         if count == 0 || at >= extent {
-            return;
+            return Ok(());
         }
 
         let count = count.min(extent - at);
-        self.cells.delete_cols(at, count);
+        self.cells.delete_cols(at, count)?;
         self.formulas.delete_cols(sheet, at as u32, count as u32);
+        Ok(())
     }
 
     pub(crate) fn add_memory_stats(&self, stats: &mut StoreMemoryStats) {

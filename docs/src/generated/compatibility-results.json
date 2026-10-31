@@ -3,7 +3,7 @@
   "testSet": {
     "version": 1,
     "libraryVersion": "0.6.1",
-    "checksum": "a016d93c9cdfaff84cf7f58e868d5cff91849246b3c399a5ae6ee51bad3e5751",
+    "checksum": "330aa3e2d3f96b2306934263b74f3fb26a5994b246bdcae6c6c00fa79d92b20a",
     "totalTests": 2350,
     "publishedExamples": 188,
     "formulaTests": 2000,

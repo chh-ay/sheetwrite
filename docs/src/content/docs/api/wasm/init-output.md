@@ -8,7 +8,7 @@ description: "InitOutput interface in @sheetwrite/wasm: Result of module initial
 Result of module initialization: the instantiated exports plus the shared linear memory.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/pkg/sheetwrite_wasm.d.ts#L502"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L502</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/pkg/sheetwrite_wasm.d.ts#L506"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L506</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -331,7 +331,7 @@ readonly cellstore_addPagedSheet: (a: number, b: number, c: number, d: number, e
 <summary><code>cellstore_addRows</code></summary>
 
 ```ts generated
-readonly cellstore_addRows: (a: number, b: number, c: number, d: number) => void;
+readonly cellstore_addRows: (a: number, b: number, c: number, d: number) => number;
 ```
 
 </details>
@@ -619,7 +619,7 @@ readonly cellstore_importRangeMemoryState: (a: number, b: any, c: number, d: num
 <summary><code>cellstore_insertCols</code></summary>
 
 ```ts generated
-readonly cellstore_insertCols: (a: number, b: number, c: number, d: number) => void;
+readonly cellstore_insertCols: (a: number, b: number, c: number, d: number) => number;
 ```
 
 </details>
@@ -808,7 +808,7 @@ readonly cellstore_remapRangeStyles: (a: number, b: number, c: number, d: number
 <summary><code>cellstore_removeCols</code></summary>
 
 ```ts generated
-readonly cellstore_removeCols: (a: number, b: number, c: number, d: number) => void;
+readonly cellstore_removeCols: (a: number, b: number, c: number, d: number) => number;
 ```
 
 </details>
@@ -826,7 +826,7 @@ readonly cellstore_removeNamedRange: (a: number, b: number, c: number, d: number
 <summary><code>cellstore_removeRows</code></summary>
 
 ```ts generated
-readonly cellstore_removeRows: (a: number, b: number, c: number, d: number) => void;
+readonly cellstore_removeRows: (a: number, b: number, c: number, d: number) => number;
 ```
 
 </details>
@@ -1437,7 +1437,7 @@ export interface InitOutput {
     b: number,
     c: number,
     d: number,
-  ) => void;
+  ) => number;
   readonly cellstore_addSheet: (a: number, b: number, c: number) => number;
   readonly cellstore_admitSourceRange: (
     a: number,
@@ -1631,7 +1631,7 @@ export interface InitOutput {
     b: number,
     c: number,
     d: number,
-  ) => void;
+  ) => number;
   readonly cellstore_isFullyLoaded: (a: number, b: number) => number;
   readonly cellstore_isPaged: (a: number, b: number) => number;
   readonly cellstore_loadedSpans: (
@@ -1728,7 +1728,7 @@ export interface InitOutput {
     b: number,
     c: number,
     d: number,
-  ) => void;
+  ) => number;
   readonly cellstore_removeNamedRange: (
     a: number,
     b: number,
@@ -1740,7 +1740,7 @@ export interface InitOutput {
     b: number,
     c: number,
     d: number,
-  ) => void;
+  ) => number;
   readonly cellstore_removeSheet: (a: number, b: number) => number;
   readonly cellstore_removeTable: (a: number, b: number, c: number) => number;
   readonly cellstore_renameSheet: (
