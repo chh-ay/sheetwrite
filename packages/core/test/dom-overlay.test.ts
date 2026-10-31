@@ -334,7 +334,9 @@ describe("retained DOM cell renderer overlay", () => {
       },
     };
 
-    expect(() => grid.defineCellRenderer("dom", sharedRenderer)).toThrow(TypeError);
+    expect(() => grid.defineCellRenderer("dom", sharedRenderer)).toThrow(
+      expect.objectContaining({ code: "invalid-argument", operation: "render" }),
+    );
     expect(sharedDestroys).toBe(1);
     expect(shared.parentNode).toBeNull();
     expect(host.querySelectorAll(".sheetwrite-dom-cell")).toHaveLength(0);

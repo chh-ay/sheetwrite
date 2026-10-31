@@ -14,6 +14,7 @@ import {
   validateTransactionResources,
   withAdmittedTransactionResources,
 } from "./document-protocol.js";
+import { SheetwriteError } from "./errors.js";
 import {
   type AxisResize,
   type HistoryAction,
@@ -1309,7 +1310,10 @@ export class DocumentController {
           return operation;
         } catch (error) {
           // Above the restore block caps the block stays a candidate for splitting.
-          if (!(error instanceof RangeError)) throw error;
+          const aboveCap =
+            error instanceof RangeError ||
+            (error instanceof SheetwriteError && error.code === "resource-limit");
+          if (!aboveCap) throw error;
           return patch;
         }
       });

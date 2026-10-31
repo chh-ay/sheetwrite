@@ -8,7 +8,7 @@ description: "BoundaryDirection type in @sheetwrite/core: Direction of a measure
 Direction of a measured JS/WASM boundary crossing.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/resource-accounting.ts#L53"><code>packages/core/src/resource-accounting.ts#L53</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/resource-accounting.ts#L59"><code>packages/core/src/resource-accounting.ts#L59</code></a></dd></div>
 </dl>
 
 ## Declaration

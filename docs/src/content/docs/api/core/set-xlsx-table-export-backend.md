@@ -8,7 +8,7 @@ description: "setXlsxTableExportBackend function in @sheetwrite/core: Registers 
 Registers the optional table XLSX export implementation used by core.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/export.ts#L413"><code>packages/core/src/export.ts#L413</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/export.ts#L414"><code>packages/core/src/export.ts#L414</code></a></dd></div>
 </dl>
 
 ## Declaration

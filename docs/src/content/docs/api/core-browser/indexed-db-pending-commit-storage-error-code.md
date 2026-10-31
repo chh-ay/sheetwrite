@@ -24,7 +24,8 @@ export type IndexedDbPendingCommitStorageErrorCode =
   | "unsupported-schema"
   | "transaction"
   | "conflict"
-  | "limit";
+  | "limit"
+  | "invalid-limits";
 ```
 
 </div>

@@ -6,9 +6,11 @@ description: "SheetwriteError class in @sheetwrite/core/adapter: Canonical envel
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="class">class</span></div>
 
 Canonical envelope for thrown and callback-delivered Sheetwrite failures.
+The message is cut to an 8 KiB UTF-8 budget, and so is the sum of the
+context strings, because both can quote host or file data.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/errors.ts#L290"><code>packages/core/src/errors.ts#L290</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/errors.ts#L477"><code>packages/core/src/errors.ts#L477</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -35,7 +37,7 @@ constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, mess
 </details>
 
 <details class="api-member" id="sheetwrite-error-code" data-pagefind-weight="1">
-<summary><code>code</code> <span class="api-member-alias"><a href="/docs/api/core-adapter/sheetwrite-error-code/"><code>SheetwriteErrorCode</code></a></span></summary>
+<summary><code>code</code></summary>
 
 ```ts generated
 code: SheetwriteErrorCode;
@@ -62,7 +64,7 @@ name: string;
 </details>
 
 <details class="api-member" id="sheetwrite-error-operation" data-pagefind-weight="1">
-<summary><code>operation</code> <span class="api-member-alias"><a href="/docs/api/core-adapter/sheetwrite-error-operation/"><code>SheetwriteErrorOperation</code></a></span></summary>
+<summary><code>operation</code></summary>
 
 ```ts generated
 operation: SheetwriteErrorOperation;
@@ -102,89 +104,10 @@ class SheetwriteError extends Error implements SheetwriteErrorEnvelope {
     message: string,
     options?: SheetwriteErrorOptions,
   );
-  code:
-    | "aborted"
-    | "batch-limit"
-    | "blocked"
-    | "buffer-byte-limit"
-    | "buffer-count-limit"
-    | "buffer-operation-limit"
-    | "comment-failed"
-    | "commit-rejected"
-    | "conflict"
-    | "datasource-request-failed"
-    | "delimited-text-invalid-limit"
-    | "delimited-text-resource-limit"
-    | "engine-failed"
-    | "export-failed"
-    | "future-distance-limit"
-    | "incomplete-data"
-    | "initialization-failed"
-    | "initialization-required"
-    | "invalid-batch"
-    | "invalid-function"
-    | "invalid-id"
-    | "invalid-limits"
-    | "invalid-operations"
-    | "invalid-shortcut"
-    | "invalid-snapshot"
-    | "invalid-version"
-    | "late-echo"
-    | "limit"
-    | "not-found"
-    | "operation-limit"
-    | "optional-backend-unavailable"
-    | "payload-limit"
-    | "pending-byte-limit"
-    | "pending-capacity"
-    | "pending-count-limit"
-    | "pending-operation-limit"
-    | "presence-failed"
-    | "quota"
-    | "remote-operations-rejected"
-    | "renderer-fallback"
-    | "resource-limit"
-    | "response-id-mismatch"
-    | "revision-failed"
-    | "shortcut-conflict"
-    | "sync-failed"
-    | "sync-storage-failed"
-    | "transaction"
-    | "unavailable"
-    | "unsafe-hyperlink"
-    | "unsupported-schema"
-    | "xlsx-import-failed"
-    | "xlsx-invalid-options"
-    | "xlsx-resource-limit";
+  code: SheetwriteErrorCode;
   context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined;
   name: string;
-  operation:
-    | "chart-view"
-    | "comments"
-    | "create-grid"
-    | "datasource-request"
-    | "delimited-encode"
-    | "delimited-export"
-    | "delimited-import"
-    | "delimited-options"
-    | "delimited-parse"
-    | "engine"
-    | "export-xlsx"
-    | "host-function"
-    | "hyperlink-activate"
-    | "initialize"
-    | "keyboard-configure"
-    | "pending-storage"
-    | "persistence"
-    | "presence"
-    | "query"
-    | "renderer-worker"
-    | "revision"
-    | "snapshot-allocate"
-    | "snapshot-validate"
-    | "synchronize"
-    | "xlsx-export"
-    | "xlsx-import";
+  operation: SheetwriteErrorOperation;
   retryable?: boolean | undefined;
   toJSON: () => SheetwriteErrorEnvelope;
 }

@@ -1,3 +1,4 @@
+import { datasourceFailure } from "./errors.js";
 import type { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
 import type { CellAddress, SheetId } from "./types/coordinates.js";
@@ -666,7 +667,7 @@ function emptyTelemetry(): MutableTelemetry {
 
 function normalizeRowCount(rowCount: number): number {
   if (!Number.isFinite(rowCount) || !Number.isSafeInteger(rowCount)) {
-    throw new RangeError("Datasource row count must be a finite safe integer");
+    throw datasourceFailure("Datasource row count must be a finite safe integer");
   }
   return Math.max(0, rowCount);
 }
@@ -678,7 +679,7 @@ function normalizeBounds(start: number, end: number, rowCount: number): RowBand 
     Math.abs(start) > Number.MAX_SAFE_INTEGER ||
     Math.abs(end) > Number.MAX_SAFE_INTEGER
   ) {
-    throw new RangeError("Datasource row bounds must be finite and safely representable");
+    throw datasourceFailure("Datasource row bounds must be finite and safely representable");
   }
   const normalizedStart = Math.min(rowCount, Math.max(0, Math.floor(start)));
   const normalizedEnd = Math.min(rowCount, Math.max(normalizedStart, Math.ceil(end)));
@@ -1105,7 +1106,7 @@ export class DatasourceController {
     for (const column of source) {
       const key = column?.key;
       if (typeof key !== "string" || key.length === 0 || unique.has(key)) {
-        throw new RangeError("Datasource schema keys must be non-empty and unique");
+        throw datasourceFailure("Datasource schema keys must be non-empty and unique");
       }
       unique.add(key);
       keys.push(key);
@@ -1126,7 +1127,7 @@ export class DatasourceController {
     let write = 0;
     for (const column of normalized) {
       if (!Number.isSafeInteger(column) || column < 0 || column >= schema.keys.length) {
-        throw new RangeError("Datasource column indices must reference the current schema");
+        throw datasourceFailure("Datasource column indices must reference the current schema");
       }
       if (write === 0 || normalized[write - 1] !== column) normalized[write++] = column;
     }
@@ -1136,11 +1137,11 @@ export class DatasourceController {
     const datasource = this.options.datasource;
     if (datasource) {
       if (datasource.capabilities?.protocol !== 2) {
-        throw new RangeError("Datasource must declare protocol 2 capabilities");
+        throw datasourceFailure("Datasource must declare protocol 2 capabilities");
       }
       if (datasource.capabilities.columns === "full-width") return this.allColumns(schema);
       if (datasource.capabilities.columns !== "windowed") {
-        throw new RangeError("Datasource column capability must be windowed or full-width");
+        throw datasourceFailure("Datasource column capability must be windowed or full-width");
       }
     }
 
@@ -1526,7 +1527,7 @@ export class DatasourceController {
         }
         if (!this.loaded.covers(activeRequest.start, activeRequest.end, activeRequest.columns)) {
           if (!progressed && activeRequest.attempt >= DATASOURCE_NO_PROGRESS_RETRIES) {
-            throw new RangeError("Datasource page made no coverage progress");
+            throw datasourceFailure("Datasource page made no coverage progress");
           }
           this.requeuePartial(activeRequest, progressed ? 0 : activeRequest.attempt + 1);
         }
@@ -1550,10 +1551,10 @@ export class DatasourceController {
 
   private validatePage(page: DataSourcePage, request: ActiveRequest): readonly number[] {
     if (page?.protocol !== 2 || !Array.isArray(page.rows) || !Array.isArray(page.columns)) {
-      throw new RangeError("Datasource page must use protocol 2 arrays");
+      throw datasourceFailure("Datasource page must use protocol 2 arrays");
     }
     if (!Number.isSafeInteger(page.start)) {
-      throw new RangeError("Datasource page start must be a safe integer");
+      throw datasourceFailure("Datasource page start must be a safe integer");
     }
     const loadedEnd = page.start + page.rows.length;
     const currentRowCount = normalizeRowCount(this.options.rowCount(request.sheet));
@@ -1563,10 +1564,10 @@ export class DatasourceController {
       loadedEnd > request.end ||
       loadedEnd > currentRowCount
     ) {
-      throw new RangeError("Datasource page rows exceed requested coverage");
+      throw datasourceFailure("Datasource page rows exceed requested coverage");
     }
     if (this.options.activeSheet() !== request.sheet || this.schema() !== request.schema) {
-      throw new RangeError("Datasource schema changed while a page was pending");
+      throw datasourceFailure("Datasource schema changed while a page was pending");
     }
 
     const responseColumns: number[] = [];
@@ -1585,7 +1586,7 @@ export class DatasourceController {
         band.keys.length !== band.end - band.start ||
         band.start < previousEnd
       ) {
-        throw new RangeError("Datasource page contains malformed column bands");
+        throw datasourceFailure("Datasource page contains malformed column bands");
       }
       while (
         requestCursor < request.bands.length &&
@@ -1595,12 +1596,12 @@ export class DatasourceController {
       }
       const requestedBand = request.bands[requestCursor];
       if (!requestedBand || band.start < requestedBand.start || band.end > requestedBand.end) {
-        throw new RangeError("Datasource page column coverage exceeds the request");
+        throw datasourceFailure("Datasource page column coverage exceeds the request");
       }
       for (let offset = 0; offset < band.keys.length; offset += 1) {
         const expected = request.schema.keys[band.start + offset]!;
         if (band.keys[offset] !== expected) {
-          throw new RangeError("Datasource page column keys do not match the current schema");
+          throw datasourceFailure("Datasource page column keys do not match the current schema");
         }
         declaredKeys.push(expected);
         responseColumns.push(band.start + offset);
@@ -1611,20 +1612,20 @@ export class DatasourceController {
     const declared = new Set(declaredKeys);
     for (const row of page.rows) {
       if (row === null || typeof row !== "object" || Array.isArray(row)) {
-        throw new RangeError("Datasource page rows must be keyed objects");
+        throw datasourceFailure("Datasource page rows must be keyed objects");
       }
       const ownKeys = Reflect.ownKeys(row);
       if (ownKeys.length !== declaredKeys.length) {
-        throw new RangeError("Datasource page row keys do not match declared coverage");
+        throw datasourceFailure("Datasource page row keys do not match declared coverage");
       }
       for (const key of ownKeys) {
         if (typeof key !== "string" || !declared.has(key)) {
-          throw new RangeError("Datasource page row contains an undeclared key");
+          throw datasourceFailure("Datasource page row contains an undeclared key");
         }
       }
       for (const key of declaredKeys) {
         if (!Object.hasOwn(row, key)) {
-          throw new RangeError("Datasource page row is missing a declared key");
+          throw datasourceFailure("Datasource page row is missing a declared key");
         }
       }
     }

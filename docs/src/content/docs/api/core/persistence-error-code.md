@@ -8,7 +8,7 @@ description: "PersistenceErrorCode type in @sheetwrite/core: Stable category for
 Stable category for a persistence failure.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/persistence.ts#L44"><code>packages/core/src/persistence.ts#L44</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/persistence.ts#L43"><code>packages/core/src/persistence.ts#L43</code></a></dd></div>
 </dl>
 
 ## Declaration
