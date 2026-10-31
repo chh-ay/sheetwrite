@@ -13,6 +13,7 @@ import type {
   ToolbarItem,
 } from "../types/grid.js";
 import {
+  commandAvailable,
   commandGroups,
   shownTabs,
   type RibbonAvailability,
@@ -217,6 +218,10 @@ export class CommandToolbar {
   private readonly more: HTMLButtonElement;
   private readonly items: HTMLElement[] = [];
   private readonly controls: RibbonControlView[] = [];
+  /** Commands with an `available` check, by their row element. */
+  private readonly gated = new Map<HTMLElement, RibbonControlSpec>();
+  /** Row elements of gated commands the grid cannot run now; fit keeps them hidden. */
+  private readonly unavailable = new Set<HTMLElement>();
   private readonly disposeState: () => void;
   private readonly resizeObserver: ResizeObserver | null;
   /** Index of the first item moved to the overflow; `items.length` when all fit. */
@@ -299,6 +304,9 @@ export class CommandToolbar {
           : renderControl(...withItemOverrides(entry.spec, entry.item, this.context));
       this.controls.push(view);
       element = view.element;
+      if (entry.kind === "command" && entry.spec.available !== undefined) {
+        this.gated.set(element, entry.spec);
+      }
     }
 
     this.items.push(element);
@@ -306,6 +314,22 @@ export class CommandToolbar {
   }
 
   private refresh(state: RibbonCommandStates): void {
+    let changed = false;
+    for (const [element, spec] of this.gated) {
+      const hidden = !commandAvailable(spec, this.grid);
+      if (this.unavailable.has(element) === hidden) continue;
+      // Hidden at once, so an unavailable command never shows for a frame;
+      // the next fit decides where a newly available one goes.
+      if (hidden) {
+        this.unavailable.add(element);
+        element.hidden = true;
+      } else {
+        this.unavailable.delete(element);
+      }
+      changed = true;
+    }
+    if (changed) this.scheduleFit();
+
     refreshControls(this.controls, this.grid, state);
   }
 
@@ -322,7 +346,7 @@ export class CommandToolbar {
   /** Hide trailing items until the row fits; the More button then lists them. */
   private fit(): void {
     this.popup.closeAll(false);
-    for (const item of this.items) item.hidden = false;
+    this.showAvailable();
     this.more.hidden = true;
     this.overflowStart = this.items.length;
     const fits = (): boolean => this.row.scrollWidth <= this.row.clientWidth;
@@ -335,12 +359,34 @@ export class CommandToolbar {
       if (item !== undefined) item.hidden = true;
     }
 
-    // A separator never ends the visible row.
-    const last = this.items[this.overflowStart - 1];
-    if (last?.getAttribute("role") === "separator") {
-      this.overflowStart -= 1;
-      last.hidden = true;
+    // A separator never ends the visible row; skip unavailable commands to find it.
+    let end = this.overflowStart - 1;
+    while (end >= 0 && this.items[end]?.hidden === true) end -= 1;
+    const last = this.items[end];
+    if (last?.getAttribute("role") === "separator") last.hidden = true;
+  }
+
+  /**
+   * Show every item but the unavailable commands, and drop the separators
+   * they leave without a command on both sides.
+   */
+  private showAvailable(): void {
+    let separator: HTMLElement | null = null;
+    let commandShown = false;
+    for (const item of this.items) {
+      item.hidden = this.unavailable.has(item);
+      if (item.hidden) continue;
+
+      if (item.getAttribute("role") !== "separator") {
+        separator = null;
+        commandShown = true;
+      } else if (!commandShown || separator !== null) {
+        item.hidden = true;
+      } else {
+        separator = item;
+      }
     }
+    if (separator !== null) separator.hidden = true;
   }
 
   /** Lend the hidden items' live controls to a popup, then put them back. */
@@ -352,7 +398,7 @@ export class CommandToolbar {
 
     const lent = this.items
       .slice(this.overflowStart)
-      .filter((item) => item.getAttribute("role") !== "separator");
+      .filter((item) => item.getAttribute("role") !== "separator" && !this.unavailable.has(item));
     const surface = document.createElement("div");
     surface.className = "sheetwrite-command-toolbar-overflow";
     for (const item of lent) {
