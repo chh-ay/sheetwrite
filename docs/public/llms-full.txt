@@ -1440,7 +1440,44 @@ SyncPendingCapacityError The durable local queue cannot reserve capacity for ano
 - `SyncProtocolError` rejects malformed or resource-violating remote input. Fix the producer; do not replay the same payload.
 - `SyncPendingCapacityError` rejects a new local transaction before it can exceed the durable queue ceiling. Drain or reconcile pending work before retrying.
 
-Worker startup and capability failures switch to the canvas renderer and emit `renderer-fallback`; observe `grid.rendererKind` to report the active renderer, not the requested option.
+Worker failures switch to the canvas renderer and emit `renderer-fallback`; observe `grid.rendererKind` to report the active renderer, not the requested option. `error.context.failure` tells why the worker stopped: `spawn` (the script did not load or start), `crash` (an uncaught error after start), `protocol` (a message that one side cannot read, for example a `workerUrl` copy from another release), `timeout` (no `ready` reply in 10 seconds) or `fatal` (the worker lost its 2D context). The worker requests do not return promises, so no request stays pending after a failure or `destroy()`.
+
+## Engine failure
+
+A WASM trap, for example `RuntimeError: unreachable` after an internal engine
+panic, leaves the engine instance half-written. Sheetwrite never calls that
+instance again:
+
+- The call that trapped throws a `SheetwriteError` with code `engine-failed` and operation `engine`. Its `cause` is the trap.
+- Every grid on that instance emits `engine-failed` once. It keeps its last frame, becomes read-only and does not read its store again. `setReadOnly(false)` does not undo this.
+- Every store on that instance throws `engine-failed` from `applyTransaction`, `recalculateVolatile` and `loadPage`. `isSheetwriteReady()` returns `false`.
+- A trap while `releaseEngineMemory()` prepares its copy also stops the engine, because the trap can come from the live instance.
+
+To continue, destroy the grid, call `initSheetwrite()` again and create a new
+grid from a document that you saved, for example through persistence or sync.
+The restart uses the same compiled module and does not download it again. Do
+not read the failed grid or store to get the document: its engine state is not
+reliable.
+
+```ts
+import {
+  createGridFromSnapshot,
+  type Grid,
+  initSheetwrite,
+  type WorkbookSnapshot,
+} from "@sheetwrite/core";
+declare const host: HTMLElement;
+declare function lastSavedSnapshot(): Promise<WorkbookSnapshot>;
+declare function useGrid(next: Grid): void;
+declare function reportEngineFailure(code: string): void;
+
+grid.on("engine-failed", async ({ error }) => {
+  reportEngineFailure(error.code);
+  grid.destroy();
+  await initSheetwrite();
+  useGrid(createGridFromSnapshot(host, await lastSavedSnapshot()));
+});
+```
 
 - [`GridEvents`](https://www.sheetwrite.dev/docs/api/core/grid-events/)
 - [`SnapshotValidationError`](https://www.sheetwrite.dev/docs/api/core/snapshot-validation-error/)
@@ -8816,9 +8853,10 @@ Framework `onGridChange` / `grid-change` callbacks carry the same committed even
 | `active-sheet` | `{ sheet: SheetId }`, after the visible sheet changes (direct call or cross-sheet scroll). |
 | `hyperlink-activate` | `HyperlinkActivationEvent` |
 | `theme-change` | `{ theme: Theme }`, after `setTheme` or `replaceTheme` changes the base theme. |
-| `renderer-fallback` | `{ requested: "worker"; error: SheetwriteError }`, once, when the worker renderer could not be constructed. |
+| `renderer-fallback` | `{ requested: "worker"; error: SheetwriteError }`, once, when the worker renderer could not start or stopped. `error.context.failure` is `spawn`, `crash`, `protocol`, `timeout` or `fatal`. |
 | `datasource-error` | `{ request; error: SheetwriteError }`; `request` is the `DataSourceRequest` without its `signal`. |
 | `export-error` | `{ format: "csv" \| "xlsx"; error: SheetwriteError }`, when a built-in toolbar or context-menu export fails. |
+| `engine-failed` | `{ error: SheetwriteError }`, once, when the engine stopped after a WASM trap. The grid stays read-only; see [Engine failure](https://www.sheetwrite.dev/docs/concepts/error-handling/#engine-failure). |
 
 `commitReason` is one of `edit-blur`, `edit-enter`, `edit-tab`, `edit-programmatic`, `paste`, `cut`, `clear`, `fill`, `structure`, `style`, `replace`, `undo`, `redo` or `api`.
 
@@ -11941,6 +11979,7 @@ that holds the pivot's ID, then to the active sheet. The pivot's
 `savedOutput` is removed, because it does not match a changed definition.
 - `setPresenceOverlays` — Replace ephemeral remote-presence overlays; null clears every collaborator.
 - `setReadOnly` — Update editability without replacing the Grid or clearing session state.
+Has no effect after `engine-failed`: that grid stays read-only.
 - `setRowHeight` — Set one row's persistent display height through document history.
 - `setSheetVisibility` — Set host-visible worksheet state; stock UI never offers `veryHidden`.
 - `setSort` — Persisted multi-key sort of the active sheet.
@@ -12112,7 +12151,7 @@ a "More commands" menu.
 ##### `GridEvents` — interface
 
 ```ts
-export interface GridEvents { change: ChangeEvent; selection: { selection: Selection | null }; scroll: { scrollTop: number; firstRow: number; lastRow: number; scrollLeft: number; firstVisibleColumn: number | null; lastVisibleColumn: number | null; }; "edit-begin": { addr: CellAddress }; "edit-commit": { addr: CellAddress; value: CellValue }; search: SearchResult; "command-state-change": GridCommandStateChangeEvent; "mutation-rejected": { issues: MutationIssue[] }; "active-sheet": { sheet: SheetId }; "hyperlink-activate": HyperlinkActivationEvent; "theme-change": { theme: Theme }; "renderer-fallback": { requested: "worker"; error: SheetwriteError }; "datasource-error": { request: Omit<DataSourceRequest, "signal">; error: SheetwriteError; }; "export-error": { format: "csv" | "xlsx"; error: SheetwriteError }; "chart-select": ChartRef | null; "chart-activate": ChartRef; }
+export interface GridEvents { change: ChangeEvent; selection: { selection: Selection | null }; scroll: { scrollTop: number; firstRow: number; lastRow: number; scrollLeft: number; firstVisibleColumn: number | null; lastVisibleColumn: number | null; }; "edit-begin": { addr: CellAddress }; "edit-commit": { addr: CellAddress; value: CellValue }; search: SearchResult; "command-state-change": GridCommandStateChangeEvent; "mutation-rejected": { issues: MutationIssue[] }; "active-sheet": { sheet: SheetId }; "hyperlink-activate": HyperlinkActivationEvent; "theme-change": { theme: Theme }; "renderer-fallback": { requested: "worker"; error: SheetwriteError }; "datasource-error": { request: Omit<DataSourceRequest, "signal">; error: SheetwriteError; }; "export-error": { format: "csv" | "xlsx"; error: SheetwriteError }; "chart-select": ChartRef | null; "chart-activate": ChartRef; "engine-failed": { error: SheetwriteError }; }
 ```
 
 Payload map for events emitted by a Grid.
@@ -12122,9 +12161,15 @@ Members:
 - `chart-activate` — The user pressed Enter on a selected chart, for example to open its editor.
 - `chart-select` — A chart object on the active sheet was selected; `null` when no object is selected.
 - `command-state-change` — Command availability or formatting activity changed.
+- `engine-failed` — Emitted once when the engine stopped after a WASM trap. `error.code` is
+`engine-failed`. The grid keeps its last frame, is read-only and does not
+read its store again; `setReadOnly(false)` does not undo this. To continue,
+destroy the grid, `await initSheetwrite()` and create a new grid from a
+saved document.
 - `export-error` — Built-in toolbar/context-menu export failed after its action was dispatched.
-- `renderer-fallback` — Emitted once when the worker renderer could not be constructed and the
-grid fell back to the main-thread canvas renderer.
+- `renderer-fallback` — Emitted once when the worker renderer could not start or stopped and the
+grid fell back to the main-thread canvas renderer. `error.context.failure`
+is `spawn`, `crash`, `protocol`, `timeout` or `fatal`.
 - `theme-change` — Emitted after `setTheme` or `replaceTheme` changes the base theme. Holds a copy.
 
 ##### `GridOptions` — interface
@@ -13100,7 +13145,10 @@ Sentinel shown for a reference that participates in a cycle.
 
 Move all live stores into a fresh WASM instance. Call explicitly while idle;
 the main-thread pause scales with resident data and compact undo history.
-Preparation failures leave every live store and the selected instance unchanged.
+Preparation failures leave every live store and the selected instance unchanged;
+running out of memory for the copy rejects with `resource-limit`. A WASM trap
+during preparation rejects with `engine-failed`: the live instance can be
+half-written, so it stops.
 A larger replacement is discarded; the report then has zero migrated stores.
 @example
 ```ts
@@ -13763,7 +13811,7 @@ Private-format MIME type used for rich Sheetwrite clipboard payloads.
 ##### `SHEETWRITE_ERROR_CODES` — variable
 
 ```ts
-readonly ["initialization-failed", "initialization-required", "datasource-request-failed", "renderer-fallback", "export-failed", "xlsx-import-failed", "optional-backend-unavailable", "delimited-text-resource-limit", "delimited-text-invalid-limit", "xlsx-resource-limit", "resource-limit", "invalid-snapshot", "aborted", "not-found", "commit-rejected", "unavailable", "blocked", "quota", "unsupported-schema", "transaction", "conflict", "limit", "invalid-limits", "invalid-version", "invalid-id", "invalid-operations", "operation-limit", "payload-limit", "response-id-mismatch", "future-distance-limit", "buffer-count-limit", "buffer-operation-limit", "buffer-byte-limit", "pending-count-limit", "pending-operation-limit", "pending-byte-limit", "late-echo", "remote-operations-rejected", "invalid-batch", "batch-limit", "pending-capacity", "presence-failed", "revision-failed", "comment-failed", "sync-failed", "sync-storage-failed", "incomplete-data", "xlsx-invalid-options", "unsafe-hyperlink", "invalid-shortcut", "shortcut-conflict", "invalid-function"]
+readonly ["initialization-failed", "initialization-required", "engine-failed", "datasource-request-failed", "renderer-fallback", "export-failed", "xlsx-import-failed", "optional-backend-unavailable", "delimited-text-resource-limit", "delimited-text-invalid-limit", "xlsx-resource-limit", "resource-limit", "invalid-snapshot", "aborted", "not-found", "commit-rejected", "unavailable", "blocked", "quota", "unsupported-schema", "transaction", "conflict", "limit", "invalid-limits", "invalid-version", "invalid-id", "invalid-operations", "operation-limit", "payload-limit", "response-id-mismatch", "future-distance-limit", "buffer-count-limit", "buffer-operation-limit", "buffer-byte-limit", "pending-count-limit", "pending-operation-limit", "pending-byte-limit", "late-echo", "remote-operations-rejected", "invalid-batch", "batch-limit", "pending-capacity", "presence-failed", "revision-failed", "comment-failed", "sync-failed", "sync-storage-failed", "incomplete-data", "xlsx-invalid-options", "unsafe-hyperlink", "invalid-shortcut", "shortcut-conflict", "invalid-function"]
 ```
 
 Stable public failure codes. Messages are diagnostic and are not API contracts.
@@ -13771,7 +13819,7 @@ Stable public failure codes. Messages are diagnostic and are not API contracts.
 ##### `SHEETWRITE_ERROR_OPERATIONS` — variable
 
 ```ts
-readonly ["initialize", "create-grid", "datasource-request", "renderer-worker", "export-xlsx", "xlsx-import", "xlsx-export", "delimited-parse", "delimited-import", "delimited-encode", "delimited-export", "delimited-options", "snapshot-validate", "snapshot-allocate", "persistence", "pending-storage", "synchronize", "presence", "revision", "comments", "query", "hyperlink-activate", "keyboard-configure", "chart-view", "host-function"]
+readonly ["initialize", "create-grid", "engine", "datasource-request", "renderer-worker", "export-xlsx", "xlsx-import", "xlsx-export", "delimited-parse", "delimited-import", "delimited-encode", "delimited-export", "delimited-options", "snapshot-validate", "snapshot-allocate", "persistence", "pending-storage", "synchronize", "presence", "revision", "comments", "query", "hyperlink-activate", "keyboard-configure", "chart-view", "host-function"]
 ```
 
 Stable operations at which a consumer-visible failure can surface.
@@ -13790,7 +13838,7 @@ Members:
 ##### `SheetwriteError` — class
 
 ```ts
-class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: "aborted" | "batch-limit" | "blocked" | "buffer-byte-limit" | "buffer-count-limit" | "buffer-operation-limit" | "comment-failed" | "commit-rejected" | "conflict" | "datasource-request-failed" | "delimited-text-invalid-limit" | "delimited-text-resource-limit" | "export-failed" | "future-distance-limit" | "incomplete-data" | "initialization-failed" | "initialization-required" | "invalid-batch" | "invalid-function" | "invalid-id" | "invalid-limits" | "invalid-operations" | "invalid-shortcut" | "invalid-snapshot" | "invalid-version" | "late-echo" | "limit" | "not-found" | "operation-limit" | "optional-backend-unavailable" | "payload-limit" | "pending-byte-limit" | "pending-capacity" | "pending-count-limit" | "pending-operation-limit" | "presence-failed" | "quota" | "remote-operations-rejected" | "renderer-fallback" | "resource-limit" | "response-id-mismatch" | "revision-failed" | "shortcut-conflict" | "sync-failed" | "sync-storage-failed" | "transaction" | "unavailable" | "unsafe-hyperlink" | "unsupported-schema" | "xlsx-import-failed" | "xlsx-invalid-options" | "xlsx-resource-limit"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: "chart-view" | "comments" | "create-grid" | "datasource-request" | "delimited-encode" | "delimited-export" | "delimited-import" | "delimited-options" | "delimited-parse" | "export-xlsx" | "host-function" | "hyperlink-activate" | "initialize" | "keyboard-configure" | "pending-storage" | "persistence" | "presence" | "query" | "renderer-worker" | "revision" | "snapshot-allocate" | "snapshot-validate" | "synchronize" | "xlsx-export" | "xlsx-import"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }
+class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: "aborted" | "batch-limit" | "blocked" | "buffer-byte-limit" | "buffer-count-limit" | "buffer-operation-limit" | "comment-failed" | "commit-rejected" | "conflict" | "datasource-request-failed" | "delimited-text-invalid-limit" | "delimited-text-resource-limit" | "engine-failed" | "export-failed" | "future-distance-limit" | "incomplete-data" | "initialization-failed" | "initialization-required" | "invalid-batch" | "invalid-function" | "invalid-id" | "invalid-limits" | "invalid-operations" | "invalid-shortcut" | "invalid-snapshot" | "invalid-version" | "late-echo" | "limit" | "not-found" | "operation-limit" | "optional-backend-unavailable" | "payload-limit" | "pending-byte-limit" | "pending-capacity" | "pending-count-limit" | "pending-operation-limit" | "presence-failed" | "quota" | "remote-operations-rejected" | "renderer-fallback" | "resource-limit" | "response-id-mismatch" | "revision-failed" | "shortcut-conflict" | "sync-failed" | "sync-storage-failed" | "transaction" | "unavailable" | "unsafe-hyperlink" | "unsupported-schema" | "xlsx-import-failed" | "xlsx-invalid-options" | "xlsx-resource-limit"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: "chart-view" | "comments" | "create-grid" | "datasource-request" | "delimited-encode" | "delimited-export" | "delimited-import" | "delimited-options" | "delimited-parse" | "engine" | "export-xlsx" | "host-function" | "hyperlink-activate" | "initialize" | "keyboard-configure" | "pending-storage" | "persistence" | "presence" | "query" | "renderer-worker" | "revision" | "snapshot-allocate" | "snapshot-validate" | "synchronize" | "xlsx-export" | "xlsx-import"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }
 ```
 
 Canonical envelope for thrown and callback-delivered Sheetwrite failures.
@@ -15458,7 +15506,7 @@ An explicit projection record for an operation with no row-space meaning.
 ##### `SHEETWRITE_ERROR_CODES` — variable
 
 ```ts
-readonly ["initialization-failed", "initialization-required", "datasource-request-failed", "renderer-fallback", "export-failed", "xlsx-import-failed", "optional-backend-unavailable", "delimited-text-resource-limit", "delimited-text-invalid-limit", "xlsx-resource-limit", "resource-limit", "invalid-snapshot", "aborted", "not-found", "commit-rejected", "unavailable", "blocked", "quota", "unsupported-schema", "transaction", "conflict", "limit", "invalid-limits", "invalid-version", "invalid-id", "invalid-operations", "operation-limit", "payload-limit", "response-id-mismatch", "future-distance-limit", "buffer-count-limit", "buffer-operation-limit", "buffer-byte-limit", "pending-count-limit", "pending-operation-limit", "pending-byte-limit", "late-echo", "remote-operations-rejected", "invalid-batch", "batch-limit", "pending-capacity", "presence-failed", "revision-failed", "comment-failed", "sync-failed", "sync-storage-failed", "incomplete-data", "xlsx-invalid-options", "unsafe-hyperlink", "invalid-shortcut", "shortcut-conflict", "invalid-function"]
+readonly ["initialization-failed", "initialization-required", "engine-failed", "datasource-request-failed", "renderer-fallback", "export-failed", "xlsx-import-failed", "optional-backend-unavailable", "delimited-text-resource-limit", "delimited-text-invalid-limit", "xlsx-resource-limit", "resource-limit", "invalid-snapshot", "aborted", "not-found", "commit-rejected", "unavailable", "blocked", "quota", "unsupported-schema", "transaction", "conflict", "limit", "invalid-limits", "invalid-version", "invalid-id", "invalid-operations", "operation-limit", "payload-limit", "response-id-mismatch", "future-distance-limit", "buffer-count-limit", "buffer-operation-limit", "buffer-byte-limit", "pending-count-limit", "pending-operation-limit", "pending-byte-limit", "late-echo", "remote-operations-rejected", "invalid-batch", "batch-limit", "pending-capacity", "presence-failed", "revision-failed", "comment-failed", "sync-failed", "sync-storage-failed", "incomplete-data", "xlsx-invalid-options", "unsafe-hyperlink", "invalid-shortcut", "shortcut-conflict", "invalid-function"]
 ```
 
 Stable public failure codes. Messages are diagnostic and are not API contracts.
@@ -15466,7 +15514,7 @@ Stable public failure codes. Messages are diagnostic and are not API contracts.
 ##### `SHEETWRITE_ERROR_OPERATIONS` — variable
 
 ```ts
-readonly ["initialize", "create-grid", "datasource-request", "renderer-worker", "export-xlsx", "xlsx-import", "xlsx-export", "delimited-parse", "delimited-import", "delimited-encode", "delimited-export", "delimited-options", "snapshot-validate", "snapshot-allocate", "persistence", "pending-storage", "synchronize", "presence", "revision", "comments", "query", "hyperlink-activate", "keyboard-configure", "chart-view", "host-function"]
+readonly ["initialize", "create-grid", "engine", "datasource-request", "renderer-worker", "export-xlsx", "xlsx-import", "xlsx-export", "delimited-parse", "delimited-import", "delimited-encode", "delimited-export", "delimited-options", "snapshot-validate", "snapshot-allocate", "persistence", "pending-storage", "synchronize", "presence", "revision", "comments", "query", "hyperlink-activate", "keyboard-configure", "chart-view", "host-function"]
 ```
 
 Stable operations at which a consumer-visible failure can surface.
@@ -15474,7 +15522,7 @@ Stable operations at which a consumer-visible failure can surface.
 ##### `SheetwriteError` — class
 
 ```ts
-class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: "aborted" | "batch-limit" | "blocked" | "buffer-byte-limit" | "buffer-count-limit" | "buffer-operation-limit" | "comment-failed" | "commit-rejected" | "conflict" | "datasource-request-failed" | "delimited-text-invalid-limit" | "delimited-text-resource-limit" | "export-failed" | "future-distance-limit" | "incomplete-data" | "initialization-failed" | "initialization-required" | "invalid-batch" | "invalid-function" | "invalid-id" | "invalid-limits" | "invalid-operations" | "invalid-shortcut" | "invalid-snapshot" | "invalid-version" | "late-echo" | "limit" | "not-found" | "operation-limit" | "optional-backend-unavailable" | "payload-limit" | "pending-byte-limit" | "pending-capacity" | "pending-count-limit" | "pending-operation-limit" | "presence-failed" | "quota" | "remote-operations-rejected" | "renderer-fallback" | "resource-limit" | "response-id-mismatch" | "revision-failed" | "shortcut-conflict" | "sync-failed" | "sync-storage-failed" | "transaction" | "unavailable" | "unsafe-hyperlink" | "unsupported-schema" | "xlsx-import-failed" | "xlsx-invalid-options" | "xlsx-resource-limit"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: "chart-view" | "comments" | "create-grid" | "datasource-request" | "delimited-encode" | "delimited-export" | "delimited-import" | "delimited-options" | "delimited-parse" | "export-xlsx" | "host-function" | "hyperlink-activate" | "initialize" | "keyboard-configure" | "pending-storage" | "persistence" | "presence" | "query" | "renderer-worker" | "revision" | "snapshot-allocate" | "snapshot-validate" | "synchronize" | "xlsx-export" | "xlsx-import"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }
+class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: "aborted" | "batch-limit" | "blocked" | "buffer-byte-limit" | "buffer-count-limit" | "buffer-operation-limit" | "comment-failed" | "commit-rejected" | "conflict" | "datasource-request-failed" | "delimited-text-invalid-limit" | "delimited-text-resource-limit" | "engine-failed" | "export-failed" | "future-distance-limit" | "incomplete-data" | "initialization-failed" | "initialization-required" | "invalid-batch" | "invalid-function" | "invalid-id" | "invalid-limits" | "invalid-operations" | "invalid-shortcut" | "invalid-snapshot" | "invalid-version" | "late-echo" | "limit" | "not-found" | "operation-limit" | "optional-backend-unavailable" | "payload-limit" | "pending-byte-limit" | "pending-capacity" | "pending-count-limit" | "pending-operation-limit" | "presence-failed" | "quota" | "remote-operations-rejected" | "renderer-fallback" | "resource-limit" | "response-id-mismatch" | "revision-failed" | "shortcut-conflict" | "sync-failed" | "sync-storage-failed" | "transaction" | "unavailable" | "unsafe-hyperlink" | "unsupported-schema" | "xlsx-import-failed" | "xlsx-invalid-options" | "xlsx-resource-limit"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: "chart-view" | "comments" | "create-grid" | "datasource-request" | "delimited-encode" | "delimited-export" | "delimited-import" | "delimited-options" | "delimited-parse" | "engine" | "export-xlsx" | "host-function" | "hyperlink-activate" | "initialize" | "keyboard-configure" | "pending-storage" | "persistence" | "presence" | "query" | "renderer-worker" | "revision" | "snapshot-allocate" | "snapshot-validate" | "synchronize" | "xlsx-export" | "xlsx-import"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }
 ```
 
 Canonical envelope for thrown and callback-delivered Sheetwrite failures.
@@ -16611,6 +16659,7 @@ that holds the pivot's ID, then to the active sheet. The pivot's
 `savedOutput` is removed, because it does not match a changed definition.
 - `setPresenceOverlays` — Replace ephemeral remote-presence overlays; null clears every collaborator.
 - `setReadOnly` — Update editability without replacing the Grid or clearing session state.
+Has no effect after `engine-failed`: that grid stays read-only.
 - `setRowHeight` — Set one row's persistent display height through document history.
 - `setSheetVisibility` — Set host-visible worksheet state; stock UI never offers `veryHidden`.
 - `setSort` — Persisted multi-key sort of the active sheet.
@@ -17170,6 +17219,7 @@ that holds the pivot's ID, then to the active sheet. The pivot's
 `savedOutput` is removed, because it does not match a changed definition.
 - `setPresenceOverlays` — Replace ephemeral remote-presence overlays; null clears every collaborator.
 - `setReadOnly` — Update editability without replacing the Grid or clearing session state.
+Has no effect after `engine-failed`: that grid stays read-only.
 - `setRowHeight` — Set one row's persistent display height through document history.
 - `setSheetVisibility` — Set host-visible worksheet state; stock UI never offers `veryHidden`.
 - `setSort` — Persisted multi-key sort of the active sheet.
@@ -17710,6 +17760,7 @@ that holds the pivot's ID, then to the active sheet. The pivot's
 `savedOutput` is removed, because it does not match a changed definition.
 - `setPresenceOverlays` — Replace ephemeral remote-presence overlays; null clears every collaborator.
 - `setReadOnly` — Update editability without replacing the Grid or clearing session state.
+Has no effect after `engine-failed`: that grid stays read-only.
 - `setRowHeight` — Set one row's persistent display height through document history.
 - `setSheetVisibility` — Set host-visible worksheet state; stock UI never offers `veryHidden`.
 - `setSort` — Persisted multi-key sort of the active sheet.

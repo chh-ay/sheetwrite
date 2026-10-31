@@ -1,3 +1,4 @@
+import { SheetwriteError } from "./errors.js";
 import type { PanePaint, Renderer, RenderLayout, Theme, Viewport } from "./types/render.js";
 import type { VisibleWindowView } from "./types/store.js";
 
@@ -52,6 +53,21 @@ const SHARED_STATE_SLOT = 0;
 const SHARED_GENERATION_SLOT = 1;
 const SHARED_FREE = 0;
 const SHARED_BUSY = 1;
+/**
+ * Error and fatal texts come from the worker script, which `workerUrl` can
+ * replace; an error message keeps only this many characters of them.
+ */
+const MAX_WORKER_TEXT_LENGTH = 256;
+
+/** Why the paint worker stopped; `context.failure` of its `renderer-fallback` error. */
+type WorkerFailure = "spawn" | "crash" | "protocol" | "timeout" | "fatal";
+
+function workerFailure(failure: WorkerFailure, message: string, cause?: unknown): SheetwriteError {
+  return new SheetwriteError("renderer-fallback", "renderer-worker", message, {
+    cause,
+    context: { requested: "worker", failure },
+  });
+}
 
 function align(offset: number, alignment: number): number {
   return (offset + alignment - 1) & ~(alignment - 1);
@@ -122,7 +138,7 @@ export class WorkerRenderer implements Renderer {
   constructor(
     private readonly workerUrl?: string | URL,
     private readonly options: WorkerRendererOptions = {},
-    private readonly onFailure?: (error: unknown) => void,
+    private readonly onFailure?: (error: SheetwriteError) => void,
   ) {}
 
   mount(host: HTMLElement, theme: Theme): void {
@@ -132,13 +148,20 @@ export class WorkerRenderer implements Renderer {
     // expression: Vite, webpack 5 and Parcel only bundle a worker (with its
     // imports) when they see that exact shape. Split apart, they copy the
     // file as a bare asset whose relative imports do not exist.
-    const worker =
-      this.workerUrl === undefined
-        ? new Worker(new URL("./worker.js", import.meta.url), { type: "module" })
-        : new Worker(this.workerUrl, { type: "module" });
+    let worker: Worker;
+    try {
+      worker =
+        this.workerUrl === undefined
+          ? new Worker(new URL("./worker.js", import.meta.url), { type: "module" })
+          : new Worker(this.workerUrl, { type: "module" });
+    } catch (error) {
+      throw workerFailure("spawn", "Sheetwrite: paint worker could not start", error);
+    }
+
     this.worker = worker;
     worker.addEventListener("error", this.onWorkerError);
     worker.addEventListener("message", this.onWorkerMessage);
+    worker.addEventListener("messageerror", this.onWorkerMessageError);
 
     const canvas = document.createElement("canvas");
     canvas.className = "sheetwrite-canvas";
@@ -151,14 +174,14 @@ export class WorkerRenderer implements Renderer {
     try {
       const offscreen = canvas.transferControlToOffscreen();
       this.readinessTimeout = window.setTimeout(() => {
-        this.fail(new Error("Sheetwrite: Paint worker did not become ready"));
+        this.fail(workerFailure("timeout", "Sheetwrite: paint worker did not become ready"));
       }, WORKER_READY_TIMEOUT_MS);
       worker.postMessage({ type: "init", canvas: offscreen, theme }, [offscreen]);
       host.appendChild(canvas);
       this.canvas = canvas;
     } catch (error) {
       this.destroy();
-      throw error;
+      throw workerFailure("spawn", "Sheetwrite: paint worker could not take the canvas", error);
     }
   }
 
@@ -319,6 +342,7 @@ export class WorkerRenderer implements Renderer {
     if (worker) {
       worker.removeEventListener("error", this.onWorkerError);
       worker.removeEventListener("message", this.onWorkerMessage);
+      worker.removeEventListener("messageerror", this.onWorkerMessageError);
       worker.postMessage({ type: "destroy" });
       worker.terminate();
     }
@@ -330,37 +354,58 @@ export class WorkerRenderer implements Renderer {
 
   private readonly onWorkerError = (event: ErrorEvent): void => {
     event.preventDefault();
-    const error =
-      event.error instanceof Error
-        ? event.error
-        : new Error(event.message || "Sheetwrite: Worker renderer failed to load");
-    this.fail(error);
+    // Before `ready`, an error event means the script did not load or start.
+    const failure = this.readinessTimeout === undefined ? "crash" : "spawn";
+    this.fail(
+      workerFailure(
+        failure,
+        event.message
+          ? event.message.slice(0, MAX_WORKER_TEXT_LENGTH)
+          : "Sheetwrite: paint worker stopped with an uncaught error",
+        event.error,
+      ),
+    );
+  };
+
+  /** A reply that cannot be deserialized means the two sides disagree on the protocol. */
+  private readonly onWorkerMessageError = (): void => {
+    this.fail(
+      workerFailure("protocol", "Sheetwrite: paint worker sent a reply that cannot be read"),
+    );
   };
 
   private readonly onWorkerMessage = (event: MessageEvent<unknown>): void => {
     const data = event.data;
-    if (data === null || typeof data !== "object" || !("type" in data)) return;
-    switch (data.type) {
+    const reply = data !== null && typeof data === "object" ? data : {};
+    switch ("type" in reply ? reply.type : undefined) {
       case "ready":
         window.clearTimeout(this.readinessTimeout);
         this.readinessTimeout = undefined;
         break;
       case "fatal": {
-        const reason =
-          "reason" in data && typeof data.reason === "string"
-            ? data.reason
-            : "Sheetwrite: Paint worker reported a fatal failure";
-        this.fail(new Error(reason));
+        const reason = "reason" in reply ? reply.reason : undefined;
+        this.fail(
+          workerFailure(
+            "fatal",
+            typeof reason === "string"
+              ? reason.slice(0, MAX_WORKER_TEXT_LENGTH)
+              : "Sheetwrite: paint worker reported a fatal failure",
+          ),
+        );
         break;
       }
       case "painted":
         this.frameGeneration++;
         if (this.canvas) this.canvas.dataset.workerFrame = String(this.frameGeneration);
         break;
+      default:
+        // A worker from another release (a stale `workerUrl` copy) can send
+        // replies this renderer does not know; painting on would be guesswork.
+        this.fail(workerFailure("protocol", "Sheetwrite: paint worker sent an unknown reply"));
     }
   };
 
-  private fail(error: unknown): void {
+  private fail(error: SheetwriteError): void {
     if (this.failed) return;
     this.failed = true;
     const onFailure = this.onFailure;
