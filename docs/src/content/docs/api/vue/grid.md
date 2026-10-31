@@ -28,7 +28,7 @@ function updateTotal(grid: Grid) {
 - [Grid.applyTransaction](/docs/api/vue/grid/#grid-apply-transaction)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/grid.d.ts#L633"><code>packages/core/dist/types/grid.d.ts#L633</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/grid.d.ts#L636"><code>packages/core/dist/types/grid.d.ts#L636</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -133,10 +133,11 @@ function updateTotal(grid: Grid) {
 <a href="#grid-renderer-kind"><code>rendererKind</code></a>
 <a href="#grid-on"><code>on</code></a>
 <a href="#grid-refresh"><code>refresh</code></a>
+<a href="#grid-trim-memory"><code>trimMemory</code></a>
 <a href="#grid-destroy"><code>destroy</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>102</span>
+## Members <span class="api-count" data-pagefind-ignore>103</span>
 
 <div class="api-member-list">
 
@@ -1235,13 +1236,48 @@ refresh(): void;
 
 </details>
 
+<details class="api-member" id="grid-trim-memory" data-pagefind-weight="1">
+<summary><code>trimMemory</code> <span class="api-member-summary">Drop the memory this grid can build again: decoded cell strings, rendered number text, compiled number formats, text measurement and unused overlay nodes, in the grid and in its worker renderer.</span></summary>
+
+```ts generated
+trimMemory(): void;
+```
+
+Drop the memory this grid can build again: decoded cell strings, rendered
+number text, compiled number formats, text measurement and unused overlay
+nodes, in the grid and in its worker renderer. Document data, undo history
+and the visible output do not change. The next frame and the next use
+build again what they need. Call it on a memory signal or when the page
+goes to the background; it does nothing after `destroy()`.
+
+Number format caches are shared by all grids on the page, so a trim also
+drops them for the other grids. WebAssembly memory does not shrink; call
+`releaseEngineMemory()` for that.
+
+### Examples
+
+```ts compile
+import type { Grid } from "@sheetwrite/core";
+
+function trimWhenHidden(grid: Grid) {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") grid.trimMemory();
+  });
+}
+```
+
+</details>
+
 <details class="api-member" id="grid-destroy" data-pagefind-weight="1">
-<summary><code>destroy</code></summary>
+<summary><code>destroy</code> <span class="api-member-summary">Free everything this grid owns: its DOM, listeners, timers, renderer, worker and caches, and the store that it created.</span></summary>
 
 ```ts generated
 destroy(): void;
 ```
 
+<p class="api-member-doc">Free everything this grid owns: its DOM, listeners, timers, renderer,
+worker and caches, and the store that it created. Call it when the host
+view is removed; a second call does nothing.</p>
 </details>
 </div>
 
@@ -1382,6 +1418,7 @@ export interface Grid {
     fn: (e: GridEvents[E]) => void,
   ): () => void;
   refresh(): void;
+  trimMemory(): void;
   destroy(): void;
 }
 ```

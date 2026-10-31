@@ -411,6 +411,22 @@ export class OverlayPainter {
     this.hideSurplusPresenceLabels();
   }
 
+  /**
+   * Remove the hidden pool divs past the last pass and the color-parsing
+   * context. The divs that the last pass shows stay, so the overlay does not
+   * change; a later busier pass creates divs again.
+   */
+  trimMemory(): void {
+    for (let index = this.cursor; index < this.pool.length; index++) this.pool[index]?.remove();
+    this.pool.length = this.cursor;
+
+    for (let index = this.presenceLabelCursor; index < this.presenceLabelPool.length; index++) {
+      this.presenceLabelPool[index]?.remove();
+    }
+    this.presenceLabelPool.length = this.presenceLabelCursor;
+    this.presenceColorContext = undefined;
+  }
+
   destroy(): void {
     this.overlay.remove();
   }

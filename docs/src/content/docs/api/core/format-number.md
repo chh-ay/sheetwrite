@@ -11,7 +11,7 @@ positive/negative/zero/text codes, quoted literals, and backslash escapes.
 `General` formats exactly like an omitted code.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/number-format.ts#L539"><code>packages/core/src/number-format.ts#L539</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/number-format.ts#L561"><code>packages/core/src/number-format.ts#L561</code></a></dd></div>
 </dl>
 
 ## Declaration

@@ -16,6 +16,6 @@ The render page includes chart-source tracking; the data-engine page includes in
 - [Formula engine performance](/docs/performance/formula-engine/): Recalculation timings by dependency shape, and how the two engine builds compare.
 - [XLSX codec performance](/docs/performance/xlsx-codec/): Import and export time and peak memory for XLSX files.
 - [Delivery size](/docs/performance/delivery-size/): Published package sizes for each Sheetwrite release.
-- [Memory](/docs/performance/memory/): Release retained engine memory, and read which owner holds each byte.
+- [Memory](/docs/performance/memory/): Release retained engine memory, free grids and trim their caches, and read which owner holds each byte.
 - [Release comparison](/docs/performance/release-comparison/): Each release measured against the previous one on the same machine, suite by suite.
 - [Benchmark protocol](/docs/performance/benchmark-protocol/): How the evidence is captured, and how to check a change for a timing regression.

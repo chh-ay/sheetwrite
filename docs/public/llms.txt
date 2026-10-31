@@ -165,7 +165,7 @@ These pages are generated from checked inventories and evidence. Their tables ar
 - [Data engine performance](https://www.sheetwrite.dev/docs/performance/data-engine/): Ingest, window read, edit, sort, filter, and aggregate timings of the data store.
 - [Delivery size](https://www.sheetwrite.dev/docs/performance/delivery-size/): Published package sizes for each Sheetwrite release.
 - [Formula engine performance](https://www.sheetwrite.dev/docs/performance/formula-engine/): Recalculation timings by dependency shape, and how the two engine builds compare.
-- [Memory](https://www.sheetwrite.dev/docs/performance/memory/): Release retained engine memory, and read which owner holds each byte.
+- [Memory](https://www.sheetwrite.dev/docs/performance/memory/): Release retained engine memory, free grids and trim their caches, and read which owner holds each byte.
 - [Release comparison](https://www.sheetwrite.dev/docs/performance/release-comparison/): Each release measured against the previous one on the same machine, suite by suite.
 - [Render performance](https://www.sheetwrite.dev/docs/performance/render/): Scroll, edit, and interaction timings of the live grid, measured against Handsontable.
 - [XLSX codec performance](https://www.sheetwrite.dev/docs/performance/xlsx-codec/): Import and export time and peak memory for XLSX files.

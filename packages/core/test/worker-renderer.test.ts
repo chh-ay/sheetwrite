@@ -165,6 +165,58 @@ function makePackedView(): VisibleWindowView {
   };
 }
 
+/** A worker handler that paints one text column and records the drawn text. */
+function textDrawingWorker() {
+  const drawnText: string[] = [];
+  const context = new Proxy<Record<string, unknown>>(
+    {},
+    {
+      get(target, property) {
+        if (property in target) return target[String(property)];
+        if (property === "measureText") return (text: string) => ({ width: text.length * 7 });
+        if (property === "fillText") return (text: string) => drawnText.push(text);
+        return () => undefined;
+      },
+    },
+  );
+  const canvas = new EventTarget();
+  Object.defineProperties(canvas, {
+    width: { value: 640, writable: true },
+    height: { value: 480, writable: true },
+    getContext: { value: () => context },
+  });
+  const handler = createWorkerMessageHandler(() => undefined);
+  handler({ type: "init", canvas, theme: TEST_THEME });
+  handler({
+    type: "layout",
+    layout: {
+      columns: [{ key: "name", header: "Name", width: 160, type: "text" }],
+      rowHeight: 20,
+      headerHeight: 24,
+      totalRows: 1,
+    },
+  });
+  handler({
+    type: "viewport",
+    viewport: { width: 640, height: 480, scrollTop: 0, scrollLeft: 0 },
+    dpr: 1,
+  });
+  const frame = {
+    type: "paintPacked",
+    ...makePackedView(),
+    cols: [0],
+    valueKinds: new Uint8Array([2]),
+    numberValues: new Float64Array([0]),
+    stringPoolIds: new Uint32Array([0]),
+    stringLocalIds: new Int32Array([-1]),
+    styleIds: new Uint32Array([0]),
+    stringPoolUpdateIds: new Uint32Array([0]),
+    stringPoolUpdateValues: ["old epoch text"],
+  };
+
+  return { handler, drawnText, frame };
+}
+
 describe("WorkerRenderer", () => {
   it("transfers a renderer-owned style id buffer when painting a generic view", () => {
     const renderer = new WorkerRenderer();
@@ -349,52 +401,7 @@ describe("WorkerRenderer", () => {
   });
 
   it("drops strings absent from a replacement-epoch frame before later packed paints", () => {
-    const drawnText: string[] = [];
-    const context = new Proxy<Record<string, unknown>>(
-      {},
-      {
-        get(target, property) {
-          if (property in target) return target[String(property)];
-          if (property === "measureText") return (text: string) => ({ width: text.length * 7 });
-          if (property === "fillText") return (text: string) => drawnText.push(text);
-          return () => undefined;
-        },
-      },
-    );
-    const canvas = new EventTarget();
-    Object.defineProperties(canvas, {
-      width: { value: 640, writable: true },
-      height: { value: 480, writable: true },
-      getContext: { value: () => context },
-    });
-    const handler = createWorkerMessageHandler(() => undefined);
-    handler({ type: "init", canvas, theme: TEST_THEME });
-    handler({
-      type: "layout",
-      layout: {
-        columns: [{ key: "name", header: "Name", width: 160, type: "text" }],
-        rowHeight: 20,
-        headerHeight: 24,
-        totalRows: 1,
-      },
-    });
-    handler({
-      type: "viewport",
-      viewport: { width: 640, height: 480, scrollTop: 0, scrollLeft: 0 },
-      dpr: 1,
-    });
-    const frame = {
-      type: "paintPacked",
-      ...makePackedView(),
-      cols: [0],
-      valueKinds: new Uint8Array([2]),
-      numberValues: new Float64Array([0]),
-      stringPoolIds: new Uint32Array([0]),
-      stringLocalIds: new Int32Array([-1]),
-      styleIds: new Uint32Array([0]),
-      stringPoolUpdateIds: new Uint32Array([0]),
-      stringPoolUpdateValues: ["old epoch text"],
-    };
+    const { handler, drawnText, frame } = textDrawingWorker();
     handler(frame);
     expect(drawnText).toContain("old epoch text");
     drawnText.length = 0;
@@ -416,6 +423,41 @@ describe("WorkerRenderer", () => {
     });
     expect(drawnText).not.toContain("old epoch text");
     handler({ type: "destroy" });
+  });
+
+  it("drops its cached strings on a trim message", () => {
+    const { handler, drawnText, frame } = textDrawingWorker();
+    const withoutUpdates = {
+      ...frame,
+      stringPoolUpdateIds: undefined,
+      stringPoolUpdateValues: undefined,
+    };
+    handler(frame);
+    drawnText.length = 0;
+    handler(withoutUpdates);
+    expect(drawnText).toContain("old epoch text");
+
+    drawnText.length = 0;
+    handler({ type: "trim" });
+    handler(withoutUpdates);
+
+    expect(drawnText).not.toContain("old epoch text");
+    handler(frame);
+    expect(drawnText).toContain("old epoch text");
+    handler({ type: "destroy" });
+  });
+
+  it("posts a trim message and drops its shared paint regions", () => {
+    const renderer = new WorkerRenderer();
+    const worker = new RecordingWorker();
+    Reflect.set(renderer, "worker", worker);
+    const regions: unknown[] = Reflect.get(renderer, "sharedRegions");
+    regions[0] = { byteLength: 64 };
+
+    renderer.trimMemory();
+
+    expect(worker.messages).toEqual([{ message: { type: "trim" }, transfer: undefined }]);
+    expect(regions.every((region) => region === undefined)).toBe(true);
   });
 
   it("round-trips sender lifecycle payloads through the worker handler before acknowledging", () => {

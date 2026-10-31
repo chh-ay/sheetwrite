@@ -8,7 +8,7 @@ description: "GridCommandState interface in @sheetwrite/core: Observable availab
 Observable availability and selection-derived activity for one command.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/grid.ts#L268"><code>packages/core/src/types/grid.ts#L268</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/grid.ts#L271"><code>packages/core/src/types/grid.ts#L271</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

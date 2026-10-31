@@ -173,7 +173,10 @@ export interface GridActions {
    * above it, or to its left when there are none above.
    */
   autoSum(): void;
-  /** Open the built-in find bar when it is enabled. */
+  /**
+   * Open the built-in find bar when it is enabled. The find bar is in its own
+   * chunk: the first call loads it, and the bar shows when the chunk arrives.
+   */
   find(): void;
   /**
    * Freeze rows above and columns left of the focus cell in view coordinates.
@@ -1154,5 +1157,34 @@ export interface Grid {
   rendererKind(): "canvas" | "worker";
   on<E extends keyof GridEvents>(evt: E, fn: (e: GridEvents[E]) => void): () => void;
   refresh(): void;
+  /**
+   * Drop the memory this grid can build again: decoded cell strings, rendered
+   * number text, compiled number formats, text measurement and unused overlay
+   * nodes, in the grid and in its worker renderer. Document data, undo history
+   * and the visible output do not change. The next frame and the next use
+   * build again what they need. Call it on a memory signal or when the page
+   * goes to the background; it does nothing after `destroy()`.
+   *
+   * Number format caches are shared by all grids on the page, so a trim also
+   * drops them for the other grids. WebAssembly memory does not shrink; call
+   * `releaseEngineMemory()` for that.
+   *
+   * @example
+   * ```ts
+   * import type { Grid } from "@sheetwrite/core";
+   *
+   * function trimWhenHidden(grid: Grid) {
+   *   document.addEventListener("visibilitychange", () => {
+   *     if (document.visibilityState === "hidden") grid.trimMemory();
+   *   });
+   * }
+   * ```
+   */
+  trimMemory(): void;
+  /**
+   * Free everything this grid owns: its DOM, listeners, timers, renderer,
+   * worker and caches, and the store that it created. Call it when the host
+   * view is removed; a second call does nothing.
+   */
   destroy(): void;
 }

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sheetwrite grid lifetime benchmark</title>
+    <style>
+      body {
+        margin: 0;
+        font: 13px/1.5 system-ui, sans-serif;
+      }
+      #grid-host {
+        width: 960px;
+        height: 560px;
+      }
+    </style>
+  </head>
+  <body>
+    <output id="bench-status" data-status="loading">loading</output>
+    <button id="bench-run" type="button" disabled>Create and destroy grids</button>
+    <div id="grid-host"></div>
+    <script type="module" src="./grid-lifetime-page.ts"></script>
+  </body>
+</html>

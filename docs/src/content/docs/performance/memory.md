@@ -1,6 +1,6 @@
 ---
 title: "Memory"
-description: "Release retained engine memory, and read which owner holds each byte."
+description: "Release retained engine memory, free grids and trim their caches, and read which owner holds each byte."
 ---
 
 ## Release retained engine memory
@@ -18,6 +18,27 @@ The call waits for synchronous transactions and active datasource page loads, th
 The main-thread pause scales with resident cells and compact history, so do not invoke it on an interaction-critical path. Migration temporarily needs both instances and packed transfer buffers; it can increase peak memory before garbage collection reclaims the retired instance. If preparation fails, every live store stays on the original instance. Concurrent calls share the same release.
 
 `report.wasmBytesBefore` and `report.wasmBytesAfter` are committed linear-memory bytes, not live-cell bytes or process memory. `report.pauseMs` measures migration, excluding the idle wait. A release is not guaranteed to reduce committed bytes: surviving data, compact history, and migration scratch can still require substantial memory. Actual process-memory reclamation depends on garbage collection.
+
+## Grid lifetime and trimMemory
+
+A grid owns its DOM, listeners, timers, renderer, worker and caches. Call `grid.destroy()` when the host view goes away. It frees all of them, and the store that the grid created. Caches that are not on the grid are keyed by their owner in a `WeakMap`, so they go with the grid; the few page-wide caches have a fixed size limit. A second `destroy()` call does nothing.
+
+`grid.trimMemory()` gives back the memory that an open grid can build again: decoded cell strings, rendered number text, compiled number formats, text measurement and unused overlay nodes, in the grid and in its worker renderer. Document data, undo history and the visible output do not change. The next frame reads its window again and builds only what it paints. Call it on a memory signal from the host, or when the page goes to the background:
+
+```ts prelude="core" partial="requires a mounted grid" title="Trim a grid in the background"
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") grid.trimMemory();
+});
+```
+
+The number format caches are shared by all grids on the page, so one trim drops them for every grid. A trim does not shrink WebAssembly memory; call [`releaseEngineMemory`](/docs/api/core/release-engine-memory/) at an idle point for that. A trim after `destroy()` does nothing.
+
+Two checks hold these rules. A Chromium browser test (`test/browser/grid-memory.spec.ts`) scrolls a 200,000-row sheet, trims, and requires the same screenshot, the same document and a lower retained heap. A Chromium benchmark creates and destroys 50 warm-up grids and then 100 more in one page. After a full collection, the V8 and Blink heaps together must stay within 5% of their size after the warm-up, as the median of three runs in a fresh browser. No DOM node, event listener or grid object may remain: the page keeps weak references to each grid, its store, its action surface and its top-level elements, and all of them must be collected. The warm-up holds the engine and the code that V8 compiles for the grid, which levels off after a few dozen grids:
+
+```sh verify title="Grid lifetime memory"
+bun run build:packages
+bun bench/src/grid-lifetime-browser-bench.ts --runs 3 --warmup 50 --cycles 100
+```
 
 ## Runtime resource ownership
 

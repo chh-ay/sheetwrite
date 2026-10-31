@@ -31,8 +31,8 @@ if (wasm.length !== 1) throw new Error(`Expected one webpack WASM asset, got ${w
 if (!publicFiles.includes("main.js")) throw new Error("webpack emitted no initial main.js");
 
 // `chunkFilename` names every lazy chunk `worker-*`, so tell the opt-in chrome
-// (the ribbon, the toolbar and the command model they share), the side panels
-// and the built-in function table apart by content. All must stay out of
+// (the ribbon, the toolbar and the command model they share), the side panels,
+// the find bar and the built-in function table apart by content. All must stay out of
 // main.js, or every app downloads them. Webpack may split the chrome into
 // several chunks.
 const RIBBON_MARKER = "sheetwrite-ribbon-tabs";
@@ -41,9 +41,11 @@ const CHROME_MARKER = "sheetwrite-ribbon-";
 const PANEL_MARKER = "sheetwrite-panel-section";
 // A row of the generated table that functions/registry.ts loads on demand.
 const FUNCTION_TABLE_MARKER = '["SUM",';
+const FIND_MARKER = "sheetwrite-find-replace-row";
 const chromeChunks = [];
 const panelChunks = [];
 const functionTableChunks = [];
+const findChunks = [];
 const workers = [];
 const chromeCode = [];
 for (const file of lazyChunks) {
@@ -53,7 +55,8 @@ for (const file of lazyChunks) {
   else if (code.includes(CHROME_MARKER) || code.includes(TOOLBAR_MARKER)) {
     chromeChunks.push(file);
     chromeCode.push(code);
-  } else workers.push(file);
+  } else if (code.includes(FIND_MARKER)) findChunks.push(file);
+  else workers.push(file);
 }
 if (workers.length !== 1)
   throw new Error(`Expected one webpack Worker chunk, got ${workers.length}`);
@@ -63,6 +66,8 @@ for (const marker of [RIBBON_MARKER, TOOLBAR_MARKER]) {
 }
 if (panelChunks.length !== 1)
   throw new Error(`Expected one lazy webpack panel chunk, got ${panelChunks.length}`);
+if (findChunks.length !== 1)
+  throw new Error(`Expected one lazy webpack find bar chunk, got ${findChunks.length}`);
 if (functionTableChunks.length !== 1) {
   throw new Error(
     `Expected one lazy webpack function table chunk, got ${functionTableChunks.length}`,
@@ -76,6 +81,9 @@ for (const marker of [CHROME_MARKER, TOOLBAR_MARKER]) {
 }
 if (mainCode.includes(PANEL_MARKER)) {
   throw new Error("The side panels are in webpack's main.js; they must load lazily");
+}
+if (mainCode.includes(FIND_MARKER)) {
+  throw new Error("The find bar is in webpack's main.js; it must load lazily");
 }
 if (mainCode.includes(FUNCTION_TABLE_MARKER)) {
   throw new Error("The built-in function table is in webpack's main.js; it must load lazily");
@@ -92,7 +100,9 @@ const assets = publicFiles.map((file) => {
     owner = "worker-async";
     roles = ["worker-async"];
   } else if (
-    [chromeChunks, panelChunks, functionTableChunks].some((chunks) => chunks.includes(file))
+    [chromeChunks, panelChunks, functionTableChunks, findChunks].some((chunks) =>
+      chunks.includes(file),
+    )
   ) {
     // The function table loads from the panels and formula help, as Vite's chrome graph counts it.
     owner = "chrome-async";

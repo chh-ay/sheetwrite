@@ -57,6 +57,10 @@ interface LifecycleFeedback {
 }
 
 let nextErrorId = 0;
+// One tab bar shows at most one sheet menu. Find it by its class, not by its
+// per-grid id: the browser keeps a parsed copy of each different selector text
+// for the page, so an id selector would keep one entry for every grid created.
+const TAB_MENU_SELECTOR = ".sheetwrite-tab-menu";
 
 function createTabIcon(pathData: string): SVGSVGElement {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -333,7 +337,7 @@ export class SheetTabs {
     this.rendering = false;
 
     const editedInput = this.host.querySelector<HTMLInputElement>(".sheetwrite-tab-input");
-    const menu = this.host.querySelector<HTMLElement>(`#${this.menuId}`);
+    const menu = this.host.querySelector<HTMLElement>(TAB_MENU_SELECTOR);
     const focusButton =
       this.buttonFor(this.focusedId) ?? this.buttonFor(this.activeId) ?? this.buttons[0];
     if (editedInput) {
@@ -724,7 +728,7 @@ export class SheetTabs {
   private closeMenu(restoreFocus: boolean): void {
     const id = this.clearMenuState();
     if (!id) return;
-    this.host.querySelector<HTMLElement>(`#${this.menuId}`)?.remove();
+    this.host.querySelector<HTMLElement>(TAB_MENU_SELECTOR)?.remove();
     const trigger = this.host.querySelector<HTMLButtonElement>(".sheetwrite-tab-options-button");
     trigger?.setAttribute("aria-expanded", "false");
     if (restoreFocus && trigger?.closest<HTMLElement>("[data-sheet-id]")?.dataset.sheetId === id) {
@@ -733,7 +737,7 @@ export class SheetTabs {
   }
 
   private focusMenuItem(index: number): void {
-    const menu = this.host.querySelector<HTMLElement>(`#${this.menuId}`);
+    const menu = this.host.querySelector<HTMLElement>(TAB_MENU_SELECTOR);
     if (!menu) return;
     const items = [...menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')];
     if (items.length === 0) return;
@@ -853,7 +857,9 @@ export class SheetTabs {
       }
       if (active instanceof HTMLButtonElement && active.getAttribute("role") === "menuitem") {
         const items = [
-          ...this.host.querySelectorAll<HTMLButtonElement>(`#${this.menuId} [role="menuitem"]`),
+          ...this.host.querySelectorAll<HTMLButtonElement>(
+            `${TAB_MENU_SELECTOR} [role="menuitem"]`,
+          ),
         ];
         const current = items.indexOf(active);
         let next: number | null = null;

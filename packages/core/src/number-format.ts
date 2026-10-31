@@ -49,8 +49,16 @@ export interface NumberFormatResourceStats {
   readonly formatCacheEntries: number;
   readonly numberFormatterCacheEntries: number;
   readonly dateTimeFormatterCacheEntries: number;
+  readonly numberTextEntries: number;
 }
 
+/*
+ * The format caches below are page-wide, not owned by one grid. Their values
+ * depend only on the format code and the locale, never on a grid or its data,
+ * so grids that show the same formats share one entry. Each cache has a fixed
+ * size limit, and `trimNumberFormatCaches` (called by `Grid.trimMemory`) drops
+ * them all; the next format call builds what it needs again.
+ */
 const FORMAT_CACHE_LIMIT = 256;
 const NUMBER_FORMATTER_CACHE_LIMIT = 128;
 const DATE_TIME_FORMATTER_CACHE_LIMIT = 64;
@@ -185,6 +193,11 @@ function cacheValue<K, V>(cache: Map<K, V>, key: K, value: V, limit: number): V 
 
 /** Test-only deterministic formatter resource counters. */
 export function getNumberFormatResourceStatsForTest(): NumberFormatResourceStats {
+  let numberTextEntries = 0;
+  for (const byLocale of numberTextCache.values()) {
+    for (const texts of byLocale.values()) numberTextEntries += texts.size;
+  }
+
   return {
     compiledFormats,
     numberFormatters,
@@ -192,16 +205,25 @@ export function getNumberFormatResourceStatsForTest(): NumberFormatResourceStats
     formatCacheEntries: formatCache.size,
     numberFormatterCacheEntries: numberFormatterCache.size,
     dateTimeFormatterCacheEntries: dateTimeFormatterCache.size,
+    numberTextEntries,
   };
 }
 
-/** Test-only reset for isolated formatter resource assertions. */
-export function resetNumberFormatResourcesForTest(): void {
+/**
+ * Drop the compiled formats, the `Intl` formatters and the rendered number
+ * text. The creation counters stay, so tests can see a rebuild.
+ */
+export function trimNumberFormatCaches(): void {
   formatCache.clear();
   numberFormatterCache.clear();
   dateTimeFormatterCache.clear();
   numberTextCache.clear();
   numberTextGroups = 0;
+}
+
+/** Test-only reset for isolated formatter resource assertions. */
+export function resetNumberFormatResourcesForTest(): void {
+  trimNumberFormatCaches();
   compiledFormats = 0;
   numberFormatters = 0;
   dateTimeFormatters = 0;

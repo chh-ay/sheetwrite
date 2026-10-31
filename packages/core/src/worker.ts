@@ -85,6 +85,7 @@ type WorkerMessage =
   | PackedPaintMessage
   | SharedPackedMessage
   | PanesMessage
+  | { type: "trim" }
   | { type: "destroy" };
 
 const NO_RENDERERS: ReadonlyMap<string, CellRenderer> = new Map();
@@ -358,6 +359,12 @@ export function createWorkerMessageHandler(
         acknowledgeFrame(painted);
         break;
       }
+      case "trim":
+        // The host trims its own string cache at the same time, so its next
+        // frame sends every string again as a pool update.
+        state.stringCache.clear();
+        state.valuesScratch = [];
+        break;
       case "destroy":
         state.ctx = null;
         state.canvas = null;

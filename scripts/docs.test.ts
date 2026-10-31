@@ -511,6 +511,7 @@ describe("performance pages", () => {
     expect(formula).not.toContain("## Formula engine benchmark");
     const memory = pages.get("performance/memory.md") ?? "";
     expect(memory).toContain("## Release retained engine memory");
+    expect(memory).toContain("## Grid lifetime and trimMemory");
     expect(memory).toContain("## Runtime resource ownership");
     expect(pages.get("performance/index.md")).toContain("](/docs/performance/memory/)");
   });

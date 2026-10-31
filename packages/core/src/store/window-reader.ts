@@ -707,6 +707,16 @@ export class StoreWindowReader {
     this.condRulesSynced.clear();
   }
 
+  /**
+   * Drop the decoded pool strings and the value scratch. The next read decodes
+   * its strings again and lists all of them as pool updates, so a worker that
+   * dropped its own string cache gets every string it paints.
+   */
+  trim(): void {
+    this.valuesScratch = [];
+    this.stringCache.clear();
+  }
+
   removeSheet(sheet: SheetId): void {
     this.condRulesSynced.delete(sheet);
   }
