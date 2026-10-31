@@ -53,6 +53,10 @@ export class EngineHiddenRows {
 
   /** Send the queued sheets whose runs differ from what the engine holds. */
   flush(): void {
+    // Most transactions queue nothing. Creating the iterator of an empty set
+    // still cost about 0.13 µs per one-cell edit in the engine memory probe.
+    if (this.pending.size === 0) return;
+
     for (const sheet of this.pending) {
       const meta = this.workbook.sheets.find((candidate) => candidate.id === sheet);
       const handle = this.handles.get(sheet);

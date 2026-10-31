@@ -361,7 +361,7 @@ const SKIPS_HIDDEN_ROWS_OFFSET: i64 = 100;
 /// the default engine is close to 100,000 bytes of WASM. JavaScriptCore does
 /// not compile a larger function with its optimizing tier. A copy of this
 /// function inlined there pushed `eval_ast` over that limit, and a SUM over
-/// 100,000 rows recalculated 65% slower.
+/// 100,000 rows recalculated 63% slower.
 #[inline(never)]
 pub(super) fn subtotal_function(
     values: &FuncAccumulator,
