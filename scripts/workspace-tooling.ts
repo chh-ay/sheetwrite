@@ -110,26 +110,63 @@ export const TYPECHECK_NODES: readonly CommandNode[] = [
   ...VERIFICATION_TYPECHECK_NODES,
 ];
 
+/**
+ * The test lists below own every repository test path. `test:tooling` (CI
+ * preflight), `test:unit` (CI unit job) and `verify-ci` all run these nodes, so
+ * a suite added here runs everywhere. Tooling suites run before any package is
+ * built; unit suites run against built package outputs.
+ * `workspace-tooling.test.ts` rejects a `scripts/*.test.ts` file that is in
+ * neither list or in both.
+ */
+export const TOOLING_TEST_PATHS = [
+  "scripts/toolchain-contract.test.ts",
+  "scripts/workspace-tooling.test.ts",
+  "scripts/dependency-audit.test.ts",
+  "scripts/verify-clean-build.test.ts",
+  "scripts/size-report.test.ts",
+  "scripts/release-artifacts.test.ts",
+  "scripts/package-dist.test.ts",
+  "scripts/consumer-lock.test.ts",
+  "scripts/release-verify.test.ts",
+  "scripts/release-workflow.test.ts",
+  "scripts/changeset-ci.test.ts",
+  "scripts/workflow-contract.test.ts",
+  "scripts/docs.test.ts",
+  "scripts/docs-llms.test.ts",
+  "scripts/formula-docs.test.ts",
+  "scripts/release-performance-docs.test.ts",
+  "scripts/coverage-check.test.ts",
+  "scripts/sheetwrite-code-hovers.test.ts",
+  "scripts/normalize-sitemap.test.ts",
+  "scripts/prepare-docs-deployment.test.ts",
+  "scripts/check-import-cycles.test.ts",
+  "scripts/check-local-paths.test.ts",
+] as const;
+
+export const UNIT_TEST_PATHS = [
+  "packages",
+  "test/browser/canvas-assertions.test.ts",
+  "scripts/public-api.test.ts",
+  "scripts/conformance.test.ts",
+  "scripts/conformance-excel-runner.test.ts",
+  "scripts/conformance-google.test.ts",
+  "scripts/conformance-workbook-roundtrip.test.ts",
+  "scripts/formula-contract.test.ts",
+  "scripts/ci-paths.test.ts",
+  "scripts/indexnow.test.ts",
+  "scripts/release-github.test.ts",
+  "bench/test",
+  "docs/test",
+] as const;
+
 const TOOLING_TESTS: CommandNode = {
   id: "test:tooling-contracts",
-  command: [
-    "bun",
-    "test",
-    "scripts/toolchain-contract.test.ts",
-    "scripts/workspace-tooling.test.ts",
-    "scripts/dependency-audit.test.ts",
-    "scripts/verify-clean-build.test.ts",
-    "scripts/size-report.test.ts",
-    "scripts/release-artifacts.test.ts",
-    "scripts/package-dist.test.ts",
-    "scripts/consumer-lock.test.ts",
-    "scripts/release-verify.test.ts",
-    "scripts/release-workflow.test.ts",
-    "scripts/docs.test.ts",
-    "scripts/coverage-check.test.ts",
-    "scripts/check-local-paths.test.ts",
-    "scripts/prepare-docs-deployment.test.ts",
-  ],
+  command: ["bun", "test", ...TOOLING_TEST_PATHS],
+};
+
+const UNIT_TESTS: CommandNode = {
+  id: "test:unit",
+  command: ["bun", "test", ...UNIT_TEST_PATHS],
 };
 
 const PRE_BUILD_VERIFICATION_NODES: readonly CommandNode[] = [
@@ -169,25 +206,7 @@ const POST_BUILD_QUALITY_NODES: readonly CommandNode[] = [
     id: "lint",
     command: ["bun", "run", "lint"],
   },
-  {
-    id: "test:unit",
-    command: [
-      "bun",
-      "test",
-      "packages",
-      "test/browser/canvas-assertions.test.ts",
-      "scripts/public-api.test.ts",
-      "scripts/conformance.test.ts",
-      "scripts/conformance-google.test.ts",
-      "scripts/conformance-workbook-roundtrip.test.ts",
-      "scripts/formula-contract.test.ts",
-      "scripts/ci-paths.test.ts",
-      "scripts/indexnow.test.ts",
-      "scripts/release-github.test.ts",
-      "bench/test",
-      "docs/test",
-    ],
-  },
+  UNIT_TESTS,
   ...EXAMPLE_BUILD_NODES,
   {
     id: "verify:node-esm",
@@ -342,6 +361,10 @@ function nodesForMode(mode: string): readonly CommandNode[] {
       return PACKAGE_BUILD_NODES;
     case "build-examples":
       return EXAMPLE_BUILD_NODES;
+    case "test-tooling":
+      return [TOOLING_TESTS];
+    case "test-unit":
+      return [UNIT_TESTS];
     case "typecheck-packages":
       return PACKAGE_TYPECHECK_NODES;
     case "typecheck-examples":

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
+import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -11,7 +12,9 @@ import {
 } from "./changeset-ci.js";
 import {
   PUBLISHABLE_PACKAGE_ORDER,
+  TOOLING_TEST_PATHS,
   TYPECHECK_NODES,
+  UNIT_TEST_PATHS,
   validateWorkspaceGraph,
 } from "./workspace-tooling.js";
 
@@ -130,6 +133,19 @@ describe("canonical workspace graph", () => {
       ).toHaveLength(1);
     }
     expect(TYPECHECK_NODES).toHaveLength(workspaceNames.length + verificationProjects.length);
+  });
+
+  it("runs every script test suite from exactly one test list", async () => {
+    const root = resolve(import.meta.dir, "..");
+    const listed: readonly string[] = [...TOOLING_TEST_PATHS, ...UNIT_TEST_PATHS];
+    const suites: string[] = [];
+    for await (const path of new Bun.Glob("scripts/*.test.ts").scan({ cwd: root })) {
+      suites.push(path);
+    }
+
+    expect(listed.filter((path, index) => listed.indexOf(path) !== index)).toEqual([]);
+    expect(suites.filter((suite) => !listed.includes(suite)).sort()).toEqual([]);
+    expect(listed.filter((path) => !existsSync(join(root, path)))).toEqual([]);
   });
 });
 
