@@ -210,6 +210,8 @@ describe("host formula functions", () => {
       expect(analyzeFormula('=TAXRATE("EU", 1)', 0, functions).diagnostics).toEqual([
         expect.objectContaining({ message: "TAXRATE takes at most 1 argument." }),
       ]);
+      // The syntax check is the full engine's parser, which calls a LAMBDA result at once.
+      expect(analyzeFormula("=LAMBDA(x, x + 1)(2)", 0, functions).diagnostics).toEqual([]);
 
       for (const name of ["SUM", "A1", "R1C1", "BAD NAME", ""]) {
         let failure: unknown;

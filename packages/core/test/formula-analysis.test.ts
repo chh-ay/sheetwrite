@@ -1,7 +1,8 @@
-import { describe, expect, it } from "bun:test";
+import { beforeAll, describe, expect, it } from "bun:test";
 
 import { analyzeFormula } from "../src/formula-analysis.js";
 import type { FormulaFunctionMetadata } from "../src/functions/types.js";
+import { initSheetwrite } from "../src/index.js";
 
 const value = { name: "value", types: ["scalar"] } as const;
 
@@ -49,6 +50,10 @@ const FUNCTIONS: readonly FormulaFunctionMetadata[] = [
   },
   { name: "ROUND", description: "Rounds.", arguments: [value, value], returnKind: "scalar" },
 ];
+
+beforeAll(async () => {
+  await initSheetwrite();
+});
 
 /** The analysis with the cursor at the `|` in `marked`. */
 function at(marked: string) {
@@ -120,6 +125,15 @@ describe("analyzeFormula: completion", () => {
     expect(at("=A1:SU|").completion).toBeNull();
     expect(at("=ZZ|").completion).toBeNull();
   });
+
+  it("completes dotted names, and not a number that starts with a decimal point", () => {
+    const mode = { name: "MODE.SNGL", description: "Most common.", arguments: [value] } as const;
+    const functions = [...FUNCTIONS, { ...mode, returnKind: "scalar" as const }];
+
+    const completion = analyzeFormula("=MODE.", 6, functions).completion;
+    expect(completion?.matches.map((fn) => fn.name)).toEqual(["MODE.SNGL"]);
+    expect(analyzeFormula("=.5", 3, functions).completion).toBeNull();
+  });
 });
 
 describe("analyzeFormula: references", () => {
@@ -158,15 +172,21 @@ describe("analyzeFormula: diagnostics", () => {
       "=SUM(A1:A3, 2) * -3%",
       "=IF(A1,,2)",
       "=LET(x, 2, f, LAMBDA(y, x + y), f(3))",
-      "=LAMBDA(x, x + 1)(2)",
       "=Sheet1!A1 Sheet1!A1:B2",
       "={1, 2; 3, 4}",
       "=A1#",
       "=Table1[Amount]",
       "=1<=2",
+      "=1E3+XYZ1",
+      "=SUM(A:A, 1:1)",
     ]) {
       expect(messages(text), text).toEqual([]);
     }
+  });
+
+  it("reports what the active engine's parser rejects", () => {
+    // Only the full engine calls a LAMBDA result at once; the default engine is active here.
+    expect(messages("=LAMBDA(x, x + 1)(2)")).toEqual(["This is not expected here."]);
   });
 
   it("marks the end of an incomplete formula as incomplete", () => {
@@ -174,29 +194,44 @@ describe("analyzeFormula: diagnostics", () => {
     expect(missing).toMatchObject({
       from: 7,
       to: 7,
-      message: "Add ) to close SUM.",
+      message: "Add ) to close the (.",
       incomplete: true,
     });
     expect(analyzeFormula("=1+", 3, FUNCTIONS).diagnostics[0]?.incomplete).toBe(true);
     expect(analyzeFormula('="abc', 5, FUNCTIONS).diagnostics[0]).toMatchObject({
-      message: "Text has no closing quote.",
+      from: 1,
+      to: 5,
+      message: 'Add " to close the text.',
       incomplete: true,
     });
   });
 
   it("reports syntax errors in the middle of the formula", () => {
-    expect(messages("=1 2")).toEqual(['"2" is not expected here.']);
+    expect(messages("=1 2")).toEqual(["This is not expected here."]);
     expect(messages("=SUM(1))")).toEqual(["This ) has no matching (."]);
-    expect(messages("=1+*2")).toEqual(['Enter a value before "*".']);
-    expect(messages("=1+@")).toEqual(['"@" is not valid in a formula.']);
-    expect(messages("=()")).toEqual(["Enter a value between ( and )."]);
+    expect(messages("=1+*2")).toEqual(["Enter a value before this."]);
+    expect(messages("=1+@")).toEqual(["@ is not allowed in a formula."]);
+    expect(messages("=()")).toEqual(["Enter a value before this."]);
+  });
+
+  it("counts UTF-16 offsets past text outside the Basic Multilingual Plane", () => {
+    const text = '="😀"&SUM(1))';
+    expect(analyzeFormula(text, text.length, FUNCTIONS).diagnostics[0]).toMatchObject({
+      from: 12,
+      to: 13,
+    });
   });
 
   it("reports unknown functions and wrong argument counts", () => {
     expect(messages("=NOPE(1)")).toEqual(["NOPE is not a known function. The cell shows #NAME?."]);
     expect(messages("=ROUND(1)")).toEqual(["ROUND needs at least 2 arguments."]);
     expect(messages("=ROUND(1, 2, 3)")).toEqual(["ROUND takes at most 2 arguments."]);
+    expect(messages("=ROUND()")).toEqual(["ROUND needs at least 2 arguments."]);
     expect(messages("=_xlfn.FUTURE(1)")).toEqual([]);
+  });
+
+  it("does not count the arguments of a call before its )", () => {
+    expect(messages("=ROUND(1")).toEqual(["Add ) to close the (."]);
   });
 
   it("skips call checks without a function list", () => {

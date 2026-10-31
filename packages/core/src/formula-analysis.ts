@@ -1,12 +1,20 @@
 // `analyzeFormula`, the one formula-help API: the grid's cell editor, the
 // formula bar and host editors read tokens, references, the call at the
-// cursor, completions and diagnostics from it. It is plain TypeScript with no
-// engine call, so it works with both engines; the function list it receives
-// (from `listFunctions`) is what makes it engine- and host-specific.
+// cursor, completions and diagnostics from it. The tokens and the syntax error
+// come from the active engine's lexer and parser (formula-syntax.ts); the
+// function list it receives (from `listFunctions`) adds what is engine- and
+// host-specific about names.
 
 import { labelToCol } from "./a1.js";
-import { checkFormula, type FormulaDiagnostic } from "./formula-check.js";
-import { lexFormula, type RawToken } from "./formula-tokens.js";
+import {
+  checkCalls,
+  formulaTokens,
+  isCallName,
+  scanCalls,
+  syntaxError,
+  type FormulaDiagnostic,
+  type RawToken,
+} from "./formula-syntax.js";
 import type { FormulaArgumentMetadata, FormulaFunctionMetadata } from "./functions/types.js";
 
 export type { FormulaDiagnostic };
@@ -104,11 +112,11 @@ const NOT_A_FORMULA: FormulaAnalysis = {
 const PUBLIC_KIND: Readonly<Partial<Record<RawToken["kind"], FormulaTokenKind>>> = {
   num: "number",
   str: "string",
+  bool: "boolean",
   error: "error",
   quoted: "sheet",
   structured: "reference",
   op: "operator",
-  cmp: "operator",
   colon: "operator",
   bang: "operator",
   hash: "operator",
@@ -177,10 +185,6 @@ function span(
   return null;
 }
 
-function isCallName(tokens: readonly RawToken[], index: number): boolean {
-  return tokens[index]?.kind === "ident" && tokens[index + 1]?.kind === "lparen";
-}
-
 function sheetName(token: RawToken): string {
   return token.kind === "quoted" ? token.text.slice(1, -1).replaceAll("''", "'") : token.text;
 }
@@ -246,10 +250,8 @@ function publicKind(tokens: readonly RawToken[], index: number): FormulaTokenKin
   const mapped = PUBLIC_KIND[token.kind];
   if (mapped !== undefined) return mapped;
 
-  const upper = token.text.toUpperCase();
   if (isCallName(tokens, index)) return "function";
   if (tokens[index + 1]?.kind === "bang") return "sheet";
-  if (upper === "TRUE" || upper === "FALSE") return "boolean";
   return "name";
 }
 
@@ -283,46 +285,24 @@ export function argumentOf(
   return fn.arguments[index];
 }
 
-type Frame = { kind: "call"; name: RawToken; argumentIndex: number } | { kind: "group" };
-
 /** The innermost call whose parentheses hold `cursor`. */
 function callAt(
   tokens: readonly RawToken[],
   cursor: number,
   functions: ReadonlyMap<string, FormulaFunctionMetadata>,
 ): FormulaCall | null {
-  const frames: Frame[] = [];
-  for (let index = 0; index < tokens.length; index++) {
-    const token = tokens[index];
-    if (token === undefined || token.to > cursor) break;
+  const call = scanCalls(tokens, cursor).open.at(-1);
+  if (call === undefined) return null;
 
-    const top = frames.at(-1);
-    const previous = tokens[index - 1];
-    if (token.kind === "lparen") {
-      const isCall = previous !== undefined && isCallName(tokens, index - 1);
-      frames.push(isCall ? { kind: "call", name: previous, argumentIndex: 0 } : { kind: "group" });
-    } else if (token.kind === "lbrace") {
-      frames.push({ kind: "group" });
-    } else if (token.kind === "rparen" || token.kind === "rbrace") {
-      frames.pop();
-    } else if (token.kind === "comma" && top?.kind === "call") {
-      top.argumentIndex += 1;
-    }
-  }
-
-  // A reverse search, not findLast: the docs site compiles core with an ES2022 lib.
-  const frame = [...frames].reverse().find((candidate) => candidate.kind === "call");
-  if (frame === undefined || frame.kind !== "call") return null;
-
-  const name = frame.name.text.toUpperCase();
+  const name = call.name.text.toUpperCase();
   const fn = functions.get(name);
   return {
     name,
-    from: frame.name.from,
-    to: frame.name.to,
-    argumentIndex: frame.argumentIndex,
+    from: call.name.from,
+    to: call.name.to,
+    argumentIndex: call.commas,
     function: fn,
-    argument: argumentOf(fn, frame.argumentIndex),
+    argument: argumentOf(fn, call.commas),
   };
 }
 
@@ -363,7 +343,9 @@ function completionAt(
  * functions. With an empty list, completion is empty and no name is reported
  * as unknown.
  *
- * The analysis never calculates: it reads text and metadata only.
+ * The tokens and the syntax error come from the engine's own lexer and
+ * parser, so call it after `initSheetwrite`. The analysis never calculates:
+ * it reads text and metadata only.
  *
  * @example
  * ```ts
@@ -385,15 +367,16 @@ export function analyzeFormula(
   if (!text.startsWith("=")) return NOT_A_FORMULA;
 
   const byName = new Map(functions.map((fn) => [fn.name.toUpperCase(), fn]));
-  const { tokens, errors } = lexFormula(text, 1);
+  const tokens = formulaTokens(text);
   const references = findReferences(tokens);
+  const error = syntaxError(text);
 
   return {
     tokens: publicTokens(tokens, references),
     references,
     call: callAt(tokens, cursor, byName),
     completion: completionAt(tokens, cursor, functions),
-    diagnostics: [...errors, ...checkFormula(tokens, text.length, byName)].sort(
+    diagnostics: [...(error === null ? [] : [error]), ...checkCalls(tokens, byName)].sort(
       (left, right) => left.from - right.from,
     ),
   };
