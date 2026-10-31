@@ -76,6 +76,13 @@ describe("remapFormulaA1Refs", () => {
     expect(remapFormulaA1Refs("=SUM(A2#)", "row", removeRow)).toBe("=SUM(#REF!)");
   });
 
+  it("shrinks a range whose corner is deleted and breaks one with no row left", () => {
+    const removeRows = (row: number) => (row <= 1 ? null : row - 2);
+    expect(remapFormulaA1Refs("=SUM(A1:B4)", "row", removeRows)).toBe("=SUM(A1:B2)");
+    expect(remapFormulaA1Refs("=SUM(A4:B1)", "row", removeRows)).toBe("=SUM(A2:B1)");
+    expect(remapFormulaA1Refs("=SUM(A1:B2)+C3", "row", removeRows)).toBe("=SUM(#REF!)+C1");
+  });
+
   it("keeps function names intact during structural edits", () => {
     expect(remapFormulaA1Refs("=LOG10(A1)+BIN2DEC(B1)", "row", (row) => row + 1)).toBe(
       "=LOG10(A2)+BIN2DEC(B2)",

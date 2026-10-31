@@ -18,9 +18,9 @@ function isClipboardOutcome(value: unknown): value is ClipboardOutcome {
   return value === "done" || value === "empty" || value === "blocked" || value === "unsupported";
 }
 
-function failureMessage(cause: unknown): string {
-  const detail = cause instanceof Error && cause.message ? cause.message : String(cause);
-  return `The command did not finish: ${detail}`;
+/** The text a user reads for a thrown value: the error message, or the value itself. */
+export function errorDetail(cause: unknown): string {
+  return cause instanceof Error && cause.message ? cause.message : String(cause);
 }
 
 /**
@@ -70,7 +70,7 @@ class ActionFeedback {
         if (message !== undefined) this.show(message);
       }
     } catch (cause) {
-      this.show(failureMessage(cause));
+      this.show(`The command did not finish: ${errorDetail(cause)}`);
     } finally {
       this.running.delete(key);
       button?.removeAttribute("aria-busy");

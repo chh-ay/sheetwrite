@@ -231,9 +231,14 @@ test("the command toolbar keeps ribbon commands reachable by keyboard at any wid
   await expect(page.locator(GRID)).toBeFocused();
 
   // A narrow window moves trailing commands into the More commands group.
+  // WebKit reports the resize a frame late, and a resize closes every popup:
+  // wait until Borders, on the row at the wide size, moves into the group.
+  const border = toolbar.locator('[data-command="border"]');
+  await expect(border).toBeVisible();
   await page.setViewportSize({ width: 640, height: 869 });
   const more = toolbar.getByRole("button", { name: "More commands" });
   await expect(more).toBeVisible();
+  await expect(border).toBeHidden();
   await expect(toolbar.locator('[data-command="zoom"]')).toBeHidden();
   await more.focus();
   await more.press("Enter");

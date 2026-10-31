@@ -8,6 +8,19 @@ const LAST_ROW_NUMBER = 1_048_576;
 const RANGE_WITH_CORNERS =
   /"(?:[^"]|"")*"|'(?:[^']|'')*'|(#REF!|\$?[A-Za-z]{1,3}\$?[0-9]+):(#REF!|\$?[A-Za-z]{1,3}\$?[0-9]+)/g;
 
+const NAME_CHARACTER = /[A-Za-z0-9_]/;
+
+/**
+ * Whether A1-shaped text at `offset` is part of a longer name, not a reference:
+ * a letter, digit or `_` touches it on either side, or `(` follows it, as in
+ * `LOG10(` or `BIN2DEC`.
+ */
+export function isGluedToName(text: string, offset: number, length: number): boolean {
+  const before = offset > 0 ? text.charAt(offset - 1) : "";
+  const after = text.charAt(offset + length);
+  return NAME_CHARACTER.test(before) || after === "(" || NAME_CHARACTER.test(after);
+}
+
 /** Column index (0-based) → A1 column label (0 → "A", 26 → "AA"). */
 export function colToA1(col: number): string {
   let c = col + 1;
@@ -68,10 +81,7 @@ export function shiftA1Refs(src: string, dRow: number, dCol: number): string {
       full: string,
     ): string => {
       if (match.startsWith('"') || match.startsWith("'")) return match;
-      const prev = offset > 0 ? full.charAt(offset - 1) : "";
-      if (prev === "_" || /[A-Za-z0-9]/.test(prev)) return match;
-      const next = full.charAt(offset + match.length);
-      if (next === "(" || next === "_" || /[A-Za-z0-9]/.test(next)) return match;
+      if (isGluedToName(full, offset, match.length)) return match;
 
       let col = labelToCol(letters.toUpperCase());
       let rowNum = Number(digits);
@@ -91,11 +101,54 @@ export function shiftA1Refs(src: string, dRow: number, dCol: number): string {
   );
 }
 
+/** One A1 corner parsed for a structural remap. */
+interface A1Corner {
+  readonly colAbsolute: string;
+  readonly rowAbsolute: string;
+  readonly col: number;
+  readonly row: number;
+}
+
+function a1Corner(colAbsolute: string, letters: string, rowAbsolute: string, digits: string) {
+  return {
+    colAbsolute,
+    rowAbsolute,
+    col: labelToCol(letters.toUpperCase()),
+    row: Number(digits) - 1,
+  } satisfies A1Corner;
+}
+
+function writeCorner(corner: A1Corner, axis: "row" | "column", index: number): string {
+  const col = axis === "column" ? index : corner.col;
+  const row = axis === "row" ? index : corner.row;
+  return `${corner.colAbsolute}${colToA1(col)}${corner.rowAbsolute}${row + 1}`;
+}
+
+/**
+ * First surviving index from `from` toward `to`, or null when every index in
+ * between was deleted. The walk ends after the deleted run, so it costs at most
+ * the number of deleted rows or columns.
+ */
+function survivingIndex(
+  from: number,
+  to: number,
+  remap: (index: number) => number | null,
+): number | null {
+  const step = from <= to ? 1 : -1;
+  for (let index = from; ; index += step) {
+    const mapped = remap(index);
+    if (mapped !== null) return mapped;
+    if (index === to) return null;
+  }
+}
+
 /**
  * Rewrite unqualified A1 references through one structural row/column mapping.
  * Absolute markers control copy translation, not structural identity, so both
  * relative and absolute coordinates follow inserts/removes/moves. Qualified
- * references are left for their target sheet's own structural pass.
+ * references are left for their target sheet's own structural pass. As in
+ * Excel, a range whose edge rows or columns are deleted shrinks to the ones
+ * left, and only a range with none left becomes `#REF!`.
  */
 export function remapFormulaA1Refs(
   source: string,
@@ -103,30 +156,42 @@ export function remapFormulaA1Refs(
   remap: (index: number) => number | null,
 ): string {
   return source.replace(
-    /"(?:[^"]|"")*"|'(?:[^']|'')*'|(\$?)([A-Za-z]{1,3})(\$?)([0-9]+)(#?)/g,
+    /"(?:[^"]|"")*"|'(?:[^']|'')*'|(\$?)([A-Za-z]{1,3})(\$?)([0-9]+)(?::(\$?)([A-Za-z]{1,3})(\$?)([0-9]+))?(#?)/g,
     (
       match: string,
       colAbsolute: string,
       letters: string,
       rowAbsolute: string,
       digits: string,
+      endColAbsolute: string | undefined,
+      endLetters: string | undefined,
+      endRowAbsolute: string | undefined,
+      endDigits: string | undefined,
       spill: string,
       offset: number,
       full: string,
     ): string => {
       if (match.startsWith('"') || match.startsWith("'")) return match;
-      const previous = offset > 0 ? full.charAt(offset - 1) : "";
-      if (previous === "!" || previous === "_" || /[A-Za-z0-9]/.test(previous)) return match;
-      const next = full.charAt(offset + match.length);
-      if (next === "(" || next === "_" || /[A-Za-z0-9]/.test(next)) return match;
-      const col = labelToCol(letters.toUpperCase());
-      const row = Number(digits) - 1;
-      const mapped = remap(axis === "row" ? row : col);
-      // A deleted anchor also ends its spill reference: `A1#` becomes `#REF!`.
-      if (mapped === null) return "#REF!";
-      return axis === "row"
-        ? `${colAbsolute}${colToA1(col)}${rowAbsolute}${mapped + 1}${spill}`
-        : `${colAbsolute}${colToA1(mapped)}${rowAbsolute}${row + 1}${spill}`;
+      if (offset > 0 && full.charAt(offset - 1) === "!") return match;
+      if (isGluedToName(full, offset, match.length)) return match;
+      const start = a1Corner(colAbsolute, letters, rowAbsolute, digits);
+      const at = (corner: A1Corner) => (axis === "row" ? corner.row : corner.col);
+
+      if (endLetters === undefined || endDigits === undefined) {
+        const mapped = remap(at(start));
+        // A deleted anchor also ends its spill reference: `A1#` becomes `#REF!`.
+        return mapped === null ? "#REF!" : `${writeCorner(start, axis, mapped)}${spill}`;
+      }
+
+      const end = a1Corner(endColAbsolute ?? "", endLetters, endRowAbsolute ?? "", endDigits);
+      const low = Math.min(at(start), at(end));
+      const high = Math.max(at(start), at(end));
+      const mappedLow = survivingIndex(low, high, remap);
+      const mappedHigh = survivingIndex(high, low, remap);
+      if (mappedLow === null || mappedHigh === null) return "#REF!";
+      const startIsLow = at(start) <= at(end);
+      const range = `${writeCorner(start, axis, startIsLow ? mappedLow : mappedHigh)}:${writeCorner(end, axis, startIsLow ? mappedHigh : mappedLow)}`;
+      return `${range}${spill}`;
     },
   );
 }
