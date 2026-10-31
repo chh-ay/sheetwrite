@@ -92,7 +92,7 @@ export class EngineHiddenRows {
  * Runs of the rows hidden by hand or by a collapsed group. Groups count as
  * one interval each, so a collapsed group costs nothing per row.
  */
-export function manualRowRuns(
+function manualRowRuns(
   hiddenRows: ReadonlySet<number> | undefined,
   groups: readonly RowGroup[] | undefined,
 ): Uint32Array {
@@ -122,7 +122,7 @@ export function manualRowRuns(
 }
 
 /** Runs of the rows in `[0, rowCount)` that the ascending `present` rows leave out. */
-export function missingRowRuns(present: Uint32Array, rowCount: number): Uint32Array {
+function missingRowRuns(present: Uint32Array, rowCount: number): Uint32Array {
   const runs: number[] = [];
   let next = 0;
   for (const row of present) {
