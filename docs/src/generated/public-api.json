@@ -2969,7 +2969,7 @@
               "owners": [
                 "src/store/data-engine.ts"
               ],
-              "source": "src/store/data-engine.ts#L346",
+              "source": "src/store/data-engine.ts#L347",
               "jsDocTags": [],
               "documentation": "Error thrown when an operation requires datasource cells that are not loaded.",
               "memberDocs": []

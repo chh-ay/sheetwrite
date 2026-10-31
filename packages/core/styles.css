@@ -489,8 +489,12 @@
   box-sizing: border-box;
 }
 
-.sheetwrite-ribbon-panel[hidden] {
-  display: none;
+/* `hidden` hides panels, and the tabs, groups and commands the grid cannot
+   run now, also inside a popup that borrows a group. It must beat every
+   layout rule, compact ones included, which set display with higher
+   specificity. */
+:is(.sheetwrite-ribbon, .sheetwrite-ribbon-popup) [hidden] {
+  display: none !important;
 }
 
 /* The divider after each group stops short of the panel edges, as in Excel,

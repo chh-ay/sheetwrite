@@ -114,6 +114,10 @@ Set `volatile: true` in the metadata for a function whose result can change with
 
 Snapshots, history and collaboration keep only the formula text. A store loaded from a snapshot shows `#NAME?` for a host function until the host registers it again. Each client calculates host functions locally, so each client must register the same functions to show the same values.
 
+## In the ribbon and toolbar
+
+While the store has a registered function, the ribbon shows a **Formulas** tab with **Insert Function**, and the toolbar shows the same command. It lists the host functions with their signature and description; a pick starts `=NAME(` in the focus cell. See [Toolbar and ribbon](/docs/features/grid/toolbar-and-ribbon/#ribbon).
+
 ## Function metadata
 
 `await listFunctions(store)` returns one list of `FormulaFunctionMetadata`: the built-in functions of the active engine, then the host functions of the store in registration order. The table of built-in functions loads on the first call, so an application that never asks for it does not download it. Built-in and host functions use the same fields:

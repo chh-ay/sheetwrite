@@ -82,20 +82,23 @@ console.log(grid.getCommandState("undo").disabled); // true: no history yet
 
 ## Ribbon
 
-The ribbon has four tabs with Excel's group names, labels and order:
+The ribbon has these tabs, with Excel's group names, labels and order:
 
 | Tab | Groups and controls |
 | --- | --- |
 | Home | **Undo**. **Clipboard**: Paste split button. **Font**: font name and size boxes, grow and shrink, bold, italic, underline, strikethrough, Borders, Fill Color and Font Color palettes. **Alignment**: top, middle, bottom, wrap, left, center, right, Merge & Center. **Number**: format box, currency, percent, comma, more and fewer decimals. **Cells**: Insert, Delete, Format. **Editing**: AutoSum, Clear, Sort & Filter, Find. |
 | Insert | **Rows & Columns**: Insert (rows above or below, columns left or right), Delete (rows or columns). **Tables**: PivotTable. **Charts**: Chart split button (column, bar, line, area, pie, doughnut, scatter). **Links**: link form. **Notes**: note form. |
+| Formulas | **Function Library**: Insert Function. Shows only while the store has [custom functions](/docs/features/formulas/custom-functions/), which need the full engine. |
 | Data | **Sort & Filter**: Sort A to Z, Sort Z to A, Clear Filter. **Outline**: Group and Ungroup rows. **Show/Hide**: Hide Rows, Unhide Rows, Hide Columns, Unhide Columns. **Export**: Export CSV, Export XLSX (with the `export` flag). |
 | View | **Window**: Freeze Panes, Freeze Top Row, Freeze First Column, Unfreeze Panes. **Zoom**: zoom out, current percent, zoom in. |
 
 Every control reads the same `getCommandState` contract as host chrome. It disables while the grid is read-only.
 
+**Insert Function** lists the functions registered with `registerFunction`, with each signature and description as the tooltip. Pick one to start `=NAME(` in the focus cell's editor, then type the arguments. The Formulas tab, and Insert Function in the toolbar, appear when the first function is registered and go away when the last one is removed. Built-in functions are offered by formula autocomplete as you type.
+
 ### Layout for the 0.7 features
 
-The 0.7 features get their commands in the places below. Each command appears in the full ribbon, the compact ribbon and the toolbar when its feature ships; until then, the ribbon does not show it. The glyphs are on the icon sheet now, so `IconOverrides` and replacement sheets can use their names.
+The 0.7 features get their commands in the places below. Insert Function is in the ribbon now; each other command appears in the full ribbon, the compact ribbon and the toolbar when its feature ships. The glyphs are on the icon sheet now, so `IconOverrides` and replacement sheets can use their names.
 
 Two tabs are new, in Excel's order: **Formulas** goes after Insert, and **Review** goes after Data. Groups fold in the order of the last column, first group first.
 
