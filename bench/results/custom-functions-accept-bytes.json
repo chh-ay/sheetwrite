@@ -1,270 +1,270 @@
 {
-  "candidateEngineDigest": "836993d7153bda43a60e3a0011aa2bb5ceb61c6d6157d9a8a04da32f4b427b5a",
+  "candidateEngineDigest": "951297d3f87b29f7525e68494ea0eb51e5159645175069d8e86a6ae02f16c75b",
   "rows": [
     {
       "key": "workload=countif-100k;size=100000.allocation.retainedBytes",
       "maximum": 2602705,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=criteria-multi-range-edit;size=100000.allocation.retainedBytes",
       "maximum": 5203382,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=criteria-range-edit;size=100000.allocation.retainedBytes",
       "maximum": 3902789,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=cross-sheet-range-edit;size=1000.allocation.retainedBytes",
       "maximum": 616681,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=cycles;size=1000.allocation.retainedBytes",
       "maximum": 699090,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=diamond-edit;size=32.allocation.retainedBytes",
       "maximum": 37298,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=distinct-range-edit;size=1000.allocation.retainedBytes",
       "maximum": 837201,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=error-propagation;size=1000.allocation.retainedBytes",
       "maximum": 283215,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=formula-constant-edit;size=100000.allocation.retainedBytes",
       "maximum": 55938753,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=incremental-dependency-closure-edit;size=100000.allocation.retainedBytes",
       "maximum": 72063489,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=independent-first-recompute;size=1000.allocation.retainedBytes",
       "maximum": 445317,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=independent-first-recompute;size=10000.allocation.retainedBytes",
       "maximum": 4009686,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=independent-first-recompute;size=100000.allocation.retainedBytes",
       "maximum": 36682631,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=independent-parse-load;size=1000.allocation.retainedBytes",
       "maximum": 352557,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=independent-parse-load;size=10000.allocation.retainedBytes",
       "maximum": 3171326,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=independent-parse-load;size=100000.allocation.retainedBytes",
       "maximum": 29015471,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=iterative-finance;size=1000.allocation.retainedBytes",
       "maximum": 872296,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=let-repeat;size=100000.allocation.retainedBytes",
       "maximum": 5203302,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=let-reuse-edit;size=100000.allocation.retainedBytes",
       "maximum": 2603095,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=linear-chain;size=16.allocation.retainedBytes",
       "maximum": 8637,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=linear-chain;size=32.allocation.retainedBytes",
       "maximum": 15681,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=linear-chain;size=64.allocation.retainedBytes",
       "maximum": 29769,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=linear-chain;size=8.allocation.retainedBytes",
       "maximum": 4263,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=lookup-range-edit;size=100000.allocation.retainedBytes",
       "maximum": 5202947,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=percentile-covariance;size=100000.allocation.retainedBytes",
       "maximum": 3903070,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=removed-sheet-ref;size=1000.allocation.retainedBytes",
       "maximum": 196778,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=scalar-edit-affects-0;size=1000.allocation.retainedBytes",
       "maximum": 396008,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=scalar-edit-affects-100000;size=100000.allocation.retainedBytes",
       "maximum": 32088397,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=scalar-edit-affects-1000;size=1000.allocation.retainedBytes",
       "maximum": 396008,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=scalar-edit-affects-1;size=1.allocation.retainedBytes",
       "maximum": 2431,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=shared-range-edit;size=1000.allocation.retainedBytes",
       "maximum": 503195,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=spill-filter-resize;size=100000.allocation.retainedBytes",
       "maximum": 5852516,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=spill-sequence-admission;size=100000.allocation.retainedBytes",
       "maximum": 3252071,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=sum-multi-range;size=100000.allocation.retainedBytes",
       "maximum": 3902742,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=sumifs-3-criteria;size=100000.allocation.retainedBytes",
       "maximum": 6503193,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=sumproduct-matrix-edit;size=100000.allocation.retainedBytes",
       "maximum": 2732774,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=sumproduct-vector-edit;size=100000.allocation.retainedBytes",
       "maximum": 3902776,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=text-lookup-many-edit;size=1000.allocation.retainedBytes",
       "maximum": 1682814,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=text-lookup-many-sorted-edit;size=1000.allocation.retainedBytes",
       "maximum": 1667526,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=text-lookup-many-sorted;size=1000.allocation.retainedBytes",
       "maximum": 1667499,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=text-lookup-many;size=1000.allocation.retainedBytes",
       "maximum": 1682787,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=topology-remove-add;size=10000.allocation.retainedBytes",
       "maximum": 4009686,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=unicode-text-date-edit;size=1000.allocation.retainedBytes",
       "maximum": 1191250,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=vlookup-many-edit;size=1000.allocation.retainedBytes",
       "maximum": 1072558,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=vlookup-many-sorted-edit;size=1000.allocation.retainedBytes",
       "maximum": 1071558,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=vlookup-many-sorted;size=1000.allocation.retainedBytes",
       "maximum": 1071531,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=vlookup-many;size=1000.allocation.retainedBytes",
       "maximum": 1072531,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=wide-fan-out-edit;size=1000.allocation.retainedBytes",
       "maximum": 396008,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=wide-fan-out-edit;size=100000.allocation.retainedBytes",
       "maximum": 32088397,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=xlookup-many-edit;size=1000.allocation.retainedBytes",
       "maximum": 1086846,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=xlookup-many-sorted-edit;size=1000.allocation.retainedBytes",
       "maximum": 1332846,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=xlookup-many-sorted;size=1000.allocation.retainedBytes",
       "maximum": 1332819,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     },
     {
       "key": "workload=xlookup-many;size=1000.allocation.retainedBytes",
       "maximum": 1086819,
-      "reason": "CellStore custom_functions field: one pointer per store, no per-cell growth; measured 8 bytes. Existing lazy structures own tab order, iteration limits, pivot data, or dependency indexes and cannot own host functions without a lifecycle redesign."
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): CellStore custom_functions field, one pointer per store, no per-cell growth; measured 8 bytes. The default engine has no such field and passes without this file."
     }
   ]
 }

@@ -1498,9 +1498,13 @@ impl CellStore {
             Ast::UnknownFunc(name, arguments) => {
                 self.eval_custom_function(name, arguments, sheet, pass, depth + 1)
             }
-            #[cfg(not(feature = "host-functions"))]
-            Ast::UnknownFunc(..) => Value::Error(FormulaError::Name),
-            Ast::Name(_) | Ast::UnresolvedStructured(_) => Value::Error(FormulaError::Name),
+            // With host functions the arm above takes every unknown call; the
+            // default engine keeps this arm as it was, so its binary does not
+            // change.
+            #[cfg_attr(feature = "host-functions", allow(unreachable_patterns))]
+            Ast::Name(_) | Ast::UnresolvedStructured(_) | Ast::UnknownFunc(..) => {
+                Value::Error(FormulaError::Name)
+            }
             Ast::NamedRange(named)
                 if named.row_start == named.row_end && named.col_start == named.col_end =>
             {
