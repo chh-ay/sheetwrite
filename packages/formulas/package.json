@@ -1,6 +1,6 @@
 {
   "name": "@sheetwrite/formulas",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "type": "module",
   "description": "Sheetwrite full formula engine (Rust/WASM), with analysis functions.",
   "license": "MIT",

@@ -1,5 +1,134 @@
 # @sheetwrite/core
 
+## 0.7.0
+
+### Minor Changes
+
+- [#309](https://github.com/chh-ay/sheetwrite/pull/309) [`f8bce6b`](https://github.com/chh-ay/sheetwrite/commit/f8bce6bcea2f4bcedfacf38ec22ad64fc52fcd8a) Thanks [@chh-ay](https://github.com/chh-ay)! - Core failures have one shape. Bad host input and passed limits on public paths now throw a `SheetwriteError` with a code instead of a plain `Error`, `TypeError` or `RangeError`: simple columns, row bridge options and row IDs, `CellRenderer.dom()` results, store options, resource reports, restore blocks, transaction limits, datasource pages and unknown sheet IDs. `isSheetwriteError` checks the shape only, so it also accepts codes from a newer release. A failure stays small: its message and the strings in its `context` are cut to 8 KiB, a `context` over 1,024 entries becomes `{ truncated: true }` instead of making the constructor throw, and `SnapshotValidationError.errors` keeps the first 64 issues. `SyncProtocolError` keeps the original failure as its `cause`.
+  
+  Upgrade checklist:
+  
+  - If you catch `RangeError` or `TypeError` from `resolveTransactionResourceLimits`, `validateTransactionResources`, `createRowBridge`, `createSimpleGridInput`, `legacyFullWidthDataSource`, `decodeStoreMemoryStats`, `assertRuntimeResourceSnapshot` or a custom `CellRenderer`, check `isSheetwriteError(error)` and `error.code` instead. The new code is `invalid-argument`; the new operations are `store`, `transaction`, `render`, `row-bridge` and `resource-diagnostics`.
+  - An unknown sheet ID throws `not-found` with operation `store` and `context.sheet`. Do not match the message.
+  - A bad limit override throws `invalid-limits` everywhere, also from `IndexedDbPendingCommitStorage.load` (was `limit`) and direct workbook allocation (was `TypeError`).
+  - The operation `comments` is now `comment`, and the grid export operation `export-xlsx` is now `xlsx-export`.
+  - `datasource-error` contexts no longer copy column keys: they hold `columnBandCount` and the `start` and `end` of the first 64 bands. Read the keys from `event.request`.
+  - If you `switch` over `SheetwriteErrorCode` or `SheetwriteErrorOperation` without a default case, add the new values.
+
+- [#286](https://github.com/chh-ay/sheetwrite/pull/286) [`a6eefc5`](https://github.com/chh-ay/sheetwrite/commit/a6eefc5842d994b1ebf3ed699c74cc762c87377b) Thanks [@chh-ay](https://github.com/chh-ay)! - Hosts can register synchronous JavaScript functions that formulas call, on the full engine (`@sheetwrite/formulas`). Import `registerFunction(store, metadata, implementation)` and `unregisterFunction(store, name)` from `@sheetwrite/core/functions`; an application that does not import that entry carries none of its JavaScript, and the default engine binary does not change. On the default engine, `registerFunction` throws a `SheetwriteError` with code `optional-backend-unavailable`. A thrown error or a result that is not a number, text, boolean or `null` shows `#VALUE!`. A workbook that calls a function that is not registered shows `#NAME?`. `listFunctions(store)` returns the metadata of the built-in functions of the active engine and of the host functions in one list.
+
+- [#296](https://github.com/chh-ay/sheetwrite/pull/296) [`50a75e6`](https://github.com/chh-ay/sheetwrite/commit/50a75e6b993b75c1ca8c63ec261dd24e49d6ebe7) Thanks [@chh-ay](https://github.com/chh-ay)! - A WASM trap in the engine now stops the engine with the new error code `engine-failed` (operation `engine`) instead of an untyped `RuntimeError`. The call that trapped throws it. Every grid on that engine emits the new `engine-failed` grid event once, keeps its last frame and becomes read-only; `setReadOnly(false)` does not undo this. Stores on that engine refuse `applyTransaction`, `recalculateVolatile` and `loadPage` with the same code. Call `initSheetwrite()` again and create a new grid from a saved document to continue. The restart uses the compiled module again.
+  
+  Worker renderer failures are now typed `renderer-fallback` errors with `context.failure`: `spawn`, `crash`, `protocol`, `timeout` or `fatal`. A reply or request that one side cannot read stops the worker and falls back to the canvas renderer, where it was ignored before.
+  
+  Engine loading and memory release failures are typed too: `getEngine` before `initSheetwrite()` reports `initialization-required`, an engine change or a concurrent source reports `initialization-failed`, and a `releaseEngineMemory()` preparation that runs out of memory reports `resource-limit` (a trap reports `engine-failed`).
+  
+  Upgrade checklist:
+  
+  - If you catch errors from grid or store calls, handle `error.code === "engine-failed"`: destroy the grid, `await initSheetwrite()` and create a new grid from your last saved document. Do not read the failed grid or store for the document.
+  - If you check `renderer-fallback` errors by message, use `error.context.failure` instead.
+  - If you `switch` over `SheetwriteErrorCode` or `SheetwriteErrorOperation` without a default case, add `engine-failed` and `engine`.
+
+- [#301](https://github.com/chh-ay/sheetwrite/pull/301) [`08fbebf`](https://github.com/chh-ay/sheetwrite/commit/08fbebfd3b654070de6edbd15d4d72398eb5198d) Thanks [@chh-ay](https://github.com/chh-ay)! - Formula help in the cell editor and the formula bar. Autocomplete lists the built-in functions of the active engine and the store's custom functions; an argument guide shows the signature of the function around the caret with the current argument in bold; syntax errors, unknown names and wrong argument counts are underlined while you type; and each reference gets a colour in the text and the same colour on its range in the grid. **Formulas › Formula Auditing › Explain Formula** opens a side panel that describes the formula in the focus cell from function metadata. The function list is an ARIA listbox, and the guide is a polite live region. Formula help loads on the first formula edit, and the panel on first use, so they add almost nothing to the grid's first download. Host editors can use the same analysis: `analyzeFormula(text, cursor, functions)` from `@sheetwrite/core/functions` returns the tokens, references, call at the cursor, completions and problems of a formula. The Formulas tab now always shows; Insert Function in it still needs custom functions.
+
+- [#313](https://github.com/chh-ay/sheetwrite/pull/313) [`3c57cb9`](https://github.com/chh-ay/sheetwrite/commit/3c57cb9e038c94cd17c7fac9a7fff2d01344b03e) Thanks [@chh-ay](https://github.com/chh-ay)! - New `grid.trimMemory()` gives back the memory that an open grid can build again: decoded cell strings, rendered number text, compiled number formats, text measurement and unused overlay nodes, in the grid and in its worker renderer. Document data, undo history and the visible output do not change; the next frame builds only what it paints. Call it on a memory signal or when the page goes to the background. The number format caches are shared by all grids on the page, so a trim drops them for every grid. It does nothing after `destroy()`, and it does not shrink WebAssembly memory (use `releaseEngineMemory()` for that).
+  
+  The find bar code is now in its own chunk. The grid loads it and builds the find bar DOM when the find bar first opens, not when the grid is created. A grid that never opens the find bar does not download its code and has no `.sheetwrite-find` element. The first Ctrl+F, Ctrl+H or `grid.actions.find()` shows the bar after its chunk loads.
+  
+  Upgrade checklist:
+  
+  - If your code or tests look for `.sheetwrite-find` before the find bar opens, open it first with `grid.actions.find()` or Ctrl+F, then wait for the element to appear.
+  - If your bundler setup lists the grid's lazy chunks (as for the ribbon and the panels), expect one more chunk for the find bar.
+
+- [#294](https://github.com/chh-ay/sheetwrite/pull/294) [`f1609ee`](https://github.com/chh-ay/sheetwrite/commit/f1609ee5e6ffb6a77226780a94827e2fcc493ec5) Thanks [@chh-ay](https://github.com/chh-ay)! - **Behaviour change:** XLSX and CSV/TSV aborts reject with `signal.reason`, not with a `SheetwriteError` that has `code: "aborted"`.
+  
+  - `fromXlsxWorkbook`, `fromXlsxWorkbookFile`, `fromXlsxTable`, `toXlsxWorkbook`, `toXlsxTable`, their streams, `buildXlsxModel`, and the CSV/TSV parse and export functions reject, throw or error with `signal.reason` after the signal fires. An abort is not a failure, so it is never a `SheetwriteError`.
+  - `parseCsv`, `parseTsv` and `fromCsv` now check `signal` too: before the scan and once per 1,024 records.
+  - The XLSX codec checks the signal once per ZIP entry, worksheet and chunk of cells, also while it builds the snapshot. An aborted import keeps no partial snapshot.
+  
+  **Upgrade checklist:** if your code tells an aborted XLSX or CSV/TSV call apart with `error.code === "aborted"`, check `signal.aborted` (or `error === signal.reason`) instead. Persistence and IndexedDB storage still use `code: "aborted"`.
+
+- [#287](https://github.com/chh-ay/sheetwrite/pull/287) [`dd153bb`](https://github.com/chh-ay/sheetwrite/commit/dd153bb24808b011b90c48cf8d3061a743b7d0e6) Thanks [@chh-ay](https://github.com/chh-ay)! - The toolbar, the full ribbon and a new compact ribbon render one command model. They show the same commands, glyphs, enabled and pressed state, accessible names and keyboard behavior.
+  
+  - The compact ribbon shows a tab's commands on one row. Set `config.ribbon` to `{ mode: "compact" }`, or to `{ mode: "auto", compactWidth }` to use compact below a width (default 768 px). The **Compact** button beside the tab list switches layout.
+  - The toolbar shows the ribbon's commands on one row. Commands that do not fit move into a **More commands** popup. Font Color and Fill Color are palettes, and Borders, Clear and Merge & Center are menus, as in the ribbon.
+  - The `GridConfig` command flags (`bold`, `sort`, `export` and the others, typed as `CommandFlags`) now choose commands in the ribbon too. `export: true` adds an Export group with Export CSV and Export XLSX.
+  - Every command element has a `data-command` attribute. The old `.sheetwrite-tb-*` classes are gone.
+  - The built-in toolbar loads with the ribbon's chunk, so it appears after the grid mounts.
+  - The shell toolbar also loads lazily, with its row height reserved. Custom Border, Merge, Unmerge and Clear Formats items keep their one-click behavior.
+
+- [#295](https://github.com/chh-ay/sheetwrite/pull/295) [`9ef07fe`](https://github.com/chh-ay/sheetwrite/commit/9ef07fea96dd5491352ad9ffe54aa5270dc61ff1) Thanks [@chh-ay](https://github.com/chh-ay)! - The ribbon and the toolbar get **Formulas › Insert Function** for custom functions, 16 new glyphs for the 0.7 features, a tab row that scrolls when it is narrow, and new group dividers.
+  
+  - **Insert Function** lists the functions registered with `registerFunction` (full engine), each with its signature and description as the tooltip. Picking one starts `=NAME(` in the focus cell's editor. The Formulas tab, and the command in the toolbar, show only while the store has a registered function.
+  - New glyphs: `insertFunction`, `defineName`, `nameManager`, `explainFormula`, `getData`, `refreshAll`, `queries`, `editLinks`, `relationships`, `dataModel`, `measure`, `dashboard`, `slicer`, `kpiCard`, `versionHistory` and `saveVersion`. `ICON_NAMES`, `IconName` and `@sheetwrite/core/icons.json` list them. They take new rows on the sheet; no published glyph moves, so a replacement sheet drawn for 0.6 still lines up.
+  - When the tabs do not fit, the tab row scrolls sideways instead of running under the **Compact** button. Focusing a tab with the keyboard scrolls it into view.
+  - The divider between ribbon groups stops short of the panel edges, so each group label reads as the caption of its controls.
+
+- [#306](https://github.com/chh-ay/sheetwrite/pull/306) [`e0c3655`](https://github.com/chh-ay/sheetwrite/commit/e0c3655b1fec3b8dd5771e234d8280a7bdf9cc4f) Thanks [@chh-ay](https://github.com/chh-ay)! - `SUBTOTAL` and `AGGREGATE` skip hidden rows, as in Excel:
+  
+  - `SUBTOTAL` accepts codes 101 to 111. All codes skip the rows that a filter hides. Codes 101 to 111 also skip the rows that you hide (`hideRows`) and the rows of a collapsed row group. Before, codes 101 to 111 returned `#VALUE!`.
+  - `SUBTOTAL` reads a cell argument, such as `A2` in `=SUBTOTAL(9,A2)`, as a reference: text in the cell is ignored, as in Excel, and the cell's row can be hidden.
+  - `SUBTOTAL` skips cells whose formula calls `SUBTOTAL` or `AGGREGATE`, as `AGGREGATE` already did, so a subtotal is not counted two times.
+  - `AGGREGATE` options 1, 3, 5 and 7 skip hidden rows. Before, they had no effect.
+  - When you hide or show rows, collapse or expand a row group, or change a filter, only the `SUBTOTAL` and `AGGREGATE` formulas that read the sheet calculate again. Core sends the hidden rows of a sheet in one engine call per transaction.
+  - New engine export `CellStore.setHiddenRows(sheet, manual, filtered)` sets the hidden rows of a sheet as packed `[first, last]` row ranges. A sheet without hidden rows uses no extra memory.
+
+### Patch Changes
+
+- [#293](https://github.com/chh-ay/sheetwrite/pull/293) [`2db15ef`](https://github.com/chh-ay/sheetwrite/commit/2db15efe6fa4d9d2948528d504281af9d72d16cd) Thanks [@chh-ay](https://github.com/chh-ay)! - Fix more bugs from the 0.6.0 audit:
+  
+  - Pasting `-5` or `+1` from HTML (Excel, Google Sheets) into a number column stores a number. Only text that would become a formula gets a leading quote.
+  - A row or column delete shrinks a conditional-format formula range whose edge was deleted (`=SUM(A1:B4)` becomes `=SUM(A1:B2)`). Only a range with no rows or columns left becomes `#REF!`.
+  - The formula bar keeps a pasted or dropped draft when the grid refreshes.
+  - Formula reference highlights skip text in quotes and references to other sheets.
+  - A cell edit no longer closes an open sheet tab menu in the spreadsheet shell.
+  - Auto-fit row height from the menu fits the selected row under a sort or filter.
+  - Search over a custom store reports data rows when the store offers `getDataWindow`.
+  - A failed PivotTable placement shows its error in the form instead of an unhandled rejection.
+  - A toolbar or ribbon that cannot load tells the user why in the grid's alert. The load error still reaches the host.
+  - A row bridge clear lists only the cells that changed, so clearing whole columns no longer creates one object per empty cell.
+  - Disposing a store ends an engine memory release that was waiting for its page loads.
+
+- [#283](https://github.com/chh-ay/sheetwrite/pull/283) [`c267c94`](https://github.com/chh-ay/sheetwrite/commit/c267c94ebc4f2c6d4f83e361b28d44fee5956f53) Thanks [@chh-ay](https://github.com/chh-ay)! - Fix several bugs that changed user data:
+  
+  - Fill, copy and row or column edits keep function names such as `LOG10` and `BIN2DEC`. A reference that moves outside the sheet, before column A or row 1 or past column XFD or row 1048576, becomes `#REF!` instead of stopping at the edge. A range with such a corner becomes one `#REF!`.
+  - Pasting `-5` or `+1` as plain text from another app into a number column stores a number. Only text that would become a formula gets a leading quote.
+  - Case-insensitive replace keeps non-ASCII text intact when lower case changes the text length (for example `İ`).
+  - Replace all skips reference cells, so the reference stays linked.
+  - `loadPage` keeps empty cells, booleans and dates, the same as `loadColumnar`.
+  - Editing a boolean cell shows `TRUE` or `FALSE`, and the editor reads formulas from any store.
+  - Delete on a focused sheet tab does not remove the last visible sheet, and Backspace no longer removes a sheet.
+  - Snapshots reject a row height of 0, the same as sheet operations, and canonical order no longer depends on the runtime locale.
+
+- [#283](https://github.com/chh-ay/sheetwrite/pull/283) [`c267c94`](https://github.com/chh-ay/sheetwrite/commit/c267c94ebc4f2c6d4f83e361b28d44fee5956f53) Thanks [@chh-ay](https://github.com/chh-ay)! - Fix bugs that hid failures or let a peer mislead the page:
+  
+  - Presence publishing reports an active-sheet failure as an `error` event instead of an unhandled rejection.
+  - Revision restore rejects a non-integer version from the adapter instead of storing `NaN`.
+  - Copied HTML writes only safe colors, and underline with strikethrough gives one `text-decoration` value.
+  - `Grid.destroy()` removes the DOM and listeners even when an earlier teardown step throws.
+  - `aria-rowcount` follows inserted, deleted and filtered rows.
+  - Default sync mutation IDs are random, so two clients that edit in the same millisecond do not collide.
+  - Conflict recovery saves the rebased queue only after every missed version applies.
+  - `SyncCoordinator.subscribe()` keeps the host's offline state.
+  - A table with too many columns reports a table-column limit.
+
+- [#307](https://github.com/chh-ay/sheetwrite/pull/307) [`5620780`](https://github.com/chh-ay/sheetwrite/commit/56207806761765cf486187dd1e72851813f75457) Thanks [@chh-ay](https://github.com/chh-ay)! - Paste, fill and conditional-format rules now rewrite formula references with the engine's own rules (part of [#246](https://github.com/chh-ay/sheetwrite/issues/246)). `=SUM(A:A)` pasted one column right becomes `=SUM(B:B)`, and a name such as `XYZ1`, past the last column, stays a name instead of becoming `#REF!`. A row or column insert, delete or move rewrites whole columns and rows in conditional-format formulas too. Only the references that change are rewritten, so the rest of the formula keeps its spacing and case.
+  
+  The engines export `translateFormula`, `shiftFormulaAxis` and `moveFormulaAxis`. `shiftA1Refs` from `@sheetwrite/core` now calls the engine, so it needs `initSheetwrite()` first. `rebaseDocumentOperations` needs it too when it moves a conditional format that has a formula.
+
+- [#294](https://github.com/chh-ay/sheetwrite/pull/294) [`f1609ee`](https://github.com/chh-ay/sheetwrite/commit/f1609ee5e6ffb6a77226780a94827e2fcc493ec5) Thanks [@chh-ay](https://github.com/chh-ay)! - XLSX and CSV failures stay small:
+  
+  - An XLSX error message keeps at most 8 KiB of text from the file, from the start and the end, and keeps the decoding error as its `cause`.
+  - One XLSX conversion reports at most 64 warnings to `onWarning`.
+  - `DelimitedTextOptionsError.context` keeps a number option value, or only `valueType` for any other value, never a copy of it.
+  - A registered XLSX backend name in a failure context is cut to 256 characters.
+
+- [#293](https://github.com/chh-ay/sheetwrite/pull/293) [`2db15ef`](https://github.com/chh-ay/sheetwrite/commit/2db15efe6fa4d9d2948528d504281af9d72d16cd) Thanks [@chh-ay](https://github.com/chh-ay)! - In Safari (WebKit), a ribbon or toolbar menu opened from the keyboard stays open. Before, focus on the first menu item scrolled the page, and the scroll closed the menu at once. A page scroll now closes a ribbon or toolbar popup only when its button moves, so a late scroll event for an earlier scroll does not close a menu that just opened.
+
+- [#300](https://github.com/chh-ay/sheetwrite/pull/300) [`cfc6d1f`](https://github.com/chh-ay/sheetwrite/commit/cfc6d1fae12c8e3fd6b68db0b93af83a1ccb531e) Thanks [@chh-ay](https://github.com/chh-ay)! - A row or column insert that a sheet cannot hold changes nothing. `addRows`, `removeRows`, `insertCols` and `removeCols` return `false` for a dense sheet that would pass its cell limit or a row count that overflows, and the store rejects the operation instead of moving formulas, charts or metadata for cells that did not move. `addPagedSheet` throws for a chunk size above 1048576 rows.
+- Updated dependencies [[`a6eefc5`](https://github.com/chh-ay/sheetwrite/commit/a6eefc5842d994b1ebf3ed699c74cc762c87377b), [`5620780`](https://github.com/chh-ay/sheetwrite/commit/56207806761765cf486187dd1e72851813f75457), [`cfc6d1f`](https://github.com/chh-ay/sheetwrite/commit/cfc6d1fae12c8e3fd6b68db0b93af83a1ccb531e), [`08fbebf`](https://github.com/chh-ay/sheetwrite/commit/08fbebfd3b654070de6edbd15d4d72398eb5198d), [`cfc6d1f`](https://github.com/chh-ay/sheetwrite/commit/cfc6d1fae12c8e3fd6b68db0b93af83a1ccb531e), [`cfc6d1f`](https://github.com/chh-ay/sheetwrite/commit/cfc6d1fae12c8e3fd6b68db0b93af83a1ccb531e), [`e0c3655`](https://github.com/chh-ay/sheetwrite/commit/e0c3655b1fec3b8dd5771e234d8280a7bdf9cc4f)]:
+  - @sheetwrite/wasm@0.7.0
+
 ## 0.6.1
 
 ### Patch Changes
