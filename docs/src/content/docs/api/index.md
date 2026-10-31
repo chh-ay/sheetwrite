@@ -38,7 +38,7 @@ The package `exports` maps define this inventory. Supported, internal, asset, an
 <table class="api-entry-table">
 <thead><tr><th>Entry point</th><th>Classification</th><th>Symbols</th></tr></thead>
 <tbody>
-<tr><td><a href="/docs/api/formulas/"><code>@sheetwrite/formulas</code></a></td><td><span class="api-status" data-status="internal">internal</span></td><td>20</td></tr>
+<tr><td><a href="/docs/api/formulas/"><code>@sheetwrite/formulas</code></a></td><td><span class="api-status" data-status="internal">internal</span></td><td>23</td></tr>
 <tr><td><a href="/docs/api/formulas-wasm/"><code>@sheetwrite/formulas/wasm</code></a></td><td><span class="api-status" data-status="asset">asset</span></td><td>0</td></tr>
 </tbody>
 </table>
@@ -78,7 +78,7 @@ The package `exports` maps define this inventory. Supported, internal, asset, an
 <table class="api-entry-table">
 <thead><tr><th>Entry point</th><th>Classification</th><th>Symbols</th></tr></thead>
 <tbody>
-<tr><td><a href="/docs/api/wasm/"><code>@sheetwrite/wasm</code></a></td><td><span class="api-status" data-status="internal">internal</span></td><td>18</td></tr>
+<tr><td><a href="/docs/api/wasm/"><code>@sheetwrite/wasm</code></a></td><td><span class="api-status" data-status="internal">internal</span></td><td>21</td></tr>
 <tr><td><a href="/docs/api/wasm-wasm/"><code>@sheetwrite/wasm/wasm</code></a></td><td><span class="api-status" data-status="asset">asset</span></td><td>0</td></tr>
 </tbody>
 </table>
