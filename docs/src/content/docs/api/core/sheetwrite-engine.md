@@ -8,7 +8,7 @@ description: "SheetwriteEngine interface in @sheetwrite/core: A complete engine 
 A complete engine module from `@sheetwrite/wasm` or `@sheetwrite/formulas`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/engine.ts#L4"><code>packages/core/src/engine.ts#L4</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/engine.ts#L6"><code>packages/core/src/engine.ts#L6</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>

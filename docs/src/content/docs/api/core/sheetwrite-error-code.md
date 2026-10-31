@@ -8,7 +8,7 @@ description: "SheetwriteErrorCode type in @sheetwrite/core: Exhaustive stable di
 Exhaustive stable discriminator for consumer-visible Sheetwrite failures.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/errors.ts#L58"><code>packages/core/src/errors.ts#L58</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/errors.ts#L59"><code>packages/core/src/errors.ts#L59</code></a></dd></div>
 </dl>
 
 ## Declaration

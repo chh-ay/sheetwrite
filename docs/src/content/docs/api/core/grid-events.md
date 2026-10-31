@@ -28,9 +28,10 @@ Payload map for events emitted by a Grid.
 <a href="#grid-events-export-error"><code>export-error</code></a>
 <a href="#grid-events-chart-select"><code>chart-select</code></a>
 <a href="#grid-events-chart-activate"><code>chart-activate</code></a>
+<a href="#grid-events-engine-failed"><code>engine-failed</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>16</span>
+## Members <span class="api-count" data-pagefind-ignore>17</span>
 
 <div class="api-member-list">
 
@@ -135,12 +136,15 @@ search: SearchResult;
 </details>
 
 <details class="api-member" id="grid-events-renderer-fallback" data-pagefind-weight="1">
-<summary><code>renderer-fallback</code> <span class="api-member-summary">Emitted once when the worker renderer could not be constructed and the grid fell back to the main-thread canvas renderer.</span></summary>
+<summary><code>renderer-fallback</code> <span class="api-member-summary">Emitted once when the worker renderer could not start or stopped and the grid fell back to the main-thread canvas renderer.</span></summary>
 
 ```ts generated
 "renderer-fallback": { requested: "worker"; error: SheetwriteError };
 ```
 
+<p class="api-member-doc">Emitted once when the worker renderer could not start or stopped and the
+grid fell back to the main-thread canvas renderer. `error.context.failure`
+is `spawn`, `crash`, `protocol`, `timeout` or `fatal`.</p>
 </details>
 
 <details class="api-member" id="grid-events-datasource-error" data-pagefind-weight="1">
@@ -177,6 +181,20 @@ search: SearchResult;
 "chart-activate": ChartRef;
 ```
 
+</details>
+
+<details class="api-member" id="grid-events-engine-failed" data-pagefind-weight="1">
+<summary><code>engine-failed</code> <span class="api-member-summary">Emitted once when the engine stopped after a WASM trap.</span></summary>
+
+```ts generated
+"engine-failed": { error: SheetwriteError };
+```
+
+<p class="api-member-doc">Emitted once when the engine stopped after a WASM trap. `error.code` is
+`engine-failed`. The grid keeps its last frame, is read-only and does not
+read its store again; `setReadOnly(false)` does not undo this. To continue,
+destroy the grid, `await initSheetwrite()` and create a new grid from a
+saved document.</p>
 </details>
 </div>
 
@@ -232,6 +250,9 @@ export interface GridEvents {
   };
   "chart-select": ChartRef | null;
   "chart-activate": ChartRef;
+  "engine-failed": {
+    error: SheetwriteError;
+  };
 }
 ```
 
