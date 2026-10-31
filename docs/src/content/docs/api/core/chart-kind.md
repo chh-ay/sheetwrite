@@ -8,7 +8,7 @@ description: "ChartKind type in @sheetwrite/core: Chart families that the docume
 Chart families that the document model supports.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/chart.ts#L4"><code>packages/core/src/types/chart.ts#L4</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/chart.ts#L4"><code>packages/core/src/types/chart.ts#L4</code></a></dd></div>
 </dl>
 
 ## Declaration

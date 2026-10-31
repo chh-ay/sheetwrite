@@ -8,7 +8,7 @@ description: "CellPaintContext interface in @sheetwrite/core: Read-only cell val
 Read-only cell value and screen geometry supplied to a custom renderer.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/render.ts#L40"><code>packages/core/src/types/render.ts#L40</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/render.ts#L40"><code>packages/core/src/types/render.ts#L40</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>

@@ -8,7 +8,7 @@ description: "AdapterGridController interface in @sheetwrite/core/adapter: Owns 
 Owns adapter attachment and monotonically numbered Grid generations.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/adapter.ts#L239"><code>packages/core/src/adapter.ts#L239</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/adapter.ts#L239"><code>packages/core/src/adapter.ts#L239</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

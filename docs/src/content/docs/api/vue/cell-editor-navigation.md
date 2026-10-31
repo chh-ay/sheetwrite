@@ -8,7 +8,7 @@ description: "CellEditorNavigation type in @sheetwrite/vue: Selection movement a
 Selection movement applied after a successful editor commit.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/types/grid.d.ts#L28"><code>packages/core/dist/types/grid.d.ts#L28</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/grid.d.ts#L28"><code>packages/core/dist/types/grid.d.ts#L28</code></a></dd></div>
 </dl>
 
 ## Declaration

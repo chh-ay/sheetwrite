@@ -25,7 +25,7 @@ await initSheetwrite(undefined, formulas);
 - [/docs/start/choose-an-engine/](/docs/start/choose-an-engine/)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/loader.d.ts#L30"><code>packages/formulas/loader.d.ts#L30</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/formulas/loader.d.ts#L30"><code>packages/formulas/loader.d.ts#L30</code></a></dd></div>
 </dl>
 
 ## Declaration

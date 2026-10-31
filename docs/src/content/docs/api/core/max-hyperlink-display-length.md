@@ -8,7 +8,7 @@ description: "MAX_HYPERLINK_DISPLAY_LENGTH variable in @sheetwrite/core: Optiona
 Optional display text ceiling used by SpreadsheetML shared-string implementations.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/hyperlink.ts#L20"><code>packages/core/src/hyperlink.ts#L20</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/hyperlink.ts#L20"><code>packages/core/src/hyperlink.ts#L20</code></a></dd></div>
 </dl>
 
 ## Declaration

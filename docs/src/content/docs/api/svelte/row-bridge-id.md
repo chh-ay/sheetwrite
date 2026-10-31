@@ -8,7 +8,7 @@ description: "RowBridgeId type in @sheetwrite/svelte: A stable host identity for
 A stable host identity for one data-space row.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/row-bridge.d.ts#L6"><code>packages/core/dist/row-bridge.d.ts#L6</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/row-bridge.d.ts#L6"><code>packages/core/dist/row-bridge.d.ts#L6</code></a></dd></div>
 </dl>
 
 ## Declaration

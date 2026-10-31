@@ -8,7 +8,7 @@ description: "FormulaScalar type in @sheetwrite/core/functions: A scalar passed 
 A scalar passed to or returned from a synchronous host formula function.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/functions/types.ts#L2"><code>packages/core/src/functions/types.ts#L2</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/functions/types.ts#L2"><code>packages/core/src/functions/types.ts#L2</code></a></dd></div>
 </dl>
 
 ## Declaration

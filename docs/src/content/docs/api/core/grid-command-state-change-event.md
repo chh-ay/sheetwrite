@@ -8,7 +8,7 @@ description: "GridCommandStateChangeEvent interface in @sheetwrite/core: Complet
 Complete command-state snapshot emitted whenever availability or activity can change.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L274"><code>packages/core/src/types/grid.ts#L274</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/grid.ts#L274"><code>packages/core/src/types/grid.ts#L274</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>1</span>

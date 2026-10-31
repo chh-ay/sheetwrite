@@ -8,7 +8,7 @@ description: "STORE_MEMORY_PROTOCOL_VERSION variable in @sheetwrite/core: Flat W
 Flat WASM store-memory protocol version; decoders reject any mismatch.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/resource-accounting.ts#L8"><code>packages/core/src/resource-accounting.ts#L8</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/resource-accounting.ts#L8"><code>packages/core/src/resource-accounting.ts#L8</code></a></dd></div>
 </dl>
 
 ## Declaration

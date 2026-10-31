@@ -13,7 +13,7 @@ replace every glyph at once, set the `--sheetwrite-icon-sheet` CSS property
 to a sheet drawn on the layout in `@sheetwrite/core/icons.json`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L317"><code>packages/core/src/types/grid.ts#L317</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/grid.ts#L317"><code>packages/core/src/types/grid.ts#L317</code></a></dd></div>
 </dl>
 
 ## Declaration

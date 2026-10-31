@@ -8,7 +8,7 @@ description: "describeSelection function in @sheetwrite/core/shell: Human phrase
 Human phrase for a selection's geometry; blank for null/single-cell.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/selection-status.ts#L12"><code>packages/core/src/shell/selection-status.ts#L12</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/shell/selection-status.ts#L12"><code>packages/core/src/shell/selection-status.ts#L12</code></a></dd></div>
 </dl>
 
 ## Declaration

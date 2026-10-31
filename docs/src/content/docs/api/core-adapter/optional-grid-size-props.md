@@ -8,7 +8,7 @@ description: "OptionalGridSizeProps interface in @sheetwrite/core/adapter: Optio
 Optional width and height accepted by advanced framework adapters.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/adapter.ts#L163"><code>packages/core/src/adapter.ts#L163</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/adapter.ts#L163"><code>packages/core/src/adapter.ts#L163</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

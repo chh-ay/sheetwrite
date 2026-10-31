@@ -8,7 +8,7 @@ description: "getGridResetReason function in @sheetwrite/core/adapter: Returns t
 Returns the first reset-sensitive adapter input that changed, if any.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/adapter.ts#L192"><code>packages/core/src/adapter.ts#L192</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/adapter.ts#L192"><code>packages/core/src/adapter.ts#L192</code></a></dd></div>
 </dl>
 
 ## Declaration

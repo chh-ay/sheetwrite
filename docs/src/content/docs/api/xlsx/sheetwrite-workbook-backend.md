@@ -8,7 +8,7 @@ description: "sheetwriteWorkbookBackend variable in @sheetwrite/xlsx: Determinis
 Deterministic optional OOXML workbook backend implemented by Sheetwrite.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/xlsx/src/workbook.ts#L9"><code>packages/xlsx/src/workbook.ts#L9</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/xlsx/src/workbook.ts#L9"><code>packages/xlsx/src/workbook.ts#L9</code></a></dd></div>
 </dl>
 
 ## Declaration

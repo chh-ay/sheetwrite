@@ -8,7 +8,7 @@ description: "SyncActivityState type in @sheetwrite/core: Current persistence ac
 Current persistence activity reported by a sync coordinator.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L71"><code>packages/core/src/sync.ts#L71</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/sync.ts#L71"><code>packages/core/src/sync.ts#L71</code></a></dd></div>
 </dl>
 
 ## Declaration

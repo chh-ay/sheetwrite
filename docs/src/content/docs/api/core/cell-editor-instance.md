@@ -8,7 +8,7 @@ description: "CellEditorInstance interface in @sheetwrite/core: Retained lifecyc
 Retained lifecycle returned by a custom editor's mount method.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L108"><code>packages/core/src/types/grid.ts#L108</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/grid.ts#L108"><code>packages/core/src/types/grid.ts#L108</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>

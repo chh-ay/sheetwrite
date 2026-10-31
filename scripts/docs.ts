@@ -23,6 +23,7 @@ import { validateEngineVersions } from "../bench/src/engine-versions.js";
 import { DATA_GATE_PROTOCOL_VERSION } from "../bench/src/gate-protocol.js";
 import { MOVED_HEADINGS, MOVED_PAGES, type MovedPage } from "../docs/src/lib/moved-pages.js";
 import { DOCS_NAVIGATION, navigationPages } from "../docs/src/lib/navigation.js";
+import { repositorySourceUrl } from "../docs/src/lib/repository.js";
 import {
   collectFenceHovers,
   formatDeclaration,
@@ -1215,7 +1216,7 @@ export async function renderSymbolPage(
     summary,
     "",
     '<dl class="api-metadata" data-pagefind-ignore>',
-    `<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/${html(source)}"><code>${html(source)}</code></a></dd></div>`,
+    `<div><dt>Source</dt><dd><a href="${html(repositorySourceUrl(source))}"><code>${html(source)}</code></a></dd></div>`,
     "</dl>",
     "",
   ];
@@ -3353,7 +3354,7 @@ function compatibilityCell(value: string): string {
 function compatibilitySource(source: string): string {
   return source.startsWith("https://")
     ? `[spec/source](${source})`
-    : `[checked source file](https://github.com/chh-ay/sheetwrite/blob/main/${source})`;
+    : `[checked source file](${repositorySourceUrl(source)})`;
 }
 
 function publicCompatibilitySource(source: string): string {

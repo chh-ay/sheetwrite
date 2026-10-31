@@ -8,7 +8,7 @@ description: "DataSourceCapabilities interface in @sheetwrite/core: Declares whe
 Declares whether a source can load only the requested column runs.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/data.ts#L60"><code>packages/core/src/types/data.ts#L60</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/data.ts#L60"><code>packages/core/src/types/data.ts#L60</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

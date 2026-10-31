@@ -8,7 +8,7 @@ description: "isLoaded function in @sheetwrite/formulas: Whether the WASM module
 Whether the WASM module has finished initializing.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/loader.d.ts#L35"><code>packages/formulas/loader.d.ts#L35</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/formulas/loader.d.ts#L35"><code>packages/formulas/loader.d.ts#L35</code></a></dd></div>
 </dl>
 
 ## Declaration
