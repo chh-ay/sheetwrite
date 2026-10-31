@@ -189,10 +189,11 @@ jobs:
           bun test packages test/browser/canvas-assertions.test.ts scripts/public-api.test.ts scripts/conformance.test.ts scripts/conformance-google.test.ts scripts/conformance-workbook-roundtrip.test.ts scripts/docs.test.ts scripts/formula-contract.test.ts scripts/ci-paths.test.ts scripts/indexnow.test.ts scripts/release-github.test.ts bench/test docs/test
           cargo test --manifest-path packages/wasm/Cargo.toml
           cargo test --manifest-path packages/wasm/Cargo.toml --features analysis
-      - name: Type checks and public API
+      - name: Type checks, public API and committed generated docs
         run: |
           bun run typecheck
           bun run api:check
+          bun run docs:check
       - name: Benchmark smoke and safety ceilings (not regression evidence)
         run: bun run --filter '@sheetwrite/bench' bench:verify
       - name: Source coverage
@@ -499,8 +500,9 @@ jobs:
         run: |
           test -n "$ARTIFACT_DIGEST"
           bun run release:verify-artifacts -- --input test-results/release-artifacts
-      - name: Record delivery sizes
-        run: bun scripts/size-report.ts report --artifacts test-results/release-artifacts
+      # The docs build renders the committed report, so it must match this measurement.
+      - name: Record delivery sizes and check the committed report
+        run: bun scripts/size-report.ts report --artifacts test-results/release-artifacts --check-committed
       - name: Upload delivery size evidence
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -523,7 +525,9 @@ jobs:
 
   docs-build:
     name: Production Docs
-    needs: [preflight, artifact-build, delivery-size]
+    # Builds the committed tree: Delivery Size checks the size report and the unit
+    # job checks generated docs, both in parallel with this build.
+    needs: [preflight, artifact-build]
     if: needs.preflight.outputs.docs_required == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -551,22 +555,16 @@ jobs:
         with:
           name: canonical-release-artifacts
           path: test-results/release-artifacts
-      - name: Download delivery size evidence
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: size-evidence
-          path: scripts
       - name: Verify and hydrate canonical package outputs
         env:
           ARTIFACT_DIGEST: ${{ needs.artifact-build.outputs.artifact_digest }}
         run: |
           test -n "$ARTIFACT_DIGEST"
           bun scripts/hydrate-release-artifacts.ts test-results/release-artifacts
-      - name: Generate, check, and build production docs
+      - name: Type check and build production docs
         run: |
-          bun run docs:generate
           bun run --filter '@sheetwrite/docs-start' typecheck
-          bun run --filter '@sheetwrite/docs-start' build
+          bun run --filter '@sheetwrite/docs-start' build:site
       - name: Package prebuilt deployment
         run: bun run docs:prepare-deployment
       - name: Upload production docs

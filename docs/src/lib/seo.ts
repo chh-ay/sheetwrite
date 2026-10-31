@@ -48,6 +48,15 @@ export function documentStructuredData(page: {
   trail: readonly Crumb[];
 }): string {
   const url = new URL(page.href, SITE_URL).href;
+  // Search engines need a URL on every breadcrumb except the last, so a section
+  // without its own page stays in the visible trail but not in the list.
+  const linkedTrail = page.trail.flatMap((crumb, index) => {
+    if (index === page.trail.length - 1) return [{ name: crumb.label, item: url }];
+
+    return crumb.href === undefined
+      ? []
+      : [{ name: crumb.label, item: new URL(crumb.href, SITE_URL).href }];
+  });
   const graph = [
     {
       "@type": "TechArticle",
@@ -61,17 +70,10 @@ export function documentStructuredData(page: {
     },
     {
       "@type": "BreadcrumbList",
-      itemListElement: page.trail.map((crumb, index) => ({
+      itemListElement: linkedTrail.map((crumb, index) => ({
         "@type": "ListItem",
         position: index + 1,
-        name: crumb.label,
-        // The last crumb is the page itself; a section without its own page
-        // has no URL, which the schema allows.
-        ...(crumb.href !== undefined
-          ? { item: new URL(crumb.href, SITE_URL).href }
-          : index === page.trail.length - 1
-            ? { item: url }
-            : {}),
+        ...crumb,
       })),
     },
   ];
