@@ -53,7 +53,7 @@ export const sheetwriteTableImportBackend: XlsxTableImportBackend = {
       }
       return { rowCount, columns };
     } catch (error) {
-      throw xlsxFailure(error, "import", "sheetwrite-ooxml-table");
+      throw xlsxFailure(error, "import", "sheetwrite-ooxml-table", options?.signal);
     }
   },
 };

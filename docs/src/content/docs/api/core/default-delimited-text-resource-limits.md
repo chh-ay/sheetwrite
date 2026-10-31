@@ -9,7 +9,7 @@ Synchronous operations return one in-memory string, so byte/cell ceilings
 bound allocation while sheet-compatible dimensions remain independently valid.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/delimited-text.ts#L32"><code>packages/core/src/delimited-text.ts#L32</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/delimited-text.ts#L35"><code>packages/core/src/delimited-text.ts#L35</code></a></dd></div>
 </dl>
 
 ## Declaration

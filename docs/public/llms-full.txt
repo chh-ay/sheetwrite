@@ -7552,7 +7552,9 @@ Clipboard formulas and references retain rich behavior only when copied/cut and 
 
 ## Options and edge cases
 
-Delimited functions accept `DelimitedTextOptions` for bounded resources. See the [API contract](https://www.sheetwrite.dev/docs/api/core/delimited-text-options/) and the [hostile-input lab](https://www.sheetwrite.dev/showcases/interoperability/#limits). These plain-text formats do not carry workbook styles, formula source, names or multiple worksheets.
+Delimited functions accept `DelimitedTextOptions` for bounded resources and cancellation. See the [API contract](https://www.sheetwrite.dev/docs/api/core/delimited-text-options/) and the [hostile-input lab](https://www.sheetwrite.dev/showcases/interoperability/#limits). These plain-text formats do not carry workbook styles, formula source, names or multiple worksheets.
+
+`signal` is checked before parsing, once per 1,024 records and once per store window, never once per field. After it fires, parsing and synchronous export throw `signal.reason`, and streams error with it, so an abort is never a `SheetwriteError`. See [Abort](https://www.sheetwrite.dev/docs/import-export/large-files-and-streaming/#abort).
 
 Built-in toolbar/context-menu download failures show an alert and emit `export-error` with `{ format: "csv", error }`. See [export error handling](https://www.sheetwrite.dev/docs/import-export/xlsx-export/#errors-and-built-in-actions).
 
@@ -7675,6 +7677,7 @@ await toXlsxWorkbookStream(store.exportSnapshot(), {
 | Destination receives bytes | Bounded `Uint8Array` chunks, not one complete file buffer. |
 | Destination slows down | Backpressure slows the producer. |
 | Reader cancels | Export stops reading the store. |
+| `controller.abort(reason)` | The stream errors with `reason` at the next ZIP entry, worksheet or chunk of cells. |
 
 The output contains the same XLSX parts as buffered export. ZIP entry order and container bytes can differ.
 
@@ -7727,8 +7730,8 @@ Every XLSX table/workbook path shares `XlsxWorkbookOptions`:
 | --- | --- |
 | `maxCells` | Logical accepted cells; default `1_000_000`. |
 | `resourceLimits` | Override specific input, archive, XML, dimension, preservation and output budgets. |
-| `signal` | Abort between bounded codec stages. |
-| `onWarning` | Surface structured fidelity losses. |
+| `signal` | Checked before the work and once per ZIP entry, worksheet and chunk of XML elements or cells, never once per cell. |
+| `onWarning` | Surface structured fidelity losses; one conversion reports at most 64 warnings. |
 
 Defaults are exported as `DEFAULT_XLSX_RESOURCE_LIMITS`:
 
@@ -7753,6 +7756,27 @@ Defaults are exported as `DEFAULT_XLSX_RESOURCE_LIMITS`:
 | XML text bytes | 16 MiB |
 
 Hard resource bounds are checked before unsafe decompression or allocation. Exceeding one rejects with `XlsxResourceError`, which names the resource, limit and observed value. The [kept-part budget](https://www.sheetwrite.dev/docs/import-export/kept-parts-and-round-trips/#drops-and-warnings) instead drops over-budget graphs with warnings. Do not raise limits merely to suppress failures; budget for the resulting snapshot as well as the codec.
+
+## Abort
+
+An abort is not a failure. After `signal` fires, every import and export call rejects (and every stream errors) with `signal.reason` itself, not with a `SheetwriteError`. CSV and TSV parsing and export do the same with `DelimitedTextOptions.signal`, checked once per 1,024 records and once per store window. An aborted import keeps no partial snapshot, and an aborted export does not change the store. Compare the rejection with the reason to tell an abort from a failure:
+
+```ts
+import { fromXlsxWorkbook, isSheetwriteError } from "@sheetwrite/core";
+import "@sheetwrite/xlsx/register";
+
+declare const bytes: Uint8Array;
+const controller = new AbortController();
+try {
+  await fromXlsxWorkbook(bytes, { signal: controller.signal });
+} catch (error) {
+  if (error === controller.signal.reason) console.info("Import cancelled");
+  else if (isSheetwriteError(error)) console.error(error.code, error.message);
+  else throw error;
+}
+```
+
+An XLSX error message keeps at most 8 KiB of text from the file, so a hostile part name or attribute cannot make a large error.
 
 ## Memory evidence and limits
 
@@ -11530,7 +11554,8 @@ Optional resource ceilings for an in-memory delimited-text operation.
 
 Members:
 - `resourceLimits` — Positive safe-integer overrides merged over `DEFAULT_DELIMITED_TEXT_RESOURCE_LIMITS`.
-- `signal` — Abort between bounded encode chunks or store windows.
+- `signal` — Checked once per chunk of records, store window and long field. After it
+fires, the operation rejects or throws with `signal.reason`.
 
 ##### `DelimitedTextOptionsError` — class
 
@@ -14940,7 +14965,9 @@ Shared options passed to every registered table and workbook XLSX backend.
 Members:
 - `maxCells` — Cells accounted by the active conversion path; defaults to 1,000,000.
 - `resourceLimits` — Positive overrides for every XLSX resource dimension except `maxCells`.
-- `signal` — Abort before or between bounded codec operations.
+- `signal` — Checked before the work and once per ZIP entry, worksheet and chunk of
+cells. After it fires, the call rejects (or the stream errors) with
+`signal.reason`, not with a `SheetwriteError`.
 
 ##### `XlsxWorkbookWarning` — interface
 

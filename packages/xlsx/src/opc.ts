@@ -1,4 +1,4 @@
-import { emitWarning, type XlsxCodecContext } from "./resources.js";
+import { boundedErrorText, emitWarning, type XlsxCodecContext } from "./resources.js";
 import {
   assertXmlRoot,
   escapeXml,
@@ -26,8 +26,11 @@ export interface OpcRelationship {
   readonly external: boolean;
 }
 
-function opcFailure(message: string): never {
-  throw new TypeError(`Sheetwrite: invalid XLSX OPC package: ${message}`);
+function opcFailure(message: string, cause?: unknown): never {
+  throw new TypeError(
+    boundedErrorText(`Sheetwrite: invalid XLSX OPC package: ${message}`),
+    cause === undefined ? undefined : { cause },
+  );
 }
 
 function relationshipsPart(sourcePart: string): string {
@@ -49,8 +52,9 @@ export function resolveRelationshipTarget(sourcePart: string, rawTarget: string)
   let decoded: string;
   try {
     decoded = decodeURIComponent(rawTarget);
-  } catch {
-    return opcFailure(`relationship target ${rawTarget} has invalid escaping`);
+  } catch (error) {
+    if (!(error instanceof URIError)) throw error;
+    return opcFailure(`relationship target ${rawTarget} has invalid escaping`, error);
   }
   if (
     decoded.includes("\\") ||
