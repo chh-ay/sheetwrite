@@ -310,7 +310,8 @@ function callAt(
     }
   }
 
-  const frame = frames.findLast((candidate) => candidate.kind === "call");
+  // A reverse search, not findLast: the docs site compiles core with an ES2022 lib.
+  const frame = [...frames].reverse().find((candidate) => candidate.kind === "call");
   if (frame === undefined || frame.kind !== "call") return null;
 
   const name = frame.name.text.toUpperCase();
