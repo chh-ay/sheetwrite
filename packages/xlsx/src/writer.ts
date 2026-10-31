@@ -22,6 +22,7 @@ import { type ContentTypeOverride, contentTypesXml, relationshipsXml } from "./o
 import { preparePivots } from "./pivot.js";
 import {
   assertResource,
+  boundedErrorText,
   checkAbort,
   emitWarning,
   validateCodecSnapshot,
@@ -187,10 +188,14 @@ function validateNames(snapshot: WorkbookSnapshot): void {
         validated.code === "duplicate"
           ? "duplicate case-insensitive XLSX sheet name"
           : "invalid XLSX sheet name";
-      throw new RangeError(`Sheetwrite: ${prefix}: ${sheet.name} (${validated.code})`);
+      throw new RangeError(
+        boundedErrorText(`Sheetwrite: ${prefix}: ${sheet.name} (${validated.code})`),
+      );
     }
     if (validated.name !== sheet.name) {
-      throw new RangeError(`Sheetwrite: non-canonical NFC XLSX sheet name: ${sheet.name}`);
+      throw new RangeError(
+        boundedErrorText(`Sheetwrite: non-canonical NFC XLSX sheet name: ${sheet.name}`),
+      );
     }
     names.push(validated.name);
   }
@@ -886,7 +891,9 @@ function* writeSheet(
     );
     if (!targetSheet) {
       throw new TypeError(
-        `Sheetwrite: hyperlink ${hyperlink.id} references missing sheet ${internalTarget.range.sheet}`,
+        boundedErrorText(
+          `Sheetwrite: hyperlink ${hyperlink.id} references missing sheet ${internalTarget.range.sheet}`,
+        ),
       );
     }
     const location = `${quotedSheet(targetSheet.name)}!${rangeA1(internalTarget.range.start, internalTarget.range.end)}`;
@@ -1085,7 +1092,9 @@ function* writeWorkbookParts(
   const checked = validateCodecSnapshot(snapshot, context);
   if (!checked.ok) {
     throw new TypeError(
-      `Sheetwrite: invalid workbook snapshot: ${checked.errors[0]?.message ?? "unknown error"}`,
+      boundedErrorText(
+        `Sheetwrite: invalid workbook snapshot: ${checked.errors[0]?.message ?? "unknown error"}`,
+      ),
     );
   }
   snapshot = checked.value;
@@ -1100,12 +1109,10 @@ function* writeWorkbookParts(
   ];
   const workbookRelationships = [];
   let nextTableId = 1;
-  for (let index = 0; index < ordered.length; index++) {
+  for (const [index, sheet] of ordered.entries()) {
     checkAbort(context);
     const number = index + 1;
     const part = `xl/worksheets/sheet${number}.xml`;
-    const sheet = ordered[index];
-    if (!sheet) throw new TypeError("Sheetwrite: missing ordered export worksheet");
     let result: SheetWriteResult | undefined;
     const sheetTableId = nextTableId;
     function* chunks(exportSheet: SheetSnapshot): Generator<Uint8Array> {

@@ -1,6 +1,12 @@
 import { Inflate, Zip, ZipDeflate, type ZipInputFile } from "fflate";
 
-import { assertResource, checkAbort, type XlsxCodecContext } from "./resources.js";
+import {
+  assertResource,
+  boundedErrorText,
+  checkAbort,
+  isAbort,
+  type XlsxCodecContext,
+} from "./resources.js";
 
 const CENTRAL_SIGNATURE = 0x02014b50;
 const EOCD_SIGNATURE = 0x06054b50;
@@ -93,6 +99,7 @@ export function validateStoredEntry(entry: StoredZipEntry, context: XlsxCodecCon
     }
     if (inflater && entry.data.length === 0) inflater.push(new Uint8Array(0), true);
   } catch (error) {
+    if (isAbort(context, error)) throw error;
     if (error instanceof Error && error.message.startsWith("Sheetwrite:")) throw error;
     throw new TypeError("Sheetwrite: invalid retained ZIP deflate stream", { cause: error });
   }
@@ -101,8 +108,11 @@ export function validateStoredEntry(entry: StoredZipEntry, context: XlsxCodecCon
   verifiedEntries.add(entry);
 }
 
-function fail(message: string): never {
-  throw new TypeError(`Sheetwrite: invalid XLSX ZIP: ${message}`);
+function fail(message: string, cause?: unknown): never {
+  throw new TypeError(
+    boundedErrorText(`Sheetwrite: invalid XLSX ZIP: ${message}`),
+    cause === undefined ? undefined : { cause },
+  );
 }
 
 function findEocd(bytes: Uint8Array, view: DataView): number {
@@ -136,8 +146,9 @@ export function normalizePartName(value: string): string {
   let decoded: string;
   try {
     decoded = decodeURIComponent(value);
-  } catch {
-    return fail(`part name ${JSON.stringify(value)} has invalid percent escaping`);
+  } catch (error) {
+    if (!(error instanceof URIError)) throw error;
+    return fail(`part name ${JSON.stringify(value)} has invalid percent escaping`, error);
   }
   return normalizeDecodedPartName(decoded, value);
 }
@@ -203,8 +214,9 @@ function* parseEntries(
     let name: string;
     try {
       name = UTF8.decode(bytes.subarray(offset + 46, offset + 46 + nameLength));
-    } catch {
-      return fail(`entry ${index} has an invalid UTF-8 name`);
+    } catch (error) {
+      if (!(error instanceof TypeError)) throw error;
+      return fail(`entry ${index} has an invalid UTF-8 name`, error);
     }
     const directory = name.endsWith("/");
     const normalized = normalizePartName(directory ? name.slice(0, -1) : name);
@@ -376,7 +388,8 @@ export class ZipReader {
 
   #entry(name: string): ZipEntry {
     const entry = this.#lookup.get(asciiFold(normalizePartName(name)));
-    if (!entry) throw new TypeError(`Sheetwrite: XLSX package is missing ${name}`);
+    if (!entry)
+      throw new TypeError(boundedErrorText(`Sheetwrite: XLSX package is missing ${name}`));
     return entry;
   }
 
@@ -430,7 +443,7 @@ export class ZipReader {
         } catch (error) {
           if (error instanceof TypeError && error.message.startsWith("Sheetwrite:")) throw error;
           throw new TypeError(
-            `Sheetwrite: invalid XLSX ZIP: deflate stream for ${name} is corrupt`,
+            boundedErrorText(`Sheetwrite: invalid XLSX ZIP: deflate stream for ${name} is corrupt`),
             { cause: error },
           );
         }

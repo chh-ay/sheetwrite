@@ -365,6 +365,27 @@ export function normalizeSheetwriteError(
   );
 }
 
+/** UTF-8 bytes of host or file text that one failure keeps. */
+const MAX_ERROR_TEXT_BYTES = 8 * 1024;
+const ERROR_TEXT_ELLIPSIS = "…";
+/** UTF-8 bytes of `ERROR_TEXT_ELLIPSIS`. */
+const ERROR_TEXT_ELLIPSIS_BYTES = 3;
+/** Most UTF-8 bytes that one UTF-16 code unit encodes to. */
+const MAX_UTF8_BYTES_PER_UNIT = 3;
+const ERROR_TEXT_ENCODER = new TextEncoder();
+
+/**
+ * Internal: cut host or file text that goes into a failure message or context
+ * to `MAX_ERROR_TEXT_BYTES` UTF-8 bytes. The cut never splits a code point.
+ */
+export function boundedErrorText(text: string): string {
+  if (text.length * MAX_UTF8_BYTES_PER_UNIT <= MAX_ERROR_TEXT_BYTES) return text;
+
+  const kept = new Uint8Array(MAX_ERROR_TEXT_BYTES - ERROR_TEXT_ELLIPSIS_BYTES);
+  const { read } = ERROR_TEXT_ENCODER.encodeInto(text, kept);
+  return read === text.length ? text : `${text.slice(0, read)}${ERROR_TEXT_ELLIPSIS}`;
+}
+
 export class JsonByteLengthError extends Error {
   override readonly name = "JsonByteLengthError";
 

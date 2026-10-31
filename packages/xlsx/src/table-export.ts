@@ -7,8 +7,11 @@ import type {
   XlsxWorkbookOptions,
 } from "@sheetwrite/core";
 
-import { assertResource, createCodecContext, xlsxFailure } from "./resources.js";
+import { assertResource, checkAbort, createCodecContext, xlsxFailure } from "./resources.js";
 import { streamTable, writeTable } from "./table-stream.js";
+
+/** Model rows built between two abort checks. */
+const ABORT_CHECK_ROWS = 4096;
 
 /** Implementation-neutral cell in the first-sheet table export model. */
 export interface XlsxModelCell {
@@ -77,6 +80,7 @@ export function buildXlsxModel(
     }),
   ];
   for (let row = 0; row < sheet.rowCount; row++) {
+    if (row % ABORT_CHECK_ROWS === 0) checkAbort(context);
     const output: (XlsxModelCell | null)[] = new Array(columnCount);
     for (let visibleCol = 0; visibleCol < columnCount; visibleCol++) {
       const flat = row * columnCount + visibleCol;
@@ -119,14 +123,14 @@ export const sheetwriteTableExportBackend: XlsxTableExportBackend = {
     try {
       return writeTable(workbook, store, createCodecContext("export", options));
     } catch (error) {
-      throw xlsxFailure(error, "export", "sheetwrite-ooxml-table");
+      throw xlsxFailure(error, "export", "sheetwrite-ooxml-table", options?.signal);
     }
   },
   async *toXlsxTableStream(workbook, store, options) {
     try {
       yield* streamTable(workbook, store, createCodecContext("export", options));
     } catch (error) {
-      throw xlsxFailure(error, "export", "sheetwrite-ooxml-table");
+      throw xlsxFailure(error, "export", "sheetwrite-ooxml-table", options?.signal);
     }
   },
 };
