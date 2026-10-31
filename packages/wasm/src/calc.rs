@@ -942,6 +942,10 @@ pub(crate) enum Tok<'a> {
     Hash,
     /// Spaces between two references: the intersection operator.
     Intersect,
+    /// The end of the text. Only the syntax check of formula help adds it
+    /// (`first_parse_error`), so that an error can tell a missing token from
+    /// a wrong one. The lexer never produces it.
+    End,
 }
 
 /// Error constants a formula can contain. `#REF!` parses as an invalid
@@ -1066,7 +1070,7 @@ fn number_token(src: &str, index: &mut usize) -> Result<f64, String> {
         .parse::<f64>()
         .ok()
         .filter(|value| value.is_finite())
-        .ok_or_else(|| format!("bad number: {number}"))
+        .ok_or_else(|| format!("{number} is not a valid number."))
 }
 
 fn tokenize(src: &str) -> Result<Tokens<'_>, String> {
@@ -1127,19 +1131,19 @@ pub(crate) fn lex_token<'a>(
         }
         Tok::Intersect
     } else if c == b'"' {
-        Tok::Str(quoted_token(
-            src,
-            index,
-            b'"',
-            "unterminated string literal",
-        )?)
+        Tok::Str(quoted_token(src, index, b'"', "Add \" to close the text.")?)
     } else if c.is_ascii_digit()
         || (c == b'.' && bytes.get(*index + 1).is_some_and(u8::is_ascii_digit))
     {
         Tok::Num(number_token(src, index)?)
     } else if c == b'\'' {
         Tok::Ident(
-            Cow::Owned(quoted_token(src, index, b'\'', "unterminated sheet name")?),
+            Cow::Owned(quoted_token(
+                src,
+                index,
+                b'\'',
+                "Add ' to close the sheet name.",
+            )?),
             true,
         )
     } else if let Some((literal, error)) = ERROR_LITERALS.iter().find(|(literal, _)| {
@@ -1189,12 +1193,12 @@ pub(crate) fn lex_token<'a>(
     } else if !c.is_ascii() {
         let ch = src[*index..].chars().next().expect("valid UTF-8 source");
         if !ch.is_whitespace() {
-            return Err(format!("unexpected char: {ch}"));
+            return Err(format!("{ch} is not allowed in a formula."));
         }
         *index += ch.len_utf8();
         return Ok(None);
     } else {
-        return Err(format!("unexpected char: {}", c as char));
+        return Err(format!("{} is not allowed in a formula.", c as char));
     };
 
     Ok(Some(tok))
@@ -1219,26 +1223,26 @@ fn structured_token(src: &str, index: &mut usize) -> Result<String, String> {
     }
 
     if depth != 0 {
-        return Err("unterminated structured reference".into());
+        return Err("Add ] to close the table reference.".into());
     }
     Ok(src[start..*index].to_string())
 }
 
 fn parse_structured_ref(raw: String, table_name: Option<String>) -> Result<Ast, String> {
     if !raw.starts_with('[') || !raw.ends_with(']') {
-        return Err("malformed structured reference".into());
+        return Err("This table reference is not valid.".into());
     }
     let (section, column_name) = if raw.starts_with("[[") && raw.ends_with("]]") {
         let inner = &raw[2..raw.len() - 2];
         let Some((selector, column)) = inner.split_once("],[") else {
-            return Err("structured reference requires one section and one column".into());
+            return Err("Write a table reference with one section and one column.".into());
         };
         let section = if selector.eq_ignore_ascii_case("#Headers") {
             TableSection::Headers
         } else if selector.eq_ignore_ascii_case("#Totals") {
             TableSection::Totals
         } else {
-            return Err("unsupported structured-reference section".into());
+            return Err("Use #Headers or #Totals as the section of a table reference.".into());
         };
         (section, column)
     } else {
@@ -1250,7 +1254,7 @@ fn parse_structured_ref(raw: String, table_name: Option<String>) -> Result<Ast, 
         }
     };
     if column_name.is_empty() {
-        return Err("structured reference column is empty".into());
+        return Err("Enter a column name in the table reference.".into());
     }
     Ok(Ast::UnresolvedStructured(UnresolvedStructuredRef {
         table_name,
@@ -1274,9 +1278,19 @@ impl<'a> Parser<'a> {
         self.toks.next()
     }
 
+    /// The `)` that closes a call or a group. A missing `)` at the end and a
+    /// wrong token in its place get different messages.
+    fn close_paren(&mut self) -> Result<(), String> {
+        match self.next() {
+            Some(Tok::RParen) => Ok(()),
+            None | Some(Tok::End) => Err(MISSING_CLOSE_PAREN.into()),
+            Some(_) => Err(NOT_EXPECTED.into()),
+        }
+    }
+
     fn guard_depth(depth: usize) -> Result<(), String> {
         if depth > PARSE_RECURSION_LIMIT {
-            Err("formula nesting is too deep".into())
+            Err("The formula has too many nested levels.".into())
         } else {
             Ok(())
         }
@@ -1370,9 +1384,7 @@ impl<'a> Parser<'a> {
                     let _ = self.next();
                 }
             }
-            if self.next() != Some(Tok::RParen) {
-                return Err("expected )".into());
-            }
+            self.close_paren()?;
             value = Ast::UnknownFunc("$LAMBDA_CALL".into(), args);
         }
         while self.peek() == Some(&Tok::Op('%')) {
@@ -1451,20 +1463,15 @@ impl<'a> Parser<'a> {
                 } else {
                     first
                 };
-                match self.next() {
-                    Some(Tok::RParen) => Ok(value),
-                    _ => Err("expected )".into()),
-                }
+                self.close_paren()?;
+                Ok(value)
             }
             Some(Tok::Ident(name, quoted)) => self.ident_at(name, quoted, depth),
             Some(Tok::Structured(raw)) => parse_structured_ref(raw, None),
             Some(Tok::Error(FormulaError::Ref)) => Ok(Ast::InvalidRef),
             Some(Tok::LBrace) => self.array_constant(),
-            other => Err(if other.is_some() {
-                "unexpected token".into()
-            } else {
-                "unexpected end".into()
-            }),
+            None | Some(Tok::End) => Err("Enter a value to complete the formula.".into()),
+            Some(_) => Err("Enter a value before this.".into()),
         }
     }
 
@@ -1481,17 +1488,21 @@ impl<'a> Parser<'a> {
                     if cols == 0 {
                         cols = row_len;
                     } else if row_len != cols {
-                        return Err("array constant rows must have the same length".into());
+                        return Err(
+                            "All rows of an array constant must have the same length.".into()
+                        );
                     }
                     if separator == Tok::RBrace {
                         break;
                     }
                     row_len = 0;
                 }
-                _ => return Err("expected , ; or } in array constant".into()),
+                None | Some(Tok::End) => return Err("Add } to close the array constant.".into()),
+                _ => return Err("Use , ; or } between the values of an array constant.".into()),
             }
         }
-        let cols = u32::try_from(cols).map_err(|_| "array constant is too wide".to_string())?;
+        let cols =
+            u32::try_from(cols).map_err(|_| "The array constant is too wide.".to_string())?;
         Ok(Ast::Array { cols, values })
     }
 
@@ -1502,7 +1513,7 @@ impl<'a> Parser<'a> {
             Some(Tok::Num(number)) => Value::number(number),
             Some(Tok::Op(sign @ ('+' | '-'))) => match self.next() {
                 Some(Tok::Num(number)) => Value::number(if sign == '-' { -number } else { number }),
-                _ => return Err("expected number after sign in array constant".into()),
+                _ => return Err("Enter a number after the sign in an array constant.".into()),
             },
             Some(Tok::Str(text)) => Value::text(text),
             Some(Tok::Ident(name, false)) if name.eq_ignore_ascii_case("TRUE") => Value::Bool(true),
@@ -1512,7 +1523,8 @@ impl<'a> Parser<'a> {
             Some(Tok::Error(error)) => Value::Error(error),
             _ => {
                 return Err(
-                    "array constants accept only numbers, text, logical values and errors".into(),
+                    "An array constant can contain only numbers, text, logical values and errors."
+                        .into(),
                 )
             }
         };
@@ -1568,13 +1580,11 @@ impl<'a> Parser<'a> {
                     }
                 }
             }
-            match self.next() {
-                Some(Tok::RParen) => Ok(match func {
-                    Some(func) => Ast::Func(func, args),
-                    None => Ast::UnknownFunc(name.into_owned(), args),
-                }),
-                _ => Err("expected )".into()),
-            }
+            self.close_paren()?;
+            Ok(match func {
+                Some(func) => Ast::Func(func, args),
+                None => Ast::UnknownFunc(name.into_owned(), args),
+            })
         } else {
             if name.eq_ignore_ascii_case("TRUE") {
                 return Ok(Ast::Bool(true));
@@ -1616,7 +1626,7 @@ impl<'a> Parser<'a> {
             let _ = self.next();
             let (end_sheet, end) = self.sheet_range_end(&sheet_name)?;
             if sheet_name_key(&end_sheet) != sheet_name_key(&sheet_name) {
-                return Err("cross-sheet ranges must stay on one sheet".into());
+                return Err("A range must stay on one sheet.".into());
             }
             let (r0, c0, r1, c1, range_flags) = area(start, end).ok_or(MIXED_AREA)?;
             return Ok(Ast::SheetRange(qualifier, r0, c0, r1, c1, range_flags));
@@ -1709,15 +1719,26 @@ impl<'a> Parser<'a> {
     }
 }
 
-const MIXED_AREA: &str = "a range joins two cells, two columns or two rows";
-const LONE_AXIS: &str = "a column or row needs a range such as A:A or 1:1";
+const MIXED_AREA: &str = "A range joins two cells, two columns or two rows.";
+const LONE_AXIS: &str = "A column or row needs a range such as A:A or 1:1.";
+const NOT_EXPECTED: &str = "This is not expected here.";
+const MISSING_CLOSE_PAREN: &str = "Add ) to close the (.";
 
 fn missing_area_end(after: &str) -> String {
-    format!("expected a cell, column or row after {after}")
+    format!("Enter a cell, column or row after {after}.")
 }
 
 pub(crate) fn sheet_name_key(name: &str) -> String {
     name.chars().flat_map(char::to_lowercase).collect()
+}
+
+/// The error for a token after a complete formula.
+fn trailing_token_error(tok: &Tok<'_>) -> String {
+    if *tok == Tok::RParen {
+        "This ) has no matching (.".into()
+    } else {
+        NOT_EXPECTED.into()
+    }
 }
 
 /// Parse a formula source (with or without a leading `=`) into an AST.
@@ -1730,10 +1751,34 @@ pub fn parse(src: &str) -> Result<Ast, String> {
         sheet_qualifiers: tokens.sheet_qualifiers,
     };
     let ast = parser.expr()?;
-    if parser.peek().is_some() {
-        return Err("trailing tokens".into());
+    if let Some(tok) = parser.peek() {
+        return Err(trailing_token_error(tok));
     }
     Ok(ast)
+}
+
+/// The first error of the parser in `toks`, which end with [`Tok::End`], and
+/// the index of the token it marks: the token that the parser read last, or
+/// the first token after a complete formula. `None` when the tokens form one
+/// formula. This is the parse of `parse` on tokens from formula help's
+/// tolerant lexer, so formula help reports exactly what the parser rejects.
+pub(crate) fn first_parse_error(toks: Vec<Tok<'_>>) -> Option<(String, usize)> {
+    let total = toks.len();
+    let mut parser = Parser {
+        intersections: toks.contains(&Tok::Intersect),
+        sheet_qualifiers: toks.contains(&Tok::Bang),
+        toks: toks.into_iter(),
+    };
+
+    let result = parser.expr();
+    let read = total - parser.toks.len();
+    match result {
+        Ok(_) => match parser.peek() {
+            None | Some(Tok::End) => None,
+            Some(tok) => Some((trailing_token_error(tok), read)),
+        },
+        Err(message) => Some((message, read.saturating_sub(1))),
+    }
 }
 
 /// Resolve sheet-qualified refs to numeric sheet handles once, at formula ingest.

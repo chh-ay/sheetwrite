@@ -29,6 +29,8 @@ mod eval;
 #[cfg(feature = "formula-engine")]
 mod formula_reads;
 #[cfg(feature = "formula-engine")]
+mod formula_tokens;
+#[cfg(feature = "formula-engine")]
 mod graph;
 #[cfg(feature = "formula-engine")]
 mod memory;
@@ -52,10 +54,14 @@ mod window;
 #[cfg(all(test, feature = "formula-engine"))]
 mod formula_syntax_tests;
 #[cfg(all(test, feature = "formula-engine"))]
+mod formula_tokens_tests;
+#[cfg(all(test, feature = "formula-engine"))]
 mod structural_edit_tests;
 #[cfg(all(test, feature = "formula-engine"))]
 mod tests;
 
+#[cfg(feature = "formula-engine")]
+pub use formula_tokens::{formula_syntax_error, formula_tokens, FormulaSyntaxError};
 #[cfg(feature = "formula-engine")]
 pub use store::{CellOut, CellStore};
 #[cfg(feature = "formula-engine")]
