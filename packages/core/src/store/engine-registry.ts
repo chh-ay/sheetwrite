@@ -28,10 +28,15 @@ export function registerStoreEngine(store: object, engine: StoreDataEngine): voi
 /**
  * Engine behind a store facade, or `null` for an object that only claims the
  * store type. Every `SheetwriteStore` registers on construction; a `null` result
- * tells a caller to fall back to the store's public surface.
+ * tells a caller to fall back to the store's public surface. Grid code reaches
+ * the engine here instead of through the store, so the host function check
+ * runs here too.
  */
 export function storeEngine(store: object): StoreDataEngine | null {
-  return ENGINES.get(store) ?? null;
+  const engine = ENGINES.get(store);
+  engine?.hostFunctions?.assertIdle();
+
+  return engine ?? null;
 }
 
 /** Pin every currently live store for the duration of an atomic instance cutover. */

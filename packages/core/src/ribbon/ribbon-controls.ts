@@ -3,6 +3,7 @@
 // ribbon-popup.ts. The full ribbon, the compact ribbon and the toolbar all
 // render through `renderControl`, so they share look, state and keyboard.
 
+import { errorDetail } from "../action-feedback.js";
 import type { IconName } from "../icons/icon-names.js";
 import { iconNode } from "../icons/resolve.js";
 import { isKeyboardAction } from "../keymap.js";
@@ -16,6 +17,7 @@ import {
   type RibbonControlSpec,
   type RibbonFocus,
   type RibbonFormSpec,
+  type RibbonMenuItem,
   type RibbonMenuSpec,
   type RibbonPlacementSpec,
 } from "./command-spec.js";
@@ -149,7 +151,7 @@ function renderButton(spec: RibbonButtonSpec, context: RibbonContext): RibbonCon
 }
 
 /** A `role="menu"` surface whose items run once and close the menu. */
-function menuSurface(items: RibbonMenuSpec["items"], context: RibbonContext): HTMLElement {
+function menuSurface(items: readonly RibbonMenuItem[], context: RibbonContext): HTMLElement {
   const menu = document.createElement("div");
   menu.className = "sheetwrite-ribbon-menu";
   for (const entry of items) {
@@ -158,6 +160,7 @@ function menuSurface(items: RibbonMenuSpec["items"], context: RibbonContext): HT
     item.className = "sheetwrite-ribbon-menu-item";
     item.setAttribute("role", "menuitem");
     item.tabIndex = -1;
+    if (entry.description !== undefined) item.title = entry.description;
     if (entry.icon !== undefined) item.appendChild(icon(entry.icon, context.icons));
     item.append(entry.label);
     item.addEventListener("mousedown", keepFocus);
@@ -179,7 +182,8 @@ function renderMenu(spec: RibbonMenuSpec, context: RibbonContext): RibbonControl
       context.popup.closeFrom(trigger, keyboard);
       return;
     }
-    context.popup.open(trigger, menuSurface(spec.items, context), {
+    const items = typeof spec.items === "function" ? spec.items(context.grid) : spec.items;
+    context.popup.open(trigger, menuSurface(items, context), {
       role: "menu",
       label: spec.label,
       focus: keyboard,
@@ -588,8 +592,7 @@ function renderPlacement(spec: RibbonPlacementSpec, context: RibbonContext): Rib
         );
       } catch (cause) {
         // A failed panel-chunk load must reach the user, not become an unhandled rejection.
-        const detail = cause instanceof Error && cause.message ? cause.message : String(cause);
-        message = `${spec.label} could not run: ${detail}`;
+        message = `${spec.label} could not run: ${errorDetail(cause)}`;
       } finally {
         save.disabled = false;
       }

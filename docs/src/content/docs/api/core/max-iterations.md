@@ -8,7 +8,7 @@ description: "MAX_ITERATIONS variable in @sheetwrite/core: Largest iteration cou
 Largest iteration count Excel accepts.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L63"><code>packages/core/src/document-protocol.ts#L63</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L64"><code>packages/core/src/document-protocol.ts#L64</code></a></dd></div>
 </dl>
 
 ## Declaration

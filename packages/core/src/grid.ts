@@ -1,5 +1,5 @@
 import { colToA1 } from "./a1.js";
-import { type ActionFeedback, attachActionFeedback } from "./action-feedback.js";
+import { type ActionFeedback, attachActionFeedback, errorDetail } from "./action-feedback.js";
 import { AriaMirror } from "./aria-mirror.js";
 import {
   fontFor,
@@ -2357,17 +2357,19 @@ export class GridImpl implements Grid {
 
     const generation = this.chromeGeneration;
     const current = () => generation === this.chromeGeneration && !this.destroyed;
+    const ribbon = Boolean(config.ribbon) && !Array.isArray(config.toolbar);
     const failed = (error: unknown): void => {
       if (!current()) return;
 
       // Give the space back and tell the user; the load error still reaches the host.
       this.setToolbarHeight(0);
-      const detail = error instanceof Error && error.message ? error.message : String(error);
-      this.actionFeedback.show(`The toolbar could not load: ${detail}`);
+      this.actionFeedback.show(
+        `The ${ribbon ? "ribbon" : "toolbar"} could not load: ${errorDetail(error)}`,
+      );
       throw error;
     };
 
-    if (!config.ribbon || Array.isArray(config.toolbar)) {
+    if (!ribbon) {
       this.toolbarHeight = TOOLBAR_HEIGHT;
       void import("./ribbon/command-toolbar.js").then(({ CommandToolbar: ToolbarClass }) => {
         if (current()) this.mountToolbar(ToolbarClass, config);

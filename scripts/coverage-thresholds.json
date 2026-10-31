@@ -25,6 +25,10 @@
       "reason": "Type-only module is verified by package and consumer typechecks"
     },
     {
+      "path": "packages/core/src/functions/types.ts",
+      "reason": "Type-only modules are verified by package and consumer typechecks"
+    },
+    {
       "path": "packages/core/src/types.ts",
       "reason": "Type-only module is verified by package and consumer typechecks"
     },

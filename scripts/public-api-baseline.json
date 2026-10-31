@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "1fb09582084e3ec339dd80a52c278a7fcd1b7ecea4040a6d9fe20690e571aec3",
+  "sha256": "5d81fab5f60aa7665b05d3e16b5a4371b11c8d0784538d18eb95d412d0b34d54",
   "intentionalExports": [
     {
       "package": "@sheetwrite/charts",
@@ -465,6 +465,20 @@
         "IndexedDbPendingCommitStorageError",
         "IndexedDbPendingCommitStorageErrorCode",
         "IndexedDbPendingCommitStorageOptions"
+      ]
+    },
+    {
+      "package": "@sheetwrite/core",
+      "entryPoint": "./functions",
+      "exports": [
+        "FormulaArgument",
+        "FormulaArgumentMetadata",
+        "FormulaFunction",
+        "FormulaFunctionMetadata",
+        "FormulaScalar",
+        "listFunctions",
+        "registerFunction",
+        "unregisterFunction"
       ]
     },
     {

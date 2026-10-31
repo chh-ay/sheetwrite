@@ -73,6 +73,22 @@ export const ICON_NAMES = [
   "chartDoughnut",
   "chartScatter",
   "pivotTable",
+  "insertFunction",
+  "defineName",
+  "nameManager",
+  "explainFormula",
+  "getData",
+  "refreshAll",
+  "queries",
+  "editLinks",
+  "relationships",
+  "dataModel",
+  "measure",
+  "dashboard",
+  "slicer",
+  "kpiCard",
+  "versionHistory",
+  "saveVersion",
 ] as const;
 
 /** The name of one glyph on the command icon sheet; the key of `IconOverrides`. */

@@ -3,7 +3,9 @@
 // so a new command is added here once. Add its glyph to scripts/icon-glyphs.ts
 // and run `bun scripts/icon-sheet.ts`; no renderer-specific entry is needed.
 // The DOM side (ribbon-controls.ts) never decides behavior, so Excel parity
-// is reviewed here. The redesign and new commands belong to #272.
+// is reviewed here. A command is added only with the feature it runs. The
+// tab, group and glyph planned for each 0.7 feature are on the Toolbar and
+// ribbon docs page, so features that land separately still form one layout.
 
 import { CHART_KINDS } from "../chart-kinds.js";
 import {
@@ -17,9 +19,11 @@ import {
   pixelsToPoints,
   pointsToPixels,
 } from "../format-presets.js";
+import type { FormulaFunctionMetadata } from "../functions/types.js";
 import { createHyperlinkId, isSafeExternalHyperlink } from "../hyperlink.js";
 import type { IconName } from "../icons/icon-names.js";
 import { loadPanels, pivotsAvailable } from "../panels/panel-loader.js";
+import { storeEngine } from "../store/engine-registry.js";
 import type { ChartKind } from "../types/chart.js";
 import type { CellAddress } from "../types/coordinates.js";
 import type { BorderPreset, CommandFlags, Grid, GridCommandName } from "../types/grid.js";
@@ -310,6 +314,51 @@ function outline(group: boolean): (grid: Grid) => void {
   };
 }
 
+/** Functions the host registered on the grid's store; none without the full engine. */
+function hostFunctions(grid: Grid): readonly FormulaFunctionMetadata[] {
+  return storeEngine(grid.store)?.hostFunctions?.metadata() ?? [];
+}
+
+/** `NAME(first, [optional], more...)`, as Excel's function tooltips write it. */
+function signature(fn: FormulaFunctionMetadata): string {
+  const parameters = fn.arguments.map((argument) => {
+    const name = argument.repeating === true ? `${argument.name}...` : argument.name;
+    return argument.optional === true ? `[${name}]` : name;
+  });
+  return `${fn.name}(${parameters.join(", ")})`;
+}
+
+/**
+ * Starts a formula that calls `name` in the focus cell, as a pick in Excel's
+ * Insert Function does; the user types the arguments. The selection holds the
+ * same coordinates the formula bar edits with.
+ */
+function startFormula(grid: Grid, name: string): void {
+  const cell = focusAddress(grid);
+  if (cell !== null) grid.beginEdit(cell.row, cell.col, `=${name}(`);
+}
+
+/**
+ * Formulas › Insert Function lists the host functions with their signature
+ * and description. It shows only while the store has host functions, which
+ * needs the full engine; built-in functions stay with formula autocomplete.
+ */
+const insertFunction: RibbonMenuSpec = {
+  kind: "menu",
+  id: "insertFunction",
+  label: "Insert Function",
+  icon: "insertFunction",
+  availability: "edit",
+  large: true,
+  available: (grid) => hostFunctions(grid).length > 0,
+  items: (grid) =>
+    hostFunctions(grid).map((fn) => ({
+      label: fn.name,
+      description: `${signature(fn)}: ${fn.description}`,
+      run: (target: Grid) => startFormula(target, fn.name),
+    })),
+};
+
 /** Percent label for a zoom factor, e.g. 1.1 → "110%". */
 export function zoomLabel(zoom: number): string {
   return `${Math.round(zoom * PERCENT_SCALE)}%`;
@@ -586,6 +635,19 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
       },
       { id: "links", label: "Links", icon: "hyperlink", layout: "flow", controls: [hyperlink] },
       { id: "notes", label: "Notes", icon: "note", layout: "flow", controls: [note] },
+    ],
+  },
+  {
+    label: "Formulas",
+    reduceOrder: ["functionLibrary"],
+    groups: [
+      {
+        id: "functionLibrary",
+        label: "Function Library",
+        icon: "insertFunction",
+        layout: "flow",
+        controls: [insertFunction],
+      },
     ],
   },
   {

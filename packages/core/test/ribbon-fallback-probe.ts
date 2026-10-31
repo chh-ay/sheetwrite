@@ -42,7 +42,7 @@ try {
 
   const status = host.querySelector<HTMLElement>(".sheetwrite-action-status");
   assert.equal(status?.hidden, false, "the failure is shown to the user");
-  assert.match(status?.textContent ?? "", new RegExp(LOAD_ERROR));
+  assert.equal(status?.textContent, `The ribbon could not load: ${LOAD_ERROR}`);
   assert.equal(reported.length, 1, "the load error still reaches the host");
 } finally {
   grid.destroy();
