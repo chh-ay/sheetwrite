@@ -31,6 +31,21 @@ interface OpenPopup {
   readonly onClose: (() => void) | undefined;
 }
 
+/**
+ * Focus an element of a popup without a focus scroll. WebKit scrolls the
+ * document to show a focused element even inside a fixed surface, and the
+ * document scroll closes every popup. Only the surface scrolls, to show the
+ * element when the surface is taller than its maximum height.
+ */
+function focusInSurface(surface: HTMLElement, element: HTMLElement): void {
+  element.focus({ preventScroll: true });
+
+  const shown = surface.getBoundingClientRect();
+  const box = element.getBoundingClientRect();
+  if (box.top < shown.top) surface.scrollTop -= shown.top - box.top;
+  else if (box.bottom > shown.bottom) surface.scrollTop += box.bottom - shown.bottom;
+}
+
 let popupSerial = 0;
 
 export class RibbonPopup {
@@ -72,7 +87,8 @@ export class RibbonPopup {
     this.host.appendChild(surface);
     this.place(trigger, surface);
 
-    if (options.focus) surface.querySelector<HTMLElement>(NAVIGABLE)?.focus();
+    const first = options.focus ? surface.querySelector<HTMLElement>(NAVIGABLE) : null;
+    if (first !== null) focusInSurface(surface, first);
   }
 
   /** Close the popup `trigger` opened, and any popups opened from inside it. */
@@ -198,6 +214,7 @@ export class RibbonPopup {
     else if (current === -1) next = step === 1 ? 0 : items.length - 1;
     else next = (current + (step ?? 0) + items.length) % items.length;
     event.preventDefault();
-    items[next]?.focus();
+    const target = items[next];
+    if (target !== undefined) focusInSurface(surface, target);
   };
 }

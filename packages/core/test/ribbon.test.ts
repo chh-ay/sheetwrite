@@ -249,6 +249,31 @@ it("runs a border preset from the keyboard and returns focus to the menu button"
   expect(document.activeElement).toBe(options);
 });
 
+it("keeps a keyboard-opened menu open when focus would scroll the page", async () => {
+  const { host, control, key } = await setup();
+  // WebKit scrolls the document to show a focused menu item, even in a fixed
+  // popup. Emulate that scroll for every focus that does not prevent it.
+  const focus = HTMLElement.prototype.focus;
+  HTMLElement.prototype.focus = function (this: HTMLElement, options?: FocusOptions) {
+    focus.call(this, options);
+    if (options?.preventScroll !== true) document.dispatchEvent(new Event("scroll"));
+  };
+  try {
+    const options = control("Borders options");
+    options.focus({ preventScroll: true });
+    key(options, "ArrowDown");
+    expect(document.activeElement?.textContent).toBe("Bottom Border");
+
+    key(document.activeElement as HTMLElement, "ArrowDown");
+    expect(document.activeElement?.textContent).toBe("Top Border");
+    expect(host.querySelector(".sheetwrite-ribbon-popup")?.getAttribute("aria-label")).toBe(
+      "Borders",
+    );
+  } finally {
+    HTMLElement.prototype.focus = focus;
+  }
+});
+
 it("disables editing controls while read-only but keeps view controls", async () => {
   const { grid, host, select, key, press } = await setup(true);
   select(0, 0);
