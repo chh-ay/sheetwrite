@@ -98,4 +98,28 @@ describe("SUBTOTAL over hidden rows", () => {
       setHiddenRows.mockRestore();
     }
   });
+
+  it("closes the mutation when the engine rejects the hidden rows", () => {
+    const store = storeWithSubtotals();
+    const setHiddenRows = spyOn(getEngine().CellStore.prototype, "setHiddenRows");
+    setHiddenRows.mockReturnValue(false);
+    try {
+      expect(() =>
+        store.applyTransaction({
+          patches: [
+            {
+              op: "set",
+              addr: { sheet: "s1", row: 0, col: 1 },
+              value: { kind: "literal", value: 100 },
+            },
+            { op: "setRowMeta", sheet: "s1", row: 1, meta: { hidden: true } },
+          ],
+        }),
+      ).toThrow(RangeError);
+      // The barrier still ran, so the edit of B1 (0.5 to 100) is recalculated.
+      expect(subtotals(store)).toEqual([252.5, 252.5]);
+    } finally {
+      setHiddenRows.mockRestore();
+    }
+  });
 });
