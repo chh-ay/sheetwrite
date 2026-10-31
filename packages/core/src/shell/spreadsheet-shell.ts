@@ -11,6 +11,7 @@ import {
   RIBBON_EXPANDED_HEIGHT,
   TOOLBAR_HEIGHT,
 } from "../ribbon/ribbon-metrics.js";
+import { Scope } from "../scope.js";
 import { sheetNameKey } from "../sheet-name.js";
 import { changesSheetTabs, SheetTabs } from "../sheet-tabs.js";
 import type { Selection, SheetId } from "../types/coordinates.js";
@@ -49,32 +50,32 @@ function mountWhenLoaded(
   load: () => Promise<() => ShellPiece>,
   fallback?: () => ShellPiece,
 ): ShellPiece {
-  let piece: ShellPiece | null = null;
-  let destroyed = false;
+  const lifetime = new Scope();
   host.style.minHeight = `${reservedHeight}px`;
 
   void load().then(
     (mount) => {
-      if (destroyed) return;
+      if (lifetime.closed) return;
 
       host.style.minHeight = "";
-      piece = mount();
+      const piece = mount();
+      lifetime.add(() => piece.destroy());
     },
     (error: unknown) => {
-      if (destroyed) return;
+      if (lifetime.closed) return;
 
       host.style.minHeight = "";
-      if (fallback !== undefined) piece = fallback();
+      if (fallback !== undefined) {
+        const piece = fallback();
+        lifetime.add(() => piece.destroy());
+      }
       throw error;
     },
   );
 
   return {
     element: host,
-    destroy() {
-      destroyed = true;
-      piece?.destroy();
-    },
+    destroy: () => lifetime.close(),
   };
 }
 
@@ -184,6 +185,9 @@ export function createSpreadsheetShell(
 
   root.append(toolbarRow, formulaRow, gridHost, bottomRow);
   host.appendChild(root);
+  // Disposers run in reverse: grid listeners, then the pieces, the grid, and the root last.
+  const lifetime = new Scope();
+  lifetime.add(() => root.remove());
 
   // Seed the widget CSS custom properties on the shell root so chrome outside
   // the grid host (toolbar/formula/bottom rows) themes identically.
@@ -201,15 +205,15 @@ export function createSpreadsheetShell(
       },
     );
   } catch (error) {
-    root.remove();
+    lifetime.close();
     throw error;
   }
+  lifetime.add(() => controller.destroy());
   const grid = controller.grid;
   try {
     options.onReady?.(grid);
   } catch (error) {
-    controller.destroy();
-    root.remove();
+    lifetime.close();
     throw error;
   }
 
@@ -225,27 +229,27 @@ export function createSpreadsheetShell(
   };
   const focusGrid = chrome.focusGrid;
 
-  const pieces: ShellPiece[] = [];
-  pieces.push(
-    options.ribbon
-      ? mountRibbon(
-          toolbarRow,
-          grid,
-          { ...chrome, flags: gridConfig },
-          typeof options.ribbon === "object" ? options.ribbon : {},
-        )
-      : mountToolbar(toolbarRow, grid, chrome),
-  );
-  pieces.push(createNameBox(formulaRow, grid, { focusGrid }));
+  const toolbar = options.ribbon
+    ? mountRibbon(
+        toolbarRow,
+        grid,
+        { ...chrome, flags: gridConfig },
+        typeof options.ribbon === "object" ? options.ribbon : {},
+      )
+    : mountToolbar(toolbarRow, grid, chrome);
+  lifetime.add(() => toolbar.destroy());
+  const nameBox = createNameBox(formulaRow, grid, { focusGrid });
+  lifetime.add(() => nameBox.destroy());
   formulaRow.appendChild(fx);
   const formulaBar = createFormulaBar(formulaRow, grid, { focusGrid });
-  pieces.push(formulaBar);
+  lifetime.add(() => formulaBar.destroy());
   let readOnly = options.grid.readOnly ?? false;
   formulaBar.setReadOnly(readOnly);
 
   let tabsEnabled = options.grid.config?.tabs !== false;
   let tabHost: HTMLDivElement | null = null;
   let tabs: SheetTabs | null = null;
+  lifetime.add(() => tabs?.destroy());
   const nextSheetName = (): string => {
     const names = new Set(grid.store.getWorkbook().sheets.map((sheet) => sheetNameKey(sheet.name)));
     let suffix = grid.store.getWorkbook().sheets.length + 1;
@@ -285,16 +289,16 @@ export function createSpreadsheetShell(
   };
   refreshTabs();
 
-  const unsubscribes: Array<() => void> = [
-    grid.on("active-sheet", () => refreshTabs()),
-    // A tab update closes an open tab menu; a collaborator's cell edit must not.
+  const status = createSelectionStatus(bottomRow, grid);
+  lifetime.add(() => status.destroy());
+  lifetime.add(grid.on("active-sheet", () => refreshTabs()));
+  // A tab update closes an open tab menu; a collaborator's cell edit must not.
+  lifetime.add(
     grid.on("change", (event) => {
       if (event.transaction.patches.some(changesSheetTabs)) refreshTabs();
     }),
-  ];
-  pieces.push(createSelectionStatus(bottomRow, grid));
+  );
 
-  let destroyed = false;
   return {
     grid,
     element: root,
@@ -322,14 +326,6 @@ export function createSpreadsheetShell(
       grid.setActiveSheet(id);
     },
 
-    destroy() {
-      if (destroyed) return;
-      destroyed = true;
-      for (const unsubscribe of unsubscribes) unsubscribe();
-      for (const piece of pieces) piece.destroy();
-      tabs?.destroy();
-      controller.destroy();
-      root.remove();
-    },
+    destroy: () => lifetime.close(),
   };
 }

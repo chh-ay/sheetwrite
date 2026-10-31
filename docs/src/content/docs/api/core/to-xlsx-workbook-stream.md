@@ -8,7 +8,7 @@ description: "toXlsxWorkbookStream function in @sheetwrite/core: Stream formula-
 Stream formula-preserving workbook XLSX with backpressure and cancellation.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/export.ts#L712"><code>packages/core/src/export.ts#L712</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/export.ts#L736"><code>packages/core/src/export.ts#L736</code></a></dd></div>
 </dl>
 
 ## Declaration

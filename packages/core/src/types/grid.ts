@@ -127,7 +127,9 @@ export interface CellEditor {
  * - `"blocked"` — the browser rejected the request, typically a permissions
  *   policy or missing user activation.
  * - `"empty"` — nothing to act on (no focused selection, empty clipboard, or
- *   a read-only grid on paste).
+ *   a read-only grid on paste), or the action stopped without a change to the
+ *   grid because a newer action of the same kind (copy or cut, paste) started
+ *   or the grid was destroyed first.
  */
 export type ClipboardOutcome = "done" | "unsupported" | "blocked" | "empty";
 
@@ -803,8 +805,9 @@ export interface Grid {
   /**
    * Totals for the current selection, for a status bar. Large selections are
    * read in chunks between frames, so the page stays responsive; abort
-   * `signal` to stop early, which rejects with the signal's reason. Resolves
-   * null when nothing is selected.
+   * `signal` to stop early, which rejects with the signal's reason.
+   * `destroy()` stops every running summary the same way, with an
+   * `AbortError`. Resolves null when nothing is selected.
    */
   summarizeSelection(signal?: AbortSignal): Promise<SelectionSummary | null>;
   setActiveSheet(id: SheetId): void;

@@ -4,6 +4,7 @@
 
 import type { IconName } from "../icons/icon-names.js";
 import { iconContentNode, iconNode } from "../icons/resolve.js";
+import { Scope } from "../scope.js";
 import type {
   CommandFlags,
   Grid,
@@ -222,12 +223,11 @@ export class CommandToolbar {
   private readonly gated = new Map<HTMLElement, RibbonControlSpec>();
   /** Row elements of gated commands the grid cannot run now; fit keeps them hidden. */
   private readonly unavailable = new Set<HTMLElement>();
-  private readonly disposeState: () => void;
-  private readonly resizeObserver: ResizeObserver | null;
+  /** The toolbar's listeners, observer and pending fit frame; `destroy` closes it. */
+  private readonly lifetime = new Scope();
   /** Index of the first item moved to the overflow; `items.length` when all fit. */
   private overflowStart: number;
   private fitFrame = 0;
-  private destroyed = false;
 
   constructor(host: HTMLElement, grid: Grid, options: CommandToolbarOptions) {
     this.grid = grid;
@@ -270,27 +270,27 @@ export class CommandToolbar {
     this.element.append(this.row, this.more);
     this.element.addEventListener("keydown", this.onKeydown);
     host.appendChild(this.element);
+    this.lifetime.add(() => this.element.remove());
+    this.lifetime.add(() => this.popup.destroy());
 
     this.refresh((command) => grid.getCommandState(command));
-    this.disposeState = grid.on("command-state-change", (event) =>
-      this.refresh((command: GridCommandName) => event.states[command]),
+    this.lifetime.add(
+      grid.on("command-state-change", (event) =>
+        this.refresh((command: GridCommandName) => event.states[command]),
+      ),
     );
     // Absent in some test environments; every command then stays on the row.
-    this.resizeObserver =
-      typeof ResizeObserver === "function" ? new ResizeObserver(() => this.scheduleFit()) : null;
-    this.resizeObserver?.observe(this.element);
+    if (typeof ResizeObserver === "function") {
+      const resizeObserver = new ResizeObserver(() => this.scheduleFit());
+      resizeObserver.observe(this.element);
+      this.lifetime.add(() => resizeObserver.disconnect());
+    }
+    this.lifetime.add(() => cancelAnimationFrame(this.fitFrame));
     this.scheduleFit();
   }
 
   destroy(): void {
-    if (this.destroyed) return;
-
-    this.destroyed = true;
-    cancelAnimationFrame(this.fitFrame);
-    this.resizeObserver?.disconnect();
-    this.disposeState();
-    this.popup.destroy();
-    this.element.remove();
+    this.lifetime.close();
   }
 
   private renderEntry(entry: ToolbarEntry): HTMLElement {
@@ -335,7 +335,7 @@ export class CommandToolbar {
 
   /** Resize bursts arrive many times a frame; fit at most once per frame. */
   private scheduleFit(): void {
-    if (this.fitFrame !== 0 || this.destroyed) return;
+    if (this.fitFrame !== 0 || this.lifetime.closed) return;
 
     this.fitFrame = requestAnimationFrame(() => {
       this.fitFrame = 0;

@@ -14,6 +14,7 @@ import {
   MAX_HYPERLINKS_PER_SHEET,
   sanitizeCellHyperlink,
 } from "./hyperlink.js";
+import { type Scope, ScopeSlot } from "./scope.js";
 import type { CellRef, SelectionModel, SelRect } from "./selection.js";
 import type { CellHyperlink, CellScalar, CellStyle, CellValue } from "./types/cell.js";
 import type { SheetId } from "./types/coordinates.js";
@@ -22,6 +23,8 @@ import type { ClipboardOutcome } from "./types/grid.js";
 import type { Store } from "./types/store.js";
 
 export interface ClipboardControllerDeps {
+  /** The grid's scope; its close stops every clipboard action that is still running. */
+  lifetime: Scope;
   store: Store;
   selection: () => SelectionModel;
   activeSheet: () => SheetId;
@@ -431,29 +434,53 @@ export class ClipboardController {
   /** Last rich copy/cut and its unguessable in-memory provenance token. */
   private trusted: TrustedClipboard | null = null;
 
+  /**
+   * The running copy or cut, and the running paste. A newer action of the
+   * same kind closes the older one: the older one then resolves `"empty"`
+   * without changing the grid, so a late write cannot replace the newer
+   * provenance token and a late read cannot paste over the newer paste.
+   */
+  private readonly writes: ScopeSlot;
+  private readonly reads: ScopeSlot;
+
   constructor(deps: ClipboardControllerDeps) {
     this.deps = deps;
+    this.writes = new ScopeSlot(deps.lifetime);
+    this.reads = new ScopeSlot(deps.lifetime);
   }
 
   async copy(): Promise<ClipboardOutcome> {
     const snapshot = this.capture(false);
     if (!snapshot) return "empty";
-    const token = createClipboardToken();
-    const outcome = await this.writeCaptured(snapshot, token);
-    if (outcome === "done") this.trusted = { snapshot, token };
-    return outcome;
+    const write = this.writes.next();
+    try {
+      const token = createClipboardToken();
+      const outcome = await this.writeCaptured(snapshot, token);
+      if (write.closed) return "empty";
+      if (outcome === "done") this.trusted = { snapshot, token };
+      return outcome;
+    } finally {
+      write.close();
+    }
   }
 
   async cut(): Promise<ClipboardOutcome> {
     const snapshot = this.capture(true);
     if (!snapshot) return "empty";
-    const token = createClipboardToken();
-    const outcome = await this.writeCaptured(snapshot, token);
-    if (outcome !== "done") return outcome;
-    this.trusted = { snapshot, token };
-    if (this.deps.readOnly()) return "done";
-    this.deps.commit(snapshot.clearPatches, "cut");
-    return "done";
+    const write = this.writes.next();
+    try {
+      const token = createClipboardToken();
+      const outcome = await this.writeCaptured(snapshot, token);
+      // The clipboard holds the cells, but the source stays: nothing is lost.
+      if (write.closed) return "empty";
+      if (outcome !== "done") return outcome;
+      this.trusted = { snapshot, token };
+      if (this.deps.readOnly()) return "done";
+      this.deps.commit(snapshot.clearPatches, "cut");
+      return "done";
+    } finally {
+      write.close();
+    }
   }
 
   private async writeCaptured(
@@ -514,12 +541,27 @@ export class ClipboardController {
     const focus = this.deps.selection().focusCell;
     if (!focus) return "empty";
     if (typeof navigator === "undefined" || !navigator.clipboard) return "unsupported";
-    const clipboard = navigator.clipboard;
+    const read = this.reads.next();
+    try {
+      return await this.readAndPaste(read, navigator.clipboard, focus, valuesOnly);
+    } finally {
+      read.close();
+    }
+  }
+
+  /** Every clipboard read awaits; a paste whose scope closed meanwhile writes nothing. */
+  private async readAndPaste(
+    read: Scope,
+    clipboard: Clipboard,
+    focus: CellRef,
+    valuesOnly: boolean,
+  ): Promise<ClipboardOutcome> {
     let richReadFailed = false;
 
     if (typeof clipboard.read === "function") {
       try {
         const items = await clipboard.read();
+        if (read.closed) return "empty";
         for (const item of items) {
           const customType = item.types.includes(SHEETWRITE_WEB_CLIPBOARD_FORMAT)
             ? SHEETWRITE_WEB_CLIPBOARD_FORMAT
@@ -528,6 +570,7 @@ export class ClipboardController {
               : null;
           if (!customType) continue;
           const envelope = parseClipboardJson(await (await item.getType(customType)).text());
+          if (read.closed) return "empty";
           if (!envelope) continue;
           if (this.trusted?.token === envelope.token) {
             this.pasteInternal(this.trusted.snapshot, focus, valuesOnly);
@@ -538,10 +581,9 @@ export class ClipboardController {
         }
         for (const item of items) {
           if (!item.types.includes("text/html")) continue;
-          const grid = parseClipboardHtml(
-            await (await item.getType("text/html")).text(),
-            valuesOnly,
-          );
+          const html = await (await item.getType("text/html")).text();
+          if (read.closed) return "empty";
+          const grid = parseClipboardHtml(html, valuesOnly);
           if (!grid) continue;
           this.pasteExternalHtml(grid, focus);
           return "done";
@@ -549,6 +591,7 @@ export class ClipboardController {
         for (const item of items) {
           if (!item.types.includes("text/plain")) continue;
           const text = await (await item.getType("text/plain")).text();
+          if (read.closed) return "empty";
           if (text.length === 0) return "empty";
           this.pasteExternal(text, focus);
           return "done";
@@ -563,7 +606,7 @@ export class ClipboardController {
     }
     try {
       const text = await clipboard.readText();
-      if (text.length === 0) return "empty";
+      if (read.closed || text.length === 0) return "empty";
       this.pasteExternal(text, focus);
       return "done";
     } catch {

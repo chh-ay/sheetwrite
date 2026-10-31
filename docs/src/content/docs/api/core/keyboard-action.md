@@ -8,7 +8,7 @@ description: "KeyboardAction type in @sheetwrite/core: Built-in actions that can
 Built-in actions that can be rebound without replacing navigation.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/grid.ts#L427"><code>packages/core/src/types/grid.ts#L427</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/grid.ts#L429"><code>packages/core/src/types/grid.ts#L429</code></a></dd></div>
 </dl>
 
 ## Declaration
