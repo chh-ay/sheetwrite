@@ -28,6 +28,7 @@ Without registration, core XLSX functions identify the missing optional package.
 
 - `toXlsxTable(workbook, store, options)` and `fromXlsxTable(bytes, options)` exchange the active or first sheet with a first-row header. Table conversion is in-memory and intentionally reduced-fidelity.
 - `toXlsxWorkbook(snapshotOrGrid, options)` and `fromXlsxWorkbook(bytes, options)` preserve multiple sheets, formula source, supported styles and number formats, validations, notes, merges, dimensions, frozen panes, named ranges, and versioned Sheetwrite metadata.
+- **Charts.** Workbook import reads Excel column, bar, line, area, pie, doughnut and scatter charts into `Sheet.charts`, and export writes `Sheet.charts` as Excel chart parts. See [Charts in XLSX files](https://www.sheetwrite.dev/docs/features/analysis/charts/#charts-in-xlsx-files).
 
 See [XLSX import](https://www.sheetwrite.dev/docs/import-export/xlsx-import/) and [XLSX export](https://www.sheetwrite.dev/docs/import-export/xlsx-export/).
 
