@@ -8,7 +8,7 @@ description: "MAX_CONDITIONAL_FORMAT_RULES variable in @sheetwrite/core: Maximum
 Maximum ordered conditional-format rules admitted per worksheet and encoded in one u32 match mask.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/conditional-format.ts#L5"><code>packages/core/src/conditional-format.ts#L5</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/conditional-format.ts#L5"><code>packages/core/src/conditional-format.ts#L5</code></a></dd></div>
 </dl>
 
 ## Declaration

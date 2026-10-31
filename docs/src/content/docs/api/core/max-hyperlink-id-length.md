@@ -8,7 +8,7 @@ description: "MAX_HYPERLINK_ID_LENGTH variable in @sheetwrite/core: Serialized i
 Serialized identifier ceiling; IDs remain stable across history and snapshots.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/hyperlink.ts#L16"><code>packages/core/src/hyperlink.ts#L16</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/hyperlink.ts#L16"><code>packages/core/src/hyperlink.ts#L16</code></a></dd></div>
 </dl>
 
 ## Declaration

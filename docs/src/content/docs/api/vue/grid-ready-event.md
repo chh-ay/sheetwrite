@@ -8,7 +8,7 @@ description: "GridReadyEvent interface in @sheetwrite/vue: Grid handle, generati
 Grid handle, generation, and reason published after adapter initialization.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/adapter.d.ts#L34"><code>packages/core/dist/adapter.d.ts#L34</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/adapter.d.ts#L34"><code>packages/core/dist/adapter.d.ts#L34</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

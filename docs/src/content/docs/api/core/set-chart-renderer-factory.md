@@ -10,7 +10,7 @@ removes it. Grids created later use it. Without a renderer, the grid draws
 a plain frame with the chart title.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/chart-backend.ts#L18"><code>packages/core/src/chart-backend.ts#L18</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/chart-backend.ts#L18"><code>packages/core/src/chart-backend.ts#L18</code></a></dd></div>
 </dl>
 
 ## Declaration

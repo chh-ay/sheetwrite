@@ -8,7 +8,7 @@ description: "RuntimeResourcePhase type in @sheetwrite/core: Measurement point w
 Measurement point within one resource-accounted operation.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/resource-accounting.ts#L51"><code>packages/core/src/resource-accounting.ts#L51</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/resource-accounting.ts#L51"><code>packages/core/src/resource-accounting.ts#L51</code></a></dd></div>
 </dl>
 
 ## Declaration

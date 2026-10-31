@@ -8,7 +8,7 @@ description: "CommentListResult interface in @sheetwrite/core: Versioned comment
 Versioned comment-thread listing returned by a host adapter.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/collaboration.ts#L462"><code>packages/core/src/collaboration.ts#L462</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/collaboration.ts#L462"><code>packages/core/src/collaboration.ts#L462</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

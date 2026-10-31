@@ -8,7 +8,7 @@ description: "XlsxSourceGraph interface in @sheetwrite/core: One relationship fr
 One relationship from the package, workbook, or a sheet to a retained part graph.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L425"><code>packages/core/src/types/document.ts#L425</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L425"><code>packages/core/src/types/document.ts#L425</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>

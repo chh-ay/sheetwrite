@@ -10,7 +10,7 @@ References resolve through the store's reference graph; formulas resolve in
 the WASM calculation engine.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/cell.ts#L117"><code>packages/core/src/types/cell.ts#L117</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/cell.ts#L117"><code>packages/core/src/types/cell.ts#L117</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>3</span>

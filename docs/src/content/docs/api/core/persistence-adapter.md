@@ -25,7 +25,7 @@ async function loadLocal(snapshot: WorkbookSnapshot) {
 - [SyncCoordinator](/docs/api/core/sync-coordinator/)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/transaction.ts#L177"><code>packages/core/src/types/transaction.ts#L177</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/transaction.ts#L177"><code>packages/core/src/types/transaction.ts#L177</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

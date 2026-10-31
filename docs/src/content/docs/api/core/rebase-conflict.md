@@ -8,7 +8,7 @@ description: "RebaseConflict interface in @sheetwrite/core: Reason and affected 
 Reason and affected operations for an unsafe document rebase.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/rebase.ts#L20"><code>packages/core/src/rebase.ts#L20</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/rebase.ts#L20"><code>packages/core/src/rebase.ts#L20</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>

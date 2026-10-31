@@ -12,7 +12,7 @@ once: `text_index` names the cell's entry in `strings`, or `-1` when the cell
 has no text, exactly like [`CellOut::string`] reports it.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L24"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L24</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/pkg/sheetwrite_wasm.d.ts#L24"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L24</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>6</span>

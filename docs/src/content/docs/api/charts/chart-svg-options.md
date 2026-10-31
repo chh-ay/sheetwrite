@@ -8,7 +8,7 @@ description: "ChartSvgOptions interface in @sheetwrite/charts: Options for rende
 Options for `renderChartSvg`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/charts/src/chart-svg.ts#L19"><code>packages/charts/src/chart-svg.ts#L19</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/charts/src/chart-svg.ts#L19"><code>packages/charts/src/chart-svg.ts#L19</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>1</span>

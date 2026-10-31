@@ -8,7 +8,7 @@ description: "MutationPolicyMode type in @sheetwrite/core: Atomic or partial han
 Atomic or partial handling for locally denied operations.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L222"><code>packages/core/src/types/document.ts#L222</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L222"><code>packages/core/src/types/document.ts#L222</code></a></dd></div>
 </dl>
 
 ## Declaration
