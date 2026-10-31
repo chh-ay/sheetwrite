@@ -316,13 +316,21 @@ describe("offline typed comparison", () => {
   });
 
   it("counts ULPs across zero within 64 bits", () => {
-    const nearZero = { type: "number", value: 0, tolerance: { kind: "ulp", value: 2 } } as const;
+    const ulps = (value: number) =>
+      ({ type: "number", value: 0, tolerance: { kind: "ulp", value } }) as const;
 
-    expect(compareResults(nearZero, { type: "number", value: -Number.MIN_VALUE })).toEqual([]);
-    expect(compareResults(nearZero, { type: "number", value: Number.MIN_VALUE })).toEqual([]);
-    expect(compareResults(nearZero, { type: "number", value: -3 * Number.MIN_VALUE })).not.toEqual(
+    expect(compareResults(ulps(0), { type: "number", value: -0 })).toEqual([]);
+    expect(compareResults(ulps(1), { type: "number", value: -Number.MIN_VALUE })).toEqual([]);
+    expect(compareResults(ulps(1), { type: "number", value: Number.MIN_VALUE })).toEqual([]);
+    expect(compareResults(ulps(1), { type: "number", value: -2 * Number.MIN_VALUE })).not.toEqual(
       [],
     );
+    expect(
+      compareResults(
+        { type: "number", value: -Number.MIN_VALUE, tolerance: { kind: "ulp", value: 2 } },
+        { type: "number", value: Number.MIN_VALUE },
+      ),
+    ).toEqual([]);
   });
 
   it("rejects an array result whose matrix does not match its shape", () => {
