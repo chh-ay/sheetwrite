@@ -2,6 +2,7 @@ import type { AriaMirror } from "./aria-mirror.js";
 import { intersectingMerges, prepareMergeIndex } from "./canvas-paint.js";
 import type { DatasourceController } from "./datasource-controller.js";
 import type { DomMergeAnchorRequest, DomOverlay } from "./dom-overlay.js";
+import { isEngineTrap } from "./engine.js";
 import type { GeometryLayoutController } from "./geometry-layout-controller.js";
 import type { OverlayPainter } from "./overlay-painter.js";
 import { storeEngine } from "./store/engine-registry.js";
@@ -79,6 +80,8 @@ export interface ReadWindowControllerOptions {
     firstVisibleColumn: number | null;
     lastVisibleColumn: number | null;
   }) => void;
+  /** Receives a WASM trap from a frame's engine reads; without it the trap is rethrown. */
+  onEngineTrap?: (cause: unknown) => void;
 }
 
 /** Owns paint/read plans, hydration demand, formula closure and residency. */
@@ -119,6 +122,8 @@ export class ReadWindowController {
   private formulaBands = EMPTY_BANDS;
   private pinnedSheet: SheetId | null = null;
   private destroyed = false;
+  /** Set after the engine stops: the last frame stays and no read reaches the store again. */
+  private frozen = false;
   private readonly stopMemoryRelease: (() => void) | undefined;
 
   constructor(private readonly options: ReadWindowControllerOptions) {
@@ -194,24 +199,27 @@ export class ReadWindowController {
   }
 
   schedule(): void {
-    if (this.frame || this.destroyed) return;
+    if (this.frame || this.destroyed || this.frozen) return;
 
     const requestFrame =
       globalThis.requestAnimationFrame ??
       ((callback: FrameRequestCallback) => setTimeout(callback, 16));
     this.frame = requestFrame(() => {
       this.frame = 0;
-      this.render();
+      this.paint();
     }) as unknown as number;
   }
 
   renderNow(): void {
-    if (this.destroyed) return;
-    if (this.frame) {
-      (globalThis.cancelAnimationFrame ?? clearTimeout)(this.frame);
-      this.frame = 0;
-    }
-    this.render();
+    if (this.destroyed || this.frozen) return;
+    this.cancelFrame();
+    this.paint();
+  }
+
+  /** Keep the last frame and stop every later engine read; used after the engine stops. */
+  freeze(): void {
+    this.frozen = true;
+    this.cancelFrame();
   }
 
   destroy(): void {
@@ -219,20 +227,36 @@ export class ReadWindowController {
     this.destroyed = true;
     this.stopMemoryRelease?.();
     if (this.pinnedSheet !== null) {
-      storeEngine(this.options.store)?.pinViewportBands(this.pinnedSheet, EMPTY_BANDS);
+      // A frozen controller's store sits on a stopped instance; unpinning would call it.
+      if (!this.frozen)
+        storeEngine(this.options.store)?.pinViewportBands(this.pinnedSheet, EMPTY_BANDS);
       this.pinnedSheet = null;
     }
 
-    if (this.frame) {
-      (globalThis.cancelAnimationFrame ?? clearTimeout)(this.frame);
-      this.frame = 0;
-    }
-
+    this.cancelFrame();
     this.lastPaintView = null;
     this.cachedPaneViews = [];
     this.cachedDomMergeAnchorViews = [];
     this.domMergeSourceViews.length = 0;
     this.domMergeAnchorState.length = 0;
+  }
+
+  private cancelFrame(): void {
+    if (!this.frame) return;
+
+    (globalThis.cancelAnimationFrame ?? clearTimeout)(this.frame);
+    this.frame = 0;
+  }
+
+  private paint(): void {
+    try {
+      this.render();
+    } catch (error) {
+      const onEngineTrap = this.options.onEngineTrap;
+      if (!onEngineTrap || !isEngineTrap(error)) throw error;
+
+      onEngineTrap(error);
+    }
   }
 
   private render(): void {
