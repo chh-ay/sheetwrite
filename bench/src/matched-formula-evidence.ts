@@ -1,9 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { isAbsolute, resolve } from "node:path";
-
-import { optionValue } from "./cli-options.js";
-import { quantile } from "./stats.js";
+import { resolve } from "node:path";
 
 export const MATCHED_FORMULA_EVIDENCE_VERSION = 1 as const;
 export const MATCHED_FORMULA_PROTOCOL = "formula-corrected-baseline-matched-v1" as const;
@@ -91,8 +88,15 @@ function finite(value: unknown, label: string): asserts value is number {
   if (typeof value !== "number" || !Number.isFinite(value))
     throw new Error(`${label} must be finite`);
 }
+function percentile(values: readonly number[], p: number): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const position = (sorted.length - 1) * p;
+  const lower = Math.floor(position);
+  const upper = Math.min(lower + 1, sorted.length - 1);
+  return sorted[lower]! + (sorted[upper]! - sorted[lower]!) * (position - lower);
+}
 function delta(before: readonly number[], after: readonly number[], p: number): number {
-  return (quantile(after, p) / quantile(before, p) - 1) * 100;
+  return (percentile(after, p) / percentile(before, p) - 1) * 100;
 }
 function nextRandom(state: { value: number }): number {
   state.value ^= state.value << 13;
@@ -121,7 +125,7 @@ function bootstrap(
   }
   return {
     value: delta(before, after, p),
-    ciPct: [quantile(estimates, 0.025), quantile(estimates, 0.975)],
+    ciPct: [percentile(estimates, 0.025), percentile(estimates, 0.975)],
   };
 }
 function sha256(path: string): string {
@@ -140,8 +144,6 @@ function assertRaw(raw: MatchedRawArtifact): void {
     raw.sides.baseline.commit === raw.sides.post94.commit
   )
     throw new Error("malformed raw commit provenance");
-  if (isAbsolute(raw.sides.baseline.pkg) || isAbsolute(raw.sides.post94.pkg))
-    throw new Error("raw package paths must be relative to the checkout root");
   if (
     JSON.stringify(raw.controls.cpuAffinity) !== JSON.stringify([12]) ||
     raw.controls.concurrency !== 1 ||
@@ -217,12 +219,16 @@ export function buildMatchedEvidence(
     const candidateMs = raw.rounds.map((round) => round.samples[workload].post94.ms);
     const median = bootstrap(baselineMs, candidateMs, resamples, seed ^ workload.length, 0.5);
     const p95 = bootstrap(baselineMs, candidateMs, resamples, seed ^ workload.length, 0.95);
+    const allocation = raw.rounds.every((round) =>
+      exactAllocation(round.samples[workload].baseline, round.samples[workload].post94),
+    );
     workloads[workload] = {
       raw: { baselineMs, candidateMs },
       median,
       p95,
       allocation: { exact: true },
     };
+    if (!allocation) failures.push(`${workload}: allocation mismatch`);
     if (median.ciPct[0] > 0) failures.push(`${workload}: median CI indicates regression`);
     if (p95.ciPct[0] > 0) failures.push(`${workload}: p95 CI indicates regression`);
   }
@@ -331,28 +337,26 @@ export function validateMatchedEvidence(
     throw new Error("matched formula regression gate did not pass");
 }
 async function main(): Promise<void> {
-  const args = process.argv.slice(2);
+  const args = new Map<string, string>();
+  for (let index = 2; index < process.argv.length; index += 2)
+    args.set(process.argv[index]!, process.argv[index + 1]!);
   const input = resolve(
-    optionValue(args, "--input") ??
+    args.get("--input") ??
       new URL("../results/formula-regression-raw.json", import.meta.url).pathname,
   );
   const output = resolve(
-    optionValue(args, "--output") ??
+    args.get("--output") ??
       new URL("../results/formula-regression-results.json", import.meta.url).pathname,
   );
   const harness = resolve(
-    optionValue(args, "--harness") ??
-      new URL("./matched-formula-harness.ts", import.meta.url).pathname,
+    args.get("--harness") ?? new URL("./matched-formula-harness.ts", import.meta.url).pathname,
   );
-  // The raw artifact names each side's engine package relative to the
-  // checkout that ran the harness; `--root` names that checkout here.
-  const root = resolve(optionValue(args, "--root") ?? new URL("../..", import.meta.url).pathname);
   const raw = JSON.parse(readFileSync(input, "utf8")) as MatchedRawArtifact;
   if (raw.harnessSha256 !== sha256(harness))
     throw new Error("raw harness hash does not match harness source");
   const evidence = buildMatchedEvidence(raw, {
-    baselineWasmSha256: sha256(resolve(root, raw.sides.baseline.pkg, "sheetwrite_wasm_bg.wasm")),
-    candidateWasmSha256: sha256(resolve(root, raw.sides.post94.pkg, "sheetwrite_wasm_bg.wasm")),
+    baselineWasmSha256: sha256(`${raw.sides.baseline.pkg}/sheetwrite_wasm_bg.wasm`),
+    candidateWasmSha256: sha256(`${raw.sides.post94.pkg}/sheetwrite_wasm_bg.wasm`),
     harnessSha256: sha256(harness),
     rawArtifactSha256: sha256(input),
   });

@@ -1,21 +1,18 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import type * as WasmModule from "../../packages/wasm/pkg/sheetwrite_wasm.js";
 
-const root = resolve(import.meta.dir, "../..");
+const root = new URL("../../", import.meta.url).pathname;
 const candidateCommit = Bun.env.CANDIDATE_COMMIT;
 if (!candidateCommit || !/^[0-9a-f]{40}$/u.test(candidateCommit)) {
   throw new Error("CANDIDATE_COMMIT must be the exact 40-character commit SHA");
 }
-// Package paths are relative to the repository root, so the raw artifact does
-// not record the machine's work directory. The evidence reader takes the root.
 const sides = {
   baseline: {
     commit: "77c41983b53f09c393c6f8b82a4033283c0f9830",
-    pkg: ".formula-evidence/pre77/packages/wasm/pkg",
+    pkg: `${root}.formula-evidence/pre77/packages/wasm/pkg`,
   },
-  post94: { commit: candidateCommit, pkg: "packages/wasm/pkg" },
+  post94: { commit: candidateCommit, pkg: `${root}packages/wasm/pkg` },
 } as const;
 
 type Side = keyof typeof sides;
@@ -38,9 +35,9 @@ type ResourceStore = Store & {
 
 const modules = {} as Record<Side, Wasm>;
 for (const side of Object.keys(sides) as Side[]) {
-  const pkg = resolve(root, sides[side].pkg);
-  const wasm = (await import(`${pkg}/sheetwrite_wasm.js`)) as Wasm;
-  wasm.initSync({ module: readFileSync(`${pkg}/sheetwrite_wasm_bg.wasm`) });
+  const descriptor = sides[side];
+  const wasm = (await import(`${descriptor.pkg}/sheetwrite_wasm.js`)) as Wasm;
+  wasm.initSync({ module: readFileSync(`${descriptor.pkg}/sheetwrite_wasm_bg.wasm`) });
   modules[side] = wasm;
 }
 function retained(store: ResourceStore): number | null {
@@ -282,6 +279,6 @@ const artifact = {
   },
   rounds,
 };
-const output = Bun.env.OUTPUT ?? resolve(root, ".formula-evidence/formula-regression-raw.json");
+const output = Bun.env.OUTPUT ?? `${root}.formula-evidence/formula-regression-raw.json`;
 await Bun.write(output, JSON.stringify(artifact, null, 2));
 console.log(JSON.stringify({ output, rounds: rounds.length, candidate: candidateCommit }));

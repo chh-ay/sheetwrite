@@ -3,8 +3,8 @@
   "protocol": "formula-corrected-baseline-matched-v1",
   "candidateCommit": "27be3443e3e8fa9404f522ad161b5c04adbc0987",
   "baselineCommit": "77c41983b53f09c393c6f8b82a4033283c0f9830",
-  "harnessSha256": "f31b2c895b6285b738010a83a232b8e4ab93472892c4a5f4ad23fc49014dc46d",
-  "rawArtifactSha256": "ea187f6ba31697d9e26e167c7c6227defd80f73c7c850f9756fd0c90246632e1",
+  "harnessSha256": "027d0b7401a3bc40964b08f8bdbfb83750e6390edcd6e9e4bf8b1533fb4f44b6",
+  "rawArtifactSha256": "20bcbc7fba63518a785d96aacfb01b5343b1428b21b344e98a18b051623d36bd",
   "wasmSha256": {
     "baseline": "7c6ccfd4b16099276b4ce666ce6feb73f0d10be66b826b5475f11158a4c44081",
     "candidate": "41dff106a2963cfece6b142346b169391bbbd569b93b0723a1c1dc3b2556c180"
