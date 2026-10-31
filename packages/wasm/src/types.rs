@@ -243,6 +243,23 @@ impl ReadSet {
             // dependency on them would only invent cycles and wasted work.
             // A runtime reference inside it is volatile and refreshes anyway.
             Ast::Func(Func::Areas, _) => {}
+            // SUMIF and AVERAGEIF read as many sum cells as the criteria
+            // range has, whatever size the sum range is written with.
+            Ast::Func(Func::SumIf | Func::AverageIf, args) if args.len() == 3 => {
+                for arg in args {
+                    self.collect(arg, formula_sheet);
+                }
+                if let (Some(criteria), Some(sum)) = (
+                    crate::eval::static_range(&args[0], formula_sheet as usize),
+                    crate::eval::static_range(&args[2], formula_sheet as usize),
+                ) {
+                    self.push_range(crate::eval::sum_range_extent(
+                        sum,
+                        criteria.row_end - criteria.row_start + 1,
+                        criteria.col_end - criteria.col_start + 1,
+                    ));
+                }
+            }
             // Static operands read only the shared cells; an empty
             // intersection is a constant #NULL! and reads nothing.
             Ast::Func(Func::Intersect, operands) => {
@@ -507,20 +524,33 @@ impl FormulaEntry {
         entry
     }
 
+    /// Applies `rewrite` to the entry's tree. When it reports a change, the
+    /// source text and read metadata follow the new tree; otherwise the text
+    /// stays as the user wrote it. Returns whether anything changed.
+    fn rewrite_ast(&mut self, formula_sheet: u32, rewrite: impl FnOnce(&mut Ast) -> bool) -> bool {
+        let Some(ast) = &mut self.ast else {
+            return false;
+        };
+        if !rewrite(ast) {
+            return false;
+        }
+        self.source = serialize(ast);
+        let (reads, volatile) = formula_metadata(ast, formula_sheet);
+        self.reads = reads;
+        self.set_volatile(volatile);
+        true
+    }
+
     pub(crate) fn shift_rows(
         &mut self,
         at: u32,
         delta: i64,
         formula_sheet: u32,
         edited_sheet: u32,
-    ) {
-        if let Some(ast) = &mut self.ast {
-            shift_rows(ast, at, delta, formula_sheet, edited_sheet);
-            self.source = serialize(ast);
-            let (reads, volatile) = formula_metadata(ast, formula_sheet);
-            self.reads = reads;
-            self.set_volatile(volatile);
-        }
+    ) -> bool {
+        self.rewrite_ast(formula_sheet, |ast| {
+            shift_rows(ast, at, delta, formula_sheet, edited_sheet)
+        })
     }
 
     pub(crate) fn shift_cols(
@@ -529,42 +559,18 @@ impl FormulaEntry {
         delta: i64,
         formula_sheet: u32,
         edited_sheet: u32,
-    ) {
-        if let Some(ast) = &mut self.ast {
-            shift_cols(ast, at, delta, formula_sheet, edited_sheet);
-            self.source = serialize(ast);
-            let (reads, volatile) = formula_metadata(ast, formula_sheet);
-            self.reads = reads;
-            self.set_volatile(volatile);
-        }
+    ) -> bool {
+        self.rewrite_ast(formula_sheet, |ast| {
+            shift_cols(ast, at, delta, formula_sheet, edited_sheet)
+        })
     }
 
     pub(crate) fn rename_sheet(&mut self, handle: u32, name: &str, formula_sheet: u32) -> bool {
-        let Some(ast) = &mut self.ast else {
-            return false;
-        };
-        if !rename_sheet_refs(ast, handle, name) {
-            return false;
-        }
-        self.source = serialize(ast);
-        let (reads, volatile) = formula_metadata(ast, formula_sheet);
-        self.reads = reads;
-        self.set_volatile(volatile);
-        true
+        self.rewrite_ast(formula_sheet, |ast| rename_sheet_refs(ast, handle, name))
     }
 
     pub(crate) fn invalidate_sheet(&mut self, handle: u32, formula_sheet: u32) -> bool {
-        let Some(ast) = &mut self.ast else {
-            return false;
-        };
-        if !invalidate_sheet_refs(ast, handle) {
-            return false;
-        }
-        self.source = serialize(ast);
-        let (reads, volatile) = formula_metadata(ast, formula_sheet);
-        self.reads = reads;
-        self.set_volatile(volatile);
-        true
+        self.rewrite_ast(formula_sheet, |ast| invalidate_sheet_refs(ast, handle))
     }
 
     /// Re-places the entry's 3-D references in the tab `order`; `names` holds
@@ -575,17 +581,7 @@ impl FormulaEntry {
         names: &[String],
         formula_sheet: u32,
     ) -> bool {
-        let Some(ast) = &mut self.ast else {
-            return false;
-        };
-        if !refresh_sheet_spans(ast, order, names) {
-            return false;
-        }
-        self.source = serialize(ast);
-        let (reads, volatile) = formula_metadata(ast, formula_sheet);
-        self.reads = reads;
-        self.set_volatile(volatile);
-        true
+        self.rewrite_ast(formula_sheet, |ast| refresh_sheet_spans(ast, order, names))
     }
 
     pub(crate) fn update_table<F>(
@@ -597,17 +593,9 @@ impl FormulaEntry {
     where
         F: Fn(&StructuredRef) -> Option<StructuredRef>,
     {
-        let Some(ast) = &mut self.ast else {
-            return false;
-        };
-        if !update_structured_refs(ast, table_id, resolve) {
-            return false;
-        }
-        self.source = serialize(ast);
-        let (reads, volatile) = formula_metadata(ast, formula_sheet);
-        self.reads = reads;
-        self.set_volatile(volatile);
-        true
+        self.rewrite_ast(formula_sheet, |ast| {
+            update_structured_refs(ast, table_id, resolve)
+        })
     }
 
     /// Heap allocations owned by this formula entry. The inline entry is

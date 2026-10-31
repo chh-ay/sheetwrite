@@ -9,14 +9,19 @@
 //!   postfix    := unary ('%')*
 //!   unary      := ('+' | '-') unary | primary
 //!   primary    := number | string | array | '(' expr ')' | func '(' args ')' | range | cell | name | structured_ref
-//!   range      := cell ':' cell
+//!   range      := cell ':' cell | letters ':' letters | digits ':' digits
 //!   array      := '{' row (';' row)* '}'
 //!   row        := constant (',' constant)*
 //!   constant   := ('+' | '-')? number | string | TRUE | FALSE | error
+//!   number     := digits ('.' digits?)? (('E' | 'e') ('+' | '-')? digits)?
 //!
 //! Every row of an array constant must have the same number of columns.
 //!
 //! Cell references accept optional absolute markers (`$A$1`, `A$1`, `$A1`).
+//! A reference is a cell only inside the sheet's limits (`XFD1048576`); a
+//! token past them, such as `XYZ1`, is a name. `A:C` and `1:3` are whole
+//! columns and rows. They are stored as ranges that span the other axis, and
+//! such a range is always written back in the short form, as Excel does.
 //! Sheet-qualified references keep the sheet name until `CellStore` resolves it
 //! to a sheet handle at formula-ingest time.
 //!
@@ -30,6 +35,11 @@ use std::{borrow::Cow, cmp::Ordering};
 /// Bounds syntax recursion below the evaluator limit because each parenthesized
 /// expression traverses the complete precedence stack.
 const PARSE_RECURSION_LIMIT: usize = 64;
+
+/// The rows of a sheet: the last row is `1048576`.
+pub(crate) const SHEET_ROWS: u32 = 1_048_576;
+/// The columns of a sheet: the last column is `XFD`.
+pub(crate) const SHEET_COLS: u32 = 16_384;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Op {
@@ -768,13 +778,93 @@ fn parse_a1(token: &str) -> Option<(u32, u32, RefFlags)> {
     }
 
     let col = parse_col(letters)?;
-    let row: u32 = digits.parse().ok()?;
+    let row = row_index(digits.parse().ok()?)?;
 
-    if row == 0 {
-        return None;
+    (col < SHEET_COLS).then_some((row, col, RefFlags { row_abs, col_abs }))
+}
+
+/// The 0-based index of a 1-based row number inside the sheet.
+fn row_index(row_number: u32) -> Option<u32> {
+    (1..=SHEET_ROWS)
+        .contains(&row_number)
+        .then(|| row_number - 1)
+}
+
+/// One end of an area reference: a cell (`B2`), a whole column (`$B`) or a
+/// whole row (`2`).
+#[derive(Clone, Copy)]
+enum AreaEnd {
+    Cell(u32, u32, RefFlags),
+    Column(u32, bool),
+    Row(u32, bool),
+}
+
+impl AreaEnd {
+    /// A row number arrives as a number token unless it has a `$` marker.
+    fn of(token: &Tok<'_>) -> Option<Self> {
+        match token {
+            Tok::Ident(name, _) => Self::of_name(name),
+            Tok::Num(number) if number.fract() == 0.0 && *number <= f64::from(SHEET_ROWS) => {
+                row_index(*number as u32).map(|row| Self::Row(row, false))
+            }
+            _ => None,
+        }
     }
 
-    Some((row - 1, col, RefFlags { row_abs, col_abs }))
+    fn of_name(name: &str) -> Option<Self> {
+        if let Some((row, col, flags)) = parse_a1(name) {
+            return Some(Self::Cell(row, col, flags));
+        }
+
+        let absolute = name.starts_with('$');
+        let bare = name.strip_prefix('$').unwrap_or(name);
+        if bare.bytes().all(|byte| byte.is_ascii_alphabetic()) {
+            let col = parse_col(bare).filter(|&col| col < SHEET_COLS)?;
+            return Some(Self::Column(col, absolute));
+        }
+        if !bare.is_empty() && bare.bytes().all(|byte| byte.is_ascii_digit()) {
+            let row = row_index(bare.parse().ok()?)?;
+            return Some(Self::Row(row, absolute));
+        }
+        None
+    }
+}
+
+/// The range between two ends of one kind; `A:1` and `A1:B` have none.
+fn area(start: AreaEnd, end: AreaEnd) -> Option<(u32, u32, u32, u32, RangeFlags)> {
+    let whole_axis = |col_abs, row_abs| RefFlags { row_abs, col_abs };
+    Some(match (start, end) {
+        (AreaEnd::Cell(row, col, flags), AreaEnd::Cell(end_row, end_col, end_flags)) => {
+            normalize_range(row, col, flags, end_row, end_col, end_flags)
+        }
+        (AreaEnd::Column(col, col_abs), AreaEnd::Column(end_col, end_abs)) => normalize_range(
+            0,
+            col,
+            whole_axis(col_abs, true),
+            SHEET_ROWS - 1,
+            end_col,
+            whole_axis(end_abs, true),
+        ),
+        (AreaEnd::Row(row, row_abs), AreaEnd::Row(end_row, end_abs)) => normalize_range(
+            row,
+            0,
+            whole_axis(true, row_abs),
+            end_row,
+            SHEET_COLS - 1,
+            whole_axis(true, end_abs),
+        ),
+        _ => return None,
+    })
+}
+
+/// Whether a range spans every row of the sheet: a whole-column range.
+fn spans_all_rows(row_start: u32, row_end: u32) -> bool {
+    row_start == 0 && row_end == SHEET_ROWS - 1
+}
+
+/// Whether a range spans every column of the sheet: a whole-row range.
+fn spans_all_cols(col_start: u32, col_end: u32) -> bool {
+    col_start == 0 && col_end == SHEET_COLS - 1
 }
 
 fn normalize_range(
@@ -811,16 +901,24 @@ fn normalize_range(
         },
     };
 
-    (
-        row.min(end_row),
-        col.min(end_col),
-        row.max(end_row),
-        col.max(end_col),
-        RangeFlags {
-            start: start_flags,
-            end: normalized_end_flags,
-        },
-    )
+    let mut range_flags = RangeFlags {
+        start: start_flags,
+        end: normalized_end_flags,
+    };
+    let (row_start, row_end) = (row.min(end_row), row.max(end_row));
+    let (col_start, col_end) = (col.min(end_col), col.max(end_col));
+    // The rows of a whole column, and the columns of a whole row, are fixed:
+    // no edit or copy moves them, so they behave as absolute.
+    if spans_all_rows(row_start, row_end) {
+        range_flags.start.row_abs = true;
+        range_flags.end.row_abs = true;
+    }
+    if spans_all_cols(col_start, col_end) {
+        range_flags.start.col_abs = true;
+        range_flags.end.col_abs = true;
+    }
+
+    (row_start, col_start, row_end, col_end, range_flags)
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -925,6 +1023,41 @@ struct Tokens<'a> {
     sheet_qualifiers: bool,
 }
 
+/// Reads the number at `*index`: digits with one optional decimal point, then
+/// an optional exponent (`E3`, `e-3`, `E+03`). An `E` without exponent digits
+/// is left for the next token.
+fn number_token(src: &str, index: &mut usize) -> Result<f64, String> {
+    let bytes = src.as_bytes();
+    let start = *index;
+    let mut saw_decimal = false;
+    while let Some(&byte) = bytes.get(*index) {
+        if byte == b'.' && !saw_decimal {
+            saw_decimal = true;
+        } else if !byte.is_ascii_digit() {
+            break;
+        }
+        *index += 1;
+    }
+
+    if matches!(bytes.get(*index), Some(b'e' | b'E')) {
+        let signed = matches!(bytes.get(*index + 1), Some(b'+' | b'-'));
+        let digits_start = *index + 1 + usize::from(signed);
+        if bytes.get(digits_start).is_some_and(u8::is_ascii_digit) {
+            *index = digits_start;
+            while bytes.get(*index).is_some_and(u8::is_ascii_digit) {
+                *index += 1;
+            }
+        }
+    }
+
+    let number = &src[start..*index];
+    number
+        .parse::<f64>()
+        .ok()
+        .filter(|value| value.is_finite())
+        .ok_or_else(|| format!("bad number: {number}"))
+}
+
 fn tokenize(src: &str) -> Result<Tokens<'_>, String> {
     let mut toks = Vec::new();
     let mut intersections = false;
@@ -952,24 +1085,7 @@ fn tokenize(src: &str) -> Result<Tokens<'_>, String> {
         } else if c.is_ascii_digit()
             || (c == b'.' && bytes.get(i + 1).is_some_and(u8::is_ascii_digit))
         {
-            let start = i;
-            let mut saw_decimal = false;
-            while i < bytes.len() {
-                if bytes[i].is_ascii_digit() {
-                    i += 1;
-                } else if bytes[i] == b'.' && !saw_decimal {
-                    saw_decimal = true;
-                    i += 1;
-                } else {
-                    break;
-                }
-            }
-            let number = &src[start..i];
-            toks.push(Tok::Num(
-                number
-                    .parse()
-                    .map_err(|_| format!("bad number: {number}"))?,
-            ));
+            toks.push(Tok::Num(number_token(src, &mut i)?));
         } else if c == b'\'' {
             toks.push(Tok::Ident(
                 Cow::Owned(quoted_token(src, &mut i, b'\'', "unterminated sheet name")?),
@@ -1292,11 +1408,23 @@ impl<'a> Parser<'a> {
         Ok(Ast::Func(Func::Intersect, operands))
     }
 
+    /// A number, or the first row of a whole-row range such as `1:3`.
+    fn number_or_rows_at(&mut self, number: f64) -> Result<Ast, String> {
+        if self.peek() == Some(&Tok::Colon) {
+            if let Some(start) = AreaEnd::of(&Tok::Num(number)) {
+                let _ = self.next();
+                let (r0, c0, r1, c1, range_flags) = self.area_after_colon(start)?;
+                return Ok(Ast::Range(r0, c0, r1, c1, range_flags));
+            }
+        }
+        Ok(Ast::Num(number))
+    }
+
     fn primary_at(&mut self, depth: usize) -> Result<Ast, String> {
         Self::guard_depth(depth)?;
 
         match self.next() {
-            Some(Tok::Num(n)) => Ok(Ast::Num(n)),
+            Some(Tok::Num(n)) => self.number_or_rows_at(n),
             Some(Tok::Str(value)) => Ok(Ast::Str(value)),
             Some(Tok::LParen) => {
                 let first = self.expr_at(depth + 1)?;
@@ -1442,23 +1570,16 @@ impl<'a> Parser<'a> {
                 return Ok(Ast::Bool(false));
             }
 
-            let Some((row, col, flags)) = parse_a1(name.as_ref()) else {
-                return Ok(Ast::Name(name.into_owned()));
-            };
-            if let Some(Tok::Colon) = self.peek() {
-                let _ = self.next();
-                match self.next() {
-                    Some(Tok::Ident(end, _)) => {
-                        let (r1, c1, end_flags) =
-                            parse_a1(&end).ok_or_else(|| format!("bad cell ref: {end}"))?;
-                        let (r0, c0, r1, c1, range_flags) =
-                            normalize_range(row, col, flags, r1, c1, end_flags);
-                        Ok(Ast::Range(r0, c0, r1, c1, range_flags))
-                    }
-                    _ => Err("expected cell after :".into()),
+            if self.peek() == Some(&Tok::Colon) {
+                if let Some(start) = AreaEnd::of_name(name.as_ref()) {
+                    let _ = self.next();
+                    let (r0, c0, r1, c1, range_flags) = self.area_after_colon(start)?;
+                    return Ok(Ast::Range(r0, c0, r1, c1, range_flags));
                 }
-            } else {
-                Ok(self.spill_suffix(Ast::Cell(row, col, flags)))
+            }
+            match parse_a1(name.as_ref()) {
+                Some((row, col, flags)) => Ok(self.spill_suffix(Ast::Cell(row, col, flags))),
+                None => Ok(Ast::Name(name.into_owned())),
             }
         }
     }
@@ -1472,10 +1593,7 @@ impl<'a> Parser<'a> {
             }
         }
 
-        let Some(Tok::Ident(start, _)) = self.next() else {
-            return Err("expected cell after !".into());
-        };
-        let (row, col, flags) = parse_a1(&start).ok_or_else(|| format!("bad cell ref: {start}"))?;
+        let start = self.area_end("!")?;
         let qualifier = UnresolvedSheetRef {
             name: sheet_name.clone(),
             quoted,
@@ -1483,14 +1601,17 @@ impl<'a> Parser<'a> {
 
         if let Some(Tok::Colon) = self.peek() {
             let _ = self.next();
-            let (end_sheet, r1, c1, end_flags) = self.sheet_range_end(&sheet_name)?;
+            let (end_sheet, end) = self.sheet_range_end(&sheet_name)?;
             if sheet_name_key(&end_sheet) != sheet_name_key(&sheet_name) {
                 return Err("cross-sheet ranges must stay on one sheet".into());
             }
-            let (r0, c0, r1, c1, range_flags) = normalize_range(row, col, flags, r1, c1, end_flags);
+            let (r0, c0, r1, c1, range_flags) = area(start, end).ok_or(MIXED_AREA)?;
             return Ok(Ast::SheetRange(qualifier, r0, c0, r1, c1, range_flags));
         }
 
+        let AreaEnd::Cell(row, col, flags) = start else {
+            return Err(LONE_AXIS.into());
+        };
         Ok(self.spill_suffix(Ast::SheetCell(qualifier, row, col, flags)))
     }
 
@@ -1498,25 +1619,15 @@ impl<'a> Parser<'a> {
     /// to sheet `last`.
     #[cold]
     fn sheet_span_at(&mut self, first: String, last: String, quoted: bool) -> Result<Ast, String> {
-        let Some(Tok::Ident(start, _)) = self.next() else {
-            return Err("expected cell after !".into());
-        };
-        let (row, col, flags) = parse_a1(&start).ok_or_else(|| format!("bad cell ref: {start}"))?;
-
+        let start = self.area_end("!")?;
         let (cell, (row_start, col_start, row_end, col_end, range_flags)) =
             if self.peek() == Some(&Tok::Colon) {
                 let _ = self.next();
-                let Some(Tok::Ident(end, _)) = self.next() else {
-                    return Err("expected cell after :".into());
-                };
-                let (end_row, end_col, end_flags) =
-                    parse_a1(&end).ok_or_else(|| format!("bad cell ref: {end}"))?;
-                (
-                    false,
-                    normalize_range(row, col, flags, end_row, end_col, end_flags),
-                )
-            } else {
+                (false, self.area_after_colon(start)?)
+            } else if let AreaEnd::Cell(row, col, flags) = start {
                 (true, normalize_range(row, col, flags, row, col, flags))
+            } else {
+                return Err(LONE_AXIS.into());
             };
 
         let endpoint = |name: String| SheetRef {
@@ -1548,26 +1659,48 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn sheet_range_end(
-        &mut self,
-        sheet_name: &str,
-    ) -> Result<(String, u32, u32, RefFlags), String> {
-        let Some(Tok::Ident(first, _)) = self.next() else {
-            return Err("expected cell after :".into());
-        };
-
-        if let Some(Tok::Bang) = self.peek() {
-            let _ = self.next();
-            let Some(Tok::Ident(end, _)) = self.next() else {
-                return Err("expected cell after !".into());
-            };
-            let (row, col, flags) = parse_a1(&end).ok_or_else(|| format!("bad cell ref: {end}"))?;
-            return Ok((first.into_owned(), row, col, flags));
+    /// The end of `Sheet1!A1:B2` or of `Sheet1!A1:Sheet1!B2`, with the sheet
+    /// the end names.
+    fn sheet_range_end(&mut self, sheet_name: &str) -> Result<(String, AreaEnd), String> {
+        let first = self.next();
+        if let Some(Tok::Ident(end_sheet, _)) = &first {
+            if self.peek() == Some(&Tok::Bang) {
+                let end_sheet = end_sheet.to_string();
+                let _ = self.next();
+                return Ok((end_sheet, self.area_end("!")?));
+            }
         }
 
-        let (row, col, flags) = parse_a1(&first).ok_or_else(|| format!("bad cell ref: {first}"))?;
-        Ok((sheet_name.to_string(), row, col, flags))
+        let end = first
+            .as_ref()
+            .and_then(AreaEnd::of)
+            .ok_or_else(|| missing_area_end(":"))?;
+        Ok((sheet_name.to_string(), end))
     }
+
+    /// The cell, column or row in the next token.
+    fn area_end(&mut self, after: &str) -> Result<AreaEnd, String> {
+        self.next()
+            .as_ref()
+            .and_then(AreaEnd::of)
+            .ok_or_else(|| missing_area_end(after))
+    }
+
+    /// The range from `start` to the end after the `:` just read.
+    fn area_after_colon(
+        &mut self,
+        start: AreaEnd,
+    ) -> Result<(u32, u32, u32, u32, RangeFlags), String> {
+        let end = self.area_end(":")?;
+        area(start, end).ok_or_else(|| MIXED_AREA.into())
+    }
+}
+
+const MIXED_AREA: &str = "a range joins two cells, two columns or two rows";
+const LONE_AXIS: &str = "a column or row needs a range such as A:A or 1:1";
+
+fn missing_area_end(after: &str) -> String {
+    format!("expected a cell, column or row after {after}")
 }
 
 pub(crate) fn sheet_name_key(name: &str) -> String {
@@ -2022,12 +2155,16 @@ pub fn translate_relative_refs(ast: &mut Ast, row_delta: i64, col_delta: i64) {
     }
 }
 
-fn translated_coordinate(value: u32, delta: i64, absolute: bool) -> Option<u32> {
+/// A coordinate moved by `delta` unless it is absolute; `None` once it leaves
+/// the sheet.
+fn translated_coordinate(value: u32, delta: i64, absolute: bool, axis: Axis) -> Option<u32> {
     if absolute {
         return Some(value);
     }
     let translated = i64::from(value).checked_add(delta)?;
-    u32::try_from(translated).ok()
+    u32::try_from(translated)
+        .ok()
+        .filter(|&index| index < axis.len())
 }
 
 fn translate_relative_refs_inner(ast: &mut Ast, row_delta: i64, col_delta: i64) -> bool {
@@ -2036,8 +2173,8 @@ fn translate_relative_refs_inner(ast: &mut Ast, row_delta: i64, col_delta: i64) 
         | Ast::SheetCell(_, row, col, flags)
         | Ast::AbsCell(_, row, col, flags) => {
             let (Some(next_row), Some(next_col)) = (
-                translated_coordinate(*row, row_delta, flags.row_abs),
-                translated_coordinate(*col, col_delta, flags.col_abs),
+                translated_coordinate(*row, row_delta, flags.row_abs, Axis::Row),
+                translated_coordinate(*col, col_delta, flags.col_abs, Axis::Col),
             ) else {
                 return false;
             };
@@ -2049,10 +2186,10 @@ fn translate_relative_refs_inner(ast: &mut Ast, row_delta: i64, col_delta: i64) 
         | Ast::SheetRange(_, r0, c0, r1, c1, flags)
         | Ast::AbsRange(_, r0, c0, r1, c1, flags) => {
             let (Some(next_r0), Some(next_c0), Some(next_r1), Some(next_c1)) = (
-                translated_coordinate(*r0, row_delta, flags.start.row_abs),
-                translated_coordinate(*c0, col_delta, flags.start.col_abs),
-                translated_coordinate(*r1, row_delta, flags.end.row_abs),
-                translated_coordinate(*c1, col_delta, flags.end.col_abs),
+                translated_coordinate(*r0, row_delta, flags.start.row_abs, Axis::Row),
+                translated_coordinate(*c0, col_delta, flags.start.col_abs, Axis::Col),
+                translated_coordinate(*r1, row_delta, flags.end.row_abs, Axis::Row),
+                translated_coordinate(*c1, col_delta, flags.end.col_abs, Axis::Col),
             ) else {
                 return false;
             };
@@ -2064,10 +2201,20 @@ fn translate_relative_refs_inner(ast: &mut Ast, row_delta: i64, col_delta: i64) 
         }
         Ast::SheetSpan(span) => {
             let (Some(row_start), Some(col_start), Some(row_end), Some(col_end)) = (
-                translated_coordinate(span.row_start, row_delta, span.flags.start.row_abs),
-                translated_coordinate(span.col_start, col_delta, span.flags.start.col_abs),
-                translated_coordinate(span.row_end, row_delta, span.flags.end.row_abs),
-                translated_coordinate(span.col_end, col_delta, span.flags.end.col_abs),
+                translated_coordinate(
+                    span.row_start,
+                    row_delta,
+                    span.flags.start.row_abs,
+                    Axis::Row,
+                ),
+                translated_coordinate(
+                    span.col_start,
+                    col_delta,
+                    span.flags.start.col_abs,
+                    Axis::Col,
+                ),
+                translated_coordinate(span.row_end, row_delta, span.flags.end.row_abs, Axis::Row),
+                translated_coordinate(span.col_end, col_delta, span.flags.end.col_abs, Axis::Col),
             ) else {
                 return false;
             };
@@ -2124,104 +2271,155 @@ enum Axis {
     Col,
 }
 
-/// Rewrite row references affected by an edit on `edited_sheet`.
-pub fn shift_rows(ast: &mut Ast, at: u32, delta: i64, formula_sheet: u32, edited_sheet: u32) {
-    rewrite_axis(ast, Axis::Row, at, delta, formula_sheet, edited_sheet);
+impl Axis {
+    /// The rows or columns of a sheet.
+    fn len(self) -> u32 {
+        match self {
+            Self::Row => SHEET_ROWS,
+            Self::Col => SHEET_COLS,
+        }
+    }
+
+    fn pick<'a>(self, row: &'a mut u32, col: &'a mut u32) -> &'a mut u32 {
+        match self {
+            Self::Row => row,
+            Self::Col => col,
+        }
+    }
 }
 
-/// Rewrite column references affected by an edit on `edited_sheet`.
-pub fn shift_cols(ast: &mut Ast, at: u32, delta: i64, formula_sheet: u32, edited_sheet: u32) {
-    rewrite_axis(ast, Axis::Col, at, delta, formula_sheet, edited_sheet);
+/// What a row or column edit did to one reference.
+#[derive(PartialEq)]
+enum Moved {
+    Unchanged,
+    Changed,
+    Deleted,
 }
 
-fn rewrite_axis(
-    ast: &mut Ast,
+/// `delta` rows or columns inserted (positive) or deleted (negative) at `at`
+/// on `edited_sheet`, applied to a formula on `formula_sheet`.
+#[derive(Clone, Copy)]
+struct AxisEdit {
     axis: Axis,
     at: u32,
     delta: i64,
     formula_sheet: u32,
     edited_sheet: u32,
-) {
-    match ast {
-        Ast::Cell(row, col, _) if formula_sheet == edited_sheet => {
-            let coord = match axis {
-                Axis::Row => row,
-                Axis::Col => col,
-            };
-            if let Some(shifted) = shift_index(*coord, at, delta) {
+}
+
+impl AxisEdit {
+    /// A cell pushed past the last row or column is deleted, as in Excel.
+    fn move_index(self, coord: &mut u32) -> Moved {
+        match shift_index(*coord, self.at, self.delta).filter(|&index| index < self.axis.len()) {
+            Some(shifted) if shifted == *coord => Moved::Unchanged,
+            Some(shifted) => {
                 *coord = shifted;
-            } else {
-                *ast = Ast::InvalidRef;
+                Moved::Changed
             }
+            None => Moved::Deleted,
         }
-        Ast::AbsCell(sheet, row, col, _) if sheet.handle == edited_sheet => {
-            let coord = match axis {
-                Axis::Row => row,
-                Axis::Col => col,
-            };
-            if let Some(shifted) = shift_index(*coord, at, delta) {
-                *coord = shifted;
-            } else {
-                *ast = Ast::InvalidRef;
-            }
+    }
+
+    /// A whole column or row keeps spanning its axis. Another range whose
+    /// end is pushed past the sheet edge stops at the last row or column.
+    fn move_span(self, start: &mut u32, end: &mut u32) -> Moved {
+        let last = self.axis.len() - 1;
+        if *start == 0 && *end == last {
+            return Moved::Unchanged;
         }
-        Ast::Range(r0, c0, r1, c1, _) if formula_sheet == edited_sheet => {
-            let (start, end) = match axis {
-                Axis::Row => (r0, r1),
-                Axis::Col => (c0, c1),
-            };
-            if let Some((shifted_start, shifted_end)) = shift_range(*start, *end, at, delta) {
+
+        match shift_range(*start, *end, self.at, self.delta) {
+            Some((shifted_start, shifted_end)) if shifted_start <= last => {
+                let shifted_end = shifted_end.min(last);
+                if (shifted_start, shifted_end) == (*start, *end) {
+                    return Moved::Unchanged;
+                }
                 *start = shifted_start;
                 *end = shifted_end;
-            } else {
-                *ast = Ast::InvalidRef;
+                Moved::Changed
             }
+            _ => Moved::Deleted,
         }
-        Ast::AbsRange(sheet, r0, c0, r1, c1, _) if sheet.handle == edited_sheet => {
-            let (start, end) = match axis {
-                Axis::Row => (r0, r1),
-                Axis::Col => (c0, c1),
-            };
-            if let Some((shifted_start, shifted_end)) = shift_range(*start, *end, at, delta) {
-                *start = shifted_start;
-                *end = shifted_end;
-            } else {
-                *ast = Ast::InvalidRef;
-            }
+    }
+}
+
+/// Rewrite row references affected by an edit on `edited_sheet`. Returns
+/// whether any reference changed.
+pub fn shift_rows(
+    ast: &mut Ast,
+    at: u32,
+    delta: i64,
+    formula_sheet: u32,
+    edited_sheet: u32,
+) -> bool {
+    rewrite_axis(
+        ast,
+        AxisEdit {
+            axis: Axis::Row,
+            at,
+            delta,
+            formula_sheet,
+            edited_sheet,
+        },
+    )
+}
+
+/// Rewrite column references affected by an edit on `edited_sheet`. Returns
+/// whether any reference changed.
+pub fn shift_cols(
+    ast: &mut Ast,
+    at: u32,
+    delta: i64,
+    formula_sheet: u32,
+    edited_sheet: u32,
+) -> bool {
+    rewrite_axis(
+        ast,
+        AxisEdit {
+            axis: Axis::Col,
+            at,
+            delta,
+            formula_sheet,
+            edited_sheet,
+        },
+    )
+}
+
+fn rewrite_axis(ast: &mut Ast, edit: AxisEdit) -> bool {
+    let on_edited_sheet = edit.formula_sheet == edit.edited_sheet;
+    let moved = match ast {
+        Ast::Cell(row, col, _) if on_edited_sheet => edit.move_index(edit.axis.pick(row, col)),
+        Ast::AbsCell(sheet, row, col, _) if sheet.handle == edit.edited_sheet => {
+            edit.move_index(edit.axis.pick(row, col))
         }
-        Ast::Structured(reference) if reference.sheet == edited_sheet => match axis {
-            Axis::Row => {
-                if let Some((start, end)) =
-                    shift_range(reference.row_start, reference.row_end, at, delta)
-                {
-                    reference.row_start = start;
-                    reference.row_end = end;
-                } else {
-                    *ast = Ast::InvalidRef;
-                }
-            }
-            Axis::Col => {
-                if let Some(col) = shift_index(reference.col, at, delta) {
-                    reference.col = col;
-                } else {
-                    *ast = Ast::InvalidRef;
-                }
-            }
+        Ast::Range(r0, c0, r1, c1, _) if on_edited_sheet => {
+            edit.move_span(edit.axis.pick(r0, c0), edit.axis.pick(r1, c1))
+        }
+        Ast::AbsRange(sheet, r0, c0, r1, c1, _) if sheet.handle == edit.edited_sheet => {
+            edit.move_span(edit.axis.pick(r0, c0), edit.axis.pick(r1, c1))
+        }
+        Ast::Structured(reference) if reference.sheet == edit.edited_sheet => match edit.axis {
+            Axis::Row => edit.move_span(&mut reference.row_start, &mut reference.row_end),
+            Axis::Col => edit.move_index(&mut reference.col),
         },
         Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
-            for arg in args {
-                rewrite_axis(arg, axis, at, delta, formula_sheet, edited_sheet);
-            }
+            return args
+                .iter_mut()
+                .fold(false, |changed, arg| rewrite_axis(arg, edit) | changed);
         }
         Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-            rewrite_axis(left, axis, at, delta, formula_sheet, edited_sheet);
-            rewrite_axis(right, axis, at, delta, formula_sheet, edited_sheet);
+            return rewrite_axis(left, edit) | rewrite_axis(right, edit);
         }
         Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
-            rewrite_axis(inner, axis, at, delta, formula_sheet, edited_sheet);
+            return rewrite_axis(inner, edit);
         }
-        _ => {}
+        _ => Moved::Unchanged,
+    };
+
+    if moved == Moved::Deleted {
+        *ast = Ast::InvalidRef;
     }
+    moved != Moved::Unchanged
 }
 
 /// Shift one coordinate. Deleting its target produces an explicit invalid ref.
@@ -2461,24 +2659,16 @@ fn write_ast(ast: &Ast, out: &mut String) {
             out.push('!');
             write_a1(*row, *col, *flags, out);
         }
-        Ast::Range(r0, c0, r1, c1, flags) => {
-            write_a1(*r0, *c0, flags.start, out);
-            out.push(':');
-            write_a1(*r1, *c1, flags.end, out);
-        }
+        Ast::Range(r0, c0, r1, c1, flags) => write_area(*r0, *c0, *r1, *c1, flags, out),
         Ast::SheetRange(sheet, r0, c0, r1, c1, flags) => {
             write_sheet_name(&sheet.name, sheet.quoted, out);
             out.push('!');
-            write_a1(*r0, *c0, flags.start, out);
-            out.push(':');
-            write_a1(*r1, *c1, flags.end, out);
+            write_area(*r0, *c0, *r1, *c1, flags, out);
         }
         Ast::AbsRange(sheet, r0, c0, r1, c1, flags) => {
             write_sheet_name(&sheet.name, sheet.quoted, out);
             out.push('!');
-            write_a1(*r0, *c0, flags.start, out);
-            out.push(':');
-            write_a1(*r1, *c1, flags.end, out);
+            write_area(*r0, *c0, *r1, *c1, flags, out);
         }
         Ast::SheetSpan(span) => {
             // Excel quotes the whole span once: `'Sheet 1:Sheet 3'!A1`.
@@ -2494,10 +2684,17 @@ fn write_ast(ast: &Ast, out: &mut String) {
                 out.push_str(&span.last.name);
             }
             out.push('!');
-            write_a1(span.row_start, span.col_start, span.flags.start, out);
-            if !span.cell {
-                out.push(':');
-                write_a1(span.row_end, span.col_end, span.flags.end, out);
+            if span.cell {
+                write_a1(span.row_start, span.col_start, span.flags.start, out);
+            } else {
+                write_area(
+                    span.row_start,
+                    span.col_start,
+                    span.row_end,
+                    span.col_end,
+                    &span.flags,
+                    out,
+                );
             }
         }
         Ast::Missing => {}
@@ -2654,6 +2851,35 @@ fn write_sheet_name(name: &str, quoted: bool, out: &mut String) {
         out.push('\'');
     } else {
         out.push_str(name);
+    }
+}
+
+/// Writes a range, in the short form when it covers whole rows (`2:3`) or
+/// whole columns (`B:C`). A range over every cell is written as rows, as
+/// Excel writes `1:1048576`.
+fn write_area(r0: u32, c0: u32, r1: u32, c1: u32, flags: &RangeFlags, out: &mut String) {
+    if spans_all_cols(c0, c1) {
+        write_absolute_marker(flags.start.row_abs, out);
+        out.push_str(&(u64::from(r0) + 1).to_string());
+        out.push(':');
+        write_absolute_marker(flags.end.row_abs, out);
+        out.push_str(&(u64::from(r1) + 1).to_string());
+    } else if spans_all_rows(r0, r1) {
+        write_absolute_marker(flags.start.col_abs, out);
+        write_col(c0, out);
+        out.push(':');
+        write_absolute_marker(flags.end.col_abs, out);
+        write_col(c1, out);
+    } else {
+        write_a1(r0, c0, flags.start, out);
+        out.push(':');
+        write_a1(r1, c1, flags.end, out);
+    }
+}
+
+fn write_absolute_marker(absolute: bool, out: &mut String) {
+    if absolute {
+        out.push('$');
     }
 }
 

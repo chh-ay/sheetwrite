@@ -8,7 +8,7 @@ description: "functionNames function in @sheetwrite/formulas: Names accepted by 
 Names accepted by the full engine, including aliases.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/formulas/pkg/sheetwrite_wasm.d.ts#L538"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L538</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/formulas/pkg/sheetwrite_wasm.d.ts#L542"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L542</code></a></dd></div>
 </dl>
 
 ## Declaration

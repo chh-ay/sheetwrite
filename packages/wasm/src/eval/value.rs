@@ -10,6 +10,7 @@ use crate::types::{
 };
 
 use super::date::format_date_serial;
+use super::number_format::{format_number, general_text};
 
 pub(super) fn cached_formula_value(
     sheet: &SheetData,
@@ -83,7 +84,7 @@ pub(super) fn bool_from_value(value: &Value) -> Result<bool, FormulaError> {
 
 pub(super) fn text_from_value(value: &Value) -> Result<String, FormulaError> {
     match value {
-        Value::Number(value) if value.is_finite() => Ok(value.to_string()),
+        Value::Number(value) if value.is_finite() => Ok(general_text(*value)),
         Value::Number(_) => Err(FormulaError::Num),
         Value::Text(text) => Ok(text.to_string()),
         Value::Bool(value) => Ok(bool_text(*value).to_string()),
@@ -167,6 +168,8 @@ pub(super) fn aggregate_number(
     }
 }
 
+/// TEXT: a date or time format, or an Excel number format code. A code this
+/// formatter cannot read gives the General text of the number.
 pub(super) fn format_basic_text(value: &Value, format: &str) -> Result<String, FormulaError> {
     let Value::Number(number) = value else {
         return text_from_value(value);
@@ -176,24 +179,9 @@ pub(super) fn format_basic_text(value: &Value, format: &str) -> Result<String, F
         return Err(FormulaError::Num);
     }
 
-    if let Some(formatted) = format_date_serial(*number, format) {
-        return Ok(formatted);
-    }
-
-    if let Some(dot) = format.find('.') {
-        let digits = format[dot + 1..]
-            .chars()
-            .take_while(|ch| matches!(ch, '0' | '#'))
-            .count();
-
-        return Ok(format!("{number:.digits$}"));
-    }
-
-    if format.contains('0') {
-        Ok(format!("{number:.0}"))
-    } else {
-        Ok(number.to_string())
-    }
+    Ok(format_date_serial(*number, format)
+        .or_else(|| format_number(*number, format))
+        .unwrap_or_else(|| general_text(*number)))
 }
 
 #[cfg(test)]
