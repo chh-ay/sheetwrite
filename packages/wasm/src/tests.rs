@@ -124,13 +124,12 @@ fn sheet_noops_dense_limits_and_paged_load_state_preserve_invariants() {
     assert!(bounded_store.sheets.is_empty());
     let mut dense = SheetData::new(2, 2);
     put_number(&mut dense, 1, 1, 9.0);
-    dense.cells.resize_rows(2);
-    dense.insert_rows(0, 1, 0);
-    dense.delete_rows(0, 2, 1);
-    dense.delete_rows(0, 0, 0);
-    dense.insert_cols(0, 1, 0);
-    dense.delete_cols(0, 2, 1);
-    dense.delete_cols(0, 0, 0);
+    assert!(dense.insert_rows(0, 1, 0).is_ok());
+    assert!(dense.delete_rows(0, 2, 1).is_ok());
+    assert!(dense.delete_rows(0, 0, 0).is_ok());
+    assert!(dense.insert_cols(0, 1, 0).is_ok());
+    assert!(dense.delete_cols(0, 2, 1).is_ok());
+    assert!(dense.delete_cols(0, 0, 0).is_ok());
     assert_close(dense.cells.num_at(dense.cells.idx(1, 1)), 9.0);
 
     dense.formulas.clear_dirty();
@@ -140,7 +139,7 @@ fn sheet_noops_dense_limits_and_paged_load_state_preserve_invariants() {
     dense.formulas.clear_dirty();
     assert!(!dense.formulas.has_dirty());
 
-    let mut paged = SheetData::new_paged(2, 2, 1, 0, DEFAULT_MAX_PAGED_DIRTY_CELLS);
+    let mut paged = SheetData::new_paged(2, 2, 1, 0, DEFAULT_MAX_PAGED_DIRTY_CELLS).unwrap();
     assert!(!paged.cells.is_fully_loaded());
     assert!(!paged.cells.range_fully_loaded(0, 0, 1, 1));
     for col in 0..2 {
@@ -429,7 +428,7 @@ fn builtin_argument_errors_and_numeric_boundaries_propagate_without_panics() {
         ("=FLOOR(1,0)", "#DIV/0!"),
         ("=CEILING(\"x\",1)", "#VALUE!"),
         ("=CEILING(1,\"x\")", "#VALUE!"),
-        ("=CEILING(1,0)", "#DIV/0!"),
+        ("=FLOOR(1,0)", "#DIV/0!"),
         ("=TRUNC(\"x\",1)", "#VALUE!"),
         ("=TRUNC(1,\"x\")", "#VALUE!"),
         ("=TRUNC(1,400)", "#NUM!"),
@@ -625,12 +624,11 @@ fn criteria_and_lookup_validation_preserves_error_precedence_and_shapes() {
         ("=COUNTIFS(A1:A2,\">0\",B1:B3,\">0\")", "#VALUE!"),
         ("=SUMIF(A1:A2)", "#VALUE!"),
         ("=SUMIF(1,\">0\")", "#VALUE!"),
-        ("=SUMIF(A1:A2,\">0\",B1:B3)", "#VALUE!"),
         ("=SUMIFS(A1:A2)", "#VALUE!"),
         ("=SUMIFS(A1:A2,B1:B3,\">0\")", "#VALUE!"),
         ("=AVERAGEIF(A1:A2,\">9\")", "#DIV/0!"),
         ("=INDEX(A1:B2)", "#VALUE!"),
-        ("=INDEX(A1:B2,0,1)", "#VALUE!"),
+        ("=INDEX(A1:B2,-1,1)", "#VALUE!"),
         ("=INDEX(A1:B2,1)", "#VALUE!"),
         ("=INDEX(A1:B2,9,1)", "#REF!"),
         ("=MATCH(1,A1:B2,0)", "#N/A"),

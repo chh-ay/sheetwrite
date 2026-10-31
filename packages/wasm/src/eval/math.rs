@@ -4,6 +4,7 @@ use crate::calc::Func;
 use crate::types::{EvalResult, FormulaError, Value};
 
 use super::functions::{integer_arg, number_arg, require_arity, FuncAccumulator};
+use super::number_format::{self, round_decimal, Rounding};
 use super::value::aggregate_number;
 
 pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> {
@@ -16,9 +17,9 @@ pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> 
                 Ok(value.sqrt())
             }
         }),
-        Func::Round => round(values, RoundDirection::Nearest),
-        Func::RoundUp => round(values, RoundDirection::Away),
-        Func::RoundDown => round(values, RoundDirection::Toward),
+        Func::Round => round(values, Rounding::Nearest),
+        Func::RoundUp => round(values, Rounding::Away),
+        Func::RoundDown => round(values, Rounding::Toward),
         Func::Mod => binary(values, |number, divisor| {
             if divisor == 0.0 {
                 Err(FormulaError::DivZero)
@@ -33,8 +34,8 @@ pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> 
                 finite(base.powf(exponent))
             }
         }),
-        Func::Floor => significance(values, f64::floor),
-        Func::Ceiling => significance(values, f64::ceil),
+        Func::Floor => significance(values, f64::floor, Err(FormulaError::DivZero)),
+        Func::Ceiling => significance(values, f64::ceil, Ok(0.0)),
         Func::Int => unary(values, |value| Ok(value.floor())),
         Func::Trunc => trunc(values),
         Func::Sign => unary(values, |value| {
@@ -114,87 +115,58 @@ fn binary(
     values: &FuncAccumulator,
     operation: impl FnOnce(f64, f64) -> Result<f64, FormulaError>,
 ) -> Value {
-    if let Err(error) = require_arity(values, 2, 2) {
-        return Value::Error(error);
-    }
-    let left = match number_arg(values, 0, None) {
-        Ok(value) => value,
-        Err(error) => return Value::Error(error),
-    };
-    let right = match number_arg(values, 1, None) {
-        Ok(value) => value,
-        Err(error) => return Value::Error(error),
-    };
-    match operation(left, right) {
-        Ok(value) => Value::number(value),
-        Err(error) => Value::Error(error),
-    }
+    binary_numbers(values)
+        .and_then(|(left, right)| operation(left, right))
+        .map_or_else(Value::Error, Value::number)
 }
 
 fn finite(value: f64) -> Result<f64, FormulaError> {
     value.is_finite().then_some(value).ok_or(FormulaError::Num)
 }
 
-#[derive(Clone, Copy)]
-enum RoundDirection {
-    Nearest,
-    Away,
-    Toward,
-}
+/// The decimal places ROUND accepts; beyond them a double has no digits left.
+const ROUND_PLACES: std::ops::RangeInclusive<i64> = -308..=308;
 
-fn round(values: &FuncAccumulator, direction: RoundDirection) -> Value {
-    if let Err(error) = require_arity(values, 2, 2) {
-        return Value::Error(error);
-    }
-    let number = match number_arg(values, 0, None) {
-        Ok(value) => value,
-        Err(error) => return Value::Error(error),
-    };
-    let digits = match integer_arg(values, 1, None) {
-        Ok(value) if (-308..=308).contains(&value) => value as i32,
-        Ok(_) => return Value::Error(FormulaError::Num),
-        Err(error) => return Value::Error(error),
-    };
-    let factor = 10f64.powi(digits.abs());
-    if !factor.is_finite() || factor == 0.0 {
-        return Value::Error(FormulaError::Num);
-    }
-    let round_scaled = |scaled: f64| match direction {
-        RoundDirection::Nearest => scaled.round(),
-        RoundDirection::Away if scaled < 0.0 => scaled.floor(),
-        RoundDirection::Away => scaled.ceil(),
-        RoundDirection::Toward => scaled.trunc(),
-    };
-    let rounded = if digits >= 0 {
-        let scaled = number * factor;
-        if scaled.is_finite() {
-            round_scaled(scaled) / factor
-        } else {
-            // At this magnitude the requested decimal place is below f64 precision.
-            number
+/// ROUND, ROUNDUP and ROUNDDOWN round the decimal value Excel shows, so
+/// `ROUND(1.005,2)` is 1.01 although the double is just below 1.005.
+fn round(values: &FuncAccumulator, rounding: Rounding) -> Value {
+    let result = require_arity(values, 2, 2).and_then(|_| {
+        let number = number_arg(values, 0, None)?;
+        let places = integer_arg(values, 1, None)?;
+        if !ROUND_PLACES.contains(&places) {
+            return Err(FormulaError::Num);
         }
-    } else {
-        round_scaled(number / factor) * factor
-    };
-    Value::number(rounded)
+        finite(round_decimal(number, places as i32, rounding))
+    });
+    result.map_or_else(Value::Error, Value::number)
 }
 
-fn significance(values: &FuncAccumulator, operation: fn(f64) -> f64) -> Value {
-    if let Err(error) = require_arity(values, 1, 2) {
-        return Value::Error(error);
-    }
-    let number = match number_arg(values, 0, None) {
-        Ok(value) => value,
-        Err(error) => return Value::Error(error),
-    };
-    let significance = match number_arg(values, 1, Some(1.0)) {
-        Ok(value) => value,
-        Err(error) => return Value::Error(error),
-    };
-    if significance == 0.0 {
-        return Value::Error(FormulaError::DivZero);
-    }
-    Value::number(operation(number / significance) * significance)
+/// FLOOR and CEILING: a multiple of `significance`. A positive number with a
+/// negative significance is `#NUM!`; `zero_significance` is the result for a
+/// zero significance. The quotient is read at 15 significant digits, so
+/// `FLOOR(0.3,0.1)` sees exactly 3 multiples rather than 2.9999999999999996.
+fn significance(
+    values: &FuncAccumulator,
+    operation: fn(f64) -> f64,
+    zero_significance: Result<f64, FormulaError>,
+) -> Value {
+    let result = binary_numbers(values).and_then(|(number, significance)| {
+        if significance == 0.0 {
+            return zero_significance;
+        }
+        if number > 0.0 && significance < 0.0 {
+            return Err(FormulaError::Num);
+        }
+        let multiples = operation(number_format::significant(number / significance));
+        finite(number_format::significant(multiples * significance))
+    });
+    result.map_or_else(Value::Error, Value::number)
+}
+
+/// The two numeric arguments of a two-argument function.
+fn binary_numbers(values: &FuncAccumulator) -> Result<(f64, f64), FormulaError> {
+    require_arity(values, 2, 2)?;
+    Ok((number_arg(values, 0, None)?, number_arg(values, 1, None)?))
 }
 
 fn trunc(values: &FuncAccumulator) -> Value {

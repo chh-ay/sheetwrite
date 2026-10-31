@@ -50,6 +50,10 @@ mod types;
 mod window;
 
 #[cfg(all(test, feature = "formula-engine"))]
+mod formula_syntax_tests;
+#[cfg(all(test, feature = "formula-engine"))]
+mod structural_edit_tests;
+#[cfg(all(test, feature = "formula-engine"))]
 mod tests;
 
 #[cfg(feature = "formula-engine")]

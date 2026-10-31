@@ -110,7 +110,7 @@ impl CellStorage {
         }
 
         let paged = if input.bool()? {
-            let mut paged = PagedStorage::new(input.usize()?, input.usize()?, input.usize()?);
+            let mut paged = PagedStorage::new(input.usize()?, input.usize()?, input.usize()?)?;
 
             for _ in 0..input.count()? {
                 let key = (input.usize()?, input.usize()?);

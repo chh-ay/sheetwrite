@@ -1698,7 +1698,9 @@ export class StoreDataEngine {
     if (columns.length <= meta.columns.length) return;
 
     const additions = columns.slice(meta.columns.length);
-    this.wasm.insertCols(this.handleOf(sheet), meta.columns.length, additions.length);
+    if (!this.wasm.insertCols(this.handleOf(sheet), meta.columns.length, additions.length)) {
+      throw new RangeError("the engine cannot hold the added columns");
+    }
     meta.columns.push(...additions);
   }
 
@@ -2457,7 +2459,8 @@ export class StoreDataEngine {
         if (!integerAt(patch.at) || !positiveCount(patch.count) || patch.at > meta.rowCount) {
           return false;
         }
-        this.wasm.addRows(this.handleOf(patch.sheet), patch.at, patch.count);
+        // The engine refuses a grid it cannot hold; the patch then changes nothing.
+        if (!this.wasm.addRows(this.handleOf(patch.sheet), patch.at, patch.count)) return false;
         meta.rowCount += patch.count;
         this.rebaseSheetRows(patch.sheet, (row) => (row >= patch.at ? row + patch.count : row));
         this.rebaseCharts({
@@ -2478,7 +2481,7 @@ export class StoreDataEngine {
         ) {
           return false;
         }
-        this.wasm.removeRows(this.handleOf(patch.sheet), patch.at, patch.count);
+        if (!this.wasm.removeRows(this.handleOf(patch.sheet), patch.at, patch.count)) return false;
         meta.rowCount -= patch.count;
         this.rebaseSheetRows(patch.sheet, (row) =>
           row < patch.at ? row : row < patch.at + patch.count ? null : row - patch.count,
@@ -2505,7 +2508,9 @@ export class StoreDataEngine {
         ) {
           return false;
         }
-        this.wasm.insertCols(this.handleOf(patch.sheet), patch.at, patch.columns.length);
+        if (!this.wasm.insertCols(this.handleOf(patch.sheet), patch.at, patch.columns.length)) {
+          return false;
+        }
         meta.columns.splice(patch.at, 0, ...patch.columns);
         this.rebaseSheetCols(
           patch.sheet,
@@ -2531,7 +2536,7 @@ export class StoreDataEngine {
         ) {
           return false;
         }
-        this.wasm.removeCols(this.handleOf(patch.sheet), patch.at, patch.count);
+        if (!this.wasm.removeCols(this.handleOf(patch.sheet), patch.at, patch.count)) return false;
         meta.columns.splice(patch.at, patch.count);
         this.rebaseSheetCols(
           patch.sheet,

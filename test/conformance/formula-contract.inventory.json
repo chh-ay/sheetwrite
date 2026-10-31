@@ -5047,48 +5047,6 @@
         "A not-equal criterion does not match a value of a different type. With 5, \"x\" and a blank cell, \"<>\" selects only the text cell; Excel selects both nonblank cells, as in =COUNTIF(A1:A3,\"<>\") (#246)."
       ]
     },
-    "excel-criteria-range": {
-      "excel": "divergent",
-      "googleSheets": "unverified",
-      "openFormula": "unverified",
-      "divergences": [
-        "A not-equal criterion does not match a value of a different type. With 5, \"x\" and a blank cell, \"<>\" selects only the text cell; Excel selects both nonblank cells (#246).",
-        "The value range must have the same shape as the criteria range. =SUMIF(A1:A10,\">0\",B1) returns #VALUE!; Excel uses B1 as the top-left cell of a ten-row value range (#246)."
-      ]
-    },
-    "excel-date-serial": {
-      "excel": "divergent",
-      "googleSheets": "unverified",
-      "openFormula": "unverified",
-      "divergences": [
-        "Serial 0 and blank cells read as 1899-12-31. Excel returns year 1900, month 1 and day 0 (#246).",
-        "Negative serials are accepted. Excel returns #NUM! (#246)."
-      ]
-    },
-    "excel-date-negative": {
-      "excel": "divergent",
-      "googleSheets": "unverified",
-      "openFormula": "unverified",
-      "divergences": [
-        "DATE can return a negative serial, as in =DATE(1900,1,-1). Excel returns #NUM! (#246)."
-      ]
-    },
-    "excel-decimal-rounding": {
-      "excel": "divergent",
-      "googleSheets": "unverified",
-      "openFormula": "unverified",
-      "divergences": [
-        "Decimal rounding exposes binary scaling error. =ROUND(1.005,2) returns 1; Excel returns 1.01 (#246)."
-      ]
-    },
-    "excel-significance-rounding": {
-      "excel": "divergent",
-      "googleSheets": "unverified",
-      "openFormula": "unverified",
-      "divergences": [
-        "The quotient is not corrected for binary error, and significance signs are not checked. =FLOOR(0.3,0.1) can return 0.2, and =FLOOR(2.5,-2) returns 4 instead of #NUM! (#246)."
-      ]
-    },
     "excel-subtotal-visible": {
       "excel": "divergent",
       "googleSheets": "unverified",
@@ -5097,64 +5055,13 @@
         "Only function codes 1 to 11 are accepted. Codes 101 to 111, which ignore hidden rows in Excel, return #VALUE! (#246)."
       ]
     },
-    "excel-text-format": {
-      "excel": "divergent",
-      "googleSheets": "unverified",
-      "openFormula": "unverified",
-      "divergences": [
-        "Numeric format codes are reduced to a decimal count. =TEXT(0.5,\"0%\") returns 0, grouping in \"#,##0.00\" is omitted, and =TEXT(2.5,\"0\") rounds half to even (#246)."
-      ]
-    },
-    "excel-fractional-index": {
-      "excel": "divergent",
-      "googleSheets": "unverified",
-      "openFormula": "unverified",
-      "divergences": [
-        "Fractional index arguments return #VALUE!. Excel truncates them, as in =CHOOSE(1.5,\"a\",\"b\") (#246)."
-      ]
-    },
-    "excel-index-arguments": {
-      "excel": "divergent",
-      "googleSheets": "unverified",
-      "openFormula": "unverified",
-      "divergences": [
-        "Fractional row and column numbers return #VALUE!. Excel truncates them, as in =INDEX(A1:A5,2.9) (#246).",
-        "Row or column number 0 returns #VALUE!. Excel returns the whole column or row, as in =SUM(INDEX(A1:B5,0,1)) (#246)."
-      ]
-    },
-    "excel-address-arguments": {
-      "excel": "divergent",
-      "googleSheets": "unverified",
-      "openFormula": "unverified",
-      "divergences": [
-        "Fractional row and column numbers return #VALUE!. Excel truncates them, as in =ADDRESS(2.5,1) (#246).",
-        "Some argument errors become #VALUE!. Excel keeps the original error, as in =ADDRESS(1,1,NA()) (#246)."
-      ]
-    },
-    "excel-replace-start": {
-      "excel": "divergent",
-      "googleSheets": "unverified",
-      "openFormula": "unverified",
-      "divergences": [
-        "A start position after the end of the text returns #VALUE!. Excel appends the new text, as in =REPLACE(\"abc\",5,1,\"X\") (#246)."
-      ]
-    },
-    "excel-trim-spaces": {
-      "excel": "divergent",
-      "googleSheets": "unverified",
-      "openFormula": "unverified",
-      "divergences": [
-        "All Unicode whitespace is collapsed. Excel removes only ordinary spaces, so a line feed in =TRIM(\"a\"&CHAR(10)&\"b\") stays a line feed in Excel (#246)."
-      ]
-    },
     "analysis-lambda-call": {
       "excel": "divergent",
       "googleSheets": "unverified",
       "openFormula": "unverified",
       "divergences": [
         "Available only in @sheetwrite/formulas. Named ranges are supported, but workbook-defined named formulas are not available.",
-        "LAMBDA uses lexical parameters and LET bindings. Calls are limited to depth 64 and 2000000 work units. Helpers reject nested arrays.",
-        "An error argument stops the call before the body runs. =LAMBDA(x,IFERROR(x,0))(1/0) returns #DIV/0!; Excel returns 0 (#246)."
+        "LAMBDA uses lexical parameters and LET bindings. Calls are limited to depth 64 and 2000000 work units. Helpers reject nested arrays."
       ]
     }
   },
@@ -5623,7 +5530,7 @@
       "contractStatus": "supported",
       "signature": "text-fixed",
       "semantics": "text",
-      "dialects": "excel-decimal-rounding",
+      "dialects": "excel-documented",
       "implementation": "text-analysis",
       "builds": ["@sheetwrite/formulas"],
       "version": 1
@@ -5803,7 +5710,7 @@
       "contractStatus": "supported",
       "signature": "round",
       "semantics": "scalar",
-      "dialects": "excel-decimal-rounding",
+      "dialects": "excel-documented",
       "implementation": "implemented-assisted",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
@@ -5887,7 +5794,7 @@
       "contractStatus": "supported",
       "signature": "binary-number",
       "semantics": "scalar",
-      "dialects": "excel-significance-rounding",
+      "dialects": "excel-documented",
       "implementation": "implemented-assisted",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
@@ -5899,7 +5806,7 @@
       "contractStatus": "supported",
       "signature": "binary-number",
       "semantics": "scalar",
-      "dialects": "excel-significance-rounding",
+      "dialects": "excel-documented",
       "implementation": "implemented-assisted",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
@@ -6271,7 +6178,7 @@
       "contractStatus": "supported",
       "signature": "unary-value",
       "semantics": "text",
-      "dialects": "excel-trim-spaces",
+      "dialects": "excel-documented",
       "implementation": "implemented-assisted",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
@@ -6283,7 +6190,7 @@
       "contractStatus": "supported",
       "signature": "text-format",
       "semantics": "text",
-      "dialects": "excel-text-format",
+      "dialects": "excel-documented",
       "implementation": "implemented-assisted",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
@@ -6307,7 +6214,7 @@
       "contractStatus": "supported",
       "signature": "date-three",
       "semantics": "date-time",
-      "dialects": "excel-date-negative",
+      "dialects": "excel-documented",
       "implementation": "implemented-assisted",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
@@ -6331,7 +6238,7 @@
       "contractStatus": "supported",
       "signature": "unary-number",
       "semantics": "date-time",
-      "dialects": "excel-date-serial",
+      "dialects": "excel-documented",
       "implementation": "implemented-assisted",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
@@ -6343,7 +6250,7 @@
       "contractStatus": "supported",
       "signature": "unary-number",
       "semantics": "date-time",
-      "dialects": "excel-date-serial",
+      "dialects": "excel-documented",
       "implementation": "implemented-assisted",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
@@ -6355,7 +6262,7 @@
       "contractStatus": "supported",
       "signature": "unary-number",
       "semantics": "date-time",
-      "dialects": "excel-date-serial",
+      "dialects": "excel-documented",
       "implementation": "implemented-assisted",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
@@ -6439,7 +6346,7 @@
       "contractStatus": "supported",
       "signature": "sumif",
       "semantics": "criteria",
-      "dialects": "excel-criteria-range",
+      "dialects": "excel-documented",
       "implementation": "implemented-assisted",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
@@ -6463,7 +6370,7 @@
       "contractStatus": "supported",
       "signature": "sumif",
       "semantics": "criteria",
-      "dialects": "excel-criteria-range",
+      "dialects": "excel-documented",
       "implementation": "implemented-assisted",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
@@ -6487,7 +6394,7 @@
       "contractStatus": "supported",
       "signature": "index",
       "semantics": "lookup",
-      "dialects": "excel-index-arguments",
+      "dialects": "excel-documented",
       "implementation": "implemented-assisted",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
@@ -6823,7 +6730,7 @@
       "contractStatus": "required-supported",
       "signature": "replace",
       "semantics": "text-sensitive",
-      "dialects": "excel-replace-start",
+      "dialects": "excel-documented",
       "implementation": "implemented-assisted",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
@@ -7363,7 +7270,7 @@
       "contractStatus": "required-supported",
       "signature": "choose",
       "semantics": "lookup",
-      "dialects": "excel-fractional-index",
+      "dialects": "excel-documented",
       "implementation": "implemented-assisted",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
@@ -7423,7 +7330,7 @@
       "contractStatus": "required-supported",
       "signature": "address",
       "semantics": "lookup",
-      "dialects": "excel-address-arguments",
+      "dialects": "excel-documented",
       "implementation": "implemented-assisted",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1

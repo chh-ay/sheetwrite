@@ -176,10 +176,23 @@ struct PagedStorage {
     evictions: u64,
 }
 
+/// The largest chunk a paged sheet accepts: the rows of a whole sheet.
+pub(crate) const MAX_PAGE_CHUNK_ROWS: usize = crate::calc::SHEET_ROWS as usize;
+
 impl PagedStorage {
-    fn new(chunk_rows: usize, byte_budget: usize, max_dirty_cells: usize) -> Self {
-        Self {
-            chunk_rows: chunk_rows.max(1).next_power_of_two(),
+    /// A chunk holds a power of two of rows, so `chunk_rows` rounds up to
+    /// one. A size above [`MAX_PAGE_CHUNK_ROWS`] is rejected before rounding,
+    /// which could otherwise overflow to zero.
+    fn new(chunk_rows: usize, byte_budget: usize, max_dirty_cells: usize) -> Result<Self, String> {
+        let chunk_rows = Some(chunk_rows.max(1))
+            .filter(|&rows| rows <= MAX_PAGE_CHUNK_ROWS)
+            .map(usize::next_power_of_two)
+            .ok_or_else(|| {
+                format!("paged sheet chunk of {chunk_rows} rows exceeds {MAX_PAGE_CHUNK_ROWS} rows")
+            })?;
+
+        Ok(Self {
+            chunk_rows,
             byte_budget,
             max_dirty_cells,
             chunks: FxHashMap::default(),
@@ -193,7 +206,7 @@ impl PagedStorage {
             clock: Cell::new(0),
             eviction_candidate_checks: 0,
             evictions: 0,
-        }
+        })
     }
 
     fn key_offset(&self, row: usize, col: usize) -> ((usize, usize), usize) {
@@ -805,6 +818,42 @@ pub(crate) fn checked_dense_cell_count(n_cols: usize, row_count: usize) -> Optio
         .filter(|&cells| cells <= MAX_DENSE_CELLS)
 }
 
+/// Kinds, payloads and styles of a dense grid.
+type DenseBuffers = (Vec<u8>, Vec<u64>, Vec<u32>);
+
+/// Empty dense buffers for a grid, or an error when the grid is over
+/// [`MAX_DENSE_CELLS`] or memory runs out.
+fn try_dense_buffers(n_cols: usize, row_count: usize) -> Result<DenseBuffers, String> {
+    let len = checked_dense_cell_count(n_cols, row_count).ok_or_else(|| {
+        format!(
+            "dense sheet resource limit exceeded: {n_cols} columns by {row_count} rows exceeds {MAX_DENSE_CELLS} cells"
+        )
+    })?;
+    let mut kind = Vec::new();
+    kind.try_reserve_exact(len)
+        .map_err(|_| "dense sheet allocation failed for cell kinds".to_string())?;
+    kind.resize(len, KIND_EMPTY);
+    let mut payload = Vec::new();
+    payload
+        .try_reserve_exact(len)
+        .map_err(|_| "dense sheet allocation failed for cell payloads".to_string())?;
+    payload.resize(len, 0);
+    let mut style = Vec::new();
+    style
+        .try_reserve_exact(len)
+        .map_err(|_| "dense sheet allocation failed for cell styles".to_string())?;
+    style.resize(len, 0);
+    Ok((kind, payload, style))
+}
+
+/// A run of `len` rows copied from `from` in the old grid to `to` in the new.
+#[derive(Clone, Copy)]
+struct RowRun {
+    from: usize,
+    to: usize,
+    len: usize,
+}
+
 /// One sheet's physical cells: column-major dense vectors or paged chunks with a
 /// revisioned dirty overlay, plus calculated slots keyed by the same indices.
 pub(crate) struct CellStorage {
@@ -873,25 +922,7 @@ impl CellStorage {
     }
 
     pub(crate) fn try_new(n_cols: usize, row_count: usize) -> Result<Self, String> {
-        let len = checked_dense_cell_count(n_cols, row_count).ok_or_else(|| {
-            format!(
-                "dense sheet resource limit exceeded: {n_cols} columns by {row_count} rows exceeds {MAX_DENSE_CELLS} cells"
-            )
-        })?;
-        let mut kind = Vec::new();
-        kind.try_reserve_exact(len)
-            .map_err(|_| "dense sheet allocation failed for cell kinds".to_string())?;
-        kind.resize(len, KIND_EMPTY);
-        let mut payload = Vec::new();
-        payload
-            .try_reserve_exact(len)
-            .map_err(|_| "dense sheet allocation failed for cell payloads".to_string())?;
-        payload.resize(len, 0);
-        let mut style = Vec::new();
-        style
-            .try_reserve_exact(len)
-            .map_err(|_| "dense sheet allocation failed for cell styles".to_string())?;
-        style.resize(len, 0);
+        let (kind, payload, style) = try_dense_buffers(n_cols, row_count)?;
 
         Ok(Self {
             n_cols,
@@ -911,17 +942,17 @@ impl CellStorage {
         chunk_rows: usize,
         byte_budget: usize,
         max_dirty_cells: usize,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, String> {
+        Ok(Self {
             n_cols,
             row_count,
             kind: Vec::new(),
             payload: Vec::new(),
             style: Vec::new(),
-            paged: Some(PagedStorage::new(chunk_rows, byte_budget, max_dirty_cells)),
+            paged: Some(PagedStorage::new(chunk_rows, byte_budget, max_dirty_cells)?),
             derived: DerivedOverlay::default(),
             dense_calculated_cells: 0,
-        }
+        })
     }
 
     pub(crate) fn is_paged(&self) -> bool {
@@ -1328,7 +1359,8 @@ impl CellStorage {
             current.chunk_rows,
             current.byte_budget,
             current.max_dirty_cells,
-        );
+        )
+        .expect("a live paged sheet already has a valid chunk size");
 
         for entry in entries {
             if let Some((new_row, new_col)) = remap(entry.row, entry.col) {
@@ -1361,104 +1393,122 @@ impl CellStorage {
         self.paged = Some(next);
     }
 
-    /// Rebuild the column-major buffers for a new row count, preserving the
-    /// overlap `[0, min(old, new))` of every column. Used by structural edits.
-    pub(crate) fn resize_rows(&mut self, new_row_count: usize) {
-        if new_row_count == self.row_count {
-            return;
+    /// Whether the grid can take `rows` rows of `cols` columns. A dense grid
+    /// must stay within [`MAX_DENSE_CELLS`]; a paged grid allocates per chunk
+    /// and has no such bound.
+    pub(crate) fn check_dimensions(&self, rows: usize, cols: usize) -> Result<(), String> {
+        if self.is_paged() || checked_dense_cell_count(cols, rows).is_some() {
+            Ok(())
+        } else {
+            Err(format!(
+                "dense sheet resource limit exceeded: {cols} columns by {rows} rows exceeds {MAX_DENSE_CELLS} cells"
+            ))
         }
+    }
 
+    /// Rebuilds the dense buffers with `new_rows` rows, copying each run of
+    /// old rows in every column. On error nothing changes.
+    fn rebuild_rows(&mut self, new_rows: usize, runs: &[RowRun]) -> Result<(), String> {
+        let (mut kind, mut payload, mut style) = try_dense_buffers(self.n_cols, new_rows)?;
         self.invalidate_derived();
-
-        if self.is_paged() {
-            self.remap_paged(new_row_count, self.n_cols, |row, col| {
-                (row < new_row_count).then_some((row, col))
-            });
-
-            return;
-        }
-
-        let Some(new_len) = self.n_cols.checked_mul(new_row_count) else {
-            return;
-        };
-
-        let keep = self.row_count.min(new_row_count);
-        let mut kind = vec![KIND_EMPTY; new_len];
-        let mut payload = vec![0u64; new_len];
-        let mut style = vec![0u32; new_len];
 
         for col in 0..self.n_cols {
             let old_base = col * self.row_count;
-            let new_base = col * new_row_count;
-
-            kind[new_base..new_base + keep].copy_from_slice(&self.kind[old_base..old_base + keep]);
-            payload[new_base..new_base + keep]
-                .copy_from_slice(&self.payload[old_base..old_base + keep]);
-            style[new_base..new_base + keep]
-                .copy_from_slice(&self.style[old_base..old_base + keep]);
+            let new_base = col * new_rows;
+            for run in runs {
+                let old = old_base + run.from..old_base + run.from + run.len;
+                let new = new_base + run.to..new_base + run.to + run.len;
+                kind[new.clone()].copy_from_slice(&self.kind[old.clone()]);
+                payload[new.clone()].copy_from_slice(&self.payload[old.clone()]);
+                style[new].copy_from_slice(&self.style[old]);
+            }
         }
 
         self.kind = kind;
         self.payload = payload;
         self.style = style;
-        self.row_count = new_row_count;
+        self.row_count = new_rows;
+        Ok(())
     }
 
-    /// Shift rows `[at, row_count)` down by `count`, opening a blank gap.
-    pub(crate) fn insert_rows(&mut self, at: usize, count: usize) {
-        if count == 0 {
-            return;
+    /// Rebuilds the dense buffers with `new_cols` columns. `old_col` names the
+    /// old column each new column copies, or `None` for a blank column. On
+    /// error nothing changes.
+    fn rebuild_cols(
+        &mut self,
+        new_cols: usize,
+        old_col: impl Fn(usize) -> Option<usize>,
+    ) -> Result<(), String> {
+        let (mut kind, mut payload, mut style) = try_dense_buffers(new_cols, self.row_count)?;
+        self.invalidate_derived();
+
+        let rows = self.row_count;
+        for new_col in 0..new_cols {
+            let Some(old_col) = old_col(new_col) else {
+                continue;
+            };
+            let old = old_col * rows..(old_col + 1) * rows;
+            let new = new_col * rows..(new_col + 1) * rows;
+            kind[new.clone()].copy_from_slice(&self.kind[old.clone()]);
+            payload[new.clone()].copy_from_slice(&self.payload[old.clone()]);
+            style[new].copy_from_slice(&self.style[old]);
         }
 
-        self.invalidate_derived();
+        self.kind = kind;
+        self.payload = payload;
+        self.style = style;
+        self.n_cols = new_cols;
+        Ok(())
+    }
+
+    /// Shift rows `[at, row_count)` down by `count`, opening a blank gap. On
+    /// error nothing changes.
+    pub(crate) fn insert_rows(&mut self, at: usize, count: usize) -> Result<(), String> {
+        if count == 0 {
+            return Ok(());
+        }
 
         let at = at.min(self.row_count);
         let old = self.row_count;
-        let Some(new_count) = old.checked_add(count) else {
-            return;
-        };
-
+        let new_count = old
+            .checked_add(count)
+            .ok_or_else(|| format!("{old} rows plus {count} rows overflow the row count"))?;
         if self.is_paged() {
+            self.invalidate_derived();
             self.remap_paged(new_count, self.n_cols, |row, col| {
                 Some((if row >= at { row + count } else { row }, col))
             });
-
-            return;
+            return Ok(());
         }
 
-        self.resize_rows(new_count);
-        let rc = self.row_count;
-
-        for col in 0..self.n_cols {
-            let base = col * rc;
-
-            self.kind
-                .copy_within(base + at..base + old, base + at + count);
-            self.payload
-                .copy_within(base + at..base + old, base + at + count);
-            self.style
-                .copy_within(base + at..base + old, base + at + count);
-
-            for i in base + at..base + at + count {
-                self.kind[i] = KIND_EMPTY;
-                self.payload[i] = 0;
-                self.style[i] = 0;
-            }
-        }
+        self.rebuild_rows(
+            new_count,
+            &[
+                RowRun {
+                    from: 0,
+                    to: 0,
+                    len: at,
+                },
+                RowRun {
+                    from: at,
+                    to: at + count,
+                    len: old - at,
+                },
+            ],
+        )
     }
 
-    /// Delete `count` rows starting at `at`, closing the gap.
-    pub(crate) fn delete_rows(&mut self, at: usize, count: usize) {
+    /// Delete `count` rows starting at `at`, closing the gap. On error
+    /// nothing changes.
+    pub(crate) fn delete_rows(&mut self, at: usize, count: usize) -> Result<(), String> {
         if count == 0 || at >= self.row_count {
-            return;
+            return Ok(());
         }
-
-        self.invalidate_derived();
 
         let count = count.min(self.row_count - at);
         let old = self.row_count;
-
         if self.is_paged() {
+            self.invalidate_derived();
             self.remap_paged(old - count, self.n_cols, |row, col| {
                 if row >= at && row < at + count {
                     None
@@ -1466,87 +1516,66 @@ impl CellStorage {
                     Some((if row >= at + count { row - count } else { row }, col))
                 }
             });
-
-            return;
+            return Ok(());
         }
 
-        for col in 0..self.n_cols {
-            let base = col * old;
-
-            self.kind
-                .copy_within(base + at + count..base + old, base + at);
-            self.payload
-                .copy_within(base + at + count..base + old, base + at);
-            self.style
-                .copy_within(base + at + count..base + old, base + at);
-        }
-
-        self.resize_rows(old - count);
+        self.rebuild_rows(
+            old - count,
+            &[
+                RowRun {
+                    from: 0,
+                    to: 0,
+                    len: at,
+                },
+                RowRun {
+                    from: at + count,
+                    to: at,
+                    len: old - at - count,
+                },
+            ],
+        )
     }
 
     /// Shift columns `[at, n_cols)` right by `count`, opening blank columns.
-    pub(crate) fn insert_cols(&mut self, at: usize, count: usize) {
+    /// On error nothing changes.
+    pub(crate) fn insert_cols(&mut self, at: usize, count: usize) -> Result<(), String> {
         if count == 0 {
-            return;
+            return Ok(());
         }
-
-        self.invalidate_derived();
 
         let at = at.min(self.n_cols);
         let old_cols = self.n_cols;
-        let Some(new_cols) = old_cols.checked_add(count) else {
-            return;
-        };
+        let new_cols = old_cols
+            .checked_add(count)
+            .ok_or_else(|| format!("{old_cols} columns plus {count} columns overflow"))?;
         if self.is_paged() {
+            self.invalidate_derived();
             self.remap_paged(self.row_count, new_cols, |row, col| {
                 Some((row, if col >= at { col + count } else { col }))
             });
-
-            return;
+            return Ok(());
         }
 
-        let Some(new_len) = new_cols.checked_mul(self.row_count) else {
-            return;
-        };
-
-        let mut kind = vec![KIND_EMPTY; new_len];
-        let mut payload = vec![0u64; new_len];
-        let mut style = vec![0u32; new_len];
-
-        for old_col in 0..old_cols {
-            let new_col = if old_col >= at {
-                old_col + count
+        self.rebuild_cols(new_cols, |col| {
+            if col < at {
+                Some(col)
             } else {
-                old_col
-            };
-            let old_base = old_col * self.row_count;
-            let new_base = new_col * self.row_count;
-            let rows = self.row_count;
-            kind[new_base..new_base + rows].copy_from_slice(&self.kind[old_base..old_base + rows]);
-            payload[new_base..new_base + rows]
-                .copy_from_slice(&self.payload[old_base..old_base + rows]);
-            style[new_base..new_base + rows]
-                .copy_from_slice(&self.style[old_base..old_base + rows]);
-        }
-
-        self.kind = kind;
-        self.payload = payload;
-        self.style = style;
-        self.n_cols = new_cols;
+                (col >= at + count).then(|| col - count)
+            }
+        })
     }
 
-    /// Delete `count` columns starting at `at`, closing the gap.
-    pub(crate) fn delete_cols(&mut self, at: usize, count: usize) {
+    /// Delete `count` columns starting at `at`, closing the gap. On error
+    /// nothing changes.
+    pub(crate) fn delete_cols(&mut self, at: usize, count: usize) -> Result<(), String> {
         if count == 0 || at >= self.n_cols {
-            return;
+            return Ok(());
         }
 
-        self.invalidate_derived();
-
         let count = count.min(self.n_cols - at);
-        let old_cols = self.n_cols;
-        let new_cols = old_cols - count;
+        let new_cols = self.n_cols - count;
         if self.is_paged() {
+            self.invalidate_derived();
             self.remap_paged(self.row_count, new_cols, |row, col| {
                 if col >= at && col < at + count {
                     None
@@ -1554,41 +1583,12 @@ impl CellStorage {
                     Some((row, if col >= at + count { col - count } else { col }))
                 }
             });
-
-            return;
+            return Ok(());
         }
 
-        let Some(new_len) = new_cols.checked_mul(self.row_count) else {
-            return;
-        };
-
-        let mut kind = vec![KIND_EMPTY; new_len];
-        let mut payload = vec![0u64; new_len];
-        let mut style = vec![0u32; new_len];
-
-        for old_col in 0..old_cols {
-            if old_col >= at && old_col < at + count {
-                continue;
-            }
-            let new_col = if old_col >= at + count {
-                old_col - count
-            } else {
-                old_col
-            };
-            let old_base = old_col * self.row_count;
-            let new_base = new_col * self.row_count;
-            let rows = self.row_count;
-            kind[new_base..new_base + rows].copy_from_slice(&self.kind[old_base..old_base + rows]);
-            payload[new_base..new_base + rows]
-                .copy_from_slice(&self.payload[old_base..old_base + rows]);
-            style[new_base..new_base + rows]
-                .copy_from_slice(&self.style[old_base..old_base + rows]);
-        }
-
-        self.kind = kind;
-        self.payload = payload;
-        self.style = style;
-        self.n_cols = new_cols;
+        self.rebuild_cols(new_cols, |col| {
+            Some(if col < at { col } else { col + count })
+        })
     }
 
     pub(crate) fn add_memory_stats(&self, stats: &mut StoreMemoryStats) {
@@ -1976,7 +1976,7 @@ mod paged_storage_tests {
 
     #[test]
     fn revision_index_cleans_only_cells_still_owned_by_the_acknowledged_write() {
-        let mut storage = PagedStorage::new(4, 0, 4);
+        let mut storage = PagedStorage::new(4, 0, 4).unwrap();
         assert!(storage.write(0, 0, KIND_EMPTY, 10, 0, Some(7)));
         assert!(storage.write(4, 0, KIND_EMPTY, 20, 0, Some(7)));
         assert!(storage.write(0, 0, KIND_EMPTY, 30, 0, Some(8)));
@@ -1993,12 +1993,12 @@ mod paged_storage_tests {
 
     #[test]
     fn structural_rebase_preserves_revision_ownership_at_the_moved_cell() {
-        let mut sheet = SheetData::new_paged(2, 8, 4, 0, 4);
+        let mut sheet = SheetData::new_paged(2, 8, 4, 0, 4).unwrap();
         assert!(sheet.write_cell(1, 0, KIND_EMPTY, 10, 0, Some(11)));
         assert!(sheet.write_cell(3, 1, KIND_EMPTY, 20, 0, Some(12)));
 
-        sheet.insert_rows(0, 0, 2);
-        sheet.insert_cols(0, 0, 1);
+        assert!(sheet.insert_rows(0, 0, 2).is_ok());
+        assert!(sheet.insert_cols(0, 0, 1).is_ok());
         assert_eq!(
             sheet.cells.paged.as_ref().unwrap().read(3, 1),
             (KIND_EMPTY, 10, 0, true, true)
@@ -2023,8 +2023,8 @@ mod paged_storage_tests {
 
     #[test]
     fn dirty_overlay_precedes_hydration_survives_eviction_and_cleans_by_revision() {
-        let chunk_bytes = PagedStorage::new(4, 0, 2).chunk_bytes();
-        let mut storage = PagedStorage::new(4, chunk_bytes, 2);
+        let chunk_bytes = PagedStorage::new(4, 0, 2).unwrap().chunk_bytes();
+        let mut storage = PagedStorage::new(4, chunk_bytes, 2).unwrap();
         assert!(storage.hydrate(0, 0, KIND_EMPTY, 10, 1));
         assert!(storage.write(0, 0, KIND_EMPTY, 20, 2, Some(7)));
         assert!(!storage.hydrate(0, 0, KIND_EMPTY, 30, 3));
@@ -2040,7 +2040,7 @@ mod paged_storage_tests {
 
     #[test]
     fn dirty_overlay_limit_fails_closed_without_changing_existing_cells() {
-        let mut storage = PagedStorage::new(4, 0, 2);
+        let mut storage = PagedStorage::new(4, 0, 2).unwrap();
         assert!(storage.write(0, 0, KIND_EMPTY, 1, 0, Some(1)));
         assert!(storage.write(4, 0, KIND_EMPTY, 2, 0, Some(1)));
         assert!(!storage.write(8, 0, KIND_EMPTY, 3, 0, Some(1)));
@@ -2063,7 +2063,7 @@ mod calculated_slot_tests {
     fn source_views_hide_calculated_slots_across_transfer_and_replacement() {
         for paged in [false, true] {
             let mut cells = if paged {
-                CellStorage::new_paged(1, 1536, 512, 0, 100)
+                CellStorage::new_paged(1, 1536, 512, 0, 100).unwrap()
             } else {
                 CellStorage::try_new(1, 1536).unwrap()
             };

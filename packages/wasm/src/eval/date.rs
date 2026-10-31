@@ -127,6 +127,19 @@ pub(super) fn date_parts(serial: f64) -> Option<(i64, i64, i64)> {
     (0..=9999).contains(&parts.0).then_some(parts)
 }
 
+/// The year, month and day that YEAR, MONTH, DAY and date formats give a
+/// serial. Excel's calendar starts at serial 0, shown as 1900-01-00, and a
+/// negative serial is not a date.
+fn excel_date_parts(serial: f64) -> Option<(i64, i64, i64)> {
+    if serial.is_nan() || serial < 0.0 {
+        return None;
+    }
+    if serial < 1.0 {
+        return Some((1900, 1, 0));
+    }
+    date_parts(serial)
+}
+
 fn exact_date(year: i64, month: i64, day: i64) -> Option<f64> {
     if !(1..=12).contains(&month) || !(1..=31).contains(&day) {
         return None;
@@ -250,7 +263,7 @@ fn serial_date_arg(values: &FuncAccumulator, index: usize) -> Result<i64, Formul
 }
 
 pub(super) fn format_date_serial(serial: f64, format: &str) -> Option<String> {
-    let (year, month, day) = date_parts(serial)?;
+    let (year, month, day) = excel_date_parts(serial)?;
     let total_seconds = ((serial.rem_euclid(1.0) * 86_400.0).round() as u32) % 86_400;
     let hour = total_seconds / 3_600;
     let minute = total_seconds % 3_600 / 60;
@@ -641,11 +654,16 @@ pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> 
     let result = match func {
         Func::Date => {
             let result = require_arity(values, 3, 3).and_then(|_| {
-                date_serial(
+                let serial = date_serial(
                     integer_arg(values, 0, None)?,
                     integer_arg(values, 1, None)?,
                     integer_arg(values, 2, None)?,
-                )
+                )?;
+                // The calendar starts at serial 0, so a date before it is no date.
+                if serial < 0.0 {
+                    return Err(FormulaError::Num);
+                }
+                Ok(serial)
             });
             result.map_or_else(Value::Error, Value::number)
         }
@@ -659,7 +677,7 @@ pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> 
         Func::Day | Func::Month | Func::Year => {
             let result = require_arity(values, 1, 1).and_then(|_| {
                 let serial = number_arg(values, 0, None)?;
-                let (year, month, day) = date_parts(serial).ok_or(FormulaError::Num)?;
+                let (year, month, day) = excel_date_parts(serial).ok_or(FormulaError::Num)?;
                 Ok(match func {
                     Func::Day => day,
                     Func::Month => month,
