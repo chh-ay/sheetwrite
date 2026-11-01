@@ -63,6 +63,11 @@ pub(super) fn plain_number(text: &str) -> Option<f64> {
 /// Arithmetic, number arguments, VALUE, and the number fallback of date
 /// arguments all read text with this one rule; NUMBERVALUE takes its own
 /// separators, and formula number literals belong to the parser.
+///
+/// Kept out of line: arithmetic on numbers is the hot path of
+/// `number_from_value`, and inlining the date and separator parsers into every
+/// operator would grow it for text that is rare there.
+#[inline(never)]
 pub(super) fn number_from_text(text: &str) -> Result<f64, FormulaError> {
     if let Some(number) = plain_number(text) {
         return Ok(number);
