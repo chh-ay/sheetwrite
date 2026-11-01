@@ -2921,7 +2921,7 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
   );
   const releaseComparison = await loadEvidence(
     "bench/results/release-comparison.json",
-    "cd bench && bun src/release-comparison.ts --base-ref release/version-0.5.4 --baseline-results-dir results/releases/0.5.4",
+    "cd bench && bun src/release-comparison.ts --baseline-results-dir results/releases/<previous release>",
     validateReleaseComparisonArtifact,
   );
   const captures = (
@@ -3280,7 +3280,7 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
     lines.push(
       "## Release comparison",
       "",
-      "The 0.6 comparison has no validated clean-tree artifact yet. Historical 0.5 evidence is preserved unmodified from `feat/chart-pivot-ui` under `bench/results/releases/0.5.0/`. No old/new timing claims are published until `bench/results/release-comparison.json` is available.",
+      "The release comparison has no validated clean-tree artifact yet. Historical 0.5 evidence is preserved unmodified from `feat/chart-pivot-ui` under `bench/results/releases/0.5.0/`. No old/new timing claims are published until `bench/results/release-comparison.json` is available.",
       "",
     );
     pending.push(releaseComparison);

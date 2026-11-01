@@ -1,3 +1,4 @@
+import { parseEngineBaselineLabel } from "../bench/src/gate-protocol.js";
 import { benchScaleFigure } from "./bench-figures.js";
 import {
   formatBytes,
@@ -29,6 +30,8 @@ interface CaptureMeta {
  * the evidence they explain, so this renderer stays the same between releases.
  */
 interface ReleaseCaptureNotes {
+  /** `sheetwrite-<release>-capture-metadata-v1`, naming the release that was captured. */
+  protocol: string;
   captureCommit: string;
   publicationNotes: Array<{ title: string; paragraphs: string[] }>;
 }
@@ -312,6 +315,16 @@ export function renderPivotSection(evidence: PivotEvidence, source: string): str
   ];
 }
 
+/** The two releases a comparison measures, as its artifact names them. */
+interface ReleasePair {
+  /** The baseline release, e.g. `0.6.2`. */
+  base: string;
+  /** The captured release, e.g. `0.7.0`. */
+  candidate: string;
+  /** The candidate's release line, which both sides' core and harness belong to, e.g. `0.7`. */
+  candidateLine: string;
+}
+
 interface ReleaseComparisonEvidence {
   schemaVersion: 1;
   protocol: "sheetwrite-release-comparison-v1";
@@ -319,6 +332,8 @@ interface ReleaseComparisonEvidence {
   captureMetadata: ReleaseCaptureNotes;
   base: { ref: string; commit: string };
   candidate: { commit: string; dirty: boolean };
+  /** Derived by `validateReleaseComparisonArtifact`, not stored in the artifact. */
+  releases: ReleasePair;
   suites: Array<{
     artifact: string;
     status: "compared" | "new-only" | "missing-candidate";
@@ -341,6 +356,33 @@ interface ReleaseComparisonEvidence {
       note?: string;
     }>;
   }>;
+}
+
+const CAPTURE_METADATA_PROTOCOL = /^sheetwrite-((\d+\.\d+)\.\d+)-capture-metadata-v1$/u;
+const RELEASE_VERSION = /^\d+\.\d+\.\d+$/u;
+
+/**
+ * The release pair, read from the artifact: the capture metadata names the
+ * captured release, and every suite's comparison label names the baseline,
+ * either alone or as `<baseline> engine (WASM) under <line> core and harness`.
+ * All of them must agree, so the page cannot name a pair the evidence does not.
+ */
+function releasePairOf(protocol: unknown, labels: readonly string[]): ReleasePair | undefined {
+  const captured = typeof protocol === "string" ? CAPTURE_METADATA_PROTOCOL.exec(protocol) : null;
+  const candidate = captured?.[1];
+  const candidateLine = captured?.[2];
+  if (candidate === undefined || candidateLine === undefined) return undefined;
+
+  const bases = new Set<string>();
+  for (const label of labels) {
+    const engine = parseEngineBaselineLabel(label);
+    if (engine !== undefined && engine.harnessVersion !== candidateLine) return undefined;
+    bases.add(engine?.engineVersion ?? label);
+  }
+  const [base] = bases;
+  if (bases.size !== 1 || base === undefined || !RELEASE_VERSION.test(base)) return undefined;
+
+  return { base, candidate, candidateLine };
 }
 
 export function validateReleaseComparisonArtifact(
@@ -400,7 +442,13 @@ export function validateReleaseComparisonArtifact(
     }
   }
 
-  return artifact;
+  const releases = releasePairOf(
+    artifact.captureMetadata.protocol,
+    artifact.suites.map((suite) => suite.comparisonLabel),
+  );
+  if (releases === undefined) return "release comparison does not name one release pair";
+
+  return { ...artifact, releases };
 }
 
 function comparisonCell(value: string): string {
@@ -476,7 +524,6 @@ const VERDICT_LABELS: Readonly<Record<string, string>> = {
   faster: "Faster",
   slower: "Slower",
   unchanged: "Unchanged",
-  "new-only": "New in 0.6",
   removed: "Removed",
 };
 
@@ -492,7 +539,11 @@ function shownVerdict(metric: ComparisonMetric): string {
   return same ? "unchanged" : metric.verdict;
 }
 
-function metricRow(metric: ComparisonMetric, leading: string[] = []): string {
+function metricRow(
+  metric: ComparisonMetric,
+  releases: ReleasePair,
+  leading: string[] = [],
+): string {
   const label = `<span title="${html(metric.key)}">${comparisonCell(metricLabel(metric.key))}</span>`;
   // A row can be flagged on its p95 alone, so show that ratio when it tells a different story.
   const p95 =
@@ -510,7 +561,9 @@ function metricRow(metric: ComparisonMetric, leading: string[] = []): string {
       ? "Smaller"
       : sized && shown === "slower"
         ? "Larger"
-        : (VERDICT_LABELS[shown] ?? comparisonCell(shown));
+        : shown === "new-only"
+          ? `New in ${releases.candidateLine}`
+          : (VERDICT_LABELS[shown] ?? comparisonCell(shown));
   const verdict = [
     verdictLabel,
     ...(metric.note === undefined ? [] : [comparisonCell(metric.note)]),
@@ -562,16 +615,17 @@ export function renderReleaseComparisonSection(
   const affinities = Object.entries(evidence.meta.effectiveCpuAffinityBySuite).sort(
     ([left], [right]) => left.localeCompare(right),
   );
-  const header = "| Measurement | 0.5.4 median / p95 | 0.6.0 median / p95 | Change | Result |";
+  const { base, candidate, candidateLine } = evidence.releases;
+  const header = `| Measurement | ${base} median / p95 | ${candidate} median / p95 | Change | Result |`;
 
   return [
     "## Release comparison",
     "",
-    "### Sheetwrite 0.6.0 compared with a fresh 0.5.4 capture",
+    `### Sheetwrite ${candidate} compared with a fresh ${base} capture`,
     "",
-    "Each suite ran once on 0.5.4 and once on 0.6.0, on the same machine. Change is 0.6.0 / 0.5.4 for the median, with the p95 ratio in brackets when it differs: below 1× is faster or smaller, above 1× is slower or larger. A suite with a documented budget marks rows beyond it as flagged; rows without a budget are only marked faster, slower, smaller or larger.",
+    `Each suite ran once on ${base} and once on ${candidate}, on the same machine. Change is ${candidate} / ${base} for the median, with the p95 ratio in brackets when it differs: below 1× is faster or smaller, above 1× is slower or larger. A suite with a documented budget marks rows beyond it as flagged; rows without a budget are only marked faster, slower, smaller or larger.`,
     "",
-    "The summary counts Sheetwrite's own measurements. **Lower** and **higher** cover time, memory and counts alike; **same** is unchanged or within budget; **new** has no 0.5.4 counterpart. **Apart** counts Handsontable control runs and full-engine rows that repeat the formula tables, so a change is not counted twice or credited to Sheetwrite.",
+    `The summary counts Sheetwrite's own measurements. **Lower** and **higher** cover time, memory and counts alike; **same** is unchanged or within budget; **new** has no ${base} counterpart. **Apart** counts Handsontable control runs and full-engine rows that repeat the formula tables, so a change is not counted twice or credited to Sheetwrite.`,
     "",
     "| Suite | Rows | Lower | Higher | Same | New | Flagged | Apart |",
     "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
@@ -584,10 +638,10 @@ export function renderReleaseComparisonSection(
     "",
     `${flags.length} rows exceed their suite's budget or noise test. They stay listed here, not removed or adjusted against a control. A flag compares one capture of each release; it is not a controlled gate verdict.`,
     "",
-    "| Suite | Measurement | 0.5.4 median / p95 | 0.6.0 median / p95 | Change | Result |",
+    `| Suite | Measurement | ${base} median / p95 | ${candidate} median / p95 | Change | Result |`,
     "| --- | --- | ---: | ---: | ---: | --- |",
     ...flags.map(({ suite, metric }) =>
-      metricRow(metric, [
+      metricRow(metric, evidence.releases, [
         `${suiteName(suite.artifact)}${isControlOrRepeat(metric.key) ? (/engine=handsontable/u.test(metric.key) ? " · Handsontable control" : " · repeat of formula table") : ""}`,
       ]),
     ),
@@ -607,7 +661,7 @@ export function renderReleaseComparisonSection(
     "",
     "For data captures, a full garbage collection runs between samples, untimed. Each ingest sample also gets a fresh happy-dom document after the prior sample has released its store or grid. Both versions use data protocol v2. Mixed protocol versions are rejected.",
     "",
-    "Formula tables compare the 0.5.4 engine (WASM) under the 0.6 core and harness with the 0.6 engine under that same core and harness. They isolate the engine difference only. The source records both commits and the hashes of the loaded binaries. Grid constant edits and Node initialization time current-core paths, so those measurements are 0.6-only and have no version ratio.",
+    `Formula tables compare the ${base} engine (WASM) under the ${candidateLine} core and harness with the ${candidateLine} engine under that same core and harness. They isolate the engine difference only. The source records both commits and the hashes of the loaded binaries. Grid constant edits and Node initialization time current-core paths, so those measurements are ${candidateLine}-only and have no version ratio.`,
     "",
     ...provenance(evidence.meta, source, "Comparison generated"),
     `Comparison base: <code>${html(evidence.base.ref)}</code> at ${shortHash(evidence.base.commit)}. Candidate: ${shortHash(evidence.candidate.commit)}.`,
@@ -627,7 +681,7 @@ export function renderReleaseComparisonSection(
         "",
         header,
         "| --- | ---: | ---: | ---: | --- |",
-        ...suite.metrics.map((metric) => metricRow(metric)),
+        ...suite.metrics.map((metric) => metricRow(metric, evidence.releases)),
         "",
         "</details>",
         "",
@@ -637,7 +691,7 @@ export function renderReleaseComparisonSection(
     "",
     '```sh verify title="Release comparison artifact"',
     "cd bench",
-    "bun src/release-comparison.ts --base-ref release/version-0.5.4 --baseline-results-dir results/releases/0.5.4 --output results/release-comparison.json",
+    `bun src/release-comparison.ts --base-ref ${evidence.base.ref} --baseline-results-dir results/releases/${base} --output results/release-comparison.json`,
     "```",
     "",
   ];
