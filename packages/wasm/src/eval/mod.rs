@@ -2632,7 +2632,7 @@ impl CellStore {
         if let Some(result) = self.streamed_criteria(func, args, sheet, pass, depth) {
             return result;
         }
-        let result = match func {
+        match func {
             Func::CountIf => {
                 if args.len() != 2 {
                     return Value::Error(FormulaError::Value);
@@ -2645,14 +2645,13 @@ impl CellStore {
                     Ok(criterion) => criterion,
                     Err(error) => return Value::Error(error),
                 };
-                Ok((
+                Value::number(
                     range
                         .values
                         .iter()
                         .filter(|value| criterion.matches(value))
                         .count() as f64,
-                    0,
-                ))
+                )
             }
             Func::CountIfs => {
                 if args.is_empty() || !args.len().is_multiple_of(2) {
@@ -2686,7 +2685,7 @@ impl CellStore {
                             .all(|(range, criterion)| criterion.matches(&range.values[index]))
                     })
                     .count();
-                Ok((count as f64, 0))
+                Value::number(count as f64)
             }
             Func::SumIf | Func::AverageIf => {
                 if !(2..=3).contains(&args.len()) {
@@ -2729,7 +2728,11 @@ impl CellStore {
                 if !criteria_range.same_shape(&value_range) {
                     return Value::Error(FormulaError::Value);
                 }
-                aggregate_if(&value_range, &[(&criteria_range, &criterion)])
+                aggregate_if(
+                    &value_range,
+                    &[(&criteria_range, &criterion)],
+                    func == Func::AverageIf,
+                )
             }
             Func::SumIfs | Func::AverageIfs | Func::MaxIfs | Func::MinIfs => {
                 if args.len() < 3 || args.len().is_multiple_of(2) {
@@ -2758,26 +2761,12 @@ impl CellStore {
                 }
                 let pairs: Vec<_> = ranges.iter().zip(&criteria).collect();
                 if matches!(func, Func::MaxIfs | Func::MinIfs) {
-                    extreme_if(&value_range, &pairs, func == Func::MaxIfs).map(|value| (value, 0))
+                    extreme_if(&value_range, &pairs, func == Func::MaxIfs)
                 } else {
-                    aggregate_if(&value_range, &pairs)
+                    aggregate_if(&value_range, &pairs, func == Func::AverageIfs)
                 }
             }
-            _ => return Value::Error(FormulaError::Value),
-        };
-        match result {
-            Ok((sum_or_count, numeric_count)) => {
-                if matches!(func, Func::AverageIf | Func::AverageIfs) {
-                    if numeric_count == 0 {
-                        Value::Error(FormulaError::DivZero)
-                    } else {
-                        Value::number(sum_or_count / numeric_count as f64)
-                    }
-                } else {
-                    Value::number(sum_or_count)
-                }
-            }
-            Err(error) => Value::Error(error),
+            _ => Value::Error(FormulaError::Value),
         }
     }
 
