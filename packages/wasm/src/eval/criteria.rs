@@ -152,8 +152,8 @@ impl WildcardPattern {
         }
     }
 
-    /// True when `candidate` matches, with the rules the per-candidate
-    /// pattern check used.
+    /// Matches `*` (any sequence), `?` (one character), and `~` escapes with
+    /// Unicode lowercase comparison; plain patterns use ASCII case folding.
     pub(super) fn matches(&self, candidate: &Value) -> bool {
         let Some(text) = criterion_text(candidate) else {
             return false;
@@ -235,9 +235,8 @@ fn ordering_matches(ordering: Ordering, op: CmpOp) -> bool {
     }
 }
 
-/// Running sum and matching count of the `*IF` family, folded one row at a
-/// time. It applies `aggregate_if`'s rules so a streamed range and a
-/// materialized one answer the same.
+/// Owns the numeric and error rules for matched rows in the `*IF` family,
+/// shared by streamed and materialized ranges.
 pub(super) struct IfSum {
     sum: f64,
     count: u64,
@@ -276,8 +275,8 @@ impl IfSum {
     }
 }
 
-/// Running extreme of `MAXIFS`/`MINIFS`, folded one row at a time with
-/// `extreme_if`'s rules.
+/// Owns the numeric and error rules for matched rows in `MAXIFS`/`MINIFS`,
+/// shared by streamed and materialized ranges.
 pub(super) struct IfExtreme {
     found: Option<f64>,
     maximum: bool,
@@ -320,23 +319,15 @@ pub(super) fn aggregate_if(
     sum_range: &EvalMatrix,
     criteria: &[(&EvalMatrix, &Criterion)],
 ) -> Result<(f64, u64), FormulaError> {
-    let mut sum = 0.0;
-    let mut count = 0;
+    let mut aggregate = IfSum::new();
     if let [(range, criterion)] = criteria {
         for (value, candidate) in sum_range.values.iter().zip(&range.values) {
             if !criterion.matches(candidate) {
                 continue;
             }
-            match value {
-                Value::Number(value) => {
-                    sum += value;
-                    count += 1;
-                }
-                Value::Error(error) => return Err(*error),
-                Value::Text(_) | Value::Bool(_) | Value::Blank => {}
-            }
+            aggregate.add(value)?;
         }
-        return Ok((sum, count));
+        return Ok((aggregate.sum, aggregate.count));
     }
     for (index, value) in sum_range.values.iter().enumerate() {
         if !criteria
@@ -345,16 +336,9 @@ pub(super) fn aggregate_if(
         {
             continue;
         }
-        match value {
-            Value::Number(value) => {
-                sum += value;
-                count += 1;
-            }
-            Value::Error(error) => return Err(*error),
-            Value::Text(_) | Value::Bool(_) | Value::Blank => {}
-        }
+        aggregate.add(value)?;
     }
-    Ok((sum, count))
+    Ok((aggregate.sum, aggregate.count))
 }
 
 pub(super) fn extreme_if(
@@ -362,7 +346,7 @@ pub(super) fn extreme_if(
     criteria: &[(&EvalMatrix, &Criterion)],
     maximum: bool,
 ) -> Result<f64, FormulaError> {
-    let mut found = None;
+    let mut aggregate = IfExtreme::new(maximum);
     for (index, value) in value_range.values.iter().enumerate() {
         if !criteria
             .iter()
@@ -370,20 +354,7 @@ pub(super) fn extreme_if(
         {
             continue;
         }
-        match value {
-            Value::Number(value) if value.is_finite() => {
-                found = Some(found.map_or(*value, |current: f64| {
-                    if maximum {
-                        current.max(*value)
-                    } else {
-                        current.min(*value)
-                    }
-                }));
-            }
-            Value::Number(_) => return Err(FormulaError::Num),
-            Value::Error(error) => return Err(*error),
-            Value::Text(_) | Value::Bool(_) | Value::Blank => {}
-        }
+        aggregate.add(value)?;
     }
-    Ok(found.unwrap_or(0.0))
+    Ok(aggregate.found.unwrap_or(0.0))
 }

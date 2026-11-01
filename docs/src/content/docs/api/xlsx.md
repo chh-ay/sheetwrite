@@ -18,7 +18,7 @@ Source entry: `packages/xlsx/src/index.ts`
 ### Functions <span class="api-count" data-pagefind-ignore>2</span>
 
 <div class="api-symbol-grid">
-<a class="api-symbol-card" href="/docs/api/xlsx/build-xlsx-model/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>buildXlsxModel</code></span><span class="api-symbol-card__desc">Build the active-sheet table model used by the bounded OOXML writer.</span></a>
+<a class="api-symbol-card" href="/docs/api/xlsx/build-xlsx-model/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>buildXlsxModel</code></span><span class="api-symbol-card__desc">Materialize the active-sheet table model.</span></a>
 <a class="api-symbol-card" href="/docs/api/xlsx/register-xlsx-backends/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>registerXlsxBackends</code></span><span class="api-symbol-card__desc">Register all concrete XLSX backends with the backend-neutral core contracts.</span></a>
 </div>
 
