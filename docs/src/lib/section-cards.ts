@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
+import { element, type HastNode } from "./build-hast.js";
 import { DOCS_NAVIGATION, type NavigationItem, navigationBadge } from "./navigation.js";
 import { LATEST_RELEASE } from "./releases.js";
 
@@ -11,14 +12,6 @@ import { LATEST_RELEASE } from "./releases.js";
  * sidebar tree and each page's frontmatter. The sidebar stays the only list.
  */
 const CARDS_TAG = "sw-section-cards";
-
-interface HastNode {
-  type: string;
-  tagName?: string;
-  value?: string;
-  properties?: Record<string, unknown>;
-  children?: HastNode[];
-}
 
 /**
  * The pages listed directly under the sidebar section or group whose own page
@@ -65,10 +58,6 @@ function description(contentRoot: string, href: string): string {
     return match[1].trim().replace(/^(["'])(.*)\1$/, "$2");
   }
   throw new Error(`no docs page for ${href}`);
-}
-
-function element(tagName: string, children: HastNode[], properties: Record<string, unknown> = {}) {
-  return { type: "element", tagName, properties, children } satisfies HastNode;
 }
 
 function routeOf(contentRoot: string, path: string): string {

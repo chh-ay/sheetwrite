@@ -7,6 +7,8 @@ import {
 } from "@vue/language-core";
 import ts from "typescript";
 
+import { lineStartOffsets as lineOffsets } from "./source-offsets.js";
+
 /** Where a hovered symbol's definitions live; drives the docs hover-quality gate. */
 export type SheetwriteHoverOrigin = "lib" | "workspace" | "snippet";
 
@@ -67,14 +69,6 @@ function tagText(parts: readonly ts.SymbolDisplayPart[] | undefined): string | u
     out += part.text;
   }
   return out;
-}
-
-function lineOffsets(source: string): number[] {
-  const offsets = [0];
-  for (let index = 0; index < source.length; index += 1) {
-    if (source.charCodeAt(index) === 10) offsets.push(index + 1);
-  }
-  return offsets;
 }
 
 function hoverOrigin(

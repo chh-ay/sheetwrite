@@ -23,7 +23,7 @@ export const Route = createFileRoute("/showcases/")({
 
 const OWNER_BY_ID = new Map(CAPABILITY_OWNERS.map((owner) => [owner.id, owner]));
 
-/** The featured app card, capability launch cards, then the four framework adapters. */
+/** The featured app card followed by the capability launch cards. */
 const SCENE_ORDER = [
   "spreadsheet",
   "analysis",

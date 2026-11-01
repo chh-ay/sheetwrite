@@ -1,3 +1,5 @@
+import { lineStartOffsets } from "./source-offsets.js";
+
 /**
  * Hidden typed preludes for documentation code fences.
  *
@@ -145,16 +147,6 @@ export interface PreludeInjection {
    * null for positions inside the injected prelude lines.
    */
   toOriginal(position: { line: number; character: number }): OriginalPosition | null;
-}
-
-function lineStartOffsets(source: string): number[] {
-  const offsets: number[] = [];
-  let offset = 0;
-  for (const line of source.split("\n")) {
-    offsets.push(offset);
-    offset += line.length + 1;
-  }
-  return offsets;
 }
 
 const SCRIPT_OPEN_TAG = /<script\b[^>]*>/i;

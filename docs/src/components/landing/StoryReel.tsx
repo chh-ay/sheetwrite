@@ -1,6 +1,6 @@
 import { type CSSProperties, useEffect, useState } from "react";
 
-import { onTabListKey } from "./tabKeys.js";
+import { onTabListKey } from "../tabKeys.js";
 import { useScenePlayback } from "./useScenePlayback.js";
 
 /**
@@ -992,7 +992,7 @@ export function StoryReel() {
   const [focusInside, setFocusInside] = useState(false);
   const [pausedByReader, setPausedByReader] = useState(false);
   const held = focusInside || pausedByReader;
-  const { ref, epoch, sync } = useScenePlayback<HTMLDivElement>();
+  const { ref, sync } = useScenePlayback<HTMLDivElement>();
   useEffect(() => {
     void active;
     requestAnimationFrame(sync);
@@ -1040,12 +1040,7 @@ export function StoryReel() {
           >
             <span>{item.tab}</span>
             {item.id === active && !held ? (
-              <i
-                aria-hidden="true"
-                className="sw-reel__timer"
-                key={`${item.id}-${epoch}`}
-                onAnimationEnd={advance}
-              />
+              <i aria-hidden="true" className="sw-reel__timer" onAnimationEnd={advance} />
             ) : null}
           </button>
         ))}

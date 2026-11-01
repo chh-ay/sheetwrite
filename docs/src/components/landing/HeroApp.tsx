@@ -2,7 +2,7 @@ import iconLayout from "@sheetwrite/core/icons.json";
 import iconSheet from "@sheetwrite/core/icons.svg?url";
 import type { CSSProperties, ReactNode } from "react";
 
-import { clamp, count, ease, lerp, span } from "./scene-math.js";
+import { count, ease, fadeWindow, lerp, span } from "./scene-math.js";
 import { useTimeline } from "./useTimeline.js";
 
 /**
@@ -136,12 +136,6 @@ const BADGES = [
   { from: 18.0, to: 22.6, text: "Pivot table on a new sheet, one undo step" },
 ] as const;
 
-/** Fade in, hold, fade out over [from, to]. */
-function window_(t: number, from: number, to: number, fade = 0.3): number {
-  if (t < from || t > to) return 0;
-  return clamp(Math.min((t - from) / fade, (to - t) / fade));
-}
-
 interface Range {
   c: number;
   r: number;
@@ -234,7 +228,7 @@ function frameAt(t: number): Frame {
 
   const badge = BADGES.find((item) => t >= item.from && t <= item.to);
   const route = routeAt(t);
-  const visible = Math.max(...POINTER_WINDOWS.map(([from, to]) => window_(t, from, to)));
+  const visible = Math.max(...POINTER_WINDOWS.map(([from, to]) => fadeWindow(t, from, to, 0.3)));
   const lastClick = Math.max(...CLICKS.filter((click) => click <= t), -Infinity);
   const age = t - lastClick;
 
@@ -256,10 +250,10 @@ function frameAt(t: number): Frame {
     chartSelected: t >= 5.05 && t < 9.6,
     bars,
     badge: {
-      opacity: badge ? window_(t, badge.from, badge.to) : 0,
+      opacity: badge ? fadeWindow(t, badge.from, badge.to, 0.3) : 0,
       text: badge?.text ?? BADGES[1].text,
     },
-    enter: window_(t, 10.8, 11.5, 0.15),
+    enter: fadeWindow(t, 10.8, 11.5, 0.15),
     pivotTab: span(t, 17.25, 17.55) * (1 - span(t, 23.6, 24.0)),
     pivotView,
     fields: span(t, 17.6, 18.2) * (1 - span(t, 23.2, 23.8)),
