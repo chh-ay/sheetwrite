@@ -36,7 +36,7 @@ import {
   SheetwriteError,
   unknownSheetError,
 } from "./errors.js";
-import { downloadBytes, toCsv, toXlsxTable } from "./export.js";
+import { downloadBytesIn, toCsv, toXlsxTable } from "./export.js";
 import type { FindBar } from "./find-bar.js";
 import { stepFontSizePx, stepNumberFormatDecimals } from "./format-presets.js";
 import { GeometryLayoutController } from "./geometry-layout-controller.js";
@@ -65,6 +65,7 @@ import {
   TOOLBAR_HEIGHT,
 } from "./ribbon/ribbon-metrics.js";
 import type { Ribbon } from "./ribbon/ribbon.js";
+import { nextTurn, Scope, ScopeSlot } from "./scope.js";
 import { SearchController } from "./search-controller.js";
 import { type CellRef, SelectionModel, type SelRect } from "./selection.js";
 import { sheetNameKey, validateSheetName } from "./sheet-name.js";
@@ -117,6 +118,7 @@ import type { ContextMenuItem, KeyboardAction, KeyboardOptions } from "./types/g
 import type {
   CellEditor,
   CellInputSnapshot,
+  ClipboardOutcome,
   Grid,
   GridActions,
   GridCommandName,
@@ -454,6 +456,12 @@ export function createGrid(host: HTMLElement, opts: GridOptions): Grid {
   return new GridImpl(host, opts);
 }
 
+/** One chunked auto-fit run; its scope cancels the pending frame when it closes. */
+interface AutoFitJob {
+  readonly scope: Scope;
+  completed: boolean;
+}
+
 export class GridImpl implements Grid {
   readonly store: Store;
   readonly actions: GridActions;
@@ -494,14 +502,18 @@ export class GridImpl implements Grid {
   private keymap: Keymap;
   private zoom = 1;
   private baseTheme: Theme;
-  private toolbar: CommandToolbar | null = null;
-  private ribbon: Ribbon | null = null;
-  /** Bumped whenever chrome is rebuilt, so a chrome chunk that loads late is dropped. */
-  private chromeGeneration = 0;
+  /**
+   * The grid's root scope. `destroy()` closes it, which closes every scope
+   * below: chrome builds, the find bar, the side panel, auto-fit jobs,
+   * clipboard actions, summaries and exports.
+   */
+  private readonly lifetime = new Scope();
+  /** The toolbar or ribbon build; a rebuild closes it, so a chunk that loads late is dropped. */
+  private readonly chromeBuilds = new ScopeSlot(this.lifetime);
   /** The loaded find bar; `null` until its first open, and again after a reset. */
   private findBar: FindBar | null = null;
-  /** Bumped by `resetFindBar`, so a find bar chunk that arrives after a reset is dropped. */
-  private findBarGeneration = 0;
+  /** The find bar build; a reset closes it, so a chunk that loads late is dropped. */
+  private readonly findBarBuilds = new ScopeSlot(this.lifetime);
   private readonly notes: NotePopover;
   private readonly actionFeedback: ActionFeedback;
   private config: GridConfig | undefined;
@@ -543,7 +555,8 @@ export class GridImpl implements Grid {
   private readonly virtualColumnTargets = new Map<SheetId, number>();
   private selection: SelectionModel;
   private readonly mutationRevisions = new MutationRevisionIndex();
-  private destroyed = false;
+  /** The open side panel; closing it runs the panel's cleanup. */
+  private readonly sidePanels = new ScopeSlot(this.lifetime);
   /** Engine generation of this grid's store; traps from its reads stop that instance only. */
   private readonly engineGeneration: number;
   /** Set once the engine stopped; read-only stays on until the host recreates the grid. */
@@ -553,9 +566,8 @@ export class GridImpl implements Grid {
   private windowContentRevision = 0;
   private sourceSheet: SheetId | null = null;
   private sheetHasSources = true;
-  private autoFitGeneration = 0;
-  private autoFitFrame = 0;
-  private autoFitActive = false;
+  /** The running auto-fit job; a new job or an edit closes it. */
+  private readonly autoFits = new ScopeSlot(this.lifetime);
   private commandStateQueued = false;
   private commandStateGeneration = 0;
   private readonly autoFitStats = {
@@ -566,10 +578,9 @@ export class GridImpl implements Grid {
     cancelledJobs: 0,
     committedPatches: 0,
   };
-  private resizeObserver: ResizeObserver | null = null;
   private resolutionMediaQuery: MediaQueryList | null = null;
   private readonly onResolutionChange = (): void => {
-    if (this.destroyed) return;
+    if (this.lifetime.closed) return;
     this.armResolutionListener();
     this.syncSizer();
     this.readWindows.invalidate();
@@ -579,12 +590,8 @@ export class GridImpl implements Grid {
   private readonly disposeStore: () => void;
   private readonly objectLayer: ObjectLayer;
   private readonly panelHost: HTMLDivElement;
-  /** Cleanup of the open side panel; `null` while no panel is open. */
-  private panelDispose: (() => void) | null = null;
   /** The cell selection last emitted, to tell a real move from a re-emit. */
   private lastSelectionKey = "";
-  /** Detaches the chart and pivot panel controller once its chunk has loaded. */
-  private disposePanels: (() => void) | null = null;
 
   constructor(
     host: HTMLElement,
@@ -773,6 +780,7 @@ export class GridImpl implements Grid {
       commit: (patches) => this.document.commit(patches, "replace"),
     });
     this.clipboard = new ClipboardController({
+      lifetime: this.lifetime,
       store: this.store,
       selection: () => this.selection,
       activeSheet: () => this.activeSheet,
@@ -804,7 +812,7 @@ export class GridImpl implements Grid {
     host.style.position = host.style.position || "relative";
     host.style.overflow = "hidden";
     if (!host.hasAttribute("tabindex")) host.tabIndex = 0;
-    this.actionFeedback = attachActionFeedback(this, host);
+    this.actionFeedback = attachActionFeedback(this, host, this.lifetime);
 
     const config = this.config;
     this.createToolbar(config);
@@ -902,10 +910,10 @@ export class GridImpl implements Grid {
       scheduleRender: () => this.scheduleRender(),
       undo: () => this.undo(),
       redo: () => this.redo(),
-      copy: () => this.clipboard.copy(),
-      cut: () => this.clipboard.cut(),
-      paste: () => void this.clipboard.paste(),
-      pasteValues: () => void this.clipboard.pasteValues(),
+      copy: () => this.runKeyboardClipboard(this.clipboard.copy()),
+      cut: () => this.runKeyboardClipboard(this.clipboard.cut()),
+      paste: () => this.runKeyboardClipboard(this.clipboard.paste()),
+      pasteValues: () => this.runKeyboardClipboard(this.clipboard.pasteValues()),
       commit: (patches, reason) => this.document.commit(patches, reason),
       readOnly: () => this.readOnly,
       onEditStart: () => this.notes.hideCard(),
@@ -1056,7 +1064,7 @@ export class GridImpl implements Grid {
 
     this.disposeStore = this.store.on("change", (event) => {
       this.storeEpoch += 1;
-      if (this.autoFitActive) this.cancelAutoFit();
+      this.cancelAutoFit();
       this.mutationRevisions.record(event.transaction.patches, this.storeEpoch);
       this.activeSheetCache = null;
       // Presence learned during this change describes the state after it, which
@@ -1236,10 +1244,14 @@ export class GridImpl implements Grid {
     });
 
     this.applyLayout();
-    this.scroller.addEventListener("scroll", this.onScroll, { passive: true });
+    this.scroller.addEventListener("scroll", this.onScroll, {
+      passive: true,
+      signal: this.lifetime.signal,
+    });
     if (typeof ResizeObserver !== "undefined") {
-      this.resizeObserver = new ResizeObserver(() => this.onResize());
-      this.resizeObserver.observe(host);
+      const resizeObserver = new ResizeObserver(() => this.onResize());
+      resizeObserver.observe(host);
+      this.lifetime.add(() => resizeObserver.disconnect());
     }
     this.armResolutionListener();
     this.attachPanels();
@@ -1258,13 +1270,14 @@ export class GridImpl implements Grid {
    * cannot replace the `engine-failed` error of the failing call.
    */
   private onEngineFailed(failure: SheetwriteError): void {
-    if (this.destroyed || this.engineFailure) return;
+    if (this.lifetime.closed || this.engineFailure) return;
 
     this.engineFailure = failure;
     this.readOnly = true;
     this.readWindows.freeze();
+    // A microtask cannot be cancelled, so it reads the closed state instead.
     queueMicrotask(() => {
-      if (this.destroyed) return;
+      if (this.lifetime.closed) return;
 
       try {
         this.syncReadOnlyChrome(true);
@@ -1277,7 +1290,7 @@ export class GridImpl implements Grid {
   /** Listen for first use without fetching the panel chunk on ordinary grids. */
   private attachPanels(): void {
     if (this.presentation !== "spreadsheet") return;
-    this.disposePanels = attachPanelTriggers(this, this.config?.icons);
+    this.lifetime.add(attachPanelTriggers(this, this.config?.icons));
   }
 
   private refreshSourcePresence(): void {
@@ -1398,7 +1411,9 @@ export class GridImpl implements Grid {
   }
 
   private fallbackWorkerRenderer(worker: WorkerRenderer, error: unknown): void {
-    if (this.destroyed || this.renderer !== worker || this.activeRendererKind !== "worker") return;
+    if (this.lifetime.closed || this.renderer !== worker || this.activeRendererKind !== "worker") {
+      return;
+    }
 
     worker.destroy();
     const canvas = new CanvasRenderer();
@@ -1416,7 +1431,7 @@ export class GridImpl implements Grid {
       requested: "worker",
     });
     queueMicrotask(() => {
-      if (this.destroyed) return;
+      if (this.lifetime.closed) return;
       for (const fn of this.listeners["renderer-fallback"]) {
         fn({ requested: "worker", error: failure });
       }
@@ -1872,31 +1887,41 @@ export class GridImpl implements Grid {
     this.autoFitStats.maxWindowCells = Math.max(this.autoFitStats.maxWindowCells, cells);
   }
 
-  private scheduleAutoFitChunk(step: () => void): void {
+  /** A new auto-fit job closes the running one; a job closed before it completes counts as cancelled. */
+  private startAutoFit(): AutoFitJob {
+    const job: AutoFitJob = { scope: this.autoFits.next(), completed: false };
+    job.scope.add(() => {
+      if (!job.completed) this.autoFitStats.cancelledJobs += 1;
+    });
+    return job;
+  }
+
+  private completeAutoFit(job: AutoFitJob): void {
+    job.completed = true;
+    job.scope.close();
+  }
+
+  /** Run `step` in the next frame, unless the job closes first. */
+  private scheduleAutoFitChunk(job: AutoFitJob, step: () => void): void {
     this.autoFitStats.scheduledChunks += 1;
-    const requestFrame =
-      globalThis.requestAnimationFrame ??
-      ((callback: FrameRequestCallback): number =>
-        setTimeout(() => callback(performance.now()), 0) as unknown as number);
-    let invokedSynchronously = false;
-    const frame = requestFrame(() => {
-      invokedSynchronously = true;
-      this.autoFitFrame = 0;
+    if (globalThis.requestAnimationFrame === undefined) {
+      job.scope.setTimeout(step, 0);
+      return;
+    }
+
+    // Some hosts run the callback synchronously; then no frame is left to cancel.
+    let ran = false;
+    let removeCancel: (() => void) | undefined;
+    const frame = requestAnimationFrame(() => {
+      ran = true;
+      removeCancel?.();
       step();
     });
-    if (!invokedSynchronously) this.autoFitFrame = frame;
+    if (!ran) removeCancel = job.scope.add(() => cancelAnimationFrame(frame));
   }
 
   private cancelAutoFit(): void {
-    this.autoFitGeneration += 1;
-    if (this.autoFitActive) {
-      this.autoFitActive = false;
-      this.autoFitStats.cancelledJobs += 1;
-    }
-    if (this.autoFitFrame !== 0) {
-      (globalThis.cancelAnimationFrame ?? clearTimeout)(this.autoFitFrame);
-      this.autoFitFrame = 0;
-    }
+    this.autoFits.close();
   }
 
   private measureAutoFitRowWindow(
@@ -2044,18 +2069,10 @@ export class GridImpl implements Grid {
     let columnStart = c0;
     let required = new Float64Array(bandEnd - bandStart);
     required.fill(this.baseTheme.rowHeight);
-    const generation = this.autoFitGeneration;
-    this.autoFitActive = true;
+    const job = this.startAutoFit();
 
     const step = (): void => {
-      if (
-        !this.autoFitActive ||
-        generation !== this.autoFitGeneration ||
-        this.destroyed ||
-        this.activeSheet !== sheetId
-      ) {
-        return;
-      }
+      if (job.scope.closed || this.activeSheet !== sheetId) return;
       const count = Math.min(columnsPerWindow, c1 - columnStart + 1);
       const columns = Array.from({ length: count }, (_, index) => columnStart + index);
       const view = this.withStoreResourceOperation("auto-fit", () =>
@@ -2068,7 +2085,7 @@ export class GridImpl implements Grid {
         appendRowPatches(bandStart, required);
         bandStart = bandEnd;
         if (bandStart > r1) {
-          this.autoFitActive = false;
+          this.completeAutoFit(job);
           this.autoFitStats.completedJobs += 1;
           this.autoFitStats.committedPatches += patches.length;
           this.withStoreResourceOperation("auto-fit", () =>
@@ -2081,9 +2098,9 @@ export class GridImpl implements Grid {
         required = new Float64Array(bandEnd - bandStart);
         required.fill(this.baseTheme.rowHeight);
       }
-      this.scheduleAutoFitChunk(step);
+      this.scheduleAutoFitChunk(job, step);
     };
-    this.scheduleAutoFitChunk(step);
+    this.scheduleAutoFitChunk(job, step);
   }
 
   autoFitColumns(cols?: readonly number[]): void {
@@ -2142,18 +2159,10 @@ export class GridImpl implements Grid {
     let targetOffset = 0;
     let columns = targets.slice(targetOffset, targetOffset + columnsPerWindow);
     let rowStart = 0;
-    const generation = this.autoFitGeneration;
-    this.autoFitActive = true;
+    const job = this.startAutoFit();
 
     const step = (): void => {
-      if (
-        !this.autoFitActive ||
-        generation !== this.autoFitGeneration ||
-        this.destroyed ||
-        this.activeSheet !== sheetId
-      ) {
-        return;
-      }
+      if (job.scope.closed || this.activeSheet !== sheetId) return;
       const rowEnd = Math.min(sheet.rowCount, rowStart + rowsPerWindow);
       const view = this.withStoreResourceOperation("auto-fit", () =>
         this.store.getVisibleWindow(sheetId, { start: rowStart, end: rowEnd }, columns),
@@ -2164,16 +2173,16 @@ export class GridImpl implements Grid {
       if (rowStart >= sheet.rowCount) {
         targetOffset += columns.length;
         if (targetOffset >= targets.length) {
-          this.autoFitActive = false;
+          this.completeAutoFit(job);
           commitWidths();
           return;
         }
         columns = targets.slice(targetOffset, targetOffset + columnsPerWindow);
         rowStart = 0;
       }
-      this.scheduleAutoFitChunk(step);
+      this.scheduleAutoFitChunk(job, step);
     };
-    this.scheduleAutoFitChunk(step);
+    this.scheduleAutoFitChunk(job, step);
   }
 
   setRowHeight(row: number, height: number): void {
@@ -2410,18 +2419,17 @@ export class GridImpl implements Grid {
   /**
    * The toolbar and the ribbon render the command model, which loads as its
    * own chunk: grids without chrome never download it. The chrome's height is
-   * reserved now, so the grid does not move when it arrives. A chunk that
-   * arrives after the chrome was rebuilt, or after destroy, is dropped.
+   * reserved now, so the grid does not move when it arrives. Each call closes
+   * the previous build, so a chunk that arrives after a rebuild, or after
+   * destroy, is dropped.
    */
   private createToolbar(config: GridConfig | undefined): void {
-    this.chromeGeneration += 1;
+    const build = this.chromeBuilds.next();
     if (!config || config.toolbar === false) return;
 
-    const generation = this.chromeGeneration;
-    const current = () => generation === this.chromeGeneration && !this.destroyed;
     const ribbon = Boolean(config.ribbon) && !Array.isArray(config.toolbar);
     const failed = (error: unknown): void => {
-      if (!current()) return;
+      if (build.closed) return;
 
       // Give the space back and tell the user; the load error still reaches the host.
       this.setToolbarHeight(0);
@@ -2434,14 +2442,14 @@ export class GridImpl implements Grid {
     if (!ribbon) {
       this.toolbarHeight = TOOLBAR_HEIGHT;
       void import("./ribbon/command-toolbar.js").then(({ CommandToolbar: ToolbarClass }) => {
-        if (current()) this.mountToolbar(ToolbarClass, config);
+        if (!build.closed) this.mountToolbar(build, ToolbarClass, config);
       }, failed);
       return;
     }
 
     this.toolbarHeight = RIBBON_EXPANDED_HEIGHT;
     void import("./ribbon/ribbon.js").then(({ Ribbon: RibbonClass }) => {
-      if (current()) this.mountRibbon(RibbonClass, config);
+      if (!build.closed) this.mountRibbon(build, RibbonClass, config);
     }, failed);
   }
 
@@ -2451,22 +2459,29 @@ export class GridImpl implements Grid {
    * arrives after a reset or after destroy is dropped.
    */
   private openFindBar(options?: { replace?: boolean }): void {
-    if (this.config?.find === false || this.destroyed) return;
+    if (this.config?.find === false || this.lifetime.closed) return;
     if (this.findBar) {
       this.findBar.open(options);
       return;
     }
 
-    const generation = this.findBarGeneration;
-    const current = () => generation === this.findBarGeneration && !this.destroyed;
+    // Opens during the load share one build, so the bar is made once.
+    const build = this.findBarBuilds.current();
     void import("./find-bar.js").then(
       ({ FindBar: FindBarClass }) => {
-        if (!current()) return;
-        this.findBar ??= new FindBarClass(this.host, this.baseTheme, this, this.readOnly);
+        if (build.closed) return;
+        if (!this.findBar) {
+          const findBar = new FindBarClass(this.host, this.baseTheme, this, this.readOnly);
+          this.findBar = findBar;
+          build.add(() => {
+            findBar.destroy();
+            this.findBar = null;
+          });
+        }
         this.findBar.open(options);
       },
       (error: unknown) => {
-        if (!current()) return;
+        if (build.closed) return;
         // Tell the user; the load error still reaches the host.
         this.actionFeedback.show(`The find bar could not load: ${errorDetail(error)}`);
         throw error;
@@ -2476,9 +2491,7 @@ export class GridImpl implements Grid {
 
   /** Drop the find bar, so the next open builds it for the current config and read-only state. */
   private resetFindBar(): void {
-    this.findBarGeneration += 1;
-    this.findBar?.destroy();
-    this.findBar = null;
+    this.findBarBuilds.close();
   }
 
   /** Chrome sits first in the host, so keyboard users reach it before the grid. */
@@ -2494,7 +2507,11 @@ export class GridImpl implements Grid {
     this.host.prepend(element);
   }
 
-  private mountToolbar(ToolbarClass: typeof CommandToolbar, config: GridConfig): void {
+  private mountToolbar(
+    build: Scope,
+    ToolbarClass: typeof CommandToolbar,
+    config: GridConfig,
+  ): void {
     const toolbar = new ToolbarClass(this.host, this, {
       label: "Spreadsheet formatting",
       className: "sheetwrite-toolbar",
@@ -2504,10 +2521,10 @@ export class GridImpl implements Grid {
     });
     toolbar.element.style.height = `${TOOLBAR_HEIGHT}px`;
     this.placeChrome(toolbar.element);
-    this.toolbar = toolbar;
+    build.add(() => toolbar.destroy());
   }
 
-  private mountRibbon(RibbonClass: typeof Ribbon, config: GridConfig): void {
+  private mountRibbon(build: Scope, RibbonClass: typeof Ribbon, config: GridConfig): void {
     const ribbon = new RibbonClass(this.host, this, {
       onHeightChange: (height) => this.setToolbarHeight(height),
       flags: config,
@@ -2515,7 +2532,7 @@ export class GridImpl implements Grid {
       ...(config.icons === undefined ? {} : { icons: config.icons }),
     });
     this.placeChrome(ribbon.element);
-    this.ribbon = ribbon;
+    build.add(() => ribbon.destroy());
     if (ribbon.height !== this.toolbarHeight) this.setToolbarHeight(ribbon.height);
   }
 
@@ -2591,10 +2608,7 @@ export class GridImpl implements Grid {
     this.keyboardPolicy =
       typeof keyboard === "function" ? (event: KeyboardEvent) => keyboard(event, this) : keyboard;
 
-    this.toolbar?.destroy();
-    this.ribbon?.destroy();
-    this.ribbon = null;
-    this.toolbar = null;
+    // `createToolbar` closes the previous build, which destroys its toolbar or ribbon.
     this.toolbarHeight = 0;
     this.createToolbar(config);
 
@@ -3028,16 +3042,17 @@ export class GridImpl implements Grid {
   }
 
   openPanel(panel: GridPanel | null): void {
-    const wasOpen = this.panelDispose !== null;
+    if (this.lifetime.closed) return;
+    const wasOpen = this.sidePanels.active;
     const hadFocus = this.panelHost.contains(document.activeElement);
-    this.panelDispose?.();
-    this.panelDispose = null;
+    this.sidePanels.close();
 
     const isOpen = panel !== null;
     // The panel focuses its first control while it mounts; a hidden host refuses focus.
     this.panelHost.hidden = !isOpen;
     if (panel) {
-      this.panelDispose = mountSidePanel(this.panelHost, panel, () => this.openPanel(null));
+      const scope = this.sidePanels.next();
+      scope.add(mountSidePanel(this.panelHost, panel, () => this.openPanel(null)));
     }
     if (isOpen !== wasOpen) {
       this.viewportEl.style.right = isOpen ? `${PANEL_WIDTH}px` : "0px";
@@ -3316,8 +3331,28 @@ export class GridImpl implements Grid {
 
   async summarizeSelection(signal?: AbortSignal): Promise<SelectionSummary | null> {
     signal?.throwIfAborted();
+    // A destroyed grid has freed its store: the call rejects with the grid's abort reason.
+    this.lifetime.signal.throwIfAborted();
     if (this.selection.isEmpty) return null;
 
+    // Each summary has its own scope under the grid's, so `destroy()` stops
+    // every running one and the caller's signal stops this one. Callers do
+    // not abort each other: a status bar and a host panel can summarize the
+    // same selection. Each caller drops its own stale summary, as the
+    // shell's status line does when the selection changes.
+    const run = this.lifetime.child();
+    signal?.addEventListener("abort", () => run.close(signal.reason), {
+      once: true,
+      signal: run.signal,
+    });
+    try {
+      return await this.summarizeRects(run);
+    } finally {
+      run.close();
+    }
+  }
+
+  private async summarizeRects(run: Scope): Promise<SelectionSummary> {
     // The selection and the active sheet can change while chunks yield, so
     // the whole run works from a copy of both.
     const rects: SelRect[] = [];
@@ -3346,10 +3381,7 @@ export class GridImpl implements Grid {
         // turn after each frame's worth of reading, then stop if aborted.
         if (readSinceYield >= SUMMARY_CELLS_PER_READ) {
           readSinceYield = 0;
-          const pause = Promise.withResolvers<void>();
-          setTimeout(pause.resolve, 0);
-          await pause.promise;
-          signal?.throwIfAborted();
+          await nextTurn(run);
         }
 
         // View rows: the store maps them through sort and filter, so rows a
@@ -3551,13 +3583,13 @@ export class GridImpl implements Grid {
   private emitCommandStateChange(): void {
     this.commandStateQueued = false;
     this.commandStateGeneration += 1;
-    if (this.destroyed || this.listeners["command-state-change"].size === 0) return;
+    if (this.lifetime.closed || this.listeners["command-state-change"].size === 0) return;
     const event = { states: this.commandStateSnapshot() };
     for (const listener of this.listeners["command-state-change"]) listener(event);
   }
 
   private queueCommandStateChange(): void {
-    if (this.commandStateQueued || this.destroyed) return;
+    if (this.commandStateQueued || this.lifetime.closed) return;
     this.commandStateQueued = true;
     const generation = ++this.commandStateGeneration;
     queueMicrotask(() => {
@@ -3753,7 +3785,7 @@ export class GridImpl implements Grid {
   }
 
   private emitExportError(error: unknown, format: "csv" | "xlsx"): void {
-    if (this.destroyed) return;
+    if (this.lifetime.closed) return;
     const operation = format === "csv" ? "delimited-export" : "xlsx-export";
     const failure = normalizeSheetwriteError(error, "export-failed", operation, { format });
     this.actionFeedback.show(`Export failed: ${failure.message} Try again.`);
@@ -3774,7 +3806,12 @@ export class GridImpl implements Grid {
 
   exportCsv(filename: string): void {
     this.requireCompleteExport([this.sheet()]);
-    downloadBytes(toCsv(this.sheet(), this.store), filename, "text/csv;charset=utf-8");
+    downloadBytesIn(
+      this.lifetime,
+      toCsv(this.sheet(), this.store),
+      filename,
+      "text/csv;charset=utf-8",
+    );
   }
 
   async exportXlsx(filename: string): Promise<void> {
@@ -3787,12 +3824,21 @@ export class GridImpl implements Grid {
       workbook.sheets.find((candidate) => candidate.id === workbook.activeSheet) ??
       workbook.sheets[0];
     if (sheet) this.requireCompleteExport([sheet]);
-    const bytes = await toXlsxTable(workbook, this.store);
-    downloadBytes(
-      bytes,
-      filename,
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    );
+
+    // Destroy aborts the export; its listeners on the signal go with this scope.
+    const run = this.lifetime.child();
+    try {
+      const bytes = await toXlsxTable(workbook, this.store, { signal: run.signal });
+      run.signal.throwIfAborted();
+      downloadBytesIn(
+        this.lifetime,
+        bytes,
+        filename,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      );
+    } finally {
+      run.close();
+    }
   }
 
   /**
@@ -3815,9 +3861,26 @@ export class GridImpl implements Grid {
     this.render();
   }
 
+  /**
+   * A clipboard shortcut has no caller to await it. Its outcomes need no
+   * message (the shortcut itself is the fallback the menu messages suggest),
+   * but a failure is a bug: tell the user, and let the error reach the host.
+   */
+  private runKeyboardClipboard(action: Promise<ClipboardOutcome>): void {
+    void action.then(undefined, (error: unknown) => {
+      if (this.lifetime.closed) return;
+      this.actionFeedback.show(`The command did not finish: ${errorDetail(error)}`);
+      throw error;
+    });
+  }
+
+  /**
+   * Closing the root scope first aborts every running operation and frees the
+   * chrome, panels and timers it owns. The grid's own parts follow in a fixed
+   * order, because later ones (the store, the renderer) are read by earlier ones.
+   */
   destroy(): void {
-    if (this.destroyed) return;
-    this.destroyed = true;
+    if (this.lifetime.closed) return;
     this.removeEngineFailureListener();
     let failure: unknown;
     let failed = false;
@@ -3831,15 +3894,13 @@ export class GridImpl implements Grid {
         }
       }
     };
-    cleanup(() => this.cancelAutoFit());
+    cleanup(() => this.lifetime.close());
     cleanup(() => this.datasourceController.destroy());
     cleanup(() => this.mutationRevisions.clear());
     cleanup(() => this.readWindows.destroy());
     cleanup(() => this.interactions.destroy());
     cleanup(() => this.notes.destroy());
     cleanup(() => this.objectLayer.destroy());
-    cleanup(() => this.scroller.removeEventListener("scroll", this.onScroll));
-    cleanup(() => this.resizeObserver?.disconnect());
     cleanup(() =>
       this.resolutionMediaQuery?.removeEventListener("change", this.onResolutionChange),
     );
@@ -3854,12 +3915,6 @@ export class GridImpl implements Grid {
     cleanup(() => this.overlayPainter.destroy());
     cleanup(() => this.sheetTabs?.destroy());
     cleanup(() => this.tabBar?.remove());
-    cleanup(() => this.toolbar?.destroy());
-    cleanup(() => this.ribbon?.destroy());
-    cleanup(() => this.findBar?.destroy());
-    cleanup(() => this.actionFeedback.destroy());
-    cleanup(() => this.panelDispose?.());
-    cleanup(() => this.disposePanels?.());
     cleanup(() => this.panelHost.remove());
     cleanup(() => this.viewportEl.remove());
     cleanup(() => this.ariaMirror.destroy());
@@ -3871,7 +3926,7 @@ export class GridImpl implements Grid {
   }
 
   trimMemory(): void {
-    if (this.destroyed) return;
+    if (this.lifetime.closed) return;
 
     // A worker drops its strings only when the host reader drops its own, so
     // the next frame resends them. A store without an engine sends no pool ids.

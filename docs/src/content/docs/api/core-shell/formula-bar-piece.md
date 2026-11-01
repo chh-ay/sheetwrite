@@ -8,7 +8,7 @@ description: "FormulaBarPiece interface in @sheetwrite/core/shell: A formula bar
 A formula bar piece; `setReadOnly` blocks commits without unmounting.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/shell/formula-controls.ts#L139"><code>packages/core/src/shell/formula-controls.ts#L139</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/shell/formula-controls.ts#L136"><code>packages/core/src/shell/formula-controls.ts#L136</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

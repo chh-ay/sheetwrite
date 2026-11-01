@@ -3,6 +3,7 @@ import { beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import { ClipboardController, SHEETWRITE_CLIPBOARD_MIME } from "../src/clipboard-controller.js";
 import { parseTsv, toTsv } from "../src/clipboard.js";
 import { initSheetwrite } from "../src/grid.js";
+import { Scope } from "../src/scope.js";
 import { SelectionModel } from "../src/selection.js";
 import { SheetwriteStore } from "../src/store.js";
 import type {
@@ -167,6 +168,8 @@ class FakeClipboardItem {
 
 interface Harness {
   controller: ClipboardController;
+  /** The grid scope the controller runs under; closing it is the grid's destroy. */
+  lifetime: Scope;
   store: FakeStore;
   sheet: Sheet;
   selection: SelectionModel;
@@ -213,12 +216,14 @@ function makeHarness(
   });
 
   const store = new FakeStore();
+  const lifetime = new Scope();
   const sheet = makeWorkbook(100).sheets[0]!; // columns: name(text), amount(number), city(text)
   const selection = new SelectionModel(100, 0, 2);
   let readOnly = false;
 
   const commitReasons: string[] = [];
   const controller = new ClipboardController({
+    lifetime,
     store: store as unknown as Store,
     selection: () => selection,
     activeSheet: () => "s1",
@@ -249,6 +254,7 @@ function makeHarness(
 
   return {
     controller,
+    lifetime,
     store,
     sheet,
     selection,
@@ -336,6 +342,54 @@ describe("ClipboardController", () => {
 
     expect(h.store.getFormula({ sheet: "s1", row: 1, col: 1 })).toBeNull();
     expect(h.store.getCell({ sheet: "s1", row: 3, col: 1 }).resolved).toBe("keep");
+  });
+
+  it("lets a newer paste stop an older one that is still reading", async () => {
+    const reads: Array<(text: string) => void> = [];
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        readText: () => {
+          const read = Promise.withResolvers<string>();
+          reads.push(read.resolve);
+          return read.promise;
+        },
+      },
+    });
+
+    h.select(3, 1);
+    const older = h.controller.paste();
+    h.select(5, 1);
+    const newer = h.controller.paste();
+    reads[1]?.("new");
+    reads[0]?.("old");
+
+    expect(await older).toBe("empty");
+    expect(await newer).toBe("done");
+    expect(h.store.getCell({ sheet: "s1", row: 3, col: 1 }).resolved).toBeNull();
+    expect(h.store.getCell({ sheet: "s1", row: 5, col: 1 }).resolved).toBe("new");
+    expect(h.commitReasons).toEqual(["paste"]);
+  });
+
+  it("keeps a cut source when the grid closes before the clipboard accepts it", async () => {
+    const { promise: pendingWrite, resolve: finishWrite } = Promise.withResolvers<void>();
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: () => pendingWrite,
+        readText: () => Promise.resolve(""),
+      },
+    });
+    h.store.seed(1, 1, { kind: "formula", src: "=A1+B$2" }, 0);
+    h.select(1, 1);
+
+    const cut = h.controller.cut();
+    h.lifetime.close();
+    finishWrite();
+
+    expect(await cut).toBe("empty");
+    expect(h.store.getFormula({ sheet: "s1", row: 1, col: 1 })).toBe("=A1+B$2");
+    expect(h.commitReasons).toEqual([]);
   });
 
   it("does not clear a read-only cut source", async () => {

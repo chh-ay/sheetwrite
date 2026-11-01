@@ -8,7 +8,7 @@ description: "GridCommandName type in @sheetwrite/vue: Built-in command names ac
 Built-in command names accepted by state queries and change events.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/grid.d.ts#L182"><code>packages/core/dist/types/grid.d.ts#L182</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/grid.d.ts#L184"><code>packages/core/dist/types/grid.d.ts#L184</code></a></dd></div>
 </dl>
 
 ## Declaration

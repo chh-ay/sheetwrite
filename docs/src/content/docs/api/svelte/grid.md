@@ -28,7 +28,7 @@ function updateTotal(grid: Grid) {
 - [Grid.applyTransaction](/docs/api/svelte/grid/#grid-apply-transaction)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/grid.d.ts#L636"><code>packages/core/dist/types/grid.d.ts#L636</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/grid.d.ts#L638"><code>packages/core/dist/types/grid.d.ts#L638</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -197,8 +197,9 @@ summarizeSelection(signal?: AbortSignal): Promise<SelectionSummary | null>;
 
 <p class="api-member-doc">Totals for the current selection, for a status bar. Large selections are
 read in chunks between frames, so the page stays responsive; abort
-`signal` to stop early, which rejects with the signal's reason. Resolves
-null when nothing is selected.</p>
+`signal` to stop early, which rejects with the signal's reason.
+`destroy()` stops every running summary the same way, with an
+`AbortError`. Resolves null when nothing is selected.</p>
 </details>
 
 <details class="api-member" id="grid-set-active-sheet" data-pagefind-weight="1">

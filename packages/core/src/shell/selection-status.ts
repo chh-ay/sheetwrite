@@ -4,6 +4,7 @@
 // frames, so this piece stays safe next to any selection size.
 
 import { formatNumber } from "../number-format.js";
+import { isAbortError, Scope, ScopeSlot } from "../scope.js";
 import type { Selection } from "../types/coordinates.js";
 import type { Grid, SelectionSummary } from "../types/grid.js";
 import type { ShellPiece } from "./formula-controls.js";
@@ -53,7 +54,8 @@ export function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece
 
   let geometry = "";
   let totals = "";
-  let pending: AbortController | null = null;
+  const lifetime = new Scope();
+  const summaries = new ScopeSlot(lifetime);
 
   const show = (): void => {
     const text = [totals, geometry].filter(Boolean).join(STATUS_SEPARATOR);
@@ -62,20 +64,23 @@ export function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece
     host.hidden = output.hidden && host.childElementCount === 1;
   };
 
-  // A newer selection or edit makes an unfinished summary stale: abort it so
-  // a huge selection never queues work behind the user.
+  // A newer selection or edit makes an unfinished summary stale: the next
+  // summary closes its scope, so a huge selection never queues work behind
+  // the user, and an aborted summary shows nothing.
   const summarize = (): void => {
-    pending?.abort();
-    const controller = new AbortController();
-    pending = controller;
-    grid.summarizeSelection(controller.signal).then(
+    const run = summaries.next();
+    grid.summarizeSelection(run.signal).then(
       (summary) => {
-        if (controller.signal.aborted) return;
+        if (run.closed) return;
+        run.close();
         totals = describeSummary(summary);
         show();
       },
       (error: unknown) => {
-        if (!controller.signal.aborted) throw error;
+        if (run.closed) return;
+        run.close();
+        // A grid destroyed before this piece aborts the summary: not a failure.
+        if (!isAbortError(error)) throw error;
       },
     );
   };
@@ -85,22 +90,14 @@ export function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece
     show();
     summarize();
   };
-  const unsubscribes = [
-    grid.on("selection", (event) => onSelection(event.selection)),
-    grid.on("change", summarize),
-  ];
   host.appendChild(output);
+  lifetime.add(() => output.remove());
+  lifetime.add(grid.on("selection", (event) => onSelection(event.selection)));
+  lifetime.add(grid.on("change", summarize));
   onSelection(grid.getSelection());
 
-  let destroyed = false;
   return {
     element: output,
-    destroy() {
-      if (destroyed) return;
-      destroyed = true;
-      pending?.abort();
-      for (const unsubscribe of unsubscribes) unsubscribe();
-      output.remove();
-    },
+    destroy: () => lifetime.close(),
   };
 }

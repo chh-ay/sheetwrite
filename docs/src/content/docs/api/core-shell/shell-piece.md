@@ -8,7 +8,7 @@ description: "ShellPiece interface in @sheetwrite/core/shell: A mounted shell pi
 A mounted shell piece: its root element plus an idempotent teardown.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/shell/formula-controls.ts#L12"><code>packages/core/src/shell/formula-controls.ts#L12</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/shell/formula-controls.ts#L13"><code>packages/core/src/shell/formula-controls.ts#L13</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

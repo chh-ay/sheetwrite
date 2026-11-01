@@ -1,3 +1,4 @@
+import { isAbortError, type Scope } from "./scope.js";
 import type { ClipboardOutcome, Grid } from "./types/grid.js";
 
 /**
@@ -27,19 +28,23 @@ export function errorDetail(cause: unknown): string {
  * One feedback channel per grid for its built-in toolbar, context menu and
  * find bar: a command already running ignores a second start, its button
  * shows that it is busy, and a failure or a refused clipboard becomes one
- * readable alert instead of a silent no-op.
+ * readable alert instead of a silent no-op. An abort is not a failure, and
+ * after the grid's scope closes the channel shows nothing.
  */
 class ActionFeedback {
   private readonly el: HTMLElement;
+  private readonly lifetime: Scope;
   private readonly running = new Set<string>();
   private timer: number | undefined;
 
-  constructor(host: HTMLElement) {
+  constructor(host: HTMLElement, lifetime: Scope) {
     this.el = document.createElement("div");
     this.el.className = "sheetwrite-action-status";
     this.el.setAttribute("role", "alert");
     this.el.hidden = true;
     host.appendChild(this.el);
+    this.lifetime = lifetime;
+    lifetime.add(() => this.destroy());
   }
 
   isRunning(key: string): boolean {
@@ -70,7 +75,7 @@ class ActionFeedback {
         if (message !== undefined) this.show(message);
       }
     } catch (cause) {
-      this.show(`The command did not finish: ${errorDetail(cause)}`);
+      if (!isAbortError(cause)) this.show(`The command did not finish: ${errorDetail(cause)}`);
     } finally {
       this.running.delete(key);
       button?.removeAttribute("aria-busy");
@@ -85,6 +90,8 @@ class ActionFeedback {
   }
 
   show(message: string): void {
+    // A command that settles after destroy must not start a timer on a removed element.
+    if (this.lifetime.closed) return;
     this.el.textContent = message;
     this.el.hidden = false;
     window.clearTimeout(this.timer);
@@ -97,7 +104,7 @@ class ActionFeedback {
     this.el.textContent = "";
   }
 
-  destroy(): void {
+  private destroy(): void {
     window.clearTimeout(this.timer);
     this.el.remove();
   }
@@ -106,8 +113,8 @@ class ActionFeedback {
 /** Feedback channels by grid, so shell chrome built outside the grid finds its grid's channel. */
 const channels = new WeakMap<Grid, ActionFeedback>();
 
-function attachActionFeedback(grid: Grid, host: HTMLElement): ActionFeedback {
-  const feedback = new ActionFeedback(host);
+function attachActionFeedback(grid: Grid, host: HTMLElement, lifetime: Scope): ActionFeedback {
+  const feedback = new ActionFeedback(host, lifetime);
   channels.set(grid, feedback);
   return feedback;
 }
