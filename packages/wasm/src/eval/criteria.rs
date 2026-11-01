@@ -314,47 +314,56 @@ impl IfExtreme {
     }
 }
 
-/// Aggregates the rows whose criteria all match, on a materialized range.
+/// `SUMIF`/`SUMIFS`, or `AVERAGEIF`/`AVERAGEIFS` when `average` is set, over
+/// the rows of a materialized range whose criteria all match.
 pub(super) fn aggregate_if(
     sum_range: &EvalMatrix,
     criteria: &[(&EvalMatrix, &Criterion)],
-) -> Result<(f64, u64), FormulaError> {
+    average: bool,
+) -> Value {
     let mut aggregate = IfSum::new();
-    if let [(range, criterion)] = criteria {
-        for (value, candidate) in sum_range.values.iter().zip(&range.values) {
-            if !criterion.matches(candidate) {
-                continue;
-            }
-            aggregate.add(value)?;
-        }
-        return Ok((aggregate.sum, aggregate.count));
-    }
-    for (index, value) in sum_range.values.iter().enumerate() {
-        if !criteria
+    let folded = if let [(range, criterion)] = criteria {
+        sum_range
+            .values
             .iter()
-            .all(|(range, criterion)| criterion.matches(&range.values[index]))
-        {
-            continue;
-        }
-        aggregate.add(value)?;
+            .zip(&range.values)
+            .filter(|(_, candidate)| criterion.matches(candidate))
+            .try_for_each(|(value, _)| aggregate.add(value))
+    } else {
+        matched_rows(sum_range, criteria).try_for_each(|value| aggregate.add(value))
+    };
+    match folded {
+        Ok(()) => aggregate.finish(average),
+        Err(error) => Value::Error(error),
     }
-    Ok((aggregate.sum, aggregate.count))
 }
 
+/// `MAXIFS`, or `MINIFS` when `maximum` is unset, over a materialized range.
 pub(super) fn extreme_if(
     value_range: &EvalMatrix,
     criteria: &[(&EvalMatrix, &Criterion)],
     maximum: bool,
-) -> Result<f64, FormulaError> {
+) -> Value {
     let mut aggregate = IfExtreme::new(maximum);
-    for (index, value) in value_range.values.iter().enumerate() {
-        if !criteria
-            .iter()
-            .all(|(range, criterion)| criterion.matches(&range.values[index]))
-        {
-            continue;
-        }
-        aggregate.add(value)?;
+    match matched_rows(value_range, criteria).try_for_each(|value| aggregate.add(value)) {
+        Ok(()) => aggregate.finish(),
+        Err(error) => Value::Error(error),
     }
-    Ok(aggregate.found.unwrap_or(0.0))
+}
+
+/// The cells of `aggregated` whose row matches every criterion.
+fn matched_rows<'a>(
+    aggregated: &'a EvalMatrix,
+    criteria: &'a [(&EvalMatrix, &Criterion)],
+) -> impl Iterator<Item = &'a Value> {
+    aggregated
+        .values
+        .iter()
+        .enumerate()
+        .filter_map(|(index, cell)| {
+            criteria
+                .iter()
+                .all(|(range, criterion)| criterion.matches(&range.values[index]))
+                .then_some(cell)
+        })
 }
