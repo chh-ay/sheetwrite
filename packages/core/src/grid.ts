@@ -40,6 +40,12 @@ import { downloadBytesIn, toCsv, toXlsxTable } from "./export.js";
 import type { FindBar } from "./find-bar.js";
 import { stepFontSizePx, stepNumberFormatDecimals } from "./format-presets.js";
 import { GeometryLayoutController } from "./geometry-layout-controller.js";
+import {
+  ZOOM_MIN,
+  ZOOM_MAX,
+  CELL_TEXT_HORIZONTAL_PADDING,
+  DEFAULT_DISTINCT_VALUES_LIMIT,
+} from "./grid-constants.js";
 import { hyperlinkAt, resolveHyperlinkTarget, sanitizeCellHyperlink } from "./hyperlink.js";
 import { InteractionSessions } from "./interaction-sessions.js";
 import { Keymap } from "./keymap.js";
@@ -1952,7 +1958,11 @@ export class GridImpl implements Grid {
           mergeWidths.get(row * sheet.columns.length + col) ?? sheet.columns[col]!.width;
         const fontSize = style.fontSize ?? fallbackFontSize;
         context.font = fontFor(this.baseTheme, style);
-        const lineCount = layoutTextLines(context, text, Math.max(0, width - 12)).length;
+        const lineCount = layoutTextLines(
+          context,
+          text,
+          Math.max(0, width - CELL_TEXT_HORIZONTAL_PADDING),
+        ).length;
         required = Math.max(required, Math.ceil(lineCount * fontSize * 1.2 + 8));
       }
       requiredHeights[requiredIndex] = required;
@@ -2682,7 +2692,7 @@ export class GridImpl implements Grid {
 
   setZoom(zoom: number): void {
     if (!Number.isFinite(zoom)) return;
-    const next = Math.min(2, Math.max(0.5, zoom));
+    const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom));
     if (next === this.zoom) return;
     this.zoom = next;
     this.applyZoomedTheme();
@@ -3611,8 +3621,8 @@ export class GridImpl implements Grid {
     return this.loadable ? this.loadable.aggregate(this.activeSheet, col, op) : 0;
   }
 
-  sortBy(col: number, ascending = true): void {
-    void this.setSort([{ col, ascending }]);
+  sortBy(col: number, ascending = true): ApplyTransactionResult {
+    return this.setSort([{ col, ascending }]);
   }
 
   filterBy(col: number, needle: string): void {
@@ -3632,8 +3642,8 @@ export class GridImpl implements Grid {
     );
   }
 
-  sortByMulti(keys: readonly SortKey[]): void {
-    void this.setSort(keys);
+  sortByMulti(keys: readonly SortKey[]): ApplyTransactionResult {
+    return this.setSort(keys);
   }
 
   setSort(keys: readonly SortKey[]): ApplyTransactionResult {
@@ -3670,7 +3680,7 @@ export class GridImpl implements Grid {
     return new Map(this.sheet().filters ?? this.loadable?.columnFilters(this.activeSheet) ?? []);
   }
 
-  distinctValues(col: number, limit = 1000): CellScalar[] {
+  distinctValues(col: number, limit = DEFAULT_DISTINCT_VALUES_LIMIT): CellScalar[] {
     return this.loadable?.distinctValues(this.activeSheet, col, limit) ?? [];
   }
 

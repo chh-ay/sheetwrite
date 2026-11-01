@@ -4,6 +4,7 @@ import { ContextMenu } from "./context-menu.js";
 import { CustomEditorController } from "./custom-editor.js";
 import { EditController, type EditNavigate } from "./editor.js";
 import { detectFillSeries, type FillSeries, type FillSourceCell } from "./fill-series.js";
+import { FILL_HANDLE_HIT_RADIUS, FALLBACK_CHARACTER_WIDTH } from "./grid-constants.js";
 import type { Keymap } from "./keymap.js";
 import { autofitColumnWidth, MIN_COLUMN_WIDTH, MIN_ROW_HEIGHT, resizeTargetAt } from "./resize.js";
 import type { CellRef, SelectionModel, SelRect } from "./selection.js";
@@ -534,7 +535,10 @@ export class InteractionSessions {
     if (fillHandle && !this.isEditing) {
       const hx = e.clientX - viewportRect.left;
       const hy = e.clientY - viewportRect.top;
-      if (Math.abs(hx - fillHandle.x) <= 5 && Math.abs(hy - fillHandle.y) <= 5) {
+      if (
+        Math.abs(hx - fillHandle.x) <= FILL_HANDLE_HIT_RADIUS &&
+        Math.abs(hy - fillHandle.y) <= FILL_HANDLE_HIT_RADIUS
+      ) {
         e.preventDefault();
         this.startFillDrag(e);
         return;
@@ -804,7 +808,7 @@ export class InteractionSessions {
     }
 
     const ctx = this.measureCtx;
-    if (!ctx) return text.length * 8;
+    if (!ctx) return text.length * FALLBACK_CHARACTER_WIDTH;
     ctx.font = this.deps.theme().font;
     return ctx.measureText(text).width;
   }

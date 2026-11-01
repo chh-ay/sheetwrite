@@ -1,6 +1,7 @@
 import { colToA1, labelToCol } from "./a1.js";
 import { SheetwriteError } from "./errors.js";
 import { sanitizeHyperlinkStyle } from "./hyperlink.js";
+import { formulaNameKey } from "./name-key.js";
 import type { Sheet } from "./types/document.js";
 import type {
   WorkbookTable,
@@ -61,7 +62,7 @@ const UNSUPPORTED_FEATURES: Readonly<Record<WorkbookTableUnsupportedFeature, tru
 
 /** Locale-independent key used for table and table-column collision checks. */
 export function workbookTableNameKey(name: string): string {
-  return name.normalize("NFC").toUpperCase();
+  return formulaNameKey(name);
 }
 
 /** Validate and NFC-normalize an ECMA-compatible structured-reference name. */

@@ -910,9 +910,9 @@ export interface Grid {
    * ```
    * @see Grid.clearView
    */
-  sortBy(col: number, ascending?: boolean): void;
+  sortBy(col: number, ascending?: boolean): ApplyTransactionResult;
   /** Multi-key sort of the displayed rows (first key primary; stable). */
-  sortByMulti(keys: readonly SortKey[]): void;
+  sortByMulti(keys: readonly SortKey[]): ApplyTransactionResult;
   /**
    * Filter the displayed rows to those whose column text contains `needle`.
    *

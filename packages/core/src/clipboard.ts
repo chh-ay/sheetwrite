@@ -20,7 +20,7 @@ export function neutralizeInjection(value: string): string {
  * negatives) remain numeric text. The result is one synchronous in-memory
  * string and has no BOM because it is a clipboard flavor.
  */
-export function toTsv(
+export function rowsToTsv(
   rows: readonly (readonly CellScalar[])[],
   options: DelimitedTextOptions = {},
 ): string {
