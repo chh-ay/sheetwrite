@@ -9,7 +9,6 @@ import type {
   GridEvents,
   GridOptions,
   Selection,
-  SheetwriteError,
   Theme,
   Workbook,
 } from "@sheetwrite/core";
@@ -27,6 +26,7 @@ import {
   type RowBridge,
   type RowBridgeHandler,
   type RowBridgeId,
+  SheetwriteError,
   type SheetwriteInitializationProps,
   type SimpleColumn,
   type SimpleGridInput,
@@ -433,7 +433,11 @@ const SheetwriteSimpleComponent = defineComponent({
         (props.height === undefined && !props.fill) ||
         (props.height !== undefined && props.fill)
       ) {
-        throw new Error("Sheetwrite: provide exactly one of height or fill");
+        throw new SheetwriteError(
+          "invalid-argument",
+          "create-grid",
+          "Sheetwrite: provide exactly one of height or fill",
+        );
       }
       if (
         input === null ||

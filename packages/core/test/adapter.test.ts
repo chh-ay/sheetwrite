@@ -3,6 +3,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 import { GRID_OPTION_CONFORMANCE } from "../../../test/adapter-lifecycle-contract.js";
 import {
   applyChangedLiveGridOptions,
+  createAdapterGridController,
   createGridController,
   createSimpleGridInput,
   extractGridOptions,
@@ -39,6 +40,40 @@ function mountHost(): HTMLDivElement {
 }
 
 describe("shared adapter option policy", () => {
+  it("does not report rejected publication from an unmounted attachment after remount", async () => {
+    const stalePublication = Promise.withResolvers<void>();
+    const retiredPublication = Promise.withResolvers<void>();
+    const failures: unknown[] = [];
+    const readyGenerations: number[] = [];
+    let published = 0;
+    const controller = createAdapterGridController(
+      {
+        onReady: ({ generation }) => readyGenerations.push(generation),
+      },
+      {
+        publish(grid) {
+          if (!grid) return retiredPublication.promise;
+          published += 1;
+          if (published === 1) return stalePublication.promise;
+        },
+        setInitializationState() {},
+        reportConsumerFailure: (error) => failures.push(error),
+      },
+    );
+    const input = { options: { workbook: makeWorkbook(1) } };
+    controller.mount(mountHost(), input);
+    controller.unmount();
+    controller.mount(mountHost(), input);
+    stalePublication.reject(new Error("retired readiness"));
+    retiredPublication.reject(new Error("retired handle"));
+    const turn = Promise.withResolvers<void>();
+    setImmediate(turn.resolve);
+    await turn.promise;
+    expect(readyGenerations).toEqual([2]);
+    expect(failures).toHaveLength(0);
+    controller.unmount();
+  });
+
   it("classifies every GridOptions key and reports its deterministic reset reason", () => {
     const initial: GridOptions = { workbook: makeWorkbook(1) };
     const changedValues: { [Key in keyof GridOptions]-?: GridOptions[Key] } = {
