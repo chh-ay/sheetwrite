@@ -66,6 +66,7 @@ pub(super) fn ast_contains_runtime_ref(ast: &Ast) -> bool {
         }
         Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => ast_contains_runtime_ref(inner),
         Ast::LetSlot { expression, .. } => ast_contains_runtime_ref(expression),
+        Ast::NamedFormula(named) => ast_contains_runtime_ref(&named.expression),
         _ => false,
     }
 }
@@ -309,6 +310,13 @@ impl CellStore {
             }
             Ast::LetSlot { expression, .. } => {
                 self.rewrite_references(expression, sheet, pass, depth + 1, child);
+            }
+            // The copy is only evaluated, never written back, so the name's
+            // expansion takes the node's place.
+            Ast::NamedFormula(named) => {
+                let mut expression = named.expression.clone();
+                self.rewrite_references(&mut expression, sheet, pass, depth + 1, scope);
+                *ast = expression;
             }
             _ => {}
         }

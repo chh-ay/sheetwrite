@@ -143,8 +143,10 @@ impl CellStore {
         seeds
     }
 
-    /// Calls a host function. An error argument propagates without a call,
-    /// as in most built-in functions, so the host never receives error values.
+    /// Calls a host function, or the LAMBDA that a defined name holds when
+    /// no host function has the name. An error argument of a host function
+    /// propagates without a call, as in most built-in functions, so the host
+    /// never receives error values.
     pub(super) fn eval_custom_function(
         &self,
         name: &str,
@@ -158,7 +160,7 @@ impl CellStore {
             .as_deref()
             .and_then(|functions| functions.get(&name.to_ascii_uppercase()))
         else {
-            return Value::Error(FormulaError::Name);
+            return self.eval_named_lambda_call(name, arguments, sheet, pass, depth);
         };
 
         let mut evaluated = Vec::with_capacity(arguments.len());
@@ -184,6 +186,39 @@ impl CellStore {
         }
 
         (function.implementation)(&evaluated)
+    }
+
+    /// A call of a defined name's LAMBDA that was left unresolved in the
+    /// formula: one inside that LAMBDA's own definition, which calls itself.
+    #[cfg(feature = "analysis")]
+    fn eval_named_lambda_call(
+        &self,
+        name: &str,
+        arguments: &[Ast],
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> Value {
+        let Some(lambda) = self.named_lambda(name, sheet) else {
+            return Value::Error(FormulaError::Name);
+        };
+        let mut call = Vec::with_capacity(arguments.len() + 1);
+        call.push(Ast::NamedFormula(lambda));
+        call.extend_from_slice(arguments);
+        let call_name = super::analysis::lambda::CALL;
+        super::analysis::lambda::evaluate(self, call_name, &call, sheet, pass, depth)
+    }
+
+    #[cfg(not(feature = "analysis"))]
+    fn eval_named_lambda_call(
+        &self,
+        _name: &str,
+        _arguments: &[Ast],
+        _sheet: usize,
+        _pass: &mut EvalPass<'_>,
+        _depth: usize,
+    ) -> Value {
+        Value::Error(FormulaError::Name)
     }
 }
 
@@ -229,6 +264,7 @@ fn calls_volatile_custom(ast: &Ast, functions: &CustomFunctions) -> bool {
             calls_volatile_custom(inner, functions)
         }
         Ast::LetSlot { expression, .. } => calls_volatile_custom(expression, functions),
+        Ast::NamedFormula(named) => calls_volatile_custom(&named.expression, functions),
         _ => false,
     }
 }

@@ -469,6 +469,7 @@ fn is_reference(ast: &Ast) -> bool {
         | Ast::NamedRange(..)
         | Ast::Structured(..) => true,
         Ast::LetSlot { expression, .. } => is_reference(expression),
+        Ast::NamedFormula(named) => is_reference(&named.expression),
         _ => false,
     }
 }

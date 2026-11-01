@@ -62,6 +62,8 @@ mod formula_syntax_tests;
 #[cfg(all(test, feature = "formula-engine"))]
 mod formula_tokens_tests;
 #[cfg(all(test, feature = "formula-engine"))]
+mod named_formula_tests;
+#[cfg(all(test, feature = "formula-engine"))]
 mod structural_edit_tests;
 #[cfg(all(test, feature = "formula-engine"))]
 mod tests;

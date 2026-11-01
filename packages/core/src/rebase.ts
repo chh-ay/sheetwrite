@@ -9,25 +9,25 @@ import type { PivotDefinition } from "./types/pivot.js";
 
 /** Stable conservative-rebase conflict category. */
 export type RebaseConflictCode =
-  | "overlapping-edit"
-  | "sheet-removed"
-  | "sheet-lifecycle"
-  | "formula-structural"
-  | "structural-overlap"
-  | "unsupported-structural";
+ | "overlapping-edit"
+ | "sheet-removed"
+ | "sheet-lifecycle"
+ | "formula-structural"
+ | "structural-overlap"
+ | "unsupported-structural";
 
 /** Reason and affected operations for an unsafe document rebase. */
 export interface RebaseConflict {
-  code: RebaseConflictCode;
-  localOperationIndex: number;
-  remoteOperationIndex: number;
-  message: string;
+ code: RebaseConflictCode;
+ localOperationIndex: number;
+ remoteOperationIndex: number;
+ message: string;
 }
 
 /** Successful rebased operations or a conservative rebase conflict. */
 export type DocumentRebaseResult =
-  | { status: "rebased"; operations: readonly DocumentOp[] }
-  | { status: "conflict"; conflict: RebaseConflict };
+ | { status: "rebased"; operations: readonly DocumentOp[] }
+ | { status: "conflict"; conflict: RebaseConflict };
 
 type Axis = "row" | "column";
 
@@ -35,13 +35,13 @@ type RestoreOperation = Extract<DocumentOp, { op: "restoreBlock" }>;
 type RestoreBlockReader = (operation: RestoreOperation) => PackedCellBlock;
 
 type AxisChange =
-  | { kind: "insert"; axis: Axis; sheet: string; at: number; count: number }
-  | { kind: "delete"; axis: Axis; sheet: string; at: number; count: number }
-  | { kind: "move"; axis: Axis; sheet: string };
+ | { kind: "insert"; axis: Axis; sheet: string; at: number; count: number }
+ | { kind: "delete"; axis: Axis; sheet: string; at: number; count: number }
+ | { kind: "move"; axis: Axis; sheet: string };
 
 interface TransformFailure {
-  code: RebaseConflictCode;
-  message: string;
+ code: RebaseConflictCode;
+ message: string;
 }
 
 /**
@@ -60,183 +60,183 @@ interface TransformFailure {
  * column edit moves, so such a rebase needs `initSheetwrite()` first.
  */
 export function rebaseDocumentOperations(
-  localOperations: readonly DocumentOp[],
-  remoteOperations: readonly DocumentOp[],
+ localOperations: readonly DocumentOp[],
+ remoteOperations: readonly DocumentOp[],
 ): DocumentRebaseResult {
-  const operations: DocumentOp[] = cloneJsonValue([...localOperations]);
-  // Only private clones enter this scope; transformed refs remain decoded until
-  // every remote operation succeeds, without retaining state across rebases.
-  const restoreBlocks = new Map<RestoreOperation, PackedCellBlock>();
-  const restoreBlock: RestoreBlockReader = (operation) => {
-    let block = restoreBlocks.get(operation);
-    if (!block) {
-      block = decodeRestoreBlock(operation);
-      restoreBlocks.set(operation, block);
-    }
-
-    return block;
-  };
-
-  let hasStructuralTransforms = false;
-
-  for (let remoteIndex = 0; remoteIndex < remoteOperations.length; remoteIndex++) {
-    const remote = remoteOperations[remoteIndex]!;
-    // The remote operation in the coordinates of the local operation being
-    // compared. It stays the caller's object until a local row or column change
-    // moves it; only then is a private footprint copied.
-    let carried: DocumentOp | null = remote;
-    let owned = false;
-    let axisChange = structuralChange(remote);
-    for (let localIndex = 0; localIndex < operations.length && carried; localIndex++) {
-      const local = operations[localIndex]!;
-      // Read before the transform: the next local operation is written after this one.
-      const localChange = changesStructure(local) ? structuralChange(local) : null;
-      if (axisChange) {
-        if (axisChange.kind !== "move") hasStructuralTransforms = true;
-        if (
-          axisChange.kind === "move" &&
-          operationTouchesSheet(local, axisChange.sheet, restoreBlock)
-        ) {
-          return conflict(
-            "unsupported-structural",
-            localIndex,
-            remoteIndex,
-            "Concurrent row/column moves require host review; index intent is ambiguous",
-          );
-        }
-
-        if (operationContainsFormula(local, restoreBlock)) {
-          return conflict(
-            "formula-structural",
-            localIndex,
-            remoteIndex,
-            "Formula source cannot be rebased across a concurrent structural edit without parsing sheet-aware references",
-          );
-        }
-
-        const transformed = transformForAxis(local, axisChange, restoreBlock);
-        if ("code" in transformed) {
-          return conflict(transformed.code, localIndex, remoteIndex, transformed.message);
-        }
-
-        operations[localIndex] = transformed.operation;
-      } else {
-        const lifecycle = lifecycleConflict(local, remote, restoreBlock);
-        if (lifecycle) {
-          return conflict(lifecycle.code, localIndex, remoteIndex, lifecycle.message);
-        }
-
-        if (operationsOverlap(local, carried)) {
-          return conflict(
-            "overlapping-edit",
-            localIndex,
-            remoteIndex,
-            "Concurrent operations mutate overlapping cells or range metadata",
-          );
-        }
-      }
-
-      // Only a later local operation needs the remote in its coordinates, and
-      // only a local row or column change moves it.
-      if (localIndex + 1 === operations.length || !localChange) continue;
-      const next = carryPastLocal(
-        owned ? carried : remoteFootprint(carried),
-        localChange,
-        restoreBlock,
-      );
-      if (next && "code" in next) {
-        return conflict(next.code, localIndex + 1, remoteIndex, next.message);
-      }
-
-      carried = next ? next.operation : null;
-      owned = true;
-      if (carried) axisChange = structuralChange(carried);
-    }
+ const operations: DocumentOp[] = cloneJsonValue([...localOperations]);
+ // Only private clones enter this scope; transformed refs remain decoded until
+ // every remote operation succeeds, without retaining state across rebases.
+ const restoreBlocks = new Map<RestoreOperation, PackedCellBlock>();
+ const restoreBlock: RestoreBlockReader = (operation) => {
+  let block = restoreBlocks.get(operation);
+  if (!block) {
+   block = decodeRestoreBlock(operation);
+   restoreBlocks.set(operation, block);
   }
 
-  if (hasStructuralTransforms) {
-    for (const [operation, block] of restoreBlocks) {
-      Object.assign(operation, encodeRestoreBlock(operation.range, block));
-    }
-  }
+  return block;
+ };
 
-  return { status: "rebased", operations };
+ let hasStructuralTransforms = false;
+
+ for (let remoteIndex = 0; remoteIndex < remoteOperations.length; remoteIndex++) {
+  const remote = remoteOperations[remoteIndex]!;
+  // The remote operation in the coordinates of the local operation being
+  // compared. It stays the caller's object until a local row or column change
+  // moves it; only then is a private footprint copied.
+  let carried: DocumentOp | null = remote;
+  let owned = false;
+  let axisChange = structuralChange(remote);
+  for (let localIndex = 0; localIndex < operations.length && carried; localIndex++) {
+   const local = operations[localIndex]!;
+   // Read before the transform: the next local operation is written after this one.
+   const localChange = changesStructure(local) ? structuralChange(local) : null;
+   if (axisChange) {
+    if (axisChange.kind !== "move") hasStructuralTransforms = true;
+    if (
+     axisChange.kind === "move" &&
+     operationTouchesSheet(local, axisChange.sheet, restoreBlock)
+    ) {
+     return conflict(
+      "unsupported-structural",
+      localIndex,
+      remoteIndex,
+      "Concurrent row/column moves require host review; index intent is ambiguous",
+     );
+    }
+
+    if (operationContainsFormula(local, restoreBlock)) {
+     return conflict(
+      "formula-structural",
+      localIndex,
+      remoteIndex,
+      "Formula source cannot be rebased across a concurrent structural edit without parsing sheet-aware references",
+     );
+    }
+
+    const transformed = transformForAxis(local, axisChange, restoreBlock);
+    if ("code" in transformed) {
+     return conflict(transformed.code, localIndex, remoteIndex, transformed.message);
+    }
+
+    operations[localIndex] = transformed.operation;
+   } else {
+    const lifecycle = lifecycleConflict(local, remote, restoreBlock);
+    if (lifecycle) {
+     return conflict(lifecycle.code, localIndex, remoteIndex, lifecycle.message);
+    }
+
+    if (operationsOverlap(local, carried)) {
+     return conflict(
+      "overlapping-edit",
+      localIndex,
+      remoteIndex,
+      "Concurrent operations mutate overlapping cells or range metadata",
+     );
+    }
+   }
+
+   // Only a later local operation needs the remote in its coordinates, and
+   // only a local row or column change moves it.
+   if (localIndex + 1 === operations.length || !localChange) continue;
+   const next = carryPastLocal(
+    owned ? carried : remoteFootprint(carried),
+    localChange,
+    restoreBlock,
+   );
+   if (next && "code" in next) {
+    return conflict(next.code, localIndex + 1, remoteIndex, next.message);
+   }
+
+   carried = next ? next.operation : null;
+   owned = true;
+   if (carried) axisChange = structuralChange(carried);
+  }
+ }
+
+ if (hasStructuralTransforms) {
+  for (const [operation, block] of restoreBlocks) {
+   Object.assign(operation, encodeRestoreBlock(operation.range, block));
+  }
+ }
+
+ return { status: "rebased", operations };
 }
 
 function conflict(
-  code: RebaseConflictCode,
-  localOperationIndex: number,
-  remoteOperationIndex: number,
-  message: string,
+ code: RebaseConflictCode,
+ localOperationIndex: number,
+ remoteOperationIndex: number,
+ message: string,
 ): DocumentRebaseResult {
-  return {
-    status: "conflict",
-    conflict: { code, localOperationIndex, remoteOperationIndex, message },
-  };
+ return {
+  status: "conflict",
+  conflict: { code, localOperationIndex, remoteOperationIndex, message },
+ };
 }
 
 /** Whether an operation inserts, deletes, or moves rows or columns. */
 function changesStructure(operation: DocumentOp): boolean {
-  switch (operation.op) {
-    case "addRows":
-    case "removeRows":
-    case "moveRows":
-    case "addColumns":
-    case "removeColumns":
-    case "moveColumns":
-      return true;
-    default:
-      return false;
-  }
+ switch (operation.op) {
+  case "addRows":
+  case "removeRows":
+  case "moveRows":
+  case "addColumns":
+  case "removeColumns":
+  case "moveColumns":
+   return true;
+  default:
+   return false;
+ }
 }
 
 function structuralChange(operation: DocumentOp): AxisChange | null {
-  switch (operation.op) {
-    case "addRows":
-      return {
-        kind: "insert",
-        axis: "row",
-        sheet: operation.sheet,
-        at: operation.at,
-        count: operation.count,
-      };
+ switch (operation.op) {
+  case "addRows":
+   return {
+    kind: "insert",
+    axis: "row",
+    sheet: operation.sheet,
+    at: operation.at,
+    count: operation.count,
+   };
 
-    case "removeRows":
-      return {
-        kind: "delete",
-        axis: "row",
-        sheet: operation.sheet,
-        at: operation.at,
-        count: operation.count,
-      };
+  case "removeRows":
+   return {
+    kind: "delete",
+    axis: "row",
+    sheet: operation.sheet,
+    at: operation.at,
+    count: operation.count,
+   };
 
-    case "moveRows":
-      return { kind: "move", axis: "row", sheet: operation.sheet };
+  case "moveRows":
+   return { kind: "move", axis: "row", sheet: operation.sheet };
 
-    case "addColumns":
-      return {
-        kind: "insert",
-        axis: "column",
-        sheet: operation.sheet,
-        at: operation.at,
-        count: operation.columns.length,
-      };
+  case "addColumns":
+   return {
+    kind: "insert",
+    axis: "column",
+    sheet: operation.sheet,
+    at: operation.at,
+    count: operation.columns.length,
+   };
 
-    case "removeColumns":
-      return {
-        kind: "delete",
-        axis: "column",
-        sheet: operation.sheet,
-        at: operation.at,
-        count: operation.count,
-      };
+  case "removeColumns":
+   return {
+    kind: "delete",
+    axis: "column",
+    sheet: operation.sheet,
+    at: operation.at,
+    count: operation.count,
+   };
 
-    case "moveColumns":
-      return { kind: "move", axis: "column", sheet: operation.sheet };
+  case "moveColumns":
+   return { kind: "move", axis: "column", sheet: operation.sheet };
 
-    default:
-      return null;
-  }
+  default:
+   return null;
+ }
 }
 
 /**
@@ -247,27 +247,27 @@ function structuralChange(operation: DocumentOp): AxisChange | null {
  * suffices except where a nested range is rewritten in place.
  */
 function remoteFootprint(operation: DocumentOp): DocumentOp {
-  switch (operation.op) {
-    case "setRange":
-    case "setBlock":
-    case "restoreBlock":
-      return { op: "clearRange", range: operation.range };
-    case "addSheet":
-      // Carries no coordinates; lifecycle checks read the original operation.
-      return operation;
-    case "setHyperlink":
-    case "setValidationRule":
-    case "setProtectedRange":
-    case "setNamedRange":
-    case "addTable":
-    case "updateTable":
-    case "setSheetMeta":
-    case "setChart":
-    case "setPivot":
-      return cloneJsonValue(operation);
-    default:
-      return { ...operation };
-  }
+ switch (operation.op) {
+  case "setRange":
+  case "setBlock":
+  case "restoreBlock":
+   return { op: "clearRange", range: operation.range };
+  case "addSheet":
+   // Carries no coordinates; lifecycle checks read the original operation.
+   return operation;
+  case "setHyperlink":
+  case "setValidationRule":
+  case "setProtectedRange":
+  case "setNamedRange":
+  case "addTable":
+  case "updateTable":
+  case "setSheetMeta":
+  case "setChart":
+  case "setPivot":
+   return cloneJsonValue(operation);
+  default:
+   return { ...operation };
+ }
 }
 
 /**
@@ -278,55 +278,55 @@ function remoteFootprint(operation: DocumentOp): DocumentOp {
  * overlap it.
  */
 function carryPastLocal(
-  remote: DocumentOp,
-  local: AxisChange | null,
-  restoreBlock: RestoreBlockReader,
+ remote: DocumentOp,
+ local: AxisChange | null,
+ restoreBlock: RestoreBlockReader,
 ): { operation: DocumentOp } | TransformFailure | null {
-  if (!local) return { operation: remote };
-  if (local.kind === "move") {
-    if (!operationTouchesSheet(remote, local.sheet, restoreBlock)) return { operation: remote };
-    return {
-      code: "unsupported-structural",
-      message: "A pending row/column move reorders cells a concurrent operation targets",
-    };
+ if (!local) return { operation: remote };
+ if (local.kind === "move") {
+  if (!operationTouchesSheet(remote, local.sheet, restoreBlock)) return { operation: remote };
+  return {
+   code: "unsupported-structural",
+   message: "A pending row/column move reorders cells a concurrent operation targets",
+  };
+ }
+
+ const remoteChange = structuralChange(remote);
+ if (
+  remoteChange &&
+  remoteChange.kind !== "move" &&
+  remoteChange.axis === local.axis &&
+  remoteChange.sheet === local.sheet
+ ) {
+  if (remoteChange.kind === "insert") {
+   // Server order puts remote rows first, so an insert at the same position
+   // stays ahead of the local rows.
+   const at =
+    local.kind === "insert"
+     ? remoteChange.at > local.at
+      ? remoteChange.at + local.count
+      : remoteChange.at
+     : transformPosition(remoteChange.at, local);
+   return { operation: { ...remote, at } as DocumentOp };
   }
 
-  const remoteChange = structuralChange(remote);
-  if (
-    remoteChange &&
-    remoteChange.kind !== "move" &&
-    remoteChange.axis === local.axis &&
-    remoteChange.sheet === local.sheet
-  ) {
-    if (remoteChange.kind === "insert") {
-      // Server order puts remote rows first, so an insert at the same position
-      // stays ahead of the local rows.
-      const at =
-        local.kind === "insert"
-          ? remoteChange.at > local.at
-            ? remoteChange.at + local.count
-            : remoteChange.at
-          : transformPosition(remoteChange.at, local);
-      return { operation: { ...remote, at } as DocumentOp };
-    }
+  const mapped = transformSpan(remoteChange.at, remoteChange.count, local);
+  if (!mapped) return overlappingStructure(remote.op);
+  return { operation: { ...remote, at: mapped.at } as DocumentOp };
+ }
 
-    const mapped = transformSpan(remoteChange.at, remoteChange.count, local);
-    if (!mapped) return overlappingStructure(remote.op);
-    return { operation: { ...remote, at: mapped.at } as DocumentOp };
-  }
+ const failure = transformDirectTarget(remote, local);
+ if (!failure) return { operation: remote };
+ switch (remote.op) {
+  case "set":
+  case "setNote":
+  case "setColumn":
+  case "setRowMeta":
+   return null;
 
-  const failure = transformDirectTarget(remote, local);
-  if (!failure) return { operation: remote };
-  switch (remote.op) {
-    case "set":
-    case "setNote":
-    case "setColumn":
-    case "setRowMeta":
-      return null;
-
-    default:
-      return failure;
-  }
+  default:
+   return failure;
+ }
 }
 
 /**
@@ -335,253 +335,257 @@ function carryPastLocal(
  * is needed here; the original array the caller passed in is never touched.
  */
 function transformForAxis(
-  input: DocumentOp,
-  change: AxisChange,
-  restoreBlock: RestoreBlockReader,
+ input: DocumentOp,
+ change: AxisChange,
+ restoreBlock: RestoreBlockReader,
 ): { operation: DocumentOp } | TransformFailure {
-  if (change.kind === "move") return { operation: input };
-  const direct = transformDirectTarget(input, change);
-  if (direct) return direct;
-  const embedded = transformEmbeddedReferences(input, change, restoreBlock);
-  return embedded ? embedded : { operation: input };
+ if (change.kind === "move") return { operation: input };
+ const direct = transformDirectTarget(input, change);
+ if (direct) return direct;
+ const embedded = transformEmbeddedReferences(input, change, restoreBlock);
+ return embedded ? embedded : { operation: input };
 }
 
 function transformDirectTarget(
-  operation: DocumentOp,
-  change: Exclude<AxisChange, { kind: "move" }>,
+ operation: DocumentOp,
+ change: Exclude<AxisChange, { kind: "move" }>,
 ): TransformFailure | null {
-  switch (operation.op) {
-    case "set":
-    case "setNote": {
-      const address = transformAddress(operation.addr, change);
-      if (!address) return deletedTarget(operation.op);
-      operation.addr = address;
-      return null;
-    }
-
-    case "setRange":
-    case "setBlock":
-    case "restoreBlock":
-    case "setRangeStyle":
-    case "clearRange": {
-      const range = transformRange(operation.range, change);
-      if (!range) return overlappingStructure(operation.op);
-      operation.range = range;
-      return null;
-    }
-
-    case "addRows":
-      if (change.axis === "row" && operation.sheet === change.sheet) {
-        operation.at = transformPosition(operation.at, change);
-      }
-
-      return null;
-
-    case "removeRows":
-      if (change.axis === "row" && operation.sheet === change.sheet) {
-        const mapped = transformSpan(operation.at, operation.count, change);
-        if (!mapped) return overlappingStructure(operation.op);
-        operation.at = mapped.at;
-      }
-
-      return null;
-
-    case "moveRows":
-      if (change.axis === "row" && operation.sheet === change.sheet) {
-        const mapped = transformSpan(operation.from, operation.count, change);
-        if (!mapped) return overlappingStructure(operation.op);
-        operation.from = mapped.at;
-        operation.to = transformPosition(operation.to, change);
-      }
-
-      return null;
-
-    case "addColumns":
-      if (change.axis === "column" && operation.sheet === change.sheet) {
-        operation.at = transformPosition(operation.at, change);
-      }
-
-      return null;
-
-    case "removeColumns":
-      if (change.axis === "column" && operation.sheet === change.sheet) {
-        const mapped = transformSpan(operation.at, operation.count, change);
-        if (!mapped) return overlappingStructure(operation.op);
-        operation.at = mapped.at;
-      }
-
-      return null;
-
-    case "moveColumns":
-      if (change.axis === "column" && operation.sheet === change.sheet) {
-        const mapped = transformSpan(operation.from, operation.count, change);
-        if (!mapped) return overlappingStructure(operation.op);
-        operation.from = mapped.at;
-        operation.to = transformPosition(operation.to, change);
-      }
-
-      return null;
-
-    case "setColumn":
-      if (change.axis === "column" && operation.sheet === change.sheet) {
-        const mapped = transformIndex(operation.col, change);
-        if (mapped === null) return deletedTarget(operation.op);
-        operation.col = mapped;
-      }
-
-      return null;
-
-    case "setRowMeta":
-      if (change.axis === "row" && operation.sheet === change.sheet) {
-        const mapped = transformIndex(operation.row, change);
-        if (mapped === null) return deletedTarget(operation.op);
-        operation.row = mapped;
-      }
-
-      return null;
-
-    case "addMerge":
-    case "removeMerge":
-      if (operation.sheet === change.sheet) {
-        const range: Range = {
-          sheet: operation.sheet,
-          start: { row: operation.merge.r0, col: operation.merge.c0 },
-          end: { row: operation.merge.r1, col: operation.merge.c1 },
-        };
-
-        const mapped = transformRange(range, change);
-        if (!mapped) return overlappingStructure(operation.op);
-        operation.merge = {
-          r0: mapped.start.row,
-          c0: mapped.start.col,
-          r1: mapped.end.row,
-          c1: mapped.end.col,
-        };
-      }
-
-      return null;
-
-    case "setHyperlink": {
-      const source = transformRange(operation.hyperlink.range, change);
-      if (!source && operation.hyperlink.range.sheet === change.sheet) {
-        return overlappingStructure(operation.op);
-      }
-
-      if (source) operation.hyperlink.range = source;
-      if (operation.hyperlink.target.kind === "internal") {
-        const target = transformRange(operation.hyperlink.target.range, change);
-        if (!target && operation.hyperlink.target.range.sheet === change.sheet) {
-          return overlappingStructure(operation.op);
-        }
-
-        if (target) operation.hyperlink.target.range = target;
-      }
-
-      return null;
-    }
-
-    case "setValidationRule": {
-      const mapped = transformRange(operation.rule.range, change);
-      if (!mapped && operation.rule.range.sheet === change.sheet) {
-        return overlappingStructure(operation.op);
-      }
-
-      if (mapped) operation.rule.range = mapped;
-      return null;
-    }
-
-    case "setProtectedRange": {
-      const mapped = transformRange(operation.protectedRange.range, change);
-      if (!mapped && operation.protectedRange.range.sheet === change.sheet) {
-        return overlappingStructure(operation.op);
-      }
-
-      if (mapped) operation.protectedRange.range = mapped;
-      return null;
-    }
-
-    case "setNamedRange": {
-      const mapped = transformRange(operation.namedRange.range, change);
-      if (!mapped && operation.namedRange.range.sheet === change.sheet) {
-        return overlappingStructure(operation.op);
-      }
-
-      if (mapped) operation.namedRange.range = mapped;
-      return null;
-    }
-
-    case "addTable": {
-      const mapped = transformRange(operation.table.range, change);
-      if (!mapped && operation.table.range.sheet === change.sheet) {
-        return overlappingStructure(operation.op);
-      }
-
-      if (mapped) operation.table.range = mapped;
-      return null;
-    }
-
-    case "updateTable": {
-      if (operation.patch.range === undefined) return null;
-      const mapped = transformRange(operation.patch.range, change);
-      if (!mapped && operation.patch.range.sheet === change.sheet) {
-        return overlappingStructure(operation.op);
-      }
-
-      if (mapped) operation.patch.range = mapped;
-      return null;
-    }
-
-    case "setChart":
-      return transformChart(operation.chart, operation.sheet, change, operation.op);
-
-    case "setSheetMeta":
-      if (operation.sheet !== change.sheet) return null;
-      if (
-        Object.keys(operation.patch).length !== 1 ||
-        !Object.hasOwn(operation.patch, "conditionalFormats")
-      ) {
-        return {
-          code: "unsupported-structural",
-          message: "Only conditional formats support metadata-aware structural rebase",
-        };
-      }
-
-      if (operation.patch.conditionalFormats !== undefined) {
-        for (const rule of operation.patch.conditionalFormats) {
-          const originalSheet = rule.range.sheet;
-          const mapped = transformRange(rule.range, change);
-          if (!mapped && originalSheet === change.sheet) return overlappingStructure(operation.op);
-          if (mapped) rule.range = mapped;
-          if (originalSheet === change.sheet && rule.when.kind === "formula") {
-            rule.when.source = remapFormulaA1Refs(rule.when.source, change.axis, {
-              kind: "shift",
-              at: change.at,
-              delta: change.kind === "insert" ? change.count : -change.count,
-            });
-          }
-        }
-      }
-
-      return null;
-
-    case "setPivot":
-      return transformPivot(operation.pivot, operation.sheet, change, operation.op);
-
-    case "addSheet":
-    case "removeSheet":
-    case "renameSheet":
-    case "moveSheet":
-    case "setSheetVisibility":
-    case "removeValidationRule":
-    case "removeHyperlink":
-    case "removeProtectedRange":
-    case "removeNamedRange":
-    case "removeTable":
-    case "setCalculation":
-    case "removeChart":
-    case "removePivot":
-      return null;
+ switch (operation.op) {
+  case "set":
+  case "setNote": {
+   const address = transformAddress(operation.addr, change);
+   if (!address) return deletedTarget(operation.op);
+   operation.addr = address;
+   return null;
   }
+
+  case "setRange":
+  case "setBlock":
+  case "restoreBlock":
+  case "setRangeStyle":
+  case "clearRange": {
+   const range = transformRange(operation.range, change);
+   if (!range) return overlappingStructure(operation.op);
+   operation.range = range;
+   return null;
+  }
+
+  case "addRows":
+   if (change.axis === "row" && operation.sheet === change.sheet) {
+    operation.at = transformPosition(operation.at, change);
+   }
+
+   return null;
+
+  case "removeRows":
+   if (change.axis === "row" && operation.sheet === change.sheet) {
+    const mapped = transformSpan(operation.at, operation.count, change);
+    if (!mapped) return overlappingStructure(operation.op);
+    operation.at = mapped.at;
+   }
+
+   return null;
+
+  case "moveRows":
+   if (change.axis === "row" && operation.sheet === change.sheet) {
+    const mapped = transformSpan(operation.from, operation.count, change);
+    if (!mapped) return overlappingStructure(operation.op);
+    operation.from = mapped.at;
+    operation.to = transformPosition(operation.to, change);
+   }
+
+   return null;
+
+  case "addColumns":
+   if (change.axis === "column" && operation.sheet === change.sheet) {
+    operation.at = transformPosition(operation.at, change);
+   }
+
+   return null;
+
+  case "removeColumns":
+   if (change.axis === "column" && operation.sheet === change.sheet) {
+    const mapped = transformSpan(operation.at, operation.count, change);
+    if (!mapped) return overlappingStructure(operation.op);
+    operation.at = mapped.at;
+   }
+
+   return null;
+
+  case "moveColumns":
+   if (change.axis === "column" && operation.sheet === change.sheet) {
+    const mapped = transformSpan(operation.from, operation.count, change);
+    if (!mapped) return overlappingStructure(operation.op);
+    operation.from = mapped.at;
+    operation.to = transformPosition(operation.to, change);
+   }
+
+   return null;
+
+  case "setColumn":
+   if (change.axis === "column" && operation.sheet === change.sheet) {
+    const mapped = transformIndex(operation.col, change);
+    if (mapped === null) return deletedTarget(operation.op);
+    operation.col = mapped;
+   }
+
+   return null;
+
+  case "setRowMeta":
+   if (change.axis === "row" && operation.sheet === change.sheet) {
+    const mapped = transformIndex(operation.row, change);
+    if (mapped === null) return deletedTarget(operation.op);
+    operation.row = mapped;
+   }
+
+   return null;
+
+  case "addMerge":
+  case "removeMerge":
+   if (operation.sheet === change.sheet) {
+    const range: Range = {
+     sheet: operation.sheet,
+     start: { row: operation.merge.r0, col: operation.merge.c0 },
+     end: { row: operation.merge.r1, col: operation.merge.c1 },
+    };
+
+    const mapped = transformRange(range, change);
+    if (!mapped) return overlappingStructure(operation.op);
+    operation.merge = {
+     r0: mapped.start.row,
+     c0: mapped.start.col,
+     r1: mapped.end.row,
+     c1: mapped.end.col,
+    };
+   }
+
+   return null;
+
+  case "setHyperlink": {
+   const source = transformRange(operation.hyperlink.range, change);
+   if (!source && operation.hyperlink.range.sheet === change.sheet) {
+    return overlappingStructure(operation.op);
+   }
+
+   if (source) operation.hyperlink.range = source;
+   if (operation.hyperlink.target.kind === "internal") {
+    const target = transformRange(operation.hyperlink.target.range, change);
+    if (!target && operation.hyperlink.target.range.sheet === change.sheet) {
+     return overlappingStructure(operation.op);
+    }
+
+    if (target) operation.hyperlink.target.range = target;
+   }
+
+   return null;
+  }
+
+  case "setValidationRule": {
+   const mapped = transformRange(operation.rule.range, change);
+   if (!mapped && operation.rule.range.sheet === change.sheet) {
+    return overlappingStructure(operation.op);
+   }
+
+   if (mapped) operation.rule.range = mapped;
+   return null;
+  }
+
+  case "setProtectedRange": {
+   const mapped = transformRange(operation.protectedRange.range, change);
+   if (!mapped && operation.protectedRange.range.sheet === change.sheet) {
+    return overlappingStructure(operation.op);
+   }
+
+   if (mapped) operation.protectedRange.range = mapped;
+   return null;
+  }
+
+  case "setNamedRange": {
+   const { namedRange } = operation;
+   // A formula name never gets here: operationContainsFormula reports it as a conflict first.
+   if (namedRange.range === undefined) return null;
+
+   const mapped = transformRange(namedRange.range, change);
+   if (!mapped && namedRange.range.sheet === change.sheet) {
+    return overlappingStructure(operation.op);
+   }
+
+   if (mapped) namedRange.range = mapped;
+   return null;
+  }
+
+  case "addTable": {
+   const mapped = transformRange(operation.table.range, change);
+   if (!mapped && operation.table.range.sheet === change.sheet) {
+    return overlappingStructure(operation.op);
+   }
+
+   if (mapped) operation.table.range = mapped;
+   return null;
+  }
+
+  case "updateTable": {
+   if (operation.patch.range === undefined) return null;
+   const mapped = transformRange(operation.patch.range, change);
+   if (!mapped && operation.patch.range.sheet === change.sheet) {
+    return overlappingStructure(operation.op);
+   }
+
+   if (mapped) operation.patch.range = mapped;
+   return null;
+  }
+
+  case "setChart":
+   return transformChart(operation.chart, operation.sheet, change, operation.op);
+
+  case "setSheetMeta":
+   if (operation.sheet !== change.sheet) return null;
+   if (
+    Object.keys(operation.patch).length !== 1 ||
+    !Object.hasOwn(operation.patch, "conditionalFormats")
+   ) {
+    return {
+     code: "unsupported-structural",
+     message: "Only conditional formats support metadata-aware structural rebase",
+    };
+   }
+
+   if (operation.patch.conditionalFormats !== undefined) {
+    for (const rule of operation.patch.conditionalFormats) {
+     const originalSheet = rule.range.sheet;
+     const mapped = transformRange(rule.range, change);
+     if (!mapped && originalSheet === change.sheet) return overlappingStructure(operation.op);
+     if (mapped) rule.range = mapped;
+     if (originalSheet === change.sheet && rule.when.kind === "formula") {
+      rule.when.source = remapFormulaA1Refs(rule.when.source, change.axis, {
+       kind: "shift",
+       at: change.at,
+       delta: change.kind === "insert" ? change.count : -change.count,
+      });
+     }
+    }
+   }
+
+   return null;
+
+  case "setPivot":
+   return transformPivot(operation.pivot, operation.sheet, change, operation.op);
+
+  case "addSheet":
+  case "removeSheet":
+  case "renameSheet":
+  case "moveSheet":
+  case "setSheetVisibility":
+  case "removeValidationRule":
+  case "removeHyperlink":
+  case "removeProtectedRange":
+  case "removeNamedRange":
+  case "removeTable":
+  case "setCalculation":
+  case "removeChart":
+  case "removePivot":
+   return null;
+ }
 }
 
 /**
@@ -590,34 +594,34 @@ function transformDirectTarget(
  * like every other range-bearing metadata operation.
  */
 function transformChart(
-  chart: ChartDefinition,
-  owner: SheetId,
-  change: Exclude<AxisChange, { kind: "move" }>,
-  operation: string,
+ chart: ChartDefinition,
+ owner: SheetId,
+ change: Exclude<AxisChange, { kind: "move" }>,
+ operation: string,
 ): TransformFailure | null {
-  // Only a source on the edited sheet can come back null.
-  const mapSource = (source: ChartRange): ChartRange | null =>
-    source === "#REF!" ? source : transformRange(source, change);
+ // Only a source on the edited sheet can come back null.
+ const mapSource = (source: ChartRange): ChartRange | null =>
+  source === "#REF!" ? source : transformRange(source, change);
 
-  for (const series of chart.series) {
-    const values = mapSource(series.values);
-    const nameRange = series.nameRange === undefined ? undefined : mapSource(series.nameRange);
-    const categories = series.categories === undefined ? undefined : mapSource(series.categories);
-    if (!values || nameRange === null || categories === null) {
-      return overlappingStructure(operation);
-    }
-
-    series.values = values;
-    if (nameRange !== undefined) series.nameRange = nameRange;
-    if (categories !== undefined) series.categories = categories;
+ for (const series of chart.series) {
+  const values = mapSource(series.values);
+  const nameRange = series.nameRange === undefined ? undefined : mapSource(series.nameRange);
+  const categories = series.categories === undefined ? undefined : mapSource(series.categories);
+  if (!values || nameRange === null || categories === null) {
+   return overlappingStructure(operation);
   }
-  if (owner !== change.sheet) return null;
 
-  const index = transformIndex(change.axis === "row" ? chart.anchor.row : chart.anchor.col, change);
-  if (index === null) return deletedTarget(operation);
-  if (change.axis === "row") chart.anchor.row = index;
-  else chart.anchor.col = index;
-  return null;
+  series.values = values;
+  if (nameRange !== undefined) series.nameRange = nameRange;
+  if (categories !== undefined) series.categories = categories;
+ }
+ if (owner !== change.sheet) return null;
+
+ const index = transformIndex(change.axis === "row" ? chart.anchor.row : chart.anchor.col, change);
+ if (index === null) return deletedTarget(operation);
+ if (change.axis === "row") chart.anchor.row = index;
+ else chart.anchor.col = index;
+ return null;
 }
 
 /**
@@ -626,535 +630,537 @@ function transformChart(
  * `tableSheet` is the sheet holding a table source, when the caller knows it.
  */
 function transformPivot(
-  pivot: PivotDefinition,
-  owner: string,
-  change: Exclude<AxisChange, { kind: "move" }>,
-  operation: string,
-  tableSheet?: string,
+ pivot: PivotDefinition,
+ owner: string,
+ change: Exclude<AxisChange, { kind: "move" }>,
+ operation: string,
+ tableSheet?: string,
 ): TransformFailure | null {
-  const anchor = transformAddress({ sheet: owner, ...pivot.anchor }, change);
-  if (!anchor) return deletedTarget(operation);
-  pivot.anchor = { row: anchor.row, col: anchor.col };
+ const anchor = transformAddress({ sheet: owner, ...pivot.anchor }, change);
+ if (!anchor) return deletedTarget(operation);
+ pivot.anchor = { row: anchor.row, col: anchor.col };
 
-  const source = pivot.source;
-  if (source.invalid) return null;
-  if ("table" in source) {
-    // Field indices are table-column offsets. When the table's sheet is not
-    // known, any concurrent column edit may shift them.
-    const mayShift = tableSheet === undefined || tableSheet === change.sheet;
-    return change.axis === "column" && mayShift
-      ? {
-          code: "unsupported-structural",
-          message: "A table-sourced pivot cannot be rebased across a column edit",
-        }
-      : null;
-  }
+ const source = pivot.source;
+ if (source.invalid) return null;
+ if ("table" in source) {
+  // Field indices are table-column offsets. When the table's sheet is not
+  // known, any concurrent column edit may shift them.
+  const mayShift = tableSheet === undefined || tableSheet === change.sheet;
+  return change.axis === "column" && mayShift
+   ? {
+    code: "unsupported-structural",
+    message: "A table-sourced pivot cannot be rebased across a column edit",
+   }
+   : null;
+ }
 
-  // A range that straddles the edit changes size; one that moves whole keeps its fields.
-  const range = transformRange(source.range, change);
-  if (!range) return overlappingStructure(operation);
-  source.range = range;
-  return null;
+ // A range that straddles the edit changes size; one that moves whole keeps its fields.
+ const range = transformRange(source.range, change);
+ if (!range) return overlappingStructure(operation);
+ source.range = range;
+ return null;
 }
 
 /** Whether `pivot` summarizes a live range on `sheet`. */
 function pivotReadsSheet(pivot: PivotDefinition, sheet: string): boolean {
-  return !pivot.source.invalid && "range" in pivot.source && pivot.source.range.sheet === sheet;
+ return !pivot.source.invalid && "range" in pivot.source && pivot.source.range.sheet === sheet;
 }
 
 function transformEmbeddedReferences(
-  operation: DocumentOp,
-  change: Exclude<AxisChange, { kind: "move" }>,
-  restoreBlock: RestoreBlockReader,
+ operation: DocumentOp,
+ change: Exclude<AxisChange, { kind: "move" }>,
+ restoreBlock: RestoreBlockReader,
 ): TransformFailure | null {
-  switch (operation.op) {
-    case "set": {
-      const value = transformCellValue(operation.value, change);
-      if (!value) return deletedReference();
-      operation.value = value;
-      return null;
-    }
-    case "setRange":
-      return transformSnapshotCells(operation.cells, change);
-    case "setBlock":
-      return transformPackedBlock(operation.block, change);
-    case "restoreBlock":
-      return transformPackedBlock(restoreBlock(operation), change);
-    case "addSheet":
-      return transformSheetSnapshot(operation.sheet, change);
-    default:
-      return null;
+ switch (operation.op) {
+  case "set": {
+   const value = transformCellValue(operation.value, change);
+   if (!value) return deletedReference();
+   operation.value = value;
+   return null;
   }
+  case "setRange":
+   return transformSnapshotCells(operation.cells, change);
+  case "setBlock":
+   return transformPackedBlock(operation.block, change);
+  case "restoreBlock":
+   return transformPackedBlock(restoreBlock(operation), change);
+  case "addSheet":
+   return transformSheetSnapshot(operation.sheet, change);
+  default:
+   return null;
+ }
 }
 
 function transformSnapshotCells(
-  cells: SnapshotCell[],
-  change: Exclude<AxisChange, { kind: "move" }>,
+ cells: SnapshotCell[],
+ change: Exclude<AxisChange, { kind: "move" }>,
 ): TransformFailure | null {
-  for (const cell of cells) {
-    const value = transformCellValue(cell.value, change);
-    if (!value) return deletedReference();
-    cell.value = value;
-  }
-  return null;
+ for (const cell of cells) {
+  const value = transformCellValue(cell.value, change);
+  if (!value) return deletedReference();
+  cell.value = value;
+ }
+ return null;
 }
 
 function transformPackedBlock(
-  block: PackedCellBlock,
-  change: Exclude<AxisChange, { kind: "move" }>,
+ block: PackedCellBlock,
+ change: Exclude<AxisChange, { kind: "move" }>,
 ): TransformFailure | null {
-  if (!block.refs) return null;
-  for (const tuple of block.refs) {
-    const address = transformAddress(tuple[1], change);
-    if (!address) return deletedReference();
-    tuple[1] = address;
-  }
-  return null;
+ if (!block.refs) return null;
+ for (const tuple of block.refs) {
+  const address = transformAddress(tuple[1], change);
+  if (!address) return deletedReference();
+  tuple[1] = address;
+ }
+ return null;
 }
 
 function transformSheetSnapshot(
-  sheet: SheetSnapshot,
-  change: Exclude<AxisChange, { kind: "move" }>,
+ sheet: SheetSnapshot,
+ change: Exclude<AxisChange, { kind: "move" }>,
 ): TransformFailure | null {
-  for (const block of sheet.cells) {
-    const failure = transformSnapshotCells(block.cells, change);
-    if (failure) return failure;
-  }
-  for (const table of sheet.tables ?? []) {
-    const mapped = transformRange(table.range, change);
-    if (!mapped && table.range.sheet === change.sheet) return overlappingStructure("addTable");
-    if (mapped) table.range = mapped;
-  }
-  for (const chart of sheet.charts ?? []) {
-    const failure = transformChart(chart, sheet.id, change, "addSheet");
-    if (failure) return failure;
-  }
-  for (const pivot of sheet.pivots ?? []) {
-    // A table in the snapshot lives on the new sheet, which no remote edit can touch.
-    const source = pivot.source;
-    const ownTable =
-      "table" in source && (sheet.tables?.some((table) => table.id === source.table) ?? false);
-    const failure = transformPivot(
-      pivot,
-      sheet.id,
-      change,
-      "addSheet",
-      ownTable ? sheet.id : undefined,
-    );
-    if (failure) return failure;
-  }
-  return null;
+ for (const block of sheet.cells) {
+  const failure = transformSnapshotCells(block.cells, change);
+  if (failure) return failure;
+ }
+ for (const table of sheet.tables ?? []) {
+  const mapped = transformRange(table.range, change);
+  if (!mapped && table.range.sheet === change.sheet) return overlappingStructure("addTable");
+  if (mapped) table.range = mapped;
+ }
+ for (const chart of sheet.charts ?? []) {
+  const failure = transformChart(chart, sheet.id, change, "addSheet");
+  if (failure) return failure;
+ }
+ for (const pivot of sheet.pivots ?? []) {
+  // A table in the snapshot lives on the new sheet, which no remote edit can touch.
+  const source = pivot.source;
+  const ownTable =
+   "table" in source && (sheet.tables?.some((table) => table.id === source.table) ?? false);
+  const failure = transformPivot(
+   pivot,
+   sheet.id,
+   change,
+   "addSheet",
+   ownTable ? sheet.id : undefined,
+  );
+  if (failure) return failure;
+ }
+ return null;
 }
 
 function transformCellValue(
-  value: CellValue,
-  change: Exclude<AxisChange, { kind: "move" }>,
+ value: CellValue,
+ change: Exclude<AxisChange, { kind: "move" }>,
 ): CellValue | null {
-  if (value.kind !== "ref") return value;
-  const target = transformAddress(value.target, change);
-  return target ? { kind: "ref", target } : null;
+ if (value.kind !== "ref") return value;
+ const target = transformAddress(value.target, change);
+ return target ? { kind: "ref", target } : null;
 }
 
 function transformAddress(
-  address: CellAddress,
-  change: Exclude<AxisChange, { kind: "move" }>,
+ address: CellAddress,
+ change: Exclude<AxisChange, { kind: "move" }>,
 ): CellAddress | null {
-  if (address.sheet !== change.sheet) return address;
-  const current = change.axis === "row" ? address.row : address.col;
-  const mapped = transformIndex(current, change);
-  if (mapped === null) return null;
-  return change.axis === "row" ? { ...address, row: mapped } : { ...address, col: mapped };
+ if (address.sheet !== change.sheet) return address;
+ const current = change.axis === "row" ? address.row : address.col;
+ const mapped = transformIndex(current, change);
+ if (mapped === null) return null;
+ return change.axis === "row" ? { ...address, row: mapped } : { ...address, col: mapped };
 }
 
 function transformRange(range: Range, change: Exclude<AxisChange, { kind: "move" }>): Range | null {
-  if (range.sheet !== change.sheet) return range;
-  const start = change.axis === "row" ? range.start.row : range.start.col;
-  const end = change.axis === "row" ? range.end.row : range.end.col;
-  const low = Math.min(start, end);
-  const high = Math.max(start, end);
-  const mapped = transformInclusiveSpan(low, high, change);
-  if (!mapped) return null;
-  const forward = start <= end;
-  const mappedStart = forward ? mapped.start : mapped.end;
-  const mappedEnd = forward ? mapped.end : mapped.start;
-  return change.axis === "row"
-    ? {
-        ...range,
-        start: { ...range.start, row: mappedStart },
-        end: { ...range.end, row: mappedEnd },
-      }
-    : {
-        ...range,
-        start: { ...range.start, col: mappedStart },
-        end: { ...range.end, col: mappedEnd },
-      };
+ if (range.sheet !== change.sheet) return range;
+ const start = change.axis === "row" ? range.start.row : range.start.col;
+ const end = change.axis === "row" ? range.end.row : range.end.col;
+ const low = Math.min(start, end);
+ const high = Math.max(start, end);
+ const mapped = transformInclusiveSpan(low, high, change);
+ if (!mapped) return null;
+ const forward = start <= end;
+ const mappedStart = forward ? mapped.start : mapped.end;
+ const mappedEnd = forward ? mapped.end : mapped.start;
+ return change.axis === "row"
+  ? {
+   ...range,
+   start: { ...range.start, row: mappedStart },
+   end: { ...range.end, row: mappedEnd },
+  }
+  : {
+   ...range,
+   start: { ...range.start, col: mappedStart },
+   end: { ...range.end, col: mappedEnd },
+  };
 }
 
 function transformInclusiveSpan(
-  start: number,
-  end: number,
-  change: Exclude<AxisChange, { kind: "move" }>,
+ start: number,
+ end: number,
+ change: Exclude<AxisChange, { kind: "move" }>,
 ): { start: number; end: number } | null {
-  if (change.kind === "insert") {
-    if (end < change.at) return { start, end };
-    if (start >= change.at) return { start: start + change.count, end: end + change.count };
-    return null;
-  }
-  const removedEnd = change.at + change.count - 1;
+ if (change.kind === "insert") {
   if (end < change.at) return { start, end };
-  if (start > removedEnd) return { start: start - change.count, end: end - change.count };
+  if (start >= change.at) return { start: start + change.count, end: end + change.count };
   return null;
+ }
+ const removedEnd = change.at + change.count - 1;
+ if (end < change.at) return { start, end };
+ if (start > removedEnd) return { start: start - change.count, end: end - change.count };
+ return null;
 }
 
 function transformSpan(
-  at: number,
-  count: number,
-  change: Exclude<AxisChange, { kind: "move" }>,
+ at: number,
+ count: number,
+ change: Exclude<AxisChange, { kind: "move" }>,
 ): { at: number } | null {
-  const mapped = transformInclusiveSpan(at, at + count - 1, change);
-  return mapped ? { at: mapped.start } : null;
+ const mapped = transformInclusiveSpan(at, at + count - 1, change);
+ return mapped ? { at: mapped.start } : null;
 }
 
 function transformIndex(
-  index: number,
-  change: Exclude<AxisChange, { kind: "move" }>,
+ index: number,
+ change: Exclude<AxisChange, { kind: "move" }>,
 ): number | null {
-  if (change.kind === "insert") return index >= change.at ? index + change.count : index;
-  if (index < change.at) return index;
-  if (index >= change.at + change.count) return index - change.count;
-  return null;
+ if (change.kind === "insert") return index >= change.at ? index + change.count : index;
+ if (index < change.at) return index;
+ if (index >= change.at + change.count) return index - change.count;
+ return null;
 }
 
 function transformPosition(
-  position: number,
-  change: Exclude<AxisChange, { kind: "move" }>,
+ position: number,
+ change: Exclude<AxisChange, { kind: "move" }>,
 ): number {
-  if (change.kind === "insert") return position >= change.at ? position + change.count : position;
-  if (position <= change.at) return position;
-  if (position >= change.at + change.count) return position - change.count;
-  return change.at;
+ if (change.kind === "insert") return position >= change.at ? position + change.count : position;
+ if (position <= change.at) return position;
+ if (position >= change.at + change.count) return position - change.count;
+ return change.at;
 }
 
 function operationContainsFormula(
-  operation: DocumentOp,
-  restoreBlock: RestoreBlockReader,
+ operation: DocumentOp,
+ restoreBlock: RestoreBlockReader,
 ): boolean {
-  switch (operation.op) {
-    case "set":
-      return operation.value.kind === "formula";
-    case "setRange":
-      return operation.cells.some((cell) => cell.value.kind === "formula");
-    case "setBlock":
-      return (operation.block.formulas?.length ?? 0) > 0;
-    case "restoreBlock":
-      return (restoreBlock(operation).formulas?.length ?? 0) > 0;
-    case "addSheet":
-      return operation.sheet.cells.some((block) =>
-        block.cells.some((cell) => cell.value.kind === "formula"),
-      );
-    default:
-      return false;
-  }
+ switch (operation.op) {
+  case "set":
+   return operation.value.kind === "formula";
+  case "setRange":
+   return operation.cells.some((cell) => cell.value.kind === "formula");
+  case "setBlock":
+   return (operation.block.formulas?.length ?? 0) > 0;
+  case "restoreBlock":
+   return (restoreBlock(operation).formulas?.length ?? 0) > 0;
+  case "addSheet":
+   return operation.sheet.cells.some((block) =>
+    block.cells.some((cell) => cell.value.kind === "formula"),
+   );
+  case "setNamedRange":
+   return operation.namedRange.formula !== undefined;
+  default:
+   return false;
+ }
 }
 
 function lifecycleConflict(
-  local: DocumentOp,
-  remote: DocumentOp,
-  restoreBlock: RestoreBlockReader,
+ local: DocumentOp,
+ remote: DocumentOp,
+ restoreBlock: RestoreBlockReader,
 ): TransformFailure | null {
-  if (remote.op === "removeSheet") {
-    if (
-      operationTouchesSheet(local, remote.sheet, restoreBlock) ||
-      operationContainsFormula(local, restoreBlock)
-    ) {
-      return {
-        code: "sheet-removed",
-        message: "Pending work targets or may reference a removed sheet",
-      };
-    }
-
-    return null;
-  }
-
-  if (remote.op === "addSheet" && local.op === "addSheet" && local.sheet.id === remote.sheet.id) {
-    return {
-      code: "sheet-lifecycle",
-      message: "Concurrent sheet creation reused the same stable ID",
-    };
-  }
-
-  if (remote.op === "renameSheet") {
-    if (
-      (local.op === "renameSheet" && local.sheet === remote.sheet) ||
-      operationContainsFormula(local, restoreBlock)
-    ) {
-      return {
-        code: "sheet-lifecycle",
-        message: "Concurrent sheet rename conflicts with a pending rename or formula source",
-      };
-    }
-  }
-
-  if (remote.op === "moveSheet" && local.op === "moveSheet" && local.sheet === remote.sheet) {
-    return {
-      code: "sheet-lifecycle",
-      message: "Concurrent sheet moves have ambiguous ordering intent",
-    };
-  }
-
-  if (remote.op === "setSheetVisibility") {
-    if (local.op === "removeSheet" && local.sheet === remote.sheet) {
-      return {
-        code: "sheet-lifecycle",
-        message: "Concurrent sheet removal conflicts with a pending visibility change",
-      };
-    }
-
-    if (
-      local.op === "setSheetVisibility" &&
-      local.sheet === remote.sheet &&
-      local.visibility !== remote.visibility
-    ) {
-      return {
-        code: "sheet-lifecycle",
-        message: "Concurrent sheet visibility changes have conflicting intent",
-      };
-    }
+ if (remote.op === "removeSheet") {
+  if (
+   operationTouchesSheet(local, remote.sheet, restoreBlock) ||
+   operationContainsFormula(local, restoreBlock)
+  ) {
+   return {
+    code: "sheet-removed",
+    message: "Pending work targets or may reference a removed sheet",
+   };
   }
 
   return null;
+ }
+
+ if (remote.op === "addSheet" && local.op === "addSheet" && local.sheet.id === remote.sheet.id) {
+  return {
+   code: "sheet-lifecycle",
+   message: "Concurrent sheet creation reused the same stable ID",
+  };
+ }
+
+ if (remote.op === "renameSheet") {
+  if (
+   (local.op === "renameSheet" && local.sheet === remote.sheet) ||
+   operationContainsFormula(local, restoreBlock)
+  ) {
+   return {
+    code: "sheet-lifecycle",
+    message: "Concurrent sheet rename conflicts with a pending rename or formula source",
+   };
+  }
+ }
+
+ if (remote.op === "moveSheet" && local.op === "moveSheet" && local.sheet === remote.sheet) {
+  return {
+   code: "sheet-lifecycle",
+   message: "Concurrent sheet moves have ambiguous ordering intent",
+  };
+ }
+
+ if (remote.op === "setSheetVisibility") {
+  if (local.op === "removeSheet" && local.sheet === remote.sheet) {
+   return {
+    code: "sheet-lifecycle",
+    message: "Concurrent sheet removal conflicts with a pending visibility change",
+   };
+  }
+
+  if (
+   local.op === "setSheetVisibility" &&
+   local.sheet === remote.sheet &&
+   local.visibility !== remote.visibility
+  ) {
+   return {
+    code: "sheet-lifecycle",
+    message: "Concurrent sheet visibility changes have conflicting intent",
+   };
+  }
+ }
+
+ return null;
 }
 
 function operationTouchesSheet(
-  operation: DocumentOp,
-  sheet: string,
-  restoreBlock: RestoreBlockReader,
+ operation: DocumentOp,
+ sheet: string,
+ restoreBlock: RestoreBlockReader,
 ): boolean {
-  switch (operation.op) {
-    case "set":
-      return (
-        operation.addr.sheet === sheet ||
-        (operation.value.kind === "ref" && operation.value.target.sheet === sheet)
-      );
+ switch (operation.op) {
+  case "set":
+   return (
+    operation.addr.sheet === sheet ||
+    (operation.value.kind === "ref" && operation.value.target.sheet === sheet)
+   );
 
-    case "setNote":
-      return operation.addr.sheet === sheet;
+  case "setNote":
+   return operation.addr.sheet === sheet;
 
-    case "setRange":
-      return (
-        operation.range.sheet === sheet ||
-        operation.cells.some(
-          (cell) => cell.value.kind === "ref" && cell.value.target.sheet === sheet,
-        )
-      );
+  case "setRange":
+   return (
+    operation.range.sheet === sheet ||
+    operation.cells.some(
+     (cell) => cell.value.kind === "ref" && cell.value.target.sheet === sheet,
+    )
+   );
 
-    case "setBlock":
-      return (
-        operation.range.sheet === sheet ||
-        (operation.block.refs?.some((tuple) => tuple[1].sheet === sheet) ?? false)
-      );
+  case "setBlock":
+   return (
+    operation.range.sheet === sheet ||
+    (operation.block.refs?.some((tuple) => tuple[1].sheet === sheet) ?? false)
+   );
 
-    case "restoreBlock":
-      return (
-        operation.range.sheet === sheet ||
-        (restoreBlock(operation).refs?.some((tuple) => tuple[1].sheet === sheet) ?? false)
-      );
+  case "restoreBlock":
+   return (
+    operation.range.sheet === sheet ||
+    (restoreBlock(operation).refs?.some((tuple) => tuple[1].sheet === sheet) ?? false)
+   );
 
-    case "setRangeStyle":
-    case "clearRange":
-      return operation.range.sheet === sheet;
+  case "setRangeStyle":
+  case "clearRange":
+   return operation.range.sheet === sheet;
 
-    case "addTable":
-      return operation.table.range.sheet === sheet;
+  case "addTable":
+   return operation.table.range.sheet === sheet;
 
-    case "setChart":
-      return chartTouchesSheet(operation.chart, operation.sheet, sheet);
+  case "setChart":
+   return chartTouchesSheet(operation.chart, operation.sheet, sheet);
 
-    case "setNamedRange":
-      return operation.namedRange.range.sheet === sheet || operation.namedRange.scope === sheet;
+  case "setNamedRange":
+   return operation.namedRange.range?.sheet === sheet || operation.namedRange.scope === sheet;
 
-    case "removeNamedRange":
-      return operation.scope === sheet;
+  case "removeNamedRange":
+   return operation.scope === sheet;
 
-    case "addSheet": {
-      const snapshot = operation.sheet;
-      return (
-        snapshot.id === sheet ||
-        snapshot.cells.some((block) =>
-          block.cells.some(
-            (cell) => cell.value.kind === "ref" && cell.value.target.sheet === sheet,
-          ),
-        ) ||
-        // A chart or pivot in the new sheet can read any other sheet.
-        (snapshot.charts?.some((chart) => chartTouchesSheet(chart, snapshot.id, sheet)) ?? false) ||
-        (snapshot.pivots?.some((pivot) => pivotReadsSheet(pivot, sheet)) ?? false)
-      );
-    }
-
-    case "setPivot":
-      return operation.sheet === sheet || pivotReadsSheet(operation.pivot, sheet);
-
-    default:
-      return "sheet" in operation && operation.sheet === sheet;
+  case "addSheet": {
+   const snapshot = operation.sheet;
+   return (
+    snapshot.id === sheet ||
+    snapshot.cells.some((block) =>
+     block.cells.some(
+      (cell) => cell.value.kind === "ref" && cell.value.target.sheet === sheet,
+     ),
+    ) ||
+    // A chart or pivot in the new sheet can read any other sheet.
+    (snapshot.charts?.some((chart) => chartTouchesSheet(chart, snapshot.id, sheet)) ?? false) ||
+    (snapshot.pivots?.some((pivot) => pivotReadsSheet(pivot, sheet)) ?? false)
+   );
   }
+
+  case "setPivot":
+   return operation.sheet === sheet || pivotReadsSheet(operation.pivot, sheet);
+
+  default:
+   return "sheet" in operation && operation.sheet === sheet;
+ }
 }
 
 function operationsOverlap(local: DocumentOp, remote: DocumentOp): boolean {
-  const localRanges = mutationRanges(local);
-  const remoteRanges = mutationRanges(remote);
-  for (const a of localRanges) {
-    for (const b of remoteRanges) {
-      if (
-        a.sheet === b.sheet &&
-        Math.min(a.start.row, a.end.row) <= Math.max(b.start.row, b.end.row) &&
-        Math.min(b.start.row, b.end.row) <= Math.max(a.start.row, a.end.row) &&
-        Math.min(a.start.col, a.end.col) <= Math.max(b.start.col, b.end.col) &&
-        Math.min(b.start.col, b.end.col) <= Math.max(a.start.col, a.end.col)
-      ) {
-        return true;
-      }
-    }
+ const localRanges = mutationRanges(local);
+ const remoteRanges = mutationRanges(remote);
+ for (const a of localRanges) {
+  for (const b of remoteRanges) {
+   if (
+    a.sheet === b.sheet &&
+    Math.min(a.start.row, a.end.row) <= Math.max(b.start.row, b.end.row) &&
+    Math.min(b.start.row, b.end.row) <= Math.max(a.start.row, a.end.row) &&
+    Math.min(a.start.col, a.end.col) <= Math.max(b.start.col, b.end.col) &&
+    Math.min(b.start.col, b.end.col) <= Math.max(a.start.col, a.end.col)
+   ) {
+    return true;
+   }
   }
-  return operationIdentity(local) !== "" && operationIdentity(local) === operationIdentity(remote);
+ }
+ return operationIdentity(local) !== "" && operationIdentity(local) === operationIdentity(remote);
 }
 
 function mutationRanges(operation: DocumentOp): Range[] {
-  switch (operation.op) {
-    case "set":
-    case "setNote":
-      return [
-        {
-          sheet: operation.addr.sheet,
-          start: { row: operation.addr.row, col: operation.addr.col },
-          end: { row: operation.addr.row, col: operation.addr.col },
-        },
-      ];
+ switch (operation.op) {
+  case "set":
+  case "setNote":
+   return [
+    {
+     sheet: operation.addr.sheet,
+     start: { row: operation.addr.row, col: operation.addr.col },
+     end: { row: operation.addr.row, col: operation.addr.col },
+    },
+   ];
 
-    case "setRange":
-    case "setBlock":
-    case "restoreBlock":
-    case "setRangeStyle":
-    case "clearRange":
-      return [operation.range];
+  case "setRange":
+  case "setBlock":
+  case "restoreBlock":
+  case "setRangeStyle":
+  case "clearRange":
+   return [operation.range];
 
-    case "addMerge":
-    case "removeMerge":
-      return [
-        {
-          sheet: operation.sheet,
-          start: { row: operation.merge.r0, col: operation.merge.c0 },
-          end: { row: operation.merge.r1, col: operation.merge.c1 },
-        },
-      ];
+  case "addMerge":
+  case "removeMerge":
+   return [
+    {
+     sheet: operation.sheet,
+     start: { row: operation.merge.r0, col: operation.merge.c0 },
+     end: { row: operation.merge.r1, col: operation.merge.c1 },
+    },
+   ];
 
-    case "setHyperlink":
-      return [operation.hyperlink.range];
+  case "setHyperlink":
+   return [operation.hyperlink.range];
 
-    case "setValidationRule":
-      return [operation.rule.range];
+  case "setValidationRule":
+   return [operation.rule.range];
 
-    case "setProtectedRange":
-      return [operation.protectedRange.range];
+  case "setProtectedRange":
+   return [operation.protectedRange.range];
 
-    case "setNamedRange":
-      return [operation.namedRange.range];
+  case "setNamedRange":
+   return operation.namedRange.range ? [operation.namedRange.range] : [];
 
-    case "addTable":
-      return [operation.table.range];
+  case "addTable":
+   return [operation.table.range];
 
-    case "updateTable":
-      return operation.patch.range ? [operation.patch.range] : [];
+  case "updateTable":
+   return operation.patch.range ? [operation.patch.range] : [];
 
-    case "setPivot":
-      return [
-        {
-          sheet: operation.sheet,
-          start: { ...operation.pivot.anchor },
-          end: { ...operation.pivot.anchor },
-        },
-      ];
+  case "setPivot":
+   return [
+    {
+     sheet: operation.sheet,
+     start: { ...operation.pivot.anchor },
+     end: { ...operation.pivot.anchor },
+    },
+   ];
 
-    default:
-      return [];
-  }
+  default:
+   return [];
+ }
 }
 
 function operationIdentity(operation: DocumentOp): string {
-  switch (operation.op) {
-    case "setColumn":
-      return `column:${operation.sheet}:${operation.col}`;
+ switch (operation.op) {
+  case "setColumn":
+   return `column:${operation.sheet}:${operation.col}`;
 
-    case "setRowMeta":
-      return `row:${operation.sheet}:${operation.row}`;
+  case "setRowMeta":
+   return `row:${operation.sheet}:${operation.row}`;
 
-    case "setHyperlink":
-    case "removeHyperlink":
-      return `hyperlink:${operation.sheet}:${operation.op === "setHyperlink" ? operation.hyperlink.id : operation.id}`;
+  case "setHyperlink":
+  case "removeHyperlink":
+   return `hyperlink:${operation.sheet}:${operation.op === "setHyperlink" ? operation.hyperlink.id : operation.id}`;
 
-    case "setValidationRule":
-    case "removeValidationRule":
-      return `validation:${operation.sheet}:${operation.op === "setValidationRule" ? operation.rule.id : operation.id}`;
+  case "setValidationRule":
+  case "removeValidationRule":
+   return `validation:${operation.sheet}:${operation.op === "setValidationRule" ? operation.rule.id : operation.id}`;
 
-    case "setProtectedRange":
-    case "removeProtectedRange":
-      return `protection:${operation.sheet}:${operation.op === "setProtectedRange" ? operation.protectedRange.id : operation.id}`;
+  case "setProtectedRange":
+  case "removeProtectedRange":
+   return `protection:${operation.sheet}:${operation.op === "setProtectedRange" ? operation.protectedRange.id : operation.id}`;
 
-    case "setNamedRange":
-      return `name:${operation.namedRange.scope ?? ""}:${operation.namedRange.name.toLowerCase()}`;
+  case "setNamedRange":
+   return `name:${operation.namedRange.scope ?? ""}:${operation.namedRange.name.toLowerCase()}`;
 
-    case "removeNamedRange":
-      return `name:${operation.scope ?? ""}:${operation.name.toLowerCase()}`;
+  case "removeNamedRange":
+   return `name:${operation.scope ?? ""}:${operation.name.toLowerCase()}`;
 
-    case "addTable":
-      return `table:${operation.table.id}`;
+  case "addTable":
+   return `table:${operation.table.id}`;
 
-    case "updateTable":
-    case "removeTable":
-      return `table:${operation.tableId}`;
+  case "updateTable":
+  case "removeTable":
+   return `table:${operation.tableId}`;
 
-    case "setSheetMeta":
-      return `sheet-meta:${operation.sheet}`;
+  case "setSheetMeta":
+   return `sheet-meta:${operation.sheet}`;
 
-    case "setChart":
-    case "removeChart":
-      return `chart:${operation.sheet}:${operation.op === "setChart" ? operation.chart.id : operation.id}`;
+  case "setChart":
+  case "removeChart":
+   return `chart:${operation.sheet}:${operation.op === "setChart" ? operation.chart.id : operation.id}`;
 
-    // Workbook-wide: concurrent calculation changes always conflict, nothing else does.
-    case "setCalculation":
-      return "calculation";
+  // Workbook-wide: concurrent calculation changes always conflict, nothing else does.
+  case "setCalculation":
+   return "calculation";
 
-    case "setPivot":
-      return `pivot:${operation.pivot.id}`;
+  case "setPivot":
+   return `pivot:${operation.pivot.id}`;
 
-    case "removePivot":
-      return `pivot:${operation.id}`;
+  case "removePivot":
+   return `pivot:${operation.id}`;
 
-    default:
-      return "";
-  }
+  default:
+   return "";
+ }
 }
 
 function deletedTarget(operation: string): TransformFailure {
-  return {
-    code: "structural-overlap",
-    message: `${operation} targets a row or column deleted by the server-ordered operation`,
-  };
+ return {
+  code: "structural-overlap",
+  message: `${operation} targets a row or column deleted by the server-ordered operation`,
+ };
 }
 
 function deletedReference(): TransformFailure {
-  return {
-    code: "structural-overlap",
-    message: "Pending reference targets a row or column deleted by the server-ordered operation",
-  };
+ return {
+  code: "structural-overlap",
+  message: "Pending reference targets a row or column deleted by the server-ordered operation",
+ };
 }
 
 function overlappingStructure(operation: string): TransformFailure {
-  return {
-    code: "structural-overlap",
-    message: `${operation} spans a concurrent row or column insertion/deletion boundary`,
-  };
+ return {
+  code: "structural-overlap",
+  message: `${operation} spans a concurrent row or column insertion/deletion boundary`,
+ };
 }
 
 function cloneJsonValue<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
+ return JSON.parse(JSON.stringify(value)) as T;
 }

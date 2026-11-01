@@ -33,6 +33,7 @@ mod hidden_rows;
 pub(crate) mod pivot_output;
 #[cfg(feature = "analysis")]
 mod pivots;
+mod names;
 mod range_transfer;
 #[cfg(all(test, feature = "analysis"))]
 mod tests;
@@ -276,6 +277,9 @@ pub struct CellStore {
     pub(crate) custom_functions: Option<Box<crate::eval::custom::CustomFunctions>>,
     loading_page: usize,
     named_ranges: HashMap<(Option<u32>, String), NamedRangeRef>,
+    /// Defined names that hold a formula. `None` until the first one, so a
+    /// workbook without them pays one pointer.
+    pub(crate) named_formulas: Option<Box<names::NamedFormulas>>,
     tables: HashMap<String, TableDefinition>,
     mutation_revision: u64,
     active_mutation_revision: Option<u64>,
@@ -379,6 +383,7 @@ impl CellStore {
             mutation_revision: 0,
             active_mutation_revision: None,
             named_ranges: HashMap::new(),
+            named_formulas: None,
             volatile_serial: 0.0,
             random: RandomSource::from_host(),
             spill_owner_cell_limit: MAX_SPILL_OWNER_CELLS,
@@ -759,6 +764,7 @@ impl CellStore {
             }
         }
 
+        self.rename_sheet_in_named_formulas(sheet as u32, name);
         self.sheet_lookup.retain(|_, handle| *handle != sheet);
         self.sheet_names[sheet] = name.to_string();
         self.sheet_lookup.insert(name_key, sheet);
@@ -798,7 +804,8 @@ impl CellStore {
         self.named_ranges.retain(|(scope, _), definition| {
             definition.sheet != sheet as u32 && *scope != Some(sheet as u32)
         });
-        let removed_names = self.named_ranges.len() != before_names;
+        let removed_ranges = self.named_ranges.len() != before_names;
+        let removed_names = self.remove_sheet_from_named_formulas(sheet as u32) || removed_ranges;
 
         let removed_table_keys: Vec<_> = self
             .tables
@@ -2170,14 +2177,10 @@ impl CellStore {
         row_end: usize,
         col_end: usize,
     ) -> bool {
-        let name_key = workbook_name_key(name);
-        if self.tables.contains_key(&name_key) {
+        let Some(scope) = self.defined_name_scope(name, scope) else {
             return false;
-        }
-        let parsed_name = parse(name).ok();
-        if name.is_empty()
-            || !matches!(parsed_name, Some(crate::calc::Ast::Name(_)))
-            || !self.sheet_alive.get(sheet).copied().unwrap_or(false)
+        };
+        if !self.sheet_alive.get(sheet).copied().unwrap_or(false)
             || row_start > row_end
             || col_start > col_end
             || row_end >= self.sheets[sheet].cells.row_count()
@@ -2185,15 +2188,8 @@ impl CellStore {
         {
             return false;
         }
-        let scope = if scope < 0 {
-            None
-        } else {
-            let scope = scope as usize;
-            if !self.sheet_alive.get(scope).copied().unwrap_or(false) {
-                return false;
-            }
-            Some(scope as u32)
-        };
+        let key = (scope, workbook_name_key(name));
+        self.remove_named_formula(&key);
         let definition = NamedRangeRef {
             name: name.to_string(),
             scope,
@@ -2203,20 +2199,19 @@ impl CellStore {
             row_end: row_end as u32,
             col_end: col_end as u32,
         };
-        self.named_ranges.insert((scope, name_key), definition);
+        self.named_ranges.insert(key, definition);
         self.refresh_named_formula_entries();
         self.recompute_all_sheets();
         true
     }
 
+    /// Remove the defined name `name` in `scope` (-1 for the workbook),
+    /// whether it refers to a range or holds a formula.
     #[wasm_bindgen(js_name = removeNamedRange)]
     pub fn remove_named_range(&mut self, name: &str, scope: i32) -> bool {
-        let scope = if scope < 0 { None } else { Some(scope as u32) };
-        if self
-            .named_ranges
-            .remove(&(scope, workbook_name_key(name)))
-            .is_none()
-        {
+        let key = (u32::try_from(scope).ok(), workbook_name_key(name));
+        let removed_range = self.named_ranges.remove(&key).is_some();
+        if !removed_range && !self.remove_named_formula(&key) {
             return false;
         }
         self.refresh_named_formula_entries();
@@ -2303,6 +2298,7 @@ impl CellStore {
             .named_ranges
             .keys()
             .any(|(_, existing_name)| existing_name == &name_key)
+            || self.has_named_formula_key(&name_key)
         {
             return false;
         }
@@ -3274,6 +3270,7 @@ impl CellStore {
             metadata.add_payload(key.len(), key.capacity());
             metadata.add_payload(value.name.len(), value.name.capacity());
         }
+        self.add_named_formula_memory(metadata);
         stats
     }
 
@@ -3313,7 +3310,8 @@ impl CellStore {
         }
         self.drop_invalid_references();
         self.rebase_table_rows(edited_sheet, at, delta);
-        if self.rebase_named_rows(edited_sheet, at, delta) {
+        let ranges_changed = self.rebase_named_rows(edited_sheet, at, delta);
+        if self.shift_named_formulas(edited_sheet, at, delta, false) || ranges_changed {
             self.refresh_named_formula_entries();
         }
     }
@@ -3329,7 +3327,8 @@ impl CellStore {
         }
         self.drop_invalid_references();
         self.rebase_table_cols(edited_sheet, at, delta);
-        if self.rebase_named_cols(edited_sheet, at, delta) {
+        let ranges_changed = self.rebase_named_cols(edited_sheet, at, delta);
+        if self.shift_named_formulas(edited_sheet, at, delta, true) || ranges_changed {
             self.refresh_named_formula_entries();
         }
     }
@@ -3401,12 +3400,24 @@ fn refresh_structured_reference(
 }
 
 impl CellStore {
-    fn named_range(&self, name: &str, formula_sheet: u32) -> Option<NamedRangeRef> {
-        let normalized = workbook_name_key(name);
-        self.named_ranges
-            .get(&(Some(formula_sheet), normalized.clone()))
-            .or_else(|| self.named_ranges.get(&(None, normalized)))
-            .cloned()
+    /// The scope of a new defined name `name`: `None` for the workbook (a
+    /// negative `scope`), else the live sheet handle. `None` overall when
+    /// the name is not formula-safe, a table has it, or the sheet is gone.
+    fn defined_name_scope(&self, name: &str, scope: i32) -> Option<Option<u32>> {
+        if name.is_empty()
+            || !matches!(parse(name), Ok(Ast::Name(_)))
+            || self.tables.contains_key(&workbook_name_key(name))
+        {
+            return None;
+        }
+        let Ok(scope) = u32::try_from(scope) else {
+            return Some(None);
+        };
+        self.sheet_alive
+            .get(scope as usize)
+            .copied()
+            .unwrap_or(false)
+            .then_some(Some(scope))
     }
 
     fn table_definition_for_reference(
@@ -3533,19 +3544,10 @@ impl CellStore {
         formula_col: u32,
     ) -> Result<Ast, FormulaError> {
         let ast = parse(source).map_err(|_| FormulaError::Value)?;
-        let ast = resolve_sheet_refs(
-            ast,
-            &|name| {
-                self.sheet_ids
-                    .get(name)
-                    .or_else(|| self.sheet_lookup.get(&sheet_name_key(name)))
-                    .map(|&index| index as u32)
-            },
-            &|span| place_span(span, &self.tab_order()),
-        )
-        .map_err(|_| FormulaError::Ref)?;
+        let ast = self.resolve_sheets(ast)?;
+        let placement = names::NamePlacement::new(formula_row, formula_col);
         let ast = resolve_named_ranges(ast, formula_sheet, &|name, sheet| {
-            self.named_range(name, sheet)
+            self.name_target(name, sheet, &placement)
         });
         Ok(resolve_structured_refs(
             ast,
@@ -3556,6 +3558,21 @@ impl CellStore {
                 self.resolve_structured_reference(reference, sheet, row, col)
             },
         ))
+    }
+
+    /// Resolve the sheet names of a parsed formula to stable handles.
+    fn resolve_sheets(&self, ast: Ast) -> Result<Ast, FormulaError> {
+        resolve_sheet_refs(
+            ast,
+            &|name| {
+                self.sheet_ids
+                    .get(name)
+                    .or_else(|| self.sheet_lookup.get(&sheet_name_key(name)))
+                    .map(|&index| index as u32)
+            },
+            &|span| place_span(span, &self.tab_order()),
+        )
+        .map_err(|_| FormulaError::Ref)
     }
 
     fn rebase_named_rows(&mut self, edited_sheet: u32, at: u32, delta: i64) -> bool {
@@ -3732,6 +3749,7 @@ impl CellStore {
     }
 
     fn refresh_named_formula_entries(&mut self) {
+        self.forget_name_expansions();
         for formula_sheet in 0..self.sheets.len() {
             if !self
                 .sheet_alive

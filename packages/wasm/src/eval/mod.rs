@@ -140,7 +140,8 @@ impl Drop for FormulaOriginGuard {
     }
 }
 
-fn current_formula_origin() -> Option<(u32, u32)> {
+/// The cell whose formula is being evaluated, or nothing outside a formula.
+pub(crate) fn current_formula_origin() -> Option<(u32, u32)> {
     FORMULA_ORIGINS.with(|origins| origins.borrow().last().copied())
 }
 
@@ -1525,6 +1526,7 @@ impl CellStore {
                     value
                 }
             },
+            Ast::NamedFormula(named) => self.eval_named_formula_family(named, sheet, pass, depth),
             #[cfg(feature = "host-functions")]
             Ast::UnknownFunc(name, arguments) => {
                 self.eval_custom_function(name, arguments, sheet, pass, depth + 1)
@@ -1599,6 +1601,21 @@ impl CellStore {
             }
             Ast::Func(func, args) => self.eval_func(*func, args, sheet, pass, depth + 1),
         }
+    }
+
+    /// The value of a defined name's formula. Out of line, so the name adds
+    /// one call to `eval_ast`, which must stay under the size above which
+    /// JavaScriptCore does not optimize a function; the `_family` suffix
+    /// keeps wasm-opt from inlining it back.
+    #[inline(never)]
+    fn eval_named_formula_family(
+        &self,
+        named: &crate::calc::NamedFormulaRef,
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> EvalResult {
+        self.eval_ast(&named.expression, sheet, pass, depth + 1)
     }
 
     fn eval_func(

@@ -33,5 +33,10 @@ opt-level = 3
 lto = "fat"
 codegen-units = 1
 
+# `--no-inline=*_family` keeps evaluator handlers named `*_family` out of
+# line: wasm-opt inlines a function with one caller even when Rust marks it
+# `#[inline(never)]`, and inlining them into `eval_ast` would grow it past
+# the 100,000-byte size above which JavaScriptCore does not optimize it.
+# The pattern must come before `-O3`, and wasm-opt takes only one.
 [package.metadata.wasm-pack.profile.release]
-wasm-opt = ["-O3"]
+wasm-opt = ["--no-inline=*_family", "-O3"]

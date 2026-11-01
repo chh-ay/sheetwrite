@@ -330,13 +330,8 @@ struct Aggregator {
     label: String,
 }
 impl Aggregator {
-    fn resolve(mut expression: &Ast) -> Result<Self, FormulaError> {
-        while let Ast::LetSlot {
-            expression: inner, ..
-        } = expression
-        {
-            expression = inner;
-        }
+    fn resolve(expression: &Ast) -> Result<Self, FormulaError> {
+        let expression = expression.bound_value();
         if let Ast::Name(name) = expression {
             let label = name.to_ascii_uppercase();
             if !AGGREGATORS.contains(&label.as_str()) {

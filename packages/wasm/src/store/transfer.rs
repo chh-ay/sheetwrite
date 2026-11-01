@@ -193,6 +193,17 @@ impl CellStore {
         }
 
         for _ in 0..input.count()? {
+            let scope = if input.bool()? {
+                Some(input.u32()?)
+            } else {
+                None
+            };
+            let name = input.text()?;
+            let source = input.text()?;
+            store.insert_transferred_named_formula(scope, name, source)?;
+        }
+
+        for _ in 0..input.count()? {
             let key = input.text()?;
             let mut table = TableDefinition {
                 id: input.text()?,
@@ -297,6 +308,17 @@ impl CellStore {
             out.u32(range.col_start);
             out.u32(range.row_end);
             out.u32(range.col_end);
+        }
+
+        let named_formulas = self.named_formula_sources();
+        out.usize(named_formulas.len());
+        for (scope, name, source) in named_formulas {
+            out.bool(scope.is_some());
+            if let Some(scope) = scope {
+                out.u32(scope);
+            }
+            out.text(name);
+            out.text(source);
         }
 
         out.usize(self.tables.len());
