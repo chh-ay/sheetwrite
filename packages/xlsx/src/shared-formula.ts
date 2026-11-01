@@ -1,4 +1,4 @@
-import { colToA1 } from "@sheetwrite/core";
+import { colToA1, labelToCol } from "@sheetwrite/core";
 
 /**
  * Shared-formula expansion for the XLSX reader.
@@ -18,7 +18,8 @@ import { colToA1 } from "@sheetwrite/core";
  * reference that leaves the sheet, with its sheet name and spill suffix,
  * becomes `#REF!`. A name past the last column, such as `XYZ1`, is a name. The
  * text of an unchanged reference stays as written; a changed one is written
- * as the engine writes it. Text that does not lex stays unchanged.
+ * as the engine writes it. Text that does not lex has no expansion here; the
+ * reader then falls back as `expandSharedFormula` in `reader.ts` describes.
  */
 
 const SHEET_ROWS = 1_048_576;
@@ -75,14 +76,18 @@ interface Reference {
   readonly end: number;
 }
 
-/** Expand a shared formula from its master cell to a cell `rowDelta` rows and `colDelta` columns away. */
+/**
+ * Expand a shared formula from its master cell to a cell `rowDelta` rows and
+ * `colDelta` columns away, or `undefined` when the master does not lex. The
+ * engine cannot parse such a master either, so it has no copy rule to follow.
+ */
 export function translateSharedFormula(
   formula: string,
   rowDelta: number,
   colDelta: number,
-): string {
+): string | undefined {
   const tokens = lex(formula);
-  if (!tokens) return formula;
+  if (!tokens) return undefined;
 
   let output = "";
   let copied = 0;
@@ -425,4 +430,60 @@ function writeArea(area: Area): string {
     return `${marker(start.colAbs)}${colToA1(start.col)}:${marker(end.colAbs)}${colToA1(end.col)}`;
   }
   return `${writeCorner(start)}:${writeCorner(end)}`;
+}
+
+const LOOSE_CELL_REFERENCE = /(?<![A-Z0-9_.])(\$?)([A-Z]{1,3})(\$?)([1-9]\d*)(?![A-Z0-9_.(!])/giu;
+
+/**
+ * The reader's former text scan, kept only for a master that does not lex:
+ * outside `"…"`, `'…'` and `[…]` it moves every relative `A1`-style cell
+ * reference and writes `#REF!` for one that leaves the top or left edge. It
+ * knows nothing of whole rows or columns, the far edges or names past `XFD`,
+ * so its result is a best effort, and the reader warns when it uses it.
+ */
+export function shiftCellReferencesInText(
+  formula: string,
+  rowDelta: number,
+  colDelta: number,
+): string {
+  const shiftReference = (
+    _match: string,
+    absoluteCol: string,
+    label: string,
+    absoluteRow: string,
+    rowText: string,
+  ): string => {
+    const sourceCol = labelToCol(label.toUpperCase());
+    const sourceRow = Number(rowText) - 1;
+    const targetCol = absoluteCol ? sourceCol : sourceCol + colDelta;
+    const targetRow = absoluteRow ? sourceRow : sourceRow + rowDelta;
+    if (targetCol < 0 || targetRow < 0) return "#REF!";
+    return `${absoluteCol}${colToA1(targetCol)}${absoluteRow}${targetRow + 1}`;
+  };
+  let output = "";
+  let segmentStart = 0;
+  for (let cursor = 0; cursor < formula.length;) {
+    const quote = formula[cursor];
+    const closing = quote === '"' ? '"' : quote === "'" ? "'" : quote === "[" ? "]" : "";
+    if (!closing) {
+      cursor += 1;
+      continue;
+    }
+    output += formula.slice(segmentStart, cursor).replace(LOOSE_CELL_REFERENCE, shiftReference);
+    let end = cursor + 1;
+    while (end < formula.length) {
+      if (formula[end] === closing && formula[end + 1] === closing && closing !== "]") {
+        end += 2;
+      } else if (formula[end] === closing) {
+        end += 1;
+        break;
+      } else {
+        end += 1;
+      }
+    }
+    output += formula.slice(cursor, end);
+    cursor = end;
+    segmentStart = end;
+  }
+  return output + formula.slice(segmentStart).replace(LOOSE_CELL_REFERENCE, shiftReference);
 }

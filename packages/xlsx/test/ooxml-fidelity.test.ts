@@ -140,6 +140,36 @@ describe("raw spec-authored OOXML fidelity", () => {
     expect(values[27]).toEqual({ kind: "formula", src: "='Q1'!AB1&\"A1\"" });
   });
 
+  it("warns and keeps a cell's own text or scans references when a shared master does not lex", async () => {
+    const warnings: XlsxWorkbookWarning[] = [];
+    // An unterminated string: neither the engine nor the reader's copy rule can lex it.
+    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
+      rawWorkbook(
+        sheet(
+          '<dimension ref="A1:A3"/><sheetData>' +
+            '<row r="1"><c r="A1"><f t="shared" si="0" ref="A1:A3">B1&amp;$C$1&amp;"open</f></c></row>' +
+            '<row r="2"><c r="A2"><f t="shared" si="0">B2&amp;$C$1&amp;"own</f></c></row>' +
+            '<row r="3"><c r="A3"><f t="shared" si="0"/></c></row>' +
+            "</sheetData>",
+        ),
+      ),
+      { onWarning: (warning) => warnings.push(warning) },
+    );
+    const values = imported.sheets[0]!.cells.flatMap((block) =>
+      block.cells.map((cell) => cell.value),
+    );
+    expect(values).toEqual([
+      { kind: "formula", src: '=B1&$C$1&"open' },
+      { kind: "formula", src: '=B2&$C$1&"own' },
+      { kind: "formula", src: '=B3&$C$1&"open' },
+    ]);
+    expect(
+      warnings
+        .filter((warning) => warning.code === "unsupported-feature")
+        .map((warning) => warning.cell),
+    ).toEqual(["A2", "A3"]);
+  });
+
   it("neutralizes external formulas and external-link workbook graphs", async () => {
     const warnings: XlsxWorkbookWarning[] = [];
     const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(

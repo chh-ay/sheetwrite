@@ -51,7 +51,7 @@ import {
   validateCodecSnapshot,
   type XlsxCodecContext,
 } from "./resources.js";
-import { translateSharedFormula } from "./shared-formula.js";
+import { shiftCellReferencesInText, translateSharedFormula } from "./shared-formula.js";
 import { type ParsedCellStyle, ParsedStyles } from "./styles.js";
 import {
   assertXmlRoot,
@@ -88,6 +88,8 @@ interface PendingSharedFormula {
   readonly cell: SnapshotCell;
   readonly index: string;
   readonly address: string;
+  /** Formula text the writer put on this cell too; Excel ignores it unless the master does not lex. */
+  readonly ownFormula: string | undefined;
 }
 
 const INITIAL_STYLE_INDEX_CAPACITY = 1_024;
@@ -279,6 +281,39 @@ function uniqueSheetId(name: string, order: number, used: Set<string>): string {
   while (used.has(id)) id = `${stem}-${suffix++}`;
   used.add(id);
   return id;
+}
+
+/**
+ * A shared-formula cell's own formula, expanded from its group's master.
+ *
+ * A master that does not lex has no copy rule, since the engine cannot parse
+ * it either. Then the cell keeps the formula text its writer stored on it, if
+ * any, and otherwise gets the reader's former text scan, which moves plain
+ * cell references. Either way the result may differ from what Excel shows, so
+ * the cell gets an `unsupported-feature` warning instead of a silently wrong
+ * or unshifted formula.
+ */
+function expandSharedFormula(
+  master: { readonly formula: string; readonly row: number; readonly col: number },
+  pending: PendingSharedFormula,
+  context: XlsxCodecContext,
+  sheet: string,
+): string {
+  const rowDelta = pending.cell.rowOffset - master.row;
+  const colDelta = pending.cell.colOffset - master.col;
+  const expanded = translateSharedFormula(master.formula, rowDelta, colDelta);
+  if (expanded !== undefined) return expanded;
+
+  emitWarning(context, {
+    code: "unsupported-feature",
+    message:
+      pending.ownFormula === undefined
+        ? "Shared formula master does not parse; its cell references were moved by a text scan"
+        : "Shared formula master does not parse; the cell keeps its own formula text",
+    sheet,
+    cell: pending.address,
+  });
+  return pending.ownFormula ?? shiftCellReferencesInText(master.formula, rowDelta, colDelta);
 }
 
 function parseSharedStrings(
@@ -1296,6 +1331,7 @@ async function parseSheet(
       const formulaElement = xmlChild(cellElement, "f");
       let value: CellValue | null;
       let sharedFormula: string | undefined;
+      let ownSharedFormula: string | undefined;
       if (formulaElement) {
         const formulaText = spillReferencesFromXlsx(decodeXstring(formulaElement.text));
         const formulaType = xmlAttribute(formulaElement, "t") ?? "normal";
@@ -1303,6 +1339,7 @@ async function parseSheet(
           sharedFormula = xmlAttribute(formulaElement, "si");
           if (!sharedFormula) readerFailure(`shared formula at ${addressText} has no index`);
           if (formulaText) {
+            ownSharedFormula = formulaText;
             const authoritative = xmlAttribute(formulaElement, "ref") !== undefined;
             const existing = sharedMasters.get(sharedFormula);
             if (authoritative || !existing) {
@@ -1373,7 +1410,12 @@ async function parseSheet(
           column.hasNumericValue = true;
         }
         if (sharedFormula) {
-          pendingSharedFormulas.push({ cell, index: sharedFormula, address: addressText });
+          pendingSharedFormulas.push({
+            cell,
+            index: sharedFormula,
+            address: addressText,
+            ownFormula: ownSharedFormula,
+          });
         }
       }
     }
@@ -1434,7 +1476,7 @@ async function parseSheet(
     const formula =
       row === master.row && col === master.col
         ? master.formula
-        : translateSharedFormula(master.formula, row - master.row, col - master.col);
+        : expandSharedFormula(master, pending, context, reference.name);
     if (formulaContainsExternalReference(formula)) {
       emitWarning(context, {
         code: "external-formula",
