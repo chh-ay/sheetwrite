@@ -624,6 +624,7 @@ export function boundedJsonByteLength(
       );
     }
   };
+
   const addString = (input: string): void => {
     add(2);
     let index = 0;
@@ -638,10 +639,12 @@ export function boundedJsonByteLength(
           if (next < 0x20 || next > 0x7f || next === 0x22 || next === 0x5c) break;
           runEnd += 1;
         }
+
         add(runEnd - index);
         index = runEnd;
         continue;
       }
+
       if (
         code === 0x22 ||
         code === 0x5c ||
@@ -669,41 +672,51 @@ export function boundedJsonByteLength(
       } else {
         add(3);
       }
+
       index += 1;
     }
   };
+
   const visit = (input: unknown): void => {
     if (input === null) {
       add(4);
       return;
     }
+
     if (typeof input === "string") {
       addString(input);
       return;
     }
+
     if (typeof input === "boolean") {
       add(input ? 4 : 5);
       return;
     }
+
     if (typeof input === "number") {
       if (!Number.isFinite(input)) {
         throw new JsonByteLengthError("invalid-operations", "JSON numbers must be finite");
       }
+
       // JSON encodes a finite number as its ToString, so no JSON machinery is needed.
       add(String(input).length);
       return;
     }
+
     if (typeof input !== "object") {
       throw new JsonByteLengthError("invalid-operations", "Value is not JSON-safe");
     }
+
     if (ancestors.has(input)) {
       throw new JsonByteLengthError("invalid-operations", "JSON values cannot contain cycles");
     }
+
     ancestors.add(input);
     if (Array.isArray(input)) {
       if (Object.getPrototypeOf(input) !== Array.prototype) {
         throw new JsonByteLengthError("invalid-operations", "Arrays must use Array prototype");
       }
+
       add(2);
       for (let index = 0; index < input.length; index++) {
         if (index > 0) add(1);
@@ -711,8 +724,10 @@ export function boundedJsonByteLength(
         if (!descriptor?.enumerable || !("value" in descriptor)) {
           throw new JsonByteLengthError("invalid-operations", "Arrays cannot be sparse");
         }
+
         visit(descriptor.value);
       }
+
       for (const key in input) {
         const index = Number(key);
         if (
@@ -727,20 +742,24 @@ export function boundedJsonByteLength(
           );
         }
       }
+
       ancestors.delete(input);
       return;
     }
+
     if (Object.getPrototypeOf(input) !== Object.prototype) {
       throw new JsonByteLengthError(
         "invalid-operations",
         "JSON values must contain only plain objects",
       );
     }
+
     const record = input as Record<string, unknown>;
     // Any own property named toJSON is rejected, whatever its descriptor says.
     if (Object.hasOwn(record, "toJSON")) {
       throw new JsonByteLengthError("invalid-operations", "JSON values cannot define toJSON");
     }
+
     add(2);
     let first = true;
     for (const key in record) {
@@ -751,6 +770,7 @@ export function boundedJsonByteLength(
           "JSON fields must be enumerable data properties",
         );
       }
+
       if (descriptor.value === undefined && options.omitUndefinedProperties) continue;
       if (!first) add(1);
       first = false;
@@ -758,8 +778,10 @@ export function boundedJsonByteLength(
       add(1);
       visit(descriptor.value);
     }
+
     ancestors.delete(input);
   };
+
   visit(value);
   return bytes;
 }

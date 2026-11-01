@@ -83,22 +83,28 @@ export function parseShortcut(shortcut: KeyShortcut): ParsedShortcut {
         case "Mod":
           mod = true;
           break;
+
         case "Ctrl":
           ctrl = true;
           break;
+
         case "Meta":
           meta = true;
           break;
+
         case "Shift":
           shift = true;
           break;
+
         case "Alt":
           alt = true;
           break;
+
         default:
           invalidShortcut(shortcut, `Unknown shortcut modifier: ${modifier}.`);
       }
     }
+
     if (parts.length === 0 || ["Mod", "Ctrl", "Meta", "Shift", "Alt"].includes(key)) {
       invalidShortcut(shortcut, "A compact shortcut must contain modifiers followed by one key.");
     }
@@ -110,12 +116,14 @@ export function parseShortcut(shortcut: KeyShortcut): ParsedShortcut {
     shift = shortcut.shift === true;
     alt = shortcut.alt === true;
   }
+
   if (key.length === 0 || (key !== " " && key.trim() !== key)) {
     invalidShortcut(
       shortcut,
       "A shortcut must contain one non-empty key without surrounding spaces.",
     );
   }
+
   const mac = isMac();
 
   return {
@@ -152,6 +160,7 @@ export function formatShortcut(shortcut: ParsedShortcut): string {
   if (isMac()) {
     return `${shortcut.ctrl ? "⌃" : ""}${shortcut.meta ? "⌘" : ""}${shortcut.shift ? "⇧" : ""}${shortcut.alt ? "⌥" : ""}${key}`;
   }
+
   return [
     shortcut.ctrl && "Ctrl",
     shortcut.meta && "Meta",

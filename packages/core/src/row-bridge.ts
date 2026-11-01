@@ -419,6 +419,7 @@ export class RowBridge<
         "Sheetwrite: maxRecentTransactions must be a positive safe integer",
       );
     }
+
     this.localFingerprints = new RecentIdentities(maxRecentTransactions);
     this.seenTransactionIds = new RecentIdentities(maxRecentTransactions);
     const columnKeys = options.columns.map((column) => column.key);
@@ -429,6 +430,7 @@ export class RowBridge<
         "Sheetwrite: row bridge columns must have unique semantic keys",
       );
     }
+
     const rowIds: Array<Id | null> = [];
     const rowIdSet = new Set<Id>();
     for (let index = 0; index < options.defaultRows.length; index += 1) {
@@ -440,6 +442,7 @@ export class RowBridge<
           `Sheetwrite: getRowId must return a stable string or number at row ${index}`,
         );
       }
+
       if (rowIdSet.has(id))
         throw new SheetwriteError(
           "invalid-argument",
@@ -449,6 +452,7 @@ export class RowBridge<
       rowIdSet.add(id);
       rowIds.push(id);
     }
+
     this.sheets.set(options.sheet ?? DEFAULT_SHEET, { rowIds, rowIdSet, columns: columnKeys });
     this.createRowId = options.createRowId;
   }
@@ -499,8 +503,10 @@ export class RowBridge<
           event?.epoch,
         );
       }
+
       this.latestVersion = input.version;
     }
+
     if (
       input.status === "rejected" ||
       input.status === "out-of-order" ||
@@ -515,15 +521,18 @@ export class RowBridge<
         event?.epoch,
       );
     }
+
     if (event) {
       return this.projectEvent(event, input.status, transactionId, input.requestedOperations);
     }
+
     const synthetic: ChangeEvent = {
       transaction: { patches: [...operations] },
       changes: [],
       commitReason: input.commitReason ?? "api",
       source,
     };
+
     return this.projectEvent(synthetic, input.status, transactionId, input.requestedOperations);
   }
 
@@ -558,23 +567,29 @@ export class RowBridge<
     if (hasTransactionIdentity && this.seenTransactionIds.has(transaction.id)) {
       return { status: "duplicate", transaction, deltas: [] };
     }
+
     if (event.source === "remote" && this.localFingerprints.has(fingerprint)) {
       this.localFingerprints.delete(fingerprint);
       if (hasTransactionIdentity) {
         this.seenTransactionIds.remember(transaction.id);
       }
+
       return { status: "duplicate", transaction, deltas: [] };
     }
+
     if (event.epoch !== undefined && event.epoch < this.latestVersion) {
       return { status: "out-of-order", transaction, deltas: [] };
     }
+
     if (event.epoch !== undefined) this.latestVersion = Math.max(this.latestVersion, event.epoch);
     if (hasTransactionIdentity) {
       this.seenTransactionIds.remember(transaction.id);
     }
+
     if (event.source === "local") {
       this.localFingerprints.remember(fingerprint);
     }
+
     const changeQueues = new Map<string, CellChange[]>();
     for (const change of event.changes) {
       const key = cellAddressKey(change.addr);
@@ -582,10 +597,12 @@ export class RowBridge<
       if (queue) queue.push(change);
       else changeQueues.set(key, [change]);
     }
+
     const deltas: RowBridgeDelta<Id>[] = [];
     for (const operation of operations) {
       deltas.push(...this.projectOperation(operation, transaction, changeQueues));
     }
+
     // Keep the explicit requested argument observable to callers through the status only;
     // the canonical patches above are always the source of projected identity changes.
     void requestedOperations;
@@ -623,13 +640,13 @@ export class RowBridge<
           row: startRow + cell.rowOffset,
           col: startCol + cell.colOffset,
         };
+
         addresses.push(addr);
         values.set(cellAddressKey(addr), cell.value);
       }
     } else if (operation.op === "setBlock" || operation.op === "restoreBlock") {
-      const prepared = operation.op === "restoreBlock" ? restoreBlockFacts(operation) : undefined;
-      const block = prepared?.block ?? (operation as Extract<DocumentOp, { op: "setBlock" }>).block;
-      const range = prepared?.range ?? operation.range;
+      const { block, range } =
+        operation.op === "restoreBlock" ? restoreBlockFacts(operation) : operation;
       const startRow = Math.min(range.start.row, range.end.row);
       const startCol = Math.min(range.start.col, range.end.col);
       const formulas = new Map(block.formulas ?? []);
@@ -640,13 +657,17 @@ export class RowBridge<
           row: startRow + Math.floor(offset / block.colCount),
           col: startCol + (offset % block.colCount),
         };
+
         addresses.push(addr);
+
+        const formula = formulas.get(offset);
+        const target = refs.get(offset);
         values.set(
           cellAddressKey(addr),
-          formulas.has(offset)
-            ? { kind: "formula", src: formulas.get(offset)! }
-            : refs.has(offset)
-              ? { kind: "ref", target: refs.get(offset)! }
+          formula !== undefined
+            ? { kind: "formula", src: formula }
+            : target !== undefined
+              ? { kind: "ref", target }
               : { kind: "literal", value: block.values[offset] ?? null },
         );
       }
@@ -664,6 +685,7 @@ export class RowBridge<
         const endRow = Math.max(range.start.row, range.end.row);
         const startCol = Math.min(range.start.col, range.end.col);
         const endCol = Math.max(range.start.col, range.end.col);
+
         for (let row = startRow; row <= endRow; row += 1) {
           for (let col = startCol; col <= endCol; col += 1) {
             const addr = { sheet: range.sheet, row, col };
@@ -675,6 +697,7 @@ export class RowBridge<
         }
       }
     }
+
     return addresses.map((addr) => {
       const key = cellAddressKey(addr);
       const change = changeQueues.get(key)?.shift();
@@ -733,17 +756,16 @@ export class RowBridge<
           cell ? [cell.rowId] : [],
         );
         if (kind === "paste") {
-          return [
-            { ...base, kind, range: operationRange(operation), cells } as RowBridgePasteDelta<Id>,
-          ];
+          return [{ ...base, kind, range: operationRange(operation), cells }];
         }
+
         if (kind === "fill") {
-          return [
-            { ...base, kind, range: operationRange(operation), cells } as RowBridgeFillDelta<Id>,
-          ];
+          return [{ ...base, kind, range: operationRange(operation), cells }];
         }
-        return [{ ...base, kind: "cell", cell } as RowBridgeCellDelta<Id>];
+
+        return [{ ...base, kind: "cell", cell }];
       }
+
       case "setRange":
       case "setBlock":
       case "restoreBlock": {
@@ -762,10 +784,11 @@ export class RowBridge<
             : transaction.commitReason === "fill"
               ? "fill"
               : "range";
-        if (kind === "paste") return [{ ...base, kind, range, cells } as RowBridgePasteDelta<Id>];
-        if (kind === "fill") return [{ ...base, kind, range, cells } as RowBridgeFillDelta<Id>];
-        return [{ ...base, kind, range, cells } as RowBridgeRangeDelta<Id>];
+        if (kind === "paste") return [{ ...base, kind, range, cells }];
+        if (kind === "fill") return [{ ...base, kind, range, cells }];
+        return [{ ...base, kind, range, cells }];
       }
+
       case "clearRange": {
         const cells = this.cellsFor(operation, changeQueues);
         const base = this.base(
@@ -775,10 +798,9 @@ export class RowBridge<
           cells.map((cell) => cell.next),
           cells.map((cell) => cell.rowId),
         );
-        return [
-          { ...base, kind: "clear", range: operation.range, cells } as RowBridgeClearDelta<Id>,
-        ];
+        return [{ ...base, kind: "clear", range: operation.range, cells }];
       }
+
       case "addRows": {
         const state = this.state(operation.sheet);
         const inserted: Array<Id | null> = [];
@@ -792,6 +814,7 @@ export class RowBridge<
               offset,
               transactionId: transaction.id,
             });
+
             if (typeof id !== "string" && typeof id !== "number") {
               throw new SheetwriteError(
                 "invalid-argument",
@@ -799,6 +822,7 @@ export class RowBridge<
                 "Sheetwrite: createRowId must return a stable string or number",
               );
             }
+
             if (state?.rowIdSet.has(id) || insertedIds.has(id)) {
               throw new SheetwriteError(
                 "invalid-argument",
@@ -806,10 +830,13 @@ export class RowBridge<
                 `Sheetwrite: duplicate inserted row ID "${String(id)}"`,
               );
             }
+
             insertedIds.add(id);
           }
+
           inserted.push(id);
         }
+
         state?.rowIds.splice(operation.at, 0, ...inserted);
         for (const id of insertedIds) state?.rowIdSet.add(id);
         const base = this.base(transaction, operation, [], inserted, inserted);
@@ -823,9 +850,10 @@ export class RowBridge<
             count: operation.count,
             inserted,
             removed: [],
-          } as RowBridgeRowStructureDelta<Id>,
+          },
         ];
       }
+
       case "removeRows": {
         const state = this.state(operation.sheet);
         const removed = state?.rowIds.splice(operation.at, operation.count) ?? [];
@@ -841,9 +869,10 @@ export class RowBridge<
             count: operation.count,
             inserted: [],
             removed,
-          } as RowBridgeRowStructureDelta<Id>,
+          },
         ];
       }
+
       case "moveRows": {
         // Reordering keeps the same identities, so `rowIdSet` needs no update.
         const state = this.state(operation.sheet);
@@ -862,9 +891,10 @@ export class RowBridge<
             count: operation.count,
             inserted: moved,
             removed: [],
-          } as RowBridgeRowStructureDelta<Id>,
+          },
         ];
       }
+
       case "addColumns": {
         this.state(operation.sheet)?.columns.splice(
           operation.at,
@@ -873,29 +903,36 @@ export class RowBridge<
         );
         return [this.metadata(transaction, operation, "column", sheet)];
       }
+
       case "removeColumns": {
         this.state(operation.sheet)?.columns.splice(operation.at, operation.count);
         return [this.metadata(transaction, operation, "column", sheet)];
       }
+
       case "moveColumns": {
         const columns = this.state(operation.sheet)?.columns;
         const moved = columns?.splice(operation.from, operation.count) ?? [];
         columns?.splice(operation.to, 0, ...moved);
         return [this.metadata(transaction, operation, "column", sheet)];
       }
+
       case "setColumn":
         return [this.metadata(transaction, operation, "column", sheet)];
+
       case "setRowMeta":
         return [
           this.metadata(transaction, operation, "row", sheet, [
             this.rowId(operation.sheet, operation.row),
           ]),
         ];
+
       case "setRangeStyle":
         return [this.metadata(transaction, operation, "row", sheet)];
+
       case "addMerge":
       case "removeMerge":
         return [this.metadata(transaction, operation, "merge", sheet)];
+
       case "addSheet": {
         const snapshot = operation.sheet;
         this.sheets.set(snapshot.id, this.sheetStateForSnapshot(snapshot));
@@ -904,9 +941,10 @@ export class RowBridge<
             ...this.base(transaction, operation, undefined, snapshot, []),
             kind: "host-action",
             action: "add-sheet",
-          } as RowBridgeHostActionDelta<Id>,
+          },
         ];
       }
+
       case "removeSheet": {
         const previous = this.sheets.get(operation.sheet)?.rowIds ?? [];
         this.sheets.delete(operation.sheet);
@@ -915,65 +953,79 @@ export class RowBridge<
             ...this.base(transaction, operation, previous, undefined, previous),
             kind: "host-action",
             action: "remove-sheet",
-          } as RowBridgeHostActionDelta<Id>,
+          },
         ];
       }
+
       case "renameSheet":
         return [
           {
             ...this.base(transaction, operation, undefined, operation.name, []),
             kind: "host-action",
             action: "rename-sheet",
-          } as RowBridgeHostActionDelta<Id>,
+          },
         ];
+
       case "moveSheet":
         return [
           {
             ...this.base(transaction, operation, undefined, operation.to, []),
             kind: "host-action",
             action: "move-sheet",
-          } as RowBridgeHostActionDelta<Id>,
+          },
         ];
+
       case "setSheetVisibility":
         return [
           {
             ...this.base(transaction, operation, undefined, operation.visibility, []),
             kind: "host-action",
             action: "set-sheet-visibility",
-          } as RowBridgeHostActionDelta<Id>,
+          },
         ];
+
       case "setSheetMeta":
         return [this.metadata(transaction, operation, "sheet", sheet)];
+
       case "addTable":
       case "updateTable":
       case "removeTable":
         return [this.metadata(transaction, operation, "table", sheet)];
+
       case "setValidationRule":
       case "removeValidationRule":
         return [this.metadata(transaction, operation, "validation", sheet)];
+
       case "setHyperlink":
       case "removeHyperlink":
         return [this.metadata(transaction, operation, "hyperlink", sheet)];
+
       case "setProtectedRange":
       case "removeProtectedRange":
         return [this.metadata(transaction, operation, "protected-range", sheet)];
+
       case "setNote":
         return [
           this.metadata(transaction, operation, "note", operation.addr.sheet, [
             this.rowId(operation.addr.sheet, operation.addr.row),
           ]),
         ];
+
       case "setNamedRange":
       case "removeNamedRange":
         return [this.metadata(transaction, operation, "named-range", sheet)];
+
       case "setCalculation":
         return [this.metadata(transaction, operation, "calculation", null)];
+
       case "setChart":
       case "removeChart":
         return [this.metadata(transaction, operation, "chart", sheet)];
+
       case "setPivot":
       case "removePivot":
         return [this.metadata(transaction, operation, "pivot", sheet)];
+
       default:
         return assertNever(operation);
     }

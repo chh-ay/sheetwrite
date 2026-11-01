@@ -185,6 +185,7 @@ export class SheetwriteStore implements Store {
       storage,
       resourceLimits: options.snapshotResourceLimits,
     });
+
     try {
       this.dataEngine = new StoreDataEngine(workbook, data, options);
     } catch (error) {
@@ -195,6 +196,7 @@ export class SheetwriteStore implements Store {
         const cells = sheet.rowCount * sheet.columns.length;
         actual = storage === "dense" ? actual + cells : Math.max(actual, cells);
       }
+
       throw new SnapshotResourceError(
         resource,
         options.snapshotResourceLimits?.[resource] ?? DEFAULT_SNAPSHOT_RESOURCE_LIMITS[resource],
@@ -202,6 +204,7 @@ export class SheetwriteStore implements Store {
         { cause: error },
       );
     }
+
     this.policy = new StoreMutationPolicy(workbook, (sheet) => this.engine.pivotOutputs(sheet));
     this.protectionResolver = options.protectionResolver;
     this.mutationPolicy = options.mutationPolicy ?? "atomic";
@@ -384,6 +387,7 @@ export class SheetwriteStore implements Store {
   getFormula(addr: CellAddress): string | null {
     return this.engine.getFormula(addr);
   }
+
   /** Owning dynamic-array formula cell, or null when `addr` is not spilled. */
   getSpillAnchor(addr: CellAddress): CellAddress | null {
     return this.engine.getSpillAnchor(addr);
@@ -642,6 +646,7 @@ export class SheetwriteStore implements Store {
       if (!resourceValidation.ok) {
         return { status: "rejected", epoch: this.epoch, issues: [resourceValidation.issue] };
       }
+
       const invalidOperations = this.validateTransactionOperations(tx);
       if (invalidOperations) return invalidOperations;
       const options =
@@ -667,9 +672,11 @@ export class SheetwriteStore implements Store {
         if (policy.rejections.length > 0 && policy.patches.length === 0) {
           return { status: "rejected", epoch: this.epoch, issues: policy.rejections };
         }
+
         if (policy.patches.length !== tx.patches.length) {
           effectiveTx = { ...tx, patches: policy.patches };
         }
+
         if (this.protectionResolver) {
           preparation.bind(effectiveTx.patches);
           // Permission callbacks receive live operations and may edit nested
@@ -681,6 +688,7 @@ export class SheetwriteStore implements Store {
           if (!callbackResources.ok) {
             return { status: "rejected", epoch: this.epoch, issues: [callbackResources.issue] };
           }
+
           const callbackOperations = this.validateTransactionOperations(effectiveTx);
           if (callbackOperations) return callbackOperations;
         }
@@ -692,12 +700,14 @@ export class SheetwriteStore implements Store {
           return { status: "rejected", epoch: this.epoch, issues: [dirtyCapacityIssue] };
         }
       }
+
       if (
         source === "local" &&
         effectiveTx.patches.some((patch) => !this.engine.canApplyLocally(patch))
       ) {
         return { status: "noop", epoch: this.epoch, reason: "incomplete-data" };
       }
+
       const hasListeners = this.listeners.size > 0;
       const effects = this.engine.applyPatches(effectiveTx.patches, {
         remoteLoad: source === "remote" && options.localReplay !== true,
@@ -710,6 +720,7 @@ export class SheetwriteStore implements Store {
         replayPivotSources:
           source === "remote" || commitReason === "undo" || commitReason === "redo",
       });
+
       if (effects.appliedPatches.length === 0) {
         return {
           status: "noop",
@@ -743,6 +754,7 @@ export class SheetwriteStore implements Store {
         source,
         epoch: this.epoch,
       };
+
       for (const listener of this.listeners) listener(event);
       return {
         status: "applied",
@@ -891,6 +903,7 @@ export class SheetwriteStore implements Store {
           ],
         };
       }
+
       const lifecycle = applySheetLifecycleOperation(sheetLifecycle, operation);
       if (lifecycle && !lifecycle.ok) {
         return {
@@ -911,6 +924,7 @@ export class SheetwriteStore implements Store {
           ],
         };
       }
+
       const requiredSheets: SheetId[] = [];
       if (operation.op === "addSheet") {
         for (const block of operation.sheet.cells) {
@@ -918,21 +932,26 @@ export class SheetwriteStore implements Store {
             if (cell.value.kind === "ref") requiredSheets.push(cell.value.target.sheet);
           }
         }
+
         for (const rule of operation.sheet.conditionalFormats ?? []) {
           requiredSheets.push(rule.range.sheet);
         }
+
         for (const hyperlink of operation.sheet.hyperlinks ?? []) {
           requiredSheets.push(hyperlink.range.sheet);
           if (hyperlink.target.kind === "internal") {
             requiredSheets.push(hyperlink.target.range.sheet);
           }
         }
+
         for (const rule of operation.sheet.validationRules ?? []) {
           requiredSheets.push(rule.range.sheet);
         }
+
         for (const entry of operation.sheet.protectedRanges ?? []) {
           requiredSheets.push(entry.range.sheet);
         }
+
         for (const note of operation.sheet.notes ?? []) requiredSheets.push(note.addr.sheet);
         for (const chart of operation.sheet.charts ?? []) {
           for (const range of chartSourceRanges(chart)) requiredSheets.push(range.sheet);
@@ -940,6 +959,7 @@ export class SheetwriteStore implements Store {
       } else {
         const primarySheet = patchSheetId(operation);
         if (lifecycle === null && primarySheet !== null) requiredSheets.push(primarySheet);
+
         if (operation.op === "set" && operation.value.kind === "ref") {
           requiredSheets.push(operation.value.target.sheet);
         } else if (operation.op === "setRange") {
@@ -984,6 +1004,7 @@ export class SheetwriteStore implements Store {
           requiredSheets.push(operation.pivot.source.range.sheet);
         }
       }
+
       const missingSheet = requiredSheets.find(
         (sheet) => !sheetLifecycle.sheets.some((candidate) => candidate.id === sheet),
       );
@@ -1002,6 +1023,7 @@ export class SheetwriteStore implements Store {
         };
       }
     }
+
     return undefined;
   }
 

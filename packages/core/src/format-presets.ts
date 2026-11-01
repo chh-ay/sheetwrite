@@ -11,6 +11,9 @@ export interface NumberFormatPreset {
   readonly code: string;
 }
 
+/** Code behind the ribbon's $ button, also listed as the Accounting preset. */
+export const ACCOUNTING_FORMAT = '_($* #,##0.00_);_($* (#,##0.00);_($* "-"??_);_(@_)';
+
 /**
  * Number formats the formatter renders faithfully, in Excel's Home > Number
  * order. Fraction (`# ?/?`) and Text (`@`) are omitted: the formatter does not
@@ -20,7 +23,7 @@ export const NUMBER_FORMAT_PRESETS: readonly NumberFormatPreset[] = [
   { label: "General", code: "General" },
   { label: "Number", code: "0.00" },
   { label: "Currency", code: "$#,##0.00" },
-  { label: "Accounting", code: '_($* #,##0.00_);_($* (#,##0.00);_($* "-"??_);_(@_)' },
+  { label: "Accounting", code: ACCOUNTING_FORMAT },
   { label: "Short Date", code: "m/d/yyyy" },
   { label: "Long Date", code: "dddd, mmmm d, yyyy" },
   { label: "Time", code: "h:mm:ss AM/PM" },
@@ -28,8 +31,7 @@ export const NUMBER_FORMAT_PRESETS: readonly NumberFormatPreset[] = [
   { label: "Scientific", code: "0.00E+00" },
 ];
 
-/** Codes behind the ribbon's $, % and comma-style buttons. */
-export const ACCOUNTING_FORMAT = NUMBER_FORMAT_PRESETS[3]!.code;
+/** Codes behind the ribbon's % and comma-style buttons. */
 export const PERCENT_FORMAT = "0%";
 export const COMMA_FORMAT = "#,##0.00";
 

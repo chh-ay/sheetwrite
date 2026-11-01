@@ -172,6 +172,7 @@ export function validateTransactionResources(
       "Transaction patches must be an array of DocumentOps",
     );
   }
+
   if (operations.length > limits.maxOperations) {
     return {
       ok: false,
@@ -185,6 +186,7 @@ export function validateTransactionResources(
       },
     };
   }
+
   try {
     return {
       ok: true,
@@ -208,6 +210,7 @@ export function validateTransactionResources(
         },
       };
     }
+
     return {
       ok: false,
       issue: {
@@ -580,8 +583,10 @@ function consumeJsonString(state: JsonInspectionState, value: string): boolean {
     } else {
       bytes = 3;
     }
+
     if (!consumeBytes(state, bytes)) return false;
   }
+
   return true;
 }
 
@@ -648,6 +653,7 @@ function findJsonSafetyIssue(
       message: "undefined is not JSON-safe",
     };
   }
+
   if (typeof value === "number") {
     if (!Number.isFinite(value)) {
       return {
@@ -656,10 +662,12 @@ function findJsonSafetyIssue(
         message: "Numbers must be finite",
       };
     }
+
     return consumeBytes(state, jsonNumberLength(value))
       ? undefined
       : serializedLimitIssue(jsonPath(segments), state.maxBytes);
   }
+
   if (typeof value === "function" || typeof value === "symbol" || typeof value === "bigint") {
     return {
       path: jsonPath(segments),
@@ -667,21 +675,25 @@ function findJsonSafetyIssue(
       message: `${typeof value} values are not JSON-safe`,
     };
   }
+
   if (value === null) {
     return consumeBytes(state, 4)
       ? undefined
       : serializedLimitIssue(jsonPath(segments), state.maxBytes);
   }
+
   if (typeof value === "boolean") {
     return consumeBytes(state, value ? 4 : 5)
       ? undefined
       : serializedLimitIssue(jsonPath(segments), state.maxBytes);
   }
+
   if (typeof value === "string") {
     return consumeJsonString(state, value)
       ? undefined
       : serializedLimitIssue(jsonPath(segments), state.maxBytes);
   }
+
   if (typeof value !== "object") {
     return {
       path: jsonPath(segments),
@@ -689,6 +701,7 @@ function findJsonSafetyIssue(
       message: "Value is not JSON-safe",
     };
   }
+
   if (ancestors.has(value)) {
     return {
       path: jsonPath(segments),
@@ -705,9 +718,11 @@ function findJsonSafetyIssue(
         message: "Arrays with custom prototypes are not JSON-safe",
       };
     }
+
     if (!consumeBytes(state, 2 + Math.max(0, value.length - 1))) {
       return serializedLimitIssue(jsonPath(segments), state.maxBytes);
     }
+
     ancestors.add(value);
     for (let index = 0; index < value.length; index++) {
       segments.push(index);
@@ -720,13 +735,16 @@ function findJsonSafetyIssue(
           message: "Array entries must be enumerable data properties",
         };
       }
+
       const issue = findJsonSafetyIssue(descriptor.value, segments, ancestors, state);
       if (issue) {
         ancestors.delete(value);
         return issue;
       }
+
       segments.pop();
     }
+
     for (const key in value) {
       if (!Object.hasOwn(value, key)) continue;
       if (!/^(0|[1-9]\d*)$/.test(key) || Number(key) >= value.length) {
@@ -738,6 +756,7 @@ function findJsonSafetyIssue(
         };
       }
     }
+
     if (Object.getOwnPropertySymbols(value).length > 0) {
       ancestors.delete(value);
       return {
@@ -746,6 +765,7 @@ function findJsonSafetyIssue(
         message: "Symbol-keyed properties are not JSON-safe",
       };
     }
+
     ancestors.delete(value);
     return undefined;
   }
@@ -757,6 +777,7 @@ function findJsonSafetyIssue(
       message: "Only plain objects are JSON-safe",
     };
   }
+
   if (!consumeBytes(state, 2)) return serializedLimitIssue(jsonPath(segments), state.maxBytes);
   ancestors.add(value);
   let propertyCount = 0;
@@ -772,6 +793,7 @@ function findJsonSafetyIssue(
         message: "Object properties must be enumerable data properties",
       };
     }
+
     if (
       (propertyCount > 0 && !consumeBytes(state, 1)) ||
       !consumeJsonString(state, key) ||
@@ -780,14 +802,17 @@ function findJsonSafetyIssue(
       ancestors.delete(value);
       return serializedLimitIssue(jsonPath(segments), state.maxBytes);
     }
+
     propertyCount += 1;
     const issue = findJsonSafetyIssue(descriptor.value, segments, ancestors, state);
     if (issue) {
       ancestors.delete(value);
       return issue;
     }
+
     segments.pop();
   }
+
   if (Object.getOwnPropertySymbols(value).length > 0) {
     ancestors.delete(value);
     return {
@@ -796,6 +821,7 @@ function findJsonSafetyIssue(
       message: "Symbol-keyed properties are not JSON-safe",
     };
   }
+
   ancestors.delete(value);
   return undefined;
 }
@@ -894,6 +920,7 @@ function preflightSnapshotResources(
         `${path}.rowCount`,
       );
     }
+
     if (Array.isArray(columns) && columns.length > limits.maxColumnsPerSheet) {
       return resourceValidationError(
         "maxColumnsPerSheet",
@@ -902,6 +929,7 @@ function preflightSnapshotResources(
         `${path}.columns`,
       );
     }
+
     if (nonNegativeInteger(rowCount) && Array.isArray(columns)) {
       if (productExceeds(rowCount, columns.length, limits.maxLogicalCellsPerSheet)) {
         return resourceValidationError(
@@ -911,6 +939,7 @@ function preflightSnapshotResources(
           path,
         );
       }
+
       if (options.storage === "dense") {
         const remaining = limits.maxDenseCells - denseCells;
         if (remaining < 0 || productExceeds(rowCount, columns.length, remaining)) {
@@ -921,6 +950,7 @@ function preflightSnapshotResources(
             path,
           );
         }
+
         denseCells += rowCount * columns.length;
       }
     }
@@ -936,6 +966,7 @@ function preflightSnapshotResources(
           `${path}.${key}`,
         );
       }
+
       metadataEntries += entries.length;
       if (key === "tables") {
         tableCount += entries.length;
@@ -946,6 +977,7 @@ function preflightSnapshotResources(
             message: `Workbook table limit ${DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxTables} exceeded by ${tableCount}`,
           };
         }
+
         for (let tableIndex = 0; tableIndex < entries.length; tableIndex++) {
           const table = arrayDataValue(entries, tableIndex);
           if (!isPlainRecord(table)) continue;
@@ -958,6 +990,7 @@ function preflightSnapshotResources(
               message: `Workbook table column limit ${DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxColumnsPerTable} exceeded by ${columns.length}`,
             };
           }
+
           if (columns.length > limits.maxMetadataEntries - metadataEntries) {
             return resourceValidationError(
               "maxMetadataEntries",
@@ -966,11 +999,13 @@ function preflightSnapshotResources(
               `${path}.tables[${tableIndex}].columns`,
             );
           }
+
           metadataEntries += columns.length;
         }
       }
     }
   }
+
   return undefined;
 }
 
@@ -988,10 +1023,12 @@ export function assertWorkbookAllocationLimits(
       { context: { path: resolved.path } },
     );
   }
+
   const { limits } = resolved;
   if (workbook.sheets.length > limits.maxSheets) {
     throw new SnapshotResourceError("maxSheets", limits.maxSheets, workbook.sheets.length);
   }
+
   assertWorkbookTables(
     workbook.sheets,
     DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
@@ -1005,6 +1042,7 @@ export function assertWorkbookAllocationLimits(
         sheet.hyperlinks!.length,
       );
     }
+
     if ((sheet.conditionalFormats?.length ?? 0) > MAX_CONDITIONAL_FORMAT_RULES) {
       throw new SnapshotResourceError(
         "maxMetadataEntries",
@@ -1012,6 +1050,7 @@ export function assertWorkbookAllocationLimits(
         sheet.conditionalFormats!.length,
       );
     }
+
     const chartCount = sheet.charts?.length ?? 0;
     if (chartCount > MAX_CHARTS_PER_SHEET) {
       throw new SnapshotResourceError("maxMetadataEntries", MAX_CHARTS_PER_SHEET, chartCount);
@@ -1027,10 +1066,12 @@ export function assertWorkbookAllocationLimits(
       metadataEntries,
     );
   }
+
   for (const sheet of workbook.sheets) {
     if (!nonNegativeInteger(sheet.rowCount) || sheet.rowCount > limits.maxRowsPerSheet) {
       throw new SnapshotResourceError("maxRowsPerSheet", limits.maxRowsPerSheet, sheet.rowCount);
     }
+
     if (sheet.columns.length > limits.maxColumnsPerSheet) {
       throw new SnapshotResourceError(
         "maxColumnsPerSheet",
@@ -1038,6 +1079,7 @@ export function assertWorkbookAllocationLimits(
         sheet.columns.length,
       );
     }
+
     if (productExceeds(sheet.rowCount, sheet.columns.length, limits.maxLogicalCellsPerSheet)) {
       throw new SnapshotResourceError(
         "maxLogicalCellsPerSheet",
@@ -1045,6 +1087,7 @@ export function assertWorkbookAllocationLimits(
         sheet.rowCount * sheet.columns.length,
       );
     }
+
     if (resolved.storage === "dense") {
       const remaining = limits.maxDenseCells - denseCells;
       if (remaining < 0 || productExceeds(sheet.rowCount, sheet.columns.length, remaining)) {
@@ -1054,6 +1097,7 @@ export function assertWorkbookAllocationLimits(
           denseCells + sheet.rowCount * sheet.columns.length,
         );
       }
+
       denseCells += sheet.rowCount * sheet.columns.length;
     }
 
@@ -1208,21 +1252,26 @@ function validateCellStyle(value: unknown, path: string, errors: DocumentValidat
   for (const key of ["bold", "italic", "underline", "strikethrough", "wrap"]) {
     optionalBoolean(style, key, path, errors);
   }
+
   for (const key of ["color", "backgroundColor"]) {
     optionalString(style, key, path, errors);
   }
+
   const fontSize = ownValue(style, "fontSize");
   if (fontSize !== undefined && (!finiteNumber(fontSize) || fontSize < 0)) {
     invalid(errors, `${path}.fontSize`, "fontSize must be finite and non-negative");
   }
+
   const align = ownValue(style, "align");
   if (align !== undefined && !["left", "center", "right"].includes(String(align))) {
     invalid(errors, `${path}.align`, "align must be left, center, or right");
   }
+
   const verticalAlign = ownValue(style, "verticalAlign");
   if (verticalAlign !== undefined && !isCellVerticalAlign(verticalAlign)) {
     invalid(errors, `${path}.verticalAlign`, "verticalAlign must be top, middle, or bottom");
   }
+
   const fontFamily = ownValue(style, "fontFamily");
   if (
     fontFamily !== undefined &&
@@ -1234,6 +1283,7 @@ function validateCellStyle(value: unknown, path: string, errors: DocumentValidat
       `fontFamily must be 1-${MAX_FONT_FAMILY_LENGTH} letters, digits, spaces, ".", "_" or "-"`,
     );
   }
+
   const numberFormat = ownValue(style, "numberFormat");
   if (
     numberFormat !== undefined &&
@@ -1245,6 +1295,7 @@ function validateCellStyle(value: unknown, path: string, errors: DocumentValidat
       `numberFormat must be 1-${MAX_NUMBER_FORMAT_LENGTH} characters without control characters`,
     );
   }
+
   const borders = ownValue(style, "border");
   if (borders !== undefined) {
     const borderRecord = recordAt(borders, `${path}.border`, errors);
@@ -1276,6 +1327,21 @@ function validateRangeShape(value: unknown, path: string, errors: DocumentValida
     requireNonNegativeInteger(coordinate, "row", coordinatePath, errors, false, true);
     requireNonNegativeInteger(coordinate, "col", coordinatePath, errors, false, true);
   }
+}
+
+/** True when `operation` carries every field of a `restoreBlock` operation. */
+function isRestoreBlockShape(
+  operation: PlainRecord,
+): operation is PlainRecord & Extract<DocumentOp, { op: "restoreBlock" }> {
+  const rangeErrors: DocumentValidationError[] = [];
+  validateRangeShape(ownValue(operation, "range"), "range", rangeErrors);
+  return (
+    rangeErrors.length === 0 &&
+    ownValue(operation, "op") === "restoreBlock" &&
+    ownValue(operation, "encoding") === "deflate-json-v1" &&
+    typeof ownValue(operation, "decodedBytes") === "number" &&
+    typeof ownValue(operation, "data") === "string"
+  );
 }
 
 function validateCellValueShape(
@@ -1336,6 +1402,7 @@ function validateConditionalPredicate(
 ): void {
   const predicate = recordAt(value, path, errors);
   if (!predicate) return;
+
   const kind = ownValue(predicate, "kind");
   if (kind === "greaterThan" || kind === "lessThan") {
     if (!finiteNumber(ownValue(predicate, "value"))) {
@@ -1408,6 +1475,7 @@ function validateHyperlinkShape(
       "resource-limit",
     );
   }
+
   requireString(hyperlink, "id", path, errors, true);
   validateRangeShape(ownValue(hyperlink, "range"), `${path}.range`, errors);
   const display = ownValue(hyperlink, "display");
@@ -1422,6 +1490,7 @@ function validateHyperlinkShape(
       "resource-limit",
     );
   }
+
   const style = ownValue(hyperlink, "style");
   if (style !== undefined) validateCellStyle(style, `${path}.style`, errors);
   const targetPath = `${path}.target`;
@@ -1443,6 +1512,7 @@ function validateHyperlinkShape(
   } else {
     invalid(errors, `${targetPath}.kind`, "Hyperlink target kind is invalid");
   }
+
   if (!isValidCellHyperlink(value)) {
     invalid(
       errors,
@@ -1524,14 +1594,17 @@ function validateValidationCondition(
     if (values && values.length === 0) {
       invalid(errors, `${path}.values`, "List validation needs at least one value");
     }
+
     values?.forEach((entry, index) => {
       if (!scalar(entry)) {
         invalid(errors, `${path}.values[${index}]`, "List validation values must be scalars");
       }
     });
+
     optionalBoolean(condition, "allowCustom", path, errors);
     return;
   }
+
   if (kind === "number" || kind === "date") {
     const min = ownValue(condition, "min");
     const max = ownValue(condition, "max");
@@ -1539,21 +1612,27 @@ function validateValidationCondition(
     if (comparison !== undefined && (min !== undefined || max !== undefined)) {
       invalid(errors, path, "Validation comparison may not be combined with legacy min or max");
     }
+
     if (comparison !== undefined) {
       validateValidationComparison(comparison, `${path}.comparison`, errors, false);
     }
+
     if (min !== undefined && !finiteNumber(min)) {
       invalid(errors, `${path}.min`, "Validation minimum must be finite");
     }
+
     if (max !== undefined && !finiteNumber(max)) {
       invalid(errors, `${path}.max`, "Validation maximum must be finite");
     }
+
     if (finiteNumber(min) && finiteNumber(max) && min > max) {
       invalid(errors, path, "Validation minimum may not exceed maximum");
     }
+
     if (kind === "number") optionalBoolean(condition, "integer", path, errors);
     return;
   }
+
   if (kind === "textLength") {
     const min = ownValue(condition, "min");
     const max = ownValue(condition, "max");
@@ -1561,20 +1640,26 @@ function validateValidationCondition(
     if (comparison !== undefined && (min !== undefined || max !== undefined)) {
       invalid(errors, path, "Text length comparison may not be combined with legacy min or max");
     }
+
     if (comparison !== undefined) {
       validateValidationComparison(comparison, `${path}.comparison`, errors, true);
     }
+
     if (min !== undefined && !nonNegativeInteger(min)) {
       invalid(errors, `${path}.min`, "Text length minimum must be a non-negative integer");
     }
+
     if (max !== undefined && !nonNegativeInteger(max)) {
       invalid(errors, `${path}.max`, "Text length maximum must be a non-negative integer");
     }
+
     if (nonNegativeInteger(min) && nonNegativeInteger(max) && min > max) {
       invalid(errors, path, "Text length minimum may not exceed maximum");
     }
+
     return;
   }
+
   if (kind === "checkbox") {
     for (const key of ["checkedValue", "uncheckedValue"]) {
       const entry = ownValue(condition, key);
@@ -1582,8 +1667,10 @@ function validateValidationCondition(
         invalid(errors, `${path}.${key}`, `${key} must be a scalar`);
       }
     }
+
     return;
   }
+
   invalid(errors, `${path}.kind`, "Validation condition kind is invalid");
 }
 
@@ -1656,6 +1743,7 @@ function validateWorkbookTableColumnShape(
   ) {
     invalid(errors, `${path}.totalsRowFunction`, "Invalid table totals-row function");
   }
+
   for (const key of ["calculatedColumnFormula", "totalsRowFormula"]) {
     const formula = ownValue(column, key);
     if (formula !== undefined && !validWorkbookTableXmlElement(formula, key)) {
@@ -1677,6 +1765,7 @@ function validateWorkbookTableShape(
     requireString(table, "id", path, errors, true);
     requireString(table, "name", path, errors, true);
   }
+
   const range = ownValue(table, "range");
   if (range !== undefined || !partial) validateRangeShape(range, `${path}.range`, errors);
   const columnsValue = ownValue(table, "columns");
@@ -1686,11 +1775,13 @@ function validateWorkbookTableShape(
       validateWorkbookTableColumnShape(column, `${path}.columns[${index}]`, errors);
     });
   }
+
   for (const key of ["headerRow", "totalsRow"]) {
     const flag = ownValue(table, key);
     if (flag === undefined && partial) continue;
     if (typeof flag !== "boolean") invalid(errors, `${path}.${key}`, `${key} must be a boolean`);
   }
+
   for (const key of ["autoFilter", "sortState"]) {
     const rule = ownValue(table, key);
     if (rule === undefined || (partial && rule === null)) continue;
@@ -1698,6 +1789,7 @@ function validateWorkbookTableShape(
       invalid(errors, `${path}.${key}`, "Invalid or oversized table rule metadata");
     }
   }
+
   const styleValue = ownValue(table, "style");
   if (styleValue !== undefined && styleValue !== null) {
     const stylePath = `${path}.style`;
@@ -1716,6 +1808,7 @@ function validateWorkbookTableShape(
   } else if (!partial && styleValue === null) {
     invalid(errors, `${path}.style`, "Table style may not be null");
   }
+
   const unsupportedValue = ownValue(table, "unsupportedFeatures");
   if (unsupportedValue !== undefined) {
     const features = arrayAt(unsupportedValue, `${path}.unsupportedFeatures`, errors);
@@ -2100,6 +2193,7 @@ export function validateDocumentOperationShape(
     invalid(errors, `${path}.op`, "Document operation kind is invalid");
     return errors;
   }
+
   const operationKind = kind as DocumentOp["op"];
 
   switch (operationKind) {
@@ -2110,14 +2204,17 @@ export function validateDocumentOperationShape(
       if (style !== undefined) validateCellStyle(style, `${path}.style`, errors);
       break;
     }
+
     case "setRange": {
       validateRangeShape(ownValue(operation, "range"), `${path}.range`, errors);
       const cells = arrayAt(ownValue(operation, "cells"), `${path}.cells`, errors);
       cells?.forEach((cell, index) => {
         validateCellShape(cell, `${path}.cells[${index}]`, errors);
       });
+
       break;
     }
+
     case "setBlock": {
       validateRangeShape(ownValue(operation, "range"), `${path}.range`, errors);
       const blockPath = `${path}.block`;
@@ -2131,6 +2228,7 @@ export function validateDocumentOperationShape(
           invalid(errors, `${blockPath}.values[${index}]`, "Block values must be scalars");
         }
       });
+
       const cellCount =
         rowCount !== undefined &&
         colCount !== undefined &&
@@ -2142,6 +2240,7 @@ export function validateDocumentOperationShape(
       } else if (values && cellCount !== undefined && values.length !== cellCount) {
         invalid(errors, `${blockPath}.values`, "Block values must match its dimensions");
       }
+
       const sourceOffsets = new Set<number>();
       const formulas = ownValue(block, "formulas");
       if (formulas !== undefined) {
@@ -2152,20 +2251,25 @@ export function validateDocumentOperationShape(
             invalid(errors, entryPath, "Block formulas must be [offset, source] tuples");
             return;
           }
+
           if (!nonNegativeInteger(entry[0]) || (cellCount !== undefined && entry[0] >= cellCount)) {
             invalid(errors, `${entryPath}[0]`, "Formula offset is outside the block");
           }
+
           if (typeof entry[0] === "number") {
             if (sourceOffsets.has(entry[0])) {
               invalid(errors, `${entryPath}[0]`, "Block source offsets must be unique");
             }
+
             sourceOffsets.add(entry[0]);
           }
+
           if (typeof entry[1] !== "string") {
             invalid(errors, `${entryPath}[1]`, "Formula source must be a string");
           }
         });
       }
+
       const refs = ownValue(block, "refs");
       if (refs !== undefined) {
         const entries = arrayAt(refs, `${blockPath}.refs`, errors);
@@ -2175,18 +2279,23 @@ export function validateDocumentOperationShape(
             invalid(errors, entryPath, "Block refs must be [offset, address] tuples");
             return;
           }
+
           if (!nonNegativeInteger(entry[0]) || (cellCount !== undefined && entry[0] >= cellCount)) {
             invalid(errors, `${entryPath}[0]`, "Reference offset is outside the block");
           }
+
           if (typeof entry[0] === "number") {
             if (sourceOffsets.has(entry[0])) {
               invalid(errors, `${entryPath}[0]`, "Block source offsets must be unique");
             }
+
             sourceOffsets.add(entry[0]);
           }
+
           validateAddress(entry[1], `${entryPath}[1]`, errors);
         });
       }
+
       const styleTableValue = ownValue(block, "styleTable");
       const styleTable =
         styleTableValue === undefined
@@ -2195,12 +2304,14 @@ export function validateDocumentOperationShape(
       styleTable?.forEach((style, index) => {
         validateCellStyle(style, `${blockPath}.styleTable[${index}]`, errors);
       });
+
       const styleIdsValue = ownValue(block, "styleIds");
       if (styleIdsValue !== undefined) {
         const styleIds = arrayAt(styleIdsValue, `${blockPath}.styleIds`, errors);
         if (styleIds && cellCount !== undefined && styleIds.length !== cellCount) {
           invalid(errors, `${blockPath}.styleIds`, "Block style IDs must match its dimensions");
         }
+
         styleIds?.forEach((styleId, index) => {
           if (
             !nonNegativeInteger(styleId) ||
@@ -2210,8 +2321,10 @@ export function validateDocumentOperationShape(
           }
         });
       }
+
       break;
     }
+
     case "restoreBlock": {
       validateRangeShape(ownValue(operation, "range"), `${path}.range`, errors);
       const encoding = ownValue(operation, "encoding");
@@ -2220,18 +2333,18 @@ export function validateDocumentOperationShape(
       if (encoding !== "deflate-json-v1") {
         invalid(errors, `${path}.encoding`, "Restore block encoding is invalid");
       }
+
       if (typeof decodedBytes !== "number") {
         invalid(errors, `${path}.decodedBytes`, "Restore block decoded bytes must be a number");
       }
+
       if (typeof data !== "string") {
         invalid(errors, `${path}.data`, "Restore block data must be a string");
       }
-      if (errors.length) break;
+
+      if (errors.length || !isRestoreBlockShape(operation)) break;
       try {
-        const prepared = preparedRestore(
-          operation as unknown as Extract<DocumentOp, { op: "restoreBlock" }>,
-          validateDocumentOperationShape,
-        );
+        const prepared = preparedRestore(operation, validateDocumentOperationShape);
         errors.push(
           ...prepared.errors.map((error) => ({
             ...error,
@@ -2239,7 +2352,7 @@ export function validateDocumentOperationShape(
           })),
         );
         if (prepared.errors.length === 0) {
-          const range = operation.range as Range;
+          const range = operation.range;
           if (
             prepared.block.rowCount !== Math.abs(range.end.row - range.start.row) + 1 ||
             prepared.block.colCount !== Math.abs(range.end.col - range.start.col) + 1 ||
@@ -2251,25 +2364,30 @@ export function validateDocumentOperationShape(
       } catch (error) {
         invalid(errors, path, error instanceof Error ? error.message : "Invalid restore block");
       }
+
       break;
     }
+
     case "setRangeStyle": {
       validateRangeShape(ownValue(operation, "range"), `${path}.range`, errors);
       const style = ownValue(operation, "style");
       if (style !== null) validateCellStyle(style, `${path}.style`, errors);
       break;
     }
+
     case "clearRange":
       validateRangeShape(ownValue(operation, "range"), `${path}.range`, errors);
       optionalBoolean(operation, "contents", path, errors);
       optionalBoolean(operation, "style", path, errors);
       break;
+
     case "addRows":
     case "removeRows":
       validateOperationSheetId(operation, path, errors);
       requireNonNegativeInteger(operation, "at", path, errors);
       requireNonNegativeInteger(operation, "count", path, errors, true);
       break;
+
     case "moveRows":
     case "moveColumns":
       validateOperationSheetId(operation, path, errors);
@@ -2277,6 +2395,7 @@ export function validateDocumentOperationShape(
       requireNonNegativeInteger(operation, "count", path, errors, true);
       requireNonNegativeInteger(operation, "to", path, errors);
       break;
+
     case "addColumns": {
       validateOperationSheetId(operation, path, errors);
       requireNonNegativeInteger(operation, "at", path, errors);
@@ -2284,13 +2403,16 @@ export function validateDocumentOperationShape(
       columns?.forEach((column, index) => {
         validateColumnShape(column, `${path}.columns[${index}]`, errors);
       });
+
       break;
     }
+
     case "removeColumns":
       validateOperationSheetId(operation, path, errors);
       requireNonNegativeInteger(operation, "at", path, errors);
       requireNonNegativeInteger(operation, "count", path, errors, true);
       break;
+
     case "setColumn": {
       validateOperationSheetId(operation, path, errors);
       requireNonNegativeInteger(operation, "col", path, errors);
@@ -2301,18 +2423,22 @@ export function validateDocumentOperationShape(
       if (key !== undefined && (typeof key !== "string" || key.length === 0)) {
         invalid(errors, `${patchPath}.key`, "Column key must be a non-empty string");
       }
+
       optionalString(patch, "header", patchPath, errors);
       const width = ownValue(patch, "width");
       if (width !== undefined && (!finiteNumber(width) || width < 0)) {
         invalid(errors, `${patchPath}.width`, "Column width must be finite and non-negative");
       }
+
       const type = ownValue(patch, "type");
       if (type !== undefined && !["text", "number", "date", "currency"].includes(String(type))) {
         invalid(errors, `${patchPath}.type`, "Column type is invalid");
       }
+
       for (const field of ["numberFormat", "numberLocale", "renderer"]) {
         optionalString(patch, field, patchPath, errors);
       }
+
       optionalBoolean(patch, "visible", patchPath, errors);
       for (const field of ["headerStyle", "cellStyle"]) {
         const style = ownValue(patch, field);
@@ -2320,8 +2446,10 @@ export function validateDocumentOperationShape(
           validateCellStyle(style, `${patchPath}.${field}`, errors);
         }
       }
+
       break;
     }
+
     case "setRowMeta": {
       validateOperationSheetId(operation, path, errors);
       requireNonNegativeInteger(operation, "row", path, errors);
@@ -2334,48 +2462,60 @@ export function validateDocumentOperationShape(
       if (height !== undefined && (!finiteNumber(height) || height <= 0)) {
         invalid(errors, `${metaPath}.height`, "Row height must be finite and positive");
       }
+
       optionalBoolean(meta, "hidden", metaPath, errors);
       break;
     }
+
     case "addMerge":
     case "removeMerge":
       validateOperationSheetId(operation, path, errors);
       validateMergeShape(ownValue(operation, "merge"), `${path}.merge`, errors);
       break;
+
     case "addSheet":
       validateSheetShape(ownValue(operation, "sheet"), `${path}.sheet`, errors);
       break;
+
     case "removeSheet":
       validateOperationSheetId(operation, path, errors);
       break;
+
     case "renameSheet":
       validateOperationSheetId(operation, path, errors);
       requireString(operation, "name", path, errors, true);
       break;
+
     case "moveSheet":
       validateOperationSheetId(operation, path, errors);
       requireNonNegativeInteger(operation, "to", path, errors);
       break;
+
     case "setSheetVisibility": {
       validateOperationSheetId(operation, path, errors);
       const visibility = ownValue(operation, "visibility");
       if (visibility !== "visible" && visibility !== "hidden" && visibility !== "veryHidden") {
         invalid(errors, `${path}.visibility`, "Sheet visibility is invalid");
       }
+
       break;
     }
+
     case "addTable":
       validateWorkbookTableShape(ownValue(operation, "table"), `${path}.table`, errors);
       break;
+
     case "updateTable":
       validateOperationSheetId(operation, path, errors);
       requireString(operation, "tableId", path, errors, true);
       validateWorkbookTableShape(ownValue(operation, "patch"), `${path}.patch`, errors, true);
       break;
+
     case "removeTable":
       validateOperationSheetId(operation, path, errors);
       requireString(operation, "tableId", path, errors, true);
       break;
+
     case "setSheetMeta": {
       validateOperationSheetId(operation, path, errors);
       const patchPath = `${path}.patch`;
@@ -2387,6 +2527,7 @@ export function validateDocumentOperationShape(
           invalid(errors, `${patchPath}.${field}`, `${field} must be a non-negative integer`);
         }
       }
+
       const conditionalFormats = ownValue(patch, "conditionalFormats");
       if (conditionalFormats !== undefined) {
         const entries = arrayAt(conditionalFormats, `${patchPath}.conditionalFormats`, errors);
@@ -2398,6 +2539,7 @@ export function validateDocumentOperationShape(
           );
         });
       }
+
       const rowGroups = ownValue(patch, "rowGroups");
       if (rowGroups !== undefined) {
         const entries = arrayAt(rowGroups, `${patchPath}.rowGroups`, errors);
@@ -2405,6 +2547,7 @@ export function validateDocumentOperationShape(
           validateOperationRowGroup(entry, `${patchPath}.rowGroups[${index}]`, errors);
         });
       }
+
       const sortKeys = ownValue(patch, "sortKeys");
       if (sortKeys !== undefined) {
         const entries = arrayAt(sortKeys, `${patchPath}.sortKeys`, errors);
@@ -2412,6 +2555,7 @@ export function validateDocumentOperationShape(
           validateOperationSortKey(entry, `${patchPath}.sortKeys[${index}]`, errors);
         });
       }
+
       const filters = ownValue(patch, "filters");
       if (filters !== undefined) {
         const entries = arrayAt(filters, `${patchPath}.filters`, errors);
@@ -2419,25 +2563,31 @@ export function validateDocumentOperationShape(
           validateOperationFilterTuple(entry, `${patchPath}.filters[${index}]`, errors);
         });
       }
+
       break;
     }
+
     case "setHyperlink":
       validateOperationSheetId(operation, path, errors);
       validateHyperlinkShape(ownValue(operation, "hyperlink"), `${path}.hyperlink`, errors);
       break;
+
     case "removeHyperlink":
       validateOperationSheetId(operation, path, errors);
       requireString(operation, "id", path, errors, true);
       break;
+
     case "setValidationRule":
       validateOperationSheetId(operation, path, errors);
       validateValidationRuleShape(ownValue(operation, "rule"), `${path}.rule`, errors);
       break;
+
     case "removeValidationRule":
     case "removeProtectedRange":
       validateOperationSheetId(operation, path, errors);
       requireString(operation, "id", path, errors, true);
       break;
+
     case "setProtectedRange":
       validateOperationSheetId(operation, path, errors);
       validateProtectedRangeShape(
@@ -2446,42 +2596,52 @@ export function validateDocumentOperationShape(
         errors,
       );
       break;
+
     case "setNote": {
       validateAddress(ownValue(operation, "addr"), `${path}.addr`, errors);
       const text = ownValue(operation, "text");
       if (text !== null && typeof text !== "string") {
         invalid(errors, `${path}.text`, "Note text must be a string or null");
       }
+
       break;
     }
+
     case "setNamedRange":
       validateNamedRangeShape(ownValue(operation, "namedRange"), `${path}.namedRange`, errors);
       break;
+
     case "removeNamedRange":
       requireString(operation, "name", path, errors, true);
       optionalString(operation, "scope", path, errors);
       break;
+
     case "setCalculation":
       validateCalculationShape(ownValue(operation, "calculation"), `${path}.calculation`, errors);
       break;
+
     case "setChart":
       validateOperationSheetId(operation, path, errors);
       validateChartShape(ownValue(operation, "chart"), `${path}.chart`, errors);
       break;
+
     case "setPivot":
       validateOperationSheetId(operation, path, errors);
       validatePivotShape(ownValue(operation, "pivot"), `${path}.pivot`, errors);
       break;
+
     case "removeChart":
     case "removePivot":
       validateOperationSheetId(operation, path, errors);
       requireString(operation, "id", path, errors, true);
       break;
+
     default: {
       const unsupported: never = operationKind;
       invalid(errors, `${path}.op`, `Document operation kind ${String(unsupported)} is invalid`);
     }
   }
+
   return errors;
 }
 
@@ -2733,6 +2893,7 @@ function validateXlsxSource(value: unknown, errors: DocumentValidationError[]): 
   ) {
     invalid(errors, `${path}.dropped`, "dropped must list safe part names");
   }
+
   if (!parts || !graphs) return;
   if (parts.length > MAX_XLSX_SOURCE_ENTRIES || graphs.length > MAX_XLSX_SOURCE_ENTRIES) {
     invalid(errors, path, `xlsxSource exceeds ${MAX_XLSX_SOURCE_ENTRIES} parts or graphs`);
@@ -2755,6 +2916,7 @@ function validateXlsxSource(value: unknown, errors: DocumentValidationError[]): 
     if (!safeXlsxPartName(name) || names.has(name.toLowerCase())) {
       invalid(errors, `${partPath}.name`, "Part name must be a unique safe OPC name");
     } else names.add(name.toLowerCase());
+
     if (
       typeof contentType !== "string" ||
       contentType.length > MAX_XLSX_CONTENT_TYPE_LENGTH ||
@@ -2762,23 +2924,28 @@ function validateXlsxSource(value: unknown, errors: DocumentValidationError[]): 
     ) {
       invalid(errors, `${partPath}.contentType`, "contentType must be a MIME type");
     }
+
     if (method !== 0 && method !== 8)
       invalid(errors, `${partPath}.method`, "method must be 0 or 8");
     if (!nonNegativeInteger(crc32) || crc32 > 0xffffffff) {
       invalid(errors, `${partPath}.crc32`, "crc32 must be an unsigned 32-bit integer");
     }
+
     if (!nonNegativeInteger(size) || size > 0xffffffff) {
       invalid(errors, `${partPath}.uncompressedSize`, "uncompressedSize must fit ZIP32");
     }
+
     if (typeof data !== "string" || data.length % 4 !== 0) {
       invalid(errors, `${partPath}.data`, "data must be base64");
       continue;
     }
+
     compressedBytes += (data.length / 4) * 3;
     if (compressedBytes > MAX_XLSX_SOURCE_COMPRESSED_BYTES) {
       invalid(errors, path, "xlsxSource exceeds 256 MiB of compressed data");
       return;
     }
+
     if (!BASE64_PATTERN.test(data)) invalid(errors, `${partPath}.data`, "data must be base64");
   }
 
@@ -2793,10 +2960,12 @@ function validateXlsxSource(value: unknown, errors: DocumentValidationError[]): 
     if (owner !== "root" && owner !== "workbook" && owner !== "sheet") {
       invalid(errors, `${graphPath}.owner`, "owner must be root, workbook, or sheet");
     }
+
     if (owner === "sheet") requireString(graph, "sheetId", graphPath, errors, true);
     else if (ownValue(graph, "sheetId") !== undefined) {
       invalid(errors, `${graphPath}.sheetId`, "Only sheet-owned graphs name a sheet");
     }
+
     if (
       typeof type !== "string" ||
       type.length > MAX_XLSX_PART_NAME_LENGTH ||
@@ -2804,9 +2973,11 @@ function validateXlsxSource(value: unknown, errors: DocumentValidationError[]): 
     ) {
       invalid(errors, `${graphPath}.type`, "type must be a relationship type URI");
     }
+
     if (cacheId !== undefined && (typeof cacheId !== "string" || !/^\d{1,10}$/.test(cacheId))) {
       invalid(errors, `${graphPath}.cacheId`, "cacheId must be an unsigned integer string");
     }
+
     const members = arrayAt(ownValue(graph, "parts"), `${graphPath}.parts`, errors);
     if (
       !members ||
@@ -2817,6 +2988,7 @@ function validateXlsxSource(value: unknown, errors: DocumentValidationError[]): 
     ) {
       invalid(errors, `${graphPath}.parts`, "Graph parts must be retained and include target");
     }
+
     const dependencies = arrayAt(
       ownValue(graph, "dependencies"),
       `${graphPath}.dependencies`,
@@ -2827,6 +2999,7 @@ function validateXlsxSource(value: unknown, errors: DocumentValidationError[]): 
       invalid(errors, `${graphPath}.dependencies`, "Too many graph dependencies");
       continue;
     }
+
     for (let dependencyIndex = 0; dependencyIndex < dependencies.length; dependencyIndex++) {
       const dependencyPath = `${graphPath}.dependencies[${dependencyIndex}]`;
       const dependency = recordAt(dependencies[dependencyIndex], dependencyPath, errors);
@@ -2837,6 +3010,7 @@ function validateXlsxSource(value: unknown, errors: DocumentValidationError[]): 
       if (scope !== "layout" && scope !== "values") {
         invalid(errors, `${dependencyPath}.scope`, "scope must be layout or values");
       }
+
       const digest = ownValue(dependency, "digest");
       if (typeof digest !== "string" || !/^[\da-f]{16}$/.test(digest)) {
         invalid(errors, `${dependencyPath}.digest`, "digest must be 16 lowercase hex digits");
@@ -2945,10 +3119,12 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
       "unsupported-schema",
     );
   }
+
   const documentId = ownValue(candidate, "documentId");
   if (documentId !== undefined && typeof documentId !== "string") {
     invalid(errors, "documentId", "documentId must be a string");
   }
+
   const version = ownValue(candidate, "version");
   if (version !== undefined && !nonNegativeInteger(version)) {
     invalid(errors, "version", "version must be a non-negative integer");
@@ -2962,6 +3138,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
     namedRanges?.forEach((entry, index) => {
       validateNamedRangeShape(entry, `workbook.namedRanges[${index}]`, errors);
     });
+
     const calculation = ownValue(workbook, "calculation");
     if (calculation !== undefined) {
       validateCalculationShape(calculation, "workbook.calculation", errors);
@@ -2972,9 +3149,11 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
   if (sheets && sheets.length === 0) {
     invalid(errors, "sheets", "At least one sheet is required");
   }
+
   sheets?.forEach((sheet, index) => {
     validateSheetShape(sheet, `sheets[${index}]`, errors);
   });
+
   if (errors.length > 0) return { ok: false, errors };
 
   // Shape validation above proves the complete schema before this trust-boundary cast.
@@ -2990,10 +3169,12 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
     if (ids.has(sheet.id)) {
       invalid(errors, `${path}.id`, "Sheet IDs must be unique", "duplicate-id");
     }
+
     ids.add(sheet.id);
     if (orders.has(sheet.order)) {
       invalid(errors, `${path}.order`, "Sheet order must be unique", "duplicate-id");
     }
+
     orders.add(sheet.order);
 
     const columnKeys = new Set<string>();
@@ -3007,19 +3188,22 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
           "duplicate-id",
         );
       }
+
       columnKeys.add(column.key);
     }
 
     const merges: MergeRange[] = [];
-    for (let mergeIndex = 0; mergeIndex < (sheet.merges?.length ?? 0); mergeIndex++) {
-      const merge = normalizedMerge(sheet.merges![mergeIndex]!);
+    for (const [mergeIndex, sourceMerge] of (sheet.merges ?? []).entries()) {
+      const merge = normalizedMerge(sourceMerge);
       lastMergeValidationStats.normalized += 1;
       const mergePath = `${path}.merges[${mergeIndex}]`;
       if (merge.r1 >= sheet.rowCount || merge.c1 >= sheet.columns.length) {
         invalid(errors, mergePath, "Merge lies outside the sheet", "out-of-bounds");
       }
+
       merges.push(merge);
     }
+
     const overlappingMerges = overlappingMergeIndices(merges);
     for (let mergeIndex = 0; mergeIndex < overlappingMerges.length; mergeIndex++) {
       if (!overlappingMerges[mergeIndex]) continue;
@@ -3043,6 +3227,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
       if (!blockInBounds) {
         invalid(errors, blockPath, "Cell block lies outside the sheet", "out-of-bounds");
       }
+
       for (let cellIndex = 0; cellIndex < block.cells.length; cellIndex++) {
         const cell = block.cells[cellIndex]!;
         if (cell.rowOffset >= block.rowCount || cell.colOffset >= block.colCount) {
@@ -3054,6 +3239,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
           );
           continue;
         }
+
         if (!blockInBounds || !occupied) continue;
         const key =
           (block.startRow + cell.rowOffset) * sheetWidth + block.startCol + cell.colOffset;
@@ -3065,12 +3251,14 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
             "duplicate-id",
           );
         }
+
         occupied.add(key);
       }
     }
+
     const metadataRows = new Set<number>();
-    for (let index = 0; index < (sheet.rowMeta?.length ?? 0); index++) {
-      const row = sheet.rowMeta![index]![0];
+    for (const [index, meta] of (sheet.rowMeta ?? []).entries()) {
+      const row = meta[0];
       if (row >= sheet.rowCount) {
         invalid(
           errors,
@@ -3086,8 +3274,10 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
           "duplicate-id",
         );
       }
+
       metadataRows.add(row);
     }
+
     for (const [field, value, limit] of [
       ["frozenRows", sheet.frozenRows, sheet.rowCount],
       ["frozenCols", sheet.frozenCols, sheet.columns.length],
@@ -3096,8 +3286,8 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
         invalid(errors, `${path}.${field}`, `${field} lies outside the sheet`, "out-of-bounds");
       }
     }
-    for (let index = 0; index < (sheet.rowGroups?.length ?? 0); index++) {
-      const group = sheet.rowGroups![index]!;
+
+    for (const [index, group] of (sheet.rowGroups ?? []).entries()) {
       if (group.start > group.end || group.end >= sheet.rowCount) {
         invalid(
           errors,
@@ -3107,8 +3297,9 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
         );
       }
     }
-    for (let index = 0; index < (sheet.conditionalFormats?.length ?? 0); index++) {
-      if (!rangeInSheet(sheet.conditionalFormats![index]!.range, sheet)) {
+
+    for (const [index, rule] of (sheet.conditionalFormats ?? []).entries()) {
+      if (!rangeInSheet(rule.range, sheet)) {
         invalid(
           errors,
           `${path}.conditionalFormats[${index}].range`,
@@ -3117,9 +3308,9 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
         );
       }
     }
+
     const hyperlinkIds = new Set<string>();
-    for (let index = 0; index < (sheet.hyperlinks?.length ?? 0); index++) {
-      const hyperlink = sheet.hyperlinks![index]!;
+    for (const [index, hyperlink] of (sheet.hyperlinks ?? []).entries()) {
       const hyperlinkPath = `${path}.hyperlinks[${index}]`;
       if (hyperlinkIds.has(hyperlink.id)) {
         invalid(
@@ -3129,6 +3320,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
           "duplicate-id",
         );
       }
+
       hyperlinkIds.add(hyperlink.id);
       if (hyperlink.range.sheet !== sheet.id || !rangeInSheet(hyperlink.range, sheet)) {
         invalid(
@@ -3141,8 +3333,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
     }
 
     const validationIds = new Set<string>();
-    for (let index = 0; index < (sheet.validationRules?.length ?? 0); index++) {
-      const rule = sheet.validationRules![index]!;
+    for (const [index, rule] of (sheet.validationRules ?? []).entries()) {
       if (validationIds.has(rule.id)) {
         invalid(
           errors,
@@ -3151,6 +3342,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
           "duplicate-id",
         );
       }
+
       validationIds.add(rule.id);
       if (!rangeInSheet(rule.range, sheet)) {
         invalid(
@@ -3163,8 +3355,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
     }
 
     const protectionIds = new Set<string>();
-    for (let index = 0; index < (sheet.protectedRanges?.length ?? 0); index++) {
-      const protectedRange = sheet.protectedRanges![index]!;
+    for (const [index, protectedRange] of (sheet.protectedRanges ?? []).entries()) {
       if (protectionIds.has(protectedRange.id)) {
         invalid(
           errors,
@@ -3173,6 +3364,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
           "duplicate-id",
         );
       }
+
       protectionIds.add(protectedRange.id);
       if (!rangeInSheet(protectedRange.range, sheet)) {
         invalid(
@@ -3185,8 +3377,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
     }
 
     const noteAddresses = new Set<string>();
-    for (let index = 0; index < (sheet.notes?.length ?? 0); index++) {
-      const note = sheet.notes![index]!;
+    for (const [index, note] of (sheet.notes ?? []).entries()) {
       const key = `${note.addr.row}:${note.addr.col}`;
       if (
         note.addr.sheet !== sheet.id ||
@@ -3207,12 +3398,12 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
           "duplicate-id",
         );
       }
+
       noteAddresses.add(key);
     }
 
     const sortColumns = new Set<number>();
-    for (let index = 0; index < (sheet.sortKeys?.length ?? 0); index++) {
-      const key = sheet.sortKeys![index]!;
+    for (const [index, key] of (sheet.sortKeys ?? []).entries()) {
       if (key.col >= sheet.columns.length) {
         invalid(
           errors,
@@ -3228,12 +3419,13 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
           "duplicate-id",
         );
       }
+
       sortColumns.add(key.col);
     }
 
     const filterColumns = new Set<number>();
-    for (let index = 0; index < (sheet.filters?.length ?? 0); index++) {
-      const column = sheet.filters![index]![0];
+    for (const [index, filter] of (sheet.filters ?? []).entries()) {
+      const column = filter[0];
       if (column >= sheet.columns.length) {
         invalid(
           errors,
@@ -3249,11 +3441,11 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
           "duplicate-id",
         );
       }
+
       filterColumns.add(column);
     }
 
-    for (let index = 0; index < (sheet.tables?.length ?? 0); index++) {
-      const table = sheet.tables![index]!;
+    for (const [index, table] of (sheet.tables ?? []).entries()) {
       if (!validWorkbookTable(table, sheet, acceptedTables)) {
         invalid(
           errors,
@@ -3303,6 +3495,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
         ),
       })),
     };
+
     if (normalizedSheet.merges === undefined) delete normalizedSheet.merges;
     if (normalizedSheet.conditionalFormats === undefined) delete normalizedSheet.conditionalFormats;
     if (normalizedSheet.hyperlinks === undefined) delete normalizedSheet.hyperlinks;
@@ -3346,8 +3539,8 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
         }
       }
     }
-    for (let linkIndex = 0; linkIndex < (sheet.hyperlinks?.length ?? 0); linkIndex++) {
-      const hyperlink = sheet.hyperlinks![linkIndex]!;
+
+    for (const [linkIndex, hyperlink] of (sheet.hyperlinks ?? []).entries()) {
       if (hyperlink.target.kind !== "internal") continue;
       const target = hyperlink.target.range;
       const targetSheet = sheetById.get(target.sheet);
@@ -3381,8 +3574,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
   }
 
   const namedRangeIds = new Set<string>();
-  for (let index = 0; index < (validated.workbook.namedRanges?.length ?? 0); index++) {
-    const namedRange = validated.workbook.namedRanges![index]!;
+  for (const [index, namedRange] of (validated.workbook.namedRanges ?? []).entries()) {
     const namedPath = `workbook.namedRanges[${index}]`;
     const id = `${namedRange.scope ?? ""}\u0000${formulaNameKey(namedRange.name)}`;
     if (
@@ -3395,6 +3587,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
         "duplicate-id",
       );
     }
+
     if (namedRangeIds.has(id)) {
       invalid(
         errors,
@@ -3403,6 +3596,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
         "duplicate-id",
       );
     }
+
     namedRangeIds.add(id);
     if (namedRange.scope !== undefined && !sheetById.has(namedRange.scope)) {
       invalid(
@@ -3412,6 +3606,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
         "missing-reference",
       );
     }
+
     const targetSheet = sheetById.get(namedRange.range.sheet);
     if (!targetSheet) {
       invalid(errors, `${namedPath}.range`, "Named range sheet must exist", "missing-reference");
@@ -3447,12 +3642,14 @@ export function validateWorkbookSnapshot(
       bytes: 0,
       maxBytes: resolved.limits.maxSerializedBytes,
     });
+
     if (issue) {
       return {
         ok: false,
         errors: [{ path: issue.path, code: issue.code, message: issue.message }],
       };
     }
+
     return validateJsonSafeSnapshot(input);
   } catch (error) {
     const resourceFailure = error instanceof RangeError;
@@ -3476,16 +3673,20 @@ export function documentOpTarget(operation: DocumentOp): string {
   switch (operation.op) {
     case "set":
       return operation.addr.sheet;
+
     case "setNote":
       return operation.addr.sheet;
+
     case "setRange":
     case "setBlock":
     case "restoreBlock":
     case "setRangeStyle":
     case "clearRange":
       return operation.range.sheet;
+
     case "addTable":
       return operation.table.range.sheet;
+
     case "addRows":
     case "removeRows":
     case "moveRows":
@@ -3514,14 +3715,19 @@ export function documentOpTarget(operation: DocumentOp): string {
     case "setPivot":
     case "removePivot":
       return operation.sheet;
+
     case "addSheet":
       return operation.sheet.id;
+
     case "setNamedRange":
       return operation.namedRange.name;
+
     case "removeNamedRange":
       return operation.name;
+
     case "setCalculation":
       return "calculation";
+
     default: {
       const exhaustive: never = operation;
       return exhaustive;

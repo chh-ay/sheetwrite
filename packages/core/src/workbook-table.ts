@@ -193,6 +193,7 @@ export function validWorkbookTableXmlElement(
       )
         return false;
     }
+
     if (element.name === "colorFilter" && element.differentialStyle === undefined) return false;
     if (element.name === "sortCondition") {
       const sortBy = (attributes as Record<string, unknown>).sortBy;
@@ -202,6 +203,7 @@ export function validWorkbookTableXmlElement(
       )
         return false;
     }
+
     budget.characters += element.text.length;
     for (const [name, attribute] of Object.entries(attributes)) {
       if (
@@ -212,12 +214,15 @@ export function validWorkbookTableXmlElement(
         return false;
       budget.characters += name.length + attribute.length;
     }
+
     if (budget.characters > TABLE_RULE_MAX_TEXT) return false;
     for (const child of element.children) {
       if (!visit(child, allowedChildren, depth + 1)) return false;
     }
+
     return true;
   };
+
   return visit(value, [expectedName], 0);
 }
 
@@ -261,6 +266,7 @@ export function remapWorkbookTableRuleColumns(
     const ref = remapColumnSpan(rule.attributes.ref, edges);
     return ref === null ? rule.attributes : { ...rule.attributes, ref };
   };
+
   const sortState = (rule: WorkbookTableXmlElement): WorkbookTableXmlElement | undefined => {
     const children: WorkbookTableXmlElement[] = [];
     for (const condition of rule.children) {
@@ -269,8 +275,10 @@ export function remapWorkbookTableRuleColumns(
         children.push({ ...condition, attributes: { ...condition.attributes, ref } });
       }
     }
+
     return children.length > 0 ? { ...rule, attributes: tableRef(rule), children } : undefined;
   };
+
   let autoFilter: WorkbookTableXmlElement | undefined;
   if (table.autoFilter) {
     const children: WorkbookTableXmlElement[] = [];
@@ -280,6 +288,7 @@ export function remapWorkbookTableRuleColumns(
         if (remapped) children.push(remapped);
         continue;
       }
+
       const colId = Number(child.attributes.colId);
       // An unreadable colId cannot follow its column; drop it like a deleted one.
       if (!Number.isSafeInteger(colId) || colId < 0) continue;
@@ -290,8 +299,10 @@ export function remapWorkbookTableRuleColumns(
         attributes: { ...child.attributes, colId: `${moved - newStart}` },
       });
     }
+
     autoFilter = { ...table.autoFilter, attributes: tableRef(table.autoFilter), children };
   }
+
   const remappedSort = table.sortState ? sortState(table.sortState) : undefined;
   return {
     ...(autoFilter ? { autoFilter } : {}),
@@ -310,6 +321,7 @@ function validColumn(
   if (!validId(column.id, limits) || column.id !== column.id.normalize("NFC") || ids.has(idKey)) {
     return false;
   }
+
   if (
     column.name.length === 0 ||
     column.name.length > limits.maxNameLength ||
@@ -320,14 +332,17 @@ function validColumn(
   ) {
     return false;
   }
+
   const key = workbookTableNameKey(column.name);
   if (names.has(key)) return false;
   if (column.totalsRowLabel !== undefined && column.totalsRowLabel.length > limits.maxNameLength) {
     return false;
   }
+
   if (column.totalsRowFunction !== undefined && !TOTALS_FUNCTIONS.has(column.totalsRowFunction)) {
     return false;
   }
+
   if (
     column.totalsRowFormula !== undefined &&
     !validWorkbookTableXmlElement(column.totalsRowFormula, "totalsRowFormula", budget)
@@ -367,6 +382,7 @@ export function validWorkbookTable(
   if (!validId(table.id, limits) || existing.some((candidate) => candidate.id === table.id)) {
     return false;
   }
+
   const validatedName = validateWorkbookTableName(
     table.name,
     existing.map((candidate) => candidate.name),
@@ -386,6 +402,7 @@ export function validWorkbookTable(
   ) {
     return false;
   }
+
   if (
     !Number.isSafeInteger(r0) ||
     !Number.isSafeInteger(r1) ||
@@ -398,6 +415,7 @@ export function validWorkbookTable(
   ) {
     return false;
   }
+
   const width = c1 - c0 + 1;
   if (width > limits.maxColumnsPerTable || table.columns.length !== width) return false;
   if (typeof table.headerRow !== "boolean" || typeof table.totalsRow !== "boolean") return false;
@@ -412,6 +430,7 @@ export function validWorkbookTable(
   ) {
     return false;
   }
+
   if (!validStyle(table.style, limits)) return false;
   if (
     table.autoFilter !== undefined &&
@@ -430,6 +449,7 @@ export function validWorkbookTable(
   ) {
     return false;
   }
+
   return !existing.some((candidate) => {
     if (candidate.range.sheet !== table.range.sheet) return false;
     const otherR0 = Math.min(candidate.range.start.row, candidate.range.end.row);

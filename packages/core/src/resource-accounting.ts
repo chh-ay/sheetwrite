@@ -266,14 +266,17 @@ export function decodeStoreMemoryStats(
       `Store memory protocol length ${encoded.length}; expected ${expectedLength}`,
     );
   }
+
   if (encoded[0] !== STORE_MEMORY_PROTOCOL_VERSION) {
     throw invalidResourceReport(`Unsupported store memory protocol ${encoded[0]}`);
   }
+
   if (encoded[1] !== WASM_MEMORY_OWNERS.length) {
     throw invalidResourceReport(
       `Store memory owner count ${encoded[1]}; expected ${WASM_MEMORY_OWNERS.length}`,
     );
   }
+
   if (encoded[2] !== STORE_MEMORY_HASH_ESTIMATE_VERSION) {
     throw invalidResourceReport(`Unsupported hash-table estimate ${encoded[2]}`);
   }
@@ -293,6 +296,7 @@ export function decodeStoreMemoryStats(
       measurement: HASH_CAPACITY_OWNERS[owner] ? "hash-capacity-v1" : "exact-capacity",
     });
   }
+
   const logicalLiveBytes = encoded[encoded.length - 2]!;
   const allocatedCapacityBytes = encoded[encoded.length - 1]!;
   const ownerLogical = sumOwnerBytes(owners, "logicalBytes");
@@ -302,6 +306,7 @@ export function decodeStoreMemoryStats(
       `Store memory totals drift: encoded ${logicalLiveBytes}/${allocatedCapacityBytes}, owners ${ownerLogical}/${ownerAllocated}`,
     );
   }
+
   if (wasmCommittedBytes !== null)
     assertNonNegativeSafeInteger(wasmCommittedBytes, "WASM committed bytes");
   return {
@@ -394,6 +399,7 @@ export function diffRuntimeResourcePhases(
   if (before.operation !== after.operation) {
     throw invalidResourceReport(`Cannot diff ${before.operation} against ${after.operation}`);
   }
+
   assertRuntimeResourceSnapshot(before);
   assertRuntimeResourceSnapshot(after);
   const beforeOwners = new Map(
@@ -413,6 +419,7 @@ export function diffRuntimeResourcePhases(
       entries: (next?.entries ?? 0) - (previous?.entries ?? 0),
     };
   });
+
   return {
     schemaVersion: RUNTIME_RESOURCE_SCHEMA_VERSION,
     operation: before.operation,

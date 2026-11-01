@@ -303,9 +303,9 @@ export class SheetTabs {
     if (activeOptions) tabstrip.appendChild(activeOptions);
     fragment.appendChild(tabstrip);
 
-    if (!this.readOnly && this.onAdd) fragment.appendChild(this.createAddButton());
+    if (!this.readOnly && this.onAdd) fragment.appendChild(this.createAddButton(this.onAdd));
     if (!this.readOnly && this.onUnhide && hidden.length > 0) {
-      fragment.appendChild(this.createUnhideMenu(hidden));
+      fragment.appendChild(this.createUnhideMenu(hidden, this.onUnhide));
     }
     if (this.feedback) fragment.appendChild(this.createError(this.feedback));
 
@@ -380,27 +380,32 @@ export class SheetTabs {
       this.setRovingFocus(tab);
       this.scrollIntoView(tab);
     });
+
     tab.addEventListener("click", () => {
       this.focusedId = sheet.id;
       this.feedback = null;
       this.onActivate(sheet.id);
     });
+
     if (!this.readOnly && this.onRename) {
       tab.addEventListener("dblclick", (event) => {
         event.preventDefault();
         this.startRename(sheet.id);
       });
     }
+
     if (tab.draggable) {
       tab.addEventListener("dragstart", (event) => {
         this.draggedId = sheet.id;
         event.dataTransfer?.setData("text/plain", sheet.id);
         if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
       });
+
       tab.addEventListener("dragover", (event) => {
         event.preventDefault();
         if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
       });
+
       tab.addEventListener("drop", (event) => {
         event.preventDefault();
         const dragged = this.draggedId ?? event.dataTransfer?.getData("text/plain") ?? null;
@@ -409,6 +414,7 @@ export class SheetTabs {
         this.focusedId = dragged;
         this.performLifecycle(dragged, () => this.onMove!(dragged, workbookIndex));
       });
+
       tab.addEventListener("dragend", () => {
         this.draggedId = null;
       });
@@ -433,18 +439,22 @@ export class SheetTabs {
       input.setAttribute("aria-invalid", "true");
       input.setAttribute("aria-describedby", this.errorId);
     }
+
     input.addEventListener("input", () => {
       if (this.editing?.id === sheet.id) this.editing.draft = input.value;
     });
+
     input.addEventListener("compositionstart", () => {
       if (this.editing?.id === sheet.id) this.editing.composing = true;
     });
+
     input.addEventListener("compositionend", () => {
       if (this.editing?.id === sheet.id) {
         this.editing.composing = false;
         this.editing.draft = input.value;
       }
     });
+
     input.addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
         if (event.isComposing || this.editing?.composing) return;
@@ -457,10 +467,12 @@ export class SheetTabs {
         this.cancelRename();
       }
     });
+
     input.addEventListener("blur", () => {
       if (this.rendering || this.destroyed || this.editing?.composing) return;
       this.commitRename();
     });
+
     return input;
   }
 
@@ -490,12 +502,14 @@ export class SheetTabs {
       if (this.menuSheetId === sheet.id) this.closeMenu(true);
       else this.openMenu(sheet.id);
     });
+
     trigger.addEventListener("keydown", (event) => {
       if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
       event.preventDefault();
       event.stopPropagation();
       this.openMenu(sheet.id, event.key === "ArrowUp");
     });
+
     options.appendChild(trigger);
 
     if (this.menuSheetId === sheet.id) {
@@ -513,16 +527,20 @@ export class SheetTabs {
           }),
         );
       }
-      if (this.onHide) {
+
+      const onHide = this.onHide;
+      if (onHide) {
         menu.appendChild(
           this.createMenuItem("Hide", `Hide ${sheet.name} sheet`, "Control+Shift+H", () => {
             this.clearMenuState();
             this.focusedId = sheet.id;
-            this.performLifecycle(sheet.id, () => this.onHide!(sheet.id), true);
+            this.performLifecycle(sheet.id, () => onHide(sheet.id), true);
           }),
         );
       }
-      if (this.onRemove && visibleCount > 1) {
+
+      const onRemove = this.onRemove;
+      if (onRemove && visibleCount > 1) {
         menu.appendChild(
           this.createMenuItem(
             "Remove",
@@ -531,14 +549,16 @@ export class SheetTabs {
             () => {
               this.clearMenuState();
               this.focusedId = sheet.id;
-              this.performLifecycle(sheet.id, () => this.onRemove!(sheet.id), true);
+              this.performLifecycle(sheet.id, () => onRemove(sheet.id), true);
             },
             true,
           ),
         );
       }
+
       options.appendChild(menu);
     }
+
     return options;
   }
 
@@ -563,7 +583,7 @@ export class SheetTabs {
     return button;
   }
 
-  private createAddButton(): HTMLButtonElement {
+  private createAddButton(onAdd: () => SheetLifecycleResult): HTMLButtonElement {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "sheetwrite-tab-add";
@@ -571,11 +591,14 @@ export class SheetTabs {
     button.setAttribute("aria-label", "Add sheet");
     button.title = "Add sheet";
     button.setAttribute("aria-keyshortcuts", "Shift+F11");
-    button.addEventListener("click", () => this.performLifecycle(this.activeId, this.onAdd!));
+    button.addEventListener("click", () => this.performLifecycle(this.activeId, onAdd));
     return button;
   }
 
-  private createUnhideMenu(hidden: readonly SheetTabRecord[]): HTMLElement {
+  private createUnhideMenu(
+    hidden: readonly SheetTabRecord[],
+    onUnhide: (id: SheetId) => SheetLifecycleResult,
+  ): HTMLElement {
     const disclosure = document.createElement("div");
     disclosure.className = "sheetwrite-tab-unhide";
     const trigger = document.createElement("button");
@@ -588,6 +611,7 @@ export class SheetTabs {
       trigger.setAttribute("aria-invalid", "true");
       trigger.setAttribute("aria-describedby", this.errorId);
     }
+
     const choices = document.createElement("div");
     choices.className = "sheetwrite-tab-unhide-menu";
     choices.setAttribute("popover", "manual");
@@ -602,22 +626,26 @@ export class SheetTabs {
           // The fallback path was open without placing the menu in the top layer.
         }
       }
+
       choices.hidden = true;
       trigger.setAttribute("aria-expanded", "false");
       this.unhideDismiss?.();
       this.unhideDismiss = null;
       if (restoreFocus) trigger.focus();
     };
+
     const onOutsidePointer = (event: PointerEvent): void => {
       if (event.target instanceof Node && !disclosure.contains(event.target)) {
         close(disclosure.contains(document.activeElement));
       }
     };
+
     trigger.addEventListener("click", () => {
       if (!choices.hidden) {
         close(true);
         return;
       }
+
       choices.hidden = false;
       if (typeof choices.showPopover === "function") {
         choices.showPopover();
@@ -629,32 +657,38 @@ export class SheetTabs {
         )}px`;
         choices.style.top = `${Math.max(4, triggerRect.top - choicesRect.height - 4)}px`;
       }
+
       trigger.setAttribute("aria-expanded", "true");
       document.addEventListener("pointerdown", onOutsidePointer, true);
       this.unhideDismiss = () =>
         document.removeEventListener("pointerdown", onOutsidePointer, true);
       choices.querySelector("button")?.focus();
     });
+
     disclosure.addEventListener("keydown", (event) => {
       if (event.key !== "Escape" || choices.hidden) return;
       event.preventDefault();
       event.stopPropagation();
       close(true);
     });
+
     disclosure.addEventListener("focusout", (event) => {
       if (event.relatedTarget instanceof Node && disclosure.contains(event.relatedTarget)) return;
       close(false);
     });
+
     for (const sheet of hidden) {
       const button = document.createElement("button");
       button.type = "button";
       button.textContent = sheet.name;
       button.addEventListener("click", () => {
         this.focusedId = sheet.id;
-        this.performLifecycle(sheet.id, () => this.onUnhide!(sheet.id));
+        this.performLifecycle(sheet.id, () => onUnhide(sheet.id));
       });
+
       choices.appendChild(button);
     }
+
     disclosure.append(trigger, choices);
     return disclosure;
   }
@@ -855,6 +889,7 @@ export class SheetTabs {
         this.closeMenu(true);
         return;
       }
+
       if (active instanceof HTMLButtonElement && active.getAttribute("role") === "menuitem") {
         const items = [
           ...this.host.querySelectorAll<HTMLButtonElement>(
@@ -881,6 +916,7 @@ export class SheetTabs {
       this.performLifecycle(this.activeId, this.onAdd);
       return;
     }
+
     if (
       !this.readOnly &&
       event.shiftKey &&
@@ -888,14 +924,17 @@ export class SheetTabs {
       event.key.toLowerCase() === "u" &&
       this.onUnhide
     ) {
+      const onUnhide = this.onUnhide;
       const hidden = this.hiddenSheets();
-      if (hidden.length === 1) {
+      const onlyHidden = hidden.length === 1 ? hidden[0] : undefined;
+      if (onlyHidden) {
         event.preventDefault();
-        this.performLifecycle(hidden[0]!.id, () => this.onUnhide!(hidden[0]!.id));
+        this.performLifecycle(onlyHidden.id, () => onUnhide(onlyHidden.id));
       } else if (hidden.length > 1) {
         event.preventDefault();
         this.host.querySelector<HTMLElement>(".sheetwrite-tab-unhide > button")?.focus();
       }
+
       return;
     }
 
@@ -910,12 +949,14 @@ export class SheetTabs {
         this.startRename(id);
         return;
       }
+
       const onRemove = this.onRemove;
       if (event.key === "Delete" && onRemove && this.buttons.length > 1) {
         event.preventDefault();
         this.performLifecycle(id, () => onRemove(id));
         return;
       }
+
       if (
         event.shiftKey &&
         (event.ctrlKey || event.metaKey) &&
@@ -926,6 +967,7 @@ export class SheetTabs {
         this.performLifecycle(id, () => this.onHide!(id));
         return;
       }
+
       if (event.shiftKey && (event.ctrlKey || event.metaKey) && this.onMove) {
         const targetVisibleIndex =
           event.key === "ArrowLeft"
