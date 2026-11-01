@@ -1510,7 +1510,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L454",
+              "source": "src/grid.ts#L455",
               "jsDocTags": [
                 "example",
                 "see"
@@ -1836,7 +1836,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L328",
+              "source": "src/grid.ts#L329",
               "jsDocTags": [],
               "documentation": "Default canvas theme used before CSS and explicit theme overrides.",
               "memberDocs": []
@@ -2993,7 +2993,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L372",
+              "source": "src/grid.ts#L373",
               "jsDocTags": [
                 "example",
                 "see"
@@ -3044,7 +3044,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L384",
+              "source": "src/grid.ts#L385",
               "jsDocTags": [],
               "documentation": "Whether `initSheetwrite` has completed — the single readiness source.",
               "memberDocs": []
@@ -4170,7 +4170,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L389",
+              "source": "src/grid.ts#L390",
               "jsDocTags": [],
               "documentation": "Read `--sheetwrite-*` CSS custom properties into a partial theme.",
               "memberDocs": []
@@ -6341,7 +6341,7 @@
               "owners": [
                 "src/sheet-name.ts"
               ],
-              "source": "src/sheet-name.ts#L14",
+              "source": "src/sheet-name.ts#L13",
               "jsDocTags": [],
               "documentation": "Validate and canonicalize a SpreadsheetML worksheet name.",
               "memberDocs": []

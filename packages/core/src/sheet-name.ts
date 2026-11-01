@@ -1,5 +1,4 @@
 import { sheetNameKey } from "./name-key.js";
-export { sheetNameKey } from "./name-key.js";
 import type { SheetNameIssueCode, SheetNameValidationResult } from "./types/document.js";
 
 function hasForbiddenSheetNameCharacter(name: string): boolean {
