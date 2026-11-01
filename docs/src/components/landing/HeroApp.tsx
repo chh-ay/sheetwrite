@@ -2,7 +2,7 @@ import iconLayout from "@sheetwrite/core/icons.json";
 import iconSheet from "@sheetwrite/core/icons.svg?url";
 import type { CSSProperties, ReactNode } from "react";
 
-import { clamp, count, ease, fadeWindow, lerp, span } from "./scene-math.js";
+import { count, ease, fadeWindow, lerp, span } from "./scene-math.js";
 import { useTimeline } from "./useTimeline.js";
 
 /**
