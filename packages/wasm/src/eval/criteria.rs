@@ -1,4 +1,4 @@
-//! Criteria parsing and conditional aggregation.
+//! Criteria parsing, wildcard matching, and conditional aggregation.
 
 use std::cmp::Ordering;
 
@@ -6,14 +6,20 @@ use crate::calc::{CmpOp, SHEET_COLS, SHEET_ROWS};
 use crate::types::{CellRange, FormulaError, Value};
 
 use super::matrix::EvalMatrix;
-use super::value::{compare_text_case_insensitive, plain_number};
-use super::wildcard::Wildcard;
+use super::value::compare_text_case_insensitive;
+
+#[derive(Debug)]
+enum WildcardToken {
+    Literal(char),
+    AnyOne,
+    AnyMany,
+}
 
 #[derive(Debug)]
 pub(super) struct Criterion {
     op: CmpOp,
     operand: Value,
-    wildcard: Option<Wildcard>,
+    wildcard: Option<Vec<WildcardToken>>,
 }
 
 impl Criterion {
@@ -46,13 +52,13 @@ impl Criterion {
             Value::Bool(true)
         } else if operand.eq_ignore_ascii_case("FALSE") {
             Value::Bool(false)
-        } else if let Some(number) = plain_number(operand) {
+        } else if let Ok(number) = operand.parse::<f64>() {
             Value::number(number)
         } else {
             Value::text(operand)
         };
         let wildcard = if matches!(op, CmpOp::Eq | CmpOp::Ne) {
-            Some(Wildcard::parse(operand)).filter(Wildcard::has_wildcards)
+            wildcard_tokens(operand)
         } else {
             None
         };
@@ -65,7 +71,8 @@ impl Criterion {
 
     pub(super) fn matches(&self, candidate: &Value) -> bool {
         let ordering = if let Some(pattern) = &self.wildcard {
-            let matched = criterion_text(candidate).is_some_and(|text| pattern.matches(text));
+            let text = criterion_text(candidate);
+            let matched = text.is_some_and(|text| wildcard_matches(pattern, &text));
             return if self.op == CmpOp::Ne {
                 !matched
             } else {
@@ -98,33 +105,107 @@ pub(crate) fn sum_range_extent(sum: CellRange, rows: u32, cols: u32) -> CellRang
     CellRange::new(sum.sheet, sum.row_start, sum.col_start, row_end, col_end)
 }
 
-/// A wildcard lookup key (`XLOOKUP`/`XMATCH` match mode 2), parsed once and
-/// matched against many candidates. A key without wildcards matches its
-/// literal text, with the same case rule.
+fn wildcard_tokens(pattern: &str) -> Option<Vec<WildcardToken>> {
+    let mut tokens = Vec::new();
+    let normalized = pattern.to_lowercase();
+    let mut chars = normalized.chars().peekable();
+    let mut has_pattern_syntax = false;
+    while let Some(ch) = chars.next() {
+        match ch {
+            '~' => match chars.peek().copied() {
+                Some(literal @ ('*' | '?' | '~')) => {
+                    has_pattern_syntax = true;
+                    chars.next();
+                    tokens.push(WildcardToken::Literal(literal));
+                }
+                _ => tokens.push(WildcardToken::Literal('~')),
+            },
+            '*' => {
+                has_pattern_syntax = true;
+                if !matches!(tokens.last(), Some(WildcardToken::AnyMany)) {
+                    tokens.push(WildcardToken::AnyMany);
+                }
+            }
+            '?' => {
+                has_pattern_syntax = true;
+                tokens.push(WildcardToken::AnyOne);
+            }
+            literal => tokens.push(WildcardToken::Literal(literal)),
+        }
+    }
+    has_pattern_syntax.then_some(tokens)
+}
+
+/// A wildcard pattern prepared once and matched against many candidates, so
+/// a search over a column parses the pattern once instead of once per cell.
 pub(super) struct WildcardPattern {
-    wildcard: Wildcard,
+    pattern: String,
+    tokens: Option<Vec<WildcardToken>>,
 }
 
 impl WildcardPattern {
+    /// Reads the pattern's wildcard syntax once.
     pub(super) fn new(pattern: &str) -> Self {
         Self {
-            wildcard: Wildcard::parse(pattern),
+            pattern: pattern.to_string(),
+            tokens: wildcard_tokens(pattern),
         }
     }
 
+    /// Matches `*` (any sequence), `?` (one character), and `~` escapes with
+    /// Unicode lowercase comparison; plain patterns use ASCII case folding.
     pub(super) fn matches(&self, candidate: &Value) -> bool {
-        criterion_text(candidate).is_some_and(|text| self.wildcard.matches(text))
+        let Some(text) = criterion_text(candidate) else {
+            return false;
+        };
+        match &self.tokens {
+            Some(tokens) => wildcard_matches(tokens, &text),
+            None => text.eq_ignore_ascii_case(&self.pattern),
+        }
     }
 }
 
-/// The text a wildcard sees in a candidate cell: numbers and booleans never
-/// match a pattern, and an error matches its sentinel such as `#N/A`.
-fn criterion_text(value: &Value) -> Option<&str> {
+fn wildcard_matches(pattern: &[WildcardToken], value: &str) -> bool {
+    let text: Vec<char> = value.to_lowercase().chars().collect();
+    let (mut pattern_index, mut text_index) = (0usize, 0usize);
+    let (mut star_index, mut star_text) = (None, 0usize);
+    while text_index < text.len() {
+        match pattern.get(pattern_index) {
+            Some(WildcardToken::Literal(expected)) if *expected == text[text_index] => {
+                pattern_index += 1;
+                text_index += 1;
+            }
+            Some(WildcardToken::AnyOne) => {
+                pattern_index += 1;
+                text_index += 1;
+            }
+            Some(WildcardToken::AnyMany) => {
+                star_index = Some(pattern_index);
+                pattern_index += 1;
+                star_text = text_index;
+            }
+            _ => {
+                let Some(star) = star_index else {
+                    return false;
+                };
+                star_text += 1;
+                text_index = star_text;
+                pattern_index = star + 1;
+            }
+        }
+    }
+    while matches!(pattern.get(pattern_index), Some(WildcardToken::AnyMany)) {
+        pattern_index += 1;
+    }
+    pattern_index == pattern.len()
+}
+
+fn criterion_text(value: &Value) -> Option<String> {
     match value {
-        Value::Text(text) => Some(text),
-        Value::Blank => Some(""),
-        Value::Error(error) => Some(error.sentinel()),
-        Value::Number(_) | Value::Bool(_) => None,
+        Value::Text(text) => Some(text.to_string()),
+        Value::Blank => Some(String::new()),
+        Value::Error(error) => Some(error.sentinel().to_string()),
+        _ => None,
     }
 }
 

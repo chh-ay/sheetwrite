@@ -62,7 +62,7 @@ grid.store.applyTransaction({
 
 ## Criteria semantics and shapes
 
-Criteria strings may begin with `=`, `<>`, `<`, `<=`, `>`, or `>=`. Plain numeric and boolean operands (`5`, `1e3`, `TRUE`) are parsed before text comparison; other text, such as `1,000`, compares as text. Plain text comparisons are case-insensitive. `*` matches zero or more characters, `?` matches one character, and `~` escapes the next `*`, `?` or `~`. Wildcards apply to equality/inequality text criteria. Criteria, `XLOOKUP` and `XMATCH` match mode 2, and `SEARCH` use the same wildcard rule: case folds one character at a time, so `?` matches `İ` and `CAFÉ` matches `café`. Criteria are parsed once per formula evaluation, not once per cell.
+Criteria strings may begin with `=`, `<>`, `<`, `<=`, `>`, or `>=`. Numeric and boolean operands are parsed before text comparison. Plain text comparisons are case-insensitive. `*` matches zero or more characters, `?` matches one character, and `~` escapes the next wildcard. Wildcards apply to equality/inequality text criteria. Criteria are parsed once per formula evaluation, not once per cell.
 
 Shapes are exact row-by-column dimensions; equal cell counts with different dimensions do not match:
 

@@ -1,8 +1,8 @@
 //! Extra calendar functions for the full engine.
 
-use super::super::date::{date_parts, date_serial};
+use super::super::date::{date_parts, date_serial, parse_date_value};
 use super::super::functions::{integer_arg, require_arity, text_arg, FuncAccumulator};
-use super::super::value::{number_from_text, number_from_value};
+use super::super::value::number_from_value;
 use crate::types::{EvalResult, FormulaError, Value};
 
 pub(crate) const NAMES: &[&str] = &["DATEDIF", "ISOWEEKNUM", "NETWORKDAYS.INTL", "WORKDAY.INTL"];
@@ -19,10 +19,10 @@ pub(crate) fn evaluate(name: &str, values: &FuncAccumulator) -> EvalResult {
 
 fn serial_value(value: &Value) -> DateResult {
     let number = match value {
-        Value::Text(text) => match year_first_date(text) {
-            Some(serial) => serial,
-            None => number_from_text(text)?,
-        },
+        Value::Text(text) => parse_date_value(text)
+            .or_else(|| year_first_date(text))
+            .or_else(|| text.trim().parse::<f64>().ok())
+            .ok_or(FormulaError::Value)?,
         _ => number_from_value(value)?,
     };
     if !number.is_finite() || !(0.0..=MAX_SERIAL as f64).contains(&number.trunc()) {
