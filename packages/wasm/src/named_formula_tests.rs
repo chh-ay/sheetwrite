@@ -95,12 +95,12 @@ fn relative_references_in_a_name_follow_the_cell_that_uses_it() {
     assert_eq!(number(&store, sheet, 2, 2), 31.0);
 }
 
-/// `A1048575:A1`, relative to A1, is the two rows above a cell and the cell
-/// itself; used in row 3 it wraps to A1:A3.
+/// `$A1048575:$A1`, relative to A1, is the two rows above a cell and the
+/// cell itself in column A; used in row 3 it wraps to A1:A3.
 #[test]
 fn a_relative_range_in_a_name_wraps_past_the_last_row() {
     let (mut store, sheet) = data_store();
-    assert!(store.set_named_formula("LastThree", -1, "=SUM(Data!A1048575:A1)"));
+    assert!(store.set_named_formula("LastThree", -1, "=SUM(Data!$A1048575:$A1)"));
     store.set_formula(sheet, 2, 3, "=LastThree", 0);
     store.recompute(sheet);
 
