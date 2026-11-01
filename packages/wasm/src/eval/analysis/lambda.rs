@@ -125,16 +125,6 @@ fn substitute(
     };
     Ok(match expression {
         Ast::Name(name) => lookup(name).cloned().unwrap_or_else(|| expression.clone()),
-        Ast::UnknownFunc(name, arguments) if lookup(name).is_some() => {
-            let mut invocation = vec![lookup(name).ok_or(FormulaError::Value)?.clone()];
-            invocation.extend(
-                arguments
-                    .iter()
-                    .map(|argument| substitute(argument, bindings, nodes))
-                    .collect::<Result<Vec<_>, _>>()?,
-            );
-            Ast::UnknownFunc(CALL.into(), invocation)
-        }
         Ast::Func(Func::Analysis(super::LAMBDA_ID), arguments) => {
             let (parameters, body) = definition(expression)?;
             let visible: Vec<_> = bindings.iter().filter(|(name, _)| !parameters.iter().any(|parameter| matches!(parameter, Ast::Name(local) if local.eq_ignore_ascii_case(name)))).copied().collect();
@@ -169,13 +159,24 @@ fn substitute(
                 .map(|argument| substitute(argument, bindings, nodes))
                 .collect::<Result<Vec<_>, _>>()?,
         ),
-        Ast::UnknownFunc(name, arguments) => Ast::UnknownFunc(
-            name.clone(),
-            arguments
-                .iter()
-                .map(|argument| substitute(argument, bindings, nodes))
-                .collect::<Result<Vec<_>, _>>()?,
-        ),
+        Ast::UnknownFunc(name, arguments) => {
+            let bound = lookup(name);
+            let mut invocation = Vec::with_capacity(arguments.len() + usize::from(bound.is_some()));
+            if let Some(function) = bound {
+                invocation.push(function.clone());
+            }
+            for argument in arguments {
+                invocation.push(substitute(argument, bindings, nodes)?);
+            }
+            Ast::UnknownFunc(
+                if bound.is_some() {
+                    CALL.into()
+                } else {
+                    name.clone()
+                },
+                invocation,
+            )
+        }
         Ast::Bin(operator, left, right) => Ast::Bin(
             *operator,
             Box::new(substitute(left, bindings, nodes)?),

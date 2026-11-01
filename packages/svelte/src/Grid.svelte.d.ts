@@ -1,4 +1,3 @@
-import type { Grid } from "@sheetwrite/core";
 import type { Component } from "svelte";
 import type { SheetwriteGridProps } from "./props.js";
 

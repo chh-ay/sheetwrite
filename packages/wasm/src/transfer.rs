@@ -15,6 +15,22 @@ pub(crate) type TransferInput<'a> = &'a [u8];
 
 pub(crate) struct Writer(pub(crate) Vec<u8>);
 
+/// An integer whose backing bytes can be filled by the transfer reader.
+///
+/// # Safety
+/// Implementors must have nonzero size, no padding, and accept every bit pattern.
+#[cfg(any(target_arch = "wasm32", test))]
+unsafe trait TransferWord: Copy + Default {}
+
+// SAFETY: These unsigned integer types have nonzero size, no padding, and
+// every bit pattern is a valid value.
+#[cfg(any(target_arch = "wasm32", test))]
+unsafe impl TransferWord for u8 {}
+#[cfg(any(target_arch = "wasm32", test))]
+unsafe impl TransferWord for u32 {}
+#[cfg(any(target_arch = "wasm32", test))]
+unsafe impl TransferWord for u64 {}
+
 impl Writer {
     pub(crate) fn new(tag: u32) -> Self {
         let mut out = Self(Vec::new());
@@ -68,12 +84,18 @@ impl Writer {
 
     pub(crate) fn words(&mut self, value: &[u64]) {
         // WASM is little-endian; borrow the backing bytes instead of packing a second vector.
+        // SAFETY: u64 has no padding, so all size_of_val(value) bytes are
+        // initialized. u8 needs only byte alignment. The slice stays within
+        // value's allocation and is read only during this borrow.
         self.bytes(unsafe {
             std::slice::from_raw_parts(value.as_ptr().cast(), std::mem::size_of_val(value))
         });
     }
 
     pub(crate) fn ints(&mut self, value: &[u32]) {
+        // SAFETY: u32 has no padding, so all size_of_val(value) bytes are
+        // initialized. u8 needs only byte alignment. The slice stays within
+        // value's allocation and is read only during this borrow.
         self.bytes(unsafe {
             std::slice::from_raw_parts(value.as_ptr().cast(), std::mem::size_of_val(value))
         });
@@ -222,7 +244,7 @@ impl<'a> Reader<'a> {
         Ok(count)
     }
 
-    fn array<T: Copy + Default>(&mut self) -> TransferResult<Vec<T>> {
+    fn array<T: TransferWord>(&mut self) -> TransferResult<Vec<T>> {
         let length = self.usize()?;
         let width = std::mem::size_of::<T>();
         if length % width != 0 {
@@ -230,7 +252,10 @@ impl<'a> Reader<'a> {
         }
 
         let mut values = vec![T::default(); length / width];
-        // Only u8/u32/u64 call this method, and every bit pattern is valid for them.
+        // SAFETY: TransferWord has nonzero size and no padding, and permits
+        // every bit pattern the decoder can write. The vector owns exactly
+        // length initialized bytes. u8 requires no stricter alignment, and
+        // the exclusive byte borrow ends before values is read or returned.
         let bytes =
             unsafe { std::slice::from_raw_parts_mut(values.as_mut_ptr().cast::<u8>(), length) };
         self.fill_array(bytes)?;

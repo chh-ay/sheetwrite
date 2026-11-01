@@ -1,6 +1,8 @@
 //! Same-build instance migration; never exposed as the document persistence format.
 
 use super::*;
+#[cfg(any(target_arch = "wasm32", test))]
+use crate::calc::{RefFlags, SheetRef};
 use crate::transfer::Writer;
 #[cfg(any(target_arch = "wasm32", test))]
 use crate::transfer::{Reader, TransferInput, TransferResult};
@@ -70,34 +72,48 @@ impl CellStore {
     ) -> TransferResult<FormulaEntry> {
         let source = input.text()?;
 
-        let mut entry = if input.bool()? {
+        let is_reference = input.bool()?;
+        let reference_ast = if is_reference {
             let target = AbsCellKey {
                 sheet: input.u32()?,
                 row: input.u32()?,
                 col: input.u32()?,
             };
 
-            FormulaEntry::reference(
-                target,
-                self.sheet_names
-                    .get(target.sheet as usize)
-                    .map_or("", String::as_str),
-                sheet,
-            )
+            Some(Ast::AbsCell(
+                SheetRef {
+                    handle: target.sheet,
+                    name: self
+                        .sheet_names
+                        .get(target.sheet as usize)
+                        .map_or("", String::as_str)
+                        .to_string(),
+                    quoted: false,
+                },
+                target.row,
+                target.col,
+                RefFlags::default(),
+            ))
         } else {
-            self.parse_formula_entry(&source, sheet, row, col)
+            None
         };
 
-        entry.source = source;
-
-        if !input.bool()? {
-            entry.ast = None;
-        }
-
-        entry.set_source_error(input.error()?);
-        entry.set_volatile(input.bool()?);
-        entry.set_has_spill_refs(input.bool()?);
-        entry.set_produces_array(input.bool()?);
+        let ast = if input.bool()? {
+            if is_reference {
+                reference_ast
+            } else {
+                Some(
+                    self.resolve_formula_ast(&source, sheet, row, col)
+                        .map_err(|_| "invalid transferred formula".to_string())?,
+                )
+            }
+        } else {
+            None
+        };
+        let source_error = input.error()?;
+        let volatile = input.bool()?;
+        let has_spill_refs = input.bool()?;
+        let produces_array = input.bool()?;
 
         let cells = (0..input.count()?)
             .map(|_| {
@@ -121,7 +137,12 @@ impl CellStore {
             })
             .collect::<TransferResult<Vec<_>>>()?;
 
-        entry.reads = ReadSet { cells, ranges };
+        let mut entry =
+            FormulaEntry::transferred_source(ast, source, ReadSet { cells, ranges }, is_reference);
+        entry.set_source_error(source_error);
+        entry.set_volatile(volatile);
+        entry.set_has_spill_refs(has_spill_refs);
+        entry.set_produces_array(produces_array);
 
         Ok(entry)
     }
@@ -138,8 +159,8 @@ impl CellStore {
             store.sheet_alive.push(input.bool()?);
         }
 
-        // Formulas below are parsed again, and their 3-D references are
-        // placed in this order. Handle order stays implicit, as it was.
+        // Resolve 3-D reference spans in their transferred tab order.
+        // Sheet handles remain independent of tab positions.
         let order = (0..input.count()?)
             .map(|_| input.u32())
             .collect::<TransferResult<Vec<_>>>()?;

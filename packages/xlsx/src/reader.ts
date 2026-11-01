@@ -174,7 +174,6 @@ interface ParsedSheet {
   readonly hasRowOutlines: boolean;
   readonly hasUnsupportedValidation: boolean;
   readonly hasConditionalFormatting: boolean;
-  readonly hasUnsupportedConditionalFormatting: boolean;
   readonly hasUnsupportedSortState: boolean;
   readonly hasSortState: boolean;
   readonly hasProtection: boolean;
@@ -605,7 +604,7 @@ function parseConditionalFormats(
   styles: ParsedStyles,
   sheet: string,
   context: XlsxCodecContext,
-): { rules: ConditionalFormatRule[]; unsupported: boolean } {
+): ConditionalFormatRule[] {
   const parsed: { priority: number; order: number; rule: ConditionalFormatRule }[] = [];
   let sourceOrder = 0;
   const dropped = (message: string): void =>
@@ -708,7 +707,7 @@ function parseConditionalFormats(
     );
     parsed.length = MAX_CONDITIONAL_FORMAT_RULES;
   }
-  return { rules: parsed.map((entry) => entry.rule), unsupported: false };
+  return parsed.map((entry) => entry.rule);
 }
 
 function xmlHasDescendant(element: XmlElement, localName: string): boolean {
@@ -1598,7 +1597,7 @@ async function parseSheet(
         parseValidation(validation, context, reference.name, date1904),
       )
     : [];
-  const conditional = parseConditionalFormats(root, styles, reference.name, context);
+  const conditionalFormats = parseConditionalFormats(root, styles, reference.name, context);
   const sort = parseSortKeys(root, Math.max(0, maxRow + 1));
   const relationships = packageFile.relationships(reference.relationship.target);
   const hyperlinkCollection = xmlChild(root, "hyperlinks");
@@ -1628,7 +1627,7 @@ async function parseSheet(
     maxRow = Math.max(maxRow, hyperlink.range.end.row);
     maxCol = Math.max(maxCol, hyperlink.range.end.col);
   }
-  for (const rule of conditional.rules) {
+  for (const rule of conditionalFormats) {
     maxRow = Math.max(maxRow, rule.range.end.row);
     maxCol = Math.max(maxCol, rule.range.end.col);
   }
@@ -1687,7 +1686,7 @@ async function parseSheet(
     ...(Number.isInteger(frozenRows) && frozenRows > 0 ? { frozenRows } : {}),
     ...(Number.isInteger(frozenCols) && frozenCols > 0 ? { frozenCols } : {}),
     validations,
-    conditionalFormats: conditional.rules,
+    conditionalFormats,
     sortKeys: sort.keys,
     notes: comments.comments,
     hyperlinks,
@@ -1696,7 +1695,6 @@ async function parseSheet(
     hasConditionalFormatting: root.children.some(
       (child) => xmlLocalName(child.name) === "conditionalFormatting",
     ),
-    hasUnsupportedConditionalFormatting: conditional.unsupported,
     hasSortState: Boolean(xmlChild(root, "sortState")),
     hasUnsupportedSortState: sort.unsupported,
     hasRowOutlines: outlineLevels.size > 0,
@@ -2452,14 +2450,6 @@ export async function readWorkbook(
       emitWarning(context, {
         code: "validation-loss",
         message: "Excel data validation rules could not be mapped safely and were dropped",
-        sheet: source.name,
-      });
-    }
-    if (source.hasUnsupportedConditionalFormatting) {
-      emitWarning(context, {
-        code: "format-loss",
-        message:
-          "One or more Excel conditional-format predicates or differential styles could not be represented and were dropped",
         sheet: source.name,
       });
     }

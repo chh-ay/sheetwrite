@@ -1294,14 +1294,15 @@ fn sort_finite_number_column_comparison(
     }
 
     order.sort_unstable_by(|&a, &b| {
-        // SAFETY: `order` holds only rows from `0..row_count`, and the scan
-        // above proved every value in this column is a finite number.
         let (left, right) = if sheet.cells.is_paged() {
             (
                 sheet.cells.num_at(base + a as usize),
                 sheet.cells.num_at(base + b as usize),
             )
         } else {
+            // SAFETY: This is dense storage. Every row in `order` is below
+            // row_count, so base + row stays within this column's payload
+            // buffer, whose range is base..base + row_count.
             unsafe {
                 (
                     f64::from_bits(sheet.cells.payload_unchecked(base + a as usize)),

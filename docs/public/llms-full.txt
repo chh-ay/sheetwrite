@@ -19076,7 +19076,7 @@ Page: https://www.sheetwrite.dev/docs/api/xlsx/
 (workbook: Workbook, store: Store, options?: XlsxWorkbookOptions): XlsxModel | null
 ```
 
-Build the active-sheet table model used by the bounded OOXML writer.
+Materialize the active-sheet table model. The bounded writer uses tableSource instead.
 
 ##### `registerXlsxBackends` — function
 

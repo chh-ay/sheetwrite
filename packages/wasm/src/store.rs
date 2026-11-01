@@ -9,7 +9,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::calc::{
     ast_contains_sheet_span, parse, place_span, resolve_named_ranges, resolve_sheet_refs,
-    resolve_structured_refs, sheet_name_key, shift_range, NamedRangeRef, StructuredRef,
+    resolve_structured_refs, sheet_name_key, shift_range, Ast, NamedRangeRef, StructuredRef,
     TableSection, UnresolvedStructuredRef,
 };
 use crate::cells::{
@@ -3519,11 +3519,21 @@ impl CellStore {
         formula_row: u32,
         formula_col: u32,
     ) -> FormulaEntry {
-        let ast = match parse(source) {
-            Ok(ast) => ast,
-            Err(_) => return FormulaEntry::parse_error(source),
-        };
-        let ast = match resolve_sheet_refs(
+        match self.resolve_formula_ast(source, formula_sheet, formula_row, formula_col) {
+            Ok(ast) => FormulaEntry::parsed_source(ast, formula_sheet, source.to_string()),
+            Err(error) => FormulaEntry::error(source, error),
+        }
+    }
+
+    fn resolve_formula_ast(
+        &self,
+        source: &str,
+        formula_sheet: u32,
+        formula_row: u32,
+        formula_col: u32,
+    ) -> Result<Ast, FormulaError> {
+        let ast = parse(source).map_err(|_| FormulaError::Value)?;
+        let ast = resolve_sheet_refs(
             ast,
             &|name| {
                 self.sheet_ids
@@ -3532,14 +3542,12 @@ impl CellStore {
                     .map(|&index| index as u32)
             },
             &|span| place_span(span, &self.tab_order()),
-        ) {
-            Ok(ast) => ast,
-            Err(_) => return FormulaEntry::error(source, FormulaError::Ref),
-        };
+        )
+        .map_err(|_| FormulaError::Ref)?;
         let ast = resolve_named_ranges(ast, formula_sheet, &|name, sheet| {
             self.named_range(name, sheet)
         });
-        let ast = resolve_structured_refs(
+        Ok(resolve_structured_refs(
             ast,
             formula_sheet,
             formula_row,
@@ -3547,8 +3555,7 @@ impl CellStore {
             &|reference, sheet, row, col| {
                 self.resolve_structured_reference(reference, sheet, row, col)
             },
-        );
-        FormulaEntry::parsed_source(ast, formula_sheet, source.to_string())
+        ))
     }
 
     fn rebase_named_rows(&mut self, edited_sheet: u32, at: u32, delta: i64) -> bool {
