@@ -25,11 +25,13 @@ import {
   unknownSheetError,
 } from "../errors.js";
 import type { FormulaFunctionMetadata } from "../functions/types.js";
+import { DEFAULT_DISTINCT_VALUES_LIMIT } from "../grid-constants.js";
 import {
   cloneCellHyperlink,
   MAX_HYPERLINKS_PER_SHEET,
   sanitizeCellHyperlink,
 } from "../hyperlink.js";
+import { formulaNameKey } from "../name-key.js";
 import {
   applyPivotRewrites,
   clonePivot,
@@ -160,7 +162,16 @@ import { StoreWindowReader } from "./window-reader.js";
  * Shared tags keep these encodings aligned with window reads
  * and the paint worker.
  */
-import { KIND_BOOL, KIND_FORMULA, KIND_NUMBER, KIND_STRING } from "./wire-tags.js";
+import {
+  KIND_BOOL,
+  KIND_FORMULA,
+  KIND_NUMBER,
+  KIND_STRING,
+  NO_CELL_COORDINATE,
+  CELL_STATE_UNLOADED,
+  CELL_STATE_LOADED_EMPTY,
+  CELL_STATE_LOCAL_EDIT,
+} from "./wire-tags.js";
 
 const AGG_OP: Record<AggregateOp, number> = { sum: 0, avg: 1, min: 2, max: 3, count: 4 };
 
@@ -875,9 +886,9 @@ export class StoreDataEngine {
   private spillAnchor(addr: CellAddress): CellAddress | null {
     const handle = this.handleOf(addr.sheet);
     const row = this.wasm.spillAnchorRow(handle, addr.row, addr.col);
-    if (row === 0xffffffff) return null;
+    if (row === NO_CELL_COORDINATE) return null;
     const col = this.wasm.spillAnchorCol(handle, addr.row, addr.col);
-    if (col === 0xffffffff) return null;
+    if (col === NO_CELL_COORDINATE) return null;
     return { sheet: addr.sheet, row, col };
   }
 
@@ -1011,10 +1022,7 @@ export class StoreDataEngine {
     name: string,
     scope: SheetId | undefined,
   ): boolean {
-    return (
-      workbookTableNameKey(namedRange.name) === workbookTableNameKey(name) &&
-      namedRange.scope === scope
-    );
+    return formulaNameKey(namedRange.name) === formulaNameKey(name) && namedRange.scope === scope;
   }
 
   private allocateSheet(columns: number, rows: number): number {
@@ -1063,9 +1071,9 @@ export class StoreDataEngine {
 
   getCellLoadState(addr: CellAddress): CellLoadState {
     const state = this.wasm.cellState(this.handleOf(addr.sheet), addr.row, addr.col);
-    if (state === 0) return "unloaded";
-    if (state === 1) return "loaded-empty";
-    if (state === 3) return "local-edit";
+    if (state === CELL_STATE_UNLOADED) return "unloaded";
+    if (state === CELL_STATE_LOADED_EMPTY) return "loaded-empty";
+    if (state === CELL_STATE_LOCAL_EDIT) return "local-edit";
     return "loaded-value";
   }
 
@@ -1682,7 +1690,7 @@ export class StoreDataEngine {
    * Distinct resolved values of a column in first-seen order, capped at `limit`
    * distinct values (`0` = uncapped). Blanks collapse to a single `null` entry.
    */
-  distinctValues(sheet: SheetId, col: number, limit = 1000): CellScalar[] {
+  distinctValues(sheet: SheetId, col: number, limit = DEFAULT_DISTINCT_VALUES_LIMIT): CellScalar[] {
     this.requireCompleteQuery(sheet);
     return this.view.distinctValues(sheet, col, limit);
   }
@@ -2213,11 +2221,19 @@ export class StoreDataEngine {
   /** Apply raw patches once; remote loads suppress paged dirty tracking. */
   applyPatches(
     patches: readonly DocumentOp[],
-    remoteLoad: boolean,
-    captureChanges: boolean,
-    captureDetailedChanges = false,
-    trustedHistory = false,
-    replayPivotSources = false,
+    {
+      remoteLoad,
+      captureChanges,
+      captureDetailedChanges = false,
+      trustedHistory = false,
+      replayPivotSources = false,
+    }: {
+      remoteLoad: boolean;
+      captureChanges: boolean;
+      captureDetailedChanges?: boolean;
+      trustedHistory?: boolean;
+      replayPivotSources?: boolean;
+    },
   ): StoreDataEngineEffects {
     const changes: ChangeEvent["changes"] | null = captureChanges ? [] : null;
     const appliedPatches: DocumentOp[] = [];
@@ -2925,7 +2941,7 @@ export class StoreDataEngine {
         if (
           tableCount >= DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxTables ||
           (this.workbook.namedRanges ?? []).some(
-            (range) => workbookTableNameKey(range.name) === workbookTableNameKey(patch.table.name),
+            (range) => formulaNameKey(range.name) === formulaNameKey(patch.table.name),
           )
         ) {
           return false;
@@ -2966,7 +2982,7 @@ export class StoreDataEngine {
         );
         if (
           (this.workbook.namedRanges ?? []).some(
-            (range) => workbookTableNameKey(range.name) === workbookTableNameKey(candidate.name),
+            (range) => formulaNameKey(range.name) === formulaNameKey(candidate.name),
           )
         ) {
           return false;
@@ -3075,8 +3091,7 @@ export class StoreDataEngine {
         if (
           this.workbook.sheets.some((sheet) =>
             (sheet.tables ?? []).some(
-              (table) =>
-                workbookTableNameKey(table.name) === workbookTableNameKey(patch.namedRange.name),
+              (table) => formulaNameKey(table.name) === formulaNameKey(patch.namedRange.name),
             ),
           )
         ) {

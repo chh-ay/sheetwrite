@@ -17,7 +17,7 @@ import { boxIn, layerParent, type MirrorMark, TextMirror } from "./formula-mirro
 import { storeFunctions } from "./functions/registry.js";
 import { argumentLabel, signature } from "./functions/signature.js";
 import type { FormulaFunctionMetadata } from "./functions/types.js";
-import { sheetNameKey } from "./sheet-name.js";
+import { sheetNameKey } from "./name-key.js";
 import type { HighlightRange, SheetId } from "./types/coordinates.js";
 import type { Theme } from "./types/render.js";
 import type { Store } from "./types/store.js";

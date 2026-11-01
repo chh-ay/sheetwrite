@@ -1358,6 +1358,23 @@ describe("Grid search over a custom store", () => {
 });
 
 describe("transactional document metadata", () => {
+  beforeAll(async () => {
+    await initSheetwrite();
+  });
+
+  it("returns outcomes from both sort convenience methods", () => {
+    const workbook = makeWorkbook(4);
+    const store = new SheetwriteStore(workbook, makeColumnarData(4));
+    const grid = new GridImpl(mountHost(), { workbook }, store);
+    try {
+      expect(grid.sortBy(1, false)).toMatchObject({ status: "applied" });
+      expect(grid.sortByMulti([{ col: 1, ascending: true }])).toMatchObject({ status: "applied" });
+      expect(store.dataRowAt("s1", 0)).toBe(0);
+    } finally {
+      grid.destroy();
+    }
+  });
+
   it("emits and histories merge, row height, freeze, conditional, and group operations", () => {
     const workbook = makeWorkbook(10);
     const store = new SheetwriteStore(workbook, makeColumnarData(10));

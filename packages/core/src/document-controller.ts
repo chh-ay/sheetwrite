@@ -24,6 +24,7 @@ import {
   UndoManager,
 } from "./history.js";
 import { cloneCellHyperlink } from "./hyperlink.js";
+import { formulaNameKey } from "./name-key.js";
 import { clonePivot, planPivotEdit, pivotRewrites } from "./pivot.js";
 import {
   encodeRestoreBlock,
@@ -776,7 +777,7 @@ export class DocumentController {
           .getWorkbook()
           .namedRanges?.find(
             (range) =>
-              range.name.toUpperCase() === patch.namedRange.name.toUpperCase() &&
+              formulaNameKey(range.name) === formulaNameKey(patch.namedRange.name) &&
               range.scope === patch.namedRange.scope,
           );
         return previous
@@ -794,7 +795,8 @@ export class DocumentController {
           .getWorkbook()
           .namedRanges?.find(
             (range) =>
-              range.name.toUpperCase() === patch.name.toUpperCase() && range.scope === patch.scope,
+              formulaNameKey(range.name) === formulaNameKey(patch.name) &&
+              range.scope === patch.scope,
           );
         return previous ? [{ op: "setNamedRange", namedRange: { ...previous } }] : [];
       }
