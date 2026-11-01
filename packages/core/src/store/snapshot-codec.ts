@@ -42,6 +42,7 @@ export function decodeWorkbookSnapshot(
         if (meta.height !== undefined) rowHeights.set(row, meta.height);
         if (meta.hidden) hiddenRows.add(row);
       }
+
       return {
         id: source.id,
         name: source.name,
@@ -67,6 +68,7 @@ export function decodeWorkbookSnapshot(
       };
     }),
   };
+
   return { snapshot, workbook };
 }
 

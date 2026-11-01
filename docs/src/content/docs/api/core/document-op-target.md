@@ -8,7 +8,7 @@ description: "documentOpTarget function in @sheetwrite/core: Exhaustive stable t
 Exhaustive stable target identity used by persistence/logging layers.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/document-protocol.ts#L3475"><code>packages/core/src/document-protocol.ts#L3475</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/document-protocol.ts#L3672"><code>packages/core/src/document-protocol.ts#L3672</code></a></dd></div>
 </dl>
 
 ## Declaration

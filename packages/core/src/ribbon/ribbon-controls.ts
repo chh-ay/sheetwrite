@@ -395,9 +395,11 @@ function renderColor(spec: RibbonColorSpec, context: RibbonContext): RibbonContr
       current = color;
       bar.style.backgroundColor = color;
     }
+
     context.run(spec.id, () => spec.apply(context.grid, color));
     context.focusGrid();
   };
+
   face.addEventListener("click", () =>
     context.run(spec.id, () => spec.apply(context.grid, current), face),
   );
@@ -416,6 +418,7 @@ function renderColor(spec: RibbonColorSpec, context: RibbonContext): RibbonContr
       context.popup.closeFrom(arrow, false);
       return;
     }
+
     const palette = document.createElement("div");
     palette.className = "sheetwrite-ribbon-palette";
     palette.appendChild(swatch(spec.clearLabel, null));
@@ -436,6 +439,7 @@ function renderColor(spec: RibbonColorSpec, context: RibbonContext): RibbonContr
     palette.addEventListener("mousedown", (pressed) => {
       if (pressed.target instanceof HTMLButtonElement) pressed.preventDefault();
     });
+
     palette.addEventListener("click", (picked) => {
       const button =
         picked.target instanceof HTMLElement
@@ -443,6 +447,7 @@ function renderColor(spec: RibbonColorSpec, context: RibbonContext): RibbonContr
           : null;
       if (button) apply(button.dataset.color || null);
     });
+
     const more = document.createElement("label");
     more.className = "sheetwrite-ribbon-menu-item";
     more.textContent = "More Colors…";
@@ -460,6 +465,7 @@ function renderColor(spec: RibbonColorSpec, context: RibbonContext): RibbonContr
       focus: fromKeyboard(event),
     });
   });
+
   split.append(face, arrow);
   return {
     element: split,
@@ -478,6 +484,7 @@ function renderForm(spec: RibbonFormSpec, context: RibbonContext): RibbonControl
   trigger.addEventListener("click", () => {
     const cell = focusAddress(context.grid);
     if (cell === null) return;
+
     const form = document.createElement("form");
     form.className = "sheetwrite-ribbon-form";
     const label = document.createElement("label");
@@ -487,14 +494,17 @@ function renderForm(spec: RibbonFormSpec, context: RibbonContext): RibbonControl
       : document.createElement("input");
     field.className = "sheetwrite-ribbon-field";
     field.value = spec.read(context.grid, cell);
+
     const error = document.createElement("p");
     error.className = "sheetwrite-ribbon-form-error";
     error.setAttribute("role", "alert");
     error.hidden = true;
+
     const save = document.createElement("button");
     save.type = "submit";
     save.className = "sheetwrite-ribbon-form-button";
     save.textContent = "OK";
+
     label.appendChild(field);
     form.append(label, error, save);
     form.addEventListener("submit", (event) => {
@@ -506,11 +516,14 @@ function renderForm(spec: RibbonFormSpec, context: RibbonContext): RibbonControl
         focusInSurface(form, field);
         return;
       }
+
       context.popup.closeAll(false);
       context.focusGrid();
     });
+
     context.popup.open(trigger, form, { role: "dialog", label: spec.label, focus: true });
   });
+
   return {
     element: trigger,
     refresh({ state }) {

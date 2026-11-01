@@ -17,13 +17,14 @@ export class OffsetIndex {
   }
 
   /** Allocate the dense index only when the first non-default height requires it. */
-  private materialize(): void {
+  private materialize(): { heights: Float64Array; tree: Float64Array } {
     const heights = new Float64Array(this.n);
     heights.fill(this.defaultHeight);
     const tree = new Float64Array(this.n + 1);
     this.heights = heights;
     this.tree = tree;
     this.build();
+    return { heights, tree };
   }
 
   /** O(n) Fenwick construction from `heights`; also refreshes `total`. */
@@ -72,9 +73,9 @@ export class OffsetIndex {
     const current = this.heights?.[row] ?? this.defaultHeight;
     const delta = h - current;
     if (delta === 0) return;
-    if (!this.heights || !this.tree) this.materialize();
-    const heights = this.heights!;
-    const tree = this.tree!;
+    let heights = this.heights;
+    let tree = this.tree;
+    if (!heights || !tree) ({ heights, tree } = this.materialize());
     heights[row] = h;
     this.total += delta;
     for (let i = row + 1; i <= this.n; i += i & -i) {

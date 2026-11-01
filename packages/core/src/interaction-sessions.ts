@@ -307,6 +307,7 @@ export class InteractionSessions {
       row: this.deps.toDataRow(editCell.row),
       col: editCell.col,
     };
+
     const formula = this.deps.store.getFormula(dataAddr);
     const current = this.deps.store.getCell(dataAddr).resolved;
     const text = initial ?? formula ?? cellScalarToText(current);
@@ -326,6 +327,7 @@ export class InteractionSessions {
     for (const listener of this.deps.editListeners["edit-begin"]) {
       listener({ addr: { sheet: dataAddr.sheet, row: editCell.row, col: editCell.col } });
     }
+
     // edit-begin remains a before-open notification. Reentrant callbacks can
     // replace or invalidate this request, but cannot reopen its stale target.
     if (generation !== this.generation || this.deps.readOnly()) return;
@@ -339,6 +341,7 @@ export class InteractionSessions {
         dataAddr.col <= Math.max(rule.range.start.col, rule.range.end.col) &&
         (rule.condition.kind === "list" || rule.condition.kind === "checkbox"),
     );
+
     const custom = column.editor ? this.deps.customEditors.get(column.editor) : undefined;
     if (custom) {
       this.activeEditor = this.customEditor;
@@ -362,8 +365,10 @@ export class InteractionSessions {
         onCommit: (value, navigate) => this.finishEdit(dataAddr, value, navigate),
         onCancel: () => this.endEditor(),
       });
+
       return;
     }
+
     if (initial === undefined && validationRule) {
       this.activeEditor = this.validationEditor;
       this.validationEditor.begin({
@@ -382,8 +387,10 @@ export class InteractionSessions {
           this.finishEdit(dataAddr, { kind: "literal", value }, navigate),
         onCancel: () => this.endEditor(),
       });
+
       return;
     }
+
     this.activeEditor = this.editor;
     this.editor.begin({
       row: editCell.row,
@@ -861,34 +868,44 @@ export class InteractionSessions {
         case "find":
           this.deps.openFind();
           break;
+
         case "replace":
           this.deps.openFind({ replace: true });
           break;
+
         case "undo":
           this.deps.undo();
           break;
+
         case "redo":
           this.deps.redo();
           break;
+
         case "copy":
           this.deps.copy();
           break;
+
         case "cut":
           this.deps.cut();
           break;
+
         case "paste":
           this.deps.paste();
           break;
+
         case "pasteValues":
           this.deps.pasteValues();
           break;
+
         case "clearContents":
           this.deps.clearSelection();
           break;
+
         case "editNote":
           this.deps.grid.actions.editNote();
           break;
       }
+
       return;
     }
 
@@ -901,6 +918,7 @@ export class InteractionSessions {
       e.preventDefault();
       return;
     }
+
     if (focus && key === " " && e.shiftKey) {
       selection.selectRow(focus.row);
       this.deps.emitSelection();
@@ -908,6 +926,7 @@ export class InteractionSessions {
       e.preventDefault();
       return;
     }
+
     const sheet = this.deps.sheet();
     const theme = this.deps.theme();
     const pageRows = Math.max(
@@ -924,6 +943,7 @@ export class InteractionSessions {
           e.shiftKey,
         );
         break;
+
       case "ArrowUp":
         this.navigate(
           focus,
@@ -932,6 +952,7 @@ export class InteractionSessions {
           e.shiftKey,
         );
         break;
+
       case "ArrowRight":
         this.navigate(
           focus,
@@ -942,6 +963,7 @@ export class InteractionSessions {
           e.shiftKey,
         );
         break;
+
       case "ArrowLeft":
         this.navigate(
           focus,
@@ -952,24 +974,30 @@ export class InteractionSessions {
           e.shiftKey,
         );
         break;
+
       case "PageDown":
         this.navigate(focus, (focus?.row ?? 0) + pageRows, undefined, e.shiftKey);
         break;
+
       case "PageUp":
         this.navigate(focus, (focus?.row ?? 0) - pageRows, undefined, e.shiftKey);
         break;
+
       case "Home":
         if (mod) this.navigate(focus, 0, this.deps.firstCol(), e.shiftKey);
         else this.navigate(focus, undefined, this.deps.firstCol(), e.shiftKey);
         break;
+
       case "End":
         if (mod) this.navigate(focus, sheet.rowCount - 1, this.deps.lastCol(), e.shiftKey);
         else this.navigate(focus, undefined, this.deps.lastCol(), e.shiftKey);
         break;
+
       case "Enter":
       case "F2":
         if (focus) this.beginEdit(focus.row, focus.col, undefined, e.key === "F2");
         break;
+
       default:
         if (!mod && !e.altKey && focus && PRINTABLE.test(e.key)) {
           this.beginEdit(focus.row, focus.col, e.key, false);
@@ -977,6 +1005,7 @@ export class InteractionSessions {
           return;
         }
     }
+
     e.preventDefault();
   };
 

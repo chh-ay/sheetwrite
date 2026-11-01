@@ -374,7 +374,7 @@
               "owners": [
                 "src/resource-accounting.ts"
               ],
-              "source": "src/resource-accounting.ts#L362",
+              "source": "src/resource-accounting.ts#L367",
               "jsDocTags": [],
               "documentation": "Reject overlap, negative values, and attempts to fold runtime observations into owner totals.",
               "memberDocs": []
@@ -386,7 +386,7 @@
               "owners": [
                 "src/workbook-table.ts"
               ],
-              "source": "src/workbook-table.ts#L444",
+              "source": "src/workbook-table.ts#L464",
               "jsDocTags": [],
               "documentation": "Reject an invalid or oversized live workbook before table arrays are copied to WASM.",
               "memberDocs": []
@@ -1537,7 +1537,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L1021",
+              "source": "src/row-bridge.ts#L1073",
               "jsDocTags": [
                 "example",
                 "see"
@@ -1552,7 +1552,7 @@
               "owners": [
                 "src/resource-accounting.ts"
               ],
-              "source": "src/resource-accounting.ts#L329",
+              "source": "src/resource-accounting.ts#L334",
               "jsDocTags": [],
               "documentation": "Build and validate one operation-phase snapshot without double-counting runtime observations.",
               "memberDocs": []
@@ -1812,7 +1812,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L374",
+              "source": "src/document-protocol.ts#L377",
               "jsDocTags": [],
               "documentation": "Conservative defaults that retain the million-row paged-sheet contract.",
               "memberDocs": []
@@ -1982,7 +1982,7 @@
               "owners": [
                 "src/resource-accounting.ts"
               ],
-              "source": "src/resource-accounting.ts#L390",
+              "source": "src/resource-accounting.ts#L395",
               "jsDocTags": [],
               "documentation": "Diff two validated phases of the same operation by exclusive resource owner.",
               "memberDocs": []
@@ -2006,7 +2006,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L3475",
+              "source": "src/document-protocol.ts#L3672",
               "jsDocTags": [],
               "documentation": "Exhaustive stable target identity used by persistence/logging layers.",
               "memberDocs": []
@@ -2030,7 +2030,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L422",
+              "source": "src/document-protocol.ts#L425",
               "jsDocTags": [],
               "documentation": "Path-qualified validation failure for a document operation.",
               "memberDocs": []
@@ -2042,7 +2042,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L437",
+              "source": "src/document-protocol.ts#L440",
               "jsDocTags": [],
               "documentation": "Success or structured errors returned by document validation.",
               "memberDocs": []
@@ -2066,7 +2066,7 @@
               "owners": [
                 "src/resource-accounting.ts"
               ],
-              "source": "src/resource-accounting.ts#L320",
+              "source": "src/resource-accounting.ts#L325",
               "jsDocTags": [],
               "documentation": "Construct a zero-owner store report when no WASM store is available.",
               "memberDocs": []
@@ -2107,7 +2107,7 @@
               "owners": [
                 "src/number-format.ts"
               ],
-              "source": "src/number-format.ts#L561",
+              "source": "src/number-format.ts#L578",
               "jsDocTags": [],
               "documentation": "Deterministic Excel-style number/date formatter. Supports explicit locale\nseparators, percent/scientific notation, UTC date/time tokens, four-section\npositive/negative/zero/text codes, quoted literals, and backslash escapes.\n`General` formats exactly like an omitted code.",
               "memberDocs": []
@@ -2981,7 +2981,7 @@
               "owners": [
                 "src/store/data-engine.ts"
               ],
-              "source": "src/store/data-engine.ts#L381",
+              "source": "src/store/data-engine.ts#L384",
               "jsDocTags": [],
               "documentation": "Error thrown when an operation requires datasource cells that are not loaded.",
               "memberDocs": []
@@ -3347,7 +3347,7 @@
               "owners": [
                 "src/resource-accounting.ts"
               ],
-              "source": "src/resource-accounting.ts#L438",
+              "source": "src/resource-accounting.ts#L445",
               "jsDocTags": [],
               "documentation": "Observe runtime memory buckets available in the current JS host without fabricating missing data.",
               "memberDocs": []
@@ -4604,7 +4604,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L1029",
+              "source": "src/row-bridge.ts#L1081",
               "jsDocTags": [],
               "documentation": "Compute a deterministic identity for a canonical transaction.",
               "memberDocs": []
@@ -5431,7 +5431,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L400",
+              "source": "src/document-protocol.ts#L403",
               "jsDocTags": [],
               "documentation": "Stable resource failure raised by direct workbook construction paths.",
               "memberDocs": []
@@ -5443,7 +5443,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L356",
+              "source": "src/document-protocol.ts#L359",
               "jsDocTags": [],
               "documentation": "Resource ceilings applied before snapshot normalization or store allocation.",
               "memberDocs": [
@@ -5484,7 +5484,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L353",
+              "source": "src/document-protocol.ts#L356",
               "jsDocTags": [],
               "documentation": "Allocation mode used when enforcing snapshot construction capacity.",
               "memberDocs": []
@@ -5496,7 +5496,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L445",
+              "source": "src/document-protocol.ts#L448",
               "jsDocTags": [],
               "documentation": "Path-qualified schema failure found while validating an untrusted snapshot.",
               "memberDocs": [
@@ -5513,7 +5513,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L392",
+              "source": "src/document-protocol.ts#L395",
               "jsDocTags": [],
               "documentation": "Validation and allocation policy for an untrusted workbook snapshot.",
               "memberDocs": [
@@ -5672,7 +5672,7 @@
               "owners": [
                 "src/charts-live.ts"
               ],
-              "source": "src/charts-live.ts#L525",
+              "source": "src/charts-live.ts#L540",
               "jsDocTags": [],
               "documentation": "Listen for commits that change any chart's `ChartView`. Edited rectangles are\nmatched against an index of series ranges, so edits outside every series\nrange cost no chart work. Charts that read formulas, references or spills\nalso change on any commit that changes cell values. Returns an unsubscribe\nfunction; the index is dropped with the last listener.",
               "memberDocs": []
@@ -6365,7 +6365,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L3437",
+              "source": "src/document-protocol.ts#L3632",
               "jsDocTags": [],
               "documentation": "Validate and canonically order a schema-1 snapshot without hydrating runtime state.",
               "memberDocs": []
@@ -6401,7 +6401,7 @@
               "owners": [
                 "src/workbook-table.ts"
               ],
-              "source": "src/workbook-table.ts#L361",
+              "source": "src/workbook-table.ts#L376",
               "jsDocTags": [],
               "documentation": "Validate one canonical table against sheet bounds and workbook-global identities.",
               "memberDocs": []
@@ -7176,7 +7176,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L1021",
+              "source": "src/row-bridge.ts#L1073",
               "jsDocTags": [
                 "example",
                 "see"
@@ -7191,7 +7191,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L475",
+              "source": "src/adapter.ts#L474",
               "jsDocTags": [],
               "documentation": "Converts simple columns and row objects into canonical workbook and columnar input.",
               "memberDocs": []
@@ -7827,7 +7827,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L1029",
+              "source": "src/row-bridge.ts#L1081",
               "jsDocTags": [],
               "documentation": "Compute a deterministic identity for a canonical transaction.",
               "memberDocs": []
@@ -8005,7 +8005,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L463",
+              "source": "src/adapter.ts#L462",
               "jsDocTags": [],
               "documentation": "Normalized workbook and columnar data produced from simple adapter props.",
               "memberDocs": [

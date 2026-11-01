@@ -282,29 +282,35 @@ function sliceBlock(
         styleIndex.set(sourceStyle, style);
         styleTable.push(block.styleTable?.[sourceStyle] ?? {});
       }
+
       styleIds[target] = style;
     }
   }
+
   const inBand = (offset: number): number | null => {
     const row = Math.floor(offset / block.colCount) - rowOffset;
     const col = (offset % block.colCount) - colOffset;
     return row >= 0 && row < rowCount && col >= 0 && col < colCount ? row * colCount + col : null;
   };
+
   const formulas: Array<[number, string]> = [];
   for (const [offset, source] of block.formulas ?? []) {
     const target = inBand(offset);
     if (target !== null) formulas.push([target, source]);
   }
+
   const refs: Array<[number, CellAddress]> = [];
   for (const [offset, address] of block.refs ?? []) {
     const target = inBand(offset);
     if (target !== null) refs.push([target, address]);
   }
+
   const bandRange: Range = {
     sheet: range.sheet,
     start: { row: startRow, col: startCol },
     end: { row: startRow + rowCount - 1, col: startCol + colCount - 1 },
   };
+
   return {
     op: "setBlock",
     range: bandRange,

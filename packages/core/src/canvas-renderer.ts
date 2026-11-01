@@ -83,13 +83,13 @@ export class CanvasRenderer implements Renderer {
   }
 
   paint(view: VisibleWindowView): void {
-    if (!this.ctx || !this.layout || !this.theme) return;
+    if (!this.ctx || !this.canvas || !this.layout || !this.theme) return;
     const round = Math.round;
     this.viewport.scrollTop = round(this.viewport.scrollTop * this.dpr) / this.dpr;
     this.viewport.scrollLeft = round(this.viewport.scrollLeft * this.dpr) / this.dpr;
     const damage = blitVerticalScroll(
       this.ctx,
-      this.canvas!,
+      this.canvas,
       this.theme,
       this.lastViewport,
       this.viewport,
