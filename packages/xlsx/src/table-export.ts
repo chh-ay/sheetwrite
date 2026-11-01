@@ -30,7 +30,7 @@ export interface XlsxModel {
   rows: (XlsxModelCell | null)[][];
 }
 
-/** Build the active-sheet table model used by the bounded OOXML writer. */
+/** Materialize the active-sheet table model. The bounded writer uses tableSource instead. */
 export function buildXlsxModel(
   workbook: Workbook,
   store: Store,

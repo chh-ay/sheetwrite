@@ -471,6 +471,32 @@ impl FormulaEntry {
         entry
     }
 
+    /// Same-build transfers own their read sets and cached metadata. Only the
+    /// AST is rebuilt; deriving its reads again would discard runtime reads.
+    #[cfg(any(target_arch = "wasm32", test))]
+    pub(crate) fn transferred_source(
+        ast: Option<Ast>,
+        source: String,
+        reads: ReadSet,
+        is_reference: bool,
+    ) -> Self {
+        let mut entry = Self {
+            ast,
+            source,
+            reads,
+            flags: 0,
+        };
+        entry.set_flag(Self::REFERENCE, is_reference);
+        entry.set_flag(
+            Self::CALLS_SUBTOTAL,
+            entry
+                .ast
+                .as_ref()
+                .is_some_and(crate::eval::ast_calls_subtotal),
+        );
+        entry
+    }
+
     pub(crate) fn reference(target: AbsCellKey, target_name: &str, formula_sheet: u32) -> Self {
         let ast = Ast::AbsCell(
             SheetRef {
@@ -515,10 +541,6 @@ impl FormulaEntry {
             }),
             _ => None,
         }
-    }
-
-    pub(crate) fn parse_error(source: &str) -> Self {
-        Self::error(source, FormulaError::Value)
     }
 
     pub(crate) fn error(source: &str, error: FormulaError) -> Self {

@@ -996,7 +996,8 @@ fn quoted_token(
 /// Whether spaces between `previous` and `rest` are the intersection operator:
 /// they follow a token that can end a reference and precede one that can start
 /// one. Spaces around other operators, after separators and before `)` stay
-/// insignificant. A name followed by spaces and `(` stays a call, as before.
+/// insignificant. A name followed by spaces and `(` is a function call, not
+/// an intersection between a named range and a parenthesized reference.
 /// `#REF!` is a reference operand too: a deleted operand serializes as it, and
 /// the formula must parse back to the same intersection.
 fn separates_references(previous: Option<&Tok<'_>>, rest: &str) -> bool {

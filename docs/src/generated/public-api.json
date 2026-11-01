@@ -10884,7 +10884,7 @@
               "owners": [
                 "src/Grid.svelte.d.ts"
               ],
-              "source": "src/Grid.svelte.d.ts#L7",
+              "source": "src/Grid.svelte.d.ts#L6",
               "jsDocTags": [],
               "documentation": "Advanced component for an existing workbook or datasource.\nAdvanced framework component for workbook data or datasource input.\n@example\n```ts\nimport { mount, unmount } from \"svelte\";\nimport { SheetwriteGrid } from \"@sheetwrite/svelte\";\nimport type { Workbook } from \"@sheetwrite/core\";\n\nfunction mountWorkbook(target: HTMLElement, workbook: Workbook) {\n  const view = mount(SheetwriteGrid, { target, props: { workbook, height: 400 } });\n  return () => unmount(view);\n}\n```\n@see\nSheetwrite\n@see\n/docs/frameworks/svelte/",
               "memberDocs": []
@@ -12824,7 +12824,7 @@
               ],
               "source": "src/table-export.ts#L34",
               "jsDocTags": [],
-              "documentation": "Build the active-sheet table model used by the bounded OOXML writer.",
+              "documentation": "Materialize the active-sheet table model. The bounded writer uses tableSource instead.",
               "memberDocs": []
             },
             {
