@@ -359,17 +359,20 @@ function tokenizeDate(section: string): DateToken[] {
       index = close < 0 ? section.length : close + 1;
       continue;
     }
+
     if (section[index] === "\\" && index + 1 < section.length) {
       tokens.push({ kind: "literal", pad: false, text: section[index + 1]! });
       index += 2;
       continue;
     }
+
     const ampm = section.slice(index).match(/^(am\/pm|a\/p)/i)?.[0];
     if (ampm) {
       tokens.push({ kind: "ampm", pad: false, text: "" });
       index += ampm.length;
       continue;
     }
+
     const lower = section[index]!.toLowerCase();
     if (lower === "y" || lower === "m" || lower === "d" || lower === "h" || lower === "s") {
       let end = index + 1;
@@ -393,6 +396,7 @@ function tokenizeDate(section: string): DateToken[] {
       index = end;
       continue;
     }
+
     let literal = "";
     while (
       index < section.length &&
@@ -401,8 +405,10 @@ function tokenizeDate(section: string): DateToken[] {
     ) {
       literal += section[index++]!;
     }
+
     tokens.push({ kind: "literal", pad: false, text: decodeLiteral(literal) });
   }
+
   resolveMonthMinute(tokens);
   return tokens;
 }
@@ -495,15 +501,19 @@ function renderDate(serial: number, tokens: readonly DateToken[], locale: string
       case "literal":
         output += token.text;
         break;
+
       case "year4":
         output += String(year).padStart(4, "0");
         break;
+
       case "year2":
         output += String(((year % 100) + 100) % 100).padStart(2, "0");
         break;
+
       case "month":
         output += token.pad ? String(month).padStart(2, "0") : String(month);
         break;
+
       case "monthShort":
       case "monthLong":
         output += calendarFormatter(
@@ -512,12 +522,15 @@ function renderDate(serial: number, tokens: readonly DateToken[], locale: string
           token.kind === "monthLong" ? "long" : "short",
         ).format(date);
         break;
+
       case "minute":
         output += token.pad ? String(minute).padStart(2, "0") : String(minute);
         break;
+
       case "day":
         output += token.pad ? String(day).padStart(2, "0") : String(day);
         break;
+
       case "weekdayShort":
       case "weekdayLong":
         output += calendarFormatter(
@@ -526,19 +539,23 @@ function renderDate(serial: number, tokens: readonly DateToken[], locale: string
           token.kind === "weekdayLong" ? "long" : "short",
         ).format(date);
         break;
+
       case "hour": {
         const hour = usesAmPm ? hour24 % 12 || 12 : hour24;
         output += token.pad ? String(hour).padStart(2, "0") : String(hour);
         break;
       }
+
       case "second":
         output += token.pad ? String(second).padStart(2, "0") : String(second);
         break;
+
       case "ampm":
         output += hour24 < 12 ? "AM" : "PM";
         break;
     }
   }
+
   return output;
 }
 

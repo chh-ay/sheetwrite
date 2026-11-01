@@ -43,7 +43,7 @@ The landing page's first-load size comes from the committed `scripts/size-report
 
 ## Code style
 
-oxfmt and rustfmt own formatting. Three rules they cannot check:
+oxfmt and rustfmt own formatting. Four rules they cannot check:
 
 - **Keep explanations, not narration.** Keep comments that explain design, data
   layout, invariants, safety arguments, non-obvious trade-offs, or why an
@@ -59,6 +59,12 @@ oxfmt and rustfmt own formatting. Three rules they cannot check:
   middle of a function, and between declarations and members. A function body
   that needs no blank line is usually short enough to read at a glance; one
   that needs many is usually several functions.
+- **Narrow, don't assert.** `noUncheckedIndexedAccess` makes every indexed read
+  possibly `undefined`. A non-null assertion (`!`) is fine on a read whose index
+  a loop bound or length check already proves in range. Anywhere else, narrow:
+  return early, throw a `SheetwriteError` for a broken invariant, capture the
+  narrowed value in a `const`, or have the helper return it. Never cast with
+  `as` to hide a missing check.
 - **Keep TypeScript in step with the engine.** When you add or change a
   Rust/WASM export, update its TypeScript callers in the same change. Check
   `packages/core/src/store/wasm-contract.ts` and every call site of the

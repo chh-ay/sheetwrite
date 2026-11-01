@@ -282,9 +282,11 @@ export function createWorkerMessageHandler(
     lastViewport: null,
     lastDpr: 1,
   };
+
   const acknowledgeFrame = (painted: boolean): void => {
     if (painted) postAcknowledgement({ type: "painted" });
   };
+
   let fatal = false;
   const reportFatal = (reason: string): void => {
     if (fatal) return;
@@ -309,6 +311,7 @@ export function createWorkerMessageHandler(
           reportFatal("Sheetwrite: Paint worker could not acquire a 2D context");
           break;
         }
+
         // A lost canvas invalidates the previous frame assumed by scroll blits;
         // falling back is safer than attempting restoration from stale pixels.
         state.canvas.addEventListener(
@@ -319,14 +322,17 @@ export function createWorkerMessageHandler(
         postAcknowledgement({ type: "ready" });
         break;
       }
+
       case "layout":
         state.layout = msg.layout;
         state.lastViewport = null;
         break;
+
       case "theme":
         state.theme = msg.theme;
         state.lastViewport = null;
         break;
+
       case "viewport":
         state.viewport = msg.viewport;
         state.dpr = msg.dpr;
@@ -339,16 +345,21 @@ export function createWorkerMessageHandler(
             state.lastViewport = null;
           }
         }
+
         break;
+
       case "paint":
         acknowledgeFrame(paintView(state, msg.view));
         break;
+
       case "paintPacked":
         acknowledgeFrame(paintView(state, unpackPackedView(msg, state)));
         break;
+
       case "paintPanes":
         acknowledgeFrame(paintPanesFrame(state, msg));
         break;
+
       case "paintPackedShared": {
         let painted = false;
         try {
@@ -356,20 +367,24 @@ export function createWorkerMessageHandler(
         } finally {
           releaseSharedPackedView(msg);
         }
+
         acknowledgeFrame(painted);
         break;
       }
+
       case "trim":
         // The host trims its own string cache at the same time, so its next
         // frame sends every string again as a pool update.
         state.stringCache.clear();
         state.valuesScratch = [];
         break;
+
       case "destroy":
         state.ctx = null;
         state.canvas = null;
         state.lastViewport = null;
         break;
+
       default:
         // A renderer from another release (a stale `workerUrl` copy) can send
         // requests this worker does not know; painting on would be guesswork.

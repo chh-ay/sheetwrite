@@ -584,6 +584,7 @@ export class SyncCoordinator {
       await this.persistence.get(clientMutationId);
       record = this.queue.get(clientMutationId);
     }
+
     const storageError = this.storageErrors.get(clientMutationId);
     if (storageError !== undefined) throw storageError;
     if (!record || record.status === "conflicted" || record.status === "sending") return null;
@@ -601,6 +602,7 @@ export class SyncCoordinator {
         operations: record.operations,
         signal: controller.signal,
       };
+
       const versionOperationCounts = record.versionOperationCounts;
       let response: PersistenceCommitResponse;
       if (versionOperationCounts === undefined) {
@@ -613,6 +615,7 @@ export class SyncCoordinator {
           `Mutation ${clientMutationId} spans several server versions, and the persistence adapter cannot commit an atomic batch`,
         );
       }
+
       await this.handleResponse(response, clientMutationId);
       return response;
     } catch (error) {
@@ -623,6 +626,7 @@ export class SyncCoordinator {
         this.emitState();
         this.emit({ type: "error", error: failure, clientMutationId });
       }
+
       throw failure;
     } finally {
       if (this.activeSends.get(clientMutationId) === controller) {
@@ -652,6 +656,7 @@ export class SyncCoordinator {
     if (requestedMutationId !== undefined) {
       assertMutationId(requestedMutationId, this.limits);
     }
+
     if (response.status === "conflict") {
       const id = requestedMutationId;
       const record = id ? this.queue.get(id) : undefined;
@@ -664,20 +669,24 @@ export class SyncCoordinator {
           ),
           ...(id ? { clientMutationId: id } : {}),
         });
+
         return;
       }
+
       assertConflictRecovery(response, record.baseVersion);
       this.queue.setStatus(record, "conflicted");
       this.outstandingConflict = {
         response,
         appliedVersion: this.outstandingConflict?.appliedVersion ?? this.version,
       };
+
       this.version = Math.max(this.version, response.currentVersion);
       this.dropStaleBatchAssembly();
       this.emitState();
       this.emit({ type: "conflict", mutation: cloneRecord(record), response });
       return;
     }
+
     if (requestedMutationId !== undefined && response.clientMutationId !== requestedMutationId) {
       throw new SyncProtocolError(
         "response-id-mismatch",
@@ -698,6 +707,7 @@ export class SyncCoordinator {
           clientMutationId: id,
         });
       }
+
       return;
     }
 
@@ -723,6 +733,7 @@ export class SyncCoordinator {
         throw error;
       }
     }
+
     this.grid.store.acknowledgeOperations?.(
       record.operations,
       this.recordStorageRevisions.get(record.clientMutationId),
@@ -737,13 +748,16 @@ export class SyncCoordinator {
           action: "remove-pending",
           clientMutationId: id,
         });
+
         if (!this.destroyed) {
           this.emitState();
           this.emit({ type: "storage-error", error: failure, clientMutationId: id });
         }
+
         throw failure;
       }
     }
+
     if (this.queue.get(id) !== record) return;
 
     if (!this.destroyed) this.version = Math.max(this.version, response.version);
@@ -752,6 +766,7 @@ export class SyncCoordinator {
     if (encodedBytes === undefined) {
       throw new Error(`Pending mutation ${id} is missing resource accounting`);
     }
+
     this.pendingCommitTotal -= 1;
     this.pendingOperationTotal -= record.operations.length;
     this.pendingEncodedByteTotal -= encodedBytes;
@@ -784,6 +799,7 @@ export class SyncCoordinator {
       );
       return Promise.resolve();
     }
+
     if (
       inspected.version > this.version &&
       inspected.version - this.version > this.limits.maxFutureVersionDistance
@@ -798,12 +814,14 @@ export class SyncCoordinator {
       );
       return Promise.resolve();
     }
+
     const preflightError = this.inboundLimitError(inspected.operations.length, inspected.bytes);
     if (preflightError) {
       this.clearGapBuffer();
       this.rejectInbound(preflightError, inspected.version);
       return Promise.resolve();
     }
+
     let validated: BufferedVersionedOperation;
     try {
       validated = {
@@ -821,12 +839,14 @@ export class SyncCoordinator {
       this.rejectInbound(asSyncProtocolError(error), inspected.version);
       return Promise.resolve();
     }
+
     const reservationError = this.reserveInbound(validated);
     if (reservationError) {
       this.clearGapBuffer();
       this.rejectInbound(reservationError, inspected.version);
       return Promise.resolve();
     }
+
     return this.enqueueInbound(() => this.processVersionedOperation(validated)).finally(() => {
       if (!validated.retained) this.releaseBuffered(validated);
     });
@@ -900,15 +920,18 @@ export class SyncCoordinator {
       reason,
       ...(rebaseConflict ? { conflict: rebaseConflict } : {}),
     });
+
     const tail = response.operationsSinceBase;
     if (!tail) return reload("missing-operations");
     if (this.version !== response.currentVersion || this.batchAssembly) {
       return reload("version-advanced");
     }
+
     const records = this.queue.toArray();
     if (tail.some((entry) => entry.clientMutationId && this.queue.has(entry.clientMutationId))) {
       return reload("own-mutation");
     }
+
     // Acknowledged versions of this client are already in the Grid, in server order.
     const missed = tail.filter(
       (entry) => !(entry.clientMutationId && this.acknowledged.has(entry.clientMutationId)),
@@ -919,6 +942,7 @@ export class SyncCoordinator {
     ) {
       return reload("structural-change");
     }
+
     // Without structural changes no coordinate moves: each pending commit only
     // needs to touch other cells and sheets than the server versions it did not
     // see. Work queued after the conflict has the head as its base but saw only
@@ -950,6 +974,7 @@ export class SyncCoordinator {
         this.emit({ type: "remote-applied", operation: cloneVersionedOperation(entry) });
       }
     }
+
     // Storage moves only after every missed version applied, so a rejection
     // leaves the durable queue on its old base for the reload.
     const queue = await this.persistQueueOnto(response.currentVersion);
@@ -961,6 +986,7 @@ export class SyncCoordinator {
       this.gapBuffer.delete(version);
       this.releaseBuffered(input);
     }
+
     this.emitState();
     this.emit({ type: "recovered", serverVersion: this.version, pending: this.pendingCommits() });
     await this.drainGapBuffer();
@@ -1051,6 +1077,7 @@ export class SyncCoordinator {
         `The pending sync queue is ${reason}`,
       );
     }
+
     if (this.pendingCommitTotal + 1 > this.limits.maxPendingCommits) {
       return this.rejectPendingCapacity(
         "pending-commits",
@@ -1059,6 +1086,7 @@ export class SyncCoordinator {
         `Pending sync commits exceed the ${this.limits.maxPendingCommits} commit limit`,
       );
     }
+
     const operationTotal = this.pendingOperationTotal + operations.length;
     if (operationTotal > this.limits.maxPendingOperations) {
       return this.rejectPendingCapacity(
@@ -1085,8 +1113,10 @@ export class SyncCoordinator {
           `Pending sync operations exceed the ${this.limits.maxPendingEncodedBytes} encoded-byte limit`,
         );
       }
+
       throw error;
     }
+
     const encodedBytes = operationArrayBytes(sizes);
     const versionIssue = this.versionAdmissionIssue(sizes, encodedBytes);
     if (versionIssue) {
@@ -1095,6 +1125,7 @@ export class SyncCoordinator {
         type: "error",
         error: new SyncProtocolError("batch-limit", versionIssue.message),
       });
+
       return { ok: false, issue: versionIssue };
     }
 
@@ -1106,6 +1137,7 @@ export class SyncCoordinator {
       operationCount: operations.length,
       encodedBytes,
     };
+
     this.localReservations.push(reservation);
     this.pendingCommitTotal += 1;
     this.pendingOperationTotal += reservation.operationCount;
@@ -1124,6 +1156,7 @@ export class SyncCoordinator {
       ) {
         throw new Error(`Duplicate client mutation ID: ${clientMutationId}`);
       }
+
       reservation.clientMutationId = clientMutationId;
     } catch (error) {
       reservation.status = "cancelled";
@@ -1157,6 +1190,7 @@ export class SyncCoordinator {
               reservation.appliedEncodedBytes,
             );
           }
+
           this.drainLocalReservations();
         },
       },
@@ -1174,6 +1208,7 @@ export class SyncCoordinator {
         if (!this.destroyed) this.emitState();
         continue;
       }
+
       const operations = reservation.appliedOperations;
       const encodedBytes = reservation.appliedEncodedBytes;
       if (operations === undefined || encodedBytes === undefined)
@@ -1189,10 +1224,12 @@ export class SyncCoordinator {
         ...(versionOperationCounts ? { versionOperationCounts } : {}),
         status: this.options.pendingStorage ? "persisting" : "pending",
       };
+
       this.queue.add(record);
       if (reservation.storageRevision !== undefined) {
         this.recordStorageRevisions.set(record.clientMutationId, reservation.storageRevision);
       }
+
       this.recordBytes.set(record.clientMutationId, encodedBytes);
 
       if (this.options.pendingStorage) {
@@ -1234,6 +1271,7 @@ export class SyncCoordinator {
       max,
       message,
     });
+
     if (!this.adapter.commitBatch) {
       return encodedBytes > limits.maxVersionPayloadBytes
         ? issue(
@@ -1249,6 +1287,7 @@ export class SyncCoordinator {
             `The commit has more operations than one server version (${limits.maxOperationsPerVersion}), and the persistence adapter cannot commit an atomic batch`,
           );
     }
+
     if (encodedBytes > limits.maxBatchBytes) {
       return issue(
         "encoded-bytes",
@@ -1257,6 +1296,7 @@ export class SyncCoordinator {
         `The commit exceeds the ${limits.maxBatchBytes} byte atomic batch limit`,
       );
     }
+
     const counts = partitionVersionOperations(
       sizes,
       limits.maxOperationsPerVersion,
@@ -1270,6 +1310,7 @@ export class SyncCoordinator {
         `One operation of the commit is larger than one server version (${limits.maxVersionPayloadBytes} bytes)`,
       );
     }
+
     if (counts.length > limits.maxBatchVersions) {
       return issue(
         "batch-versions",
@@ -1278,6 +1319,7 @@ export class SyncCoordinator {
         `The commit needs ${counts.length} server versions, above the ${limits.maxBatchVersions} version atomic batch limit`,
       );
     }
+
     return undefined;
   }
 
@@ -1639,6 +1681,7 @@ export class SyncCoordinator {
       );
       return false;
     }
+
     const next: BatchAssembly = assembly ?? {
       count: member.count,
       members: [],
@@ -1647,6 +1690,7 @@ export class SyncCoordinator {
         ? { clientMutationId: operation.clientMutationId }
         : {}),
     };
+
     if (next.bytes + input.bytes > this.limits.maxBatchBytes) {
       this.batchAssembly = undefined;
       this.rejectInbound(
@@ -1658,12 +1702,14 @@ export class SyncCoordinator {
       );
       return false;
     }
+
     next.members.push(operation);
     next.bytes += input.bytes;
     if (next.members.length < next.count) {
       this.batchAssembly = next;
       return true;
     }
+
     this.batchAssembly = undefined;
     return this.applyCompleteBatch(next);
   }
@@ -1806,13 +1852,16 @@ export class SyncCoordinator {
               "Version-gap recovery returned too many operations",
             );
           }
+
           for (const operation of recovery) {
             assertVersion((operation as { version?: unknown } | null)?.version, "version");
           }
+
           const ordered = recovery.slice().sort((a, b) => a.version - b.version);
           for (const operation of ordered) await this.applyVersionedOperation(operation);
           return;
         }
+
         const snapshot = recovery as WorkbookSnapshot;
         this.emit({
           type: "reload-required",
@@ -1963,6 +2012,7 @@ class PendingRecordQueue {
    * after every acknowledgement.
    */
   private readonly order: string[] = [];
+
   private readonly statusCounts: Record<SyncMutationStatus, number> = {
     persisting: 0,
     pending: 0,
@@ -1970,6 +2020,7 @@ class PendingRecordQueue {
     conflicted: 0,
     "storage-error": 0,
   };
+
   private serverVersions = 0;
 
   /** Server versions the queued records occupy once acknowledged. */
@@ -2178,6 +2229,7 @@ function assertPendingCommit(
       "Durable queue returned a commit for the wrong document",
     );
   }
+
   assertVersion(ownDataValue(record, "baseVersion"), "pending baseVersion");
   assertMutationId(ownDataValue(record, "clientMutationId"), limits);
   const operations = ownDataValue(record, "operations");
@@ -2202,6 +2254,7 @@ function assertPendingCommit(
       "Durable queue returned invalid atomic batch version operation counts",
     );
   }
+
   assertCommitOperations(commit, limits);
   return bytes;
 }
@@ -2213,17 +2266,17 @@ function resolveLimits(
   const record = assertPlainRecord(overrides, "Sync limits must be a plain object");
   const resolved: SyncCoordinatorLimits = { ...DEFAULT_SYNC_COORDINATOR_LIMITS };
   for (const key in record) {
-    if (!Object.hasOwn(LIMIT_KEYS, key)) {
+    if (!isLimitKey(key)) {
       throw new SyncProtocolError("invalid-limits", `Unknown sync limit ${key}`);
     }
     const value = ownDataValue(record, key);
-    if (!Number.isSafeInteger(value) || (value as number) <= 0) {
+    if (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0) {
       throw new SyncProtocolError(
         "invalid-limits",
         `Sync limit ${key} must be a positive safe integer`,
       );
     }
-    (resolved as unknown as Record<string, number>)[key] = value as number;
+    resolved[key] = value;
   }
   if (
     resolved.maxBatchVersions > MAX_ATOMIC_BATCH_VERSIONS ||
@@ -2235,6 +2288,10 @@ function resolveLimits(
     );
   }
   return Object.freeze(resolved);
+}
+
+function isLimitKey(key: string): key is keyof SyncCoordinatorLimits {
+  return Object.hasOwn(LIMIT_KEYS, key);
 }
 
 function assertDocumentId(value: unknown): asserts value is string {
@@ -2398,6 +2455,7 @@ function assertPersistenceResponse(
         storage: "paged",
         resourceLimits: { maxSerializedBytes: limits.maxBufferedBytes },
       });
+
       if (!validation.ok) {
         throw new SyncProtocolError(
           validation.errors.some((error) => error.code === "resource-limit")
@@ -2407,6 +2465,7 @@ function assertPersistenceResponse(
         );
       }
     }
+
     const operationsSinceBase = optionalOwnDataValue(record, "operationsSinceBase");
     if (operationsSinceBase === undefined) return;
     if (
@@ -2415,12 +2474,14 @@ function assertPersistenceResponse(
     ) {
       throw new SyncProtocolError("invalid-operations", "operationsSinceBase must be an array");
     }
+
     if (operationsSinceBase.length > limits.maxBufferedVersions) {
       throw new SyncProtocolError(
         "buffer-count-limit",
         "Conflict operation tail exceeds the version count limit",
       );
     }
+
     let operationCount = 0;
     let byteCount = 0;
     for (const operation of operationsSinceBase) {
@@ -2433,6 +2494,7 @@ function assertPersistenceResponse(
           "Conflict operation tail exceeds the operation count limit",
         );
       }
+
       if (byteCount > limits.maxBufferedBytes) {
         throw new SyncProtocolError(
           "buffer-byte-limit",
@@ -2440,11 +2502,14 @@ function assertPersistenceResponse(
         );
       }
     }
+
     return;
   }
+
   if (status !== "applied" && status !== "duplicate") {
     throw new SyncProtocolError("invalid-operations", "Persistence response status is invalid");
   }
+
   assertVersion(ownDataValue(record, "version"), "version");
   assertMutationId(ownDataValue(record, "clientMutationId"), limits);
   if (Object.getOwnPropertyDescriptor(record, "canonicalOperations") !== undefined) {
@@ -2465,6 +2530,7 @@ function assertConflictRecovery(
       "Conflict currentVersion cannot precede the pending baseVersion",
     );
   }
+
   if (
     response.snapshot !== undefined &&
     (response.snapshot.version ?? 0) !== response.currentVersion
@@ -2474,6 +2540,7 @@ function assertConflictRecovery(
       "Conflict snapshot version must equal currentVersion",
     );
   }
+
   const tail = response.operationsSinceBase;
   if (tail === undefined) return;
   if (tail.length === 0) {
@@ -2483,8 +2550,10 @@ function assertConflictRecovery(
         "An empty conflict operation tail cannot advance currentVersion",
       );
     }
+
     return;
   }
+
   let expectedVersion = incrementVersion(baseVersion);
   for (let index = 0; index < tail.length; index++) {
     if (tail[index]!.version !== expectedVersion) {
@@ -2493,9 +2562,12 @@ function assertConflictRecovery(
         "Conflict operationsSinceBase must be contiguous from the pending baseVersion",
       );
     }
+
     if (index + 1 < tail.length) expectedVersion = incrementVersion(expectedVersion);
   }
-  if (tail.at(-1)!.version !== response.currentVersion) {
+
+  // The loop proved the last entry carries `expectedVersion`.
+  if (expectedVersion !== response.currentVersion) {
     throw new SyncProtocolError(
       "invalid-version",
       "Conflict operationsSinceBase must end at currentVersion",
