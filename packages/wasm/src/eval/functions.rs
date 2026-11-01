@@ -255,7 +255,9 @@ pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
         | Func::Unicode
         | Func::UniChar
         | Func::Proper
-        | Func::NumberValue => text_family(func, values),
+        | Func::NumberValue => {
+            text::apply(func, values).unwrap_or(Value::Error(FormulaError::Value))
+        }
         Func::Date
         | Func::DateValue
         | Func::Day
@@ -274,7 +276,7 @@ pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
         | Func::Workday
         | Func::NetworkDays
         | Func::YearFrac
-        | Func::Days360 => date_family(func, values),
+        | Func::Days360 => date::apply(func, values).unwrap_or(Value::Error(FormulaError::Value)),
         Func::Median
         | Func::ModeSngl
         | Func::Large
@@ -311,16 +313,6 @@ pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
 #[inline(never)]
 fn math_family(func: Func, values: &FuncAccumulator) -> EvalResult {
     math::apply(func, values).unwrap_or(Value::Error(FormulaError::Value))
-}
-
-#[inline(never)]
-fn text_family(func: Func, values: &FuncAccumulator) -> EvalResult {
-    text::apply(func, values).unwrap_or(Value::Error(FormulaError::Value))
-}
-
-#[inline(never)]
-fn date_family(func: Func, values: &FuncAccumulator) -> EvalResult {
-    date::apply(func, values).unwrap_or(Value::Error(FormulaError::Value))
 }
 
 #[inline(never)]

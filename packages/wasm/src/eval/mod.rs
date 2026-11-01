@@ -1603,7 +1603,9 @@ impl CellStore {
 
     /// Routes a function call. Only the hottest calls run here: `LET`, `IF`,
     /// `IFERROR`, `IFNA`, `SUM` over one range, streamed reductions and the
-    /// argument collection of scalar functions. Every other family runs in an
+    /// argument collection of scalar functions, plus the text and date
+    /// families in `apply_func` (out of line, they slowed the paired gate's
+    /// unicode-text-date-edit row 1.64×). Every other family runs in an
     /// out-of-line `*_family` handler.
     ///
     /// `eval_func` and its one-caller callees are inlined into `eval_ast`.
