@@ -431,7 +431,7 @@ function total(grid: Grid) {
 <summary><code>sortBy</code> <span class="api-member-summary">Sort the displayed rows by a column (does not mutate stored data).</span></summary>
 
 ```ts generated
-sortBy(col: number, ascending?: boolean): void;
+sortBy(col: number, ascending?: boolean): ApplyTransactionResult;
 ```
 
 Sort the displayed rows by a column (does not mutate stored data).
@@ -456,7 +456,7 @@ function showLargestFirst(grid: Grid) {
 <summary><code>sortByMulti</code> <span class="api-member-summary">Multi-key sort of the displayed rows (first key primary; stable).</span></summary>
 
 ```ts generated
-sortByMulti(keys: readonly SortKey[]): void;
+sortByMulti(keys: readonly SortKey[]): ApplyTransactionResult;
 ```
 
 </details>
@@ -1321,8 +1321,8 @@ export interface Grid {
   ): ApplyTransactionResult;
   defineCellRenderer(name: string, renderer: CellRenderer): void;
   aggregate(col: number, op: AggregateOp): number;
-  sortBy(col: number, ascending?: boolean): void;
-  sortByMulti(keys: readonly SortKey[]): void;
+  sortBy(col: number, ascending?: boolean): ApplyTransactionResult;
+  sortByMulti(keys: readonly SortKey[]): ApplyTransactionResult;
   filterBy(col: number, needle: string): void;
   setColumnFilter(col: number, filter: ColumnFilter | null): void;
   setSort(keys: readonly SortKey[]): ApplyTransactionResult;

@@ -40,6 +40,17 @@ export const WASM_MEMORY_OWNERS = [
 
 /** One retained-memory owner reported by the WASM cell store. */
 export type WasmMemoryOwner = (typeof WASM_MEMORY_OWNERS)[number];
+
+const HASH_CAPACITY_OWNERS: Partial<Record<WasmMemoryOwner, true>> = {
+  "wasm.paged.dirty-bitmaps": true,
+  "wasm.paged.indexes": true,
+  "wasm.string-index": true,
+  "wasm.formulas": true,
+  "wasm.dependency-nodes": true,
+  "wasm.sheet-indexes-metadata": true,
+  "wasm.spill-ranges": true,
+  "wasm.spill-owners": true,
+};
 /** User-visible operation whose retained and transient resource costs are measured. */
 export type RuntimeResourceOperation =
   | "startup"
@@ -268,28 +279,18 @@ export function decodeStoreMemoryStats(
   }
 
   const owners: ResourceOwnerBytes[] = [];
-  for (let index = 0; index < WASM_MEMORY_OWNERS.length; index++) {
+  for (const [index, owner] of WASM_MEMORY_OWNERS.entries()) {
     const offset = 3 + index * 3;
     const logicalBytes = encoded[offset]!;
     const allocatedBytes = encoded[offset + 1]!;
     const entries = encoded[offset + 2]!;
-    assertOwnerValues(WASM_MEMORY_OWNERS[index]!, logicalBytes, allocatedBytes, entries);
+    assertOwnerValues(owner, logicalBytes, allocatedBytes, entries);
     owners.push({
-      owner: WASM_MEMORY_OWNERS[index]!,
+      owner,
       logicalBytes,
       allocatedBytes,
       entries,
-      measurement:
-        index === 7 ||
-        index === 8 ||
-        index === 11 ||
-        index === 12 ||
-        index === 13 ||
-        index === 15 ||
-        index === 16 ||
-        index === 17
-          ? "hash-capacity-v1"
-          : "exact-capacity",
+      measurement: HASH_CAPACITY_OWNERS[owner] ? "hash-capacity-v1" : "exact-capacity",
     });
   }
   const logicalLiveBytes = encoded[encoded.length - 2]!;

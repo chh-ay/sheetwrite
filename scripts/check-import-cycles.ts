@@ -40,6 +40,7 @@ const STORE_EDGES: Readonly<Record<string, readonly string[]>> = {
     "engine-hidden-rows.ts",
     "wasm-contract.ts",
     "../types/store.ts",
+    "wire-tags.ts",
   ],
   "wasm-contract.ts": [],
   "wire-tags.ts": [],

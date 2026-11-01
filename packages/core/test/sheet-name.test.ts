@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
-import { sheetNameKey, validateSheetName } from "../src/sheet-name.js";
+import { sheetNameKey } from "../src/name-key.js";
+import { validateSheetName } from "../src/sheet-name.js";
 
 describe("worksheet name contract", () => {
   it("returns NFC display names and case-insensitive canonical keys", () => {

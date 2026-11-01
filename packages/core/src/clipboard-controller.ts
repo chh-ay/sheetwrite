@@ -6,7 +6,7 @@ import {
   type ClipboardSnapshot,
   neutralizeInjection,
   parseTsv,
-  toTsv,
+  rowsToTsv,
 } from "./clipboard.js";
 import {
   cloneCellHyperlink,
@@ -997,6 +997,6 @@ export class ClipboardController {
     }
 
     const anchor = { row: bulk?.dataRows[0] ?? this.deps.toDataRow(rect.r0), col: rect.c0 };
-    return { anchor, cells, hyperlinks, tsv: toTsv(values), cut, clearPatches };
+    return { anchor, cells, hyperlinks, tsv: rowsToTsv(values), cut, clearPatches };
   }
 }

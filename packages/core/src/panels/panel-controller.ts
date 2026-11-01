@@ -4,7 +4,7 @@
 // once per grid. Everything goes through the public Grid API.
 
 import { colToA1 } from "../a1.js";
-import { sheetNameKey } from "../sheet-name.js";
+import { sheetNameKey } from "../name-key.js";
 import type { ChartKind, ChartRef } from "../types/chart.js";
 import type { CellAddress, SheetId } from "../types/coordinates.js";
 import type { SheetSnapshot } from "../types/document.js";

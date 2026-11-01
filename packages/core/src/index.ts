@@ -230,10 +230,11 @@ export {
   rowBridgeTransactionId,
 } from "./row-bridge.js";
 
+export { sheetNameKey } from "./name-key.js";
+
 export {
   type SheetNameIssueCode,
   type SheetNameValidationResult,
-  sheetNameKey,
   validateSheetName,
 } from "./sheet-name.js";
 

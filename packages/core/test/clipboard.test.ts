@@ -1,7 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
 import { ClipboardController, SHEETWRITE_CLIPBOARD_MIME } from "../src/clipboard-controller.js";
-import { parseTsv, toTsv } from "../src/clipboard.js";
+import { parseTsv, rowsToTsv } from "../src/clipboard.js";
 import { initSheetwrite } from "../src/grid.js";
 import { Scope } from "../src/scope.js";
 import { SelectionModel } from "../src/selection.js";
@@ -22,14 +22,14 @@ beforeAll(async () => {
 });
 describe("clipboard TSV", () => {
   it("serializes a block, quoting fields with tabs/newlines/quotes", () => {
-    expect(toTsv([["a", 1, null]])).toBe("a\t1\t");
-    expect(toTsv([['q"x', "b\tc", "d\ne"]])).toBe('"q""x"\t"b\tc"\t"d\ne"');
-    expect(toTsv([[true, false]])).toBe("TRUE\tFALSE");
+    expect(rowsToTsv([["a", 1, null]])).toBe("a\t1\t");
+    expect(rowsToTsv([['q"x', "b\tc", "d\ne"]])).toBe('"q""x"\t"b\tc"\t"d\ne"');
+    expect(rowsToTsv([[true, false]])).toBe("TRUE\tFALSE");
   });
 
   it("hardens every dangerous string prefix in external TSV while leaving numbers intact", () => {
     const dangerous = ["=cmd", "+1", "-1", "@x", "\tx", "\rx"];
-    expect(parseTsv(toTsv([dangerous, [-1, 1, 0, null, true, false]]))).toEqual([
+    expect(parseTsv(rowsToTsv([dangerous, [-1, 1, 0, null, true, false]]))).toEqual([
       dangerous.map((value) => `'${value}`),
       ["-1", "1", "0", "", "TRUE", "FALSE"],
     ]);
@@ -39,8 +39,8 @@ describe("clipboard TSV", () => {
     expect(parseTsv("\ufeffα\tβ")).toEqual([["α", "β"]]);
     expect(parseTsv("\ufeff\ufeffα")).toEqual([["\ufeffα"]]);
     expect(parseTsv('""')).toEqual([[""]]);
-    expect(toTsv([[null], [null], [null]])).toBe('""\r\n""\r\n""');
-    expect(parseTsv(toTsv([[null], [null], [null]]))).toEqual([[""], [""], [""]]);
+    expect(rowsToTsv([[null], [null], [null]])).toBe('""\r\n""\r\n""');
+    expect(parseTsv(rowsToTsv([[null], [null], [null]]))).toEqual([[""], [""], [""]]);
   });
 });
 
