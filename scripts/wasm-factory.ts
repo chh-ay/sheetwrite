@@ -1,5 +1,31 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { copyFile, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
+
+/**
+ * The JavaScript loaders that both engine packages publish. `packages/wasm` owns
+ * them; every other engine package gets a copy at build time, so the loaders
+ * cannot drift between engines.
+ */
+export const ENGINE_LOADER_FILES = [
+  "loader.mjs",
+  "loader-browser.mjs",
+  "loader-node.mjs",
+  "loader-state.mjs",
+] as const;
+
+const LOADER_SOURCE_DIRECTORY = resolve(import.meta.dir, "../packages/wasm");
+
+/** Copy the loaders owned by `packages/wasm` into another engine package. */
+export async function copyEngineLoaders(packageDirectory: string): Promise<void> {
+  const target = resolve(packageDirectory);
+  if (target === LOADER_SOURCE_DIRECTORY) return;
+
+  await Promise.all(
+    ENGINE_LOADER_FILES.map((file) =>
+      copyFile(resolve(LOADER_SOURCE_DIRECTORY, file), resolve(target, file)),
+    ),
+  );
+}
 
 /** Keep wasm-bindgen's closure-local caches and finalizers isolated per engine. */
 export async function generateWasmFactory(packageDirectory: string): Promise<void> {
@@ -71,4 +97,5 @@ if (import.meta.main) {
   if (!packageDirectory) throw new Error("Expected an engine package directory");
 
   await generateWasmFactory(packageDirectory);
+  await copyEngineLoaders(packageDirectory);
 }
