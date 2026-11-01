@@ -51,6 +51,7 @@ import {
   validateCodecSnapshot,
   type XlsxCodecContext,
 } from "./resources.js";
+import { translateSharedFormula } from "./shared-formula.js";
 import { type ParsedCellStyle, ParsedStyles } from "./styles.js";
 import {
   assertXmlRoot,
@@ -278,55 +279,6 @@ function uniqueSheetId(name: string, order: number, used: Set<string>): string {
   while (used.has(id)) id = `${stem}-${suffix++}`;
   used.add(id);
   return id;
-}
-
-function translateFormula(
-  formula: string,
-  masterRow: number,
-  masterCol: number,
-  row: number,
-  col: number,
-): string {
-  const rowDelta = row - masterRow;
-  const colDelta = col - masterCol;
-  const translateSegment = (segment: string): string =>
-    segment.replace(
-      /(?<![A-Z0-9_.])(\$?)([A-Z]{1,3})(\$?)([1-9]\d*)(?![A-Z0-9_.(!])/gi,
-      (_match, absoluteCol: string, label: string, absoluteRow: string, rowText: string) => {
-        const sourceCol = labelToCol(label);
-        const sourceRow = Number(rowText) - 1;
-        const targetCol = absoluteCol ? sourceCol : sourceCol + colDelta;
-        const targetRow = absoluteRow ? sourceRow : sourceRow + rowDelta;
-        if (targetCol < 0 || targetRow < 0) return "#REF!";
-        return `${absoluteCol}${colToA1(targetCol)}${absoluteRow}${targetRow + 1}`;
-      },
-    );
-  let output = "";
-  let segmentStart = 0;
-  for (let cursor = 0; cursor < formula.length;) {
-    const quote = formula[cursor];
-    const closing = quote === '"' ? '"' : quote === "'" ? "'" : quote === "[" ? "]" : "";
-    if (!closing) {
-      cursor += 1;
-      continue;
-    }
-    output += translateSegment(formula.slice(segmentStart, cursor));
-    let end = cursor + 1;
-    while (end < formula.length) {
-      if (formula[end] === closing && formula[end + 1] === closing && closing !== "]") {
-        end += 2;
-      } else if (formula[end] === closing) {
-        end += 1;
-        break;
-      } else {
-        end += 1;
-      }
-    }
-    output += formula.slice(cursor, end);
-    cursor = end;
-    segmentStart = end;
-  }
-  return output + translateSegment(formula.slice(segmentStart));
 }
 
 function parseSharedStrings(
@@ -1482,7 +1434,7 @@ async function parseSheet(
     const formula =
       row === master.row && col === master.col
         ? master.formula
-        : translateFormula(master.formula, master.row, master.col, row, col);
+        : translateSharedFormula(master.formula, row - master.row, col - master.col);
     if (formulaContainsExternalReference(formula)) {
       emitWarning(context, {
         code: "external-formula",

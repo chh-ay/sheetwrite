@@ -1,5 +1,5 @@
 <script lang="ts">
-import { isSheetwriteReady } from "@sheetwrite/core";
+import { type GridOptions, isSheetwriteReady } from "@sheetwrite/core";
 import {
   type AdapterGridInput,
   createAdapterGridController,
@@ -106,12 +106,15 @@ const lifetime = createAdapterGridController(handlers, {
 } satisfies GridPublicationAdapter);
 let attached = false;
 $effect(() => {
+  // The props are destructured (with `renderer`'s default) for Svelte's reactivity,
+  // so the options are listed here rather than read by `extractGridOptions`;
+  // `satisfies` fails the typecheck when a GridOptions key is missing.
   const input: AdapterGridInput = {
     options: {
       workbook, data, datasource, datasourceStorage, renderer, workerUrl, presentation,
       protectionResolver, mutationPolicy, transactionResourceLimits, hyperlinkActivation,
       renderers, editors, theme, readOnly, overscan, minColumns, config,
-    },
+    } satisfies Record<keyof GridOptions, unknown>,
     rowBridge,
     wasmSource,
   };

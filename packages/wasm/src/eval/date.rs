@@ -7,7 +7,7 @@ use crate::types::{EvalResult, Value};
 use super::functions::{
     bool_arg, integer_arg, number_arg, require_arity, text_arg, FuncAccumulator,
 };
-use super::value::number_from_value;
+use super::value::{number_from_text, number_from_value};
 
 const UNIX_EPOCH_SERIAL: i64 = 25_569;
 const SECONDS_PER_DAY: i64 = 86_400;
@@ -225,14 +225,13 @@ fn temporal_serial(value: &Value) -> Result<f64, FormulaError> {
     let serial = match value {
         Value::Text(text) => {
             let trimmed = text.trim();
-            if let Ok(number) = trimmed.parse::<f64>() {
-                number
-            } else if let Some((date, time)) = parse_time_with_date(trimmed) {
+            // Time text always has a `:`, which no number or date text has.
+            if let Some((date, time)) = parse_time_with_date(trimmed) {
                 date.map_or(time, |date| date.floor() + time)
             } else if trimmed.contains(':') {
                 return Err(FormulaError::Value);
             } else {
-                parse_date_value(trimmed).ok_or(FormulaError::Value)?
+                number_from_text(trimmed)?
             }
         }
         _ => number_from_value(value)?,
@@ -247,9 +246,7 @@ fn temporal_serial(value: &Value) -> Result<f64, FormulaError> {
 fn serial_date_arg(values: &FuncAccumulator, index: usize) -> Result<i64, FormulaError> {
     let value = values.arg_value(index).ok_or(FormulaError::Value)?;
     let serial = match value {
-        Value::Text(text) => parse_date_value(text)
-            .or_else(|| text.trim().parse::<f64>().ok())
-            .ok_or(FormulaError::Value)?,
+        Value::Text(text) => number_from_text(text)?,
         _ => number_from_value(value)?,
     };
     if !serial.is_finite() {
@@ -397,9 +394,7 @@ fn holiday_serials(values: &FuncAccumulator, index: usize) -> Result<Vec<i64>, F
         let serial = match &entry.value {
             Value::Blank => continue,
             Value::Text(text) if text.trim().is_empty() => continue,
-            Value::Text(text) => parse_date_value(text)
-                .or_else(|| text.trim().parse::<f64>().ok())
-                .ok_or(FormulaError::Value)?,
+            Value::Text(text) => number_from_text(text)?,
             Value::Error(error) => return Err(*error),
             value => number_from_value(value)?,
         };

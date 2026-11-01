@@ -1,4 +1,4 @@
-//! Criteria parsing, wildcard matching, and conditional aggregation.
+//! Criteria parsing and conditional aggregation.
 
 use std::cmp::Ordering;
 
@@ -6,20 +6,14 @@ use crate::calc::{CmpOp, SHEET_COLS, SHEET_ROWS};
 use crate::types::{CellRange, FormulaError, Value};
 
 use super::matrix::EvalMatrix;
-use super::value::compare_text_case_insensitive;
-
-#[derive(Debug)]
-enum WildcardToken {
-    Literal(char),
-    AnyOne,
-    AnyMany,
-}
+use super::value::{compare_text_case_insensitive, plain_number};
+use super::wildcard::Wildcard;
 
 #[derive(Debug)]
 pub(super) struct Criterion {
     op: CmpOp,
     operand: Value,
-    wildcard: Option<Vec<WildcardToken>>,
+    wildcard: Option<Wildcard>,
 }
 
 impl Criterion {
@@ -52,13 +46,13 @@ impl Criterion {
             Value::Bool(true)
         } else if operand.eq_ignore_ascii_case("FALSE") {
             Value::Bool(false)
-        } else if let Ok(number) = operand.parse::<f64>() {
+        } else if let Some(number) = plain_number(operand) {
             Value::number(number)
         } else {
             Value::text(operand)
         };
         let wildcard = if matches!(op, CmpOp::Eq | CmpOp::Ne) {
-            wildcard_tokens(operand)
+            Some(Wildcard::parse(operand)).filter(Wildcard::has_wildcards)
         } else {
             None
         };
@@ -71,8 +65,7 @@ impl Criterion {
 
     pub(super) fn matches(&self, candidate: &Value) -> bool {
         let ordering = if let Some(pattern) = &self.wildcard {
-            let text = criterion_text(candidate);
-            let matched = text.is_some_and(|text| wildcard_matches(pattern, &text));
+            let matched = criterion_text(candidate).is_some_and(|text| pattern.matches(text));
             return if self.op == CmpOp::Ne {
                 !matched
             } else {
@@ -105,107 +98,33 @@ pub(crate) fn sum_range_extent(sum: CellRange, rows: u32, cols: u32) -> CellRang
     CellRange::new(sum.sheet, sum.row_start, sum.col_start, row_end, col_end)
 }
 
-fn wildcard_tokens(pattern: &str) -> Option<Vec<WildcardToken>> {
-    let mut tokens = Vec::new();
-    let normalized = pattern.to_lowercase();
-    let mut chars = normalized.chars().peekable();
-    let mut has_pattern_syntax = false;
-    while let Some(ch) = chars.next() {
-        match ch {
-            '~' => match chars.peek().copied() {
-                Some(literal @ ('*' | '?' | '~')) => {
-                    has_pattern_syntax = true;
-                    chars.next();
-                    tokens.push(WildcardToken::Literal(literal));
-                }
-                _ => tokens.push(WildcardToken::Literal('~')),
-            },
-            '*' => {
-                has_pattern_syntax = true;
-                if !matches!(tokens.last(), Some(WildcardToken::AnyMany)) {
-                    tokens.push(WildcardToken::AnyMany);
-                }
-            }
-            '?' => {
-                has_pattern_syntax = true;
-                tokens.push(WildcardToken::AnyOne);
-            }
-            literal => tokens.push(WildcardToken::Literal(literal)),
-        }
-    }
-    has_pattern_syntax.then_some(tokens)
-}
-
-/// A wildcard pattern prepared once and matched against many candidates, so
-/// a search over a column parses the pattern once instead of once per cell.
+/// A wildcard lookup key (`XLOOKUP`/`XMATCH` match mode 2), parsed once and
+/// matched against many candidates. A key without wildcards matches its
+/// literal text, with the same case rule.
 pub(super) struct WildcardPattern {
-    pattern: String,
-    tokens: Option<Vec<WildcardToken>>,
+    wildcard: Wildcard,
 }
 
 impl WildcardPattern {
-    /// Reads the pattern's wildcard syntax once.
     pub(super) fn new(pattern: &str) -> Self {
         Self {
-            pattern: pattern.to_string(),
-            tokens: wildcard_tokens(pattern),
+            wildcard: Wildcard::parse(pattern),
         }
     }
 
-    /// Matches `*` (any sequence), `?` (one character), and `~` escapes with
-    /// Unicode lowercase comparison; plain patterns use ASCII case folding.
     pub(super) fn matches(&self, candidate: &Value) -> bool {
-        let Some(text) = criterion_text(candidate) else {
-            return false;
-        };
-        match &self.tokens {
-            Some(tokens) => wildcard_matches(tokens, &text),
-            None => text.eq_ignore_ascii_case(&self.pattern),
-        }
+        criterion_text(candidate).is_some_and(|text| self.wildcard.matches(text))
     }
 }
 
-fn wildcard_matches(pattern: &[WildcardToken], value: &str) -> bool {
-    let text: Vec<char> = value.to_lowercase().chars().collect();
-    let (mut pattern_index, mut text_index) = (0usize, 0usize);
-    let (mut star_index, mut star_text) = (None, 0usize);
-    while text_index < text.len() {
-        match pattern.get(pattern_index) {
-            Some(WildcardToken::Literal(expected)) if *expected == text[text_index] => {
-                pattern_index += 1;
-                text_index += 1;
-            }
-            Some(WildcardToken::AnyOne) => {
-                pattern_index += 1;
-                text_index += 1;
-            }
-            Some(WildcardToken::AnyMany) => {
-                star_index = Some(pattern_index);
-                pattern_index += 1;
-                star_text = text_index;
-            }
-            _ => {
-                let Some(star) = star_index else {
-                    return false;
-                };
-                star_text += 1;
-                text_index = star_text;
-                pattern_index = star + 1;
-            }
-        }
-    }
-    while matches!(pattern.get(pattern_index), Some(WildcardToken::AnyMany)) {
-        pattern_index += 1;
-    }
-    pattern_index == pattern.len()
-}
-
-fn criterion_text(value: &Value) -> Option<String> {
+/// The text a wildcard sees in a candidate cell: numbers and booleans never
+/// match a pattern, and an error matches its sentinel such as `#N/A`.
+fn criterion_text(value: &Value) -> Option<&str> {
     match value {
-        Value::Text(text) => Some(text.to_string()),
-        Value::Blank => Some(String::new()),
-        Value::Error(error) => Some(error.sentinel().to_string()),
-        _ => None,
+        Value::Text(text) => Some(text),
+        Value::Blank => Some(""),
+        Value::Error(error) => Some(error.sentinel()),
+        Value::Number(_) | Value::Bool(_) => None,
     }
 }
 
@@ -314,47 +233,56 @@ impl IfExtreme {
     }
 }
 
-/// Aggregates the rows whose criteria all match, on a materialized range.
+/// `SUMIF`/`SUMIFS`, or `AVERAGEIF`/`AVERAGEIFS` when `average` is set, over
+/// the rows of a materialized range whose criteria all match.
 pub(super) fn aggregate_if(
     sum_range: &EvalMatrix,
     criteria: &[(&EvalMatrix, &Criterion)],
-) -> Result<(f64, u64), FormulaError> {
+    average: bool,
+) -> Value {
     let mut aggregate = IfSum::new();
-    if let [(range, criterion)] = criteria {
-        for (value, candidate) in sum_range.values.iter().zip(&range.values) {
-            if !criterion.matches(candidate) {
-                continue;
-            }
-            aggregate.add(value)?;
-        }
-        return Ok((aggregate.sum, aggregate.count));
-    }
-    for (index, value) in sum_range.values.iter().enumerate() {
-        if !criteria
+    let folded = if let [(range, criterion)] = criteria {
+        sum_range
+            .values
             .iter()
-            .all(|(range, criterion)| criterion.matches(&range.values[index]))
-        {
-            continue;
-        }
-        aggregate.add(value)?;
+            .zip(&range.values)
+            .filter(|(_, candidate)| criterion.matches(candidate))
+            .try_for_each(|(value, _)| aggregate.add(value))
+    } else {
+        matched_rows(sum_range, criteria).try_for_each(|value| aggregate.add(value))
+    };
+    match folded {
+        Ok(()) => aggregate.finish(average),
+        Err(error) => Value::Error(error),
     }
-    Ok((aggregate.sum, aggregate.count))
 }
 
+/// `MAXIFS`, or `MINIFS` when `maximum` is unset, over a materialized range.
 pub(super) fn extreme_if(
     value_range: &EvalMatrix,
     criteria: &[(&EvalMatrix, &Criterion)],
     maximum: bool,
-) -> Result<f64, FormulaError> {
+) -> Value {
     let mut aggregate = IfExtreme::new(maximum);
-    for (index, value) in value_range.values.iter().enumerate() {
-        if !criteria
-            .iter()
-            .all(|(range, criterion)| criterion.matches(&range.values[index]))
-        {
-            continue;
-        }
-        aggregate.add(value)?;
+    match matched_rows(value_range, criteria).try_for_each(|value| aggregate.add(value)) {
+        Ok(()) => aggregate.finish(),
+        Err(error) => Value::Error(error),
     }
-    Ok(aggregate.found.unwrap_or(0.0))
+}
+
+/// The cells of `aggregated` whose row matches every criterion.
+fn matched_rows<'a>(
+    aggregated: &'a EvalMatrix,
+    criteria: &'a [(&EvalMatrix, &Criterion)],
+) -> impl Iterator<Item = &'a Value> {
+    aggregated
+        .values
+        .iter()
+        .enumerate()
+        .filter_map(|(index, cell)| {
+            criteria
+                .iter()
+                .all(|(range, criterion)| criterion.matches(&range.values[index]))
+                .then_some(cell)
+        })
 }
