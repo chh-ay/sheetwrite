@@ -27,8 +27,10 @@ import {
 } from "@sheetwrite/core";
 import { IndexedDbPendingCommitStorage } from "@sheetwrite/core/browser";
 
+import { deleteDatabase } from "../lib/delete-database.js";
 import { errorText } from "../lib/errors.js";
 import { ShowcaseCollaborationServer, ShowcasePresenceBus } from "./collaboration-protocol.js";
+import { fitColumnPixels } from "./column-fit.js";
 import {
   createOfflineData,
   createOfflineSeedSnapshot,
@@ -46,7 +48,7 @@ import {
 } from "./scenarios/offline.js";
 
 /** Durable pending-commit outbox; deleted on session boot so demos restart clean. */
-export const SVELTE_WORKBENCH_OUTBOX = "sheetwrite-svelte-workbench-outbox";
+const SVELTE_WORKBENCH_OUTBOX = "sheetwrite-svelte-workbench-outbox";
 
 type ConflictResponse = Extract<PersistenceCommitResponse, { status: "conflict" }>;
 
@@ -118,21 +120,14 @@ const DISPATCH_GUTTER_WIDTH = 48;
 
 /** Widen column weights to cover the measured stage, remainder included. */
 function fitColumnWidths(weights: readonly number[], hostWidth: number | undefined): number[] {
-  const baseSum = weights.reduce((total, width) => total + width, 0);
   const fill = hostWidth === undefined ? 0 : Math.floor(hostWidth) - DISPATCH_GUTTER_WIDTH;
-  if (baseSum <= 0 || fill <= baseSum) return [...weights];
-  const widths = weights.map(
-    (weight) => weight + Math.floor(((fill - baseSum) * weight) / baseSum),
+  return (
+    fitColumnPixels(weights, fill, {
+      minimumScale: 1,
+      belowMinimum: "keep",
+      rounding: "ordered",
+    }) ?? [...weights]
   );
-  // Spread the rounding remainder so the declared columns cover the stage exactly.
-  let remainder = fill - widths.reduce((total, width) => total + width, 0);
-  for (let index = 0; remainder > 0; index = (index + 1) % widths.length) {
-    const width = widths[index];
-    if (width === undefined) break;
-    widths[index] = width + 1;
-    remainder -= 1;
-  }
-  return widths;
 }
 
 /**
@@ -166,14 +161,8 @@ function describeRemoteCommit(entry: VersionedOperation): string {
 
 async function resetOutbox(databaseName: string): Promise<void> {
   if (typeof indexedDB === "undefined") return;
-  await new Promise<void>((resolve) => {
-    const request = indexedDB.deleteDatabase(databaseName);
-    request.onsuccess = () => resolve();
-    // A blocked or failed delete only means stale records stay visible in the
-    // outbox list; never wedge boot over demo cleanup.
-    request.onerror = () => resolve();
-    request.onblocked = () => resolve();
-  });
+  // Stale records can stay visible; demo cleanup must not prevent boot.
+  await deleteDatabase(databaseName, { error: "resolve", blocked: "resolve" });
 }
 
 /**
@@ -281,10 +270,6 @@ export class SvelteWorkbenchSession {
     this.baseSnapshot = seed;
     this.colleagueTransport = this.bus.endpoint();
     this.storage = new IndexedDbPendingCommitStorage({ databaseName: SVELTE_WORKBENCH_OUTBOX });
-  }
-
-  get isOnline(): boolean {
-    return this.online;
   }
 
   /** Pristine construction-bound inputs for the first island generation. */

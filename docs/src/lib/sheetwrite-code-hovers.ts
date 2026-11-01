@@ -11,12 +11,14 @@ import { ExpressiveCode } from "expressive-code";
 import { format } from "prettier";
 import { svelte2tsx } from "svelte2tsx";
 
+import { hashIdentifier } from "./hash-identifier.js";
 import {
   injectHoverPrelude,
   type PreludeInjection,
   resolveHoverPrelude,
 } from "./hover-preludes.js";
 import { SheetwriteTypeEngine, type SheetwriteTypeHover } from "./sheetwrite-type-engine.js";
+import { lineStartOffsets } from "./source-offsets.js";
 
 const SUPPORTED_LANGUAGES = new Set(["ts", "tsx", "vue", "svelte"]);
 const LOW_QUALITY_HOVER = /\bany\b|\/\*unresolved\*\//;
@@ -361,12 +363,7 @@ function svelteSourceHovers(source: string, analyzer: SheetwriteTypeEngine): She
   const sourceMap = new TraceMap(JSON.parse(transformed.map.toString()));
   const scriptDocumentation = svelteScriptDocumentation(source, analyzer);
   const sourceLines = source.split("\n");
-  const lineOffsets: number[] = [];
-  let offset = 0;
-  for (const line of sourceLines) {
-    lineOffsets.push(offset);
-    offset += line.length + 1;
-  }
+  const lineOffsets = lineStartOffsets(source);
 
   const result = analyzer.analyze(transformed.code, "tsx");
   const hovers: SheetwriteTypeHover[] = [];
@@ -452,15 +449,6 @@ export function collectFenceHovers(
     injection,
     code,
   );
-}
-
-function hashIdentifier(value: string): string {
-  let hash = 2_166_136_261;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 16_777_619);
-  }
-  return (hash >>> 0).toString(36);
 }
 
 export function hoverPopoverId(

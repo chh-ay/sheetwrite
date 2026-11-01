@@ -1,5 +1,6 @@
 import { colToA1, labelToCol } from "../../../packages/core/src/a1.js";
 import { formatNumber } from "../../../packages/core/src/number-format.js";
+import { element, type HastNode } from "./build-hast.js";
 
 /**
  * Static result figures for docs pages. An author writes the cells a snippet
@@ -19,13 +20,6 @@ import { formatNumber } from "../../../packages/core/src/number-format.js";
  * anywhere on a page becomes the text the grid itself paints for that value,
  * because it calls the grid's number formatter.
  */
-interface HastNode {
-  type: string;
-  tagName?: string;
-  value?: string;
-  properties?: Record<string, unknown>;
-  children?: HastNode[];
-}
 
 const RESULT_CLASS = "sw-grid-result";
 const LEGEND_CLASS = "sw-grid-result__legend";
@@ -97,10 +91,6 @@ function classNames(node: HastNode): string[] {
     : typeof value === "string"
       ? value.split(" ")
       : [];
-}
-
-function element(tagName: string, children: HastNode[], properties: Record<string, unknown> = {}) {
-  return { type: "element", tagName, properties, children } satisfies HastNode;
 }
 
 function elements(node: HastNode, tagName: string): HastNode[] {

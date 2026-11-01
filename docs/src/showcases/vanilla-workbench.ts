@@ -38,6 +38,7 @@ import {
 import workerRendererUrl from "@sheetwrite/core/worker?worker&url";
 
 import { errorText } from "../lib/errors.js";
+import { fitColumnPixels, rowGutterWidth } from "./column-fit.js";
 import {
   buildEngineData,
   createEngineWorkbook,
@@ -47,6 +48,7 @@ import {
   ENGINE_SHEET_REF,
   ENGINE_THEME,
 } from "./scenarios/engine.js";
+import { pagedStatsOf } from "./scenarios/scale.js";
 
 /** The fixture sheet every non-imported mount hydrates. */
 const WORKBENCH_SHEET: SheetId = ENGINE_SHEET_ID;
@@ -194,12 +196,6 @@ function createRevenuePageSource(onServed: (start: number, end: number) => void)
   };
 }
 
-/** Paged allocation stats through the store handle; null for dense stores. */
-export function pagedStatsOf(grid: Grid, sheet: SheetId): PagedStoreStats | null {
-  const store = grid.store as { getPagedStats?: (sheet: SheetId) => PagedStoreStats };
-  return typeof store.getPagedStats === "function" ? store.getPagedStats(sheet) : null;
-}
-
 /**
  * Mount one grid generation plus its chrome into `host` and wire every
  * subscription. `initSheetwrite()` must already be awaited.
@@ -247,21 +243,21 @@ export function createWorkbench(
   };
 
   const workbook = createEngineWorkbook();
-  const MIN_ROW_GUTTER_WIDTH = 48;
-  const ROW_LABEL_FONT_SIZE = 13;
-  const ROW_LABEL_DIGIT_WIDTH = 0.6;
-  const ROW_LABEL_PADDING = 12;
   for (const sheet of workbook.sheets) {
-    const rowGutterWidth = Math.max(
-      ENGINE_THEME.rowHeaderWidth ?? MIN_ROW_GUTTER_WIDTH,
-      Math.ceil(
-        String(sheet.rowCount).length * ROW_LABEL_FONT_SIZE * ROW_LABEL_DIGIT_WIDTH +
-          ROW_LABEL_PADDING,
-      ),
+    const target =
+      gridHost.clientWidth - rowGutterWidth(sheet.rowCount, ENGINE_THEME.rowHeaderWidth);
+    const widths = fitColumnPixels(
+      sheet.columns.map((column) => column.width),
+      target,
+      {
+        minimumScale: 1,
+        belowMinimum: "clamp",
+        rounding: "ceil",
+      },
     );
-    const dataWidth = sheet.columns.reduce((total, column) => total + column.width, 0);
-    const columnScale = Math.max(1, (gridHost.clientWidth - rowGutterWidth) / dataWidth);
-    for (const column of sheet.columns) column.width = Math.ceil(column.width * columnScale);
+    sheet.columns.forEach((column, index) => {
+      column.width = widths?.[index] ?? column.width;
+    });
   }
 
   try {
@@ -388,9 +384,8 @@ export function createWorkbench(
 }
 
 /**
- * Workbook operation: add (or re-activate) a summary sheet whose cells are
- * live cross-sheet formulas over the fixture data, then rebuild the built-in
- * chrome so the sheet-tab bar reflects the now-multi-sheet workbook.
+ * Add or activate a summary sheet with live cross-sheet formulas over the
+ * fixture data.
  */
 export function addSummarySheet(grid: Grid, hostWidth: number): SheetId {
   const existing = grid.store.getWorkbook().sheets.find((sheet) => sheet.id === SUMMARY_SHEET);

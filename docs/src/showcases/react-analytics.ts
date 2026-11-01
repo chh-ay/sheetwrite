@@ -1,11 +1,3 @@
-/**
- * React adapter for the analytics scenario: one hook that binds the shared
- * dataset/workbook/KPI contract from `scenarios/analytics.ts` to controlled
- * React state. Every workbench interaction — filters, search/replace, formula
- * entry, undo/redo, import/export, dataset reloads, renderer choice — flows
- * through this state, and grid resets reconcile back into it via `onReady`.
- */
-
 import type {
   CellAddress,
   CellFormat,
@@ -17,6 +9,13 @@ import type {
   Selection,
   Workbook,
 } from "@sheetwrite/core";
+/**
+ * React adapter for the analytics scenario: one hook that binds the shared
+ * dataset/workbook/KPI contract from `scenarios/analytics.ts` to controlled
+ * React state. Every workbench interaction — filters, search/replace, formula
+ * entry, undo/redo, import/export, dataset reloads, renderer choice — flows
+ * through this state, and grid resets reconcile back into it via `onReady`.
+ */
 import { downloadBytes, fromCsv, parseCellInput, toCsv } from "@sheetwrite/core";
 import type { GridReadyEvent, GridReadyReason } from "@sheetwrite/core/adapter";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -25,6 +24,7 @@ import { errorText } from "../lib/errors.js";
 import { selectionLabel } from "../lib/selection-label.js";
 import { observeSiteTheme } from "../lib/site-theme.js";
 import { useAction } from "../lib/use-action.js";
+import { fitColumnPixels, rowGutterWidth } from "./column-fit.js";
 import {
   ANALYTICS_COLUMNS,
   ANALYTICS_MARKETS,
@@ -77,16 +77,6 @@ function columnFormat(col: number): CellFormat {
   return workbookColumn?.type ?? "text";
 }
 
-/** Minimum row-number gutter and label metrics the Grid allocates for it. */
-const ROW_GUTTER_MIN = 48;
-const ROW_LABEL_FONT_PX = 13;
-
-/** Row-number gutter width the Grid paints for a sheet of `rowCount` rows. */
-function rowGutterWidth(rowCount: number): number {
-  const digits = String(Math.max(1, rowCount)).length;
-  return Math.max(ROW_GUTTER_MIN, Math.ceil(digits * ROW_LABEL_FONT_PX * 0.6 + 12));
-}
-
 /** Scenario widths, captured once so repeated fits never compound a scale. */
 const NATURAL_WIDTHS: readonly (readonly number[])[] = createAnalyticsWorkbook().sheets.map(
   (sheet) => sheet.columns.map((column) => column.width),
@@ -111,21 +101,12 @@ export function fitColumnsToHost(workbook: Workbook, hostWidth: number): void {
   workbook.sheets.forEach((sheet, sheetIndex) => {
     const natural = NATURAL_WIDTHS[sheetIndex];
     if (!natural) return;
-    const total = natural.reduce((sum, width) => sum + width, 0);
-    const scale = total > 0 ? target / total : 1;
-    if (scale < MIN_COLUMN_SCALE) return; // keep scenario widths; grid scrolls
-    const widths = natural.map((width) => Math.floor(width * scale));
-    let spare = scale === 1 ? 0 : target - widths.reduce((sum, width) => sum + width, 0);
-    // Rounding pixels go to the widest columns so the total lands on the host
-    // edge exactly instead of short (padding columns) or long (clipping).
-    const byWidth = widths
-      .map((width, index) => ({ width, index }))
-      .sort((a, b) => b.width - a.width);
-    for (const entry of byWidth) {
-      if (spare <= 0) break;
-      widths[entry.index] = entry.width + 1;
-      spare -= 1;
-    }
+    const widths = fitColumnPixels(natural, target, {
+      minimumScale: MIN_COLUMN_SCALE,
+      belowMinimum: "keep",
+      rounding: "widest",
+    });
+    if (widths === undefined) return;
     sheet.columns.forEach((column, index) => {
       column.width = widths[index] ?? column.width;
     });

@@ -390,8 +390,8 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
               <div className="sw-vw-state" role="alert" data-testid="boot-failed">
                 <strong>Grid failed to boot</strong>
                 <p>
-                  The host reports the failure instead of retrying silently. Create grid starts a
-                  fresh generation from the same construction options.
+                  The host reports the failure instead of retrying silently. Select Destroy grid,
+                  then Create grid to retry the same construction options.
                 </p>
                 {bootError === null ? null : (
                   <code className="sw-vw-state__error">{bootError}</code>
@@ -409,8 +409,8 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
                   <div>
                     <span>Next</span>
                     <ul>
-                      <li>Create grid retries the same spec</li>
-                      <li>Reset generation clears the failure</li>
+                      <li>Destroy grid clears the failed generation</li>
+                      <li>Then Create grid retries the same construction options</li>
                     </ul>
                   </div>
                 </div>

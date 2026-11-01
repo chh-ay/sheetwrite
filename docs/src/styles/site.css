@@ -718,23 +718,6 @@ body .sw-code-popover__tag-link:hover {
   color: var(--sw-fg-muted);
 }
 
-.sw-proof-shell {
-  width: min(52rem, calc(100% - 2rem));
-  margin-inline: auto;
-  padding-block: clamp(4rem, 12vw, 9rem);
-}
-
-.sw-button {
-  display: inline-flex;
-  margin-top: 1rem;
-  border-radius: 0.5rem;
-  padding: 0.7rem 1rem;
-  color: var(--sw-accent-ink);
-  background: var(--sw-accent);
-  font-weight: 700;
-  text-decoration: none;
-}
-
 .sw-prose .expressive-code {
   margin-block: 1.4rem 2rem;
 }

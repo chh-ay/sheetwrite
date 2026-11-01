@@ -349,8 +349,8 @@ function Landing() {
             <p className="sw-lp-eyebrow">See it happen</p>
             <h2 id="landing-stories">The hard parts of a spreadsheet, handled.</h2>
             <p>
-              Three short stories about work that a table component leaves to you. Each one links to
-              the live example that runs it for real.
+              Short stories about work that a table component leaves to you. Each one links to the
+              live example that runs it for real.
             </p>
           </header>
           <StoryReel />

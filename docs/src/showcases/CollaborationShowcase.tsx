@@ -11,11 +11,13 @@ import {
   rebaseDocumentOperations,
   SyncCoordinator,
   type SyncStateSnapshot,
+  type WorkbookSnapshot,
 } from "@sheetwrite/core";
 import { IndexedDbPendingCommitStorage } from "@sheetwrite/core/browser";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { isRepeatClick } from "../lib/action-guard.js";
+import { deleteDatabase } from "../lib/delete-database.js";
 import { errorText } from "../lib/errors.js";
 
 import "@sheetwrite/core/styles.css";
@@ -355,23 +357,20 @@ export default function CollaborationShowcase() {
     return accountRef.current[key];
   };
 
-  const bootClient = async (
+  const createClient = (
     key: ClientKey,
-    generation: number,
-    target: ShowcaseDocument,
-  ): Promise<void> => {
-    const host = hostRefs[key].current;
-    const server = serversRef.current[target];
-    const bus = busRef.current;
-    if (!host || !server || !bus || generation !== bootGenerationRef.current) return;
+    options: {
+      host: HTMLElement;
+      snapshot: WorkbookSnapshot;
+      generation: number;
+      target: ShowcaseDocument;
+      link: ShowcaseNetworkLink;
+      storage: IndexedDbPendingCommitStorage;
+      bus: ShowcasePresenceBus;
+    },
+  ): ClientRuntime => {
+    const { host, snapshot, generation, target, link, storage, bus } = options;
     const actor = key === "a" ? COLLABORATION_ACTORS[0] : COLLABORATION_ACTORS[1];
-    const link = new ShowcaseNetworkLink(server);
-    const snapshot = await server.load(DOCUMENT_ID[target]);
-    link.startFrom(snapshot.version ?? 0);
-    if (generation !== bootGenerationRef.current) {
-      link.destroy();
-      return;
-    }
     host.replaceChildren();
     const grid = createGridFromSnapshot(host, snapshot, {
       presentation: "data-grid",
@@ -385,7 +384,6 @@ export default function CollaborationShowcase() {
       },
       transactionResourceLimits: { maxEncodedBytes: DEMO_TRANSACTION_BYTES },
     });
-    const storage = new IndexedDbPendingCommitStorage({ databaseName: QUEUE_DATABASE[key] });
     const sync = new SyncCoordinator(grid, link, {
       documentId: DOCUMENT_ID[target],
       serverVersion: snapshot.version ?? 0,
@@ -408,6 +406,28 @@ export default function CollaborationShowcase() {
     wireClient(key, runtime);
     clientsRef.current[key] = runtime;
     runtime.disposers.push(sync.subscribe(link));
+    return runtime;
+  };
+
+  const bootClient = async (
+    key: ClientKey,
+    generation: number,
+    target: ShowcaseDocument,
+  ): Promise<void> => {
+    const host = hostRefs[key].current;
+    const server = serversRef.current[target];
+    const bus = busRef.current;
+    if (!host || !server || !bus || generation !== bootGenerationRef.current) return;
+    const link = new ShowcaseNetworkLink(server);
+    const snapshot = await server.load(DOCUMENT_ID[target]);
+    link.startFrom(snapshot.version ?? 0);
+    if (generation !== bootGenerationRef.current) {
+      link.destroy();
+      return;
+    }
+    const storage = new IndexedDbPendingCommitStorage({ databaseName: QUEUE_DATABASE[key] });
+    const runtime = createClient(key, { host, snapshot, generation, target, link, storage, bus });
+    const { sync } = runtime;
     if (generation !== bootGenerationRef.current) {
       if (clientsRef.current[key] === runtime) disposeClient(key);
       return;
@@ -523,7 +543,7 @@ export default function CollaborationShowcase() {
     );
   };
 
-  const disposeClient = (key: ClientKey, keepStores = false) => {
+  const disposeClient = (key: ClientKey, resources: "close" | "retain" = "close") => {
     const runtime = clientsRef.current[key];
     if (!runtime) return;
     for (const dispose of runtime.disposers) dispose();
@@ -531,8 +551,13 @@ export default function CollaborationShowcase() {
     runtime.presence.destroy();
     runtime.sync.destroy();
     runtime.grid.destroy();
-    runtime.link.destroy();
-    if (!keepStores) runtime.storage.close();
+    if (resources === "close") {
+      runtime.link.destroy();
+      runtime.storage.close();
+    } else {
+      // Recovery keeps the open queue and link, but drops broadcasts covered by the reload.
+      runtime.link.discardParkedBroadcasts();
+    }
     clientsRef.current[key] = null;
   };
 
@@ -545,12 +570,7 @@ export default function CollaborationShowcase() {
    */
   const clearQueueDatabases = async () => {
     for (const key of CLIENT_KEYS) {
-      const { promise, resolve, reject } = Promise.withResolvers<void>();
-      const request = indexedDB.deleteDatabase(QUEUE_DATABASE[key]);
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error ?? new Error("IndexedDB deletion failed"));
-      request.onblocked = () => resolve();
-      await promise;
+      await deleteDatabase(QUEUE_DATABASE[key], { error: "reject", blocked: "resolve" });
     }
   };
 
@@ -1093,14 +1113,8 @@ export default function CollaborationShowcase() {
       for (const record of pending) {
         await runtime.storage.remove(DOCUMENT_ID[runtime.document], record.clientMutationId);
       }
-      const { actor, link, storage, document: target } = runtime;
-      for (const dispose of runtime.disposers) dispose();
-      runtime.disposers.length = 0;
-      runtime.presence.destroy();
-      runtime.sync.destroy();
-      runtime.grid.destroy();
-      link.discardParkedBroadcasts();
-      clientsRef.current[key] = null;
+      const { link, storage, document: target } = runtime;
+      disposeClient(key, "retain");
 
       // Loading and validating the whole document is the expensive step. Give
       // the browser a frame before each half so scrolling keeps painting.
@@ -1110,41 +1124,16 @@ export default function CollaborationShowcase() {
       // the new coordinator; the ones this snapshot already holds are dropped.
       link.startFrom(latest.version ?? 0);
       await delay(0);
-      host.replaceChildren();
-      const grid = createGridFromSnapshot(host, latest, {
-        presentation: "data-grid",
-        config: {
-          contextMenu: [
-            { action: "copy", label: "Copy shared value" },
-            { action: "paste" },
-            { label: "Retry pending", onClick: () => retryPending(key) },
-            { action: "exportXlsx", label: "Export this client's workbook" },
-          ],
-        },
-        transactionResourceLimits: { maxEncodedBytes: DEMO_TRANSACTION_BYTES },
-      });
-      const sync = new SyncCoordinator(grid, link, {
-        documentId: DOCUMENT_ID[target],
-        serverVersion: latest.version ?? 0,
-        pendingStorage: storage,
-        createMutationId: () => `${actor.id}-${Date.now().toString(36)}-${nextMutation++}`,
-        limits: { maxVersionPayloadBytes: DEMO_VERSION_BYTES },
-      });
-      const presence = new PresenceCoordinator(grid, bus.endpoint(), { actor, heartbeatMs: 0 });
-      const next: ClientRuntime = {
-        actor,
+      const next = createClient(key, {
+        host,
+        snapshot: latest,
         generation: bootGenerationRef.current,
-        document: target,
+        target,
         link,
         storage,
-        grid,
-        sync,
-        presence,
-        disposers: [],
-      };
-      wireClient(key, next);
-      clientsRef.current[key] = next;
-      next.disposers.push(sync.subscribe(link));
+        bus,
+      });
+      const { grid, sync, presence } = next;
       await sync.ready();
       if (bootGenerationRef.current !== next.generation) return;
       for (const batch of rebasedBatches) {
