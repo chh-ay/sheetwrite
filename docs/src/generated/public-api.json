@@ -1224,7 +1224,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L477",
+              "source": "src/collaboration.ts#L497",
               "jsDocTags": [],
               "documentation": "Host persistence contract for versioned comment threads.",
               "memberDocs": []
@@ -1236,7 +1236,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L406",
+              "source": "src/collaboration.ts#L426",
               "jsDocTags": [],
               "documentation": "Document location to which a comment thread is attached.",
               "memberDocs": []
@@ -1248,7 +1248,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L399",
+              "source": "src/collaboration.ts#L419",
               "jsDocTags": [],
               "documentation": "Stable host-provided identity displayed on a comment message.",
               "memberDocs": []
@@ -1256,11 +1256,11 @@
             {
               "name": "CommentCoordinator",
               "kind": "class",
-              "signature": "class CommentCoordinator { constructor(adapter: CommentAdapter, options: CommentCoordinatorOptions); commentThreads: () => readonly CommentThread[]; create: (threadId: string, messageId: string, anchor: CommentAnchor, body: string, clientMutationId: string) => Promise<CommentMutationResponse>; destroy: () => void; load: () => Promise<readonly CommentThread[]>; mutate: (mutation: CommentMutation, clientMutationId: string) => Promise<CommentMutationResponse>; on: (listener: CommentListener) => () => void; reply: (threadId: string, messageId: string, body: string, clientMutationId: string) => Promise<CommentMutationResponse>; resolve: (threadId: string, resolved: boolean, clientMutationId: string) => Promise<CommentMutationResponse>; serverVersion: number }",
+              "signature": "class CommentCoordinator { constructor(adapter: CommentAdapter, options: CommentCoordinatorOptions); commentThreads: () => readonly CommentThread[]; create: (threadId: string, messageId: string, anchor: CommentAnchor, body: string, clientMutationId: string, signal?: AbortSignal) => Promise<CommentMutationResponse>; destroy: () => void; load: (signal?: AbortSignal) => Promise<readonly CommentThread[]>; mutate: (mutation: CommentMutation, clientMutationId: string, signal?: AbortSignal) => Promise<CommentMutationResponse>; on: (listener: CommentListener) => () => void; reply: (threadId: string, messageId: string, body: string, clientMutationId: string, signal?: AbortSignal) => Promise<CommentMutationResponse>; resolve: (threadId: string, resolved: boolean, clientMutationId: string, signal?: AbortSignal) => Promise<CommentMutationResponse>; serverVersion: number }",
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L504",
+              "source": "src/collaboration.ts#L524",
               "jsDocTags": [],
               "documentation": "Transport/auth-neutral comment state with server-owned author and timestamp fields.",
               "memberDocs": []
@@ -1272,7 +1272,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L494",
+              "source": "src/collaboration.ts#L514",
               "jsDocTags": [],
               "documentation": "State transition emitted by the comment coordinator.",
               "memberDocs": []
@@ -1284,7 +1284,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L488",
+              "source": "src/collaboration.ts#L508",
               "jsDocTags": [],
               "documentation": "Document identity and initial version for comment coordination.",
               "memberDocs": []
@@ -1296,7 +1296,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L464",
+              "source": "src/collaboration.ts#L484",
               "jsDocTags": [],
               "documentation": "Versioned comment-thread listing returned by a host adapter.",
               "memberDocs": []
@@ -1308,7 +1308,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L411",
+              "source": "src/collaboration.ts#L431",
               "jsDocTags": [],
               "documentation": "One immutable author message in a comment thread.",
               "memberDocs": []
@@ -1320,7 +1320,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L432",
+              "source": "src/collaboration.ts#L452",
               "jsDocTags": [],
               "documentation": "Serializable operation that creates or updates comment state.",
               "memberDocs": []
@@ -1332,7 +1332,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L444",
+              "source": "src/collaboration.ts#L464",
               "jsDocTags": [],
               "documentation": "Versioned comment mutation submitted to a host adapter.",
               "memberDocs": []
@@ -1344,7 +1344,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L453",
+              "source": "src/collaboration.ts#L473",
               "jsDocTags": [],
               "documentation": "Applied, duplicate, or conflict acknowledgement for a comment mutation.",
               "memberDocs": []
@@ -1356,7 +1356,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L420",
+              "source": "src/collaboration.ts#L440",
               "jsDocTags": [],
               "documentation": "Versioned discussion anchored to a document location.",
               "memberDocs": []
@@ -4228,7 +4228,7 @@
             {
               "name": "RevisionCoordinator",
               "kind": "class",
-              "signature": "class RevisionCoordinator { constructor(adapter: RevisionAdapter, options: RevisionCoordinatorOptions); destroy: () => void; list: () => Promise<readonly RevisionSummary[]>; on: (listener: RevisionListener) => () => void; preview: (host: HTMLElement, version: number, options?: SnapshotGridOptions) => Promise<Grid>; restore: (targetVersion: number, clientMutationId: string) => Promise<RevisionRestoreResponse>; serverVersion: number }",
+              "signature": "class RevisionCoordinator { constructor(adapter: RevisionAdapter, options: RevisionCoordinatorOptions); destroy: () => void; list: (signal?: AbortSignal) => Promise<readonly RevisionSummary[]>; on: (listener: RevisionListener) => () => void; preview: (host: HTMLElement, version: number, options?: SnapshotGridOptions, signal?: AbortSignal) => Promise<Grid>; restore: (targetVersion: number, clientMutationId: string, signal?: AbortSignal) => Promise<RevisionRestoreResponse>; serverVersion: number }",
               "owners": [
                 "src/collaboration.ts"
               ],
@@ -6446,7 +6446,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L470",
+              "source": "src/collaboration.ts#L490",
               "jsDocTags": [],
               "documentation": "Comment mutation paired with its assigned server version.",
               "memberDocs": []
@@ -7109,7 +7109,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L239",
+              "source": "src/adapter.ts#L240",
               "jsDocTags": [],
               "documentation": "Owns adapter attachment and monotonically numbered Grid generations.",
               "memberDocs": [
@@ -7126,7 +7126,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L219",
+              "source": "src/adapter.ts#L220",
               "jsDocTags": [],
               "documentation": "Committed inputs to a framework adapter lifetime.",
               "memberDocs": []
@@ -7138,7 +7138,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L206",
+              "source": "src/adapter.ts#L207",
               "jsDocTags": [],
               "documentation": "Applies live-updatable adapter option changes to an existing Grid.",
               "memberDocs": []
@@ -7150,7 +7150,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L247",
+              "source": "src/adapter.ts#L248",
               "jsDocTags": [],
               "documentation": "Owns initialization, replacement, publication, and retirement for framework adapters.",
               "memberDocs": []
@@ -7191,7 +7191,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L463",
+              "source": "src/adapter.ts#L475",
               "jsDocTags": [],
               "documentation": "Converts simple columns and row objects into canonical workbook and columnar input.",
               "memberDocs": []
@@ -7203,7 +7203,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L436",
+              "source": "src/adapter.ts#L448",
               "jsDocTags": [],
               "documentation": "Creates the optional row bridge for a simple data-first input.",
               "memberDocs": []
@@ -7215,7 +7215,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L397",
+              "source": "src/adapter.ts#L409",
               "jsDocTags": [],
               "documentation": "Default pixel width assigned to simple adapter columns.",
               "memberDocs": []
@@ -7227,7 +7227,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L183",
+              "source": "src/adapter.ts#L184",
               "jsDocTags": [],
               "documentation": "Extracts advanced GridOptions from framework adapter props.",
               "memberDocs": []
@@ -7239,7 +7239,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L192",
+              "source": "src/adapter.ts#L193",
               "jsDocTags": [],
               "documentation": "Returns the first reset-sensitive adapter input that changed, if any.",
               "memberDocs": []
@@ -7251,7 +7251,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L69",
+              "source": "src/adapter.ts#L70",
               "jsDocTags": [],
               "documentation": "Classification of adapter options as live-updatable or reset-sensitive.",
               "memberDocs": []
@@ -7263,7 +7263,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L106",
+              "source": "src/adapter.ts#L107",
               "jsDocTags": [],
               "documentation": "Framework-neutral readiness, change, and error callbacks shared by adapters.",
               "memberDocs": [
@@ -7442,7 +7442,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L226",
+              "source": "src/adapter.ts#L227",
               "jsDocTags": [],
               "documentation": "Inbound hooks implemented by framework adapters for scheduling and imperative-handle publication.",
               "memberDocs": [
@@ -7463,7 +7463,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L96",
+              "source": "src/adapter.ts#L97",
               "jsDocTags": [],
               "documentation": "Grid handle, generation, and reason published after adapter initialization.",
               "memberDocs": [
@@ -7488,7 +7488,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L93",
+              "source": "src/adapter.ts#L94",
               "jsDocTags": [],
               "documentation": "Reason an adapter published a ready Grid generation.",
               "memberDocs": []
@@ -7500,7 +7500,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L91",
+              "source": "src/adapter.ts#L92",
               "jsDocTags": [],
               "documentation": "Reset-sensitive input change that requires an adapter to replace its Grid.",
               "memberDocs": []
@@ -7512,7 +7512,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L148",
+              "source": "src/adapter.ts#L149",
               "jsDocTags": [],
               "documentation": "Explicit width and height accepted by framework adapters.",
               "memberDocs": []
@@ -7524,7 +7524,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L169",
+              "source": "src/adapter.ts#L170",
               "jsDocTags": [],
               "documentation": "Converts adapter size props into a host element style object.",
               "memberDocs": []
@@ -7548,7 +7548,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L163",
+              "source": "src/adapter.ts#L164",
               "jsDocTags": [],
               "documentation": "Optional width and height accepted by advanced framework adapters.",
               "memberDocs": []
@@ -7935,7 +7935,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L140",
+              "source": "src/adapter.ts#L141",
               "jsDocTags": [],
               "documentation": "Optional explicit WASM source and initialization error callback for adapters.",
               "memberDocs": [
@@ -7956,7 +7956,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L400",
+              "source": "src/adapter.ts#L412",
               "jsDocTags": [],
               "documentation": "Column definition accepted by the adapters’ simple row-object API.",
               "memberDocs": [
@@ -8005,7 +8005,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L451",
+              "source": "src/adapter.ts#L463",
               "jsDocTags": [],
               "documentation": "Normalized workbook and columnar data produced from simple adapter props.",
               "memberDocs": [
@@ -8022,7 +8022,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L422",
+              "source": "src/adapter.ts#L434",
               "jsDocTags": [],
               "documentation": "Framework-neutral simple columns, rows, sizing, and grid options.",
               "memberDocs": [
@@ -11869,7 +11869,7 @@
               "owners": [
                 "src/index.ts"
               ],
-              "source": "src/index.ts#L491",
+              "source": "src/index.ts#L495",
               "jsDocTags": [
                 "example",
                 "see"
