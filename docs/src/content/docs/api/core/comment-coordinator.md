@@ -8,7 +8,7 @@ description: "CommentCoordinator class in @sheetwrite/core: Transport/auth-neutr
 Transport/auth-neutral comment state with server-owned author and timestamp fields.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/collaboration.ts#L504"><code>packages/core/src/collaboration.ts#L504</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/collaboration.ts#L524"><code>packages/core/src/collaboration.ts#L524</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -50,7 +50,7 @@ commentThreads: () => readonly CommentThread[];
 <summary><code>create</code></summary>
 
 ```ts generated
-create: (threadId: string, messageId: string, anchor: CommentAnchor, body: string, clientMutationId: string) => Promise<CommentMutationResponse>;
+create: (threadId: string, messageId: string, anchor: CommentAnchor, body: string, clientMutationId: string, signal?: AbortSignal) => Promise<CommentMutationResponse>;
 ```
 
 </details>
@@ -68,7 +68,7 @@ destroy: () => void;
 <summary><code>load</code></summary>
 
 ```ts generated
-load: () => Promise<readonly CommentThread[]>;
+load: (signal?: AbortSignal) => Promise<readonly CommentThread[]>;
 ```
 
 </details>
@@ -77,7 +77,7 @@ load: () => Promise<readonly CommentThread[]>;
 <summary><code>mutate</code></summary>
 
 ```ts generated
-mutate: (mutation: CommentMutation, clientMutationId: string) => Promise<CommentMutationResponse>;
+mutate: (mutation: CommentMutation, clientMutationId: string, signal?: AbortSignal) => Promise<CommentMutationResponse>;
 ```
 
 </details>
@@ -95,7 +95,7 @@ on: (listener: CommentListener) => () => void;
 <summary><code>reply</code></summary>
 
 ```ts generated
-reply: (threadId: string, messageId: string, body: string, clientMutationId: string) => Promise<CommentMutationResponse>;
+reply: (threadId: string, messageId: string, body: string, clientMutationId: string, signal?: AbortSignal) => Promise<CommentMutationResponse>;
 ```
 
 </details>
@@ -104,7 +104,7 @@ reply: (threadId: string, messageId: string, body: string, clientMutationId: str
 <summary><code>resolve</code></summary>
 
 ```ts generated
-resolve: (threadId: string, resolved: boolean, clientMutationId: string) => Promise<CommentMutationResponse>;
+resolve: (threadId: string, resolved: boolean, clientMutationId: string, signal?: AbortSignal) => Promise<CommentMutationResponse>;
 ```
 
 </details>
@@ -134,12 +134,14 @@ class CommentCoordinator {
     anchor: CommentAnchor,
     body: string,
     clientMutationId: string,
+    signal?: AbortSignal,
   ) => Promise<CommentMutationResponse>;
   destroy: () => void;
-  load: () => Promise<readonly CommentThread[]>;
+  load: (signal?: AbortSignal) => Promise<readonly CommentThread[]>;
   mutate: (
     mutation: CommentMutation,
     clientMutationId: string,
+    signal?: AbortSignal,
   ) => Promise<CommentMutationResponse>;
   on: (listener: CommentListener) => () => void;
   reply: (
@@ -147,11 +149,13 @@ class CommentCoordinator {
     messageId: string,
     body: string,
     clientMutationId: string,
+    signal?: AbortSignal,
   ) => Promise<CommentMutationResponse>;
   resolve: (
     threadId: string,
     resolved: boolean,
     clientMutationId: string,
+    signal?: AbortSignal,
   ) => Promise<CommentMutationResponse>;
   serverVersion: number;
 }

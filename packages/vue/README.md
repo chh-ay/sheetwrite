@@ -36,6 +36,17 @@ the exposed `Grid` for mutation IDs, acknowledgements, retry, and remote orderin
 
 WASM initializes on client mount. Supply a `#fallback` slot while loading, observe `@initialization-error`, and use `wasm-source` only for explicit asset control.
 
+## Upgrade checklist for 0.7.0
+
+- Unmount destroys the owned grid and aborts pending summaries, lazy chrome,
+  clipboard work and built-in saves without emitting an error event.
+- Shared WASM initialization continues for other grids; this adapter stops its
+  own initialization subscription.
+- Invalid `height`/`fill` combinations throw `SheetwriteError` with code
+  `invalid-argument` and operation `create-grid`.
+- Host-created sync and collaboration coordinators remain host-owned; destroy
+  them when the view is removed.
+
 ## New in 0.6.0
 
 - Enable the opt-in ribbon with `:config="{ ribbon: true }"`. It loads only when requested. See [Toolbar and ribbon](https://www.sheetwrite.dev/docs/features/grid/toolbar-and-ribbon/).

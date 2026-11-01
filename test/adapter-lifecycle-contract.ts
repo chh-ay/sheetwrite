@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, spyOn } from "bun:test";
 
 import { setXlsxTableExportBackend } from "../packages/core/dist/index.js";
 import type {
@@ -291,6 +291,84 @@ async function runInitializationProbe(
 
 export function runSharedAdapterLifecycleContract(adapter: string, mount: MountAdapter): void {
   describe(`${adapter} shared lifecycle contract`, () => {
+    it("aborts pending summary, clipboard and save work when the framework unmounts", async () => {
+      const clipboardRead = Promise.withResolvers<string>();
+      const savedBytes = Promise.withResolvers<Uint8Array>();
+      const saveStarted = Promise.withResolvers<AbortSignal | undefined>();
+      const originalClipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+      const errors = spyOn(console, "error").mockImplementation(() => undefined);
+      const warnings = spyOn(console, "warn").mockImplementation(() => undefined);
+      const reportedErrors: unknown[] = [];
+      let callbacksAfterUnmount = 0;
+      let isUnmounted = false;
+      const observeCallback = () => {
+        if (isUnmounted) callbacksAfterUnmount += 1;
+      };
+      const workbook = makeConformanceWorkbook();
+      const summaryRows = 100_000;
+      const sheet = workbook.sheets[0];
+      if (!sheet) throw new Error("Conformance workbook needs a sheet");
+      sheet.rowCount = summaryRows;
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: { readText: () => clipboardRead.promise },
+      });
+      setXlsxTableExportBackend({
+        name: "pending-unmount-save",
+        toXlsxTable(_workbook, _store, options) {
+          saveStarted.resolve(options?.signal);
+          return savedBytes.promise;
+        },
+      });
+      let mounted: MountedAdapter | undefined;
+      try {
+        mounted = await mount({
+          workbook,
+          presentation: "data-grid",
+          fallbackLabel: "Loading",
+          onReady: observeCallback,
+          onGridChange: observeCallback,
+          onSelectionChange: observeCallback,
+          onExportError: (event) => reportedErrors.push(event),
+        });
+        const grid = mounted.getPublishedGrid();
+        if (!grid) throw new Error("Adapter did not publish a grid");
+        grid.actions.exportXlsx();
+        const saveSignal = await waitForDelivery(saveStarted.promise, "save start");
+        grid.setSelection({
+          kind: "range",
+          range: {
+            sheet: sheet.id,
+            start: { row: 0, col: 0 },
+            end: { row: summaryRows - 1, col: 0 },
+          },
+        });
+        const summary = grid.summarizeSelection().then(observeCallback, (error: unknown) => error);
+        const paste = grid.actions.paste();
+        grid.actions.find();
+        await mounted.unmount();
+        mounted = undefined;
+        isUnmounted = true;
+        expect(saveSignal?.aborted).toBe(true);
+        clipboardRead.resolve("late clipboard");
+        savedBytes.reject(new Error("late save failure"));
+        expect(await summary).toMatchObject({ name: "AbortError" });
+        expect(await paste).toBe("empty");
+        await nextTask();
+        expect(callbacksAfterUnmount).toBe(0);
+        expect(reportedErrors).toHaveLength(0);
+        expect(errors).toHaveBeenCalledTimes(0);
+        expect(warnings).toHaveBeenCalledTimes(0);
+      } finally {
+        await mounted?.unmount();
+        setXlsxTableExportBackend(null as never);
+        if (originalClipboard) Object.defineProperty(navigator, "clipboard", originalClipboard);
+        else Reflect.deleteProperty(navigator, "clipboard");
+        errors.mockRestore();
+        warnings.mockRestore();
+      }
+    });
+
     it("applies pending committed live options before publishing readiness", async () => {
       expect(await runInitializationProbe(adapter.toLowerCase(), true)).toEqual({
         pendingLiveOptions: true,

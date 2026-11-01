@@ -226,6 +226,49 @@ describe("presence coordinator", () => {
 });
 
 describe("revision coordinator", () => {
+  for (const cancellation of ["destroy", "caller"] as const) {
+    it(`does not construct a late preview after ${cancellation} cancellation`, async () => {
+      const loaded = deferred<WorkbookSnapshot>();
+      const observedSignals: AbortSignal[] = [];
+      const coordinator = new RevisionCoordinator(
+        {
+          async listRevisions() {
+            return [];
+          },
+          loadRevision(_documentId, _version, signal) {
+            if (signal) observedSignals.push(signal);
+            return loaded.promise;
+          },
+          async restoreRevision(request) {
+            return {
+              status: "conflict",
+              currentVersion: 7,
+              clientMutationId: request.clientMutationId,
+            };
+          },
+        },
+        { documentId: "collab-doc", serverVersion: 7 },
+      );
+      const events: unknown[] = [];
+      coordinator.on((event) => events.push(event));
+      const caller = new AbortController();
+      const reason = new Error("Preview cancelled");
+      const host = document.createElement("div");
+      const preview = coordinator.preview(host, 3, {}, caller.signal);
+      if (cancellation === "destroy") coordinator.destroy();
+      else caller.abort(reason);
+      loaded.resolve(snapshot(3));
+      const signal = observedSignals[0];
+      if (!signal) throw new Error("Preview did not pass a signal to the adapter");
+      expect(signal.aborted).toBe(true);
+      await expect(preview).rejects.toBe(signal.reason);
+      expect(host.childElementCount).toBe(0);
+      expect(coordinator.serverVersion).toBe(7);
+      expect(events).toHaveLength(0);
+      coordinator.destroy();
+    });
+  }
+
   it("rejects invalid restored versions without poisoning the current version", async () => {
     const coordinator = new RevisionCoordinator(
       {
@@ -456,14 +499,20 @@ describe("comment coordinator", () => {
       mutateComment: () => mutation.promise,
     };
     const coordinator = new CommentCoordinator(adapter, { documentId: "collab-doc" });
-    const pendingList = coordinator.load();
-    const pendingMutation = coordinator.create(
-      "thread-destroyed",
-      "message-destroyed",
-      { kind: "cell", address: { sheet: "s1", row: 0, col: 0 } },
-      "Destroyed",
-      "comment-destroyed",
-    );
+    const errors: unknown[] = [];
+    coordinator.on((event) => {
+      if (event.type === "error") errors.push(event.error);
+    });
+    const pendingList = coordinator.load().catch((error: unknown) => error);
+    const pendingMutation = coordinator
+      .create(
+        "thread-destroyed",
+        "message-destroyed",
+        { kind: "cell", address: { sheet: "s1", row: 0, col: 0 } },
+        "Destroyed",
+        "comment-destroyed",
+      )
+      .catch((error: unknown) => error);
     coordinator.destroy();
     listing.resolve({ version: 1, threads: [serverThread({ version: 1 })] });
     mutation.resolve({
@@ -473,9 +522,10 @@ describe("comment coordinator", () => {
       thread: serverThread({ id: "thread-destroyed", version: 2 }),
     });
 
-    expect(await pendingList).toEqual([]);
-    expect(await pendingMutation).toMatchObject({ status: "applied", version: 2 });
+    expect(await pendingList).toMatchObject({ name: "AbortError" });
+    expect(await pendingMutation).toMatchObject({ name: "AbortError" });
     expect(coordinator.serverVersion).toBe(0);
     expect(coordinator.commentThreads()).toEqual([]);
+    expect(errors).toHaveLength(0);
   });
 });

@@ -178,7 +178,7 @@ export class PresenceCoordinator {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
-    this.abortController.abort("Sheetwrite presence coordinator destroyed");
+    this.abortController.abort();
     this.disposeSelection();
     this.disposeActiveSheet();
     this.disposeTransport?.();
@@ -315,10 +315,17 @@ export class RevisionCoordinator {
     return () => this.listeners.delete(listener);
   }
 
-  async list(): Promise<readonly RevisionSummary[]> {
+  async list(signal?: AbortSignal): Promise<readonly RevisionSummary[]> {
+    signal = signal
+      ? AbortSignal.any([signal, this.abortController.signal])
+      : this.abortController.signal;
     try {
-      return await this.adapter.listRevisions(this.options.documentId, this.abortController.signal);
+      signal.throwIfAborted();
+      const revisions = await this.adapter.listRevisions(this.options.documentId, signal);
+      signal.throwIfAborted();
+      return revisions;
     } catch (error) {
+      signal.throwIfAborted();
       const failure = normalizeSheetwriteError(error, "revision-failed", "revision", {
         action: "list",
       });
@@ -331,16 +338,19 @@ export class RevisionCoordinator {
     host: HTMLElement,
     version: number,
     options: SnapshotGridOptions = {},
+    signal?: AbortSignal,
   ): Promise<Grid> {
+    signal = signal
+      ? AbortSignal.any([signal, this.abortController.signal])
+      : this.abortController.signal;
     try {
-      const input = await this.adapter.loadRevision(
-        this.options.documentId,
-        version,
-        this.abortController.signal,
-      );
+      signal.throwIfAborted();
+      const input = await this.adapter.loadRevision(this.options.documentId, version, signal);
+      signal.throwIfAborted();
       const snapshot = this.options.migrateSnapshot ? this.options.migrateSnapshot(input) : input;
       return createGridFromSnapshot(host, snapshot, { ...options, readOnly: true });
     } catch (error) {
+      signal.throwIfAborted();
       const failure = normalizeSheetwriteError(error, "revision-failed", "revision", {
         action: "preview",
         version,
@@ -350,15 +360,24 @@ export class RevisionCoordinator {
     }
   }
 
-  async restore(targetVersion: number, clientMutationId: string): Promise<RevisionRestoreResponse> {
+  async restore(
+    targetVersion: number,
+    clientMutationId: string,
+    signal?: AbortSignal,
+  ): Promise<RevisionRestoreResponse> {
+    signal = signal
+      ? AbortSignal.any([signal, this.abortController.signal])
+      : this.abortController.signal;
     try {
+      signal.throwIfAborted();
       const response = await this.adapter.restoreRevision({
         documentId: this.options.documentId,
         targetVersion,
         baseVersion: this.version,
         clientMutationId,
-        signal: this.abortController.signal,
+        signal,
       });
+      signal.throwIfAborted();
       if (response.status === "conflict") {
         validateAdapterVersion(response.currentVersion);
         this.version = Math.max(this.version, response.currentVersion);
@@ -376,6 +395,7 @@ export class RevisionCoordinator {
       }
       return response;
     } catch (error) {
+      signal.throwIfAborted();
       const failure = normalizeSheetwriteError(error, "revision-failed", "revision", {
         action: "restore",
         targetVersion,
@@ -386,7 +406,7 @@ export class RevisionCoordinator {
   }
 
   destroy(): void {
-    this.abortController.abort("Sheetwrite revision coordinator destroyed");
+    this.abortController.abort();
     this.listeners.clear();
   }
 
@@ -534,13 +554,14 @@ export class CommentCoordinator {
     return [...this.threads.values()].map(cloneCommentThread);
   }
 
-  async load(): Promise<readonly CommentThread[]> {
+  async load(signal?: AbortSignal): Promise<readonly CommentThread[]> {
+    signal = signal
+      ? AbortSignal.any([signal, this.abortController.signal])
+      : this.abortController.signal;
     try {
-      const result = await this.adapter.listComments(
-        this.options.documentId,
-        this.abortController.signal,
-      );
-      if (this.destroyed) return this.commentThreads();
+      signal.throwIfAborted();
+      const result = await this.adapter.listComments(this.options.documentId, signal);
+      signal.throwIfAborted();
       validateAdapterVersion(result.version);
       const next = new Map<string, CommentThread>();
       for (const input of result.threads) {
@@ -556,6 +577,7 @@ export class CommentCoordinator {
       this.emit({ type: "loaded", version: this.version, threads });
       return threads;
     } catch (error) {
+      signal.throwIfAborted();
       const failure = normalizeSheetwriteError(error, "comment-failed", "comment", {
         action: "load",
       });
@@ -570,8 +592,13 @@ export class CommentCoordinator {
     anchor: CommentAnchor,
     body: string,
     clientMutationId: string,
+    signal?: AbortSignal,
   ): Promise<CommentMutationResponse> {
-    return this.mutate({ kind: "create", threadId, messageId, anchor, body }, clientMutationId);
+    return this.mutate(
+      { kind: "create", threadId, messageId, anchor, body },
+      clientMutationId,
+      signal,
+    );
   }
 
   reply(
@@ -579,31 +606,38 @@ export class CommentCoordinator {
     messageId: string,
     body: string,
     clientMutationId: string,
+    signal?: AbortSignal,
   ): Promise<CommentMutationResponse> {
-    return this.mutate({ kind: "reply", threadId, messageId, body }, clientMutationId);
+    return this.mutate({ kind: "reply", threadId, messageId, body }, clientMutationId, signal);
   }
 
   resolve(
     threadId: string,
     resolved: boolean,
     clientMutationId: string,
+    signal?: AbortSignal,
   ): Promise<CommentMutationResponse> {
-    return this.mutate({ kind: "resolve", threadId, resolved }, clientMutationId);
+    return this.mutate({ kind: "resolve", threadId, resolved }, clientMutationId, signal);
   }
 
   async mutate(
     mutation: CommentMutation,
     clientMutationId: string,
+    signal?: AbortSignal,
   ): Promise<CommentMutationResponse> {
+    signal = signal
+      ? AbortSignal.any([signal, this.abortController.signal])
+      : this.abortController.signal;
     try {
+      signal.throwIfAborted();
       const response = await this.adapter.mutateComment({
         documentId: this.options.documentId,
         baseVersion: this.version,
         clientMutationId,
         mutation: cloneJsonValue(mutation),
-        signal: this.abortController.signal,
+        signal,
       });
-      if (this.destroyed) return response;
+      signal.throwIfAborted();
       if (response.status === "conflict") {
         validateAdapterVersion(response.currentVersion);
         this.version = Math.max(this.version, response.currentVersion);
@@ -631,6 +665,7 @@ export class CommentCoordinator {
       }
       return response;
     } catch (error) {
+      signal.throwIfAborted();
       const failure = normalizeSheetwriteError(error, "comment-failed", "comment", {
         action: "mutate",
         mutation: mutation.kind,
@@ -643,7 +678,7 @@ export class CommentCoordinator {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
-    this.abortController.abort("Sheetwrite comment coordinator destroyed");
+    this.abortController.abort();
     this.disposeRemote?.();
     this.threads.clear();
     this.listeners.clear();

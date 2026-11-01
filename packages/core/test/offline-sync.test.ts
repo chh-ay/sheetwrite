@@ -171,6 +171,30 @@ function mountGrid(version = 4, rowCount = 2, paged = false) {
 }
 
 describe("durable offline sync", () => {
+  it("does not turn storage cancellation during destroy into a hydration failure", async () => {
+    const loading = Promise.withResolvers<readonly PendingCommit[]>();
+    const started = Promise.withResolvers<AbortSignal | undefined>();
+    const storage = new FakePendingStorage();
+    storage.load = (_documentId, options) => {
+      started.resolve(options.signal);
+      return loading.promise;
+    };
+    const grid = mountGrid();
+    const coordinator = new SyncCoordinator(grid, new ControlledAdapter(snapshot()), {
+      documentId: "doc-1",
+      serverVersion: 4,
+      pendingStorage: storage,
+    });
+    const signal = await started.promise;
+    coordinator.destroy();
+    expect(signal?.aborted).toBe(true);
+    loading.reject(signal?.reason);
+    await coordinator.ready();
+    expect(coordinator.state.connection).toBe("destroyed");
+    expect(coordinator.pendingCount).toBe(0);
+    grid.destroy();
+  });
+
   it("reopens and rebases a compact atomic batch through IndexedDB before acknowledging every version", async () => {
     const indexedDbDescriptor = Object.getOwnPropertyDescriptor(globalThis, "indexedDB");
     const keyRangeDescriptor = Object.getOwnPropertyDescriptor(globalThis, "IDBKeyRange");

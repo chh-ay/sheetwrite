@@ -403,6 +403,7 @@ export class SyncCoordinator {
       ? Promise.resolve()
           .then(() => this.restorePending())
           .catch((error: unknown) => {
+            if (this.destroyed) return;
             const failure = syncStorageFailure(error, { action: "hydrate" });
             this.hydrationError = failure;
             this.hydrating = false;
@@ -469,7 +470,7 @@ export class SyncCoordinator {
     this.connection = next;
     if (!online) {
       for (const controller of this.activeSends.values()) {
-        controller.abort("Sheetwrite sync disconnected");
+        controller.abort();
       }
     }
     this.emitState();
@@ -487,7 +488,7 @@ export class SyncCoordinator {
     const cleanup = () => {
       if (disposed) return;
       disposed = true;
-      controller.abort("Sheetwrite remote subscription disposed");
+      controller.abort();
       disposeSource?.();
       if (this.disposeRemote === cleanup) {
         this.disposeRemote = undefined;
@@ -1015,9 +1016,9 @@ export class SyncCoordinator {
     this.disposeGrid();
     this.disposeRemote?.();
     this.disposeRemote = undefined;
-    this.abortController.abort("Sheetwrite sync coordinator destroyed");
+    this.abortController.abort();
     for (const controller of this.activeSends.values()) {
-      controller.abort("Sheetwrite sync coordinator destroyed");
+      controller.abort(this.abortController.signal.reason);
     }
     this.activeSends.clear();
     this.clearGapBuffer();
@@ -1397,6 +1398,7 @@ export class SyncCoordinator {
     }
 
     for (const { record } of prepared) {
+      if (this.destroyed) return;
       if (ambiguousIds.has(record.clientMutationId)) continue;
       const replay = record.versionOperationCounts
         ? markAtomicBatch(record.operations.slice())
