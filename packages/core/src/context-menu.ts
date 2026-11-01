@@ -22,6 +22,7 @@ import { seedWidgetTheme } from "./widget-theme.js";
 function defaultItems(grid: Grid): ContextMenuItem[] {
   const hasNote = (context: ContextMenuContext): boolean =>
     context.cell !== null && grid.getNote(context.cell) !== null;
+
   // The field list edits the pivot, so a grid that cannot edit (read-only) does
   // not offer it. `clearFormat` is the ribbon's stand-in for every edit command.
   const inPivot = (context: ContextMenuContext): boolean =>
@@ -179,52 +180,76 @@ function actionHandler(
   switch (action) {
     case "cut":
       return () => actions.cut();
+
     case "copy":
       return () => actions.copy();
+
     case "paste":
       return () => actions.paste();
+
     case "clearContents":
       return () => actions.clearContents();
+
     case "merge":
       return () => actions.merge();
+
     case "unmerge":
       return () => actions.unmerge();
+
     case "insertRowAbove":
       return () => actions.insertRowAbove();
+
     case "insertRowBelow":
       return () => actions.insertRowBelow();
+
     case "deleteRow":
       return () => actions.deleteRow();
+
     case "hideRow":
       return () => actions.hideRows();
+
     case "showAllRows":
       return () => actions.showRows();
+
     case "autoFitRow":
       return () => actions.autoFitRows();
+
     case "insertColumnLeft":
       return () => actions.insertColumnLeft();
+
     case "insertColumnRight":
       return () => actions.insertColumnRight();
+
     case "deleteColumn":
       return () => actions.deleteColumn();
+
     case "hideColumn":
       return () => actions.hideColumns();
+
     case "showAllColumns":
       return () => actions.showColumns();
+
     case "autoFitColumn":
       return () => actions.autoFitColumns();
+
     case "clearFilter":
       return () => actions.clearFilter();
+
     case "exportCsv":
       return () => actions.exportCsv();
+
     case "exportXlsx":
       return () => actions.exportXlsx();
+
     case "editNote":
       return () => actions.editNote();
+
     case "deleteNote":
       return () => actions.deleteNote();
+
     case "pivotFields":
       return () => actions.showPivotFields();
+
     default:
       return () => {};
   }
@@ -572,6 +597,7 @@ export class ContextMenu {
     const focusAt = (next: number): void => {
       rows[(next + rows.length) % rows.length]?.focus({ preventScroll: true });
     };
+
     const backToParent = (): void => {
       const parentRow = this.submenus[level - 1]?.parentRow;
       this.closeSubmenusFrom(level - 1);
@@ -582,37 +608,48 @@ export class ContextMenu {
       case "ArrowDown":
         focusAt(index + 1);
         break;
+
       case "ArrowUp":
         focusAt(index < 0 ? -1 : index - 1);
         break;
+
       case "Home":
         focusAt(0);
         break;
+
       case "End":
         focusAt(-1);
         break;
+
       case "Enter":
       case " ":
         if (active instanceof HTMLElement && rows.includes(active)) active.click();
         break;
+
       case "ArrowRight":
         if (active instanceof HTMLElement && active.getAttribute("aria-haspopup") === "menu") {
           active.click();
         }
+
         break;
+
       case "ArrowLeft":
         if (level > 0) backToParent();
         break;
+
       case "Escape":
         if (level > 0) backToParent();
         else this.close();
         break;
+
       case "Tab":
         this.close();
         break;
+
       default:
         return;
     }
+
     // The grid under the menu must not also move its selection.
     event.preventDefault();
     event.stopPropagation();

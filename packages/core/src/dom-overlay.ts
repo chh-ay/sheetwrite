@@ -284,8 +284,10 @@ export class DomOverlay {
     view: VisibleWindowView,
     pane: { x: number; y: number; w: number; h: number; scrollTop: number; scrollLeft: number },
   ): void {
-    const layout = this.layout!;
-    const theme = this.theme!;
+    const { layout, theme } = this;
+    // beginFrame already refused a frame without both.
+    if (layout === null || theme === null) return;
+
     const nCols = view.cols.length;
     const nRows = view.rows.end - view.rows.start;
     const styleStride = view.styles.length || 1;
@@ -297,7 +299,7 @@ export class DomOverlay {
         const col = view.cols[colOffset]!;
         const merge = this.mergeMap.get(row * MERGE_KEY_STRIDE + col);
         if (merge && (merge.r0 !== row || merge.c0 !== col)) {
-          this.retainCoveredMerge(view, merge, pane, theme);
+          this.retainCoveredMerge(view, merge, pane, layout, theme);
           continue;
         }
 
@@ -318,7 +320,7 @@ export class DomOverlay {
         const style =
           !hasFreshStyle && entry
             ? entry.context.style
-            : this.effectiveStyle(styleCache, col, styleId, styleStride, sourceStyle);
+            : this.effectiveStyle(layout, styleCache, col, styleId, styleStride, sourceStyle);
         const value = view.values[index] ?? null;
         const rowEnd = merge?.r1 ?? row;
         const colEnd = merge?.c1 ?? col;
@@ -353,9 +355,10 @@ export class DomOverlay {
     currentView: VisibleWindowView,
     merge: MergeRect,
     pane: { x: number; y: number; w: number; h: number; scrollTop: number; scrollLeft: number },
+    layout: RenderLayout,
     theme: Theme,
   ): void {
-    const rendererName = this.layout!.columns[merge.c0]?.renderer;
+    const rendererName = layout.columns[merge.c0]?.renderer;
     const renderer = rendererName === undefined ? undefined : this.renderers.get(rendererName);
     if (renderer?.dom === undefined || rendererName === undefined) return;
     const key = `${currentView.sheet}\u0000${merge.r0}\u0000${merge.c0}\u0000${this.rendererId(renderer)}`;
@@ -375,6 +378,7 @@ export class DomOverlay {
       !hasFreshStyle && entry
         ? entry.context.style
         : this.effectiveStyle(
+            layout,
             this.styleCacheFor(anchorView.styles),
             merge.c0,
             styleId,
@@ -408,13 +412,14 @@ export class DomOverlay {
   }
 
   private effectiveStyle(
+    layout: RenderLayout,
     cache: Map<number, CellStyle>,
     col: number,
     styleId: number,
     styleStride: number,
     sourceStyle: CellStyle,
   ): CellStyle {
-    const columnStyle = this.layout!.columns[col]?.cellStyle;
+    const columnStyle = layout.columns[col]?.cellStyle;
     if (columnStyle === undefined) return sourceStyle;
     const key = col * styleStride + styleId;
     let style = cache.get(key);

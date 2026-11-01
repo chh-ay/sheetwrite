@@ -138,14 +138,17 @@ export function fontFor(
   ) {
     return theme.font;
   }
+
   const size = style.fontSize === undefined ? undefined : style.fontSize * zoom;
   const key = `${style.italic ? 1 : 0}:${style.bold ? 1 : 0}:${size ?? ""}:${style.fontFamily ?? ""}`;
   const cached = cache?.get(key);
   if (cached !== undefined) return cached;
+
   const sized = size === undefined ? theme.font : theme.font.replace(FONT_PX_RE, `${size}px`);
   const base = style.fontFamily === undefined ? sized : withFontFamily(sized, style.fontFamily);
   const sizeMatch = FONT_PX_RE.exec(base);
   if (!sizeMatch || sizeMatch.index === undefined) return base;
+
   const prefix = base.slice(0, sizeMatch.index).trim().split(/\s+/).filter(Boolean);
   const themeWeight = prefix.find(
     (token) => FONT_WEIGHT_TOKEN_RE.test(token) && token !== "normal",
@@ -163,6 +166,7 @@ export function fontFor(
         FONT_ANGLE_TOKEN_RE.test(token)
       ),
   );
+
   const font = [
     ...(style.italic ? ["italic"] : themeStyle ? [themeStyle] : []),
     ...retainedPrefix,
@@ -523,6 +527,7 @@ export function paintFrame(
     hashWidth: 0,
     fontCache: new Map(),
   };
+
   const styleCache = new Map<number, CellStyle>();
   const styleStride = view.styles.length || 1;
   const merges = layout.merges;
@@ -537,6 +542,7 @@ export function paintFrame(
     minimumVisibleColumn = Math.min(minimumVisibleColumn, view.cols[index]!);
     maximumVisibleColumn = Math.max(maximumVisibleColumn, view.cols[index]!);
   }
+
   const mergeMap =
     visibleMerges === undefined
       ? undefined
@@ -549,11 +555,13 @@ export function paintFrame(
     ctx.rect(pane.x, pane.y, pane.w, pane.h);
     ctx.clip();
   }
+
   if (damage) {
     ctx.beginPath();
     ctx.rect(damage.x, damage.y, damage.w, damage.h);
     ctx.clip();
   }
+
   ctx.textBaseline = "middle";
   applyFont(ctx, state, theme.font);
 
@@ -613,6 +621,7 @@ export function paintFrame(
             break;
           spillX = colX[view.cols[k]!]! - scrollLeft + g;
         }
+
         for (let k = cj + 1; k < nCols; k++) {
           const adjacent = view.cols[k - 1]! + 1 === view.cols[k]!;
           const neighbour = view.values[ri * nCols + k];
@@ -621,6 +630,7 @@ export function paintFrame(
           spillRight = colX[view.cols[k]! + 1]! - scrollLeft + g;
         }
       }
+
       paintCell(
         ctx,
         theme,
@@ -668,14 +678,17 @@ export function paintFrame(
           ctx.moveTo(cursorX, lineY);
           ctx.lineTo(gapStart, lineY);
         }
+
         cursorX = Math.max(cursorX, gapEnd);
       }
     }
+
     if (cursorX < width) {
       ctx.moveTo(cursorX, lineY);
       ctx.lineTo(width, lineY);
     }
   }
+
   ctx.stroke();
   ctx.restore();
   state.lastFont = theme.font;
@@ -709,9 +722,11 @@ export function paintFrame(
           ctx.moveTo(lineX, cursorY);
           ctx.lineTo(lineX, gapStart);
         }
+
         cursorY = Math.max(cursorY, gapEnd);
       }
     }
+
     if (cursorY < height) {
       ctx.moveTo(lineX, cursorY);
       ctx.lineTo(lineX, height);
@@ -722,10 +737,12 @@ export function paintFrame(
     const c = view.cols[cj]!;
     appendVerticalGridline(c, Math.round(colX[c]! - scrollLeft + g) - 0.5);
   }
+
   if (nCols > 0) {
     const c = view.cols[nCols - 1]! + 1;
     appendVerticalGridline(c, Math.round(colX[c]! - scrollLeft + g) - 0.5);
   }
+
   ctx.stroke();
 
   paintHeader(ctx, theme, layout, colX, view.cols, width, scrollLeft, g, state);
@@ -737,12 +754,14 @@ export function paintFrame(
     ctx.clip();
     applyFill(ctx, state, theme.headerBg);
     ctx.fillRect(0, 0, g, height);
+
     ctx.strokeStyle = theme.gridLine;
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(g - 0.5, 0);
     ctx.lineTo(g - 0.5, height);
     ctx.stroke();
+
     // Row numbers stay below the column header, like the cell body: a row
     // scrolled half under the header must not paint its number in the corner.
     ctx.beginPath();
@@ -752,6 +771,7 @@ export function paintFrame(
     applyFont(ctx, state, theme.font);
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
+
     for (let ri = 0; ri < nRows; ri++) {
       const row = view.rows.start + ri;
       const bandTop =
@@ -766,8 +786,10 @@ export function paintFrame(
       const cy = bandTop + bandHeight / 2;
       ctx.fillText(String(row + 1), g / 2, cy);
     }
+
     ctx.restore();
   }
+
   ctx.restore();
 }
 
@@ -823,6 +845,7 @@ function paintCell(
     applyFill(ctx, state, effective.backgroundColor);
     ctx.fillRect(x, y, w, h);
   }
+
   paintBorders(ctx, effective, x, y, w, h);
 
   const custom = column?.renderer ? renderers.get(column.renderer) : undefined;
@@ -864,6 +887,7 @@ function paintCell(
       state.digitWidth = ctx.measureText("0").width;
       state.hashWidth = ctx.measureText("#").width || 1;
     }
+
     // Most numeric cells are comfortably wider than their formatted value.
     // Only pay for exact measurement when a cached digit-width estimate says
     // the run is close enough to the edge to plausibly overflow.
@@ -880,9 +904,11 @@ function paintCell(
       : effective.fontSize * (layout.zoom ?? 1);
   const zoom = layout.zoom ?? 1;
   const lineHeight = fontPx * 1.2;
+
   ctx.save();
   if (effective.wrap && !numeric) {
     clipCell(ctx, x, y, w, h);
+
     // The draw loop below never paints a line whose band starts past the cell,
     // and a block taller than the cell is top-anchored either way, so laying
     // out one line past the last drawable one changes no pixel.
@@ -890,6 +916,7 @@ function paintCell(
     const lines = layoutTextLinesInto(ctx, text, availableTextWidth, maxLines, []);
     const blockHeight = lines.length * lineHeight;
     const firstCy = textBlockTop(effective.verticalAlign, y, h, blockHeight, zoom) + lineHeight / 2;
+
     for (let line = 0; line < lines.length; line++) {
       const cy = firstCy + line * lineHeight;
       if (cy - lineHeight / 2 >= y + h) break;
@@ -926,6 +953,7 @@ function paintCell(
       paintTextDecoration(ctx, effective, text, align, x, w, cy, fontPx);
     }
   }
+
   ctx.restore();
 }
 

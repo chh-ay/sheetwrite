@@ -450,13 +450,12 @@ export function createSimpleRowBridge<
   Id extends RowBridgeId = RowBridgeId,
 >(options: SimpleSheetwriteOptions<Row, Id>): RowBridgeInstance<Id> | undefined {
   if (!options.getRowId) return undefined;
-  const bridge = createRowBridge({
+  return createRowBridge<Row, Id>({
     columns: options.columns,
     defaultRows: options.defaultRows,
     getRowId: options.getRowId,
     ...(options.createRowId === undefined ? {} : { createRowId: options.createRowId }),
   });
-  return bridge as unknown as RowBridgeInstance<Id>;
 }
 
 /** Normalized workbook and columnar data produced from simple adapter props. */

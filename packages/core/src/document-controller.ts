@@ -367,6 +367,7 @@ export class DocumentController {
     switch (patch.op) {
       case "set":
         return [this.snapshotCell(patch.addr)];
+
       case "setRange": {
         const engine = storeEngine(this.options.store);
         const width = Math.abs(patch.range.end.col - patch.range.start.col) + 1;
@@ -420,6 +421,7 @@ export class DocumentController {
           },
         ];
       }
+
       case "setBlock":
       case "restoreBlock":
       case "setRangeStyle":
@@ -435,8 +437,10 @@ export class DocumentController {
               },
             ];
       }
+
       case "addRows":
         return [{ op: "removeRows", sheet: patch.sheet, at: patch.at, count: patch.count }];
+
       case "removeRows": {
         const sheet = this.sheetById(patch.sheet);
         const range =
@@ -461,6 +465,7 @@ export class DocumentController {
               ...charts,
             ];
       }
+
       case "moveRows":
         return [
           {
@@ -473,6 +478,7 @@ export class DocumentController {
           // A partly moved source range does not map back exactly.
           ...this.chartRestores(patch.sheet, { includeOwned: true }),
         ];
+
       case "addColumns":
         return [
           {
@@ -482,6 +488,7 @@ export class DocumentController {
             count: patch.columns.length,
           },
         ];
+
       case "removeColumns": {
         const sheet = this.sheetById(patch.sheet);
         const range =
@@ -492,8 +499,10 @@ export class DocumentController {
                 end: { row: sheet.rowCount - 1, col: patch.at + patch.count - 1 },
               }
             : null;
+
         const compact = range ? this.compactHistoryPart(range) : null;
         const charts = this.chartRestores(patch.sheet, { includeOwned: true });
+
         return compact
           ? [
               {
@@ -516,6 +525,7 @@ export class DocumentController {
               ...charts,
             ];
       }
+
       case "moveColumns":
         return [
           {
@@ -528,6 +538,7 @@ export class DocumentController {
           // A partly moved source range does not map back exactly.
           ...this.chartRestores(patch.sheet, { includeOwned: true }),
         ];
+
       case "setColumn": {
         const sheet = this.sheetById(patch.sheet);
         const column = sheet?.columns[patch.col];
@@ -542,6 +553,7 @@ export class DocumentController {
             ]
           : [];
       }
+
       case "setRowMeta": {
         const sheet = this.sheetById(patch.sheet);
         if (!sheet) return [];
@@ -556,15 +568,19 @@ export class DocumentController {
           },
         ];
       }
+
       case "addMerge":
         return [
           { op: "removeMerge", sheet: patch.sheet, merge: patch.merge },
           ...this.snapshotCellsInMerge(patch.sheet, patch.merge),
         ];
+
       case "removeMerge":
         return [{ op: "addMerge", sheet: patch.sheet, merge: patch.merge }];
+
       case "addSheet":
         return [{ op: "removeSheet", sheet: patch.sheet.id }];
+
       case "removeSheet": {
         const snapshot = this.snapshotSheet(patch.sheet);
         if (!snapshot) return [];
@@ -579,12 +595,15 @@ export class DocumentController {
             restore.push({ op: "setNamedRange", namedRange: { ...namedRange } });
           }
         }
+
         return restore;
       }
+
       case "renameSheet": {
         const sheet = this.sheetById(patch.sheet);
         return sheet ? [{ op: "renameSheet", sheet: patch.sheet, name: sheet.name }] : [];
       }
+
       case "moveSheet": {
         const from = this.options.store
           .getWorkbook()
@@ -594,6 +613,7 @@ export class DocumentController {
         // sources again after moving back restores the text exactly.
         return [{ op: "moveSheet", sheet: patch.sheet, to: from }, ...this.snapshotSpanFormulas()];
       }
+
       case "setSheetVisibility": {
         const sheet = this.sheetById(patch.sheet);
         return sheet
@@ -606,6 +626,7 @@ export class DocumentController {
             ]
           : [];
       }
+
       case "addTable":
         return [
           {
@@ -614,6 +635,7 @@ export class DocumentController {
             tableId: patch.table.id,
           },
         ];
+
       case "updateTable": {
         const table = this.sheetById(patch.sheet)?.tables?.find(
           (candidate) => candidate.id === patch.tableId,
@@ -628,15 +650,19 @@ export class DocumentController {
         if (patch.patch.style !== undefined) {
           previous.style = table.style ? structuredClone(table.style) : null;
         }
+
         if (patch.patch.autoFilter !== undefined) {
           previous.autoFilter = structuredClone(table.autoFilter ?? null);
         }
+
         if (patch.patch.sortState !== undefined) {
           previous.sortState = structuredClone(table.sortState ?? null);
         }
+
         if (patch.patch.unsupportedFeatures !== undefined) {
           previous.unsupportedFeatures = structuredClone(table.unsupportedFeatures ?? []);
         }
+
         return [
           {
             op: "updateTable",
@@ -646,15 +672,18 @@ export class DocumentController {
           },
         ];
       }
+
       case "removeTable": {
         const table = this.sheetById(patch.sheet)?.tables?.find(
           (candidate) => candidate.id === patch.tableId,
         );
         return table ? [{ op: "addTable", table: structuredClone(table) }] : [];
       }
+
       case "setSheetMeta": {
         const sheet = this.sheetById(patch.sheet);
         if (!sheet) return [];
+
         return [
           {
             op: "setSheetMeta",
@@ -684,6 +713,7 @@ export class DocumentController {
           },
         ];
       }
+
       case "setHyperlink": {
         const previous = this.sheetById(patch.sheet)?.hyperlinks?.find(
           (hyperlink) => hyperlink.id === patch.hyperlink.id,
@@ -692,6 +722,7 @@ export class DocumentController {
           ? [{ op: "setHyperlink", sheet: patch.sheet, hyperlink: cloneCellHyperlink(previous) }]
           : [{ op: "removeHyperlink", sheet: patch.sheet, id: patch.hyperlink.id }];
       }
+
       case "removeHyperlink": {
         const previous = this.sheetById(patch.sheet)?.hyperlinks?.find(
           (hyperlink) => hyperlink.id === patch.id,
@@ -700,6 +731,7 @@ export class DocumentController {
           ? [{ op: "setHyperlink", sheet: patch.sheet, hyperlink: cloneCellHyperlink(previous) }]
           : [];
       }
+
       case "setChart": {
         const previous = this.sheetById(patch.sheet)?.charts?.find(
           (chart) => chart.id === patch.chart.id,
@@ -708,6 +740,7 @@ export class DocumentController {
           ? [{ op: "setChart", sheet: patch.sheet, chart: cloneChartDefinition(previous) }]
           : [{ op: "removeChart", sheet: patch.sheet, id: patch.chart.id }];
       }
+
       case "removeChart": {
         const previous = this.sheetById(patch.sheet)?.charts?.find(
           (chart) => chart.id === patch.id,
@@ -716,6 +749,7 @@ export class DocumentController {
           ? [{ op: "setChart", sheet: patch.sheet, chart: cloneChartDefinition(previous) }]
           : [];
       }
+
       case "setValidationRule": {
         const previous = this.sheetById(patch.sheet)?.validationRules?.find(
           (rule) => rule.id === patch.rule.id,
@@ -724,6 +758,7 @@ export class DocumentController {
           ? [{ op: "setValidationRule", sheet: patch.sheet, rule: structuredClone(previous) }]
           : [{ op: "removeValidationRule", sheet: patch.sheet, id: patch.rule.id }];
       }
+
       case "removeValidationRule": {
         const previous = this.sheetById(patch.sheet)?.validationRules?.find(
           (rule) => rule.id === patch.id,
@@ -732,6 +767,7 @@ export class DocumentController {
           ? [{ op: "setValidationRule", sheet: patch.sheet, rule: structuredClone(previous) }]
           : [];
       }
+
       case "setProtectedRange": {
         const previous = this.sheetById(patch.sheet)?.protectedRanges?.find(
           (range) => range.id === patch.protectedRange.id,
@@ -746,6 +782,7 @@ export class DocumentController {
             ]
           : [{ op: "removeProtectedRange", sheet: patch.sheet, id: patch.protectedRange.id }];
       }
+
       case "removeProtectedRange": {
         const previous = this.sheetById(patch.sheet)?.protectedRanges?.find(
           (range) => range.id === patch.id,
@@ -760,6 +797,7 @@ export class DocumentController {
             ]
           : [];
       }
+
       case "setNote": {
         const previous = this.sheetById(patch.addr.sheet)?.notes?.find(
           (note) => note.addr.row === patch.addr.row && note.addr.col === patch.addr.col,
@@ -772,6 +810,7 @@ export class DocumentController {
           },
         ];
       }
+
       case "setNamedRange": {
         const previous = this.options.store
           .getWorkbook()
@@ -790,6 +829,7 @@ export class DocumentController {
               },
             ];
       }
+
       case "removeNamedRange": {
         const previous = this.options.store
           .getWorkbook()
@@ -800,12 +840,14 @@ export class DocumentController {
           );
         return previous ? [{ op: "setNamedRange", namedRange: { ...previous } }] : [];
       }
+
       case "setCalculation": {
         // Absent settings are the defaults, which undo must restore explicitly.
         const previous =
           this.options.store.getWorkbook().calculation ?? DEFAULT_CALCULATION_SETTINGS;
         return [{ op: "setCalculation", calculation: { ...previous } }];
       }
+
       case "setPivot": {
         const sheet = this.sheetById(patch.sheet);
         // A sheet created in this batch is removed by the addSheet inverse,
@@ -816,6 +858,7 @@ export class DocumentController {
           ? [{ op: "setPivot", sheet: patch.sheet, pivot: clonePivot(previous) }]
           : [{ op: "removePivot", sheet: patch.sheet, id: patch.pivot.id }];
       }
+
       case "removePivot": {
         const previous = this.sheetById(patch.sheet)?.pivots?.find(
           (pivot) => pivot.id === patch.id,
@@ -1094,6 +1137,7 @@ export class DocumentController {
         },
       ]);
     }
+
     return {
       id: sheet.id,
       name: sheet.name,
@@ -1296,9 +1340,11 @@ export class DocumentController {
               message: "History restore exceeds the transaction resource limits",
             },
           };
+
     if (resources.ok) {
       return { patches, admitted: admitTransactionResources(patches, limits, resources) };
     }
+
     if (resources.issue.kind !== "resource-limit") return { patches };
     if (resources.issue.resource === "encoded-bytes" && this.compactRestoreMayFit(patches)) {
       const compact = patches.map((patch) => {
@@ -1319,6 +1365,7 @@ export class DocumentController {
           return patch;
         }
       });
+
       const compactResources = validateTransactionResources(compact, limits);
       if (compactResources.ok) {
         return {
@@ -1327,6 +1374,7 @@ export class DocumentController {
         };
       }
     }
+
     const split = splitOversizedBlocks(patches, limits);
     if (!split) return { patches };
     const batch = markAtomicBatch(split.operations);

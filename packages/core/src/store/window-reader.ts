@@ -302,17 +302,20 @@ export class StoreWindowReader {
           if (!Number.isSafeInteger(word) || word < 0 || word > 0xffff_ffff) {
             throw new Error("Sheetwrite: invalid persisted formula source");
           }
+
           for (let byte = 0; byte < 4; byte++) {
             const byteIndex = wordIndex * 4 + byte;
             if (byteIndex < bytes.length) bytes[byteIndex] = (word >>> (byte * 8)) & 0xff;
           }
         }
+
         formulaOffsets.push(offset);
         formulaSources.push(UTF8_DECODER.decode(bytes));
       } else if (sourceKind === 2) {
         if (sourceLength !== 3 || cursor + 3 > packed.length) {
           throw new Error("Sheetwrite: invalid persisted reference source");
         }
+
         const targetSheet = packed[cursor++]!;
         const targetRow = packed[cursor++]!;
         const targetCol = packed[cursor++]!;
@@ -326,12 +329,14 @@ export class StoreWindowReader {
         ) {
           throw new Error("Sheetwrite: invalid persisted reference target");
         }
+
         referenceOffsets.push(offset);
         referenceTargets.push(targetSheet, targetRow, targetCol);
       } else if (sourceKind !== 0 || sourceLength !== 0) {
         throw new Error("Sheetwrite: invalid persisted source kind");
       }
     }
+
     this.syncStringPoolEpoch(stringPoolEpoch);
     if (stringIds.length > 0) {
       const texts = this.wasm.poolStrings(Uint32Array.from(stringIds));
@@ -621,10 +626,12 @@ export class StoreWindowReader {
       if (decoded.nCols !== cols.length || decoded.nRows !== rows) {
         throw new Error("Sheetwrite: invalid packed window shape");
       }
+
       strings = decoded.localStringCount === 0 ? [] : view.takeStrings();
       if (strings.length !== decoded.localStringCount) {
         throw new Error("Sheetwrite: invalid packed window strings");
       }
+
       for (let index = 0; index < decoded.kinds.length; index++) {
         const kind = decoded.kinds[index];
         const local = decoded.stringIndex[index] ?? -1;
@@ -657,6 +664,7 @@ export class StoreWindowReader {
         missingIdSet.add(id);
       }
     }
+
     if (missingIdSet) {
       const missingIds = Uint32Array.from(missingIdSet);
       const resolved = this.wasm.poolStrings(missingIds);
@@ -682,6 +690,7 @@ export class StoreWindowReader {
         values[index] = null;
       }
     }
+
     return { values, styleIds, styles: this.stylesFrom(styleDict) };
   }
 
@@ -793,6 +802,7 @@ export class StoreWindowReader {
       this.conditionalRuleLargestInputBytes = 0;
       return packable.length > 0 ? CONDITIONAL_HAS_RULES : 0;
     }
+
     this.condRulesSynced.set(sheet, signature);
 
     const kinds = new Uint8Array(packable.length);
@@ -833,8 +843,10 @@ export class StoreWindowReader {
         kinds[i] = CONDITIONAL_FORMULA;
         strs[i] = when.source;
       }
+
       if (rule.stopIfTrue) flags[i] = (flags[i] ?? 0) | CONDITIONAL_STOP_IF_TRUE;
     }
+
     const stringBytes = strs.reduce((bytes, value) => bytes + utf8ByteLength(value), 0);
     this.conditionalRuleInputBytes =
       kinds.byteLength + bounds.byteLength + nums.byteLength + flags.byteLength + stringBytes;
@@ -859,10 +871,13 @@ export class StoreWindowReader {
   ): void {
     const hyperlinks = this.sheetMeta(sheet).hyperlinks ?? [];
     if (hyperlinks.length === 0 || cols.length === 0 || rows.end <= rows.start) return;
+
     const colPositions = new Map<number, number>();
     for (let index = 0; index < cols.length; index++) colPositions.set(cols[index]!, index);
+
     const mergedIds = new Map<string, number>();
     const rowCount = Math.min(rows.end - rows.start, Math.floor(styleIds.length / cols.length));
+
     for (const hyperlink of hyperlinks) {
       if (hyperlink.range.sheet !== sheet) continue;
       const r0 = Math.min(hyperlink.range.start.row, hyperlink.range.end.row);
@@ -870,6 +885,7 @@ export class StoreWindowReader {
       const c0 = Math.min(hyperlink.range.start.col, hyperlink.range.end.col);
       const c1 = Math.max(hyperlink.range.start.col, hyperlink.range.end.col);
       const styleKey = JSON.stringify(hyperlink.style);
+
       for (let rowIndex = 0; rowIndex < rowCount; rowIndex++) {
         const dataRow = order?.[rows.start + rowIndex] ?? rows.start + rowIndex;
         if (dataRow < r0 || dataRow > r1) continue;
@@ -888,8 +904,10 @@ export class StoreWindowReader {
               ...styles[base],
               ...hyperlink.style,
             });
+
             mergedIds.set(key, merged);
           }
+
           styleIds[offset] = merged;
         }
       }

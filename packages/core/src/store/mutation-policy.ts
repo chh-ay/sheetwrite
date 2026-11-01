@@ -59,6 +59,7 @@ export class StoreMutationPolicy {
         pivots = [...(this.sheet(sheet)?.pivots ?? [])];
         pivotsBySheet.set(sheet, pivots);
       }
+
       return pivots;
     };
 
@@ -70,8 +71,10 @@ export class StoreMutationPolicy {
         ];
         rulesBySheet.set(sheet, rules);
       }
+
       return rules;
     };
+
     const protectionsFor = (sheet: SheetId): ProtectedRange[] => {
       let ranges = protectionsBySheet.get(sheet);
       if (!ranges) {
@@ -80,8 +83,10 @@ export class StoreMutationPolicy {
         ];
         protectionsBySheet.set(sheet, ranges);
       }
+
       return ranges;
     };
+
     const outputsBySheet = new Map<SheetId, ReadonlyArray<{ id: string; range: Range }>>();
     const pivotOutputsFor = (sheet: SheetId): ReadonlyArray<{ id: string; range: Range }> => {
       let outputs = outputsBySheet.get(sheet);
@@ -89,6 +94,7 @@ export class StoreMutationPolicy {
         outputs = this.pivotOutputs(sheet);
         outputsBySheet.set(sheet, outputs);
       }
+
       return outputs;
     };
 
@@ -116,6 +122,7 @@ export class StoreMutationPolicy {
           ),
         );
       }
+
       warnings.push(...patchIssues.filter((issue) => issue.severity === "warning"));
       const errors = patchIssues.filter((issue) => issue.severity === "error");
       if (errors.length > 0) {
@@ -124,6 +131,7 @@ export class StoreMutationPolicy {
       }
 
       allowed.push(patch);
+
       if (patch.op === "setValidationRule") {
         const rules = rulesFor(patch.sheet);
         const index = rules.findIndex((rule) => rule.id === patch.rule.id);
@@ -223,6 +231,7 @@ export class StoreMutationPolicy {
       ) {
         continue;
       }
+
       seen.add(protectedRange.id);
       let allowed = false;
       try {
@@ -235,6 +244,7 @@ export class StoreMutationPolicy {
       } catch {
         allowed = false;
       }
+
       if (!allowed) {
         issues.push({
           kind: "protection",
@@ -248,6 +258,7 @@ export class StoreMutationPolicy {
         });
       }
     }
+
     return issues;
   }
 
@@ -256,12 +267,14 @@ export class StoreMutationPolicy {
       case "set":
       case "setNote":
         return [cellRange(patch.addr)];
+
       case "setRange":
       case "setBlock":
       case "restoreBlock":
       case "setRangeStyle":
       case "clearRange":
         return [normalizedRange(patch.range)];
+
       case "addMerge":
       case "removeMerge":
         return [
@@ -271,16 +284,20 @@ export class StoreMutationPolicy {
             end: { row: patch.merge.r1, col: patch.merge.c1 },
           },
         ];
+
       case "setHyperlink":
         return [normalizedRange(patch.hyperlink.range)];
+
       case "removeHyperlink": {
         const hyperlink = this.sheet(patch.sheet)?.hyperlinks?.find(
           (candidate) => candidate.id === patch.id,
         );
         return hyperlink ? [normalizedRange(hyperlink.range)] : [];
       }
+
       case "setValidationRule":
         return [normalizedRange(patch.rule.range)];
+
       case "setColumn": {
         const sheet = this.sheet(patch.sheet);
         if (!sheet || sheet.rowCount === 0 || sheet.columns.length === 0) return [];
@@ -292,6 +309,7 @@ export class StoreMutationPolicy {
           },
         ];
       }
+
       case "setRowMeta": {
         const sheet = this.sheet(patch.sheet);
         if (!sheet || sheet.rowCount === 0 || sheet.columns.length === 0) return [];
@@ -303,6 +321,7 @@ export class StoreMutationPolicy {
           },
         ];
       }
+
       case "addRows":
       case "removeRows":
       case "moveRows":
@@ -317,6 +336,7 @@ export class StoreMutationPolicy {
         if (!sheet || sheet.rowCount === 0 || sheet.columns.length === 0) return [];
         return [fullSheetRange(sheet)];
       }
+
       case "addSheet":
       case "addTable":
       case "updateTable":
@@ -334,6 +354,7 @@ export class StoreMutationPolicy {
       case "setChart":
       case "removeChart":
         return [];
+
       default: {
         const unclassified: never = patch;
         return unclassified;
@@ -362,6 +383,7 @@ export class StoreMutationPolicy {
         ) {
           continue;
         }
+
         issues.push({
           kind: "validation",
           severity: rule.policy === "warn" ? "warning" : "error",
@@ -372,6 +394,7 @@ export class StoreMutationPolicy {
           message: rule.helpText ?? validationMessage(rule),
         });
       }
+
       return issues;
     }
 
@@ -385,11 +408,13 @@ export class StoreMutationPolicy {
         if (cell.rowOffset > maxRowOffset) maxRowOffset = cell.rowOffset;
         if (cell.colOffset > maxColOffset) maxColOffset = cell.colOffset;
       }
+
       const written: Range = {
         sheet: range.sheet,
         start: range.start,
         end: { row: range.end.row + maxRowOffset, col: range.end.col + maxColOffset },
       };
+
       // A rule can only produce an issue for a cell inside its own range, so
       // rules that miss the written area are dropped before the cell loop.
       const candidates = rules.filter(
@@ -403,10 +428,12 @@ export class StoreMutationPolicy {
           row: range.start.row + cell.rowOffset,
           col: range.start.col + cell.colOffset,
         };
+
         for (const rule of candidates) {
           if (!rangeContains(rule.range, addr) || validationAccepts(rule, cell.value.value)) {
             continue;
           }
+
           issues.push({
             kind: "validation",
             severity: rule.policy === "warn" ? "warning" : "error",
@@ -418,6 +445,7 @@ export class StoreMutationPolicy {
           });
         }
       }
+
       return issues;
     }
 
@@ -432,11 +460,13 @@ export class StoreMutationPolicy {
         ) {
           continue;
         }
+
         const addr = {
           sheet: range.sheet,
           row: Math.max(range.start.row, ruleRange.start.row),
           col: Math.max(range.start.col, ruleRange.start.col),
         };
+
         issues.push({
           kind: "validation",
           severity: rule.policy === "warn" ? "warning" : "error",
@@ -447,13 +477,14 @@ export class StoreMutationPolicy {
           message: rule.helpText ?? validationMessage(rule),
         });
       }
+
       return issues;
     }
 
     if (patch.op !== "setBlock" && patch.op !== "restoreBlock") return issues;
-    const prepared = patch.op === "restoreBlock" ? restoreBlockFacts(patch) : undefined;
-    const range = prepared?.range ?? normalizedRange(patch.range);
-    const block = prepared?.block ?? (patch as Extract<DocumentOp, { op: "setBlock" }>).block;
+    const { block, range: sourceRange } =
+      patch.op === "restoreBlock" ? restoreBlockFacts(patch) : patch;
+    const range = patch.op === "restoreBlock" ? sourceRange : normalizedRange(sourceRange);
     const formulaOffsets = new Set((block.formulas ?? []).map(([offset]) => offset));
     const refOffsets = new Set((block.refs ?? []).map(([offset]) => offset));
     for (const rule of rules) {
@@ -485,6 +516,7 @@ export class StoreMutationPolicy {
         }
       }
     }
+
     return issues;
   }
 }

@@ -188,6 +188,7 @@ function presenceColor(value: string, resolver?: CanvasRenderingContext2D | null
       blue: Number.parseInt(expanded.slice(4, 6), 16),
     };
   }
+
   const rgb = /^rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$/i.exec(input);
   if (rgb) {
     const red = Math.min(255, Number(rgb[1]));
@@ -195,6 +196,7 @@ function presenceColor(value: string, resolver?: CanvasRenderingContext2D | null
     const blue = Math.min(255, Number(rgb[3]));
     return { css: `rgb(${red}, ${green}, ${blue})`, red, green, blue };
   }
+
   if (resolver && input) {
     const sentinel = "#010203";
     resolver.fillStyle = sentinel;
@@ -205,6 +207,7 @@ function presenceColor(value: string, resolver?: CanvasRenderingContext2D | null
       return { ...parsed, css: input };
     }
   }
+
   return { css: input || "#475569", red: 71, green: 85, blue: 105 };
 }
 
@@ -786,6 +789,7 @@ export class OverlayPainter {
       for (let rangeIndex = 0; rangeIndex < rangeCount; rangeIndex++) {
         const range = presence.ranges[rangeIndex]!;
         if (range.sheet !== activeSheet) continue;
+
         const dataR0 = Math.max(0, Math.min(maxRow, Math.min(range.start.row, range.end.row)));
         const dataR1 = Math.max(0, Math.min(maxRow, Math.max(range.start.row, range.end.row)));
         const viewR0 = this.deps.toViewRow(dataR0);
@@ -793,6 +797,7 @@ export class OverlayPainter {
         if (viewR0 === null || viewR1 === null) continue;
         const c0 = Math.max(0, Math.min(maxCol, Math.min(range.start.col, range.end.col)));
         const c1 = Math.max(0, Math.min(maxCol, Math.max(range.start.col, range.end.col)));
+
         const before = this.cursor;
         this.appendClampedRange(
           Math.min(viewR0, viewR1),
@@ -808,6 +813,7 @@ export class OverlayPainter {
           clientW,
           clientH,
         );
+
         for (let index = before; index < this.cursor; index++) {
           const rect = this.pool[index]!;
           rect.dataset.sheetwritePresence = presence.actorId;
@@ -815,6 +821,7 @@ export class OverlayPainter {
           rect.setAttribute("aria-hidden", "true");
           rect.style.outlineWidth = "2px";
         }
+
         const firstVisibleSegment = this.pool[before];
         if (!labelPainted && firstVisibleSegment) {
           labelPainted = this.paintPresenceLabel(
@@ -863,12 +870,14 @@ export class OverlayPainter {
         );
         return true;
       }
+
       for (let candidateLeft = minLeft; candidateLeft <= maxLabelLeft; candidateLeft += 4) {
         if (
           !this.reservePresenceLabel(candidateLeft, labelTop, labelWidth, PRESENCE_LABEL_HEIGHT)
         ) {
           continue;
         }
+
         this.acquirePresenceLabel(
           presence,
           theme,
@@ -909,6 +918,7 @@ export class OverlayPainter {
       ) {
         continue;
       }
+
       this.acquirePresenceLabel(
         presence,
         theme,
@@ -939,6 +949,7 @@ export class OverlayPainter {
       ) {
         continue;
       }
+
       this.acquirePresenceLabel(
         presence,
         theme,
@@ -950,6 +961,7 @@ export class OverlayPainter {
       );
       return true;
     }
+
     return false;
   }
 

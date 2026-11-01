@@ -143,31 +143,38 @@ function validateSourceShape(value: unknown, path: string, issues: PivotIssueSin
     issue(issues, path, "Pivot source must be an object");
     return;
   }
+
   const flag = ownValue(value, "invalid");
   if (flag !== undefined && flag !== true) {
     issue(issues, `${path}.invalid`, "invalid must be true when present");
   }
+
   const range = ownValue(value, "range");
   const table = ownValue(value, "table");
   if ((range === undefined) === (table === undefined)) {
     issue(issues, path, "Pivot source needs exactly one of range or table");
     return;
   }
+
   if (table !== undefined) {
     if (typeof table !== "string" || table.length === 0) {
       issue(issues, `${path}.table`, "table must be a non-empty table ID");
     }
+
     return;
   }
+
   const rangePath = `${path}.range`;
   if (!isPlainRecord(range)) {
     issue(issues, rangePath, "range must be an object");
     return;
   }
+
   const sheet = ownValue(range, "sheet");
   if (typeof sheet !== "string" || sheet.length === 0) {
     issue(issues, `${rangePath}.sheet`, "sheet must be a non-empty string");
   }
+
   const corners: { row: number; col: number }[] = [];
   for (const end of ["start", "end"]) {
     const corner = ownValue(range, end);
@@ -177,8 +184,10 @@ function validateSourceShape(value: unknown, path: string, issues: PivotIssueSin
       issue(issues, `${rangePath}.${end}`, `${end} must hold non-negative integer row and col`);
       return;
     }
+
     corners.push({ row, col });
   }
+
   const [start, finish] = corners;
   // The first range row is the header row, so the rectangle must be canonical.
   if (start && finish && (start.row > finish.row || start.col > finish.col)) {
@@ -397,6 +406,7 @@ export function validatePivotReferences(
   ) {
     issue(issues, `${path}.anchor`, "Pivot anchor lies outside its sheet", "out-of-bounds");
   }
+
   const saved = pivot.savedOutput;
   if (
     saved &&
@@ -410,6 +420,7 @@ export function validatePivotReferences(
       "out-of-bounds",
     );
   }
+
   if (pivot.source.invalid) return;
 
   let width: number;
@@ -425,10 +436,12 @@ export function validatePivotReferences(
       );
       return;
     }
+
     if (range.end.row >= size.rows || range.end.col >= size.cols) {
       issue(issues, `${path}.source.range`, "Pivot source lies outside its sheet", "out-of-bounds");
       return;
     }
+
     width = range.end.col - range.start.col + 1;
   } else {
     const tableWidth = scope.tableWidth(pivot.source.table);
@@ -441,6 +454,7 @@ export function validatePivotReferences(
       );
       return;
     }
+
     width = tableWidth;
   }
 
@@ -620,6 +634,7 @@ export function planPivotEdit(
     case "moveColumns":
       if (!hasPivots(sheets)) return null;
       break;
+
     default:
       return null;
   }
@@ -634,6 +649,7 @@ export function planPivotEdit(
       tableColumns: NO_TABLE_COLUMNS,
     };
   }
+
   if (operation.op === "removeTable") {
     return { removedTables: new Set([operation.tableId]), tableColumns: NO_TABLE_COLUMNS };
   }
@@ -648,6 +664,7 @@ export function planPivotEdit(
         (row) => (row >= operation.at ? row + operation.count : row),
         0,
       );
+
     case "removeRows": {
       const { at, count } = operation;
       return axisPlan(
@@ -657,6 +674,7 @@ export function planPivotEdit(
         Math.max(0, Math.min(at, sheet.rowCount - count - 1)),
       );
     }
+
     case "moveRows":
       return axisPlan(
         sheet,
@@ -665,10 +683,12 @@ export function planPivotEdit(
         0,
         movedSpan(operation.from, operation.count, operation.to),
       );
+
     case "addColumns": {
       const count = operation.columns.length;
       return axisPlan(sheet, "col", (col) => (col >= operation.at ? col + count : col), 0);
     }
+
     case "removeColumns": {
       const { at, count } = operation;
       return axisPlan(
@@ -678,6 +698,7 @@ export function planPivotEdit(
         Math.max(0, Math.min(at, sheet.columns.length - count - 1)),
       );
     }
+
     default:
       return axisPlan(
         sheet,
@@ -1103,11 +1124,13 @@ export function encodeSavedPivotPayload(pivots: readonly PivotDefinition[]): Sav
     (total, pivot) => total + (pivot.savedOutput?.cells.length ?? 0),
     0,
   );
+
   const layout = new Uint32Array(saved.length * SAVED_LAYOUT_STRIDE);
   const kinds = new Uint8Array(cellCount);
   const numbers = new Float64Array(cellCount);
   const texts: string[] = [];
   const textLengths: number[] = [];
+
   let cell = 0;
   saved.forEach((pivot, index) => {
     const output = pivot.savedOutput;
@@ -1116,6 +1139,7 @@ export function encodeSavedPivotPayload(pivots: readonly PivotDefinition[]): Sav
       [pivot.anchor.row, pivot.anchor.col, output.rows, output.cols],
       index * SAVED_LAYOUT_STRIDE,
     );
+
     for (const value of output.cells) {
       if (value === null) kinds[cell] = SAVED_BLANK;
       else if (typeof value === "number") {
@@ -1129,9 +1153,11 @@ export function encodeSavedPivotPayload(pivots: readonly PivotDefinition[]): Sav
         kinds[cell] = SAVED_BOOLEAN;
         numbers[cell] = value ? 1 : 0;
       }
+
       cell += 1;
     }
   });
+
   return {
     layout,
     kinds,
