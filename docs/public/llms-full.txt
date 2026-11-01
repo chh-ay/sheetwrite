@@ -5022,7 +5022,7 @@ Errors are values for display and dependency propagation, not `NaN` or blank ren
 
 Coercion follows these documented rules:
 
-- Arithmetic converts numeric text and booleans (`TRUE = 1`, `FALSE = 0`); nonnumeric text returns `#VALUE!`.
+- Arithmetic converts numeric text and booleans (`TRUE = 1`, `FALSE = 0`); nonnumeric text returns `#VALUE!`. Numeric text is what `VALUE` reads: a plain number (`1e3`, `.5`), a date (`2024-01-31`, `1/31/2024`), or a number with `,` group separators and a trailing `%` (`1,234.5%`). Spaces may surround the number but not split it. Date arguments read the same text, and `NUMBERVALUE` takes its own separators and ignores spaces.
 - Direct scalar boolean/text arguments may be coerced by numeric functions. Text/booleans reached through a range are ignored by numeric aggregates, matching common spreadsheet behavior.
 - Empty scalar arithmetic behaves as zero. Empty range cells are skipped.
 - Comparisons are case-insensitive for text and use spreadsheet type ordering.
@@ -5760,7 +5760,7 @@ grid.store.applyTransaction({
 
 ## Criteria semantics and shapes
 
-Criteria strings may begin with `=`, `<>`, `<`, `<=`, `>`, or `>=`. Numeric and boolean operands are parsed before text comparison. Plain text comparisons are case-insensitive. `*` matches zero or more characters, `?` matches one character, and `~` escapes the next wildcard. Wildcards apply to equality/inequality text criteria. Criteria are parsed once per formula evaluation, not once per cell.
+Criteria strings may begin with `=`, `<>`, `<`, `<=`, `>`, or `>=`. Plain numeric and boolean operands (`5`, `1e3`, `TRUE`) are parsed before text comparison; other text, such as `1,000`, compares as text. Plain text comparisons are case-insensitive. `*` matches zero or more characters, `?` matches one character, and `~` escapes the next `*`, `?` or `~`. Wildcards apply to equality/inequality text criteria. Criteria, `XLOOKUP` and `XMATCH` match mode 2, and `SEARCH` use the same wildcard rule: case folds one character at a time, so `?` matches `İ` and `CAFÉ` matches `café`. Criteria are parsed once per formula evaluation, not once per cell.
 
 Shapes are exact row-by-column dimensions; equal cell counts with different dimensions do not match:
 

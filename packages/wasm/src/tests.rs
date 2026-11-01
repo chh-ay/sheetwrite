@@ -731,6 +731,64 @@ fn criteria_wildcards_approximate_lookup_and_empty_logic_follow_spreadsheet_sema
     }
 }
 
+/// Number text and wildcards each have one rule, so every function that reads
+/// them answers alike: arithmetic and SUM read text the way VALUE does, and
+/// criteria, wildcard lookups and SEARCH match patterns the same way.
+#[test]
+fn number_text_and_wildcards_read_the_same_in_every_function() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(24, 2);
+    store.set_string(sheet, 1, 0, "İ", 0);
+    store.set_string(sheet, 1, 1, "café", 0);
+    store.set_string(sheet, 1, 2, "inf", 0);
+    let cases: [(&str, Result<f64, &str>); 18] = [
+        // A group separator, a percent and a date read alike everywhere.
+        ("=VALUE(\"1,000\")", Ok(1000.0)),
+        ("=\"1,000\"+0", Ok(1000.0)),
+        ("=SUM(\"1,000\",1)", Ok(1001.0)),
+        ("=VALUE(\"50%\")*2", Ok(1.0)),
+        ("=\"50%\"*2", Ok(1.0)),
+        ("=VALUE(\"2024-01-31\")", Ok(45322.0)),
+        ("=\"2024-01-31\"+0", Ok(45322.0)),
+        // A space inside a number is text, as in Excel's VALUE.
+        ("=VALUE(\"1 234\")", Err("#VALUE!")),
+        ("=\"1 234\"+0", Err("#VALUE!")),
+        // `inf` is text to Excel, not an infinite number.
+        ("=\"inf\"+0", Err("#VALUE!")),
+        ("=DAY(\"inf\")", Err("#VALUE!")),
+        ("=COUNTIF(C2,\"inf\")", Ok(1.0)),
+        // `?` is one character as written, and case folds per character.
+        ("=SEARCH(\"?\",A2)", Ok(1.0)),
+        ("=COUNTIF(A2,\"?\")", Ok(1.0)),
+        ("=XMATCH(\"?\",A2:A2,2)", Ok(1.0)),
+        ("=SEARCH(\"CAFÉ\",B2)", Ok(1.0)),
+        ("=COUNTIF(B2,\"CAF?\")", Ok(1.0)),
+        ("=XMATCH(\"CAFÉ\",B2:B2,2)", Ok(1.0)),
+    ];
+    for (col, (formula, _)) in cases.iter().enumerate() {
+        store.set_formula(sheet, 0, col, formula, 0);
+    }
+    store.recompute(sheet);
+
+    for (col, (formula, expected)) in cases.iter().enumerate() {
+        match expected {
+            Ok(value) => {
+                let actual = number(&store, sheet, 0, col);
+                assert!(
+                    (actual - value).abs() < 1e-9,
+                    "{formula} expected {value}, got {actual} ({:?})",
+                    string(&store, sheet, 0, col)
+                );
+            }
+            Err(error) => assert_eq!(
+                string(&store, sheet, 0, col).as_deref(),
+                Some(*error),
+                "{formula}"
+            ),
+        }
+    }
+}
+
 #[test]
 fn named_ranges_resolve_scope_rebase_delete_cycle_and_preserve_unknown_sources() {
     let mut store = CellStore::new();

@@ -30,6 +30,7 @@ mod subtotal;
 mod subtotal_tests;
 mod text;
 mod value;
+mod wildcard;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;

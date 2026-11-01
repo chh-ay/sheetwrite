@@ -6,7 +6,7 @@ use crate::types::{FormulaError, Value};
 
 use super::super::criteria::Criterion;
 use super::super::matrix::EvalMatrix;
-use super::super::value::compare_text_case_insensitive;
+use super::super::value::{compare_text_case_insensitive, plain_number};
 use super::super::{EvalPass, EvalResult};
 
 pub(crate) const NAMES: &[&str] = &[
@@ -111,7 +111,7 @@ fn database_criterion(value: &Value) -> Criterion {
         // Unlike COUNTIF, plain database text criteria are prefixes.
         if !raw.starts_with(['=', '<', '>'])
             && !raw.contains(['*', '?', '~'])
-            && raw.parse::<f64>().is_err()
+            && plain_number(raw).is_none()
             && !raw.eq_ignore_ascii_case("TRUE")
             && !raw.eq_ignore_ascii_case("FALSE")
         {
