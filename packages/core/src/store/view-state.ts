@@ -5,6 +5,7 @@ import type { ColumnFilter, RowGroup, SortKey, Workbook } from "../types/documen
 import type { ResourceOwnerBytes } from "../types/store.js";
 import { EngineHiddenRows } from "./engine-hidden-rows.js";
 import type { RecomputingCellStore } from "./wasm-contract.js";
+import { KIND_NUMBER, KIND_STRING, KIND_BOOL } from "./wire-tags.js";
 
 const EMPTY_U32 = new Uint32Array(0);
 const EMPTY_FILTERS: ReadonlyMap<number, ColumnFilter> = new Map();
@@ -288,9 +289,9 @@ export class StoreViewState {
     let textAt = 0;
 
     for (let i = 0; i < kinds.length; i++) {
-      if (kinds[i] === 1) out[i] = numbers[numberAt++] ?? null;
-      else if (kinds[i] === 2) out[i] = texts[textAt++] ?? null;
-      else if (kinds[i] === 3) out[i] = (numbers[numberAt++] ?? 0) !== 0;
+      if (kinds[i] === KIND_NUMBER) out[i] = numbers[numberAt++] ?? null;
+      else if (kinds[i] === KIND_STRING) out[i] = texts[textAt++] ?? null;
+      else if (kinds[i] === KIND_BOOL) out[i] = (numbers[numberAt++] ?? 0) !== 0;
       else out[i] = null;
     }
 

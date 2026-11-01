@@ -7,7 +7,24 @@ import type { SheetId } from "../types/coordinates.js";
 import type { Workbook } from "../types/document.js";
 import type { ResourceOwnerBytes, VisibleWindowView } from "../types/store.js";
 import type { RecomputingCellStore } from "./wasm-contract.js";
-import { KIND_BOOL, KIND_EMPTY, KIND_NUMBER, KIND_STRING, NO_STRING } from "./wire-tags.js";
+import {
+  KIND_BOOL,
+  KIND_EMPTY,
+  KIND_NUMBER,
+  KIND_STRING,
+  NO_STRING,
+  CONDITIONAL_GREATER_THAN,
+  CONDITIONAL_LESS_THAN,
+  CONDITIONAL_EQUAL_NUMBER,
+  CONDITIONAL_EQUAL_STRING,
+  CONDITIONAL_EQUAL_EMPTY,
+  CONDITIONAL_CONTAINS,
+  CONDITIONAL_FORMULA,
+  CONDITIONAL_MATCH_CASE,
+  CONDITIONAL_STOP_IF_TRUE,
+  CONDITIONAL_HAS_RULES,
+  CONDITIONAL_RULES_UPDATED,
+} from "./wire-tags.js";
 
 const EMPTY_COND_MATCHES = new Uint32Array(0);
 const EMPTY_PIN_COLUMNS = new Uint32Array(0);
@@ -387,9 +404,9 @@ export class StoreWindowReader {
     }
 
     const conditionalSync = applyConditionalRules ? this.syncConditionalRules(sheet, handle) : 0;
-    const hasCondRules = (conditionalSync & 1) !== 0;
+    const hasCondRules = (conditionalSync & CONDITIONAL_HAS_RULES) !== 0;
 
-    if ((conditionalSync & 2) !== 0) {
+    if ((conditionalSync & CONDITIONAL_RULES_UPDATED) !== 0) {
       ffiCalls += 1;
       ffiInputBytes += this.conditionalRuleInputBytes;
       ffiLargestTransferBytes = Math.max(
@@ -774,7 +791,7 @@ export class StoreWindowReader {
     if (this.condRulesSynced.get(sheet) === signature) {
       this.conditionalRuleInputBytes = 0;
       this.conditionalRuleLargestInputBytes = 0;
-      return packable.length > 0 ? 1 : 0;
+      return packable.length > 0 ? CONDITIONAL_HAS_RULES : 0;
     }
     this.condRulesSynced.set(sheet, signature);
 
@@ -793,30 +810,30 @@ export class StoreWindowReader {
 
       const when = rule.when;
       if (when.kind === "greaterThan") {
-        kinds[i] = 0;
+        kinds[i] = CONDITIONAL_GREATER_THAN;
         nums[i] = when.value;
       } else if (when.kind === "lessThan") {
-        kinds[i] = 1;
+        kinds[i] = CONDITIONAL_LESS_THAN;
         nums[i] = when.value;
       } else if (when.kind === "equal") {
         if (typeof when.value === "number") {
-          kinds[i] = 2;
+          kinds[i] = CONDITIONAL_EQUAL_NUMBER;
           nums[i] = when.value;
         } else if (typeof when.value === "string") {
-          kinds[i] = 3;
+          kinds[i] = CONDITIONAL_EQUAL_STRING;
           strs[i] = when.value;
         } else {
-          kinds[i] = 4;
+          kinds[i] = CONDITIONAL_EQUAL_EMPTY;
         }
       } else if (when.kind === "contains") {
-        kinds[i] = 5;
+        kinds[i] = CONDITIONAL_CONTAINS;
         strs[i] = when.text;
-        flags[i] = when.matchCase ? 1 : 0;
+        flags[i] = when.matchCase ? CONDITIONAL_MATCH_CASE : 0;
       } else {
-        kinds[i] = 6;
+        kinds[i] = CONDITIONAL_FORMULA;
         strs[i] = when.source;
       }
-      if (rule.stopIfTrue) flags[i] = (flags[i] ?? 0) | 2;
+      if (rule.stopIfTrue) flags[i] = (flags[i] ?? 0) | CONDITIONAL_STOP_IF_TRUE;
     }
     const stringBytes = strs.reduce((bytes, value) => bytes + utf8ByteLength(value), 0);
     this.conditionalRuleInputBytes =
@@ -829,7 +846,7 @@ export class StoreWindowReader {
       stringBytes,
     );
     this.wasm.setConditionalRules(handle, kinds, bounds, nums, strs, flags);
-    return (packable.length > 0 ? 1 : 0) | 2;
+    return (packable.length > 0 ? CONDITIONAL_HAS_RULES : 0) | CONDITIONAL_RULES_UPDATED;
   }
 
   private mergeHyperlinkStyles(

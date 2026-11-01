@@ -1,3 +1,4 @@
+import { sheetNameKey } from "./name-key.js";
 import type { SheetNameIssueCode, SheetNameValidationResult } from "./types/document.js";
 
 function hasForbiddenSheetNameCharacter(name: string): boolean {
@@ -6,11 +7,6 @@ function hasForbiddenSheetNameCharacter(name: string): boolean {
     if (code <= 0x1f || "\\/*?:[]".includes(name[index]!)) return true;
   }
   return false;
-}
-
-/** NFC and locale-independent Unicode lowercase key used for worksheet-name identity. */
-export function sheetNameKey(name: string): string {
-  return name.normalize("NFC").toLowerCase();
 }
 
 /** Validate and canonicalize a SpreadsheetML worksheet name. */

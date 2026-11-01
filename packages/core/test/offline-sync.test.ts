@@ -171,6 +171,30 @@ function mountGrid(version = 4, rowCount = 2, paged = false) {
 }
 
 describe("durable offline sync", () => {
+  it("does not turn storage cancellation during destroy into a hydration failure", async () => {
+    const loading = Promise.withResolvers<readonly PendingCommit[]>();
+    const started = Promise.withResolvers<AbortSignal | undefined>();
+    const storage = new FakePendingStorage();
+    storage.load = (_documentId, options) => {
+      started.resolve(options.signal);
+      return loading.promise;
+    };
+    const grid = mountGrid();
+    const coordinator = new SyncCoordinator(grid, new ControlledAdapter(snapshot()), {
+      documentId: "doc-1",
+      serverVersion: 4,
+      pendingStorage: storage,
+    });
+    const signal = await started.promise;
+    coordinator.destroy();
+    expect(signal?.aborted).toBe(true);
+    loading.reject(signal?.reason);
+    await coordinator.ready();
+    expect(coordinator.state.connection).toBe("destroyed");
+    expect(coordinator.pendingCount).toBe(0);
+    grid.destroy();
+  });
+
   it("reopens and rebases a compact atomic batch through IndexedDB before acknowledging every version", async () => {
     const indexedDbDescriptor = Object.getOwnPropertyDescriptor(globalThis, "indexedDB");
     const keyRangeDescriptor = Object.getOwnPropertyDescriptor(globalThis, "IDBKeyRange");
@@ -377,10 +401,17 @@ describe("durable offline sync", () => {
           });
         }),
     );
-    const sending = coordinator.sendNext();
-    expect(adapter.requests[0]?.signal?.aborted).toBe(false);
+    const errorEvents: unknown[] = [];
+    coordinator.on((event) => {
+      if (event.type === "error") errorEvents.push(event.error);
+    });
+    const sending = coordinator.sendNext().catch((error: unknown) => error);
+    const signal = adapter.requests[0]?.signal;
+    expect(signal?.aborted).toBe(false);
     coordinator.setOnline(false);
-    await expect(sending).rejects.toThrow("disconnected");
+    expect(await sending).toBe(signal?.reason);
+    expect(signal?.reason).toMatchObject({ name: "AbortError" });
+    expect(errorEvents).toHaveLength(0);
     expect(coordinator.pendingCommits()[0]).toMatchObject({
       clientMutationId: "disconnect-m1",
       status: "pending",

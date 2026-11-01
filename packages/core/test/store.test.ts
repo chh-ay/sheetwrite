@@ -31,6 +31,45 @@ beforeAll(async () => {
 });
 
 describe("SheetwriteStore", () => {
+  it("returns transaction outcomes from synchronous view and row mutators", () => {
+    const store = new SheetwriteStore(makeWorkbook(4), makeColumnarData(4));
+    try {
+      const mutations = [
+        () => store.sortBy("s1", 1, false),
+        () => store.sortByMulti("s1", [{ col: 1, ascending: true }]),
+        () => store.setColumnFilter("s1", 0, { kind: "contains", text: "Customer" }),
+        () => store.filterBy("s1", 0, "Customer 0"),
+        () => store.hideRows("s1", [0]),
+        () => store.showRows("s1", [0]),
+        () => store.groupRows("s1", 1, 2),
+        () => store.setGroupCollapsed("s1", 1, true),
+        () => store.ungroupRows("s1", 1, 2),
+        () => store.clearView("s1"),
+      ];
+      for (const mutate of mutations) expect(mutate()).toMatchObject({ status: "applied" });
+      expect(store.clearView("s1")).toMatchObject({ status: "noop", reason: "empty" });
+      expect(store.setColumnFilter("s1", 0, null)).toMatchObject({
+        status: "noop",
+        reason: "empty",
+      });
+      expect(store.hideRows("s1", [-1])).toMatchObject({ status: "noop" });
+    } finally {
+      store.dispose();
+    }
+
+    const bounded = new SheetwriteStore(makeWorkbook(4), undefined, {
+      transactionResourceLimits: { maxOperations: 0 },
+    });
+    try {
+      expect(bounded.sortBy("s1", 0, true)).toMatchObject({ status: "rejected" });
+      expect(bounded.hideRows("s1", [0])).toMatchObject({ status: "rejected" });
+      expect(bounded.getWorkbook().sheets[0]?.sortKeys ?? []).toEqual([]);
+      expect(bounded.hiddenRows("s1")).toEqual([]);
+    } finally {
+      bounded.dispose();
+    }
+  });
+
   it("refreshes cached window text and restores history after committed string collection", () => {
     const store = new SheetwriteStore(makeWorkbook(3));
     const range = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } };

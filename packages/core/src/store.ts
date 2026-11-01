@@ -13,6 +13,7 @@ import {
 } from "./document-protocol.js";
 import { engineFailedError, engineGeneration, isEngineTrap, stopEngine } from "./engine.js";
 import { SheetwriteError, unknownSheetError } from "./errors.js";
+import { DEFAULT_DISTINCT_VALUES_LIMIT } from "./grid-constants.js";
 import { clonePivots, pivotOwner, withoutSavedOutput } from "./pivot.js";
 import type {
   RuntimeMemoryObservation,
@@ -460,13 +461,13 @@ export class SheetwriteStore implements Store {
     return this.engine.aggregate(sheet, col, op);
   }
 
-  sortBy(sheet: SheetId, col: number, ascending: boolean): void {
-    this.sortByMulti(sheet, [{ col, ascending }]);
+  sortBy(sheet: SheetId, col: number, ascending: boolean): ApplyTransactionResult {
+    return this.sortByMulti(sheet, [{ col, ascending }]);
   }
 
-  sortByMulti(sheet: SheetId, keys: readonly SortKey[]): void {
+  sortByMulti(sheet: SheetId, keys: readonly SortKey[]): ApplyTransactionResult {
     if (keys.length > 0) this.requireCompleteQuery(sheet);
-    void this.applyTransaction(
+    return this.applyTransaction(
       {
         patches: [
           {
@@ -480,15 +481,19 @@ export class SheetwriteStore implements Store {
     );
   }
 
-  setColumnFilter(sheet: SheetId, col: number, filter: ColumnFilter | null): void {
+  setColumnFilter(
+    sheet: SheetId,
+    col: number,
+    filter: ColumnFilter | null,
+  ): ApplyTransactionResult {
     if (filter !== null) this.requireCompleteQuery(sheet);
     const filters = new Map(this.sheetMeta(sheet).filters ?? []);
     if (filter === null) {
-      if (!filters.delete(col)) return;
+      if (!filters.delete(col)) return { status: "noop", epoch: this.epoch, reason: "empty" };
     } else {
       filters.set(col, JSON.parse(JSON.stringify(filter)));
     }
-    void this.applyTransaction(
+    return this.applyTransaction(
       {
         patches: [{ op: "setSheetMeta", sheet, patch: { filters: [...filters] } }],
       },
@@ -496,19 +501,19 @@ export class SheetwriteStore implements Store {
     );
   }
 
-  filterBy(sheet: SheetId, col: number, needle: string): void {
-    this.setColumnFilter(sheet, col, { kind: "contains", text: needle });
+  filterBy(sheet: SheetId, col: number, needle: string): ApplyTransactionResult {
+    return this.setColumnFilter(sheet, col, { kind: "contains", text: needle });
   }
 
   columnFilters(sheet: SheetId): ReadonlyMap<number, ColumnFilter> {
     return this.engine.columnFilters(sheet);
   }
 
-  distinctValues(sheet: SheetId, col: number, limit = 1000): CellScalar[] {
+  distinctValues(sheet: SheetId, col: number, limit = DEFAULT_DISTINCT_VALUES_LIMIT): CellScalar[] {
     return this.engine.distinctValues(sheet, col, limit);
   }
 
-  hideRows(sheet: SheetId, rows: readonly number[]): void {
+  hideRows(sheet: SheetId, rows: readonly number[]): ApplyTransactionResult {
     const meta = this.sheetMeta(sheet);
     const patches: DocumentOp[] = [];
     for (const row of new Set(rows)) {
@@ -520,10 +525,10 @@ export class SheetwriteStore implements Store {
         meta: { height: meta.rowHeights?.get(row), hidden: true },
       });
     }
-    void this.applyTransaction({ patches }, "structure");
+    return this.applyTransaction({ patches }, "structure");
   }
 
-  showRows(sheet: SheetId, rows?: readonly number[]): void {
+  showRows(sheet: SheetId, rows?: readonly number[]): ApplyTransactionResult {
     const meta = this.sheetMeta(sheet);
     const targets = rows ?? [...(meta.hiddenRows ?? [])];
     const patches: DocumentOp[] = [];
@@ -536,32 +541,32 @@ export class SheetwriteStore implements Store {
         meta: { height: meta.rowHeights?.get(row), hidden: false },
       });
     }
-    void this.applyTransaction({ patches }, "structure");
+    return this.applyTransaction({ patches }, "structure");
   }
 
   hiddenRows(sheet: SheetId): number[] {
     return this.engine.hiddenRows(sheet);
   }
 
-  groupRows(sheet: SheetId, start: number, end: number): void {
+  groupRows(sheet: SheetId, start: number, end: number): ApplyTransactionResult {
     const groups = addRowGroup(this.sheetMeta(sheet).rowGroups, start, end);
-    void this.applyTransaction(
+    return this.applyTransaction(
       { patches: [{ op: "setSheetMeta", sheet, patch: { rowGroups: groups } }] },
       "structure",
     );
   }
 
-  ungroupRows(sheet: SheetId, start: number, end: number): void {
+  ungroupRows(sheet: SheetId, start: number, end: number): ApplyTransactionResult {
     const groups = removeRowGroup(this.sheetMeta(sheet).rowGroups, start, end);
-    void this.applyTransaction(
+    return this.applyTransaction(
       { patches: [{ op: "setSheetMeta", sheet, patch: { rowGroups: groups } }] },
       "structure",
     );
   }
 
-  setGroupCollapsed(sheet: SheetId, start: number, collapsed: boolean): void {
+  setGroupCollapsed(sheet: SheetId, start: number, collapsed: boolean): ApplyTransactionResult {
     const groups = collapseRowGroup(this.sheetMeta(sheet).rowGroups, start, collapsed);
-    void this.applyTransaction(
+    return this.applyTransaction(
       { patches: [{ op: "setSheetMeta", sheet, patch: { rowGroups: groups } }] },
       "structure",
     );
@@ -591,10 +596,12 @@ export class SheetwriteStore implements Store {
     return this.engine.searchCellsFlat(sheet, query, opts);
   }
 
-  clearView(sheet: SheetId): void {
+  clearView(sheet: SheetId): ApplyTransactionResult {
     const meta = this.sheetMeta(sheet);
-    if ((meta.sortKeys?.length ?? 0) === 0 && (meta.filters?.length ?? 0) === 0) return;
-    void this.applyTransaction(
+    if ((meta.sortKeys?.length ?? 0) === 0 && (meta.filters?.length ?? 0) === 0) {
+      return { status: "noop", epoch: this.epoch, reason: "empty" };
+    }
+    return this.applyTransaction(
       { patches: [{ op: "setSheetMeta", sheet, patch: { sortKeys: [], filters: [] } }] },
       "structure",
     );
@@ -692,16 +699,17 @@ export class SheetwriteStore implements Store {
         return { status: "noop", epoch: this.epoch, reason: "incomplete-data" };
       }
       const hasListeners = this.listeners.size > 0;
-      const effects = this.engine.applyPatches(
-        effectiveTx.patches,
-        source === "remote" && options.localReplay !== true,
-        hasListeners,
-        this.detailedChangeCapture,
-        admittedResources !== undefined &&
+      const effects = this.engine.applyPatches(effectiveTx.patches, {
+        remoteLoad: source === "remote" && options.localReplay !== true,
+        captureChanges: hasListeners,
+        captureDetailedChanges: this.detailedChangeCapture,
+        trustedHistory:
+          admittedResources !== undefined &&
           resourceResolution.admitted === admittedResources &&
           !this.protectionResolver,
-        source === "remote" || commitReason === "undo" || commitReason === "redo",
-      );
+        replayPivotSources:
+          source === "remote" || commitReason === "undo" || commitReason === "redo",
+      });
       if (effects.appliedPatches.length === 0) {
         return {
           status: "noop",

@@ -24,6 +24,7 @@ import {
   MAX_HYPERLINK_DISPLAY_LENGTH,
   MAX_HYPERLINKS_PER_SHEET,
 } from "./hyperlink.js";
+import { formulaNameKey } from "./name-key.js";
 import {
   clonePivot,
   MAX_PIVOTS_PER_WORKBOOK,
@@ -48,7 +49,6 @@ import {
   DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
   validWorkbookTable,
   validWorkbookTableXmlElement,
-  workbookTableNameKey,
 } from "./workbook-table.js";
 
 /** Current workbook snapshot schema version accepted by Sheetwrite. */
@@ -3384,11 +3384,9 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
   for (let index = 0; index < (validated.workbook.namedRanges?.length ?? 0); index++) {
     const namedRange = validated.workbook.namedRanges![index]!;
     const namedPath = `workbook.namedRanges[${index}]`;
-    const id = `${namedRange.scope ?? ""}\u0000${workbookTableNameKey(namedRange.name)}`;
+    const id = `${namedRange.scope ?? ""}\u0000${formulaNameKey(namedRange.name)}`;
     if (
-      acceptedTables.some(
-        (table) => workbookTableNameKey(table.name) === workbookTableNameKey(namedRange.name),
-      )
+      acceptedTables.some((table) => formulaNameKey(table.name) === formulaNameKey(namedRange.name))
     ) {
       invalid(
         errors,

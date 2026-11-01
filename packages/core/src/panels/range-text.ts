@@ -2,7 +2,7 @@
 // `Sales!B2:D9` / `'Q1 Sales'!B2`. `$` markers are accepted, as in the name box.
 
 import { labelToCol, rangeA1 } from "../a1.js";
-import { sheetNameKey } from "../sheet-name.js";
+import { sheetNameKey } from "../name-key.js";
 import type { Range, SheetId } from "../types/coordinates.js";
 
 /** The sheet facts that parsing needs: the ID, the name and the size. */
