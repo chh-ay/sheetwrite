@@ -9,7 +9,7 @@ use crate::types::{
     KIND_NUMBER, KIND_STRING,
 };
 
-use super::date::{format_date_serial, parse_date_value};
+use super::date::{format_date_serial, parse_date, parse_time_with_date};
 use super::number_format::{format_number, general_text};
 use super::text::{parse_number, InnerSpaces};
 
@@ -58,8 +58,10 @@ pub(super) fn plain_number(text: &str) -> Option<f64> {
 }
 
 /// Excel's rule for reading text as a number: a plain number, a date
-/// (`2024-01-31`, `1/31/2024`), or a number with `,` group separators and
-/// trailing `%` (`1,234.5%`). Spaces may surround the number but not split it.
+/// (`2024-01-31`, `1/31/2024`), a time with or without a date (`13:30`,
+/// `2024-01-31 13:30`), or a number with `,` group separators and trailing
+/// `%` (`1,234.5%`). The date or number must be the whole text, apart from
+/// surrounding spaces: `2024-01-31 notes` and `1 234` are text.
 /// Arithmetic, number arguments, VALUE, and the number fallback of date
 /// arguments all read text with this one rule; NUMBERVALUE takes its own
 /// separators, and formula number literals belong to the parser.
@@ -74,8 +76,11 @@ pub(super) fn number_from_text(text: &str) -> Result<f64, FormulaError> {
     }
 
     let trimmed = text.trim();
-    if let Some(serial) = parse_date_value(trimmed) {
+    if let Some(serial) = parse_date(trimmed) {
         return Ok(serial);
+    }
+    if let Some((date, time)) = parse_time_with_date(trimmed) {
+        return Ok(date.map_or(time, |date| date.floor() + time));
     }
     parse_number(trimmed, '.', Some(','), InnerSpaces::Reject)
 }

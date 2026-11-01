@@ -424,7 +424,8 @@ fn find_search(values: &FuncAccumulator, case_sensitive: bool) -> Value {
 }
 
 /// SEARCH from code point `start`, without case and with wildcards. A search
-/// that takes more than `MAX_SEARCH_STEPS` matching steps fails with `#NUM!`.
+/// that takes more than `MAX_SEARCH_STEPS` matching steps, or whose pattern
+/// cannot be allocated, fails with `#NUM!`.
 fn wildcard_search(haystack: &str, pattern: &str, start: usize) -> Value {
     if haystack.len() > MAX_TEXT_OUTPUT_BYTES || pattern.len() > MAX_TEXT_OUTPUT_BYTES {
         return Value::Error(FormulaError::Num);
@@ -442,7 +443,9 @@ fn wildcard_search(haystack: &str, pattern: &str, start: usize) -> Value {
             Ok(())
         }
     };
-    match Wildcard::parse(pattern).find(haystack, start_byte, &mut charge_step) {
+    let found = Wildcard::parse(pattern)
+        .and_then(|wildcard| wildcard.find(haystack, start_byte, &mut charge_step));
+    match found {
         Ok(Some(offset)) => {
             let position = start + haystack[start_byte..offset].chars().count() + 1;
             Value::number(position as f64)

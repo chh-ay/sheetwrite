@@ -98,14 +98,14 @@ fn compile_criteria(
                     database_column
                 }
             };
-            conditions.push((database_column, database_criterion(value)));
+            conditions.push((database_column, database_criterion(value)?));
         }
         rows.push(conditions);
     }
     Ok(rows)
 }
 
-fn database_criterion(value: &Value) -> Criterion {
+fn database_criterion(value: &Value) -> Result<Criterion, FormulaError> {
     if let Value::Text(text) = value {
         let raw = text.trim();
         // Unlike COUNTIF, plain database text criteria are prefixes.

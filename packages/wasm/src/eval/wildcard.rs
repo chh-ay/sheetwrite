@@ -9,6 +9,8 @@
 
 use std::convert::Infallible;
 
+use crate::types::FormulaError;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Token {
     Literal(char),
@@ -24,8 +26,14 @@ pub(super) struct Wildcard {
 }
 
 impl Wildcard {
-    pub(super) fn parse(pattern: &str) -> Self {
-        let mut tokens = Vec::with_capacity(pattern.len());
+    /// Parses `pattern`, or fails with `#NUM!` when its tokens (four bytes
+    /// per character) cannot be allocated, as for a pattern of millions of
+    /// characters on a nearly full WebAssembly memory.
+    pub(super) fn parse(pattern: &str) -> Result<Self, FormulaError> {
+        let mut tokens = Vec::new();
+        tokens
+            .try_reserve_exact(pattern.chars().count())
+            .map_err(|_| FormulaError::Num)?;
         let mut has_wildcards = false;
         let mut chars = pattern.chars().peekable();
         while let Some(character) = chars.next() {
@@ -52,10 +60,10 @@ impl Wildcard {
                 literal => tokens.push(Token::Literal(literal)),
             }
         }
-        Self {
+        Ok(Self {
             tokens,
             has_wildcards,
-        }
+        })
     }
 
     /// Whether the pattern uses `*`, `?` or a `~` escape. Criteria compare a
@@ -166,11 +174,14 @@ mod tests {
     use super::Wildcard;
 
     fn whole(pattern: &str, text: &str) -> bool {
-        Wildcard::parse(pattern).matches(text)
+        Wildcard::parse(pattern)
+            .expect("small pattern")
+            .matches(text)
     }
 
     fn search(pattern: &str, text: &str) -> Option<usize> {
         Wildcard::parse(pattern)
+            .expect("small pattern")
             .find(text, 0, &mut || Ok::<(), ()>(()))
             .expect("unbounded search")
     }
@@ -207,7 +218,9 @@ mod tests {
         assert_eq!(search("", "abc"), Some(0));
         assert_eq!(search("x", "abc"), None);
         assert_eq!(
-            Wildcard::parse("c").find("abc", 1, &mut || Ok::<(), ()>(())),
+            Wildcard::parse("c")
+                .expect("small pattern")
+                .find("abc", 1, &mut || Ok::<(), ()>(())),
             Ok(Some(2))
         );
     }
@@ -224,7 +237,9 @@ mod tests {
             }
         };
         assert_eq!(
-            Wildcard::parse("*x").find(&"a".repeat(64), 0, &mut budget),
+            Wildcard::parse("*x")
+                .expect("small pattern")
+                .find(&"a".repeat(64), 0, &mut budget),
             Err("budget")
         );
     }

@@ -17,13 +17,15 @@ pub(super) struct Criterion {
 }
 
 impl Criterion {
-    pub(super) fn parse(value: Value) -> Self {
+    /// Parses a criterion, or fails with `#NUM!` when its wildcard pattern
+    /// cannot be allocated.
+    pub(super) fn parse(value: Value) -> Result<Self, FormulaError> {
         let Value::Text(text) = value else {
-            return Self {
+            return Ok(Self {
                 op: CmpOp::Eq,
                 operand: value,
                 wildcard: None,
-            };
+            });
         };
         let raw = text.trim();
         let (op, operand) = if let Some(rest) = raw.strip_prefix("<>") {
@@ -52,15 +54,15 @@ impl Criterion {
             Value::text(operand)
         };
         let wildcard = if matches!(op, CmpOp::Eq | CmpOp::Ne) {
-            Some(Wildcard::parse(operand)).filter(Wildcard::has_wildcards)
+            Some(Wildcard::parse(operand)?).filter(Wildcard::has_wildcards)
         } else {
             None
         };
-        Self {
+        Ok(Self {
             op,
             operand: parsed_operand,
             wildcard,
-        }
+        })
     }
 
     pub(super) fn matches(&self, candidate: &Value) -> bool {
@@ -106,10 +108,10 @@ pub(super) struct WildcardPattern {
 }
 
 impl WildcardPattern {
-    pub(super) fn new(pattern: &str) -> Self {
-        Self {
-            wildcard: Wildcard::parse(pattern),
-        }
+    pub(super) fn new(pattern: &str) -> Result<Self, FormulaError> {
+        Ok(Self {
+            wildcard: Wildcard::parse(pattern)?,
+        })
     }
 
     pub(super) fn matches(&self, candidate: &Value) -> bool {

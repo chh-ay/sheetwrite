@@ -741,7 +741,7 @@ fn number_text_and_wildcards_read_the_same_in_every_function() {
     store.set_string(sheet, 1, 0, "İ", 0);
     store.set_string(sheet, 1, 1, "café", 0);
     store.set_string(sheet, 1, 2, "inf", 0);
-    let cases: [(&str, Result<f64, &str>); 18] = [
+    let cases: [(&str, Result<f64, &str>); 24] = [
         // A group separator, a percent and a date read alike everywhere.
         ("=VALUE(\"1,000\")", Ok(1000.0)),
         ("=\"1,000\"+0", Ok(1000.0)),
@@ -750,6 +750,13 @@ fn number_text_and_wildcards_read_the_same_in_every_function() {
         ("=\"50%\"*2", Ok(1.0)),
         ("=VALUE(\"2024-01-31\")", Ok(45322.0)),
         ("=\"2024-01-31\"+0", Ok(45322.0)),
+        // A date must be the whole text; a time may follow it, or stand alone.
+        ("=\"2024-01-31 notes\"+0", Err("#VALUE!")),
+        ("=VALUE(\"2024-01-31 notes\")", Err("#VALUE!")),
+        ("=DAY(\"2024-01-31 notes\")", Err("#VALUE!")),
+        ("=\"2024-01-31 12:00\"+0", Ok(45322.5)),
+        ("=VALUE(\"2024-01-31T06:00\")", Ok(45322.25)),
+        ("=\"12:00\"*2", Ok(1.0)),
         // A space inside a number is text, as in Excel's VALUE.
         ("=VALUE(\"1 234\")", Err("#VALUE!")),
         ("=\"1 234\"+0", Err("#VALUE!")),
