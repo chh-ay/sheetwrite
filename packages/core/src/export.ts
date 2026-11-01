@@ -11,6 +11,7 @@ import {
 } from "./delimited-text.js";
 import { normalizeSheetwriteError, SheetwriteError } from "./errors.js";
 import { readableBytes, utf8Chunks } from "./export-stream.js";
+import type { Scope } from "./scope.js";
 import { IncompleteDataError, SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
 import { visibleColumns } from "./store/ranges.js";
@@ -277,6 +278,29 @@ export function fromCsv(
  * click throws.
  */
 export function downloadBytes(bytes: Uint8Array | string, filename: string, mime: string): void {
+  startDownload(bytes, filename, mime, (revoke) => setTimeout(revoke, 0));
+}
+
+/**
+ * {@link downloadBytes} for a download that `owner` starts: when `owner`
+ * closes before the deferred revoke, it revokes the object URL at once, so
+ * no URL and no timer outlives it.
+ */
+export function downloadBytesIn(
+  owner: Scope,
+  bytes: Uint8Array | string,
+  filename: string,
+  mime: string,
+): void {
+  startDownload(bytes, filename, mime, (revoke) => owner.disposeAfter(revoke, 0));
+}
+
+function startDownload(
+  bytes: Uint8Array | string,
+  filename: string,
+  mime: string,
+  scheduleRevoke: (revoke: () => void) => void,
+): void {
   if (typeof document === "undefined") {
     throw new Error("Sheetwrite: downloadBytes requires a browser environment");
   }
@@ -300,7 +324,7 @@ export function downloadBytes(bytes: Uint8Array | string, filename: string, mime
       anchor?.remove();
     } finally {
       // A synchronous revoke can race download navigation in some engines.
-      setTimeout(() => URL.revokeObjectURL(url), 0);
+      scheduleRevoke(() => URL.revokeObjectURL(url));
     }
   }
 }

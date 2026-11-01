@@ -8,7 +8,7 @@ description: "toXlsxTableStream function in @sheetwrite/core: Stream table XLSX 
 Stream table XLSX bytes without materializing the finished archive.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/export.ts#L500"><code>packages/core/src/export.ts#L500</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/export.ts#L524"><code>packages/core/src/export.ts#L524</code></a></dd></div>
 </dl>
 
 ## Declaration
