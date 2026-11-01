@@ -619,6 +619,12 @@ export class SyncCoordinator {
     } catch (error) {
       const current = this.queue.get(clientMutationId);
       if (current?.status === "sending") this.queue.setStatus(current, "pending");
+      // An abort (disconnect or destroy) is not a failure: the record stays
+      // pending under its mutation ID, and the caller gets the abort reason.
+      if (controller.signal.aborted) {
+        if (!this.destroyed) this.emitState();
+        throw controller.signal.reason;
+      }
       const failure = syncFailure(error, { action: "send", clientMutationId });
       if (!this.destroyed) {
         this.emitState();

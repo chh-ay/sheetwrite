@@ -50,6 +50,9 @@ Framework users should normally install only `@sheetwrite/react`, `@sheetwrite/v
 
 - Coordinator teardown and sync disconnection pass an `AbortError` reason to
   transport adapters instead of a string. Do not compare cancellation messages.
+- A sync send aborted by `setOnline(false)` or `destroy()` rejects with the
+  signal's `AbortError` reason, not a `sync-failed` error, and emits no `error`
+  event. The commit stays pending under its mutation ID.
 - Revision `list`, `preview`, and `restore`, and comment `load`, `create`, `reply`,
   `resolve`, and `mutate` accept a final optional `AbortSignal`. Cancellation
   rejects with that signal's reason, without emitting a failure event. Destroy

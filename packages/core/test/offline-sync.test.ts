@@ -396,15 +396,22 @@ describe("durable offline sync", () => {
     adapter.responders.push(
       (request) =>
         new Promise<PersistenceCommitResponse>((_resolve, reject) => {
-          request.signal?.addEventListener("abort", () => reject(new Error("disconnected")), {
+          request.signal?.addEventListener("abort", () => reject(request.signal?.reason), {
             once: true,
           });
         }),
     );
-    const sending = coordinator.sendNext();
-    expect(adapter.requests[0]?.signal?.aborted).toBe(false);
+    const errorEvents: unknown[] = [];
+    coordinator.on((event) => {
+      if (event.type === "error") errorEvents.push(event.error);
+    });
+    const sending = coordinator.sendNext().catch((error: unknown) => error);
+    const signal = adapter.requests[0]?.signal;
+    expect(signal?.aborted).toBe(false);
     coordinator.setOnline(false);
-    await expect(sending).rejects.toThrow("disconnected");
+    expect(await sending).toBe(signal?.reason);
+    expect(signal?.reason).toMatchObject({ name: "AbortError" });
+    expect(errorEvents).toHaveLength(0);
     expect(coordinator.pendingCommits()[0]).toMatchObject({
       clientMutationId: "disconnect-m1",
       status: "pending",
