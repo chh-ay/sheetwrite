@@ -396,7 +396,7 @@ describe("durable offline sync", () => {
     adapter.responders.push(
       (request) =>
         new Promise<PersistenceCommitResponse>((_resolve, reject) => {
-          request.signal?.addEventListener("abort", () => reject(request.signal?.reason), {
+          request.signal?.addEventListener("abort", () => reject(new Error("disconnected")), {
             once: true,
           });
         }),

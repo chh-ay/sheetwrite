@@ -32,17 +32,6 @@ import "@sheetwrite/svelte/styles.css";
 
 WASM initializes on client mount. Use `fallback` while loading, `onInitializationError` for failures, and `wasmSource` for an explicit source.
 
-## Upgrade checklist for 0.7.0
-
-- Destroying the component destroys its owned grid and aborts pending summaries,
-  lazy chrome, clipboard work and built-in saves without emitting an error event.
-- Shared WASM initialization continues for other grids; this adapter stops its
-  own initialization subscription.
-- Invalid `height`/`fill` combinations throw `SheetwriteError` with code
-  `invalid-argument` and operation `create-grid`.
-- Host-created sync and collaboration coordinators remain host-owned; destroy
-  them when the view is removed.
-
 ## New in 0.6.0
 
 - Enable the opt-in ribbon with `config={{ ribbon: true }}`. It loads only when requested. See [Toolbar and ribbon](https://www.sheetwrite.dev/docs/features/grid/toolbar-and-ribbon/).

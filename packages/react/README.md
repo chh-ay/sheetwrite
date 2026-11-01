@@ -37,16 +37,6 @@ Use `height={500}` for a fixed host or `fill` to occupy an already-sized ancesto
 
 The component initializes WASM on client mount. `fallback` renders inside the stable host while initialization is pending or after an initialization failure. `onInitializationError(error)` observes failures. `wasmSource` is the advanced explicit-source escape hatch.
 
-## Upgrade checklist for 0.7.0
-
-- Unmount destroys the owned grid and aborts its pending summaries, lazy chrome,
-  clipboard work and built-in saves. Cancellation does not emit an error event.
-  Handle rejected summary promises as cancellation, not as a failed save.
-- The adapter stops its own initialization subscription on unmount. Shared WASM
-  initialization continues for other mounted grids.
-- Host-created sync and collaboration coordinators remain host-owned; destroy
-  them when the view is removed.
-
 ## New in 0.6.0
 
 - Enable the opt-in ribbon with `config={{ ribbon: true }}`. It loads only when requested. See [Toolbar and ribbon](https://www.sheetwrite.dev/docs/features/grid/toolbar-and-ribbon/).
