@@ -373,6 +373,26 @@ it("keeps a menu open for a scroll that leaves its trigger in place", async () =
   expect(menu()).toBeNull();
 });
 
+it("keeps a menu open for a resize event delivered after it was placed", async () => {
+  const { host, control, key } = await setup();
+  const options = control("Borders options");
+  let triggerTop = 500;
+  Object.defineProperty(options, "getBoundingClientRect", {
+    configurable: true,
+    value: () => new DOMRect(40, triggerTop, 28, 24),
+  });
+  key(options, "ArrowDown");
+  const menuSelector = '.sheetwrite-ribbon-popup[aria-label="Borders"]';
+
+  window.dispatchEvent(new Event("resize"));
+  expect(host.querySelector(menuSelector)).not.toBeNull();
+  expect(document.activeElement?.textContent).toBe("Bottom Border");
+
+  triggerTop = 300;
+  window.dispatchEvent(new Event("resize"));
+  expect(host.querySelector(menuSelector)).toBeNull();
+});
+
 it("disables editing controls while read-only but keeps view controls", async () => {
   const { grid, host, select, key, press } = await setup(true);
   select(0, 0);

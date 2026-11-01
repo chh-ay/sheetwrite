@@ -12,3 +12,5 @@
 - An abort is never shown as an error alert.
 
 **Upgrade checklist:** if you call `summarizeSelection()` and can destroy the grid while it runs, handle the `AbortError` rejection as you handle your own signal's abort.
+
+Ribbon and toolbar popups ignore a late resize event when they were placed after the resize. A later change to the viewport or the trigger position still closes them.
