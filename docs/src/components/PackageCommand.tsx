@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import { readPreference, writePreference } from "../lib/preference-storage.js";
 import { ActionError, pendingProps, useAction } from "../lib/use-action.js";
+import { onTabListKey } from "./tabKeys.js";
 
 const MANAGERS = [
   { id: "npm", install: "npm install" },
@@ -9,6 +10,7 @@ const MANAGERS = [
   { id: "yarn", install: "yarn add" },
   { id: "bun", install: "bun add" },
 ] as const;
+const MANAGER_IDS = MANAGERS.map((manager) => manager.id);
 
 type ManagerId = (typeof MANAGERS)[number]["id"];
 
@@ -79,31 +81,9 @@ export function PackageCommand({ packages, note }: Readonly<PackageCommandProps>
               aria-selected={entry.id === manager}
               key={entry.id}
               onClick={() => choose(entry.id)}
-              onKeyDown={(event) => {
-                const index = MANAGERS.findIndex((item) => item.id === entry.id);
-                let nextIndex: number;
-                switch (event.key) {
-                  case "ArrowRight":
-                    nextIndex = (index + 1) % MANAGERS.length;
-                    break;
-                  case "ArrowLeft":
-                    nextIndex = (index + MANAGERS.length - 1) % MANAGERS.length;
-                    break;
-                  case "Home":
-                    nextIndex = 0;
-                    break;
-                  case "End":
-                    nextIndex = MANAGERS.length - 1;
-                    break;
-                  default:
-                    return;
-                }
-                event.preventDefault();
-                const next = MANAGERS[nextIndex]?.id;
-                if (!next) return;
-                choose(next);
-                document.getElementById(`${id}-${next}`)?.focus();
-              }}
+              onKeyDown={(event) =>
+                onTabListKey(event, MANAGER_IDS, entry.id, choose, (next) => `${id}-${next}`)
+              }
               role="tab"
               tabIndex={entry.id === manager ? 0 : -1}
               type="button"

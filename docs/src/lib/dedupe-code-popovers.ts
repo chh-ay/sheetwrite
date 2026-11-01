@@ -7,13 +7,8 @@
  * open panel to `document.body`, so its source position does not matter.
  */
 
-interface HastNode {
-  type: string;
-  tagName?: string;
-  value?: string;
-  properties?: Record<string, unknown>;
-  children?: HastNode[];
-}
+import type { HastNode } from "./build-hast.js";
+import { hashIdentifier } from "./hash-identifier.js";
 
 interface VFileLike {
   path?: string;
@@ -35,15 +30,6 @@ function panelKey(panel: HastNode): string {
   return JSON.stringify(panel, (key, value) =>
     key === "position" || key === "id" ? undefined : value,
   );
-}
-
-function hashIdentifier(value: string): string {
-  let hash = 2_166_136_261;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 16_777_619);
-  }
-  return (hash >>> 0).toString(36);
 }
 
 export function dedupeCodePopovers() {

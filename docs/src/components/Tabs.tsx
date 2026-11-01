@@ -10,7 +10,7 @@ import {
 } from "react";
 
 import { readPreference, writePreference } from "../lib/preference-storage.js";
-import { onTabListKey } from "./landing/tabKeys.js";
+import { onTabListKey } from "./tabKeys.js";
 
 interface TabItemProps {
   label: string;

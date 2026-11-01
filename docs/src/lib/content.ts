@@ -29,14 +29,10 @@ export interface DocumentModule {
 interface DocumentSource {
   component: LazyExoticComponent<DocumentComponent>;
   fallbackTitle: string;
-  href: string;
   load: () => Promise<DocumentModule>;
 }
 
-export interface DocumentRecord extends DocumentFrontmatter {
-  component: LazyExoticComponent<DocumentComponent>;
-  href: string;
-}
+export type DocumentRecord = DocumentFrontmatter;
 
 const sourceModules = import.meta.glob<DocumentModule>("../content/docs/**/*.{md,mdx}");
 
@@ -53,7 +49,7 @@ const DOCUMENT_SOURCES: ReadonlyMap<string, DocumentSource> = new Map(
     const href = hrefFromSource(source);
     const fallbackTitle =
       href.split("/").filter(Boolean).at(-1)?.replaceAll("-", " ") ?? "Sheetwrite";
-    return [href, { component: lazy(load), fallbackTitle, href, load }];
+    return [href, { component: lazy(load), fallbackTitle, load }];
   }),
 );
 
@@ -69,10 +65,8 @@ export async function documentForSplat(
   if (source === undefined) return undefined;
   const module = await source.load();
   return {
-    component: source.component,
     title: module.frontmatter?.title ?? source.fallbackTitle,
     description: module.frontmatter?.description ?? "Sheetwrite documentation.",
-    href: source.href,
   };
 }
 

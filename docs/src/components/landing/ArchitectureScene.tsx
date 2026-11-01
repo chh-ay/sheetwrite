@@ -1,4 +1,4 @@
-import { clamp, count, ease, lerp, span } from "./scene-math.js";
+import { clamp, count, ease, fadeWindow, lerp, span } from "./scene-math.js";
 import { useTimeline } from "./useTimeline.js";
 
 /**
@@ -96,12 +96,6 @@ const COLUMN = { w: 18, gap: 8, h: 58 } as const;
 /* Edits that gather into one transaction: they start on the pasted cells. */
 const EDITS = CELLS.filter((cell) => cell.index % 2 === 0);
 
-/* ---- Timing helpers ---------------------------------------------------------- */
-
-/** Fade in, hold, fade out over [from, to]. */
-const windowed = (t: number, from: number, to: number, fade = 0.2) =>
-  t < from || t > to ? 0 : clamp(Math.min((t - from) / fade, (to - t) / fade));
-
 /* ---- Drawing ----------------------------------------------------------------- */
 
 function query<T extends Element>(root: Element, selector: string): T {
@@ -156,11 +150,11 @@ function createDraw(root: HTMLElement): (t: number) => void {
       cell.dataset.filled = String(paste > at && reset > 0.5);
 
       const inWindow = col < WINDOW_CELLS.cols && row < WINDOW_CELLS.rows;
-      const repaint = inWindow ? windowed(t, 6.3, 7.0, 0.1) : 0;
+      const repaint = inWindow ? fadeWindow(t, 6.3, 7.0, 0.1) : 0;
       cell.dataset.painted = String(repaint > 0.5);
     }
     pasted.textContent = `${count(20_000 * paste * reset)} cells pasted`;
-    opacity(pasted, windowed(t, 0.3, 3.2));
+    opacity(pasted, fadeWindow(t, 0.3, 3.2, 0.2));
 
     // Edits fly from their cells to the lane start and merge into one packet.
     const gather = span(t, 1.6, 2.3);
@@ -181,7 +175,7 @@ function createDraw(root: HTMLElement): (t: number) => void {
       LANE.tx.y,
       0.6 + 0.4 * span(t, 2.2, 2.4),
     );
-    opacity(packets.get("tx"), windowed(t, 2.2, 3.05, 0.1));
+    opacity(packets.get("tx"), fadeWindow(t, 2.2, 3.05, 0.1));
 
     for (const [index, column] of columns.entries()) {
       const k = span(t, 3.0 + index * 0.12, 3.5 + index * 0.12) * reset;
@@ -193,17 +187,17 @@ function createDraw(root: HTMLElement): (t: number) => void {
 
     const back = span(t, 5.3, 6.1);
     move(packets.get("window"), lerp(LANE.window.from, LANE.window.to, back), LANE.window.y);
-    opacity(packets.get("window"), windowed(t, 5.2, 6.15, 0.1));
+    opacity(packets.get("window"), fadeWindow(t, 5.2, 6.15, 0.1));
 
     const change = span(t, 7.3, 8.1);
     move(packets.get("change"), lerp(LANE.change.from, LANE.change.to, change), LANE.change.y);
-    opacity(packets.get("change"), windowed(t, 7.2, 8.15, 0.1));
+    opacity(packets.get("change"), fadeWindow(t, 7.2, 8.15, 0.1));
     opacity(logLines[0], clamp((t - 8.1) / 0.3) * reset);
     opacity(logLines[1], clamp((t - 9.0) / 0.3) * reset);
 
     const save = span(t, 9.1, 9.9);
     move(packets.get("save"), LANE.save.x, lerp(LANE.save.from, LANE.save.to, save));
-    opacity(packets.get("save"), windowed(t, 9.0, 9.95, 0.1));
+    opacity(packets.get("save"), fadeWindow(t, 9.0, 9.95, 0.1));
     const landed = t >= 9.9 && reset > 0.5;
     version.textContent = landed ? "v43" : "v42";
     const pop = landed ? 1 + 0.25 * (1 - span(t, 9.9, 10.3)) : 1;
@@ -221,9 +215,12 @@ function createDraw(root: HTMLElement): (t: number) => void {
     }
 
     // The busy layer glows.
-    opacity(glows.get("grid"), Math.max(windowed(t, 0.2, 2.4, 0.3), windowed(t, 6.1, 7.1, 0.2)));
-    opacity(glows.get("engine"), windowed(t, 3.0, 5.2, 0.3));
-    opacity(glows.get("app"), windowed(t, 8.1, 10.2, 0.3));
+    opacity(
+      glows.get("grid"),
+      Math.max(fadeWindow(t, 0.2, 2.4, 0.3), fadeWindow(t, 6.1, 7.1, 0.2)),
+    );
+    opacity(glows.get("engine"), fadeWindow(t, 3.0, 5.2, 0.3));
+    opacity(glows.get("app"), fadeWindow(t, 8.1, 10.2, 0.3));
   };
 }
 

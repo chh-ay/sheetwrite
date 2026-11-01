@@ -1,7 +1,7 @@
 import { type ComponentType, lazy, Suspense, useState } from "react";
 
+import { onTabListKey } from "../tabKeys.js";
 import VanillaSnippet from "./snippets/vanilla.mdx";
-import { onTabListKey } from "./tabKeys.js";
 
 type SnippetModule = { default: ComponentType };
 

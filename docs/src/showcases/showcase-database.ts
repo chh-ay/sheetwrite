@@ -12,6 +12,8 @@ import {
   type WorkbookSnapshot,
 } from "@sheetwrite/core";
 
+import { deleteDatabase } from "../lib/delete-database.js";
+
 /** Live IndexedDB gauges surfaced by the database showcase. */
 export interface ShowcaseDatabaseStats {
   /** IndexedDB read requests issued (gets and range scans). */
@@ -439,12 +441,7 @@ export class ShowcaseIndexedDbAdapter implements PersistenceAdapter {
 
 /** Removes a showcase database so a demo can restart from its seed. */
 export async function deleteShowcaseDatabase(databaseName: string): Promise<void> {
-  const { promise, resolve, reject } = Promise.withResolvers<void>();
-  const deletion = indexedDB.deleteDatabase(databaseName);
-  deletion.onsuccess = () => resolve();
-  deletion.onerror = () => reject(deletion.error ?? new Error("IndexedDB deletion failed"));
-  deletion.onblocked = () => reject(new Error("IndexedDB deletion was blocked by an open tab"));
-  await promise;
+  await deleteDatabase(databaseName, { error: "reject", blocked: "reject" });
 }
 
 function openDatabase(name: string): Promise<IDBDatabase> {

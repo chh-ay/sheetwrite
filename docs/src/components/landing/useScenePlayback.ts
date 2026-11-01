@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 /**
  * Plays the CSS animations inside a landing illustration only while it is on
@@ -8,18 +8,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * styles are the finished, informative state, so a reduced-motion reader (for
  * whom the stylesheet removes the animations) sees the complete picture.
  * `data-landing-running` reports whether the scene can play its animations.
- * `replay()` remounts the subtree through `epoch`, which restarts every
- * animation from its first frame. `sync()` applies the current decision to
- * animations that mounted later (for example a newly selected story).
+ * `sync()` applies the current decision to animations that mounted later (for
+ * example a newly selected story).
  */
 export function useScenePlayback<T extends HTMLElement>() {
   const ref = useRef<T>(null);
   const applyRef = useRef<() => void>(() => {});
-  const [epoch, setEpoch] = useState(0);
 
   useEffect(() => {
-    // Replay remounts the animated subtree and recreates observers on this root.
-    void epoch;
     const root = ref.current;
     if (!root) return;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -30,7 +26,7 @@ export function useScenePlayback<T extends HTMLElement>() {
       for (const animation of animations) {
         // Pause only running animations. Resume only paused ones. play() on a
         // finished animation starts it again, so a finished entrance would
-        // play again when you scroll back. replay() remounts it through epoch.
+        // play again when you scroll back.
         if (!play && animation.playState === "running") animation.pause();
         else if (play && animation.playState === "paused") animation.play();
       }
@@ -55,8 +51,8 @@ export function useScenePlayback<T extends HTMLElement>() {
       reducedMotion.removeEventListener("change", onPreference);
       applyRef.current = () => {};
     };
-  }, [epoch]);
+  }, []);
 
   const sync = useCallback(() => applyRef.current(), []);
-  return { ref, epoch, sync, replay: () => setEpoch((value) => value + 1) };
+  return { ref, sync };
 }
