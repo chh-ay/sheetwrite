@@ -3,6 +3,7 @@
 // keyboard through the menu button on each field. Each change is ONE
 // `grid.setPivot`, so it is one undo step and the output updates at once.
 
+import { Scope } from "../scope.js";
 import type { CellScalar } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
 import type { Grid, GridPanel } from "../types/grid.js";
@@ -86,6 +87,8 @@ function scalarLabel(value: CellScalar): string {
 function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: string): () => void {
   const read = (): PivotDefinition | null =>
     grid.getPivots(sheet).find((pivot) => pivot.id === id) ?? null;
+  // The panel's lifetime: its grid listener and the document listener of an open menu.
+  const lifetime = new Scope();
 
   let drag: DragState | null = null;
   let message: string | null = null;
@@ -171,12 +174,16 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
       const badge = document.createElement("span");
       badge.className = "sheetwrite-panel-badge";
       badge.textContent = TYPE_BADGES[field.type];
-      const menu = menuButton(`${field.header} field actions`, `field-${field.index}-menu`, () =>
-        PIVOT_AREAS.map(([area, label]) => ({
-          label: `Add to ${label}`,
-          disabled: area !== "values" && areaFields(pivot, area).includes(field.index),
-          run: () => move(pivot, fields, field.index, area, null),
-        })),
+      const menu = menuButton(
+        `${field.header} field actions`,
+        `field-${field.index}-menu`,
+        () =>
+          PIVOT_AREAS.map(([area, label]) => ({
+            label: `Add to ${label}`,
+            disabled: area !== "values" && areaFields(pivot, area).includes(field.index),
+            run: () => move(pivot, fields, field.index, area, null),
+          })),
+        lifetime.signal,
       );
       item.append(name, badge, menu);
       item.addEventListener("dragstart", (event) => {
@@ -216,6 +223,7 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
           move: (field, to, from, at) => move(pivot, fields, field, to, from, at),
           commit,
           distinctValues: (field) => distinctValues(pivot, field),
+          signal: lifetime.signal,
         }),
       );
     }
@@ -235,7 +243,8 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
   };
 
   refresh(true);
-  return grid.on("change", () => refresh());
+  lifetime.add(grid.on("change", () => refresh()));
+  return () => lifetime.close();
 }
 
 function note(text: string, alert = false): HTMLElement {
@@ -253,6 +262,8 @@ interface AreaActions {
   move(field: number, to: PivotArea, from: PivotPlacement | null, at?: number): void;
   commit(next: PivotDefinition, focusKey?: string): void;
   distinctValues(field: number): CellScalar[];
+  /** The panel's signal; an open menu stops listening on the document when it aborts. */
+  signal: AbortSignal;
 }
 
 function areaSection(
@@ -313,7 +324,7 @@ function areaSection(
     ];
     // The area is part of the name: a field can sit in two areas at once.
     const actionsLabel = `${name.textContent} in ${label} actions`;
-    item.appendChild(menuButton(actionsLabel, `${area}-${index}-menu`, menuItems));
+    item.appendChild(menuButton(actionsLabel, `${area}-${index}-menu`, menuItems, actions.signal));
 
     if (area === "values") {
       const select = selectOf(AGGREGATION_LABELS, value?.aggregation ?? "SUM");

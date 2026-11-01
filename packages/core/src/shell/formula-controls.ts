@@ -5,6 +5,7 @@
 
 import { colToA1, labelToCol } from "../a1.js";
 import { FormulaAssist } from "../formula-assist.js";
+import { Scope } from "../scope.js";
 import type { CellInputSnapshot, Grid } from "../types/grid.js";
 import { commitCellInput, selectionFocus } from "./grid-binding.js";
 
@@ -109,21 +110,17 @@ export function createNameBox(
     }
   };
 
-  input.addEventListener("keydown", onKeydown);
-  const unsubscribes = [grid.on("selection", refresh), grid.on("active-sheet", refresh)];
+  const lifetime = new Scope();
+  input.addEventListener("keydown", onKeydown, { signal: lifetime.signal });
+  lifetime.add(grid.on("selection", refresh));
+  lifetime.add(grid.on("active-sheet", refresh));
   refresh();
   host.appendChild(input);
+  lifetime.add(() => input.remove());
 
-  let destroyed = false;
   return {
     element: input,
-    destroy() {
-      if (destroyed) return;
-      destroyed = true;
-      for (const unsubscribe of unsubscribes) unsubscribe();
-      input.removeEventListener("keydown", onKeydown);
-      input.remove();
-    },
+    destroy: () => lifetime.close(),
   };
 }
 
@@ -213,19 +210,20 @@ export function createFormulaBar(
   const onFocus = (): void => assist.attach(input, null);
   const onBlur = (): void => assist.detach();
 
-  input.addEventListener("keydown", onKeydown);
-  input.addEventListener("input", onInput);
-  input.addEventListener("focus", onFocus);
-  input.addEventListener("blur", onBlur);
-  const unsubscribes = [
-    grid.on("selection", refresh),
-    grid.on("change", refresh),
-    grid.on("active-sheet", refresh),
-  ];
+  const lifetime = new Scope();
+  const { signal } = lifetime;
+  input.addEventListener("keydown", onKeydown, { signal });
+  input.addEventListener("input", onInput, { signal });
+  input.addEventListener("focus", onFocus, { signal });
+  input.addEventListener("blur", onBlur, { signal });
+  lifetime.add(grid.on("selection", refresh));
+  lifetime.add(grid.on("change", refresh));
+  lifetime.add(grid.on("active-sheet", refresh));
   refresh();
   host.appendChild(input);
+  lifetime.add(() => input.remove());
+  lifetime.add(() => assist.detach());
 
-  let destroyed = false;
   return {
     element: input,
     setReadOnly(value: boolean) {
@@ -237,16 +235,6 @@ export function createFormulaBar(
         dirty = false;
       }
     },
-    destroy() {
-      if (destroyed) return;
-      destroyed = true;
-      for (const unsubscribe of unsubscribes) unsubscribe();
-      assist.detach();
-      input.removeEventListener("keydown", onKeydown);
-      input.removeEventListener("input", onInput);
-      input.removeEventListener("focus", onFocus);
-      input.removeEventListener("blur", onBlur);
-      input.remove();
-    },
+    destroy: () => lifetime.close(),
   };
 }

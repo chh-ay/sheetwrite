@@ -30,6 +30,9 @@ interface OpenPopup {
   readonly trigger: HTMLElement;
   /** Viewport position of the trigger when the popup was placed. */
   readonly anchor: { readonly left: number; readonly top: number };
+  /** Viewport size used to place and constrain the surface. */
+  readonly viewportWidth: number;
+  readonly viewportHeight: number;
   readonly onClose: (() => void) | undefined;
 }
 
@@ -70,9 +73,8 @@ export class RibbonPopup {
   constructor(private readonly host: HTMLElement) {
     const signal = this.listeners.signal;
     document.addEventListener("pointerdown", this.onOutsidePointer, { capture: true, signal });
-    // A resize, or a scroll that moves a trigger, would leave popups floating
-    // away from their triggers.
-    window.addEventListener("resize", () => this.closeAll(false), { signal });
+    // Ignore delayed events when the popup already uses the current geometry.
+    window.addEventListener("resize", this.onResize, { signal });
     document.addEventListener("scroll", this.onScroll, { capture: true, signal });
   }
 
@@ -105,6 +107,8 @@ export class RibbonPopup {
       surface,
       trigger,
       anchor: { left: anchor.left, top: anchor.top },
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
       onClose: options.onClose,
     });
     this.place(anchor, surface);
@@ -195,6 +199,17 @@ export class RibbonPopup {
   private readonly onScroll = (): void => {
     const moved = this.stack.findIndex(triggerMoved);
     if (moved !== -1) this.closeAbove(moved, false);
+  };
+
+  /** A late resize must not dismiss a popup placed after that resize. */
+  private readonly onResize = (): void => {
+    const changed = this.stack.findIndex(
+      (popup) =>
+        popup.viewportWidth !== window.innerWidth ||
+        popup.viewportHeight !== window.innerHeight ||
+        triggerMoved(popup),
+    );
+    if (changed !== -1) this.closeAbove(changed, false);
   };
 
   private readonly onKeydown = (event: KeyboardEvent): void => {

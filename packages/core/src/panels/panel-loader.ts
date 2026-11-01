@@ -4,6 +4,7 @@
 // chunk on first use: an Insert command, Enter on a chart, or a cell selected
 // in a pivot's output. A grid that never does any of these never fetches it.
 
+import { Scope } from "../scope.js";
 import { storeEngine } from "../store/engine-registry.js";
 import type { ChartRef } from "../types/chart.js";
 import type { Selection, SheetId } from "../types/coordinates.js";
@@ -42,8 +43,8 @@ interface LoaderState {
   loading: Promise<PanelController> | null;
   /** The latest panel a trigger asked for while the chunk loads; older asks are dropped. */
   pending: ((controller: PanelController) => void) | null;
-  detach: (() => void) | null;
-  disposed: boolean;
+  /** The triggers and the attached controller; a chunk that loads after it closes does nothing. */
+  lifetime: Scope;
 }
 
 const STATES = new WeakMap<Grid, LoaderState>();
@@ -56,8 +57,7 @@ function stateOf(grid: Grid): LoaderState {
       controller: null,
       loading: null,
       pending: null,
-      detach: null,
-      disposed: false,
+      lifetime: new Scope(),
     };
     STATES.set(grid, state);
   }
@@ -81,8 +81,8 @@ export function loadPanels(grid: Grid): Promise<PanelController> {
   const state = stateOf(grid);
   state.loading ??= import("./panel-controller.js").then(
     (controller) => {
-      if (state.controller === null && !state.disposed) {
-        state.detach = controller.attachPanels(grid, state.icons);
+      if (state.controller === null && !state.lifetime.closed) {
+        state.lifetime.add(controller.attachPanels(grid, state.icons));
         state.controller = controller;
       }
       return controller;
@@ -110,11 +110,17 @@ function requestPanel(grid: Grid, open: (controller: PanelController) => void): 
   state.pending = open;
   // Like the ribbon's optional chunk, a failed load remains a rejected
   // promise, so the host can observe it through its unhandled-rejection path.
-  void loadPanels(grid).then((controller) => {
-    const run = state.pending;
-    state.pending = null;
-    if (run !== null && !state.disposed) run(controller);
-  });
+  // After the grid is destroyed, the load result no longer matters.
+  void loadPanels(grid).then(
+    (controller) => {
+      const run = state.pending;
+      state.pending = null;
+      if (run !== null && !state.lifetime.closed) run(controller);
+    },
+    (error: unknown) => {
+      if (!state.lifetime.closed) throw error;
+    },
+  );
 }
 
 /** Formulas › Explain Formula: open its panel, loading the panels on first use. */
@@ -221,12 +227,14 @@ export function attachPanelTriggers(grid: Grid, icons?: IconOverrides): () => vo
     return hit === undefined ? null : { sheet: cell.sheet, id: hit.id };
   };
 
-  const disposers = [
+  state.lifetime.add(
     grid.on("chart-activate", (ref: ChartRef) =>
       requestPanel(grid, (controller) => controller.openChartPanel(grid, ref)),
     ),
-    grid.on("chart-select", (ref) => state.controller?.followChart(grid, ref)),
-    grid.on("change", () => outputs.clear()),
+  );
+  state.lifetime.add(grid.on("chart-select", (ref) => state.controller?.followChart(grid, ref)));
+  state.lifetime.add(grid.on("change", () => outputs.clear()));
+  state.lifetime.add(
     grid.on("selection", () => {
       const hit = pivotHit();
       // Without the controller no panel is open, so only a hit needs it.
@@ -235,12 +243,10 @@ export function attachPanelTriggers(grid: Grid, icons?: IconOverrides): () => vo
         requestPanel(grid, (controller) => controller.syncPivotPanel(grid, pivotHit()));
       }
     }),
-  ];
+  );
   return () => {
-    for (const dispose of disposers) dispose();
-    state.disposed = true;
     state.pending = null;
-    state.detach?.();
     STATES.delete(grid);
+    state.lifetime.close();
   };
 }

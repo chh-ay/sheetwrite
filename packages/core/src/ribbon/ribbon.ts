@@ -5,6 +5,7 @@
 // the element; the ribbon never positions itself.
 
 import { iconNode } from "../icons/resolve.js";
+import { Scope } from "../scope.js";
 import type { CommandFlags, Grid, IconOverrides, RibbonConfig, RibbonMode } from "../types/grid.js";
 import {
   commandAvailable,
@@ -82,15 +83,14 @@ export class Ribbon {
   private readonly minimizeButton: HTMLButtonElement;
   private readonly modeButton: HTMLButtonElement;
   private readonly id: number;
-  private readonly disposers: Array<() => void> = [];
-  private readonly resizeObserver: ResizeObserver | null;
+  /** The ribbon's listeners, observer and pending fit frame; `destroy` closes it. */
+  private readonly lifetime = new Scope();
   private activeTab = 0;
   private minimized = false;
   private mode: RibbonMode;
   private compact = false;
   private fitFrame = 0;
   private fittedWidth = -1;
-  private destroyed = false;
 
   constructor(host: HTMLElement, grid: Grid, options: RibbonOptions) {
     ribbonSerial += 1;
@@ -147,14 +147,19 @@ export class Ribbon {
     this.element.appendChild(tabRow);
     this.element.addEventListener("keydown", this.onKeydown);
     host.appendChild(this.element);
+    this.lifetime.add(() => this.element.remove());
+    this.lifetime.add(() => this.popup.destroy());
 
-    this.disposers.push(
+    this.lifetime.add(
       grid.on("command-state-change", (event) => this.refresh((command) => event.states[command])),
     );
     // Absent in some test environments; the ribbon then never shrinks groups.
-    this.resizeObserver =
-      typeof ResizeObserver === "function" ? new ResizeObserver(() => this.scheduleFit()) : null;
-    this.resizeObserver?.observe(this.element);
+    if (typeof ResizeObserver === "function") {
+      const resizeObserver = new ResizeObserver(() => this.scheduleFit());
+      resizeObserver.observe(this.element);
+      this.lifetime.add(() => resizeObserver.disconnect());
+    }
+    this.lifetime.add(() => cancelAnimationFrame(this.fitFrame));
 
     this.updateMinimizeButton();
     this.updateLayout();
@@ -169,13 +174,7 @@ export class Ribbon {
   }
 
   destroy(): void {
-    if (this.destroyed) return;
-    this.destroyed = true;
-    cancelAnimationFrame(this.fitFrame);
-    this.resizeObserver?.disconnect();
-    for (const dispose of this.disposers) dispose();
-    this.popup.destroy();
-    this.element.remove();
+    this.lifetime.close();
   }
 
   private createTab(spec: RibbonTabSpec, index: number): HTMLButtonElement {
@@ -409,7 +408,7 @@ export class Ribbon {
 
   /** Resize bursts arrive many times a frame; fit at most once per frame. */
   private scheduleFit(): void {
-    if (this.fitFrame !== 0 || this.destroyed) return;
+    if (this.fitFrame !== 0 || this.lifetime.closed) return;
     this.fitFrame = requestAnimationFrame(() => {
       this.fitFrame = 0;
       this.fit();

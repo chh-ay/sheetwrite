@@ -645,7 +645,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L699",
+              "source": "src/types/grid.ts#L701",
               "jsDocTags": [],
               "documentation": "View-aware editable snapshot of one cell, for hosts building a detached\nformula bar or cell inspector. `address` is the translated *data* address —\nthe correct target for `Grid.applyTransaction` even under an active\nsort/filter view — while the `(row, col)` inputs of\n{@link Grid.getCellInput} are active-sheet view coordinates.",
               "memberDocs": [
@@ -1212,7 +1212,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L356",
+              "source": "src/types/grid.ts#L358",
               "jsDocTags": [],
               "documentation": "The `GridConfig` switches that choose built-in commands. They apply to every\nrenderer of the command model: the toolbar, the full ribbon and the compact\nribbon. Each defaults to true, except `export`.",
               "memberDocs": []
@@ -1409,7 +1409,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L372",
+              "source": "src/types/grid.ts#L374",
               "jsDocTags": [],
               "documentation": "Built-in action names accepted by custom context-menu rows.",
               "memberDocs": []
@@ -1421,7 +1421,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L400",
+              "source": "src/types/grid.ts#L402",
               "jsDocTags": [],
               "documentation": "Cell and viewport coordinates resolved for one bundled context-menu opening.",
               "memberDocs": [
@@ -1446,7 +1446,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L461",
+              "source": "src/types/grid.ts#L463",
               "jsDocTags": [
                 "example",
                 "see"
@@ -1498,7 +1498,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L490",
+              "source": "src/types/grid.ts#L492",
               "jsDocTags": [],
               "documentation": "Static rows or a context-aware factory evaluated each time the menu opens.",
               "memberDocs": []
@@ -1510,7 +1510,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L446",
+              "source": "src/grid.ts#L448",
               "jsDocTags": [
                 "example",
                 "see"
@@ -1836,7 +1836,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L320",
+              "source": "src/grid.ts#L322",
               "jsDocTags": [],
               "documentation": "Default canvas theme used before CSS and explicit theme overrides.",
               "memberDocs": []
@@ -1872,7 +1872,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L352",
+              "source": "src/export.ts#L376",
               "jsDocTags": [],
               "documentation": "Codec defaults combine SpreadsheetML worksheet dimensions with independent\nZIP/XML and aggregate-work ceilings for untrusted in-memory conversion.",
               "memberDocs": []
@@ -2054,7 +2054,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L279",
+              "source": "src/export.ts#L280",
               "jsDocTags": [],
               "documentation": "Trigger a browser download from in-memory bytes. The temporary anchor is\nremoved and its object URL is scheduled for revocation even when DOM append or\nclick throws.",
               "memberDocs": []
@@ -2119,7 +2119,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L214",
+              "source": "src/export.ts#L215",
               "jsDocTags": [],
               "documentation": "Parse CSV into `ColumnarData`. The first record is consumed as a positional\nheader. Input fields project onto declared visible columns; hidden declared\ncolumns are initialized to `null`, matching the visible-column CSV export.\nExtra fields are ignored and missing fields become `null`. The returned\ncolumnar table is fully materialized in memory.",
               "memberDocs": []
@@ -2131,7 +2131,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L554",
+              "source": "src/export.ts#L578",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2146,7 +2146,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L768",
+              "source": "src/export.ts#L792",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2161,7 +2161,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L732",
+              "source": "src/export.ts#L756",
               "jsDocTags": [],
               "documentation": "Import a seekable File/Blob without first buffering the compressed workbook.",
               "memberDocs": []
@@ -2173,7 +2173,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L786",
+              "source": "src/types/grid.ts#L788",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2474,7 +2474,7 @@
                 },
                 {
                   "name": "summarizeSelection",
-                  "documentation": "Totals for the current selection, for a status bar. Large selections are\nread in chunks between frames, so the page stays responsive; abort\n`signal` to stop early, which rejects with the signal's reason. Resolves\nnull when nothing is selected."
+                  "documentation": "Totals for the current selection, for a status bar. Large selections are\nread in chunks between frames, so the page stays responsive; abort\n`signal` to stop early, which rejects with the signal's reason.\n`destroy()` stops every running summary the same way, with an\n`AbortError`. Resolves null when nothing is selected."
                 },
                 {
                   "name": "trimMemory",
@@ -2497,7 +2497,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L138",
+              "source": "src/types/grid.ts#L140",
               "jsDocTags": [],
               "documentation": "Imperative operations the toolbar and context menu bind to; also exposed as `Grid.actions`.",
               "memberDocs": [
@@ -2598,7 +2598,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L268",
+              "source": "src/types/grid.ts#L270",
               "jsDocTags": [],
               "documentation": "Built-in command names accepted by state queries and change events.",
               "memberDocs": []
@@ -2610,7 +2610,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L271",
+              "source": "src/types/grid.ts#L273",
               "jsDocTags": [],
               "documentation": "Observable availability and selection-derived activity for one command.",
               "memberDocs": []
@@ -2622,7 +2622,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L277",
+              "source": "src/types/grid.ts#L279",
               "jsDocTags": [],
               "documentation": "Complete command-state snapshot emitted whenever availability or activity can change.",
               "memberDocs": []
@@ -2634,7 +2634,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L517",
+              "source": "src/types/grid.ts#L519",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2722,7 +2722,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L719",
+              "source": "src/types/grid.ts#L721",
               "jsDocTags": [],
               "documentation": "Payload map for events emitted by a Grid.",
               "memberDocs": [
@@ -2767,7 +2767,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L592",
+              "source": "src/types/grid.ts#L594",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2880,7 +2880,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L135",
+              "source": "src/types/grid.ts#L137",
               "jsDocTags": [],
               "documentation": "Header semantics used by the retained canvas and accessibility mirror.",
               "memberDocs": []
@@ -2969,7 +2969,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L320",
+              "source": "src/types/grid.ts#L322",
               "jsDocTags": [],
               "documentation": "Per-glyph icon overrides, keyed by the names on the command icon sheet\n(`ICON_NAMES`). One override applies wherever the glyph shows: the flat\ntoolbar, the ribbon and ribbon menus, and the context menu. Strings render\nas plain text; DOM nodes and node factories support SVG or HTML icons. To\nreplace every glyph at once, set the `--sheetwrite-icon-sheet` CSS property\nto a sheet drawn on the layout in `@sheetwrite/core/icons.json`.",
               "memberDocs": []
@@ -2993,7 +2993,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L364",
+              "source": "src/grid.ts#L366",
               "jsDocTags": [
                 "example",
                 "see"
@@ -3044,7 +3044,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L376",
+              "source": "src/grid.ts#L378",
               "jsDocTags": [],
               "documentation": "Whether `initSheetwrite` has completed — the single readiness source.",
               "memberDocs": []
@@ -3080,7 +3080,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L427",
+              "source": "src/types/grid.ts#L429",
               "jsDocTags": [],
               "documentation": "Built-in actions that can be rebound without replacing navigation.",
               "memberDocs": []
@@ -3092,7 +3092,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L440",
+              "source": "src/types/grid.ts#L442",
               "jsDocTags": [],
               "documentation": "Overrides replace all default keys for an action; null disables that action's keys.",
               "memberDocs": []
@@ -3104,7 +3104,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L415",
+              "source": "src/types/grid.ts#L417",
               "jsDocTags": [],
               "documentation": "A compact modified key combination or a key object. Modifiers may appear in\nany order before the final key, for example \"Mod+Shift+K\" or \"Ctrl+Alt+Delete\".\n`Mod`/`mod` means Command on macOS and Control elsewhere; Ctrl and Meta are literal.\nThe parser rejects unknown/repeated modifiers and missing keys.",
               "memberDocs": []
@@ -3436,7 +3436,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L203",
+              "source": "src/export.ts#L204",
               "jsDocTags": [],
               "documentation": "Parse the fixed comma dialect: quoted delimiters/newlines, doubled quotes,\nbare CR, LF, or CRLF records, Unicode, trailing empty fields, and one optional\nleading UTF-8 BOM. The synchronous API consumes an existing in-memory string\nand returns an in-memory grid; it does not claim streaming. Scanning enforces\nresource ceilings before materializing the next oversized field or record.",
               "memberDocs": []
@@ -4101,7 +4101,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L685",
+              "source": "src/types/grid.ts#L687",
               "jsDocTags": [],
               "documentation": "Replacement count and refreshed search state returned by replace-all.",
               "memberDocs": [
@@ -4170,7 +4170,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L381",
+              "source": "src/grid.ts#L383",
               "jsDocTags": [],
               "documentation": "Read `--sheetwrite-*` CSS custom properties into a partial theme.",
               "memberDocs": []
@@ -4304,7 +4304,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L344",
+              "source": "src/types/grid.ts#L346",
               "jsDocTags": [],
               "documentation": "Initial layout settings for the built-in or composable ribbon.",
               "memberDocs": [
@@ -4325,7 +4325,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L341",
+              "source": "src/types/grid.ts#L343",
               "jsDocTags": [],
               "documentation": "Layout of the Excel-style ribbon. `auto` chooses compact below the configured width.",
               "memberDocs": []
@@ -4760,7 +4760,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L663",
+              "source": "src/types/grid.ts#L665",
               "jsDocTags": [],
               "documentation": "Case, whole-cell, sheet, and column constraints for grid search.",
               "memberDocs": [
@@ -4789,7 +4789,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L675",
+              "source": "src/types/grid.ts#L677",
               "jsDocTags": [],
               "documentation": "Ordered matches and active index produced by a grid search.",
               "memberDocs": [
@@ -4862,7 +4862,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L414",
+              "source": "src/export.ts#L438",
               "jsDocTags": [],
               "documentation": "Registers the optional table XLSX export implementation used by core.",
               "memberDocs": []
@@ -4874,7 +4874,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L532",
+              "source": "src/export.ts#L556",
               "jsDocTags": [],
               "documentation": "Registers the optional table XLSX import implementation used by core.",
               "memberDocs": []
@@ -4886,7 +4886,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L636",
+              "source": "src/export.ts#L660",
               "jsDocTags": [],
               "documentation": "Registers the optional workbook XLSX implementation used by core.",
               "memberDocs": []
@@ -5019,7 +5019,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L709",
+              "source": "src/types/grid.ts#L711",
               "jsDocTags": [],
               "documentation": "Actionable transaction outcome for a stable sheet lifecycle target.",
               "memberDocs": []
@@ -5104,7 +5104,7 @@
               "owners": [
                 "src/clipboard-controller.ts"
               ],
-              "source": "src/clipboard-controller.ts#L58",
+              "source": "src/clipboard-controller.ts#L61",
               "jsDocTags": [],
               "documentation": "Private-format MIME type used for rich Sheetwrite clipboard payloads.",
               "memberDocs": []
@@ -6086,7 +6086,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L96",
+              "source": "src/export.ts#L97",
               "jsDocTags": [
                 "link",
                 "throws"
@@ -6101,7 +6101,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L104",
+              "source": "src/export.ts#L105",
               "jsDocTags": [],
               "documentation": "Export UTF-8 CSV on demand, retaining only one store window and one byte chunk.",
               "memberDocs": []
@@ -6113,7 +6113,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L241",
+              "source": "src/types/grid.ts#L243",
               "jsDocTags": [],
               "documentation": "Built-in action names accepted by custom toolbar items.",
               "memberDocs": []
@@ -6125,7 +6125,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L310",
+              "source": "src/types/grid.ts#L312",
               "jsDocTags": [],
               "documentation": "Text, DOM node, or node factory used as toolbar icon content.",
               "memberDocs": []
@@ -6137,7 +6137,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L326",
+              "source": "src/types/grid.ts#L328",
               "jsDocTags": [],
               "documentation": "Built-in, separator, or custom callback item in the grid toolbar. A built-in\n`action` renders the same command, glyph and state as the ribbon.",
               "memberDocs": [
@@ -6166,7 +6166,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L175",
+              "source": "src/export.ts#L176",
               "jsDocTags": [
                 "link",
                 "throws"
@@ -6181,7 +6181,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L182",
+              "source": "src/export.ts#L183",
               "jsDocTags": [],
               "documentation": "Export canonical data-space TSV with pull-driven store reads and cancellation.",
               "memberDocs": []
@@ -6193,7 +6193,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L480",
+              "source": "src/export.ts#L504",
               "jsDocTags": [
                 "example",
                 "see"
@@ -6208,7 +6208,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L500",
+              "source": "src/export.ts#L524",
               "jsDocTags": [],
               "documentation": "Stream table XLSX bytes without materializing the finished archive.",
               "memberDocs": []
@@ -6220,7 +6220,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L691",
+              "source": "src/export.ts#L715",
               "jsDocTags": [
                 "example",
                 "see"
@@ -6235,7 +6235,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L712",
+              "source": "src/export.ts#L736",
               "jsDocTags": [],
               "documentation": "Stream formula-preserving workbook XLSX with backpressure and cancellation.",
               "memberDocs": []
@@ -6840,7 +6840,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L379",
+              "source": "src/export.ts#L403",
               "jsDocTags": [],
               "documentation": "Stable resource-limit failure surfaced before an XLSX codec allocates unsafe data.",
               "memberDocs": []
@@ -6852,7 +6852,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L309",
+              "source": "src/export.ts#L333",
               "jsDocTags": [],
               "documentation": "Resource dimensions bounded by every XLSX import and export path.",
               "memberDocs": [
@@ -7025,7 +7025,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L401",
+              "source": "src/export.ts#L425",
               "jsDocTags": [],
               "documentation": "Pluggable first-row-header, first-sheet table export backend.",
               "memberDocs": []
@@ -7037,7 +7037,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L521",
+              "source": "src/export.ts#L545",
               "jsDocTags": [],
               "documentation": "Pluggable table import backend. Parses raw `.xlsx` bytes into the same\n`ColumnarData` shape `fromCsv` returns, so host ingestion code can stay\nformat-agnostic.",
               "memberDocs": []
@@ -7049,7 +7049,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L612",
+              "source": "src/export.ts#L636",
               "jsDocTags": [
                 "internal"
               ],
@@ -7063,7 +7063,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L592",
+              "source": "src/export.ts#L616",
               "jsDocTags": [],
               "documentation": "Shared options passed to every registered table and workbook XLSX backend.",
               "memberDocs": [
@@ -7088,7 +7088,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L573",
+              "source": "src/export.ts#L597",
               "jsDocTags": [],
               "documentation": "Structured fidelity warning emitted during XLSX conversion.",
               "memberDocs": []
@@ -8355,7 +8355,7 @@
               "owners": [
                 "src/shell/formula-controls.ts"
               ],
-              "source": "src/shell/formula-controls.ts#L152",
+              "source": "src/shell/formula-controls.ts#L149",
               "jsDocTags": [],
               "documentation": "Detached formula bar: mirrors the focused cell's editable text (exact\nformula source, else literal text) and commits on Enter through the grid's\nundoable transaction path, targeting the data address captured with the\ndraft — correct even under an active sort/filter view. A focused, dirty\ndraft is never overwritten by selection/change events; Escape restores the\nlast stable text. While focused, it shows formula help as the cell editor\ndoes.",
               "memberDocs": []
@@ -8367,7 +8367,7 @@
               "owners": [
                 "src/shell/formula-controls.ts"
               ],
-              "source": "src/shell/formula-controls.ts#L34",
+              "source": "src/shell/formula-controls.ts#L35",
               "jsDocTags": [],
               "documentation": "A1 jump box, like Excel's name box: shows the focused cell's reference, and\non Enter selects the typed cell (`B7`) or range (`B2:D9`); `$` markers are\naccepted. Invalid or out-of-bounds references set `aria-invalid` and make\nno grid calls; Escape restores the displayed reference.",
               "memberDocs": []
@@ -8391,7 +8391,7 @@
               "owners": [
                 "src/shell/selection-status.ts"
               ],
-              "source": "src/shell/selection-status.ts#L48",
+              "source": "src/shell/selection-status.ts#L49",
               "jsDocTags": [],
               "documentation": "`<output role=\"status\">` that follows the grid's selection and its values.\nText nodes only; polite live region so screen readers announce changes\nwithout interrupting.",
               "memberDocs": []
@@ -8403,7 +8403,7 @@
               "owners": [
                 "src/shell/spreadsheet-shell.ts"
               ],
-              "source": "src/shell/spreadsheet-shell.ts#L158",
+              "source": "src/shell/spreadsheet-shell.ts#L159",
               "jsDocTags": [],
               "documentation": "Mount a complete spreadsheet shell into `host`: toolbar row, formula row\n(name box + formula bar), the grid, and a bottom row with sheet tabs and a\nselection status. The host must have a real size; the shell fills it. Returns\nthe shell handle; `destroy` tears down every piece, the grid, and the shell\nDOM, and is safe to call twice.",
               "memberDocs": []
@@ -8427,7 +8427,7 @@
               "owners": [
                 "src/shell/selection-status.ts"
               ],
-              "source": "src/shell/selection-status.ts#L12",
+              "source": "src/shell/selection-status.ts#L13",
               "jsDocTags": [],
               "documentation": "Human phrase for a selection's geometry; blank for null/single-cell.",
               "memberDocs": []
@@ -8439,7 +8439,7 @@
               "owners": [
                 "src/shell/formula-controls.ts"
               ],
-              "source": "src/shell/formula-controls.ts#L131",
+              "source": "src/shell/formula-controls.ts#L128",
               "jsDocTags": [],
               "documentation": "Host elements and callbacks used to bind a formula bar to a Grid.",
               "memberDocs": [
@@ -8460,7 +8460,7 @@
               "owners": [
                 "src/shell/formula-controls.ts"
               ],
-              "source": "src/shell/formula-controls.ts#L139",
+              "source": "src/shell/formula-controls.ts#L136",
               "jsDocTags": [],
               "documentation": "A formula bar piece; `setReadOnly` blocks commits without unmounting.",
               "memberDocs": []
@@ -8472,7 +8472,7 @@
               "owners": [
                 "src/shell/formula-controls.ts"
               ],
-              "source": "src/shell/formula-controls.ts#L18",
+              "source": "src/shell/formula-controls.ts#L19",
               "jsDocTags": [],
               "documentation": "Host elements and callbacks used to bind a name box to a Grid.",
               "memberDocs": [
@@ -8530,7 +8530,7 @@
               "owners": [
                 "src/shell/formula-controls.ts"
               ],
-              "source": "src/shell/formula-controls.ts#L12",
+              "source": "src/shell/formula-controls.ts#L13",
               "jsDocTags": [],
               "documentation": "A mounted shell piece: its root element plus an idempotent teardown.",
               "memberDocs": []
@@ -8542,7 +8542,7 @@
               "owners": [
                 "src/shell/spreadsheet-shell.ts"
               ],
-              "source": "src/shell/spreadsheet-shell.ts#L133",
+              "source": "src/shell/spreadsheet-shell.ts#L134",
               "jsDocTags": [],
               "documentation": "Disposable controller for the framework-neutral spreadsheet shell.",
               "memberDocs": [
@@ -8567,7 +8567,7 @@
               "owners": [
                 "src/shell/spreadsheet-shell.ts"
               ],
-              "source": "src/shell/spreadsheet-shell.ts#L119",
+              "source": "src/shell/spreadsheet-shell.ts#L120",
               "jsDocTags": [],
               "documentation": "Host elements and feature options used to create a spreadsheet shell.",
               "memberDocs": [
@@ -9411,7 +9411,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L636",
+              "source": "../core/dist/types/grid.d.ts#L638",
               "jsDocTags": [
                 "example",
                 "see"
@@ -9712,7 +9712,7 @@
                 },
                 {
                   "name": "summarizeSelection",
-                  "documentation": "Totals for the current selection, for a status bar. Large selections are\nread in chunks between frames, so the page stays responsive; abort\n`signal` to stop early, which rejects with the signal's reason. Resolves\nnull when nothing is selected."
+                  "documentation": "Totals for the current selection, for a status bar. Large selections are\nread in chunks between frames, so the page stays responsive; abort\n`signal` to stop early, which rejects with the signal's reason.\n`destroy()` stops every running summary the same way, with an\n`AbortError`. Resolves null when nothing is selected."
                 },
                 {
                   "name": "trimMemory",
@@ -9735,7 +9735,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L182",
+              "source": "../core/dist/types/grid.d.ts#L184",
               "jsDocTags": [],
               "documentation": "Built-in command names accepted by state queries and change events.",
               "memberDocs": []
@@ -9747,7 +9747,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L184",
+              "source": "../core/dist/types/grid.d.ts#L186",
               "jsDocTags": [],
               "documentation": "Observable availability and selection-derived activity for one command.",
               "memberDocs": []
@@ -10422,7 +10422,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L636",
+              "source": "../core/dist/types/grid.d.ts#L638",
               "jsDocTags": [
                 "example",
                 "see"
@@ -10723,7 +10723,7 @@
                 },
                 {
                   "name": "summarizeSelection",
-                  "documentation": "Totals for the current selection, for a status bar. Large selections are\nread in chunks between frames, so the page stays responsive; abort\n`signal` to stop early, which rejects with the signal's reason. Resolves\nnull when nothing is selected."
+                  "documentation": "Totals for the current selection, for a status bar. Large selections are\nread in chunks between frames, so the page stays responsive; abort\n`signal` to stop early, which rejects with the signal's reason.\n`destroy()` stops every running summary the same way, with an\n`AbortError`. Resolves null when nothing is selected."
                 },
                 {
                   "name": "trimMemory",
@@ -10746,7 +10746,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L182",
+              "source": "../core/dist/types/grid.d.ts#L184",
               "jsDocTags": [],
               "documentation": "Built-in command names accepted by state queries and change events.",
               "memberDocs": []
@@ -10758,7 +10758,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L184",
+              "source": "../core/dist/types/grid.d.ts#L186",
               "jsDocTags": [],
               "documentation": "Observable availability and selection-derived activity for one command.",
               "memberDocs": []
@@ -11419,7 +11419,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L636",
+              "source": "../core/dist/types/grid.d.ts#L638",
               "jsDocTags": [
                 "example",
                 "see"
@@ -11720,7 +11720,7 @@
                 },
                 {
                   "name": "summarizeSelection",
-                  "documentation": "Totals for the current selection, for a status bar. Large selections are\nread in chunks between frames, so the page stays responsive; abort\n`signal` to stop early, which rejects with the signal's reason. Resolves\nnull when nothing is selected."
+                  "documentation": "Totals for the current selection, for a status bar. Large selections are\nread in chunks between frames, so the page stays responsive; abort\n`signal` to stop early, which rejects with the signal's reason.\n`destroy()` stops every running summary the same way, with an\n`AbortError`. Resolves null when nothing is selected."
                 },
                 {
                   "name": "trimMemory",
@@ -11743,7 +11743,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L182",
+              "source": "../core/dist/types/grid.d.ts#L184",
               "jsDocTags": [],
               "documentation": "Built-in command names accepted by state queries and change events.",
               "memberDocs": []
@@ -11755,7 +11755,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L184",
+              "source": "../core/dist/types/grid.d.ts#L186",
               "jsDocTags": [],
               "documentation": "Observable availability and selection-derived activity for one command.",
               "memberDocs": []

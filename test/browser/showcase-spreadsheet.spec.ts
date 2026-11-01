@@ -156,10 +156,12 @@ for (const mode of ["full", "compact"] as const) {
     const menu = page.getByRole("menu", { name: "Borders", exact: true });
     const bottom = menu.getByRole("menuitem", { name: "Bottom Border", exact: true });
     await expect(bottom).toBeFocused();
-    await bottom.press("ArrowDown");
+    // locator.press refocuses twice without preventScroll. That can scroll
+    // WebKit's document and dismiss the fixed menu before the key is sent.
+    await page.keyboard.press("ArrowDown");
     const top = menu.getByRole("menuitem", { name: "Top Border", exact: true });
     await expect(top).toBeFocused();
-    await top.press("Escape");
+    await page.keyboard.press("Escape");
     await expect(menu).not.toBeVisible();
     await expect(options).toBeFocused();
     await expect(options).toHaveAttribute("aria-expanded", "false");
