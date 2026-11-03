@@ -15,8 +15,8 @@ const ENGINE_PACKAGE = process.env.SHEETWRITE_BENCH_ENGINE === "full" ? "formula
  * base needs built engine artifacts, not this benchmark code. The checkout is
  * chosen at run time, so its loader can only be imported dynamically.
  */
-const ENGINE_ROOT = process.env.SHEETWRITE_BENCH_ENGINE_ROOT;
-const engine: typeof defaultEngine =
+const ENGINE_ROOT = process.env.SHEETWRITE_BENCH_ENGINE_ROOT ?? process.env.PROFILE_ENGINE_ROOT;
+export const engine: typeof defaultEngine =
   ENGINE_ROOT === undefined
     ? ENGINE_PACKAGE === "formulas"
       ? formulas
@@ -56,7 +56,7 @@ import { protocolCaptureMeta } from "./protocol-meta.js";
 import { forceGc, mib, ms, now, type Stat, summarize } from "./stats.js";
 
 // Check every entry path before it can load or measure the selected baseline.
-if (ENGINE_ROOT !== undefined) {
+if (process.env.SHEETWRITE_BENCH_ENGINE_ROOT !== undefined) {
   captureEngineBaselineContext(protocolCaptureMeta().commit, [ENGINE_PACKAGE]);
 }
 
@@ -1764,7 +1764,7 @@ interface FormulaWorkload {
   readonly factory: FixtureFactory;
 }
 
-function formulaWorkloads(smoke: boolean): FormulaWorkload[] {
+export function formulaWorkloads(smoke: boolean): FormulaWorkload[] {
   const workloads: FormulaWorkload[] = [];
   const add = (id: string, size: number, factory: FixtureFactory) =>
     workloads.push({ id, size, factory });
