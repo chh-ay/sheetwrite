@@ -245,16 +245,16 @@ function withBlock(styles: string, block: string): string {
   return `${styles.slice(0, start)}${block}${styles.slice(end + BLOCK_END.length)}`;
 }
 
-/** Formats like `oxfmt` with the repo config, so generated and formatted output never disagree. */
+/** Formats with `bun fmt` and the repo config, so generated and formatted output never disagree. */
 function formatted(path: string, content: string): string {
   if (path.endsWith(".svg")) return content;
-  const result = Bun.spawnSync(["bunx", "oxfmt", `--stdin-filepath=${path}`], {
+  const result = Bun.spawnSync(["bun", "fmt", `--stdin-filepath=${path}`], {
     cwd: ROOT,
     stdin: new TextEncoder().encode(content),
     stdout: "pipe",
     stderr: "pipe",
   });
-  if (result.exitCode !== 0) throw new Error(`oxfmt failed on ${path}: ${result.stderr}`);
+  if (result.exitCode !== 0) throw new Error(`bun fmt failed on ${path}: ${result.stderr}`);
   return result.stdout.toString();
 }
 
