@@ -8,9 +8,9 @@ use rustc_hash::FxHashSet;
 use wasm_bindgen::prelude::*;
 
 use crate::calc::{
-    ast_contains_sheet_span, parse, place_span, resolve_named_ranges, resolve_sheet_refs,
-    resolve_structured_refs, sheet_name_key, shift_range, Ast, NamedRangeRef, StructuredRef,
-    TableSection, UnresolvedStructuredRef,
+    ast_contains_sheet_span, parse, place_span, resolve_sheet_refs, resolve_structured_refs,
+    sheet_name_key, shift_range, Ast, NamedRangeRef, StructuredRef, TableSection,
+    UnresolvedStructuredRef,
 };
 use crate::cells::{
     encode_num, encode_str_id, payload_num, payload_str_id, DEFAULT_MAX_PAGED_DIRTY_CELLS,
@@ -3533,9 +3533,7 @@ impl CellStore {
         let ast = parse(source).map_err(|_| FormulaError::Value)?;
         let ast = self.resolve_sheets(ast)?;
         let placement = names::NamePlacement::new(formula_row, formula_col);
-        let ast = resolve_named_ranges(ast, formula_sheet, &|name, sheet| {
-            self.name_target(name, sheet, &placement)
-        });
+        let ast = self.resolve_defined_names(ast, formula_sheet, &placement);
         Ok(resolve_structured_refs(
             ast,
             formula_sheet,

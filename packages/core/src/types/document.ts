@@ -152,7 +152,7 @@ export interface AddSheetInput {
 export type NamedRangeSnapshot = NamedReferenceSnapshot | NamedFormulaSnapshot;
 
 /** A defined name that refers to one rectangular range. */
-export interface NamedReferenceSnapshot {
+interface NamedReferenceSnapshot {
   name: string;
   /** Formula-context sheet whose local definition shadows the workbook definition. */
   scope?: SheetId;
@@ -167,7 +167,7 @@ export interface NamedReferenceSnapshot {
  * rows down. A `LAMBDA` name is called like a function (`=MYFN(A1)`) in the
  * full engine; the default engine keeps it and returns `#NAME?` for the call.
  */
-export interface NamedFormulaSnapshot {
+interface NamedFormulaSnapshot {
   name: string;
   /** Formula-context sheet whose local definition shadows the workbook definition. */
   scope?: SheetId;

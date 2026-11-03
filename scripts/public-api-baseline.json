@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "36de8c0c24f9dc80aed59030825b091cc29a00f506d1b6648deea7b5f8c008a6",
+  "sha256": "714643b7314e65bfdae9871a91383e3119d7de58d8c6de58426f108ca68bb17a",
   "intentionalExports": [
     {
       "package": "@sheetwrite/charts",
@@ -30,7 +30,9 @@
     {
       "package": "@sheetwrite/charts",
       "entryPoint": "./register",
-      "exports": ["registerChartsBackend"]
+      "exports": [
+        "registerChartsBackend"
+      ]
     },
     {
       "package": "@sheetwrite/core",
@@ -524,7 +526,10 @@
     {
       "package": "@sheetwrite/core",
       "entryPoint": "./worker",
-      "exports": ["WorkerAcknowledgement", "createWorkerMessageHandler"]
+      "exports": [
+        "WorkerAcknowledgement",
+        "createWorkerMessageHandler"
+      ]
     },
     {
       "package": "@sheetwrite/formulas",
@@ -545,6 +550,8 @@
         "WindowView",
         "checkFormulaSyntax",
         "createEngine",
+        "formulaFromXlsx",
+        "formulaToXlsx",
         "formulaTokens",
         "initSync",
         "isLoaded",
@@ -649,6 +656,8 @@
         "WindowView",
         "checkFormulaSyntax",
         "createEngine",
+        "formulaFromXlsx",
+        "formulaToXlsx",
         "formulaTokens",
         "initSync",
         "isLoaded",
@@ -674,7 +683,9 @@
     {
       "package": "@sheetwrite/xlsx",
       "entryPoint": "./register",
-      "exports": ["registerXlsxBackends"]
+      "exports": [
+        "registerXlsxBackends"
+      ]
     }
   ]
 }

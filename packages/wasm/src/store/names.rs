@@ -200,6 +200,20 @@ impl CellStore {
         None
     }
 
+    /// Cell formulas and expanded name definitions use one resolver closure
+    /// type, so the recursive traversal has one compiled specialization.
+    #[inline(never)]
+    pub(super) fn resolve_defined_names(
+        &self,
+        ast: Ast,
+        formula_sheet: u32,
+        placement: &NamePlacement,
+    ) -> Ast {
+        resolve_named_ranges(ast, formula_sheet, &|name, sheet| {
+            self.name_target(name, sheet, placement)
+        })
+    }
+
     fn expand(
         &self,
         definition: &Definition,
@@ -232,9 +246,7 @@ impl CellStore {
         if definition.positional {
             translate_name_refs(&mut ast, placement.row, placement.col);
         }
-        let ast = resolve_named_ranges(ast, formula_sheet, &|name, sheet| {
-            self.name_target(name, sheet, placement)
-        });
+        let ast = self.resolve_defined_names(ast, formula_sheet, placement);
         let ast = resolve_structured_refs(
             ast,
             formula_sheet,
