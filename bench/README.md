@@ -680,9 +680,11 @@ formula gate, and the capture records no baseline context.
 
 Copy the previous release's complete results and records to
 `results/releases/<version>/`. The recorded
-`results/release-capture-metadata.json` names the immutable measurement commit,
-baseline commit and method notes. The comparison validates every receipt
-against those commits and separately records its own newer generator commit:
+`results/release-capture-metadata.json` names the captured release in its
+protocol (`sheetwrite-<release>-capture-metadata-v1`), the immutable
+measurement commit, baseline commit and method notes. The comparison validates
+every receipt against those commits and separately records its own newer
+generator commit:
 
 ```sh
 bun src/release-comparison.ts --baseline-results-dir results/releases/<version> \
@@ -696,6 +698,11 @@ Comparison refuses stale commits, missing suites, wrong caps, and records
 that report throttling. A suite with no scope receipt in the baseline result
 set is new in the candidate and is reported as a new-only measurement; a
 baseline artifact without its receipt is rejected.
+
+`bun run docs:generate` names both releases on the release comparison page
+from this artifact: the captured release from the capture metadata protocol and
+the baseline from the suites' comparison labels. It rejects an artifact whose
+labels name more than one baseline or another release line.
 
 
 ### Chart tracking and pivot evidence

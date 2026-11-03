@@ -130,6 +130,7 @@ export const TOOLING_TEST_PATHS = [
   "scripts/prepare-docs-deployment.test.ts",
   "scripts/check-import-cycles.test.ts",
   "scripts/check-local-paths.test.ts",
+  "scripts/verify-example-xlsx-isolation.test.ts",
 ] as const;
 
 export const UNIT_TEST_PATHS = [

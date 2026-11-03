@@ -109,7 +109,7 @@ the cache: core resends definitions and the replacement engine rebuilds them.
 
 ## Contributors
 
-The Rust source is in `../wasm`. Do not add a second Rust crate here. Keep the loader contract the same as in `@sheetwrite/wasm`.
+The Rust source is in `../wasm`. Do not add a second Rust crate here. The JavaScript loaders (`loader*.mjs`) are in `../wasm` too: the build copies them here, so edit them there and rebuild this package. `loader.d.ts` stays here because the full engine's types and examples differ from the default engine's.
 
 Keep family kernels small. Use `analysis::sorted_positions` for stable sorts so Wasm shares one sort implementation. Move owned cell values when a local matrix is no longer needed. Keep the order of floating-point sums unchanged. Compare heavy-case timings and both engine sizes when you change a kernel.
 
