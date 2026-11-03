@@ -13,7 +13,8 @@ import {
   type PersistenceCommitRequest,
   type PersistenceCommitResponse,
   rebaseDocumentOperations,
-  type SheetwriteStore,
+  SheetwriteStore,
+  SheetwriteError,
   SyncCoordinator,
   SyncProtocolError,
   type VersionedOperation,
@@ -171,6 +172,184 @@ function mountGrid(version = 4, rowCount = 2, paged = false) {
 }
 
 describe("durable offline sync", () => {
+  it("keeps the restore error and rolls back older records after a rollback throws", async () => {
+    const storage = new FakePendingStorage();
+    for (const [index, value] of [9, 8, 7].entries()) {
+      await storage.put({
+        documentId: "offline-doc",
+        baseVersion: 4 + index,
+        clientMutationId: `restore-${index}`,
+        operations: [{ ...setValue(value), addr: { sheet: "s1", row: index, col: 0 } }],
+      });
+    }
+
+    const grid = mountGrid(4, 3);
+    const store = grid.store;
+    const applyTransaction = store.applyTransaction.bind(store);
+    const restoreError = new SheetwriteError("transaction", "store", "restore failed");
+    const rollbackError = new Error("second rollback failed");
+    store.applyTransaction = (transaction, options) => {
+      const [operation] = transaction.patches;
+      if (operation?.op === "set" && operation.value.kind === "literal") {
+        if (operation.addr.row === 2 && operation.value.value === 7) throw restoreError;
+        if (operation.addr.row === 1 && operation.value.value === null) throw rollbackError;
+      }
+
+      return applyTransaction(transaction, options);
+    };
+
+    const coordinator = new SyncCoordinator(grid, new ControlledAdapter(snapshot(4, 3)), {
+      documentId: "offline-doc",
+      serverVersion: 4,
+      pendingStorage: storage,
+      initialConnection: "offline",
+    });
+    try {
+      const failure = await coordinator.ready().then(
+        () => undefined,
+        (error: unknown) => error,
+      );
+      expect(failure).toBe(restoreError);
+      expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBeNull();
+      expect(coordinator.pendingCommits()).toEqual([]);
+      expect(restoreError.cause).toBeInstanceOf(AggregateError);
+      if (!(restoreError.cause instanceof AggregateError)) {
+        throw new Error("Expected the rollback failure as the restore error cause");
+      }
+
+      expect(restoreError.cause.errors).toEqual([rollbackError]);
+    } finally {
+      coordinator.destroy();
+      grid.destroy();
+    }
+  });
+
+  it("does not write to the grid when it is destroyed during pending restore", async () => {
+    const storage = new FakePendingStorage();
+    await storage.put({
+      documentId: "offline-doc",
+      baseVersion: 4,
+      clientMutationId: "restore-first",
+      operations: [setValue(9)],
+    });
+    const grid = mountGrid();
+    const applyTransaction = grid.store.applyTransaction.bind(grid.store);
+    let destroyed = false;
+    let writesAfterDestroy = 0;
+    grid.store.applyTransaction = (transaction, options) => {
+      if (destroyed) {
+        writesAfterDestroy += 1;
+        throw new Error("Store used after grid destruction");
+      }
+
+      return applyTransaction(transaction, options);
+    };
+
+    const coordinator = new SyncCoordinator(grid, new ControlledAdapter(snapshot()), {
+      documentId: "offline-doc",
+      serverVersion: 4,
+      pendingStorage: storage,
+      initialConnection: "offline",
+    });
+    grid.on("change", () => {
+      coordinator.destroy();
+      grid.destroy();
+      destroyed = true;
+    });
+
+    try {
+      await coordinator.ready();
+      expect(coordinator.state.connection).toBe("destroyed");
+      expect(coordinator.pendingCount).toBe(0);
+      expect(writesAfterDestroy).toBe(0);
+    } finally {
+      coordinator.destroy();
+      grid.destroy();
+    }
+  });
+
+  for (const paged of [false, true]) {
+    it(`rolls back earlier stored records when a later restore fails (${paged ? "paged" : "dense"})`, async () => {
+      const storage = new FakePendingStorage();
+      const grid = mountGrid(4, 2, paged);
+      grid.applyTransaction({ patches: [setValue(7)] });
+      grid.applyTransaction({ patches: [setValue(42)] });
+      const before = grid.exportSnapshot();
+      await storage.put({
+        documentId: "offline-doc",
+        baseVersion: 4,
+        clientMutationId: "restore-first",
+        operations: [{ op: "removeRows", sheet: "s1", at: 0, count: 1 }],
+      });
+      await storage.put({
+        documentId: "offline-doc",
+        baseVersion: 5,
+        clientMutationId: "restore-second",
+        // This address is valid before the first record removes a row.
+        operations: [{ ...setValue(9), addr: { sheet: "s1", row: 1, col: 0 } }],
+      });
+      const adapter = new ControlledAdapter(snapshot());
+      const coordinator = new SyncCoordinator(grid, adapter, {
+        documentId: "offline-doc",
+        serverVersion: 4,
+        pendingStorage: storage,
+        initialConnection: "offline",
+      });
+
+      try {
+        await expect(coordinator.ready()).rejects.toThrow();
+        expect(grid.exportSnapshot()).toEqual(before);
+        expect(coordinator.pendingCommits()).toEqual([]);
+        expect(coordinator.state).toMatchObject({
+          pendingCount: 0,
+          pendingOperations: 0,
+          pendingEncodedBytes: 0,
+        });
+        expect(adapter.requests).toEqual([]);
+        expect([...storage.records.keys()]).toEqual(["restore-first", "restore-second"]);
+
+        coordinator.destroy();
+        grid.undo();
+        expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(7);
+      } finally {
+        coordinator.destroy();
+        grid.destroy();
+      }
+    });
+  }
+
+  it("rolls back a stored edit when the next record targets a missing sheet", async () => {
+    const storage = new FakePendingStorage();
+    await storage.put({
+      documentId: "offline-doc",
+      baseVersion: 4,
+      clientMutationId: "restore-first",
+      operations: [setValue(9)],
+    });
+    await storage.put({
+      documentId: "offline-doc",
+      baseVersion: 5,
+      clientMutationId: "restore-second",
+      operations: [{ ...setValue(8), addr: { sheet: "removed", row: 0, col: 0 } }],
+    });
+    const grid = mountGrid();
+    const before = grid.exportSnapshot();
+    const coordinator = new SyncCoordinator(grid, new ControlledAdapter(snapshot()), {
+      documentId: "offline-doc",
+      serverVersion: 4,
+      pendingStorage: storage,
+      initialConnection: "offline",
+    });
+    try {
+      await expect(coordinator.ready()).rejects.toThrow();
+      expect(grid.exportSnapshot()).toEqual(before);
+      expect(coordinator.pendingCommits()).toEqual([]);
+    } finally {
+      coordinator.destroy();
+      grid.destroy();
+    }
+  });
+
   it("does not turn storage cancellation during destroy into a hydration failure", async () => {
     const loading = Promise.withResolvers<readonly PendingCommit[]>();
     const started = Promise.withResolvers<AbortSignal | undefined>();
@@ -787,10 +966,21 @@ describe("durable offline sync", () => {
       clientMutationId: "paged-m1",
       operations: [setValue(9)],
     });
+    storage.records.set("paged-m2", {
+      documentId: "offline-doc",
+      baseVersion: 5,
+      clientMutationId: "paged-m2",
+      operations: [setValue(8)],
+    });
     const adapter = new ControlledAdapter(snapshot(4, 100));
     adapter.responders.push(async (request) => ({
       status: "applied",
       version: 5,
+      clientMutationId: request.clientMutationId,
+    }));
+    adapter.responders.push(async (request) => ({
+      status: "applied",
+      version: 6,
       clientMutationId: request.clientMutationId,
     }));
     const grid = mountGrid(4, 100, true);
@@ -798,20 +988,27 @@ describe("durable offline sync", () => {
       documentId: "offline-doc",
       serverVersion: 4,
       pendingStorage: storage,
-      initialConnection: "offline",
     });
 
     await coordinator.ready();
-    expect((grid.store as SheetwriteStore).getPagedStats("s1")).toMatchObject({
+    const store = grid.store;
+    if (!(store instanceof SheetwriteStore)) throw new Error("Expected a sheet store");
+    expect(coordinator.pendingCount).toBe(2);
+    expect(store.getPagedStats("s1")).toMatchObject({
       chunks: 0,
       loadedCells: 1,
       dirtyCells: 1,
       allocatedBytes: 0,
     });
-    coordinator.setOnline(true);
-    await coordinator.flush();
-    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(9);
-    expect((grid.store as SheetwriteStore).getPagedStats("s1")).toMatchObject({
+    await coordinator.sendNext();
+    expect(coordinator.pendingCount).toBe(1);
+    expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(8);
+    expect(store.getPagedStats("s1")).toMatchObject({ dirtyCells: 1 });
+
+    await coordinator.sendNext();
+    expect(coordinator.pendingCount).toBe(0);
+    expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(8);
+    expect(store.getPagedStats("s1")).toMatchObject({
       chunks: 1,
       dirtyCells: 0,
     });

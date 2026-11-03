@@ -25,6 +25,43 @@ export interface GridTransactionAdmissionGuard {
 const guardsByGrid = new WeakMap<Grid, Set<GridTransactionAdmissionGuard>>();
 const storageRevisionByTransaction = new WeakMap<Transaction, bigint>();
 
+/** Owns the temporary inverse resources of one durable local replay. */
+export interface TransactionReplayRollback {
+  commit(): void;
+  rollback(): void;
+  dispose(): void;
+}
+
+const replayRollbackByTransaction = new WeakMap<Transaction, TransactionReplayRollback>();
+const replayRollbackRequests = new WeakSet<readonly DocumentOp[]>();
+
+/** Only the restore owner may defer history and retain inverse resources. */
+export function requestTransactionReplayRollback(
+  operations: readonly DocumentOp[],
+): readonly DocumentOp[] {
+  replayRollbackRequests.add(operations);
+  return operations;
+}
+
+export function takeTransactionReplayRollbackRequest(operations: readonly DocumentOp[]): boolean {
+  return replayRollbackRequests.delete(operations);
+}
+
+export function setTransactionReplayRollback(
+  transaction: Transaction,
+  rollback: TransactionReplayRollback,
+): void {
+  replayRollbackByTransaction.set(transaction, rollback);
+}
+
+export function takeTransactionReplayRollback(
+  transaction: Transaction,
+): TransactionReplayRollback | undefined {
+  const rollback = replayRollbackByTransaction.get(transaction);
+  replayRollbackByTransaction.delete(transaction);
+  return rollback;
+}
+
 export function setTransactionStorageRevision(transaction: Transaction, revision: bigint): void {
   storageRevisionByTransaction.set(transaction, revision);
 }
