@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, beforeEach, expect, it } from "bun:test";
+import { afterEach, beforeAll, beforeEach, expect, it, spyOn } from "bun:test";
 
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { renderControl } from "../src/ribbon/ribbon-controls.js";
@@ -222,32 +222,49 @@ it("shows the focus cell's size in points and applies typed points as pixels", a
   expect(document.activeElement).toBe(host);
 });
 
-it("runs a border preset from the keyboard and returns focus to the menu button", async () => {
-  const { host, control, select, cell, key, press } = await setup();
-  select(0, 0);
-  const options = control("Borders options");
+it.each(["full", "compact"] as const)(
+  "%s ribbon keeps a keyboard menu open across a pending layout frame and returns focus",
+  async (mode) => {
+    const frames: FrameRequestCallback[] = [];
+    const requestFrame = spyOn(globalThis, "requestAnimationFrame").mockImplementation((callback) =>
+      frames.push(callback),
+    );
+    try {
+      const { host, control, select, cell, key, press, openTab } = await setup(false, undefined, {
+        mode,
+      });
+      select(0, 0);
+      openTab("Insert");
+      openTab("Home");
+      const options = control("Borders options");
 
-  press(options);
-  const menu = host.querySelector(".sheetwrite-ribbon-popup");
-  expect(menu?.getAttribute("role")).toBe("menu");
-  expect(menu?.getAttribute("aria-label")).toBe("Borders");
-  expect(document.activeElement?.textContent).toBe("Bottom Border");
+      press(options);
+      // A tab switch can leave a layout frame behind the user's next key.
+      for (const frame of frames.splice(0)) frame(0);
+      const menu = host.querySelector(".sheetwrite-ribbon-popup");
+      expect(menu?.getAttribute("role")).toBe("menu");
+      expect(menu?.getAttribute("aria-label")).toBe("Borders");
+      expect(document.activeElement?.textContent).toBe("Bottom Border");
 
-  key(document.activeElement as HTMLElement, "ArrowDown");
-  expect(document.activeElement?.textContent).toBe("Top Border");
-  press(document.activeElement as HTMLElement);
+      key(document.activeElement as HTMLElement, "ArrowDown");
+      expect(document.activeElement?.textContent).toBe("Top Border");
+      press(document.activeElement as HTMLElement);
 
-  expect(cell(0, 0).style.border?.top).toBeDefined();
-  expect(cell(0, 0).style.border?.bottom).toBeUndefined();
-  expect(host.querySelector(".sheetwrite-ribbon-popup")).toBeNull();
-  expect(document.activeElement).toBe(options);
+      expect(cell(0, 0).style.border?.top).toBeDefined();
+      expect(cell(0, 0).style.border?.bottom).toBeUndefined();
+      expect(host.querySelector(".sheetwrite-ribbon-popup")).toBeNull();
+      expect(document.activeElement).toBe(options);
 
-  press(options);
-  key(document.activeElement as HTMLElement, "Escape");
-  expect(host.querySelector(".sheetwrite-ribbon-popup")).toBeNull();
-  expect(options.getAttribute("aria-expanded")).toBe("false");
-  expect(document.activeElement).toBe(options);
-});
+      press(options);
+      key(document.activeElement as HTMLElement, "Escape");
+      expect(host.querySelector(".sheetwrite-ribbon-popup")).toBeNull();
+      expect(options.getAttribute("aria-expanded")).toBe("false");
+      expect(document.activeElement).toBe(options);
+    } finally {
+      requestFrame.mockRestore();
+    }
+  },
+);
 
 /**
  * Emulate WebKit's focus scroll: it scrolls the document to show a focused
