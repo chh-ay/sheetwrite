@@ -23,6 +23,14 @@ pub(super) struct Criterion {
 }
 
 impl Criterion {
+    #[cfg(target_arch = "wasm32")]
+    pub(super) fn numeric_operand(&self) -> Option<(CmpOp, f64)> {
+        match &self.operand {
+            Value::Number(number) if self.wildcard.is_none() => Some((self.op, *number)),
+            _ => None,
+        }
+    }
+
     pub(super) fn parse(value: Value) -> Self {
         let Value::Text(text) = value else {
             return Self {

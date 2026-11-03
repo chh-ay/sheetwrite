@@ -24,6 +24,8 @@ mod operators;
 mod random;
 mod range_reader;
 mod reference;
+#[cfg(target_arch = "wasm32")]
+mod simd;
 mod statistics;
 mod subtotal;
 #[cfg(test)]
@@ -2417,6 +2419,10 @@ impl CellStore {
             Ok(criterion) => criterion,
             Err(error) => return Some(Value::Error(error)),
         };
+        #[cfg(target_arch = "wasm32")]
+        if let Some(result) = self.dense_countif_family(range, &criterion, depth + 1) {
+            return Some(result);
+        }
         let mut matches = 0.0;
         loop {
             match reader.next_allow_errors(pass) {
