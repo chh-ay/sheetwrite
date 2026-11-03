@@ -6,7 +6,7 @@ use crate::types::{FormulaError, Value};
 
 use super::super::criteria::Criterion;
 use super::super::matrix::EvalMatrix;
-use super::super::value::compare_text_case_insensitive;
+use super::super::value::{compare_text_case_insensitive, plain_number};
 use super::super::{EvalPass, EvalResult};
 
 pub(crate) const NAMES: &[&str] = &[
@@ -98,20 +98,20 @@ fn compile_criteria(
                     database_column
                 }
             };
-            conditions.push((database_column, database_criterion(value)));
+            conditions.push((database_column, database_criterion(value)?));
         }
         rows.push(conditions);
     }
     Ok(rows)
 }
 
-fn database_criterion(value: &Value) -> Criterion {
+fn database_criterion(value: &Value) -> Result<Criterion, FormulaError> {
     if let Value::Text(text) = value {
         let raw = text.trim();
         // Unlike COUNTIF, plain database text criteria are prefixes.
         if !raw.starts_with(['=', '<', '>'])
             && !raw.contains(['*', '?', '~'])
-            && raw.parse::<f64>().is_err()
+            && plain_number(raw).is_none()
             && !raw.eq_ignore_ascii_case("TRUE")
             && !raw.eq_ignore_ascii_case("FALSE")
         {

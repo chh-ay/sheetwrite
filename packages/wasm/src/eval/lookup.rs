@@ -313,7 +313,7 @@ pub(super) fn find_match_index_indexed(
     }
     let search_reverse = search_mode < 0;
     if match_mode == 2 {
-        return Ok(wildcard_scan(values, key, search_reverse));
+        return wildcard_scan(values, key, search_reverse);
     }
     if let Some(found) = list.exact_match(key, search_reverse, use_index)? {
         return Ok(Some(found));
@@ -344,19 +344,23 @@ fn monotonicity_walk(values: &[Value], requires_ascending: bool) -> Result<bool,
 
 /// First (or last) wildcard match. A non-text key matches nothing, exactly
 /// like the pattern check the plain scan runs per candidate.
-fn wildcard_scan(values: &[Value], key: &Value, search_reverse: bool) -> Option<usize> {
+fn wildcard_scan(
+    values: &[Value],
+    key: &Value,
+    search_reverse: bool,
+) -> Result<Option<usize>, FormulaError> {
     let Value::Text(pattern) = key else {
-        return None;
+        return Ok(None);
     };
-    let pattern = WildcardPattern::new(pattern);
+    let pattern = WildcardPattern::new(pattern)?;
     let matches = |candidate: &Value| pattern.matches(candidate);
-    if search_reverse {
+    Ok(if search_reverse {
         (0..values.len())
             .rev()
             .find(|&position| matches(&values[position]))
     } else {
         (0..values.len()).find(|&position| matches(&values[position]))
-    }
+    })
 }
 
 /// Exact-match positions from the class index. `None` keeps the plain scan:
