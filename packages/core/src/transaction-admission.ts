@@ -32,6 +32,19 @@ export interface TransactionReplayRollback {
 }
 
 const replayRollbackByTransaction = new WeakMap<Transaction, TransactionReplayRollback>();
+const replayRollbackRequests = new WeakSet<readonly DocumentOp[]>();
+
+/** Only the restore owner may defer history and retain inverse resources. */
+export function requestTransactionReplayRollback(
+  operations: readonly DocumentOp[],
+): readonly DocumentOp[] {
+  replayRollbackRequests.add(operations);
+  return operations;
+}
+
+export function takeTransactionReplayRollbackRequest(operations: readonly DocumentOp[]): boolean {
+  return replayRollbackRequests.delete(operations);
+}
 
 export function setTransactionReplayRollback(
   transaction: Transaction,

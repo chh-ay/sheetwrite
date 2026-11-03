@@ -22,6 +22,7 @@ import { type RebaseConflict, rebaseDocumentOperations } from "./rebase.js";
 import {
   type GridTransactionAdmissionDecision,
   registerGridTransactionAdmission,
+  requestTransactionReplayRollback,
   transactionStorageRevision,
   takeTransactionReplayRollback,
   type TransactionReplayRollback,
@@ -1459,7 +1460,9 @@ export class SyncCoordinator {
         const replay = record.versionOperationCounts
           ? markAtomicBatch(record.operations.slice())
           : record.operations;
-        const outcome = this.grid.applyRemoteOperations(replay, { localReplay: true });
+        const outcome = this.grid.applyRemoteOperations(requestTransactionReplayRollback(replay), {
+          localReplay: true,
+        });
         if (outcome.status === "applied") {
           const rollback = takeTransactionReplayRollback(outcome.transaction);
           if (rollback) rollbacks.push(rollback);

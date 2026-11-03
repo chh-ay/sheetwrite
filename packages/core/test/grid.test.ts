@@ -494,9 +494,21 @@ describe("Grid transaction resource ingress", () => {
           },
         ],
       });
-    const cases: Array<{ remote: DocumentOp; rows: number; expected: CellScalar[] }> = [
+    const cases: Array<{
+      remote: DocumentOp;
+      localReplay?: boolean;
+      rows: number;
+      expected: CellScalar[];
+    }> = [
       {
         remote: { op: "addRows", sheet: "s1", at: 0, count: 1 },
+        rows: 7,
+        expected: [null, 0.5, 10.5, 20.5, 30.5, 40.5, 50.5],
+      },
+
+      {
+        remote: { op: "addRows", sheet: "s1", at: 0, count: 1 },
+        localReplay: true,
         rows: 7,
         expected: [null, 0.5, 10.5, 20.5, 30.5, 40.5, 50.5],
       },
@@ -514,13 +526,13 @@ describe("Grid transaction resource ingress", () => {
       },
     ];
 
-    for (const { remote, rows, expected } of cases) {
+    for (const { remote, localReplay, rows, expected } of cases) {
       const grid = new GridImpl(mountHost(), {
         workbook: makeWorkbook(6),
         data: makeColumnarData(6),
       });
       expect(editRow3(grid).status).toBe("applied");
-      expect(grid.applyRemoteOperations([remote]).status).toBe("applied");
+      expect(grid.applyRemoteOperations([remote], { localReplay }).status).toBe("applied");
       grid.undo();
       expect({ remote, amounts: amounts(grid, rows) }).toEqual({ remote, amounts: expected });
       grid.destroy();

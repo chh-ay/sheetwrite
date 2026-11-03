@@ -36,6 +36,7 @@ import { storeEngine } from "./store/engine-registry.js";
 import {
   type GridTransactionAdmissionDecision,
   setTransactionReplayRollback,
+  takeTransactionReplayRollbackRequest,
 } from "./transaction-admission.js";
 import { preparedHistoryBlock, TransactionPreparation } from "./transaction-preparation.js";
 import type { CellValue, Column } from "./types/cell.js";
@@ -114,7 +115,8 @@ export class DocumentController {
     if (atomic) markAtomicBatch(patches);
     const admitted = admitTransactionResources(patches, limits, resourceValidation, operations);
 
-    const captured = options.localReplay ? this.captureInverses(patches) : undefined;
+    const captureReplay = takeTransactionReplayRollbackRequest(operations);
+    const captured = captureReplay ? this.captureInverses(patches) : undefined;
     let outcome: ApplyTransactionResult;
     try {
       outcome = this.options.store.applyTransaction(
