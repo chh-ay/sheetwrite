@@ -2244,6 +2244,7 @@ impl CellStore {
         }
         Value::Error(FormulaError::Value)
     }
+
     fn eval_matrix_arg(
         &self,
         ast: &Ast,
