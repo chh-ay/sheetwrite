@@ -180,7 +180,7 @@ export function checkWasmFunctionSizes(bytes: Uint8Array): {
     }
     return {
       name: name
-        .replace(/\[[0-9a-f]{16}\]|::h[0-9a-f]{16}/g, "")
+        .replace(/\[[0-9a-f]{8,16}\]|::h[0-9a-f]{16}/g, "")
         .replaceAll("sheetwrite_wasm::", ""),
       bytes: size,
     };
