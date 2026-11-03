@@ -30,6 +30,7 @@ mod subtotal;
 mod subtotal_tests;
 mod text;
 mod value;
+mod wildcard;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
@@ -2353,7 +2354,7 @@ impl CellStore {
         if let Value::Error(error) = value {
             return Err(error);
         }
-        Ok(Criterion::parse(value))
+        Criterion::parse(value)
     }
 
     /// Folds the reduction functions straight from their ranges instead of

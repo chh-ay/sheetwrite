@@ -3,9 +3,9 @@
 use crate::calc::Func;
 use crate::types::{EvalResult, FormulaError, Value};
 
-use super::date::parse_date_value;
 use super::functions::{bool_arg, integer_arg, require_arity, text_arg, FuncAccumulator};
-use super::value::{format_basic_text, text_from_value};
+use super::value::{format_basic_text, number_from_text, text_from_value};
+use super::wildcard::Wildcard;
 
 const MAX_TEXT_OUTPUT_BYTES: usize = 16 * 1024 * 1024;
 const MAX_SEARCH_STEPS: usize = 4_000_000;
@@ -401,6 +401,10 @@ fn find_search(values: &FuncAccumulator, case_sensitive: bool) -> Value {
         Ok(_) => return Value::Error(FormulaError::Value),
         Err(error) => return Value::Error(error),
     };
+    if !case_sensitive {
+        return wildcard_search(&haystack, &needle, start);
+    }
+
     let haystack = match collect_code_points(&haystack) {
         Ok(value) => value,
         Err(error) => return Value::Error(error),
@@ -412,13 +416,40 @@ fn find_search(values: &FuncAccumulator, case_sensitive: bool) -> Value {
     if start > haystack.len() {
         return Value::Error(FormulaError::Value);
     }
-    let found = if case_sensitive {
-        literal_find(&haystack, &needle, start)
-    } else {
-        wildcard_find(&haystack, &needle, start)
-    };
-    match found {
+    match literal_find(&haystack, &needle, start) {
         Ok(Some(index)) => Value::number((index + 1) as f64),
+        Ok(None) => Value::Error(FormulaError::Value),
+        Err(error) => Value::Error(error),
+    }
+}
+
+/// SEARCH from code point `start`, without case and with wildcards. A search
+/// that takes more than `MAX_SEARCH_STEPS` matching steps, or whose pattern
+/// cannot be allocated, fails with `#NUM!`.
+fn wildcard_search(haystack: &str, pattern: &str, start: usize) -> Value {
+    if haystack.len() > MAX_TEXT_OUTPUT_BYTES || pattern.len() > MAX_TEXT_OUTPUT_BYTES {
+        return Value::Error(FormulaError::Num);
+    }
+    let Some(start_byte) = code_point_byte_offset(haystack, start) else {
+        return Value::Error(FormulaError::Value);
+    };
+
+    let mut steps = 0usize;
+    let mut charge_step = || {
+        steps += 1;
+        if steps > MAX_SEARCH_STEPS {
+            Err(FormulaError::Num)
+        } else {
+            Ok(())
+        }
+    };
+    let found = Wildcard::parse(pattern)
+        .and_then(|wildcard| wildcard.find(haystack, start_byte, &mut charge_step));
+    match found {
+        Ok(Some(offset)) => {
+            let position = start + haystack[start_byte..offset].chars().count() + 1;
+            Value::number(position as f64)
+        }
         Ok(None) => Value::Error(FormulaError::Value),
         Err(error) => Value::Error(error),
     }
@@ -457,83 +488,6 @@ fn literal_find(
         .find(|&index| haystack[index..index + needle.len()] == *needle))
 }
 
-fn wildcard_find(
-    haystack: &[char],
-    pattern: &[char],
-    start: usize,
-) -> Result<Option<usize>, FormulaError> {
-    let mut steps = 0usize;
-    for candidate in start..=haystack.len() {
-        if wildcard_prefix(&haystack[candidate..], pattern, &mut steps)? {
-            return Ok(Some(candidate));
-        }
-    }
-    Ok(None)
-}
-
-fn wildcard_prefix(
-    text: &[char],
-    pattern: &[char],
-    steps: &mut usize,
-) -> Result<bool, FormulaError> {
-    let (mut text_index, mut pattern_index) = (0usize, 0usize);
-    let mut star: Option<(usize, usize)> = None;
-    loop {
-        *steps = steps.checked_add(1).ok_or(FormulaError::Num)?;
-        if *steps > MAX_SEARCH_STEPS {
-            return Err(FormulaError::Num);
-        }
-        if pattern_index == pattern.len() {
-            return Ok(true);
-        }
-
-        let pattern_character = pattern[pattern_index];
-        if pattern_character == '*' {
-            pattern_index += 1;
-            star = Some((pattern_index, text_index));
-            continue;
-        }
-
-        let (literal, next_pattern) = if pattern_character == '~'
-            && matches!(pattern.get(pattern_index + 1), Some('~' | '*' | '?'))
-        {
-            (Some(pattern[pattern_index + 1]), pattern_index + 2)
-        } else if pattern_character == '?' {
-            (None, pattern_index + 1)
-        } else {
-            (Some(pattern_character), pattern_index + 1)
-        };
-        let matched = text.get(text_index).is_some_and(|character| {
-            literal.is_none_or(|literal| characters_equal_ignore_case(*character, literal))
-        });
-        if matched {
-            text_index += 1;
-            pattern_index = next_pattern;
-            continue;
-        }
-
-        if let Some((retry_pattern, retry_text)) = star {
-            if retry_text < text.len() {
-                let retry_text = retry_text + 1;
-                text_index = retry_text;
-                pattern_index = retry_pattern;
-                star = Some((retry_pattern, retry_text));
-                continue;
-            }
-        }
-        return Ok(false);
-    }
-}
-
-fn characters_equal_ignore_case(left: char, right: char) -> bool {
-    if left.is_ascii() && right.is_ascii() {
-        return left.eq_ignore_ascii_case(&right);
-    }
-    left == right
-        || left.to_lowercase().eq(right.to_lowercase())
-        || left.to_uppercase().eq(right.to_uppercase())
-}
-
 fn value(values: &FuncAccumulator) -> Value {
     if let Err(error) = require_arity(values, 1, 1) {
         return Value::Error(error);
@@ -542,10 +496,7 @@ fn value(values: &FuncAccumulator) -> Value {
         Ok(value) => value,
         Err(error) => return Value::Error(error),
     };
-    if let Some(serial) = parse_date_value(&text) {
-        return Value::number(serial);
-    }
-    parse_number(&text, ".", ",").map_or_else(Value::Error, Value::number)
+    number_from_text(&text).map_or_else(Value::Error, Value::number)
 }
 
 fn repeat(values: &FuncAccumulator) -> Value {
@@ -653,24 +604,45 @@ fn number_value(values: &FuncAccumulator) -> Value {
         Ok(value) => value,
         Err(error) => return Value::Error(error),
     };
-    parse_number(&text, &decimal, &group).map_or_else(Value::Error, Value::number)
+    let Some((decimal, group)) = number_separators(&decimal, &group) else {
+        return Value::Error(FormulaError::Value);
+    };
+    parse_number(&text, decimal, group, InnerSpaces::Ignore)
+        .map_or_else(Value::Error, Value::number)
 }
 
-fn parse_number(text: &str, decimal: &str, group: &str) -> Result<f64, FormulaError> {
+/// NUMBERVALUE's separators: one decimal character and at most one group
+/// character, different from each other.
+fn number_separators(decimal: &str, group: &str) -> Option<(char, Option<char>)> {
+    let mut decimal_chars = decimal.chars();
+    let decimal_separator = decimal_chars.next()?;
+    let mut group_chars = group.chars();
+    let group_separator = group_chars.next();
+    let is_single = decimal_chars.next().is_none() && group_chars.next().is_none();
+    (is_single && Some(decimal_separator) != group_separator)
+        .then_some((decimal_separator, group_separator))
+}
+
+/// Whether spaces inside a number are skipped. NUMBERVALUE documents that it
+/// ignores them, even in the middle of the text; VALUE and coercion do not.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum InnerSpaces {
+    Ignore,
+    Reject,
+}
+
+/// Reads a number with the given separators and any trailing `%` signs. Group
+/// separators may appear anywhere before the decimal separator.
+pub(super) fn parse_number(
+    text: &str,
+    decimal: char,
+    group: Option<char>,
+    inner_spaces: InnerSpaces,
+) -> Result<f64, FormulaError> {
     if text.len() > MAX_TEXT_OUTPUT_BYTES {
         return Err(FormulaError::Num);
     }
-    if decimal.is_empty()
-        || decimal.len() > 4
-        || group.len() > 4
-        || decimal == group
-        || decimal.chars().count() != 1
-        || group.chars().count() > 1
-    {
-        return Err(FormulaError::Value);
-    }
-    let decimal = decimal.chars().next().expect("validated decimal separator");
-    let group = group.chars().next();
+
     let mut source = text.trim();
     let mut percent = 1.0;
     while let Some(prefix) = source.strip_suffix('%') {
@@ -698,6 +670,8 @@ fn parse_number(text: &str, decimal: &str, group: &str) -> Result<f64, FormulaEr
             normalized.push('.');
         } else if !character.is_whitespace() {
             normalized.push(character);
+        } else if inner_spaces == InnerSpaces::Reject {
+            return Err(FormulaError::Value);
         }
     }
     let value = normalized

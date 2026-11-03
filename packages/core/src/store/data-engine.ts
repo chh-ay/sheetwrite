@@ -635,6 +635,10 @@ export class StoreDataEngine {
       this.wasm.commitSources();
     }
 
+    // After the cells, because filters and sort keys read cell values.
+    for (const sheet of workbook.sheets) this.view.sheetLoaded(sheet.id);
+    if (this.view.hasQueuedHiddenRows()) this.flushHiddenRowsAndCommit();
+
     this.resourceOperation = null;
   }
 
@@ -3921,6 +3925,7 @@ export class StoreDataEngine {
     }
 
     this.windowReader.conditionalRulesChanged(snapshot.id);
+    this.view.sheetLoaded(snapshot.id);
     if (this.snapshotAuthoritative) this.authoritativeSnapshotSheets.add(snapshot.id);
     return true;
   }
@@ -4552,7 +4557,12 @@ export class StoreDataEngine {
 
     if (!accepted) throw new Error("snapshot hydration contains invalid persisted sources");
     this.snapshotAuthoritative = true;
-    for (const sheet of snapshot.sheets) this.authoritativeSnapshotSheets.add(sheet.id);
+    for (const sheet of snapshot.sheets) {
+      this.authoritativeSnapshotSheets.add(sheet.id);
+      this.view.cellsLoaded(sheet.id);
+    }
+
+    if (this.view.hasQueuedHiddenRows()) this.flushHiddenRowsAndCommit();
   }
 
   beginPageRequest(): void {
