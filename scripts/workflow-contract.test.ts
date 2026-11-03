@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -121,8 +121,8 @@ describe("CI and release workflow contracts", () => {
     }
   });
 
-  it("refuses to deploy a commit that is not on develop", async () => {
-    const guard = stepRun(job("docs", "build"), "Require a commit on develop");
+  it("deploys only develop commits that npm already released", async () => {
+    const guard = stepRun(job("docs", "build"), "Require a released commit on develop");
     const repository = await mkdtemp(join(tmpdir(), "sheetwrite-docs-guard-"));
     const git = (...args: string[]): string => {
       const result = Bun.spawnSync(["git", ...args], { cwd: repository, stdout: "pipe" });
@@ -142,6 +142,7 @@ describe("CI and release workflow contracts", () => {
     try {
       git("init", "--quiet");
       const commit = (message: string): string => {
+        git("add", "--all");
         git(
           "-c",
           "user.name=test",
@@ -155,15 +156,24 @@ describe("CI and release workflow contracts", () => {
         );
         return git("rev-parse", "HEAD");
       };
+      const changeset = join(repository, ".changeset", "feature.md");
+      await mkdir(join(repository, ".changeset"));
+      await writeFile(join(repository, ".changeset", "README.md"), "Changesets\n");
       const released = commit("released");
-      const develop = commit("develop");
-      git("update-ref", "refs/remotes/origin/develop", develop);
+      await writeFile(changeset, "---\n'@sheetwrite/core': minor\n---\n\nA feature.\n");
+      const unreleased = commit("feature with a pending changeset");
+      await rm(changeset);
+      const versioned = commit("version packages");
+      const docsFix = commit("docs-only fix");
+      git("update-ref", "refs/remotes/origin/develop", docsFix);
       git("checkout", "--quiet", "--detach", released);
       const unreviewed = commit("unreviewed branch");
 
       expect(runGuard(released)).toBe(0);
       expect(await readFile(join(repository, "output"), "utf8")).toBe(`commit=${released}\n`);
-      expect(runGuard(develop)).toBe(0);
+      expect(runGuard(versioned)).toBe(0);
+      expect(runGuard(docsFix)).toBe(0);
+      expect(runGuard(unreleased)).not.toBe(0);
       expect(runGuard(unreviewed)).not.toBe(0);
     } finally {
       await rm(repository, { recursive: true, force: true });

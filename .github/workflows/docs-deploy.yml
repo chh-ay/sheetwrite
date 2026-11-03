@@ -3,8 +3,9 @@ name: Deploy Production Docs
 # The production docs describe the published packages, so a push to develop
 # only builds and tests them (ci.yml). release.yml calls this workflow with the
 # release commit after npm publication. A maintainer can also start it by hand
-# to redeploy a release tag or a later develop commit, for example after the
-# release size-history pull request or a docs-only fix.
+# to redeploy a release tag, or a later develop commit that has no pending
+# changesets: for example after the release size-history pull request or a
+# docs-only fix.
 on:
   workflow_call:
     inputs:
@@ -15,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: Release tag (for example @sheetwrite/core@0.6.1) or develop commit to deploy.
+        description: Release tag (for example @sheetwrite/core@0.6.1) or develop commit with no pending changesets.
         type: string
         required: true
 
@@ -42,11 +43,18 @@ jobs:
           ref: ${{ inputs.ref }}
           fetch-depth: 0
           persist-credentials: false
-      # A branch other than develop can hold unreviewed or unreleased docs.
-      - name: Require a commit on develop
+      # A branch other than develop can hold unreviewed docs. A pending
+      # changeset means the commit holds package changes that npm does not
+      # have yet, so its docs would describe unreleased behavior.
+      - name: Require a released commit on develop
         id: commit
         run: |
           git merge-base --is-ancestor HEAD origin/develop
+          pending=$(find .changeset -maxdepth 1 -name '*.md' ! -name README.md)
+          if [ -n "$pending" ]; then
+            printf '::error::Unreleased changesets at this commit:\n%s\n' "$pending"
+            exit 1
+          fi
           echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Setup Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
