@@ -36,11 +36,17 @@ fn a_constant_name_calculates_and_follows_its_definition() {
 
     assert!(store.set_named_formula("tax", -1, "=0.5"));
     assert_eq!(number(&store, sheet, 0, 3), 5.0);
-    assert_eq!(store.named_formula_source("TAX", -1).as_deref(), Some("=0.5"));
+    assert_eq!(
+        store.named_formula_source("TAX", -1).as_deref(),
+        Some("=0.5")
+    );
 
     assert!(store.remove_named_range("Tax", -1));
     assert_eq!(text(&store, sheet, 0, 3).as_deref(), Some("#NAME?"));
-    assert_eq!(store.formula_source(sheet, 0, 3).as_deref(), Some("=B1*Tax"));
+    assert_eq!(
+        store.formula_source(sheet, 0, 3).as_deref(),
+        Some("=B1*Tax")
+    );
 }
 
 #[test]
@@ -63,11 +69,7 @@ fn a_name_that_holds_a_reference_works_where_a_reference_is_needed() {
 #[test]
 fn a_dynamic_name_reads_the_range_its_formula_returns() {
     let (mut store, sheet) = data_store();
-    assert!(store.set_named_formula(
-        "Filled",
-        -1,
-        "=OFFSET(Data!$A$1,0,0,COUNT(Data!$A:$A),1)"
-    ));
+    assert!(store.set_named_formula("Filled", -1, "=OFFSET(Data!$A$1,0,0,COUNT(Data!$A:$A),1)"));
     store.set_formula(sheet, 0, 3, "=SUM(Filled)", 0);
     store.recompute(sheet);
     assert_eq!(number(&store, sheet, 0, 3), 6.0);
@@ -218,7 +220,10 @@ fn a_formula_rewritten_by_a_row_edit_keeps_the_name() {
 
     store.add_rows(sheet, 0, 1);
     store.recompute(sheet);
-    assert_eq!(store.formula_source(sheet, 4, 3).as_deref(), Some("=(B4*Tax)"));
+    assert_eq!(
+        store.formula_source(sheet, 4, 3).as_deref(),
+        Some("=(B4*Tax)")
+    );
     assert_eq!(number(&store, sheet, 4, 3), 6.0);
 }
 
@@ -255,7 +260,10 @@ mod lambda {
         assert_eq!(number(&store, sheet, 1, 3), 12.0);
         assert_eq!(text(&store, sheet, 2, 3).as_deref(), Some("#CALC!"));
         assert_eq!(text(&store, sheet, 3, 3).as_deref(), Some("#VALUE!"));
-        assert_eq!(store.formula_source(sheet, 0, 3).as_deref(), Some("=Double(B1)"));
+        assert_eq!(
+            store.formula_source(sheet, 0, 3).as_deref(),
+            Some("=Double(B1)")
+        );
 
         store.set_number(sheet, 0, 1, 7.0, 0);
         store.recompute(sheet);
@@ -278,21 +286,9 @@ mod lambda {
     #[test]
     fn a_named_lambda_calls_itself() {
         let (mut store, sheet) = data_store();
-        assert!(store.set_named_formula(
-            "Fact",
-            -1,
-            "=LAMBDA(n,IF(n<=1,1,n*Fact(n-1)))"
-        ));
-        assert!(store.set_named_formula(
-            "IsEven",
-            -1,
-            "=LAMBDA(n,IF(n=0,TRUE,IsOdd(n-1)))"
-        ));
-        assert!(store.set_named_formula(
-            "IsOdd",
-            -1,
-            "=LAMBDA(n,IF(n=0,FALSE,IsEven(n-1)))"
-        ));
+        assert!(store.set_named_formula("Fact", -1, "=LAMBDA(n,IF(n<=1,1,n*Fact(n-1)))"));
+        assert!(store.set_named_formula("IsEven", -1, "=LAMBDA(n,IF(n=0,TRUE,IsOdd(n-1)))"));
+        assert!(store.set_named_formula("IsOdd", -1, "=LAMBDA(n,IF(n=0,FALSE,IsEven(n-1)))"));
         store.set_formula(sheet, 0, 3, "=Fact(5)", 0);
         store.set_formula(sheet, 1, 3, "=IsEven(7)", 0);
         store.recompute(sheet);
@@ -307,11 +303,7 @@ mod lambda {
 #[test]
 fn recursion_past_the_call_limit_is_a_num_error() {
     let (mut store, sheet) = data_store();
-    assert!(store.set_named_formula(
-        "SumTo",
-        -1,
-        "=LAMBDA(n,IF(n=0,0,n+SumTo(n-1)))"
-    ));
+    assert!(store.set_named_formula("SumTo", -1, "=LAMBDA(n,IF(n=0,0,n+SumTo(n-1)))"));
     store.set_formula(sheet, 0, 3, "=SumTo(10)", 0);
     store.set_formula(sheet, 1, 3, "=SumTo(100000)", 0);
     store.recompute(sheet);
