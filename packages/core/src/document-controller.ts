@@ -33,7 +33,10 @@ import {
 } from "./restore-block.js";
 import type { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
-import type { GridTransactionAdmissionDecision } from "./transaction-admission.js";
+import {
+  type GridTransactionAdmissionDecision,
+  setTransactionReplayRollback,
+} from "./transaction-admission.js";
 import { preparedHistoryBlock, TransactionPreparation } from "./transaction-preparation.js";
 import type { CellValue, Column } from "./types/cell.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "./types/coordinates.js";
@@ -111,19 +114,48 @@ export class DocumentController {
     if (atomic) markAtomicBatch(patches);
     const admitted = admitTransactionResources(patches, limits, resourceValidation, operations);
 
-    const outcome = this.options.store.applyTransaction(
-      withAdmittedTransactionResources({ patches }, admitted),
-      {
-        source: "remote",
-        commitReason: options.commitReason ?? "api",
-        localReplay: options.localReplay,
-      },
-    );
+    const captured = options.localReplay ? this.captureInverses(patches) : undefined;
+    let outcome: ApplyTransactionResult;
+    try {
+      outcome = this.options.store.applyTransaction(
+        withAdmittedTransactionResources({ patches }, admitted),
+        {
+          source: "remote",
+          commitReason: options.commitReason ?? "api",
+          localReplay: options.localReplay,
+        },
+      );
+    } catch (error) {
+      if (captured) this.disposeInverses(captured);
+      throw error;
+    }
 
-    // Undo entries hold addresses from before this change: a remote row or
-    // column insert or delete moves them exactly as a local one does.
-    if (outcome.status === "applied") {
-      this.rebaseHistoryFor(outcome.transaction.patches);
+    if (outcome.status === "applied" && captured) {
+      const inverse = this.takeAppliedInverses(patches, captured, outcome.transaction.patches);
+      const rebases: Array<{ edit: AxisResize; extent: number }> = [];
+      this.rebaseHistoryFor(outcome.transaction.patches, (edit, extent) => {
+        rebases.push({ edit, extent });
+      });
+      const dispose = () => {
+        for (const part of inverse) if (part.kind === "rangeSnapshot") part.dispose();
+      };
+      setTransactionReplayRollback(outcome.transaction, {
+        commit: () => {
+          for (const { edit, extent } of rebases) this.history.rebaseAxis(edit, extent);
+          dispose();
+        },
+        rollback: () => {
+          try {
+            this.rollbackReplay(inverse);
+          } finally {
+            dispose();
+          }
+        },
+      });
+    } else {
+      if (captured) this.disposeInverses(captured);
+      // Replay rebases history only when every stored record has applied.
+      if (outcome.status === "applied") this.rebaseHistoryFor(outcome.transaction.patches);
     }
 
     return outcome;
@@ -202,41 +234,11 @@ export class DocumentController {
       return outcome;
     }
 
-    const inverseByPatch = new Map<DocumentOp, Array<DocumentOp | HistoryPart>>();
+    let inverseByPatch = new Map<DocumentOp, Array<DocumentOp | HistoryPart>>();
     let outcome: ApplyTransactionResult;
 
     try {
-      // One edit avoids the coordinate/grouping allocation of a batch snapshot.
-      if (patches.length > 1) {
-        const setsBySheet = new Map<SheetId, Array<Extract<DocumentOp, { op: "set" }>>>();
-        for (const patch of patches) {
-          if (patch.op !== "set") continue;
-          const sets = setsBySheet.get(patch.addr.sheet) ?? [];
-          sets.push(patch);
-          setsBySheet.set(patch.addr.sheet, sets);
-        }
-
-        const engine = storeEngine(this.options.store);
-        if (engine) {
-          for (const [sheet, sets] of setsBySheet) {
-            const captured = this.snapshotSetBatch(sheet, sets);
-
-            for (const [index, patch] of sets.entries()) {
-              const cell = captured[index];
-              if (!cell) throw new Error("Missing captured inverse cell");
-
-              inverseByPatch.set(patch, [cell]);
-            }
-          }
-        }
-      }
-
-      // Custom stores without an engine retain their scalar snapshot contract.
-      for (const patch of patches) {
-        if (!inverseByPatch.has(patch)) {
-          inverseByPatch.set(patch, [...this.inversePatch(patch), ...this.pivotRestores(patch)]);
-        }
-      }
+      inverseByPatch = this.captureInverses(patches);
 
       outcome = this.storeApply(patches, reason, admittedPatches);
     } catch (error) {
@@ -268,28 +270,7 @@ export class DocumentController {
     if (outcome.rejections?.length) this.options.onMutationRejected(outcome.rejections);
 
     const applied = outcome.transaction.patches;
-    const appliedSet = new Set(applied);
-    const inverse: HistoryAction = [];
-
-    // Bulk capture groups by sheet; history still follows input order and
-    // captures a reused operation object only once.
-    for (const patch of patches) {
-      const items = inverseByPatch.get(patch);
-      if (!items) continue;
-      inverseByPatch.delete(patch);
-
-      if (!appliedSet.has(patch)) {
-        for (const item of items) {
-          if ("kind" in item && item.kind === "rangeSnapshot") item.dispose();
-        }
-
-        continue;
-      }
-
-      for (const item of items) {
-        inverse.push("kind" in item ? item : { kind: "patches", patches: [item] });
-      }
-    }
+    const inverse = this.takeAppliedInverses(patches, inverseByPatch, applied);
 
     this.rebaseHistoryFor(applied);
     this.history.push(inverse, applied);
@@ -361,6 +342,95 @@ export class DocumentController {
       withAdmittedTransactionResources({ patches }, admitted),
       { commitReason: reason },
     );
+  }
+
+  private captureInverses(
+    patches: readonly DocumentOp[],
+  ): Map<DocumentOp, Array<DocumentOp | HistoryPart>> {
+    const captured = new Map<DocumentOp, Array<DocumentOp | HistoryPart>>();
+    try {
+      // Batch cell reads retain the same compact capture used by local history.
+      if (patches.length > 1) {
+        const setsBySheet = new Map<SheetId, Array<Extract<DocumentOp, { op: "set" }>>>();
+        for (const patch of patches) {
+          if (patch.op !== "set") continue;
+          const sets = setsBySheet.get(patch.addr.sheet) ?? [];
+          sets.push(patch);
+          setsBySheet.set(patch.addr.sheet, sets);
+        }
+
+        if (storeEngine(this.options.store)) {
+          for (const [sheet, sets] of setsBySheet) {
+            const cells = this.snapshotSetBatch(sheet, sets);
+            for (const [index, patch] of sets.entries()) {
+              const cell = cells[index];
+              if (!cell) throw new Error("Missing captured inverse cell");
+              captured.set(patch, [cell]);
+            }
+          }
+        }
+      }
+
+      for (const patch of patches) {
+        if (!captured.has(patch)) {
+          captured.set(patch, [...this.inversePatch(patch), ...this.pivotRestores(patch)]);
+        }
+      }
+      return captured;
+    } catch (error) {
+      this.disposeInverses(captured);
+      throw error;
+    }
+  }
+
+  private disposeInverses(captured: Map<DocumentOp, Array<DocumentOp | HistoryPart>>): void {
+    for (const inverse of captured.values()) {
+      for (const part of inverse) {
+        if ("kind" in part && part.kind === "rangeSnapshot") part.dispose();
+      }
+    }
+  }
+
+  private takeAppliedInverses(
+    patches: readonly DocumentOp[],
+    captured: Map<DocumentOp, Array<DocumentOp | HistoryPart>>,
+    applied: readonly DocumentOp[],
+  ): HistoryAction {
+    const appliedSet = new Set(applied);
+    const inverse: HistoryAction = [];
+    for (const patch of patches) {
+      const items = captured.get(patch);
+      if (!items) continue;
+      captured.delete(patch);
+      if (!appliedSet.has(patch)) {
+        for (const part of items) {
+          if ("kind" in part && part.kind === "rangeSnapshot") part.dispose();
+        }
+        continue;
+      }
+      for (const part of items) {
+        inverse.push("kind" in part ? part : { kind: "patches", patches: [part] });
+      }
+    }
+    return inverse;
+  }
+
+  private rollbackReplay(action: HistoryAction): void {
+    const preparation = new TransactionPreparation();
+    try {
+      const patches = materializeHistoryAction(action, preparation);
+      if (patches.length === 0) return;
+      const fitted = this.fitHistoryPatches(patches, preparation);
+      // Rollback is not a new local edit. It must bypass sync admission and
+      // dirty-capacity checks, including while the pending queue is hydrating.
+      const outcome = this.options.store.applyTransaction(
+        withAdmittedTransactionResources({ patches: fitted.patches }, fitted.admitted),
+        { source: "remote" },
+      );
+      if (outcome.status !== "applied") throw new Error("Durable replay rollback failed");
+    } finally {
+      preparation.dispose();
+    }
   }
 
   private inversePatch(patch: DocumentOp): Array<DocumentOp | HistoryPart> {
@@ -1254,7 +1324,10 @@ export class DocumentController {
    * right after its own edit, and later edits in the batch may resize the sheet
    * again, so each edit's extent is recovered from the final one.
    */
-  private rebaseHistoryFor(patches: readonly DocumentOp[]): void {
+  private rebaseHistoryFor(
+    patches: readonly DocumentOp[],
+    defer?: (edit: AxisResize, extent: number) => void,
+  ): void {
     const extents = new Map<SheetId, { row: number; col: number }>();
     for (const patch of patches) {
       const edit = axisResize(patch);
@@ -1275,7 +1348,8 @@ export class DocumentController {
       if (!edit || !extent) continue;
 
       extent[edit.axis] += edit.delta;
-      this.history.rebaseAxis(edit, extent[edit.axis]);
+      if (defer) defer(edit, extent[edit.axis]);
+      else this.history.rebaseAxis(edit, extent[edit.axis]);
     }
   }
 

@@ -23,6 +23,8 @@ import {
   type GridTransactionAdmissionDecision,
   registerGridTransactionAdmission,
   transactionStorageRevision,
+  takeTransactionReplayRollback,
+  type TransactionReplayRollback,
 } from "./transaction-admission.js";
 import type { DocumentOp, MutationIssue, WorkbookSnapshot } from "./types/document.js";
 import type { Grid } from "./types/grid.js";
@@ -1447,28 +1449,43 @@ export class SyncCoordinator {
       }
     }
 
-    for (const { record } of prepared) {
-      if (this.destroyed) return;
-      if (ambiguousIds.has(record.clientMutationId)) continue;
-      const replay = record.versionOperationCounts
-        ? markAtomicBatch(record.operations.slice())
-        : record.operations;
-      const outcome = this.grid.applyRemoteOperations(replay, { localReplay: true });
-      if (
-        outcome.status === "conflict" ||
-        outcome.status === "rejected" ||
-        (outcome.status === "noop" && record.operations.length > 0)
-      ) {
-        throw new Error(`Durable mutation ${record.clientMutationId} could not be restored`);
-      }
-      if (outcome.status === "applied") {
-        const revision = transactionStorageRevision(outcome.transaction);
-        if (revision !== undefined) {
-          this.recordStorageRevisions.set(record.clientMutationId, revision);
+    const rollbacks: TransactionReplayRollback[] = [];
+    const storageRevisions = new Map<string, bigint>();
+    let restored = false;
+    try {
+      for (const { record } of prepared) {
+        if (this.destroyed) return;
+        if (ambiguousIds.has(record.clientMutationId)) continue;
+        const replay = record.versionOperationCounts
+          ? markAtomicBatch(record.operations.slice())
+          : record.operations;
+        const outcome = this.grid.applyRemoteOperations(replay, { localReplay: true });
+        if (outcome.status === "applied") {
+          const rollback = takeTransactionReplayRollback(outcome.transaction);
+          if (rollback) rollbacks.push(rollback);
+          const revision = transactionStorageRevision(outcome.transaction);
+          if (revision !== undefined) storageRevisions.set(record.clientMutationId, revision);
+        }
+        if (
+          outcome.status === "conflict" ||
+          outcome.status === "rejected" ||
+          (outcome.status === "noop" && record.operations.length > 0) ||
+          (outcome.status === "applied" && outcome.transaction.patches.length !== replay.length)
+        ) {
+          throw new Error(`Durable mutation ${record.clientMutationId} could not be restored`);
         }
       }
+      if (this.destroyed) return;
+      restored = true;
+    } finally {
+      if (restored) {
+        for (const rollback of rollbacks) rollback.commit();
+      } else {
+        for (const rollback of rollbacks.reverse()) rollback.rollback();
+      }
     }
-    if (this.destroyed) return;
+
+    for (const [id, revision] of storageRevisions) this.recordStorageRevisions.set(id, revision);
 
     for (const { record, bytes } of prepared) {
       this.queue.add(record);
