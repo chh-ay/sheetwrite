@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "36de8c0c24f9dc80aed59030825b091cc29a00f506d1b6648deea7b5f8c008a6",
+  "sha256": "b245da5f6869127bd05d223ff0d1ef56c7b292ea47617e2f95868e35fe12aff5",
   "intentionalExports": [
     {
       "package": "@sheetwrite/charts",
