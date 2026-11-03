@@ -9170,7 +9170,7 @@
               ],
               "source": "pkg/sheetwrite_wasm.d.ts#L617",
               "jsDocTags": [],
-              "documentation": "Write the same future-function spelling for cell and defined-name formulas.\nThis is lexical: unknown future functions and incomplete formulas still\nround-trip without a parse/serialize pass changing their source text.",
+              "documentation": "Write future-function and local-binding prefixes for defined-name formulas.\nThis is lexical: unknown future functions and incomplete formulas still\nround-trip without a parse/serialize pass changing their source text.",
               "memberDocs": []
             },
             {
@@ -12714,7 +12714,7 @@
               ],
               "source": "pkg/sheetwrite_wasm.d.ts#L582",
               "jsDocTags": [],
-              "documentation": "Write the same future-function spelling for cell and defined-name formulas.\nThis is lexical: unknown future functions and incomplete formulas still\nround-trip without a parse/serialize pass changing their source text.",
+              "documentation": "Write future-function and local-binding prefixes for defined-name formulas.\nThis is lexical: unknown future functions and incomplete formulas still\nround-trip without a parse/serialize pass changing their source text.",
               "memberDocs": []
             },
             {

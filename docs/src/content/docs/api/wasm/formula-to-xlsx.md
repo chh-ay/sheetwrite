@@ -1,11 +1,11 @@
 ---
 title: "formulaToXlsx | @sheetwrite/wasm"
-description: "formulaToXlsx function in @sheetwrite/wasm: Write the same future-function spelling for cell and defined-name formulas."
+description: "formulaToXlsx function in @sheetwrite/wasm: Write future-function and local-binding prefixes for defined-name formulas."
 ---
 <!-- api-export:@sheetwrite/wasm|.|formulaToXlsx -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/wasm/">@sheetwrite/wasm</a><span class="api-status" data-kind="function">function</span></div>
 
-Write the same future-function spelling for cell and defined-name formulas.
+Write future-function and local-binding prefixes for defined-name formulas.
 This is lexical: unknown future functions and incomplete formulas still
 round-trip without a parse/serialize pass changing their source text.
 
