@@ -43,13 +43,20 @@ jobs:
           ref: ${{ inputs.ref }}
           fetch-depth: 0
           persist-credentials: false
-      # A branch other than develop can hold unreviewed docs. A pending
-      # changeset means the commit holds package changes that npm does not
-      # have yet, so its docs would describe unreleased behavior.
+      # A branch other than develop can hold unreviewed docs. The release
+      # workflow tags a version only after npm publishes it, so a missing tag
+      # means the version PR merged but npm does not have this version yet. A
+      # pending changeset means the commit holds package changes newer than
+      # that version. Either way the docs would describe unreleased behavior.
       - name: Require a released commit on develop
         id: commit
         run: |
           git merge-base --is-ancestor HEAD origin/develop
+          version=$(jq -r .version packages/core/package.json)
+          if ! git rev-parse --quiet --verify "refs/tags/@sheetwrite/core@$version" >/dev/null; then
+            printf '::error::@sheetwrite/core@%s has no release tag; npm has not published it\n' "$version"
+            exit 1
+          fi
           pending=$(find .changeset -maxdepth 1 -name '*.md' ! -name README.md)
           if [ -n "$pending" ]; then
             printf '::error::Unreleased changesets at this commit:\n%s\n' "$pending"

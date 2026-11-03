@@ -91,8 +91,10 @@ commit on `develop` and deploys them to Vercel. It runs in two ways:
 - A maintainer starts **Deploy Production Docs** by hand with a release tag
   (for example `@sheetwrite/core@0.6.1`) or a later `develop` commit. Use it
   after the release size-history pull request merges, or for a docs-only fix.
-  The run fails for a commit that is not on `develop` or that has a pending
-  changeset, because its docs would describe changes npm does not have yet.
+  The run fails for a commit that is not on `develop`, whose
+  `@sheetwrite/core` version has no release tag yet (the version pull request
+  merged but npm has not published it), or that has a pending changeset. In
+  each case the docs would describe changes npm does not have yet.
 
 Add these secrets to the GitHub `Production` environment or the repository:
 
