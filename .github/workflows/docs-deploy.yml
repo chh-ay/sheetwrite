@@ -1,0 +1,136 @@
+name: Deploy Production Docs
+
+# The production docs describe the published packages, so a push to develop
+# only builds and tests them (ci.yml). release.yml calls this workflow with the
+# release commit after npm publication. A maintainer can also start it by hand
+# to redeploy a release tag or a later develop commit, for example after the
+# release size-history pull request or a docs-only fix.
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Commit on develop to build and deploy.
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Release tag (for example @sheetwrite/core@0.6.1) or develop commit to deploy.
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  BUN_VERSION: "1.4.4"
+  NODE_VERSION: "26.12.1"
+  RUST_VERSION: "1.99.0"
+  WASM_TARGET: "wasm32-unknown-unknown"
+
+jobs:
+  build:
+    name: Build Production Docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      commit: ${{ steps.commit.outputs.commit }}
+    steps:
+      - name: Checkout requested commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+      # A branch other than develop can hold unreviewed or unreleased docs.
+      - name: Require a commit on develop
+        id: commit
+        run: |
+          git merge-base --is-ancestor HEAD origin/develop
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install "$RUST_VERSION" --profile minimal --target "$WASM_TARGET"
+      - name: Install dependencies and wasm-pack
+        run: |
+          bun install --frozen-lockfile
+          bun scripts/install-wasm-pack.ts
+      # CI artifacts expire after 7 days, so a redeploy of an older release
+      # builds the packages again from the same commit.
+      - name: Build packages
+        run: bun run build
+      - name: Type check and build production docs
+        run: |
+          bun run --filter '@sheetwrite/docs-start' typecheck
+          bun run --filter '@sheetwrite/docs-start' build:site
+      - name: Package prebuilt deployment
+        run: bun run docs:prepare-deployment
+      - name: Upload production docs
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: production-docs-deployment
+          path: .vercel/output/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 1
+
+  deploy:
+    name: Deploy Production Docs
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: Production
+    # Two deployments must not overlap: the later start must also finish last.
+    concurrency:
+      group: docs-production
+      cancel-in-progress: false
+    steps:
+      - name: Checkout built commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.build.outputs.commit }}
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - name: Download built production docs
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: production-docs-deployment
+          path: .vercel/output
+      - name: Deploy prebuilt production docs
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          missing=false
+          for name in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!name}" ]; then
+              printf '::error::Set %s in repository or Production environment secrets before deploying.\n' "$name"
+              missing=true
+            fi
+          done
+          if [ "$missing" = true ]; then
+            exit 1
+          fi
+          # One archive upload instead of one request per file: the free plan
+          # allows 5,000 file uploads a day, and a docs build has thousands.
+          npx --yes vercel@59.25.0 deploy --prebuilt --prod --yes --archive=tgz --token "$VERCEL_TOKEN"
+      - name: Submit deployed sitemap to IndexNow
+        env:
+          VERCEL_ENV: production
+          DOCS_OUTPUT_DIR: .vercel/output/static
+        run: bun scripts/indexnow.ts

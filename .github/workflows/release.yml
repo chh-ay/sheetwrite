@@ -53,6 +53,9 @@ jobs:
       contents: write
       pull-requests: write
       id-token: write
+    outputs:
+      # The GitHub release step runs only when npm shows every version.
+      released: ${{ steps.publish.outputs.pending != 'true' }}
     steps:
       - name: Checkout release commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -127,3 +130,13 @@ jobs:
             docs/src/generated/docs-contract.json
             scripts/size-report.json
             docs/src/generated/landing-bench.json
+
+  # The docs describe the published packages, so they deploy only after the
+  # GitHub release for the same commit.
+  docs:
+    needs: [identity, publish]
+    if: needs.publish.outputs.released == 'true'
+    uses: ./.github/workflows/docs-deploy.yml
+    with:
+      ref: ${{ needs.identity.outputs.commit }}
+    secrets: inherit
