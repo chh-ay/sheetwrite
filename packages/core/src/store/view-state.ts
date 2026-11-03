@@ -184,6 +184,29 @@ export class StoreViewState {
     this.recompute(sheet);
   }
 
+  /**
+   * Build the view of a sheet that was loaded with saved hidden rows, row
+   * groups, filters or sort keys, as {@link metadataChanged} does for a live
+   * edit. A sheet without them keeps no view state.
+   */
+  sheetLoaded(sheet: SheetId): void {
+    const meta = this.sheetMeta(sheet);
+    if (
+      (meta.hiddenRows?.size ?? 0) > 0 ||
+      (meta.rowGroups?.length ?? 0) > 0 ||
+      (meta.filters?.length ?? 0) > 0 ||
+      (meta.sortKeys?.length ?? 0) > 0
+    ) {
+      this.metadataChanged(sheet);
+    }
+  }
+
+  /** Filters and sort keys read cell values, so cells loaded after the sheet change the view. */
+  cellsLoaded(sheet: SheetId): void {
+    const state = this.stateBySheet.get(sheet);
+    if (state && (state.filters.size > 0 || state.sortKeys.length > 0)) this.recompute(sheet);
+  }
+
   /** Row structures already rebased workbook metadata; invalidate query and rebuild from it. */
   rowsChanged(sheet: SheetId): void {
     const state = this.stateBySheet.get(sheet);
