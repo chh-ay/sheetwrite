@@ -1453,22 +1453,29 @@ export class SyncCoordinator {
     const rollbacks: TransactionReplayRollback[] = [];
     const storageRevisions = new Map<string, bigint>();
     let restored = false;
+    let restoreFailure: SheetwriteError | undefined;
+
     try {
       for (const { record } of prepared) {
-        if (this.destroyed) return;
+        if (this.destroyed) break;
         if (ambiguousIds.has(record.clientMutationId)) continue;
+
         const replay = record.versionOperationCounts
           ? markAtomicBatch(record.operations.slice())
           : record.operations;
+
         const outcome = this.grid.applyRemoteOperations(requestTransactionReplayRollback(replay), {
           localReplay: true,
         });
+
         if (outcome.status === "applied") {
           const rollback = takeTransactionReplayRollback(outcome.transaction);
           if (rollback) rollbacks.push(rollback);
+
           const revision = transactionStorageRevision(outcome.transaction);
           if (revision !== undefined) storageRevisions.set(record.clientMutationId, revision);
         }
+
         if (
           outcome.status === "conflict" ||
           outcome.status === "rejected" ||
@@ -1478,15 +1485,43 @@ export class SyncCoordinator {
           throw new Error(`Durable mutation ${record.clientMutationId} could not be restored`);
         }
       }
-      if (this.destroyed) return;
-      restored = true;
-    } finally {
-      if (restored) {
-        for (const rollback of rollbacks) rollback.commit();
-      } else {
-        for (const rollback of rollbacks.reverse()) rollback.rollback();
+
+      restored = !this.destroyed;
+    } catch (error) {
+      restoreFailure = syncStorageFailure(error, { action: "hydrate" });
+    }
+
+    const failures: unknown[] = [];
+    const finalizing = restored ? rollbacks : rollbacks.reverse();
+
+    for (const rollback of finalizing) {
+      try {
+        if (!this.destroyed) {
+          if (restored) rollback.commit();
+          else rollback.rollback();
+        }
+      } catch (error) {
+        failures.push(error);
+      } finally {
+        try {
+          rollback.dispose();
+        } catch (error) {
+          failures.push(error);
+        }
       }
     }
+
+    if (failures.length > 0) {
+      if (restoreFailure?.cause !== undefined) failures.unshift(restoreFailure.cause);
+
+      const failure = new AggregateError(failures, "Durable replay finalization failed");
+
+      if (restoreFailure) restoreFailure.cause = failure;
+      else throw failure;
+    }
+
+    if (restoreFailure) throw restoreFailure;
+    if (this.destroyed) return;
 
     for (const [id, revision] of storageRevisions) this.recordStorageRevisions.set(id, revision);
 

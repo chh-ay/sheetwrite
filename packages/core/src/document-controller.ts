@@ -144,15 +144,9 @@ export class DocumentController {
       setTransactionReplayRollback(outcome.transaction, {
         commit: () => {
           for (const { edit, extent } of rebases) this.history.rebaseAxis(edit, extent);
-          dispose();
         },
-        rollback: () => {
-          try {
-            this.rollbackReplay(inverse);
-          } finally {
-            dispose();
-          }
-        },
+        rollback: () => this.rollbackReplay(inverse),
+        dispose,
       });
     } else {
       if (captured) this.disposeInverses(captured);
@@ -400,20 +394,26 @@ export class DocumentController {
   ): HistoryAction {
     const appliedSet = new Set(applied);
     const inverse: HistoryAction = [];
+
     for (const patch of patches) {
       const items = captured.get(patch);
       if (!items) continue;
+
       captured.delete(patch);
+
       if (!appliedSet.has(patch)) {
         for (const part of items) {
           if ("kind" in part && part.kind === "rangeSnapshot") part.dispose();
         }
+
         continue;
       }
+
       for (const part of items) {
         inverse.push("kind" in part ? part : { kind: "patches", patches: [part] });
       }
     }
+
     return inverse;
   }
 

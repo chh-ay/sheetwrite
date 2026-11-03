@@ -29,6 +29,7 @@ const storageRevisionByTransaction = new WeakMap<Transaction, bigint>();
 export interface TransactionReplayRollback {
   commit(): void;
   rollback(): void;
+  dispose(): void;
 }
 
 const replayRollbackByTransaction = new WeakMap<Transaction, TransactionReplayRollback>();
