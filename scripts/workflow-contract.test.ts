@@ -1,6 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 
 import {
   assertReviewedActionPins,
@@ -14,6 +16,7 @@ const workflowSources = {
   ci: readFileSync(resolve(root, ".github/workflows/ci.yml"), "utf8"),
   release: readFileSync(resolve(root, ".github/workflows/release.yml"), "utf8"),
   version: readFileSync(resolve(root, ".github/workflows/version.yml"), "utf8"),
+  docs: readFileSync(resolve(root, ".github/workflows/docs-deploy.yml"), "utf8"),
 } as const;
 
 function workflows(): Readonly<Record<keyof typeof workflowSources, WorkflowContract>> {
@@ -21,13 +24,20 @@ function workflows(): Readonly<Record<keyof typeof workflowSources, WorkflowCont
     ci: parseWorkflowContract(workflowSources.ci, "CI workflow"),
     release: parseWorkflowContract(workflowSources.release, "release workflow"),
     version: parseWorkflowContract(workflowSources.version, "version workflow"),
+    docs: parseWorkflowContract(workflowSources.docs, "docs deployment workflow"),
   };
 }
 
-function ciJob(name: string): WorkflowJob {
-  const job = workflows().ci.jobs[name];
-  if (!job) throw new Error(`Missing CI job ${name}`);
-  return job;
+function job(workflow: keyof typeof workflowSources, name: string): WorkflowJob {
+  const found = workflows()[workflow].jobs[name];
+  if (!found) throw new Error(`Missing ${workflow} job ${name}`);
+  return found;
+}
+
+function stepRun(found: WorkflowJob, name: string): string {
+  const step = found.steps?.find((candidate) => candidate.name === name);
+  if (!step?.run) throw new Error(`Missing step ${name}`);
+  return step.run;
 }
 
 describe("CI and release workflow contracts", () => {
@@ -38,6 +48,7 @@ describe("CI and release workflow contracts", () => {
         { name: "CI", workflow: parsed.ci },
         { name: "release", workflow: parsed.release },
         { name: "version", workflow: parsed.version },
+        { name: "docs deployment", workflow: parsed.docs },
       ]),
     ).not.toThrow();
 
@@ -73,49 +84,124 @@ describe("CI and release workflow contracts", () => {
     ).toThrow();
   });
 
-  it("deploys only successful develop pushes after Required CI and docs", () => {
-    const deploy = ciJob("docs-deploy");
-    if (!deploy.if) throw new Error("Docs deployment must have a condition");
-    expect(deploy.needs).toEqual(["required", "docs-build"]);
-    expect(deploy.environment).toBe("Production");
+  it("never deploys production docs from CI", () => {
+    // Production docs describe published packages; develop holds unreleased ones.
+    for (const [name, ciJob] of Object.entries(workflows().ci.jobs)) {
+      expect({ name, environment: ciJob.environment }).toEqual({ name, environment: undefined });
+    }
+  });
 
-    // These string comparisons and boolean operators also have JavaScript semantics.
-    const permitsDeployment = new Function("github", "needs", "success", `return ${deploy.if};`);
-    const evaluate = ({
-      eventName = "push",
-      ref = "refs/heads/develop",
-      requiredResult = "success",
-      docsResult = "success",
-      succeeded = true,
-      isFork = false,
-    }: {
-      eventName?: string;
-      ref?: string;
-      requiredResult?: string;
-      docsResult?: string;
-      succeeded?: boolean;
-      isFork?: boolean;
-    } = {}): unknown =>
-      permitsDeployment(
-        { event_name: eventName, ref, event: { repository: { fork: isFork } } },
-        { required: { result: requiredResult }, "docs-build": { result: docsResult } },
-        () => succeeded,
-      );
-    expect(evaluate()).toBeTrue();
-    expect(evaluate({ eventName: "pull_request", ref: "refs/pull/1/merge" })).toBeFalse();
-    expect(evaluate({ eventName: "pull_request" })).toBeFalse();
-    expect(evaluate({ eventName: "pull_request_target" })).toBeFalse();
-    expect(evaluate({ ref: "refs/heads/release" })).toBeFalse();
-    expect(evaluate({ succeeded: false })).toBeFalse();
-    expect(evaluate({ isFork: true })).toBeFalse();
-    for (const result of ["failure", "skipped", "cancelled"]) {
-      expect(evaluate({ requiredResult: result })).toBeFalse();
-      expect(evaluate({ docsResult: result })).toBeFalse();
+  it("deploys docs from the release commit only after its GitHub release", () => {
+    const publish = job("release", "publish");
+    const docs = job("release", "docs");
+    const githubRelease = publish.steps?.find(
+      (step) => step.run === "bun scripts/release-github.ts",
+    );
+    if (githubRelease?.if === undefined) throw new Error("Missing GitHub release condition");
+
+    expect(publish.outputs?.released).toBe(`\${{ ${githubRelease.if} }}`);
+    expect(docs.if).toBe("needs.publish.outputs.released == 'true'");
+    expect(docs.needs).toEqual(["identity", "publish"]);
+    expect(docs.uses).toBe("./.github/workflows/docs-deploy.yml");
+    expect(docs.with).toEqual({ ref: "${{ needs.identity.outputs.commit }}" });
+  });
+
+  it("starts docs deployment only from a release call or a manual run", () => {
+    const docs = workflows().docs;
+    expect(Object.keys(docs.on ?? {}).sort()).toEqual(["workflow_call", "workflow_dispatch"]);
+    expect(docs.on?.workflow_dispatch?.inputs?.ref?.required).toBeTrue();
+    expect(job("docs", "deploy").environment).toBe("Production");
+    expect(job("docs", "deploy").needs).toBe("build");
+  });
+
+  it("builds docs with the toolchain versions CI tests", () => {
+    const ciEnv = workflows().ci.env ?? {};
+    for (const [name, version] of Object.entries(workflows().docs.env ?? {})) {
+      expect({ name, version }).toEqual({ name, version: ciEnv[name] });
+    }
+  });
+
+  it("deploys only develop commits that npm already released", async () => {
+    const guard = stepRun(job("docs", "build"), "Require a released commit on develop");
+    const repository = await mkdtemp(join(tmpdir(), "sheetwrite-docs-guard-"));
+    // Outside the repository, so commits never pick it up.
+    const output = `${repository}.output`;
+    const git = (...args: string[]): string => {
+      const result = Bun.spawnSync(["git", ...args], { cwd: repository, stdout: "pipe" });
+      if (result.exitCode !== 0) throw new Error(`git ${args.join(" ")} failed`);
+      return result.stdout.toString().trim();
+    };
+    const runGuard = (commit: string): number => {
+      git("checkout", "--quiet", "--detach", commit);
+      return Bun.spawnSync(["bash", "-e", "-c", guard], {
+        cwd: repository,
+        env: { ...process.env, GITHUB_OUTPUT: output },
+        stdout: "pipe",
+        stderr: "pipe",
+      }).exitCode;
+    };
+
+    try {
+      git("init", "--quiet");
+      const commit = (message: string): string => {
+        git("add", "--all");
+        git(
+          "-c",
+          "user.name=test",
+          "-c",
+          "user.email=test@example.com",
+          "commit",
+          "--quiet",
+          "--allow-empty",
+          "-m",
+          message,
+        );
+        return git("rev-parse", "HEAD");
+      };
+      const changeset = join(repository, ".changeset", "feature.md");
+      const corePackage = join(repository, "packages", "core", "package.json");
+      const setVersion = (version: string) =>
+        writeFile(corePackage, `${JSON.stringify({ name: "@sheetwrite/core", version })}\n`);
+      await mkdir(join(repository, ".changeset"));
+      await mkdir(join(repository, "packages", "core"), { recursive: true });
+      await writeFile(join(repository, ".changeset", "README.md"), "Changesets\n");
+      await setVersion("1.0.0");
+      const released = commit("released 1.0.0");
+      git("tag", "@sheetwrite/core@1.0.0");
+      await writeFile(changeset, "---\n'@sheetwrite/core': minor\n---\n\nA feature.\n");
+      const unreleased = commit("feature with a pending changeset");
+      await rm(changeset);
+      await setVersion("1.1.0");
+      const versioned = commit("version packages, not yet published");
+      const unpublishedDocs = commit("docs fix before publication");
+      git("update-ref", "refs/remotes/origin/develop", unpublishedDocs);
+
+      // npm does not have 1.1.0 yet: only the 1.0.0 release may deploy.
+      expect(runGuard(versioned)).not.toBe(0);
+      expect(runGuard(unpublishedDocs)).not.toBe(0);
+      expect(runGuard(unreleased)).not.toBe(0);
+      expect(runGuard(released)).toBe(0);
+      expect(await readFile(output, "utf8")).toBe(`commit=${released}\n`);
+
+      // The release workflow tags 1.1.0 after npm publishes it.
+      git("checkout", "--quiet", "--detach", unpublishedDocs);
+      git("tag", "@sheetwrite/core@1.1.0");
+      const docsFix = commit("docs-only fix after publication");
+      git("update-ref", "refs/remotes/origin/develop", docsFix);
+      git("checkout", "--quiet", "--detach", released);
+      const unreviewed = commit("unreviewed branch");
+
+      expect(runGuard(versioned)).toBe(0);
+      expect(runGuard(docsFix)).toBe(0);
+      expect(runGuard(unreviewed)).not.toBe(0);
+    } finally {
+      await rm(repository, { recursive: true, force: true });
+      await rm(output, { force: true });
     }
   });
 
   it("fails Required CI when required docs or browser checks do not pass", () => {
-    const required = ciJob("required");
+    const required = job("ci", "required");
     const gate = required.steps?.find((step) => step.name === "Require every CI branch");
     if (!gate?.run) throw new Error("Missing Required CI gate command");
     const gateCommand = gate.run;
@@ -146,11 +232,7 @@ describe("CI and release workflow contracts", () => {
   });
 
   it("rejects every missing Vercel credential before invoking the deployment CLI", () => {
-    const deploy = ciJob("docs-deploy");
-    const step = deploy.steps?.find(
-      (candidate) => candidate.name === "Deploy prebuilt production docs",
-    );
-    if (!step?.run) throw new Error("Missing prebuilt deployment command");
+    const run = stepRun(job("docs", "deploy"), "Deploy prebuilt production docs");
     const credentials = {
       VERCEL_TOKEN: "test-token",
       VERCEL_ORG_ID: "test-org",
@@ -158,7 +240,7 @@ describe("CI and release workflow contracts", () => {
     };
     const CLI_REACHED_EXIT_CODE = 42;
     const runDeployment = (env: Readonly<Record<string, string>>) =>
-      Bun.spawnSync(["bash", "-e", "-c", `npx() { exit ${CLI_REACHED_EXIT_CODE}; }\n${step.run}`], {
+      Bun.spawnSync(["bash", "-e", "-c", `npx() { exit ${CLI_REACHED_EXIT_CODE}; }\n${run}`], {
         env,
         stdout: "pipe",
         stderr: "pipe",

@@ -84,12 +84,23 @@ they cannot check:
 
 CI builds the docs with the package outputs from the same run. It packages
 `docs/dist/client` as `.vercel/output`, then runs browser tests against
-`.vercel/output/static`. A successful push to `develop` deploys that exact output
-to Vercel after Required CI passes. Pull requests and forks do not deploy.
-Changes that skip the docs build also skip deployment.
+`.vercel/output/static`. CI does not deploy: the live site describes the
+published packages, and `develop` holds changes that are not released yet.
 
-Before merging this deployment setup, add these secrets to the GitHub
-`Production` environment or the repository:
+`.github/workflows/docs-deploy.yml` builds the packages and the docs from one
+commit on `develop` and deploys them to Vercel. It runs in two ways:
+
+- `release.yml` calls it with the release commit, after npm publication and the
+  GitHub release.
+- A maintainer starts **Deploy Production Docs** by hand with a release tag
+  (for example `@sheetwrite/core@0.6.1`) or a later `develop` commit. Use it
+  after the release size-history pull request merges, or for a docs-only fix.
+  The run fails for a commit that is not on `develop`, whose
+  `@sheetwrite/core` version has no release tag yet (the version pull request
+  merged but npm has not published it), or that has a pending changeset. In
+  each case the docs would describe changes npm does not have yet.
+
+Add these secrets to the GitHub `Production` environment or the repository:
 
 | Secret | Value |
 |---|---|
@@ -99,13 +110,10 @@ Before merging this deployment setup, add these secrets to the GitHub
 
 Keep the existing Vercel project and domain. These IDs let the CLI select it on
 a fresh runner without a local project link. Do not commit tokens or env files.
-Missing secrets fail the deployment job, not the pull-request checks.
+Missing secrets fail the deployment job before the Vercel CLI runs.
 
 `vercel.json` disables automatic Git deployments. Source deployments fail with
 a prebuilt-only message, so Vercel cannot install tools or rebuild the library.
-Do not merge this setup before the secrets are ready: otherwise the live site
-will stop receiving updates. After merging, check the first successful
-`Deploy Production Docs` job and the live site.
 
 To package an existing local docs build without rebuilding it:
 
