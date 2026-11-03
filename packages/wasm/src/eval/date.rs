@@ -7,7 +7,7 @@ use crate::types::{EvalResult, Value};
 use super::functions::{
     bool_arg, integer_arg, number_arg, require_arity, text_arg, FuncAccumulator,
 };
-use super::value::number_from_value;
+use super::value::{number_from_text, number_from_value};
 
 const UNIX_EPOCH_SERIAL: i64 = 25_569;
 const SECONDS_PER_DAY: i64 = 86_400;
@@ -148,8 +148,14 @@ fn exact_date(year: i64, month: i64, day: i64) -> Option<f64> {
     (date_parts(serial) == Some((year, month, day))).then_some(serial)
 }
 
+/// The date at the start of `text`, before any time after a space or `T`, as
+/// `DATEVALUE` reads it.
 pub(super) fn parse_date_value(text: &str) -> Option<f64> {
-    let date = text.trim().split(['T', ' ']).next()?;
+    parse_date(text.trim().split(['T', ' ']).next()?)
+}
+
+/// A date that is the whole of `date` (`2024-01-31`, `1/31/2024`, `31/1/2024`).
+pub(super) fn parse_date(date: &str) -> Option<f64> {
     if let Some((year, rest)) = date.split_once('-') {
         let (month, day) = rest.split_once('-')?;
         return exact_date(year.parse().ok()?, month.parse().ok()?, day.parse().ok()?);
@@ -171,7 +177,9 @@ pub(super) fn parse_date_value(text: &str) -> Option<f64> {
     exact_date(year, month, day)
 }
 
-fn parse_time_with_date(text: &str) -> Option<(Option<f64>, f64)> {
+/// A time (`13:30`, `1:30:15 PM`), alone or after a date and a space or `T`:
+/// the date's serial, if any, and the time as a fraction of a day.
+pub(super) fn parse_time_with_date(text: &str) -> Option<(Option<f64>, f64)> {
     let mut raw = text.trim();
     let mut meridiem = None;
     if raw.len() >= 2 {
@@ -188,7 +196,7 @@ fn parse_time_with_date(text: &str) -> Option<(Option<f64>, f64)> {
             return None;
         }
         (
-            Some(parse_date_value(prefix)?),
+            Some(parse_date(prefix)?),
             raw.get(separator + 1..)?.trim_start(),
         )
     } else {
@@ -223,18 +231,7 @@ fn parse_time_with_date(text: &str) -> Option<(Option<f64>, f64)> {
 
 fn temporal_serial(value: &Value) -> Result<f64, FormulaError> {
     let serial = match value {
-        Value::Text(text) => {
-            let trimmed = text.trim();
-            if let Ok(number) = trimmed.parse::<f64>() {
-                number
-            } else if let Some((date, time)) = parse_time_with_date(trimmed) {
-                date.map_or(time, |date| date.floor() + time)
-            } else if trimmed.contains(':') {
-                return Err(FormulaError::Value);
-            } else {
-                parse_date_value(trimmed).ok_or(FormulaError::Value)?
-            }
-        }
+        Value::Text(text) => number_from_text(text)?,
         _ => number_from_value(value)?,
     };
     if serial.is_finite() && serial >= 0.0 {
@@ -247,9 +244,7 @@ fn temporal_serial(value: &Value) -> Result<f64, FormulaError> {
 fn serial_date_arg(values: &FuncAccumulator, index: usize) -> Result<i64, FormulaError> {
     let value = values.arg_value(index).ok_or(FormulaError::Value)?;
     let serial = match value {
-        Value::Text(text) => parse_date_value(text)
-            .or_else(|| text.trim().parse::<f64>().ok())
-            .ok_or(FormulaError::Value)?,
+        Value::Text(text) => number_from_text(text)?,
         _ => number_from_value(value)?,
     };
     if !serial.is_finite() {
@@ -397,9 +392,7 @@ fn holiday_serials(values: &FuncAccumulator, index: usize) -> Result<Vec<i64>, F
         let serial = match &entry.value {
             Value::Blank => continue,
             Value::Text(text) if text.trim().is_empty() => continue,
-            Value::Text(text) => parse_date_value(text)
-                .or_else(|| text.trim().parse::<f64>().ok())
-                .ok_or(FormulaError::Value)?,
+            Value::Text(text) => number_from_text(text)?,
             Value::Error(error) => return Err(*error),
             value => number_from_value(value)?,
         };
