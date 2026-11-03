@@ -31,6 +31,8 @@ export interface WorkflowJob {
   readonly outputs?: Readonly<Record<string, string>>;
   readonly "timeout-minutes"?: number;
   readonly uses?: string;
+  /** Inputs for a reusable workflow named by `uses`. */
+  readonly with?: Readonly<Record<string, unknown>>;
   readonly steps?: readonly WorkflowStep[];
 }
 

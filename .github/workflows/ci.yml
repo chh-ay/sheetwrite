@@ -272,7 +272,7 @@ jobs:
             packages/formulas/pkg
             ~/.cargo/registry
             ~/.cargo/git
-          key: wasm-target-v2-${{ runner.os }}-${{ runner.arch }}-${{ env.RUST_VERSION }}-${{ env.WASM_PACK_VERSION }}-${{ hashFiles('rust-toolchain.toml', 'packages/wasm/Cargo.*', 'packages/wasm/src/**', 'packages/wasm/build.rs', 'packages/wasm/package.json', 'packages/formulas/package.json', 'scripts/wasm-factory.ts', 'scripts/workspace-tooling.ts', 'bun.lock') }}
+          key: wasm-target-v2-${{ runner.os }}-${{ runner.arch }}-${{ env.RUST_VERSION }}-${{ env.WASM_PACK_VERSION }}-${{ hashFiles('rust-toolchain.toml', 'packages/wasm/Cargo.*', 'packages/wasm/src/**', 'packages/wasm/build.rs', 'packages/wasm/package.json', 'packages/formulas/package.json', 'scripts/wasm-factory.ts', 'scripts/wasm-function-sizes.ts', 'scripts/workspace-tooling.ts', 'bun.lock') }}
           restore-keys: |
             wasm-target-v2-${{ runner.os }}-${{ runner.arch }}-${{ env.RUST_VERSION }}-${{ env.WASM_PACK_VERSION }}-
       - name: Cache release verification tools
@@ -682,57 +682,3 @@ jobs:
             test "$DOCS" = skipped
             test "$BROWSER" = skipped
           fi
-
-  docs-deploy:
-    name: Deploy Production Docs
-    needs: [required, docs-build]
-    if: >-
-      success() && github.event_name == 'push' && github.ref == 'refs/heads/develop' &&
-      github.event.repository.fork == false &&
-      needs.required.result == 'success' && needs['docs-build'].result == 'success'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment: Production
-    steps:
-      - name: Checkout tested commit
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
-      - name: Setup Node
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
-      - name: Download tested production docs
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: production-docs
-          path: .vercel/output
-      - name: Deploy prebuilt production docs
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: |
-          missing=false
-          for name in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
-            if [ -z "${!name}" ]; then
-              printf '::error::Set %s in repository or Production environment secrets before deploying.\n' "$name"
-              missing=true
-            fi
-          done
-          if [ "$missing" = true ]; then
-            exit 1
-          fi
-          # One archive upload instead of one request per file: the free plan
-          # allows 5,000 file uploads a day, and a docs build has thousands.
-          npx --yes vercel@59.25.0 deploy --prebuilt --prod --yes --archive=tgz --token "$VERCEL_TOKEN"
-      - name: Submit deployed sitemap to IndexNow
-        env:
-          VERCEL_ENV: production
-          DOCS_OUTPUT_DIR: .vercel/output/static
-        run: bun scripts/indexnow.ts

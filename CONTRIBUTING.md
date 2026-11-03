@@ -23,6 +23,8 @@ Browser changes also require `bun run test:browser`; Rust changes require `cargo
 
 A change to the engine (the Rust source in `packages/wasm`, which also builds `@sheetwrite/formulas`) or to its TypeScript callers must also pass two benchmark checks before it merges, not only at the release capture. For engine changes, run the paired formula gate against a checkout with a built base engine: `bun bench/src/formula-gate.ts --base <built-base-checkout>`, pinned to one idle core where the system allows it (for example `taskset -c <core>` on Linux). The gate loads only the engine packages from each checkout, so changes to TypeScript callers need the benchmark that covers their path. Use the quiet-machine release capture, `bun run src/formula-bench.ts` from `bench/`, only when updating release evidence. Run the engine memory probe described in [`bench/README.md`](bench/README.md#engine-memory-release-gate). Byte counters must not grow unless a reviewed `--accept-bytes` file names the exact candidate engine, row, maximum and measured reason (see [the formula gate](bench/README.md#formula-gate-for-changes-on-a-shared-machine)).
 
+Every engine build, including CI's canonical artifacts, checks the optimized WASM function bodies in `scripts/wasm-factory.ts`. Each function must be at most **75,000 bytes**. This leaves 25,000 bytes below JavaScriptCore's **100,000-byte** `maximumOMGCandidateCost` ([WebKit source](https://github.com/WebKit/WebKit/blob/main/Source/JavaScriptCore/runtime/OptionsList.h)), above which its optimizing compiler does not compile a WASM function. The build prints the ten largest functions by name for each engine. Split large evaluator functions into `#[inline(never)]` `*_family` handlers; keep wasm-opt `--no-inline=*_family` before `-O3`, since LLVM's inline attribute does not control wasm-opt. Do not raise the budget to hide growth. Release builds retain names with `-g` only until this check; finalization removes the name section before packaging, so published WASM does not grow.
+
 `verify:ci` is the broadest local pre-submit gate, though not a complete mirror of the pipeline — CI additionally runs the full browser matrix, coverage, and the production docs build. Matched timing comparisons run deliberately through the local protocol in `bench/README.md`, not as a required CI job. `verify:ci` prints `::workspace-node::<id>` before each step; `bun scripts/workspace-tooling.ts verify-ci --dry-run` lists every id with the exact command it runs, so you can re-run just the step that failed. [`scripts/README.md`](scripts/README.md) explains how the repository's scripts are organised and which handful you actually need.
 
 Generated API pages, `docs/src/generated/*`, and `docs/public/llms*.txt` are owned by `bun run docs:generate`. Do not hand-edit generated files. `bun run docs:check` rejects stale output, including the AI-readable endpoints. Build output, benchmark evidence, and release artifacts remain uncommitted.
@@ -82,12 +84,23 @@ they cannot check:
 
 CI builds the docs with the package outputs from the same run. It packages
 `docs/dist/client` as `.vercel/output`, then runs browser tests against
-`.vercel/output/static`. A successful push to `develop` deploys that exact output
-to Vercel after Required CI passes. Pull requests and forks do not deploy.
-Changes that skip the docs build also skip deployment.
+`.vercel/output/static`. CI does not deploy: the live site describes the
+published packages, and `develop` holds changes that are not released yet.
 
-Before merging this deployment setup, add these secrets to the GitHub
-`Production` environment or the repository:
+`.github/workflows/docs-deploy.yml` builds the packages and the docs from one
+commit on `develop` and deploys them to Vercel. It runs in two ways:
+
+- `release.yml` calls it with the release commit, after npm publication and the
+  GitHub release.
+- A maintainer starts **Deploy Production Docs** by hand with a release tag
+  (for example `@sheetwrite/core@0.6.1`) or a later `develop` commit. Use it
+  after the release size-history pull request merges, or for a docs-only fix.
+  The run fails for a commit that is not on `develop`, whose
+  `@sheetwrite/core` version has no release tag yet (the version pull request
+  merged but npm has not published it), or that has a pending changeset. In
+  each case the docs would describe changes npm does not have yet.
+
+Add these secrets to the GitHub `Production` environment or the repository:
 
 | Secret | Value |
 |---|---|
@@ -97,13 +110,10 @@ Before merging this deployment setup, add these secrets to the GitHub
 
 Keep the existing Vercel project and domain. These IDs let the CLI select it on
 a fresh runner without a local project link. Do not commit tokens or env files.
-Missing secrets fail the deployment job, not the pull-request checks.
+Missing secrets fail the deployment job before the Vercel CLI runs.
 
 `vercel.json` disables automatic Git deployments. Source deployments fail with
 a prebuilt-only message, so Vercel cannot install tools or rebuild the library.
-Do not merge this setup before the secrets are ready: otherwise the live site
-will stop receiving updates. After merging, check the first successful
-`Deploy Production Docs` job and the live site.
 
 To package an existing local docs build without rebuilding it:
 

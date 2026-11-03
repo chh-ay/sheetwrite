@@ -41,4 +41,6 @@ codegen-units = 1
 # `-O3`: wasm-opt runs passes in order. It takes one pattern, matched against
 # the demangled names wasm-bindgen writes.
 [package.metadata.wasm-pack.profile.release]
-wasm-opt = ["--no-inline=*_family", "-O3"]
+# Keep names for the function-size guard in wasm-factory; it removes the name
+# section before either engine is packaged.
+wasm-opt = ["--no-inline=*_family", "-O3", "-g"]
