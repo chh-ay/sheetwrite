@@ -228,6 +228,7 @@ export class CommandToolbar {
   /** Index of the first item moved to the overflow; `items.length` when all fit. */
   private overflowStart: number;
   private fitFrame = 0;
+  private fittedWidth = -1;
 
   constructor(host: HTMLElement, grid: Grid, options: CommandToolbarOptions) {
     this.grid = grid;
@@ -328,7 +329,10 @@ export class CommandToolbar {
       }
       changed = true;
     }
-    if (changed) this.scheduleFit();
+    if (changed) {
+      this.fittedWidth = -1;
+      this.scheduleFit();
+    }
 
     refreshControls(this.controls, this.grid, state);
   }
@@ -345,6 +349,11 @@ export class CommandToolbar {
 
   /** Hide trailing items until the row fits; the More button then lists them. */
   private fit(): void {
+    const width = this.element.clientWidth;
+    // ResizeObserver can deliver another fit after the overflow has opened.
+    // Its borrowed controls must stay in the popup when the width is unchanged.
+    if (width === this.fittedWidth) return;
+    this.fittedWidth = width;
     this.popup.closeAll(false);
     this.showAvailable();
     this.more.hidden = true;
