@@ -52,6 +52,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-loaded-spans"><code>loadedSpans</code></a>
 <a href="#cell-store-mark-range-clean"><code>markRangeClean</code></a>
 <a href="#cell-store-memory-stats"><code>memoryStats</code></a>
+<a href="#cell-store-move-named-formula-source"><code>moveNamedFormulaSource</code></a>
 <a href="#cell-store-named-formula-source"><code>namedFormulaSource</code></a>
 <a href="#cell-store-paged-dirty-coordinates"><code>pagedDirtyCoordinates</code></a>
 <a href="#cell-store-paged-stats"><code>pagedStats</code></a>
@@ -113,7 +114,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-import-memory-state"><code>importMemoryState</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>99</span>
+## Members <span class="api-count" data-pagefind-ignore>100</span>
 
 <div class="api-member-list">
 
@@ -527,6 +528,18 @@ markRangeClean: (sheet: number, start_row: number, end_row: number, start_col: n
 memoryStats: () => Float64Array;
 ```
 
+</details>
+
+<details class="api-member" id="cell-store-move-named-formula-source" data-pagefind-weight="1">
+<summary><code>moveNamedFormulaSource</code> <span class="api-member-summary">Rewrite a saved name definition after a row/column move.</span></summary>
+
+```ts generated
+moveNamedFormulaSource: (source: string, sheet: number, columns: boolean, from: number, count: number, to: number) => string | undefined;
+```
+
+<p class="api-member-doc">Rewrite a saved name definition after a row/column move. Unqualified
+relative references keep their A1-relative meaning; only references
+qualified by the moved sheet follow that sheet's cells.</p>
 </details>
 
 <details class="api-member" id="cell-store-named-formula-source" data-pagefind-weight="1">
@@ -1340,6 +1353,14 @@ class CellStore {
     end_col: number,
   ) => void;
   memoryStats: () => Float64Array;
+  moveNamedFormulaSource: (
+    source: string,
+    sheet: number,
+    columns: boolean,
+    from: number,
+    count: number,
+    to: number,
+  ) => string | undefined;
   namedFormulaSource: (name: string, scope: number) => string | undefined;
   pagedDirtyCoordinates: (sheet: number) => Float64Array;
   pagedStats: (sheet: number) => Float64Array;

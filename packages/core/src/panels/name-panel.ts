@@ -87,9 +87,10 @@ export function namePanel(grid: Grid, define = false): GridPanel {
               : (workbook.sheets.find((sheet) => sheet.id === definition.scope)?.name ??
                 definition.scope);
           const label = `${definition.name} (${scopeLabel})`;
-          const definitionSource = definition.range === undefined
-            ? definition.formula
-            : absoluteFormula(grid, definition.range);
+          const definitionSource =
+            definition.range === undefined
+              ? definition.formula
+              : absoluteFormula(grid, definition.range);
           const row = panelSection(label);
           const source = document.createElement("code");
           source.className = "sheetwrite-explain-formula";

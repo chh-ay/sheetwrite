@@ -11,6 +11,9 @@ use wasm_bindgen::prelude::wasm_bindgen;
 // https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/3d025add-118d-4413-9856-ab65712ec1b0
 const FUTURE_FUNCTIONS: &str = "ACOT ACOTH AGGREGATE ANCHORARRAY ARABIC BASE BETA.DIST BETA.INV BINOM.DIST BINOM.DIST.RANGE BINOM.INV BITAND BITLSHIFT BITOR BITRSHIFT BITXOR BYCOL BYROW CEILING.MATH CEILING.PRECISE CHISQ.DIST CHISQ.DIST.RT CHISQ.INV CHISQ.INV.RT CHISQ.TEST CHOOSECOLS CHOOSEROWS COMBINA CONCAT CONFIDENCE.NORM CONFIDENCE.T COT COTH COVARIANCE.P COVARIANCE.S CSC CSCH DAYS DECIMAL DROP ERF.PRECISE ERFC.PRECISE EXPAND EXPON.DIST F.DIST F.DIST.RT F.INV F.INV.RT F.TEST FIELDVALUE FILTERXML FLOOR.MATH FLOOR.PRECISE FORECAST.ETS FORECAST.ETS.CONFINT FORECAST.ETS.SEASONALITY FORECAST.ETS.STAT FORECAST.LINEAR FORMULATEXT GAMMA GAMMA.DIST GAMMA.INV GAMMALN.PRECISE GAUSS HSTACK HYPGEOM.DIST IFNA IFS IMCOSH IMCOT IMCSC IMCSCH IMSEC IMSECH IMSINH IMTAN ISFORMULA ISOMITTED ISOWEEKNUM LAMBDA LET LOGNORM.DIST LOGNORM.INV MAKEARRAY MAP MAXIFS MINIFS MODE.MULT MODE.SNGL MUNIT NEGBINOM.DIST NORM.DIST NORM.INV NORM.S.DIST NORM.S.INV NUMBERVALUE PDURATION PERCENTILE.EXC PERCENTILE.INC PERCENTRANK.EXC PERCENTRANK.INC PERMUTATIONA PHI POISSON.DIST PQSOURCE PYTHON_STR PYTHON_TYPE PYTHON_TYPENAME QUARTILE.EXC QUARTILE.INC QUERYSTRING RANDARRAY RANK.AVG RANK.EQ REDUCE RRI SCAN SEC SECH SEQUENCE SHEET SHEETS SKEW.P SORTBY STDEV.P STDEV.S SWITCH T.DIST T.DIST.2T T.DIST.RT T.INV T.INV.2T T.TEST TAKE TEXTAFTER TEXTBEFORE TEXTJOIN TEXTSPLIT TOCOL TOROW UNICHAR UNICODE UNIQUE VAR.P VAR.S VSTACK WEBSERVICE WEIBULL.DIST WRAPCOLS WRAPROWS XLOOKUP XMATCH XOR Z.TEST";
 
+const MODERN_FUTURE_FUNCTIONS: &str =
+    "ARRAYTOTEXT GROUPBY PERCENTOF PIVOTBY REGEXEXTRACT REGEXREPLACE REGEXTEST VALUETOTEXT";
+
 fn strip_prefix(name: &str) -> &str {
     let mut bare = name;
     for prefix in ["_xlfn.", "_xlws.", "_xlpm."] {
@@ -34,7 +37,7 @@ fn identifier<'a>(token: &'a Spanned<'_>) -> Option<&'a str> {
 fn is_qualified(tokens: &[Spanned<'_>], index: usize) -> bool {
     matches!(
         tokens.get(index + 1).map(|token| &token.tok),
-        Some(Ok(Tok::Bang))
+        Some(Ok(Tok::Bang | Tok::Structured(_)))
     ) || index
         .checked_sub(1)
         .is_some_and(|previous| matches!(tokens[previous].tok, Ok(Tok::Bang)))
@@ -81,6 +84,14 @@ struct Frame {
 }
 
 fn bindings<'a>(tokens: &'a [Spanned<'_>]) -> Vec<Binding<'a>> {
+    if !tokens.iter().any(|token| {
+        identifier(token).is_some_and(|name| {
+            let bare = strip_prefix(name);
+            bare.eq_ignore_ascii_case("LAMBDA") || bare.eq_ignore_ascii_case("LET")
+        })
+    }) {
+        return Vec::new();
+    }
     let mut frames: Vec<Frame> = Vec::new();
     let mut bindings = Vec::new();
     for (index, token) in tokens.iter().enumerate() {
@@ -192,6 +203,7 @@ pub fn formula_to_xlsx(source: &str) -> String {
                 "_xlfn._xlws."
             } else if FUTURE_FUNCTIONS
                 .split_ascii_whitespace()
+                .chain(MODERN_FUTURE_FUNCTIONS.split_ascii_whitespace())
                 .any(|function| function.eq_ignore_ascii_case(bare))
             {
                 "_xlfn."

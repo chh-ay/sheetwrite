@@ -2598,6 +2598,27 @@ pub(crate) fn rewrite_own_sheet_axis(ast: &mut Ast, axis: Axis, change: AxisChan
     )
 }
 
+/// A moved block must not first delete a defined name's references: rewrite
+/// the saved definition once, after the store's remove/add move completes.
+pub(crate) fn move_named_formula_refs(
+    ast: &mut Ast,
+    edited_sheet: u32,
+    columns: bool,
+    from: u32,
+    count: u32,
+    to: u32,
+) -> bool {
+    rewrite_axis(
+        ast,
+        AxisEdit {
+            axis: if columns { Axis::Col } else { Axis::Row },
+            change: AxisChange::Move { from, count, to },
+            formula_sheet: u32::MAX,
+            edited_sheet,
+        },
+    )
+}
+
 fn rewrite_axis(ast: &mut Ast, edit: AxisEdit) -> bool {
     let on_edited_sheet = edit.formula_sheet == edit.edited_sheet;
     let moved = match ast {

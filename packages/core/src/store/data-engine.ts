@@ -1070,6 +1070,29 @@ export class StoreDataEngine {
     });
   }
 
+  private restoreMovedNamedFormulas(
+    originals: readonly Extract<NamedRangeSnapshot, { formula: string }>[],
+    patch: Extract<DocumentOp, { op: "moveRows" | "moveColumns" }>,
+  ): boolean {
+    for (const original of originals) {
+      const formula = this.wasm.moveNamedFormulaSource(
+        original.formula,
+        this.handleOf(patch.sheet),
+        patch.op === "moveColumns",
+        patch.from,
+        patch.count,
+        patch.to,
+      );
+      if (
+        formula === undefined ||
+        !this.applyPatch({ op: "setNamedRange", namedRange: { ...original, formula } }, null)
+      ) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   private sameNamedRange(
     namedRange: NamedRangeSnapshot,
     name: string,
@@ -3400,6 +3423,10 @@ export class StoreDataEngine {
     }
 
     if (patch.from === patch.to) return true;
+    const movedNamedFormulas = (this.workbook.namedRanges ?? []).filter(
+      (named): named is Extract<NamedRangeSnapshot, { formula: string }> =>
+        named.formula !== undefined,
+    );
     const movedNamedRanges = (this.workbook.namedRanges ?? [])
       .filter(
         (namedRange): namedRange is NamedRangeSnapshot & { range: Range } =>
@@ -3530,7 +3557,7 @@ export class StoreDataEngine {
       if (!this.syncNamedRange(namedRange)) return false;
     }
 
-    return true;
+    return this.restoreMovedNamedFormulas(movedNamedFormulas, patch);
   }
 
   private moveColumns(
@@ -3550,6 +3577,10 @@ export class StoreDataEngine {
 
     if (patch.from === patch.to) return true;
 
+    const movedNamedFormulas = (this.workbook.namedRanges ?? []).filter(
+      (named): named is Extract<NamedRangeSnapshot, { formula: string }> =>
+        named.formula !== undefined,
+    );
     const movedNamedRanges = (this.workbook.namedRanges ?? [])
       .filter(
         (namedRange): namedRange is NamedRangeSnapshot & { range: Range } =>
@@ -3665,7 +3696,7 @@ export class StoreDataEngine {
       if (!this.syncNamedRange(namedRange)) return false;
     }
 
-    return true;
+    return this.restoreMovedNamedFormulas(movedNamedFormulas, patch);
   }
 
   /**

@@ -8,7 +8,7 @@ description: "InitOutput interface in @sheetwrite/formulas: Result of module ini
 Result of module initialization: the instantiated exports plus the shared linear memory.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/formulas/pkg/sheetwrite_wasm.d.ts#L654"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L654</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/formulas/pkg/sheetwrite_wasm.d.ts#L660"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L660</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -71,6 +71,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-loaded-spans"><code>cellstore_loadedSpans</code></a>
 <a href="#init-output-cellstore-mark-range-clean"><code>cellstore_markRangeClean</code></a>
 <a href="#init-output-cellstore-memory-stats"><code>cellstore_memoryStats</code></a>
+<a href="#init-output-cellstore-move-named-formula-source"><code>cellstore_moveNamedFormulaSource</code></a>
 <a href="#init-output-cellstore-named-formula-source"><code>cellstore_namedFormulaSource</code></a>
 <a href="#init-output-cellstore-new"><code>cellstore_new</code></a>
 <a href="#init-output-cellstore-paged-dirty-coordinates"><code>cellstore_pagedDirtyCoordinates</code></a>
@@ -174,7 +175,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-wbindgen-start"><code>__wbindgen_start</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>160</span>
+## Members <span class="api-count" data-pagefind-ignore>161</span>
 
 <div class="api-member-list">
 
@@ -705,6 +706,15 @@ readonly cellstore_markRangeClean: (a: number, b: number, c: number, d: number, 
 
 ```ts generated
 readonly cellstore_memoryStats: (a: number) => [number, number];
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-move-named-formula-source" data-pagefind-weight="1">
+<summary><code>cellstore_moveNamedFormulaSource</code></summary>
+
+```ts generated
+readonly cellstore_moveNamedFormulaSource: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number];
 ```
 
 </details>
@@ -1872,6 +1882,16 @@ export interface InitOutput {
     f: number,
   ) => void;
   readonly cellstore_memoryStats: (a: number) => [number, number];
+  readonly cellstore_moveNamedFormulaSource: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+    g: number,
+    h: number,
+  ) => [number, number];
   readonly cellstore_namedFormulaSource: (
     a: number,
     b: number,

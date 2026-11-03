@@ -728,6 +728,44 @@ describe("SheetwriteStore", () => {
     store.dispose();
   });
 
+  it("keeps formula-name source authoritative across structural edits and snapshot reload", () => {
+    const workbook = makeWorkbook(6);
+    const store = new SheetwriteStore(workbook);
+    try {
+      expect(
+        store.applyTransaction({
+          patches: [
+            { op: "set", addr: addr(1, 1), value: { kind: "literal", value: 7 } },
+            { op: "setNamedRange", namedRange: { name: "Input", formula: "='Sheet 1'!$B$2*2" } },
+            { op: "set", addr: addr(0, 2), value: { kind: "formula", src: "=Input" } },
+          ],
+        }).status,
+      ).toBe("applied");
+      expect(store.getCell(addr(0, 2)).resolved).toBe(14);
+      expect(
+        store.applyTransaction({
+          patches: [{ op: "moveRows", sheet: "s1", from: 1, count: 1, to: 3 }],
+        }).status,
+      ).toBe("applied");
+      expect(store.getCell(addr(0, 2)).resolved).toBe(14);
+      expect(store.exportSnapshot().workbook.namedRanges?.[0]?.formula).toContain("'Sheet 1'!$B$4");
+      expect(
+        store.applyTransaction({ patches: [{ op: "renameSheet", sheet: "s1", name: "New name" }] })
+          .status,
+      ).toBe("applied");
+      const snapshot = store.exportSnapshot();
+      expect(snapshot.workbook.namedRanges?.[0]?.formula).toContain("'New name'!$B$4");
+      const restored = SheetwriteStore.fromSnapshot(snapshot);
+      try {
+        expect(restored.getCell(addr(0, 2)).resolved).toBe(14);
+      } finally {
+        restored.dispose();
+      }
+    } finally {
+      store.dispose();
+    }
+  });
+
   it("resolves scoped named ranges and recalculates volatile formulas from one instant", () => {
     const columns = Array.from({ length: 4 }, (_, col) => ({
       key: `c${col}`,
