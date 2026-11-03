@@ -272,7 +272,7 @@ jobs:
             packages/formulas/pkg
             ~/.cargo/registry
             ~/.cargo/git
-          key: wasm-target-v2-${{ runner.os }}-${{ runner.arch }}-${{ env.RUST_VERSION }}-${{ env.WASM_PACK_VERSION }}-${{ hashFiles('rust-toolchain.toml', 'packages/wasm/Cargo.*', 'packages/wasm/src/**', 'packages/wasm/build.rs', 'packages/wasm/package.json', 'packages/formulas/package.json', 'scripts/wasm-factory.ts', 'scripts/workspace-tooling.ts', 'bun.lock') }}
+          key: wasm-target-v2-${{ runner.os }}-${{ runner.arch }}-${{ env.RUST_VERSION }}-${{ env.WASM_PACK_VERSION }}-${{ hashFiles('rust-toolchain.toml', 'packages/wasm/Cargo.*', 'packages/wasm/src/**', 'packages/wasm/build.rs', 'packages/wasm/package.json', 'packages/formulas/package.json', 'scripts/wasm-factory.ts', 'scripts/wasm-function-sizes.ts', 'scripts/workspace-tooling.ts', 'bun.lock') }}
           restore-keys: |
             wasm-target-v2-${{ runner.os }}-${{ runner.arch }}-${{ env.RUST_VERSION }}-${{ env.WASM_PACK_VERSION }}-
       - name: Cache release verification tools

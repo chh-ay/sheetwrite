@@ -1,5 +1,7 @@
 import { copyFile, readFile, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
+
+import { checkWasmFunctionSizes, WASM_FUNCTION_BUDGET_BYTES } from "./wasm-function-sizes.js";
 
 /**
  * The JavaScript loaders that both engine packages publish. `packages/wasm` owns
@@ -29,6 +31,19 @@ export async function copyEngineLoaders(packageDirectory: string): Promise<void>
 
 /** Keep wasm-bindgen's closure-local caches and finalizers isolated per engine. */
 export async function generateWasmFactory(packageDirectory: string): Promise<void> {
+  const wasmPath = resolve(packageDirectory, "pkg/sheetwrite_wasm_bg.wasm");
+  const { wasm, largestFunctions } = checkWasmFunctionSizes(await readFile(wasmPath));
+  process.stdout.write(
+    [
+      `WASM function sizes (${basename(resolve(packageDirectory))}; budget ${WASM_FUNCTION_BUDGET_BYTES} bytes)`,
+      "| Bytes | Function |",
+      "| ---: | --- |",
+      ...largestFunctions.map((entry) => `| ${entry.bytes} | ${entry.name} |`),
+      "",
+    ].join("\n"),
+  );
+  await writeFile(wasmPath, wasm);
+
   const gluePath = resolve(packageDirectory, "pkg/sheetwrite_wasm.js");
   const source = await readFile(gluePath, "utf8");
   const declarations = [...source.matchAll(/^export (?:class|function|const|let) (\w+)/gm)].map(
