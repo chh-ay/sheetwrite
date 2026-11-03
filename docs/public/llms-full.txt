@@ -5022,7 +5022,7 @@ Errors are values for display and dependency propagation, not `NaN` or blank ren
 
 Coercion follows these documented rules:
 
-- Arithmetic converts numeric text and booleans (`TRUE = 1`, `FALSE = 0`); nonnumeric text returns `#VALUE!`. Numeric text is what `VALUE` reads: a plain number (`1e3`, `.5`), a date (`2024-01-31`, `1/31/2024`), or a number with `,` group separators and a trailing `%` (`1,234.5%`). Spaces may surround the number but not split it. Date arguments read the same text, and `NUMBERVALUE` takes its own separators and ignores spaces.
+- Arithmetic converts numeric text and booleans (`TRUE = 1`, `FALSE = 0`); nonnumeric text returns `#VALUE!`. Numeric text is what `VALUE` reads: a plain number (`1e3`, `.5`), a date (`2024-01-31`, `1/31/2024`), a time alone or after a date and a space or `T` (`13:30`, `1:30:15 PM`, `2024-01-31 13:30`, `2024-01-31T06:00`), or a number with `,` group separators and a trailing `%` (`1,234.5%`). A date with a time reads as the date's serial plus the fraction of a day, so `="2024-01-31 12:00"+0` is 45322.5. The date or number must be the whole text: spaces may surround it but not split it, and nothing but a time may follow a date, so `2024-01-31 notes` and `1 234` stay text. Date arguments read the same text, and `NUMBERVALUE` takes its own separators and ignores spaces.
 - Direct scalar boolean/text arguments may be coerced by numeric functions. Text/booleans reached through a range are ignored by numeric aggregates, matching common spreadsheet behavior.
 - Empty scalar arithmetic behaves as zero. Empty range cells are skipped.
 - Comparisons are case-insensitive for text and use spreadsheet type ordering.
