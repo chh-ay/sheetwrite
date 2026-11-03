@@ -43,7 +43,9 @@ The landing page's first-load size comes from the committed `scripts/size-report
 
 ## Code style
 
-oxfmt and rustfmt own formatting. Four rules they cannot check:
+`bun fmt` (configured by `.oxfmtrc.json`) and rustfmt own formatting. Run
+`bun run format` before you push; CI checks it with `bun run lint`. Four rules
+they cannot check:
 
 - **Keep explanations, not narration.** Keep comments that explain design, data
   layout, invariants, safety arguments, non-obvious trade-offs, or why an
