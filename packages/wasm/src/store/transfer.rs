@@ -244,7 +244,8 @@ impl CellStore {
                 let row = input.u32()?;
                 let col = input.u32()?;
                 let entry = store.read_transfer_formula(&mut input, sheet as u32, row, col)?;
-                data.formulas.insert((row, col), entry);
+                data.formulas
+                    .insert((row, col), entry, sheet, &mut store.formula_slots);
             }
 
             store.sheets.push(data);
@@ -334,7 +335,7 @@ impl CellStore {
         for (sheet, data) in self.sheets.iter().enumerate() {
             data.write_transfer(&mut out);
             out.usize(data.formulas.len());
-            for ((row, col), entry) in data.formulas.iter() {
+            for ((row, col), entry) in data.formulas.iter(&self.formula_slots) {
                 out.u32(row);
                 out.u32(col);
                 write_formula(&mut out, entry, sheet as u32);

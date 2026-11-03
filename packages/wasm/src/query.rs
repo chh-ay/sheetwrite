@@ -7,6 +7,7 @@ use std::collections::HashSet;
 use wasm_bindgen::prelude::*;
 
 use crate::cells::{dense_resolved, payload_num, payload_str_id, source_kind, CellRun};
+use crate::formula_slots::FormulaStore;
 use crate::sheet::{formula_error_at, SheetData};
 use crate::store::CellStore;
 use crate::types::{
@@ -210,8 +211,9 @@ impl CellStore {
                     KIND_FORMULA => {
                         let (kind, payload) = dense_resolved(raw, payloads[row]);
                         (!matches!(kind, KIND_STRING | KIND_BOOL | KIND_EMPTY)
-                            && cell_key(row, col)
-                                .is_some_and(|key| formula_error_at(s, key).is_none()))
+                            && cell_key(row, col).is_some_and(|key| {
+                                formula_error_at(s, key, &self.formula_slots).is_none()
+                            }))
                         .then(|| payload_num(payload))
                     }
                     // A spilled value sits in a calculated slot with no source.
@@ -233,7 +235,7 @@ impl CellStore {
             while start < end {
                 let run = s.cells.run(start, end);
                 for index in run.start..run.end {
-                    if let Some(value) = numeric_cell_value(s, index) {
+                    if let Some(value) = numeric_cell_value(s, index, &self.formula_slots) {
                         acc.add(value, op);
                     }
                 }
@@ -322,7 +324,7 @@ impl CellStore {
                     KIND_EMPTY => false,
                     _ => cell_matches_text(
                         s,
-                        &self.strings,
+                        self,
                         base + row,
                         &needle,
                         FILTER_CASE_INSENSITIVE,
@@ -356,7 +358,7 @@ impl CellStore {
                 } else {
                     cell_matches_text(
                         s,
-                        &self.strings,
+                        self,
                         index,
                         &needle,
                         FILTER_CASE_INSENSITIVE,
@@ -482,7 +484,7 @@ impl CellStore {
                 let i = base + row;
                 if cell_matches_text(
                     s,
-                    &self.strings,
+                    self,
                     i,
                     &needle,
                     case_insensitive,
@@ -537,7 +539,13 @@ impl CellStore {
         while start < end {
             let run = s.cells.run(start, end);
             for index in run.start..run.end {
-                keys.push(ComparableCell::from_run(s, &self.strings, &run, index));
+                keys.push(ComparableCell::from_run(
+                    s,
+                    &self.strings,
+                    &run,
+                    index,
+                    &self.formula_slots,
+                ));
             }
             start = run.end;
         }
@@ -614,7 +622,13 @@ impl CellStore {
                 if index < run.start || index >= run.end {
                     *run = data.cells.run(index, base + data.cells.row_count());
                 }
-                keys.push(ComparableCell::from_run(data, &self.strings, run, index));
+                keys.push(ComparableCell::from_run(
+                    data,
+                    &self.strings,
+                    run,
+                    index,
+                    &self.formula_slots,
+                ));
             }
         }
         let mut positions: Vec<u32> = (0..row_count as u32).collect();
@@ -707,7 +721,7 @@ impl CellStore {
         'rows: for row in 0..data.cells.row_count() {
             for i in 0..cols.len() {
                 let index = cols[i] as usize * data.cells.row_count() + row;
-                let kind = resolved_kind(data, index);
+                let kind = resolved_kind(data, index, &self.formula_slots);
                 let matches = match kinds[i] {
                     0 => {
                         let mut hit = kind == 0 && flags.get(i).copied().unwrap_or(0) & 1 != 0;
@@ -716,14 +730,21 @@ impl CellStore {
                         match &value_sets[i] {
                             ValueSet::Linear => {
                                 if kind == 1 {
-                                    if let Some(value) = numeric_cell_value(data, index) {
+                                    if let Some(value) =
+                                        numeric_cell_value(data, index, &self.formula_slots)
+                                    {
                                         hit |= value_nums
                                             .get(num_offsets[i]..num_offsets[i] + nc)
                                             .unwrap_or(&[])
                                             .contains(&value);
                                     }
                                 } else if kind == 2 {
-                                    if let Some(text) = resolved_text(data, &self.strings, index) {
+                                    if let Some(text) = resolved_text(
+                                        data,
+                                        &self.strings,
+                                        index,
+                                        &self.formula_slots,
+                                    ) {
                                         hit |= value_texts
                                             .get(text_offsets[i]..text_offsets[i] + tc)
                                             .unwrap_or(&[])
@@ -731,7 +752,9 @@ impl CellStore {
                                             .any(|picked| picked == text);
                                     }
                                 } else if kind == 3 {
-                                    if let Some(value) = boolean_cell_value(data, index) {
+                                    if let Some(value) =
+                                        boolean_cell_value(data, index, &self.formula_slots)
+                                    {
                                         let expected = if value {
                                             VALUE_SET_TRUE
                                         } else {
@@ -751,16 +774,25 @@ impl CellStore {
                                 bools,
                             } => {
                                 if kind == 1 {
-                                    if let Some(value) = numeric_cell_value(data, index) {
+                                    if let Some(value) =
+                                        numeric_cell_value(data, index, &self.formula_slots)
+                                    {
                                         let normalized = if value == 0.0 { 0.0 } else { value };
                                         hit |= numbers.binary_search(&normalized.to_bits()).is_ok();
                                     }
                                 } else if kind == 2 {
-                                    if let Some(text) = resolved_text(data, &self.strings, index) {
+                                    if let Some(text) = resolved_text(
+                                        data,
+                                        &self.strings,
+                                        index,
+                                        &self.formula_slots,
+                                    ) {
                                         hit |= texts.contains(text);
                                     }
                                 } else if kind == 3 {
-                                    if let Some(value) = boolean_cell_value(data, index) {
+                                    if let Some(value) =
+                                        boolean_cell_value(data, index, &self.formula_slots)
+                                    {
                                         let picked_bit = if value {
                                             VALUE_SET_TRUE_BIT
                                         } else {
@@ -780,7 +812,7 @@ impl CellStore {
                             .unwrap_or("");
                         cell_matches_text(
                             data,
-                            &self.strings,
+                            self,
                             index,
                             needle,
                             flags.get(i).copied().unwrap_or(0) == 0,
@@ -788,16 +820,18 @@ impl CellStore {
                             &mut match_caches[cache_index[i]],
                         )
                     }
-                    2 => numeric_cell_value(data, index).is_some_and(|value| {
-                        match flags.get(i).copied().unwrap_or(0) {
-                            0 => value > nums.get(i).copied().unwrap_or(0.0),
-                            1 => value >= nums.get(i).copied().unwrap_or(0.0),
-                            2 => value < nums.get(i).copied().unwrap_or(0.0),
-                            3 => value <= nums.get(i).copied().unwrap_or(0.0),
-                            4 => value == nums.get(i).copied().unwrap_or(0.0),
-                            _ => value != nums.get(i).copied().unwrap_or(0.0),
-                        }
-                    }),
+                    2 => {
+                        numeric_cell_value(data, index, &self.formula_slots).is_some_and(|value| {
+                            match flags.get(i).copied().unwrap_or(0) {
+                                0 => value > nums.get(i).copied().unwrap_or(0.0),
+                                1 => value >= nums.get(i).copied().unwrap_or(0.0),
+                                2 => value < nums.get(i).copied().unwrap_or(0.0),
+                                3 => value <= nums.get(i).copied().unwrap_or(0.0),
+                                4 => value == nums.get(i).copied().unwrap_or(0.0),
+                                _ => value != nums.get(i).copied().unwrap_or(0.0),
+                            }
+                        })
+                    }
                     3 => kind == 0,
                     4 => kind != 0,
                     _ => false,
@@ -820,7 +854,9 @@ impl CellStore {
         if col >= data.cells.n_cols() {
             return out;
         }
-        let text_at = |index: usize| resolved_text(data, &self.strings, index).unwrap_or("");
+        let text_at = |index: usize| {
+            resolved_text(data, &self.strings, index, &self.formula_slots).unwrap_or("")
+        };
         // Stored text carries a pool id that stands for its value, so the scan
         // dedupes it through one bit per id instead of hashing the characters.
         // Text without an id — the sentinel a formula error reports reads back as
@@ -835,10 +871,12 @@ impl CellStore {
             let mut needs_content = false;
             for row in 0..data.cells.row_count() {
                 let index = col * data.cells.row_count() + row;
-                let kind = resolved_kind(data, index);
+                let kind = resolved_kind(data, index, &self.formula_slots);
                 let fresh = match kind {
                     1 => seen.insert(DistinctKey::Number(
-                        numeric_cell_value(data, index).unwrap_or(0.0).to_bits(),
+                        numeric_cell_value(data, index, &self.formula_slots)
+                            .unwrap_or(0.0)
+                            .to_bits(),
                     )),
                     2 if pooled => match data.cells.str_id_at(index) {
                         NO_STRING => {
@@ -849,7 +887,7 @@ impl CellStore {
                     },
                     2 => seen.insert(DistinctKey::Text(text_at(index))),
                     3 => seen.insert(DistinctKey::Bool(
-                        boolean_cell_value(data, index).unwrap_or(false),
+                        boolean_cell_value(data, index, &self.formula_slots).unwrap_or(false),
                     )),
                     _ => seen.insert(DistinctKey::Blank),
                 };
@@ -859,14 +897,15 @@ impl CellStore {
                 out.kinds.push(kind);
                 if kind == 1 {
                     out.numbers
-                        .push(numeric_cell_value(data, index).unwrap_or(0.0));
+                        .push(numeric_cell_value(data, index, &self.formula_slots).unwrap_or(0.0));
                 } else if kind == 3 {
-                    out.numbers
-                        .push(if boolean_cell_value(data, index).unwrap_or(false) {
+                    out.numbers.push(
+                        if boolean_cell_value(data, index, &self.formula_slots).unwrap_or(false) {
                             1.0
                         } else {
                             0.0
-                        });
+                        },
+                    );
                 } else if kind == 2 {
                     out.texts.push(text_at(index).to_owned());
                 }
@@ -917,7 +956,7 @@ impl CellStore {
                     && match column.map(|column| column.raw_kind(r)) {
                         Some(KIND_NUMBER | KIND_STRING | KIND_BOOL) => true,
                         Some(KIND_EMPTY) => false,
-                        _ => resolved_kind(data, index) != 0,
+                        _ => resolved_kind(data, index, &self.formula_slots) != 0,
                     }
             })
         };
@@ -925,7 +964,7 @@ impl CellStore {
     }
 }
 
-fn resolved_kind(sheet: &SheetData, index: usize) -> u8 {
+fn resolved_kind(sheet: &SheetData, index: usize, slots: &FormulaStore) -> u8 {
     match sheet.cells.kind_at(index) {
         KIND_NUMBER => 1,
         KIND_STRING => 2,
@@ -934,7 +973,7 @@ fn resolved_kind(sheet: &SheetData, index: usize) -> u8 {
             let Some(key) = key_for_index(sheet, index) else {
                 return 0;
             };
-            if formula_error_at(sheet, key).is_some() {
+            if formula_error_at(sheet, key, slots).is_some() {
                 return 2;
             }
             match sheet.cells.formula_value_kind(index) {
@@ -956,12 +995,12 @@ fn boolean_text(value: bool) -> &'static str {
     }
 }
 
-fn boolean_cell_value(sheet: &SheetData, index: usize) -> Option<bool> {
+fn boolean_cell_value(sheet: &SheetData, index: usize, slots: &FormulaStore) -> Option<bool> {
     match sheet.cells.kind_at(index) {
         KIND_BOOL => Some(sheet.cells.num_at(index) != 0.0),
         KIND_FORMULA => {
             let key = key_for_index(sheet, index)?;
-            (formula_error_at(sheet, key).is_none()
+            (formula_error_at(sheet, key, slots).is_none()
                 && sheet.cells.formula_value_kind(index) == FormulaValueKind::Bool)
                 .then(|| sheet.cells.num_at(index) != 0.0)
         }
@@ -973,8 +1012,9 @@ fn resolved_text<'a>(
     sheet: &SheetData,
     strings: &'a StringStorage,
     index: usize,
+    slots: &FormulaStore,
 ) -> Option<&'a str> {
-    if let Some(value) = boolean_cell_value(sheet, index) {
+    if let Some(value) = boolean_cell_value(sheet, index, slots) {
         return Some(boolean_text(value));
     }
     match sheet.cells.kind_at(index) {
@@ -982,7 +1022,7 @@ fn resolved_text<'a>(
             string_from_pool_ref(strings, sheet.cells.str_id_at(index))
         }
         KIND_FORMULA => key_for_index(sheet, index)
-            .and_then(|key| formula_error_at(sheet, key))
+            .and_then(|key| formula_error_at(sheet, key, slots))
             .map(FormulaError::sentinel),
         _ => None,
     }
@@ -1020,12 +1060,16 @@ impl DistinctColumn {
     }
 }
 
-pub(crate) fn numeric_cell_value(sheet: &SheetData, index: usize) -> Option<f64> {
+pub(crate) fn numeric_cell_value(
+    sheet: &SheetData,
+    index: usize,
+    slots: &FormulaStore,
+) -> Option<f64> {
     match sheet.cells.kind_at(index) {
         KIND_NUMBER => Some(sheet.cells.num_at(index)),
         KIND_FORMULA => {
             let key = key_for_index(sheet, index)?;
-            if formula_error_at(sheet, key).is_none()
+            if formula_error_at(sheet, key, slots).is_none()
                 && sheet.cells.formula_value_kind(index) == FormulaValueKind::Number
             {
                 Some(sheet.cells.num_at(index))
@@ -1207,14 +1251,16 @@ impl MatchCache {
 
 pub(crate) fn cell_matches_text(
     sheet: &SheetData,
-    strings: &StringStorage,
+    store: &CellStore,
     index: usize,
     needle: &str,
     case_insensitive: bool,
     whole_cell: bool,
     cache: &mut MatchCache,
 ) -> bool {
-    if let Some(value) = boolean_cell_value(sheet, index) {
+    let strings = &store.strings;
+    let slots = &store.formula_slots;
+    if let Some(value) = boolean_cell_value(sheet, index, slots) {
         return matches_needle(boolean_text(value), needle, case_insensitive, whole_cell);
     }
     match sheet.cells.kind_at(index) {
@@ -1228,7 +1274,7 @@ pub(crate) fn cell_matches_text(
             let Some(key) = key_for_index(sheet, index) else {
                 return false;
             };
-            if let Some(error) = formula_error_at(sheet, key) {
+            if let Some(error) = formula_error_at(sheet, key, slots) {
                 matches_needle(error.sentinel(), needle, case_insensitive, whole_cell)
             } else if sheet.cells.str_id_at(index) != NO_STRING {
                 cache.matches(
@@ -1475,6 +1521,7 @@ impl<'a> ComparableCell<'a> {
         sheet: &'a SheetData,
         strings: &'a StringStorage,
         index: usize,
+        slots: &FormulaStore,
     ) -> Self {
         match sheet.cells.kind_at(index) {
             KIND_NUMBER => ComparableCell::Number(OrderedNumber(sheet.cells.num_at(index))),
@@ -1483,7 +1530,7 @@ impl<'a> ComparableCell<'a> {
                 let Some(key) = key_for_index(sheet, index) else {
                     return ComparableCell::Empty;
                 };
-                if let Some(error) = formula_error_at(sheet, key) {
+                if let Some(error) = formula_error_at(sheet, key, slots) {
                     ComparableCell::Text(error.sentinel())
                 } else if sheet.cells.formula_value_kind(index) == FormulaValueKind::Blank {
                     ComparableCell::Empty
@@ -1508,9 +1555,10 @@ impl<'a> ComparableCell<'a> {
         strings: &'a StringStorage,
         run: &CellRun<'_>,
         index: usize,
+        slots: &FormulaStore,
     ) -> Self {
         if sheet.cells.is_paged() {
-            return Self::from_cell(sheet, strings, index);
+            return Self::from_cell(sheet, strings, index, slots);
         }
         let (kind, payload) = run.source(index);
         match kind {
@@ -1522,7 +1570,7 @@ impl<'a> ComparableCell<'a> {
                 let Some(key) = key_for_index(sheet, index) else {
                     return Self::Empty;
                 };
-                if let Some(error) = formula_error_at(sheet, key) {
+                if let Some(error) = formula_error_at(sheet, key, slots) {
                     return Self::Text(error.sentinel());
                 }
                 let (kind, payload) = run.resolved(index);

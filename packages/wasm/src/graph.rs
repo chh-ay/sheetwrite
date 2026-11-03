@@ -1,14 +1,15 @@
 //! Formula sources, the cells awaiting recompute, and the cached dependency graph.
 //!
-//! [`SheetFormulas`] owns one sheet's formula entries and its dirty state.
+//! [`SheetFormulas`] owns a sheet's address index and dirty source seeds.
 //! [`FormulaGraph`] owns the workbook dependency index and keeps it in step
 //! with entry replacements, dropping it for rewrites it cannot patch.
 
 use std::collections::hash_set;
 
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashSet;
 
 use crate::eval::{build_dep_index, DepIndex};
+use crate::formula_slots::{FormulaId, FormulaStore};
 use crate::memory::{
     StoreMemoryStats, DEPENDENCY_EDGES, DEPENDENCY_NODES, FORMULAS, SHEET_INDEXES_METADATA,
 };
@@ -115,154 +116,256 @@ impl Default for DirtyState {
     }
 }
 
-/// One sheet's formula entries plus the source cells changed since the last
-/// transaction-barrier recompute.
-///
-/// `volatile` holds exactly the keys of entries whose formula calls a volatile
-/// function, and `subtotals` the keys of entries that call SUBTOTAL or
-/// AGGREGATE, which read hidden rows. Every entry mutation keeps both in step,
-/// so a recompute seeds volatile formulas, and a hidden-row change seeds
-/// subtotals, in O(matching cells) instead of scanning every entry. Each set is
-/// boxed and exists only while the sheet holds such a formula, so every other
-/// sheet pays one null pointer and no heap.
+// Bound a scalar insert or delete's shifts to one small row band, not a column.
+const FORMULA_INDEX_PAGE_ROWS: u32 = 256;
+
+struct FormulaPage {
+    band: u32,
+    cells: Vec<(u32, FormulaId)>,
+}
+
+struct FormulaColumn {
+    col: u32,
+    pages: Vec<FormulaPage>,
+}
+
+/// A sparse address index and source-edit seeds. The workbook owns all entries.
 #[derive(Default)]
 pub(crate) struct SheetFormulas {
-    entries: FxHashMap<CellKey, FormulaEntry>,
-    volatile: Option<Box<FxHashSet<CellKey>>>,
-    subtotals: Option<Box<FxHashSet<CellKey>>>,
+    columns: Vec<FormulaColumn>,
+    count: usize,
+    volatile_count: usize,
+    subtotal_count: usize,
     dirty: DirtyState,
 }
 
 impl SheetFormulas {
     #[inline]
     pub(crate) fn is_empty(&self) -> bool {
-        self.entries.is_empty()
+        self.count == 0
     }
 
     pub(crate) fn len(&self) -> usize {
-        self.entries.len()
+        self.count
     }
 
-    /// Skips hashing when the sheet has no formulas, which keeps literal-only
-    /// sheets free of per-cell map probes.
     #[inline]
-    pub(crate) fn get(&self, key: CellKey) -> Option<&FormulaEntry> {
-        if self.entries.is_empty() {
-            return None;
-        }
-        self.entries.get(&key)
+    pub(crate) fn id(&self, (row, col): CellKey) -> Option<FormulaId> {
+        let column = self
+            .columns
+            .binary_search_by_key(&col, |column| column.col)
+            .ok()?;
+        let pages = &self.columns[column].pages;
+        let band = row / FORMULA_INDEX_PAGE_ROWS;
+        let page = pages.binary_search_by_key(&band, |page| page.band).ok()?;
+        let cells = &pages[page].cells;
+        let offset = cells.binary_search_by_key(&row, |&(row, _)| row).ok()?;
+        Some(cells[offset].1)
+    }
+
+    #[inline]
+    pub(crate) fn get<'a>(
+        &self,
+        key: CellKey,
+        slots: &'a FormulaStore,
+    ) -> Option<&'a FormulaEntry> {
+        slots.get(self.id(key)?)
     }
 
     #[inline]
     pub(crate) fn contains(&self, key: CellKey) -> bool {
-        self.get(key).is_some()
+        self.id(key).is_some()
     }
 
-    /// Entries in unspecified order.
-    pub(crate) fn iter(&self) -> impl Iterator<Item = (CellKey, &FormulaEntry)> {
-        self.entries.iter().map(|(&key, entry)| (key, entry))
+    pub(crate) fn iter<'a>(
+        &'a self,
+        slots: &'a FormulaStore,
+    ) -> impl Iterator<Item = (CellKey, &'a FormulaEntry)> {
+        self.ids().map(move |id| {
+            (
+                slots.location(id).local(),
+                slots.get(id).expect("live sheet formula"),
+            )
+        })
+    }
+
+    pub(crate) fn ids(&self) -> impl Iterator<Item = FormulaId> + '_ {
+        self.columns.iter().flat_map(|column| {
+            column
+                .pages
+                .iter()
+                .flat_map(|page| page.cells.iter().map(|&(_, id)| id))
+        })
     }
 
     pub(crate) fn keys(&self) -> impl Iterator<Item = CellKey> + '_ {
-        self.entries.keys().copied()
+        self.columns.iter().flat_map(|column| {
+            column
+                .pages
+                .iter()
+                .flat_map(move |page| page.cells.iter().map(move |&(row, _)| (row, column.col)))
+        })
     }
 
     #[inline]
     pub(crate) fn has_volatile(&self) -> bool {
-        self.volatile.is_some()
+        self.volatile_count != 0
     }
 
-    /// Keys of the volatile entries, in unspecified order.
-    pub(crate) fn volatile_keys(&self) -> impl Iterator<Item = CellKey> + '_ {
-        self.volatile.iter().flat_map(|keys| keys.iter().copied())
+    pub(crate) fn volatile_keys<'a>(
+        &'a self,
+        slots: &'a FormulaStore,
+    ) -> impl Iterator<Item = CellKey> + 'a {
+        let sheet = self.ids().next().map(|id| slots.location(id).sheet);
+        slots
+            .volatile_ids()
+            .filter(move |&id| Some(slots.location(id).sheet) == sheet)
+            .map(|id| slots.location(id).local())
     }
 
-    /// Keys of the entries that call SUBTOTAL or AGGREGATE, or `None` when
-    /// the sheet has none.
-    pub(crate) fn subtotal_keys(&self) -> Option<&FxHashSet<CellKey>> {
-        self.subtotals.as_deref()
+    pub(crate) fn subtotal_keys<'a>(
+        &'a self,
+        slots: &'a FormulaStore,
+    ) -> Option<impl Iterator<Item = CellKey> + 'a> {
+        let sheet = self.ids().next().map(|id| slots.location(id).sheet);
+        (self.subtotal_count != 0).then(move || {
+            slots
+                .subtotal_ids()
+                .filter(move |&id| Some(slots.location(id).sheet) == sheet)
+                .map(|id| slots.location(id).local())
+        })
     }
 
-    /// Records whether the entry now at `key` belongs to a key set. The first
-    /// member allocates the set and removing the last one frees it, so a
-    /// sheet that once held RAND returns to no heap; removal skips the probe
-    /// while there is no set, which is the common case.
-    #[inline]
-    fn track_key(keys: &mut Option<Box<FxHashSet<CellKey>>>, key: CellKey, is_member: bool) {
-        if is_member {
-            keys.get_or_insert_default().insert(key);
-        } else if let Some(members) = keys {
-            members.remove(&key);
-            if members.is_empty() {
-                *keys = None;
+    fn index_id(&mut self, key: CellKey, id: FormulaId) {
+        let column = match self
+            .columns
+            .binary_search_by_key(&key.1, |column| column.col)
+        {
+            Ok(column) => column,
+            Err(column) => {
+                self.columns.insert(
+                    column,
+                    FormulaColumn {
+                        col: key.1,
+                        pages: Vec::new(),
+                    },
+                );
+                column
             }
+        };
+        let pages = &mut self.columns[column].pages;
+        let band = key.0 / FORMULA_INDEX_PAGE_ROWS;
+        let page = match pages.binary_search_by_key(&band, |page| page.band) {
+            Ok(page) => page,
+            Err(page) => {
+                pages.insert(
+                    page,
+                    FormulaPage {
+                        band,
+                        cells: Vec::new(),
+                    },
+                );
+                page
+            }
+        };
+        let cells = &mut pages[page].cells;
+        let offset = cells
+            .binary_search_by_key(&key.0, |&(row, _)| row)
+            .expect_err("new formula address");
+        cells.insert(offset, (key.0, id));
+        self.count += 1;
+    }
+
+    pub(crate) fn insert(
+        &mut self,
+        key: CellKey,
+        entry: FormulaEntry,
+        sheet: usize,
+        slots: &mut FormulaStore,
+    ) {
+        self.replace(key, Some(entry), sheet, slots);
+    }
+
+    pub(crate) fn remove(&mut self, key: CellKey, slots: &mut FormulaStore) {
+        self.replace(key, None, 0, slots);
+    }
+
+    fn replace(
+        &mut self,
+        key: CellKey,
+        entry: Option<FormulaEntry>,
+        sheet: usize,
+        slots: &mut FormulaStore,
+    ) -> Option<FormulaEntry> {
+        match (self.id(key), entry) {
+            (Some(id), Some(entry)) => {
+                self.volatile_count -= usize::from(slots.is_volatile(id));
+                self.subtotal_count -= usize::from(slots.is_subtotal(id));
+                let previous = slots.replace(id, entry);
+                self.volatile_count += usize::from(slots.is_volatile(id));
+                self.subtotal_count += usize::from(slots.is_subtotal(id));
+                Some(previous)
+            }
+            (Some(id), None) => {
+                self.volatile_count -= usize::from(slots.is_volatile(id));
+                self.subtotal_count -= usize::from(slots.is_subtotal(id));
+                let column = self
+                    .columns
+                    .binary_search_by_key(&key.1, |column| column.col)
+                    .expect("formula column");
+                let pages = &mut self.columns[column].pages;
+                let band = key.0 / FORMULA_INDEX_PAGE_ROWS;
+                let page = pages
+                    .binary_search_by_key(&band, |page| page.band)
+                    .expect("formula page");
+                let cells = &mut pages[page].cells;
+                let offset = cells
+                    .binary_search_by_key(&key.0, |&(row, _)| row)
+                    .expect("formula row");
+                cells.remove(offset);
+                if cells.is_empty() {
+                    pages.remove(page);
+                }
+                if pages.is_empty() {
+                    self.columns.remove(column);
+                }
+                self.count -= 1;
+                Some(slots.retire(id))
+            }
+            (None, Some(entry)) => {
+                let id = slots.allocate(AbsCellKey::from_local(sheet, key), entry);
+                self.volatile_count += usize::from(slots.is_volatile(id));
+                self.subtotal_count += usize::from(slots.is_subtotal(id));
+                self.index_id(key, id);
+                None
+            }
+            (None, None) => None,
         }
     }
 
-    #[inline]
-    fn track_entry(&mut self, key: CellKey, entry: Option<&FormulaEntry>) {
-        Self::track_key(
-            &mut self.volatile,
-            key,
-            entry.is_some_and(FormulaEntry::volatile),
-        );
-        Self::track_key(
-            &mut self.subtotals,
-            key,
-            entry.is_some_and(FormulaEntry::calls_subtotal),
-        );
-    }
-
-    /// Stores `entry` for a bulk load or a workbook-wide refresh whose caller
-    /// invalidates the [`FormulaGraph`] itself.
-    pub(crate) fn insert(&mut self, key: CellKey, entry: FormulaEntry) {
-        self.track_entry(key, Some(&entry));
-        self.entries.insert(key, entry);
-    }
-
-    /// [`Self::insert`]'s counterpart for structural rewrites.
-    pub(crate) fn remove(&mut self, key: CellKey) {
-        if !self.entries.is_empty() {
-            self.entries.remove(&key);
-            self.track_entry(key, None);
+    pub(crate) fn rewrite_entries(
+        &mut self,
+        slots: &mut FormulaStore,
+        mut rewrite: impl FnMut(&mut FormulaEntry),
+    ) {
+        for id in self.ids() {
+            rewrite(slots.get_mut(id).expect("live sheet formula"));
+            slots.refresh_flags(id);
         }
-    }
-
-    /// Stores `entry` at `key`, or removes the formula there for `None`, and
-    /// returns the replaced entry so the dependency index can retire its reads.
-    /// Use [`FormulaGraph::replace_entry`], which keeps the index in step.
-    fn replace(&mut self, key: CellKey, entry: Option<FormulaEntry>) -> Option<FormulaEntry> {
-        match entry {
-            Some(entry) => {
-                self.track_entry(key, Some(&entry));
-                self.entries.insert(key, entry)
-            }
-            None if self.entries.is_empty() => None,
-            None => {
-                self.track_entry(key, None);
-                self.entries.remove(&key)
-            }
-        }
-    }
-
-    /// Applies a workbook-level rewrite (rename, sheet removal, structural shift
-    /// of another sheet, table change) to every entry. The caller decides which
-    /// cells the rewrite dirtied. A rewrite changes references, never which
-    /// functions a formula calls, so the subtotal keys stay valid.
-    pub(crate) fn rewrite_entries(&mut self, mut rewrite: impl FnMut(&mut FormulaEntry)) {
-        for (&key, entry) in self.entries.iter_mut() {
-            let was_volatile = entry.volatile();
-            rewrite(entry);
-            if entry.volatile() != was_volatile {
-                Self::track_key(&mut self.volatile, key, entry.volatile());
-            }
-        }
+        self.volatile_count = self.ids().filter(|&id| slots.is_volatile(id)).count();
+        self.subtotal_count = self.ids().filter(|&id| slots.is_subtotal(id)).count();
     }
 
     /// Moves entries at or below `at` down by `count` rows on this sheet,
     /// rewriting their same-sheet references, and dirties the whole sheet.
-    pub(crate) fn insert_rows(&mut self, sheet: u32, at: u32, count: u32) {
-        self.move_entries(|(row, col), entry| {
+    pub(crate) fn insert_rows(
+        &mut self,
+        sheet: u32,
+        at: u32,
+        count: u32,
+        slots: &mut FormulaStore,
+    ) {
+        self.move_entries(slots, |(row, col), entry| {
             entry.shift_rows(at, i64::from(count), sheet, sheet);
             let row = if row >= at {
                 row.saturating_add(count)
@@ -275,9 +378,15 @@ impl SheetFormulas {
 
     /// Drops entries in rows `at..at + count`, moves later entries up, rewrites
     /// same-sheet references, and dirties the whole sheet.
-    pub(crate) fn delete_rows(&mut self, sheet: u32, at: u32, count: u32) {
+    pub(crate) fn delete_rows(
+        &mut self,
+        sheet: u32,
+        at: u32,
+        count: u32,
+        slots: &mut FormulaStore,
+    ) {
         let end = at.saturating_add(count);
-        self.move_entries(|(row, col), entry| {
+        self.move_entries(slots, |(row, col), entry| {
             if row >= at && row < end {
                 return None;
             }
@@ -287,8 +396,14 @@ impl SheetFormulas {
     }
 
     /// Column counterpart of [`Self::insert_rows`].
-    pub(crate) fn insert_cols(&mut self, sheet: u32, at: u32, count: u32) {
-        self.move_entries(|(row, col), entry| {
+    pub(crate) fn insert_cols(
+        &mut self,
+        sheet: u32,
+        at: u32,
+        count: u32,
+        slots: &mut FormulaStore,
+    ) {
+        self.move_entries(slots, |(row, col), entry| {
             entry.shift_cols(at, i64::from(count), sheet, sheet);
             let col = if col >= at {
                 col.saturating_add(count)
@@ -300,9 +415,15 @@ impl SheetFormulas {
     }
 
     /// Column counterpart of [`Self::delete_rows`].
-    pub(crate) fn delete_cols(&mut self, sheet: u32, at: u32, count: u32) {
+    pub(crate) fn delete_cols(
+        &mut self,
+        sheet: u32,
+        at: u32,
+        count: u32,
+        slots: &mut FormulaStore,
+    ) {
         let end = at.saturating_add(count);
-        self.move_entries(|(row, col), entry| {
+        self.move_entries(slots, |(row, col), entry| {
             if col >= at && col < end {
                 return None;
             }
@@ -313,17 +434,25 @@ impl SheetFormulas {
 
     fn move_entries(
         &mut self,
+        slots: &mut FormulaStore,
         mut relocate: impl FnMut(CellKey, &mut FormulaEntry) -> Option<CellKey>,
     ) {
-        if !self.entries.is_empty() {
-            // Every key may move, so the key sets are rebuilt alongside the
-            // entries; this pass already visits each entry once.
-            self.volatile = None;
-            self.subtotals = None;
-            for (key, mut entry) in std::mem::take(&mut self.entries) {
-                if let Some(key) = relocate(key, &mut entry) {
-                    self.track_entry(key, Some(&entry));
-                    self.entries.insert(key, entry);
+        let columns = std::mem::take(&mut self.columns);
+        self.count = 0;
+        self.volatile_count = 0;
+        self.subtotal_count = 0;
+        for column in columns {
+            for (row, id) in column.pages.into_iter().flat_map(|page| page.cells) {
+                let previous = slots.location(id);
+                let entry = slots.get_mut(id).expect("live sheet formula");
+                if let Some(key) = relocate((row, column.col), entry) {
+                    slots.relocate(id, AbsCellKey::from_local(previous.sheet as usize, key));
+                    slots.refresh_flags(id);
+                    self.index_id(key, id);
+                    self.volatile_count += usize::from(slots.is_volatile(id));
+                    self.subtotal_count += usize::from(slots.is_subtotal(id));
+                } else {
+                    slots.retire(id);
                 }
             }
         }
@@ -441,20 +570,14 @@ impl SheetFormulas {
 
     pub(crate) fn add_memory_stats(&self, stats: &mut StoreMemoryStats) {
         let formulas = stats.owner_mut(FORMULAS);
-        formulas
-            .add_hash_table::<CellKey, FormulaEntry>(self.entries.len(), self.entries.capacity());
-        for entry in self.entries.values() {
-            entry.heap_memory_stats(formulas);
+        formulas.add_vec::<FormulaColumn>(self.columns.len(), self.columns.capacity());
+        for column in &self.columns {
+            formulas.add_vec::<FormulaPage>(column.pages.len(), column.pages.capacity());
+            for page in &column.pages {
+                formulas.add_vec::<(u32, FormulaId)>(page.cells.len(), page.cells.capacity());
+            }
         }
-
         let metadata = stats.owner_mut(SHEET_INDEXES_METADATA);
-        for keys in [&self.volatile, &self.subtotals].into_iter().flatten() {
-            metadata.add_payload(
-                std::mem::size_of::<FxHashSet<CellKey>>(),
-                std::mem::size_of::<FxHashSet<CellKey>>(),
-            );
-            metadata.add_hash_table::<CellKey, ()>(keys.len(), keys.capacity());
-        }
         match &self.dirty {
             DirtyState::Cells(cells) => {
                 metadata.add_hash_table::<CellKey, ()>(cells.len(), cells.capacity())
@@ -523,9 +646,10 @@ impl SheetFormulas {
         };
 
         Ok(Self {
-            entries: FxHashMap::default(),
-            volatile: None,
-            subtotals: None,
+            columns: Vec::new(),
+            count: 0,
+            volatile_count: 0,
+            subtotal_count: 0,
             dirty,
         })
     }
@@ -561,12 +685,13 @@ impl FormulaGraph {
     pub(crate) fn replace_entry(
         &mut self,
         formulas: &mut SheetFormulas,
+        slots: &mut FormulaStore,
         sheet: usize,
         key: CellKey,
         entry: Option<FormulaEntry>,
     ) {
         let stores_formula = entry.is_some();
-        let previous = formulas.replace(key, entry);
+        let previous = formulas.replace(key, entry, sheet, slots);
         // A literal written over a literal is the bulk-load case: skip the
         // lookup of an entry that cannot exist.
         if !stores_formula && previous.is_none() {
@@ -574,11 +699,14 @@ impl FormulaGraph {
         }
 
         let next = if stores_formula {
-            formulas.get(key)
+            formulas.get(key, slots)
         } else {
             None
         };
         self.record_replacement(AbsCellKey::from_local(sheet, key), previous, next);
+        // Pending graph edits own read sets and cell addresses, not slot ids.
+        // No pass can overlap this mutable source edit, so reuse is now safe.
+        slots.release_retired();
     }
 
     /// The index half of [`Self::replace_entry`] for callers that changed the
@@ -609,9 +737,11 @@ impl FormulaGraph {
 
     /// The index for the current entries: built if missing, otherwise patched
     /// with the queued replacements.
-    pub(crate) fn ensure_index(&mut self, sheets: &[SheetData]) -> &DepIndex {
-        let index = self.index.get_or_insert_with(|| build_dep_index(sheets));
-        index.apply_pending(sheets);
+    pub(crate) fn ensure_index(&mut self, sheets: &[SheetData], slots: &FormulaStore) -> &DepIndex {
+        let index = self
+            .index
+            .get_or_insert_with(|| build_dep_index(sheets, slots));
+        index.apply_pending(sheets, slots);
         index
     }
 

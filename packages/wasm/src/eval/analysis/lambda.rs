@@ -1,5 +1,5 @@
 //! Full-engine lexical functions and bounded array helpers.
-use rustc_hash::{FxHashMap, FxHashSet};
+use crate::formula_slots::{FormulaResults, FormulaWork};
 use std::rc::Rc;
 
 use super::super::array::ast_produces_array;
@@ -273,13 +273,12 @@ pub(crate) fn shape(
             if arguments.len() != 3 {
                 return Err(FormulaError::Value);
             }
-            let affected = FxHashSet::default();
-            let mut memo = FxHashMap::default();
-            let mut visiting = FxHashSet::default();
+            let affected = FormulaWork::default();
+            let mut results = FormulaResults::default();
+
             let mut pass = EvalPass {
                 affected: &affected,
-                memo: &mut memo,
-                visiting: &mut visiting,
+                results: &mut results,
             };
             let mut context = Context {
                 store,

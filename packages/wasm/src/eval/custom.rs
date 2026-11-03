@@ -123,7 +123,7 @@ impl CellStore {
         for (index, sheet) in self.sheets.iter_mut().enumerate() {
             let keys: Vec<_> = sheet
                 .formulas
-                .iter()
+                .iter(&self.formula_slots)
                 .filter_map(|(key, entry)| {
                     entry
                         .ast

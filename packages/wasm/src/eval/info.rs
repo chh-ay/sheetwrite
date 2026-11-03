@@ -97,7 +97,7 @@ impl CellStore {
         }
 
         let source = cell_key(cell.row as usize, cell.col as usize)
-            .and_then(|key| data.formulas.get(key))
+            .and_then(|key| data.formulas.get(key, &self.formula_slots))
             .filter(|entry| entry.is_formula())
             .map(|entry| entry.source.as_str());
         if func == Func::IsFormula {

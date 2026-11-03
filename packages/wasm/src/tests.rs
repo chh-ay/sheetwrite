@@ -124,12 +124,13 @@ fn sheet_noops_dense_limits_and_paged_load_state_preserve_invariants() {
     assert!(bounded_store.sheets.is_empty());
     let mut dense = SheetData::new(2, 2);
     put_number(&mut dense, 1, 1, 9.0);
-    assert!(dense.insert_rows(0, 1, 0).is_ok());
-    assert!(dense.delete_rows(0, 2, 1).is_ok());
-    assert!(dense.delete_rows(0, 0, 0).is_ok());
-    assert!(dense.insert_cols(0, 1, 0).is_ok());
-    assert!(dense.delete_cols(0, 2, 1).is_ok());
-    assert!(dense.delete_cols(0, 0, 0).is_ok());
+    let mut slots = crate::formula_slots::FormulaStore::default();
+    assert!(dense.insert_rows(0, 1, 0, &mut slots).is_ok());
+    assert!(dense.delete_rows(0, 2, 1, &mut slots).is_ok());
+    assert!(dense.delete_rows(0, 0, 0, &mut slots).is_ok());
+    assert!(dense.insert_cols(0, 1, 0, &mut slots).is_ok());
+    assert!(dense.delete_cols(0, 2, 1, &mut slots).is_ok());
+    assert!(dense.delete_cols(0, 0, 0, &mut slots).is_ok());
     assert_close(dense.cells.num_at(dense.cells.idx(1, 1)), 9.0);
 
     dense.formulas.clear_dirty();
@@ -4429,6 +4430,57 @@ fn a_value_edit_in_a_formula_free_workbook_skips_the_formula_pass() {
     store.commit_sources();
     assert_eq!(store.formula_passes, passes + 1);
     assert_close(number(&store, sheet, 0, 1), 30.0);
+}
+
+#[test]
+fn dirty_formula_work_survives_replacement_before_the_pass() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(4, 4);
+    store.set_number(sheet, 0, 0, 2.0, 0);
+    store.set_formula(sheet, 0, 1, "=A1+1", 0);
+    store.set_formula(sheet, 0, 2, "=B1*10", 0);
+    store.commit_sources();
+
+    // The old dependency reads must leave before a removed slot can be reused.
+    store.set_number(sheet, 0, 1, 7.0, 0);
+    store.set_formula(sheet, 1, 1, "=A1+100", 0);
+    store.set_formula(sheet, 0, 1, "=A1+5", 0);
+    store.set_number(sheet, 0, 0, 3.0, 0);
+    store.commit_sources();
+    assert_eq!(number(&store, sheet, 0, 1), 8.0);
+    assert_eq!(number(&store, sheet, 0, 2), 80.0);
+    assert_eq!(number(&store, sheet, 1, 1), 103.0);
+
+    store.set_number(sheet, 0, 0, 4.0, 0);
+    store.commit_sources();
+    assert_eq!(number(&store, sheet, 0, 2), 90.0);
+    assert_eq!(number(&store, sheet, 1, 1), 104.0);
+}
+
+#[test]
+fn shared_formula_readers_run_once_when_two_seed_sheets_change() {
+    let mut store = CellStore::new();
+    let left = store.add_sheet(2, 2);
+    let right = store.add_sheet(2, 2);
+    let report = store.add_sheet(3, 2);
+    store.set_sheet_name(left, "left", "Left");
+    store.set_sheet_name(right, "right", "Right");
+    store.set_number(left, 0, 0, 2.0, 0);
+    store.set_number(right, 0, 0, 3.0, 0);
+    store.set_formula(report, 0, 0, "=Left!A1+Right!A1", 0);
+    store.set_formula(report, 0, 1, "=A1*2", 0);
+    store.set_formula(report, 0, 2, "=A1+B1", 0);
+    store.commit_sources();
+
+    crate::eval::FORMULA_EVALUATIONS.with(|count| count.set(0));
+    store.set_number(left, 0, 0, 5.0, 0);
+    store.set_number(right, 0, 0, 7.0, 0);
+    store.commit_sources();
+    assert_eq!(number(&store, report, 0, 2), 36.0);
+    assert_eq!(
+        crate::eval::FORMULA_EVALUATIONS.with(|count| count.get()),
+        3
+    );
 }
 
 /// Volatile formulas (RAND, RANDBETWEEN, NOW, TODAY) recalculate with their
