@@ -4,6 +4,7 @@
 pub(crate) mod analysis;
 mod areas;
 mod array;
+pub(crate) mod bytecode;
 mod criteria;
 #[cfg(feature = "host-functions")]
 pub(crate) mod custom;
@@ -1444,6 +1445,12 @@ impl CellStore {
                         } else {
                             self.eval_ast(&resolved, sheet, pass, depth + 1)
                         }
+                    } else if let Some(compiled) = entry
+                        .compiled
+                        .as_deref()
+                        .filter(|compiled| compiled.fits_depth(depth + 1))
+                    {
+                        self.eval_bytecode_family(compiled, sheet, pass, depth + 1)
                     } else {
                         self.eval_ast(ast, sheet, pass, depth + 1)
                     }

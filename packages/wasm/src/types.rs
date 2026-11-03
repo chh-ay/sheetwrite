@@ -386,6 +386,7 @@ fn formula_metadata(ast: &Ast, formula_sheet: u32) -> (ReadSet, bool) {
 #[derive(Clone, Debug)]
 pub(crate) struct FormulaEntry {
     pub(crate) ast: Option<Ast>,
+    pub(crate) compiled: Option<Box<crate::eval::bytecode::Program>>,
     pub(crate) source: String,
     pub(crate) reads: ReadSet,
     // Low nibble: source-error slot + 1 (zero means none). Upper bits are
@@ -458,6 +459,7 @@ impl FormulaEntry {
         let mut entry = Self {
             flags: 0,
             ast: None,
+            compiled: crate::eval::bytecode::Program::compile(&ast),
             source,
             reads,
         };
@@ -481,6 +483,7 @@ impl FormulaEntry {
         is_reference: bool,
     ) -> Self {
         let mut entry = Self {
+            compiled: ast.as_ref().and_then(crate::eval::bytecode::Program::compile),
             ast,
             source,
             reads,
@@ -510,6 +513,7 @@ impl FormulaEntry {
         );
         Self {
             reads: ReadSet::from_ast(&ast, formula_sheet),
+            compiled: crate::eval::bytecode::Program::compile(&ast),
             ast: Some(ast),
             source: String::new(),
             flags: Self::REFERENCE,
@@ -546,6 +550,7 @@ impl FormulaEntry {
     pub(crate) fn error(source: &str, error: FormulaError) -> Self {
         let mut entry = Self {
             ast: None,
+            compiled: None,
             source: source.to_string(),
             reads: ReadSet::default(),
             flags: 0,
@@ -568,6 +573,7 @@ impl FormulaEntry {
         self.source = serialize(ast);
         let (reads, volatile) = formula_metadata(ast, formula_sheet);
         self.reads = reads;
+        self.compiled = crate::eval::bytecode::Program::compile(ast);
         self.set_volatile(volatile);
         true
     }
@@ -655,6 +661,9 @@ impl FormulaEntry {
         );
         if let Some(ast) = &self.ast {
             ast.heap_memory_stats(out);
+        }
+        if let Some(compiled) = &self.compiled {
+            compiled.heap_memory_stats(out);
         }
     }
 }
