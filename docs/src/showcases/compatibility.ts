@@ -327,19 +327,23 @@ export const COMPATIBILITY_INVENTORY: readonly CompatibilityRecord[] = [
     status: "partial",
     resultMode: "evaluated",
     semantics:
-      "The full engine evaluates LAMBDA with lexical parameters, immediate calls, LET-bound functions, ISOMITTED, and the MAP, REDUCE, SCAN, BYROW, BYCOL, and MAKEARRAY helpers, with bounded recursion.",
+      "Both engines evaluate plain defined-name formulas, including relative references and sheet scope. The full engine also evaluates named LAMBDAs, immediate calls, LET-bound functions, ISOMITTED, and the MAP, REDUCE, SCAN, BYROW, BYCOL, and MAKEARRAY helpers.",
     divergence:
-      "Only in the full engine (@sheetwrite/formulas); the default engine returns #NAME?. Calls nest at most 64 deep, and an uncalled LAMBDA returns #CALC!. No JavaScript execution fallback is provided.",
+      "LAMBDA calls require the full engine (@sheetwrite/formulas); the default engine stores the definitions but returns #NAME?. Calls nest at most 64 deep (#NUM! beyond that), unlike Excel's parameter-dependent recursion allowance. An uncalled LAMBDA returns #CALC!. No JavaScript execution fallback is provided.",
     source:
       "https://support.microsoft.com/en-us/office/lambda-function-bd212d27-1cd1-4321-a34a-ccbf254b8b67",
     evidence: [
       "packages/wasm/src/eval/analysis/lambda.rs",
+      "packages/wasm/src/named_formula_tests.rs",
+      "packages/xlsx/test/ooxml-fidelity.test.ts",
+      "packages/core/test/side-panel.test.ts",
       "docs/src/content/docs/features/formulas/analysis-formulas.md",
     ],
     fixtureIds: ["formula-engine-vectors"],
     importBehavior:
-      "LAMBDA source evaluates when the full engine is selected; with the default engine the source is preserved and returns #NAME?.",
-    exportBehavior: "The exact formula source is emitted without a fabricated cached result.",
+      "Native defined-name formulas are retained. Future-function and LAMBDA parameter prefixes are removed by the engine. Named LAMBDA source evaluates only with the full engine.",
+    exportBehavior:
+      "Native definedName elements keep formula names and scope, with Excel future-function and LAMBDA parameter prefixes and no fabricated cached result.",
     warningCode: null,
     lastVerifiedProtocolVersion: 3,
   },

@@ -52,6 +52,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-loaded-spans"><code>loadedSpans</code></a>
 <a href="#cell-store-mark-range-clean"><code>markRangeClean</code></a>
 <a href="#cell-store-memory-stats"><code>memoryStats</code></a>
+<a href="#cell-store-named-formula-source"><code>namedFormulaSource</code></a>
 <a href="#cell-store-paged-dirty-coordinates"><code>pagedDirtyCoordinates</code></a>
 <a href="#cell-store-paged-stats"><code>pagedStats</code></a>
 <a href="#cell-store-persisted-cell-data"><code>persistedCellData</code></a>
@@ -87,6 +88,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-set-formula"><code>setFormula</code></a>
 <a href="#cell-store-set-hidden-rows"><code>setHiddenRows</code></a>
 <a href="#cell-store-set-iterative-calculation"><code>setIterativeCalculation</code></a>
+<a href="#cell-store-set-named-formula"><code>setNamedFormula</code></a>
 <a href="#cell-store-set-named-range"><code>setNamedRange</code></a>
 <a href="#cell-store-set-number"><code>setNumber</code></a>
 <a href="#cell-store-set-saved-pivots"><code>setSavedPivots</code></a>
@@ -108,7 +110,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-import-memory-state"><code>importMemoryState</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>94</span>
+## Members <span class="api-count" data-pagefind-ignore>96</span>
 
 <div class="api-member-list">
 
@@ -524,6 +526,18 @@ memoryStats: () => Float64Array;
 
 </details>
 
+<details class="api-member" id="cell-store-named-formula-source" data-pagefind-weight="1">
+<summary><code>namedFormulaSource</code> <span class="api-member-summary">The formula of the defined name name in scope (-1 for the workbook), or nothing when the name holds no formula there.</span></summary>
+
+```ts generated
+namedFormulaSource: (name: string, scope: number) => string | undefined;
+```
+
+<p class="api-member-doc">The formula of the defined name `name` in `scope` (-1 for the
+workbook), or nothing when the name holds no formula there. A sheet
+rename, a sheet removal or a row or column edit can rewrite it.</p>
+</details>
+
 <details class="api-member" id="cell-store-paged-dirty-coordinates" data-pagefind-weight="1">
 <summary><code>pagedDirtyCoordinates</code></summary>
 
@@ -678,7 +692,7 @@ removeCols: (sheet: number, at: number, count: number) => boolean;
 </details>
 
 <details class="api-member" id="cell-store-remove-named-range" data-pagefind-weight="1">
-<summary><code>removeNamedRange</code></summary>
+<summary><code>removeNamedRange</code> <span class="api-member-summary">Remove the defined name name in scope (-1 for the workbook), whether it refers to a range or holds a formula.</span></summary>
 
 ```ts generated
 removeNamedRange: (name: string, scope: number) => boolean;
@@ -916,6 +930,21 @@ setIterativeCalculation: (enabled: boolean, max_iterations: number, max_change: 
 stopping once no member changes by more than `max_change` (finite, not
 negative). Rejects limits outside those ranges. Recalculates every
 formula when the setting changes.</p>
+</details>
+
+<details class="api-member" id="cell-store-set-named-formula" data-pagefind-weight="1">
+<summary><code>setNamedFormula</code> <span class="api-member-summary">Define name in scope (a sheet handle, or -1 for the workbook) as source, a formula with its leading = whose relative references are relative to A1.</span></summary>
+
+```ts generated
+setNamedFormula: (name: string, scope: number, source: string) => boolean;
+```
+
+<p class="api-member-doc">Define `name` in `scope` (a sheet handle, or -1 for the workbook) as
+`source`, a formula with its leading `=` whose relative references
+are relative to A1. It replaces a range or formula of the same name
+and scope. Rejects a name that is not formula-safe or that a table
+has, a removed scope sheet, and a formula that does not parse or
+names a missing sheet.</p>
 </details>
 
 <details class="api-member" id="cell-store-set-named-range" data-pagefind-weight="1">
@@ -1274,6 +1303,7 @@ class CellStore {
     end_col: number,
   ) => void;
   memoryStats: () => Float64Array;
+  namedFormulaSource: (name: string, scope: number) => string | undefined;
   pagedDirtyCoordinates: (sheet: number) => Float64Array;
   pagedStats: (sheet: number) => Float64Array;
   persistedCellData: (sheet: number) => Float64Array;
@@ -1429,6 +1459,7 @@ class CellStore {
     max_iterations: number,
     max_change: number,
   ) => boolean;
+  setNamedFormula: (name: string, scope: number, source: string) => boolean;
   setNamedRange: (
     name: string,
     scope: number,

@@ -142,20 +142,20 @@ function tableSource(
   return { snapshot, hook: { cellRows: rows } };
 }
 
-export function writeTable(
+export async function writeTable(
   workbook: Workbook,
   store: Store,
   context: XlsxCodecContext,
-): Uint8Array {
+): Promise<Uint8Array> {
   const source = tableSource(workbook, store, context);
   return source ? writeWorkbook(source.snapshot, context, () => source.hook) : new Uint8Array(0);
 }
 
-export function* streamTable(
+export async function* streamTable(
   workbook: Workbook,
   store: Store,
   context: XlsxCodecContext,
-): Generator<Uint8Array> {
+): AsyncGenerator<Uint8Array> {
   const source = tableSource(workbook, store, context);
   if (source) yield* streamWorkbook(source.snapshot, context, () => source.hook);
 }

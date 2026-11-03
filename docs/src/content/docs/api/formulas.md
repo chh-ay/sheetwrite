@@ -8,7 +8,7 @@ description: "API reference for @sheetwrite/formulas."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./loader.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>23</dd></div>
+<div><dt>Exports</dt><dd>25</dd></div>
 </dl>
 
 Source entry: `packages/formulas/loader.d.ts`
@@ -29,12 +29,14 @@ Source entry: `packages/formulas/loader.d.ts`
 <a class="api-symbol-card" href="/docs/api/formulas/window-view/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>WindowView</code></span><span class="api-symbol-card__desc">A bulk window of resolved cells, row-major over nrows x ncols.</span></a>
 </div>
 
-### Functions <span class="api-count" data-pagefind-ignore>10</span>
+### Functions <span class="api-count" data-pagefind-ignore>12</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/formulas/check-formula-syntax/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>checkFormulaSyntax</code></span><span class="api-symbol-card__desc">The first syntax error in formula text, or undefined when the engine's parser reads the whole formula.</span></a>
 <a class="api-symbol-card" href="/docs/api/formulas/create-engine/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>createEngine</code></span><span class="api-symbol-card__desc">Initialize a fresh engine; a compiled module can be reused without retaining its memory.</span></a>
+<a class="api-symbol-card" href="/docs/api/formulas/formula-from-xlsx/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>formulaFromXlsx</code></span><span class="api-symbol-card__desc">Remove only identifier prefixes.</span></a>
 <a class="api-symbol-card" href="/docs/api/formulas/formula-tokens/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>formulaTokens</code></span><span class="api-symbol-card__desc">The tokens of formula text: four u32 per token, kind, from and to (UTF-16 offsets into src) and space (1 when whitespace comes before the token).</span></a>
+<a class="api-symbol-card" href="/docs/api/formulas/formula-to-xlsx/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>formulaToXlsx</code></span><span class="api-symbol-card__desc">Write the same future-function spelling for cell and defined-name formulas.</span></a>
 <a class="api-symbol-card" href="/docs/api/formulas/function-names/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>functionNames</code></span><span class="api-symbol-card__desc">Names accepted by the full engine, including aliases.</span></a>
 <a class="api-symbol-card" href="/docs/api/formulas/init-sync/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>initSync</code></span><span class="api-symbol-card__desc">Instantiates the given module, which can either be bytes or a precompiled WebAssembly.Module.</span></a>
 <a class="api-symbol-card" href="/docs/api/formulas/is-loaded/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>isLoaded</code></span><span class="api-symbol-card__desc">Whether the WASM module has finished initializing.</span></a>

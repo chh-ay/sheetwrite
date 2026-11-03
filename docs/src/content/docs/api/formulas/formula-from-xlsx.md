@@ -1,0 +1,41 @@
+---
+title: "formulaFromXlsx | @sheetwrite/formulas"
+description: "formulaFromXlsx function in @sheetwrite/formulas: Remove only identifier prefixes."
+---
+<!-- api-export:@sheetwrite/formulas|.|formulaFromXlsx -->
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/formulas/">@sheetwrite/formulas</a><span class="api-status" data-kind="function">function</span></div>
+
+Remove only identifier prefixes. Quoted text, sheet names and structured
+references are not function or parameter names and must remain unchanged.
+
+<dl class="api-metadata" data-pagefind-ignore>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/formulas/pkg/sheetwrite_wasm.d.ts#L604"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L604</code></a></dd></div>
+</dl>
+
+## Declaration
+
+<div class="api-declaration-open" data-pagefind-ignore>
+
+```ts generated
+function formulaFromXlsx(source: string): string
+```
+
+</div>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/formulas</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>formulaFromXlsx</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/formulas/init-output/"><code>InitOutput</code></a><span class="api-consumer-kind">@sheetwrite/formulas</span></li>
+<li><a href="/docs/api/wasm/init-output/"><code>InitOutput</code></a><span class="api-consumer-kind">@sheetwrite/wasm</span></li>
+</ul>
+</div>

@@ -23,9 +23,9 @@ use wasm_bindgen::prelude::*;
 
 use super::{workbook_name_key, CellStore};
 use crate::calc::{
-    invalidate_sheet_refs, parse, rename_sheet_refs, resolve_named_ranges,
-    resolve_structured_refs, serialize, shift_cols, shift_rows, translate_name_refs, Ast,
-    NameTarget, NamedFormulaRef, NamedRangeRef,
+    invalidate_sheet_refs, parse, rename_sheet_refs, resolve_named_ranges, resolve_structured_refs,
+    serialize, shift_cols, shift_rows, translate_name_refs, Ast, NameTarget, NamedFormulaRef,
+    NamedRangeRef,
 };
 use crate::memory::MemoryOwnerStats;
 use crate::types::{FormulaError, Value};
@@ -122,7 +122,10 @@ impl CellStore {
         let Some(scope) = self.defined_name_scope(name, scope) else {
             return false;
         };
-        let Some(ast) = parse(source).ok().and_then(|ast| self.resolve_sheets(ast).ok()) else {
+        let Some(ast) = parse(source)
+            .ok()
+            .and_then(|ast| self.resolve_sheets(ast).ok())
+        else {
             return false;
         };
 
@@ -195,7 +198,9 @@ impl CellStore {
         let depth = {
             let expanding = placement.expanding.borrow();
             if let Some(index) = expanding.iter().position(|expanding| *expanding == key) {
-                placement.lowest_cut.set(placement.lowest_cut.get().min(index));
+                placement
+                    .lowest_cut
+                    .set(placement.lowest_cut.get().min(index));
                 return None;
             }
             expanding.len()

@@ -14,7 +14,7 @@ export const sheetwriteWorkbookBackend: XlsxWorkbookBackend = {
   async toXlsxWorkbook(snapshot, options, exportContext) {
     try {
       const context = createCodecContext("export", options);
-      return writeWorkbook(snapshot, context, (validated) =>
+      return await writeWorkbook(snapshot, context, (validated) =>
         preparePreserved(validated, context, exportContext?.sourceTracked === true),
       );
     } catch (error) {

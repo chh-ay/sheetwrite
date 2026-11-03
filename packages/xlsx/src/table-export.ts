@@ -121,7 +121,7 @@ export const sheetwriteTableExportBackend: XlsxTableExportBackend = {
   name: "sheetwrite-ooxml-table",
   async toXlsxTable(workbook, store, options) {
     try {
-      return writeTable(workbook, store, createCodecContext("export", options));
+      return await writeTable(workbook, store, createCodecContext("export", options));
     } catch (error) {
       throw xlsxFailure(error, "export", "sheetwrite-ooxml-table", options?.signal);
     }

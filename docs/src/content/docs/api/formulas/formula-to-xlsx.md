@@ -1,0 +1,42 @@
+---
+title: "formulaToXlsx | @sheetwrite/formulas"
+description: "formulaToXlsx function in @sheetwrite/formulas: Write the same future-function spelling for cell and defined-name formulas."
+---
+<!-- api-export:@sheetwrite/formulas|.|formulaToXlsx -->
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/formulas/">@sheetwrite/formulas</a><span class="api-status" data-kind="function">function</span></div>
+
+Write the same future-function spelling for cell and defined-name formulas.
+This is lexical: unknown future functions and incomplete formulas still
+round-trip without a parse/serialize pass changing their source text.
+
+<dl class="api-metadata" data-pagefind-ignore>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/formulas/pkg/sheetwrite_wasm.d.ts#L611"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L611</code></a></dd></div>
+</dl>
+
+## Declaration
+
+<div class="api-declaration-open" data-pagefind-ignore>
+
+```ts generated
+function formulaToXlsx(source: string): string
+```
+
+</div>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/formulas</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>formulaToXlsx</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/formulas/init-output/"><code>InitOutput</code></a><span class="api-consumer-kind">@sheetwrite/formulas</span></li>
+<li><a href="/docs/api/wasm/init-output/"><code>InitOutput</code></a><span class="api-consumer-kind">@sheetwrite/wasm</span></li>
+</ul>
+</div>
