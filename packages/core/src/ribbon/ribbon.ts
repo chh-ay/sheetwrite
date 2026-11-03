@@ -134,7 +134,7 @@ export class Ribbon {
     this.modeButton.addEventListener("mousedown", (event) => event.preventDefault());
     this.modeButton.addEventListener("click", () => {
       this.mode = this.compact ? "full" : "compact";
-      this.updateLayout();
+      this.fit();
     });
 
     this.minimizeButton = document.createElement("button");
@@ -212,7 +212,8 @@ export class Ribbon {
     }
     this.refreshPanel(panel, (command) => this.grid.getCommandState(command));
     this.fittedWidth = -1;
-    this.scheduleFit();
+    // A following key can open a menu before the next animation frame.
+    this.fit();
   }
 
   /** Build a tab's panel on first use; most sessions never open most tabs. */
