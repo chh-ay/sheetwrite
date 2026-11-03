@@ -47,7 +47,7 @@ destroy: () => void;
 <summary><code>list</code></summary>
 
 ```ts generated
-list: () => Promise<readonly RevisionSummary[]>;
+list: (signal?: AbortSignal) => Promise<readonly RevisionSummary[]>;
 ```
 
 </details>
@@ -65,7 +65,7 @@ on: (listener: RevisionListener) => () => void;
 <summary><code>preview</code></summary>
 
 ```ts generated
-preview: (host: HTMLElement, version: number, options?: SnapshotGridOptions) => Promise<Grid>;
+preview: (host: HTMLElement, version: number, options?: SnapshotGridOptions, signal?: AbortSignal) => Promise<Grid>;
 ```
 
 </details>
@@ -74,7 +74,7 @@ preview: (host: HTMLElement, version: number, options?: SnapshotGridOptions) => 
 <summary><code>restore</code></summary>
 
 ```ts generated
-restore: (targetVersion: number, clientMutationId: string) => Promise<RevisionRestoreResponse>;
+restore: (targetVersion: number, clientMutationId: string, signal?: AbortSignal) => Promise<RevisionRestoreResponse>;
 ```
 
 </details>
@@ -98,16 +98,18 @@ serverVersion: number
 class RevisionCoordinator {
   constructor(adapter: RevisionAdapter, options: RevisionCoordinatorOptions);
   destroy: () => void;
-  list: () => Promise<readonly RevisionSummary[]>;
+  list: (signal?: AbortSignal) => Promise<readonly RevisionSummary[]>;
   on: (listener: RevisionListener) => () => void;
   preview: (
     host: HTMLElement,
     version: number,
     options?: SnapshotGridOptions,
+    signal?: AbortSignal,
   ) => Promise<Grid>;
   restore: (
     targetVersion: number,
     clientMutationId: string,
+    signal?: AbortSignal,
   ) => Promise<RevisionRestoreResponse>;
   serverVersion: number;
 }

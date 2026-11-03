@@ -87,6 +87,7 @@ export class PagedDirtyPreflight {
       const lifecycle = applySheetLifecycleOperation(referenceLifecycle, patch);
       return patch.op === "removeSheet" && lifecycle?.ok === true;
     });
+
     const removeAfter = new Array<boolean>(patches.length);
     let laterRemove = false;
 
@@ -143,6 +144,7 @@ export class PagedDirtyPreflight {
             row: Math.floor(offset / sheet.columns.length),
             col: offset % sheet.columns.length,
           };
+
           refs.set(cellKey(source), target);
         }
       }
@@ -277,8 +279,8 @@ export class PagedDirtyPreflight {
       return null;
     };
 
-    const materializeExisting = (state: PagedDirtyPreflightState) => {
-      if (state.existing) return;
+    const materializeExisting = (state: PagedDirtyPreflightState): Set<string> => {
+      if (state.existing) return state.existing;
       const existing = new Set<string>();
       if (state.handle !== null) {
         const coordinates = this.wasm.pagedDirtyCoordinates(state.handle);
@@ -289,6 +291,7 @@ export class PagedDirtyPreflight {
 
       state.existing = existing;
       state.dirty = existing.size;
+      return existing;
     };
 
     const rebaseSet = (
@@ -314,8 +317,7 @@ export class PagedDirtyPreflight {
       rowAt: (row: number) => number | null,
       colAt: (col: number) => number | null,
     ) => {
-      materializeExisting(state);
-      state.existing = rebaseSet(state.existing!, rowAt, colAt);
+      state.existing = rebaseSet(materializeExisting(state), rowAt, colAt);
       state.seen = rebaseSet(state.seen, rowAt, colAt);
       state.dirty = state.existing.size;
       state.additional = state.seen.size;
@@ -404,11 +406,11 @@ export class PagedDirtyPreflight {
         return actual > limit ? issue(actual) : null;
       }
 
-      materializeExisting(state);
+      const existing = materializeExisting(state);
       for (let row = startRow; row < startRow + rows; row++) {
         for (let col = startCol; col < startCol + cols; col++) {
           const key = keyOf(row, col);
-          if (state.existing!.has(key) || state.seen.has(key)) continue;
+          if (existing.has(key) || state.seen.has(key)) continue;
           const rejection = consume(state);
           if (rejection) return rejection;
           state.seen.add(key);
@@ -436,6 +438,7 @@ export class PagedDirtyPreflight {
           seen: new Set<string>(),
           sparseProbes: 0,
         };
+
         states.set(snapshot.id, state);
         for (const block of snapshot.cells) {
           for (const cell of block.cells) {
@@ -503,6 +506,7 @@ export class PagedDirtyPreflight {
             const rejection = addSparse(source.sheet, source.row, source.col);
             if (rejection) return rejection;
           }
+
           if (remaining && source.sheet !== patch.sheet && target.sheet !== patch.sheet) {
             remaining.set(cellKey(source), { ...target });
           }
@@ -668,13 +672,15 @@ export class PagedDirtyPreflight {
             row: range.start.row + cell.rowOffset,
             col: range.start.col + cell.colOffset,
           };
+
           setVirtualRef(source, cell.value.kind === "ref" ? cell.value.target : null);
           if (referenceSimulationExceeded) return referenceSimulationIssue();
         }
       } else if (patch.op === "setBlock" || patch.op === "restoreBlock") {
-        const prepared = patch.op === "restoreBlock" ? restoreBlockFacts(patch) : undefined;
-        const block = prepared?.block ?? (patch as Extract<DocumentOp, { op: "setBlock" }>).block;
-        const range = prepared?.range ?? normalizedRange(patch.range);
+        const { block, range: sourceRange } =
+          patch.op === "restoreBlock" ? restoreBlockFacts(patch) : patch;
+        const range = patch.op === "restoreBlock" ? sourceRange : normalizedRange(sourceRange);
+
         rejection = addRectangle(
           range.sheet,
           range.start.row,
@@ -682,6 +688,7 @@ export class PagedDirtyPreflight {
           block.rowCount,
           block.colCount,
         );
+
         if (
           !rejection &&
           block.rowCount === range.end.row - range.start.row + 1 &&
@@ -722,6 +729,7 @@ export class PagedDirtyPreflight {
         }
       } else if (patch.op === "setRangeStyle" || patch.op === "clearRange") {
         const range = normalizedRange(patch.range);
+
         rejection = addRectangle(
           range.sheet,
           range.start.row,
@@ -729,6 +737,7 @@ export class PagedDirtyPreflight {
           range.end.row - range.start.row + 1,
           range.end.col - range.start.col + 1,
         );
+
         if (
           !rejection &&
           patch.op === "clearRange" &&

@@ -7,7 +7,24 @@ import type { SheetId } from "../types/coordinates.js";
 import type { Workbook } from "../types/document.js";
 import type { ResourceOwnerBytes, VisibleWindowView } from "../types/store.js";
 import type { RecomputingCellStore } from "./wasm-contract.js";
-import { KIND_BOOL, KIND_EMPTY, KIND_NUMBER, KIND_STRING, NO_STRING } from "./wire-tags.js";
+import {
+  KIND_BOOL,
+  KIND_EMPTY,
+  KIND_NUMBER,
+  KIND_STRING,
+  NO_STRING,
+  CONDITIONAL_GREATER_THAN,
+  CONDITIONAL_LESS_THAN,
+  CONDITIONAL_EQUAL_NUMBER,
+  CONDITIONAL_EQUAL_STRING,
+  CONDITIONAL_EQUAL_EMPTY,
+  CONDITIONAL_CONTAINS,
+  CONDITIONAL_FORMULA,
+  CONDITIONAL_MATCH_CASE,
+  CONDITIONAL_STOP_IF_TRUE,
+  CONDITIONAL_HAS_RULES,
+  CONDITIONAL_RULES_UPDATED,
+} from "./wire-tags.js";
 
 const EMPTY_COND_MATCHES = new Uint32Array(0);
 const EMPTY_PIN_COLUMNS = new Uint32Array(0);
@@ -285,17 +302,20 @@ export class StoreWindowReader {
           if (!Number.isSafeInteger(word) || word < 0 || word > 0xffff_ffff) {
             throw new Error("Sheetwrite: invalid persisted formula source");
           }
+
           for (let byte = 0; byte < 4; byte++) {
             const byteIndex = wordIndex * 4 + byte;
             if (byteIndex < bytes.length) bytes[byteIndex] = (word >>> (byte * 8)) & 0xff;
           }
         }
+
         formulaOffsets.push(offset);
         formulaSources.push(UTF8_DECODER.decode(bytes));
       } else if (sourceKind === 2) {
         if (sourceLength !== 3 || cursor + 3 > packed.length) {
           throw new Error("Sheetwrite: invalid persisted reference source");
         }
+
         const targetSheet = packed[cursor++]!;
         const targetRow = packed[cursor++]!;
         const targetCol = packed[cursor++]!;
@@ -309,12 +329,14 @@ export class StoreWindowReader {
         ) {
           throw new Error("Sheetwrite: invalid persisted reference target");
         }
+
         referenceOffsets.push(offset);
         referenceTargets.push(targetSheet, targetRow, targetCol);
       } else if (sourceKind !== 0 || sourceLength !== 0) {
         throw new Error("Sheetwrite: invalid persisted source kind");
       }
     }
+
     this.syncStringPoolEpoch(stringPoolEpoch);
     if (stringIds.length > 0) {
       const texts = this.wasm.poolStrings(Uint32Array.from(stringIds));
@@ -387,9 +409,9 @@ export class StoreWindowReader {
     }
 
     const conditionalSync = applyConditionalRules ? this.syncConditionalRules(sheet, handle) : 0;
-    const hasCondRules = (conditionalSync & 1) !== 0;
+    const hasCondRules = (conditionalSync & CONDITIONAL_HAS_RULES) !== 0;
 
-    if ((conditionalSync & 2) !== 0) {
+    if ((conditionalSync & CONDITIONAL_RULES_UPDATED) !== 0) {
       ffiCalls += 1;
       ffiInputBytes += this.conditionalRuleInputBytes;
       ffiLargestTransferBytes = Math.max(
@@ -604,10 +626,12 @@ export class StoreWindowReader {
       if (decoded.nCols !== cols.length || decoded.nRows !== rows) {
         throw new Error("Sheetwrite: invalid packed window shape");
       }
+
       strings = decoded.localStringCount === 0 ? [] : view.takeStrings();
       if (strings.length !== decoded.localStringCount) {
         throw new Error("Sheetwrite: invalid packed window strings");
       }
+
       for (let index = 0; index < decoded.kinds.length; index++) {
         const kind = decoded.kinds[index];
         const local = decoded.stringIndex[index] ?? -1;
@@ -640,6 +664,7 @@ export class StoreWindowReader {
         missingIdSet.add(id);
       }
     }
+
     if (missingIdSet) {
       const missingIds = Uint32Array.from(missingIdSet);
       const resolved = this.wasm.poolStrings(missingIds);
@@ -665,6 +690,7 @@ export class StoreWindowReader {
         values[index] = null;
       }
     }
+
     return { values, styleIds, styles: this.stylesFrom(styleDict) };
   }
 
@@ -774,8 +800,9 @@ export class StoreWindowReader {
     if (this.condRulesSynced.get(sheet) === signature) {
       this.conditionalRuleInputBytes = 0;
       this.conditionalRuleLargestInputBytes = 0;
-      return packable.length > 0 ? 1 : 0;
+      return packable.length > 0 ? CONDITIONAL_HAS_RULES : 0;
     }
+
     this.condRulesSynced.set(sheet, signature);
 
     const kinds = new Uint8Array(packable.length);
@@ -793,31 +820,33 @@ export class StoreWindowReader {
 
       const when = rule.when;
       if (when.kind === "greaterThan") {
-        kinds[i] = 0;
+        kinds[i] = CONDITIONAL_GREATER_THAN;
         nums[i] = when.value;
       } else if (when.kind === "lessThan") {
-        kinds[i] = 1;
+        kinds[i] = CONDITIONAL_LESS_THAN;
         nums[i] = when.value;
       } else if (when.kind === "equal") {
         if (typeof when.value === "number") {
-          kinds[i] = 2;
+          kinds[i] = CONDITIONAL_EQUAL_NUMBER;
           nums[i] = when.value;
         } else if (typeof when.value === "string") {
-          kinds[i] = 3;
+          kinds[i] = CONDITIONAL_EQUAL_STRING;
           strs[i] = when.value;
         } else {
-          kinds[i] = 4;
+          kinds[i] = CONDITIONAL_EQUAL_EMPTY;
         }
       } else if (when.kind === "contains") {
-        kinds[i] = 5;
+        kinds[i] = CONDITIONAL_CONTAINS;
         strs[i] = when.text;
-        flags[i] = when.matchCase ? 1 : 0;
+        flags[i] = when.matchCase ? CONDITIONAL_MATCH_CASE : 0;
       } else {
-        kinds[i] = 6;
+        kinds[i] = CONDITIONAL_FORMULA;
         strs[i] = when.source;
       }
-      if (rule.stopIfTrue) flags[i] = (flags[i] ?? 0) | 2;
+
+      if (rule.stopIfTrue) flags[i] = (flags[i] ?? 0) | CONDITIONAL_STOP_IF_TRUE;
     }
+
     const stringBytes = strs.reduce((bytes, value) => bytes + utf8ByteLength(value), 0);
     this.conditionalRuleInputBytes =
       kinds.byteLength + bounds.byteLength + nums.byteLength + flags.byteLength + stringBytes;
@@ -829,7 +858,7 @@ export class StoreWindowReader {
       stringBytes,
     );
     this.wasm.setConditionalRules(handle, kinds, bounds, nums, strs, flags);
-    return (packable.length > 0 ? 1 : 0) | 2;
+    return (packable.length > 0 ? CONDITIONAL_HAS_RULES : 0) | CONDITIONAL_RULES_UPDATED;
   }
 
   private mergeHyperlinkStyles(
@@ -842,10 +871,13 @@ export class StoreWindowReader {
   ): void {
     const hyperlinks = this.sheetMeta(sheet).hyperlinks ?? [];
     if (hyperlinks.length === 0 || cols.length === 0 || rows.end <= rows.start) return;
+
     const colPositions = new Map<number, number>();
     for (let index = 0; index < cols.length; index++) colPositions.set(cols[index]!, index);
+
     const mergedIds = new Map<string, number>();
     const rowCount = Math.min(rows.end - rows.start, Math.floor(styleIds.length / cols.length));
+
     for (const hyperlink of hyperlinks) {
       if (hyperlink.range.sheet !== sheet) continue;
       const r0 = Math.min(hyperlink.range.start.row, hyperlink.range.end.row);
@@ -853,6 +885,7 @@ export class StoreWindowReader {
       const c0 = Math.min(hyperlink.range.start.col, hyperlink.range.end.col);
       const c1 = Math.max(hyperlink.range.start.col, hyperlink.range.end.col);
       const styleKey = JSON.stringify(hyperlink.style);
+
       for (let rowIndex = 0; rowIndex < rowCount; rowIndex++) {
         const dataRow = order?.[rows.start + rowIndex] ?? rows.start + rowIndex;
         if (dataRow < r0 || dataRow > r1) continue;
@@ -871,8 +904,10 @@ export class StoreWindowReader {
               ...styles[base],
               ...hyperlink.style,
             });
+
             mergedIds.set(key, merged);
           }
+
           styleIds[offset] = merged;
         }
       }

@@ -5,6 +5,7 @@ import type { ColumnFilter, RowGroup, SortKey, Workbook } from "../types/documen
 import type { ResourceOwnerBytes } from "../types/store.js";
 import { EngineHiddenRows } from "./engine-hidden-rows.js";
 import type { RecomputingCellStore } from "./wasm-contract.js";
+import { KIND_NUMBER, KIND_STRING, KIND_BOOL } from "./wire-tags.js";
 
 const EMPTY_U32 = new Uint32Array(0);
 const EMPTY_FILTERS: ReadonlyMap<number, ColumnFilter> = new Map();
@@ -288,9 +289,9 @@ export class StoreViewState {
     let textAt = 0;
 
     for (let i = 0; i < kinds.length; i++) {
-      if (kinds[i] === 1) out[i] = numbers[numberAt++] ?? null;
-      else if (kinds[i] === 2) out[i] = texts[textAt++] ?? null;
-      else if (kinds[i] === 3) out[i] = (numbers[numberAt++] ?? 0) !== 0;
+      if (kinds[i] === KIND_NUMBER) out[i] = numbers[numberAt++] ?? null;
+      else if (kinds[i] === KIND_STRING) out[i] = texts[textAt++] ?? null;
+      else if (kinds[i] === KIND_BOOL) out[i] = (numbers[numberAt++] ?? 0) !== 0;
       else out[i] = null;
     }
 
@@ -299,19 +300,22 @@ export class StoreViewState {
 
   private recompute(sheet: SheetId): void {
     const state = this.stateBySheet.get(sheet);
-    const hasSort = state !== undefined && state.sortKeys.length > 0;
-    const hasFilters = state !== undefined && state.filters.size > 0;
     const hidden = state ? this.hiddenRowSet(state) : null;
     const rowCount = this.sheetMeta(sheet).rowCount;
 
-    if (!hasSort && !hasFilters && !hidden) {
+    if (
+      state === undefined ||
+      (state.sortKeys.length === 0 && state.filters.size === 0 && !hidden)
+    ) {
       this.engineHiddenRows.viewChanged(sheet, null, rowCount);
       this.dropOrder(sheet);
       return;
     }
 
+    const hasSort = state.sortKeys.length > 0;
     const handle = this.handleOf(sheet);
-    let survivors: Uint32Array | null = hasFilters ? this.runFilters(handle, state!.filters) : null;
+    let survivors: Uint32Array | null =
+      state.filters.size > 0 ? this.runFilters(handle, state.filters) : null;
     this.engineHiddenRows.viewChanged(sheet, survivors, rowCount);
 
     if (hidden) {
@@ -334,12 +338,12 @@ export class StoreViewState {
       return;
     }
 
-    const cols = new Uint32Array(state!.sortKeys.length);
-    const ascending = new Uint8Array(state!.sortKeys.length);
+    const cols = new Uint32Array(state.sortKeys.length);
+    const ascending = new Uint8Array(state.sortKeys.length);
 
-    for (let i = 0; i < state!.sortKeys.length; i++) {
-      cols[i] = state!.sortKeys[i]!.col;
-      ascending[i] = state!.sortKeys[i]!.ascending ? 1 : 0;
+    for (const [i, key] of state.sortKeys.entries()) {
+      cols[i] = key.col;
+      ascending[i] = key.ascending ? 1 : 0;
     }
 
     this.setOrder(sheet, this.wasm.sortRowsMulti(handle, cols, ascending, survivors ?? EMPTY_U32));

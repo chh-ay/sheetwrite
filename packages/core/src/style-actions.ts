@@ -33,6 +33,7 @@ export class StyleActions {
   constructor(deps: StyleActionsDeps) {
     this.deps = deps;
   }
+
   setBorders(preset: BorderPreset): void {
     const selection = this.deps.selection();
     if (this.deps.readOnly() || selection.isEmpty) return;
@@ -43,6 +44,7 @@ export class StyleActions {
             ? undefined
             : { all: { color: this.deps.theme().fg, width: 1, style: "solid" } },
       });
+
       return;
     }
 
@@ -52,6 +54,7 @@ export class StyleActions {
       width: preset === "thickOutside" ? 2 : 1,
       style: "solid" as const,
     };
+
     const targets = new Map<
       string,
       { row: number; col: number; border: NonNullable<CellStyle["border"]> }
@@ -79,8 +82,10 @@ export class StyleActions {
         target = { row: dataRow, col: anchor.col, border: {} };
         targets.set(key, target);
       }
+
       target.border[edge] = side;
     };
+
     const patches: DocumentOp[] = [];
     if (edgeCount > edgeLimit) {
       // Bound style reads and allocation for huge edges; side-only borders replace existing borders.
@@ -103,6 +108,7 @@ export class StyleActions {
               : { r0: r0 + 1, c0, r1: r1 - 1, c1 };
             strips = interior.r0 <= interior.r1 && interior.c0 <= interior.c1 ? [interior] : [];
           }
+
           for (const merge of this.deps.merges()) {
             const remainder: SelRect[] = [];
             for (const strip of strips) {
@@ -110,6 +116,7 @@ export class StyleActions {
                 remainder.push(strip);
                 continue;
               }
+
               add(Math.max(strip.r0, merge.r0), Math.max(strip.c0, merge.c0), edge);
               if (strip.r0 === strip.r1) {
                 if (strip.c0 < merge.c0) remainder.push({ ...strip, c1: merge.c0 - 1 });
@@ -119,8 +126,10 @@ export class StyleActions {
                 if (strip.r1 > merge.r1) remainder.push({ ...strip, r0: merge.r1 + 1 });
               }
             }
+
             strips = remainder;
           }
+
           for (const strip of strips) {
             let start = this.deps.toDataRow(strip.r0);
             let previous = start;
@@ -130,6 +139,7 @@ export class StyleActions {
                 previous = next;
                 continue;
               }
+
               patches.push({
                 op: "setRangeStyle",
                 range: {
@@ -139,12 +149,14 @@ export class StyleActions {
                 },
                 style: { border: { [edge]: side } },
               });
+
               start = next;
               previous = next;
             }
           }
         }
       }
+
       for (const target of targets.values()) {
         patches.push({
           op: "setRangeStyle",
@@ -156,6 +168,7 @@ export class StyleActions {
           style: { border: target.border },
         });
       }
+
       this.deps.commit(patches);
       return;
     }
@@ -170,6 +183,7 @@ export class StyleActions {
       if (outside || preset === "right")
         for (let row = rect.r0; row <= rect.r1; row++) add(row, rect.c1, "right");
     }
+
     const cells = [...targets.values()];
     const sheet = this.deps.activeSheet();
     const captured = storeEngine(this.deps.store)?.captureResolvedCells(sheet, cells);
@@ -181,6 +195,7 @@ export class StyleActions {
         ...cell.border,
       },
     }));
+
     const runs = (columnWise: boolean): DocumentOp[] => {
       const sorted = [...merged].sort((a, b) =>
         columnWise ? a.col - b.col || a.row - b.row : a.row - b.row || a.col - b.col,
@@ -210,11 +225,14 @@ export class StyleActions {
             },
             style: { border: cell.border },
           });
+
         previous = cell;
         signature = key;
       }
+
       return result;
     };
+
     const rows = runs(false);
     const columns = runs(true);
     this.deps.commit(rows.length <= columns.length ? rows : columns);
@@ -307,6 +325,7 @@ export class StyleActions {
             previous = dataRow;
             continue;
           }
+
           patches.push({
             op: "setRangeStyle",
             range: {
@@ -316,10 +335,12 @@ export class StyleActions {
             },
             style: patch,
           });
+
           runStart = dataRow;
           previous = dataRow;
         }
       }
+
       this.deps.commit(patches);
       return;
     }
@@ -338,12 +359,14 @@ export class StyleActions {
             row: this.deps.toDataRow(cellRef.row),
             col: cellRef.col,
           };
+
           anchors.push(addr);
         }
       }
     }
 
     const captured = storeEngine(this.deps.store)?.captureCells(activeSheet, anchors);
+
     // Per-cell operations preserve policy issue indices and partial spill rejection.
     const scalarWrites =
       !captured ||
@@ -352,6 +375,7 @@ export class StyleActions {
         sheet.protectedRanges?.length ||
         captured.some((cell) => cell.isSpillChild),
       );
+
     const cells: SnapshotCell[] = [];
     let endRow = 0;
     let endCol = 0;
@@ -364,6 +388,7 @@ export class StyleActions {
           ? persisted.src
           : null
         : (this.deps.loadable?.getFormula(addr) ?? null);
+
       const value: CellValue = formula
         ? { kind: "formula", src: formula }
         : { kind: "literal", value: cell.resolved };

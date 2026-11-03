@@ -251,6 +251,7 @@ function rebaseEntries(
         if (patches.length > 0) undo.push({ kind: "patches", patches });
         continue;
       }
+
       const start = mapAddr({ sheet: part.range.sheet, ...part.range.start });
       const end = mapAddr({ sheet: part.range.sheet, ...part.range.end });
       if (start && end && start.sheet === end.sheet) {
@@ -259,11 +260,13 @@ function rebaseEntries(
           start: { row: start.row, col: start.col },
           end: { row: end.row, col: end.col },
         };
+
         undo.push(part);
       } else {
         part.dispose();
       }
     }
+
     entry.undo = undo;
     entry.redo = rebasePatches(entry.redo, mapAddr, mapPivot);
     if (entry.undo.length === 0 || entry.redo.length === 0) {
@@ -285,6 +288,7 @@ function rebasePatches(
       if (addr) out.push({ ...patch, addr });
       continue;
     }
+
     if (
       patch.op === "setRange" ||
       patch.op === "setBlock" ||
@@ -304,8 +308,10 @@ function rebasePatches(
           },
         });
       }
+
       continue;
     }
+
     if (patch.op === "addTable") {
       const start = mapAddr({ sheet: patch.table.range.sheet, ...patch.table.range.start });
       const end = mapAddr({ sheet: patch.table.range.sheet, ...patch.table.range.end });
@@ -327,8 +333,10 @@ function rebasePatches(
           },
         });
       }
+
       continue;
     }
+
     if (patch.op === "updateTable" && patch.patch.range) {
       const start = mapAddr({ sheet: patch.patch.range.sheet, ...patch.patch.range.start });
       const end = mapAddr({ sheet: patch.patch.range.sheet, ...patch.patch.range.end });
@@ -351,14 +359,18 @@ function rebasePatches(
           },
         });
       }
+
       continue;
     }
+
     if (patch.op === "setPivot") {
       out.push({ ...patch, pivot: mapPivot(patch.pivot, patch.sheet) });
       continue;
     }
+
     out.push(patch);
   }
+
   return out;
 }
 

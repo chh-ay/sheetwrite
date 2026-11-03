@@ -84,9 +84,20 @@ export interface ReadWindowControllerOptions {
   onEngineTrap?: (cause: unknown) => void;
 }
 
+/** Runs `callback` on the next animation frame, or after 16 ms without one; returns its canceller. */
+function scheduleFrame(callback: () => void): () => void {
+  if (globalThis.requestAnimationFrame !== undefined) {
+    const frame = requestAnimationFrame(callback);
+    return () => cancelAnimationFrame(frame);
+  }
+
+  const timer = setTimeout(callback, 16);
+  return () => clearTimeout(timer);
+}
+
 /** Owns paint/read plans, hydration demand, formula closure and residency. */
 export class ReadWindowController {
-  private frame = 0;
+  private cancelScheduledFrame: (() => void) | null = null;
   private paintInvalidationEpoch = 0;
   private dataInvalidationEpoch = 0;
   private columnWindowStart = -1;
@@ -199,15 +210,16 @@ export class ReadWindowController {
   }
 
   schedule(): void {
-    if (this.frame || this.destroyed || this.frozen) return;
+    if (this.cancelScheduledFrame || this.destroyed || this.frozen) return;
 
-    const requestFrame =
-      globalThis.requestAnimationFrame ??
-      ((callback: FrameRequestCallback) => setTimeout(callback, 16));
-    this.frame = requestFrame(() => {
-      this.frame = 0;
+    let ran = false;
+    const cancel = scheduleFrame(() => {
+      ran = true;
+      this.cancelScheduledFrame = null;
       this.paint();
-    }) as unknown as number;
+    });
+    // A synchronous frame source (a test stub) has already painted; nothing is left to cancel.
+    if (!ran) this.cancelScheduledFrame = cancel;
   }
 
   renderNow(): void {
@@ -242,10 +254,11 @@ export class ReadWindowController {
   }
 
   private cancelFrame(): void {
-    if (!this.frame) return;
+    const cancel = this.cancelScheduledFrame;
+    if (!cancel) return;
 
-    (globalThis.cancelAnimationFrame ?? clearTimeout)(this.frame);
-    this.frame = 0;
+    cancel();
+    this.cancelScheduledFrame = null;
   }
 
   private paint(): void {

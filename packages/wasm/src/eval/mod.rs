@@ -1602,6 +1602,19 @@ impl CellStore {
         }
     }
 
+    /// Routes a function call. Only the hottest calls run here: `LET`, `IF`,
+    /// `IFERROR`, `IFNA`, `SUM` over one range, streamed reductions and the
+    /// argument collection of scalar functions, plus the text and date
+    /// families in `apply_func` (out of line, they slowed the paired gate's
+    /// unicode-text-date-edit row 1.64×). Every other family runs in an
+    /// out-of-line `*_family` handler.
+    ///
+    /// `eval_func` and its one-caller callees are inlined into `eval_ast`.
+    /// JavaScriptCore never compiles a WebAssembly function of 100,000 bytes or
+    /// more with its optimizing tier, and `eval_ast` reached that size when
+    /// every family was inlined into it. `#[inline(never)]` keeps the handlers
+    /// out of line in LLVM. wasm-opt inlines one-caller functions again
+    /// afterwards, so `packages/wasm/Cargo.toml` passes it `--no-inline=*_family`.
     fn eval_func(
         &self,
         func: Func,
@@ -1653,143 +1666,19 @@ impl CellStore {
             };
         }
 
-        if matches!(func, Func::Offset | Func::Indirect) {
-            return self.eval_runtime_reference(func, args, sheet, pass, depth);
-        }
-
         match func {
-            Func::Intersect => return self.eval_intersection(args, sheet, pass, depth),
-            // A union has several areas, and a value position takes one.
-            Func::Union => return Value::Error(FormulaError::Value),
-            Func::Areas => return self.eval_areas(args, sheet, pass, depth),
+            Func::Offset
+            | Func::Indirect
+            | Func::Intersect
+            | Func::Union
+            | Func::Areas
+            | Func::Choose
+            | Func::Row
+            | Func::Column
+            | Func::Rows
+            | Func::Columns
+            | Func::Address => return self.eval_reference_family(func, args, sheet, pass, depth),
             _ => {}
-        }
-
-        if func == Func::Choose {
-            if args.len() < 2 {
-                return Value::Error(FormulaError::Value);
-            }
-            let index = self.eval_ast(&args[0], sheet, pass, depth + 1);
-            let index = match positive_index(&index) {
-                Ok(index) if index + 1 < args.len() => index + 1,
-                Ok(_) => return Value::Error(FormulaError::Value),
-                Err(error) => return Value::Error(error),
-            };
-            let selected = &args[index];
-            if range_from_ast(selected, sheet).is_some() {
-                return match self.eval_matrix_arg(selected, sheet, pass, depth + 1) {
-                    Ok(matrix) => matrix.into_first(),
-                    Err(error) => Value::Error(error),
-                };
-            }
-            if let Some(result) = self.eval_dynamic_array(selected, sheet, pass, depth + 1) {
-                return result.map_or_else(Value::Error, EvalMatrix::into_first);
-            }
-            return self.eval_ast(selected, sheet, pass, depth + 1);
-        }
-
-        if matches!(func, Func::Row | Func::Column) {
-            if args.len() > 1 {
-                return Value::Error(FormulaError::Value);
-            }
-            let coordinate = if let Some(reference) = args.first() {
-                let range = match (range_from_ast(reference, sheet), reference) {
-                    (Some(range), _) => range,
-                    (None, Ast::Func(func @ (Func::Offset | Func::Indirect), args)) => {
-                        match self.runtime_range(*func, args, sheet, pass, depth + 1) {
-                            Ok(range) => range,
-                            Err(error) => return Value::Error(error),
-                        }
-                    }
-                    (None, Ast::InvalidRef) => return Value::Error(FormulaError::Ref),
-                    (None, _) => return Value::Error(FormulaError::Value),
-                };
-                if func == Func::Row {
-                    range.row_start
-                } else {
-                    range.col_start
-                }
-            } else {
-                let Some((row, col)) = current_formula_origin() else {
-                    return Value::Error(FormulaError::Value);
-                };
-                if func == Func::Row {
-                    row
-                } else {
-                    col
-                }
-            };
-            return Value::number(coordinate as f64 + 1.0);
-        }
-
-        if matches!(func, Func::Rows | Func::Columns) {
-            if args.len() != 1 {
-                return Value::Error(FormulaError::Value);
-            }
-            // A written reference has its shape without its cells, which
-            // keeps `ROWS(A:A)` at 1048576 instead of the used rows.
-            if let Some(range) = range_from_ast(&args[0], sheet) {
-                if self.sheets.get(range.sheet as usize).is_none() {
-                    return Value::Error(FormulaError::Ref);
-                }
-                let (start, end) = if func == Func::Rows {
-                    (range.row_start, range.row_end)
-                } else {
-                    (range.col_start, range.col_end)
-                };
-                return Value::number(f64::from(end - start) + 1.0);
-            }
-            let matrix = match self.eval_matrix_arg(&args[0], sheet, pass, depth + 1) {
-                Ok(matrix) => matrix,
-                Err(error) => return Value::Error(error),
-            };
-            return Value::number(if func == Func::Rows {
-                matrix.rows as f64
-            } else {
-                matrix.cols as f64
-            });
-        }
-
-        if func == Func::Address {
-            if !(2..=5).contains(&args.len()) {
-                return Value::Error(FormulaError::Value);
-            }
-            let scalar =
-                |ast: &Ast, pass: &mut EvalPass<'_>| self.eval_ast(ast, sheet, pass, depth + 1);
-            let row = match positive_index(&scalar(&args[0], pass)) {
-                Ok(row) => row,
-                Err(error) => return Value::Error(error),
-            };
-            let col = match positive_index(&scalar(&args[1], pass)) {
-                Ok(col) => col,
-                Err(error) => return Value::Error(error),
-            };
-            let abs = match optional_ast(args, 2) {
-                Some(ast) => match option_code(&scalar(ast, pass)) {
-                    Ok(value @ 1..=4) => value,
-                    Ok(_) => return Value::Error(FormulaError::Value),
-                    Err(error) => return Value::Error(error),
-                },
-                None => 1,
-            };
-            let a1 = match optional_ast(args, 3) {
-                Some(ast) => match bool_from_value(&scalar(ast, pass)) {
-                    Ok(value) => value,
-                    Err(error) => return Value::Error(error),
-                },
-                None => true,
-            };
-            let sheet_name = match optional_ast(args, 4) {
-                Some(ast) => match text_from_value(&scalar(ast, pass)) {
-                    Ok(value) => Some(value),
-                    Err(error) => return Value::Error(error),
-                },
-                None => None,
-            };
-            return match address_text(row, col, abs, a1, sheet_name.as_deref()) {
-                Ok(text) => Value::text(text),
-                Err(error) => Value::Error(error),
-            };
         }
 
         if func == Func::If {
@@ -1843,148 +1732,42 @@ impl CellStore {
             };
         }
 
-        if func == Func::Ifs {
-            if args.len() < 2 || !args.len().is_multiple_of(2) {
-                return Value::Error(FormulaError::Value);
+        match func {
+            Func::Ifs | Func::Switch => {
+                return self.eval_conditional_family(func, args, sheet, pass, depth)
             }
-            for pair in args.as_chunks::<2>().0 {
-                let condition = self.eval_ast(&pair[0], sheet, pass, depth + 1);
-                match bool_from_value(&condition) {
-                    Ok(true) => {
-                        return self.eval_ast(&pair[1], sheet, pass, depth + 1);
-                    }
-                    Ok(false) => {}
-                    Err(error) => return Value::Error(error),
-                }
-            }
-            return Value::Error(FormulaError::Na);
-        }
-
-        if func == Func::Switch {
-            if args.len() < 3 {
-                return Value::Error(FormulaError::Value);
-            }
-            let expression = self.eval_ast(&args[0], sheet, pass, depth + 1);
-            if let Value::Error(error) = expression {
-                return Value::Error(error);
-            }
-            let pairs_end = if args.len().is_multiple_of(2) {
-                args.len() - 1
-            } else {
-                args.len()
-            };
-            for pair in args[1..pairs_end].as_chunks::<2>().0 {
-                let case = self.eval_ast(&pair[0], sheet, pass, depth + 1);
-                match compare_values(&expression, &case) {
-                    Ok(Ordering::Equal) => {
-                        return self.eval_ast(&pair[1], sheet, pass, depth + 1);
-                    }
-                    Ok(_) => {}
-                    Err(error) => return Value::Error(error),
-                }
-            }
-            return if pairs_end < args.len() {
-                self.eval_ast(&args[pairs_end], sheet, pass, depth + 1)
-            } else {
-                Value::Error(FormulaError::Na)
-            };
-        }
-
-        if matches!(
-            func,
             Func::IsBlank
-                | Func::IsNumber
-                | Func::IsText
-                | Func::IsLogical
-                | Func::IsError
-                | Func::IsErr
-                | Func::IsNa
-                | Func::Type
-                | Func::N
-                | Func::T
-        ) {
-            if args.len() != 1 {
-                return Value::Error(FormulaError::Value);
+            | Func::IsNumber
+            | Func::IsText
+            | Func::IsLogical
+            | Func::IsError
+            | Func::IsErr
+            | Func::IsNa
+            | Func::Type
+            | Func::N
+            | Func::T
+            | Func::FormulaText
+            | Func::IsFormula
+            | Func::Hyperlink
+            | Func::Cell => return self.eval_information_family(func, args, sheet, pass, depth),
+            Func::Today | Func::Now | Func::Rand | Func::RandBetween => {
+                return self.eval_volatile_family(func, args, sheet, pass, depth)
             }
-            let value = self.eval_ast(&args[0], sheet, pass, depth + 1);
-            return match func {
-                Func::IsBlank => Value::Bool(matches!(value, Value::Blank)),
-                Func::IsNumber => Value::Bool(matches!(value, Value::Number(_))),
-                Func::IsText => Value::Bool(matches!(value, Value::Text(_))),
-                Func::IsLogical => Value::Bool(matches!(value, Value::Bool(_))),
-                Func::IsError => Value::Bool(matches!(value, Value::Error(_))),
-                Func::IsErr => Value::Bool(matches!(
-                    value,
-                    Value::Error(error) if error != FormulaError::Na
-                )),
-                Func::IsNa => Value::Bool(value == Value::Error(FormulaError::Na)),
-                Func::Type => Value::number(match value {
-                    Value::Number(_) | Value::Blank => 1.0,
-                    Value::Text(_) => 2.0,
-                    Value::Bool(_) => 4.0,
-                    Value::Error(_) => 16.0,
-                }),
-                Func::N => match value {
-                    Value::Number(value) => Value::number(value),
-                    Value::Bool(value) => Value::number(if value { 1.0 } else { 0.0 }),
-                    Value::Error(error) => Value::Error(error),
-                    Value::Text(_) | Value::Blank => Value::Number(0.0),
-                },
-                Func::T => match value {
-                    Value::Text(value) => Value::Text(value),
-                    Value::Error(error) => Value::Error(error),
-                    Value::Number(_) | Value::Bool(_) | Value::Blank => Value::text(""),
-                },
-                _ => unreachable!(),
-            };
-        }
-
-        if matches!(func, Func::Today | Func::Now) {
-            if !args.is_empty() {
-                return Value::Error(FormulaError::Value);
-            }
-            return Value::number(if func == Func::Today {
-                self.volatile_serial.floor()
-            } else {
-                self.volatile_serial
-            });
-        }
-
-        if matches!(func, Func::Rand | Func::RandBetween) {
-            return self.eval_random_func(func == Func::RandBetween, args, sheet, pass, depth + 1);
-        }
-
-        if matches!(
-            func,
-            Func::FormulaText | Func::IsFormula | Func::Hyperlink | Func::Cell
-        ) {
-            return self.eval_info_func(func, args, sheet, pass, depth + 1);
-        }
-
-        if matches!(
-            func,
             Func::CountIf
-                | Func::CountIfs
-                | Func::SumIf
-                | Func::SumIfs
-                | Func::AverageIfs
-                | Func::AverageIf
-                | Func::MaxIfs
-                | Func::MinIfs
-        ) {
-            return self.eval_criteria_func(func, args, sheet, pass, depth + 1);
-        }
-
-        if matches!(
-            func,
+            | Func::CountIfs
+            | Func::SumIf
+            | Func::SumIfs
+            | Func::AverageIfs
+            | Func::AverageIf
+            | Func::MaxIfs
+            | Func::MinIfs => return self.eval_criteria_family(func, args, sheet, pass, depth + 1),
             Func::Index
-                | Func::Match
-                | Func::VLookup
-                | Func::HLookup
-                | Func::XLookup
-                | Func::XMatch
-        ) {
-            return self.eval_lookup_func(func, args, sheet, pass, depth + 1);
+            | Func::Match
+            | Func::VLookup
+            | Func::HLookup
+            | Func::XLookup
+            | Func::XMatch => return self.eval_lookup_family(func, args, sheet, pass, depth + 1),
+            _ => {}
         }
 
         if func == Func::Sum && args.len() == 1 {
@@ -2161,6 +1944,308 @@ impl CellStore {
 
         apply_func(func, &values)
     }
+
+    /// `OFFSET`, `INDIRECT`, reference operators, `CHOOSE`, `ROW(S)`,
+    /// `COLUMN(S)` and `ADDRESS`. See `eval_func` for why families live in
+    /// out-of-line `*_family` handlers.
+    #[inline(never)]
+    fn eval_reference_family(
+        &self,
+        func: Func,
+        args: &[Ast],
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> EvalResult {
+        if matches!(func, Func::Offset | Func::Indirect) {
+            return self.eval_runtime_reference(func, args, sheet, pass, depth);
+        }
+
+        match func {
+            Func::Intersect => return self.eval_intersection(args, sheet, pass, depth),
+            // A union has several areas, and a value position takes one.
+            Func::Union => return Value::Error(FormulaError::Value),
+            Func::Areas => return self.eval_areas(args, sheet, pass, depth),
+            _ => {}
+        }
+
+        if func == Func::Choose {
+            if args.len() < 2 {
+                return Value::Error(FormulaError::Value);
+            }
+            let index = self.eval_ast(&args[0], sheet, pass, depth + 1);
+            let index = match positive_index(&index) {
+                Ok(index) if index + 1 < args.len() => index + 1,
+                Ok(_) => return Value::Error(FormulaError::Value),
+                Err(error) => return Value::Error(error),
+            };
+            let selected = &args[index];
+            if range_from_ast(selected, sheet).is_some() {
+                return match self.eval_matrix_arg(selected, sheet, pass, depth + 1) {
+                    Ok(matrix) => matrix.into_first(),
+                    Err(error) => Value::Error(error),
+                };
+            }
+            if let Some(result) = self.eval_dynamic_array(selected, sheet, pass, depth + 1) {
+                return result.map_or_else(Value::Error, EvalMatrix::into_first);
+            }
+            return self.eval_ast(selected, sheet, pass, depth + 1);
+        }
+
+        if matches!(func, Func::Row | Func::Column) {
+            if args.len() > 1 {
+                return Value::Error(FormulaError::Value);
+            }
+            let coordinate = if let Some(reference) = args.first() {
+                let range = match (range_from_ast(reference, sheet), reference) {
+                    (Some(range), _) => range,
+                    (None, Ast::Func(func @ (Func::Offset | Func::Indirect), args)) => {
+                        match self.runtime_range(*func, args, sheet, pass, depth + 1) {
+                            Ok(range) => range,
+                            Err(error) => return Value::Error(error),
+                        }
+                    }
+                    (None, Ast::InvalidRef) => return Value::Error(FormulaError::Ref),
+                    (None, _) => return Value::Error(FormulaError::Value),
+                };
+                if func == Func::Row {
+                    range.row_start
+                } else {
+                    range.col_start
+                }
+            } else {
+                let Some((row, col)) = current_formula_origin() else {
+                    return Value::Error(FormulaError::Value);
+                };
+                if func == Func::Row {
+                    row
+                } else {
+                    col
+                }
+            };
+            return Value::number(coordinate as f64 + 1.0);
+        }
+
+        if matches!(func, Func::Rows | Func::Columns) {
+            if args.len() != 1 {
+                return Value::Error(FormulaError::Value);
+            }
+            // A written reference has its shape without its cells, which
+            // keeps `ROWS(A:A)` at 1048576 instead of the used rows.
+            if let Some(range) = range_from_ast(&args[0], sheet) {
+                if self.sheets.get(range.sheet as usize).is_none() {
+                    return Value::Error(FormulaError::Ref);
+                }
+                let (start, end) = if func == Func::Rows {
+                    (range.row_start, range.row_end)
+                } else {
+                    (range.col_start, range.col_end)
+                };
+                return Value::number(f64::from(end - start) + 1.0);
+            }
+            let matrix = match self.eval_matrix_arg(&args[0], sheet, pass, depth + 1) {
+                Ok(matrix) => matrix,
+                Err(error) => return Value::Error(error),
+            };
+            return Value::number(if func == Func::Rows {
+                matrix.rows as f64
+            } else {
+                matrix.cols as f64
+            });
+        }
+
+        if func == Func::Address {
+            if !(2..=5).contains(&args.len()) {
+                return Value::Error(FormulaError::Value);
+            }
+            let scalar =
+                |ast: &Ast, pass: &mut EvalPass<'_>| self.eval_ast(ast, sheet, pass, depth + 1);
+            let row = match positive_index(&scalar(&args[0], pass)) {
+                Ok(row) => row,
+                Err(error) => return Value::Error(error),
+            };
+            let col = match positive_index(&scalar(&args[1], pass)) {
+                Ok(col) => col,
+                Err(error) => return Value::Error(error),
+            };
+            let abs = match optional_ast(args, 2) {
+                Some(ast) => match option_code(&scalar(ast, pass)) {
+                    Ok(value @ 1..=4) => value,
+                    Ok(_) => return Value::Error(FormulaError::Value),
+                    Err(error) => return Value::Error(error),
+                },
+                None => 1,
+            };
+            let a1 = match optional_ast(args, 3) {
+                Some(ast) => match bool_from_value(&scalar(ast, pass)) {
+                    Ok(value) => value,
+                    Err(error) => return Value::Error(error),
+                },
+                None => true,
+            };
+            let sheet_name = match optional_ast(args, 4) {
+                Some(ast) => match text_from_value(&scalar(ast, pass)) {
+                    Ok(value) => Some(value),
+                    Err(error) => return Value::Error(error),
+                },
+                None => None,
+            };
+            return match address_text(row, col, abs, a1, sheet_name.as_deref()) {
+                Ok(text) => Value::text(text),
+                Err(error) => Value::Error(error),
+            };
+        }
+        Value::Error(FormulaError::Value)
+    }
+
+    /// `IFS` and `SWITCH`; `IF`, `IFERROR` and `IFNA` stay in `eval_func`.
+    #[inline(never)]
+    fn eval_conditional_family(
+        &self,
+        func: Func,
+        args: &[Ast],
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> EvalResult {
+        if func == Func::Ifs {
+            if args.len() < 2 || !args.len().is_multiple_of(2) {
+                return Value::Error(FormulaError::Value);
+            }
+            for pair in args.as_chunks::<2>().0 {
+                let condition = self.eval_ast(&pair[0], sheet, pass, depth + 1);
+                match bool_from_value(&condition) {
+                    Ok(true) => {
+                        return self.eval_ast(&pair[1], sheet, pass, depth + 1);
+                    }
+                    Ok(false) => {}
+                    Err(error) => return Value::Error(error),
+                }
+            }
+            return Value::Error(FormulaError::Na);
+        }
+
+        if func == Func::Switch {
+            if args.len() < 3 {
+                return Value::Error(FormulaError::Value);
+            }
+            let expression = self.eval_ast(&args[0], sheet, pass, depth + 1);
+            if let Value::Error(error) = expression {
+                return Value::Error(error);
+            }
+            let pairs_end = if args.len().is_multiple_of(2) {
+                args.len() - 1
+            } else {
+                args.len()
+            };
+            for pair in args[1..pairs_end].as_chunks::<2>().0 {
+                let case = self.eval_ast(&pair[0], sheet, pass, depth + 1);
+                match compare_values(&expression, &case) {
+                    Ok(Ordering::Equal) => {
+                        return self.eval_ast(&pair[1], sheet, pass, depth + 1);
+                    }
+                    Ok(_) => {}
+                    Err(error) => return Value::Error(error),
+                }
+            }
+            return if pairs_end < args.len() {
+                self.eval_ast(&args[pairs_end], sheet, pass, depth + 1)
+            } else {
+                Value::Error(FormulaError::Na)
+            };
+        }
+        Value::Error(FormulaError::Value)
+    }
+
+    /// The `IS*` tests, `TYPE`, `N`, `T`, and the cell information functions.
+    #[inline(never)]
+    fn eval_information_family(
+        &self,
+        func: Func,
+        args: &[Ast],
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> EvalResult {
+        if matches!(
+            func,
+            Func::IsBlank
+                | Func::IsNumber
+                | Func::IsText
+                | Func::IsLogical
+                | Func::IsError
+                | Func::IsErr
+                | Func::IsNa
+                | Func::Type
+                | Func::N
+                | Func::T
+        ) {
+            if args.len() != 1 {
+                return Value::Error(FormulaError::Value);
+            }
+            let value = self.eval_ast(&args[0], sheet, pass, depth + 1);
+            return match func {
+                Func::IsBlank => Value::Bool(matches!(value, Value::Blank)),
+                Func::IsNumber => Value::Bool(matches!(value, Value::Number(_))),
+                Func::IsText => Value::Bool(matches!(value, Value::Text(_))),
+                Func::IsLogical => Value::Bool(matches!(value, Value::Bool(_))),
+                Func::IsError => Value::Bool(matches!(value, Value::Error(_))),
+                Func::IsErr => Value::Bool(matches!(
+                    value,
+                    Value::Error(error) if error != FormulaError::Na
+                )),
+                Func::IsNa => Value::Bool(value == Value::Error(FormulaError::Na)),
+                Func::Type => Value::number(match value {
+                    Value::Number(_) | Value::Blank => 1.0,
+                    Value::Text(_) => 2.0,
+                    Value::Bool(_) => 4.0,
+                    Value::Error(_) => 16.0,
+                }),
+                Func::N => match value {
+                    Value::Number(value) => Value::number(value),
+                    Value::Bool(value) => Value::number(if value { 1.0 } else { 0.0 }),
+                    Value::Error(error) => Value::Error(error),
+                    Value::Text(_) | Value::Blank => Value::Number(0.0),
+                },
+                Func::T => match value {
+                    Value::Text(value) => Value::Text(value),
+                    Value::Error(error) => Value::Error(error),
+                    Value::Number(_) | Value::Bool(_) | Value::Blank => Value::text(""),
+                },
+                _ => unreachable!(),
+            };
+        }
+        self.eval_info_func(func, args, sheet, pass, depth + 1)
+    }
+
+    /// `TODAY`, `NOW`, `RAND` and `RANDBETWEEN`.
+    #[cold]
+    #[inline(never)]
+    fn eval_volatile_family(
+        &self,
+        func: Func,
+        args: &[Ast],
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> EvalResult {
+        if matches!(func, Func::Today | Func::Now) {
+            if !args.is_empty() {
+                return Value::Error(FormulaError::Value);
+            }
+            return Value::number(if func == Func::Today {
+                self.volatile_serial.floor()
+            } else {
+                self.volatile_serial
+            });
+        }
+
+        if matches!(func, Func::Rand | Func::RandBetween) {
+            return self.eval_random_func(func == Func::RandBetween, args, sheet, pass, depth + 1);
+        }
+        Value::Error(FormulaError::Value)
+    }
+
     fn eval_matrix_arg(
         &self,
         ast: &Ast,
@@ -2537,7 +2622,8 @@ impl CellStore {
         })
     }
 
-    fn eval_criteria_func(
+    #[inline(never)]
+    fn eval_criteria_family(
         &self,
         func: Func,
         args: &[Ast],
@@ -2826,7 +2912,8 @@ impl CellStore {
         true
     }
 
-    fn eval_lookup_func(
+    #[inline(never)]
+    fn eval_lookup_family(
         &self,
         func: Func,
         args: &[Ast],

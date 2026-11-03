@@ -65,6 +65,7 @@ function addSheetSnapshotIssue(
   ) {
     return "invalid-sheet";
   }
+
   const merges = snapshot.merges?.map(normalizeMerge) ?? [];
   const candidate: Sheet = {
     id: snapshot.id,
@@ -81,6 +82,7 @@ function addSheetSnapshotIssue(
     filters: snapshot.filters,
     tables: snapshot.tables,
   };
+
   if (
     (snapshot.frozenRows !== undefined && snapshot.frozenRows > snapshot.rowCount) ||
     (snapshot.frozenCols !== undefined && snapshot.frozenCols > snapshot.columns.length) ||
@@ -123,6 +125,7 @@ function addSheetSnapshotIssue(
   ) {
     return "invalid-sheet";
   }
+
   return null;
 }
 
@@ -151,8 +154,10 @@ export function applySheetLifecycleOperation(
       name: name.name,
       visibility: operation.sheet.visibility ?? "visible",
     });
+
     return { ok: true };
   }
+
   if (operation.op === "removeSheet") {
     const index = state.sheets.findIndex((sheet) => sheet.id === operation.sheet);
     if (index < 0) return { ok: false, code: "sheet-not-found" };
@@ -163,9 +168,11 @@ export function applySheetLifecycleOperation(
     ) {
       return { ok: false, code: "last-visible-sheet" };
     }
+
     state.sheets.splice(index, 1);
     return { ok: true };
   }
+
   if (operation.op === "renameSheet") {
     const sheet = state.sheets.find((candidate) => candidate.id === operation.sheet);
     if (!sheet) return { ok: false, code: "sheet-not-found" };
@@ -179,16 +186,19 @@ export function applySheetLifecycleOperation(
     sheet.name = name.name;
     return { ok: true };
   }
+
   if (operation.op === "moveSheet") {
     const from = state.sheets.findIndex((sheet) => sheet.id === operation.sheet);
     if (from < 0) return { ok: false, code: "sheet-not-found" };
     if (!integerAt(operation.to) || operation.to >= state.sheets.length) {
       return { ok: false, code: "invalid-position" };
     }
+
     const [sheet] = state.sheets.splice(from, 1);
     state.sheets.splice(operation.to, 0, sheet!);
     return { ok: true };
   }
+
   if (operation.op === "setSheetVisibility") {
     const sheet = state.sheets.find((candidate) => candidate.id === operation.sheet);
     if (!sheet) return { ok: false, code: "sheet-not-found" };
@@ -199,8 +209,10 @@ export function applySheetLifecycleOperation(
     ) {
       return { ok: false, code: "last-visible-sheet" };
     }
+
     sheet.visibility = operation.visibility;
     return { ok: true };
   }
+
   return null;
 }

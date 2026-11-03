@@ -21,6 +21,7 @@ import {
 } from "../format-presets.js";
 import { signature } from "../functions/signature.js";
 import type { FormulaFunctionMetadata } from "../functions/types.js";
+import { ZOOM_MIN, ZOOM_MAX } from "../grid-constants.js";
 import { createHyperlinkId, isSafeExternalHyperlink } from "../hyperlink.js";
 import type { IconName } from "../icons/icon-names.js";
 import { loadPanels, pivotsAvailable, showFormulaExplanation } from "../panels/panel-loader.js";
@@ -40,9 +41,7 @@ import type {
   RibbonTabSpec,
 } from "./command-spec.js";
 
-/** Zoom limits and step of `Grid.setZoom`, shown as percents. */
-const ZOOM_MIN = 0.5;
-const ZOOM_MAX = 2;
+/** Zoom step of `Grid.setZoom`, shown as percents. */
 const ZOOM_STEP = 0.1;
 /** The zoom that the ribbon's percent readout resets to: 100%. */
 export const ZOOM_RESET = 1;

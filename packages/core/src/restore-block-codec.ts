@@ -51,6 +51,7 @@ export function decodeRestoreBlockPayload(operation: RestoreBlock): PackedCellBl
   if (block.rowCount > Math.floor(MAX_RESTORE_BLOCK_CELLS / block.colCount)) {
     throw restoreBlockLimit("Restore block exceeds the cell limit");
   }
+
   if (
     block.rowCount !== Math.abs(operation.range.end.row - operation.range.start.row) + 1 ||
     block.colCount !== Math.abs(operation.range.end.col - operation.range.start.col) + 1 ||
@@ -122,6 +123,7 @@ function inspectDeflate(data: Uint8Array, expected: number): void {
       value |= (((data[bit >>> 3] ?? 0) >>> (bit & 7)) & 1) << i;
     return value;
   };
+
   const symbol = (tree: Huffman): number => {
     let code = 0;
     for (let length = 1; length <= tree.max; length++) {
@@ -129,12 +131,15 @@ function inspectDeflate(data: Uint8Array, expected: number): void {
       const result = tree.codes[length]?.get(code);
       if (result !== undefined) return result;
     }
+
     return invalidRestoreBlock();
   };
+
   const add = (count: number): void => {
     output += count;
     if (output > expected || output > MAX_RESTORE_BLOCK_DECODED_BYTES) invalidRestoreBlock();
   };
+
   let final = false;
   do {
     final = bits(1) === 1;
@@ -148,6 +153,7 @@ function inspectDeflate(data: Uint8Array, expected: number): void {
       bit += length * 8;
       continue;
     }
+
     if (kind === 3) invalidRestoreBlock();
     let literal = FIXED_LITERAL;
     let distance = FIXED_DISTANCE;
@@ -162,6 +168,7 @@ function inspectDeflate(data: Uint8Array, expected: number): void {
         if (index === undefined) invalidRestoreBlock();
         lengths[index] = bits(3);
       }
+
       const tree = huffman(lengths);
       const all: number[] = [];
       while (all.length < literals + distances) {
@@ -175,10 +182,12 @@ function inspectDeflate(data: Uint8Array, expected: number): void {
           for (let i = 0; i < repeat; i++) all.push(length);
         }
       }
+
       if (all[256] === 0) invalidRestoreBlock();
       literal = huffman(all.slice(0, literals), true);
       distance = huffman(all.slice(literals), true);
     }
+
     for (;;) {
       const value = symbol(literal);
       if (value < 256) add(1);
@@ -201,5 +210,6 @@ function inspectDeflate(data: Uint8Array, expected: number): void {
       }
     }
   } while (!final);
+
   if (Math.ceil(bit / 8) !== data.length || output !== expected) invalidRestoreBlock();
 }

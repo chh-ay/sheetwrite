@@ -351,6 +351,7 @@ function classifyPatch(patch: DocumentOp, context: PatchContext): void {
           row: Math.min(range.start.row, range.end.row),
           col: Math.min(range.start.col, range.end.col),
         };
+
         sources?.query(
           { sheet: range.sheet, start, end: { row: UNBOUNDED, col: UNBOUNDED } },
           (chart) => {
@@ -359,13 +360,16 @@ function classifyPatch(patch: DocumentOp, context: PatchContext): void {
           },
         );
       }
+
       return;
     }
+
     case "setRangeStyle":
       // The view carries number formats, not other cell styling.
       if (patch.style === null || patch.style.numberFormat !== undefined)
         index.sources.get(patch.range.sheet)?.query(patch.range, hit);
       return;
+
     case "setColumn": {
       const changed = patch.patch;
       if (
@@ -382,8 +386,10 @@ function classifyPatch(patch: DocumentOp, context: PatchContext): void {
           hit,
         );
       }
+
       return;
     }
+
     case "addRows":
     case "removeRows":
     case "moveRows":
@@ -397,21 +403,26 @@ function classifyPatch(patch: DocumentOp, context: PatchContext): void {
       context.valuesChanged = true;
       context.rebuild = true;
       return;
+
     case "addSheet":
       for (const chart of patch.sheet.charts ?? []) {
         direct.push({ sheet: patch.sheet.id, id: chart.id });
       }
+
       context.valuesChanged = true;
       context.rebuild = true;
       return;
+
     case "setChart":
       direct.push({ sheet: patch.sheet, id: patch.chart.id });
       context.rebuild = true;
       return;
+
     case "removeChart":
       direct.push({ sheet: patch.sheet, id: patch.id });
       context.rebuild = true;
       return;
+
     case "setPivot":
     case "removePivot":
       // Output cells on the anchor sheet appear, move or clear with no cell op on them,
@@ -420,6 +431,7 @@ function classifyPatch(patch: DocumentOp, context: PatchContext): void {
       context.valuesChanged = true;
       context.rebuild = true;
       return;
+
     case "addTable":
     case "updateTable":
     case "removeTable":
@@ -427,6 +439,7 @@ function classifyPatch(patch: DocumentOp, context: PatchContext): void {
       sheetWide(patch.op === "addTable" ? patch.table.range.sheet : patch.sheet);
       context.valuesChanged = true;
       return;
+
     case "renameSheet":
     case "moveSheet":
     case "setNamedRange":
@@ -435,6 +448,7 @@ function classifyPatch(patch: DocumentOp, context: PatchContext): void {
       // Formula results can depend on names, calculation settings and sheet identity/order.
       context.valuesChanged = true;
       return;
+
     case "setNote":
     case "setHyperlink":
     case "removeHyperlink":
@@ -449,6 +463,7 @@ function classifyPatch(patch: DocumentOp, context: PatchContext): void {
     case "setSheetVisibility":
       // Presentation metadata does not change canonical source values.
       return;
+
     default: {
       const unhandled: never = patch;
       return unhandled;

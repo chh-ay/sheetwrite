@@ -1,3 +1,8 @@
+// The adapters import `@sheetwrite/core/adapter`, which resolves to the built
+// package. Initializing through the same package makes their grids mount; a
+// source-tree initializer would leave the adapters on the loading fallback.
+import { createGrid, type Grid, initSheetwrite, type Workbook } from "@sheetwrite/core";
+import { installCanvasTestStubs } from "@sheetwrite/core/testing";
 import { createElement, createRef } from "react";
 import { flushSync as flushReact } from "react-dom";
 import { createRoot } from "react-dom/client";
@@ -9,13 +14,6 @@ import {
   mount,
   unmount,
 } from "../../node_modules/svelte/src/index-client.js";
-import {
-  createGrid,
-  type Grid,
-  initSheetwrite,
-  type Workbook,
-} from "../../packages/core/src/index.js";
-import { installCanvasTestStubs } from "../../packages/core/src/testing.js";
 import { SheetwriteGrid as ReactGrid } from "../../packages/react/src/index.js";
 import SvelteHarness from "../../packages/svelte/test/LifecycleHarness.svelte";
 import { SheetwriteGrid as VueGrid } from "../../packages/vue/src/index.js";
@@ -51,10 +49,18 @@ interface SvelteBenchmarkHarness {
   update(props: { workbook: Workbook; fallbackLabel: string }): void;
 }
 
+/** Throws unless the adapter published a live grid into the host. */
+function assertMounted(adapter: string): void {
+  if (host.querySelector('[role="grid"]') === null) {
+    throw new Error(`${adapter} benchmark cycle did not mount a grid`);
+  }
+}
+
 async function reactCycle(reset: boolean): Promise<void> {
   const root = createRoot(host);
   const ref = createRef<Grid>();
   flushReact(() => root.render(createElement(ReactGrid, { workbook, ref })));
+  if (ref.current === null) throw new Error("React benchmark cycle did not publish a grid");
   if (reset)
     flushReact(() => root.render(createElement(ReactGrid, { workbook: replacement, ref })));
   flushReact(() => root.unmount());
@@ -67,6 +73,7 @@ async function vueCycle(reset: boolean): Promise<void> {
   );
   app.mount(host);
   await nextTick();
+  assertMounted("Vue");
   if (reset) {
     input.value = replacement;
     await nextTick();
@@ -81,6 +88,7 @@ async function svelteCycle(reset: boolean): Promise<void> {
     props: { initialProps: { workbook, fallbackLabel: "" } },
   }) as SvelteBenchmarkHarness;
   flushSvelte();
+  assertMounted("Svelte");
   if (reset) {
     component.update({ workbook: replacement, fallbackLabel: "" });
     flushSvelte();

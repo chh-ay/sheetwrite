@@ -230,7 +230,7 @@ class SparseColumnIntervals {
     const firstColumn = [...this.columns.keys()].sort((a, b) => a - b)[0];
     if (firstColumn === undefined) return null;
 
-    const band = this.columns.get(firstColumn)!.first();
+    const band = this.columns.get(firstColumn)?.first();
     if (!band) return null;
 
     const columns: number[] = [];
@@ -750,12 +750,14 @@ export class DatasourceController {
   private direction: -1 | 0 | 1 = 0;
   private velocityRowsPerMs = 0;
   private telemetry = emptyTelemetry();
+
   private lastViewport: {
     start: number;
     end: number;
     columns: readonly number[];
     at: number;
   } | null = null;
+
   private readonly visibleWaitDurations: VisibleWaitSample[] = [];
   private visibleWaitSampleCursor = 0;
   private schemaCache: SchemaSnapshot | null = null;
@@ -1190,6 +1192,7 @@ export class DatasourceController {
       ) {
         throw new Error("Sheetwrite: formula read bands are not a quad sequence");
       }
+
       const rows = normalizeBounds(rowStart, rowEnd, this.rowCount);
       const schemaColumnEnd = Math.min(columnEnd, schema.keys.length);
       if (rows.start === rows.end || columnStart >= schemaColumnEnd) continue;
@@ -1212,6 +1215,7 @@ export class DatasourceController {
         attempt: 0,
       });
     }
+
     return demands;
   }
 
@@ -1261,6 +1265,7 @@ export class DatasourceController {
     columns: readonly number[],
   ): void {
     this.speculativeDemand.length = 0;
+
     for (const interval of intervals) {
       if (direction > 0) {
         for (let cursor = interval.start; cursor < interval.end; cursor += bandRows) {
@@ -1465,6 +1470,7 @@ export class DatasourceController {
       attempt,
       released: false,
     };
+
     this.activeIds.set(id, activeRequest);
     this.requests.add(activeRequest);
     storeEngine(loadable)?.beginPageRequest();
@@ -1490,6 +1496,7 @@ export class DatasourceController {
       signal: controller.signal,
       revision,
     };
+
     const generation = this.generation;
     let pending: Promise<DataSourcePage>;
     try {
@@ -1506,6 +1513,7 @@ export class DatasourceController {
         if (this.destroyed || generation !== this.generation || controller.signal.aborted) return;
         this.options.onError(requestWithoutSignal(activeRequest), error);
       });
+
       return;
     }
 
@@ -1525,12 +1533,15 @@ export class DatasourceController {
           this.recordCompletedWaits(responseColumns, page.start, loadedEnd);
           this.options.onRowsLoaded();
         }
+
         if (!this.loaded.covers(activeRequest.start, activeRequest.end, activeRequest.columns)) {
           if (!progressed && activeRequest.attempt >= DATASOURCE_NO_PROGRESS_RETRIES) {
             throw datasourceFailure("Datasource page made no coverage progress");
           }
+
           this.requeuePartial(activeRequest, progressed ? 0 : activeRequest.attempt + 1);
         }
+
         this.clearOwned(activeRequest);
       })
       .catch((error: unknown) => {
@@ -1553,9 +1564,11 @@ export class DatasourceController {
     if (page?.protocol !== 2 || !Array.isArray(page.rows) || !Array.isArray(page.columns)) {
       throw datasourceFailure("Datasource page must use protocol 2 arrays");
     }
+
     if (!Number.isSafeInteger(page.start)) {
       throw datasourceFailure("Datasource page start must be a safe integer");
     }
+
     const loadedEnd = page.start + page.rows.length;
     const currentRowCount = normalizeRowCount(this.options.rowCount(request.sheet));
     if (
@@ -1566,6 +1579,7 @@ export class DatasourceController {
     ) {
       throw datasourceFailure("Datasource page rows exceed requested coverage");
     }
+
     if (this.options.activeSheet() !== request.sheet || this.schema() !== request.schema) {
       throw datasourceFailure("Datasource schema changed while a page was pending");
     }
@@ -1588,24 +1602,29 @@ export class DatasourceController {
       ) {
         throw datasourceFailure("Datasource page contains malformed column bands");
       }
+
       while (
         requestCursor < request.bands.length &&
         request.bands[requestCursor]!.end <= band.start
       ) {
         requestCursor += 1;
       }
+
       const requestedBand = request.bands[requestCursor];
       if (!requestedBand || band.start < requestedBand.start || band.end > requestedBand.end) {
         throw datasourceFailure("Datasource page column coverage exceeds the request");
       }
+
       for (let offset = 0; offset < band.keys.length; offset += 1) {
         const expected = request.schema.keys[band.start + offset]!;
         if (band.keys[offset] !== expected) {
           throw datasourceFailure("Datasource page column keys do not match the current schema");
         }
+
         declaredKeys.push(expected);
         responseColumns.push(band.start + offset);
       }
+
       previousEnd = band.end;
     }
 
@@ -1614,21 +1633,25 @@ export class DatasourceController {
       if (row === null || typeof row !== "object" || Array.isArray(row)) {
         throw datasourceFailure("Datasource page rows must be keyed objects");
       }
+
       const ownKeys = Reflect.ownKeys(row);
       if (ownKeys.length !== declaredKeys.length) {
         throw datasourceFailure("Datasource page row keys do not match declared coverage");
       }
+
       for (const key of ownKeys) {
         if (typeof key !== "string" || !declared.has(key)) {
           throw datasourceFailure("Datasource page row contains an undeclared key");
         }
       }
+
       for (const key of declaredKeys) {
         if (!Object.hasOwn(row, key)) {
           throw datasourceFailure("Datasource page row is missing a declared key");
         }
       }
     }
+
     return responseColumns;
   }
 
@@ -1838,6 +1861,7 @@ export class DatasourceController {
         if (!stillRead) this.abortRequest(request, reason);
         continue;
       }
+
       const intersectsViewport =
         rowsIntersect(request, viewport) && columnsSubset(request.columns, viewport.columns);
       if (request.speculativeOrigin) {
@@ -1851,9 +1875,11 @@ export class DatasourceController {
           request.priority = "speculative";
           continue;
         }
+
         this.abortRequest(request, reason);
         continue;
       }
+
       if (request.viewportOrigin) {
         const requestRows = request.end - request.start;
         const currentRows = viewport.end - viewport.start;

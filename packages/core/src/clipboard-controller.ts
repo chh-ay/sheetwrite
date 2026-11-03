@@ -6,7 +6,7 @@ import {
   type ClipboardSnapshot,
   neutralizeInjection,
   parseTsv,
-  toTsv,
+  rowsToTsv,
 } from "./clipboard.js";
 import {
   cloneCellHyperlink,
@@ -89,6 +89,7 @@ function clipboardHtml(snapshot: ClipboardSnapshot): string {
         ...(style.strikethrough ? ["line-through"] : []),
       ];
       if (decoration.length > 0) css.push(`text-decoration:${decoration.join(" ")}`);
+
       const color = style.color ? safeCssColor(style.color) : undefined;
       const backgroundColor = style.backgroundColor
         ? safeCssColor(style.backgroundColor)
@@ -99,6 +100,7 @@ function clipboardHtml(snapshot: ClipboardSnapshot): string {
       if (style.verticalAlign) css.push(`vertical-align:${style.verticalAlign}`);
       // The family is validated to need no escaping beyond its quotes.
       if (style.fontFamily) css.push(`font-family:"${style.fontFamily}"`);
+
       const styleAttr = css.length > 0 ? ` style="${escapeHtml(css.join(";"))}"` : "";
       const text =
         cell.resolved === null
@@ -110,8 +112,10 @@ function clipboardHtml(snapshot: ClipboardSnapshot): string {
             : String(cell.resolved);
       html += `<td${styleAttr}>${escapeHtml(neutralizeInjection(text))}</td>`;
     }
+
     html += "</tr>";
   }
+
   return `${html}</tbody></table>`;
 }
 
@@ -138,6 +142,7 @@ function parseClipboardJson(text: string): ClipboardEnvelope | null {
       tsv?: unknown;
       cut?: unknown;
     };
+
     if (
       value.version !== 3 ||
       typeof value.token !== "string" ||
@@ -166,6 +171,7 @@ function parseClipboardJson(text: string): ClipboardEnvelope | null {
           resolved?: unknown;
           style?: unknown;
         };
+
         const resolved = cell.resolved;
         if (
           !(
@@ -177,6 +183,7 @@ function parseClipboardJson(text: string): ClipboardEnvelope | null {
         ) {
           return null;
         }
+
         const cellValue = parseClipboardValue(cell.value);
         if (!cellValue) return null;
         row.push({
@@ -185,8 +192,10 @@ function parseClipboardJson(text: string): ClipboardEnvelope | null {
           style: safeClipboardStyle(cell.style),
         });
       }
+
       cells.push(row);
     }
+
     const hyperlinks: CellHyperlink[] = [];
     for (const input of value.hyperlinks) {
       const hyperlink = sanitizeCellHyperlink(input);
@@ -217,6 +226,7 @@ function parseClipboardValue(value: unknown): CellValue | null {
     src?: unknown;
     target?: { sheet?: unknown; row?: unknown; col?: unknown };
   };
+
   if (candidate.kind === "literal") {
     const literal = candidate.value;
     return literal === null ||
@@ -226,11 +236,13 @@ function parseClipboardValue(value: unknown): CellValue | null {
       ? { kind: "literal", value: literal }
       : null;
   }
+
   if (candidate.kind === "formula") {
     return typeof candidate.src === "string" && candidate.src.startsWith("=")
       ? { kind: "formula", src: candidate.src }
       : null;
   }
+
   if (candidate.kind === "ref") {
     const target = candidate.target;
     return target &&
@@ -244,6 +256,7 @@ function parseClipboardValue(value: unknown): CellValue | null {
         }
       : null;
   }
+
   return null;
 }
 
@@ -254,6 +267,7 @@ function safeClipboardStyle(value: unknown): CellStyle {
   for (const key of ["bold", "italic", "underline", "strikethrough", "wrap"] as const) {
     if (typeof input[key] === "boolean") style[key] = input[key];
   }
+
   if (
     typeof input.fontSize === "number" &&
     Number.isFinite(input.fontSize) &&
@@ -262,20 +276,25 @@ function safeClipboardStyle(value: unknown): CellStyle {
   ) {
     style.fontSize = input.fontSize;
   }
+
   if (typeof input.color === "string") style.color = safeCssColor(input.color);
   if (typeof input.backgroundColor === "string") {
     style.backgroundColor = safeCssColor(input.backgroundColor);
   }
+
   if (input.align === "left" || input.align === "center" || input.align === "right") {
     style.align = input.align;
   }
+
   if (isCellVerticalAlign(input.verticalAlign)) style.verticalAlign = input.verticalAlign;
   if (typeof input.fontFamily === "string" && isCellFontFamily(input.fontFamily)) {
     style.fontFamily = input.fontFamily;
   }
+
   if (typeof input.numberFormat === "string" && isCellNumberFormat(input.numberFormat)) {
     style.numberFormat = input.numberFormat;
   }
+
   if (input.border && typeof input.border === "object" && !Array.isArray(input.border)) {
     const borders: NonNullable<CellStyle["border"]> = {};
     const borderInput = input.border as Record<string, unknown>;
@@ -293,6 +312,7 @@ function safeClipboardStyle(value: unknown): CellStyle {
       ) {
         border.width = borderValue.width;
       }
+
       if (
         borderValue.style === "solid" ||
         borderValue.style === "dashed" ||
@@ -300,10 +320,13 @@ function safeClipboardStyle(value: unknown): CellStyle {
       ) {
         border.style = borderValue.style;
       }
+
       if (Object.keys(border).length > 0) borders[side] = border;
     }
+
     if (Object.keys(borders).length > 0) style.border = borders;
   }
+
   return style;
 }
 
@@ -512,6 +535,7 @@ export class ClipboardController {
         }
       }
     }
+
     if (typeof clipboard.writeText !== "function") return "unsupported";
     try {
       await clipboard.writeText(snapshot.tsv);
@@ -520,6 +544,7 @@ export class ClipboardController {
       return "blocked";
     }
   }
+
   /**
    * Paste at the focus cell. Only the current controller's token restores rich
    * formulas/refs; custom, HTML, and plain external inputs are inert.
@@ -577,8 +602,10 @@ export class ClipboardController {
           } else {
             this.pasteExternalSnapshot(envelope.snapshot, focus, valuesOnly);
           }
+
           return "done";
         }
+
         for (const item of items) {
           if (!item.types.includes("text/html")) continue;
           const html = await (await item.getType("text/html")).text();
@@ -588,6 +615,7 @@ export class ClipboardController {
           this.pasteExternalHtml(grid, focus);
           return "done";
         }
+
         for (const item of items) {
           if (!item.types.includes("text/plain")) continue;
           const text = await (await item.getType("text/plain")).text();
@@ -604,6 +632,7 @@ export class ClipboardController {
     if (typeof clipboard.readText !== "function") {
       return richReadFailed ? "blocked" : "unsupported";
     }
+
     try {
       const text = await clipboard.readText();
       if (read.closed || text.length === 0) return "empty";
@@ -674,15 +703,15 @@ export class ClipboardController {
       (row, col, targetCol): CellWrite => {
         const cell = snapshot.cells[row]![col]!;
         if (valuesOnly) return { value: { kind: "literal", value: cell.resolved } };
-        if (cell.value.kind === "literal" && typeof cell.value.value !== "string") {
-          return { value: cell.value, style: cell.style };
-        }
+        const value = cell.value;
         let source: string;
-        if (cell.value.kind === "formula") source = cell.value.src;
-        else if (cell.value.kind === "ref") {
-          source = `=${cell.value.target.sheet}!${cellA1(cell.value.target.row, cell.value.target.col)}`;
+        if (value.kind === "formula") source = value.src;
+        else if (value.kind === "ref") {
+          source = `=${value.target.sheet}!${cellA1(value.target.row, value.target.col)}`;
+        } else if (typeof value.value === "string") {
+          source = value.value;
         } else {
-          source = cell.value.value as string;
+          return { value, style: cell.style };
         }
         return {
           value: parseExternalInput(source, sheet.columns[targetCol]?.type ?? "text"),
@@ -700,13 +729,15 @@ export class ClipboardController {
       (row) => grid[row]!.length,
       (row, col, targetCol): CellWrite => {
         const cell = grid[row]![col]!;
-        if (cell.value.kind === "literal" && typeof cell.value.value !== "string") return cell;
+        const value = cell.value;
         let source: string;
-        if (cell.value.kind === "formula") source = cell.value.src;
-        else if (cell.value.kind === "ref") {
-          source = `=${cell.value.target.sheet}!${cellA1(cell.value.target.row, cell.value.target.col)}`;
+        if (value.kind === "formula") source = value.src;
+        else if (value.kind === "ref") {
+          source = `=${value.target.sheet}!${cellA1(value.target.row, value.target.col)}`;
+        } else if (typeof value.value === "string") {
+          source = value.value;
         } else {
-          source = cell.value.value as string;
+          return cell;
         }
         return {
           value: parseExternalInput(source, sheet.columns[targetCol]?.type ?? "text"),
@@ -778,11 +809,13 @@ export class ClipboardController {
             canPack = false;
             break;
           }
+
           const write = cellAt(row, col, targetCol);
           if (!write) {
             canPack = false;
             break;
           }
+
           const offset = row * width + col;
           if (write.value.kind === "formula") {
             values[offset] = null;
@@ -793,6 +826,7 @@ export class ClipboardController {
           } else {
             values[offset] = write.value.value;
           }
+
           const style = write.style ?? {};
           const styleKey = JSON.stringify(style);
           let styleId = styleLookup.get(styleKey);
@@ -801,9 +835,11 @@ export class ClipboardController {
             styleLookup.set(styleKey, styleId);
             styleTable.push(style);
           }
+
           styleIds[offset] = styleId;
         }
       }
+
       if (canPack) {
         const block: PackedCellBlock = {
           rowCount: availableRows,
@@ -814,6 +850,7 @@ export class ClipboardController {
           styleTable,
           styleIds,
         };
+
         this.deps.commit(
           [
             {
@@ -857,6 +894,7 @@ export class ClipboardController {
         });
       }
     }
+
     this.deps.commit([...patches, ...extraPatches], "paste");
   }
 
@@ -902,6 +940,7 @@ export class ClipboardController {
         rangeClear = false;
         break;
       }
+
       for (let col = rect.c0; col <= rect.c1; col++) {
         if (this.deps.mergeAnchorAt(row, col)) {
           rangeClear = false;
@@ -909,6 +948,7 @@ export class ClipboardController {
         }
       }
     }
+
     if (rangeClear) {
       clearPatches.push({
         op: "clearRange",
@@ -919,6 +959,7 @@ export class ClipboardController {
         },
       });
     }
+
     const hyperlinks = rangeClear
       ? (this.deps.sheet().hyperlinks ?? [])
           .filter((hyperlink) => {
@@ -941,6 +982,7 @@ export class ClipboardController {
         clearPatches.push({ op: "removeHyperlink", sheet: activeSheet, id: hyperlink.id });
       }
     }
+
     for (let r = rect.r0; r <= rect.r1; r++) {
       const cellLine: ClipboardCell[] = [];
       const valueLine: CellScalar[] = [];
@@ -960,6 +1002,7 @@ export class ClipboardController {
           row: bulk?.dataRows[rowIndex] ?? this.deps.toDataRow(r),
           col: c,
         };
+
         const bulkResolved = bulk?.values[offset];
         const cell =
           bulk === undefined
@@ -968,6 +1011,7 @@ export class ClipboardController {
                 resolved: bulkResolved === undefined ? null : bulkResolved,
                 style: bulk.styles[bulk.styleIds[offset] ?? 0] ?? {},
               };
+
         const formula =
           bulk === undefined
             ? this.deps.store.getFormula(addr)
@@ -992,11 +1036,12 @@ export class ClipboardController {
           });
         }
       }
+
       cells.push(cellLine);
       values.push(valueLine);
     }
 
     const anchor = { row: bulk?.dataRows[0] ?? this.deps.toDataRow(rect.r0), col: rect.c0 };
-    return { anchor, cells, hyperlinks, tsv: toTsv(values), cut, clearPatches };
+    return { anchor, cells, hyperlinks, tsv: rowsToTsv(values), cut, clearPatches };
   }
 }

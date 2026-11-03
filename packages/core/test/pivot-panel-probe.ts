@@ -9,6 +9,7 @@ import type { DocumentOp, PivotDefinition } from "../src/index.js";
 import { loadPanels } from "../src/panels/panel-loader.js";
 import { storeEngine } from "../src/store/engine-registry.js";
 import { installCanvasTestStubs } from "../src/testing.js";
+import { elementAdded } from "./fixtures.js";
 
 await initSheetwrite(undefined, formulas);
 const restore = installCanvasTestStubs();
@@ -26,8 +27,10 @@ const grid = createGrid(host, {
   workbook: { activeSheet: "data", sheets: [{ id: "data", name: "Data", rowCount: 30, columns }] },
   config: { ribbon: true },
 });
-// Await the ribbon's lazy mount; the first submit loads the panel controller.
-await import("../src/ribbon/ribbon.js");
+// The ribbon mounts when its lazy chunk arrives. Awaiting the same import does
+// not order this probe after the grid's own `import().then`, so wait for the
+// mounted ribbon itself; the first submit loads the panel controller.
+await elementAdded(host, ".sheetwrite-ribbon", HTMLDivElement);
 
 const ops: PivotDefinition[] = [];
 const setPivot = grid.setPivot.bind(grid);
@@ -88,7 +91,8 @@ try {
   const insertTab = [...host.querySelectorAll<HTMLElement>('[role="tab"]')].find(
     (tab) => tab.textContent === "Insert",
   );
-  insertTab?.click();
+  if (insertTab === undefined) throw new Error("the ribbon has no Insert tab");
+  insertTab.click();
   // Let the tab's fit frame settle before opening its popup, just as a user
   // clicks after the tab has painted. A fit pass closes floating surfaces.
   const fitted = Promise.withResolvers<void>();

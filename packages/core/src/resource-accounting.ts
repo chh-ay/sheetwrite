@@ -40,6 +40,17 @@ export const WASM_MEMORY_OWNERS = [
 
 /** One retained-memory owner reported by the WASM cell store. */
 export type WasmMemoryOwner = (typeof WASM_MEMORY_OWNERS)[number];
+
+const HASH_CAPACITY_OWNERS: Partial<Record<WasmMemoryOwner, true>> = {
+  "wasm.paged.dirty-bitmaps": true,
+  "wasm.paged.indexes": true,
+  "wasm.string-index": true,
+  "wasm.formulas": true,
+  "wasm.dependency-nodes": true,
+  "wasm.sheet-indexes-metadata": true,
+  "wasm.spill-ranges": true,
+  "wasm.spill-owners": true,
+};
 /** User-visible operation whose retained and transient resource costs are measured. */
 export type RuntimeResourceOperation =
   | "startup"
@@ -255,43 +266,37 @@ export function decodeStoreMemoryStats(
       `Store memory protocol length ${encoded.length}; expected ${expectedLength}`,
     );
   }
+
   if (encoded[0] !== STORE_MEMORY_PROTOCOL_VERSION) {
     throw invalidResourceReport(`Unsupported store memory protocol ${encoded[0]}`);
   }
+
   if (encoded[1] !== WASM_MEMORY_OWNERS.length) {
     throw invalidResourceReport(
       `Store memory owner count ${encoded[1]}; expected ${WASM_MEMORY_OWNERS.length}`,
     );
   }
+
   if (encoded[2] !== STORE_MEMORY_HASH_ESTIMATE_VERSION) {
     throw invalidResourceReport(`Unsupported hash-table estimate ${encoded[2]}`);
   }
 
   const owners: ResourceOwnerBytes[] = [];
-  for (let index = 0; index < WASM_MEMORY_OWNERS.length; index++) {
+  for (const [index, owner] of WASM_MEMORY_OWNERS.entries()) {
     const offset = 3 + index * 3;
     const logicalBytes = encoded[offset]!;
     const allocatedBytes = encoded[offset + 1]!;
     const entries = encoded[offset + 2]!;
-    assertOwnerValues(WASM_MEMORY_OWNERS[index]!, logicalBytes, allocatedBytes, entries);
+    assertOwnerValues(owner, logicalBytes, allocatedBytes, entries);
     owners.push({
-      owner: WASM_MEMORY_OWNERS[index]!,
+      owner,
       logicalBytes,
       allocatedBytes,
       entries,
-      measurement:
-        index === 7 ||
-        index === 8 ||
-        index === 11 ||
-        index === 12 ||
-        index === 13 ||
-        index === 15 ||
-        index === 16 ||
-        index === 17
-          ? "hash-capacity-v1"
-          : "exact-capacity",
+      measurement: HASH_CAPACITY_OWNERS[owner] ? "hash-capacity-v1" : "exact-capacity",
     });
   }
+
   const logicalLiveBytes = encoded[encoded.length - 2]!;
   const allocatedCapacityBytes = encoded[encoded.length - 1]!;
   const ownerLogical = sumOwnerBytes(owners, "logicalBytes");
@@ -301,6 +306,7 @@ export function decodeStoreMemoryStats(
       `Store memory totals drift: encoded ${logicalLiveBytes}/${allocatedCapacityBytes}, owners ${ownerLogical}/${ownerAllocated}`,
     );
   }
+
   if (wasmCommittedBytes !== null)
     assertNonNegativeSafeInteger(wasmCommittedBytes, "WASM committed bytes");
   return {
@@ -393,6 +399,7 @@ export function diffRuntimeResourcePhases(
   if (before.operation !== after.operation) {
     throw invalidResourceReport(`Cannot diff ${before.operation} against ${after.operation}`);
   }
+
   assertRuntimeResourceSnapshot(before);
   assertRuntimeResourceSnapshot(after);
   const beforeOwners = new Map(
@@ -412,6 +419,7 @@ export function diffRuntimeResourcePhases(
       entries: (next?.entries ?? 0) - (previous?.entries ?? 0),
     };
   });
+
   return {
     schemaVersion: RUNTIME_RESOURCE_SCHEMA_VERSION,
     operation: before.operation,

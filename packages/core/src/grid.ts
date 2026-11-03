@@ -40,10 +40,17 @@ import { downloadBytesIn, toCsv, toXlsxTable } from "./export.js";
 import type { FindBar } from "./find-bar.js";
 import { stepFontSizePx, stepNumberFormatDecimals } from "./format-presets.js";
 import { GeometryLayoutController } from "./geometry-layout-controller.js";
+import {
+  ZOOM_MIN,
+  ZOOM_MAX,
+  CELL_TEXT_HORIZONTAL_PADDING,
+  DEFAULT_DISTINCT_VALUES_LIMIT,
+} from "./grid-constants.js";
 import { hyperlinkAt, resolveHyperlinkTarget, sanitizeCellHyperlink } from "./hyperlink.js";
 import { InteractionSessions } from "./interaction-sessions.js";
 import { Keymap } from "./keymap.js";
 import { MutationRevisionIndex, type MutationRevisionStats } from "./mutation-revision-index.js";
+import { sheetNameKey } from "./name-key.js";
 import { type NoteCell, NotePopover } from "./note-popover.js";
 import { trimNumberFormatCaches } from "./number-format.js";
 import { ObjectLayer } from "./object-layer.js";
@@ -68,7 +75,7 @@ import type { Ribbon } from "./ribbon/ribbon.js";
 import { nextTurn, Scope, ScopeSlot } from "./scope.js";
 import { SearchController } from "./search-controller.js";
 import { type CellRef, SelectionModel, type SelRect } from "./selection.js";
-import { sheetNameKey, validateSheetName } from "./sheet-name.js";
+import { validateSheetName } from "./sheet-name.js";
 import { changesSheetTabs, SheetTabs } from "./sheet-tabs.js";
 import { mountSidePanel } from "./side-panel.js";
 import { IncompleteDataError, SheetwriteStore } from "./store.js";
@@ -523,6 +530,7 @@ export class GridImpl implements Grid {
   private readonly viewportEl: HTMLDivElement;
   private readonly customRenderers = new Map<string, CellRenderer>();
   private readonly customEditors = new Map<string, CellEditor>();
+
   private readonly listeners: { [K in keyof GridEvents]: Set<(e: GridEvents[K]) => void> } = {
     change: new Set(),
     selection: new Set(),
@@ -570,6 +578,7 @@ export class GridImpl implements Grid {
   private readonly autoFits = new ScopeSlot(this.lifetime);
   private commandStateQueued = false;
   private commandStateGeneration = 0;
+
   private readonly autoFitStats = {
     windowRequests: 0,
     maxWindowCells: 0,
@@ -578,7 +587,9 @@ export class GridImpl implements Grid {
     cancelledJobs: 0,
     committedPatches: 0,
   };
+
   private resolutionMediaQuery: MediaQueryList | null = null;
+
   private readonly onResolutionChange = (): void => {
     if (this.lifetime.closed) return;
     this.armResolutionListener();
@@ -586,6 +597,7 @@ export class GridImpl implements Grid {
     this.readWindows.invalidate();
     this.scheduleRender();
   };
+
   private readonly onScroll = () => this.scheduleRender();
   private readonly disposeStore: () => void;
   private readonly objectLayer: ObjectLayer;
@@ -620,6 +632,7 @@ export class GridImpl implements Grid {
         storage: opts.datasourceStorage?.mode ?? "dense",
       });
     }
+
     this.store =
       store ??
       new SheetwriteStore(workbook, opts.data, {
@@ -631,6 +644,7 @@ export class GridImpl implements Grid {
         mutationPolicy: opts.mutationPolicy,
         transactionResourceLimits: this.transactionResourceLimits,
       });
+
     this.loadable = this.store instanceof SheetwriteStore ? this.store : null;
     // A host store keeps the generation of the engine it was built on.
     this.engineGeneration = storeGeneration(this.store) ?? engineGeneration();
@@ -640,11 +654,13 @@ export class GridImpl implements Grid {
     for (const sheet of workbook.sheets) {
       this.virtualColumnTargets.set(sheet.id, Math.max(sheet.columns.length, virtualTarget));
     }
+
     const datasource = opts.datasource;
     this.readOnly = opts.readOnly ?? false;
     this.config = opts.config;
     this.overscan = opts.overscan ?? DEFAULT_OVERSCAN;
     this.baseTheme = { ...DEFAULT_THEME, ...resolveThemeFromCss(host), ...opts.theme };
+
     const requestedActive = opts.workbook.activeSheet;
     const requestedSheet = workbook.sheets.find((sheet) => sheet.id === requestedActive);
     this.activeSheet =
@@ -653,6 +669,7 @@ export class GridImpl implements Grid {
         : (visibleSheetNeighbor(workbook.sheets, requestedActive) ??
           workbook.sheets.find((sheet) => (sheet.visibility ?? "visible") === "visible")?.id ??
           requestedActive);
+
     this.sessionSheets = workbook.sheets.map(({ id, visibility }) => ({ id, visibility }));
     this.displayedHiddenRows = new Set(this.sheet().hiddenRows);
     this.displayedHasView = this.loadable?.hasView(this.activeSheet) ?? false;
@@ -660,7 +677,9 @@ export class GridImpl implements Grid {
       this.baseTheme,
       workbook.sheets.find((sheet) => sheet.id === this.activeSheet)?.rowCount ?? 0,
     );
+
     this.tabBarHeight = opts.config?.tabs !== false ? 28 : 0;
+
     this.document = new DocumentController({
       store: this.store,
       loadable: this.loadable,
@@ -688,6 +707,7 @@ export class GridImpl implements Grid {
     for (const [name, r] of Object.entries(opts.renderers ?? {})) {
       this.customRenderers.set(name, r);
     }
+
     for (const [name, editor] of Object.entries(opts.editors ?? {})) {
       this.customEditors.set(name, editor);
     }
@@ -695,6 +715,7 @@ export class GridImpl implements Grid {
     const sheet = this.sheet();
     this.maxElementHeight = measureMaxElementHeight();
     this.lastDevicePixelRatio = globalThis.devicePixelRatio ?? 1;
+
     this.geometry = new GeometryLayoutController(
       {
         sheet: () => this.sheet(),
@@ -706,7 +727,9 @@ export class GridImpl implements Grid {
       },
       host.clientHeight - this.tabBarHeight,
     );
+
     this.selection = new SelectionModel(sheet.rowCount, this.firstCol(), this.lastCol());
+
     this.datasourceController = new DatasourceController(
       {
         datasource,
@@ -741,6 +764,7 @@ export class GridImpl implements Grid {
               .slice(0, MAX_DATASOURCE_ERROR_COLUMN_BANDS)
               .map(({ start, end }) => ({ start, end })),
           };
+
           // The controller's own page checks carry this code without the
           // request, so they are wrapped once to add it; host failures with
           // another code keep their identity.
@@ -760,6 +784,7 @@ export class GridImpl implements Grid {
       },
       sheet.rowCount,
     );
+
     this.searchController = new SearchController({
       store: this.store,
       loadable: this.loadable,
@@ -779,6 +804,7 @@ export class GridImpl implements Grid {
       readOnly: () => this.readOnly,
       commit: (patches) => this.document.commit(patches, "replace"),
     });
+
     this.clipboard = new ClipboardController({
       lifetime: this.lifetime,
       store: this.store,
@@ -791,6 +817,7 @@ export class GridImpl implements Grid {
       toDataRow: (viewRow) => this.toDataRow(viewRow),
       commit: (patches, reason) => this.document.commit(patches, reason),
     });
+
     this.styleActions = new StyleActions({
       store: this.store,
       loadable: this.loadable,
@@ -918,6 +945,7 @@ export class GridImpl implements Grid {
       readOnly: () => this.readOnly,
       onEditStart: () => this.notes.hideCard(),
     });
+
     this.interactions.configureMenu(config, this.theme);
 
     this.notes = new NotePopover({
@@ -982,6 +1010,7 @@ export class GridImpl implements Grid {
       host,
       geometry: this.geometry,
     });
+
     this.domOverlay.setRenderers(this.customRenderers);
     this.domOverlay.setTheme(this.theme);
 
@@ -1011,6 +1040,7 @@ export class GridImpl implements Grid {
         return action === "undo" || action === "redo";
       },
     });
+
     this.objectLayer.sync();
     // The grid emits no selection at construction; start from the real one so
     // the first re-emit (an undo, say) does not count as a move.
@@ -1067,11 +1097,13 @@ export class GridImpl implements Grid {
       this.cancelAutoFit();
       this.mutationRevisions.record(event.transaction.patches, this.storeEpoch);
       this.activeSheetCache = null;
+
       // Presence learned during this change describes the state after it, which
       // cannot vouch for cells it just stopped computing (e.g. a removed spill).
       const presenceKnown = this.sourceSheet === this.activeSheet;
       const windowChanged = this.transactionAffectsWindow(event.transaction.patches);
       if (windowChanged) this.windowContentRevision += 1;
+
       let geometryChanged = false;
       let shouldRebuildRows = false;
       let shouldReconcileView = false;
@@ -1081,6 +1113,7 @@ export class GridImpl implements Grid {
       let shouldResetDatasource = false;
       const sessionSheets = this.sessionSheets.map((sheet) => ({ ...sheet }));
       let sessionActive = this.activeSheet;
+
       for (const patch of event.transaction.patches) {
         if ("sheet" in patch && patch.sheet === this.activeSheet) {
           if (
@@ -1095,6 +1128,7 @@ export class GridImpl implements Grid {
           ) {
             geometryChanged = true;
           }
+
           if (
             patch.op === "setSheetMeta" &&
             (patch.patch.sortKeys !== undefined ||
@@ -1109,6 +1143,7 @@ export class GridImpl implements Grid {
             else this.displayedHiddenRows.delete(patch.row);
           }
         }
+
         if (
           (patch.op === "addRows" ||
             patch.op === "removeRows" ||
@@ -1124,6 +1159,7 @@ export class GridImpl implements Grid {
           shouldReconcileView ||=
             this.displayedHasView || (this.loadable?.hasView(this.activeSheet) ?? false);
         }
+
         if (
           "sheet" in patch &&
           patch.sheet === this.activeSheet &&
@@ -1144,6 +1180,7 @@ export class GridImpl implements Grid {
         ) {
           shouldRebuildColumns = true;
         }
+
         if (
           "sheet" in patch &&
           patch.sheet === this.activeSheet &&
@@ -1151,7 +1188,9 @@ export class GridImpl implements Grid {
         ) {
           shouldApplyLayout = true;
         }
+
         if (changesSheetTabs(patch)) sheetsChanged = true;
+
         if (patch.op === "addSheet") {
           sessionSheets.splice(patch.sheet.order, 0, {
             id: patch.sheet.id,
@@ -1182,6 +1221,7 @@ export class GridImpl implements Grid {
           }
         }
       }
+
       const sheets = this.store.getWorkbook().sheets;
       const reconciled = sheets.find((sheet) => sheet.id === sessionActive);
       if (!reconciled || (reconciled.visibility ?? "visible") !== "visible") {
@@ -1189,6 +1229,7 @@ export class GridImpl implements Grid {
           sheets.find((sheet) => (sheet.visibility ?? "visible") === "visible")?.id ??
           sessionActive;
       }
+
       if (sessionActive !== this.activeSheet) this.setActiveSheet(sessionActive);
       this.sessionSheets = sheets.map(({ id, visibility }) => ({ id, visibility }));
       this.displayedHasView = this.loadable?.hasView(this.activeSheet) ?? false;
@@ -1197,6 +1238,7 @@ export class GridImpl implements Grid {
         this.mutationRevisions.clear();
         this.displayedHiddenRows = new Set(this.sheet().hiddenRows);
       }
+
       const change = shouldResetDatasource
         ? "structure"
         : shouldReconcileView || shouldRebuildRows || shouldRebuildColumns || shouldApplyLayout
@@ -1227,6 +1269,7 @@ export class GridImpl implements Grid {
         this.scroller.scrollTop = 0;
         this.readWindows.invalidateData();
       }
+
       if (sheetsChanged) this.renderTabs();
       if (
         event.transaction.patches.some(
@@ -1236,6 +1279,7 @@ export class GridImpl implements Grid {
         this.ariaMirror.bumpVersion();
         this.notes.refresh();
       }
+
       // Chart edits, undo and sheet changes all arrive here.
       this.objectLayer.sync();
       this.scheduleRender();
@@ -1248,11 +1292,13 @@ export class GridImpl implements Grid {
       passive: true,
       signal: this.lifetime.signal,
     });
+
     if (typeof ResizeObserver !== "undefined") {
       const resizeObserver = new ResizeObserver(() => this.onResize());
       resizeObserver.observe(host);
       this.lifetime.add(() => resizeObserver.disconnect());
     }
+
     this.armResolutionListener();
     this.attachPanels();
     // A host store built before an engine stop starts this grid read-only.
@@ -1316,6 +1362,7 @@ export class GridImpl implements Grid {
       this.refreshSourcePresence();
       return true;
     }
+
     let affectsWindow = false;
     const engine = storeEngine(this.store);
     // A source-free active sheet cannot receive computed values from another
@@ -1344,6 +1391,7 @@ export class GridImpl implements Grid {
             this.sheetHasSources = true;
           range = patch.addr;
           break;
+
         case "setRange":
           if (
             patch.range.sheet === this.activeSheet &&
@@ -1352,6 +1400,7 @@ export class GridImpl implements Grid {
             this.sheetHasSources = true;
           range = patch.range;
           break;
+
         case "setBlock":
           if (
             patch.range.sheet === this.activeSheet &&
@@ -1360,24 +1409,30 @@ export class GridImpl implements Grid {
             this.sheetHasSources = true;
           range = patch.range;
           break;
+
         case "restoreBlock":
           if (patch.range.sheet === this.activeSheet) this.sheetHasSources = true;
           range = patch.range;
           break;
+
         case "setRangeStyle":
         case "clearRange":
           range = patch.range;
           break;
+
         case "setNote":
           continue;
+
         default:
           affectsWindow = true;
           continue;
       }
+
       if (affectsWindow || dependentDisplay || this.sheetHasSources) {
         affectsWindow = true;
         continue;
       }
+
       // Large off-screen batches pay for one window snapshot, not one per patch.
       painted ??= this.readWindows.paintedCells();
       affectsWindow =
@@ -1385,6 +1440,7 @@ export class GridImpl implements Grid {
           ? painted.intersects(range.sheet, range.start, range.end)
           : painted.intersects(range.sheet, range, range);
     }
+
     return affectsWindow;
   }
 
@@ -1748,6 +1804,7 @@ export class GridImpl implements Grid {
             previous = dataRow;
             continue;
           }
+
           patches.push({
             op: "clearRange",
             range: {
@@ -1756,6 +1813,7 @@ export class GridImpl implements Grid {
               end: { row: previous, col: rect.c1 },
             },
           });
+
           runStart = dataRow;
           previous = dataRow;
         }
@@ -1866,6 +1924,7 @@ export class GridImpl implements Grid {
     if (!this.loadable) return null;
     return this.loadable.dataEdge(this.activeSheet, row, col, dRow, dCol);
   }
+
   private measurementContext(): CanvasRenderingContext2D | null {
     const canvas = document.createElement("canvas");
     return canvas.getContext("2d");
@@ -1952,7 +2011,11 @@ export class GridImpl implements Grid {
           mergeWidths.get(row * sheet.columns.length + col) ?? sheet.columns[col]!.width;
         const fontSize = style.fontSize ?? fallbackFontSize;
         context.font = fontFor(this.baseTheme, style);
-        const lineCount = layoutTextLines(context, text, Math.max(0, width - 12)).length;
+        const lineCount = layoutTextLines(
+          context,
+          text,
+          Math.max(0, width - CELL_TEXT_HORIZONTAL_PADDING),
+        ).length;
         required = Math.max(required, Math.ceil(lineCount * fontSize * 1.2 + 8));
       }
       requiredHeights[requiredIndex] = required;
@@ -2015,6 +2078,7 @@ export class GridImpl implements Grid {
       start: { row: r0, col: c0 },
       end: { row: r1, col: c1 },
     };
+
     this.requireAutoFitRangeLoaded(measuredRange);
     const context = this.measurementContext();
     if (!context) return;
@@ -2028,6 +2092,7 @@ export class GridImpl implements Grid {
       for (let col = merge.c0; col <= merge.c1; col++) width += sheet.columns[col]?.width ?? 0;
       mergeWidths.set(viewRow * sheet.columns.length + merge.c0, width);
     }
+
     const rowCount = r1 - r0 + 1;
     const columnCount = c1 - c0 + 1;
     const patches: DocumentOp[] = [];
@@ -2093,13 +2158,16 @@ export class GridImpl implements Grid {
           );
           return;
         }
+
         bandEnd = Math.min(r1 + 1, bandStart + rowsPerBand);
         columnStart = c0;
         required = new Float64Array(bandEnd - bandStart);
         required.fill(this.baseTheme.rowHeight);
       }
+
       this.scheduleAutoFitChunk(job, step);
     };
+
     this.scheduleAutoFitChunk(job, step);
   }
 
@@ -2119,6 +2187,7 @@ export class GridImpl implements Grid {
         end: { row: Math.max(0, sheet.rowCount - 1), col },
       });
     }
+
     const context = this.measurementContext();
     if (!context) return;
     const widths = new Float64Array(targets.length);
@@ -2128,8 +2197,10 @@ export class GridImpl implements Grid {
         ...column.headerStyle,
         bold: column.headerStyle?.bold ?? true,
       });
+
       widths[index] = context.measureText(column.header).width + 12;
     }
+
     const patches: DocumentOp[] = [];
     const commitWidths = (): void => {
       for (let index = 0; index < targets.length; index++) {
@@ -2138,6 +2209,7 @@ export class GridImpl implements Grid {
         if (sheet.columns[col]!.width === width) continue;
         patches.push({ op: "setColumn", sheet: sheetId, col, patch: { width } });
       }
+
       this.autoFitStats.completedJobs += 1;
       this.autoFitStats.committedPatches += patches.length;
       this.withStoreResourceOperation("auto-fit", () => this.document.commit(patches, "structure"));
@@ -2177,11 +2249,14 @@ export class GridImpl implements Grid {
           commitWidths();
           return;
         }
+
         columns = targets.slice(targetOffset, targetOffset + columnsPerWindow);
         rowStart = 0;
       }
+
       this.scheduleAutoFitChunk(job, step);
     };
+
     this.scheduleAutoFitChunk(job, step);
   }
 
@@ -2220,6 +2295,7 @@ export class GridImpl implements Grid {
     this.applyLayout();
     this.scheduleRender();
   }
+
   setOverscan(overscan?: number): void {
     const next = overscan === undefined ? DEFAULT_OVERSCAN : Math.max(0, Math.floor(overscan));
     if (next === this.overscan) return;
@@ -2233,6 +2309,7 @@ export class GridImpl implements Grid {
   getMutationRevisionStats(): MutationRevisionStats {
     return this.mutationRevisions.stats();
   }
+
   getAutoFitResourceStats(): AutoFitResourceStats {
     return { ...this.autoFitStats, chunkCellLimit: AUTO_FIT_CHUNK_CELLS };
   }
@@ -2682,7 +2759,7 @@ export class GridImpl implements Grid {
 
   setZoom(zoom: number): void {
     if (!Number.isFinite(zoom)) return;
-    const next = Math.min(2, Math.max(0.5, zoom));
+    const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom));
     if (next === this.zoom) return;
     this.zoom = next;
     this.applyZoomedTheme();
@@ -3197,6 +3274,7 @@ export class GridImpl implements Grid {
           row: this.toDataRow(focus.row),
           col: focus.col,
         }).resolved;
+
         const numberFormat = stepNumberFormatDecimals(
           this.getFocusCellStyle().numberFormat ?? column?.numberFormat,
           direction,
@@ -3420,9 +3498,11 @@ export class GridImpl implements Grid {
   private autoSum(): void {
     const focus = this.selection.focusCell;
     if (this.readOnly || !focus) return;
+
     const row = this.toDataRow(focus.row);
     const col = focus.col;
     const chunkCells = 4_096;
+
     const numericStart = (vertical: boolean): number => {
       let end = vertical ? row : col;
       const origin = end;
@@ -3436,6 +3516,7 @@ export class GridImpl implements Grid {
           vertical ? { start, end } : { start: row, end: row + 1 },
           columns,
         );
+
         let values: ArrayLike<CellScalar>;
         if (window) values = window.values;
         else {
@@ -3443,6 +3524,7 @@ export class GridImpl implements Grid {
             columns.length === 1 && vertical
               ? Array.from({ length: end - start }, (_, index) => ({ row: start + index, col }))
               : columns.map((column) => ({ row, col: column }));
+
           const engine = storeEngine(this.store);
           // Custom stores without canonical windows retain their scalar data-address contract.
           const cells = engine
@@ -3452,13 +3534,17 @@ export class GridImpl implements Grid {
               );
           values = cells.map((cell) => cell.resolved);
         }
+
         for (let index = values.length - 1; index >= 0; index--) {
           if (typeof values[index] !== "number") return start + index + 1;
         }
+
         end = start;
       }
+
       return origin === 0 ? origin : end;
     };
+
     const firstRow = numericStart(true);
     const vertical = firstRow < row;
     const firstCol = vertical ? col : numericStart(false);
@@ -3611,8 +3697,8 @@ export class GridImpl implements Grid {
     return this.loadable ? this.loadable.aggregate(this.activeSheet, col, op) : 0;
   }
 
-  sortBy(col: number, ascending = true): void {
-    void this.setSort([{ col, ascending }]);
+  sortBy(col: number, ascending = true): ApplyTransactionResult {
+    return this.setSort([{ col, ascending }]);
   }
 
   filterBy(col: number, needle: string): void {
@@ -3632,8 +3718,8 @@ export class GridImpl implements Grid {
     );
   }
 
-  sortByMulti(keys: readonly SortKey[]): void {
-    void this.setSort(keys);
+  sortByMulti(keys: readonly SortKey[]): ApplyTransactionResult {
+    return this.setSort(keys);
   }
 
   setSort(keys: readonly SortKey[]): ApplyTransactionResult {
@@ -3670,7 +3756,7 @@ export class GridImpl implements Grid {
     return new Map(this.sheet().filters ?? this.loadable?.columnFilters(this.activeSheet) ?? []);
   }
 
-  distinctValues(col: number, limit = 1000): CellScalar[] {
+  distinctValues(col: number, limit = DEFAULT_DISTINCT_VALUES_LIMIT): CellScalar[] {
     return this.loadable?.distinctValues(this.activeSheet, col, limit) ?? [];
   }
 
@@ -3894,6 +3980,7 @@ export class GridImpl implements Grid {
         }
       }
     };
+
     cleanup(() => this.lifetime.close());
     cleanup(() => this.datasourceController.destroy());
     cleanup(() => this.mutationRevisions.clear());
@@ -3922,6 +4009,7 @@ export class GridImpl implements Grid {
     cleanup(() => {
       for (const listeners of Object.values(this.listeners)) listeners.clear();
     });
+
     if (failed) throw failure;
   }
 

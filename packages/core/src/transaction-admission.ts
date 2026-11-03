@@ -45,18 +45,16 @@ export function registerGridTransactionAdmission(
   grid: Grid,
   guard: GridTransactionAdmissionGuard,
 ): () => void {
-  let guards = guardsByGrid.get(grid);
-  if (!guards) {
-    guards = new Set();
-    guardsByGrid.set(grid, guards);
-  }
+  const guards = guardsByGrid.get(grid) ?? new Set<GridTransactionAdmissionGuard>();
+  guardsByGrid.set(grid, guards);
   guards.add(guard);
   let active = true;
+
   return () => {
     if (!active) return;
     active = false;
-    guards!.delete(guard);
-    if (guards!.size === 0) guardsByGrid.delete(grid);
+    guards.delete(guard);
+    if (guards.size === 0) guardsByGrid.delete(grid);
   };
 }
 

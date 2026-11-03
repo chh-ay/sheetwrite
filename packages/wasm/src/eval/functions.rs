@@ -230,7 +230,7 @@ pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
         | Func::Quotient
         | Func::Gcd
         | Func::Lcm
-        | Func::Subtotal => math::apply(func, values).unwrap_or(Value::Error(FormulaError::Value)),
+        | Func::Subtotal => math_family(func, values),
         Func::Len
         | Func::Left
         | Func::Right
@@ -294,9 +294,7 @@ pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
         | Func::CovarianceP
         | Func::CountBlank
         | Func::MaxIfs
-        | Func::MinIfs => {
-            statistics::apply(func, values).unwrap_or(Value::Error(FormulaError::Value))
-        }
+        | Func::MinIfs => statistics_family(func, values),
         Func::Pv
         | Func::Fv
         | Func::Pmt
@@ -304,9 +302,27 @@ pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
         | Func::Irr
         | Func::Rate
         | Func::Ipmt
-        | Func::Ppmt => financial::apply(func, values).unwrap_or(Value::Error(FormulaError::Value)),
+        | Func::Ppmt => financial_family(func, values),
         _ => Value::Error(FormulaError::Value),
     }
+}
+
+// Out-of-line family handlers; `eval_func` in mod.rs explains why they exist
+// and why their names end in `_family`.
+
+#[inline(never)]
+fn math_family(func: Func, values: &FuncAccumulator) -> EvalResult {
+    math::apply(func, values).unwrap_or(Value::Error(FormulaError::Value))
+}
+
+#[inline(never)]
+fn statistics_family(func: Func, values: &FuncAccumulator) -> EvalResult {
+    statistics::apply(func, values).unwrap_or(Value::Error(FormulaError::Value))
+}
+
+#[inline(never)]
+fn financial_family(func: Func, values: &FuncAccumulator) -> EvalResult {
+    financial::apply(func, values).unwrap_or(Value::Error(FormulaError::Value))
 }
 
 fn logical_reduce(func: Func, values: &FuncAccumulator) -> Value {

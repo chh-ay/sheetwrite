@@ -1,5 +1,6 @@
 import { SheetwriteError } from "./errors.js";
 import { initSheetwrite, isSheetwriteReady } from "./grid.js";
+import { Scope, ScopeSlot } from "./scope.js";
 
 export {
   isSheetwriteError,
@@ -254,11 +255,12 @@ export function createAdapterGridController<Id extends RowBridgeId = RowBridgeId
   let applied: GridOptions | null = null;
   let previous: GridOptions | null = null;
   let generation = 0;
-  let epoch = 0;
-  let request = 0;
+  let lifetime = new Scope();
+  let initialization = new ScopeSlot(lifetime);
 
   function retire(): void {
     const retiring = owned;
+    const attachment = lifetime;
     owned = null;
     applied = null;
     if (!retiring) return;
@@ -266,7 +268,10 @@ export function createAdapterGridController<Id extends RowBridgeId = RowBridgeId
     let failed = false;
     try {
       const pending = publication.publish(null);
-      if (pending) void pending.catch(publication.reportConsumerFailure);
+      if (pending)
+        void pending.catch((error) => {
+          if (!attachment.closed) publication.reportConsumerFailure(error);
+        });
     } catch (error) {
       failure = error;
       failed = true;
@@ -291,8 +296,9 @@ export function createAdapterGridController<Id extends RowBridgeId = RowBridgeId
     owned = created;
     applied = previous = options;
     const currentGeneration = ++generation;
-    const attachment = epoch;
-    function failed(error: unknown): never {
+    const attachment = lifetime;
+    function failed(error: unknown): void {
+      if (attachment.closed || owned !== created) return;
       try {
         if (owned === created) retire();
       } catch (cleanupError) {
@@ -301,7 +307,7 @@ export function createAdapterGridController<Id extends RowBridgeId = RowBridgeId
       throw error;
     }
     function ready(): void {
-      if (epoch !== attachment || owned !== created) return;
+      if (attachment.closed || owned !== created) return;
       try {
         publication.setInitializationState("ready");
         handlers.onReady?.({ grid: created.grid, generation: currentGeneration, reason });
@@ -312,39 +318,45 @@ export function createAdapterGridController<Id extends RowBridgeId = RowBridgeId
     try {
       const pending = publication.publish(created.grid);
       if (pending) {
-        void pending.then(ready, failed).catch(publication.reportConsumerFailure);
+        void pending.then(ready, failed).catch((error) => {
+          if (!attachment.closed) publication.reportConsumerFailure(error);
+        });
       } else {
         ready();
       }
     } catch (error) {
+      if (owned !== created) throw error;
       failed(error);
     }
   }
 
   function initialize(): void {
     if (!input) return;
-    const token = ++request;
-    const attachment = epoch;
+    const operation = initialization.next();
     const alreadyReady = isSheetwriteReady();
     if (!alreadyReady) publication.setInitializationState("loading");
     const pending = initSheetwrite(input.wasmSource);
+    const attachment = lifetime;
     void pending
       .then(
         () => {
-          if (alreadyReady || !host || epoch !== attachment) return;
+          // Initialization is shared: an earlier source can make this attachment ready.
+          if (alreadyReady || attachment.closed) return;
           try {
             create();
           } catch (error) {
-            publication.reportConsumerFailure(error);
+            if (!attachment.closed) publication.reportConsumerFailure(error);
           }
         },
         (error: SheetwriteError) => {
-          if (!host || epoch !== attachment || token !== request) return;
+          if (operation.closed) return;
           publication.setInitializationState("error");
           handlers.onInitializationError?.(error);
         },
       )
-      .catch(publication.reportConsumerFailure);
+      .catch((error) => {
+        if (!attachment.closed) publication.reportConsumerFailure(error);
+      });
     create();
   }
 
@@ -379,15 +391,15 @@ export function createAdapterGridController<Id extends RowBridgeId = RowBridgeId
     mount(element, next) {
       if (host) throw new Error("Adapter lifetime is already mounted");
       host = element;
-      epoch += 1;
+      lifetime = new Scope();
+      initialization = new ScopeSlot(lifetime);
       input = null;
       update(next);
     },
     update,
     unmount() {
       host = null;
-      epoch += 1;
-      request += 1;
+      lifetime.close();
       retire();
     },
   };
@@ -438,13 +450,12 @@ export function createSimpleRowBridge<
   Id extends RowBridgeId = RowBridgeId,
 >(options: SimpleSheetwriteOptions<Row, Id>): RowBridgeInstance<Id> | undefined {
   if (!options.getRowId) return undefined;
-  const bridge = createRowBridge({
+  return createRowBridge<Row, Id>({
     columns: options.columns,
     defaultRows: options.defaultRows,
     getRowId: options.getRowId,
     ...(options.createRowId === undefined ? {} : { createRowId: options.createRowId }),
   });
-  return bridge as unknown as RowBridgeInstance<Id>;
 }
 
 /** Normalized workbook and columnar data produced from simple adapter props. */

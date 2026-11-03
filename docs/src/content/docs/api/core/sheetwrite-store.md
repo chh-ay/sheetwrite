@@ -29,7 +29,7 @@ async function total(workbook: Workbook) {
 - [createGrid](/docs/api/core/create-grid/)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/store.ts#L148"><code>packages/core/src/store.ts#L148</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/store.ts#L149"><code>packages/core/src/store.ts#L149</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -191,7 +191,7 @@ captureRangeHistory: (input: Range) => CompactRangeHistory | null;
 <summary><code>clearView</code></summary>
 
 ```ts generated
-clearView: (sheet: SheetId) => void;
+clearView: (sheet: SheetId) => ApplyTransactionResult;
 ```
 
 </details>
@@ -265,7 +265,7 @@ exportSnapshot: () => WorkbookSnapshot;
 <summary><code>filterBy</code></summary>
 
 ```ts generated
-filterBy: (sheet: SheetId, col: number, needle: string) => void;
+filterBy: (sheet: SheetId, col: number, needle: string) => ApplyTransactionResult;
 ```
 
 </details>
@@ -427,7 +427,7 @@ getWorkbook: () => Workbook;
 <summary><code>groupRows</code></summary>
 
 ```ts generated
-groupRows: (sheet: SheetId, start: number, end: number) => void;
+groupRows: (sheet: SheetId, start: number, end: number) => ApplyTransactionResult;
 ```
 
 </details>
@@ -454,7 +454,7 @@ hiddenRows: (sheet: SheetId) => number[];
 <summary><code>hideRows</code></summary>
 
 ```ts generated
-hideRows: (sheet: SheetId, rows: readonly number[]) => void;
+hideRows: (sheet: SheetId, rows: readonly number[]) => ApplyTransactionResult;
 ```
 
 </details>
@@ -602,7 +602,7 @@ searchCellsFlat: (sheet: SheetId, query: string, opts?: { matchCase?: boolean; w
 <summary><code>setColumnFilter</code></summary>
 
 ```ts generated
-setColumnFilter: (sheet: SheetId, col: number, filter: ColumnFilter | null) => void;
+setColumnFilter: (sheet: SheetId, col: number, filter: ColumnFilter | null) => ApplyTransactionResult;
 ```
 
 </details>
@@ -620,7 +620,7 @@ setDetailedChangeCapture: (enabled: boolean) => void;
 <summary><code>setGroupCollapsed</code></summary>
 
 ```ts generated
-setGroupCollapsed: (sheet: SheetId, start: number, collapsed: boolean) => void;
+setGroupCollapsed: (sheet: SheetId, start: number, collapsed: boolean) => ApplyTransactionResult;
 ```
 
 </details>
@@ -652,7 +652,7 @@ so every local mutation ingress shares one atomic commit barrier.</p>
 <summary><code>showRows</code></summary>
 
 ```ts generated
-showRows: (sheet: SheetId, rows?: readonly number[]) => void;
+showRows: (sheet: SheetId, rows?: readonly number[]) => ApplyTransactionResult;
 ```
 
 </details>
@@ -661,7 +661,7 @@ showRows: (sheet: SheetId, rows?: readonly number[]) => void;
 <summary><code>sortBy</code></summary>
 
 ```ts generated
-sortBy: (sheet: SheetId, col: number, ascending: boolean) => void;
+sortBy: (sheet: SheetId, col: number, ascending: boolean) => ApplyTransactionResult;
 ```
 
 </details>
@@ -670,7 +670,7 @@ sortBy: (sheet: SheetId, col: number, ascending: boolean) => void;
 <summary><code>sortByMulti</code></summary>
 
 ```ts generated
-sortByMulti: (sheet: SheetId, keys: readonly SortKey[]) => void;
+sortByMulti: (sheet: SheetId, keys: readonly SortKey[]) => ApplyTransactionResult;
 ```
 
 </details>
@@ -679,7 +679,7 @@ sortByMulti: (sheet: SheetId, keys: readonly SortKey[]) => void;
 <summary><code>ungroupRows</code></summary>
 
 ```ts generated
-ungroupRows: (sheet: SheetId, start: number, end: number) => void;
+ungroupRows: (sheet: SheetId, start: number, end: number) => ApplyTransactionResult;
 ```
 
 </details>
@@ -750,7 +750,7 @@ class SheetwriteStore implements Store {
   ) => boolean;
   canApplyLocally: (patch: DocumentOp) => boolean;
   captureRangeHistory: (input: Range) => CompactRangeHistory | null;
-  clearView: (sheet: SheetId) => void;
+  clearView: (sheet: SheetId) => ApplyTransactionResult;
   columnFilters: (sheet: SheetId) => ReadonlyMap<number, ColumnFilter>;
   dataEdge: (
     sheet: SheetId,
@@ -768,7 +768,11 @@ class SheetwriteStore implements Store {
   ) => CellScalar[];
   ensureColumns: (sheet: SheetId, columns: readonly Column[]) => void;
   exportSnapshot: () => WorkbookSnapshot;
-  filterBy: (sheet: SheetId, col: number, needle: string) => void;
+  filterBy: (
+    sheet: SheetId,
+    col: number,
+    needle: string,
+  ) => ApplyTransactionResult;
   getCell: (addr: CellAddress) => ResolvedCell;
   getCellLoadState: (addr: CellAddress) => CellLoadState;
   getClipboardWindow: (
@@ -810,10 +814,17 @@ class SheetwriteStore implements Store {
     cols: readonly number[],
   ) => VisibleWindowView;
   getWorkbook: () => Workbook;
-  groupRows: (sheet: SheetId, start: number, end: number) => void;
+  groupRows: (
+    sheet: SheetId,
+    start: number,
+    end: number,
+  ) => ApplyTransactionResult;
   hasView: (sheet: SheetId) => boolean;
   hiddenRows: (sheet: SheetId) => number[];
-  hideRows: (sheet: SheetId, rows: readonly number[]) => void;
+  hideRows: (
+    sheet: SheetId,
+    rows: readonly number[],
+  ) => ApplyTransactionResult;
   isPaged: (sheet: SheetId) => boolean;
   isRangeFullyLoaded: (input: Range) => boolean;
   loadPage: (
@@ -855,13 +866,13 @@ class SheetwriteStore implements Store {
     sheet: SheetId,
     col: number,
     filter: ColumnFilter | null,
-  ) => void;
+  ) => ApplyTransactionResult;
   setDetailedChangeCapture: (enabled: boolean) => void;
   setGroupCollapsed: (
     sheet: SheetId,
     start: number,
     collapsed: boolean,
-  ) => void;
+  ) => ApplyTransactionResult;
   setPivot: (
     pivot: PivotDefinition,
     sheet?: SheetId,
@@ -870,10 +881,24 @@ class SheetwriteStore implements Store {
     resolver: ProtectionResolver | undefined,
     mode?: MutationPolicyMode,
   ) => void;
-  showRows: (sheet: SheetId, rows?: readonly number[]) => void;
-  sortBy: (sheet: SheetId, col: number, ascending: boolean) => void;
-  sortByMulti: (sheet: SheetId, keys: readonly SortKey[]) => void;
-  ungroupRows: (sheet: SheetId, start: number, end: number) => void;
+  showRows: (
+    sheet: SheetId,
+    rows?: readonly number[],
+  ) => ApplyTransactionResult;
+  sortBy: (
+    sheet: SheetId,
+    col: number,
+    ascending: boolean,
+  ) => ApplyTransactionResult;
+  sortByMulti: (
+    sheet: SheetId,
+    keys: readonly SortKey[],
+  ) => ApplyTransactionResult;
+  ungroupRows: (
+    sheet: SheetId,
+    start: number,
+    end: number,
+  ) => ApplyTransactionResult;
   viewRowCount: (sheet: SheetId) => number;
   viewRowOf: (sheet: SheetId, dataRow: number) => number | null;
   withResourceOperation: <T>(

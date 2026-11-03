@@ -25,11 +25,13 @@ import {
   unknownSheetError,
 } from "../errors.js";
 import type { FormulaFunctionMetadata } from "../functions/types.js";
+import { DEFAULT_DISTINCT_VALUES_LIMIT } from "../grid-constants.js";
 import {
   cloneCellHyperlink,
   MAX_HYPERLINKS_PER_SHEET,
   sanitizeCellHyperlink,
 } from "../hyperlink.js";
+import { formulaNameKey } from "../name-key.js";
 import {
   applyPivotRewrites,
   clonePivot,
@@ -160,7 +162,16 @@ import { StoreWindowReader } from "./window-reader.js";
  * Shared tags keep these encodings aligned with window reads
  * and the paint worker.
  */
-import { KIND_BOOL, KIND_FORMULA, KIND_NUMBER, KIND_STRING } from "./wire-tags.js";
+import {
+  KIND_BOOL,
+  KIND_FORMULA,
+  KIND_NUMBER,
+  KIND_STRING,
+  NO_CELL_COORDINATE,
+  CELL_STATE_UNLOADED,
+  CELL_STATE_LOADED_EMPTY,
+  CELL_STATE_LOCAL_EDIT,
+} from "./wire-tags.js";
 
 const AGG_OP: Record<AggregateOp, number> = { sum: 0, avg: 1, min: 2, max: 3, count: 4 };
 
@@ -297,11 +308,13 @@ function rebaseHyperlinkAxis(
           end: { ...range.end, col: span[1] },
         };
   };
+
   const range = rebaseRange(hyperlink.range);
   if (!range) return null;
   if (hyperlink.target.kind === "external") {
     return range === hyperlink.range ? hyperlink : { ...hyperlink, range };
   }
+
   const targetRange = rebaseRange(hyperlink.target.range);
   if (!targetRange) return null;
   return {
@@ -339,6 +352,7 @@ function rebaseConditionalFormatMove(
           start: { ...rule.range.start, col: span[0] },
           end: { ...rule.range.end, col: span[1] },
         };
+
   return {
     ...rule,
     range,
@@ -499,6 +513,7 @@ export class StoreDataEngine {
   /** Paged sheets hydrated from a snapshot treat omitted cells as known empty. */
   private readonly authoritativeSnapshotSheets = new Set<SheetId>();
   private snapshotAuthoritative = false;
+
   private readonly rangeMutationStats = {
     documentOperations: 0,
     jsPatchObjects: 0,
@@ -520,6 +535,7 @@ export class StoreDataEngine {
         `Sheetwrite: await initSheetwrite() before constructing SheetwriteStore. ${ENGINE_LOAD_HINT}`,
       );
     }
+
     if (
       options.referenceSimulationLimit !== undefined &&
       (!Number.isSafeInteger(options.referenceSimulationLimit) ||
@@ -530,15 +546,19 @@ export class StoreDataEngine {
         "Sheetwrite: referenceSimulationLimit must be a positive safe integer",
       );
     }
+
     if (data && options.storage === "paged") {
       throw storeFailure("invalid-argument", "Sheetwrite: ColumnarData requires dense storage");
     }
+
     assertWorkbookTables(
       workbook.sheets,
       DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
       (workbook.namedRanges ?? []).map((range) => range.name),
     );
+
     assertWorkbookCharts(workbook.sheets);
+
     this.workbook = workbook;
     this.storageOptions = options;
     this.wasm = new (getEngine().CellStore)();
@@ -559,6 +579,7 @@ export class StoreDataEngine {
             options.referenceSimulationLimit ?? MAX_PAGED_REFERENCE_SIMULATION_ENTRIES,
           )
         : null;
+
     for (const sheet of workbook.sheets) {
       const handle = this.allocateSheet(sheet.columns.length, sheet.rowCount);
       this.boundaryAccounting.record(
@@ -573,6 +594,7 @@ export class StoreDataEngine {
       this.syncSpillBlockers(sheet);
       this.view.queueHiddenRows(sheet.id);
     }
+
     // Before any formula is loaded, so SUBTOTAL computes once with the saved hidden rows.
     this.view.flushHiddenRows();
     for (const sheet of workbook.sheets) {
@@ -585,6 +607,7 @@ export class StoreDataEngine {
         }
       }
     }
+
     for (const namedRange of workbook.namedRanges ?? []) {
       if (!this.syncNamedRange(namedRange)) {
         this.wasm.free();
@@ -593,6 +616,7 @@ export class StoreDataEngine {
         });
       }
     }
+
     this.loadPivots();
 
     // Before any cell is loaded, so formulas compute once under the stored limits.
@@ -610,6 +634,7 @@ export class StoreDataEngine {
     } else if (workbook.sheets.some((sheet) => sheet.pivots?.length)) {
       this.wasm.commitSources();
     }
+
     this.resourceOperation = null;
   }
 
@@ -745,6 +770,7 @@ export class StoreDataEngine {
     if (handle === undefined) throw unknownSheetError(sheet);
     return handle;
   }
+
   private syncSpillBlockers(sheet: Sheet): void {
     const bounds: number[] = [];
     for (const merge of sheet.merges ?? []) {
@@ -823,8 +849,10 @@ export class StoreDataEngine {
         if (pivots.some((pivot) => pivot.savedOutput !== undefined)) {
           throw new Error("Engine cannot install saved pivot output");
         }
+
         return;
       }
+
       const saved = encodeSavedPivotPayload(pivots);
       this.boundaryAccounting.record(
         this.resourceOperation ?? "edit",
@@ -846,6 +874,7 @@ export class StoreDataEngine {
           },
         );
       }
+
       return;
     }
 
@@ -875,9 +904,9 @@ export class StoreDataEngine {
   private spillAnchor(addr: CellAddress): CellAddress | null {
     const handle = this.handleOf(addr.sheet);
     const row = this.wasm.spillAnchorRow(handle, addr.row, addr.col);
-    if (row === 0xffffffff) return null;
+    if (row === NO_CELL_COORDINATE) return null;
     const col = this.wasm.spillAnchorCol(handle, addr.row, addr.col);
-    if (col === 0xffffffff) return null;
+    if (col === NO_CELL_COORDINATE) return null;
     return { sheet: addr.sheet, row, col };
   }
 
@@ -935,6 +964,7 @@ export class StoreDataEngine {
       table.columns.map((column) => column.name),
     );
   }
+
   private insertedTableColumns(
     table: WorkbookTable,
     columns: readonly Column[],
@@ -952,6 +982,7 @@ export class StoreDataEngine {
           DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxIdLength - marker.length,
         )}${marker}`;
       }
+
       ids.add(workbookTableNameKey(id));
       const normalizedHeader = (column.header || fallback).normalize("NFC");
       const rawName =
@@ -968,6 +999,7 @@ export class StoreDataEngine {
           DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxNameLength - marker.length,
         )}${marker}`;
       }
+
       names.add(workbookTableNameKey(name));
       return { id, name };
     });
@@ -1011,10 +1043,7 @@ export class StoreDataEngine {
     name: string,
     scope: SheetId | undefined,
   ): boolean {
-    return (
-      workbookTableNameKey(namedRange.name) === workbookTableNameKey(name) &&
-      namedRange.scope === scope
-    );
+    return formulaNameKey(namedRange.name) === formulaNameKey(name) && namedRange.scope === scope;
   }
 
   private allocateSheet(columns: number, rows: number): number {
@@ -1063,9 +1092,9 @@ export class StoreDataEngine {
 
   getCellLoadState(addr: CellAddress): CellLoadState {
     const state = this.wasm.cellState(this.handleOf(addr.sheet), addr.row, addr.col);
-    if (state === 0) return "unloaded";
-    if (state === 1) return "loaded-empty";
-    if (state === 3) return "local-edit";
+    if (state === CELL_STATE_UNLOADED) return "unloaded";
+    if (state === CELL_STATE_LOADED_EMPTY) return "loaded-empty";
+    if (state === CELL_STATE_LOCAL_EDIT) return "local-edit";
     return "loaded-value";
   }
 
@@ -1200,6 +1229,7 @@ export class StoreDataEngine {
     ) {
       return null;
     }
+
     const rows = range.end.row - range.start.row + 1;
     const cols = range.end.col - range.start.col + 1;
     this.noteRangeMutationFfi();
@@ -1238,6 +1268,7 @@ export class StoreDataEngine {
         resource.free();
         throw new Error("history snapshot contains an unknown reference target");
       }
+
       refs[index] = [
         referenceCoordinates[coordinate]! * cols + referenceCoordinates[coordinate + 1]!,
         target,
@@ -1257,16 +1288,19 @@ export class StoreDataEngine {
       toDocumentOp: (target, preparation) => {
         if (disposed) throw new Error("history range snapshot already disposed");
         this.rangeMutationStats.historyMaterializations += 1;
+
         const kindsColumnMajor = resource.kinds();
         const numbersColumnMajor = this.wasm.snapshotNumbers(resource);
         const textsColumnMajor = kindsColumnMajor.includes(KIND_STRING)
           ? this.wasm.snapshotTexts(resource)
           : undefined;
         const stylesColumnMajor = resource.styleIds();
+
         const values: CellScalar[] = new Array(rows * cols);
         const styleIds: number[] = new Array(rows * cols);
         const styleTable: CellStyle[] = [];
         const styleLookup = new Map<number, number>();
+
         for (let col = 0; col < cols; col++) {
           for (let row = 0; row < rows; row++) {
             const source = col * rows + row;
@@ -1289,9 +1323,11 @@ export class StoreDataEngine {
               styleLookup.set(storeStyleId, tableId);
               styleTable.push({ ...this.styles.get(storeStyleId) });
             }
+
             styleIds[offset] = tableId;
           }
         }
+
         const block: PackedCellBlock = {
           rowCount: rows,
           colCount: cols,
@@ -1301,11 +1337,13 @@ export class StoreDataEngine {
           styleTable,
           styleIds,
         };
+
         const operation: Extract<DocumentOp, { op: "setBlock" }> = {
           op: "setBlock",
           range: target,
           block,
         };
+
         preparation?.seedHistory(operation, (bounds) => {
           if (disposed) throw new Error("history range snapshot already disposed");
           if (
@@ -1321,6 +1359,7 @@ export class StoreDataEngine {
             resource,
           );
         });
+
         return operation;
       },
       dispose: () => {
@@ -1503,6 +1542,7 @@ export class StoreDataEngine {
   getFormula(addr: CellAddress): string | null {
     return this.wasm.formulaSource(this.handleOf(addr.sheet), addr.row, addr.col) ?? null;
   }
+
   /** The owning formula anchor for a spill cell, including the anchor itself. */
   getSpillAnchor(addr: CellAddress): CellAddress | null {
     return this.spillAnchor(addr);
@@ -1578,6 +1618,7 @@ export class StoreDataEngine {
     } else {
       for (let index = 0; index < rowCount; index++) dataRows[index] = viewRows.start + index;
     }
+
     const window = this.windowReader.read(
       sheet,
       { start: viewRows.start, end: clippedEnd },
@@ -1598,12 +1639,14 @@ export class StoreDataEngine {
           source: sources.formulaSources[index]!,
         });
       }
+
       for (let index = 0; index < sources.referenceOffsets.length; index++) {
         const offset = sources.referenceOffsets[index]!;
         const target = sources.referenceAt(offset);
         if (target) refs.push({ offset, target });
       }
     }
+
     return {
       sheet,
       viewRows: { start: viewRows.start, end: clippedEnd },
@@ -1682,7 +1725,7 @@ export class StoreDataEngine {
    * Distinct resolved values of a column in first-seen order, capped at `limit`
    * distinct values (`0` = uncapped). Blanks collapse to a single `null` entry.
    */
-  distinctValues(sheet: SheetId, col: number, limit = 1000): CellScalar[] {
+  distinctValues(sheet: SheetId, col: number, limit = DEFAULT_DISTINCT_VALUES_LIMIT): CellScalar[] {
     this.requireCompleteQuery(sheet);
     return this.view.distinctValues(sheet, col, limit);
   }
@@ -2213,11 +2256,19 @@ export class StoreDataEngine {
   /** Apply raw patches once; remote loads suppress paged dirty tracking. */
   applyPatches(
     patches: readonly DocumentOp[],
-    remoteLoad: boolean,
-    captureChanges: boolean,
-    captureDetailedChanges = false,
-    trustedHistory = false,
-    replayPivotSources = false,
+    {
+      remoteLoad,
+      captureChanges,
+      captureDetailedChanges = false,
+      trustedHistory = false,
+      replayPivotSources = false,
+    }: {
+      remoteLoad: boolean;
+      captureChanges: boolean;
+      captureDetailedChanges?: boolean;
+      trustedHistory?: boolean;
+      replayPivotSources?: boolean;
+    },
   ): StoreDataEngineEffects {
     const changes: ChangeEvent["changes"] | null = captureChanges ? [] : null;
     const appliedPatches: DocumentOp[] = [];
@@ -2239,6 +2290,7 @@ export class StoreDataEngine {
           applyPivotRewrites(this.workbook.sheets, rewrites);
           for (const rewrite of rewrites) this.pivotSheetsDirty.add(rewrite.owner);
         }
+
         appliedPatches.push(patch);
 
         if (patch.op === "set" || patch.op === "setNote") touchedSheets.add(patch.addr.sheet);
@@ -2260,6 +2312,7 @@ export class StoreDataEngine {
         ) {
           touchedSheets.add(patch.op === "addSheet" ? patch.sheet.id : patch.sheet);
         }
+
         if (
           patch.op === "addRows" ||
           patch.op === "removeRows" ||
@@ -2273,9 +2326,11 @@ export class StoreDataEngine {
           hasStructuralPatch = true;
         }
       }
+
       if (hasStructuralPatch) {
         for (const touched of touchedSheets) this.spillBlockersDirty.add(touched);
       }
+
       this.flushSpillBlockers();
       this.flushPivots();
       if (appliedPatches.length === 0) return { appliedPatches, changes, storageRevision };
@@ -2324,11 +2379,13 @@ export class StoreDataEngine {
           start: { row: patch.addr.row, col: patch.addr.col },
           end: { row: patch.addr.row, col: patch.addr.col },
         };
+
         if (
           !this.writeSparseBlock(bounds, [{ offset: 0, value: patch.value, style: patch.style }])
         ) {
           return false;
         }
+
         if (changes && before) {
           changes.push({
             addr: patch.addr,
@@ -2338,8 +2395,10 @@ export class StoreDataEngine {
             newStyle: patch.style,
           });
         }
+
         return true;
       }
+
       case "setRange": {
         const bounds = normalizedRange(patch.range);
         const sheet = this.sheetMeta(bounds.sheet);
@@ -2351,6 +2410,7 @@ export class StoreDataEngine {
         ) {
           return false;
         }
+
         if (
           patch.cells.some(
             (cell) =>
@@ -2362,6 +2422,7 @@ export class StoreDataEngine {
         ) {
           return false;
         }
+
         // Grouped source snapshots allocate more than scalar admission for sparse writes.
         if (
           patch.cells.some((cell) => {
@@ -2372,6 +2433,7 @@ export class StoreDataEngine {
         ) {
           return false;
         }
+
         const cols = bounds.end.col - bounds.start.col + 1;
         const beforeCells = changes ? this.captureSparseBeforeCells(bounds, patch.cells) : null;
         const sparseCells = patch.cells.map((cell, index) => ({
@@ -2385,6 +2447,7 @@ export class StoreDataEngine {
           },
           before: beforeCells?.[index] ?? null,
         }));
+
         this.rangeMutationStats.jsPatchObjects += patch.cells.length;
         if (!this.writeSparseBlock(bounds, sparseCells)) return false;
         if (changes) {
@@ -2399,20 +2462,23 @@ export class StoreDataEngine {
             });
           }
         }
+
         return true;
       }
+
       case "setBlock":
       case "restoreBlock": {
-        const prepared = patch.op === "restoreBlock" ? restoreBlockFacts(patch) : undefined;
-        const bounds = prepared?.range ?? normalizedRange(patch.range);
+        const { range, block } = patch.op === "restoreBlock" ? restoreBlockFacts(patch) : patch;
+        const bounds = patch.op === "restoreBlock" ? range : normalizedRange(range);
+
         const sheet = this.sheetMeta(bounds.sheet);
         const rows = bounds.end.row - bounds.start.row + 1;
         const cols = bounds.end.col - bounds.start.col + 1;
         const cellCount = rows * cols;
-        const block = prepared?.block ?? (patch as Extract<DocumentOp, { op: "setBlock" }>).block;
         const styleTable = block.styleTable ?? [];
         const styleIds = block.styleIds;
         const exceptions = [...(block.formulas ?? []), ...(block.refs ?? [])];
+
         if (
           bounds.start.row < 0 ||
           bounds.start.col < 0 ||
@@ -2432,6 +2498,7 @@ export class StoreDataEngine {
         ) {
           return false;
         }
+
         if (!this.admitsSourceRange(bounds)) return false;
 
         const beforeCells =
@@ -2445,11 +2512,14 @@ export class StoreDataEngine {
         const refs = new Map(block.refs ?? []);
         for (let offset = 0; offset < beforeCells.length; offset += 1) {
           const entry = beforeCells[offset]!;
-          const next: CellValue = formulas.has(offset)
-            ? { kind: "formula", src: formulas.get(offset)! }
-            : refs.has(offset)
-              ? { kind: "ref", target: refs.get(offset)! }
-              : { kind: "literal", value: block.values[offset]! };
+          const formula = formulas.get(offset);
+          const target = refs.get(offset);
+          const next: CellValue =
+            formula !== undefined
+              ? { kind: "formula", src: formula }
+              : target !== undefined
+                ? { kind: "ref", target }
+                : { kind: "literal", value: block.values[offset]! };
           changes.push({
             addr: entry.addr,
             oldValue: literalOf(entry.before.resolved),
@@ -2457,8 +2527,10 @@ export class StoreDataEngine {
             oldStyle: entry.before.style,
           });
         }
+
         return applied;
       }
+
       case "setRangeStyle": {
         const bounds = normalizedRange(patch.range);
         const sheet = this.sheetMeta(bounds.sheet);
@@ -2470,6 +2542,7 @@ export class StoreDataEngine {
         ) {
           return false;
         }
+
         this.noteRangeMutationFfi();
         const oldIds = this.wasm.rangeStyleIds(
           this.handleOf(bounds.sheet),
@@ -2493,6 +2566,7 @@ export class StoreDataEngine {
               ? 0
               : this.styles.intern({ ...this.styles.get(oldIds[i]!), ...patch.style });
         }
+
         this.noteRangeMutationFfi(Math.max(oldIds.length, newIds.length));
         return this.wasm.remapRangeStyles(
           this.handleOf(bounds.sheet),
@@ -2504,6 +2578,7 @@ export class StoreDataEngine {
           newIds,
         );
       }
+
       case "clearRange": {
         const bounds = normalizedRange(patch.range);
         const sheet = this.sheetMeta(bounds.sheet);
@@ -2515,9 +2590,11 @@ export class StoreDataEngine {
         ) {
           return false;
         }
+
         if ((patch.contents ?? true) && !this.admitsSourceRange(bounds)) return false;
         const clearContents = patch.contents ?? true;
         const clearStyle = patch.style ?? true;
+
         const beforeCells =
           changes && captureDetailedChanges && clearContents
             ? this.captureBlockBeforeCells(
@@ -2527,6 +2604,7 @@ export class StoreDataEngine {
                 true,
               )
             : null;
+
         const applied = this.wasm.clearRange(
           this.handleOf(bounds.sheet),
           bounds.start.row,
@@ -2536,6 +2614,7 @@ export class StoreDataEngine {
           clearContents,
           clearStyle,
         );
+
         if (applied && changes && beforeCells) {
           capturedClearCells.set(
             patch,
@@ -2550,13 +2629,16 @@ export class StoreDataEngine {
             });
           }
         }
+
         return applied;
       }
+
       case "addRows": {
         const meta = this.sheetMeta(patch.sheet);
         if (!integerAt(patch.at) || !positiveCount(patch.count) || patch.at > meta.rowCount) {
           return false;
         }
+
         // The engine refuses a grid it cannot hold; the patch then changes nothing.
         if (!this.wasm.addRows(this.handleOf(patch.sheet), patch.at, patch.count)) return false;
         meta.rowCount += patch.count;
@@ -2564,6 +2646,7 @@ export class StoreDataEngine {
           at: patch.at,
           delta: patch.count,
         });
+
         this.rebaseCharts({
           kind: "insert",
           sheet: patch.sheet,
@@ -2571,8 +2654,10 @@ export class StoreDataEngine {
           at: patch.at,
           count: patch.count,
         });
+
         return true;
       }
+
       case "removeRows": {
         const meta = this.sheetMeta(patch.sheet);
         if (
@@ -2582,6 +2667,7 @@ export class StoreDataEngine {
         ) {
           return false;
         }
+
         if (!this.wasm.removeRows(this.handleOf(patch.sheet), patch.at, patch.count)) return false;
         meta.rowCount -= patch.count;
         this.rebaseSheetRows(
@@ -2597,10 +2683,13 @@ export class StoreDataEngine {
           count: patch.count,
           remaining: meta.rowCount,
         });
+
         return true;
       }
+
       case "moveRows":
         return this.moveRows(patch, changes);
+
       case "addColumns": {
         const meta = this.sheetMeta(patch.sheet);
         if (
@@ -2611,9 +2700,11 @@ export class StoreDataEngine {
         ) {
           return false;
         }
+
         if (!this.wasm.insertCols(this.handleOf(patch.sheet), patch.at, patch.columns.length)) {
           return false;
         }
+
         meta.columns.splice(patch.at, 0, ...patch.columns);
         this.rebaseSheetCols(
           patch.sheet,
@@ -2627,8 +2718,10 @@ export class StoreDataEngine {
           at: patch.at,
           count: patch.columns.length,
         });
+
         return true;
       }
+
       case "removeColumns": {
         const meta = this.sheetMeta(patch.sheet);
         if (
@@ -2639,6 +2732,7 @@ export class StoreDataEngine {
         ) {
           return false;
         }
+
         if (!this.wasm.removeCols(this.handleOf(patch.sheet), patch.at, patch.count)) return false;
         meta.columns.splice(patch.at, patch.count);
         this.rebaseSheetCols(
@@ -2654,10 +2748,13 @@ export class StoreDataEngine {
           count: patch.count,
           remaining: meta.columns.length,
         });
+
         return true;
       }
+
       case "moveColumns":
         return this.moveColumns(patch, changes);
+
       case "setColumn": {
         const meta = this.sheetMeta(patch.sheet);
         const column = meta.columns[patch.col];
@@ -2670,9 +2767,11 @@ export class StoreDataEngine {
         ) {
           return false;
         }
+
         meta.columns[patch.col] = next;
         return true;
       }
+
       case "setRowMeta": {
         const sheet = this.sheetMeta(patch.sheet);
         if (!integerAt(patch.row) || patch.row >= sheet.rowCount) return false;
@@ -2682,6 +2781,7 @@ export class StoreDataEngine {
         ) {
           return false;
         }
+
         if (!sheet.rowHeights) sheet.rowHeights = new Map();
         if (!sheet.hiddenRows) sheet.hiddenRows = new Set();
         if (patch.meta?.height !== undefined) {
@@ -2689,11 +2789,13 @@ export class StoreDataEngine {
         } else {
           sheet.rowHeights.delete(patch.row);
         }
+
         if (patch.meta?.hidden) sheet.hiddenRows.add(patch.row);
         else sheet.hiddenRows.delete(patch.row);
         this.view.metadataChanged(patch.sheet);
         return true;
       }
+
       case "setHyperlink": {
         const sheet = this.sheetMeta(patch.sheet);
         const hyperlink = sanitizeCellHyperlink(patch.hyperlink);
@@ -2702,6 +2804,7 @@ export class StoreDataEngine {
         if (source.end.row >= sheet.rowCount || source.end.col >= sheet.columns.length) {
           return false;
         }
+
         if (hyperlink.target.kind === "internal") {
           const target = hyperlink.target.range;
           const targetSheet = this.workbook.sheets.find(
@@ -2715,6 +2818,7 @@ export class StoreDataEngine {
             return false;
           }
         }
+
         const links = sheet.hyperlinks ?? [];
         const index = links.findIndex((candidate) => candidate.id === hyperlink.id);
         if (index < 0) {
@@ -2725,9 +2829,11 @@ export class StoreDataEngine {
           next[index] = hyperlink;
           sheet.hyperlinks = next;
         }
+
         this.view.metadataChanged(patch.sheet);
         return true;
       }
+
       case "removeHyperlink": {
         const sheet = this.sheetMeta(patch.sheet);
         const links = sheet.hyperlinks ?? [];
@@ -2736,6 +2842,7 @@ export class StoreDataEngine {
         this.view.metadataChanged(patch.sheet);
         return true;
       }
+
       case "setChart": {
         const sheet = this.sheetMeta(patch.sheet);
         const chart = sanitizeChartDefinition(patch.chart);
@@ -2752,8 +2859,10 @@ export class StoreDataEngine {
           next[index] = chart;
           sheet.charts = next;
         }
+
         return true;
       }
+
       case "removeChart": {
         const sheet = this.sheetMeta(patch.sheet);
         const charts = sheet.charts ?? [];
@@ -2761,6 +2870,7 @@ export class StoreDataEngine {
         sheet.charts = charts.filter((chart) => chart.id !== patch.id);
         return true;
       }
+
       case "setValidationRule": {
         const sheet = this.sheetMeta(patch.sheet);
         const rule = {
@@ -2768,6 +2878,7 @@ export class StoreDataEngine {
           range: normalizedRange(patch.rule.range),
           condition: cloneJsonValue(patch.rule.condition),
         };
+
         if (!validValidationRules(sheet, [rule]) || rule.range.sheet !== patch.sheet) return false;
         const rules = sheet.validationRules ?? [];
         const index = rules.findIndex((existing) => existing.id === rule.id);
@@ -2777,9 +2888,11 @@ export class StoreDataEngine {
           next[index] = rule;
           sheet.validationRules = next;
         }
+
         this.spillBlockersDirty.add(patch.sheet);
         return true;
       }
+
       case "removeValidationRule": {
         const sheet = this.sheetMeta(patch.sheet);
         const rules = sheet.validationRules ?? [];
@@ -2788,18 +2901,21 @@ export class StoreDataEngine {
         this.spillBlockersDirty.add(patch.sheet);
         return true;
       }
+
       case "setProtectedRange": {
         const sheet = this.sheetMeta(patch.sheet);
         const protectedRange = {
           ...patch.protectedRange,
           range: normalizedRange(patch.protectedRange.range),
         };
+
         if (
           protectedRange.range.sheet !== patch.sheet ||
           !validProtectedRanges(sheet, [protectedRange])
         ) {
           return false;
         }
+
         const ranges = sheet.protectedRanges ?? [];
         const index = ranges.findIndex((existing) => existing.id === protectedRange.id);
         if (index < 0) sheet.protectedRanges = [...ranges, protectedRange];
@@ -2808,9 +2924,11 @@ export class StoreDataEngine {
           next[index] = protectedRange;
           sheet.protectedRanges = next;
         }
+
         this.spillBlockersDirty.add(patch.sheet);
         return true;
       }
+
       case "removeProtectedRange": {
         const sheet = this.sheetMeta(patch.sheet);
         const ranges = sheet.protectedRanges ?? [];
@@ -2819,6 +2937,7 @@ export class StoreDataEngine {
         this.spillBlockersDirty.add(patch.sheet);
         return true;
       }
+
       case "setNote": {
         if (!this.isCellInBounds(patch.addr)) return false;
         const sheet = this.sheetMeta(patch.addr.sheet);
@@ -2836,8 +2955,10 @@ export class StoreDataEngine {
           next[index] = { addr: { ...patch.addr }, text: patch.text };
           sheet.notes = next;
         }
+
         return true;
       }
+
       case "addMerge": {
         const sheet = this.sheetMeta(patch.sheet);
         const merge = normalizeMerge(patch.merge);
@@ -2848,6 +2969,7 @@ export class StoreDataEngine {
         this.spillBlockersDirty.add(patch.sheet);
         return true;
       }
+
       case "removeMerge": {
         const sheet = this.sheetMeta(patch.sheet);
         const merge = normalizeMerge(patch.merge);
@@ -2858,10 +2980,13 @@ export class StoreDataEngine {
         this.spillBlockersDirty.add(patch.sheet);
         return true;
       }
+
       case "addSheet":
         return this.addSheetSnapshot(patch.sheet, changes);
+
       case "removeSheet":
         return this.removeSheetSnapshot(patch.sheet, changes);
+
       case "renameSheet": {
         const sheet = this.workbook.sheets.find((candidate) => candidate.id === patch.sheet);
         if (!sheet) return false;
@@ -2875,6 +3000,7 @@ export class StoreDataEngine {
         sheet.name = name.name;
         return true;
       }
+
       case "moveSheet": {
         const from = this.workbook.sheets.findIndex((sheet) => sheet.id === patch.sheet);
         if (from < 0 || !integerAt(patch.to) || patch.to >= this.workbook.sheets.length)
@@ -2884,6 +3010,7 @@ export class StoreDataEngine {
         this.syncSheetOrder();
         return true;
       }
+
       case "setSheetVisibility": {
         const sheet = this.workbook.sheets.find((candidate) => candidate.id === patch.sheet);
         if (!sheet) return false;
@@ -2898,6 +3025,7 @@ export class StoreDataEngine {
         ) {
           return false;
         }
+
         const fallback =
           this.workbook.activeSheet === patch.sheet && patch.visibility !== "visible"
             ? visibleSheetNeighbor(this.workbook.sheets, patch.sheet)
@@ -2909,10 +3037,12 @@ export class StoreDataEngine {
         ) {
           return false;
         }
+
         sheet.visibility = patch.visibility;
         if (fallback) this.workbook.activeSheet = fallback;
         return true;
       }
+
       case "addTable": {
         const sheet = this.workbook.sheets.find(
           (candidate) => candidate.id === patch.table.range.sheet,
@@ -2925,11 +3055,12 @@ export class StoreDataEngine {
         if (
           tableCount >= DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxTables ||
           (this.workbook.namedRanges ?? []).some(
-            (range) => workbookTableNameKey(range.name) === workbookTableNameKey(patch.table.name),
+            (range) => formulaNameKey(range.name) === formulaNameKey(patch.table.name),
           )
         ) {
           return false;
         }
+
         const existing = this.workbook.sheets.flatMap((candidate) => candidate.tables ?? []);
         if (!validWorkbookTable(patch.table, sheet, existing)) return false;
         const table = structuredClone(patch.table);
@@ -2937,11 +3068,13 @@ export class StoreDataEngine {
         sheet.tables = [...(sheet.tables ?? []), table];
         return true;
       }
+
       case "updateTable": {
         const sheet = this.workbook.sheets.find((candidate) => candidate.id === patch.sheet);
-        const index = sheet?.tables?.findIndex((table) => table.id === patch.tableId) ?? -1;
-        const current = index >= 0 ? sheet!.tables![index] : undefined;
-        if (!sheet || !current) return false;
+        const tables = sheet?.tables;
+        const index = tables?.findIndex((table) => table.id === patch.tableId) ?? -1;
+        const current = index >= 0 ? tables?.[index] : undefined;
+        if (!sheet || !tables || !current) return false;
         const candidate: WorkbookTable = {
           ...current,
           ...patch.patch,
@@ -2961,39 +3094,45 @@ export class StoreDataEngine {
               ? undefined
               : (patch.patch.sortState ?? current.sortState),
         };
+
         const existing = this.workbook.sheets.flatMap((candidateSheet) =>
           (candidateSheet.tables ?? []).filter((table) => table.id !== current.id),
         );
         if (
           (this.workbook.namedRanges ?? []).some(
-            (range) => workbookTableNameKey(range.name) === workbookTableNameKey(candidate.name),
+            (range) => formulaNameKey(range.name) === formulaNameKey(candidate.name),
           )
         ) {
           return false;
         }
+
         if (!validWorkbookTable(candidate, sheet, existing)) return false;
         const next = structuredClone(candidate);
         if (next.style === undefined) delete next.style;
         if (next.autoFilter === undefined) delete next.autoFilter;
         if (next.sortState === undefined) delete next.sortState;
         if (!this.syncTable(next)) return false;
-        const tables = [...sheet.tables!];
-        tables[index] = next;
-        sheet.tables = tables;
+        const nextTables = [...tables];
+        nextTables[index] = next;
+        sheet.tables = nextTables;
         return true;
       }
+
       case "removeTable": {
         const sheet = this.workbook.sheets.find((candidate) => candidate.id === patch.sheet);
-        const index = sheet?.tables?.findIndex((table) => table.id === patch.tableId) ?? -1;
-        if (!sheet || index < 0 || !this.wasm.removeTable(patch.tableId)) return false;
-        sheet.tables = [...sheet.tables!.slice(0, index), ...sheet.tables!.slice(index + 1)];
+        const tables = sheet?.tables;
+        const index = tables?.findIndex((table) => table.id === patch.tableId) ?? -1;
+        if (!sheet || !tables || index < 0 || !this.wasm.removeTable(patch.tableId)) return false;
+        sheet.tables = [...tables.slice(0, index), ...tables.slice(index + 1)];
         return true;
       }
+
       case "setPivot": {
         const sheet = this.workbook.sheets.find((candidate) => candidate.id === patch.sheet);
         if (!sheet || this.pivotIssues(patch.pivot, sheet, this.workbook.sheets).length > 0) {
           return false;
         }
+
         const owner = pivotOwner(this.workbook.sheets, patch.pivot.id);
         if (owner && owner !== sheet) return false;
         if (!owner && this.pivotCount() >= MAX_PIVOTS_PER_WORKBOOK) return false;
@@ -3006,6 +3145,7 @@ export class StoreDataEngine {
         this.pivotSheetsDirty.add(sheet.id);
         return true;
       }
+
       case "removePivot": {
         const sheet = this.workbook.sheets.find((candidate) => candidate.id === patch.sheet);
         if (!sheet?.pivots?.some((pivot) => pivot.id === patch.id)) return false;
@@ -3015,6 +3155,7 @@ export class StoreDataEngine {
         this.syncPivots(sheet);
         return true;
       }
+
       case "setSheetMeta": {
         const sheet = this.sheetMeta(patch.sheet);
         if (
@@ -3023,12 +3164,14 @@ export class StoreDataEngine {
         ) {
           return false;
         }
+
         if (
           patch.patch.frozenCols !== undefined &&
           (!integerAt(patch.patch.frozenCols) || patch.patch.frozenCols > sheet.columns.length)
         ) {
           return false;
         }
+
         if (
           patch.patch.rowGroups?.some(
             (group) =>
@@ -3046,6 +3189,7 @@ export class StoreDataEngine {
         ) {
           return false;
         }
+
         if (patch.patch.frozenRows !== undefined) sheet.frozenRows = patch.patch.frozenRows;
         if (patch.patch.frozenCols !== undefined) sheet.frozenCols = patch.patch.frozenCols;
         if (patch.patch.conditionalFormats !== undefined) {
@@ -3053,35 +3197,41 @@ export class StoreDataEngine {
           sheet.conditionalFormats = patch.patch.conditionalFormats;
           this.windowReader.conditionalRulesChanged(patch.sheet);
         }
+
         if (patch.patch.rowGroups !== undefined) {
           sheet.rowGroups = patch.patch.rowGroups.map((group) => ({ ...group }));
           this.view.metadataChanged(patch.sheet);
         }
+
         if (patch.patch.sortKeys !== undefined || patch.patch.filters !== undefined) {
           if (patch.patch.sortKeys !== undefined) {
             sheet.sortKeys = patch.patch.sortKeys.map((key) => ({ ...key }));
           }
+
           if (patch.patch.filters !== undefined) {
             sheet.filters = patch.patch.filters.map(([col, filter]) => [
               col,
               cloneJsonValue(filter),
             ]);
           }
+
           this.view.metadataChanged(patch.sheet);
         }
+
         return true;
       }
+
       case "setNamedRange": {
         if (
           this.workbook.sheets.some((sheet) =>
             (sheet.tables ?? []).some(
-              (table) =>
-                workbookTableNameKey(table.name) === workbookTableNameKey(patch.namedRange.name),
+              (table) => formulaNameKey(table.name) === formulaNameKey(patch.namedRange.name),
             ),
           )
         ) {
           return false;
         }
+
         if (
           !this.workbook.sheets.some((sheet) => sheet.id === patch.namedRange.range.sheet) ||
           (patch.namedRange.scope !== undefined &&
@@ -3089,10 +3239,12 @@ export class StoreDataEngine {
         ) {
           return false;
         }
+
         const namedRange = {
           ...patch.namedRange,
           range: normalizedRange(patch.namedRange.range),
         };
+
         if (!this.syncNamedRange(namedRange)) return false;
         const ranges = this.workbook.namedRanges ?? [];
         const index = ranges.findIndex((range) =>
@@ -3104,13 +3256,16 @@ export class StoreDataEngine {
           next[index] = namedRange;
           this.workbook.namedRanges = next;
         }
+
         return true;
       }
+
       case "removeNamedRange": {
         const ranges = this.workbook.namedRanges ?? [];
         if (!ranges.some((range) => this.sameNamedRange(range, patch.name, patch.scope))) {
           return false;
         }
+
         if (!this.wasm.removeNamedRange(patch.name, this.namedRangeScope(patch.scope)))
           return false;
         this.workbook.namedRanges = ranges.filter(
@@ -3118,6 +3273,7 @@ export class StoreDataEngine {
         );
         return true;
       }
+
       case "setCalculation": {
         if (!this.syncCalculation(patch.calculation)) return false;
         this.workbook.calculation = storedCalculationSettings(patch.calculation);
@@ -3135,10 +3291,12 @@ export class StoreDataEngine {
   ): Array<Extract<DocumentOp, { op: "set" }>> {
     const rows = rowEnd - rowStart;
     const cols = colEnd - colStart;
+
     this.noteRangeMutationFfi();
     const snapshot = this.wasm.captureSources(this.handleOf(sheet), rowStart, colStart, rows, cols);
     const derived = snapshot?.spillDerived();
     const sources = snapshot ? consumeSourceSnapshot(snapshot, this.sheetIdsByHandle) : null;
+
     // Only outputs crossing the moved rectangle need a per-cell ownership check.
     const outputs = this.pivotOutputs(sheet).filter(
       ({ range }) =>
@@ -3147,6 +3305,7 @@ export class StoreDataEngine {
         range.start.col < colEnd &&
         range.end.col >= colStart,
     );
+
     const columns = Array.from({ length: cols }, (_, offset) => colStart + offset);
     const window = this.windowReader.read(
       sheet,
@@ -3155,6 +3314,7 @@ export class StoreDataEngine {
       undefined,
       false,
     );
+
     const patches: Array<Extract<DocumentOp, { op: "set" }>> = [];
     for (let row = rowStart; row < rowEnd; row++) {
       for (let col = colStart; col < colEnd; col++) {
@@ -3178,12 +3338,15 @@ export class StoreDataEngine {
                 kind: "literal",
                 value: derived?.[offset] || pivotDerived ? null : (window.values[offset] ?? null),
               };
+
         if (value.kind === "literal" && value.value === null && Object.keys(style).length === 0) {
           continue;
         }
+
         patches.push({ op: "set", addr, value, style });
       }
     }
+
     return patches;
   }
 
@@ -3201,6 +3364,7 @@ export class StoreDataEngine {
     ) {
       return false;
     }
+
     if (patch.from === patch.to) return true;
     const movedNamedRanges = (this.workbook.namedRanges ?? [])
       .filter((namedRange) => namedRange.range.sheet === patch.sheet)
@@ -3226,6 +3390,7 @@ export class StoreDataEngine {
       const hidden = sheet.hiddenRows?.has(row) ?? false;
       return height === undefined && !hidden ? null : { height, hidden };
     });
+
     if (
       !this.applyPatch(
         { op: "removeRows", sheet: patch.sheet, at: patch.from, count: patch.count },
@@ -3238,6 +3403,7 @@ export class StoreDataEngine {
     ) {
       return false;
     }
+
     if (
       cells.length > 0 &&
       !this.applyPatch(
@@ -3260,6 +3426,7 @@ export class StoreDataEngine {
     ) {
       return false;
     }
+
     for (let offset = 0; offset < rowMeta.length; offset++) {
       const meta = rowMeta[offset];
       if (meta) {
@@ -3269,6 +3436,7 @@ export class StoreDataEngine {
         );
       }
     }
+
     const moveRow = (row: number) => moveIndex(row, patch.from, patch.count, patch.to);
     sheet.validationRules = movedValidationRules
       .map((rule) => rebaseRangeRows(rule, patch.sheet, moveRow))
@@ -3280,6 +3448,7 @@ export class StoreDataEngine {
       ...note,
       addr: { ...note.addr, row: moveRow(note.addr.row) },
     }));
+
     sheet.conditionalFormats = movedConditionalFormats
       .map((rule) => rebaseConditionalFormatMove(rule, patch.sheet, "row", patch))
       .filter((rule): rule is ConditionalFormatRule => rule !== null);
@@ -3290,6 +3459,7 @@ export class StoreDataEngine {
         .map((hyperlink) => rebaseHyperlinkAxis(hyperlink, patch.sheet, "row", moveRow))
         .filter((hyperlink): hyperlink is CellHyperlink => hyperlink !== null);
     }
+
     this.restoreMovedCharts(movedCharts, {
       kind: "move",
       sheet: patch.sheet,
@@ -3298,6 +3468,7 @@ export class StoreDataEngine {
       count: patch.count,
       to: patch.to,
     });
+
     this.windowReader.conditionalRulesChanged(patch.sheet);
     for (const original of movedNamedRanges) {
       const span = remapSpan(original.range.start.row, original.range.end.row, (row) =>
@@ -3312,6 +3483,7 @@ export class StoreDataEngine {
           end: { ...original.range.end, row: span[1] },
         },
       };
+
       const ranges = this.workbook.namedRanges ?? [];
       const index = ranges.findIndex((range) =>
         this.sameNamedRange(range, namedRange.name, namedRange.scope),
@@ -3320,6 +3492,7 @@ export class StoreDataEngine {
       else ranges[index] = namedRange;
       if (!this.syncNamedRange(namedRange)) return false;
     }
+
     return true;
   }
 
@@ -3337,7 +3510,9 @@ export class StoreDataEngine {
     ) {
       return false;
     }
+
     if (patch.from === patch.to) return true;
+
     const movedNamedRanges = (this.workbook.namedRanges ?? [])
       .filter((namedRange) => namedRange.range.sheet === patch.sheet)
       .map((namedRange) => structuredClone(namedRange));
@@ -3350,6 +3525,7 @@ export class StoreDataEngine {
     );
     const movedTables = structuredClone(sheet.tables ?? []);
     const movedCharts = this.captureCharts();
+
     const columns = sheet.columns.slice(patch.from, patch.from + patch.count);
     const cells = this.snapshotCells(
       patch.sheet,
@@ -3358,6 +3534,7 @@ export class StoreDataEngine {
       patch.from,
       patch.from + patch.count,
     );
+
     if (
       !this.applyPatch(
         { op: "removeColumns", sheet: patch.sheet, at: patch.from, count: patch.count },
@@ -3367,6 +3544,7 @@ export class StoreDataEngine {
     ) {
       return false;
     }
+
     if (
       cells.length > 0 &&
       !this.applyPatch(
@@ -3389,6 +3567,7 @@ export class StoreDataEngine {
     ) {
       return false;
     }
+
     const moveCol = (col: number) => moveIndex(col, patch.from, patch.count, patch.to);
     sheet.validationRules = movedValidationRules
       .map((rule) => rebaseRangeCols(rule, patch.sheet, moveCol))
@@ -3400,6 +3579,7 @@ export class StoreDataEngine {
       ...note,
       addr: { ...note.addr, col: moveCol(note.addr.col) },
     }));
+
     sheet.conditionalFormats = movedConditionalFormats
       .map((rule) => rebaseConditionalFormatMove(rule, patch.sheet, "column", patch))
       .filter((rule): rule is ConditionalFormatRule => rule !== null);
@@ -3410,6 +3590,7 @@ export class StoreDataEngine {
         .map((hyperlink) => rebaseHyperlinkAxis(hyperlink, patch.sheet, "column", moveCol))
         .filter((hyperlink): hyperlink is CellHyperlink => hyperlink !== null);
     }
+
     this.restoreMovedTables(sheet, movedTables, moveCol);
     this.restoreMovedCharts(movedCharts, {
       kind: "move",
@@ -3419,6 +3600,7 @@ export class StoreDataEngine {
       count: patch.count,
       to: patch.to,
     });
+
     this.windowReader.conditionalRulesChanged(patch.sheet);
     for (const original of movedNamedRanges) {
       const span = remapSpan(original.range.start.col, original.range.end.col, (col) =>
@@ -3433,6 +3615,7 @@ export class StoreDataEngine {
           end: { ...original.range.end, col: span[1] },
         },
       };
+
       const ranges = this.workbook.namedRanges ?? [];
       const index = ranges.findIndex((range) =>
         this.sameNamedRange(range, namedRange.name, namedRange.scope),
@@ -3441,6 +3624,7 @@ export class StoreDataEngine {
       else ranges[index] = namedRange;
       if (!this.syncNamedRange(namedRange)) return false;
     }
+
     return true;
   }
 
@@ -3479,6 +3663,7 @@ export class StoreDataEngine {
           end: { ...original.range.end, col: end },
         },
       };
+
       delete restored.autoFilter;
       delete restored.sortState;
       Object.assign(restored, remapWorkbookTableRuleColumns(original, moveCol, start, end));
@@ -3493,6 +3678,7 @@ export class StoreDataEngine {
         tables[index] = restored;
       }
     }
+
     sheet.tables = tables;
   }
 
@@ -3580,6 +3766,7 @@ export class StoreDataEngine {
       rowHeights: new Map(),
       hiddenRows: new Set(),
     };
+
     // Charts may read sheets already present, so bounds are checked against every tab.
     if (snapshot.charts) {
       const charts: ChartDefinition[] = [];
@@ -3588,10 +3775,12 @@ export class StoreDataEngine {
         if (!chart) return false;
         charts.push(chart);
       }
+
       if (!sheetChartsFit(charts, sheet, [...this.workbook.sheets, sheet])) return false;
 
       sheet.charts = charts;
     }
+
     try {
       assertWorkbookTables(
         [...this.workbook.sheets, sheet],
@@ -3601,6 +3790,7 @@ export class StoreDataEngine {
     } catch {
       return false;
     }
+
     if (snapshot.pivots?.length) {
       const sheets = [...this.workbook.sheets, sheet];
       if (this.pivotCount() + snapshot.pivots.length > MAX_PIVOTS_PER_WORKBOOK) return false;
@@ -3613,11 +3803,14 @@ export class StoreDataEngine {
         ) {
           return false;
         }
+
         ids.add(pivot.id);
       }
+
       sheet.pivots = snapshot.pivots.map(clonePivot);
       this.pivotSheetsDirty.add(sheet.id);
     }
+
     const handle = this.allocateSheet(snapshot.columns.length, snapshot.rowCount);
     this.wasm.setSheetName(handle, snapshot.id, name.name);
     this.handles.set(snapshot.id, handle);
@@ -3626,12 +3819,14 @@ export class StoreDataEngine {
       if (meta.height !== undefined) sheet.rowHeights!.set(row, meta.height);
       if (meta.hidden) sheet.hiddenRows!.add(row);
     }
+
     this.view.queueHiddenRows(snapshot.id);
     this.workbook.sheets.splice(snapshot.order, 0, sheet);
     this.syncSheetOrder();
     for (const table of sheet.tables ?? []) {
       if (!this.syncTable(table)) return false;
     }
+
     for (const block of snapshot.cells) {
       if (
         !this.applyPatch(
@@ -3653,6 +3848,7 @@ export class StoreDataEngine {
         return false;
       }
     }
+
     this.windowReader.conditionalRulesChanged(snapshot.id);
     if (this.snapshotAuthoritative) this.authoritativeSnapshotSheets.add(snapshot.id);
     return true;
@@ -3669,6 +3865,7 @@ export class StoreDataEngine {
     ) {
       return false;
     }
+
     const fallback =
       this.workbook.activeSheet === sheetId
         ? visibleSheetNeighbor(this.workbook.sheets, sheetId)
@@ -3709,28 +3906,34 @@ export class StoreDataEngine {
         const mapped = remap(row);
         if (mapped !== null) next.set(mapped, height);
       }
+
       meta.rowHeights = next;
     }
+
     if (meta.hiddenRows) {
       const next = new Set<number>();
       for (const row of meta.hiddenRows) {
         const mapped = remap(row);
         if (mapped !== null) next.add(mapped);
       }
+
       meta.hiddenRows = next;
     }
+
     meta.rowGroups = meta.rowGroups
       ?.map((group) => {
         const span = remapSpan(group.start, group.end, remap);
         return span ? { ...group, start: span[0], end: span[1] } : null;
       })
       .filter((group): group is RowGroup => group !== null);
+
     meta.merges = meta.merges
       ?.map((merge) => {
         const span = remapSpan(merge.r0, merge.r1, remap);
         return span ? { ...merge, r0: span[0], r1: span[1] } : null;
       })
       .filter((merge): merge is MergeRange => merge !== null);
+
     meta.conditionalFormats = meta.conditionalFormats
       ?.map((rule) => {
         if (rule.range.sheet !== sheet) return rule;
@@ -3747,6 +3950,7 @@ export class StoreDataEngine {
           : null;
       })
       .filter((rule): rule is ConditionalFormatRule => rule !== null);
+
     for (const owner of this.workbook.sheets) {
       owner.hyperlinks = owner.hyperlinks
         ?.map((hyperlink) => rebaseHyperlinkAxis(hyperlink, sheet, "row", remap))
@@ -3754,6 +3958,7 @@ export class StoreDataEngine {
           (hyperlink): hyperlink is NonNullable<Sheet["hyperlinks"]>[number] => hyperlink !== null,
         );
     }
+
     if (meta.conditionalFormats?.some((rule) => rule.when.kind === "formula")) {
       meta.conditionalFormats = meta.conditionalFormats.map((rule) =>
         rule.when.kind === "formula"
@@ -3767,6 +3972,7 @@ export class StoreDataEngine {
           : rule,
       );
     }
+
     this.windowReader.conditionalRulesChanged(sheet);
     meta.validationRules = meta.validationRules
       ?.map((rule) => rebaseRangeRows(rule, sheet, remap))
@@ -3788,6 +3994,7 @@ export class StoreDataEngine {
         this.wasm.removeTable(table.id);
         continue;
       }
+
       const next = {
         ...table,
         range: {
@@ -3796,14 +4003,17 @@ export class StoreDataEngine {
           end: { ...table.range.end, row: span[1] },
         },
       };
+
       tables.push(next);
       this.syncTable(next);
     }
+
     meta.tables = tables;
     if (meta.frozenRows) {
       const boundary = remapSpan(0, meta.frozenRows - 1, remap);
       meta.frozenRows = boundary ? boundary[1] + 1 : 0;
     }
+
     this.workbook.namedRanges = this.workbook.namedRanges
       ?.map((namedRange) => {
         if (namedRange.range.sheet !== sheet) return namedRange;
@@ -3829,12 +4039,14 @@ export class StoreDataEngine {
     edit: { at: number; delta: number; inserted?: readonly Column[] },
   ): void {
     const meta = this.sheetMeta(sheet);
+
     meta.merges = meta.merges
       ?.map((merge) => {
         const span = remapSpan(merge.c0, merge.c1, remap);
         return span ? { ...merge, c0: span[0], c1: span[1] } : null;
       })
       .filter((merge): merge is MergeRange => merge !== null);
+
     meta.conditionalFormats = meta.conditionalFormats
       ?.map((rule) => {
         if (rule.range.sheet !== sheet) return rule;
@@ -3851,6 +4063,7 @@ export class StoreDataEngine {
           : null;
       })
       .filter((rule): rule is ConditionalFormatRule => rule !== null);
+
     for (const owner of this.workbook.sheets) {
       owner.hyperlinks = owner.hyperlinks
         ?.map((hyperlink) => rebaseHyperlinkAxis(hyperlink, sheet, "column", remap))
@@ -3858,6 +4071,7 @@ export class StoreDataEngine {
           (hyperlink): hyperlink is NonNullable<Sheet["hyperlinks"]>[number] => hyperlink !== null,
         );
     }
+
     if (meta.conditionalFormats?.some((rule) => rule.when.kind === "formula")) {
       meta.conditionalFormats = meta.conditionalFormats.map((rule) =>
         rule.when.kind === "formula"
@@ -3875,6 +4089,7 @@ export class StoreDataEngine {
           : rule,
       );
     }
+
     this.windowReader.conditionalRulesChanged(sheet);
     meta.validationRules = meta.validationRules
       ?.map((rule) => rebaseRangeCols(rule, sheet, remap))
@@ -3896,6 +4111,7 @@ export class StoreDataEngine {
         this.wasm.removeTable(table.id);
         continue;
       }
+
       let columns = table.columns;
       if (edit.delta > 0 && edit.at > table.range.start.col && edit.at <= table.range.end.col) {
         const added = this.insertedTableColumns(table, edit.inserted ?? []);
@@ -3906,10 +4122,12 @@ export class StoreDataEngine {
           (_column, offset) => remap(table.range.start.col + offset) !== null,
         );
       }
+
       if (columns.length !== span[1] - span[0] + 1) {
         this.wasm.removeTable(table.id);
         continue;
       }
+
       const next: WorkbookTable = {
         ...table,
         columns,
@@ -3919,17 +4137,20 @@ export class StoreDataEngine {
           end: { ...table.range.end, col: span[1] },
         },
       };
+
       delete next.autoFilter;
       delete next.sortState;
       Object.assign(next, remapWorkbookTableRuleColumns(table, remap, span[0], span[1]));
       tables.push(next);
       this.syncTable(next);
     }
+
     meta.tables = tables;
     if (meta.frozenCols) {
       const boundary = remapSpan(0, meta.frozenCols - 1, remap);
       meta.frozenCols = boundary ? boundary[1] + 1 : 0;
     }
+
     this.workbook.namedRanges = this.workbook.namedRanges
       ?.map((namedRange) => {
         if (namedRange.range.sheet !== sheet) return namedRange;
@@ -4138,15 +4359,19 @@ export class StoreDataEngine {
       ) {
         throw datasourceFailure("datasource page contains invalid column bounds");
       }
+
       for (let offset = 0; offset < band.keys.length; offset++) {
         const key = band.keys[offset]!;
         if (meta.columns[band.start + offset]?.key !== key || declaredKeys.has(key)) {
           throw datasourceFailure("datasource page contains invalid column keys");
         }
+
         declaredKeys.add(key);
       }
+
       previousEnd = band.end;
     }
+
     for (let rowOffset = 0; rowOffset < rowCount; rowOffset++) {
       const row = rows[rowOffset]!;
       for (const key of declaredKeys) {
@@ -4154,6 +4379,7 @@ export class StoreDataEngine {
           throw datasourceFailure("datasource page omits declared cell data");
         }
       }
+
       for (const key of Object.keys(row)) {
         if (!declaredKeys.has(key))
           throw datasourceFailure("datasource page contains undeclared cell data");
@@ -4163,6 +4389,7 @@ export class StoreDataEngine {
     const blockStart = columns[0]!.start;
     const blockEnd = columns[columns.length - 1]!.end;
     const blockWidth = blockEnd - blockStart;
+
     const cells: Array<{ offset: number; value: CellValue; style?: CellStyle }> = [];
     const address: CellAddress = { sheet, row: start, col: blockStart };
     for (let rowOffset = 0; rowOffset < rowCount; rowOffset++) {
@@ -4178,6 +4405,7 @@ export class StoreDataEngine {
             dataCell && typeof dataCell === "object" && !("kind" in dataCell) && "value" in dataCell
               ? dataCell
               : undefined;
+
           const source = columnarScalar(dataCellValue(dataCell), column.type);
           const value: CellValue =
             source && typeof source === "object"
@@ -4198,6 +4426,7 @@ export class StoreDataEngine {
       start: { row: start, col: blockStart },
       end: { row: start + rowCount - 1, col: blockEnd - 1 },
     };
+
     const previousOperation = this.resourceOperation;
     this.resourceOperation ??= "ingest";
     let accepted = false;
@@ -4209,6 +4438,7 @@ export class StoreDataEngine {
       this.wasm.commitSources();
       this.resourceOperation = previousOperation;
     }
+
     if (!accepted) throw new Error("datasource page contains invalid persisted sources");
   }
 
@@ -4226,22 +4456,26 @@ export class StoreDataEngine {
               col: block.startCol + block.colCount - 1,
             },
           };
+
           const cells = block.cells.map((cell) => ({
             offset: cell.rowOffset * block.colCount + cell.colOffset,
             value: cell.value,
             style: cell.style,
           }));
+
           if (!this.writeSparseBlock(bounds, cells)) {
             accepted = false;
             break;
           }
         }
+
         if (!accepted) break;
         this.windowReader.conditionalRulesChanged(sourceSheet.id);
       }
     } finally {
       this.wasm.commitSources();
     }
+
     if (!accepted) throw new Error("snapshot hydration contains invalid persisted sources");
     this.snapshotAuthoritative = true;
     for (const sheet of snapshot.sheets) this.authoritativeSnapshotSheets.add(sheet.id);
@@ -4403,6 +4637,7 @@ export class StoreDataEngine {
         }
       }
     }
+
     const referenceTargets = new Uint32Array(refs.length * 3);
     for (let index = 0; index < refs.length; index++) {
       const target = refs[index]![1];
@@ -4410,6 +4645,7 @@ export class StoreDataEngine {
       if (targetHandle === undefined || !this.isCellInBounds(target)) {
         throw new Error("columnar import contains invalid persisted sources");
       }
+
       const packed = index * 3;
       referenceTargets[packed] = targetHandle;
       referenceTargets[packed + 1] = target.row;
@@ -4441,6 +4677,7 @@ export class StoreDataEngine {
     if (applied !== 0) {
       throw new Error("columnar import contains invalid persisted sources");
     }
+
     this.noteRangeMutationFfi();
     this.wasm.commitSources();
     this.noteRangeMutationFfi();

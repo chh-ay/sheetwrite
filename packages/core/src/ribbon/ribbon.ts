@@ -38,7 +38,7 @@ import {
 import { RIBBON_TABS } from "./ribbon-model.js";
 import { RibbonPopup } from "./ribbon-popup.js";
 
-export interface RibbonOptions extends RibbonConfig {
+export interface RibbonMountOptions extends RibbonConfig {
   /** Called after the ribbon is minimized to its tab row or expanded again. */
   readonly onHeightChange: (height: number) => void;
   /** Where keyboard focus goes back to; defaults to focusing the host. */
@@ -73,7 +73,7 @@ export class Ribbon {
   readonly element: HTMLDivElement;
 
   private readonly grid: Grid;
-  private readonly options: RibbonOptions;
+  private readonly options: RibbonMountOptions;
   private readonly context: RibbonContext;
   private readonly popup: RibbonPopup;
   private readonly tabs: HTMLButtonElement[] = [];
@@ -92,7 +92,7 @@ export class Ribbon {
   private fitFrame = 0;
   private fittedWidth = -1;
 
-  constructor(host: HTMLElement, grid: Grid, options: RibbonOptions) {
+  constructor(host: HTMLElement, grid: Grid, options: RibbonMountOptions) {
     ribbonSerial += 1;
     this.id = ribbonSerial;
     this.grid = grid;
