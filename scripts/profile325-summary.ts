@@ -30,7 +30,7 @@ const timingByMarker = new Map(timings.map((row) => [markerOf(row), row]));
 const nodes = new Map(profile.nodes.map((node) => [node.id, node]));
 const parents = new Map<number, number>();
 for (const node of profile.nodes) for (const child of node.children ?? []) parents.set(child, node.id);
-function phaseOf(name: string): Phase | undefined {
+function phaseOf(name: string, parentPhase?: Phase): Phase | undefined {
   name = name.replace(/^sheetwrite_wasm\.wasm\.wasm-function\[/u, "");
   // A type argument is not the function's owner. HashMap<DependencyNode>,
   // for example, inherits its caller's phase instead of becoming evaluation.
@@ -38,10 +38,13 @@ function phaseOf(name: string): Phase | undefined {
   if (!isEngineOwner) return undefined;
   if (["parse_formula_entry", "resolve_formula_ast", "::calc::"].some((part) => name.includes(part))) return "parse";
   if (["FormulaGraph", "build_dep_index", "ensure_index", "patch_dep"].some((part) => name.includes(part))) return "dependency";
-  if (["collect_affected_formulas", "collect_matching_range_groups", "collect_interval_matches", "seed_depth_errors", "DependencyDepthWalk", "ComponentWalk", "seed_dependency_depth", "seed_additional_depth", "SheetFormulas"].some((part) => name.includes(part))) return "dirty";
+  if (["collect_affected_formulas", "collect_matching_range_groups", "collect_interval_matches", "seed_depth_errors", "DependencyDepthWalk", "ComponentWalk", "seed_dependency_depth", "seed_additional_depth", "add_dirty_rect", "mark_dirty", "mark_all_dirty"].some((part) => name.includes(part))) return "dirty";
   if (["store_formula_result", "install_spill_result", "::spill::", "set_derived"].some((part) => name.includes(part))) return "writes";
   if (["RangeReader", "eval_sum_range", "eval_range_matrix", "push_range_values", "eval_range_values", "range_is_reusable"].some((part) => name.includes(part))) return "range";
-  if (name.includes("::eval::") || [">::eval_", ">::evaluate_pass", "finish_runtime_formula", "settle_circular"].some((part) => name.includes(part))) return "evaluation";
+  // Literal decoding belongs to the surrounding read. A formula reached by
+  // that read switches back to evaluation at eval_formula_cell.
+  if (parentPhase === "range" && name.includes(">::eval_at")) return undefined;
+  if ([">::eval_", ">::evaluate_pass", "finish_runtime_formula", "settle_circular", "_family"].some((part) => name.includes(part))) return "evaluation";
   return undefined;
 }
 const cache = new Map<number, Attribution>();
@@ -55,7 +58,7 @@ function attribute(id: number): Attribution {
   const name = node.callFrame.functionName;
   const result = {
     marker: name.startsWith("profile_") ? name : parent.marker,
-    phase: phaseOf(name) ?? parent.phase,
+    phase: phaseOf(name, parent.phase) ?? parent.phase,
     allocation: parent.allocation || ["dlmalloc", "__rdl_alloc", "__rdl_dealloc", "__rust_alloc", "__rust_dealloc", "reserve_rehash", "RawVec", "fallible_with_capacity"].some((part) => name.includes(part)),
   };
   cache.set(id, result);
