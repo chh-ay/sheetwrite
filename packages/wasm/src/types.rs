@@ -198,6 +198,7 @@ impl ReadSet {
     pub(crate) fn collect(&mut self, ast: &Ast, formula_sheet: u32) {
         match ast {
             Ast::LetSlot { expression, .. } => self.collect(expression, formula_sheet),
+            Ast::NamedFormula(named) => self.collect(&named.expression, formula_sheet),
             Ast::Cell(row, col, _) => self.push_cell(AbsCellKey {
                 sheet: formula_sheet,
                 row: *row,
@@ -338,6 +339,7 @@ fn ast_is_volatile(ast: &Ast) -> bool {
         }
         Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => ast_is_volatile(inner),
         Ast::LetSlot { expression, .. } => ast_is_volatile(expression),
+        Ast::NamedFormula(named) => ast_is_volatile(&named.expression),
         _ => false,
     }
 }
@@ -351,6 +353,7 @@ fn ast_contains_let(ast: &Ast) -> bool {
         }
         Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => ast_contains_let(inner),
         Ast::LetSlot { expression, .. } => ast_contains_let(expression),
+        Ast::NamedFormula(named) => ast_contains_let(&named.expression),
         _ => false,
     }
 }
@@ -364,6 +367,7 @@ fn ast_contains_spill_ref(ast: &Ast) -> bool {
         }
         Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => ast_contains_spill_ref(inner),
         Ast::LetSlot { expression, .. } => ast_contains_spill_ref(expression),
+        Ast::NamedFormula(named) => ast_contains_spill_ref(&named.expression),
         _ => false,
     }
 }

@@ -276,7 +276,7 @@ Limitations: Google Sheets and OpenFormula results require producer evidence bef
 | Google Sheets | unverified |
 | OpenFormula | unverified |
 
-Limitations: Available only in @sheetwrite/formulas. Named ranges are supported, but workbook-defined named formulas are not available. LAMBDA uses lexical parameters and LET bindings. Calls are limited to depth 64 and 2000000 work units. Helpers reject nested arrays.
+Limitations: Available only in @sheetwrite/formulas. Both engines support plain defined-name formulas; named LAMBDA calls require the full engine. LAMBDA uses lexical parameters and LET bindings. Calls are limited to depth 64 and 2000000 work units. Helpers reject nested arrays.
 
 </details>
 
@@ -288,7 +288,7 @@ Limitations: Available only in @sheetwrite/formulas. Named ranges are supported,
 | Google Sheets | unverified |
 | OpenFormula | unverified |
 
-Limitations: Available only in @sheetwrite/formulas. Named ranges are supported, but workbook-defined named formulas are not available. LAMBDA uses lexical parameters and LET bindings. Calls are limited to depth 64 and 2000000 work units. Helpers reject nested arrays.
+Limitations: Available only in @sheetwrite/formulas. Both engines support plain defined-name formulas; named LAMBDA calls require the full engine. LAMBDA uses lexical parameters and LET bindings. Calls are limited to depth 64 and 2000000 work units. Helpers reject nested arrays.
 
 </details>
 

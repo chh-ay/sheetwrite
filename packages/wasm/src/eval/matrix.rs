@@ -142,6 +142,7 @@ pub(super) fn optional_ast(args: &[Ast], index: usize) -> Option<&Ast> {
 pub(crate) fn range_from_ast(ast: &Ast, formula_sheet: usize) -> Option<CellRange> {
     match ast {
         Ast::LetSlot { expression, .. } => range_from_ast(expression, formula_sheet),
+        Ast::NamedFormula(named) => range_from_ast(&named.expression, formula_sheet),
         Ast::Cell(row, col, _) => {
             Some(CellRange::new(formula_sheet as u32, *row, *col, *row, *col))
         }

@@ -19,6 +19,7 @@ pub(crate) fn ast_calls_subtotal(ast: &Ast) -> bool {
         }
         Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => ast_calls_subtotal(inner),
         Ast::LetSlot { expression, .. } => ast_calls_subtotal(expression),
+        Ast::NamedFormula(named) => ast_calls_subtotal(&named.expression),
         _ => false,
     }
 }

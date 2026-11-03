@@ -501,12 +501,16 @@ function transformDirectTarget(
     }
 
     case "setNamedRange": {
-      const mapped = transformRange(operation.namedRange.range, change);
-      if (!mapped && operation.namedRange.range.sheet === change.sheet) {
+      const { namedRange } = operation;
+      // A formula name never gets here: operationContainsFormula reports it as a conflict first.
+      if (namedRange.range === undefined) return null;
+
+      const mapped = transformRange(namedRange.range, change);
+      if (!mapped && namedRange.range.sheet === change.sheet) {
         return overlappingStructure(operation.op);
       }
 
-      if (mapped) operation.namedRange.range = mapped;
+      if (mapped) namedRange.range = mapped;
       return null;
     }
 
@@ -852,6 +856,8 @@ function operationContainsFormula(
       return operation.sheet.cells.some((block) =>
         block.cells.some((cell) => cell.value.kind === "formula"),
       );
+    case "setNamedRange":
+      return operation.namedRange.formula !== undefined;
     default:
       return false;
   }
@@ -971,7 +977,7 @@ function operationTouchesSheet(
       return chartTouchesSheet(operation.chart, operation.sheet, sheet);
 
     case "setNamedRange":
-      return operation.namedRange.range.sheet === sheet || operation.namedRange.scope === sheet;
+      return operation.namedRange.range?.sheet === sheet || operation.namedRange.scope === sheet;
 
     case "removeNamedRange":
       return operation.scope === sheet;
@@ -1057,7 +1063,7 @@ function mutationRanges(operation: DocumentOp): Range[] {
       return [operation.protectedRange.range];
 
     case "setNamedRange":
-      return [operation.namedRange.range];
+      return operation.namedRange.range ? [operation.namedRange.range] : [];
 
     case "addTable":
       return [operation.table.range];

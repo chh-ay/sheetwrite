@@ -16,6 +16,7 @@ import type {
   insertPivot,
   openChartPanel,
   openExplainPanel,
+  openNamePanel,
   openPivotPanel,
   syncPivotPanel,
 } from "./panel-controller.js";
@@ -27,6 +28,7 @@ interface PanelController {
   insertPivot: typeof insertPivot;
   openChartPanel: typeof openChartPanel;
   openExplainPanel: typeof openExplainPanel;
+  openNamePanel: typeof openNamePanel;
   openPivotPanel: typeof openPivotPanel;
   syncPivotPanel: typeof syncPivotPanel;
 }
@@ -126,6 +128,15 @@ function requestPanel(grid: Grid, open: (controller: PanelController) => void): 
 /** Formulas › Explain Formula: open its panel, loading the panels on first use. */
 export function showFormulaExplanation(grid: Grid): void {
   requestPanel(grid, (controller) => controller.openExplainPanel(grid));
+}
+
+/** Formulas › Defined Names loads the same optional panel chunk. */
+export function showNameManager(grid: Grid): void {
+  requestPanel(grid, (controller) => controller.openNamePanel(grid));
+}
+
+export function showDefineName(grid: Grid): void {
+  requestPanel(grid, (controller) => controller.openNamePanel(grid, true));
 }
 
 /** The focus cell of a selection; whole rows and columns are never inside a pivot. */

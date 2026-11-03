@@ -208,7 +208,8 @@ function readSource(cache: XmlElement, snapshot: WorkbookSnapshot): ResolvedRead
     const named = snapshot.workbook.namedRanges?.find(
       (candidate) => candidate.scope === undefined && nameKey(candidate.name) === key,
     );
-    if (!named) return "its source name is neither a table nor a workbook range";
+    if (named?.range === undefined)
+      return "its source name is neither a table nor a workbook range";
     return {
       source: { range: structuredClone(named.range) },
       width: Math.abs(named.range.end.col - named.range.start.col) + 1,

@@ -2132,8 +2132,28 @@ function validateNamedRangeShape(
     invalid(errors, `${path}.name`, "Named range name must be formula-safe");
   }
   optionalString(namedRange, "scope", path, errors);
-  validateRangeShape(ownValue(namedRange, "range"), `${path}.range`, errors);
+
+  const formula = ownValue(namedRange, "formula");
+  if (formula === undefined) {
+    validateRangeShape(ownValue(namedRange, "range"), `${path}.range`, errors);
+  } else if (ownValue(namedRange, "range") !== undefined) {
+    invalid(errors, path, "A defined name has a range or a formula, not both");
+  } else if (
+    typeof formula !== "string" ||
+    !formula.startsWith("=") ||
+    formula.length > MAX_NAMED_FORMULA_LENGTH
+  ) {
+    invalid(
+      errors,
+      `${path}.formula`,
+      `A defined name's formula must start with = and contain at most ${MAX_NAMED_FORMULA_LENGTH} characters`,
+      "resource-limit",
+    );
+  }
 }
+
+/** Excel's limit on the length of a formula, which a defined name's formula shares. */
+const MAX_NAMED_FORMULA_LENGTH = 8_192;
 
 function validateOperationSortKey(
   entry: unknown,
@@ -3607,6 +3627,8 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
       );
     }
 
+    // The engine checks a formula name's references when the store loads it.
+    if (namedRange.range === undefined) continue;
     const targetSheet = sheetById.get(namedRange.range.sheet);
     if (!targetSheet) {
       invalid(errors, `${namedPath}.range`, "Named range sheet must exist", "missing-reference");

@@ -165,6 +165,44 @@ store.applyTransaction({
 
 A formula on `summary` resolves the sheet-scoped `Revenue`; formulas on other sheets resolve the workbook definition. Names are case-insensitive, must be formula-safe identifiers, and cannot look like A1 cells or boolean literals. Row/column insertions, removals, and moves rebase their rectangles. Deleting the complete target or its scope removes the definition; formulas then fall back to a workbook definition or evaluate to `#NAME?`.
 
+### Defined-name formulas and Name Manager
+
+Open **Formulas › Defined Names › Name Manager** to list, add, edit, or delete
+workbook and sheet-scoped names. **Define Name** starts with the selected range.
+The full ribbon, compact ribbon, and toolbar share these commands. The panel
+loads on first use. Each save or delete is one undo step and uses the same
+document operations as collaboration.
+
+A definition holds either `range` or `formula`, never both. Plain named formulas
+work in both engines: constants, calculated values, ranges, relative references,
+and sheet-scoped names. Relative references are based on A1: a name defined as
+`=A1*2`, used in C5, reads C5. Use `$` markers for fixed references.
+
+```ts prelude="core" partial="requires an initialized grid" title="Define reusable formulas"
+grid.applyTransaction({
+  patches: [
+    { op: "setNamedRange", namedRange: { name: "Rate", formula: "=0.2" } },
+    { op: "setNamedRange", namedRange: { name: "MYFN", formula: "=LAMBDA(value,value+1)" } },
+    { op: "set", addr: { sheet: "sheet1", row: 0, col: 1 },
+      value: { kind: "formula", src: "=MYFN(A1)" } },
+  ],
+});
+```
+
+Named `LAMBDA` calls require `@sheetwrite/formulas`. The default engine stores,
+syncs, and round-trips the same definitions, but a call returns `#NAME?`.
+Recursive named functions stop after 64 nested calls with `#NUM!`. This differs
+from Excel, whose recursion allowance depends on the parameter count (about
+1024 divided by parameters plus one).
+
+XLSX keeps formula names in native `definedName` elements. Import removes Excel's
+future-function and parameter prefixes; export writes `_xlfn.` for future
+functions and `_xlpm.` for `LAMBDA` parameters. Text literals, sheet names, and
+table column names are not changed. Converting a workbook with only range names
+does not load a formula engine. Formula-name conversion reuses the initialized
+document engine or releases a temporary engine when conversion finishes.
+
+
 ## Date/time semantics
 
 Dates are numbers: whole days since the spreadsheet epoch, with a fractional day for time. Sheetwrite uses only the Excel 1900 date system on this path:

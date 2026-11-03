@@ -166,9 +166,13 @@ for each value, row, or column.
 | `=BYROW(C1:D3, LAMBDA(row, PRODUCT(row)))` | 1000; 800; 480 |
 | `=LET(big, LAMBDA(x, x >= 1000), FILTER(B1:B12, MAP(E1:E12, big)))` | Desk; Desk |
 
-`LET` can name a `LAMBDA` and call it later. An uncalled `LAMBDA` returns
-`#CALC!`, and a call with the wrong number of arguments returns `#VALUE!`. Calls
-nest up to 64 deep.
+`LET` can name a `LAMBDA` and call it later. Save a reusable `LAMBDA` in
+**Formulas › Defined Names › Name Manager** and call it by name, such as
+`=MYFN(A1)`. Named calls require the full engine; the default engine keeps the
+definition but returns `#NAME?`. An uncalled `LAMBDA` returns `#CALC!`, and a call
+with the wrong number of arguments returns `#VALUE!`. Calls nest up to 64 deep,
+then return `#NUM!`. This is lower than Excel's parameter-dependent recursion
+allowance (about 1024 divided by parameters plus one).
 
 ## Describe: statistics and ranking
 

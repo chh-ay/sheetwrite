@@ -1024,6 +1024,17 @@ export class StoreDataEngine {
   }
 
   private syncNamedRange(namedRange: NamedRangeSnapshot): boolean {
+    const scope = this.namedRangeScope(namedRange.scope);
+    if (namedRange.range === undefined) {
+      this.boundaryAccounting.record(
+        this.resourceOperation ?? "edit",
+        "js-to-wasm",
+        (namedRange.name.length + namedRange.formula.length) * 2,
+        "scalar",
+      );
+      return this.wasm.setNamedFormula(namedRange.name, scope, namedRange.formula);
+    }
+
     const range = normalizedRange(namedRange.range);
     this.boundaryAccounting.record(
       this.resourceOperation ?? "edit",
@@ -1033,13 +1044,65 @@ export class StoreDataEngine {
     );
     return this.wasm.setNamedRange(
       namedRange.name,
-      this.namedRangeScope(namedRange.scope),
+      scope,
       this.handleOf(range.sheet),
       range.start.row,
       range.start.col,
       range.end.row,
       range.end.col,
     );
+  }
+
+  /**
+   * Read back the formula of every defined name that holds one. The engine
+   * rewrites them when a sheet is renamed or removed and when rows or
+   * columns are added or removed.
+   */
+  private refreshNamedFormulas(): void {
+    const namedRanges = this.workbook.namedRanges;
+    if (!namedRanges?.some((namedRange) => namedRange.formula !== undefined)) return;
+
+    this.workbook.namedRanges = namedRanges.map((namedRange) => {
+      if (namedRange.formula === undefined) return namedRange;
+      const formula = this.wasm.namedFormulaSource(
+        namedRange.name,
+        this.namedRangeScope(namedRange.scope),
+      );
+      return formula === undefined || formula === namedRange.formula
+        ? namedRange
+        : { ...namedRange, formula };
+    });
+  }
+
+  /** Plan every name rewrite before the move can change cells or metadata. */
+  private prepareMovedNamedFormulas(
+    patch: Extract<DocumentOp, { op: "moveRows" | "moveColumns" }>,
+  ): Extract<NamedRangeSnapshot, { formula: string }>[] | null {
+    const rewritten: Extract<NamedRangeSnapshot, { formula: string }>[] = [];
+    const sheet = this.handleOf(patch.sheet);
+    for (const original of this.workbook.namedRanges ?? []) {
+      if (original.formula === undefined) continue;
+      const formula = this.wasm.moveNamedFormulaSource(
+        original.formula,
+        sheet,
+        patch.op === "moveColumns",
+        patch.from,
+        patch.count,
+        patch.to,
+      );
+      if (formula === undefined) return null;
+      rewritten.push({ ...original, formula });
+    }
+    return rewritten;
+  }
+
+  private restoreMovedNamedFormulas(
+    definitions: readonly Extract<NamedRangeSnapshot, { formula: string }>[],
+  ): boolean {
+    for (const namedRange of definitions) {
+      if (!this.applyPatch({ op: "setNamedRange", namedRange }, null)) return false;
+    }
+    return true;
   }
 
   private sameNamedRange(
@@ -3002,6 +3065,7 @@ export class StoreDataEngine {
         );
         if (!name.ok || !this.renameSheetFormulaIdentity(patch.sheet, name.name)) return false;
         sheet.name = name.name;
+        this.refreshNamedFormulas();
         return true;
       }
 
@@ -3237,17 +3301,18 @@ export class StoreDataEngine {
         }
 
         if (
-          !this.workbook.sheets.some((sheet) => sheet.id === patch.namedRange.range.sheet) ||
+          (patch.namedRange.range !== undefined &&
+            !this.workbook.sheets.some((sheet) => sheet.id === patch.namedRange.range?.sheet)) ||
           (patch.namedRange.scope !== undefined &&
             !this.workbook.sheets.some((sheet) => sheet.id === patch.namedRange.scope))
         ) {
           return false;
         }
 
-        const namedRange = {
-          ...patch.namedRange,
-          range: normalizedRange(patch.namedRange.range),
-        };
+        const namedRange: NamedRangeSnapshot =
+          patch.namedRange.range === undefined
+            ? { ...patch.namedRange }
+            : { ...patch.namedRange, range: normalizedRange(patch.namedRange.range) };
 
         if (!this.syncNamedRange(namedRange)) return false;
         const ranges = this.workbook.namedRanges ?? [];
@@ -3370,8 +3435,13 @@ export class StoreDataEngine {
     }
 
     if (patch.from === patch.to) return true;
+    const movedNamedFormulas = this.prepareMovedNamedFormulas(patch);
+    if (movedNamedFormulas === null) return false;
     const movedNamedRanges = (this.workbook.namedRanges ?? [])
-      .filter((namedRange) => namedRange.range.sheet === patch.sheet)
+      .filter(
+        (namedRange): namedRange is NamedRangeSnapshot & { range: Range } =>
+          namedRange.range?.sheet === patch.sheet,
+      )
       .map((namedRange) => structuredClone(namedRange));
     const movedValidationRules = cloneJsonValue(sheet.validationRules) ?? [];
     const movedProtectedRanges = cloneJsonValue(sheet.protectedRanges) ?? [];
@@ -3497,7 +3567,7 @@ export class StoreDataEngine {
       if (!this.syncNamedRange(namedRange)) return false;
     }
 
-    return true;
+    return this.restoreMovedNamedFormulas(movedNamedFormulas);
   }
 
   private moveColumns(
@@ -3517,8 +3587,13 @@ export class StoreDataEngine {
 
     if (patch.from === patch.to) return true;
 
+    const movedNamedFormulas = this.prepareMovedNamedFormulas(patch);
+    if (movedNamedFormulas === null) return false;
     const movedNamedRanges = (this.workbook.namedRanges ?? [])
-      .filter((namedRange) => namedRange.range.sheet === patch.sheet)
+      .filter(
+        (namedRange): namedRange is NamedRangeSnapshot & { range: Range } =>
+          namedRange.range?.sheet === patch.sheet,
+      )
       .map((namedRange) => structuredClone(namedRange));
     const movedValidationRules = cloneJsonValue(sheet.validationRules) ?? [];
     const movedProtectedRanges = cloneJsonValue(sheet.protectedRanges) ?? [];
@@ -3629,7 +3704,7 @@ export class StoreDataEngine {
       if (!this.syncNamedRange(namedRange)) return false;
     }
 
-    return true;
+    return this.restoreMovedNamedFormulas(movedNamedFormulas);
   }
 
   /**
@@ -3884,8 +3959,9 @@ export class StoreDataEngine {
     this.workbook.sheets.splice(index, 1);
     if (fallback) this.workbook.activeSheet = fallback;
     this.workbook.namedRanges = this.workbook.namedRanges?.filter(
-      (range) => range.range.sheet !== sheetId && range.scope !== sheetId,
+      (range) => range.range?.sheet !== sheetId && range.scope !== sheetId,
     );
+    this.refreshNamedFormulas();
     for (const owner of this.workbook.sheets) {
       owner.hyperlinks = owner.hyperlinks?.filter(
         (hyperlink) =>
@@ -4021,7 +4097,7 @@ export class StoreDataEngine {
 
     this.workbook.namedRanges = this.workbook.namedRanges
       ?.map((namedRange) => {
-        if (namedRange.range.sheet !== sheet) return namedRange;
+        if (namedRange.range === undefined || namedRange.range.sheet !== sheet) return namedRange;
         const span = remapSpan(namedRange.range.start.row, namedRange.range.end.row, remap);
         return span
           ? {
@@ -4035,6 +4111,7 @@ export class StoreDataEngine {
           : null;
       })
       .filter((range): range is NonNullable<Workbook["namedRanges"]>[number] => range !== null);
+    this.refreshNamedFormulas();
     this.view.rowsChanged(sheet);
   }
 
@@ -4158,7 +4235,7 @@ export class StoreDataEngine {
 
     this.workbook.namedRanges = this.workbook.namedRanges
       ?.map((namedRange) => {
-        if (namedRange.range.sheet !== sheet) return namedRange;
+        if (namedRange.range === undefined || namedRange.range.sheet !== sheet) return namedRange;
         const span = remapSpan(namedRange.range.start.col, namedRange.range.end.col, remap);
         return span
           ? {
@@ -4172,6 +4249,7 @@ export class StoreDataEngine {
           : null;
       })
       .filter((range): range is NonNullable<Workbook["namedRanges"]>[number] => range !== null);
+    this.refreshNamedFormulas();
     this.view.columnsChanged(sheet);
   }
 
