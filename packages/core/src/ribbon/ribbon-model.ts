@@ -24,7 +24,13 @@ import type { FormulaFunctionMetadata } from "../functions/types.js";
 import { ZOOM_MIN, ZOOM_MAX } from "../grid-constants.js";
 import { createHyperlinkId, isSafeExternalHyperlink } from "../hyperlink.js";
 import type { IconName } from "../icons/icon-names.js";
-import { loadPanels, pivotsAvailable, showFormulaExplanation } from "../panels/panel-loader.js";
+import {
+  loadPanels,
+  pivotsAvailable,
+  showDefineName,
+  showFormulaExplanation,
+  showNameManager,
+} from "../panels/panel-loader.js";
 import { storeEngine } from "../store/engine-registry.js";
 import type { ChartKind } from "../types/chart.js";
 import type { CellAddress } from "../types/coordinates.js";
@@ -630,7 +636,7 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
   },
   {
     label: "Formulas",
-    reduceOrder: ["formulaAuditing", "functionLibrary"],
+    reduceOrder: ["formulaAuditing", "definedNames", "functionLibrary"],
     groups: [
       {
         id: "functionLibrary",
@@ -638,6 +644,16 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
         icon: "insertFunction",
         layout: "flow",
         controls: [insertFunction],
+      },
+      {
+        id: "definedNames",
+        label: "Defined Names",
+        icon: "nameManager",
+        layout: "flow",
+        controls: [
+          button("Name Manager", "nameManager", showNameManager, "view", { large: true }),
+          button("Define Name", "defineName", showDefineName, "edit"),
+        ],
       },
       {
         id: "formulaAuditing",

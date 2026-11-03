@@ -13,6 +13,7 @@ import type { PivotDefinition } from "../types/pivot.js";
 import { chartFromRange, nextChartId, selectionRange } from "./chart-model.js";
 import { chartPanel } from "./chart-panel.js";
 import { explainPanel } from "./explain-panel.js";
+import { namePanel } from "./name-panel.js";
 import { rejectionMessage } from "./panel-dom.js";
 import { nextPivotIdentity, pivotSourceFor } from "./pivot-model.js";
 import { pivotPanel } from "./pivot-panel.js";
@@ -21,7 +22,7 @@ import { parseRangeText } from "./range-text.js";
 /** What the open panel shows, so selection changes can switch or close it. */
 type OpenPanel =
   | { readonly kind: "chart" | "pivot"; readonly sheet: SheetId; readonly id: string }
-  | { readonly kind: "explain" };
+  | { readonly kind: "explain" | "names" };
 
 interface PanelState {
   icons: IconOverrides | undefined;
@@ -77,6 +78,16 @@ export function openExplainPanel(grid: Grid): void {
   const state = stateOf(grid);
   const open: OpenPanel = { kind: "explain" };
   const panel = explainPanel(grid);
+  grid.openPanel({
+    ...panel,
+    render: (body) => trackOpen(state, open, panel.render(body)),
+  });
+}
+
+export function openNamePanel(grid: Grid, define = false): void {
+  const state = stateOf(grid);
+  const open: OpenPanel = { kind: "names" };
+  const panel = namePanel(grid, define);
   grid.openPanel({
     ...panel,
     render: (body) => trackOpen(state, open, panel.render(body)),

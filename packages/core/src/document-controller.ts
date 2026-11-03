@@ -24,7 +24,7 @@ import {
   UndoManager,
 } from "./history.js";
 import { cloneCellHyperlink } from "./hyperlink.js";
-import { formulaNameKey } from "./name-key.js";
+import { formulaNameKey, sheetNameKey } from "./name-key.js";
 import { clonePivot, planPivotEdit, pivotRewrites } from "./pivot.js";
 import {
   encodeRestoreBlock,
@@ -662,8 +662,16 @@ export class DocumentController {
           ...this.snapshotExternalFormulaAndRefs(patch.sheet),
           ...this.chartRestores(patch.sheet, { includeOwned: false }),
         ];
+        // Removing the sheet turns a formula name's references to it into #REF!. A name whose
+        // text holds the sheet name may refer to it; restoring one that does not is harmless.
+        const sheetName = sheetNameKey(snapshot.name);
         for (const namedRange of this.options.store.getWorkbook().namedRanges ?? []) {
-          if (namedRange.range.sheet === patch.sheet || namedRange.scope === patch.sheet) {
+          if (
+            namedRange.scope === patch.sheet ||
+            (namedRange.range === undefined
+              ? sheetNameKey(namedRange.formula).replaceAll("''", "'").includes(sheetName)
+              : namedRange.range.sheet === patch.sheet)
+          ) {
             restore.push({ op: "setNamedRange", namedRange: { ...namedRange } });
           }
         }

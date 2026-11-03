@@ -189,7 +189,20 @@ impl CellStore {
                 col_end: input.u32()?,
             };
 
-            store.named_ranges.insert((scope, key), range);
+            store
+                .defined_names
+                .insert((scope, key), names::DefinedName::Range(range));
+        }
+
+        for _ in 0..input.count()? {
+            let scope = if input.bool()? {
+                Some(input.u32()?)
+            } else {
+                None
+            };
+            let name = input.text()?;
+            let source = input.text()?;
+            store.insert_transferred_named_formula(scope, name, source)?;
         }
 
         for _ in 0..input.count()? {
@@ -282,9 +295,17 @@ impl CellStore {
 
         write_names(&mut out, &self.sheet_lookup);
         write_names(&mut out, &self.sheet_ids);
-        out.usize(self.named_ranges.len());
+        out.usize(
+            self.defined_names
+                .values()
+                .filter(|name| matches!(name, names::DefinedName::Range(_)))
+                .count(),
+        );
 
-        for ((scope, key), range) in &self.named_ranges {
+        for ((scope, key), definition) in &self.defined_names {
+            let names::DefinedName::Range(range) = definition else {
+                continue;
+            };
             out.bool(scope.is_some());
             if let Some(scope) = scope {
                 out.u32(*scope);
@@ -297,6 +318,21 @@ impl CellStore {
             out.u32(range.col_start);
             out.u32(range.row_end);
             out.u32(range.col_end);
+        }
+
+        out.usize(
+            self.defined_names
+                .values()
+                .filter(|name| matches!(name, names::DefinedName::Formula(_)))
+                .count(),
+        );
+        for (scope, name, source) in self.named_formula_sources() {
+            out.bool(scope.is_some());
+            if let Some(scope) = scope {
+                out.u32(scope);
+            }
+            out.text(name);
+            out.text(source);
         }
 
         out.usize(self.tables.len());

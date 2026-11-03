@@ -30,6 +30,14 @@ fn copy_keeps_absolute_parts() {
     assert_eq!(translate_formula("=$A$1+$A1+A$1", 2, 3), "=$A$1+$A3+D$1");
 }
 
+/// A copy can move a relative edge past an absolute one; each edge keeps
+/// its own `$` marker, as Excel writes it.
+#[test]
+fn copy_keeps_each_range_edge_with_its_marker() {
+    assert_eq!(translate_formula("=A$5:A10", -8, 0), "=A$5:A2");
+    assert_eq!(translate_formula("=$B1:A1", 0, 3), "=D1:$B1");
+}
+
 #[test]
 fn copy_past_the_sheet_edge_gives_ref_errors() {
     assert_eq!(translate_formula("=XFD1", 0, 1), "=#REF!");

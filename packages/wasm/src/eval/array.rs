@@ -48,6 +48,7 @@ pub(crate) fn ast_produces_array(ast: &Ast) -> bool {
         | Ast::Structured(..)
         | Ast::Array { .. } => true,
         Ast::LetSlot { expression, .. } => ast_produces_array(expression),
+        Ast::NamedFormula(named) => ast_produces_array(&named.expression),
         Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
             ast_produces_array(left) || ast_produces_array(right)
         }
@@ -219,6 +220,7 @@ impl CellStore {
                     .map(|(_, _, cells)| cells),
             ),
             Ast::LetSlot { expression, .. } => self.dynamic_array_bound(expression, formula_sheet),
+            Ast::NamedFormula(named) => self.dynamic_array_bound(&named.expression, formula_sheet),
             // The selection is at most the whole area; an area that has no
             // shape before evaluation is charged at the spill limit.
             Ast::Func(Func::Index, args) if index_selects_whole_axis(args) => Some(Ok(self
@@ -352,6 +354,9 @@ impl CellStore {
             Ast::LetSlot { expression, .. } => {
                 return self.eval_dynamic_array(expression, sheet, pass, depth)
             }
+            Ast::NamedFormula(named) => {
+                return self.eval_dynamic_array(&named.expression, sheet, pass, depth)
+            }
             Ast::Func(Func::Let, args) => {
                 let (expanded, slots) = match expand_let_ast(args) {
                     Ok(expanded) => expanded,
@@ -473,6 +478,9 @@ impl CellStore {
             }
             Ast::LetSlot { expression, .. } => {
                 return self.matrix_shape(expression, formula_sheet);
+            }
+            Ast::NamedFormula(named) => {
+                return self.matrix_shape(&named.expression, formula_sheet);
             }
             Ast::Array { cols, values } => {
                 let cols = *cols as usize;

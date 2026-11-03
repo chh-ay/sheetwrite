@@ -556,6 +556,27 @@ pub struct NamedRangeRef {
     pub row_end: u32,
     pub col_end: u32,
 }
+
+/// A use of a defined name that holds a formula: the name, for writing the
+/// formula back, and the name's formula expanded for the formula that uses
+/// it. Formulas share one expansion when it does not depend on where they
+/// are; see `CellStore::name_target`.
+#[derive(Debug, PartialEq)]
+pub struct NamedFormulaRef {
+    pub name: String,
+    pub expression: Ast,
+    /// Nodes of `expression`, counting each name in it at its own count:
+    /// what one walk over the expansion visits.
+    pub nodes: usize,
+}
+
+/// What a defined name stands for in one formula.
+#[derive(Clone)]
+pub enum NameTarget {
+    Range(NamedRangeRef),
+    Formula(std::rc::Rc<NamedFormulaRef>),
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum TableSection {
     Body,
@@ -601,6 +622,9 @@ pub enum Ast {
     },
     Name(String),
     NamedRange(NamedRangeRef),
+    /// A defined name that holds a formula. Shared, because one name can be
+    /// used by many formulas; never mutated in place.
+    NamedFormula(std::rc::Rc<NamedFormulaRef>),
     UnresolvedStructured(UnresolvedStructuredRef),
     Structured(Box<StructuredRef>),
     Cell(u32, u32, RefFlags),
@@ -637,6 +661,21 @@ pub enum Ast {
     },
 }
 impl Ast {
+    /// The expression that a LET binding's use or a defined name stands
+    /// for, through any number of them: what a function argument such as
+    /// `MAP(A1:A3,MYFN)` passes.
+    #[cfg(feature = "analysis")]
+    pub(crate) fn bound_value(&self) -> &Ast {
+        let mut expression = self;
+        loop {
+            expression = match expression {
+                Ast::LetSlot { expression, .. } => expression,
+                Ast::NamedFormula(named) => &named.expression,
+                _ => return expression,
+            };
+        }
+    }
+
     /// Heap payload owned below an inline AST root. The root itself is already
     /// included in its formula hash-table bucket.
     pub(crate) fn heap_memory_stats(&self, out: &mut MemoryOwnerStats) {
@@ -647,6 +686,15 @@ impl Ast {
             }
             Ast::Str(value) | Ast::Name(value) => add_string_memory(value, out),
             Ast::NamedRange(value) => add_string_memory(&value.name, out),
+            // A shared expansion is counted once, by the store's cache that
+            // also holds it; an expansion only this formula holds is its own.
+            Ast::NamedFormula(value) if std::rc::Rc::strong_count(value) == 1 => {
+                let bytes = std::mem::size_of::<NamedFormulaRef>();
+                out.add_payload(bytes, bytes);
+                add_string_memory(&value.name, out);
+                value.expression.heap_memory_stats(out);
+            }
+            Ast::NamedFormula(_) => {}
             Ast::UnresolvedStructured(value) => {
                 if let Some(name) = &value.table_name {
                     add_string_memory(name, out);
@@ -1989,10 +2037,11 @@ fn refresh_span(span: &mut SheetSpanRef, order: &[u32], names: &[String]) -> Opt
     Some(true)
 }
 
-/// Resolve workbook/sheet-scoped names after sheet references have stable handles.
+/// Resolve workbook/sheet-scoped defined names after sheet references have
+/// stable handles. A LET or LAMBDA name shadows a defined name in its scope.
 pub fn resolve_named_ranges<F>(ast: Ast, formula_sheet: u32, resolve: &F) -> Ast
 where
-    F: Fn(&str, u32) -> Option<NamedRangeRef>,
+    F: Fn(&str, u32) -> Option<NameTarget>,
 {
     resolve_named_ranges_inner(ast, formula_sheet, resolve, &[])
 }
@@ -2004,13 +2053,17 @@ fn resolve_named_ranges_inner<F>(
     locals: &[String],
 ) -> Ast
 where
-    F: Fn(&str, u32) -> Option<NamedRangeRef>,
+    F: Fn(&str, u32) -> Option<NameTarget>,
 {
     match ast {
         Ast::Name(name) if locals.iter().any(|local| local.eq_ignore_ascii_case(&name)) => {
             Ast::Name(name)
         }
-        Ast::Name(name) => resolve(&name, formula_sheet).map_or(Ast::Name(name), Ast::NamedRange),
+        Ast::Name(name) => match resolve(&name, formula_sheet) {
+            Some(NameTarget::Range(range)) => Ast::NamedRange(range),
+            Some(NameTarget::Formula(formula)) => Ast::NamedFormula(formula),
+            None => Ast::Name(name),
+        },
         Ast::Func(Func::Let, args) if args.len() >= 3 && args.len() % 2 == 1 => {
             let mut scoped = locals.to_vec();
             let mut resolved = Vec::with_capacity(args.len());
@@ -2066,12 +2119,22 @@ where
                 .map(|arg| resolve_named_ranges_inner(arg, formula_sheet, resolve, locals))
                 .collect(),
         ),
-        Ast::UnknownFunc(name, args) => Ast::UnknownFunc(
-            name,
-            args.into_iter()
+        Ast::UnknownFunc(name, args) => {
+            let args = args
+                .into_iter()
                 .map(|arg| resolve_named_ranges_inner(arg, formula_sheet, resolve, locals))
-                .collect(),
-        ),
+                .collect();
+            // `MYFN(A1)` calls the LAMBDA that the defined name MYFN holds.
+            // LAMBDA needs the full engine; the default engine leaves the call
+            // unknown, so it returns #NAME? as LAMBDA itself does there.
+            #[cfg(feature = "analysis")]
+            if !locals.iter().any(|local| local.eq_ignore_ascii_case(&name)) {
+                if let Some(NameTarget::Formula(formula)) = resolve(&name, formula_sheet) {
+                    return named_lambda_call(formula, args);
+                }
+            }
+            Ast::UnknownFunc(name, args)
+        }
         Ast::Bin(op, left, right) => Ast::Bin(
             op,
             Box::new(resolve_named_ranges_inner(
@@ -2123,6 +2186,17 @@ where
         other => other,
     }
 }
+
+/// A call of the LAMBDA that a defined name holds, in the form an immediate
+/// `LAMBDA(…)(…)` call parses to: the function, then the arguments.
+#[cfg(feature = "analysis")]
+pub(crate) fn named_lambda_call(formula: std::rc::Rc<NamedFormulaRef>, arguments: Vec<Ast>) -> Ast {
+    let mut call = Vec::with_capacity(arguments.len() + 1);
+    call.push(Ast::NamedFormula(formula));
+    call.extend(arguments);
+    Ast::UnknownFunc(crate::eval::analysis::lambda::CALL.into(), call)
+}
+
 pub fn resolve_structured_refs<F>(
     ast: Ast,
     formula_sheet: u32,
@@ -2221,112 +2295,146 @@ where
 /// top-left. Window evaluation clones that bounded AST and applies the target
 /// cell delta here; absolute row/column markers remain fixed.
 pub fn translate_relative_refs(ast: &mut Ast, row_delta: i64, col_delta: i64) {
-    if !translate_relative_refs_inner(ast, row_delta, col_delta) {
+    if !translate_relative_refs_inner(ast, row_delta, col_delta, false) {
         *ast = Ast::InvalidRef;
     }
 }
 
-/// A coordinate moved by `delta` unless it is absolute; `None` once it leaves
-/// the sheet.
-fn translated_coordinate(value: u32, delta: i64, absolute: bool, axis: Axis) -> Option<u32> {
+/// Move the relative references of a defined name's formula from cell A1,
+/// which they are written relative to, to the cell (`row`, `col`) whose
+/// formula uses the name. As in Excel, a reference that passes the last row
+/// or column wraps around to the first, so a name can refer to cells above
+/// or left of the cell that uses it.
+pub fn translate_name_refs(ast: &mut Ast, row: u32, col: u32) {
+    translate_relative_refs_inner(ast, i64::from(row), i64::from(col), true);
+}
+
+/// A coordinate moved by `delta` unless it is absolute. Past the sheet it is
+/// `None`, or with `wrap` the coordinate it reaches from the other edge.
+fn translated_coordinate(
+    value: u32,
+    delta: i64,
+    absolute: bool,
+    axis: Axis,
+    wrap: bool,
+) -> Option<u32> {
     if absolute {
         return Some(value);
     }
     let translated = i64::from(value).checked_add(delta)?;
+    let translated = if wrap {
+        translated.rem_euclid(i64::from(axis.len()))
+    } else {
+        translated
+    };
     u32::try_from(translated)
         .ok()
         .filter(|&index| index < axis.len())
 }
 
-fn translate_relative_refs_inner(ast: &mut Ast, row_delta: i64, col_delta: i64) -> bool {
+/// Put one axis of a range back in order after a wrapping translation moved
+/// one edge past the other; each edge keeps its `$` marker.
+fn order_wrapped_edges(start: &mut u32, end: &mut u32, start_abs: &mut bool, end_abs: &mut bool) {
+    if *start > *end {
+        std::mem::swap(start, end);
+        std::mem::swap(start_abs, end_abs);
+    }
+}
+
+fn translate_relative_refs_inner(
+    ast: &mut Ast,
+    row_delta: i64,
+    col_delta: i64,
+    wrap: bool,
+) -> bool {
+    let row = |value, absolute| translated_coordinate(value, row_delta, absolute, Axis::Row, wrap);
+    let col = |value, absolute| translated_coordinate(value, col_delta, absolute, Axis::Col, wrap);
+    let inner = |ast: &mut Ast| {
+        if !translate_relative_refs_inner(ast, row_delta, col_delta, wrap) {
+            *ast = Ast::InvalidRef;
+        }
+    };
     match ast {
-        Ast::Cell(row, col, flags)
-        | Ast::SheetCell(_, row, col, flags)
-        | Ast::AbsCell(_, row, col, flags) => {
-            let (Some(next_row), Some(next_col)) = (
-                translated_coordinate(*row, row_delta, flags.row_abs, Axis::Row),
-                translated_coordinate(*col, col_delta, flags.col_abs, Axis::Col),
-            ) else {
+        Ast::Cell(r, c, flags) | Ast::SheetCell(_, r, c, flags) | Ast::AbsCell(_, r, c, flags) => {
+            let (Some(next_row), Some(next_col)) = (row(*r, flags.row_abs), col(*c, flags.col_abs))
+            else {
                 return false;
             };
-            *row = next_row;
-            *col = next_col;
+            *r = next_row;
+            *c = next_col;
             true
         }
         Ast::Range(r0, c0, r1, c1, flags)
         | Ast::SheetRange(_, r0, c0, r1, c1, flags)
         | Ast::AbsRange(_, r0, c0, r1, c1, flags) => {
             let (Some(next_r0), Some(next_c0), Some(next_r1), Some(next_c1)) = (
-                translated_coordinate(*r0, row_delta, flags.start.row_abs, Axis::Row),
-                translated_coordinate(*c0, col_delta, flags.start.col_abs, Axis::Col),
-                translated_coordinate(*r1, row_delta, flags.end.row_abs, Axis::Row),
-                translated_coordinate(*c1, col_delta, flags.end.col_abs, Axis::Col),
+                row(*r0, flags.start.row_abs),
+                col(*c0, flags.start.col_abs),
+                row(*r1, flags.end.row_abs),
+                col(*c1, flags.end.col_abs),
             ) else {
                 return false;
             };
-            *r0 = next_r0;
-            *c0 = next_c0;
-            *r1 = next_r1;
-            *c1 = next_c1;
+            (*r0, *c0, *r1, *c1) = (next_r0, next_c0, next_r1, next_c1);
+            if wrap {
+                let RangeFlags { start, end } = flags;
+                order_wrapped_edges(r0, r1, &mut start.row_abs, &mut end.row_abs);
+                order_wrapped_edges(c0, c1, &mut start.col_abs, &mut end.col_abs);
+            }
             true
         }
         Ast::SheetSpan(span) => {
             let (Some(row_start), Some(col_start), Some(row_end), Some(col_end)) = (
-                translated_coordinate(
-                    span.row_start,
-                    row_delta,
-                    span.flags.start.row_abs,
-                    Axis::Row,
-                ),
-                translated_coordinate(
-                    span.col_start,
-                    col_delta,
-                    span.flags.start.col_abs,
-                    Axis::Col,
-                ),
-                translated_coordinate(span.row_end, row_delta, span.flags.end.row_abs, Axis::Row),
-                translated_coordinate(span.col_end, col_delta, span.flags.end.col_abs, Axis::Col),
+                row(span.row_start, span.flags.start.row_abs),
+                col(span.col_start, span.flags.start.col_abs),
+                row(span.row_end, span.flags.end.row_abs),
+                col(span.col_end, span.flags.end.col_abs),
             ) else {
                 return false;
             };
-            span.row_start = row_start;
-            span.col_start = col_start;
-            span.row_end = row_end;
-            span.col_end = col_end;
+            (span.row_start, span.col_start) = (row_start, col_start);
+            (span.row_end, span.col_end) = (row_end, col_end);
+            if wrap {
+                let RangeFlags { start, end } = &mut span.flags;
+                order_wrapped_edges(
+                    &mut span.row_start,
+                    &mut span.row_end,
+                    &mut start.row_abs,
+                    &mut end.row_abs,
+                );
+                order_wrapped_edges(
+                    &mut span.col_start,
+                    &mut span.col_end,
+                    &mut start.col_abs,
+                    &mut end.col_abs,
+                );
+            }
             true
         }
         Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
-            for arg in args {
-                if !translate_relative_refs_inner(arg, row_delta, col_delta) {
-                    *arg = Ast::InvalidRef;
-                }
-            }
+            args.iter_mut().for_each(inner);
             true
         }
         Ast::LetSlot { expression, .. } => {
-            translate_relative_refs_inner(expression, row_delta, col_delta)
+            translate_relative_refs_inner(expression, row_delta, col_delta, wrap)
         }
         Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-            if !translate_relative_refs_inner(left, row_delta, col_delta) {
-                **left = Ast::InvalidRef;
-            }
-            if !translate_relative_refs_inner(right, row_delta, col_delta) {
-                **right = Ast::InvalidRef;
-            }
+            inner(left);
+            inner(right);
             true
         }
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
-            if !translate_relative_refs_inner(inner, row_delta, col_delta) {
-                **inner = Ast::InvalidRef;
-            }
+        Ast::Neg(operand) | Ast::Pos(operand) | Ast::Percent(operand) => {
+            inner(operand);
             true
         }
+        // A defined name's expansion is already placed for its formula.
         Ast::Num(_)
         | Ast::Str(_)
         | Ast::Bool(_)
         | Ast::Missing
         | Ast::Name(_)
         | Ast::NamedRange(_)
+        | Ast::NamedFormula(_)
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
         | Ast::InvalidRef
@@ -2486,6 +2594,27 @@ pub(crate) fn rewrite_own_sheet_axis(ast: &mut Ast, axis: Axis, change: AxisChan
             change,
             formula_sheet: 0,
             edited_sheet: 0,
+        },
+    )
+}
+
+/// A moved block must not first delete a defined name's references: rewrite
+/// the saved definition once, after the store's remove/add move completes.
+pub(crate) fn move_named_formula_refs(
+    ast: &mut Ast,
+    edited_sheet: u32,
+    columns: bool,
+    from: u32,
+    count: u32,
+    to: u32,
+) -> bool {
+    rewrite_axis(
+        ast,
+        AxisEdit {
+            axis: if columns { Axis::Col } else { Axis::Row },
+            change: AxisChange::Move { from, count, to },
+            formula_sheet: u32::MAX,
+            edited_sheet,
         },
     )
 }
@@ -2757,6 +2886,7 @@ pub(crate) fn write_ast(ast: &Ast, out: &mut String) {
         Ast::Bool(value) => out.push_str(if *value { "TRUE" } else { "FALSE" }),
         Ast::Name(name) => out.push_str(name),
         Ast::NamedRange(named) => out.push_str(&named.name),
+        Ast::NamedFormula(named) => out.push_str(&named.name),
         Ast::UnresolvedStructured(reference) => write_structured_ref(
             reference.table_name.as_deref(),
             &reference.column_name,

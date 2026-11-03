@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "b245da5f6869127bd05d223ff0d1ef56c7b292ea47617e2f95868e35fe12aff5",
+  "sha256": "f00954ea7086a2132a8d9c50b847a26881144b59b11747ad8c42c66b183c8e2f",
   "intentionalExports": [
     {
       "package": "@sheetwrite/charts",
@@ -545,6 +545,8 @@
         "WindowView",
         "checkFormulaSyntax",
         "createEngine",
+        "formulaFromXlsx",
+        "formulaToXlsx",
         "formulaTokens",
         "initSync",
         "isLoaded",
@@ -649,6 +651,8 @@
         "WindowView",
         "checkFormulaSyntax",
         "createEngine",
+        "formulaFromXlsx",
+        "formulaToXlsx",
         "formulaTokens",
         "initSync",
         "isLoaded",

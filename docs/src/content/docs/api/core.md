@@ -8,7 +8,7 @@ description: "API reference for @sheetwrite/core."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/index.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>378</dd></div>
+<div><dt>Exports</dt><dd>379</dd></div>
 </dl>
 
 Source entry: `packages/core/src/index.ts`
@@ -37,7 +37,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/xlsx-resource-error/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>XlsxResourceError</code></span><span class="api-symbol-card__desc">Stable resource-limit failure surfaced before an XLSX codec allocates unsafe data.</span></a>
 </div>
 
-### Functions <span class="api-count" data-pagefind-ignore>71</span>
+### Functions <span class="api-count" data-pagefind-ignore>72</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/assert-runtime-resource-snapshot/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>assertRuntimeResourceSnapshot</code></span><span class="api-symbol-card__desc">Reject overlap, negative values, and attempts to fold runtime observations into owner totals.</span></a>
@@ -45,6 +45,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/cell-a1/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>cellA1</code></span><span class="api-symbol-card__desc">0-based (row, col) → A1 cell reference (0, 0 → &quot;A1&quot;).</span></a>
 <a class="api-symbol-card" href="/docs/api/core/cell-scalar-to-text/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>cellScalarToText</code></span><span class="api-symbol-card__desc">Spreadsheet display text for a resolved scalar.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/col-to-a1/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>colToA1</code></span><span class="api-symbol-card__desc">Column index (0-based) → A1 column label (0 → &quot;A&quot;, 26 → &quot;AA&quot;).</span></a>
+<a class="api-symbol-card" href="/docs/api/core/convert-defined-name-formulas/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>convertDefinedNameFormulas</code></span><span class="api-symbol-card__desc">Convert defined-name formulas between editor and OOXML spellings.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/create-grid/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>createGrid</code></span><span class="api-symbol-card__desc">Creates and mounts an imperative Grid in the supplied host element.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/create-grid-from-snapshot/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>createGridFromSnapshot</code></span><span class="api-symbol-card__desc">Mount a grid over a validated, non-dirty snapshot.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/create-row-bridge/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>createRowBridge</code></span><span class="api-symbol-card__desc">Create a typed bridge while preserving row and identity inference.</span></a>
@@ -113,7 +114,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/workbook-table-name-key/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>workbookTableNameKey</code></span><span class="api-symbol-card__desc">Locale-independent key used for table and table-column collision checks.</span></a>
 </div>
 
-### Interfaces <span class="api-count" data-pagefind-ignore>167</span>
+### Interfaces <span class="api-count" data-pagefind-ignore>166</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/boundary-operation-stats/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>BoundaryOperationStats</code></span><span class="api-symbol-card__desc">Fixed-cardinality boundary crossing counters for one operation.</span></a>
@@ -180,7 +181,6 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/legacy-row-page/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>LegacyRowPage</code></span><span class="api-symbol-card__desc">Row-only page shape accepted by the full-width compatibility adapter.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/merge-range/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>MergeRange</code></span><span class="api-symbol-card__desc">Inclusive merged-cell rectangle in data-row/column coordinates.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/mounted-chart/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>MountedChart</code></span><span class="api-symbol-card__desc">Draws one chart into a box that core places and sizes.</span></a>
-<a class="api-symbol-card" href="/docs/api/core/named-range-snapshot/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>NamedRangeSnapshot</code></span><span class="api-symbol-card__desc">Workbook-global or sheet-scoped named range used by formulas and persistence.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/packed-cell-block/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PackedCellBlock</code></span><span class="api-symbol-card__desc">Dense row-major mutation payload.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/paged-store-stats/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PagedStoreStats</code></span><span class="api-symbol-card__desc">Allocation and load statistics for one paged datasource sheet.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/pending-commit/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PendingCommit</code></span><span class="api-symbol-card__desc">Immutable local operation batch awaiting a host acknowledgement.</span></a>
@@ -285,7 +285,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/xlsx-workbook-warning/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>XlsxWorkbookWarning</code></span><span class="api-symbol-card__desc">Structured fidelity warning emitted during XLSX conversion.</span></a>
 </div>
 
-### Types <span class="api-count" data-pagefind-ignore>96</span>
+### Types <span class="api-count" data-pagefind-ignore>97</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/aggregate-op/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>AggregateOp</code></span><span class="api-symbol-card__desc">Column aggregate operation for Grid.aggregate / Store data ops.</span></a>
@@ -331,6 +331,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/legacy-row-loader/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>LegacyRowLoader</code></span><span class="api-symbol-card__desc">Loads one row-only page for the full-width compatibility adapter.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/mutation-issue/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>MutationIssue</code></span><span class="api-symbol-card__desc">Structured warning or rejection produced while applying an operation.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/mutation-policy-mode/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>MutationPolicyMode</code></span><span class="api-symbol-card__desc">Atomic or partial handling for locally denied operations.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/named-range-snapshot/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>NamedRangeSnapshot</code></span><span class="api-symbol-card__desc">A defined name: a workbook-global or sheet-scoped name that formulas use.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/operation-source/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>OperationSource</code></span><span class="api-symbol-card__desc">Whether a committed change originated locally or from remote host input.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/persistence-commit-response/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>PersistenceCommitResponse</code></span><span class="api-symbol-card__desc">Applied, duplicate, or conflict acknowledgement from persistence.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/persistence-error-code/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>PersistenceErrorCode</code></span><span class="api-symbol-card__desc">Stable category for a persistence failure.</span></a>

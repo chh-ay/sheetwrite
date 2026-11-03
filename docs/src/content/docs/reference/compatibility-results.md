@@ -84,9 +84,9 @@ Result labels distinguish **evaluated** formulas or structures, **preserved** so
 <div class="compat-result__body">
 <dl>
 <div><dt>Result</dt><dd>evaluated</dd></div>
-<div><dt>Import</dt><dd>LAMBDA source evaluates when the full engine is selected; with the default engine the source is preserved and returns #NAME?.</dd></div>
-<div><dt>Export</dt><dd>The exact formula source is emitted without a fabricated cached result.</dd></div>
-<div><dt>Known boundary</dt><dd>Only in the full engine (@sheetwrite/formulas); the default engine returns #NAME?. Calls nest at most 64 deep, and an uncalled LAMBDA returns #CALC!. No JavaScript execution fallback is provided.</dd></div>
+<div><dt>Import</dt><dd>Native defined-name formulas are retained. Future-function and LAMBDA parameter prefixes are removed by the engine. Named LAMBDA source evaluates only with the full engine.</dd></div>
+<div><dt>Export</dt><dd>Native definedName elements keep formula names and scope, with Excel future-function and LAMBDA parameter prefixes and no fabricated cached result.</dd></div>
+<div><dt>Known boundary</dt><dd>LAMBDA calls require the full engine (@sheetwrite/formulas); the default engine stores the definitions but returns #NAME?. Calls nest at most 64 deep (#NUM! beyond that), unlike Excel's parameter-dependent recursion allowance. An uncalled LAMBDA returns #CALC!. No JavaScript execution fallback is provided.</dd></div>
 <div><dt>Evidence</dt><dd>1 checked evidence record</dd></div>
 </dl>
 <a href="/showcases/interoperability/?compatibility=formula.let-lambda">Open the checked interactive result</a>

@@ -426,4 +426,9 @@ Sheetwrite uses deterministic server ordering plus conservative rebase, not a CR
 - conflicting sheet lifecycle operations; and
 - metadata families that need domain-specific transforms.
 
+This also applies to defined-name formulas in 0.7.0. A concurrent structural
+edit and a `setNamedRange` operation that holds a formula report a conflict.
+The client must reload the document and keep the pending edit for host recovery.
+The client does not rewrite that formula across the remote structural edit.
+
 This choice preserves stable sheet IDs and authoritative formula source without lossy adapters. A CRDT/OT dependency is not justified by current scenarios: short-lived offline and online collaboration converge under server sequencing, while long-lived offline concurrent structural edits require product-level conflict UX and spreadsheet-specific formula/range semantics that generic sequence CRDTs do not supply. Revisit only if requirements demand automatic preservation of those ambiguous edits and scenario tests define the intended result for every structural/formula case.
