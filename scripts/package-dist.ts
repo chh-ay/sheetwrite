@@ -1,7 +1,6 @@
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, relative, resolve, sep } from "node:path";
 
-import { format, type FormatConfig } from "oxfmt";
 import { isStringLiteral, type Node, type SourceFile } from "typescript/unstable/ast";
 import { API, type Project } from "typescript/unstable/async";
 
@@ -11,14 +10,17 @@ import { readJson } from "./script-io.js";
  * TypeScript always emits 4-space indentation. Two spaces save about a tenth of
  * the published JavaScript without minifying it, so the code stays readable.
  * Import order is evaluation order, and template literal contents are runtime
- * strings, so neither may be rewritten.
+ * strings, so neither may be rewritten. The repo config does not apply: it
+ * sorts imports.
  */
-const PUBLISHED_JAVASCRIPT_FORMAT: FormatConfig = {
-  tabWidth: 2,
-  printWidth: 100,
-  sortImports: false,
-  embeddedLanguageFormatting: "off",
-};
+const PUBLISHED_JAVASCRIPT_FORMAT = [
+  "--no-config",
+  "--no-editorconfig",
+  "--flavor=oxfmt",
+  "--tab-width=2",
+  "--print-width=100",
+  "--embedded-language-formatting=off",
+] as const;
 const BUILT_JAVASCRIPT = "dist/**/*.js";
 const BUILT_DECLARATIONS = "dist/**/*.d.{ts,mts,cts}";
 const DECLARATION_FILE = /\.d\.[mc]?ts$/;
@@ -223,16 +225,20 @@ export async function formatBuiltJavaScript(packageRoot: string): Promise<void> 
     files.map(async (file) => {
       const path = resolve(packageRoot, file);
       const source = await readFile(path, "utf8");
-      const formatted = await format(path, source, PUBLISHED_JAVASCRIPT_FORMAT);
-      if (formatted.errors.length > 0) {
-        throw new Error(
-          `Cannot format ${file}: ${formatted.errors.map((error) => error.message).join("; ")}`,
-        );
-      }
-      if (semanticPrinter.transformSync(formatted.code) !== semanticPrinter.transformSync(source)) {
+      const formatter = Bun.spawn(
+        ["bun", "fmt", ...PUBLISHED_JAVASCRIPT_FORMAT, `--stdin-filepath=${path}`],
+        { stdin: new TextEncoder().encode(source), stdout: "pipe", stderr: "pipe" },
+      );
+      const [code, errors, exitCode] = await Promise.all([
+        new Response(formatter.stdout).text(),
+        new Response(formatter.stderr).text(),
+        formatter.exited,
+      ]);
+      if (exitCode !== 0) throw new Error(`Cannot format ${file}: ${errors}`);
+      if (semanticPrinter.transformSync(code) !== semanticPrinter.transformSync(source)) {
         throw new Error(`Formatting changed the program in ${file}`);
       }
-      await writeFile(path, formatted.code);
+      await writeFile(path, code);
     }),
   );
 }

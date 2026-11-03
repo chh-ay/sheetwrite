@@ -374,7 +374,10 @@ fn conditional_extreme(values: &FuncAccumulator, maximum: bool) -> Value {
         let Some(criterion) = values.arg_value(pair + 1) else {
             return Value::Error(FormulaError::Value);
         };
-        criteria.push((range, Criterion::parse(criterion.clone())));
+        match Criterion::parse(criterion.clone()) {
+            Ok(criterion) => criteria.push((range, criterion)),
+            Err(error) => return Value::Error(error),
+        }
     }
 
     let mut result: Option<f64> = None;

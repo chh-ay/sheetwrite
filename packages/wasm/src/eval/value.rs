@@ -9,8 +9,9 @@ use crate::types::{
     KIND_NUMBER, KIND_STRING,
 };
 
-use super::date::format_date_serial;
+use super::date::{format_date_serial, parse_date, parse_time_with_date};
 use super::number_format::{format_number, general_text};
+use super::text::{parse_number, InnerSpaces};
 
 pub(super) fn cached_formula_value(
     sheet: &SheetData,
@@ -45,23 +46,52 @@ fn bool_text(value: bool) -> &'static str {
     }
 }
 
+/// A finite decimal number written plainly (`1e3`, `.5`, `-2`), the first
+/// stage of `number_from_text`. Criteria operands read only this stage, since
+/// criteria compare text cells as text. Rust's float syntax also reads `inf`
+/// and `NaN`, which are text to Excel, so non-finite results are rejected.
+pub(super) fn plain_number(text: &str) -> Option<f64> {
+    text.trim()
+        .parse::<f64>()
+        .ok()
+        .filter(|value| value.is_finite())
+}
+
+/// Excel's rule for reading text as a number: a plain number, a date
+/// (`2024-01-31`, `1/31/2024`), a time with or without a date (`13:30`,
+/// `2024-01-31 13:30`), or a number with `,` group separators and trailing
+/// `%` (`1,234.5%`). The date or number must be the whole text, apart from
+/// surrounding spaces: `2024-01-31 notes` and `1 234` are text.
+/// Arithmetic, number arguments, VALUE, and the number fallback of date
+/// arguments all read text with this one rule; NUMBERVALUE takes its own
+/// separators, and formula number literals belong to the parser.
+///
+/// Kept out of line: arithmetic on numbers is the hot path of
+/// `number_from_value`, and inlining the date and separator parsers into every
+/// operator would grow it for text that is rare there.
+#[inline(never)]
+pub(super) fn number_from_text(text: &str) -> Result<f64, FormulaError> {
+    if let Some(number) = plain_number(text) {
+        return Ok(number);
+    }
+
+    let trimmed = text.trim();
+    if let Some(serial) = parse_date(trimmed) {
+        return Ok(serial);
+    }
+    if let Some((date, time)) = parse_time_with_date(trimmed) {
+        return Ok(date.map_or(time, |date| date.floor() + time));
+    }
+    parse_number(trimmed, '.', Some(','), InnerSpaces::Reject)
+}
+
 pub(super) fn number_from_value(value: &Value) -> Result<f64, FormulaError> {
     match value {
         Value::Number(value) if value.is_finite() => Ok(*value),
         Value::Number(_) => Err(FormulaError::Num),
         Value::Bool(value) => Ok(if *value { 1.0 } else { 0.0 }),
-        Value::Text(text) => {
-            let trimmed = text.trim();
-            if trimmed.is_empty() {
-                Ok(0.0)
-            } else {
-                trimmed
-                    .parse::<f64>()
-                    .ok()
-                    .filter(|value| value.is_finite())
-                    .ok_or(FormulaError::Value)
-            }
-        }
+        Value::Text(text) if text.trim().is_empty() => Ok(0.0),
+        Value::Text(text) => number_from_text(text),
         Value::Blank => Ok(0.0),
         Value::Error(error) => Err(*error),
     }
@@ -151,16 +181,10 @@ pub(super) fn aggregate_number(
             }
         }
         Value::Text(text) => {
-            let trimmed = text.trim();
-            if trimmed.is_empty() || from_range {
+            if from_range || text.trim().is_empty() {
                 Ok(None)
             } else {
-                trimmed
-                    .parse::<f64>()
-                    .ok()
-                    .filter(|value| value.is_finite())
-                    .map(Some)
-                    .ok_or(FormulaError::Value)
+                number_from_text(text).map(Some)
             }
         }
         Value::Blank => Ok(None),

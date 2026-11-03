@@ -1354,13 +1354,13 @@ async function recordRelease(history: SizeHistory, release: SizeReleaseSnapshot)
     releases: [...history.releases, release],
   };
   await writeFile(historyPath, `${JSON.stringify(updated, null, 2)}\n`);
-  await runCommand(["bunx", "oxfmt", historyPath]);
+  await runCommand(["bun", "fmt", historyPath]);
 }
 
 async function writeReport(report: SizeReport): Promise<void> {
   await rm(join(import.meta.dir, "size-report-failure.json"), { force: true });
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
-  await runCommand(["bunx", "oxfmt", reportPath]);
+  await runCommand(["bun", "fmt", reportPath]);
 }
 
 async function writeFailure(error: unknown): Promise<void> {
