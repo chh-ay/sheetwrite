@@ -521,7 +521,7 @@ function summarizeAllocations(samples: readonly FormulaAllocationSample[]): Form
 }
 
 /** Untimed fixture runs allowed inside one aggregated sample before it is abandoned. */
-export const AGGREGATED_SAMPLE_MAX_ITERATIONS = 1_000_000;
+export const AGGREGATED_SAMPLE_MAX_ITERATIONS = 10_000_000;
 /** Default aggregation floor (ms) of the single-sample runner used by the matched engine protocol. */
 export const SAMPLE_AGGREGATE_MS = 50;
 /** Default untimed warm-up fixture runs of the single-sample runner. */
