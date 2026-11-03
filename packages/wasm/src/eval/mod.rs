@@ -822,7 +822,14 @@ impl CellStore {
         let mut affected = FxHashSet::default();
 
         for &sheet in seeds {
-            affected.extend(collect_affected_formulas(&self.sheets, sheet, index));
+            let selected = collect_affected_formulas(&self.sheets, sheet, index);
+            // Keep the first set's buckets instead of allocating and hashing
+            // the same keys again. Later sheets still union their selections.
+            if affected.is_empty() {
+                affected = selected;
+            } else {
+                affected.extend(selected);
+            }
             let data = &self.sheets[sheet];
 
             // A dirty cell inside a spilled range invalidates that anchor.
