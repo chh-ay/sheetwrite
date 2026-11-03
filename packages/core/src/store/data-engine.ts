@@ -1074,25 +1074,33 @@ export class StoreDataEngine {
     });
   }
 
-  private restoreMovedNamedFormulas(
-    originals: readonly Extract<NamedRangeSnapshot, { formula: string }>[],
+  /** Plan every name rewrite before the move can change cells or metadata. */
+  private prepareMovedNamedFormulas(
     patch: Extract<DocumentOp, { op: "moveRows" | "moveColumns" }>,
-  ): boolean {
-    for (const original of originals) {
+  ): Extract<NamedRangeSnapshot, { formula: string }>[] | null {
+    const rewritten: Extract<NamedRangeSnapshot, { formula: string }>[] = [];
+    const sheet = this.handleOf(patch.sheet);
+    for (const original of this.workbook.namedRanges ?? []) {
+      if (original.formula === undefined) continue;
       const formula = this.wasm.moveNamedFormulaSource(
         original.formula,
-        this.handleOf(patch.sheet),
+        sheet,
         patch.op === "moveColumns",
         patch.from,
         patch.count,
         patch.to,
       );
-      if (
-        formula === undefined ||
-        !this.applyPatch({ op: "setNamedRange", namedRange: { ...original, formula } }, null)
-      ) {
-        return false;
-      }
+      if (formula === undefined) return null;
+      rewritten.push({ ...original, formula });
+    }
+    return rewritten;
+  }
+
+  private restoreMovedNamedFormulas(
+    definitions: readonly Extract<NamedRangeSnapshot, { formula: string }>[],
+  ): boolean {
+    for (const namedRange of definitions) {
+      if (!this.applyPatch({ op: "setNamedRange", namedRange }, null)) return false;
     }
     return true;
   }
@@ -3427,10 +3435,8 @@ export class StoreDataEngine {
     }
 
     if (patch.from === patch.to) return true;
-    const movedNamedFormulas = (this.workbook.namedRanges ?? []).filter(
-      (named): named is Extract<NamedRangeSnapshot, { formula: string }> =>
-        named.formula !== undefined,
-    );
+    const movedNamedFormulas = this.prepareMovedNamedFormulas(patch);
+    if (movedNamedFormulas === null) return false;
     const movedNamedRanges = (this.workbook.namedRanges ?? [])
       .filter(
         (namedRange): namedRange is NamedRangeSnapshot & { range: Range } =>
@@ -3561,7 +3567,7 @@ export class StoreDataEngine {
       if (!this.syncNamedRange(namedRange)) return false;
     }
 
-    return this.restoreMovedNamedFormulas(movedNamedFormulas, patch);
+    return this.restoreMovedNamedFormulas(movedNamedFormulas);
   }
 
   private moveColumns(
@@ -3581,10 +3587,8 @@ export class StoreDataEngine {
 
     if (patch.from === patch.to) return true;
 
-    const movedNamedFormulas = (this.workbook.namedRanges ?? []).filter(
-      (named): named is Extract<NamedRangeSnapshot, { formula: string }> =>
-        named.formula !== undefined,
-    );
+    const movedNamedFormulas = this.prepareMovedNamedFormulas(patch);
+    if (movedNamedFormulas === null) return false;
     const movedNamedRanges = (this.workbook.namedRanges ?? [])
       .filter(
         (namedRange): namedRange is NamedRangeSnapshot & { range: Range } =>
@@ -3700,7 +3704,7 @@ export class StoreDataEngine {
       if (!this.syncNamedRange(namedRange)) return false;
     }
 
-    return this.restoreMovedNamedFormulas(movedNamedFormulas, patch);
+    return this.restoreMovedNamedFormulas(movedNamedFormulas);
   }
 
   /**

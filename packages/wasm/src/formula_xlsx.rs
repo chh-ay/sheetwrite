@@ -6,13 +6,173 @@ use wasm_bindgen::prelude::wasm_bindgen;
 
 // MS-XLSX §2.2.3 and §2.2.2 extend ISO/IEC 29500-1 §18.17.2.4:
 // future functions use `_xlfn.`, worksheet-only functions also use `_xlws.`,
-// and LAMBDA parameter names use `_xlpm.` (lambda-parameter-name).
+// and LET bindings and LAMBDA parameters use `_xlpm.` (parameter-name).
 // https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/5d1b6d44-6fc1-4ecd-8fef-0b27406cc2bf
 // https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/3d025add-118d-4413-9856-ab65712ec1b0
-const FUTURE_FUNCTIONS: &str = "ACOT ACOTH AGGREGATE ANCHORARRAY ARABIC BASE BETA.DIST BETA.INV BINOM.DIST BINOM.DIST.RANGE BINOM.INV BITAND BITLSHIFT BITOR BITRSHIFT BITXOR BYCOL BYROW CEILING.MATH CEILING.PRECISE CHISQ.DIST CHISQ.DIST.RT CHISQ.INV CHISQ.INV.RT CHISQ.TEST CHOOSECOLS CHOOSEROWS COMBINA CONCAT CONFIDENCE.NORM CONFIDENCE.T COT COTH COVARIANCE.P COVARIANCE.S CSC CSCH DAYS DECIMAL DROP ERF.PRECISE ERFC.PRECISE EXPAND EXPON.DIST F.DIST F.DIST.RT F.INV F.INV.RT F.TEST FIELDVALUE FILTERXML FLOOR.MATH FLOOR.PRECISE FORECAST.ETS FORECAST.ETS.CONFINT FORECAST.ETS.SEASONALITY FORECAST.ETS.STAT FORECAST.LINEAR FORMULATEXT GAMMA GAMMA.DIST GAMMA.INV GAMMALN.PRECISE GAUSS HSTACK HYPGEOM.DIST IFNA IFS IMCOSH IMCOT IMCSC IMCSCH IMSEC IMSECH IMSINH IMTAN ISFORMULA ISOMITTED ISOWEEKNUM LAMBDA LET LOGNORM.DIST LOGNORM.INV MAKEARRAY MAP MAXIFS MINIFS MODE.MULT MODE.SNGL MUNIT NEGBINOM.DIST NORM.DIST NORM.INV NORM.S.DIST NORM.S.INV NUMBERVALUE PDURATION PERCENTILE.EXC PERCENTILE.INC PERCENTRANK.EXC PERCENTRANK.INC PERMUTATIONA PHI POISSON.DIST PQSOURCE PYTHON_STR PYTHON_TYPE PYTHON_TYPENAME QUARTILE.EXC QUARTILE.INC QUERYSTRING RANDARRAY RANK.AVG RANK.EQ REDUCE RRI SCAN SEC SECH SEQUENCE SHEET SHEETS SKEW.P SORTBY STDEV.P STDEV.S SWITCH T.DIST T.DIST.2T T.DIST.RT T.INV T.INV.2T T.TEST TAKE TEXTAFTER TEXTBEFORE TEXTJOIN TEXTSPLIT TOCOL TOROW UNICHAR UNICODE UNIQUE VAR.P VAR.S VSTACK WEBSERVICE WEIBULL.DIST WRAPCOLS WRAPROWS XLOOKUP XMATCH XOR Z.TEST";
-
-const MODERN_FUTURE_FUNCTIONS: &str =
-    "ARRAYTOTEXT GROUPBY PERCENTOF PIVOTBY REGEXEXTRACT REGEXREPLACE REGEXTEST VALUETOTEXT";
+const FUTURE_FUNCTIONS: &[&str] = &[
+    "ACOT",
+    "ACOTH",
+    "AGGREGATE",
+    "ANCHORARRAY",
+    "ARABIC",
+    "ARRAYTOTEXT",
+    "BASE",
+    "BETA.DIST",
+    "BETA.INV",
+    "BINOM.DIST",
+    "BINOM.DIST.RANGE",
+    "BINOM.INV",
+    "BITAND",
+    "BITLSHIFT",
+    "BITOR",
+    "BITRSHIFT",
+    "BITXOR",
+    "BYCOL",
+    "BYROW",
+    "CEILING.MATH",
+    "CEILING.PRECISE",
+    "CHISQ.DIST",
+    "CHISQ.DIST.RT",
+    "CHISQ.INV",
+    "CHISQ.INV.RT",
+    "CHISQ.TEST",
+    "CHOOSECOLS",
+    "CHOOSEROWS",
+    "COMBINA",
+    "CONCAT",
+    "CONFIDENCE.NORM",
+    "CONFIDENCE.T",
+    "COT",
+    "COTH",
+    "COVARIANCE.P",
+    "COVARIANCE.S",
+    "CSC",
+    "CSCH",
+    "DAYS",
+    "DECIMAL",
+    "DROP",
+    "ERF.PRECISE",
+    "ERFC.PRECISE",
+    "EXPAND",
+    "EXPON.DIST",
+    "F.DIST",
+    "F.DIST.RT",
+    "F.INV",
+    "F.INV.RT",
+    "F.TEST",
+    "FIELDVALUE",
+    "FILTERXML",
+    "FLOOR.MATH",
+    "FLOOR.PRECISE",
+    "FORECAST.ETS",
+    "FORECAST.ETS.CONFINT",
+    "FORECAST.ETS.SEASONALITY",
+    "FORECAST.ETS.STAT",
+    "FORECAST.LINEAR",
+    "FORMULATEXT",
+    "GAMMA",
+    "GAMMA.DIST",
+    "GAMMA.INV",
+    "GAMMALN.PRECISE",
+    "GAUSS",
+    "GROUPBY",
+    "HSTACK",
+    "HYPGEOM.DIST",
+    "IFNA",
+    "IFS",
+    "IMCOSH",
+    "IMCOT",
+    "IMCSC",
+    "IMCSCH",
+    "IMSEC",
+    "IMSECH",
+    "IMSINH",
+    "IMTAN",
+    "ISFORMULA",
+    "ISOMITTED",
+    "ISOWEEKNUM",
+    "LAMBDA",
+    "LET",
+    "LOGNORM.DIST",
+    "LOGNORM.INV",
+    "MAKEARRAY",
+    "MAP",
+    "MAXIFS",
+    "MINIFS",
+    "MODE.MULT",
+    "MODE.SNGL",
+    "MUNIT",
+    "NEGBINOM.DIST",
+    "NORM.DIST",
+    "NORM.INV",
+    "NORM.S.DIST",
+    "NORM.S.INV",
+    "NUMBERVALUE",
+    "PDURATION",
+    "PERCENTILE.EXC",
+    "PERCENTILE.INC",
+    "PERCENTOF",
+    "PERCENTRANK.EXC",
+    "PERCENTRANK.INC",
+    "PERMUTATIONA",
+    "PHI",
+    "PIVOTBY",
+    "POISSON.DIST",
+    "PQSOURCE",
+    "PYTHON_STR",
+    "PYTHON_TYPE",
+    "PYTHON_TYPENAME",
+    "QUARTILE.EXC",
+    "QUARTILE.INC",
+    "QUERYSTRING",
+    "RANDARRAY",
+    "RANK.AVG",
+    "RANK.EQ",
+    "REDUCE",
+    "REGEXEXTRACT",
+    "REGEXREPLACE",
+    "REGEXTEST",
+    "RRI",
+    "SCAN",
+    "SEC",
+    "SECH",
+    "SEQUENCE",
+    "SHEET",
+    "SHEETS",
+    "SKEW.P",
+    "SORTBY",
+    "STDEV.P",
+    "STDEV.S",
+    "SWITCH",
+    "T.DIST",
+    "T.DIST.2T",
+    "T.DIST.RT",
+    "T.INV",
+    "T.INV.2T",
+    "T.TEST",
+    "TAKE",
+    "TEXTAFTER",
+    "TEXTBEFORE",
+    "TEXTJOIN",
+    "TEXTSPLIT",
+    "TOCOL",
+    "TOROW",
+    "UNICHAR",
+    "UNICODE",
+    "UNIQUE",
+    "VALUETOTEXT",
+    "VAR.P",
+    "VAR.S",
+    "VSTACK",
+    "WEBSERVICE",
+    "WEIBULL.DIST",
+    "WRAPCOLS",
+    "WRAPROWS",
+    "XLOOKUP",
+    "XMATCH",
+    "XOR",
+    "Z.TEST",
+];
 
 fn strip_prefix(name: &str) -> &str {
     let mut bare = name;
@@ -74,7 +234,6 @@ struct Binding<'a> {
     declaration: usize,
     start: usize,
     end: usize,
-    lambda: bool,
 }
 
 struct Frame {
@@ -151,7 +310,6 @@ fn bindings<'a>(tokens: &'a [Spanned<'_>]) -> Vec<Binding<'a>> {
                                 .map_or(index, |argument| argument.0)
                         },
                         end: index,
-                        lambda,
                     });
                 }
             }
@@ -161,7 +319,7 @@ fn bindings<'a>(tokens: &'a [Spanned<'_>]) -> Vec<Binding<'a>> {
     bindings
 }
 
-/// Write the same future-function spelling for cell and defined-name formulas.
+/// Write future-function and local-binding prefixes for defined-name formulas.
 /// This is lexical: unknown future functions and incomplete formulas still
 /// round-trip without a parse/serialize pass changing their source text.
 #[wasm_bindgen(js_name = formulaToXlsx)]
@@ -186,12 +344,8 @@ pub fn formula_to_xlsx(source: &str) -> String {
                         || (index >= binding.start && index < binding.end))
             })
             .max_by_key(|binding| binding.declaration);
-        let prefix = if let Some(binding) = binding {
-            if binding.lambda {
-                "_xlpm."
-            } else {
-                ""
-            }
+        let prefix = if binding.is_some() {
+            "_xlpm."
         } else if matches!(
             tokens.get(index + 1).map(|token| &token.tok),
             Some(Ok(Tok::LParen))
@@ -202,9 +356,12 @@ pub fn formula_to_xlsx(source: &str) -> String {
             {
                 "_xlfn._xlws."
             } else if FUTURE_FUNCTIONS
-                .split_ascii_whitespace()
-                .chain(MODERN_FUTURE_FUNCTIONS.split_ascii_whitespace())
-                .any(|function| function.eq_ignore_ascii_case(bare))
+                .binary_search_by(|function| {
+                    function
+                        .bytes()
+                        .cmp(bare.bytes().map(|byte| byte.to_ascii_uppercase()))
+                })
+                .is_ok()
             {
                 "_xlfn."
             } else {
@@ -230,8 +387,15 @@ mod tests {
     use super::{formula_from_xlsx, formula_to_xlsx};
 
     #[test]
-    fn future_functions_and_lambda_parameters_keep_lexical_scopes() {
+    fn future_functions_and_bindings_keep_lexical_scopes() {
         let cases = [
+            ("=LET(x,1,x+1)", "=_xlfn.LET(_xlpm.x,1,_xlpm.x+1)"),
+            ("=let(x,1,X+1)", "=_xlfn.let(_xlpm.x,1,_xlpm.X+1)"),
+            ("=LET(x,x+1,x)+x", "=_xlfn.LET(_xlpm.x,x+1,_xlpm.x)+x"),
+            (
+                "=LET(x,1,LET(x,x+1,x))+x",
+                "=_xlfn.LET(_xlpm.x,1,_xlfn.LET(_xlpm.x,_xlpm.x+1,_xlpm.x))+x",
+            ),
             (
                 "=LAMBDA(value,value+1)",
                 "=_xlfn.LAMBDA(_xlpm.value,_xlpm.value+1)",
@@ -242,16 +406,21 @@ mod tests {
             ),
             (
                 "=LAMBDA(value,LET(value,2,value))+value",
-                "=_xlfn.LAMBDA(_xlpm.value,_xlfn.LET(value,2,value))+value",
+                "=_xlfn.LAMBDA(_xlpm.value,_xlfn.LET(_xlpm.value,2,_xlpm.value))+value",
             ),
             ("=LAMBDA(fn,fn(2))", "=_xlfn.LAMBDA(_xlpm.fn,_xlpm.fn(2))"),
             (
                 "=SUM(A1)+FILTER(A1:A3,A1:A3>0)",
                 "=SUM(A1)+_xlfn._xlws.FILTER(A1:A3,A1:A3>0)",
             ),
+            ("=sort(A1:A3)", "=_xlfn._xlws.sort(A1:A3)"),
             (
                 "=IFNA(XLOOKUP(1,A1:A3,B1:B3),0)",
                 "=_xlfn.IFNA(_xlfn.XLOOKUP(1,A1:A3,B1:B3),0)",
+            ),
+            (
+                "=ifna(xlookup(1,A1:A3,B1:B3),0)",
+                "=_xlfn.ifna(_xlfn.xlookup(1,A1:A3,B1:B3),0)",
             ),
             (
                 "=LAMBDA(value,\"_xlpm.value\"&'value'!A1&Table[value])",
