@@ -1183,11 +1183,9 @@ export class InteractionSessions {
       end: { row: endRow, col: output.c1 },
     };
     const metadata = this.deps.sheet();
-    // Per-cell operations preserve policy issue indices and partial spill rejection.
+    // Validation and protection require per-cell operations for policy issue indices.
     const scalarWrites = Boolean(
-      metadata.validationRules?.length ||
-      metadata.protectedRanges?.length ||
-      storeEngine(this.deps.store)?.hasSpillChildren(range),
+      metadata.validationRules?.length || metadata.protectedRanges?.length,
     );
     const patches: DocumentOp[] = [];
     const cells: SnapshotCell[] = [];

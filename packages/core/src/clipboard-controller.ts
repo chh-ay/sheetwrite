@@ -924,6 +924,26 @@ export class ClipboardController {
       { start: rect.r0, end: rect.r1 + 1 },
       selectedColumns,
     );
+    // A projected child has no source to move. Reject the whole cut before
+    // replacing the clipboard when its owning formula is outside the selection.
+    if (cut && bulk?.spillDerived.some((derived) => derived === 1)) {
+      const selectedRows = new Set(bulk.dataRows);
+      for (const [offset, derived] of bulk.spillDerived.entries()) {
+        if (derived !== 1) continue;
+        const row = bulk.dataRows[Math.floor(offset / selectedColumns.length)];
+        if (row === undefined) throw new Error("Missing spill clipboard row");
+        const owner = this.deps.store.getSpillAnchor({
+          sheet: activeSheet,
+          row,
+          col: rect.c0 + (offset % selectedColumns.length),
+        });
+        if (
+          owner !== null &&
+          (selectedRows.has(owner.row) === false || owner.col < rect.c0 || owner.col > rect.c1)
+        )
+          return null;
+      }
+    }
     const bulkFormulas = bulk
       ? new Map(bulk.formulas.map((entry) => [entry.offset, entry.source] as const))
       : null;

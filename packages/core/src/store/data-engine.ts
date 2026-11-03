@@ -2369,14 +2369,6 @@ export class StoreDataEngine {
     switch (patch.op) {
       case "set": {
         if (!this.isCellInBounds(patch.addr)) return false;
-        if (
-          !this.admitsSourceRange({
-            sheet: patch.addr.sheet,
-            start: { row: patch.addr.row, col: patch.addr.col },
-            end: { row: patch.addr.row, col: patch.addr.col },
-          })
-        )
-          return false;
         const before = changes ? this.getCell(patch.addr) : null;
         const bounds: Range = {
           sheet: patch.addr.sheet,
@@ -2423,17 +2415,6 @@ export class StoreDataEngine {
               bounds.start.row + cell.rowOffset > bounds.end.row ||
               bounds.start.col + cell.colOffset > bounds.end.col,
           )
-        ) {
-          return false;
-        }
-
-        // Grouped source snapshots allocate more than scalar admission for sparse writes.
-        if (
-          patch.cells.some((cell) => {
-            const row = bounds.start.row + cell.rowOffset;
-            const col = bounds.start.col + cell.colOffset;
-            return !this.wasm.admitSourceRange(this.handleOf(bounds.sheet), row, col, row, col);
-          })
         ) {
           return false;
         }
@@ -2502,8 +2483,6 @@ export class StoreDataEngine {
         ) {
           return false;
         }
-
-        if (!this.admitsSourceRange(bounds)) return false;
 
         const beforeCells =
           changes && captureDetailedChanges

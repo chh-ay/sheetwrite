@@ -179,6 +179,36 @@ describe("pointer input: mouse parity", () => {
 });
 
 describe("pointer input: touch policy", () => {
+  it("fills through a spill child without dropping the fill or persisting projections in history", () => {
+    const { grid, store, scroller, workbook } = makeGrid();
+    const anchor = { sheet: "s1", row: 1, col: 0 };
+    store.applyTransaction({
+      patches: [
+        {
+          op: "clearRange",
+          range: { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 3, col: 0 } },
+        },
+        { op: "set", addr: anchor, value: { kind: "formula", src: "=SEQUENCE(3)" } },
+        { op: "set", addr: { ...anchor, row: 0 }, value: { kind: "literal", value: "filled" } },
+      ],
+    });
+    grid.setSelection({ kind: "cell", addr: { ...anchor, row: 0 } });
+    scroller.dispatchEvent(pointer("pointerdown", fillHandlePoint(0, 0, workbook)));
+    scroller.dispatchEvent(pointer("pointermove", cellPoint(2, 0, workbook)));
+    scroller.dispatchEvent(pointer("pointerup", cellPoint(2, 0, workbook)));
+
+    expect(store.getCell(anchor).resolved).toBe("filled");
+    expect(store.getCell({ ...anchor, row: 2 }).resolved).toBe("filled");
+    expect(store.getCell({ ...anchor, row: 3 }).resolved).toBeNull();
+    grid.undo();
+    expect(store.getFormula(anchor)).toBe("=SEQUENCE(3)");
+    expect(store.getCell({ ...anchor, row: 2 }).resolved).toBe(2);
+    grid.redo();
+    expect(store.getCell({ ...anchor, row: 2 }).resolved).toBe("filled");
+    grid.destroy();
+    store.dispose();
+  });
+
   it("touch drag on the fill handle captures, previews, and commits the fill", () => {
     const { grid, store, scroller, workbook, capture } = makeGrid();
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });

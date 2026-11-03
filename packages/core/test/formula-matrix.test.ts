@@ -119,7 +119,17 @@ describe("formula behavior matrix", () => {
     expect([0, 1, 2, 3, 4].map((row) => store.getCell(address(row, 2)).resolved)).toEqual(values);
 
     store.applyTransaction({
-      patches: [{ op: "set", addr: address(1, 2), value: { kind: "literal", value: "rejected" } }],
+      patches: [{ op: "set", addr: address(1, 2), value: { kind: "literal", value: "blocker" } }],
+    });
+    expect(store.getCell(address(0, 2)).resolved).toBe("#SPILL!");
+    expect(store.getCell(address(1, 2)).resolved).toBe("blocker");
+    store.applyTransaction({
+      patches: [
+        {
+          op: "clearRange",
+          range: { sheet: "s1", start: { row: 1, col: 2 }, end: { row: 1, col: 2 } },
+        },
+      ],
     });
     expect(store.getCell(address(1, 2)).resolved).toBe(1);
 
