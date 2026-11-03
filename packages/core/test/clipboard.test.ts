@@ -2,6 +2,7 @@ import { beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
 import { ClipboardController, SHEETWRITE_CLIPBOARD_MIME } from "../src/clipboard-controller.js";
 import { parseTsv, rowsToTsv } from "../src/clipboard.js";
+import { DocumentController } from "../src/document-controller.js";
 import { initSheetwrite } from "../src/grid.js";
 import { Scope } from "../src/scope.js";
 import { SelectionModel } from "../src/selection.js";
@@ -823,6 +824,126 @@ describe("ClipboardController", () => {
     expect(h.store.getCell({ sheet: "s1", row: 5, col: 0 }).resolved).toBe(7);
     expect(h.store.getFormula({ sheet: "s1", row: 5, col: 0 })).toBeNull();
     expect(h.store.getCell({ sheet: "s1", row: 5, col: 0 }).style).toEqual({});
+  });
+});
+
+describe("spill clipboard commands", () => {
+  function spillHarness() {
+    const fake = makeHarness();
+    fake.lifetime.close();
+    const workbook = makeWorkbook(10);
+    const sheet = workbook.sheets[0];
+    if (sheet === undefined) throw new Error("Missing clipboard fixture sheet");
+    const store = new SheetwriteStore(workbook);
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 1, col: 1 },
+          value: { kind: "formula", src: "=SEQUENCE(3)" },
+        },
+      ],
+    });
+    const document = new DocumentController({
+      store,
+      loadable: store,
+      readOnly: () => false,
+      epoch: () => 0,
+      materializeVirtualColumns: (patches) => patches,
+      onMutationRejected: () => {},
+      onHistoryApplied: () => {},
+    });
+    const selection = new SelectionModel(10, 0, 2);
+    const lifetime = new Scope();
+    const clipboard = new ClipboardController({
+      lifetime,
+      store,
+      selection: () => selection,
+      activeSheet: () => "s1",
+      sheet: () => sheet,
+      colIndices: () => [0, 1, 2],
+      readOnly: () => false,
+      mergeAnchorAt: () => null,
+      toDataRow: (row) => row,
+      commit: (patches, reason) => {
+        document.commit(patches, reason);
+      },
+    });
+    return {
+      store,
+      document,
+      clipboard,
+      selection,
+      close: () => {
+        lifetime.close();
+        document.destroy();
+        store.dispose();
+      },
+    };
+  }
+
+  it("does not cut or move a projected child without its anchor", async () => {
+    const harness = spillHarness();
+    try {
+      harness.selection.selectCell(2, 1);
+      expect(await harness.clipboard.cut()).toBe("empty");
+      expect(harness.document.canUndo).toBe(false);
+      expect(harness.store.getCell({ sheet: "s1", row: 2, col: 1 }).resolved).toBe(2);
+      harness.selection.selectCell(6, 1);
+      expect(await harness.clipboard.paste()).toBe("empty");
+      expect(harness.store.getCell({ sheet: "s1", row: 6, col: 1 }).resolved).toBeNull();
+    } finally {
+      harness.close();
+    }
+  });
+
+  it("cuts the anchor and moves its formula, with undo and redo for both commands", async () => {
+    const harness = spillHarness();
+    const anchor = { sheet: "s1", row: 1, col: 1 };
+    const destination = { ...anchor, row: 6 };
+    try {
+      harness.selection.selectCell(1, 1);
+      expect(await harness.clipboard.cut()).toBe("done");
+      expect(harness.store.getCell(anchor).resolved).toBeNull();
+      expect(harness.store.getCell({ ...anchor, row: 2 }).resolved).toBeNull();
+      harness.document.undo();
+      expect(harness.store.getCell({ ...anchor, row: 2 }).resolved).toBe(2);
+      harness.document.redo();
+      expect(harness.store.getCell(anchor).resolved).toBeNull();
+      harness.selection.selectCell(6, 1);
+      expect(await harness.clipboard.paste()).toBe("done");
+      expect(harness.store.getFormula(destination)).toBe("=SEQUENCE(3)");
+      expect(harness.store.getCell({ ...destination, row: 8 }).resolved).toBe(3);
+      harness.document.undo();
+      expect(harness.store.getCell(destination).resolved).toBeNull();
+      harness.document.redo();
+      expect(harness.store.getCell({ ...destination, row: 8 }).resolved).toBe(3);
+    } finally {
+      harness.close();
+    }
+  });
+
+  it("pastes clipboard values into projected children and restores the spill on undo", async () => {
+    const harness = spillHarness();
+    const source = { sheet: "s1", row: 0, col: 0 };
+    const child = { sheet: "s1", row: 2, col: 1 };
+    try {
+      harness.store.applyTransaction({
+        patches: [{ op: "set", addr: source, value: { kind: "literal", value: 99 } }],
+      });
+      harness.selection.selectCell(0, 0);
+      expect(await harness.clipboard.copy()).toBe("done");
+      harness.selection.selectCell(2, 1);
+      expect(await harness.clipboard.paste()).toBe("done");
+      expect(harness.store.getCell(child).resolved).toBe(99);
+      expect(harness.store.getCell({ ...child, row: 1 }).resolved).toBe("#SPILL!");
+      harness.document.undo();
+      expect(harness.store.getCell(child).resolved).toBe(2);
+      harness.document.redo();
+      expect(harness.store.getCell(child).resolved).toBe(99);
+    } finally {
+      harness.close();
+    }
   });
 });
 
