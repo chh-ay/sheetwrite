@@ -10,13 +10,7 @@ it("frees a destroyed grid, its store and its owner-scoped caches", async () => 
       "./test-setup.ts",
       "./packages/core/test/grid-lifetime-probe.ts",
     ],
-    {
-      cwd: new URL("../../..", import.meta.url).pathname,
-      // JIT stack roots can retain a dead local during forced collection.
-      env: { ...process.env, JSC_useJIT: "false" },
-      stdout: "pipe",
-      stderr: "pipe",
-    },
+    { cwd: new URL("../../..", import.meta.url).pathname, stdout: "pipe", stderr: "pipe" },
   );
   const [stdout, stderr, exitCode] = await Promise.all([
     new Response(probe.stdout).text(),
