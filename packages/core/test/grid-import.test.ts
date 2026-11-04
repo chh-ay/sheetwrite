@@ -6,7 +6,7 @@ import { storeEngine } from "../src/store/engine-registry.js";
 import { SyncCoordinator } from "../src/sync.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { Grid, WorkbookSnapshot } from "../src/types.js";
-import { setXlsxWorkbookBackend } from "../src/xlsx-backend.js";
+import { setXlsxWorkbookBackend } from "../src/xlsx-bridge.js";
 import { elementAdded, makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 const IMPORTED: WorkbookSnapshot = {

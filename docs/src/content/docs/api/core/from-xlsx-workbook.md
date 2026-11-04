@@ -26,7 +26,7 @@ async function openWorkbook(host: HTMLElement, file: File) {
 - [toXlsxWorkbook](/docs/api/core/to-xlsx-workbook/)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/xlsx-backend.ts#L480"><code>packages/core/src/xlsx-backend.ts#L480</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/xlsx-bridge.ts#L480"><code>packages/core/src/xlsx-bridge.ts#L480</code></a></dd></div>
 </dl>
 
 ## Declaration

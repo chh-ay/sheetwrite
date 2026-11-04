@@ -4,7 +4,7 @@ import { Scope } from "./scope.js";
 import { IncompleteDataError, SheetwriteStore } from "./store.js";
 import type { WorkbookSnapshot } from "./types/document.js";
 import type { Grid } from "./types/grid.js";
-import { fromXlsxWorkbookFile, hasXlsxWorkbookBackend, toXlsxTable } from "./xlsx-backend.js";
+import { fromXlsxWorkbookFile, hasXlsxWorkbookBackend, toXlsxTable } from "./xlsx-bridge.js";
 
 /** The registry loads this module before activation, so opening the native picker needs no network turn. */
 export const xlsxImportCommand: RibbonButtonSpec = {

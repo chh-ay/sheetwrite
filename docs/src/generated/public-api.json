@@ -1882,9 +1882,9 @@
               "kind": "variable",
               "signature": "Readonly<XlsxResourceLimits>",
               "owners": [
-                "src/xlsx-backend.ts"
+                "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-backend.ts#L55",
+              "source": "src/xlsx-bridge.ts#L55",
               "jsDocTags": [],
               "documentation": "Codec defaults combine SpreadsheetML worksheet dimensions with independent\nZIP/XML and aggregate-work ceilings for untrusted in-memory conversion.",
               "memberDocs": []
@@ -2141,9 +2141,9 @@
               "kind": "function",
               "signature": "(data: ArrayBuffer | Uint8Array, options?: XlsxWorkbookOptions): Promise<ColumnarData>",
               "owners": [
-                "src/xlsx-backend.ts"
+                "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-backend.ts#L257",
+              "source": "src/xlsx-bridge.ts#L257",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2156,9 +2156,9 @@
               "kind": "function",
               "signature": "(data: ArrayBuffer | Uint8Array, options?: XlsxWorkbookOptions): Promise<WorkbookSnapshot>",
               "owners": [
-                "src/xlsx-backend.ts"
+                "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-backend.ts#L480",
+              "source": "src/xlsx-bridge.ts#L480",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2171,9 +2171,9 @@
               "kind": "function",
               "signature": "(file: Blob, options?: XlsxWorkbookOptions): Promise<WorkbookSnapshot>",
               "owners": [
-                "src/xlsx-backend.ts"
+                "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-backend.ts#L440",
+              "source": "src/xlsx-bridge.ts#L440",
               "jsDocTags": [],
               "documentation": "Import a File/Blob. The built-in backend reads it without buffering the compressed workbook.",
               "memberDocs": []
@@ -4875,9 +4875,9 @@
               "kind": "function",
               "signature": "(next: XlsxTableExportBackend): void",
               "owners": [
-                "src/xlsx-backend.ts"
+                "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-backend.ts#L117",
+              "source": "src/xlsx-bridge.ts#L117",
               "jsDocTags": [],
               "documentation": "Registers the optional table XLSX export implementation used by core.",
               "memberDocs": []
@@ -4887,9 +4887,9 @@
               "kind": "function",
               "signature": "(next: XlsxTableImportBackend): void",
               "owners": [
-                "src/xlsx-backend.ts"
+                "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-backend.ts#L235",
+              "source": "src/xlsx-bridge.ts#L235",
               "jsDocTags": [],
               "documentation": "Registers the optional table XLSX import implementation used by core.",
               "memberDocs": []
@@ -4899,9 +4899,9 @@
               "kind": "function",
               "signature": "(next: XlsxWorkbookBackend | null): void",
               "owners": [
-                "src/xlsx-backend.ts"
+                "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-backend.ts#L339",
+              "source": "src/xlsx-bridge.ts#L339",
               "jsDocTags": [],
               "documentation": "Registers the optional workbook XLSX implementation used by core.",
               "memberDocs": []
@@ -6210,9 +6210,9 @@
               "kind": "function",
               "signature": "(workbook: Workbook, store: Store, options?: XlsxWorkbookOptions): Promise<Uint8Array>",
               "owners": [
-                "src/xlsx-backend.ts"
+                "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-backend.ts#L183",
+              "source": "src/xlsx-bridge.ts#L183",
               "jsDocTags": [
                 "example",
                 "see"
@@ -6225,9 +6225,9 @@
               "kind": "function",
               "signature": "(workbook: Workbook, store: Store, options?: XlsxWorkbookOptions): ReadableStream<Uint8Array>",
               "owners": [
-                "src/xlsx-backend.ts"
+                "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-backend.ts#L203",
+              "source": "src/xlsx-bridge.ts#L203",
               "jsDocTags": [],
               "documentation": "Stream table XLSX bytes without materializing the finished archive.",
               "memberDocs": []
@@ -6237,9 +6237,9 @@
               "kind": "function",
               "signature": "(input: WorkbookSnapshot | Pick<Grid, \"exportSnapshot\">, options?: XlsxWorkbookOptions): Promise<Uint8Array>",
               "owners": [
-                "src/xlsx-backend.ts"
+                "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-backend.ts#L399",
+              "source": "src/xlsx-bridge.ts#L399",
               "jsDocTags": [
                 "example",
                 "see"
@@ -6252,9 +6252,9 @@
               "kind": "function",
               "signature": "(input: WorkbookSnapshot | Pick<Grid, \"exportSnapshot\">, options?: XlsxWorkbookOptions): ReadableStream<Uint8Array>",
               "owners": [
-                "src/xlsx-backend.ts"
+                "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-backend.ts#L420",
+              "source": "src/xlsx-bridge.ts#L420",
               "jsDocTags": [],
               "documentation": "Stream formula-preserving workbook XLSX with backpressure and cancellation.",
               "memberDocs": []
@@ -6857,9 +6857,9 @@
               "kind": "class",
               "signature": "class XlsxResourceError extends SheetwriteError { constructor(resource: keyof XlsxResourceLimits, limit: number, actual: number, operation: \"import\" | \"export\"); actual: number; code: \"xlsx-resource-limit\"; limit: number; name: \"XlsxResourceError\"; resource: keyof XlsxResourceLimits }",
               "owners": [
-                "src/xlsx-backend.ts"
+                "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-backend.ts#L82",
+              "source": "src/xlsx-bridge.ts#L82",
               "jsDocTags": [],
               "documentation": "Stable resource-limit failure surfaced before an XLSX codec allocates unsafe data.",
               "memberDocs": []
@@ -6869,9 +6869,9 @@
               "kind": "interface",
               "signature": "export interface XlsxResourceLimits { maxInputBytes: number; maxOutputBytes: number; maxArchiveEntries: number; maxEntryUncompressedBytes: number; maxTotalUncompressedBytes: number; maxPreservedBytes: number; maxCompressionRatio: number; maxSheets: number; maxRowsPerSheet: number; maxColumnsPerSheet: number; maxCells: number; maxMerges: number; maxSharedStrings: number; maxStyles: number; maxXmlElements: number; maxXmlDepth: number; maxXmlAttributesPerElement: number; maxXmlTextBytes: number; }",
               "owners": [
-                "src/xlsx-backend.ts"
+                "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-backend.ts#L12",
+              "source": "src/xlsx-bridge.ts#L12",
               "jsDocTags": [],
               "documentation": "Resource dimensions bounded by every XLSX import and export path.",
               "memberDocs": [
@@ -7042,9 +7042,9 @@
               "kind": "interface",
               "signature": "export interface XlsxTableExportBackend { name: string; toXlsxTable(workbook: Workbook, store: Store, options?: XlsxWorkbookOptions): Promise<Uint8Array>; toXlsxTableStream?( workbook: Workbook, store: Store, options?: XlsxWorkbookOptions, ): AsyncIterable<Uint8Array>; }",
               "owners": [
-                "src/xlsx-backend.ts"
+                "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-backend.ts#L104",
+              "source": "src/xlsx-bridge.ts#L104",
               "jsDocTags": [],
               "documentation": "Pluggable first-row-header, first-sheet table export backend.",
               "memberDocs": []
@@ -7054,9 +7054,9 @@
               "kind": "interface",
               "signature": "export interface XlsxTableImportBackend { name: string; fromXlsxTable( data: ArrayBuffer | Uint8Array, options?: XlsxWorkbookOptions, ): Promise<ColumnarData>; }",
               "owners": [
-                "src/xlsx-backend.ts"
+                "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-backend.ts#L224",
+              "source": "src/xlsx-bridge.ts#L224",
               "jsDocTags": [],
               "documentation": "Pluggable table import backend. Parses raw `.xlsx` bytes into the same\n`ColumnarData` shape `fromCsv` returns, so host ingestion code can stay\nformat-agnostic.",
               "memberDocs": []
@@ -7066,9 +7066,9 @@
               "kind": "interface",
               "signature": "export interface XlsxWorkbookBackend { name: string; toXlsxWorkbook( snapshot: WorkbookSnapshot, options?: XlsxWorkbookOptions, context?: XlsxWorkbookExportContext, ): Promise<Uint8Array>; fromXlsxWorkbook( data: ArrayBuffer | Uint8Array, options?: XlsxWorkbookOptions, ): Promise<WorkbookSnapshot>; toXlsxWorkbookStream?( snapshot: WorkbookSnapshot, options?: XlsxWorkbookOptions, context?: XlsxWorkbookExportContext, ): AsyncIterable<Uint8Array>; fromXlsxWorkbookFile?(file: Blob, options?: XlsxWorkbookOptions): Promise<WorkbookSnapshot>; verifySource?(snapshot: WorkbookSnapshot): WorkbookSnapshot[\"workbook\"][\"xlsxSource\"]; }",
               "owners": [
-                "src/xlsx-backend.ts"
+                "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-backend.ts#L315",
+              "source": "src/xlsx-bridge.ts#L315",
               "jsDocTags": [
                 "internal"
               ],
@@ -7080,9 +7080,9 @@
               "kind": "interface",
               "signature": "export interface XlsxWorkbookOptions { signal?: AbortSignal; maxCells?: number; resourceLimits?: Partial<Omit<XlsxResourceLimits, \"maxCells\">>; onWarning?: (warning: XlsxWorkbookWarning) => void; }",
               "owners": [
-                "src/xlsx-backend.ts"
+                "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-backend.ts#L295",
+              "source": "src/xlsx-bridge.ts#L295",
               "jsDocTags": [],
               "documentation": "Shared options passed to every registered table and workbook XLSX backend.",
               "memberDocs": [
@@ -7105,9 +7105,9 @@
               "kind": "interface",
               "signature": "export interface XlsxWorkbookWarning { code: | \"boolean-literal\" | \"rich-text\" | \"hyperlink\" | \"unsupported-cell-value\" | \"unsupported-feature\" | \"external-relationship\" | \"external-formula\" | \"format-loss\" | \"validation-loss\" | \"invalid-metadata\"; message: string; sheet?: string; cell?: string; part?: string; }",
               "owners": [
-                "src/xlsx-backend.ts"
+                "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-backend.ts#L276",
+              "source": "src/xlsx-bridge.ts#L276",
               "jsDocTags": [],
               "documentation": "Structured fidelity warning emitted during XLSX conversion.",
               "memberDocs": []

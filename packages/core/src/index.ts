@@ -131,7 +131,7 @@ export {
   type XlsxWorkbookBackend,
   type XlsxWorkbookOptions,
   type XlsxWorkbookWarning,
-} from "./xlsx-backend.js";
+} from "./xlsx-bridge.js";
 
 export { convertXlsxFormulas } from "./engine.js";
 

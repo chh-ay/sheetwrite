@@ -27,7 +27,7 @@ import {
   toXlsxTable,
   toXlsxWorkbook,
   XlsxResourceError,
-} from "../src/xlsx-backend.js";
+} from "../src/xlsx-bridge.js";
 
 beforeAll(async () => {
   await initSheetwrite();
