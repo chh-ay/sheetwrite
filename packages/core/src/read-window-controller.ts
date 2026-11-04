@@ -135,10 +135,32 @@ export class ReadWindowController {
   private destroyed = false;
   /** Set after the engine stops: the last frame stays and no read reaches the store again. */
   private frozen = false;
-  private readonly stopMemoryRelease: (() => void) | undefined;
+  private stopMemoryRelease: (() => void) | undefined;
 
   constructor(private readonly options: ReadWindowControllerOptions) {
-    this.stopMemoryRelease = storeEngine(options.store)?.onMemoryRelease(() => {
+    this.bindMemoryRelease();
+  }
+
+  /** A replacement has a new engine and must not retain the old window or listener. */
+  resetDocument(): void {
+    this.stopMemoryRelease?.();
+    this.cancelFrame();
+    this.pinnedSheet = null;
+    this.formulaBands = EMPTY_BANDS;
+    this.lastPaintView = null;
+    this.cachedPaneViews = [];
+    this.cachedDomMergeAnchorViews = [];
+    this.domMergeSourceViews.length = 0;
+    this.domMergeAnchorState.length = 0;
+    this.mainViewValuePool.length = 0;
+    this.paneValuePools.length = 0;
+    this.domMergeAnchorValuePools.length = 0;
+    this.bindMemoryRelease();
+    this.invalidateColumns();
+  }
+
+  private bindMemoryRelease(): void {
+    this.stopMemoryRelease = storeEngine(this.options.store)?.onMemoryRelease(() => {
       this.invalidateData();
       this.schedule();
     });

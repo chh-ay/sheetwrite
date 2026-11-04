@@ -6,24 +6,19 @@ import {
   encodeDelimitedTextChunks,
 } from "../src/delimited-text.js";
 import { SheetwriteError } from "../src/errors.js";
-import {
-  fromCsv,
-  fromXlsxTable,
-  fromXlsxWorkbook,
-  parseCsv,
-  setXlsxTableExportBackend,
-  setXlsxTableImportBackend,
-  setXlsxWorkbookBackend,
-  toCsv,
-  toCsvStream,
-  toTsv,
-  toTsvStream,
-  toXlsxTable,
-  toXlsxWorkbook,
-} from "../src/export.js";
+import { fromCsv, parseCsv, toCsv, toCsvStream, toTsv, toTsvStream } from "../src/export.js";
 import { initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import type { Column, Workbook, WorkbookSnapshot } from "../src/types.js";
+import {
+  fromXlsxTable,
+  fromXlsxWorkbook,
+  setXlsxTableExportBackend,
+  setXlsxTableImportBackend,
+  setXlsxWorkbookBackend,
+  toXlsxTable,
+  toXlsxWorkbook,
+} from "../src/xlsx-backend.js";
 
 beforeAll(async () => {
   await initSheetwrite();

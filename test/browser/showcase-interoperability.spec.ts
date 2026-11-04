@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 import { expect, type Page, test } from "@playwright/test";
 
 import compatibilityResults from "../../docs/src/generated/compatibility-results.json" with { type: "json" };
@@ -320,6 +322,62 @@ test("live round-trip preserves formulas, the merge, and frozen rows after an ed
 
   expect(errors.page).toEqual([]);
   expect(errors.console).toEqual([]);
+});
+
+test("@portability File import opens the native picker from the keyboard and replaces the live workbook", async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await bootInterop(page);
+
+  // The showcase registers its optional backend on its first XLSX action.
+  await openDisclosure(page, "interop-fixtures-disclosure");
+  await page.getByTestId("fixture-libreoffice-rich-load").click();
+  await expect(page.getByTestId("interop-source")).toContainText("libreoffice-rich.xlsx");
+
+  await page.evaluate(() => {
+    const grid = window.__sheetwriteInteropGrid;
+    if (!grid) throw new Error("Expected live interoperability grid");
+    grid.setConfig({ ribbon: true });
+  });
+  const ribbon = page.locator(".sw-si-grid .sheetwrite-ribbon");
+  const fileTab = ribbon.getByRole("tab", { name: "File", exact: true });
+  await fileTab.focus();
+  await fileTab.press("Enter");
+  const command = ribbon.getByRole("button", { name: "Import XLSX", exact: true });
+  await expect(command).toBeEnabled();
+  await expect(command).toHaveAccessibleName("Import XLSX");
+  await command.focus();
+  const chooserReady = page.waitForEvent("filechooser");
+  await command.press("Enter");
+  const chooser = await chooserReady;
+  await chooser.setFiles(
+    fileURLToPath(
+      new URL("../../packages/xlsx/test/fixtures/shared-formula.xlsx", import.meta.url),
+    ),
+  );
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.__sheetwriteInteropGrid?.store
+          .getWorkbook()
+          .sheets.map((sheet) => sheet.name)
+          .sort(),
+      ),
+    )
+    .toEqual(["Fixture"]);
+  expect(await page.evaluate(() => {
+    const grid = window.__sheetwriteInteropGrid;
+    if (!grid) throw new Error("Expected imported grid");
+    return grid.store.getCell({ sheet: grid.getActiveSheet(), row: 2, col: 1 }).resolved;
+  })).toBe(6);
+  await expect
+    .poll(() =>
+      page.evaluate(() => window.__sheetwriteInteropGrid?.getCommandState("undo").disabled),
+    )
+    .toBe(true);
+  await expect(ribbon).toBeVisible();
+  expect(errors.page).toEqual([]);
 });
 
 test("committed LibreOffice fixture imports live with structured coded warnings", async ({

@@ -28,7 +28,7 @@ function updateTotal(grid: Grid) {
 - [Grid.applyTransaction](/docs/api/vue/grid/#grid-apply-transaction)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/grid.d.ts#L638"><code>packages/core/dist/types/grid.d.ts#L638</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/grid.d.ts#L640"><code>packages/core/dist/types/grid.d.ts#L640</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -79,6 +79,7 @@ function updateTotal(grid: Grid) {
 <a href="#grid-redo"><code>redo</code></a>
 <a href="#grid-export-csv"><code>exportCsv</code></a>
 <a href="#grid-export-xlsx"><code>exportXlsx</code></a>
+<a href="#grid-import-workbook"><code>importWorkbook</code></a>
 <a href="#grid-search"><code>search</code></a>
 <a href="#grid-find-next"><code>findNext</code></a>
 <a href="#grid-find-prev"><code>findPrev</code></a>
@@ -137,7 +138,7 @@ function updateTotal(grid: Grid) {
 <a href="#grid-destroy"><code>destroy</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>103</span>
+## Members <span class="api-count" data-pagefind-ignore>104</span>
 
 <div class="api-member-list">
 
@@ -708,6 +709,19 @@ async function downloadXlsx(grid: Grid) {
 
 - [toXlsxWorkbook](/docs/api/core/to-xlsx-workbook/)
 
+</details>
+
+<details class="api-member" id="grid-import-workbook" data-pagefind-weight="1">
+<summary><code>importWorkbook</code> <span class="api-member-summary">Replace the document without recreating the grid or chrome.</span></summary>
+
+```ts generated
+importWorkbook(source: WorkbookSnapshot | ((signal: AbortSignal) => Promise<WorkbookSnapshot>), options?: { signal?: AbortSignal; }): Promise<void>;
+```
+
+<p class="api-member-doc">Replace the document without recreating the grid or chrome. A new import
+aborts the previous loader. Failure keeps the document and history; success
+clears undo and redo. Import is not undoable, like Excel Open.
+Injected stores, datasource grids and attached collaboration sessions reject.</p>
 </details>
 
 <details class="api-member" id="grid-search" data-pagefind-weight="1">
@@ -1343,6 +1357,13 @@ export interface Grid {
   redo(): void;
   exportCsv(filename: string): void;
   exportXlsx(filename: string): Promise<void>;
+  importWorkbook(
+    source:
+      WorkbookSnapshot | ((signal: AbortSignal) => Promise<WorkbookSnapshot>),
+    options?: {
+      signal?: AbortSignal;
+    },
+  ): Promise<void>;
   search(query: string, opts?: SearchOptions): SearchResult;
   findNext(): SearchResult;
   findPrev(): SearchResult;

@@ -645,7 +645,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L701",
+              "source": "src/types/grid.ts#L704",
               "jsDocTags": [],
               "documentation": "View-aware editable snapshot of one cell, for hosts building a detached\nformula bar or cell inspector. `address` is the translated *data* address —\nthe correct target for `Grid.applyTransaction` even under an active\nsort/filter view — while the `(row, col)` inputs of\n{@link Grid.getCellInput} are active-sheet view coordinates.",
               "memberDocs": [
@@ -1212,7 +1212,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L358",
+              "source": "src/types/grid.ts#L361",
               "jsDocTags": [],
               "documentation": "The `GridConfig` switches that choose built-in commands. They apply to every\nrenderer of the command model: the toolbar, the full ribbon and the compact\nribbon. Each defaults to true, except `export`.",
               "memberDocs": []
@@ -1409,7 +1409,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L374",
+              "source": "src/types/grid.ts#L377",
               "jsDocTags": [],
               "documentation": "Built-in action names accepted by custom context-menu rows.",
               "memberDocs": []
@@ -1421,7 +1421,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L402",
+              "source": "src/types/grid.ts#L405",
               "jsDocTags": [],
               "documentation": "Cell and viewport coordinates resolved for one bundled context-menu opening.",
               "memberDocs": [
@@ -1446,7 +1446,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L463",
+              "source": "src/types/grid.ts#L466",
               "jsDocTags": [
                 "example",
                 "see"
@@ -1498,7 +1498,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L492",
+              "source": "src/types/grid.ts#L495",
               "jsDocTags": [],
               "documentation": "Static rows or a context-aware factory evaluated each time the menu opens.",
               "memberDocs": []
@@ -1522,7 +1522,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L455",
+              "source": "src/grid.ts#L454",
               "jsDocTags": [
                 "example",
                 "see"
@@ -1848,7 +1848,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L329",
+              "source": "src/grid.ts#L328",
               "jsDocTags": [],
               "documentation": "Default canvas theme used before CSS and explicit theme overrides.",
               "memberDocs": []
@@ -1882,9 +1882,9 @@
               "kind": "variable",
               "signature": "Readonly<XlsxResourceLimits>",
               "owners": [
-                "src/export.ts"
+                "src/xlsx-backend.ts"
               ],
-              "source": "src/export.ts#L376",
+              "source": "src/xlsx-backend.ts#L55",
               "jsDocTags": [],
               "documentation": "Codec defaults combine SpreadsheetML worksheet dimensions with independent\nZIP/XML and aggregate-work ceilings for untrusted in-memory conversion.",
               "memberDocs": []
@@ -2066,7 +2066,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L280",
+              "source": "src/export.ts#L277",
               "jsDocTags": [],
               "documentation": "Trigger a browser download from in-memory bytes. The temporary anchor is\nremoved and its object URL is scheduled for revocation even when DOM append or\nclick throws.",
               "memberDocs": []
@@ -2131,7 +2131,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L215",
+              "source": "src/export.ts#L212",
               "jsDocTags": [],
               "documentation": "Parse CSV into `ColumnarData`. The first record is consumed as a positional\nheader. Input fields project onto declared visible columns; hidden declared\ncolumns are initialized to `null`, matching the visible-column CSV export.\nExtra fields are ignored and missing fields become `null`. The returned\ncolumnar table is fully materialized in memory.",
               "memberDocs": []
@@ -2141,9 +2141,9 @@
               "kind": "function",
               "signature": "(data: ArrayBuffer | Uint8Array, options?: XlsxWorkbookOptions): Promise<ColumnarData>",
               "owners": [
-                "src/export.ts"
+                "src/xlsx-backend.ts"
               ],
-              "source": "src/export.ts#L578",
+              "source": "src/xlsx-backend.ts#L257",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2156,9 +2156,9 @@
               "kind": "function",
               "signature": "(data: ArrayBuffer | Uint8Array, options?: XlsxWorkbookOptions): Promise<WorkbookSnapshot>",
               "owners": [
-                "src/export.ts"
+                "src/xlsx-backend.ts"
               ],
-              "source": "src/export.ts#L792",
+              "source": "src/xlsx-backend.ts#L480",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2171,21 +2171,21 @@
               "kind": "function",
               "signature": "(file: Blob, options?: XlsxWorkbookOptions): Promise<WorkbookSnapshot>",
               "owners": [
-                "src/export.ts"
+                "src/xlsx-backend.ts"
               ],
-              "source": "src/export.ts#L756",
+              "source": "src/xlsx-backend.ts#L440",
               "jsDocTags": [],
-              "documentation": "Import a seekable File/Blob without first buffering the compressed workbook.",
+              "documentation": "Import a File/Blob. The built-in backend reads it without buffering the compressed workbook.",
               "memberDocs": []
             },
             {
               "name": "Grid",
               "kind": "interface",
-              "signature": "export interface Grid { readonly store: Store; readonly actions: GridActions; getRuntimeResourceSnapshot( operation: RuntimeResourceOperation, phase: RuntimeResourcePhase, runtime?: RuntimeMemoryObservation, ): RuntimeResourceSnapshot; getCommandState(command: GridCommandName): GridCommandState; getFocusCellStyle(): CellStyle; summarizeSelection(signal?: AbortSignal): Promise<SelectionSummary | null>; setActiveSheet(id: SheetId): void; scrollToCell(addr: CellAddress): void; getCellAtPoint(clientX: number, clientY: number): CellAddress | null; getActiveSheet(): SheetId; getCellInput(row: number, col: number): CellInputSnapshot | null; getSelection(): Selection | null; setSelection(sel: Selection | null): void; getTheme(): Theme; getShortcutLabel(action: KeyboardAction): string; setTheme(theme: Partial<Theme>): void; replaceTheme(theme: Partial<Theme> | undefined): void; getEffectiveTheme(): Theme; setReadOnly(readOnly: boolean): void; setConfig(config: GridConfig | undefined): void; applyTransaction(transaction: GridTransaction): ApplyTransactionResult; exportSnapshot(): WorkbookSnapshot; applyRemoteOperations( operations: readonly DocumentOp[], options?: RemoteOperationOptions, ): ApplyTransactionResult; defineCellRenderer(name: string, renderer: CellRenderer): void; aggregate(col: number, op: AggregateOp): number; sortBy(col: number, ascending?: boolean): ApplyTransactionResult; sortByMulti(keys: readonly SortKey[]): ApplyTransactionResult; filterBy(col: number, needle: string): void; setColumnFilter(col: number, filter: ColumnFilter | null): void; setSort(keys: readonly SortKey[]): ApplyTransactionResult; getColumnFilters(): ReadonlyMap<number, ColumnFilter>; distinctValues(col: number, limit?: number): CellScalar[]; hideRows(rows: readonly number[]): void; showRows(rows?: readonly number[]): void; hiddenRows(): readonly number[]; hideColumns(cols?: readonly number[]): void; showColumns(cols?: readonly number[]): void; hiddenColumns(): readonly number[]; groupRows(start: number, end: number): void; ungroupRows(start: number, end: number): void; setGroupCollapsed(start: number, collapsed: boolean): void; rowGroups(): readonly RowGroup[]; clearView(): void; undo(): void; redo(): void; exportCsv(filename: string): void; exportXlsx(filename: string): Promise<void>; search(query: string, opts?: SearchOptions): SearchResult; findNext(): SearchResult; findPrev(): SearchResult; clearSearch(): void; replaceCurrent(replacement: string): SearchResult; replaceAll(replacement: string): ReplaceResult; insertRows(at: number, count?: number): void; removeRows(at: number, count?: number): void; insertColumns(at: number, count?: number): void; removeColumns(at: number, count?: number): void; addSheet(input: AddSheetInput): SheetLifecycleResult; removeSheet(id: SheetId): SheetLifecycleResult; renameSheet(id: SheetId, name: string): SheetLifecycleResult; moveSheet(id: SheetId, toIndex: number): SheetLifecycleResult; setSheetVisibility(id: SheetId, visibility: SheetVisibility): SheetLifecycleResult; setConditionalFormats(rules: readonly ConditionalFormatRule[]): void; setHyperlink(hyperlink: CellHyperlink): ApplyTransactionResult; removeHyperlink(id: string): ApplyTransactionResult; getHyperlink(addr: CellAddress): CellHyperlink | null; activateHyperlink(addr: CellAddress): boolean; setValidationRule(rule: DataValidationRule): ApplyTransactionResult; removeValidationRule(id: string): ApplyTransactionResult; setProtectedRange(protectedRange: ProtectedRange): ApplyTransactionResult; removeProtectedRange(id: string): ApplyTransactionResult; getPivots(sheet?: SheetId): PivotDefinition[]; setPivot(pivot: PivotDefinition, sheet?: SheetId): ApplyTransactionResult; removePivot(id: string, sheet?: SheetId): ApplyTransactionResult; getPivotFields(sheet: SheetId, id: string): PivotSourceField[]; getPivotResult(sheet: SheetId, id: string): PivotResultView | null; getCharts(sheet?: SheetId): readonly ChartDefinition[]; setChart(chart: ChartDefinition, sheet?: SheetId): ApplyTransactionResult; removeChart(id: string, sheet?: SheetId): ApplyTransactionResult; selectChart(id: string | null, sheet?: SheetId): void; openPanel(panel: GridPanel | null): void; setProtectionResolver(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void; setNote(addr: CellAddress, text: string | null): ApplyTransactionResult; getNote(addr: CellAddress): string | null; setOverscan(overscan?: number): void; setMinColumns(minColumns?: number): void; highlightCells(ranges: readonly HighlightRange[] | null, color?: string): void; setPresenceOverlays(overlays: readonly PresenceOverlay[] | null): void; styleRange(range: Range, style: Partial<CellStyle> | null): void; beginEdit(row: number, col: number, initial?: string, selectAll?: boolean): void; dataEdge(row: number, col: number, dRow: number, dCol: number): number | null; setRowHeight(row: number, height: number): void; setColumnWidth(col: number, width: number): void; autoFitRows(range?: Range): void; autoFitColumns(cols?: readonly number[]): void; setFrozen(rows: number, cols?: number): void; setZoom(zoom: number): void; getZoom(): number; rendererKind(): \"canvas\" | \"worker\"; on<E extends keyof GridEvents>(evt: E, fn: (e: GridEvents[E]) => void): () => void; refresh(): void; trimMemory(): void; destroy(): void; }",
+              "signature": "export interface Grid { readonly store: Store; readonly actions: GridActions; getRuntimeResourceSnapshot( operation: RuntimeResourceOperation, phase: RuntimeResourcePhase, runtime?: RuntimeMemoryObservation, ): RuntimeResourceSnapshot; getCommandState(command: GridCommandName): GridCommandState; getFocusCellStyle(): CellStyle; summarizeSelection(signal?: AbortSignal): Promise<SelectionSummary | null>; setActiveSheet(id: SheetId): void; scrollToCell(addr: CellAddress): void; getCellAtPoint(clientX: number, clientY: number): CellAddress | null; getActiveSheet(): SheetId; getCellInput(row: number, col: number): CellInputSnapshot | null; getSelection(): Selection | null; setSelection(sel: Selection | null): void; getTheme(): Theme; getShortcutLabel(action: KeyboardAction): string; setTheme(theme: Partial<Theme>): void; replaceTheme(theme: Partial<Theme> | undefined): void; getEffectiveTheme(): Theme; setReadOnly(readOnly: boolean): void; setConfig(config: GridConfig | undefined): void; applyTransaction(transaction: GridTransaction): ApplyTransactionResult; exportSnapshot(): WorkbookSnapshot; applyRemoteOperations( operations: readonly DocumentOp[], options?: RemoteOperationOptions, ): ApplyTransactionResult; defineCellRenderer(name: string, renderer: CellRenderer): void; aggregate(col: number, op: AggregateOp): number; sortBy(col: number, ascending?: boolean): ApplyTransactionResult; sortByMulti(keys: readonly SortKey[]): ApplyTransactionResult; filterBy(col: number, needle: string): void; setColumnFilter(col: number, filter: ColumnFilter | null): void; setSort(keys: readonly SortKey[]): ApplyTransactionResult; getColumnFilters(): ReadonlyMap<number, ColumnFilter>; distinctValues(col: number, limit?: number): CellScalar[]; hideRows(rows: readonly number[]): void; showRows(rows?: readonly number[]): void; hiddenRows(): readonly number[]; hideColumns(cols?: readonly number[]): void; showColumns(cols?: readonly number[]): void; hiddenColumns(): readonly number[]; groupRows(start: number, end: number): void; ungroupRows(start: number, end: number): void; setGroupCollapsed(start: number, collapsed: boolean): void; rowGroups(): readonly RowGroup[]; clearView(): void; undo(): void; redo(): void; exportCsv(filename: string): void; exportXlsx(filename: string): Promise<void>; importWorkbook( source: WorkbookSnapshot | ((signal: AbortSignal) => Promise<WorkbookSnapshot>), options?: { signal?: AbortSignal }, ): Promise<void>; search(query: string, opts?: SearchOptions): SearchResult; findNext(): SearchResult; findPrev(): SearchResult; clearSearch(): void; replaceCurrent(replacement: string): SearchResult; replaceAll(replacement: string): ReplaceResult; insertRows(at: number, count?: number): void; removeRows(at: number, count?: number): void; insertColumns(at: number, count?: number): void; removeColumns(at: number, count?: number): void; addSheet(input: AddSheetInput): SheetLifecycleResult; removeSheet(id: SheetId): SheetLifecycleResult; renameSheet(id: SheetId, name: string): SheetLifecycleResult; moveSheet(id: SheetId, toIndex: number): SheetLifecycleResult; setSheetVisibility(id: SheetId, visibility: SheetVisibility): SheetLifecycleResult; setConditionalFormats(rules: readonly ConditionalFormatRule[]): void; setHyperlink(hyperlink: CellHyperlink): ApplyTransactionResult; removeHyperlink(id: string): ApplyTransactionResult; getHyperlink(addr: CellAddress): CellHyperlink | null; activateHyperlink(addr: CellAddress): boolean; setValidationRule(rule: DataValidationRule): ApplyTransactionResult; removeValidationRule(id: string): ApplyTransactionResult; setProtectedRange(protectedRange: ProtectedRange): ApplyTransactionResult; removeProtectedRange(id: string): ApplyTransactionResult; getPivots(sheet?: SheetId): PivotDefinition[]; setPivot(pivot: PivotDefinition, sheet?: SheetId): ApplyTransactionResult; removePivot(id: string, sheet?: SheetId): ApplyTransactionResult; getPivotFields(sheet: SheetId, id: string): PivotSourceField[]; getPivotResult(sheet: SheetId, id: string): PivotResultView | null; getCharts(sheet?: SheetId): readonly ChartDefinition[]; setChart(chart: ChartDefinition, sheet?: SheetId): ApplyTransactionResult; removeChart(id: string, sheet?: SheetId): ApplyTransactionResult; selectChart(id: string | null, sheet?: SheetId): void; openPanel(panel: GridPanel | null): void; setProtectionResolver(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void; setNote(addr: CellAddress, text: string | null): ApplyTransactionResult; getNote(addr: CellAddress): string | null; setOverscan(overscan?: number): void; setMinColumns(minColumns?: number): void; highlightCells(ranges: readonly HighlightRange[] | null, color?: string): void; setPresenceOverlays(overlays: readonly PresenceOverlay[] | null): void; styleRange(range: Range, style: Partial<CellStyle> | null): void; beginEdit(row: number, col: number, initial?: string, selectAll?: boolean): void; dataEdge(row: number, col: number, dRow: number, dCol: number): number | null; setRowHeight(row: number, height: number): void; setColumnWidth(col: number, width: number): void; autoFitRows(range?: Range): void; autoFitColumns(cols?: readonly number[]): void; setFrozen(rows: number, cols?: number): void; setZoom(zoom: number): void; getZoom(): number; rendererKind(): \"canvas\" | \"worker\"; on<E extends keyof GridEvents>(evt: E, fn: (e: GridEvents[E]) => void): () => void; refresh(): void; trimMemory(): void; destroy(): void; }",
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L788",
+              "source": "src/types/grid.ts#L791",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2353,6 +2353,10 @@
                   "documentation": "Draw temporary highlights outside document history. Pass `null` to clear all\nhighlights: `grid.highlightCells(null)`. Per-range `color` wins over the call color.\nUndo does not clear highlights; use `styleRange` for persistent cell fills."
                 },
                 {
+                  "name": "importWorkbook",
+                  "documentation": "Replace the document without recreating the grid or chrome. A new import\naborts the previous loader. Failure keeps the document and history; success\nclears undo and redo. Import is not undoable, like Excel Open.\nInjected stores, datasource grids and attached collaboration sessions reject."
+                },
+                {
                   "name": "openPanel",
                   "documentation": "Show `panel` on the grid's right edge and shrink the cells to make room;\n`null` closes the open panel. One panel shows at a time: opening a panel\ncloses the previous one. Escape and the close button close it and return\nfocus to the grid."
                 },
@@ -2505,7 +2509,7 @@
             {
               "name": "GridActions",
               "kind": "interface",
-              "signature": "export interface GridActions { toggleBold(): void; toggleItalic(): void; toggleUnderline(): void; toggleStrikethrough(): void; setAlign(align: CellAlign): void; setTextColor(color: string | null): void; setFillColor(color: string | null): void; toggleBorder(): void; setBorders(preset: BorderPreset): void; setFontFamily(family: string | null): void; setFontSize(size: number | null): void; stepFontSize(direction: 1 | -1): void; setVerticalAlign(align: CellVerticalAlign): void; toggleWrap(): void; setNumberFormat(code: string | null): void; stepDecimals(direction: 1 | -1): void; mergeAndCenter(): void; clearAll(): void; autoSum(): void; find(): void; freezePanes(): void; clearFormat(): void; merge(): void; unmerge(): void; sort(ascending: boolean): void; insertRowAbove(): void; insertRowBelow(): void; deleteRow(): void; insertColumnLeft(): void; insertColumnRight(): void; deleteColumn(): void; hideRows(rows?: readonly number[]): void; showRows(rows?: readonly number[]): void; autoFitRows(): void; hideColumns(cols?: readonly number[]): void; showColumns(cols?: readonly number[]): void; autoFitColumns(cols?: readonly number[]): void; clearFilter(col?: number): void; copy(): Promise<ClipboardOutcome>; cut(): Promise<ClipboardOutcome>; paste(): Promise<ClipboardOutcome>; pasteValues(): Promise<ClipboardOutcome>; clearContents(): void; exportCsv(filename?: string): void; exportXlsx(filename?: string): Promise<void>; editNote(): void; deleteNote(): void; showPivotFields(): void; undo(): void; redo(): void; }",
+              "signature": "export interface GridActions { toggleBold(): void; toggleItalic(): void; toggleUnderline(): void; toggleStrikethrough(): void; setAlign(align: CellAlign): void; setTextColor(color: string | null): void; setFillColor(color: string | null): void; toggleBorder(): void; setBorders(preset: BorderPreset): void; setFontFamily(family: string | null): void; setFontSize(size: number | null): void; stepFontSize(direction: 1 | -1): void; setVerticalAlign(align: CellVerticalAlign): void; toggleWrap(): void; setNumberFormat(code: string | null): void; stepDecimals(direction: 1 | -1): void; mergeAndCenter(): void; clearAll(): void; autoSum(): void; find(): void; freezePanes(): void; clearFormat(): void; merge(): void; unmerge(): void; sort(ascending: boolean): void; insertRowAbove(): void; insertRowBelow(): void; deleteRow(): void; insertColumnLeft(): void; insertColumnRight(): void; deleteColumn(): void; hideRows(rows?: readonly number[]): void; showRows(rows?: readonly number[]): void; autoFitRows(): void; hideColumns(cols?: readonly number[]): void; showColumns(cols?: readonly number[]): void; autoFitColumns(cols?: readonly number[]): void; clearFilter(col?: number): void; copy(): Promise<ClipboardOutcome>; cut(): Promise<ClipboardOutcome>; paste(): Promise<ClipboardOutcome>; pasteValues(): Promise<ClipboardOutcome>; clearContents(): void; exportCsv(filename?: string): void; exportXlsx(filename?: string): Promise<void>; importXlsx(): Promise<void>; editNote(): void; deleteNote(): void; showPivotFields(): void; undo(): void; redo(): void; }",
               "owners": [
                 "src/types/grid.ts"
               ],
@@ -2552,6 +2556,10 @@
                 {
                   "name": "freezePanes",
                   "documentation": "Freeze rows above and columns left of the focus cell in view coordinates.\nDoes nothing without a selection; focusing A1 unfreezes both axes."
+                },
+                {
+                  "name": "importXlsx",
+                  "documentation": "Pick an XLSX file and replace the open document."
                 },
                 {
                   "name": "mergeAndCenter",
@@ -2610,7 +2618,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L270",
+              "source": "src/types/grid.ts#L273",
               "jsDocTags": [],
               "documentation": "Built-in command names accepted by state queries and change events.",
               "memberDocs": []
@@ -2622,7 +2630,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L273",
+              "source": "src/types/grid.ts#L276",
               "jsDocTags": [],
               "documentation": "Observable availability and selection-derived activity for one command.",
               "memberDocs": []
@@ -2634,7 +2642,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L279",
+              "source": "src/types/grid.ts#L282",
               "jsDocTags": [],
               "documentation": "Complete command-state snapshot emitted whenever availability or activity can change.",
               "memberDocs": []
@@ -2646,7 +2654,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L519",
+              "source": "src/types/grid.ts#L522",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2734,7 +2742,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L721",
+              "source": "src/types/grid.ts#L724",
               "jsDocTags": [],
               "documentation": "Payload map for events emitted by a Grid.",
               "memberDocs": [
@@ -2779,7 +2787,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L594",
+              "source": "src/types/grid.ts#L597",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2953,7 +2961,7 @@
             {
               "name": "ICON_NAMES",
               "kind": "variable",
-              "signature": "readonly [\"undo\", \"redo\", \"paste\", \"cut\", \"copy\", \"find\", \"zoomIn\", \"zoomOut\", \"autoSum\", \"clear\", \"bold\", \"italic\", \"underline\", \"strikethrough\", \"textColor\", \"fillColor\", \"fontGrow\", \"fontShrink\", \"clearFormat\", \"separator\", \"alignLeft\", \"alignCenter\", \"alignRight\", \"alignTop\", \"alignMiddle\", \"alignBottom\", \"wrap\", \"merge\", \"unmerge\", \"mergeAndCenter\", \"border\", \"borderAll\", \"borderOutside\", \"borderThickOutside\", \"borderTop\", \"borderBottom\", \"borderLeft\", \"borderRight\", \"borderNone\", \"currency\", \"percent\", \"comma\", \"decimalIncrease\", \"decimalDecrease\", \"hyperlink\", \"note\", \"exportCsv\", \"exportXlsx\", \"insert\", \"delete\", \"format\", \"hideRows\", \"unhideRows\", \"hideColumns\", \"unhideColumns\", \"freeze\", \"groupRows\", \"ungroupRows\", \"sortAsc\", \"sortDesc\", \"sortFilter\", \"clearFilter\", \"chart\", \"chartColumn\", \"chartBar\", \"chartLine\", \"chartArea\", \"chartPie\", \"chartDoughnut\", \"chartScatter\", \"pivotTable\", \"insertFunction\", \"defineName\", \"nameManager\", \"explainFormula\", \"getData\", \"refreshAll\", \"queries\", \"editLinks\", \"relationships\", \"dataModel\", \"measure\", \"dashboard\", \"slicer\", \"kpiCard\", \"versionHistory\", \"saveVersion\"]",
+              "signature": "readonly [\"undo\", \"redo\", \"paste\", \"cut\", \"copy\", \"find\", \"zoomIn\", \"zoomOut\", \"autoSum\", \"clear\", \"bold\", \"italic\", \"underline\", \"strikethrough\", \"textColor\", \"fillColor\", \"fontGrow\", \"fontShrink\", \"clearFormat\", \"separator\", \"alignLeft\", \"alignCenter\", \"alignRight\", \"alignTop\", \"alignMiddle\", \"alignBottom\", \"wrap\", \"merge\", \"unmerge\", \"mergeAndCenter\", \"border\", \"borderAll\", \"borderOutside\", \"borderThickOutside\", \"borderTop\", \"borderBottom\", \"borderLeft\", \"borderRight\", \"borderNone\", \"currency\", \"percent\", \"comma\", \"decimalIncrease\", \"decimalDecrease\", \"hyperlink\", \"note\", \"exportCsv\", \"exportXlsx\", \"insert\", \"delete\", \"format\", \"hideRows\", \"unhideRows\", \"hideColumns\", \"unhideColumns\", \"freeze\", \"groupRows\", \"ungroupRows\", \"sortAsc\", \"sortDesc\", \"sortFilter\", \"clearFilter\", \"chart\", \"chartColumn\", \"chartBar\", \"chartLine\", \"chartArea\", \"chartPie\", \"chartDoughnut\", \"chartScatter\", \"pivotTable\", \"insertFunction\", \"defineName\", \"nameManager\", \"explainFormula\", \"getData\", \"refreshAll\", \"queries\", \"editLinks\", \"relationships\", \"dataModel\", \"measure\", \"dashboard\", \"slicer\", \"kpiCard\", \"versionHistory\", \"saveVersion\", \"importXlsx\"]",
               "owners": [
                 "src/icons/icon-names.ts"
               ],
@@ -2969,7 +2977,7 @@
               "owners": [
                 "src/icons/icon-names.ts"
               ],
-              "source": "src/icons/icon-names.ts#L95",
+              "source": "src/icons/icon-names.ts#L96",
               "jsDocTags": [],
               "documentation": "The name of one glyph on the command icon sheet; the key of `IconOverrides`.",
               "memberDocs": []
@@ -2981,7 +2989,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L322",
+              "source": "src/types/grid.ts#L325",
               "jsDocTags": [],
               "documentation": "Per-glyph icon overrides, keyed by the names on the command icon sheet\n(`ICON_NAMES`). One override applies wherever the glyph shows: the flat\ntoolbar, the ribbon and ribbon menus, and the context menu. Strings render\nas plain text; DOM nodes and node factories support SVG or HTML icons. To\nreplace every glyph at once, set the `--sheetwrite-icon-sheet` CSS property\nto a sheet drawn on the layout in `@sheetwrite/core/icons.json`.",
               "memberDocs": []
@@ -3005,7 +3013,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L373",
+              "source": "src/grid.ts#L372",
               "jsDocTags": [
                 "example",
                 "see"
@@ -3056,7 +3064,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L385",
+              "source": "src/grid.ts#L384",
               "jsDocTags": [],
               "documentation": "Whether `initSheetwrite` has completed — the single readiness source.",
               "memberDocs": []
@@ -3092,7 +3100,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L429",
+              "source": "src/types/grid.ts#L432",
               "jsDocTags": [],
               "documentation": "Built-in actions that can be rebound without replacing navigation.",
               "memberDocs": []
@@ -3104,7 +3112,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L442",
+              "source": "src/types/grid.ts#L445",
               "jsDocTags": [],
               "documentation": "Overrides replace all default keys for an action; null disables that action's keys.",
               "memberDocs": []
@@ -3116,7 +3124,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L417",
+              "source": "src/types/grid.ts#L420",
               "jsDocTags": [],
               "documentation": "A compact modified key combination or a key object. Modifiers may appear in\nany order before the final key, for example \"Mod+Shift+K\" or \"Ctrl+Alt+Delete\".\n`Mod`/`mod` means Command on macOS and Control elsewhere; Ctrl and Meta are literal.\nThe parser rejects unknown/repeated modifiers and missing keys.",
               "memberDocs": []
@@ -3443,7 +3451,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L204",
+              "source": "src/export.ts#L201",
               "jsDocTags": [],
               "documentation": "Parse the fixed comma dialect: quoted delimiters/newlines, doubled quotes,\nbare CR, LF, or CRLF records, Unicode, trailing empty fields, and one optional\nleading UTF-8 BOM. The synchronous API consumes an existing in-memory string\nand returns an in-memory grid; it does not claim streaming. Scanning enforces\nresource ceilings before materializing the next oversized field or record.",
               "memberDocs": []
@@ -4108,7 +4116,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L687",
+              "source": "src/types/grid.ts#L690",
               "jsDocTags": [],
               "documentation": "Replacement count and refreshed search state returned by replace-all.",
               "memberDocs": [
@@ -4177,7 +4185,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L390",
+              "source": "src/grid.ts#L389",
               "jsDocTags": [],
               "documentation": "Read `--sheetwrite-*` CSS custom properties into a partial theme.",
               "memberDocs": []
@@ -4311,7 +4319,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L346",
+              "source": "src/types/grid.ts#L349",
               "jsDocTags": [],
               "documentation": "Initial layout settings for the built-in or composable ribbon.",
               "memberDocs": [
@@ -4332,7 +4340,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L343",
+              "source": "src/types/grid.ts#L346",
               "jsDocTags": [],
               "documentation": "Layout of the Excel-style ribbon. `auto` chooses compact below the configured width.",
               "memberDocs": []
@@ -4767,7 +4775,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L665",
+              "source": "src/types/grid.ts#L668",
               "jsDocTags": [],
               "documentation": "Case, whole-cell, sheet, and column constraints for grid search.",
               "memberDocs": [
@@ -4796,7 +4804,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L677",
+              "source": "src/types/grid.ts#L680",
               "jsDocTags": [],
               "documentation": "Ordered matches and active index produced by a grid search.",
               "memberDocs": [
@@ -4867,9 +4875,9 @@
               "kind": "function",
               "signature": "(next: XlsxTableExportBackend): void",
               "owners": [
-                "src/export.ts"
+                "src/xlsx-backend.ts"
               ],
-              "source": "src/export.ts#L438",
+              "source": "src/xlsx-backend.ts#L117",
               "jsDocTags": [],
               "documentation": "Registers the optional table XLSX export implementation used by core.",
               "memberDocs": []
@@ -4879,9 +4887,9 @@
               "kind": "function",
               "signature": "(next: XlsxTableImportBackend): void",
               "owners": [
-                "src/export.ts"
+                "src/xlsx-backend.ts"
               ],
-              "source": "src/export.ts#L556",
+              "source": "src/xlsx-backend.ts#L235",
               "jsDocTags": [],
               "documentation": "Registers the optional table XLSX import implementation used by core.",
               "memberDocs": []
@@ -4889,11 +4897,11 @@
             {
               "name": "setXlsxWorkbookBackend",
               "kind": "function",
-              "signature": "(next: XlsxWorkbookBackend): void",
+              "signature": "(next: XlsxWorkbookBackend | null): void",
               "owners": [
-                "src/export.ts"
+                "src/xlsx-backend.ts"
               ],
-              "source": "src/export.ts#L660",
+              "source": "src/xlsx-backend.ts#L339",
               "jsDocTags": [],
               "documentation": "Registers the optional workbook XLSX implementation used by core.",
               "memberDocs": []
@@ -5026,7 +5034,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L711",
+              "source": "src/types/grid.ts#L714",
               "jsDocTags": [],
               "documentation": "Actionable transaction outcome for a stable sheet lifecycle target.",
               "memberDocs": []
@@ -5249,11 +5257,11 @@
             {
               "name": "SheetwriteStore",
               "kind": "class",
-              "signature": "class SheetwriteStore implements Store { constructor(workbook: Workbook, data?: ColumnarData, options?: SheetwriteStoreOptions); acknowledgeOperations: (operations: readonly DocumentOp[], storageRevision?: bigint) => void; aggregate: (sheet: SheetId, col: number, op: AggregateOp) => number; applyTransaction: (tx: Transaction, reasonOrOptions?: CommitReason | TransactionApplicationOptions) => ApplyTransactionResult; areColumnsFullyLoaded: (sheet: SheetId, startRow: number, endRow: number, columns: readonly number[]) => boolean; canApplyLocally: (patch: DocumentOp) => boolean; captureRangeHistory: (input: Range) => CompactRangeHistory | null; clearView: (sheet: SheetId) => ApplyTransactionResult; columnFilters: (sheet: SheetId) => ReadonlyMap<number, ColumnFilter>; dataEdge: (sheet: SheetId, row: number, col: number, dRow: number, dCol: number) => number; dataRowAt: (sheet: SheetId, viewRow: number) => number; dispose: () => void; distinctValues: (sheet: SheetId, col: number, limit?: number) => CellScalar[]; ensureColumns: (sheet: SheetId, columns: readonly Column[]) => void; exportSnapshot: () => WorkbookSnapshot; filterBy: (sheet: SheetId, col: number, needle: string) => ApplyTransactionResult; getCell: (addr: CellAddress) => ResolvedCell; getCellLoadState: (addr: CellAddress) => CellLoadState; getClipboardWindow: (sheet: SheetId, viewRows: { start: number; end: number; }, cols: readonly number[]) => ClipboardWindowView; getDataWindow: (sheet: SheetId, rows: { start: number; end: number; }, cols: readonly number[]) => VisibleWindowView; getFormula: (addr: CellAddress) => string | null; getFormulaMatrixResourcePeak: () => TransientResourcePeak; getPagedStats: (sheet: SheetId) => PagedStoreStats; getPivotFields: (sheet: SheetId, id: string) => PivotSourceField[]; getPivotResult: (sheet: SheetId, id: string) => PivotResultView | null; getPivots: (sheet?: SheetId) => PivotDefinition[]; getRangeMutationAllocationStats: () => RangeMutationAllocationStats; getRefTarget: (addr: CellAddress) => CellAddress | null; getRuntimeResourceSnapshot: (operation: RuntimeResourceOperation, phase: RuntimeResourcePhase, runtime?: RuntimeMemoryObservation) => RuntimeResourceSnapshot; getSpillAnchor: (addr: CellAddress) => CellAddress | null; getVisibleWindow: (sheet: SheetId, rows: { start: number; end: number; }, cols: readonly number[]) => VisibleWindowView; getWorkbook: () => Workbook; groupRows: (sheet: SheetId, start: number, end: number) => ApplyTransactionResult; hasView: (sheet: SheetId) => boolean; hiddenRows: (sheet: SheetId) => number[]; hideRows: (sheet: SheetId, rows: readonly number[]) => ApplyTransactionResult; isPaged: (sheet: SheetId) => boolean; isRangeFullyLoaded: (input: Range) => boolean; loadPage: (sheet: SheetId, start: number, columns: readonly DataSourceColumnBand[], rows: readonly RowData[], protect?: (addr: CellAddress) => boolean) => void; on: (_evt: \"change\", fn: ChangeListener) => () => void; queryCapability: (sheet: SheetId) => QueryCapability; recalculateVolatile: (now?: Date) => void; removePivot: (id: string, sheet?: SheetId) => ApplyTransactionResult; removeSheetFormulaIdentity: (sheet: SheetId) => boolean; renameSheetFormulaIdentity: (sheet: SheetId, name: string) => boolean; resetFormulaMatrixResourcePeak: () => void; resetRangeMutationAllocationStats: () => void; resetRuntimeResourceAccounting: () => void; rowGroups: (sheet: SheetId) => readonly RowGroup[]; searchCells: (sheet: SheetId, query: string, opts?: { matchCase?: boolean; wholeCell?: boolean; columns?: number[]; }) => CellAddress[]; searchCellsFlat: (sheet: SheetId, query: string, opts?: { matchCase?: boolean; wholeCell?: boolean; columns?: number[]; }) => Uint32Array; setColumnFilter: (sheet: SheetId, col: number, filter: ColumnFilter | null) => ApplyTransactionResult; setDetailedChangeCapture: (enabled: boolean) => void; setGroupCollapsed: (sheet: SheetId, start: number, collapsed: boolean) => ApplyTransactionResult; setPivot: (pivot: PivotDefinition, sheet?: SheetId) => ApplyTransactionResult; setProtectionResolver: (resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode) => void; showRows: (sheet: SheetId, rows?: readonly number[]) => ApplyTransactionResult; sortBy: (sheet: SheetId, col: number, ascending: boolean) => ApplyTransactionResult; sortByMulti: (sheet: SheetId, keys: readonly SortKey[]) => ApplyTransactionResult; ungroupRows: (sheet: SheetId, start: number, end: number) => ApplyTransactionResult; viewRowCount: (sheet: SheetId) => number; viewRowOf: (sheet: SheetId, dataRow: number) => number | null; withResourceOperation: <T>(operation: RuntimeResourceOperation, run: () => T) => T; static fromSnapshot: (input: unknown, options?: SheetwriteStoreOptions) => SheetwriteStore }",
+              "signature": "class SheetwriteStore implements Store { constructor(workbook: Workbook, data?: ColumnarData, options?: SheetwriteStoreOptions); acknowledgeOperations: (operations: readonly DocumentOp[], storageRevision?: bigint) => void; aggregate: (sheet: SheetId, col: number, op: AggregateOp) => number; applyTransaction: (tx: Transaction, reasonOrOptions?: CommitReason | TransactionApplicationOptions) => ApplyTransactionResult; areColumnsFullyLoaded: (sheet: SheetId, startRow: number, endRow: number, columns: readonly number[]) => boolean; canApplyLocally: (patch: DocumentOp) => boolean; captureRangeHistory: (input: Range) => CompactRangeHistory | null; clearView: (sheet: SheetId) => ApplyTransactionResult; columnFilters: (sheet: SheetId) => ReadonlyMap<number, ColumnFilter>; dataEdge: (sheet: SheetId, row: number, col: number, dRow: number, dCol: number) => number; dataRowAt: (sheet: SheetId, viewRow: number) => number; dispose: () => void; distinctValues: (sheet: SheetId, col: number, limit?: number) => CellScalar[]; ensureColumns: (sheet: SheetId, columns: readonly Column[]) => void; exportSnapshot: () => WorkbookSnapshot; filterBy: (sheet: SheetId, col: number, needle: string) => ApplyTransactionResult; getCell: (addr: CellAddress) => ResolvedCell; getCellLoadState: (addr: CellAddress) => CellLoadState; getClipboardWindow: (sheet: SheetId, viewRows: { start: number; end: number; }, cols: readonly number[]) => ClipboardWindowView; getDataWindow: (sheet: SheetId, rows: { start: number; end: number; }, cols: readonly number[]) => VisibleWindowView; getFormula: (addr: CellAddress) => string | null; getFormulaMatrixResourcePeak: () => TransientResourcePeak; getPagedStats: (sheet: SheetId) => PagedStoreStats; getPivotFields: (sheet: SheetId, id: string) => PivotSourceField[]; getPivotResult: (sheet: SheetId, id: string) => PivotResultView | null; getPivots: (sheet?: SheetId) => PivotDefinition[]; getRangeMutationAllocationStats: () => RangeMutationAllocationStats; getRefTarget: (addr: CellAddress) => CellAddress | null; getRuntimeResourceSnapshot: (operation: RuntimeResourceOperation, phase: RuntimeResourcePhase, runtime?: RuntimeMemoryObservation) => RuntimeResourceSnapshot; getSpillAnchor: (addr: CellAddress) => CellAddress | null; getVisibleWindow: (sheet: SheetId, rows: { start: number; end: number; }, cols: readonly number[]) => VisibleWindowView; getWorkbook: () => Workbook; groupRows: (sheet: SheetId, start: number, end: number) => ApplyTransactionResult; hasView: (sheet: SheetId) => boolean; hiddenRows: (sheet: SheetId) => number[]; hideRows: (sheet: SheetId, rows: readonly number[]) => ApplyTransactionResult; isPaged: (sheet: SheetId) => boolean; isRangeFullyLoaded: (input: Range) => boolean; loadPage: (sheet: SheetId, start: number, columns: readonly DataSourceColumnBand[], rows: readonly RowData[], protect?: (addr: CellAddress) => boolean) => void; on: (_evt: \"change\", fn: ChangeListener) => () => void; queryCapability: (sheet: SheetId) => QueryCapability; recalculateVolatile: (now?: Date) => void; removePivot: (id: string, sheet?: SheetId) => ApplyTransactionResult; removeSheetFormulaIdentity: (sheet: SheetId) => boolean; renameSheetFormulaIdentity: (sheet: SheetId, name: string) => boolean; replaceSnapshot: (snapshot: WorkbookSnapshot) => void; resetFormulaMatrixResourcePeak: () => void; resetRangeMutationAllocationStats: () => void; resetRuntimeResourceAccounting: () => void; rowGroups: (sheet: SheetId) => readonly RowGroup[]; searchCells: (sheet: SheetId, query: string, opts?: { matchCase?: boolean; wholeCell?: boolean; columns?: number[]; }) => CellAddress[]; searchCellsFlat: (sheet: SheetId, query: string, opts?: { matchCase?: boolean; wholeCell?: boolean; columns?: number[]; }) => Uint32Array; setColumnFilter: (sheet: SheetId, col: number, filter: ColumnFilter | null) => ApplyTransactionResult; setDetailedChangeCapture: (enabled: boolean) => void; setGroupCollapsed: (sheet: SheetId, start: number, collapsed: boolean) => ApplyTransactionResult; setPivot: (pivot: PivotDefinition, sheet?: SheetId) => ApplyTransactionResult; setProtectionResolver: (resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode) => void; showRows: (sheet: SheetId, rows?: readonly number[]) => ApplyTransactionResult; sortBy: (sheet: SheetId, col: number, ascending: boolean) => ApplyTransactionResult; sortByMulti: (sheet: SheetId, keys: readonly SortKey[]) => ApplyTransactionResult; ungroupRows: (sheet: SheetId, start: number, end: number) => ApplyTransactionResult; viewRowCount: (sheet: SheetId) => number; viewRowOf: (sheet: SheetId, dataRow: number) => number | null; withResourceOperation: <T>(operation: RuntimeResourceOperation, run: () => T) => T; static fromSnapshot: (input: unknown, options?: SheetwriteStoreOptions) => SheetwriteStore }",
               "owners": [
                 "src/store.ts"
               ],
-              "source": "src/store.ts#L149",
+              "source": "src/store.ts#L153",
               "jsDocTags": [
                 "example",
                 "see"
@@ -5337,6 +5345,10 @@
                   "documentation": "Remove a pivot; `sheet` defaults to the sheet that holds it."
                 },
                 {
+                  "name": "replaceSnapshot",
+                  "documentation": "Replace only after a separate store has validated and hydrated every sheet."
+                },
+                {
                   "name": "setDetailedChangeCapture",
                   "documentation": "Opt in to per-cell before/after capture for packed and clear operations."
                 },
@@ -5361,7 +5373,7 @@
               "owners": [
                 "src/store.ts"
               ],
-              "source": "src/store.ts#L79",
+              "source": "src/store.ts#L83",
               "jsDocTags": [],
               "documentation": "Storage layout plus snapshot and transaction resource ceilings for one store.",
               "memberDocs": [
@@ -6093,7 +6105,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L97",
+              "source": "src/export.ts#L94",
               "jsDocTags": [
                 "link",
                 "throws"
@@ -6108,7 +6120,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L105",
+              "source": "src/export.ts#L102",
               "jsDocTags": [],
               "documentation": "Export UTF-8 CSV on demand, retaining only one store window and one byte chunk.",
               "memberDocs": []
@@ -6116,11 +6128,11 @@
             {
               "name": "ToolbarActionName",
               "kind": "type",
-              "signature": "export type ToolbarActionName = | \"bold\" | \"italic\" | \"underline\" | \"strikethrough\" | \"alignLeft\" | \"alignCenter\" | \"alignRight\" | \"alignTop\" | \"alignMiddle\" | \"alignBottom\" | \"wrap\" | \"textColor\" | \"fillColor\" | \"border\" | \"clearFormat\" | \"merge\" | \"unmerge\" | \"sortAsc\" | \"sortDesc\" | \"exportCsv\" | \"exportXlsx\" | \"undo\" | \"redo\" | \"separator\";",
+              "signature": "export type ToolbarActionName = | \"bold\" | \"italic\" | \"underline\" | \"strikethrough\" | \"alignLeft\" | \"alignCenter\" | \"alignRight\" | \"alignTop\" | \"alignMiddle\" | \"alignBottom\" | \"wrap\" | \"textColor\" | \"fillColor\" | \"border\" | \"clearFormat\" | \"merge\" | \"unmerge\" | \"sortAsc\" | \"sortDesc\" | \"exportCsv\" | \"exportXlsx\" | \"importXlsx\" | \"undo\" | \"redo\" | \"separator\";",
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L243",
+              "source": "src/types/grid.ts#L245",
               "jsDocTags": [],
               "documentation": "Built-in action names accepted by custom toolbar items.",
               "memberDocs": []
@@ -6132,7 +6144,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L312",
+              "source": "src/types/grid.ts#L315",
               "jsDocTags": [],
               "documentation": "Text, DOM node, or node factory used as toolbar icon content.",
               "memberDocs": []
@@ -6144,7 +6156,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L328",
+              "source": "src/types/grid.ts#L331",
               "jsDocTags": [],
               "documentation": "Built-in, separator, or custom callback item in the grid toolbar. A built-in\n`action` renders the same command, glyph and state as the ribbon.",
               "memberDocs": [
@@ -6173,7 +6185,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L176",
+              "source": "src/export.ts#L173",
               "jsDocTags": [
                 "link",
                 "throws"
@@ -6188,7 +6200,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L183",
+              "source": "src/export.ts#L180",
               "jsDocTags": [],
               "documentation": "Export canonical data-space TSV with pull-driven store reads and cancellation.",
               "memberDocs": []
@@ -6198,9 +6210,9 @@
               "kind": "function",
               "signature": "(workbook: Workbook, store: Store, options?: XlsxWorkbookOptions): Promise<Uint8Array>",
               "owners": [
-                "src/export.ts"
+                "src/xlsx-backend.ts"
               ],
-              "source": "src/export.ts#L504",
+              "source": "src/xlsx-backend.ts#L183",
               "jsDocTags": [
                 "example",
                 "see"
@@ -6213,9 +6225,9 @@
               "kind": "function",
               "signature": "(workbook: Workbook, store: Store, options?: XlsxWorkbookOptions): ReadableStream<Uint8Array>",
               "owners": [
-                "src/export.ts"
+                "src/xlsx-backend.ts"
               ],
-              "source": "src/export.ts#L524",
+              "source": "src/xlsx-backend.ts#L203",
               "jsDocTags": [],
               "documentation": "Stream table XLSX bytes without materializing the finished archive.",
               "memberDocs": []
@@ -6225,9 +6237,9 @@
               "kind": "function",
               "signature": "(input: WorkbookSnapshot | Pick<Grid, \"exportSnapshot\">, options?: XlsxWorkbookOptions): Promise<Uint8Array>",
               "owners": [
-                "src/export.ts"
+                "src/xlsx-backend.ts"
               ],
-              "source": "src/export.ts#L715",
+              "source": "src/xlsx-backend.ts#L399",
               "jsDocTags": [
                 "example",
                 "see"
@@ -6240,9 +6252,9 @@
               "kind": "function",
               "signature": "(input: WorkbookSnapshot | Pick<Grid, \"exportSnapshot\">, options?: XlsxWorkbookOptions): ReadableStream<Uint8Array>",
               "owners": [
-                "src/export.ts"
+                "src/xlsx-backend.ts"
               ],
-              "source": "src/export.ts#L736",
+              "source": "src/xlsx-backend.ts#L420",
               "jsDocTags": [],
               "documentation": "Stream formula-preserving workbook XLSX with backpressure and cancellation.",
               "memberDocs": []
@@ -6845,9 +6857,9 @@
               "kind": "class",
               "signature": "class XlsxResourceError extends SheetwriteError { constructor(resource: keyof XlsxResourceLimits, limit: number, actual: number, operation: \"import\" | \"export\"); actual: number; code: \"xlsx-resource-limit\"; limit: number; name: \"XlsxResourceError\"; resource: keyof XlsxResourceLimits }",
               "owners": [
-                "src/export.ts"
+                "src/xlsx-backend.ts"
               ],
-              "source": "src/export.ts#L403",
+              "source": "src/xlsx-backend.ts#L82",
               "jsDocTags": [],
               "documentation": "Stable resource-limit failure surfaced before an XLSX codec allocates unsafe data.",
               "memberDocs": []
@@ -6857,9 +6869,9 @@
               "kind": "interface",
               "signature": "export interface XlsxResourceLimits { maxInputBytes: number; maxOutputBytes: number; maxArchiveEntries: number; maxEntryUncompressedBytes: number; maxTotalUncompressedBytes: number; maxPreservedBytes: number; maxCompressionRatio: number; maxSheets: number; maxRowsPerSheet: number; maxColumnsPerSheet: number; maxCells: number; maxMerges: number; maxSharedStrings: number; maxStyles: number; maxXmlElements: number; maxXmlDepth: number; maxXmlAttributesPerElement: number; maxXmlTextBytes: number; }",
               "owners": [
-                "src/export.ts"
+                "src/xlsx-backend.ts"
               ],
-              "source": "src/export.ts#L333",
+              "source": "src/xlsx-backend.ts#L12",
               "jsDocTags": [],
               "documentation": "Resource dimensions bounded by every XLSX import and export path.",
               "memberDocs": [
@@ -7030,9 +7042,9 @@
               "kind": "interface",
               "signature": "export interface XlsxTableExportBackend { name: string; toXlsxTable(workbook: Workbook, store: Store, options?: XlsxWorkbookOptions): Promise<Uint8Array>; toXlsxTableStream?( workbook: Workbook, store: Store, options?: XlsxWorkbookOptions, ): AsyncIterable<Uint8Array>; }",
               "owners": [
-                "src/export.ts"
+                "src/xlsx-backend.ts"
               ],
-              "source": "src/export.ts#L425",
+              "source": "src/xlsx-backend.ts#L104",
               "jsDocTags": [],
               "documentation": "Pluggable first-row-header, first-sheet table export backend.",
               "memberDocs": []
@@ -7042,9 +7054,9 @@
               "kind": "interface",
               "signature": "export interface XlsxTableImportBackend { name: string; fromXlsxTable( data: ArrayBuffer | Uint8Array, options?: XlsxWorkbookOptions, ): Promise<ColumnarData>; }",
               "owners": [
-                "src/export.ts"
+                "src/xlsx-backend.ts"
               ],
-              "source": "src/export.ts#L545",
+              "source": "src/xlsx-backend.ts#L224",
               "jsDocTags": [],
               "documentation": "Pluggable table import backend. Parses raw `.xlsx` bytes into the same\n`ColumnarData` shape `fromCsv` returns, so host ingestion code can stay\nformat-agnostic.",
               "memberDocs": []
@@ -7054,9 +7066,9 @@
               "kind": "interface",
               "signature": "export interface XlsxWorkbookBackend { name: string; toXlsxWorkbook( snapshot: WorkbookSnapshot, options?: XlsxWorkbookOptions, context?: XlsxWorkbookExportContext, ): Promise<Uint8Array>; fromXlsxWorkbook( data: ArrayBuffer | Uint8Array, options?: XlsxWorkbookOptions, ): Promise<WorkbookSnapshot>; toXlsxWorkbookStream?( snapshot: WorkbookSnapshot, options?: XlsxWorkbookOptions, context?: XlsxWorkbookExportContext, ): AsyncIterable<Uint8Array>; fromXlsxWorkbookFile?(file: Blob, options?: XlsxWorkbookOptions): Promise<WorkbookSnapshot>; verifySource?(snapshot: WorkbookSnapshot): WorkbookSnapshot[\"workbook\"][\"xlsxSource\"]; }",
               "owners": [
-                "src/export.ts"
+                "src/xlsx-backend.ts"
               ],
-              "source": "src/export.ts#L636",
+              "source": "src/xlsx-backend.ts#L315",
               "jsDocTags": [
                 "internal"
               ],
@@ -7068,9 +7080,9 @@
               "kind": "interface",
               "signature": "export interface XlsxWorkbookOptions { signal?: AbortSignal; maxCells?: number; resourceLimits?: Partial<Omit<XlsxResourceLimits, \"maxCells\">>; onWarning?: (warning: XlsxWorkbookWarning) => void; }",
               "owners": [
-                "src/export.ts"
+                "src/xlsx-backend.ts"
               ],
-              "source": "src/export.ts#L616",
+              "source": "src/xlsx-backend.ts#L295",
               "jsDocTags": [],
               "documentation": "Shared options passed to every registered table and workbook XLSX backend.",
               "memberDocs": [
@@ -7093,9 +7105,9 @@
               "kind": "interface",
               "signature": "export interface XlsxWorkbookWarning { code: | \"boolean-literal\" | \"rich-text\" | \"hyperlink\" | \"unsupported-cell-value\" | \"unsupported-feature\" | \"external-relationship\" | \"external-formula\" | \"format-loss\" | \"validation-loss\" | \"invalid-metadata\"; message: string; sheet?: string; cell?: string; part?: string; }",
               "owners": [
-                "src/export.ts"
+                "src/xlsx-backend.ts"
               ],
-              "source": "src/export.ts#L597",
+              "source": "src/xlsx-backend.ts#L276",
               "jsDocTags": [],
               "documentation": "Structured fidelity warning emitted during XLSX conversion.",
               "memberDocs": []
@@ -9466,11 +9478,11 @@
             {
               "name": "Grid",
               "kind": "interface",
-              "signature": "export interface Grid { readonly store: Store; readonly actions: GridActions; getRuntimeResourceSnapshot(operation: RuntimeResourceOperation, phase: RuntimeResourcePhase, runtime?: RuntimeMemoryObservation): RuntimeResourceSnapshot; getCommandState(command: GridCommandName): GridCommandState; getFocusCellStyle(): CellStyle; summarizeSelection(signal?: AbortSignal): Promise<SelectionSummary | null>; setActiveSheet(id: SheetId): void; scrollToCell(addr: CellAddress): void; getCellAtPoint(clientX: number, clientY: number): CellAddress | null; getActiveSheet(): SheetId; getCellInput(row: number, col: number): CellInputSnapshot | null; getSelection(): Selection | null; setSelection(sel: Selection | null): void; getTheme(): Theme; getShortcutLabel(action: KeyboardAction): string; setTheme(theme: Partial<Theme>): void; replaceTheme(theme: Partial<Theme> | undefined): void; getEffectiveTheme(): Theme; setReadOnly(readOnly: boolean): void; setConfig(config: GridConfig | undefined): void; applyTransaction(transaction: GridTransaction): ApplyTransactionResult; exportSnapshot(): WorkbookSnapshot; applyRemoteOperations(operations: readonly DocumentOp[], options?: RemoteOperationOptions): ApplyTransactionResult; defineCellRenderer(name: string, renderer: CellRenderer): void; aggregate(col: number, op: AggregateOp): number; sortBy(col: number, ascending?: boolean): ApplyTransactionResult; sortByMulti(keys: readonly SortKey[]): ApplyTransactionResult; filterBy(col: number, needle: string): void; setColumnFilter(col: number, filter: ColumnFilter | null): void; setSort(keys: readonly SortKey[]): ApplyTransactionResult; getColumnFilters(): ReadonlyMap<number, ColumnFilter>; distinctValues(col: number, limit?: number): CellScalar[]; hideRows(rows: readonly number[]): void; showRows(rows?: readonly number[]): void; hiddenRows(): readonly number[]; hideColumns(cols?: readonly number[]): void; showColumns(cols?: readonly number[]): void; hiddenColumns(): readonly number[]; groupRows(start: number, end: number): void; ungroupRows(start: number, end: number): void; setGroupCollapsed(start: number, collapsed: boolean): void; rowGroups(): readonly RowGroup[]; clearView(): void; undo(): void; redo(): void; exportCsv(filename: string): void; exportXlsx(filename: string): Promise<void>; search(query: string, opts?: SearchOptions): SearchResult; findNext(): SearchResult; findPrev(): SearchResult; clearSearch(): void; replaceCurrent(replacement: string): SearchResult; replaceAll(replacement: string): ReplaceResult; insertRows(at: number, count?: number): void; removeRows(at: number, count?: number): void; insertColumns(at: number, count?: number): void; removeColumns(at: number, count?: number): void; addSheet(input: AddSheetInput): SheetLifecycleResult; removeSheet(id: SheetId): SheetLifecycleResult; renameSheet(id: SheetId, name: string): SheetLifecycleResult; moveSheet(id: SheetId, toIndex: number): SheetLifecycleResult; setSheetVisibility(id: SheetId, visibility: SheetVisibility): SheetLifecycleResult; setConditionalFormats(rules: readonly ConditionalFormatRule[]): void; setHyperlink(hyperlink: CellHyperlink): ApplyTransactionResult; removeHyperlink(id: string): ApplyTransactionResult; getHyperlink(addr: CellAddress): CellHyperlink | null; activateHyperlink(addr: CellAddress): boolean; setValidationRule(rule: DataValidationRule): ApplyTransactionResult; removeValidationRule(id: string): ApplyTransactionResult; setProtectedRange(protectedRange: ProtectedRange): ApplyTransactionResult; removeProtectedRange(id: string): ApplyTransactionResult; getPivots(sheet?: SheetId): PivotDefinition[]; setPivot(pivot: PivotDefinition, sheet?: SheetId): ApplyTransactionResult; removePivot(id: string, sheet?: SheetId): ApplyTransactionResult; getPivotFields(sheet: SheetId, id: string): PivotSourceField[]; getPivotResult(sheet: SheetId, id: string): PivotResultView | null; getCharts(sheet?: SheetId): readonly ChartDefinition[]; setChart(chart: ChartDefinition, sheet?: SheetId): ApplyTransactionResult; removeChart(id: string, sheet?: SheetId): ApplyTransactionResult; selectChart(id: string | null, sheet?: SheetId): void; openPanel(panel: GridPanel | null): void; setProtectionResolver(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void; setNote(addr: CellAddress, text: string | null): ApplyTransactionResult; getNote(addr: CellAddress): string | null; setOverscan(overscan?: number): void; setMinColumns(minColumns?: number): void; highlightCells(ranges: readonly HighlightRange[] | null, color?: string): void; setPresenceOverlays(overlays: readonly PresenceOverlay[] | null): void; styleRange(range: Range, style: Partial<CellStyle> | null): void; beginEdit(row: number, col: number, initial?: string, selectAll?: boolean): void; dataEdge(row: number, col: number, dRow: number, dCol: number): number | null; setRowHeight(row: number, height: number): void; setColumnWidth(col: number, width: number): void; autoFitRows(range?: Range): void; autoFitColumns(cols?: readonly number[]): void; setFrozen(rows: number, cols?: number): void; setZoom(zoom: number): void; getZoom(): number; rendererKind(): \"canvas\" | \"worker\"; on<E extends keyof GridEvents>(evt: E, fn: (e: GridEvents[E]) => void): () => void; refresh(): void; trimMemory(): void; destroy(): void; }",
+              "signature": "export interface Grid { readonly store: Store; readonly actions: GridActions; getRuntimeResourceSnapshot(operation: RuntimeResourceOperation, phase: RuntimeResourcePhase, runtime?: RuntimeMemoryObservation): RuntimeResourceSnapshot; getCommandState(command: GridCommandName): GridCommandState; getFocusCellStyle(): CellStyle; summarizeSelection(signal?: AbortSignal): Promise<SelectionSummary | null>; setActiveSheet(id: SheetId): void; scrollToCell(addr: CellAddress): void; getCellAtPoint(clientX: number, clientY: number): CellAddress | null; getActiveSheet(): SheetId; getCellInput(row: number, col: number): CellInputSnapshot | null; getSelection(): Selection | null; setSelection(sel: Selection | null): void; getTheme(): Theme; getShortcutLabel(action: KeyboardAction): string; setTheme(theme: Partial<Theme>): void; replaceTheme(theme: Partial<Theme> | undefined): void; getEffectiveTheme(): Theme; setReadOnly(readOnly: boolean): void; setConfig(config: GridConfig | undefined): void; applyTransaction(transaction: GridTransaction): ApplyTransactionResult; exportSnapshot(): WorkbookSnapshot; applyRemoteOperations(operations: readonly DocumentOp[], options?: RemoteOperationOptions): ApplyTransactionResult; defineCellRenderer(name: string, renderer: CellRenderer): void; aggregate(col: number, op: AggregateOp): number; sortBy(col: number, ascending?: boolean): ApplyTransactionResult; sortByMulti(keys: readonly SortKey[]): ApplyTransactionResult; filterBy(col: number, needle: string): void; setColumnFilter(col: number, filter: ColumnFilter | null): void; setSort(keys: readonly SortKey[]): ApplyTransactionResult; getColumnFilters(): ReadonlyMap<number, ColumnFilter>; distinctValues(col: number, limit?: number): CellScalar[]; hideRows(rows: readonly number[]): void; showRows(rows?: readonly number[]): void; hiddenRows(): readonly number[]; hideColumns(cols?: readonly number[]): void; showColumns(cols?: readonly number[]): void; hiddenColumns(): readonly number[]; groupRows(start: number, end: number): void; ungroupRows(start: number, end: number): void; setGroupCollapsed(start: number, collapsed: boolean): void; rowGroups(): readonly RowGroup[]; clearView(): void; undo(): void; redo(): void; exportCsv(filename: string): void; exportXlsx(filename: string): Promise<void>; importWorkbook(source: WorkbookSnapshot | ((signal: AbortSignal) => Promise<WorkbookSnapshot>), options?: { signal?: AbortSignal; }): Promise<void>; search(query: string, opts?: SearchOptions): SearchResult; findNext(): SearchResult; findPrev(): SearchResult; clearSearch(): void; replaceCurrent(replacement: string): SearchResult; replaceAll(replacement: string): ReplaceResult; insertRows(at: number, count?: number): void; removeRows(at: number, count?: number): void; insertColumns(at: number, count?: number): void; removeColumns(at: number, count?: number): void; addSheet(input: AddSheetInput): SheetLifecycleResult; removeSheet(id: SheetId): SheetLifecycleResult; renameSheet(id: SheetId, name: string): SheetLifecycleResult; moveSheet(id: SheetId, toIndex: number): SheetLifecycleResult; setSheetVisibility(id: SheetId, visibility: SheetVisibility): SheetLifecycleResult; setConditionalFormats(rules: readonly ConditionalFormatRule[]): void; setHyperlink(hyperlink: CellHyperlink): ApplyTransactionResult; removeHyperlink(id: string): ApplyTransactionResult; getHyperlink(addr: CellAddress): CellHyperlink | null; activateHyperlink(addr: CellAddress): boolean; setValidationRule(rule: DataValidationRule): ApplyTransactionResult; removeValidationRule(id: string): ApplyTransactionResult; setProtectedRange(protectedRange: ProtectedRange): ApplyTransactionResult; removeProtectedRange(id: string): ApplyTransactionResult; getPivots(sheet?: SheetId): PivotDefinition[]; setPivot(pivot: PivotDefinition, sheet?: SheetId): ApplyTransactionResult; removePivot(id: string, sheet?: SheetId): ApplyTransactionResult; getPivotFields(sheet: SheetId, id: string): PivotSourceField[]; getPivotResult(sheet: SheetId, id: string): PivotResultView | null; getCharts(sheet?: SheetId): readonly ChartDefinition[]; setChart(chart: ChartDefinition, sheet?: SheetId): ApplyTransactionResult; removeChart(id: string, sheet?: SheetId): ApplyTransactionResult; selectChart(id: string | null, sheet?: SheetId): void; openPanel(panel: GridPanel | null): void; setProtectionResolver(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void; setNote(addr: CellAddress, text: string | null): ApplyTransactionResult; getNote(addr: CellAddress): string | null; setOverscan(overscan?: number): void; setMinColumns(minColumns?: number): void; highlightCells(ranges: readonly HighlightRange[] | null, color?: string): void; setPresenceOverlays(overlays: readonly PresenceOverlay[] | null): void; styleRange(range: Range, style: Partial<CellStyle> | null): void; beginEdit(row: number, col: number, initial?: string, selectAll?: boolean): void; dataEdge(row: number, col: number, dRow: number, dCol: number): number | null; setRowHeight(row: number, height: number): void; setColumnWidth(col: number, width: number): void; autoFitRows(range?: Range): void; autoFitColumns(cols?: readonly number[]): void; setFrozen(rows: number, cols?: number): void; setZoom(zoom: number): void; getZoom(): number; rendererKind(): \"canvas\" | \"worker\"; on<E extends keyof GridEvents>(evt: E, fn: (e: GridEvents[E]) => void): () => void; refresh(): void; trimMemory(): void; destroy(): void; }",
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L638",
+              "source": "../core/dist/types/grid.d.ts#L640",
               "jsDocTags": [
                 "example",
                 "see"
@@ -9638,6 +9650,10 @@
                   "documentation": "Draw temporary highlights outside document history. Pass `null` to clear all\nhighlights: `grid.highlightCells(null)`. Per-range `color` wins over the call color.\nUndo does not clear highlights; use `styleRange` for persistent cell fills."
                 },
                 {
+                  "name": "importWorkbook",
+                  "documentation": "Replace the document without recreating the grid or chrome. A new import\naborts the previous loader. Failure keeps the document and history; success\nclears undo and redo. Import is not undoable, like Excel Open.\nInjected stores, datasource grids and attached collaboration sessions reject."
+                },
+                {
                   "name": "openPanel",
                   "documentation": "Show `panel` on the grid's right edge and shrink the cells to make room;\n`null` closes the open panel. One panel shows at a time: opening a panel\ncloses the previous one. Escape and the close button close it and return\nfocus to the grid."
                 },
@@ -9794,7 +9810,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L184",
+              "source": "../core/dist/types/grid.d.ts#L186",
               "jsDocTags": [],
               "documentation": "Built-in command names accepted by state queries and change events.",
               "memberDocs": []
@@ -9806,7 +9822,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L186",
+              "source": "../core/dist/types/grid.d.ts#L188",
               "jsDocTags": [],
               "documentation": "Observable availability and selection-derived activity for one command.",
               "memberDocs": []
@@ -10477,11 +10493,11 @@
             {
               "name": "Grid",
               "kind": "interface",
-              "signature": "export interface Grid { readonly store: Store; readonly actions: GridActions; getRuntimeResourceSnapshot(operation: RuntimeResourceOperation, phase: RuntimeResourcePhase, runtime?: RuntimeMemoryObservation): RuntimeResourceSnapshot; getCommandState(command: GridCommandName): GridCommandState; getFocusCellStyle(): CellStyle; summarizeSelection(signal?: AbortSignal): Promise<SelectionSummary | null>; setActiveSheet(id: SheetId): void; scrollToCell(addr: CellAddress): void; getCellAtPoint(clientX: number, clientY: number): CellAddress | null; getActiveSheet(): SheetId; getCellInput(row: number, col: number): CellInputSnapshot | null; getSelection(): Selection | null; setSelection(sel: Selection | null): void; getTheme(): Theme; getShortcutLabel(action: KeyboardAction): string; setTheme(theme: Partial<Theme>): void; replaceTheme(theme: Partial<Theme> | undefined): void; getEffectiveTheme(): Theme; setReadOnly(readOnly: boolean): void; setConfig(config: GridConfig | undefined): void; applyTransaction(transaction: GridTransaction): ApplyTransactionResult; exportSnapshot(): WorkbookSnapshot; applyRemoteOperations(operations: readonly DocumentOp[], options?: RemoteOperationOptions): ApplyTransactionResult; defineCellRenderer(name: string, renderer: CellRenderer): void; aggregate(col: number, op: AggregateOp): number; sortBy(col: number, ascending?: boolean): ApplyTransactionResult; sortByMulti(keys: readonly SortKey[]): ApplyTransactionResult; filterBy(col: number, needle: string): void; setColumnFilter(col: number, filter: ColumnFilter | null): void; setSort(keys: readonly SortKey[]): ApplyTransactionResult; getColumnFilters(): ReadonlyMap<number, ColumnFilter>; distinctValues(col: number, limit?: number): CellScalar[]; hideRows(rows: readonly number[]): void; showRows(rows?: readonly number[]): void; hiddenRows(): readonly number[]; hideColumns(cols?: readonly number[]): void; showColumns(cols?: readonly number[]): void; hiddenColumns(): readonly number[]; groupRows(start: number, end: number): void; ungroupRows(start: number, end: number): void; setGroupCollapsed(start: number, collapsed: boolean): void; rowGroups(): readonly RowGroup[]; clearView(): void; undo(): void; redo(): void; exportCsv(filename: string): void; exportXlsx(filename: string): Promise<void>; search(query: string, opts?: SearchOptions): SearchResult; findNext(): SearchResult; findPrev(): SearchResult; clearSearch(): void; replaceCurrent(replacement: string): SearchResult; replaceAll(replacement: string): ReplaceResult; insertRows(at: number, count?: number): void; removeRows(at: number, count?: number): void; insertColumns(at: number, count?: number): void; removeColumns(at: number, count?: number): void; addSheet(input: AddSheetInput): SheetLifecycleResult; removeSheet(id: SheetId): SheetLifecycleResult; renameSheet(id: SheetId, name: string): SheetLifecycleResult; moveSheet(id: SheetId, toIndex: number): SheetLifecycleResult; setSheetVisibility(id: SheetId, visibility: SheetVisibility): SheetLifecycleResult; setConditionalFormats(rules: readonly ConditionalFormatRule[]): void; setHyperlink(hyperlink: CellHyperlink): ApplyTransactionResult; removeHyperlink(id: string): ApplyTransactionResult; getHyperlink(addr: CellAddress): CellHyperlink | null; activateHyperlink(addr: CellAddress): boolean; setValidationRule(rule: DataValidationRule): ApplyTransactionResult; removeValidationRule(id: string): ApplyTransactionResult; setProtectedRange(protectedRange: ProtectedRange): ApplyTransactionResult; removeProtectedRange(id: string): ApplyTransactionResult; getPivots(sheet?: SheetId): PivotDefinition[]; setPivot(pivot: PivotDefinition, sheet?: SheetId): ApplyTransactionResult; removePivot(id: string, sheet?: SheetId): ApplyTransactionResult; getPivotFields(sheet: SheetId, id: string): PivotSourceField[]; getPivotResult(sheet: SheetId, id: string): PivotResultView | null; getCharts(sheet?: SheetId): readonly ChartDefinition[]; setChart(chart: ChartDefinition, sheet?: SheetId): ApplyTransactionResult; removeChart(id: string, sheet?: SheetId): ApplyTransactionResult; selectChart(id: string | null, sheet?: SheetId): void; openPanel(panel: GridPanel | null): void; setProtectionResolver(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void; setNote(addr: CellAddress, text: string | null): ApplyTransactionResult; getNote(addr: CellAddress): string | null; setOverscan(overscan?: number): void; setMinColumns(minColumns?: number): void; highlightCells(ranges: readonly HighlightRange[] | null, color?: string): void; setPresenceOverlays(overlays: readonly PresenceOverlay[] | null): void; styleRange(range: Range, style: Partial<CellStyle> | null): void; beginEdit(row: number, col: number, initial?: string, selectAll?: boolean): void; dataEdge(row: number, col: number, dRow: number, dCol: number): number | null; setRowHeight(row: number, height: number): void; setColumnWidth(col: number, width: number): void; autoFitRows(range?: Range): void; autoFitColumns(cols?: readonly number[]): void; setFrozen(rows: number, cols?: number): void; setZoom(zoom: number): void; getZoom(): number; rendererKind(): \"canvas\" | \"worker\"; on<E extends keyof GridEvents>(evt: E, fn: (e: GridEvents[E]) => void): () => void; refresh(): void; trimMemory(): void; destroy(): void; }",
+              "signature": "export interface Grid { readonly store: Store; readonly actions: GridActions; getRuntimeResourceSnapshot(operation: RuntimeResourceOperation, phase: RuntimeResourcePhase, runtime?: RuntimeMemoryObservation): RuntimeResourceSnapshot; getCommandState(command: GridCommandName): GridCommandState; getFocusCellStyle(): CellStyle; summarizeSelection(signal?: AbortSignal): Promise<SelectionSummary | null>; setActiveSheet(id: SheetId): void; scrollToCell(addr: CellAddress): void; getCellAtPoint(clientX: number, clientY: number): CellAddress | null; getActiveSheet(): SheetId; getCellInput(row: number, col: number): CellInputSnapshot | null; getSelection(): Selection | null; setSelection(sel: Selection | null): void; getTheme(): Theme; getShortcutLabel(action: KeyboardAction): string; setTheme(theme: Partial<Theme>): void; replaceTheme(theme: Partial<Theme> | undefined): void; getEffectiveTheme(): Theme; setReadOnly(readOnly: boolean): void; setConfig(config: GridConfig | undefined): void; applyTransaction(transaction: GridTransaction): ApplyTransactionResult; exportSnapshot(): WorkbookSnapshot; applyRemoteOperations(operations: readonly DocumentOp[], options?: RemoteOperationOptions): ApplyTransactionResult; defineCellRenderer(name: string, renderer: CellRenderer): void; aggregate(col: number, op: AggregateOp): number; sortBy(col: number, ascending?: boolean): ApplyTransactionResult; sortByMulti(keys: readonly SortKey[]): ApplyTransactionResult; filterBy(col: number, needle: string): void; setColumnFilter(col: number, filter: ColumnFilter | null): void; setSort(keys: readonly SortKey[]): ApplyTransactionResult; getColumnFilters(): ReadonlyMap<number, ColumnFilter>; distinctValues(col: number, limit?: number): CellScalar[]; hideRows(rows: readonly number[]): void; showRows(rows?: readonly number[]): void; hiddenRows(): readonly number[]; hideColumns(cols?: readonly number[]): void; showColumns(cols?: readonly number[]): void; hiddenColumns(): readonly number[]; groupRows(start: number, end: number): void; ungroupRows(start: number, end: number): void; setGroupCollapsed(start: number, collapsed: boolean): void; rowGroups(): readonly RowGroup[]; clearView(): void; undo(): void; redo(): void; exportCsv(filename: string): void; exportXlsx(filename: string): Promise<void>; importWorkbook(source: WorkbookSnapshot | ((signal: AbortSignal) => Promise<WorkbookSnapshot>), options?: { signal?: AbortSignal; }): Promise<void>; search(query: string, opts?: SearchOptions): SearchResult; findNext(): SearchResult; findPrev(): SearchResult; clearSearch(): void; replaceCurrent(replacement: string): SearchResult; replaceAll(replacement: string): ReplaceResult; insertRows(at: number, count?: number): void; removeRows(at: number, count?: number): void; insertColumns(at: number, count?: number): void; removeColumns(at: number, count?: number): void; addSheet(input: AddSheetInput): SheetLifecycleResult; removeSheet(id: SheetId): SheetLifecycleResult; renameSheet(id: SheetId, name: string): SheetLifecycleResult; moveSheet(id: SheetId, toIndex: number): SheetLifecycleResult; setSheetVisibility(id: SheetId, visibility: SheetVisibility): SheetLifecycleResult; setConditionalFormats(rules: readonly ConditionalFormatRule[]): void; setHyperlink(hyperlink: CellHyperlink): ApplyTransactionResult; removeHyperlink(id: string): ApplyTransactionResult; getHyperlink(addr: CellAddress): CellHyperlink | null; activateHyperlink(addr: CellAddress): boolean; setValidationRule(rule: DataValidationRule): ApplyTransactionResult; removeValidationRule(id: string): ApplyTransactionResult; setProtectedRange(protectedRange: ProtectedRange): ApplyTransactionResult; removeProtectedRange(id: string): ApplyTransactionResult; getPivots(sheet?: SheetId): PivotDefinition[]; setPivot(pivot: PivotDefinition, sheet?: SheetId): ApplyTransactionResult; removePivot(id: string, sheet?: SheetId): ApplyTransactionResult; getPivotFields(sheet: SheetId, id: string): PivotSourceField[]; getPivotResult(sheet: SheetId, id: string): PivotResultView | null; getCharts(sheet?: SheetId): readonly ChartDefinition[]; setChart(chart: ChartDefinition, sheet?: SheetId): ApplyTransactionResult; removeChart(id: string, sheet?: SheetId): ApplyTransactionResult; selectChart(id: string | null, sheet?: SheetId): void; openPanel(panel: GridPanel | null): void; setProtectionResolver(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void; setNote(addr: CellAddress, text: string | null): ApplyTransactionResult; getNote(addr: CellAddress): string | null; setOverscan(overscan?: number): void; setMinColumns(minColumns?: number): void; highlightCells(ranges: readonly HighlightRange[] | null, color?: string): void; setPresenceOverlays(overlays: readonly PresenceOverlay[] | null): void; styleRange(range: Range, style: Partial<CellStyle> | null): void; beginEdit(row: number, col: number, initial?: string, selectAll?: boolean): void; dataEdge(row: number, col: number, dRow: number, dCol: number): number | null; setRowHeight(row: number, height: number): void; setColumnWidth(col: number, width: number): void; autoFitRows(range?: Range): void; autoFitColumns(cols?: readonly number[]): void; setFrozen(rows: number, cols?: number): void; setZoom(zoom: number): void; getZoom(): number; rendererKind(): \"canvas\" | \"worker\"; on<E extends keyof GridEvents>(evt: E, fn: (e: GridEvents[E]) => void): () => void; refresh(): void; trimMemory(): void; destroy(): void; }",
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L638",
+              "source": "../core/dist/types/grid.d.ts#L640",
               "jsDocTags": [
                 "example",
                 "see"
@@ -10649,6 +10665,10 @@
                   "documentation": "Draw temporary highlights outside document history. Pass `null` to clear all\nhighlights: `grid.highlightCells(null)`. Per-range `color` wins over the call color.\nUndo does not clear highlights; use `styleRange` for persistent cell fills."
                 },
                 {
+                  "name": "importWorkbook",
+                  "documentation": "Replace the document without recreating the grid or chrome. A new import\naborts the previous loader. Failure keeps the document and history; success\nclears undo and redo. Import is not undoable, like Excel Open.\nInjected stores, datasource grids and attached collaboration sessions reject."
+                },
+                {
                   "name": "openPanel",
                   "documentation": "Show `panel` on the grid's right edge and shrink the cells to make room;\n`null` closes the open panel. One panel shows at a time: opening a panel\ncloses the previous one. Escape and the close button close it and return\nfocus to the grid."
                 },
@@ -10805,7 +10825,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L184",
+              "source": "../core/dist/types/grid.d.ts#L186",
               "jsDocTags": [],
               "documentation": "Built-in command names accepted by state queries and change events.",
               "memberDocs": []
@@ -10817,7 +10837,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L186",
+              "source": "../core/dist/types/grid.d.ts#L188",
               "jsDocTags": [],
               "documentation": "Observable availability and selection-derived activity for one command.",
               "memberDocs": []
@@ -11474,11 +11494,11 @@
             {
               "name": "Grid",
               "kind": "interface",
-              "signature": "export interface Grid { readonly store: Store; readonly actions: GridActions; getRuntimeResourceSnapshot(operation: RuntimeResourceOperation, phase: RuntimeResourcePhase, runtime?: RuntimeMemoryObservation): RuntimeResourceSnapshot; getCommandState(command: GridCommandName): GridCommandState; getFocusCellStyle(): CellStyle; summarizeSelection(signal?: AbortSignal): Promise<SelectionSummary | null>; setActiveSheet(id: SheetId): void; scrollToCell(addr: CellAddress): void; getCellAtPoint(clientX: number, clientY: number): CellAddress | null; getActiveSheet(): SheetId; getCellInput(row: number, col: number): CellInputSnapshot | null; getSelection(): Selection | null; setSelection(sel: Selection | null): void; getTheme(): Theme; getShortcutLabel(action: KeyboardAction): string; setTheme(theme: Partial<Theme>): void; replaceTheme(theme: Partial<Theme> | undefined): void; getEffectiveTheme(): Theme; setReadOnly(readOnly: boolean): void; setConfig(config: GridConfig | undefined): void; applyTransaction(transaction: GridTransaction): ApplyTransactionResult; exportSnapshot(): WorkbookSnapshot; applyRemoteOperations(operations: readonly DocumentOp[], options?: RemoteOperationOptions): ApplyTransactionResult; defineCellRenderer(name: string, renderer: CellRenderer): void; aggregate(col: number, op: AggregateOp): number; sortBy(col: number, ascending?: boolean): ApplyTransactionResult; sortByMulti(keys: readonly SortKey[]): ApplyTransactionResult; filterBy(col: number, needle: string): void; setColumnFilter(col: number, filter: ColumnFilter | null): void; setSort(keys: readonly SortKey[]): ApplyTransactionResult; getColumnFilters(): ReadonlyMap<number, ColumnFilter>; distinctValues(col: number, limit?: number): CellScalar[]; hideRows(rows: readonly number[]): void; showRows(rows?: readonly number[]): void; hiddenRows(): readonly number[]; hideColumns(cols?: readonly number[]): void; showColumns(cols?: readonly number[]): void; hiddenColumns(): readonly number[]; groupRows(start: number, end: number): void; ungroupRows(start: number, end: number): void; setGroupCollapsed(start: number, collapsed: boolean): void; rowGroups(): readonly RowGroup[]; clearView(): void; undo(): void; redo(): void; exportCsv(filename: string): void; exportXlsx(filename: string): Promise<void>; search(query: string, opts?: SearchOptions): SearchResult; findNext(): SearchResult; findPrev(): SearchResult; clearSearch(): void; replaceCurrent(replacement: string): SearchResult; replaceAll(replacement: string): ReplaceResult; insertRows(at: number, count?: number): void; removeRows(at: number, count?: number): void; insertColumns(at: number, count?: number): void; removeColumns(at: number, count?: number): void; addSheet(input: AddSheetInput): SheetLifecycleResult; removeSheet(id: SheetId): SheetLifecycleResult; renameSheet(id: SheetId, name: string): SheetLifecycleResult; moveSheet(id: SheetId, toIndex: number): SheetLifecycleResult; setSheetVisibility(id: SheetId, visibility: SheetVisibility): SheetLifecycleResult; setConditionalFormats(rules: readonly ConditionalFormatRule[]): void; setHyperlink(hyperlink: CellHyperlink): ApplyTransactionResult; removeHyperlink(id: string): ApplyTransactionResult; getHyperlink(addr: CellAddress): CellHyperlink | null; activateHyperlink(addr: CellAddress): boolean; setValidationRule(rule: DataValidationRule): ApplyTransactionResult; removeValidationRule(id: string): ApplyTransactionResult; setProtectedRange(protectedRange: ProtectedRange): ApplyTransactionResult; removeProtectedRange(id: string): ApplyTransactionResult; getPivots(sheet?: SheetId): PivotDefinition[]; setPivot(pivot: PivotDefinition, sheet?: SheetId): ApplyTransactionResult; removePivot(id: string, sheet?: SheetId): ApplyTransactionResult; getPivotFields(sheet: SheetId, id: string): PivotSourceField[]; getPivotResult(sheet: SheetId, id: string): PivotResultView | null; getCharts(sheet?: SheetId): readonly ChartDefinition[]; setChart(chart: ChartDefinition, sheet?: SheetId): ApplyTransactionResult; removeChart(id: string, sheet?: SheetId): ApplyTransactionResult; selectChart(id: string | null, sheet?: SheetId): void; openPanel(panel: GridPanel | null): void; setProtectionResolver(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void; setNote(addr: CellAddress, text: string | null): ApplyTransactionResult; getNote(addr: CellAddress): string | null; setOverscan(overscan?: number): void; setMinColumns(minColumns?: number): void; highlightCells(ranges: readonly HighlightRange[] | null, color?: string): void; setPresenceOverlays(overlays: readonly PresenceOverlay[] | null): void; styleRange(range: Range, style: Partial<CellStyle> | null): void; beginEdit(row: number, col: number, initial?: string, selectAll?: boolean): void; dataEdge(row: number, col: number, dRow: number, dCol: number): number | null; setRowHeight(row: number, height: number): void; setColumnWidth(col: number, width: number): void; autoFitRows(range?: Range): void; autoFitColumns(cols?: readonly number[]): void; setFrozen(rows: number, cols?: number): void; setZoom(zoom: number): void; getZoom(): number; rendererKind(): \"canvas\" | \"worker\"; on<E extends keyof GridEvents>(evt: E, fn: (e: GridEvents[E]) => void): () => void; refresh(): void; trimMemory(): void; destroy(): void; }",
+              "signature": "export interface Grid { readonly store: Store; readonly actions: GridActions; getRuntimeResourceSnapshot(operation: RuntimeResourceOperation, phase: RuntimeResourcePhase, runtime?: RuntimeMemoryObservation): RuntimeResourceSnapshot; getCommandState(command: GridCommandName): GridCommandState; getFocusCellStyle(): CellStyle; summarizeSelection(signal?: AbortSignal): Promise<SelectionSummary | null>; setActiveSheet(id: SheetId): void; scrollToCell(addr: CellAddress): void; getCellAtPoint(clientX: number, clientY: number): CellAddress | null; getActiveSheet(): SheetId; getCellInput(row: number, col: number): CellInputSnapshot | null; getSelection(): Selection | null; setSelection(sel: Selection | null): void; getTheme(): Theme; getShortcutLabel(action: KeyboardAction): string; setTheme(theme: Partial<Theme>): void; replaceTheme(theme: Partial<Theme> | undefined): void; getEffectiveTheme(): Theme; setReadOnly(readOnly: boolean): void; setConfig(config: GridConfig | undefined): void; applyTransaction(transaction: GridTransaction): ApplyTransactionResult; exportSnapshot(): WorkbookSnapshot; applyRemoteOperations(operations: readonly DocumentOp[], options?: RemoteOperationOptions): ApplyTransactionResult; defineCellRenderer(name: string, renderer: CellRenderer): void; aggregate(col: number, op: AggregateOp): number; sortBy(col: number, ascending?: boolean): ApplyTransactionResult; sortByMulti(keys: readonly SortKey[]): ApplyTransactionResult; filterBy(col: number, needle: string): void; setColumnFilter(col: number, filter: ColumnFilter | null): void; setSort(keys: readonly SortKey[]): ApplyTransactionResult; getColumnFilters(): ReadonlyMap<number, ColumnFilter>; distinctValues(col: number, limit?: number): CellScalar[]; hideRows(rows: readonly number[]): void; showRows(rows?: readonly number[]): void; hiddenRows(): readonly number[]; hideColumns(cols?: readonly number[]): void; showColumns(cols?: readonly number[]): void; hiddenColumns(): readonly number[]; groupRows(start: number, end: number): void; ungroupRows(start: number, end: number): void; setGroupCollapsed(start: number, collapsed: boolean): void; rowGroups(): readonly RowGroup[]; clearView(): void; undo(): void; redo(): void; exportCsv(filename: string): void; exportXlsx(filename: string): Promise<void>; importWorkbook(source: WorkbookSnapshot | ((signal: AbortSignal) => Promise<WorkbookSnapshot>), options?: { signal?: AbortSignal; }): Promise<void>; search(query: string, opts?: SearchOptions): SearchResult; findNext(): SearchResult; findPrev(): SearchResult; clearSearch(): void; replaceCurrent(replacement: string): SearchResult; replaceAll(replacement: string): ReplaceResult; insertRows(at: number, count?: number): void; removeRows(at: number, count?: number): void; insertColumns(at: number, count?: number): void; removeColumns(at: number, count?: number): void; addSheet(input: AddSheetInput): SheetLifecycleResult; removeSheet(id: SheetId): SheetLifecycleResult; renameSheet(id: SheetId, name: string): SheetLifecycleResult; moveSheet(id: SheetId, toIndex: number): SheetLifecycleResult; setSheetVisibility(id: SheetId, visibility: SheetVisibility): SheetLifecycleResult; setConditionalFormats(rules: readonly ConditionalFormatRule[]): void; setHyperlink(hyperlink: CellHyperlink): ApplyTransactionResult; removeHyperlink(id: string): ApplyTransactionResult; getHyperlink(addr: CellAddress): CellHyperlink | null; activateHyperlink(addr: CellAddress): boolean; setValidationRule(rule: DataValidationRule): ApplyTransactionResult; removeValidationRule(id: string): ApplyTransactionResult; setProtectedRange(protectedRange: ProtectedRange): ApplyTransactionResult; removeProtectedRange(id: string): ApplyTransactionResult; getPivots(sheet?: SheetId): PivotDefinition[]; setPivot(pivot: PivotDefinition, sheet?: SheetId): ApplyTransactionResult; removePivot(id: string, sheet?: SheetId): ApplyTransactionResult; getPivotFields(sheet: SheetId, id: string): PivotSourceField[]; getPivotResult(sheet: SheetId, id: string): PivotResultView | null; getCharts(sheet?: SheetId): readonly ChartDefinition[]; setChart(chart: ChartDefinition, sheet?: SheetId): ApplyTransactionResult; removeChart(id: string, sheet?: SheetId): ApplyTransactionResult; selectChart(id: string | null, sheet?: SheetId): void; openPanel(panel: GridPanel | null): void; setProtectionResolver(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void; setNote(addr: CellAddress, text: string | null): ApplyTransactionResult; getNote(addr: CellAddress): string | null; setOverscan(overscan?: number): void; setMinColumns(minColumns?: number): void; highlightCells(ranges: readonly HighlightRange[] | null, color?: string): void; setPresenceOverlays(overlays: readonly PresenceOverlay[] | null): void; styleRange(range: Range, style: Partial<CellStyle> | null): void; beginEdit(row: number, col: number, initial?: string, selectAll?: boolean): void; dataEdge(row: number, col: number, dRow: number, dCol: number): number | null; setRowHeight(row: number, height: number): void; setColumnWidth(col: number, width: number): void; autoFitRows(range?: Range): void; autoFitColumns(cols?: readonly number[]): void; setFrozen(rows: number, cols?: number): void; setZoom(zoom: number): void; getZoom(): number; rendererKind(): \"canvas\" | \"worker\"; on<E extends keyof GridEvents>(evt: E, fn: (e: GridEvents[E]) => void): () => void; refresh(): void; trimMemory(): void; destroy(): void; }",
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L638",
+              "source": "../core/dist/types/grid.d.ts#L640",
               "jsDocTags": [
                 "example",
                 "see"
@@ -11646,6 +11666,10 @@
                   "documentation": "Draw temporary highlights outside document history. Pass `null` to clear all\nhighlights: `grid.highlightCells(null)`. Per-range `color` wins over the call color.\nUndo does not clear highlights; use `styleRange` for persistent cell fills."
                 },
                 {
+                  "name": "importWorkbook",
+                  "documentation": "Replace the document without recreating the grid or chrome. A new import\naborts the previous loader. Failure keeps the document and history; success\nclears undo and redo. Import is not undoable, like Excel Open.\nInjected stores, datasource grids and attached collaboration sessions reject."
+                },
+                {
                   "name": "openPanel",
                   "documentation": "Show `panel` on the grid's right edge and shrink the cells to make room;\n`null` closes the open panel. One panel shows at a time: opening a panel\ncloses the previous one. Escape and the close button close it and return\nfocus to the grid."
                 },
@@ -11802,7 +11826,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L184",
+              "source": "../core/dist/types/grid.d.ts#L186",
               "jsDocTags": [],
               "documentation": "Built-in command names accepted by state queries and change events.",
               "memberDocs": []
@@ -11814,7 +11838,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L186",
+              "source": "../core/dist/types/grid.d.ts#L188",
               "jsDocTags": [],
               "documentation": "Observable availability and selection-derived activity for one command.",
               "memberDocs": []

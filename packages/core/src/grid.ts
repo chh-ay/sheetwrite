@@ -36,7 +36,7 @@ import {
   SheetwriteError,
   unknownSheetError,
 } from "./errors.js";
-import { downloadBytesIn, toCsv, toXlsxTable } from "./export.js";
+import { downloadBytesIn, toCsv } from "./export.js";
 import type { FindBar } from "./find-bar.js";
 import { stepFontSizePx, stepNumberFormatDecimals } from "./format-presets.js";
 import { GeometryLayoutController } from "./geometry-layout-controller.js";
@@ -72,7 +72,7 @@ import {
   TOOLBAR_HEIGHT,
 } from "./ribbon/ribbon-metrics.js";
 import type { Ribbon } from "./ribbon/ribbon.js";
-import { nextTurn, Scope, ScopeSlot } from "./scope.js";
+import { Scope, ScopeSlot } from "./scope.js";
 import { SearchController } from "./search-controller.js";
 import { type CellRef, SelectionModel, type SelRect } from "./selection.js";
 import { validateSheetName } from "./sheet-name.js";
@@ -87,7 +87,10 @@ import {
   visibleSheetNeighbor,
 } from "./store/ranges.js";
 import { StyleActions } from "./style-actions.js";
-import { beginGridTransactionAdmission } from "./transaction-admission.js";
+import {
+  beginGridTransactionAdmission,
+  hasGridTransactionAdmission,
+} from "./transaction-admission.js";
 import type {
   CellHyperlink,
   CellScalar,
@@ -216,6 +219,7 @@ const GRID_COMMANDS: readonly GridCommandName[] = [
   "sortDesc",
   "exportCsv",
   "exportXlsx",
+  "importXlsx",
   "undo",
   "redo",
 ];
@@ -236,11 +240,6 @@ const COMMAND_STATE_ACTIVITY_COMMANDS: readonly GridCommandName[] = [
 /** Bound synchronous command-state work; larger uniform selections report mixed conservatively. */
 const COMMAND_STATE_CELL_LIMIT = 4_096;
 
-/**
- * Cells read per store call when summarizing a selection: about a frame's
- * work (measured ~10 ms for 64k cells), so huge selections yield between reads.
- */
-const SUMMARY_CELLS_PER_READ = 65_536;
 /** Column bands copied into a datasource failure; the full count goes beside them. */
 const MAX_DATASOURCE_ERROR_COLUMN_BANDS = 64;
 
@@ -576,6 +575,9 @@ export class GridImpl implements Grid {
   private sheetHasSources = true;
   /** The running auto-fit job; a new job or an edit closes it. */
   private readonly autoFits = new ScopeSlot(this.lifetime);
+  private imports: ScopeSlot | null = null;
+  private documentOperations: ScopeSlot | null = null;
+  private readonly hasDatasource: boolean;
   private commandStateQueued = false;
   private commandStateGeneration = 0;
 
@@ -656,6 +658,7 @@ export class GridImpl implements Grid {
     }
 
     const datasource = opts.datasource;
+    this.hasDatasource = datasource !== undefined;
     this.readOnly = opts.readOnly ?? false;
     this.config = opts.config;
     this.overscan = opts.overscan ?? DEFAULT_OVERSCAN;
@@ -2346,9 +2349,13 @@ export class GridImpl implements Grid {
     });
   }
 
-  setActiveSheet(id: SheetId): void {
+  setActiveSheet(id: SheetId, reset = false): void {
     const target = this.store.getWorkbook().sheets.find((sheet) => sheet.id === id);
-    if (!target || (target.visibility ?? "visible") !== "visible" || id === this.activeSheet)
+    if (
+      !target ||
+      (target.visibility ?? "visible") !== "visible" ||
+      (id === this.activeSheet && !reset)
+    )
       return;
 
     this.interactions.reconcile("sheet");
@@ -2748,6 +2755,50 @@ export class GridImpl implements Grid {
       ...snapshot,
       workbook: { ...snapshot.workbook, activeSheet: this.activeSheet },
     };
+  }
+
+  async importWorkbook(
+    source: WorkbookSnapshot | ((signal: AbortSignal) => Promise<WorkbookSnapshot>),
+    options?: { signal?: AbortSignal },
+  ): Promise<void> {
+    this.lifetime.signal.throwIfAborted();
+    const run = (this.imports ??= new ScopeSlot(this.lifetime)).next();
+
+    try {
+      // Replacement owns cold bootstrap and cleanup; normal grid hosts do not load it.
+      const { replaceDocument } = await import("./document-replace.js");
+      await replaceDocument(
+        {
+          grid: this,
+          store: this.loadable,
+          cancelOperations: () => this.documentOperations?.close(),
+          windows: this.readWindows,
+          history: this.document,
+          clipboard: this.clipboard,
+          closeFind: () => {
+            this.findBarBuilds.close();
+            this.findBar?.destroy();
+            this.findBar = null;
+          },
+          activate: (workbook, activeSheet) => {
+            this.virtualColumnTargets.clear();
+            this.sessionSheets = workbook.sheets.map(({ id, visibility }) => ({ id, visibility }));
+
+            this.storeEpoch += 1;
+            this.windowContentRevision += 1;
+
+            this.setActiveSheet(activeSheet, true);
+            this.applyZoomedTheme();
+            this.emitCommandStateChange();
+          },
+        },
+        source,
+        run,
+        options?.signal,
+      );
+    } finally {
+      run.close();
+    }
   }
 
   applyRemoteOperations(
@@ -3368,6 +3419,11 @@ export class GridImpl implements Grid {
         this.exportXlsx(filename ?? "sheetwrite.xlsx").catch((error: unknown) => {
           this.emitExportError(error, "xlsx");
         }),
+      importXlsx: async () => {
+        // File selection is optional chrome, not part of initial grid delivery.
+        const { pickXlsxWorkbook } = await import("./workbook-io.js");
+        await pickXlsxWorkbook(this, this.host, this.lifetime);
+      },
       editNote: () => {
         // Same gate as the cell editor: do not open an editor whose save must fail.
         const focus = this.selection.focusCell;
@@ -3413,86 +3469,23 @@ export class GridImpl implements Grid {
     this.lifetime.signal.throwIfAborted();
     if (this.selection.isEmpty) return null;
 
-    // Each summary has its own scope under the grid's, so `destroy()` stops
-    // every running one and the caller's signal stops this one. Callers do
-    // not abort each other: a status bar and a host panel can summarize the
-    // same selection. Each caller drops its own stale summary, as the
-    // shell's status line does when the selection changes.
-    const run = this.lifetime.child();
+    // Summaries are independent, but none may read a replaced document.
+    const run = (this.documentOperations ??= new ScopeSlot(this.lifetime)).current().child();
     signal?.addEventListener("abort", () => run.close(signal.reason), {
       once: true,
       signal: run.signal,
     });
-    try {
-      return await this.summarizeRects(run);
-    } finally {
-      run.close();
-    }
-  }
-
-  private async summarizeRects(run: Scope): Promise<SelectionSummary> {
-    // The selection and the active sheet can change while chunks yield, so
-    // the whole run works from a copy of both.
     const rects: SelRect[] = [];
     this.selection.forEachRect((rect) => rects.push({ ...rect }));
     const sheet = this.activeSheet;
     const columnCount = this.sheet().columns.length;
-
-    let count = 0;
-    let numericCount = 0;
-    let sum = 0;
-    let min = Infinity;
-    let max = -Infinity;
-    let readSinceYield = 0;
-
-    for (const rect of rects) {
-      // Whole-row selections extend past the last column; nothing lives there.
-      const lastCol = Math.min(rect.c1, columnCount - 1);
-      if (lastCol < rect.c0) continue;
-
-      const cols: number[] = [];
-      for (let col = rect.c0; col <= lastCol; col++) cols.push(col);
-      const rowsPerRead = Math.max(1, Math.floor(SUMMARY_CELLS_PER_READ / cols.length));
-
-      for (let start = rect.r0; start <= rect.r1; start += rowsPerRead) {
-        // Small selections finish in one turn. Larger ones give the page a
-        // turn after each frame's worth of reading, then stop if aborted.
-        if (readSinceYield >= SUMMARY_CELLS_PER_READ) {
-          readSinceYield = 0;
-          await nextTurn(run);
-        }
-
-        // View rows: the store maps them through sort and filter, so rows a
-        // filter hides are never read, as in Excel's status bar.
-        const end = Math.min(rect.r1 + 1, start + rowsPerRead);
-        const { values } = this.store.getVisibleWindow(sheet, { start, end }, cols);
-        readSinceYield += values.length;
-
-        // Tallied inline: a helper call per cell would cost millions of calls
-        // on a whole-sheet selection.
-        for (let index = 0; index < values.length; index++) {
-          const value = values[index];
-          if (value === null || value === undefined || value === "") continue;
-          count += 1;
-
-          if (typeof value !== "number") continue;
-          numericCount += 1;
-          sum += value;
-          if (value < min) min = value;
-          if (value > max) max = value;
-        }
-      }
+    try {
+      // Summary scans are cold work; do not add them to initial grid delivery.
+      const { summarizeRects } = await import("./selection-summary.js");
+      return await summarizeRects(this.store, sheet, columnCount, rects, run);
+    } finally {
+      run.close();
     }
-
-    const hasNumbers = numericCount > 0;
-    return {
-      count,
-      numericCount,
-      sum,
-      average: hasNumbers ? sum / numericCount : null,
-      min: hasNumbers ? min : null,
-      max: hasNumbers ? max : null,
-    };
   }
 
   private autoSum(): void {
@@ -3583,6 +3576,16 @@ export class GridImpl implements Grid {
     if (command === "redo") {
       return {
         disabled: this.readOnly || !this.document.canRedo,
+        activity: "inactive",
+      };
+    }
+    if (command === "importXlsx") {
+      return {
+        disabled:
+          this.readOnly ||
+          !this.ownsStore ||
+          this.hasDatasource ||
+          hasGridTransactionAdmission(this),
         activity: "inactive",
       };
     }
@@ -3901,27 +3904,12 @@ export class GridImpl implements Grid {
   }
 
   async exportXlsx(filename: string): Promise<void> {
-    const storedWorkbook = this.store.getWorkbook();
-    const workbook =
-      storedWorkbook.activeSheet === this.activeSheet
-        ? storedWorkbook
-        : { ...storedWorkbook, activeSheet: this.activeSheet };
-    const sheet =
-      workbook.sheets.find((candidate) => candidate.id === workbook.activeSheet) ??
-      workbook.sheets[0];
-    if (sheet) this.requireCompleteExport([sheet]);
-
     // Destroy aborts the export; its listeners on the signal go with this scope.
-    const run = this.lifetime.child();
+    const run = (this.documentOperations ??= new ScopeSlot(this.lifetime)).current().child();
     try {
-      const bytes = await toXlsxTable(workbook, this.store, { signal: run.signal });
-      run.signal.throwIfAborted();
-      downloadBytesIn(
-        this.lifetime,
-        bytes,
-        filename,
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      );
+      // XLSX conversion is optional document work, not initial grid code.
+      const { exportWorkbookFile } = await import("./workbook-io.js");
+      await exportWorkbookFile(this, filename, run, this.lifetime);
     } finally {
       run.close();
     }

@@ -352,6 +352,10 @@
     "saveVersion": {
       "column": 4,
       "row": 10
+    },
+    "importXlsx": {
+      "column": 0,
+      "row": 11
     }
   }
 }
