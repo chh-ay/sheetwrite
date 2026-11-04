@@ -22,6 +22,7 @@ import type {
   XlsxWorkbookWarning,
 } from "@sheetwrite/core";
 import {
+  convertXlsxFormulas,
   fromCsv,
   fromXlsxWorkbook,
   parseCsv,
@@ -639,8 +640,6 @@ const NAMED_ENTITIES: Record<string, string> = {
   quot: '"',
   apos: "'",
 };
-/** Excel's stored spill form, as the writer emits it for an `A1#` source. */
-const SPILL_IN_FILE = /_xlfn\.ANCHORARRAY\(\s*([A-Za-z]{1,3}[0-9]+)\s*\)/giu;
 const STORED_UTF8 = new TextDecoder();
 
 /** Sequential little-endian reader over one ZIP record. */
@@ -759,14 +758,30 @@ async function storedFormulaTexts(bytes: Uint8Array): Promise<string[]> {
   return texts;
 }
 
+/** One formula as the exported file stores it, beside its editor spelling. */
+interface StoredFormula {
+  readonly stored: string;
+  readonly editor: string;
+}
+
 /**
- * Claim the stored text that belongs to one source formula. The stored form may
- * use Excel's `_xlfn.ANCHORARRAY(A1)`; it reduces to the `A1#` source text.
+ * Pair each stored formula with its editor spelling. The engine's import
+ * converter owns Excel's prefixes (`_xlfn.`, `_xlws.`, `_xlpm.`) and the
+ * `_xlfn.ANCHORARRAY(A1)` form of `A1#`, so the page applies no second rule.
  */
-function takeStoredFormula(stored: string[], source: string): string | null {
-  const wanted = source.startsWith("=") ? source.slice(1) : source;
-  const index = stored.findIndex((text) => text.replace(SPILL_IN_FILE, "$1#") === wanted);
-  return index === -1 ? null : (stored.splice(index, 1)[0] ?? null);
+async function withEditorSpelling(stored: string[]): Promise<StoredFormula[]> {
+  const editor = await convertXlsxFormulas(
+    stored.map((text) => `=${text}`),
+    "import",
+  );
+
+  return stored.map((text, index) => ({ stored: text, editor: editor[index] ?? `=${text}` }));
+}
+
+/** Claim the stored text that belongs to one source formula. */
+function takeStoredFormula(stored: StoredFormula[], source: string): string | null {
+  const index = stored.findIndex((formula) => formula.editor === source);
+  return index === -1 ? null : (stored.splice(index, 1)[0]?.stored ?? null);
 }
 
 export interface RoundTripReport {
@@ -800,14 +815,14 @@ export async function roundTripWorkbook(
   const before = grid.exportSnapshot();
   const exported = await exportWorkbook(before);
   const imported = await importWorkbook(exported.bytes);
-  const storedFormulas = await storedFormulaTexts(exported.bytes).catch(
-    (error: unknown): string[] => {
+  const storedFormulas = await storedFormulaTexts(exported.bytes)
+    .then(withEditorSpelling)
+    .catch((error: unknown): StoredFormula[] => {
       // The proof table shows "not found in the exported file" per row, so an
       // unreadable package reports itself there instead of failing the exchange.
       console.warn("Sheetwrite showcase: exported workbook formulas could not be read", error);
       return [];
-    },
-  );
+    });
 
   const beforeCells = cellsByAddress(before);
   const afterCells = cellsByAddress(imported.snapshot);
