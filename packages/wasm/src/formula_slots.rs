@@ -7,7 +7,8 @@ const NO_FREE_SLOT: u32 = u32::MAX;
 const BITS_PER_WORD: usize = u64::BITS as usize;
 const NO_RESULT_POSITION: u32 = u32::MAX;
 const SLOT_CAPACITY_SLACK: usize = 4096;
-const SLOT_GROWTH_DIVISOR: usize = 16;
+const SLOT_GROWTH_DIVISOR: usize = 8;
+const MIN_SLOT_GROWTH: usize = 1;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub(crate) struct FormulaId(pub(crate) u32);
@@ -38,6 +39,9 @@ impl FormulaBits {
         let index = id.index();
         let word = index / BITS_PER_WORD;
         if self.words.len() <= word {
+            if self.words.capacity() == 0 {
+                self.words.reserve_exact(word + 1);
+            }
             self.words.resize(word + 1, 0);
         }
         let mask = 1u64 << (index % BITS_PER_WORD);
@@ -140,14 +144,24 @@ impl Iterator for FormulaFlagKeys<'_> {
     }
 }
 
+enum FormulaSlot {
+    Occupied(FormulaEntry),
+    Vacant(u32),
+}
+
+// A vacant slot holds its link without adding bytes per live formula.
+const _: () = assert!(
+    std::mem::size_of::<FormulaSlot>() == std::mem::size_of::<Option<FormulaEntry>>()
+);
+
 #[derive(Default)]
 pub(crate) struct FormulaStore {
     locations: Vec<AbsCellKey>,
-    entries: Vec<Option<FormulaEntry>>,
-    next_free: Vec<u32>,
-    // Removed ids stay retired until the graph edit owns their old read sets.
-    retired: Vec<FormulaId>,
+    entries: Vec<FormulaSlot>,
     free_head: Option<FormulaId>,
+    // Removed ids stay retired until the graph edit owns their old read sets.
+    retired_head: Option<FormulaId>,
+    retired_tail: Option<FormulaId>,
     volatile: FormulaBits,
     subtotals: FormulaBits,
 }
@@ -165,7 +179,6 @@ impl FormulaStore {
         if self.entries.capacity() > retained.saturating_add(SLOT_CAPACITY_SLACK) {
             self.entries.shrink_to(retained);
             self.locations.shrink_to(retained);
-            self.next_free.shrink_to(retained);
         }
     }
 
@@ -176,11 +189,17 @@ impl FormulaStore {
 
     #[inline]
     pub(crate) fn get(&self, id: FormulaId) -> Option<&FormulaEntry> {
-        self.entries.get(id.index()).and_then(Option::as_ref)
+        match self.entries.get(id.index())? {
+            FormulaSlot::Occupied(entry) => Some(entry),
+            FormulaSlot::Vacant(_) => None,
+        }
     }
 
     pub(crate) fn get_mut(&mut self, id: FormulaId) -> Option<&mut FormulaEntry> {
-        self.entries.get_mut(id.index()).and_then(Option::as_mut)
+        match self.entries.get_mut(id.index())? {
+            FormulaSlot::Occupied(entry) => Some(entry),
+            FormulaSlot::Vacant(_) => None,
+        }
     }
 
     fn track(&mut self, id: FormulaId) {
@@ -222,11 +241,12 @@ impl FormulaStore {
         let index = id.index();
         let location_slot = self.locations.get_mut(index)?;
         let entry_slot = self.entries.get_mut(index)?;
-        let next_slot = self.next_free.get_mut(index)?;
-        self.free_head = (*next_slot != NO_FREE_SLOT).then_some(FormulaId(*next_slot));
+        let FormulaSlot::Vacant(next) = entry_slot else {
+            return None;
+        };
+        self.free_head = (*next != NO_FREE_SLOT).then_some(FormulaId(*next));
         *location_slot = location;
-        *entry_slot = Some(entry);
-        *next_slot = NO_FREE_SLOT;
+        *entry_slot = FormulaSlot::Occupied(entry);
         Some(id)
     }
 
@@ -239,32 +259,58 @@ impl FormulaStore {
             index < NO_FREE_SLOT as usize,
             "formula slot count exceeds u32"
         );
+        if index == self.entries.capacity() {
+            // Bound unused entry storage without adding copies on replacement.
+            let growth = (index / SLOT_GROWTH_DIVISOR).max(MIN_SLOT_GROWTH);
+            self.entries.reserve_exact(growth);
+            self.locations.reserve_exact(growth);
+        }
         self.locations.push(location);
-        self.entries.push(Some(entry));
-        self.next_free.push(NO_FREE_SLOT);
+        self.entries.push(FormulaSlot::Occupied(entry));
         FormulaId(index as u32)
     }
 
     pub(crate) fn replace(&mut self, id: FormulaId, entry: FormulaEntry) -> Option<FormulaEntry> {
-        let previous = self.entries.get_mut(id.index())?.replace(entry);
+        let previous = std::mem::replace(
+            self.entries.get_mut(id.index())?,
+            FormulaSlot::Occupied(entry),
+        );
         self.track(id);
-        previous
+        match previous {
+            FormulaSlot::Occupied(entry) => Some(entry),
+            FormulaSlot::Vacant(_) => None,
+        }
     }
 
+    #[inline(never)]
     pub(crate) fn retire(&mut self, id: FormulaId) -> Option<FormulaEntry> {
-        let previous = self.entries.get_mut(id.index())?.take()?;
+        let slot = self.entries.get_mut(id.index())?;
+        if matches!(slot, FormulaSlot::Vacant(_)) {
+            return None;
+        }
+        let previous = std::mem::replace(
+            slot,
+            FormulaSlot::Vacant(self.retired_head.map_or(NO_FREE_SLOT, |head| head.0)),
+        );
         self.track(id);
-        self.retired.push(id);
-        Some(previous)
+        self.retired_head = Some(id);
+        self.retired_tail.get_or_insert(id);
+        match previous {
+            FormulaSlot::Occupied(entry) => Some(entry),
+            FormulaSlot::Vacant(_) => None,
+        }
     }
 
     pub(crate) fn release_retired(&mut self) {
-        for id in self.retired.drain(..) {
-            if let Some(next) = self.next_free.get_mut(id.index()) {
-                *next = self.free_head.map_or(NO_FREE_SLOT, |free| free.0);
-                self.free_head = Some(id);
-            }
-        }
+        let Some(tail) = self.retired_tail else {
+            return;
+        };
+        let Some(FormulaSlot::Vacant(next)) = self.entries.get_mut(tail.index()) else {
+            return;
+        };
+        *next = self.free_head.map_or(NO_FREE_SLOT, |head| head.0);
+        self.free_head = self.retired_head.take();
+        self.retired_tail = None;
     }
 
     pub(crate) fn relocate(&mut self, id: FormulaId, location: AbsCellKey) {
@@ -304,13 +350,13 @@ impl FormulaStore {
     pub(crate) fn add_memory_stats(&self, stats: &mut StoreMemoryStats) {
         let formulas = stats.owner_mut(FORMULAS);
         formulas.add_vec::<AbsCellKey>(self.locations.len(), self.locations.capacity());
-        formulas.add_vec::<Option<FormulaEntry>>(self.entries.len(), self.entries.capacity());
-        formulas.add_vec::<u32>(self.next_free.len(), self.next_free.capacity());
-        formulas.add_vec::<FormulaId>(self.retired.len(), self.retired.capacity());
+        formulas.add_vec::<FormulaSlot>(self.entries.len(), self.entries.capacity());
         self.volatile.add_memory_stats(formulas);
         self.subtotals.add_memory_stats(formulas);
-        for entry in self.entries.iter().flatten() {
-            entry.heap_memory_stats(formulas);
+        for slot in &self.entries {
+            if let FormulaSlot::Occupied(entry) = slot {
+                entry.heap_memory_stats(formulas);
+            }
         }
     }
 }
@@ -335,6 +381,9 @@ impl FormulaWork {
     pub(crate) fn insert(&mut self, id: FormulaId) -> bool {
         if !self.bits.insert(id) {
             return false;
+        }
+        if self.ids.capacity() == 0 {
+            self.ids.reserve_exact(MIN_SLOT_GROWTH);
         }
         self.ids.push(id);
         true
@@ -367,6 +416,23 @@ impl FormulaWork {
     ) -> impl Iterator<Item = AbsCellKey> + 'a {
         self.ids.iter().filter_map(|&id| slots.location(id))
     }
+
+    fn clear(&mut self) {
+        if self.ids.len() < self.bits.words.len() {
+            for &id in &self.ids {
+                self.bits.remove(id);
+            }
+        } else {
+            self.bits.words.fill(0);
+            self.bits.count = 0;
+        }
+        self.ids.clear();
+    }
+
+    fn add_memory_stats(&self, stats: &mut crate::memory::MemoryOwnerStats) {
+        self.bits.add_memory_stats(stats);
+        stats.add_vec::<FormulaId>(self.ids.len(), self.ids.capacity());
+    }
 }
 
 impl Extend<FormulaId> for FormulaWork {
@@ -393,15 +459,24 @@ pub(crate) struct FormulaResults {
     positions: Vec<u32>,
     values: Vec<Option<EvalResult>>,
     used: Vec<FormulaId>,
+    work: FormulaWork,
     count: usize,
     pub(crate) visiting: FormulaBits,
 }
 
 impl FormulaResults {
+    pub(crate) fn take_work(&mut self) -> FormulaWork {
+        std::mem::take(&mut self.work)
+    }
+
     pub(crate) fn prepare(&mut self, slots: usize, selected: usize) {
         self.clear();
-        self.positions.resize(slots, NO_RESULT_POSITION);
         let retained = slots.saturating_add(slots / SLOT_GROWTH_DIVISOR);
+        if self.positions.capacity() < slots {
+            self.positions
+                .reserve_exact(retained.saturating_sub(self.positions.len()));
+        }
+        self.positions.resize(slots, NO_RESULT_POSITION);
         if self.positions.capacity() > retained.saturating_add(SLOT_CAPACITY_SLACK) {
             self.positions.shrink_to(retained);
         }
@@ -468,10 +543,13 @@ impl FormulaResults {
         self.count = 0;
     }
 
-    pub(crate) fn finish(&mut self) {
+    pub(crate) fn finish(&mut self, mut work: FormulaWork) {
         self.clear();
         self.values = Vec::new();
         self.used = Vec::new();
+        // Reuse primary pass storage, never formula values or selected ids.
+        work.clear();
+        self.work = work;
     }
 
     pub(crate) fn add_memory_stats(&self, stats: &mut StoreMemoryStats) {
@@ -480,5 +558,6 @@ impl FormulaResults {
         formulas.add_vec::<Option<EvalResult>>(self.values.len(), self.values.capacity());
         formulas.add_vec::<FormulaId>(self.used.len(), self.used.capacity());
         self.visiting.add_memory_stats(formulas);
+        self.work.add_memory_stats(formulas);
     }
 }

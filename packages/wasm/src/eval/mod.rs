@@ -824,11 +824,17 @@ impl CellStore {
         let _lookup_pass = LookupPassGuard::begin();
         let _iteration_pass = IterationPassGuard::begin(self.iteration.is_some());
 
+        let mut memo = std::mem::take(&mut self.formula_results);
         let index = self.graph.ensure_index(&self.sheets, &self.formula_slots);
         self.formula_slots.release_retired();
         self.formula_slots.compact();
-        let mut affected =
-            collect_affected_formulas(&self.sheets, &self.formula_slots, seeds, index);
+        let mut affected = collect_affected_formulas(
+            &self.sheets,
+            &self.formula_slots,
+            seeds,
+            index,
+            memo.take_work(),
+        );
 
         for &sheet in seeds {
             let data = &self.sheets[sheet];
@@ -860,10 +866,11 @@ impl CellStore {
 
         if affected.is_empty() {
             self.finish_recompute(seeds.iter().copied(), None);
+            memo.finish(affected);
+            self.formula_results = memo;
             return;
         }
 
-        let mut memo = std::mem::take(&mut self.formula_results);
         memo.prepare(self.formula_slots.slots(), affected.len());
 
         let found_cycle = self.graph.index().is_some_and(|index| {
@@ -899,7 +906,7 @@ impl CellStore {
             }
 
             self.finish_recompute(seeds.iter().copied(), Some(&affected));
-            memo.finish();
+            memo.finish(affected);
             self.formula_results = memo;
 
             return;
@@ -1151,10 +1158,11 @@ impl CellStore {
                 }
             }
 
-            let index = self
-                .graph
-                .index()
-                .expect("graph stays live during a formula pass");
+            let Some(index) = self.graph.index() else {
+                memo.finish(affected);
+                self.formula_results = memo;
+                return;
+            };
 
             for changed_sheet in changed_sheets {
                 affected.extend(collect_affected_formulas(
@@ -1162,6 +1170,7 @@ impl CellStore {
                     &self.formula_slots,
                     &[changed_sheet],
                     index,
+                    FormulaWork::default(),
                 ));
             }
 
@@ -1279,7 +1288,7 @@ impl CellStore {
         }
 
         self.finish_recompute(seeded_sheets.iter().copied(), Some(&affected));
-        memo.finish();
+        memo.finish(affected);
         self.formula_results = memo;
     }
 

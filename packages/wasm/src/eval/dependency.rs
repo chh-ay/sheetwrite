@@ -574,12 +574,13 @@ pub(super) fn collect_affected_formulas(
     slots: &FormulaStore,
     seeds: &[usize],
     index: &DepIndex,
+    affected: FormulaWork,
 ) -> FormulaWork {
     let mut walk = DirtyWalk {
         sheets,
         slots,
         index,
-        affected: FormulaWork::default(),
+        affected,
         range_matches: Vec::new(),
         row_matches: Vec::new(),
         range_marks: vec![0; index.range_groups.len()],
@@ -624,10 +625,16 @@ impl DirtyWalk<'_> {
     }
 
     fn fire_group(&mut self, group: usize) {
-        if std::mem::replace(&mut self.fired_groups[group], true) {
+        let Some(fired) = self.fired_groups.get_mut(group) else {
+            return;
+        };
+        if std::mem::replace(fired, true) {
             return;
         }
-        for &reader in &self.index.range_groups[group].dependents {
+        let Some(group) = self.index.range_groups.get(group) else {
+            return;
+        };
+        for &reader in &group.dependents {
             self.select(reader);
         }
     }
@@ -645,11 +652,15 @@ impl DirtyWalk<'_> {
             &mut self.range_marks,
             &mut self.range_stamp,
         );
-        for offset in 0..self.range_matches.len() {
-            debug_assert!(self.index.range_groups[self.range_matches[offset]]
-                .range
-                .contains(cell));
-            self.fire_group(self.range_matches[offset]);
+        let mut offset = 0;
+        while let Some(&group) = self.range_matches.get(offset) {
+            offset += 1;
+            debug_assert!(self
+                .index
+                .range_groups
+                .get(group)
+                .is_some_and(|group| group.range.contains(cell)));
+            self.fire_group(group);
         }
     }
 
@@ -688,8 +699,8 @@ impl DirtyWalk<'_> {
                         }
                     }
                 }
-                for group in 0..self.index.range_groups.len() {
-                    if self.index.range_groups[group].range.sheet == seed as u32 {
+                for (group, entry) in self.index.range_groups.iter().enumerate() {
+                    if entry.range.sheet == seed as u32 {
                         self.fire_group(group);
                     }
                 }
@@ -704,7 +715,9 @@ impl DirtyWalk<'_> {
 
     fn seed_rectangles(&mut self, seed: usize, rects: &[DirtyRect]) {
         const ENUMERATED_RECT_CELLS: u64 = 4096;
-        let sheet = &self.sheets[seed];
+        let Some(sheet) = self.sheets.get(seed) else {
+            return;
+        };
         let area = |rect: &DirtyRect| {
             (u64::from(rect.row_end - rect.row_start) + 1)
                 .saturating_mul(u64::from(rect.col_end - rect.col_start) + 1)
@@ -747,8 +760,8 @@ impl DirtyWalk<'_> {
                 }
             }
         }
-        for group in 0..self.index.range_groups.len() {
-            let range = self.index.range_groups[group].range;
+        for (group, entry) in self.index.range_groups.iter().enumerate() {
+            let range = entry.range;
             if range.sheet == seed as u32
                 && rects.iter().filter(|rect| !is_small(rect)).any(|rect| {
                     rect.intersects(DirtyRect {
@@ -854,15 +867,12 @@ fn seed_depth_errors(
 
     let mut walk = DependencyDepthWalk::new(sheets, slots, affected);
     let mut found_cycle = false;
-    for key in affected.keys(slots) {
+    for id in affected.ids() {
+        let Some(key) = slots.location(id) else {
+            continue;
+        };
         if let Err(error) = walk.depth(key) {
             found_cycle |= error == FormulaError::Cycle;
-            let Some(id) = sheets
-                .get(key.sheet as usize)
-                .and_then(|sheet| sheet.formulas.id(key.local()))
-            else {
-                continue;
-            };
             if !preserve_results || results.get(id).is_none() {
                 results.insert(id, Value::Error(error));
             }

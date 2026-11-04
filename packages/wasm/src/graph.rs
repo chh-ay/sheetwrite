@@ -118,6 +118,7 @@ impl Default for DirtyState {
 
 // Bound a scalar insert or delete's shifts to one small row band, not a column.
 const FORMULA_INDEX_PAGE_ROWS: u32 = 256;
+const FORMULA_INDEX_INITIAL_CAPACITY: usize = 1;
 
 struct FormulaPage {
     band: u32,
@@ -294,11 +295,14 @@ impl SheetFormulas {
                 if self.columns.get(column..).is_none() {
                     return;
                 }
+                if self.columns.capacity() == 0 {
+                    self.columns.reserve_exact(FORMULA_INDEX_INITIAL_CAPACITY);
+                }
                 self.columns.insert(
                     column,
                     FormulaColumn {
                         col: key.1,
-                        pages: Vec::new(),
+                        pages: Vec::with_capacity(FORMULA_INDEX_INITIAL_CAPACITY),
                     },
                 );
                 column
@@ -319,7 +323,7 @@ impl SheetFormulas {
                     page,
                     FormulaPage {
                         band,
-                        cells: Vec::new(),
+                        cells: Vec::with_capacity(FORMULA_INDEX_INITIAL_CAPACITY),
                     },
                 );
                 page
