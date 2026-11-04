@@ -150,9 +150,8 @@ enum FormulaSlot {
 }
 
 // A vacant slot holds its link without adding bytes per live formula.
-const _: () = assert!(
-    std::mem::size_of::<FormulaSlot>() == std::mem::size_of::<Option<FormulaEntry>>()
-);
+const _: () =
+    assert!(std::mem::size_of::<FormulaSlot>() == std::mem::size_of::<Option<FormulaEntry>>());
 
 #[derive(Default)]
 pub(crate) struct FormulaStore {
