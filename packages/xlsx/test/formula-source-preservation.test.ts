@@ -90,7 +90,7 @@ describe("XLSX formula source preservation", () => {
   });
 
   it("writes Excel future-function and local-binding spellings and imports editor sources", async () => {
-    const cases = [
+    const cases: readonly (readonly [source: string, expected: string])[] = [
       ["=LET(x,1,x+1)", "_xlfn.LET(_xlpm.x,1,_xlpm.x+1)"],
       ["=LAMBDA(v,v+1)(2)", "_xlfn.LAMBDA(_xlpm.v,_xlpm.v+1)(2)"],
       ["=XLOOKUP(1,A1:A3,B1:B3)", "_xlfn.XLOOKUP(1,A1:A3,B1:B3)"],
@@ -101,16 +101,12 @@ describe("XLSX formula source preservation", () => {
         "_xlfn.LET(_xlpm.x,'_xlfn.Sheet'!A1,\"_xlfn.LET(_xlpm.x)\"&_xlpm.x)",
       ],
     ];
-    const sources = cases.map(([source]) => {
-      if (source === undefined) throw new Error("Missing editor formula fixture");
-      return source;
-    });
+    const sources = cases.map(([source]) => source);
     const encoded = await toXlsxWorkbook(formulaWorkbook(sources));
     const xml = unzipSync(encoded)["xl/worksheets/sheet1.xml"];
     if (xml === undefined) throw new Error("Missing exported worksheet");
     const native = strFromU8(xml);
     for (const [, expected] of cases) {
-      if (expected === undefined) throw new Error("Missing Excel formula fixture");
       expect(native).toContain(`<f>${escapeXml(expected)}</f>`);
     }
     expect(formulaSources(await fromXlsxWorkbook(encoded))).toEqual(sources);
