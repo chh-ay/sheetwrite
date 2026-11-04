@@ -224,12 +224,12 @@ const cases: EditingCase[] = [
     reason: "edit-enter",
   },
   {
-    name: "sorting remains a view-only operation over source cells",
+    name: "sorting orders spill rows by their displayed values without changing ownership",
     patches: [
-      { op: "setSheetMeta", sheet: "s1", patch: { sortKeys: [{ col: 1, ascending: false }] } },
+      { op: "setSheetMeta", sheet: "s1", patch: { sortKeys: [{ col: 1, ascending: true }] } },
     ],
     expected: original,
-    view: [null, 3, 5],
+    view: [1, 3, 5],
   },
   {
     name: "filtering a spill hides rows without changing ownership",
