@@ -366,11 +366,13 @@ test("@portability File import opens the native picker from the keyboard and rep
       ),
     )
     .toEqual(["Fixture"]);
-  expect(await page.evaluate(() => {
-    const grid = window.__sheetwriteInteropGrid;
-    if (!grid) throw new Error("Expected imported grid");
-    return grid.store.getCell({ sheet: grid.getActiveSheet(), row: 2, col: 1 }).resolved;
-  })).toBe(6);
+  expect(
+    await page.evaluate(() => {
+      const grid = window.__sheetwriteInteropGrid;
+      if (!grid) throw new Error("Expected imported grid");
+      return grid.store.getCell({ sheet: grid.getActiveSheet(), row: 2, col: 1 }).resolved;
+    }),
+  ).toBe(6);
   await expect
     .poll(() =>
       page.evaluate(() => window.__sheetwriteInteropGrid?.getCommandState("undo").disabled),
