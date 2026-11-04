@@ -333,7 +333,18 @@ test("@portability File import opens the native picker from the keyboard and rep
   // The showcase registers its optional backend on its first XLSX action.
   await openDisclosure(page, "interop-fixtures-disclosure");
   await page.getByTestId("fixture-libreoffice-rich-load").click();
-  await expect(page.getByTestId("interop-source")).toContainText("libreoffice-rich.xlsx");
+
+  // The label updates before React mounts the new grid; configure only the live workbook.
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.__sheetwriteInteropGrid?.store
+          .getWorkbook()
+          .sheets.map((sheet) => sheet.name)
+          .sort(),
+      ),
+    )
+    .toEqual(["Calc", "Hidden", "Inputs"]);
 
   await page.evaluate(() => {
     const grid = window.__sheetwriteInteropGrid;
