@@ -298,7 +298,7 @@ impl FormulaStore {
             return None;
         }
 
-        if index % SLOT_PAGE_LEN == 0 {
+        if index.is_multiple_of(SLOT_PAGE_LEN) {
             if self.entries.capacity() == 0 {
                 self.entries.reserve_exact(MIN_SLOT_GROWTH);
             }
