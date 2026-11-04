@@ -21,7 +21,6 @@ import type {
 } from "@sheetwrite/core";
 import {
   colToA1,
-  convertDefinedNameFormulas,
   DEFAULT_MAX_CHANGE,
   DEFAULT_MAX_ITERATIONS,
   DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
@@ -40,7 +39,7 @@ import {
 } from "@sheetwrite/core";
 
 import { readCharts } from "./chart-read.js";
-import { formulaContainsExternalReference, spillReferencesFromXlsx } from "./formula.js";
+import { convertWorkbookFormulas, formulaContainsExternalReference } from "./formula.js";
 import { OpcPackage, type OpcRelationship, relationshipTypeMatches } from "./opc.js";
 import { readPivots } from "./pivot.js";
 import { capturePreserved, isRetainedRelationship } from "./preservation.js";
@@ -1334,7 +1333,7 @@ async function parseSheet(
       let sharedFormula: string | undefined;
       let ownSharedFormula: string | undefined;
       if (formulaElement) {
-        const formulaText = spillReferencesFromXlsx(decodeXstring(formulaElement.text));
+        const formulaText = decodeXstring(formulaElement.text);
         const formulaType = xmlAttribute(formulaElement, "t") ?? "normal";
         if (formulaType === "shared") {
           sharedFormula = xmlAttribute(formulaElement, "si");
@@ -1961,12 +1960,12 @@ function workbookCalculation(workbookRoot: XmlElement): CalculationSettings | un
   return { iterate, maxIterations, maxChange };
 }
 
-async function externalNamedRanges(
+function externalNamedRanges(
   workbookRoot: XmlElement,
   sheetIds: ReadonlyMap<string, string>,
   sheets: readonly WorkbookSheetReference[],
   context: XlsxCodecContext,
-): Promise<WorkbookSnapshot["workbook"]["namedRanges"]> {
+): WorkbookSnapshot["workbook"]["namedRanges"] {
   const definitions = xmlChild(workbookRoot, "definedNames");
   if (!definitions) return undefined;
   const ranges: NonNullable<WorkbookSnapshot["workbook"]["namedRanges"]> = [];
@@ -2003,7 +2002,7 @@ async function externalNamedRanges(
         continue;
       }
     }
-    const source = spillReferencesFromXlsx(decodeXstring(definition.text));
+    const source = decodeXstring(definition.text);
     const match =
       /^(?:'((?:[^']|'')+)'|([^!]+))!(\$[A-Z]{1,3}\$[1-9]\d*(?::\$[A-Z]{1,3}\$[1-9]\d*)?)$/i.exec(
         source,
@@ -2031,15 +2030,6 @@ async function externalNamedRanges(
         end: { row: parsed.r1, col: parsed.c1 },
       },
     });
-  }
-  const formulas = ranges.flatMap((named) => (named.formula === undefined ? [] : [named.formula]));
-  const converted = await convertDefinedNameFormulas(formulas, "import");
-  let formulaIndex = 0;
-  for (const named of ranges) {
-    if (named.formula === undefined) continue;
-    const source = converted[formulaIndex++];
-    if (source === undefined) throw new Error("Missing imported defined-name formula");
-    named.formula = source;
   }
   return ranges.length > 0 ? ranges : undefined;
 }
@@ -2544,12 +2534,7 @@ export async function readWorkbook(
           (reference) => reference.state !== "hidden" && reference.state !== "veryHidden",
         );
   const activeSheet = sheets[activeIndex]!.id;
-  const nativeNamedRanges = await externalNamedRanges(
-    workbookRoot,
-    sheetIds,
-    sourceReferences,
-    context,
-  );
+  const nativeNamedRanges = externalNamedRanges(workbookRoot, sheetIds, sourceReferences, context);
   const namedRanges = xmlChild(workbookRoot, "definedNames")
     ? nativeNamedRanges
     : metadata?.workbook.namedRanges;
@@ -2608,6 +2593,23 @@ export async function readWorkbook(
       new Set([...modelledPivotParts, ...chartParts.modelled]),
       chartParts.replacements,
     );
+  const formulas = await convertWorkbookFormulas(snapshot, "import");
+  for (const sheet of snapshot.sheets) {
+    for (const block of sheet.cells) {
+      for (const cell of block.cells) {
+        if (cell.value.kind !== "formula") continue;
+        const source = formulas.get(cell.value.src);
+        if (source === undefined) throw new Error("Missing imported cell formula");
+        cell.value.src = source;
+      }
+    }
+  }
+  for (const named of snapshot.workbook.namedRanges ?? []) {
+    if (named.formula === undefined) continue;
+    const source = formulas.get(named.formula);
+    if (source === undefined) throw new Error("Missing imported defined-name formula");
+    named.formula = source;
+  }
   const checked = validateCodecSnapshot(snapshot, context);
   if (!checked.ok) {
     throw new TypeError(

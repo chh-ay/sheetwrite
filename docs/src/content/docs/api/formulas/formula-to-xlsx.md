@@ -1,16 +1,16 @@
 ---
 title: "formulaToXlsx | @sheetwrite/formulas"
-description: "formulaToXlsx function in @sheetwrite/formulas: Write future-function and local-binding prefixes for defined-name formulas."
+description: "formulaToXlsx function in @sheetwrite/formulas: Write future-function, local-binding and spill spellings for OOXML formulas."
 ---
 <!-- api-export:@sheetwrite/formulas|.|formulaToXlsx -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/formulas/">@sheetwrite/formulas</a><span class="api-status" data-kind="function">function</span></div>
 
-Write future-function and local-binding prefixes for defined-name formulas.
+Write future-function, local-binding and spill spellings for OOXML formulas.
 This is lexical: unknown future functions and incomplete formulas still
 round-trip without a parse/serialize pass changing their source text.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/formulas/pkg/sheetwrite_wasm.d.ts#L617"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L617</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/formulas/pkg/sheetwrite_wasm.d.ts#L623"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L623</code></a></dd></div>
 </dl>
 
 ## Declaration

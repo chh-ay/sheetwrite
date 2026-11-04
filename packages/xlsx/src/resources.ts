@@ -15,8 +15,8 @@ export interface XlsxCodecContext {
   readonly options: XlsxWorkbookOptions | undefined;
   /** Warnings given to `onWarning` so far; see `MAX_WARNINGS`. */
   warningCount: number;
-  /** OOXML spellings of formula names, computed once per export batch. */
-  definedNameFormulas?: ReadonlyMap<string, string>;
+  /** OOXML spellings of cell and defined-name formulas, computed in one batch. */
+  formulas?: ReadonlyMap<string, string>;
 }
 
 /** Warnings one conversion reports, so a hostile file cannot flood the host callback. */

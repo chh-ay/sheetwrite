@@ -300,7 +300,12 @@ test("live round-trip preserves formulas, the merge, and frozen rows after an ed
   const spillExamples = [
     { source: "={1,2;3,4}", stored: "{1,2;3,4}", encoding: "plain" },
     { source: "=SUM(A1#)", stored: "SUM(_xlfn.ANCHORARRAY(A1))", encoding: "anchorarray" },
-    { source: "=SORT(A1#)", stored: "SORT(_xlfn.ANCHORARRAY(A1))", encoding: "anchorarray" },
+    {
+      source: "=SORT(A1#)",
+      // MS-XLSX §2.2.2: SORT is a future worksheet function.
+      stored: "_xlfn._xlws.SORT(_xlfn.ANCHORARRAY(A1))",
+      encoding: "anchorarray",
+    },
   ];
   for (const example of spillExamples) {
     const row = sourceProof.locator("tbody tr").filter({ hasText: example.source });

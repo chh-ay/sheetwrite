@@ -8,7 +8,7 @@ description: "InitOutput interface in @sheetwrite/formulas: Result of module ini
 Result of module initialization: the instantiated exports plus the shared linear memory.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/formulas/pkg/sheetwrite_wasm.d.ts#L660"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L660</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/formulas/pkg/sheetwrite_wasm.d.ts#L666"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L666</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -132,6 +132,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-string-pool-epoch"><code>cellstore_stringPoolEpoch</code></a>
 <a href="#init-output-cellstore-wasm-committed-bytes"><code>cellstore_wasmCommittedBytes</code></a>
 <a href="#init-output-check-formula-syntax"><code>checkFormulaSyntax</code></a>
+<a href="#init-output-convert-xlsx-formulas"><code>convertXlsxFormulas</code></a>
 <a href="#init-output-distinctcolumn-take-kinds"><code>distinctcolumn_takeKinds</code></a>
 <a href="#init-output-distinctcolumn-take-numbers"><code>distinctcolumn_takeNumbers</code></a>
 <a href="#init-output-distinctcolumn-take-texts"><code>distinctcolumn_takeTexts</code></a>
@@ -175,7 +176,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-wbindgen-start"><code>__wbindgen_start</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>161</span>
+## Members <span class="api-count" data-pagefind-ignore>162</span>
 
 <div class="api-member-list">
 
@@ -1259,6 +1260,15 @@ readonly checkFormulaSyntax: (a: number, b: number) => number;
 
 </details>
 
+<details class="api-member" id="init-output-convert-xlsx-formulas" data-pagefind-weight="1">
+<summary><code>convertXlsxFormulas</code></summary>
+
+```ts generated
+readonly convertXlsxFormulas: (a: number, b: number, c: number) => [number, number];
+```
+
+</details>
+
 <details class="api-member" id="init-output-distinctcolumn-take-kinds" data-pagefind-weight="1">
 <summary><code>distinctcolumn_takeKinds</code></summary>
 
@@ -2307,6 +2317,11 @@ export interface InitOutput {
   readonly cellstore_stringPoolEpoch: (a: number) => number;
   readonly cellstore_wasmCommittedBytes: (a: number) => number;
   readonly checkFormulaSyntax: (a: number, b: number) => number;
+  readonly convertXlsxFormulas: (
+    a: number,
+    b: number,
+    c: number,
+  ) => [number, number];
   readonly distinctcolumn_takeKinds: (a: number) => [number, number];
   readonly distinctcolumn_takeNumbers: (a: number) => [number, number];
   readonly distinctcolumn_takeTexts: (a: number) => [number, number];
