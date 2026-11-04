@@ -269,8 +269,10 @@ pub struct CellStore {
     pub(crate) sheet_lookup: HashMap<String, usize>,
     pub(crate) sheet_ids: HashMap<String, usize>,
     pub(crate) strings: StringStorage,
+    /// Stable ids keep formula passes independent of address-index allocation.
     pub(crate) formula_slots: FormulaStore,
-    pub(crate) formula_results: FormulaResults,
+    /// Moving one pointer keeps pass setup independent of scratch-header size.
+    pub(crate) formula_results: Option<Box<FormulaResults>>,
     pub(crate) graph: FormulaGraph,
     pub(crate) conditional_rules: ConditionalRules,
     /// Host functions of this store. `None` until the host registers one, so
@@ -376,7 +378,7 @@ impl CellStore {
             sheet_ids: HashMap::new(),
             strings: StringStorage::new(),
             formula_slots: FormulaStore::default(),
-            formula_results: FormulaResults::default(),
+            formula_results: None,
             graph: FormulaGraph::default(),
             conditional_rules: ConditionalRules::default(),
             #[cfg(feature = "host-functions")]
@@ -3153,6 +3155,7 @@ struct CellSourceWrite {
     hydrating: bool,
 }
 impl CellStore {
+    /// Translate coordinates at evaluator boundaries; pass work keeps ids.
     #[inline]
     pub(crate) fn formula_id(&self, key: AbsCellKey) -> Option<FormulaId> {
         self.sheets
@@ -3223,6 +3226,14 @@ impl CellStore {
         if !sheet_data.cells.contains_cell(row, col) {
             return false;
         }
+
+        if source.is_some()
+            && !self.formula_slots.can_allocate()
+            && !sheet_data.formulas.contains(key)
+        {
+            return false;
+        }
+
         let written = if hydrating {
             sheet_data.hydrate_cell(row, col, kind, payload, style)
         } else if prepared_rect {
@@ -3264,7 +3275,13 @@ impl CellStore {
             .owner_mut(STRING_INDEX)
             .add(self.strings.index_memory_stats());
         self.formula_slots.add_memory_stats(&mut stats);
-        self.formula_results.add_memory_stats(&mut stats);
+        if let Some(results) = &self.formula_results {
+            let bytes = size_of::<FormulaResults>();
+            stats
+                .owner_mut(crate::memory::FORMULAS)
+                .add_payload(bytes, bytes);
+            results.add_memory_stats(&mut stats);
+        }
 
         self.graph.add_memory_stats(&mut stats);
         self.conditional_rules.add_memory_stats(&mut stats);

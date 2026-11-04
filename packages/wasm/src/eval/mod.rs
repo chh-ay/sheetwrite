@@ -151,7 +151,9 @@ pub(crate) fn current_formula_origin() -> Option<(u32, u32)> {
 /// pass recomputes, the results computed so far, and the formulas on the
 /// current evaluation path, which detect cycles.
 pub(crate) struct EvalPass<'a> {
+    /// Selection is immutable while this evaluation reads indexed results.
     pub(crate) affected: &'a FormulaWork,
+    /// Results and active-call bits exist only for this pass.
     pub(crate) results: &'a mut FormulaResults,
 }
 
@@ -799,7 +801,7 @@ impl CellStore {
         self.finish_recompute(seeds.iter().copied(), None);
         self.graph.invalidate();
         self.formula_slots = FormulaStore::default();
-        self.formula_results = FormulaResults::default();
+        self.formula_results = None;
     }
 
     /// Recalculates the formulas that the dirty cells of the `seeds` sheets
@@ -824,10 +826,9 @@ impl CellStore {
         let _lookup_pass = LookupPassGuard::begin();
         let _iteration_pass = IterationPassGuard::begin(self.iteration.is_some());
 
-        let mut memo = std::mem::take(&mut self.formula_results);
+        let mut memo = self.formula_results.take().unwrap_or_default();
         let index = self.graph.ensure_index(&self.sheets, &self.formula_slots);
         self.formula_slots.release_retired();
-        self.formula_slots.compact();
         let mut affected = collect_affected_formulas(
             &self.sheets,
             &self.formula_slots,
@@ -867,7 +868,7 @@ impl CellStore {
         if affected.is_empty() {
             self.finish_recompute(seeds.iter().copied(), None);
             memo.finish(affected);
-            self.formula_results = memo;
+            self.formula_results = Some(memo);
             return;
         }
 
@@ -907,7 +908,7 @@ impl CellStore {
 
             self.finish_recompute(seeds.iter().copied(), Some(&affected));
             memo.finish(affected);
-            self.formula_results = memo;
+            self.formula_results = Some(memo);
 
             return;
         }
@@ -1160,7 +1161,7 @@ impl CellStore {
 
             let Some(index) = self.graph.index() else {
                 memo.finish(affected);
-                self.formula_results = memo;
+                self.formula_results = Some(memo);
                 return;
             };
 
@@ -1289,7 +1290,7 @@ impl CellStore {
 
         self.finish_recompute(seeded_sheets.iter().copied(), Some(&affected));
         memo.finish(affected);
-        self.formula_results = memo;
+        self.formula_results = Some(memo);
     }
 
     fn install_spill_result(
@@ -1458,6 +1459,7 @@ impl CellStore {
         self.eval_formula_id(id, pass, depth)
     }
 
+    /// Evaluate a selected id without repeating its address-index lookup.
     pub(crate) fn eval_formula_id(
         &self,
         id: FormulaId,

@@ -569,6 +569,7 @@ fn next_match_stamp(marks: &mut [u32], stamp: &mut u32) -> u32 {
     current
 }
 
+/// Collect every seed into one id worklist so shared readers enter it once.
 pub(super) fn collect_affected_formulas(
     sheets: &[SheetData],
     slots: &FormulaStore,
