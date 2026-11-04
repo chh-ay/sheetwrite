@@ -129,6 +129,65 @@ struct FormulaColumn {
     pages: Vec<FormulaPage>,
 }
 
+struct FormulaAddresses<'a> {
+    columns: std::slice::Iter<'a, FormulaColumn>,
+    pages: std::slice::Iter<'a, FormulaPage>,
+    cells: std::slice::Iter<'a, (u32, FormulaId)>,
+    col: u32,
+}
+
+impl<'a> FormulaAddresses<'a> {
+    fn new(columns: &'a [FormulaColumn]) -> Self {
+        Self {
+            columns: columns.iter(),
+            pages: [].iter(),
+            cells: [].iter(),
+            col: 0,
+        }
+    }
+
+    // Share the address walk instead of copying nested iterators into callers.
+    #[inline(never)]
+    fn next_address_family(&mut self) -> Option<(CellKey, FormulaId)> {
+        loop {
+            if let Some(&(row, id)) = self.cells.next() {
+                return Some(((row, self.col), id));
+            }
+
+            if let Some(page) = self.pages.next() {
+                self.cells = page.cells.iter();
+                continue;
+            }
+
+            let column = self.columns.next()?;
+            self.col = column.col;
+            self.pages = column.pages.iter();
+        }
+    }
+}
+
+impl Iterator for FormulaAddresses<'_> {
+    type Item = (CellKey, FormulaId);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next_address_family()
+    }
+}
+
+struct FormulaEntries<'a> {
+    addresses: FormulaAddresses<'a>,
+    slots: &'a FormulaStore,
+}
+
+impl<'a> Iterator for FormulaEntries<'a> {
+    type Item = (CellKey, &'a FormulaEntry);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let (key, id) = self.addresses.next()?;
+        Some((key, self.slots.get(id)?))
+    }
+}
+
 /// A sparse address index and source-edit seeds. The workbook owns all entries.
 #[derive(Default)]
 pub(crate) struct SheetFormulas {
@@ -155,12 +214,12 @@ impl SheetFormulas {
             .columns
             .binary_search_by_key(&col, |column| column.col)
             .ok()?;
-        let pages = &self.columns[column].pages;
+        let pages = &self.columns.get(column)?.pages;
         let band = row / FORMULA_INDEX_PAGE_ROWS;
         let page = pages.binary_search_by_key(&band, |page| page.band).ok()?;
-        let cells = &pages[page].cells;
+        let cells = &pages.get(page)?.cells;
         let offset = cells.binary_search_by_key(&row, |&(row, _)| row).ok()?;
-        Some(cells[offset].1)
+        cells.get(offset).map(|&(_, id)| id)
     }
 
     #[inline]
@@ -181,30 +240,18 @@ impl SheetFormulas {
         &'a self,
         slots: &'a FormulaStore,
     ) -> impl Iterator<Item = (CellKey, &'a FormulaEntry)> {
-        self.ids().map(move |id| {
-            (
-                slots.location(id).local(),
-                slots.get(id).expect("live sheet formula"),
-            )
-        })
+        FormulaEntries {
+            addresses: FormulaAddresses::new(&self.columns),
+            slots,
+        }
     }
 
     pub(crate) fn ids(&self) -> impl Iterator<Item = FormulaId> + '_ {
-        self.columns.iter().flat_map(|column| {
-            column
-                .pages
-                .iter()
-                .flat_map(|page| page.cells.iter().map(|&(_, id)| id))
-        })
+        FormulaAddresses::new(&self.columns).map(|(_, id)| id)
     }
 
     pub(crate) fn keys(&self) -> impl Iterator<Item = CellKey> + '_ {
-        self.columns.iter().flat_map(|column| {
-            column
-                .pages
-                .iter()
-                .flat_map(move |page| page.cells.iter().map(move |&(row, _)| (row, column.col)))
-        })
+        FormulaAddresses::new(&self.columns).map(|(key, _)| key)
     }
 
     #[inline]
@@ -216,26 +263,27 @@ impl SheetFormulas {
         &'a self,
         slots: &'a FormulaStore,
     ) -> impl Iterator<Item = CellKey> + 'a {
-        let sheet = self.ids().next().map(|id| slots.location(id).sheet);
-        slots
-            .volatile_ids()
-            .filter(move |&id| Some(slots.location(id).sheet) == sheet)
-            .map(|id| slots.location(id).local())
+        let sheet = self
+            .ids()
+            .next()
+            .and_then(|id| slots.location(id))
+            .map(|key| key.sheet);
+        slots.volatile_keys(sheet)
     }
 
     pub(crate) fn subtotal_keys<'a>(
         &'a self,
         slots: &'a FormulaStore,
     ) -> Option<impl Iterator<Item = CellKey> + 'a> {
-        let sheet = self.ids().next().map(|id| slots.location(id).sheet);
-        (self.subtotal_count != 0).then(move || {
-            slots
-                .subtotal_ids()
-                .filter(move |&id| Some(slots.location(id).sheet) == sheet)
-                .map(|id| slots.location(id).local())
-        })
+        let sheet = self
+            .ids()
+            .next()
+            .and_then(|id| slots.location(id))
+            .map(|key| key.sheet);
+        (self.subtotal_count != 0).then(move || slots.subtotal_keys(sheet))
     }
 
+    #[inline(never)]
     fn index_id(&mut self, key: CellKey, id: FormulaId) {
         let column = match self
             .columns
@@ -243,6 +291,9 @@ impl SheetFormulas {
         {
             Ok(column) => column,
             Err(column) => {
+                if self.columns.get(column..).is_none() {
+                    return;
+                }
                 self.columns.insert(
                     column,
                     FormulaColumn {
@@ -253,11 +304,17 @@ impl SheetFormulas {
                 column
             }
         };
-        let pages = &mut self.columns[column].pages;
+        let Some(column) = self.columns.get_mut(column) else {
+            return;
+        };
+        let pages = &mut column.pages;
         let band = key.0 / FORMULA_INDEX_PAGE_ROWS;
         let page = match pages.binary_search_by_key(&band, |page| page.band) {
             Ok(page) => page,
             Err(page) => {
+                if pages.get(page..).is_none() {
+                    return;
+                }
                 pages.insert(
                     page,
                     FormulaPage {
@@ -268,10 +325,16 @@ impl SheetFormulas {
                 page
             }
         };
-        let cells = &mut pages[page].cells;
-        let offset = cells
-            .binary_search_by_key(&key.0, |&(row, _)| row)
-            .expect_err("new formula address");
+        let Some(page) = pages.get_mut(page) else {
+            return;
+        };
+        let cells = &mut page.cells;
+        let Err(offset) = cells.binary_search_by_key(&key.0, |&(row, _)| row) else {
+            return;
+        };
+        if cells.get(offset..).is_none() {
+            return;
+        }
         cells.insert(offset, (key.0, id));
         self.count += 1;
     }
@@ -304,24 +367,21 @@ impl SheetFormulas {
                 let previous = slots.replace(id, entry);
                 self.volatile_count += usize::from(slots.is_volatile(id));
                 self.subtotal_count += usize::from(slots.is_subtotal(id));
-                Some(previous)
+                previous
             }
             (Some(id), None) => {
-                self.volatile_count -= usize::from(slots.is_volatile(id));
-                self.subtotal_count -= usize::from(slots.is_subtotal(id));
                 let column = self
                     .columns
                     .binary_search_by_key(&key.1, |column| column.col)
-                    .expect("formula column");
-                let pages = &mut self.columns[column].pages;
+                    .ok()?;
+                let pages = &mut self.columns.get_mut(column)?.pages;
                 let band = key.0 / FORMULA_INDEX_PAGE_ROWS;
-                let page = pages
-                    .binary_search_by_key(&band, |page| page.band)
-                    .expect("formula page");
-                let cells = &mut pages[page].cells;
-                let offset = cells
-                    .binary_search_by_key(&key.0, |&(row, _)| row)
-                    .expect("formula row");
+                let page = pages.binary_search_by_key(&band, |page| page.band).ok()?;
+                let cells = &mut pages.get_mut(page)?.cells;
+                let offset = cells.binary_search_by_key(&key.0, |&(row, _)| row).ok()?;
+                cells.get(offset)?;
+                self.volatile_count -= usize::from(slots.is_volatile(id));
+                self.subtotal_count -= usize::from(slots.is_subtotal(id));
                 cells.remove(offset);
                 if cells.is_empty() {
                     pages.remove(page);
@@ -330,7 +390,7 @@ impl SheetFormulas {
                     self.columns.remove(column);
                 }
                 self.count -= 1;
-                Some(slots.retire(id))
+                slots.retire(id)
             }
             (None, Some(entry)) => {
                 let id = slots.allocate(AbsCellKey::from_local(sheet, key), entry);
@@ -348,12 +408,19 @@ impl SheetFormulas {
         slots: &mut FormulaStore,
         mut rewrite: impl FnMut(&mut FormulaEntry),
     ) {
+        let mut volatile_count = 0;
+        let mut subtotal_count = 0;
         for id in self.ids() {
-            rewrite(slots.get_mut(id).expect("live sheet formula"));
+            let Some(entry) = slots.get_mut(id) else {
+                continue;
+            };
+            rewrite(entry);
             slots.refresh_flags(id);
+            volatile_count += usize::from(slots.is_volatile(id));
+            subtotal_count += usize::from(slots.is_subtotal(id));
         }
-        self.volatile_count = self.ids().filter(|&id| slots.is_volatile(id)).count();
-        self.subtotal_count = self.ids().filter(|&id| slots.is_subtotal(id)).count();
+        self.volatile_count = volatile_count;
+        self.subtotal_count = subtotal_count;
     }
 
     /// Moves entries at or below `at` down by `count` rows on this sheet,
@@ -443,8 +510,12 @@ impl SheetFormulas {
         self.subtotal_count = 0;
         for column in columns {
             for (row, id) in column.pages.into_iter().flat_map(|page| page.cells) {
-                let previous = slots.location(id);
-                let entry = slots.get_mut(id).expect("live sheet formula");
+                let Some(previous) = slots.location(id) else {
+                    continue;
+                };
+                let Some(entry) = slots.get_mut(id) else {
+                    continue;
+                };
                 if let Some(key) = relocate((row, column.col), entry) {
                     slots.relocate(id, AbsCellKey::from_local(previous.sheet as usize, key));
                     slots.refresh_flags(id);
@@ -452,7 +523,7 @@ impl SheetFormulas {
                     self.volatile_count += usize::from(slots.is_volatile(id));
                     self.subtotal_count += usize::from(slots.is_subtotal(id));
                 } else {
-                    slots.retire(id);
+                    let _ = slots.retire(id);
                 }
             }
         }

@@ -888,10 +888,12 @@ impl CellStore {
             };
             self.evaluate_pass(&mut pass, found_cycle);
 
-            for offset in 0..affected.len() {
-                let id = affected.id_at(offset).expect("selected formula");
+            for id in affected.ids() {
+                let Some(key) = self.formula_slots.location(id) else {
+                    continue;
+                };
                 if let Some(result) = pass.results.remove(id) {
-                    self.store_formula_result(self.formula_slots.location(id), result);
+                    self.store_formula_result(key, result);
                 }
             }
 
@@ -963,6 +965,9 @@ impl CellStore {
             let mut spill_changes: Vec<SpillChange> = Vec::new();
 
             for (key, ast, has_spill_refs) in pending {
+                let Some(id) = self.formula_id(key) else {
+                    continue;
+                };
                 processed_arrays.insert(key);
                 sequence += 1;
                 evaluated_at.insert(key, sequence);
@@ -973,7 +978,6 @@ impl CellStore {
                 let vacated_range = data.spill.installed(local);
                 let vacated = data.spill.clear_keeping_values(local, &mut data.cells);
 
-                let id = self.formula_id(key).expect("live spill formula");
                 memo.remove(id);
                 let mut pass = EvalPass {
                     affected: &affected,
@@ -1264,10 +1268,12 @@ impl CellStore {
         };
         self.evaluate_pass(&mut pass, found_cycle);
 
-        for offset in 0..affected.len() {
-            let id = affected.id_at(offset).expect("selected formula");
+        for id in affected.ids() {
+            let Some(key) = self.formula_slots.location(id) else {
+                continue;
+            };
             if let Some(result) = pass.results.remove(id) {
-                self.store_formula_result(self.formula_slots.location(id), result);
+                self.store_formula_result(key, result);
             }
         }
 
@@ -1284,7 +1290,9 @@ impl CellStore {
     ) -> Vec<(u32, u32)> {
         let sheet = key.sheet as usize;
         let local = key.local();
-        let id = self.formula_id(key).expect("live spill formula");
+        let Some(id) = self.formula_id(key) else {
+            return Vec::new();
+        };
         let matrix = match result {
             Ok(matrix) => matrix,
             Err(error) => {
@@ -1408,7 +1416,6 @@ impl CellStore {
 
         if let Some(key) = cell_key(row, col) {
             if let Some(id) = s.formulas.id(key) {
-                let entry = self.formula_slots.get(id).expect("live formula");
                 if pass.affected.contains(id) {
                     return self.eval_formula_id(id, pass, depth + 1);
                 }
@@ -1417,7 +1424,7 @@ impl CellStore {
                     s,
                     &self.strings,
                     i,
-                    formula_error_with_entry(s, key, Some(entry)),
+                    formula_error_with_entry(s, key, self.formula_slots.get(id)),
                 );
             }
             if let Some(error) = s.cells.calculated_error_at(i) {
@@ -1450,7 +1457,9 @@ impl CellStore {
         if depth > FORMULA_RECURSION_LIMIT {
             return Value::Error(FormulaError::Num);
         }
-        let key = self.formula_slots.location(id);
+        let Some(key) = self.formula_slots.location(id) else {
+            return Value::Error(FormulaError::Ref);
+        };
         if let Some(result) = pass.results.get(id) {
             if self.iteration.is_some() {
                 iteration::record_iteration_read(key);
@@ -1483,7 +1492,9 @@ impl CellStore {
     ) -> EvalResult {
         #[cfg(test)]
         FORMULA_EVALUATIONS.with(|count| count.set(count.get() + 1));
-        let key = self.formula_slots.location(id);
+        let Some(key) = self.formula_slots.location(id) else {
+            return Value::Error(FormulaError::Ref);
+        };
 
         let sheet = key.sheet as usize;
         let local = key.local();

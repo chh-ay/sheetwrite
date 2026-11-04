@@ -593,7 +593,9 @@ pub(super) fn collect_affected_formulas(
     let mut cursor = 0;
     while let Some(id) = walk.affected.id_at(cursor) {
         cursor += 1;
-        walk.readers(slots.location(id));
+        if let Some(key) = slots.location(id) {
+            walk.readers(key);
+        }
     }
     walk.affected
 }
@@ -855,10 +857,12 @@ fn seed_depth_errors(
     for key in affected.keys(slots) {
         if let Err(error) = walk.depth(key) {
             found_cycle |= error == FormulaError::Cycle;
-            let id = sheets[key.sheet as usize]
-                .formulas
-                .id(key.local())
-                .expect("selected formula");
+            let Some(id) = sheets
+                .get(key.sheet as usize)
+                .and_then(|sheet| sheet.formulas.id(key.local()))
+            else {
+                continue;
+            };
             if !preserve_results || results.get(id).is_none() {
                 results.insert(id, Value::Error(error));
             }

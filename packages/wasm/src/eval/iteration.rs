@@ -147,8 +147,7 @@ impl CellStore {
             if pass.results.len() == affected.len() {
                 return;
             }
-            for offset in 0..affected.len() {
-                let id = affected.id_at(offset).expect("selected formula");
+            for id in affected.ids() {
                 let _ = self.eval_formula_id(id, pass, 0);
             }
             return;
@@ -157,8 +156,7 @@ impl CellStore {
         if found_cycle {
             self.settle_circular_references(pass, limits, true);
         }
-        for offset in 0..affected.len() {
-            let id = affected.id_at(offset).expect("selected formula");
+        for id in affected.ids() {
             let _ = self.eval_formula_id(id, pass, 0);
         }
     }
@@ -232,18 +230,19 @@ impl CellStore {
     ) {
         let cyclic: Vec<AbsCellKey> = pass
             .affected
-            .keys(&self.formula_slots)
-            .filter(|&key| {
+            .ids()
+            .filter(|&id| {
                 matches!(
-                    pass.results
-                        .get(self.formula_id(key).expect("selected formula")),
+                    pass.results.get(id),
                     Some(Value::Error(FormulaError::Cycle))
                 )
             })
+            .filter_map(|id| self.formula_slots.location(id))
             .collect();
         for key in &cyclic {
-            pass.results
-                .remove(self.formula_id(*key).expect("selected formula"));
+            if let Some(id) = self.formula_id(*key) {
+                pass.results.remove(id);
+            }
         }
 
         let components = circular_components(&self.sheets, &self.formula_slots, &cyclic);
@@ -252,10 +251,9 @@ impl CellStore {
                 self.iterate_component(members, pass, limits);
             } else if circular {
                 for &key in members {
-                    pass.results.insert(
-                        self.formula_id(key).expect("component formula"),
-                        Value::Error(FormulaError::Cycle),
-                    );
+                    if let Some(id) = self.formula_id(key) {
+                        pass.results.insert(id, Value::Error(FormulaError::Cycle));
+                    }
                 }
             } else if evaluate_readers {
                 for &key in members {
@@ -286,24 +284,19 @@ impl CellStore {
             }
         });
         for &key in &members {
-            pass.results.insert(
-                self.formula_id(key).expect("component formula"),
-                self.starting_value(key),
-            );
+            if let Some(id) = self.formula_id(key) {
+                pass.results.insert(id, self.starting_value(key));
+            }
         }
 
         for _ in 0..limits.max_iterations {
             let mut converged = true;
             for &key in &members {
-                let next = self.eval_formula_body(
-                    self.formula_id(key).expect("component formula"),
-                    pass,
-                    0,
-                );
-                if let Some(current) = pass
-                    .results
-                    .get_mut(self.formula_id(key).expect("component formula"))
-                {
+                let Some(id) = self.formula_id(key) else {
+                    continue;
+                };
+                let next = self.eval_formula_body(id, pass, 0);
+                if let Some(current) = pass.results.get_mut(id) {
                     converged &= !limits.moved(current, &next);
                     *current = next;
                 }
@@ -359,15 +352,9 @@ impl CellStore {
         for _ in 1..limits.max_iterations {
             let mut converged = true;
             for &member in &members {
-                let next = self.eval_formula_body(
-                    self.formula_id(member).expect("component formula"),
-                    pass,
-                    0,
-                );
-                if let Some(current) = pass
-                    .results
-                    .get_mut(self.formula_id(member).expect("component formula"))
-                {
+                let id = self.formula_id(member)?;
+                let next = self.eval_formula_body(id, pass, 0);
+                if let Some(current) = pass.results.get_mut(id) {
                     converged &= !limits.moved(current, &next);
                     *current = next;
                 }

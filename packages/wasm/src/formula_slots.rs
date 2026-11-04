@@ -1,7 +1,7 @@
 //! Workbook-owned formula entries. Cell addresses locate slots; graph walks use ids.
 
 use crate::memory::{StoreMemoryStats, FORMULAS};
-use crate::types::{AbsCellKey, EvalResult, FormulaEntry};
+use crate::types::{AbsCellKey, CellKey, EvalResult, FormulaEntry};
 
 const NO_FREE_SLOT: u32 = u32::MAX;
 const BITS_PER_WORD: usize = u64::BITS as usize;
@@ -41,10 +41,13 @@ impl FormulaBits {
             self.words.resize(word + 1, 0);
         }
         let mask = 1u64 << (index % BITS_PER_WORD);
-        if self.words[word] & mask != 0 {
+        let Some(word) = self.words.get_mut(word) else {
+            return false;
+        };
+        if *word & mask != 0 {
             return false;
         }
-        self.words[word] |= mask;
+        *word |= mask;
         self.count += 1;
         true
     }
@@ -67,21 +70,12 @@ impl FormulaBits {
         self.count == 0
     }
 
-    pub(crate) fn ids(&self) -> impl Iterator<Item = FormulaId> + '_ {
-        self.words
-            .iter()
-            .enumerate()
-            .flat_map(|(word_index, &word)| {
-                let mut remaining = word;
-                std::iter::from_fn(move || {
-                    if remaining == 0 {
-                        return None;
-                    }
-                    let bit = remaining.trailing_zeros() as usize;
-                    remaining &= remaining - 1;
-                    Some(FormulaId((word_index * BITS_PER_WORD + bit) as u32))
-                })
-            })
+    fn ids(&self) -> FormulaBitIds<'_> {
+        FormulaBitIds {
+            words: self.words.iter(),
+            base: 0,
+            remaining: 0,
+        }
     }
 
     pub(crate) fn release_if_empty(&mut self) {
@@ -92,6 +86,57 @@ impl FormulaBits {
 
     pub(crate) fn add_memory_stats(&self, stats: &mut crate::memory::MemoryOwnerStats) {
         stats.add_vec::<u64>(self.words.len(), self.words.capacity());
+    }
+}
+
+struct FormulaBitIds<'a> {
+    words: std::slice::Iter<'a, u64>,
+    base: usize,
+    remaining: u64,
+}
+
+impl Iterator for FormulaBitIds<'_> {
+    type Item = FormulaId;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            if self.remaining != 0 {
+                let bit = self.remaining.trailing_zeros() as usize;
+                self.remaining &= self.remaining - 1;
+                return Some(FormulaId((self.base - BITS_PER_WORD + bit) as u32));
+            }
+
+            self.remaining = *self.words.next()?;
+            self.base += BITS_PER_WORD;
+        }
+    }
+}
+
+struct FormulaFlagKeys<'a> {
+    ids: FormulaBitIds<'a>,
+    locations: &'a [AbsCellKey],
+    sheet: Option<u32>,
+}
+
+impl FormulaFlagKeys<'_> {
+    #[inline(never)]
+    fn next_flag_family(&mut self) -> Option<CellKey> {
+        let sheet = self.sheet?;
+        loop {
+            let id = self.ids.next()?;
+            let key = self.locations.get(id.index())?;
+            if key.sheet == sheet {
+                return Some(key.local());
+            }
+        }
+    }
+}
+
+impl Iterator for FormulaFlagKeys<'_> {
+    type Item = CellKey;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next_flag_family()
     }
 }
 
@@ -125,8 +170,8 @@ impl FormulaStore {
     }
 
     #[inline]
-    pub(crate) fn location(&self, id: FormulaId) -> AbsCellKey {
-        self.locations[id.index()]
+    pub(crate) fn location(&self, id: FormulaId) -> Option<AbsCellKey> {
+        self.locations.get(id.index()).copied()
     }
 
     #[inline]
@@ -139,14 +184,16 @@ impl FormulaStore {
     }
 
     fn track(&mut self, id: FormulaId) {
-        let entry = self.entries[id.index()].as_ref();
-        if entry.is_some_and(FormulaEntry::volatile) {
+        let (volatile, subtotal) = self.get(id).map_or((false, false), |entry| {
+            (entry.volatile(), entry.calls_subtotal())
+        });
+        if volatile {
             self.volatile.insert(id);
         } else {
             self.volatile.remove(id);
             self.volatile.release_if_empty();
         }
-        if entry.is_some_and(FormulaEntry::calls_subtotal) {
+        if subtotal {
             self.subtotals.insert(id);
         } else {
             self.subtotals.remove(id);
@@ -154,50 +201,76 @@ impl FormulaStore {
         }
     }
 
+    #[inline(never)]
     pub(crate) fn allocate(&mut self, location: AbsCellKey, entry: FormulaEntry) -> FormulaId {
         let id = if let Some(id) = self.free_head {
-            let next = self.next_free[id.index()];
-            self.free_head = (next != NO_FREE_SLOT).then_some(FormulaId(next));
-            self.locations[id.index()] = location;
-            self.entries[id.index()] = Some(entry);
-            self.next_free[id.index()] = NO_FREE_SLOT;
-            id
+            self.reuse_slot_family(id, location, entry)
+                .expect("invalid free formula slot")
         } else {
-            let index = u32::try_from(self.entries.len()).expect("formula slot count exceeds u32");
-            assert_ne!(index, NO_FREE_SLOT, "formula slot count exceeds u32");
-            self.locations.push(location);
-            self.entries.push(Some(entry));
-            self.next_free.push(NO_FREE_SLOT);
-            FormulaId(index)
+            self.grow_slot_family(location, entry)
         };
         self.track(id);
         id
     }
 
-    pub(crate) fn replace(&mut self, id: FormulaId, entry: FormulaEntry) -> FormulaEntry {
-        let previous = self.entries[id.index()]
-            .replace(entry)
-            .expect("live formula slot");
+    fn reuse_slot_family(
+        &mut self,
+        id: FormulaId,
+        location: AbsCellKey,
+        entry: FormulaEntry,
+    ) -> Option<FormulaId> {
+        let index = id.index();
+        let location_slot = self.locations.get_mut(index)?;
+        let entry_slot = self.entries.get_mut(index)?;
+        let next_slot = self.next_free.get_mut(index)?;
+        self.free_head = (*next_slot != NO_FREE_SLOT).then_some(FormulaId(*next_slot));
+        *location_slot = location;
+        *entry_slot = Some(entry);
+        *next_slot = NO_FREE_SLOT;
+        Some(id)
+    }
+
+    // Most source writes replace a live formula or reuse a slot.
+    #[cold]
+    #[inline(never)]
+    fn grow_slot_family(&mut self, location: AbsCellKey, entry: FormulaEntry) -> FormulaId {
+        let index = self.entries.len();
+        assert!(
+            index < NO_FREE_SLOT as usize,
+            "formula slot count exceeds u32"
+        );
+        self.locations.push(location);
+        self.entries.push(Some(entry));
+        self.next_free.push(NO_FREE_SLOT);
+        FormulaId(index as u32)
+    }
+
+    pub(crate) fn replace(&mut self, id: FormulaId, entry: FormulaEntry) -> Option<FormulaEntry> {
+        let previous = self.entries.get_mut(id.index())?.replace(entry);
         self.track(id);
         previous
     }
 
-    pub(crate) fn retire(&mut self, id: FormulaId) -> FormulaEntry {
-        let previous = self.entries[id.index()].take().expect("live formula slot");
+    pub(crate) fn retire(&mut self, id: FormulaId) -> Option<FormulaEntry> {
+        let previous = self.entries.get_mut(id.index())?.take()?;
         self.track(id);
         self.retired.push(id);
-        previous
+        Some(previous)
     }
 
     pub(crate) fn release_retired(&mut self) {
         for id in self.retired.drain(..) {
-            self.next_free[id.index()] = self.free_head.map_or(NO_FREE_SLOT, |free| free.0);
-            self.free_head = Some(id);
+            if let Some(next) = self.next_free.get_mut(id.index()) {
+                *next = self.free_head.map_or(NO_FREE_SLOT, |free| free.0);
+                self.free_head = Some(id);
+            }
         }
     }
 
     pub(crate) fn relocate(&mut self, id: FormulaId, location: AbsCellKey) {
-        self.locations[id.index()] = location;
+        if let Some(slot) = self.locations.get_mut(id.index()) {
+            *slot = location;
+        }
     }
 
     pub(crate) fn refresh_flags(&mut self, id: FormulaId) {
@@ -212,12 +285,20 @@ impl FormulaStore {
         self.subtotals.contains(id)
     }
 
-    pub(crate) fn volatile_ids(&self) -> impl Iterator<Item = FormulaId> + '_ {
-        self.volatile.ids()
+    pub(crate) fn volatile_keys(&self, sheet: Option<u32>) -> impl Iterator<Item = CellKey> + '_ {
+        FormulaFlagKeys {
+            ids: self.volatile.ids(),
+            locations: &self.locations,
+            sheet,
+        }
     }
 
-    pub(crate) fn subtotal_ids(&self) -> impl Iterator<Item = FormulaId> + '_ {
-        self.subtotals.ids()
+    pub(crate) fn subtotal_keys(&self, sheet: Option<u32>) -> impl Iterator<Item = CellKey> + '_ {
+        FormulaFlagKeys {
+            ids: self.subtotals.ids(),
+            locations: &self.locations,
+            sheet,
+        }
     }
 
     pub(crate) fn add_memory_stats(&self, stats: &mut StoreMemoryStats) {
@@ -276,11 +357,15 @@ impl FormulaWork {
         self.ids.get(offset).copied()
     }
 
+    pub(crate) fn ids(&self) -> impl Iterator<Item = FormulaId> + '_ {
+        self.ids.iter().copied()
+    }
+
     pub(crate) fn keys<'a>(
         &'a self,
         slots: &'a FormulaStore,
     ) -> impl Iterator<Item = AbsCellKey> + 'a {
-        self.ids.iter().map(|&id| slots.location(id))
+        self.ids.iter().filter_map(|&id| slots.location(id))
     }
 }
 
@@ -345,10 +430,16 @@ impl FormulaResults {
             self.positions.resize(id.index() + 1, NO_RESULT_POSITION);
         }
         if let Some(position) = self.position(id) {
-            self.count += usize::from(self.values[position].replace(value).is_none());
+            let Some(slot) = self.values.get_mut(position) else {
+                return;
+            };
+            self.count += usize::from(slot.replace(value).is_none());
         } else {
-            self.positions[id.index()] =
-                u32::try_from(self.values.len()).expect("formula result count exceeds u32");
+            let Some(position) = self.positions.get_mut(id.index()) else {
+                return;
+            };
+            // There is at most one position per allocated FormulaId.
+            *position = self.values.len() as u32;
             self.used.push(id);
             self.values.push(Some(value));
             self.count += 1;
@@ -357,7 +448,7 @@ impl FormulaResults {
 
     pub(crate) fn remove(&mut self, id: FormulaId) -> Option<EvalResult> {
         let position = self.position(id)?;
-        let value = self.values[position].take()?;
+        let value = self.values.get_mut(position)?.take()?;
         self.count -= 1;
         Some(value)
     }
@@ -368,7 +459,9 @@ impl FormulaResults {
 
     pub(crate) fn clear(&mut self) {
         for id in self.used.drain(..) {
-            self.positions[id.index()] = NO_RESULT_POSITION;
+            if let Some(position) = self.positions.get_mut(id.index()) {
+                *position = NO_RESULT_POSITION;
+            }
             self.visiting.remove(id);
         }
         self.values.clear();

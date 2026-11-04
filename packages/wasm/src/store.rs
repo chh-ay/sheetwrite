@@ -821,9 +821,8 @@ impl CellStore {
         self.sheet_ids.retain(|_, handle| *handle != sheet);
         self.sheet_lookup.retain(|_, handle| *handle != sheet);
         self.sheet_names[sheet].clear();
-        let removed_ids: Vec<_> = self.sheets[sheet].formulas.ids().collect();
-        for id in removed_ids {
-            self.formula_slots.retire(id);
+        for id in self.sheets[sheet].formulas.ids() {
+            let _ = self.formula_slots.retire(id);
         }
         self.sheets[sheet] = SheetData::new(0, 0);
         self.conditional_rules.remove_sheet(sheet);
