@@ -384,9 +384,12 @@ function cellXml(
   const styleAttribute = styleId ? ` s="${styleId}"` : "";
   const value = cell.source.value;
   if (value.kind === "formula" || value.kind === "ref") {
-    let formula = value.kind === "formula"
-      ? value.src.startsWith("=") ? value.src.slice(1) : value.src
-      : formulaForReference(snapshot, value);
+    let formula =
+      value.kind === "formula"
+        ? value.src.startsWith("=")
+          ? value.src.slice(1)
+          : value.src
+        : formulaForReference(snapshot, value);
     if (formulaContainsExternalReference(formula)) {
       emitWarning(context, {
         code: "external-formula",
@@ -1254,17 +1257,13 @@ function* writeWorkbookParts(
   yield* hook?.parts?.() ?? [];
 }
 
-
 export async function writeWorkbook(
   snapshot: WorkbookSnapshot,
   context: XlsxCodecContext,
   hook?: WorkbookWriteHookResolver,
 ): Promise<Uint8Array> {
   const formulas = await convertWorkbookFormulas(snapshot, "export");
-  return writeZip(
-    writeWorkbookParts(snapshot, { ...context, formulas }, hook),
-    context,
-  );
+  return writeZip(writeWorkbookParts(snapshot, { ...context, formulas }, hook), context);
 }
 
 export async function* streamWorkbook(
@@ -1273,8 +1272,5 @@ export async function* streamWorkbook(
   hook?: WorkbookWriteHookResolver,
 ): AsyncGenerator<Uint8Array> {
   const formulas = await convertWorkbookFormulas(snapshot, "export");
-  yield* zipChunks(
-    writeWorkbookParts(snapshot, { ...context, formulas }, hook),
-    context,
-  );
+  yield* zipChunks(writeWorkbookParts(snapshot, { ...context, formulas }, hook), context);
 }

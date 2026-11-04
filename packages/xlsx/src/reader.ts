@@ -2534,12 +2534,7 @@ export async function readWorkbook(
           (reference) => reference.state !== "hidden" && reference.state !== "veryHidden",
         );
   const activeSheet = sheets[activeIndex]!.id;
-  const nativeNamedRanges = externalNamedRanges(
-    workbookRoot,
-    sheetIds,
-    sourceReferences,
-    context,
-  );
+  const nativeNamedRanges = externalNamedRanges(workbookRoot, sheetIds, sourceReferences, context);
   const namedRanges = xmlChild(workbookRoot, "definedNames")
     ? nativeNamedRanges
     : metadata?.workbook.namedRanges;

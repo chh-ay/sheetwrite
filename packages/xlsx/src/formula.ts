@@ -47,10 +47,14 @@ export async function convertWorkbookFormulas(
   }
   const formulas = [...sources];
   const converted = await convertXlsxFormulas(formulas, direction);
-  return new Map(formulas.map((source, index) => {
+  const results = new Map<string, string>();
+  for (let index = 0; index < formulas.length; index += 1) {
+    const source = formulas[index];
     const result = converted[index];
-    if (result === undefined) throw new Error("Missing converted workbook formula");
-    return [source, result];
-  }));
+    if (source === undefined || result === undefined) {
+      throw new Error("Missing converted workbook formula");
+    }
+    results.set(source, result);
+  }
+  return results;
 }
-

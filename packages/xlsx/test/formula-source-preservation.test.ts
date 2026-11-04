@@ -97,8 +97,8 @@ describe("XLSX formula source preservation", () => {
       ["=FILTER(A1:A3,A1:A3>0)", "_xlfn._xlws.FILTER(A1:A3,A1:A3>0)"],
       ["=SORT(A1:A3)", "_xlfn._xlws.SORT(A1:A3)"],
       [
-        '=LET(x,\'_xlfn.Sheet\'!A1,"_xlfn.LET(_xlpm.x)"&x)',
-        '_xlfn.LET(_xlpm.x,\'_xlfn.Sheet\'!A1,"_xlfn.LET(_xlpm.x)"&_xlpm.x)',
+        "=LET(x,'_xlfn.Sheet'!A1,\"_xlfn.LET(_xlpm.x)\"&x)",
+        "_xlfn.LET(_xlpm.x,'_xlfn.Sheet'!A1,\"_xlfn.LET(_xlpm.x)\"&_xlpm.x)",
       ],
     ];
     const sources = cases.map(([source]) => {
@@ -118,12 +118,14 @@ describe("XLSX formula source preservation", () => {
 
   it("strips prefixes after expanding shared formulas without shifting local names", async () => {
     const encoded = rawXlsx({
-      sheets: [{
-        xml: worksheet(`<sheetData>
+      sheets: [
+        {
+          xml: worksheet(`<sheetData>
           <row r="1"><c r="B1"><f t="shared" si="0" ref="B1:B2">_xlfn.LET(_xlpm.x,A1,_xlfn.LAMBDA(_xlpm.v,_xlpm.v+_xlpm.x)(2))</f></c></row>
           <row r="2"><c r="B2"><f t="shared" si="0"/></c></row>
         </sheetData>`),
-      }],
+        },
+      ],
     });
     expect(formulaSources(await fromXlsxWorkbook(encoded))).toEqual([
       "=LET(x,A1,LAMBDA(v,v+x)(2))",
