@@ -95,6 +95,11 @@ export function registerGridTransactionAdmission(
   };
 }
 
+/** Document replacement cannot run while a session owns local admission. */
+export function hasGridTransactionAdmission(grid: Grid): boolean {
+  return (guardsByGrid.get(grid)?.size ?? 0) > 0;
+}
+
 export function beginGridTransactionAdmission(
   grid: Grid,
   operations: readonly DocumentOp[],

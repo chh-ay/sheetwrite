@@ -2,7 +2,7 @@ import { expect, it } from "bun:test";
 
 // Objects held by other suites in the shared `bun test` process can keep a
 // referent alive, so the collection runs in a fresh process (grid-lifetime-probe.ts).
-it("frees a destroyed grid, its store and its owner-scoped caches", async () => {
+it("frees destroyed grids and the old document of a live grid after import", async () => {
   const probe = Bun.spawn(
     [
       process.execPath,
@@ -19,5 +19,5 @@ it("frees a destroyed grid, its store and its owner-scoped caches", async () => 
   ]);
 
   expect(exitCode, `grid lifetime probe failed:\n${stderr}`).toBe(0);
-  expect(JSON.parse(stdout.trim())).toEqual({ tracked: 40, retained: [] });
+  expect(JSON.parse(stdout.trim())).toEqual({ tracked: 43, retained: [] });
 });

@@ -499,4 +499,5 @@ export const ICON_ROWS: readonly (readonly Glyph[])[] = [
       ["M6.5 3h11A1.5 1.5 0 0 1 19 4.5V21l-7-4.5L5 21V4.5A1.5 1.5 0 0 1 6.5 3Z", "M12 7v6M9 10h6"],
     ],
   ],
+  [["importXlsx", [DOCUMENT, DOCUMENT_FOLD, "M2 12h10m-3-3 3 3-3 3", "M9 18h6"]]],
 ];

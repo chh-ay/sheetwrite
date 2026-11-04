@@ -89,6 +89,7 @@ export const ICON_NAMES = [
   "kpiCard",
   "versionHistory",
   "saveVersion",
+  "importXlsx",
 ] as const;
 
 /** The name of one glyph on the command icon sheet; the key of `IconOverrides`. */

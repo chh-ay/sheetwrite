@@ -8,7 +8,7 @@ description: "XlsxWorkbookWarning interface in @sheetwrite/core: Structured fide
 Structured fidelity warning emitted during XLSX conversion.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/export.ts#L597"><code>packages/core/src/export.ts#L597</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/xlsx-bridge.ts#L276"><code>packages/core/src/xlsx-bridge.ts#L276</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>
