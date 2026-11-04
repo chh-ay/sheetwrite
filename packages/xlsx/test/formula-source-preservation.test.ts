@@ -12,6 +12,8 @@ import {
 import { strFromU8, unzipSync } from "fflate";
 
 import { registerXlsxBackends } from "../src/index.js";
+import { escapeXml } from "../src/xml.js";
+import { rawXlsx, worksheet } from "./raw-opc.js";
 
 interface FormulaContractInventory {
   functions: {
@@ -85,6 +87,46 @@ describe("XLSX formula source preservation", () => {
       rowCount: FORMULA_SOURCES.length,
     });
     expect(formulaSources(decoded)).toEqual(FORMULA_SOURCES);
+  });
+
+  it("writes Excel future-function and local-binding spellings and imports editor sources", async () => {
+    const cases: readonly (readonly [source: string, expected: string])[] = [
+      ["=LET(x,1,x+1)", "_xlfn.LET(_xlpm.x,1,_xlpm.x+1)"],
+      ["=LAMBDA(v,v+1)(2)", "_xlfn.LAMBDA(_xlpm.v,_xlpm.v+1)(2)"],
+      ["=XLOOKUP(1,A1:A3,B1:B3)", "_xlfn.XLOOKUP(1,A1:A3,B1:B3)"],
+      ["=FILTER(A1:A3,A1:A3>0)", "_xlfn._xlws.FILTER(A1:A3,A1:A3>0)"],
+      ["=SORT(A1:A3)", "_xlfn._xlws.SORT(A1:A3)"],
+      [
+        "=LET(x,'_xlfn.Sheet'!A1,\"_xlfn.LET(_xlpm.x)\"&x)",
+        "_xlfn.LET(_xlpm.x,'_xlfn.Sheet'!A1,\"_xlfn.LET(_xlpm.x)\"&_xlpm.x)",
+      ],
+    ];
+    const sources = cases.map(([source]) => source);
+    const encoded = await toXlsxWorkbook(formulaWorkbook(sources));
+    const xml = unzipSync(encoded)["xl/worksheets/sheet1.xml"];
+    if (xml === undefined) throw new Error("Missing exported worksheet");
+    const native = strFromU8(xml);
+    for (const [, expected] of cases) {
+      expect(native).toContain(`<f>${escapeXml(expected)}</f>`);
+    }
+    expect(formulaSources(await fromXlsxWorkbook(encoded))).toEqual(sources);
+  });
+
+  it("strips prefixes after expanding shared formulas without shifting local names", async () => {
+    const encoded = rawXlsx({
+      sheets: [
+        {
+          xml: worksheet(`<sheetData>
+          <row r="1"><c r="B1"><f t="shared" si="0" ref="B1:B2">_xlfn.LET(_xlpm.x,A1,_xlfn.LAMBDA(_xlpm.v,_xlpm.v+_xlpm.x)(2))</f></c></row>
+          <row r="2"><c r="B2"><f t="shared" si="0"/></c></row>
+        </sheetData>`),
+        },
+      ],
+    });
+    expect(formulaSources(await fromXlsxWorkbook(encoded))).toEqual([
+      "=LET(x,A1,LAMBDA(v,v+x)(2))",
+      "=LET(x,A2,LAMBDA(v,v+x)(2))",
+    ]);
   });
 
   it("writes spill references in Excel's ANCHORARRAY form and reads them back", async () => {

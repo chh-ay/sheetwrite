@@ -63,22 +63,20 @@ export function getEngine(): defaultEngine.EngineInstance {
 }
 
 /**
- * Convert defined-name formulas between editor and OOXML spellings. XLSX
+ * Convert cell and defined-name formulas between editor and OOXML spellings. XLSX
  * codecs can run before grid initialization without selecting its engine.
  * An initialized document lends its engine; otherwise the temporary instance
  * releases its memory when this batch finishes.
  */
-export async function convertDefinedNameFormulas(
-  formulas: readonly string[],
+export async function convertXlsxFormulas(
+  formulas: string[],
   direction: "import" | "export",
 ): Promise<string[]> {
   if (formulas.length === 0) return [];
   const engine = engineInstance ?? (await defaultEngine.createEngine());
   const temporary = engine !== engineInstance;
   try {
-    return formulas.map((formula) =>
-      direction === "import" ? engine.formulaFromXlsx(formula) : engine.formulaToXlsx(formula),
-    );
+    return engine.convertXlsxFormulas(formulas, direction === "export");
   } finally {
     if (temporary) engine.retire();
   }

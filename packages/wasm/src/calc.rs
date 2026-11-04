@@ -798,7 +798,7 @@ fn parse_col(letters: &str) -> Option<u32> {
 }
 
 /// Parse an A1 token like `B12` or `$B$12`, preserving absolute markers.
-fn parse_a1(token: &str) -> Option<(u32, u32, RefFlags)> {
+pub(crate) fn parse_a1(token: &str) -> Option<(u32, u32, RefFlags)> {
     let col_abs = token.starts_with('$');
     let token = token.strip_prefix('$').unwrap_or(token);
 

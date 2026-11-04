@@ -195,12 +195,17 @@ Recursive named functions stop after 64 nested calls with `#NUM!`. This differs
 from Excel, whose recursion allowance depends on the parameter count (about
 1024 divided by parameters plus one).
 
-XLSX keeps formula names in native `definedName` elements. Import removes Excel's
-future-function and parameter prefixes; export writes `_xlfn.` for future
-functions and `_xlpm.` for `LAMBDA` parameters. Text literals, sheet names, and
-table column names are not changed. Converting a workbook with only range names
-does not load a formula engine. Formula-name conversion reuses the initialized
-document engine or releases a temporary engine when conversion finishes.
+XLSX keeps formula names in native `definedName` elements. Cells and names use
+the same engine conversion rule: import removes Excel's future-function and
+parameter prefixes; export writes `_xlfn.` for future functions, `_xlfn._xlws.`
+for `FILTER` and `SORT`, and `_xlpm.` for `LET` bindings and `LAMBDA` parameters.
+The converter also maps `A1#` to `_xlfn.ANCHORARRAY(A1)`. Text literals, sheet
+names, and table column names are not changed.
+
+Each workbook converts its distinct cell and name formulas in one engine call.
+A workbook without formulas, including one with only range names, does not load
+a formula engine. Conversion reuses the initialized document engine or releases
+a temporary engine when conversion finishes.
 
 
 ## Date/time semantics

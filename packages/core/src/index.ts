@@ -131,7 +131,7 @@ export {
   type XlsxWorkbookWarning,
 } from "./export.js";
 
-export { convertDefinedNameFormulas } from "./engine.js";
+export { convertXlsxFormulas } from "./engine.js";
 
 export {
   createGrid,

@@ -1,6 +1,6 @@
 //! OOXML spelling belongs beside the lexer, not in the workbook transport.
 
-use crate::calc::Tok;
+use crate::calc::{parse_a1, Tok};
 use crate::formula_tokens::{lex_tolerant, Spanned};
 use wasm_bindgen::prelude::wasm_bindgen;
 
@@ -203,6 +203,33 @@ fn is_qualified(tokens: &[Spanned<'_>], index: usize) -> bool {
         .is_some_and(|previous| matches!(tokens[previous].tok, Ok(Tok::Bang)))
 }
 
+/// Include a sheet qualifier without interpreting its spelling as a function.
+fn reference_start(tokens: &[Spanned<'_>], cell: usize) -> Option<usize> {
+    let token = tokens.get(cell)?;
+    parse_a1(identifier(token)?)?;
+    if cell >= 2 && matches!(tokens[cell - 1].tok, Ok(Tok::Bang)) {
+        return matches!(tokens[cell - 2].tok, Ok(Tok::Ident(_, _)))
+            .then_some(tokens[cell - 2].start);
+    }
+    Some(token.start)
+}
+
+fn anchor_reference(tokens: &[Spanned<'_>], function: usize) -> Option<(usize, usize, usize)> {
+    if !matches!(tokens.get(function + 1)?.tok, Ok(Tok::LParen)) {
+        return None;
+    }
+    let argument = function + 2;
+    let cell = if matches!(tokens.get(argument + 1)?.tok, Ok(Tok::Bang)) {
+        argument + 2
+    } else {
+        argument
+    };
+    let start = reference_start(tokens, cell)?;
+    let end = tokens.get(cell)?;
+    let close = tokens.get(cell + 1)?;
+    matches!(close.tok, Ok(Tok::RParen)).then_some((start, end.end, close.end))
+}
+
 /// Remove only identifier prefixes. Quoted text, sheet names and structured
 /// references are not function or parameter names and must remain unchanged.
 #[wasm_bindgen(js_name = formulaFromXlsx)]
@@ -211,11 +238,23 @@ pub fn formula_from_xlsx(source: &str) -> String {
     let mut result = String::with_capacity(source.len());
     let mut previous = 0;
     for (index, token) in tokens.iter().enumerate() {
+        if token.start < previous {
+            continue;
+        }
         let Some(name) = identifier(token) else {
             continue;
         };
         if is_qualified(&tokens, index) {
             continue;
+        }
+        if name.eq_ignore_ascii_case("_xlfn.ANCHORARRAY") {
+            if let Some((start, end, close)) = anchor_reference(&tokens, index) {
+                result.push_str(&source[previous..token.start]);
+                result.push_str(&source[start..end]);
+                result.push('#');
+                previous = close;
+                continue;
+            }
         }
         let bare = strip_prefix(name);
         if bare.len() == name.len() {
@@ -319,7 +358,7 @@ fn bindings<'a>(tokens: &'a [Spanned<'_>]) -> Vec<Binding<'a>> {
     bindings
 }
 
-/// Write future-function and local-binding prefixes for defined-name formulas.
+/// Write future-function, local-binding and spill spellings for OOXML formulas.
 /// This is lexical: unknown future functions and incomplete formulas still
 /// round-trip without a parse/serialize pass changing their source text.
 #[wasm_bindgen(js_name = formulaToXlsx)]
@@ -329,6 +368,22 @@ pub fn formula_to_xlsx(source: &str) -> String {
     let mut result = String::with_capacity(source.len());
     let mut previous = 0;
     for (index, token) in tokens.iter().enumerate() {
+        if token.start < previous {
+            continue;
+        }
+        if matches!(
+            tokens.get(index + 1).map(|token| &token.tok),
+            Some(Ok(Tok::Hash))
+        ) {
+            if let Some(start) = reference_start(&tokens, index) {
+                result.push_str(&source[previous..start]);
+                result.push_str("_xlfn.ANCHORARRAY(");
+                result.push_str(&source[start..token.end]);
+                result.push(')');
+                previous = tokens[index + 1].end;
+                continue;
+            }
+        }
         let Some(name) = identifier(token) else {
             continue;
         };
@@ -380,6 +435,18 @@ pub fn formula_to_xlsx(source: &str) -> String {
     }
     result.push_str(&source[previous..]);
     result
+}
+
+/// Convert a workbook's formula sources in one JavaScript-to-WASM call.
+/// The consumed input vector can release each source as its result is produced.
+#[wasm_bindgen(js_name = convertXlsxFormulas)]
+pub fn convert_xlsx_formulas(sources: Vec<String>, exporting: bool) -> Vec<String> {
+    let convert: fn(&str) -> String = if exporting {
+        formula_to_xlsx
+    } else {
+        formula_from_xlsx
+    };
+    sources.into_iter().map(|source| convert(&source)).collect()
 }
 
 #[cfg(test)]
