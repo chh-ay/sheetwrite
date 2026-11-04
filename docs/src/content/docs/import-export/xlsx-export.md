@@ -54,6 +54,12 @@ downloadBytes(bytes, "workbook.xlsx",
 
 `toXlsxWorkbook(snapshot, options?)` returns `Promise<Uint8Array>` from the same `WorkbookSnapshot` used by persistence. It does not synthesize a header row.
 
+Cell formulas and defined-name formulas use the same engine-owned Excel
+spelling. For example, `=LET(x,1,x+1)` is written as
+`_xlfn.LET(_xlpm.x,1,_xlpm.x+1)`. Import restores the editor source.
+All distinct formulas are converted in one batch per workbook. Literal-only
+workbooks and workbooks with only range names do not load the formula engine.
+
 | Feature | Workbook result |
 | --- | --- |
 | Worksheets, order and active sheet | Preserved. |

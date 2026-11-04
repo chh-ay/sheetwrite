@@ -9,7 +9,6 @@ import type {
 } from "@sheetwrite/core";
 import {
   colToA1,
-  convertDefinedNameFormulas,
   DEFAULT_MAX_CHANGE,
   DEFAULT_MAX_ITERATIONS,
   labelToCol,
@@ -20,7 +19,7 @@ import {
 
 import { chartDrawingParts, type DrawingChart, freePartName, writeCharts } from "./chart-write.js";
 import { DRAWING_REL } from "./chart-xml.js";
-import { formulaContainsExternalReference, spillReferencesToXlsx } from "./formula.js";
+import { convertWorkbookFormulas, formulaContainsExternalReference } from "./formula.js";
 import { type ContentTypeOverride, contentTypesXml, relationshipsXml } from "./opc.js";
 import { preparePivots } from "./pivot.js";
 import {
@@ -385,12 +384,9 @@ function cellXml(
   const styleAttribute = styleId ? ` s="${styleId}"` : "";
   const value = cell.source.value;
   if (value.kind === "formula" || value.kind === "ref") {
-    const formula =
-      value.kind === "formula"
-        ? value.src.startsWith("=")
-          ? value.src.slice(1)
-          : value.src
-        : formulaForReference(snapshot, value);
+    let formula = value.kind === "formula"
+      ? value.src.startsWith("=") ? value.src.slice(1) : value.src
+      : formulaForReference(snapshot, value);
     if (formulaContainsExternalReference(formula)) {
       emitWarning(context, {
         code: "external-formula",
@@ -400,7 +396,12 @@ function cellXml(
       });
       return `<c r="${reference}"${styleAttribute} t="inlineStr"><is><t xml:space="preserve">${escapeXml(encodeXstring(`=${formula}`))}</t></is></c>`;
     }
-    return `<c r="${reference}"${styleAttribute}><f>${escapeXml(encodeXstring(spillReferencesToXlsx(formula)))}</f></c>`;
+    if (value.kind === "formula") {
+      const converted = context.formulas?.get(value.src);
+      if (converted === undefined) throw new Error("Cell formula was not converted");
+      formula = converted.startsWith("=") ? converted.slice(1) : converted;
+    }
+    return `<c r="${reference}"${styleAttribute}><f>${escapeXml(encodeXstring(formula))}</f></c>`;
   }
   if (value.value === null) return `<c r="${reference}"${styleAttribute}/>`;
   if (typeof value.value === "string") {
@@ -1076,7 +1077,7 @@ function workbookXml(
           : ordered.findIndex((candidate) => candidate.id === named.scope);
       let source: string;
       if (named.range === undefined) {
-        const converted = context.definedNameFormulas?.get(named.formula);
+        const converted = context.formulas?.get(named.formula);
         if (converted === undefined) throw new Error("Defined-name formula was not converted");
         source = converted.replace(/^=/, "");
       } else {
@@ -1253,30 +1254,15 @@ function* writeWorkbookParts(
   yield* hook?.parts?.() ?? [];
 }
 
-async function convertedNameFormulas(
-  snapshot: WorkbookSnapshot,
-): Promise<ReadonlyMap<string, string>> {
-  const formulas = (snapshot.workbook.namedRanges ?? []).flatMap((named) =>
-    named.formula === undefined ? [] : [named.formula],
-  );
-  const converted = await convertDefinedNameFormulas(formulas, "export");
-  return new Map(
-    formulas.map((source, index) => {
-      const result = converted[index];
-      if (result === undefined) throw new Error("Missing converted defined-name formula");
-      return [source, spillReferencesToXlsx(result)];
-    }),
-  );
-}
 
 export async function writeWorkbook(
   snapshot: WorkbookSnapshot,
   context: XlsxCodecContext,
   hook?: WorkbookWriteHookResolver,
 ): Promise<Uint8Array> {
-  const formulas = await convertedNameFormulas(snapshot);
+  const formulas = await convertWorkbookFormulas(snapshot, "export");
   return writeZip(
-    writeWorkbookParts(snapshot, { ...context, definedNameFormulas: formulas }, hook),
+    writeWorkbookParts(snapshot, { ...context, formulas }, hook),
     context,
   );
 }
@@ -1286,9 +1272,9 @@ export async function* streamWorkbook(
   context: XlsxCodecContext,
   hook?: WorkbookWriteHookResolver,
 ): AsyncGenerator<Uint8Array> {
-  const formulas = await convertedNameFormulas(snapshot);
+  const formulas = await convertWorkbookFormulas(snapshot, "export");
   yield* zipChunks(
-    writeWorkbookParts(snapshot, { ...context, definedNameFormulas: formulas }, hook),
+    writeWorkbookParts(snapshot, { ...context, formulas }, hook),
     context,
   );
 }
