@@ -8,7 +8,7 @@ description: "API reference for @sheetwrite/wasm."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./loader.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>23</dd></div>
+<div><dt>Exports</dt><dd>24</dd></div>
 </dl>
 
 Source entry: `packages/wasm/loader.d.ts`
@@ -28,14 +28,15 @@ Source entry: `packages/wasm/loader.d.ts`
 <a class="api-symbol-card" href="/docs/api/wasm/window-view/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>WindowView</code></span><span class="api-symbol-card__desc">A bulk window of resolved cells, row-major over nrows x ncols.</span></a>
 </div>
 
-### Functions <span class="api-count" data-pagefind-ignore>11</span>
+### Functions <span class="api-count" data-pagefind-ignore>12</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/wasm/check-formula-syntax/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>checkFormulaSyntax</code></span><span class="api-symbol-card__desc">The first syntax error in formula text, or undefined when the engine's parser reads the whole formula.</span></a>
+<a class="api-symbol-card" href="/docs/api/wasm/convert-xlsx-formulas/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>convertXlsxFormulas</code></span><span class="api-symbol-card__desc">Convert a workbook's formula sources in one JavaScript-to-WASM call.</span></a>
 <a class="api-symbol-card" href="/docs/api/wasm/create-engine/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>createEngine</code></span><span class="api-symbol-card__desc">Initialize a fresh engine; a compiled module can be reused without retaining its memory.</span></a>
 <a class="api-symbol-card" href="/docs/api/wasm/formula-from-xlsx/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>formulaFromXlsx</code></span><span class="api-symbol-card__desc">Remove only identifier prefixes.</span></a>
 <a class="api-symbol-card" href="/docs/api/wasm/formula-tokens/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>formulaTokens</code></span><span class="api-symbol-card__desc">The tokens of formula text: four u32 per token, kind, from and to (UTF-16 offsets into src) and space (1 when whitespace comes before the token).</span></a>
-<a class="api-symbol-card" href="/docs/api/wasm/formula-to-xlsx/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>formulaToXlsx</code></span><span class="api-symbol-card__desc">Write future-function and local-binding prefixes for defined-name formulas.</span></a>
+<a class="api-symbol-card" href="/docs/api/wasm/formula-to-xlsx/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>formulaToXlsx</code></span><span class="api-symbol-card__desc">Write future-function, local-binding and spill spellings for OOXML formulas.</span></a>
 <a class="api-symbol-card" href="/docs/api/wasm/init-sync/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>initSync</code></span><span class="api-symbol-card__desc">Instantiates the given module, which can either be bytes or a precompiled WebAssembly.Module.</span></a>
 <a class="api-symbol-card" href="/docs/api/wasm/is-loaded/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>isLoaded</code></span><span class="api-symbol-card__desc">Whether the WASM module has finished initializing.</span></a>
 <a class="api-symbol-card" href="/docs/api/wasm/load/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>load</code></span><span class="api-symbol-card__desc">Initialize the WASM module.</span></a>

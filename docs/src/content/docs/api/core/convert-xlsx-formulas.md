@@ -1,11 +1,11 @@
 ---
-title: "convertDefinedNameFormulas | @sheetwrite/core"
-description: "convertDefinedNameFormulas function in @sheetwrite/core: Convert defined-name formulas between editor and OOXML spellings."
+title: "convertXlsxFormulas | @sheetwrite/core"
+description: "convertXlsxFormulas function in @sheetwrite/core: Convert cell and defined-name formulas between editor and OOXML spellings."
 ---
-<!-- api-export:@sheetwrite/core|.|convertDefinedNameFormulas -->
+<!-- api-export:@sheetwrite/core|.|convertXlsxFormulas -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
 
-Convert defined-name formulas between editor and OOXML spellings. XLSX
+Convert cell and defined-name formulas between editor and OOXML spellings. XLSX
 codecs can run before grid initialization without selecting its engine.
 An initialized document lends its engine; otherwise the temporary instance
 releases its memory when this batch finishes.
@@ -19,8 +19,8 @@ releases its memory when this batch finishes.
 <div class="api-declaration-open" data-pagefind-ignore>
 
 ```ts generated
-function convertDefinedNameFormulas(
-  formulas: readonly string[],
+function convertXlsxFormulas(
+  formulas: string[],
   direction: "import" | "export",
 ): Promise<string[]>
 ```
@@ -42,9 +42,10 @@ function convertDefinedNameFormulas(
 <li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
 </ul>
 
-<p class="api-consumers-label">Public exports naming <code>convertDefinedNameFormulas</code></p>
+<p class="api-consumers-label">Public exports naming <code>convertXlsxFormulas</code></p>
 
 <ul class="api-consumer-list">
-<li>None.</li>
+<li><a href="/docs/api/formulas/init-output/"><code>InitOutput</code></a><span class="api-consumer-kind">@sheetwrite/formulas</span></li>
+<li><a href="/docs/api/wasm/init-output/"><code>InitOutput</code></a><span class="api-consumer-kind">@sheetwrite/wasm</span></li>
 </ul>
 </div>
