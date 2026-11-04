@@ -975,7 +975,7 @@ export class SheetwriteStore implements Store {
             for (const [, target] of operation.block.refs ?? []) requiredSheets.push(target.sheet);
           }
         } else if (operation.op === "setNamedRange") {
-          requiredSheets.push(operation.namedRange.range.sheet);
+          if (operation.namedRange.range) requiredSheets.push(operation.namedRange.range.sheet);
           if (operation.namedRange.scope !== undefined) {
             requiredSheets.push(operation.namedRange.scope);
           }

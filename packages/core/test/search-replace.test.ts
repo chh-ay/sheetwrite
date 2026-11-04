@@ -53,7 +53,7 @@ describe("replaceInText", () => {
 });
 
 describe("replaceAll", () => {
-  it("does not let a spill-child rejection prevent another matched cell replacement", () => {
+  it("keeps replacements in spill children and ordinary cells through undo", () => {
     const workbook = makeWorkbook(6);
     const store = new SheetwriteStore(workbook);
     store.applyTransaction({
@@ -66,11 +66,13 @@ describe("replaceAll", () => {
     grid.search("2", { wholeCell: true });
 
     expect(grid.replaceAll("9").replaced).toBe(2);
-    expect(store.getCell(A(1, 1)).resolved).toBe(2);
+    expect(store.getCell(A(1, 1)).resolved).toBe(9);
+    expect(store.getCell(A(0, 1)).resolved).toBe("#SPILL!");
     expect(store.getCell(A(5, 1)).resolved).toBe(9);
     grid.actions.undo();
     expect(store.getCell(A(5, 1)).resolved).toBe(2);
     expect(store.getFormula(A(0, 1))).toBe("=SEQUENCE(3)");
+    expect(store.getCell(A(1, 1)).resolved).toBe(2);
     grid.destroy();
     store.dispose();
   });

@@ -35,6 +35,8 @@ mod formula_slots;
 #[cfg(feature = "formula-engine")]
 mod formula_tokens;
 #[cfg(feature = "formula-engine")]
+mod formula_xlsx;
+#[cfg(feature = "formula-engine")]
 mod graph;
 #[cfg(feature = "formula-engine")]
 mod memory;
@@ -64,12 +66,16 @@ mod formula_syntax_tests;
 #[cfg(all(test, feature = "formula-engine"))]
 mod formula_tokens_tests;
 #[cfg(all(test, feature = "formula-engine"))]
+mod named_formula_tests;
+#[cfg(all(test, feature = "formula-engine"))]
 mod structural_edit_tests;
 #[cfg(all(test, feature = "formula-engine"))]
 mod tests;
 
 #[cfg(feature = "formula-engine")]
 pub use formula_tokens::{check_formula_syntax, formula_tokens, FormulaSyntaxError};
+#[cfg(feature = "formula-engine")]
+pub use formula_xlsx::{formula_from_xlsx, formula_to_xlsx};
 #[cfg(feature = "formula-engine")]
 pub use store::{CellOut, CellStore};
 #[cfg(feature = "formula-engine")]

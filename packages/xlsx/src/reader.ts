@@ -21,6 +21,7 @@ import type {
 } from "@sheetwrite/core";
 import {
   colToA1,
+  convertDefinedNameFormulas,
   DEFAULT_MAX_CHANGE,
   DEFAULT_MAX_ITERATIONS,
   DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
@@ -1960,12 +1961,12 @@ function workbookCalculation(workbookRoot: XmlElement): CalculationSettings | un
   return { iterate, maxIterations, maxChange };
 }
 
-function externalNamedRanges(
+async function externalNamedRanges(
   workbookRoot: XmlElement,
   sheetIds: ReadonlyMap<string, string>,
   sheets: readonly WorkbookSheetReference[],
   context: XlsxCodecContext,
-): WorkbookSnapshot["workbook"]["namedRanges"] {
+): Promise<WorkbookSnapshot["workbook"]["namedRanges"]> {
   const definitions = xmlChild(workbookRoot, "definedNames");
   if (!definitions) return undefined;
   const ranges: NonNullable<WorkbookSnapshot["workbook"]["namedRanges"]> = [];
@@ -1987,30 +1988,6 @@ function externalNamedRanges(
       });
       continue;
     }
-    const match = /^(?:'((?:[^']|'')+)'|([^!]+))!(.+)$/.exec(definition.text);
-    if (!match) {
-      emitWarning(context, {
-        code: "unsupported-feature",
-        message: `Defined name ${name} was not a single rectangular range`,
-      });
-      continue;
-    }
-    if (!/^\$?[A-Z]{1,3}\$?[1-9]\d*(?::\$?[A-Z]{1,3}\$?[1-9]\d*)?$/i.test(match[3]!)) {
-      emitWarning(context, {
-        code: "unsupported-feature",
-        message: `Defined name ${name} was not a single rectangular range`,
-      });
-      continue;
-    }
-    const sheetName = (match[1] ?? match[2] ?? "").replaceAll("''", "'");
-    const sheet = sheetIds.get(sheetNameKey(sheetName));
-    if (!sheet) {
-      emitWarning(context, {
-        code: "unsupported-feature",
-        message: `Defined name ${name} referenced missing worksheet ${sheetName} and was dropped`,
-      });
-      continue;
-    }
     const localSheetId = xmlAttribute(definition, "localSheetId");
     let scope: string | undefined;
     if (localSheetId !== undefined) {
@@ -2026,7 +2003,23 @@ function externalNamedRanges(
         continue;
       }
     }
-    const parsed = parseRange(match[3]!);
+    const source = spillReferencesFromXlsx(decodeXstring(definition.text));
+    const match =
+      /^(?:'((?:[^']|'')+)'|([^!]+))!(\$[A-Z]{1,3}\$[1-9]\d*(?::\$[A-Z]{1,3}\$[1-9]\d*)?)$/i.exec(
+        source,
+      );
+    const reference = match?.[3];
+    if (match === null || reference === undefined) {
+      ranges.push({ name, ...(scope ? { scope } : {}), formula: `=${source.replace(/^=/, "")}` });
+      continue;
+    }
+    const sheetName = (match[1] ?? match[2] ?? "").replaceAll("''", "'");
+    const sheet = sheetIds.get(sheetNameKey(sheetName));
+    if (sheet === undefined) {
+      ranges.push({ name, ...(scope ? { scope } : {}), formula: `=${source.replace(/^=/, "")}` });
+      continue;
+    }
+    const parsed = parseRange(reference);
     assertResource(context, "maxRowsPerSheet", parsed.r1 + 1);
     assertResource(context, "maxColumnsPerSheet", parsed.c1 + 1);
     ranges.push({
@@ -2038,6 +2031,15 @@ function externalNamedRanges(
         end: { row: parsed.r1, col: parsed.c1 },
       },
     });
+  }
+  const formulas = ranges.flatMap((named) => (named.formula === undefined ? [] : [named.formula]));
+  const converted = await convertDefinedNameFormulas(formulas, "import");
+  let formulaIndex = 0;
+  for (const named of ranges) {
+    if (named.formula === undefined) continue;
+    const source = converted[formulaIndex++];
+    if (source === undefined) throw new Error("Missing imported defined-name formula");
+    named.formula = source;
   }
   return ranges.length > 0 ? ranges : undefined;
 }
@@ -2542,7 +2544,12 @@ export async function readWorkbook(
           (reference) => reference.state !== "hidden" && reference.state !== "veryHidden",
         );
   const activeSheet = sheets[activeIndex]!.id;
-  const nativeNamedRanges = externalNamedRanges(workbookRoot, sheetIds, sourceReferences, context);
+  const nativeNamedRanges = await externalNamedRanges(
+    workbookRoot,
+    sheetIds,
+    sourceReferences,
+    context,
+  );
   const namedRanges = xmlChild(workbookRoot, "definedNames")
     ? nativeNamedRanges
     : metadata?.workbook.namedRanges;
@@ -2564,7 +2571,9 @@ export async function readWorkbook(
     else delete sheet.tables;
   }
   for (const namedRange of namedRanges ?? []) {
-    const sheet = sheets.find((candidate) => candidate.id === namedRange.range.sheet);
+    if (namedRange.range === undefined) continue;
+    const range = namedRange.range;
+    const sheet = sheets.find((candidate) => candidate.id === range.sheet);
     if (sheet) extendSheet(sheet, namedRange.range.end.row, namedRange.range.end.col);
   }
   const calculation = workbookCalculation(workbookRoot);

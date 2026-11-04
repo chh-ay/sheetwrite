@@ -144,13 +144,37 @@ export interface AddSheetInput {
   columns?: Column[];
 }
 
-/** Workbook-global or sheet-scoped named range used by formulas and persistence. */
-export interface NamedRangeSnapshot {
+/**
+ * A defined name: a workbook-global or sheet-scoped name that formulas use.
+ * It refers to one rectangular range, or holds a formula such as a constant,
+ * an expression or a `LAMBDA`.
+ */
+export type NamedRangeSnapshot = NamedReferenceSnapshot | NamedFormulaSnapshot;
+
+/** A defined name that refers to one rectangular range. */
+interface NamedReferenceSnapshot {
   name: string;
   /** Formula-context sheet whose local definition shadows the workbook definition. */
   scope?: SheetId;
   range: Range;
+  formula?: never;
 }
+
+/**
+ * A defined name that holds a formula, written with its leading `=`.
+ * Relative references in it are relative to cell A1, as in an XLSX file: a
+ * formula that uses the name at C5 reads them two columns right and four
+ * rows down. A `LAMBDA` name is called like a function (`=MYFN(A1)`) in the
+ * full engine; the default engine keeps it and returns `#NAME?` for the call.
+ */
+interface NamedFormulaSnapshot {
+  name: string;
+  /** Formula-context sheet whose local definition shadows the workbook definition. */
+  scope?: SheetId;
+  formula: string;
+  range?: never;
+}
+
 /** Reject-or-warn policy attached to a data-validation rule. */
 export type ValidationPolicy = "reject" | "warn" | "allow";
 

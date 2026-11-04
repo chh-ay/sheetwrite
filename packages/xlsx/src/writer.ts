@@ -9,6 +9,7 @@ import type {
 } from "@sheetwrite/core";
 import {
   colToA1,
+  convertDefinedNameFormulas,
   DEFAULT_MAX_CHANGE,
   DEFAULT_MAX_ITERATIONS,
   labelToCol,
@@ -1069,15 +1070,23 @@ function workbookXml(
   if (snapshot.workbook.namedRanges?.length) {
     xml.append("<definedNames>");
     for (const named of snapshot.workbook.namedRanges) {
-      const sheet = snapshot.sheets.find((candidate) => candidate.id === named.range.sheet);
-      if (!sheet) continue;
       const scopeIndex =
         named.scope === undefined
           ? undefined
           : ordered.findIndex((candidate) => candidate.id === named.scope);
-      const range = named.range;
+      let source: string;
+      if (named.range === undefined) {
+        const converted = context.definedNameFormulas?.get(named.formula);
+        if (converted === undefined) throw new Error("Defined-name formula was not converted");
+        source = converted.replace(/^=/, "");
+      } else {
+        const range = named.range;
+        const sheet = snapshot.sheets.find((candidate) => candidate.id === range.sheet);
+        if (sheet === undefined) continue;
+        source = `${quotedSheet(sheet.name)}!$${colToA1(range.start.col)}$${range.start.row + 1}:$${colToA1(range.end.col)}$${range.end.row + 1}`;
+      }
       xml.append(
-        `<definedName name="${escapeXml(encodeXstring(named.name))}"${scopeIndex !== undefined && scopeIndex >= 0 ? ` localSheetId="${scopeIndex}"` : ""}>${escapeXml(encodeXstring(`${quotedSheet(sheet.name)}!$${colToA1(range.start.col)}$${range.start.row + 1}:$${colToA1(range.end.col)}$${range.end.row + 1}`))}</definedName>`,
+        `<definedName name="${escapeXml(encodeXstring(named.name))}"${scopeIndex !== undefined && scopeIndex >= 0 ? ` localSheetId="${scopeIndex}"` : ""}>${escapeXml(encodeXstring(source))}</definedName>`,
       );
     }
     xml.append("</definedNames>");
@@ -1244,18 +1253,42 @@ function* writeWorkbookParts(
   yield* hook?.parts?.() ?? [];
 }
 
-export function writeWorkbook(
+async function convertedNameFormulas(
   snapshot: WorkbookSnapshot,
-  context: XlsxCodecContext,
-  hook?: WorkbookWriteHookResolver,
-): Uint8Array {
-  return writeZip(writeWorkbookParts(snapshot, context, hook), context);
+): Promise<ReadonlyMap<string, string>> {
+  const formulas = (snapshot.workbook.namedRanges ?? []).flatMap((named) =>
+    named.formula === undefined ? [] : [named.formula],
+  );
+  const converted = await convertDefinedNameFormulas(formulas, "export");
+  return new Map(
+    formulas.map((source, index) => {
+      const result = converted[index];
+      if (result === undefined) throw new Error("Missing converted defined-name formula");
+      return [source, spillReferencesToXlsx(result)];
+    }),
+  );
 }
 
-export function streamWorkbook(
+export async function writeWorkbook(
   snapshot: WorkbookSnapshot,
   context: XlsxCodecContext,
   hook?: WorkbookWriteHookResolver,
-): Generator<Uint8Array> {
-  return zipChunks(writeWorkbookParts(snapshot, context, hook), context);
+): Promise<Uint8Array> {
+  const formulas = await convertedNameFormulas(snapshot);
+  return writeZip(
+    writeWorkbookParts(snapshot, { ...context, definedNameFormulas: formulas }, hook),
+    context,
+  );
+}
+
+export async function* streamWorkbook(
+  snapshot: WorkbookSnapshot,
+  context: XlsxCodecContext,
+  hook?: WorkbookWriteHookResolver,
+): AsyncGenerator<Uint8Array> {
+  const formulas = await convertedNameFormulas(snapshot);
+  yield* zipChunks(
+    writeWorkbookParts(snapshot, { ...context, definedNameFormulas: formulas }, hook),
+    context,
+  );
 }

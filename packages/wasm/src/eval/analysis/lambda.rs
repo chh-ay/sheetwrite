@@ -67,14 +67,8 @@ impl Drop for CallBudget {
     }
 }
 
-fn definition(mut expression: &Ast) -> Result<(&[Ast], &Ast), FormulaError> {
-    while let Ast::LetSlot {
-        expression: inner, ..
-    } = expression
-    {
-        expression = inner;
-    }
-    let Ast::Func(Func::Analysis(super::LAMBDA_ID), arguments) = expression else {
+fn definition(expression: &Ast) -> Result<(&[Ast], &Ast), FormulaError> {
+    let Ast::Func(Func::Analysis(super::LAMBDA_ID), arguments) = expression.bound_value() else {
         return Err(FormulaError::Value);
     };
     let (body, parameters) = arguments.split_last().ok_or(FormulaError::Value)?;

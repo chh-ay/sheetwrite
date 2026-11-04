@@ -8,7 +8,7 @@ description: "InitOutput interface in @sheetwrite/wasm: Result of module initial
 Result of module initialization: the instantiated exports plus the shared linear memory.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/pkg/sheetwrite_wasm.d.ts#L582"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L582</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/pkg/sheetwrite_wasm.d.ts#L620"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L620</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -70,6 +70,8 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-loaded-spans"><code>cellstore_loadedSpans</code></a>
 <a href="#init-output-cellstore-mark-range-clean"><code>cellstore_markRangeClean</code></a>
 <a href="#init-output-cellstore-memory-stats"><code>cellstore_memoryStats</code></a>
+<a href="#init-output-cellstore-move-named-formula-source"><code>cellstore_moveNamedFormulaSource</code></a>
+<a href="#init-output-cellstore-named-formula-source"><code>cellstore_namedFormulaSource</code></a>
 <a href="#init-output-cellstore-new"><code>cellstore_new</code></a>
 <a href="#init-output-cellstore-paged-dirty-coordinates"><code>cellstore_pagedDirtyCoordinates</code></a>
 <a href="#init-output-cellstore-paged-stats"><code>cellstore_pagedStats</code></a>
@@ -106,6 +108,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-set-formula"><code>cellstore_setFormula</code></a>
 <a href="#init-output-cellstore-set-hidden-rows"><code>cellstore_setHiddenRows</code></a>
 <a href="#init-output-cellstore-set-iterative-calculation"><code>cellstore_setIterativeCalculation</code></a>
+<a href="#init-output-cellstore-set-named-formula"><code>cellstore_setNamedFormula</code></a>
 <a href="#init-output-cellstore-set-named-range"><code>cellstore_setNamedRange</code></a>
 <a href="#init-output-cellstore-set-number"><code>cellstore_setNumber</code></a>
 <a href="#init-output-cellstore-set-saved-pivots"><code>cellstore_setSavedPivots</code></a>
@@ -128,6 +131,8 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-distinctcolumn-take-kinds"><code>distinctcolumn_takeKinds</code></a>
 <a href="#init-output-distinctcolumn-take-numbers"><code>distinctcolumn_takeNumbers</code></a>
 <a href="#init-output-distinctcolumn-take-texts"><code>distinctcolumn_takeTexts</code></a>
+<a href="#init-output-formula-from-xlsx"><code>formulaFromXlsx</code></a>
+<a href="#init-output-formula-to-xlsx"><code>formulaToXlsx</code></a>
 <a href="#init-output-formula-tokens"><code>formulaTokens</code></a>
 <a href="#init-output-formulasyntaxerror-from"><code>formulasyntaxerror_from</code></a>
 <a href="#init-output-formulasyntaxerror-incomplete"><code>formulasyntaxerror_incomplete</code></a>
@@ -163,7 +168,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-wbindgen-start"><code>__wbindgen_start</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>149</span>
+## Members <span class="api-count" data-pagefind-ignore>154</span>
 
 <div class="api-member-list">
 
@@ -689,6 +694,24 @@ readonly cellstore_memoryStats: (a: number) => [number, number];
 
 </details>
 
+<details class="api-member" id="init-output-cellstore-move-named-formula-source" data-pagefind-weight="1">
+<summary><code>cellstore_moveNamedFormulaSource</code></summary>
+
+```ts generated
+readonly cellstore_moveNamedFormulaSource: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number];
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-named-formula-source" data-pagefind-weight="1">
+<summary><code>cellstore_namedFormulaSource</code></summary>
+
+```ts generated
+readonly cellstore_namedFormulaSource: (a: number, b: number, c: number, d: number) => [number, number];
+```
+
+</details>
+
 <details class="api-member" id="init-output-cellstore-new" data-pagefind-weight="1">
 <summary><code>cellstore_new</code></summary>
 
@@ -1013,6 +1036,15 @@ readonly cellstore_setIterativeCalculation: (a: number, b: number, c: number, d:
 
 </details>
 
+<details class="api-member" id="init-output-cellstore-set-named-formula" data-pagefind-weight="1">
+<summary><code>cellstore_setNamedFormula</code></summary>
+
+```ts generated
+readonly cellstore_setNamedFormula: (a: number, b: number, c: number, d: number, e: number, f: number) => number;
+```
+
+</details>
+
 <details class="api-member" id="init-output-cellstore-set-named-range" data-pagefind-weight="1">
 <summary><code>cellstore_setNamedRange</code></summary>
 
@@ -1207,6 +1239,24 @@ readonly distinctcolumn_takeNumbers: (a: number) => [number, number];
 
 ```ts generated
 readonly distinctcolumn_takeTexts: (a: number) => [number, number];
+```
+
+</details>
+
+<details class="api-member" id="init-output-formula-from-xlsx" data-pagefind-weight="1">
+<summary><code>formulaFromXlsx</code></summary>
+
+```ts generated
+readonly formulaFromXlsx: (a: number, b: number) => [number, number];
+```
+
+</details>
+
+<details class="api-member" id="init-output-formula-to-xlsx" data-pagefind-weight="1">
+<summary><code>formulaToXlsx</code></summary>
+
+```ts generated
+readonly formulaToXlsx: (a: number, b: number) => [number, number];
 ```
 
 </details>
@@ -1761,6 +1811,22 @@ export interface InitOutput {
     f: number,
   ) => void;
   readonly cellstore_memoryStats: (a: number) => [number, number];
+  readonly cellstore_moveNamedFormulaSource: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+    g: number,
+    h: number,
+  ) => [number, number];
+  readonly cellstore_namedFormulaSource: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+  ) => [number, number];
   readonly cellstore_new: () => number;
   readonly cellstore_pagedDirtyCoordinates: (
     a: number,
@@ -2008,6 +2074,14 @@ export interface InitOutput {
     c: number,
     d: number,
   ) => number;
+  readonly cellstore_setNamedFormula: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+  ) => number;
   readonly cellstore_setNamedRange: (
     a: number,
     b: number,
@@ -2161,6 +2235,8 @@ export interface InitOutput {
   readonly distinctcolumn_takeKinds: (a: number) => [number, number];
   readonly distinctcolumn_takeNumbers: (a: number) => [number, number];
   readonly distinctcolumn_takeTexts: (a: number) => [number, number];
+  readonly formulaFromXlsx: (a: number, b: number) => [number, number];
+  readonly formulaToXlsx: (a: number, b: number) => [number, number];
   readonly formulaTokens: (a: number, b: number) => [number, number];
   readonly formulasyntaxerror_from: (a: number) => number;
   readonly formulasyntaxerror_incomplete: (a: number) => number;

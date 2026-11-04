@@ -104,6 +104,28 @@ function workbookXml(bytes: Uint8Array): string {
 }
 
 describe("raw spec-authored OOXML fidelity", () => {
+  it("keeps scoped formula names and Excel LAMBDA prefixes through native OOXML", async () => {
+    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
+      rawWorkbook(sheet("<sheetData/>"), {
+        workbookExtra:
+          '<definedNames><definedName name="MYFN">_xlfn.LAMBDA(_xlpm.value,_xlpm.value+1)</definedName><definedName name="Rate" localSheetId="0">0.2</definedName></definedNames>',
+      }),
+    );
+    const owner = imported.sheets[0];
+    if (owner === undefined) throw new Error("missing imported sheet");
+    expect(imported.workbook.namedRanges).toEqual([
+      { name: "MYFN", formula: "=LAMBDA(value,value+1)" },
+      { name: "Rate", scope: owner.id, formula: "=0.2" },
+    ]);
+
+    const bytes = await sheetwriteWorkbookBackend.toXlsxWorkbook(imported);
+    expect(workbookXml(bytes)).toContain(
+      '<definedName name="MYFN">_xlfn.LAMBDA(_xlpm.value,_xlpm.value+1)</definedName>',
+    );
+    const reopened = await sheetwriteWorkbookBackend.fromXlsxWorkbook(bytes);
+    expect(reopened.workbook.namedRanges).toEqual(imported.workbook.namedRanges);
+  });
+
   it("accepts Strict namespaces and relationship types", async () => {
     const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
       rawWorkbook(
