@@ -3516,6 +3516,96 @@ mod value_set_filter {
     }
 }
 
+mod spill_query_fixtures {
+    use super::*;
+
+    #[test]
+    fn spill_single_key_sort_uses_displayed_kinds_and_keeps_blank_ties() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(1, 7);
+        store.set_formula(sheet, 1, 0, "={3;\"alpha\";TRUE;#N/A;1}", 0);
+        store.recompute(sheet);
+
+        assert_eq!(
+            store.sort_rows_multi(sheet, &[0], &[1], &[]),
+            vec![5, 1, 4, 2, 3, 0, 6]
+        );
+        assert_eq!(
+            store.sort_rows_multi(sheet, &[0], &[0], &[]),
+            vec![0, 6, 3, 2, 4, 1, 5]
+        );
+    }
+
+    #[test]
+    fn spill_multi_key_sort_reads_each_output_column_and_preserves_ties() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(2, 4);
+        store.set_formula(sheet, 0, 0, "={2,4;1,7;2,3;1,7}", 0);
+        store.recompute(sheet);
+
+        assert_eq!(
+            store.sort_rows_multi(sheet, &[0, 1], &[1, 1], &[]),
+            vec![1, 3, 2, 0]
+        );
+        assert_eq!(
+            store.sort_rows_multi(sheet, &[0, 1], &[0, 1], &[]),
+            vec![2, 0, 1, 3]
+        );
+    }
+
+    #[test]
+    fn spill_sort_at_radix_size_includes_anchor_and_child_only_columns() {
+        const ROWS: usize = 4096;
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(2, ROWS);
+        store.set_formula(sheet, 0, 0, "=SEQUENCE(4096,2,8192,-1)", 0);
+        store.recompute(sheet);
+        let ascending: Vec<u32> = (0..ROWS as u32).rev().collect();
+        let descending: Vec<u32> = (0..ROWS as u32).collect();
+
+        for col in [0, 1] {
+            assert_eq!(store.sort_rows_multi(sheet, &[col], &[1], &[]), ascending);
+            assert_eq!(store.sort_rows_multi(sheet, &[col], &[0], &[]), descending);
+        }
+    }
+
+    #[test]
+    fn spill_filter_and_sort_use_the_same_displayed_rows() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(2, 4);
+        store.set_formula(
+            sheet,
+            0,
+            0,
+            "={3,\"keep\";1,\"drop\";2,\"keep\";1,\"keep\"}",
+            0,
+        );
+        store.recompute(sheet);
+
+        assert_eq!(store.filter_rows(sheet, 1, "keep"), vec![0, 2, 3]);
+        let candidates = store.filter_rows_multi(
+            sheet,
+            &[1],
+            &[0],
+            &[0],
+            &[],
+            &[0],
+            &[1],
+            &[],
+            vec!["keep".into()],
+        );
+        assert_eq!(candidates, vec![0, 2, 3]);
+        assert_eq!(
+            store.sort_rows_multi(sheet, &[0], &[1], &candidates),
+            vec![3, 2, 0]
+        );
+        assert_eq!(
+            store.filter_rows_multi(sheet, &[0], &[0], &[0], &[], &[1], &[0], &[1.0], vec![],),
+            vec![1, 3]
+        );
+    }
+}
+
 /// Multi-key sort coverage over hand-written fixtures: ties keep the row id,
 /// keys can descend, candidate lists drop out-of-range rows, kinds order as
 /// numbers, text, booleans, blanks, and `-0.0` compares equal to `0.0`.

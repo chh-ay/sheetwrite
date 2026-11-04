@@ -1513,6 +1513,13 @@ impl<'a> ComparableCell<'a> {
             return Self::from_cell(sheet, strings, index);
         }
         let (kind, payload) = run.source(index);
+        // Spill owners install calculated output in these same dense slots.
+        // Read the bounded run directly; ownership needs no per-row hash probe.
+        let (kind, payload) = if kind == KIND_EMPTY {
+            run.resolved(index)
+        } else {
+            (kind, payload)
+        };
         match kind {
             KIND_NUMBER => Self::Number(OrderedNumber(f64::from_bits(payload))),
             KIND_BOOL => Self::Bool(payload_num(payload) != 0.0),

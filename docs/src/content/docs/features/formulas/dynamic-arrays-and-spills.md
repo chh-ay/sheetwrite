@@ -144,14 +144,12 @@ describes that formula text as [not editable](https://support.microsoft.com/en-u
   including an originator's undo or redo, follow the same spill rules. Received operations
   do not enter the receiver's local undo history.
 
-### Sort and filter difference from Excel
+### Sort and filter
 
-Sheetwrite sorts and filters a **view**; these commands do not move the sheet's source cells
-as an Excel in-place sort does. They can show a spill's rows in another order or hide some
-rows without changing its anchor, ownership, or formula references. Sort keys use source
-cells: projected children have empty sources, so sorting on a spill column does not sort
-its displayed results as independent records. Use `SORT` or `FILTER` in a formula to create
-a sorted or filtered array. View sort and filter changes support undo and redo.
+Sort keys and filters use displayed cell values, including every projected spill result.
+Single-key and multi-key sorts keep row order stable when the keys are equal. Filtering
+selects the displayed rows before sorting them. These view changes leave the anchor,
+spill ownership, and formula references unchanged and support undo and redo.
 
 ## Spill limits
 
