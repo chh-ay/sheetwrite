@@ -55,6 +55,9 @@ const MEASURED_RATIO_LIMITS: Readonly<Record<string, number>> = {
   "workload=error-propagation;size=1000": 1.2,
   "workload=criteria-range-edit;size=100000": 1.25,
   "workload=lookup-range-edit;size=100000": 1.2,
+  // Rows without the 56-pair resampling above keep the 1.2 default.
+  "workload=xlookup-mixed-exact;size=10000": 1.2,
+  "workload=xlookup-mixed-exact;size=100000": 1.2,
   "workload=vlookup-many;size=1000": 1.15,
   "workload=vlookup-many-edit;size=1000": 1.15,
   "workload=vlookup-many-sorted;size=1000": 1.15,
