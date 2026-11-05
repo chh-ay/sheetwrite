@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
-import { forwardedHeading, movedPageTarget } from "../src/lib/moved-pages.js";
+import { forwardedHeading } from "../src/lib/moved-headings.js";
+import { movedPageTarget } from "../src/lib/moved-pages.js";
 
 const moved = {
   "/docs/guides/configuration/": {
