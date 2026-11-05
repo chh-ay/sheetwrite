@@ -8,7 +8,7 @@ description: "SnapshotStorageMode type in @sheetwrite/core: Allocation mode used
 Allocation mode used when enforcing snapshot construction capacity.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/document-protocol.ts#L357"><code>packages/core/src/document-protocol.ts#L357</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/document-protocol.ts#L358"><code>packages/core/src/document-protocol.ts#L358</code></a></dd></div>
 </dl>
 
 ## Declaration

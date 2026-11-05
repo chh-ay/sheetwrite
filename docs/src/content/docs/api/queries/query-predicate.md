@@ -8,7 +8,7 @@ description: "QueryPredicate type in @sheetwrite/queries: Data-only predicate tr
 Data-only predicate trees use M null logic; only logical true selects a row.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/types.ts#L45"><code>packages/queries/src/types.ts#L45</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/query.d.ts#L12"><code>packages/core/dist/types/query.d.ts#L12</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>5</span>
@@ -109,6 +109,7 @@ export type QueryPredicate =
 <p class="api-consumers-label">Public exports naming <code>QueryPredicate</code></p>
 
 <ul class="api-consumer-list">
+<li><a href="/docs/api/core/query-step/"><code>QueryStep</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/queries/query-step/"><code>QueryStep</code></a><span class="api-consumer-kind">@sheetwrite/queries</span></li>
 </ul>
 </div>
