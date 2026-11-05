@@ -569,8 +569,10 @@ pub(crate) struct FormulaResults {
     /// Active calls are separate from results so back edges do not recurse.
     pub(crate) visiting: FormulaBits,
     range_sums: RangeSums,
+    /// Boxed, so the pass workspace the store keeps between passes grows by
+    /// one pointer, not by the whole entry.
     #[cfg(feature = "analysis")]
-    last_regex: Option<PassRegex>,
+    last_regex: Option<Box<PassRegex>>,
 }
 
 /// The last regex pattern this pass compiled, with its case mode. Formulas
@@ -752,11 +754,11 @@ impl FormulaResults {
         insensitive: bool,
         regex: std::rc::Rc<regex_lite::Regex>,
     ) {
-        self.last_regex = Some(PassRegex {
+        self.last_regex = Some(Box::new(PassRegex {
             pattern: pattern.to_owned(),
             insensitive,
             regex,
-        });
+        }));
     }
 
     /// Clear touched positions so a small edit does not scan all slots.
