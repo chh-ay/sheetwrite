@@ -2276,6 +2276,8 @@ const DOCUMENT_OPERATION_KINDS: Record<DocumentOp["op"], true> = {
   setNamedRange: true,
   removeNamedRange: true,
   setCalculation: true,
+  setRelationship: true,
+  removeRelationship: true,
   setChart: true,
   removeChart: true,
   setPivot: true,
