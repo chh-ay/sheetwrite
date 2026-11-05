@@ -217,6 +217,13 @@ pub enum Func {
     Offset,
     Indirect,
     Areas,
+    AverageA,
+    MaxA,
+    MinA,
+    StdevA,
+    StdevPA,
+    VarA,
+    VarPA,
     /// `A1#`: the current spill of the anchor cell. Only `#` after a cell
     /// reference makes it; the name is not in the function table.
     AnchorArray,
@@ -366,6 +373,8 @@ define_function_registry! {
         Ipmt => "IPMT";
         IsNa => "ISNA";
         Left => "LEFT";
+        MaxA => "MAXA";
+        MinA => "MINA";
         Ppmt => "PPMT";
         Rand => "RAND";
         Rate => "RATE";
@@ -380,6 +389,7 @@ define_function_registry! {
         Trim => "TRIM";
         True => "TRUE";
         Type => "TYPE";
+        VarA => "VARA";
         Year => "YEAR";
         Areas => "AREAS";
         Clean => "CLEAN";
@@ -406,6 +416,7 @@ define_function_registry! {
         Value => "VALUE";
         VarP => "VAR.P";
         VarS => "VAR.S";
+        VarPA => "VARPA";
         Choose => "CHOOSE";
         Column => "COLUMN";
         Concat => "CONCAT";
@@ -422,6 +433,7 @@ define_function_registry! {
         Proper => "PROPER";
         Search => "SEARCH";
         Second => "SECOND";
+        StdevA => "STDEVA";
         SumIfs => "SUMIFS";
         Switch => "SWITCH";
         Unique => "UNIQUE";
@@ -443,6 +455,7 @@ define_function_registry! {
         RoundUp => "ROUNDUP";
         StdevP => "STDEV.P";
         StdevS => "STDEV.S";
+        StdevPA => "STDEVPA";
         UniChar => "UNICHAR";
         Unicode => "UNICODE";
         VLookup => "VLOOKUP";
@@ -450,6 +463,7 @@ define_function_registry! {
         WeekNum => "WEEKNUM";
         Workday => "WORKDAY";
         XLookup => "XLOOKUP";
+        AverageA => "AVERAGEA";
         CountIfs => "COUNTIFS";
         Indirect => "INDIRECT";
         IsNumber => "ISNUMBER";

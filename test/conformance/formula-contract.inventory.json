@@ -3953,6 +3953,112 @@
         }
       ],
       "returns": "scalar"
+    },
+    "hypgeom-dist": {
+      "arguments": [
+        {
+          "name": "sampleS",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "numberSample",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "populationS",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "numberPop",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "cumulative",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "negbinom-dist": {
+      "arguments": [
+        {
+          "name": "numberF",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "numberS",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "probabilityS",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "cumulative",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "binom-dist-range": {
+      "arguments": [
+        {
+          "name": "trials",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "probabilityS",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "numberS",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "numberS2",
+          "required": false,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
     }
   },
   "semanticsProfiles": {
@@ -5125,6 +5231,51 @@
         "collaboration": "formula-source",
         "xlsxSource": "rewrite-on-structural-edit"
       }
+    },
+    "aggregate-counted": {
+      "shape": {
+        "scalar": "accepted",
+        "range": "accepted",
+        "array": "accepted",
+        "broadcast": "none",
+        "result": "scalar"
+      },
+      "coercion": {
+        "blank": "ignored",
+        "text": "function-defined",
+        "boolean": "number",
+        "error": "propagate"
+      },
+      "text": {
+        "case": "not-applicable",
+        "wildcard": "not-applicable"
+      },
+      "environment": {
+        "locale": "invariant",
+        "dateSystem": "not-applicable"
+      },
+      "numeric": {
+        "tolerance": "binary64",
+        "domain": "function-defined",
+        "iteration": {
+          "kind": "none",
+          "maximum": null
+        }
+      },
+      "calculation": {
+        "dependencies": "tracked",
+        "lazy": "eager",
+        "spill": "scalar",
+        "fill": "relative-reference-rewrite",
+        "copy": "relative-reference-rewrite",
+        "structuralRewrite": "ast-reference-rewrite"
+      },
+      "persistence": {
+        "snapshot": "formula-source",
+        "history": "formula-source",
+        "collaboration": "formula-source",
+        "xlsxSource": "rewrite-on-structural-edit"
+      }
     }
   },
   "dialectProfiles": {
@@ -5290,7 +5441,7 @@
       "openFormula": "unverified",
       "divergences": [
         "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?.",
-        "CHITEST and paired TTEST skip pairs where either value is not a number. TTEST type 3 uses Welch's degrees of freedom without rounding."
+        "CHISQ.TEST, CHITEST and paired T.TEST and TTEST skip pairs where either value is not a number. Type 3 of T.TEST and TTEST uses Welch's degrees of freedom without rounding."
       ]
     }
   },
@@ -5320,7 +5471,11 @@
       },
       "evaluator": {
         "status": "implemented",
-        "paths": ["packages/wasm/src/eval/mod.rs", "packages/wasm/src/eval/functions.rs"]
+        "paths": [
+          "packages/wasm/src/eval/mod.rs",
+          "packages/wasm/src/eval/functions.rs",
+          "packages/wasm/src/eval/statistics.rs"
+        ]
       },
       "assist": {
         "status": "implemented",
@@ -5643,7 +5798,8 @@
         "status": "implemented",
         "paths": [
           "packages/wasm/src/eval/analysis/compatibility.rs",
-          "packages/wasm/src/eval/analysis/distributions.rs"
+          "packages/wasm/src/eval/analysis/distributions.rs",
+          "packages/wasm/src/eval/analysis/discrete.rs"
         ]
       },
       "assist": {
@@ -5663,6 +5819,24 @@
       "evaluator": {
         "status": "implemented",
         "paths": ["packages/wasm/src/eval/analysis/hypothesis.rs"]
+      },
+      "assist": {
+        "status": "implemented",
+        "paths": ["packages/core/src/formula-assist.ts"]
+      },
+      "evidence": {
+        "status": "source-linked",
+        "paths": ["scripts/formula-contract.test.ts"]
+      }
+    },
+    "analysis-discrete": {
+      "parser": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/calc.rs"]
+      },
+      "evaluator": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/eval/analysis/discrete.rs"]
       },
       "assist": {
         "status": "implemented",
@@ -9868,6 +10042,198 @@
       "semantics": "analysis-descriptive",
       "dialects": "analysis-hypothesis",
       "implementation": "analysis-hypothesis",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "AVERAGEA",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "aggregate-counted",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "MAXA",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "aggregate-counted",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "MINA",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "aggregate-counted",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "STDEVA",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "aggregate-counted",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "STDEVPA",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "aggregate-counted",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "VARA",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "aggregate-counted",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "VARPA",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "aggregate-counted",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "CHISQ.TEST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "chi-test",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-hypothesis",
+      "implementation": "analysis-hypothesis",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "F.TEST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "pair-arrays",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-hypothesis",
+      "implementation": "analysis-hypothesis",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "T.TEST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "t-test",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-hypothesis",
+      "implementation": "analysis-hypothesis",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "Z.TEST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "z-test",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-hypothesis",
+      "implementation": "analysis-hypothesis",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "GAMMALN.PRECISE",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "BINOM.INV",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "binom-inverse",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-discrete",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "HYPGEOM.DIST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "hypgeom-dist",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-discrete",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "NEGBINOM.DIST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "negbinom-dist",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-discrete",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "BINOM.DIST.RANGE",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "binom-dist-range",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-discrete",
       "version": 1,
       "builds": ["@sheetwrite/formulas"]
     }
