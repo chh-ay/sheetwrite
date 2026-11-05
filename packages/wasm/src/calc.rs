@@ -1491,7 +1491,9 @@ impl<'a> Cursor<'a> {
         None
     }
 
-    /// Whether `count` tokens are ahead, lexing them when needed.
+    /// Whether `count` tokens are ahead, lexing them when needed. Out of
+    /// line so each peek and read inlines only the buffered case.
+    #[inline(never)]
     fn fill(&mut self, count: usize) -> bool {
         while self.ahead_len < count {
             let Some(tok) = self.lex_next() else {
@@ -1504,18 +1506,20 @@ impl<'a> Cursor<'a> {
         true
     }
 
-    #[inline]
+    #[inline(never)]
     fn peek_at(&mut self, offset: usize) -> Option<&Tok<'a>> {
-        if !self.fill(offset + 1) {
+        if self.ahead_len <= offset && !self.fill(offset + 1) {
             return None;
         }
 
         self.ahead[(self.ahead_start + offset) & (LOOKAHEAD - 1)].as_ref()
     }
 
-    #[inline]
+    /// Out of line: the parser reads tokens at many sites, and one copy of
+    /// the ring step keeps the parser small.
+    #[inline(never)]
     fn next(&mut self) -> Option<Tok<'a>> {
-        if !self.fill(1) {
+        if self.ahead_len == 0 && !self.fill(1) {
             return None;
         }
 
