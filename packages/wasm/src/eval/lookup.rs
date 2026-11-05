@@ -297,7 +297,7 @@ fn exact_match(
         }
         if let Some(found) = state
             .exact_index(list)
-            .and_then(|index| index.find(list, key, search_reverse))
+            .and_then(|index| index.find(key, search_reverse))
         {
             return Ok(found);
         }
@@ -503,11 +503,13 @@ struct IndexEntry {
 
 /// Every position sorted by class, value and position, so an equal run is
 /// contiguous and its ends are its first and last position. Text is ranked
-/// once by its case-folded order, so the main sort compares integers only.
+/// once by its case-folded bytes, so the main sort compares integers only.
 struct ExactIndex {
     entries: Vec<IndexEntry>,
-    /// One position per distinct case-folded text, in rank order.
-    texts: Vec<u32>,
+    /// The distinct case-folded texts in rank order, end to end.
+    text_bytes: Vec<u8>,
+    /// The end of each rank's text in `text_bytes`.
+    text_ends: Vec<u32>,
 }
 
 impl ExactIndex {
@@ -515,7 +517,10 @@ impl ExactIndex {
     /// scan order must decide.
     fn build(list: &ListView<'_>) -> Option<Self> {
         let mut entries = Vec::with_capacity(list.len());
-        let mut text_positions = Vec::new();
+        // Folded texts end to end, in list order, with their positions.
+        let mut folded = String::new();
+        let mut folded_ends: Vec<u32> = Vec::new();
+        let mut text_positions: Vec<u32> = Vec::new();
         for position in 0..list.len() {
             let (class, value) = match list.entry(position) {
                 Entry::Error(_) => return None,
@@ -523,7 +528,9 @@ impl ExactIndex {
                 Entry::Blank => (CLASS_BLANK, 0),
                 Entry::Number(number) => (CLASS_NUMBER, number_value(number)),
                 Entry::Text("") => (CLASS_EMPTY_TEXT, 0),
-                Entry::Text(_) => {
+                Entry::Text(text) => {
+                    fold_case_into(text, &mut folded);
+                    folded_ends.push(folded.len() as u32);
                     text_positions.push(position as u32);
                     (CLASS_TEXT, 0)
                 }
@@ -536,24 +543,33 @@ impl ExactIndex {
             });
         }
 
-        let text_of = |position: u32| match list.entry(position as usize) {
-            Entry::Text(text) => text,
-            _ => "",
+        let folded = folded.into_bytes();
+        let text = |slot: u32| {
+            let slot = slot as usize;
+            let start = slot
+                .checked_sub(1)
+                .map_or(0, |previous| folded_ends[previous]);
+            &folded[start as usize..folded_ends[slot] as usize]
         };
-        merge_sort(&mut text_positions, &mut |left, right| {
-            compare_text_case_insensitive(text_of(left), text_of(right))
-        });
-        let mut texts: Vec<u32> = Vec::new();
-        for &position in &text_positions {
-            let distinct = texts.last().is_none_or(|&last| {
-                compare_text_case_insensitive(text_of(last), text_of(position)) != Ordering::Equal
-            });
-            if distinct {
-                texts.push(position);
+        let mut order: Vec<u32> = (0..text_positions.len() as u32).collect();
+        merge_sort(&mut order, &mut |left, right| text(left).cmp(text(right)));
+
+        let mut text_bytes = Vec::new();
+        let mut text_ends: Vec<u32> = Vec::new();
+        for &slot in &order {
+            let bytes = text(slot);
+            let last_start = text_ends
+                .len()
+                .checked_sub(2)
+                .map_or(0, |previous| text_ends[previous] as usize);
+            if text_ends.is_empty() || &text_bytes[last_start..] != bytes {
+                text_bytes.extend_from_slice(bytes);
+                text_ends.push(text_bytes.len() as u32);
             }
-            entries[position as usize].value = (texts.len() - 1) as u64;
+            let position = text_positions[slot as usize] as usize;
+            entries[position].value = (text_ends.len() - 1) as u64;
         }
-        drop(text_positions);
+        drop((order, text_positions, folded_ends));
 
         let mut order: Vec<u32> = (0..entries.len() as u32).collect();
         merge_sort(&mut order, &mut |left, right| {
@@ -561,17 +577,36 @@ impl ExactIndex {
             (left.class, left.value).cmp(&(right.class, right.value))
         });
         let entries = order.iter().map(|&index| entries[index as usize]).collect();
-        Some(Self { entries, texts })
+        Some(Self {
+            entries,
+            text_bytes,
+            text_ends,
+        })
+    }
+
+    /// The rank of a case-folded text, by binary search over the ranks.
+    fn text_rank(&self, folded: &[u8]) -> Option<usize> {
+        let text = |rank: usize| {
+            let start = rank
+                .checked_sub(1)
+                .map_or(0, |previous| self.text_ends[previous]);
+            &self.text_bytes[start as usize..self.text_ends[rank] as usize]
+        };
+        let (mut low, mut high) = (0, self.text_ends.len());
+        while low < high {
+            let middle = low + (high - low) / 2;
+            match text(middle).cmp(folded) {
+                Ordering::Less => low = middle + 1,
+                Ordering::Greater => high = middle,
+                Ordering::Equal => return Some(middle),
+            }
+        }
+        None
     }
 
     /// The first (or last) position equal to `key`, or `None` for a key the
     /// index does not classify (an error or NaN), which keeps the plain scan.
-    fn find(
-        &self,
-        list: &ListView<'_>,
-        key: Entry<'_>,
-        search_reverse: bool,
-    ) -> Option<Option<usize>> {
+    fn find(&self, key: Entry<'_>, search_reverse: bool) -> Option<Option<usize>> {
         let mut found: Option<usize> = None;
         let mut consider = |class: u8, value: u64| {
             let start = self
@@ -612,13 +647,9 @@ impl ExactIndex {
                 consider(CLASS_BLANK, 0);
             }
             Entry::Text(text) => {
-                let rank =
-                    self.texts
-                        .binary_search_by(|&position| match list.entry(position as usize) {
-                            Entry::Text(stored) => compare_text_case_insensitive(stored, text),
-                            _ => Ordering::Less,
-                        });
-                if let Ok(rank) = rank {
+                let mut folded = String::new();
+                fold_case_into(text, &mut folded);
+                if let Some(rank) = self.text_rank(folded.as_bytes()) {
                     consider(CLASS_TEXT, rank as u64);
                 }
             }
@@ -635,7 +666,21 @@ impl ExactIndex {
 
     fn add_memory_stats(&self, stats: &mut crate::memory::MemoryOwnerStats) {
         stats.add_vec::<IndexEntry>(self.entries.len(), self.entries.capacity());
-        stats.add_vec::<u32>(self.texts.len(), self.texts.capacity());
+        stats.add_vec::<u8>(self.text_bytes.len(), self.text_bytes.capacity());
+        stats.add_vec::<u32>(self.text_ends.len(), self.text_ends.capacity());
+    }
+}
+
+/// Appends `text` case-folded to `folded`, with the fast path for ASCII.
+/// Folded texts compare by bytes exactly as `compare_text_case_insensitive`
+/// compares their sources.
+fn fold_case_into(text: &str, folded: &mut String) {
+    if text.is_ascii() {
+        let start = folded.len();
+        folded.push_str(text);
+        folded[start..].make_ascii_lowercase();
+    } else {
+        folded.push_str(&text.to_lowercase());
     }
 }
 
