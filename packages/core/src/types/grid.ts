@@ -142,6 +142,8 @@ export interface GridActions {
   versionHistory(): void;
   /** Open the configured named-version form. Requires `GridConfig.history`. */
   saveVersion(): void;
+  /** Add a dashboard sheet named `DashboardN` and show it, as Insert › New Dashboard does. */
+  newDashboard(): void;
   toggleBold(): void;
   toggleItalic(): void;
   toggleUnderline(): void;
@@ -276,6 +278,7 @@ export type ToolbarActionName =
   | "importXlsx"
   | "versionHistory"
   | "saveVersion"
+  | "newDashboard"
   | "undo"
   | "redo"
   | "separator";
