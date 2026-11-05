@@ -19,6 +19,7 @@
     "@sheetwrite/charts": "workspace:*",
     "@sheetwrite/core": "workspace:*",
     "@sheetwrite/formulas": "workspace:*",
+    "@sheetwrite/queries": "workspace:*",
     "@sheetwrite/react": "workspace:*",
     "@sheetwrite/svelte": "workspace:*",
     "@sheetwrite/vue": "workspace:*",

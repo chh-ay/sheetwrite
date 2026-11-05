@@ -161,6 +161,7 @@ const REQUIRED_CORE_EXPORTS = new Set([
 const SUPPORTED_PACKAGES: Readonly<Record<string, true>> = {
   "@sheetwrite/charts": true,
   "@sheetwrite/core": true,
+  "@sheetwrite/queries": true,
   "@sheetwrite/react": true,
   "@sheetwrite/svelte": true,
   "@sheetwrite/vue": true,

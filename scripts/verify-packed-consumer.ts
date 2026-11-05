@@ -64,11 +64,16 @@ const auditedLicenseOverrides: Record<string, string> = {
   "buffers@0.1.1": "MIT",
 };
 /** Optional packages that core and the framework adapters must install and run without. */
-const OPTIONAL_PACKAGES = ["@sheetwrite/xlsx", "@sheetwrite/charts"] as const;
-/** Packages that ship only compiled `dist/` output, never their source or tests. */
+const OPTIONAL_PACKAGES = [
+  "@sheetwrite/xlsx",
+  "@sheetwrite/charts",
+  "@sheetwrite/queries",
+] as const;
+/** Packages that ship compiled output, never their source or tests. */
 const DIST_ONLY_PACKAGES: Readonly<Record<string, true>> = {
   "@sheetwrite/xlsx": true,
   "@sheetwrite/charts": true,
+  "@sheetwrite/queries": true,
 };
 const packageSpecs: PackageSpec[] = [
   {
@@ -108,6 +113,11 @@ const packageSpecs: PackageSpec[] = [
   },
   { directory: "packages/wasm" },
   { directory: "packages/formulas" },
+  {
+    directory: "packages/queries",
+    extraFiles: ["dist/types.d.ts"],
+    forbiddenFiles: ["dist/types.js", "dist/types.js.map"],
+  },
   {
     directory: "packages/xlsx",
     extraFiles: [
@@ -561,6 +571,7 @@ try {
   await verifyMountedFrameworkConsumers(consumerRoot);
   await run(["npm", "run", "runtime"], consumerRoot);
   await run(["npm", "run", "runtime:formulas"], consumerRoot);
+  await run(["npm", "run", "runtime:queries"], consumerRoot);
 
   // The Vite build must have compiled the packed Svelte adapter and retained
   // its operational-event wiring, in addition to the mounted browser proof.

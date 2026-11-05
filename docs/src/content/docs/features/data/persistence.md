@@ -76,6 +76,94 @@ Document snapshots include workbook and sheet data, formula source, formatting, 
 
 Session state never belongs in a snapshot: selection, scroll position, caret state, search overlays and temporary highlights, host read-only policy, local zoom, and session-only grid options such as `renderer` and `readOnly`.
 
+## Opt-in version archives
+
+Import `HistoryArchive` and `MemoryHistoryStorage` from `@sheetwrite/core/history`.
+For durable browser storage, import `IndexedDbHistoryStorage` from
+`@sheetwrite/core/browser/history`. Neither entrypoint is loaded by a normal grid.
+The archive is a headless storage module. It does not add grid commands.
+
+Open an archive with a stable `documentId` and storage adapter. Call `initialize`
+once with a fully loaded, committed `WorkbookSnapshot` and its creation time.
+On restart, `HistoryArchive.open` reads only the durable recorder cursor.
+
+Pass each **committed**, ordered transaction to `record`. A `CommittedTransaction` carries
+`baseRevision`, `revision`, `mutationId`, `authorId`, `time`, and `operations`.
+Do not record optimistic grid change events. The document authority must confirm
+the revision and author first. `HistoryArchive` implements `CommitJournal`, so the
+reference `MemoryPersistenceAdapter.recordHistory` can record each commit as part of
+it; see [Authors and version history](/docs/features/collaboration/#authors-and-version-history)
+for the server contract. This module does not replace `SyncCoordinator` or the
+durable pending queue.
+
+The second argument to `record` is a snapshot provider. It runs only when a
+checkpoint is due. It must return the complete committed document at the incoming
+revision, including matching `documentId` and `version`. A grid snapshot still
+needs its confirmed persistence revision attached by the host.
+
+| Archive call | Behavior |
+| --- | --- |
+| `initialize(snapshot, time, signal?)` | Atomically publish the initial checkpoint. |
+| `record(commit, captureSnapshot?, signal?)` | Append one confirmed transaction; create a checkpoint and automatic marker when due. |
+| `saveVersion(name, authorId, time, signal?)` | Name the durable head without copying the workbook. Flush pending edits before calling it. |
+| `listVersions({ maxEntries?, maxBytes?, cursor?, signal? })` | Read bounded metadata, newest first. A new publication invalidates an old cursor. |
+| `readVersion(id, signal?)` | Rebuild the document of one version. When the version has log entries after its checkpoint, replay runs in a separate engine instance that is retired before the call returns or rejects, so the document engine's memory does not grow. Starting that instance reuses the compiled module. |
+| `prune({ beforeTime?, targetBytes?, signal? })` | Remove eligible automatic markers and unreachable records. Keep named markers. |
+| `deleteVersion(id, signal?)` | Explicitly remove one marker. Keep chunks another version or reader still needs. |
+| `storageUsage(signal?)` | Read retained encoded bytes and record/marker counts. This is not a JS heap estimate. |
+
+### Chunks and limits
+
+Checkpoints contain references to per-sheet records, fixed **16-row by 4-column**
+cell pages, and separate metadata blocks. Large metadata arrays use 128-entry
+blocks. Content IDs include the schema, encoding, references, and compressed
+payload. Unchanged pages are shared across checkpoints. SHA-256 verification and
+bounded inflate run before replay.
+
+An automatic marker is made after five active minutes with committed edits.
+A checkpoint is due after 30 active minutes, 1,000 transactions, or 2 MiB of log.
+No history timer or workbook-sized version cache runs in the background.
+
+The defaults are a 64 MiB encoded snapshot ceiling, 1 MiB decoded log segments,
+64 MiB per atomic transaction, a 256 MiB working-set reservation, and 512 MiB
+retained storage per document. Snapshot capture uses a conservative reservation
+in addition to its encoded limit, so a large snapshot can reach the working-set
+limit first. Metadata pages contain at most 100 entries or 256 KiB. An atomic
+transaction can cross log segments, but replay never exposes a partial transaction.
+
+Automatic markers have a 30-day age ceiling and can expire earlier to meet the
+storage cap. Up to 100 named markers stay pinned until explicitly deleted.
+Pinned data or the current head exceeding capacity makes archiving fail; it does
+not delete named versions or discard pending document edits. The host can override
+storage, cadence, and retention limits through `HistoryArchiveOptions.limits`.
+
+### Implement a history storage adapter
+
+`HistoryStorageAdapter` has four asynchronous methods: `put`, `get`, `list`, and
+`prune`. Every request includes document identity, resolved ceilings, and an
+optional `AbortSignal`.
+
+- `put` publishes immutable chunk records, a head, and an optional marker in one
+  transaction. Compare `expectedGeneration` before any publication. Dependencies
+  precede their owners. A reader can also acquire or release a short-lived pin.
+- `get` returns a manifest, marker, or bounded payload. A pinned record read
+  renews its five-minute lease. Expired leases fail rather than read pruned data.
+- `list` returns bounded marker metadata, filtered by revision interval, or
+  metadata for a selected record kind. It never returns cell payloads.
+- `prune` compares the expected generation, removes eligible markers, and deletes
+  records only when no head, marker, record, or active reader refers to them.
+
+Keep document commit and history journaling in one host database transaction or
+a durable transactional outbox when collaboration is connected. An in-page event
+listener alone is not a durable journal. The supplied memory adapter is session
+storage; the IndexedDB adapter uses atomic database transactions and closes its
+database connection after each request.
+
+`HistoryError` extends `SheetwriteError`. Its stable codes distinguish invalid
+history, generation conflicts, capacity, missing records, integrity, unavailable
+storage, blocked database open, and transaction failures. An abort rejects with
+the caller's `signal.reason`. It never publishes a partial marker.
+
 ## Large undo
 
 Undo of a large clear can be larger than one transaction allows. Sheetwrite 0.5.0 sends such a restore as one compressed `restoreBlock` operation. Your server must accept that operation before it accepts 0.5.0 clients. When even the compressed restore needs more than one server version, the Grid uses an atomic batch, which needs `commitBatch`. Without `commitBatch`, only that undo is rejected; everything else works. See [Large undo and atomic batches](/docs/features/collaboration/#large-undo-and-atomic-batches).

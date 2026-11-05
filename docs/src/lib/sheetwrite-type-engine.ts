@@ -138,6 +138,10 @@ export class SheetwriteTypeEngine {
       baseUrl: this.options.cwd,
       paths: {
         "@sheetwrite/core": ["../packages/core/src/index.ts"],
+        // Subpaths whose `exports` target differs from the file name; the wildcard
+        // below would resolve `history` to the internal undo module.
+        "@sheetwrite/core/history": ["../packages/core/src/history-archive.ts"],
+        "@sheetwrite/core/browser/history": ["../packages/core/src/history-indexeddb.ts"],
         "@sheetwrite/core/*": ["../packages/core/src/*"],
         "@sheetwrite/react": ["../packages/react/src/index.tsx"],
         "@sheetwrite/svelte": ["../packages/svelte/src/index.ts"],

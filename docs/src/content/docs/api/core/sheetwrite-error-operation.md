@@ -8,7 +8,7 @@ description: "SheetwriteErrorOperation type in @sheetwrite/core: Stable operatio
 Stable operation at which a consumer-visible failure can surface.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/errors.ts#L126"><code>packages/core/src/errors.ts#L126</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/errors.ts#L132"><code>packages/core/src/errors.ts#L132</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -36,6 +36,7 @@ export type SheetwriteErrorOperation =
   | "snapshot-allocate"
   | "persistence"
   | "pending-storage"
+  | "history"
   | "synchronize"
   | "presence"
   | "revision"
@@ -60,6 +61,7 @@ export type SheetwriteErrorOperation =
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/queries</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>

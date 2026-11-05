@@ -10,6 +10,7 @@ import { DEFAULT_SYNC_COORDINATOR_LIMITS } from "./sync.js";
 import type { DocumentOp, WorkbookSnapshot } from "./types/document.js";
 import type { Grid, GridOptions } from "./types/grid.js";
 import type {
+  CommitJournal,
   PersistenceAdapter,
   PersistenceBatchCommitRequest,
   PersistenceCommitRequest,
@@ -31,6 +32,10 @@ interface MemoryDocument {
   initialVersion: number;
   log: VersionedOperation[];
   applied: Map<string, number>;
+  /** Records each commit as part of it; present only when the host attached history. */
+  journal?: CommitJournal;
+  /** Time of the last commit; commit times never go back. */
+  lastCommitAt: number;
 }
 
 /** Grid creation options accepted when hydrating a validated snapshot. */
@@ -106,6 +111,8 @@ export function createGridFromSnapshot(
 /** Executable database-neutral reference adapter for tests, demos, and local workflows. */
 export class MemoryPersistenceAdapter implements PersistenceAdapter {
   private readonly documents = new Map<string, MemoryDocument>();
+  /** Commits run one at a time, so a journal write cannot interleave with another commit. */
+  private commitTail: Promise<unknown> = Promise.resolve();
 
   constructor(...snapshots: readonly WorkbookSnapshot[]) {
     for (const snapshot of snapshots) {
@@ -126,6 +133,7 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
         initialVersion: version,
         log: [],
         applied: new Map(),
+        lastCommitAt: 0,
       });
     }
   }
@@ -137,6 +145,21 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
     await Promise.resolve();
     throwIfAborted(signal);
     return currentSnapshot(document);
+  }
+
+  /**
+   * Record every later commit of `documentId` in `journal`, as part of the
+   * commit: if the journal rejects, the commit is not applied, published or
+   * acknowledged, and the client keeps it pending. While a journal is
+   * attached, a commit without `authorId` is rejected. The journal must
+   * already describe the current version, for example a `HistoryArchive`
+   * initialized with the loaded snapshot.
+   */
+  recordHistory(documentId: string, journal: CommitJournal): void {
+    const document = this.documents.get(documentId);
+    if (!document) throw new PersistenceError("not-found", `Unknown document: ${documentId}`);
+
+    document.journal = journal;
   }
 
   async commit(request: PersistenceCommitRequest): Promise<PersistenceCommitResponse> {
@@ -152,7 +175,22 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
     return this.commitVersions(request, splitBatchVersions(request));
   }
 
-  private async commitVersions(
+  private commitVersions(
+    request: PersistenceCommitRequest,
+    versions: readonly (readonly DocumentOp[])[],
+  ): Promise<PersistenceCommitResponse> {
+    const run = this.commitTail.then(() => this.commitInOrder(request, versions));
+
+    // The caller receives the outcome through `run`; the tail only orders the next commit.
+    this.commitTail = run.then(
+      () => undefined,
+      () => undefined,
+    );
+
+    return run;
+  }
+
+  private async commitInOrder(
     request: PersistenceCommitRequest,
     versions: readonly (readonly DocumentOp[])[],
   ): Promise<PersistenceCommitResponse> {
@@ -184,6 +222,17 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
       };
     }
 
+    const journal = document.journal;
+    if (journal && request.authorId === undefined) {
+      throw new PersistenceError(
+        "commit-rejected",
+        "Recorded history needs the author of each commit",
+      );
+    }
+
+    const committedAt = Math.max(Date.now(), document.lastCommitAt);
+    const version = document.version + versions.length;
+
     // Everything that can fail runs before the store changes or inside the
     // rollback-protected block, so a failed commit changes nothing.
     const entries: VersionedOperation[] = versions.map((operations, index) => ({
@@ -191,6 +240,8 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
       operations: cloneJsonValue(operations),
       clientMutationId: request.clientMutationId,
       ...(versions.length > 1 ? { batch: { index, count: versions.length } } : {}),
+      ...(request.authorId !== undefined ? { authorId: request.authorId } : {}),
+      ...(journal ? { committedAt } : {}),
     }));
     // Built before the rollback-protected block: a failed build changes nothing.
     document.store ??= SheetwriteStore.fromSnapshot(document.initial);
@@ -210,20 +261,39 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
         }
       }
       throwIfAborted(request.signal);
+
+      // Last step that can fail: once the journal holds the commit, it is published.
+      if (journal && request.authorId !== undefined) {
+        await journal.record(
+          {
+            baseRevision: document.version,
+            revision: version,
+            mutationId: request.clientMutationId,
+            authorId: request.authorId,
+            time: committedAt,
+            operations: versions.flat(),
+          },
+          () => ({ ...store.exportSnapshot(), version }),
+        );
+      }
     } catch (error) {
       // A rejected transaction leaves the store unchanged, but an earlier
       // member of a batch, an abort, or an unexpected failure may not. Rebuild
       // the last committed state so a failed commit changes nothing.
       restoreCommittedStore(document);
       if (error instanceof PersistenceError) throw error;
-      throw new PersistenceError("commit-rejected", "Persistence commit could not be applied", {
-        cause: error,
-      });
+      throw new PersistenceError(
+        "commit-rejected",
+        "Persistence commit could not be applied or recorded",
+        { cause: error },
+      );
     }
-    const version = document.version + versions.length;
+
     document.applied.set(request.clientMutationId, version);
     document.log.push(...entries);
     document.version = version;
+    document.lastCommitAt = committedAt;
+
     return {
       status: "applied",
       version,

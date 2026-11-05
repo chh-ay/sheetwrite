@@ -1,5 +1,6 @@
 import { atomicBatchLimits, isAtomicBatch } from "./atomic-batch.js";
 import { chartSourceRanges } from "./chart-definition.js";
+import { cloneRelationship, cloneRelationships } from "./data-model.js";
 import {
   assertWorkbookAllocationLimits,
   DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
@@ -42,6 +43,7 @@ import { setTransactionStorageRevision } from "./transaction-admission.js";
 import { preparedRestore, TransactionPreparation } from "./transaction-preparation.js";
 import type { CellScalar, Column } from "./types/cell.js";
 import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
+import type { RelationshipStatus, TableRelationship } from "./types/data-model.js";
 import type { AggregateOp, ColumnarData, DataSourceColumnBand, RowData } from "./types/data.js";
 import type {
   ColumnFilter,
@@ -336,6 +338,37 @@ export class SheetwriteStore implements Store {
     return this.engine.getPivotResult(sheet, id);
   }
 
+  /** Clones of the workbook's table relationships; readable without the engine. */
+  getRelationships(): TableRelationship[] {
+    return cloneRelationships(this.engine.getWorkbook().dataModel);
+  }
+
+  /**
+   * Whether the keys of the relationship with `id` resolve, checked now from
+   * the cell values. The default engine checks no keys and reports
+   * `unavailable`, as it does for an unknown ID.
+   */
+  getRelationshipStatus(id: string): RelationshipStatus {
+    return this.engine.getRelationshipStatus(id);
+  }
+
+  /**
+   * Insert a relationship, or replace the one with its ID. Both columns must
+   * exist, at most one relationship may join two tables, and relationships
+   * must not form a cycle; otherwise the result is a no-op.
+   */
+  setRelationship(relationship: TableRelationship): ApplyTransactionResult {
+    return this.applyTransaction(
+      { patches: [{ op: "setRelationship", relationship: cloneRelationship(relationship) }] },
+      "api",
+    );
+  }
+
+  /** Remove the relationship with `id`. */
+  removeRelationship(id: string): ApplyTransactionResult {
+    return this.applyTransaction({ patches: [{ op: "removeRelationship", id }] }, "api");
+  }
+
   getRangeMutationAllocationStats(): RangeMutationAllocationStats {
     return this.engine.getRangeMutationAllocationStats();
   }
@@ -512,6 +545,52 @@ export class SheetwriteStore implements Store {
       },
       "structure",
     );
+  }
+
+  /**
+   * Sort the rows of `range` in place, as Excel's Sort does: cells move with
+   * their row in one undoable transaction, and formulas follow Excel's
+   * rules for sorted rows. Hidden and filtered-out rows keep their place.
+   * With `hasHeader`, the first row of `range` stays. A sort that would
+   * move part of a merged cell or spill range is rejected.
+   *
+   * @example
+   * ```ts
+   * import type { SheetwriteStore } from "@sheetwrite/core";
+   *
+   * function sortByRevenue(store: SheetwriteStore) {
+   *   return store.sortRange(
+   *     { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 99, col: 3 } },
+   *     [{ col: 2, ascending: false }],
+   *     { hasHeader: true },
+   *   );
+   * }
+   * ```
+   */
+  sortRange(
+    range: Range,
+    keys: readonly SortKey[],
+    options: { hasHeader?: boolean } = {},
+  ): ApplyTransactionResult {
+    this.requireCompleteQuery(range.sheet);
+    const plan = this.engine.sortRangePlan(range, keys, options.hasHeader ?? false);
+    if (plan.kind === "unchanged") return { status: "noop", epoch: this.epoch, reason: "empty" };
+    if (plan.kind === "refused") {
+      return {
+        status: "rejected",
+        epoch: this.epoch,
+        issues: [
+          {
+            kind: "invalid-operation",
+            severity: "error",
+            operationIndex: 0,
+            message: plan.message,
+          },
+        ],
+      };
+    }
+
+    return this.applyTransaction({ patches: [plan.operation] }, "sort");
   }
 
   setColumnFilter(

@@ -15,6 +15,7 @@ import {
   MAX_CONDITIONAL_FORMAT_FORMULA_LENGTH,
   MAX_CONDITIONAL_FORMAT_RULES,
 } from "./conditional-format.js";
+import { validateDataModelShape, validateRelationshipShape } from "./data-model.js";
 import { boundedJsonByteLength, JsonByteLengthError, SheetwriteError } from "./errors.js";
 import {
   cloneCellHyperlink,
@@ -31,7 +32,9 @@ import {
   validatePivotReferences,
   validatePivotShape,
 } from "./pivot.js";
-import { compareCodeUnits } from "./plain-data.js";
+import { compareCodeUnits, isPlainRecord, ownValue, type PlainRecord } from "./plain-data.js";
+import { ROW_ORDER_ENCODING } from "./row-order.js";
+import { validateSavedQueriesShape, validateSavedQueryShape } from "./saved-query.js";
 import { preparedRestore } from "./transaction-preparation.js";
 import type { MergeRange, Range } from "./types/coordinates.js";
 import type {
@@ -473,8 +476,6 @@ export class SnapshotValidationError extends SheetwriteError {
   }
 }
 
-type PlainRecord = Record<string, unknown>;
-
 interface JsonSafetyIssue {
   path: string;
   code: "non-serializable" | "resource-limit";
@@ -524,20 +525,6 @@ function nonNegativeInteger(value: unknown): value is number {
 
 function finiteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
-}
-
-function isPlainRecord(value: unknown): value is PlainRecord {
-  return (
-    value !== null &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
-    Object.getPrototypeOf(value) === Object.prototype
-  );
-}
-
-function ownValue(record: PlainRecord, key: string): unknown {
-  const descriptor = Object.getOwnPropertyDescriptor(record, key);
-  return descriptor?.enumerable && "value" in descriptor ? descriptor.value : undefined;
 }
 
 function childPath(path: string, key: string): string {
@@ -2401,6 +2388,17 @@ export function validateDocumentOperationShape(
       optionalBoolean(operation, "style", path, errors);
       break;
 
+    case "permuteRows":
+      validateRangeShape(ownValue(operation, "range"), `${path}.range`, errors);
+      if (ownValue(operation, "encoding") !== ROW_ORDER_ENCODING) {
+        invalid(errors, `${path}.encoding`, "Row order encoding is invalid");
+      }
+
+      if (typeof ownValue(operation, "order") !== "string") {
+        invalid(errors, `${path}.order`, "Row order must be a string");
+      }
+      break;
+
     case "addRows":
     case "removeRows":
       validateOperationSheetId(operation, path, errors);
@@ -2638,6 +2636,26 @@ export function validateDocumentOperationShape(
 
     case "setCalculation":
       validateCalculationShape(ownValue(operation, "calculation"), `${path}.calculation`, errors);
+      break;
+
+    case "setRelationship":
+      validateRelationshipShape(
+        ownValue(operation, "relationship"),
+        `${path}.relationship`,
+        errors,
+      );
+      break;
+
+    case "removeRelationship":
+      requireString(operation, "id", path, errors, true);
+      break;
+
+    case "setQuery":
+      validateSavedQueryShape(ownValue(operation, "query"), `${path}.query`, errors);
+      break;
+
+    case "removeQuery":
+      requireString(operation, "id", path, errors, true);
       break;
 
     case "setChart":
@@ -3162,6 +3180,16 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
     const calculation = ownValue(workbook, "calculation");
     if (calculation !== undefined) {
       validateCalculationShape(calculation, "workbook.calculation", errors);
+    }
+
+    const dataModel = ownValue(workbook, "dataModel");
+    if (dataModel !== undefined) {
+      validateDataModelShape(dataModel, "workbook.dataModel", errors);
+    }
+
+    const queries = ownValue(workbook, "queries");
+    if (queries !== undefined) {
+      validateSavedQueriesShape(queries, "workbook.queries", errors);
     }
   }
 
@@ -3704,6 +3732,7 @@ export function documentOpTarget(operation: DocumentOp): string {
     case "restoreBlock":
     case "setRangeStyle":
     case "clearRange":
+    case "permuteRows":
       return operation.range.sheet;
 
     case "addTable":
@@ -3749,6 +3778,18 @@ export function documentOpTarget(operation: DocumentOp): string {
 
     case "setCalculation":
       return "calculation";
+
+    case "setRelationship":
+      return `relationship:${operation.relationship.id}`;
+
+    case "removeRelationship":
+      return `relationship:${operation.id}`;
+
+    case "setQuery":
+      return `query:${operation.query.id}`;
+
+    case "removeQuery":
+      return `query:${operation.id}`;
 
     default: {
       const exhaustive: never = operation;
