@@ -445,8 +445,8 @@
     grid-column: 1 / -1;
   }
 
-  /* Seven or more ticks crowd a phone axis: keep every other label. */
-  .perf-bars__axis:is([data-ticks="7"], [data-ticks="8"], [data-ticks="9"])
+  /* Six or more ticks crowd a phone axis: keep every other label. */
+  .perf-bars__axis:is([data-ticks="6"], [data-ticks="7"], [data-ticks="8"], [data-ticks="9"])
     .perf-bars__tick:nth-child(even):not([data-edge]) {
     visibility: hidden;
   }

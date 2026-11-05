@@ -157,9 +157,11 @@ function barValue(value: number, figure: PerfFigure): string {
   return figure.unit === "ratio" && figure.ratioWord ? `${text} ${escapeHtml(figure.ratioWord)}` : text;
 }
 
+/** A signed change with one decimal below 10%, whole percents above: "−75%", "+4.2%". */
 function formatPercent(fraction: number): string {
   const percent = fraction * 100;
-  const magnitude = Math.abs(percent);
+  // Decide the decimals on the rounded value, so 9.96% reads "10%", not "10.0%".
+  const magnitude = Math.round(Math.abs(percent) * 10) / 10;
   const digits = magnitude < 10 ? 1 : 0;
   const text = grouped(magnitude, digits);
   if (text === grouped(0, digits)) return "0%";
@@ -263,7 +265,7 @@ function logAxis(values: readonly number[], unit: PerfUnit): Axis {
     const exponent = low + index;
     return { at: (index / decades) * 100, label: logTickLabel(10 ** exponent, unit) };
   });
-  return { at, ticks, note: "Log scale, each step 10×" };
+  return { at, ticks, note: "Log scale: each step is 10×" };
 }
 
 /** A round step for a linear axis: 1, 2 or 5 times a power of ten. */
@@ -285,7 +287,7 @@ function linearAxis(values: readonly number[], unit: PerfUnit): Axis {
     at: (index / count) * 100,
     label: index === 0 ? "0" : formatPerfValue(step * index, unit),
   }));
-  return { at, ticks, note: "Linear scale" };
+  return { at, ticks, note: "Linear scale from 0" };
 }
 
 function clampPercent(value: number): number {
@@ -294,6 +296,16 @@ function clampPercent(value: number): number {
 
 function percent(value: number): string {
   return `${clampPercent(value).toFixed(2)}%`;
+}
+
+/** "19.6–23.5 ms": a range names its unit once when both ends share it. */
+function formatRange(low: number, high: number, unit: PerfUnit): string {
+  const lowText = formatPerfValue(low, unit);
+  const highText = formatPerfValue(high, unit);
+  const suffix = /(\s\S+|×)$/u.exec(highText)?.[1];
+  return suffix !== undefined && lowText.endsWith(suffix)
+    ? `${lowText.slice(0, -suffix.length)}–${highText}`
+    : `${lowText}–${highText}`;
 }
 
 const UNIT_NAMES: Readonly<Record<PerfUnit, string>> = {
@@ -333,9 +345,7 @@ function barMarkup(bar: PerfBar, axis: Axis, figure: PerfFigure): string {
           axis.at(spread[1]) - axis.at(spread[0]),
         )}"></i>`;
   const spreadText =
-    spread === undefined
-      ? ""
-      : `<small>${formatPerfValue(spread[0], figure.unit)}–${formatPerfValue(spread[1], figure.unit)}</small>`;
+    spread === undefined ? "" : `<small>${formatRange(spread[0], spread[1], figure.unit)}</small>`;
   return (
     `<div class="perf-bars__bar" data-role="${bar.role}">` +
     label +
@@ -360,7 +370,7 @@ function rowMarkup(row: PerfRow, axis: Axis, figure: PerfFigure, icon: PerfIconM
   ].join("");
 }
 
-function axisMarkup(axis: Axis, figure: PerfFigure): string {
+function axisMarkup(axis: Axis): string {
   const ticks = axis.ticks
     .map(
       (tick, index) =>
@@ -371,7 +381,7 @@ function axisMarkup(axis: Axis, figure: PerfFigure): string {
     .join("");
   return (
     `<div class="perf-bars__axis" aria-hidden="true" data-ticks="${axis.ticks.length}">` +
-    `<span class="perf-bars__axis-title">${escapeHtml(figure.title)} · ${axis.note}</span>` +
+    `<span class="perf-bars__axis-title">${axis.note}</span>` +
     `<span class="perf-bars__scale">${ticks}</span>` +
     "</div>"
   );
@@ -437,7 +447,7 @@ function tableMarkup(figure: PerfFigure): string {
           hasSeries ? `<td>${escapeHtml(bar.label)}</td>` : "",
           `<td>${bar.stat ? barValue(bar.stat.value, figure) : escapeHtml(bar.missing ?? "Did not complete")}</td>`,
           hasSpread
-            ? `<td>${bar.stat?.spread ? `${formatPerfValue(bar.stat.spread[0], figure.unit)}–${formatPerfValue(bar.stat.spread[1], figure.unit)}` : ""}</td>`
+            ? `<td>${bar.stat?.spread ? formatRange(bar.stat.spread[0], bar.stat.spread[1], figure.unit) : ""}</td>`
             : "",
           hasComparison
             ? index === 0
@@ -480,7 +490,7 @@ export function renderPerfBars(figure: PerfFigure, icon: PerfIconMarkup): string
       // Ticks are evenly spaced on both scales, so the tracks draw them as one repeating gridline.
       `<section class="perf-bars__group"${group.machine ? ` data-machine="${group.machine}"` : ""} style="--perf-steps:${axis.ticks.length - 1}">`,
       groupHeading(group, icon),
-      axisMarkup(axis, figure),
+      axisMarkup(axis),
       `<ul class="perf-bars__rows">${group.rows.map((row) => rowMarkup(row, axis, figure, icon)).join("")}</ul>`,
       "</section>",
     );

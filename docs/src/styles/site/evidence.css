@@ -911,6 +911,11 @@
   display: none;
 }
 
+/* The tabs sit right above the figure they switch. */
+.bench-panel > .perf-bars {
+  margin-top: 0;
+}
+
 /* Active tab + visible panel wiring; inputs precede everything they select. */
 #bench-size-1000:checked ~ .bench-widget__tabs label[for="bench-size-1000"],
 #bench-size-10000:checked ~ .bench-widget__tabs label[for="bench-size-10000"],

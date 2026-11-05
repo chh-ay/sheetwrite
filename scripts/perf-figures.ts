@@ -15,7 +15,7 @@ import {
   renderPerfBars,
 } from "../docs/src/lib/perf-bars.js";
 import { repositoryRoot } from "./docs-shared.js";
-import { formatCaptureTime } from "./evidence-format.js";
+import { formatCaptureTime, html, provenanceList, shortHash } from "./evidence-format.js";
 
 /** Bars as static HTML for a Markdown page; icons are inlined, so the figure needs no JavaScript. */
 export function perfFigure(figure: PerfFigure): string {
@@ -29,6 +29,8 @@ export interface CaptureMachine {
   readonly directory: string;
   /** "Linux · x86-64 · 12th Gen Intel Core i9-12900H". */
   readonly label: string;
+  /** What `bench:release:machine` recorded; the Linux release machine has none. */
+  readonly manifest?: MachineCaptureManifest;
 }
 
 /** The Linux release machine's captures are the committed `bench/results` evidence. */
@@ -36,9 +38,22 @@ const LINUX_DIRECTORY = "bench/results";
 /** Other machines capture the same release with `bench:release:machine`. */
 const MAC_DIRECTORY = "bench/results/machines/mac";
 
+/** `capture.json`, as `bench/src/machine-capture.ts` writes it. */
 interface MachineCaptureManifest {
   readonly protocol: string;
-  readonly machine: { readonly cpu: string; readonly os: string; readonly arch: string };
+  readonly machine: {
+    readonly cpu: string;
+    readonly os: string;
+    readonly arch: string;
+    readonly logicalCores: number;
+    readonly memoryBytes: number;
+    readonly bun: string;
+  };
+  readonly release: string;
+  readonly commit: string;
+  readonly startedAt: string;
+  readonly finishedAt: string;
+  readonly command: string;
 }
 
 interface CaptureScopeReceipt {
@@ -78,9 +93,42 @@ export function captureMachines(): readonly CaptureMachine[] {
       machine: "mac",
       directory: MAC_DIRECTORY,
       label: `Mac · Apple Silicon · ${cpuName(mac.machine.cpu)}`,
+      manifest: mac,
     });
   }
   return machines;
+}
+
+const GIB = 1024 ** 3;
+
+/** How each machine other than the release machine was captured, for the Capture section. */
+export function machineCaptureLines(machines: readonly CaptureMachine[]): string[] {
+  return machines.flatMap(({ label, directory, manifest }) =>
+    manifest === undefined
+      ? []
+      : [
+          `### ${label}`,
+          "",
+          `These captures measure release ${html(manifest.release)} on a second machine. They sit beside the release machine's results in their own groups and are never compared with them.`,
+          "",
+          ...provenanceList([
+            ["Release", `${html(manifest.release)} · ${shortHash(manifest.commit)} clean checkout`],
+            ["Captured", `${formatCaptureTime(manifest.startedAt)} → ${formatCaptureTime(manifest.finishedAt)} UTC`],
+            [
+              "Machine",
+              `${html(manifest.machine.cpu)} · ${manifest.machine.logicalCores} cores · ${Math.round(manifest.machine.memoryBytes / GIB)} GiB · ${html(manifest.machine.os)} · Bun ${html(manifest.machine.bun)}`,
+            ],
+            ["Artifacts", `<code>${html(directory)}/</code>`],
+          ]),
+          "",
+          "Reproduce with:",
+          "",
+          '```sh title="Release capture on another machine"',
+          manifest.command,
+          "```",
+          "",
+        ],
+  );
 }
 
 /** A capture validated on one machine. */
