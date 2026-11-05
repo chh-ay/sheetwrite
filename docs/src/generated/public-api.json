@@ -9509,6 +9509,266 @@
       ]
     },
     {
+      "name": "@sheetwrite/queries",
+      "entryPoints": [
+        {
+          "subpath": ".",
+          "target": "./dist/index.d.ts",
+          "source": "src/index.ts",
+          "kind": "typescript",
+          "classification": "supported",
+          "exports": [
+            {
+              "name": "loadQueryEngine",
+              "kind": "function",
+              "signature": "(options?: QueryEngineOptions): Promise<QueryEngine>",
+              "owners": [
+                "src/index.ts"
+              ],
+              "source": "src/index.ts#L48",
+              "jsDocTags": [
+                "example"
+              ],
+              "documentation": "Importing this package loads no WASM; only this explicit call loads query execution.\n@example\n```ts\nimport { loadQueryEngine } from \"@sheetwrite/queries\";\n\nasync function selectLargeTotals() {\n  const engine = await loadQueryEngine();\n  const source = engine.parse(\n    new TextEncoder().encode('[{\"Total\":120},{\"Total\":75}]'),\n    { format: \"json\", columns: [{ id: \"total\", name: \"Total\", type: \"number\" }] },\n  );\n\n  return engine.execute(source, [\n    { kind: \"filter\", predicate: { kind: \"compare\", column: \"total\", op: \"gte\", value: 100 } },\n  ]);\n}\n```",
+              "memberDocs": []
+            },
+            {
+              "name": "QueryAggregate",
+              "kind": "interface",
+              "signature": "export interface QueryAggregate { readonly id: string; readonly name: string; readonly op: \"countRows\" | \"count\" | \"sum\" | \"average\" | \"min\" | \"max\"; readonly column?: string; }",
+              "owners": [
+                "src/types.ts"
+              ],
+              "source": "src/types.ts#L69",
+              "jsDocTags": [],
+              "documentation": "Column is required except for countRows; numeric aggregates ignore nulls.",
+              "memberDocs": []
+            },
+            {
+              "name": "QueryBatch",
+              "kind": "interface",
+              "signature": "export interface QueryBatch { readonly rowCount: number; readonly columns: readonly QueryColumn[]; }",
+              "owners": [
+                "src/types.ts"
+              ],
+              "source": "src/types.ts#L144",
+              "jsDocTags": [],
+              "documentation": "Equal-length columns with a u32 row count; returned buffers are owned by the caller.",
+              "memberDocs": []
+            },
+            {
+              "name": "QueryColumn",
+              "kind": "type",
+              "signature": "export type QueryColumn = ColumnState & ( | { readonly type: \"number\"; readonly values: Float64Array } | { readonly type: \"logical\"; readonly values: Uint8Array } | { readonly type: \"text\"; readonly bytes: Uint8Array; readonly offsets: Uint32Array } | { readonly type: \"date\"; readonly values: Int32Array } | { readonly type: \"dateTime\"; readonly values: BigInt64Array } | ({ readonly type: \"mixed\" } & QueryMixedLanes) );",
+              "owners": [
+                "src/types.ts"
+              ],
+              "source": "src/types.ts#L133",
+              "jsDocTags": [],
+              "documentation": "Typed host buffers; validity and sparse error lanes preserve null/error distinctions.",
+              "memberDocs": []
+            },
+            {
+              "name": "QueryColumnSpec",
+              "kind": "interface",
+              "signature": "export interface QueryColumnSpec { readonly id: string; readonly name: string; readonly type: QueryColumnType; }",
+              "owners": [
+                "src/types.ts"
+              ],
+              "source": "src/types.ts#L5",
+              "jsDocTags": [],
+              "documentation": "Stable identity is separate from the field name used by source records.",
+              "memberDocs": []
+            },
+            {
+              "name": "QueryColumnType",
+              "kind": "type",
+              "signature": "export type QueryColumnType = \"number\" | \"logical\" | \"text\" | \"date\" | \"dateTime\" | \"mixed\";",
+              "owners": [
+                "src/types.ts"
+              ],
+              "source": "src/types.ts#L2",
+              "jsDocTags": [],
+              "documentation": "Physical column types; mixed columns use compact typed payload lanes.",
+              "memberDocs": []
+            },
+            {
+              "name": "QueryDiagnostic",
+              "kind": "interface",
+              "signature": "export interface QueryDiagnostic { readonly code: string; readonly step: number | null; readonly column: string | null; readonly row: number | null; }",
+              "owners": [
+                "src/types.ts"
+              ],
+              "source": "src/types.ts#L22",
+              "jsDocTags": [],
+              "documentation": "A stable failure code and optional coordinates, without source values or credentials.",
+              "memberDocs": []
+            },
+            {
+              "name": "QueryEngine",
+              "kind": "interface",
+              "signature": "export interface QueryEngine { parse(bytes: Uint8Array, source: QuerySource, limits?: Partial<QueryLimits>): QueryBatch; execute( source: QueryBatch, steps: readonly QueryStep[], inputs?: readonly QueryInput[], limits?: Partial<QueryLimits>, ): QueryBatch; }",
+              "owners": [
+                "src/types.ts"
+              ],
+              "source": "src/types.ts#L156",
+              "jsDocTags": [],
+              "documentation": "Rust performs parsing and every step; this interface does no source fetching.",
+              "memberDocs": [
+                {
+                  "name": "execute",
+                  "documentation": "Execute an ordered plan; cell errors stay in the typed output buffers."
+                },
+                {
+                  "name": "parse",
+                  "documentation": "Parse host-provided bytes; fatal failures throw QueryError."
+                }
+              ]
+            },
+            {
+              "name": "QueryEngineOptions",
+              "kind": "interface",
+              "signature": "export interface QueryEngineOptions { readonly wasm?: SyncInitInput; }",
+              "owners": [
+                "src/index.ts"
+              ],
+              "source": "src/index.ts#L23",
+              "jsDocTags": [],
+              "documentation": "Hosts can provide the compiled artifact instead of using browser artifact loading.",
+              "memberDocs": [
+                {
+                  "name": "wasm",
+                  "documentation": "Compiled module or artifact bytes, as accepted by the generated bindings."
+                }
+              ]
+            },
+            {
+              "name": "QueryError",
+              "kind": "class",
+              "signature": "class QueryError extends SheetwriteError { constructor(diagnostic: QueryDiagnostic); code: \"invalid-argument\" | \"resource-limit\"; diagnostic: QueryDiagnostic; name: \"QueryError\" }",
+              "owners": [
+                "src/errors.ts"
+              ],
+              "source": "src/errors.ts#L8",
+              "jsDocTags": [],
+              "documentation": "Fatal source or plan failure; cell-level errors stay in the returned column lanes.",
+              "memberDocs": [
+                {
+                  "name": "new",
+                  "documentation": "Diagnostic codes remain stable even when their human-readable context changes."
+                }
+              ]
+            },
+            {
+              "name": "QueryInput",
+              "kind": "interface",
+              "signature": "export interface QueryInput { readonly id: string; readonly batch: QueryBatch; }",
+              "owners": [
+                "src/types.ts"
+              ],
+              "source": "src/types.ts#L150",
+              "jsDocTags": [],
+              "documentation": "One execution-local named input, consumed by join steps without a result cache.",
+              "memberDocs": []
+            },
+            {
+              "name": "QueryJoinKind",
+              "kind": "type",
+              "signature": "export type QueryJoinKind = | \"inner\" | \"left\" | \"right\" | \"full\" | \"leftSemi\" | \"rightSemi\" | \"leftAnti\" | \"rightAnti\";",
+              "owners": [
+                "src/types.ts"
+              ],
+              "source": "src/types.ts#L58",
+              "jsDocTags": [],
+              "documentation": "Join kinds retain duplicate matches and match null keys to null keys.",
+              "memberDocs": []
+            },
+            {
+              "name": "QueryLimits",
+              "kind": "interface",
+              "signature": "export interface QueryLimits { readonly maxRows: number; readonly maxCells: number; readonly maxSourceBytes: number; readonly maxOutputBytes: number; readonly maxSteps: number; }",
+              "owners": [
+                "src/types.ts"
+              ],
+              "source": "src/types.ts#L12",
+              "jsDocTags": [],
+              "documentation": "Per-execution ceilings; expanding operations reject output before allocation.",
+              "memberDocs": [
+                {
+                  "name": "maxOutputBytes",
+                  "documentation": "Conservative cell payload budget across all columns, checked before each append."
+                }
+              ]
+            },
+            {
+              "name": "QueryMixedLanes",
+              "kind": "interface",
+              "signature": "export interface QueryMixedLanes { readonly tags: Uint8Array; readonly indexes: Uint32Array; readonly numbers: Float64Array; readonly logical: Uint8Array; readonly text: Uint8Array; readonly offsets: Uint32Array; readonly dates: Int32Array; readonly dateTimes: BigInt64Array; }",
+              "owners": [
+                "src/types.ts"
+              ],
+              "source": "src/types.ts#L119",
+              "jsDocTags": [],
+              "documentation": "The tag selects a compact lane; indexes address that lane or the error-code pool.",
+              "memberDocs": [
+                {
+                  "name": "indexes",
+                  "documentation": "Index in the typed lane selected by the row's tag."
+                },
+                {
+                  "name": "tags",
+                  "documentation": "0 = null, 1 = number, 2 = logical, 3 = text, 4 = date, 5 = dateTime, 6 = error."
+                }
+              ]
+            },
+            {
+              "name": "QueryPredicate",
+              "kind": "type",
+              "signature": "export type QueryPredicate = | { readonly kind: \"compare\"; readonly column: string; readonly op: \"eq\" | \"neq\" | \"lt\" | \"lte\" | \"gt\" | \"gte\"; readonly value: string | number | boolean | null; } | { readonly kind: \"isNull\"; readonly column: string } | { readonly kind: \"contains\"; readonly column: string; readonly text: string } | { readonly kind: \"and\" | \"or\"; readonly predicates: readonly QueryPredicate[] } | { readonly kind: \"not\"; readonly predicate: QueryPredicate };",
+              "owners": [
+                "src/types.ts"
+              ],
+              "source": "src/types.ts#L45",
+              "jsDocTags": [],
+              "documentation": "Data-only predicate trees use M null logic; only logical true selects a row.",
+              "memberDocs": []
+            },
+            {
+              "name": "QuerySource",
+              "kind": "type",
+              "signature": "export type QuerySource = | { readonly format: \"json\"; readonly columns: readonly QueryColumnSpec[]; readonly path?: readonly string[]; } | { readonly format: \"csv\"; readonly columns: readonly QueryColumnSpec[]; readonly delimiter?: number; readonly headers?: boolean; readonly emptyIsNull?: boolean; };",
+              "owners": [
+                "src/types.ts"
+              ],
+              "source": "src/types.ts#L30",
+              "jsDocTags": [],
+              "documentation": "Host-owned UTF-8 bytes are parsed against an explicit schema, without type guessing.",
+              "memberDocs": []
+            },
+            {
+              "name": "QueryStep",
+              "kind": "type",
+              "signature": "export type QueryStep = | { readonly kind: \"filter\"; readonly predicate: QueryPredicate } | { readonly kind: \"select\"; readonly columns: readonly string[] } | { readonly kind: \"rename\"; readonly columns: readonly (readonly [id: string, name: string])[] } | { readonly kind: \"changeType\"; readonly column: string; readonly type: QueryColumnType; readonly onError: \"error\" | \"null\"; } | { readonly kind: \"join\"; readonly input: string; readonly keys: readonly (readonly [left: string, right: string])[]; readonly join: QueryJoinKind; } | { readonly kind: \"group\"; readonly keys: readonly string[]; readonly aggregates: readonly QueryAggregate[]; } | { readonly kind: \"unpivot\"; readonly columns: readonly string[]; readonly attribute: { readonly id: string; readonly name: string }; readonly value: { readonly id: string; readonly name: string }; };",
+              "owners": [
+                "src/types.ts"
+              ],
+              "source": "src/types.ts#L77",
+              "jsDocTags": [],
+              "documentation": "Saved step order is execution order; each column reference is a stable identity.",
+              "memberDocs": []
+            }
+          ]
+        },
+        {
+          "subpath": "./wasm",
+          "target": "./pkg/sheetwrite_queries_bg.wasm",
+          "kind": "asset",
+          "classification": "asset",
+          "exports": []
+        }
+      ]
+    },
+    {
       "name": "@sheetwrite/react",
       "entryPoints": [
         {

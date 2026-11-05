@@ -11,6 +11,7 @@ dist/
 target/
 packages/wasm/pkg/
 packages/formulas/pkg/
+packages/queries/pkg/
 # Copied from packages/wasm by the formulas build (scripts/wasm-factory.ts).
 packages/formulas/loader*.mjs
 

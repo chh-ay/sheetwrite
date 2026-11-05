@@ -35,6 +35,7 @@ export type SyncInitInput = BufferSource | WebAssembly.Module;
 
 <ul class="api-consumer-list">
 <li><a href="/docs/api/formulas/init-sync/"><code>initSync</code></a><span class="api-consumer-kind">@sheetwrite/formulas</span></li>
+<li><a href="/docs/api/queries/query-engine-options/"><code>QueryEngineOptions</code></a><span class="api-consumer-kind">@sheetwrite/queries</span></li>
 <li><a href="/docs/api/wasm/init-sync/"><code>initSync</code></a><span class="api-consumer-kind">@sheetwrite/wasm</span></li>
 </ul>
 </div>
