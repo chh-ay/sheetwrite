@@ -18,6 +18,9 @@ export type SheetwriteErrorCode =
   | "xlsx-resource-limit"
   | "resource-limit"
   | "invalid-snapshot"
+  | "invalid-history"
+  | "capacity"
+  | "integrity"
   | "invalid-argument"
   | "aborted"
   | "not-found"
@@ -79,6 +82,9 @@ export const SHEETWRITE_ERROR_CODES = [
   "xlsx-resource-limit",
   "resource-limit",
   "invalid-snapshot",
+  "invalid-history",
+  "capacity",
+  "integrity",
   "invalid-argument",
   "aborted",
   "not-found",
@@ -143,6 +149,7 @@ export type SheetwriteErrorOperation =
   | "snapshot-allocate"
   | "persistence"
   | "pending-storage"
+  | "history"
   | "synchronize"
   | "presence"
   | "revision"
@@ -179,6 +186,7 @@ export const SHEETWRITE_ERROR_OPERATIONS = [
   "snapshot-allocate",
   "persistence",
   "pending-storage",
+  "history",
   "synchronize",
   "presence",
   "revision",

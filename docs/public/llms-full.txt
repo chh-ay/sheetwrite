@@ -4976,6 +4976,92 @@ Document snapshots include workbook and sheet data, formula source, formatting, 
 
 Session state never belongs in a snapshot: selection, scroll position, caret state, search overlays and temporary highlights, host read-only policy, local zoom, and session-only grid options such as `renderer` and `readOnly`.
 
+## Opt-in version archives
+
+Import `HistoryArchive` and `MemoryHistoryStorage` from `@sheetwrite/core/history`.
+For durable browser storage, import `IndexedDbHistoryStorage` from
+`@sheetwrite/core/browser/history`. Neither entrypoint is loaded by a normal grid.
+The archive is a headless storage module. It does not add grid commands.
+
+Open an archive with a stable `documentId` and storage adapter. Call `initialize`
+once with a fully loaded, committed `WorkbookSnapshot` and its creation time.
+On restart, `HistoryArchive.open` reads only the durable recorder cursor.
+
+Pass each **committed**, ordered transaction to `record`. A `HistoryCommit` carries
+`baseRevision`, `revision`, `mutationId`, `authorId`, `time`, and `operations`.
+Do not record optimistic grid change events. The document authority must confirm
+the revision and author first. A local persistence adapter can be the authority
+for a standalone workbook. This module does not replace `SyncCoordinator` or the
+durable pending queue.
+
+The second argument to `record` is a snapshot provider. It runs only when a
+checkpoint is due. It must return the complete committed document at the incoming
+revision, including matching `documentId` and `version`. A grid snapshot still
+needs its confirmed persistence revision attached by the host.
+
+| Archive call | Behavior |
+| --- | --- |
+| `initialize(snapshot, time, signal?)` | Atomically publish the initial checkpoint. |
+| `record(commit, captureSnapshot?, signal?)` | Append one confirmed transaction; create a checkpoint and automatic marker when due. |
+| `saveVersion(name, authorId, time, signal?)` | Name the durable head without copying the workbook. Flush pending edits before calling it. |
+| `listVersions({ maxEntries?, maxBytes?, cursor?, signal? })` | Read bounded metadata, newest first. A new publication invalidates an old cursor. |
+| `readVersion(id, signal?)` | Rebuild the document of one version. When the version has log entries after its checkpoint, replay runs in a separate engine instance that is retired before the call returns or rejects, so the document engine's memory does not grow. Starting that instance reuses the compiled module. |
+| `prune({ beforeTime?, targetBytes?, signal? })` | Remove eligible automatic markers and unreachable records. Keep named markers. |
+| `deleteVersion(id, signal?)` | Explicitly remove one marker. Keep chunks another version or reader still needs. |
+| `storageUsage(signal?)` | Read retained encoded bytes and record/marker counts. This is not a JS heap estimate. |
+
+### Chunks and limits
+
+Checkpoints contain references to per-sheet records, fixed **16-row by 4-column**
+cell pages, and separate metadata blocks. Large metadata arrays use 128-entry
+blocks. Content IDs include the schema, encoding, references, and compressed
+payload. Unchanged pages are shared across checkpoints. SHA-256 verification and
+bounded inflate run before replay.
+
+An automatic marker is made after five active minutes with committed edits.
+A checkpoint is due after 30 active minutes, 1,000 transactions, or 2 MiB of log.
+No history timer or workbook-sized version cache runs in the background.
+
+The defaults are a 64 MiB encoded snapshot ceiling, 1 MiB decoded log segments,
+64 MiB per atomic transaction, a 256 MiB working-set reservation, and 512 MiB
+retained storage per document. Snapshot capture uses a conservative reservation
+in addition to its encoded limit, so a large snapshot can reach the working-set
+limit first. Metadata pages contain at most 100 entries or 256 KiB. An atomic
+transaction can cross log segments, but replay never exposes a partial transaction.
+
+Automatic markers have a 30-day age ceiling and can expire earlier to meet the
+storage cap. Up to 100 named markers stay pinned until explicitly deleted.
+Pinned data or the current head exceeding capacity makes archiving fail; it does
+not delete named versions or discard pending document edits. The host can override
+storage, cadence, and retention limits through `HistoryArchiveOptions.limits`.
+
+### Implement a history storage adapter
+
+`HistoryStorageAdapter` has four asynchronous methods: `put`, `get`, `list`, and
+`prune`. Every request includes document identity, resolved ceilings, and an
+optional `AbortSignal`.
+
+- `put` publishes immutable chunk records, a head, and an optional marker in one
+transaction. Compare `expectedGeneration` before any publication. Dependencies
+precede their owners. A reader can also acquire or release a short-lived pin.
+- `get` returns a manifest, marker, or bounded payload. A pinned record read
+renews its five-minute lease. Expired leases fail rather than read pruned data.
+- `list` returns bounded marker metadata, filtered by revision interval, or
+metadata for a selected record kind. It never returns cell payloads.
+- `prune` compares the expected generation, removes eligible markers, and deletes
+records only when no head, marker, record, or active reader refers to them.
+
+Keep document commit and history journaling in one host database transaction or
+a durable transactional outbox when collaboration is connected. An in-page event
+listener alone is not a durable journal. The supplied memory adapter is session
+storage; the IndexedDB adapter uses atomic database transactions and closes its
+database connection after each request.
+
+`HistoryError` extends `SheetwriteError`. Its stable codes distinguish invalid
+history, generation conflicts, capacity, missing records, integrity, unavailable
+storage, blocked database open, and transaction failures. An abort rejects with
+the caller's `signal.reason`. It never publishes a partial marker.
+
 ## Large undo
 
 Undo of a large clear can be larger than one transaction allows. Sheetwrite 0.5.0 sends such a restore as one compressed `restoreBlock` operation. Your server must accept that operation before it accepts 0.5.0 clients. When even the compressed restore needs more than one server version, the Grid uses an atomic batch, which needs `commitBatch`. Without `commitBatch`, only that undo is rejected; everything else works. See [Large undo and atomic batches](https://www.sheetwrite.dev/docs/features/collaboration/#large-undo-and-atomic-batches).
@@ -14592,7 +14678,7 @@ Private-format MIME type used for rich Sheetwrite clipboard payloads.
 ##### `SHEETWRITE_ERROR_CODES` — variable
 
 ```ts
-readonly ["initialization-failed", "initialization-required", "engine-failed", "datasource-request-failed", "renderer-fallback", "export-failed", "xlsx-import-failed", "optional-backend-unavailable", "delimited-text-resource-limit", "delimited-text-invalid-limit", "xlsx-resource-limit", "resource-limit", "invalid-snapshot", "invalid-argument", "aborted", "not-found", "commit-rejected", "unavailable", "blocked", "quota", "unsupported-schema", "transaction", "conflict", "limit", "invalid-limits", "invalid-version", "invalid-id", "invalid-operations", "operation-limit", "payload-limit", "response-id-mismatch", "future-distance-limit", "buffer-count-limit", "buffer-operation-limit", "buffer-byte-limit", "pending-count-limit", "pending-operation-limit", "pending-byte-limit", "late-echo", "remote-operations-rejected", "invalid-batch", "batch-limit", "pending-capacity", "presence-failed", "revision-failed", "comment-failed", "sync-failed", "sync-storage-failed", "incomplete-data", "xlsx-invalid-options", "unsafe-hyperlink", "invalid-shortcut", "shortcut-conflict", "invalid-function"]
+readonly ["initialization-failed", "initialization-required", "engine-failed", "datasource-request-failed", "renderer-fallback", "export-failed", "xlsx-import-failed", "optional-backend-unavailable", "delimited-text-resource-limit", "delimited-text-invalid-limit", "xlsx-resource-limit", "resource-limit", "invalid-snapshot", "invalid-history", "capacity", "integrity", "invalid-argument", "aborted", "not-found", "commit-rejected", "unavailable", "blocked", "quota", "unsupported-schema", "transaction", "conflict", "limit", "invalid-limits", "invalid-version", "invalid-id", "invalid-operations", "operation-limit", "payload-limit", "response-id-mismatch", "future-distance-limit", "buffer-count-limit", "buffer-operation-limit", "buffer-byte-limit", "pending-count-limit", "pending-operation-limit", "pending-byte-limit", "late-echo", "remote-operations-rejected", "invalid-batch", "batch-limit", "pending-capacity", "presence-failed", "revision-failed", "comment-failed", "sync-failed", "sync-storage-failed", "incomplete-data", "xlsx-invalid-options", "unsafe-hyperlink", "invalid-shortcut", "shortcut-conflict", "invalid-function"]
 ```
 
 Every `SheetwriteErrorCode`, for hosts that list the codes at run time.
@@ -14602,7 +14688,7 @@ it does not contain it.
 ##### `SHEETWRITE_ERROR_OPERATIONS` — variable
 
 ```ts
-readonly ["initialize", "create-grid", "engine", "store", "transaction", "render", "datasource-request", "renderer-worker", "xlsx-import", "xlsx-export", "delimited-parse", "delimited-import", "delimited-encode", "delimited-export", "delimited-options", "snapshot-validate", "snapshot-allocate", "persistence", "pending-storage", "synchronize", "presence", "revision", "comment", "query", "row-bridge", "resource-diagnostics", "hyperlink-activate", "keyboard-configure", "chart-view", "host-function"]
+readonly ["initialize", "create-grid", "engine", "store", "transaction", "render", "datasource-request", "renderer-worker", "xlsx-import", "xlsx-export", "delimited-parse", "delimited-import", "delimited-encode", "delimited-export", "delimited-options", "snapshot-validate", "snapshot-allocate", "persistence", "pending-storage", "history", "synchronize", "presence", "revision", "comment", "query", "row-bridge", "resource-diagnostics", "hyperlink-activate", "keyboard-configure", "chart-view", "host-function"]
 ```
 
 Every `SheetwriteErrorOperation`, for hosts that list the operations at run
@@ -14632,7 +14718,7 @@ context strings, because both can quote host or file data.
 ##### `SheetwriteErrorCode` — type
 
 ```ts
-export type SheetwriteErrorCode = | "initialization-failed" | "initialization-required" | "engine-failed" | "datasource-request-failed" | "renderer-fallback" | "export-failed" | "xlsx-import-failed" | "optional-backend-unavailable" | "delimited-text-resource-limit" | "delimited-text-invalid-limit" | "xlsx-resource-limit" | "resource-limit" | "invalid-snapshot" | "invalid-argument" | "aborted" | "not-found" | "commit-rejected" | "unavailable" | "blocked" | "quota" | "unsupported-schema" | "transaction" | "conflict" | "limit" | "invalid-limits" | "invalid-version" | "invalid-id" | "invalid-operations" | "operation-limit" | "payload-limit" | "response-id-mismatch" | "future-distance-limit" | "buffer-count-limit" | "buffer-operation-limit" | "buffer-byte-limit" | "pending-count-limit" | "pending-operation-limit" | "pending-byte-limit" | "late-echo" | "remote-operations-rejected" | "invalid-batch" | "batch-limit" | "pending-capacity" | "presence-failed" | "revision-failed" | "comment-failed" | "sync-failed" | "sync-storage-failed" | "incomplete-data" | "xlsx-invalid-options" | "unsafe-hyperlink" | "invalid-shortcut" | "shortcut-conflict" | "invalid-function";
+export type SheetwriteErrorCode = | "initialization-failed" | "initialization-required" | "engine-failed" | "datasource-request-failed" | "renderer-fallback" | "export-failed" | "xlsx-import-failed" | "optional-backend-unavailable" | "delimited-text-resource-limit" | "delimited-text-invalid-limit" | "xlsx-resource-limit" | "resource-limit" | "invalid-snapshot" | "invalid-history" | "capacity" | "integrity" | "invalid-argument" | "aborted" | "not-found" | "commit-rejected" | "unavailable" | "blocked" | "quota" | "unsupported-schema" | "transaction" | "conflict" | "limit" | "invalid-limits" | "invalid-version" | "invalid-id" | "invalid-operations" | "operation-limit" | "payload-limit" | "response-id-mismatch" | "future-distance-limit" | "buffer-count-limit" | "buffer-operation-limit" | "buffer-byte-limit" | "pending-count-limit" | "pending-operation-limit" | "pending-byte-limit" | "late-echo" | "remote-operations-rejected" | "invalid-batch" | "batch-limit" | "pending-capacity" | "presence-failed" | "revision-failed" | "comment-failed" | "sync-failed" | "sync-storage-failed" | "incomplete-data" | "xlsx-invalid-options" | "unsafe-hyperlink" | "invalid-shortcut" | "shortcut-conflict" | "invalid-function";
 ```
 
 Stable discriminator for every consumer-visible Sheetwrite failure. Messages
@@ -14667,7 +14753,7 @@ Structural form preserved across realms and JSON serialization.
 ##### `SheetwriteErrorOperation` — type
 
 ```ts
-export type SheetwriteErrorOperation = | "initialize" | "create-grid" | "engine" | "store" | "transaction" | "render" | "datasource-request" | "renderer-worker" | "xlsx-import" | "xlsx-export" | "delimited-parse" | "delimited-import" | "delimited-encode" | "delimited-export" | "delimited-options" | "snapshot-validate" | "snapshot-allocate" | "persistence" | "pending-storage" | "synchronize" | "presence" | "revision" | "comment" | "query" | "row-bridge" | "resource-diagnostics" | "hyperlink-activate" | "keyboard-configure" | "chart-view" | "host-function";
+export type SheetwriteErrorOperation = | "initialize" | "create-grid" | "engine" | "store" | "transaction" | "render" | "datasource-request" | "renderer-worker" | "xlsx-import" | "xlsx-export" | "delimited-parse" | "delimited-import" | "delimited-encode" | "delimited-export" | "delimited-options" | "snapshot-validate" | "snapshot-allocate" | "persistence" | "pending-storage" | "history" | "synchronize" | "presence" | "revision" | "comment" | "query" | "row-bridge" | "resource-diagnostics" | "hyperlink-activate" | "keyboard-configure" | "chart-view" | "host-function";
 ```
 
 Stable operation at which a consumer-visible failure can surface.
@@ -16342,7 +16428,7 @@ An explicit projection record for an operation with no row-space meaning.
 ##### `SHEETWRITE_ERROR_CODES` — variable
 
 ```ts
-readonly ["initialization-failed", "initialization-required", "engine-failed", "datasource-request-failed", "renderer-fallback", "export-failed", "xlsx-import-failed", "optional-backend-unavailable", "delimited-text-resource-limit", "delimited-text-invalid-limit", "xlsx-resource-limit", "resource-limit", "invalid-snapshot", "invalid-argument", "aborted", "not-found", "commit-rejected", "unavailable", "blocked", "quota", "unsupported-schema", "transaction", "conflict", "limit", "invalid-limits", "invalid-version", "invalid-id", "invalid-operations", "operation-limit", "payload-limit", "response-id-mismatch", "future-distance-limit", "buffer-count-limit", "buffer-operation-limit", "buffer-byte-limit", "pending-count-limit", "pending-operation-limit", "pending-byte-limit", "late-echo", "remote-operations-rejected", "invalid-batch", "batch-limit", "pending-capacity", "presence-failed", "revision-failed", "comment-failed", "sync-failed", "sync-storage-failed", "incomplete-data", "xlsx-invalid-options", "unsafe-hyperlink", "invalid-shortcut", "shortcut-conflict", "invalid-function"]
+readonly ["initialization-failed", "initialization-required", "engine-failed", "datasource-request-failed", "renderer-fallback", "export-failed", "xlsx-import-failed", "optional-backend-unavailable", "delimited-text-resource-limit", "delimited-text-invalid-limit", "xlsx-resource-limit", "resource-limit", "invalid-snapshot", "invalid-history", "capacity", "integrity", "invalid-argument", "aborted", "not-found", "commit-rejected", "unavailable", "blocked", "quota", "unsupported-schema", "transaction", "conflict", "limit", "invalid-limits", "invalid-version", "invalid-id", "invalid-operations", "operation-limit", "payload-limit", "response-id-mismatch", "future-distance-limit", "buffer-count-limit", "buffer-operation-limit", "buffer-byte-limit", "pending-count-limit", "pending-operation-limit", "pending-byte-limit", "late-echo", "remote-operations-rejected", "invalid-batch", "batch-limit", "pending-capacity", "presence-failed", "revision-failed", "comment-failed", "sync-failed", "sync-storage-failed", "incomplete-data", "xlsx-invalid-options", "unsafe-hyperlink", "invalid-shortcut", "shortcut-conflict", "invalid-function"]
 ```
 
 Every `SheetwriteErrorCode`, for hosts that list the codes at run time.
@@ -16352,7 +16438,7 @@ it does not contain it.
 ##### `SHEETWRITE_ERROR_OPERATIONS` — variable
 
 ```ts
-readonly ["initialize", "create-grid", "engine", "store", "transaction", "render", "datasource-request", "renderer-worker", "xlsx-import", "xlsx-export", "delimited-parse", "delimited-import", "delimited-encode", "delimited-export", "delimited-options", "snapshot-validate", "snapshot-allocate", "persistence", "pending-storage", "synchronize", "presence", "revision", "comment", "query", "row-bridge", "resource-diagnostics", "hyperlink-activate", "keyboard-configure", "chart-view", "host-function"]
+readonly ["initialize", "create-grid", "engine", "store", "transaction", "render", "datasource-request", "renderer-worker", "xlsx-import", "xlsx-export", "delimited-parse", "delimited-import", "delimited-encode", "delimited-export", "delimited-options", "snapshot-validate", "snapshot-allocate", "persistence", "pending-storage", "history", "synchronize", "presence", "revision", "comment", "query", "row-bridge", "resource-diagnostics", "hyperlink-activate", "keyboard-configure", "chart-view", "host-function"]
 ```
 
 Every `SheetwriteErrorOperation`, for hosts that list the operations at run
@@ -16371,7 +16457,7 @@ context strings, because both can quote host or file data.
 ##### `SheetwriteErrorCode` — type
 
 ```ts
-export type SheetwriteErrorCode = | "initialization-failed" | "initialization-required" | "engine-failed" | "datasource-request-failed" | "renderer-fallback" | "export-failed" | "xlsx-import-failed" | "optional-backend-unavailable" | "delimited-text-resource-limit" | "delimited-text-invalid-limit" | "xlsx-resource-limit" | "resource-limit" | "invalid-snapshot" | "invalid-argument" | "aborted" | "not-found" | "commit-rejected" | "unavailable" | "blocked" | "quota" | "unsupported-schema" | "transaction" | "conflict" | "limit" | "invalid-limits" | "invalid-version" | "invalid-id" | "invalid-operations" | "operation-limit" | "payload-limit" | "response-id-mismatch" | "future-distance-limit" | "buffer-count-limit" | "buffer-operation-limit" | "buffer-byte-limit" | "pending-count-limit" | "pending-operation-limit" | "pending-byte-limit" | "late-echo" | "remote-operations-rejected" | "invalid-batch" | "batch-limit" | "pending-capacity" | "presence-failed" | "revision-failed" | "comment-failed" | "sync-failed" | "sync-storage-failed" | "incomplete-data" | "xlsx-invalid-options" | "unsafe-hyperlink" | "invalid-shortcut" | "shortcut-conflict" | "invalid-function";
+export type SheetwriteErrorCode = | "initialization-failed" | "initialization-required" | "engine-failed" | "datasource-request-failed" | "renderer-fallback" | "export-failed" | "xlsx-import-failed" | "optional-backend-unavailable" | "delimited-text-resource-limit" | "delimited-text-invalid-limit" | "xlsx-resource-limit" | "resource-limit" | "invalid-snapshot" | "invalid-history" | "capacity" | "integrity" | "invalid-argument" | "aborted" | "not-found" | "commit-rejected" | "unavailable" | "blocked" | "quota" | "unsupported-schema" | "transaction" | "conflict" | "limit" | "invalid-limits" | "invalid-version" | "invalid-id" | "invalid-operations" | "operation-limit" | "payload-limit" | "response-id-mismatch" | "future-distance-limit" | "buffer-count-limit" | "buffer-operation-limit" | "buffer-byte-limit" | "pending-count-limit" | "pending-operation-limit" | "pending-byte-limit" | "late-echo" | "remote-operations-rejected" | "invalid-batch" | "batch-limit" | "pending-capacity" | "presence-failed" | "revision-failed" | "comment-failed" | "sync-failed" | "sync-storage-failed" | "incomplete-data" | "xlsx-invalid-options" | "unsafe-hyperlink" | "invalid-shortcut" | "shortcut-conflict" | "invalid-function";
 ```
 
 Stable discriminator for every consumer-visible Sheetwrite failure. Messages
@@ -16398,7 +16484,7 @@ Structural form preserved across realms and JSON serialization.
 ##### `SheetwriteErrorOperation` — type
 
 ```ts
-export type SheetwriteErrorOperation = | "initialize" | "create-grid" | "engine" | "store" | "transaction" | "render" | "datasource-request" | "renderer-worker" | "xlsx-import" | "xlsx-export" | "delimited-parse" | "delimited-import" | "delimited-encode" | "delimited-export" | "delimited-options" | "snapshot-validate" | "snapshot-allocate" | "persistence" | "pending-storage" | "synchronize" | "presence" | "revision" | "comment" | "query" | "row-bridge" | "resource-diagnostics" | "hyperlink-activate" | "keyboard-configure" | "chart-view" | "host-function";
+export type SheetwriteErrorOperation = | "initialize" | "create-grid" | "engine" | "store" | "transaction" | "render" | "datasource-request" | "renderer-worker" | "xlsx-import" | "xlsx-export" | "delimited-parse" | "delimited-import" | "delimited-encode" | "delimited-export" | "delimited-options" | "snapshot-validate" | "snapshot-allocate" | "persistence" | "pending-storage" | "history" | "synchronize" | "presence" | "revision" | "comment" | "query" | "row-bridge" | "resource-diagnostics" | "hyperlink-activate" | "keyboard-configure" | "chart-view" | "host-function";
 ```
 
 Stable operation at which a consumer-visible failure can surface.
@@ -16499,6 +16585,35 @@ export interface IndexedDbPendingCommitStorageOptions { databaseName?: string; s
 ```
 
 Database and store naming options for durable pending commits.
+
+#### `@sheetwrite/core/browser/history` — supported
+
+Declaration target: `./dist/history-indexeddb.d.ts`
+Source entry: `src/history-indexeddb.ts`
+Page: https://www.sheetwrite.dev/docs/api/core-browser-history/
+
+##### `IndexedDbHistoryStorage` — class
+
+```ts
+class IndexedDbHistoryStorage extends AtomicHistoryStorage { constructor(options?: IndexedDbHistoryStorageOptions); transact: <T>(request: HistoryStorageRequest, action: (transaction: HistoryStorageTransaction) => Promise<T>) => Promise<T> }
+```
+
+Browser history storage. Import it from `@sheetwrite/core/browser/history`.
+Each call opens the database, runs one readwrite transaction over every
+store, and closes the connection, so publication and reference counts are
+atomic across restarts and tabs.
+
+##### `IndexedDbHistoryStorageOptions` — interface
+
+```ts
+export interface IndexedDbHistoryStorageOptions { databaseName?: string; indexedDB?: IDBFactory; }
+```
+
+Database selection for a host-owned browser history archive.
+
+Members:
+- `databaseName` — Database name; defaults to `sheetwrite-history`.
+- `indexedDB` — IndexedDB factory; defaults to `globalThis.indexedDB`.
 
 #### `@sheetwrite/core/functions` — supported
 
@@ -16706,6 +16821,276 @@ function addTaxRate(store: Store) {
 
 Removes a host function from `store`. Formulas that call it show `#NAME?`.
 Returns whether the function existed.
+
+#### `@sheetwrite/core/history` — supported
+
+Declaration target: `./dist/history-archive.d.ts`
+Source entry: `src/history-archive.ts`
+Page: https://www.sheetwrite.dev/docs/api/core-history/
+
+##### `DEFAULT_HISTORY_LIMITS` — variable
+
+```ts
+Readonly<HistoryLimits>
+```
+
+Default byte, count, cadence, and retention bounds (decision recorded in #228).
+
+##### `HistoryArchive` — class
+
+```ts
+class HistoryArchive { constructor(options: HistoryArchiveOptions, limits: Readonly<HistoryLimits>, manifest: HistoryManifest); deleteVersion: (id: string, signal?: AbortSignal) => Promise<void>; initialize: (snapshot: WorkbookSnapshot, time: number, signal?: AbortSignal) => Promise<void>; listVersions: (options?: ListVersionsOptions) => Promise<HistoryListPage>; prune: (options?: PruneOptions) => Promise<void>; readVersion: (id: string, signal?: AbortSignal) => Promise<WorkbookSnapshot>; record: (commit: HistoryCommit, capture?: HistorySnapshotProvider, signal?: AbortSignal) => Promise<void>; saveVersion: (name: string, authorId: string, time: number, signal?: AbortSignal) => Promise<HistoryVersion>; storageUsage: (signal?: AbortSignal) => Promise<HistoryStorageUsage>; static open: (options: HistoryArchiveOptions, signal?: AbortSignal) => Promise<HistoryArchive> }
+```
+
+Opt-in archive of named and automatic versions for one document. It stores
+content-addressed checkpoints plus the committed transactions since each
+one, through a host `HistoryStorageAdapter`. A grid that never imports this
+module has no history state.
+
+Calls that change the archive run one at a time. Each publishes atomically,
+so a failure or abort leaves the last durable version readable.
+
+Members:
+- `deleteVersion` — Delete one version. Records it shares with other versions stay.
+- `initialize` — Store the first checkpoint: a complete, committed snapshot of the document at `time`.
+- `listVersions` — One bounded page of version metadata, newest first.
+- `open` — Open an archive by reading its manifest only; no workbook is loaded.
+- `prune` — Remove automatic versions made at or before `beforeTime` (default: the age
+ceiling) and, oldest first, while the archive is above `targetBytes`.
+Named versions and every record they need stay.
+- `readVersion` — Rebuild the document of one version. A reader lease keeps its records
+alive while a concurrent prune runs; the lease is released on every exit.
+- `record` — Append one committed transaction. `capture` runs only when a checkpoint is
+due and must return the committed document at `commit.revision`. An
+automatic version is made after `automaticIntervalMs` of active time.
+- `saveVersion` — Name the archived head. The host flushes pending edits first, so the name covers them.
+- `storageUsage` — Retained bytes and counts, read from the manifest without fetching any payload.
+
+##### `HistoryArchiveOptions` — interface
+
+```ts
+export interface HistoryArchiveOptions { documentId: string; storage: HistoryStorageAdapter; limits?: Partial<HistoryLimits>; }
+```
+
+Host-controlled archive configuration. No history is created until explicitly opened.
+
+##### `HistoryCommit` — interface
+
+```ts
+export interface HistoryCommit { baseRevision: number; revision: number; mutationId: string; authorId: string; time: number; operations: readonly DocumentOp[]; }
+```
+
+One committed transaction, confirmed by the document authority; never an optimistic local edit.
+
+Members:
+- `authorId` — Authenticated ID of the person who made the change, at most 256 code units.
+- `baseRevision` — Revision the transaction applies to; equals the archive head.
+- `mutationId` — Stable mutation ID from the commit, at most 256 code units.
+- `operations` — The committed document operations, in order.
+- `revision` — Revision after the transaction; an atomic batch can advance up to 16 revisions.
+- `time` — Commit time in milliseconds since the epoch; never before the previous commit.
+
+##### `HistoryError` — class
+
+```ts
+class HistoryError extends SheetwriteError { constructor(code: HistoryErrorCode, message: string, options?: ErrorOptions); code: HistoryErrorCode; name: "HistoryError" }
+```
+
+Expected archive failure; cancellation preserves the caller's abort reason.
+
+##### `HistoryErrorCode` — type
+
+```ts
+export type HistoryErrorCode = | "invalid-history" | "conflict" | "capacity" | "not-found" | "integrity" | "unavailable" | "blocked" | "transaction";
+```
+
+Stable failure category for history validation, storage, and replay.
+
+##### `HistoryGetRequest` — type
+
+```ts
+export type HistoryGetRequest = HistoryStorageRequest & ( | { kind: "manifest" } | { kind: "version"; id: string } | { kind: "record"; id: string; maxBytes: number; pin?: string } );
+```
+
+Fetch metadata or a bounded immutable payload; leased reads renew their lease.
+
+##### `HistoryHead` — interface
+
+```ts
+export interface HistoryHead { revision: number; checkpoint: string; tail: readonly string[]; time: number; activeMs: number; automaticAt: number; checkpointAt: number; checkpointTransactions: number; checkpointLogBytes: number; }
+```
+
+Durable recorder cursor: the newest checkpoint, the log tail since it, and cadence counters.
+
+Members:
+- `activeMs` — Active editing time since the baseline; idle gaps count as at most one automatic interval.
+- `automaticAt` — `activeMs` at the last automatic version.
+- `checkpointAt` — `activeMs` at the last checkpoint.
+- `checkpointLogBytes` — Encoded operation bytes since the last checkpoint.
+- `checkpointTransactions` — Transactions since the last checkpoint.
+- `time` — Time of the last archived commit.
+
+##### `HistoryLimits` — interface
+
+```ts
+export interface HistoryLimits { maxSnapshotBytes: number; maxSegmentBytes: number; maxTransactionBytes: number; maxStorageBytes: number; maxWorkingBytes: number; maxNamedVersions: number; maxVersions: number; maxPageEntries: number; maxPageBytes: number; maxAgeMs: number; automaticIntervalMs: number; checkpointIntervalMs: number; checkpointTransactions: number; checkpointLogBytes: number; }
+```
+
+Resource and retention ceilings for an opt-in history archive.
+
+Members:
+- `automaticIntervalMs` — Active time between automatic versions; defaults to 5 minutes.
+- `checkpointIntervalMs` — Active time between checkpoints; defaults to 30 minutes.
+- `checkpointLogBytes` — Encoded log bytes between checkpoints; defaults to 2 MiB.
+- `checkpointTransactions` — Transactions between checkpoints; defaults to 1,000.
+- `maxAgeMs` — Age after which automatic versions expire; defaults to 30 days.
+- `maxNamedVersions` — Named versions per document; defaults to 100.
+- `maxPageBytes` — JSON bytes of one metadata page; defaults to 256 KiB.
+- `maxPageEntries` — Entries in one metadata page; defaults to 100.
+- `maxSegmentBytes` — Decoded bytes of one log segment; defaults to 1 MiB.
+- `maxSnapshotBytes` — Encoded bytes of one checkpoint snapshot or one record; defaults to 64 MiB.
+- `maxStorageBytes` — Retained bytes per document, including headers and index entries; defaults to 512 MiB.
+- `maxTransactionBytes` — Encoded operation bytes of one archived transaction; defaults to and cannot exceed 64 MiB.
+- `maxVersions` — Named and automatic versions per document; defaults to 10,000.
+- `maxWorkingBytes` — Working-set reservation for one capture, decode or replay; defaults to 256 MiB.
+
+##### `HistoryListPage` — interface
+
+```ts
+export interface HistoryListPage { versions: readonly HistoryVersion[]; records?: readonly HistoryRecordMetadata[]; cursor?: string; generation: number; }
+```
+
+Metadata-only response in newest-first order.
+
+##### `HistoryListRequest` — interface
+
+```ts
+export interface HistoryListRequest { kind?: "versions" | HistoryStoredRecord["kind"]; fromRevision?: number; toRevision?: number; maxEntries: number; maxBytes: number; cursor?: string; documentId: string; limits: Readonly<HistoryLimits>; signal?: AbortSignal; }
+```
+
+Bounded metadata-only page. Cursors are scoped to a manifest generation.
+
+##### `HistoryManifest` — interface
+
+```ts
+export interface HistoryManifest { generation: number; head?: HistoryHead; encodedBytes: number; recordCount: number; versionCount: number; namedVersionCount: number; }
+```
+
+Archive state, read without fetching any payload.
+
+Members:
+- `generation` — Increases on each publication or prune; writers compare it to detect a concurrent writer.
+
+##### `HistoryPinRequest` — interface
+
+```ts
+export interface HistoryPinRequest { kind: "pin" | "release"; token: string; versionId: string; documentId: string; limits: Readonly<HistoryLimits>; signal?: AbortSignal; }
+```
+
+Acquire or release a five-minute renewable reader lease through the storage seam.
+
+##### `HistoryPruneRequest` — interface
+
+```ts
+export interface HistoryPruneRequest { expectedGeneration: number; beforeTime: number; deleteVersionId?: string; targetBytes?: number; documentId: string; limits: Readonly<HistoryLimits>; signal?: AbortSignal; }
+```
+
+Retention removes automatic markers, or one explicitly selected named marker.
+
+##### `HistoryPublishRequest` — interface
+
+```ts
+export interface HistoryPublishRequest { kind: "publish"; expectedGeneration: number; records: readonly HistoryStoredRecord[]; head?: HistoryHead; version?: HistoryVersion; documentId: string; limits: Readonly<HistoryLimits>; signal?: AbortSignal; }
+```
+
+Atomically publish immutable records and a new head or version marker.
+
+##### `HistoryPutRequest` — type
+
+```ts
+export type HistoryPutRequest = HistoryPublishRequest | HistoryPinRequest;
+```
+
+A storage write either publishes one complete revision or manages a reader lease.
+
+##### `HistoryRecordMetadata` — interface
+
+```ts
+export interface HistoryRecordMetadata { id: string; kind: HistoryStoredRecord["kind"]; encodedBytes: number; decodedBytes: number; }
+```
+
+Metadata for one immutable record; listings never return payload bytes.
+
+##### `HistorySnapshotProvider` — type
+
+```ts
+export type HistorySnapshotProvider = () => WorkbookSnapshot | Promise<WorkbookSnapshot>;
+```
+
+Snapshot provider invoked only when a checkpoint is due. Must describe the committed head.
+
+##### `HistoryStorageAdapter` — interface
+
+```ts
+export interface HistoryStorageAdapter { put(request: HistoryPutRequest): Promise<HistoryManifest>; get(request: HistoryGetRequest): Promise<HistoryManifest | HistoryVersion | HistoryStoredRecord>; list(request: HistoryListRequest): Promise<HistoryListPage>; prune(request: HistoryPruneRequest): Promise<HistoryManifest>; }
+```
+
+Atomic storage seam for local databases and host-owned history backends.
+
+##### `HistoryStorageRequest` — interface
+
+```ts
+export interface HistoryStorageRequest { documentId: string; limits: Readonly<HistoryLimits>; signal?: AbortSignal; }
+```
+
+Common document identity, ceilings, and cancellation for adapter calls.
+
+##### `HistoryStorageUsage` — interface
+
+```ts
+export interface HistoryStorageUsage { encodedBytes: number; recordCount: number; versionCount: number; namedVersionCount: number; }
+```
+
+Retained storage of one document, including headers and index entries.
+
+##### `HistoryStoredRecord` — interface
+
+```ts
+export interface HistoryStoredRecord { schemaVersion: 1; id: string; kind: "cells" | "metadata" | "sheet" | "checkpoint" | "segment" | "transaction"; encoding: "deflate-json-v1" | "deflate-bytes-v1"; decodedBytes: number; bytes: Uint8Array; references: readonly string[]; }
+```
+
+Immutable, content-addressed history payload and the records it refers to.
+
+Members:
+- `bytes` — Deflate-compressed payload.
+- `decodedBytes` — Exact size after inflate.
+- `id` — SHA-256 over the header and compressed bytes, as 64 lowercase hex digits.
+- `references` — Records this record needs; they stay while this record exists.
+
+##### `HistoryVersion` — interface
+
+```ts
+export interface HistoryVersion { id: string; revision: number; kind: "named" | "automatic"; name?: string; authorId: string; time: number; checkpoint: string; tail: readonly string[]; }
+```
+
+A durable marker at one archived revision.
+
+Members:
+- `authorId` — Who saved a named version, or who made the last change of an automatic one.
+- `checkpoint` — Record ID of the checkpoint the version rebuilds from.
+- `id` — Content ID of the marker fields.
+- `name` — Present on named versions.
+- `tail` — Transaction envelope IDs applied after the checkpoint, in order.
+
+##### `MemoryHistoryStorage` — class
+
+```ts
+class MemoryHistoryStorage extends AtomicHistoryStorage { transact: <T>(request: HistoryStorageRequest, action: (transaction: HistoryStorageTransaction) => Promise<T>) => Promise<T> }
+```
+
+In-memory history for one page session and for tests. Transactions run one
+at a time per adapter and write through `PendingMapWrites`, so a failure or
+an abort leaves the stored maps unchanged without copying them.
 
 #### `@sheetwrite/core/icons.json` — asset
 

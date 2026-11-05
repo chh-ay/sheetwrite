@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "135a2ddef360f90d263768a94da57f04a8902693c368306b9b1157a1a8eb9318",
+  "sha256": "2df3ee5355aa1a854792ca7ab690db8218af73a27766d7abd16afecfdb4c97de",
   "intentionalExports": [
     {
       "package": "@sheetwrite/charts",
@@ -473,6 +473,11 @@
     },
     {
       "package": "@sheetwrite/core",
+      "entryPoint": "./browser/history",
+      "exports": ["IndexedDbHistoryStorage", "IndexedDbHistoryStorageOptions"]
+    },
+    {
+      "package": "@sheetwrite/core",
       "entryPoint": "./functions",
       "exports": [
         "FormulaAnalysis",
@@ -492,6 +497,36 @@
         "listFunctions",
         "registerFunction",
         "unregisterFunction"
+      ]
+    },
+    {
+      "package": "@sheetwrite/core",
+      "entryPoint": "./history",
+      "exports": [
+        "DEFAULT_HISTORY_LIMITS",
+        "HistoryArchive",
+        "HistoryArchiveOptions",
+        "HistoryCommit",
+        "HistoryError",
+        "HistoryErrorCode",
+        "HistoryGetRequest",
+        "HistoryHead",
+        "HistoryLimits",
+        "HistoryListPage",
+        "HistoryListRequest",
+        "HistoryManifest",
+        "HistoryPinRequest",
+        "HistoryPruneRequest",
+        "HistoryPublishRequest",
+        "HistoryPutRequest",
+        "HistoryRecordMetadata",
+        "HistorySnapshotProvider",
+        "HistoryStorageAdapter",
+        "HistoryStorageRequest",
+        "HistoryStorageUsage",
+        "HistoryStoredRecord",
+        "HistoryVersion",
+        "MemoryHistoryStorage"
       ]
     },
     {
