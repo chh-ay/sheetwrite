@@ -348,6 +348,10 @@ export class StoreMutationPolicy {
       case "setNamedRange":
       case "removeNamedRange":
       case "setCalculation":
+      case "setRelationship":
+      case "removeRelationship":
+      case "setQuery":
+      case "removeQuery":
       case "setPivot":
       case "removePivot":
       // A chart only reads its sources, so protection and validation never apply.

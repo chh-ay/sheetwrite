@@ -8,7 +8,7 @@ description: "SnapshotResourceError class in @sheetwrite/core: Stable resource f
 Stable resource failure raised by direct workbook construction paths.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/document-protocol.ts#L403"><code>packages/core/src/document-protocol.ts#L403</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/document-protocol.ts#L405"><code>packages/core/src/document-protocol.ts#L405</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>6</span>
@@ -102,6 +102,7 @@ class SnapshotResourceError extends SheetwriteError {
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/queries</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>

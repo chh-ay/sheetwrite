@@ -16,6 +16,7 @@ The full engine adds these function families:
 | Database | `DSUM`, `DAVERAGE`, `DCOUNT`, `DGET` |
 | Math and matrices | `AGGREGATE`, `MMULT`, `MINVERSE`, `MDETERM`, `SUMSQ` |
 | Complex numbers | `COMPLEX`, `IMSUM`, `IMPRODUCT`, `IMABS`, `IMEXP`, `IMSQRT` |
+| Engineering | `DEC2HEX`, `HEX2DEC`, `BITAND`, `BITLSHIFT`, `ERF`, `GESTEP` |
 | Reshaping | `SORTBY`, `HSTACK`, `VSTACK`, `TOCOL`, `WRAPROWS`, `EXPAND` |
 | LAMBDA | `LAMBDA`, `MAP`, `REDUCE`, `SCAN`, `BYROW`, `MAKEARRAY` |
 | Grouping | `GROUPBY`, `PIVOTBY`, `PERCENTOF` |

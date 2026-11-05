@@ -77,6 +77,7 @@ function comparableEvidence(bundler: "next" | "vite", overrides: Record<string, 
           "worker-async",
           "xlsx-async",
           "charts-async",
+          "queries-async",
           "chrome-async",
         ];
   const assets = roles.map((role) => ({

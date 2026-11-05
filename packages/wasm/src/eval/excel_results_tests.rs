@@ -86,6 +86,17 @@ fn lambda_arguments_can_be_errors_that_the_body_handles() {
 
 #[cfg(feature = "analysis")]
 #[test]
+fn engineering_functions_read_cells_and_ranges() {
+    assert_results(&[
+        ("=DEC2HEX(Data!B3)", "1E"),
+        ("=BIN2DEC(Data!A1&Data!A2-Data!A2)", "2"),
+        ("=BITAND(Data!B1,Data!A3)", "2"),
+        ("=ERF(Data!F1)", "0"),
+    ]);
+}
+
+#[cfg(feature = "analysis")]
+#[test]
 fn complex_functions_read_cells_and_ranges() {
     assert_results(&[
         ("=IMSUM(Data!A1:A3)", "6"),

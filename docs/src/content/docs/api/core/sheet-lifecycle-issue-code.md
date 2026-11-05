@@ -8,7 +8,7 @@ description: "SheetLifecycleIssueCode type in @sheetwrite/core: Stable lifecycle
 Stable lifecycle rejection codes suitable for inline sheet-management UI.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L284"><code>packages/core/src/types/document.ts#L284</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L290"><code>packages/core/src/types/document.ts#L290</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -36,6 +36,7 @@ export type SheetLifecycleIssueCode =
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/queries</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>

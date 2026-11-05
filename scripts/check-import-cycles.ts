@@ -91,6 +91,11 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "WorkbookTableXmlElement",
     ],
   },
+  "data-model": {
+    source: "packages/core/src/types/data-model.ts",
+    dependencies: ["table"],
+    exports: ["DataModel", "RelationshipStatus", "TableColumnRef", "TableRelationship"],
+  },
   pivot: {
     source: "packages/core/src/types/pivot.ts",
     dependencies: ["cell", "coordinates", "table"],
@@ -105,6 +110,21 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "PivotSource",
       "PivotSourceField",
       "PivotValueField",
+    ],
+  },
+  query: {
+    source: "packages/core/src/types/query.ts",
+    dependencies: ["coordinates", "table"],
+    exports: [
+      "QueryAggregate",
+      "QueryColumnSpec",
+      "QueryColumnType",
+      "QueryJoinKind",
+      "QueryPredicate",
+      "QueryStep",
+      "SavedQuery",
+      "SavedQueryOutput",
+      "SavedQuerySource",
     ],
   },
   cell: {
@@ -147,7 +167,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
   },
   document: {
     source: "packages/core/src/types/document.ts",
-    dependencies: ["cell", "chart", "coordinates", "pivot", "table"],
+    dependencies: ["cell", "chart", "coordinates", "data-model", "pivot", "query", "table"],
     exports: [
       "AddSheetInput",
       "CalculationSettings",
@@ -192,6 +212,8 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "ApplyTransactionResult",
       "CellChange",
       "ChangeEvent",
+      "CommitJournal",
+      "CommittedTransaction",
       "GridTransaction",
       "OperationSource",
       "PendingCommit",

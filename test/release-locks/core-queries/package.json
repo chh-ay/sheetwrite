@@ -1,0 +1,10 @@
+{
+  "name": "sheetwrite-release-core-queries",
+  "private": true,
+  "version": "0.0.0",
+  "dependencies": {
+    "@sheetwrite/core": "file:artifacts/sheetwrite-core-0.6.1.tgz",
+    "@sheetwrite/queries": "file:artifacts/sheetwrite-queries-0.6.1.tgz",
+    "@sheetwrite/wasm": "file:artifacts/sheetwrite-wasm-0.6.1.tgz"
+  }
+}

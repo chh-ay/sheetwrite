@@ -1,0 +1,358 @@
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
+
+import { validateDocumentOperationShape } from "../src/document-protocol.js";
+import {
+  type Column,
+  createGrid,
+  createGridFromSnapshot,
+  type DocumentOp,
+  type Grid,
+  initSheetwrite,
+  MemoryPersistenceAdapter,
+  rebaseDocumentOperations,
+  SheetwriteStore,
+  SyncCoordinator,
+  type TableRelationship,
+  validateWorkbookSnapshot,
+  type Workbook,
+  type WorkbookSnapshot,
+  type WorkbookTable,
+} from "../src/index.js";
+import { installCanvasTestStubs } from "../src/testing.js";
+
+beforeAll(async () => {
+  await initSheetwrite();
+});
+
+let restoreStubs: () => void;
+beforeEach(() => {
+  restoreStubs = installCanvasTestStubs();
+});
+afterEach(() => restoreStubs());
+
+const columns = (count: number): Column[] =>
+  Array.from({ length: count }, (_, index) => ({
+    key: `c${index}`,
+    header: `C${index}`,
+    width: 80,
+    type: "text" as const,
+  }));
+
+/** A two-column table on `sheet` whose rectangle starts at column `col`. */
+const table = (
+  id: string,
+  sheet: string,
+  col: number,
+  columnIds: [string, string],
+): WorkbookTable => ({
+  id,
+  name: id,
+  range: { sheet, start: { row: 0, col }, end: { row: 4, col: col + 1 } },
+  columns: columnIds.map((columnId) => ({ id: columnId, name: columnId })),
+  headerRow: true,
+  totalsRow: false,
+});
+
+const workbook = (): Workbook => ({
+  activeSheet: "data",
+  sheets: [
+    {
+      id: "data",
+      name: "Data",
+      rowCount: 10,
+      columns: columns(6),
+      tables: [
+        table("orders", "data", 0, ["customer", "amount"]),
+        table("customers", "data", 2, ["id", "region"]),
+        table("regions", "data", 4, ["code", "name"]),
+      ],
+    },
+    { id: "other", name: "Other", rowCount: 10, columns: columns(2) },
+  ],
+});
+
+const ordersToCustomers: TableRelationship = {
+  id: "r-orders-customers",
+  from: { table: "orders", column: "customer" },
+  to: { table: "customers", column: "id" },
+};
+
+const customersToRegions: TableRelationship = {
+  id: "r-customers-regions",
+  from: { table: "customers", column: "region" },
+  to: { table: "regions", column: "code" },
+};
+
+const snapshot = (relationships: TableRelationship[]): WorkbookSnapshot => ({
+  schemaVersion: 1,
+  workbook: { activeSheet: "data", dataModel: { relationships } },
+  sheets: workbook().sheets.map((sheet, order) => ({
+    id: sheet.id,
+    name: sheet.name,
+    order,
+    rowCount: sheet.rowCount,
+    columns: sheet.columns,
+    ...(sheet.tables ? { tables: sheet.tables } : {}),
+    cells: [],
+  })),
+});
+
+const grids: Grid[] = [];
+const mountGrid = (): Grid => {
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const grid = createGrid(host, { workbook: workbook() });
+  grids.push(grid);
+  return grid;
+};
+afterEach(() => {
+  for (const grid of grids.splice(0)) grid.destroy();
+});
+
+describe("relationship shape", () => {
+  it("validates setRelationship and removeRelationship operations", () => {
+    expect(
+      validateDocumentOperationShape({ op: "setRelationship", relationship: ordersToCustomers }),
+    ).toEqual([]);
+    expect(validateDocumentOperationShape({ op: "removeRelationship", id: "r" })).toEqual([]);
+    expect(
+      validateDocumentOperationShape({
+        op: "setRelationship",
+        relationship: { ...ordersToCustomers, to: { table: "customers" } },
+      }),
+    ).toContainEqual(expect.objectContaining({ path: "operation.relationship.to.column" }));
+  });
+
+  it("refuses saved models with a cycle, a repeated table pair or a self link", () => {
+    const cycle: TableRelationship = {
+      id: "r-regions-orders",
+      from: { table: "regions", column: "name" },
+      to: { table: "orders", column: "customer" },
+    };
+    const reversedPair: TableRelationship = {
+      id: "r-customers-orders",
+      from: { table: "customers", column: "id" },
+      to: { table: "orders", column: "customer" },
+    };
+    const selfLink: TableRelationship = {
+      id: "r-self",
+      from: { table: "orders", column: "customer" },
+      to: { table: "orders", column: "amount" },
+    };
+
+    for (const relationships of [
+      [ordersToCustomers, customersToRegions, cycle],
+      [ordersToCustomers, reversedPair],
+      [selfLink],
+      [ordersToCustomers, { ...customersToRegions, id: ordersToCustomers.id }],
+    ]) {
+      expect(validateWorkbookSnapshot(snapshot(relationships)).ok).toBe(false);
+    }
+    expect(validateWorkbookSnapshot(snapshot([ordersToCustomers, customersToRegions])).ok).toBe(
+      true,
+    );
+  });
+});
+
+describe("relationships in the store", () => {
+  it("round-trips through a snapshot and drops an empty model", () => {
+    const store = SheetwriteStore.fromSnapshot(snapshot([ordersToCustomers, customersToRegions]));
+    const empty = SheetwriteStore.fromSnapshot(snapshot([]));
+    try {
+      expect(store.getRelationships()).toEqual([ordersToCustomers, customersToRegions]);
+      expect(store.exportSnapshot().workbook.dataModel).toEqual({
+        relationships: [ordersToCustomers, customersToRegions],
+      });
+      expect(empty.exportSnapshot().workbook.dataModel).toBeUndefined();
+    } finally {
+      store.dispose();
+      empty.dispose();
+    }
+  });
+
+  it("returns clones that callers cannot use to change the document", () => {
+    const store = SheetwriteStore.fromSnapshot(snapshot([ordersToCustomers]));
+    try {
+      const [read] = store.getRelationships();
+      if (!read) throw new Error("the relationship is missing");
+      read.to.column = "region";
+      expect(store.getRelationships()).toEqual([ordersToCustomers]);
+    } finally {
+      store.dispose();
+    }
+  });
+
+  it("admits a relationship only between existing columns and without a cycle", () => {
+    const store = SheetwriteStore.fromSnapshot(snapshot([]));
+    try {
+      expect(store.setRelationship(ordersToCustomers).status).toBe("applied");
+      expect(store.setRelationship(customersToRegions).status).toBe("applied");
+
+      const missingColumn = {
+        ...ordersToCustomers,
+        id: "r2",
+        to: { table: "regions", column: "x" },
+      };
+      const missingTable = { ...ordersToCustomers, id: "r3", to: { table: "gone", column: "id" } };
+      const cycle: TableRelationship = {
+        id: "r4",
+        from: { table: "regions", column: "name" },
+        to: { table: "orders", column: "customer" },
+      };
+      for (const refused of [missingColumn, missingTable, cycle]) {
+        expect(store.setRelationship(refused).status).not.toBe("applied");
+      }
+
+      // Replacing by ID may change the key columns of the same pair.
+      const replaced = { ...ordersToCustomers, from: { table: "orders", column: "amount" } };
+      expect(store.setRelationship(replaced).status).toBe("applied");
+      expect(store.getRelationships()).toEqual([replaced, customersToRegions]);
+
+      expect(store.removeRelationship("unknown").status).not.toBe("applied");
+      expect(store.removeRelationship(replaced.id).status).toBe("applied");
+      expect(store.getRelationships()).toEqual([customersToRegions]);
+    } finally {
+      store.dispose();
+    }
+  });
+});
+
+describe("relationship key status", () => {
+  it("is unavailable on the default engine, which checks no keys", () => {
+    const store = SheetwriteStore.fromSnapshot(snapshot([ordersToCustomers]));
+    try {
+      expect(store.getRelationshipStatus(ordersToCustomers.id)).toEqual({ status: "unavailable" });
+    } finally {
+      store.dispose();
+    }
+  });
+
+  it("checks keys on the full engine, in its own process", async () => {
+    // Engine selection is process-wide, so the full-engine checks run apart.
+    const probe = Bun.spawn(
+      [process.execPath, "test", "./packages/core/test/data-model.full-engine.ts"],
+      { cwd: new URL("../../..", import.meta.url).pathname, stdout: "pipe", stderr: "pipe" },
+    );
+    const [exitCode, stderr] = await Promise.all([probe.exited, new Response(probe.stderr).text()]);
+
+    expect({ exitCode, failures: stderr.match(/^\(fail\).*$/gmu) ?? [] }).toEqual({
+      exitCode: 0,
+      failures: [],
+    });
+  });
+});
+
+describe("relationship history", () => {
+  it("undoes and redoes each relationship change as one step", () => {
+    const grid = mountGrid();
+    const apply = (patch: DocumentOp) => grid.applyTransaction({ patches: [patch] }).status;
+    const relationships = () => grid.store.getWorkbook().dataModel?.relationships ?? [];
+    const renamedKey = { ...ordersToCustomers, from: { table: "orders", column: "amount" } };
+
+    expect(apply({ op: "setRelationship", relationship: ordersToCustomers })).toBe("applied");
+    expect(apply({ op: "setRelationship", relationship: renamedKey })).toBe("applied");
+    expect(apply({ op: "removeRelationship", id: ordersToCustomers.id })).toBe("applied");
+    expect(relationships()).toEqual([]);
+
+    grid.undo();
+    expect(relationships()).toEqual([renamedKey]);
+    grid.undo();
+    expect(relationships()).toEqual([ordersToCustomers]);
+    grid.undo();
+    expect(grid.store.getWorkbook().dataModel).toBeUndefined();
+    grid.redo();
+    expect(relationships()).toEqual([ordersToCustomers]);
+  });
+
+  it("keeps a relationship whose table is removed, so undo restores a working model", () => {
+    const grid = mountGrid();
+    grid.applyTransaction({
+      patches: [{ op: "setRelationship", relationship: ordersToCustomers }],
+    });
+
+    expect(
+      grid.applyTransaction({
+        patches: [{ op: "removeTable", sheet: "data", tableId: "customers" }],
+      }).status,
+    ).toBe("applied");
+    expect(grid.store.getWorkbook().dataModel?.relationships).toEqual([ordersToCustomers]);
+
+    // A saved relationship to a removed table is valid in a snapshot.
+    const exported = grid.store.exportSnapshot?.();
+    if (!exported) throw new Error("the store must export snapshots");
+    expect(validateWorkbookSnapshot(exported).ok).toBe(true);
+
+    grid.undo();
+    const tables = grid.store.getWorkbook().sheets[0]?.tables?.map((entry) => entry.id);
+    expect(tables).toContain("customers");
+    expect(grid.store.getWorkbook().dataModel?.relationships).toEqual([ordersToCustomers]);
+  });
+});
+
+describe("relationship collaboration", () => {
+  it("conflicts on concurrent model changes and on a removed or changed table", () => {
+    const local: DocumentOp[] = [{ op: "setRelationship", relationship: ordersToCustomers }];
+
+    expect(
+      rebaseDocumentOperations(local, [{ op: "addRows", sheet: "data", at: 0, count: 2 }]),
+    ).toEqual({ status: "rebased", operations: local });
+    expect(
+      rebaseDocumentOperations(local, [{ op: "removeTable", sheet: "data", tableId: "regions" }]),
+    ).toEqual({ status: "rebased", operations: local });
+
+    for (const remote of [
+      { op: "setRelationship", relationship: customersToRegions },
+      { op: "removeRelationship", id: "anything" },
+      { op: "removeTable", sheet: "data", tableId: "customers" },
+      { op: "updateTable", sheet: "data", tableId: "orders", patch: { name: "Sales" } },
+    ] satisfies DocumentOp[]) {
+      expect(rebaseDocumentOperations(local, [remote])).toMatchObject({
+        status: "conflict",
+        conflict: { code: "overlapping-edit" },
+      });
+    }
+    expect(rebaseDocumentOperations(local, [{ op: "removeSheet", sheet: "other" }])).toMatchObject({
+      status: "conflict",
+      conflict: { code: "sheet-removed" },
+    });
+  });
+
+  it("delivers a relationship change to a synced peer", async () => {
+    const base = { ...snapshot([]), documentId: "model-doc", version: 0 };
+    const adapter = new MemoryPersistenceAdapter(base);
+    const senderHost = document.createElement("div");
+    const peerHost = document.createElement("div");
+    document.body.append(senderHost, peerHost);
+    const sender = createGridFromSnapshot(senderHost, structuredClone(base));
+    const peer = createGridFromSnapshot(peerHost, structuredClone(base));
+    grids.push(sender, peer);
+    const options = { documentId: "model-doc", serverVersion: 0 };
+    const senderSync = new SyncCoordinator(sender, adapter, options);
+    const peerSync = new SyncCoordinator(peer, adapter, options);
+    try {
+      expect(
+        sender.applyTransaction({
+          patches: [{ op: "setRelationship", relationship: ordersToCustomers }],
+        }).status,
+      ).toBe("applied");
+      expect(await senderSync.sendNext()).toMatchObject({ status: "applied", version: 1 });
+
+      const tail = await adapter.commit({
+        documentId: "model-doc",
+        baseVersion: 0,
+        clientMutationId: "read-tail",
+        operations: [],
+      });
+      if (tail.status !== "conflict" || !tail.operationsSinceBase) {
+        throw new Error("the adapter must return the committed version");
+      }
+      for (const version of tail.operationsSinceBase) {
+        await peerSync.applyVersionedOperation(version);
+      }
+      expect(peer.store.getWorkbook().dataModel?.relationships).toEqual([ordersToCustomers]);
+    } finally {
+      senderSync.destroy();
+      peerSync.destroy();
+    }
+  });
+});

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "7283d96880dfd08a6d500d1b000357930ad1e035327c2c02ea5b6560b421c5f1",
+  "sha256": "3dee9418f0274b3ccf8ef33f8dcdb8554a7836be3aac785b2354762fbb5234e9",
   "intentionalExports": [
     {
       "package": "@sheetwrite/charts",
@@ -93,7 +93,9 @@
         "CommentMutationRequest",
         "CommentMutationResponse",
         "CommentThread",
+        "CommitJournal",
         "CommitReason",
+        "CommittedTransaction",
         "ConditionalFormatPredicate",
         "ConditionalFormatRule",
         "ContextMenuActionName",
@@ -108,6 +110,7 @@
         "DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS",
         "DEFAULT_XLSX_RESOURCE_LIMITS",
         "DataCell",
+        "DataModel",
         "DataSource",
         "DataSourceCapabilities",
         "DataSourceColumnBand",
@@ -201,6 +204,7 @@
         "Range",
         "RebaseConflict",
         "RebaseConflictCode",
+        "RelationshipStatus",
         "RemoteOperationOptions",
         "RemoteOperationSource",
         "ReplaceResult",
@@ -297,6 +301,8 @@
         "SyncProtocolErrorCode",
         "SyncStateSnapshot",
         "SyncVersionGapRequest",
+        "TableColumnRef",
+        "TableRelationship",
         "Theme",
         "ToolbarActionName",
         "ToolbarIcon",
@@ -469,6 +475,11 @@
     },
     {
       "package": "@sheetwrite/core",
+      "entryPoint": "./browser/history",
+      "exports": ["IndexedDbHistoryStorage", "IndexedDbHistoryStorageOptions"]
+    },
+    {
+      "package": "@sheetwrite/core",
       "entryPoint": "./functions",
       "exports": [
         "FormulaAnalysis",
@@ -488,6 +499,36 @@
         "listFunctions",
         "registerFunction",
         "unregisterFunction"
+      ]
+    },
+    {
+      "package": "@sheetwrite/core",
+      "entryPoint": "./history",
+      "exports": [
+        "DEFAULT_HISTORY_LIMITS",
+        "HistoryArchive",
+        "HistoryArchiveOptions",
+        "HistoryCommit",
+        "HistoryError",
+        "HistoryErrorCode",
+        "HistoryGetRequest",
+        "HistoryHead",
+        "HistoryLimits",
+        "HistoryListPage",
+        "HistoryListRequest",
+        "HistoryManifest",
+        "HistoryPinRequest",
+        "HistoryPruneRequest",
+        "HistoryPublishRequest",
+        "HistoryPutRequest",
+        "HistoryRecordMetadata",
+        "HistorySnapshotProvider",
+        "HistoryStorageAdapter",
+        "HistoryStorageRequest",
+        "HistoryStorageUsage",
+        "HistoryStoredRecord",
+        "HistoryVersion",
+        "MemoryHistoryStorage"
       ]
     },
     {
@@ -555,6 +596,40 @@
         "moveFormulaAxis",
         "shiftFormulaAxis",
         "translateFormula"
+      ]
+    },
+    {
+      "package": "@sheetwrite/queries",
+      "entryPoint": ".",
+      "exports": [
+        "QueryAggregate",
+        "QueryBatch",
+        "QueryColumn",
+        "QueryColumnSpec",
+        "QueryColumnType",
+        "QueryDefinitionResult",
+        "QueryDiagnostic",
+        "QueryEngine",
+        "QueryEngineOptions",
+        "QueryError",
+        "QueryFetchContext",
+        "QueryFetchRequest",
+        "QueryFetchResult",
+        "QueryFetchSource",
+        "QueryInput",
+        "QueryJoinKind",
+        "QueryLimits",
+        "QueryMixedLanes",
+        "QueryOutputBlock",
+        "QueryPredicate",
+        "QueryRefreshOptions",
+        "QueryRefreshResult",
+        "QuerySession",
+        "QuerySessionOptions",
+        "QuerySource",
+        "QueryStep",
+        "createQuerySession",
+        "loadQueryEngine"
       ]
     },
     {

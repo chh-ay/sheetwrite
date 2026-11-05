@@ -7,6 +7,7 @@ mod database;
 mod dates;
 mod descriptive;
 mod distributions;
+mod engineering;
 mod finance;
 mod groupby;
 mod hypothesis;
@@ -121,6 +122,13 @@ const FAMILIES: &[Family] = &[
         names: hypothesis::NAMES,
         reference_cells: &[],
         evaluate: Some(hypothesis::evaluate),
+        evaluate_ast: None,
+        array: None,
+    },
+    Family {
+        names: engineering::NAMES,
+        reference_cells: &[],
+        evaluate: Some(engineering::evaluate),
         evaluate_ast: None,
         array: None,
     },

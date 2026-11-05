@@ -8,10 +8,10 @@ description: "VersionedOperation interface in @sheetwrite/core: Remote document 
 Remote document operations paired with a contiguous server version.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/transaction.ts#L125"><code>packages/core/src/types/transaction.ts#L125</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/transaction.ts#L131"><code>packages/core/src/types/transaction.ts#L131</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>4</span>
+## Members <span class="api-count" data-pagefind-ignore>6</span>
 
 <div class="api-member-list">
 
@@ -53,6 +53,24 @@ batch?: VersionBatchMember;
 carries the same `clientMutationId` and `count`. Receivers apply the batch
 only after its last member arrives.</p>
 </details>
+
+<details class="api-member" id="versioned-operation-author-id" data-pagefind-weight="1">
+<summary><code>authorId</code> <span class="api-member-summary">Author the authority recorded for this version; every batch member carries the same one.</span></summary>
+
+```ts generated
+authorId?: string;
+```
+
+</details>
+
+<details class="api-member" id="versioned-operation-committed-at" data-pagefind-weight="1">
+<summary><code>committedAt</code> <span class="api-member-summary">Authority commit time, in milliseconds since the epoch.</span></summary>
+
+```ts generated
+committedAt?: number;
+```
+
+</details>
 </div>
 
 ## Declaration
@@ -66,6 +84,8 @@ export interface VersionedOperation {
   readonly operations: readonly DocumentOp[];
   clientMutationId?: string;
   batch?: VersionBatchMember;
+  authorId?: string;
+  committedAt?: number;
 }
 ```
 
@@ -80,6 +100,7 @@ export interface VersionedOperation {
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/queries</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>

@@ -11,7 +11,9 @@ import type {
 } from "./cell.js";
 import type { ChartDefinition } from "./chart.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "./coordinates.js";
+import type { DataModel, TableRelationship } from "./data-model.js";
 import type { PivotDefinition } from "./pivot.js";
+import type { SavedQuery } from "./query.js";
 import type { WorkbookTable, WorkbookTablePatch } from "./table.js";
 
 /** Stable reason codes returned by worksheet-name validation. */
@@ -135,6 +137,10 @@ export interface Workbook {
   xlsxSource?: XlsxSourceSnapshot;
   /** Iterative calculation options; absent means the defaults. */
   calculation?: CalculationSettings;
+  /** Relationships between workbook tables; absent means none. */
+  dataModel?: DataModel;
+  /** Saved refreshable queries; absent means none. */
+  queries?: SavedQuery[];
 }
 
 export interface AddSheetInput {
@@ -480,6 +486,10 @@ export interface WorkbookSnapshot {
     xlsxSource?: XlsxSourceSnapshot;
     /** Iterative calculation options; omitted when every field has its default. */
     calculation?: CalculationSettings;
+    /** Relationships between workbook tables; omitted when there are none. */
+    dataModel?: DataModel;
+    /** Saved refreshable queries; omitted when there are none. */
+    queries?: SavedQuery[];
   };
   sheets: SheetSnapshot[];
 }
@@ -538,6 +548,13 @@ export type DocumentOp =
   | { op: "setNamedRange"; namedRange: NamedRangeSnapshot }
   | { op: "removeNamedRange"; name: string; scope?: SheetId }
   | { op: "setCalculation"; calculation: CalculationSettings }
+  /** Insert or replace the relationship with `relationship.id`. */
+  | { op: "setRelationship"; relationship: TableRelationship }
+  | { op: "removeRelationship"; id: string }
+  /** Insert or replace the saved query with `query.id`. */
+  | { op: "setQuery"; query: SavedQuery }
+  /** Remove a saved query; its output table and values stay. */
+  | { op: "removeQuery"; id: string }
   | { op: "setChart"; sheet: SheetId; chart: ChartDefinition }
   | { op: "removeChart"; sheet: SheetId; id: string }
 

@@ -24,6 +24,9 @@ const GENERATED_OUTPUTS = [
   "packages/formulas/loader-browser.mjs",
   "packages/formulas/loader-node.mjs",
   "packages/formulas/loader-state.mjs",
+  "packages/queries/pkg",
+  "packages/queries/engine/target",
+  "packages/queries/dist",
   "packages/core/dist",
   "packages/xlsx/dist",
   "packages/charts/dist",
@@ -39,6 +42,7 @@ const RUNTIME_ENTRY_PATHS = [
   "./packages/core/dist/index.js",
   "./packages/xlsx/dist/index.js",
   "./packages/charts/dist/index.js",
+  "./packages/queries/dist/node.js",
   "./packages/react/dist/index.js",
   "./packages/vue/dist/index.js",
 ] as const;

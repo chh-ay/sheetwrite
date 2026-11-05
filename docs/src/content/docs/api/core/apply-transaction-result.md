@@ -104,6 +104,7 @@ export type ApplyTransactionResult =
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/queries</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
@@ -117,6 +118,9 @@ export type ApplyTransactionResult =
 <li><a href="/docs/api/core/sheet-lifecycle-result/"><code>SheetLifecycleResult</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/sheetwrite-store/"><code>SheetwriteStore</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/store/"><code>Store</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/queries/query-definition-result/"><code>QueryDefinitionResult</code></a><span class="api-consumer-kind">@sheetwrite/queries</span></li>
+<li><a href="/docs/api/queries/query-refresh-result/"><code>QueryRefreshResult</code></a><span class="api-consumer-kind">@sheetwrite/queries</span></li>
+<li><a href="/docs/api/queries/query-session/"><code>QuerySession</code></a><span class="api-consumer-kind">@sheetwrite/queries</span></li>
 <li><a href="/docs/api/react/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/react</span></li>
 <li><a href="/docs/api/svelte/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/svelte</span></li>
 <li><a href="/docs/api/vue/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
