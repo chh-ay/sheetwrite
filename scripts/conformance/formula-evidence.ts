@@ -183,6 +183,13 @@ export const AUTHORED_ASSERTIONS: Readonly<Record<string, readonly [string, stri
   RATE: ["ABS(RATE(1,0,-100,110)-0.1)<0.0000001", "RATE(1,0,-100,120)>0"],
   IPMT: ["IPMT(0,1,10,1000)=0", "IPMT(0,2,10,1000)=0"],
   PPMT: ["PPMT(0,1,10,1000)=-100", "PPMT(0,2,10,1000)=-100"],
+  AVERAGEA: ["AVERAGEA(1,TRUE)=1", 'AVERAGEA(2,"4")=3'],
+  MAXA: ["MAXA(-1,TRUE)=1", "MAXA(-2,FALSE)=0"],
+  MINA: ["MINA(2,TRUE)=1", "MINA(3,FALSE)=0"],
+  STDEVA: ["STDEVA(1,3)=SQRT(2)", "STDEVA(TRUE,3)=SQRT(2)"],
+  STDEVPA: ["STDEVPA(1,3)=1", "STDEVPA(TRUE,3)=1"],
+  VARA: ["VARA(1,3)=2", "VARA(TRUE,3)=2"],
+  VARPA: ["VARPA(1,3)=1", "VARPA(TRUE,3)=1"],
 };
 
 export function authoredAssertions(name: string): readonly [string, string] {
