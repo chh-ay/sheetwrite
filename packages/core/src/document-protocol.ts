@@ -2633,6 +2633,10 @@ function rangeInSheet(range: Range, sheet: SheetSnapshot): boolean {
 const MAX_XLSX_SOURCE_COMPRESSED_BYTES = 256 * 1024 * 1024;
 const MAX_XLSX_SOURCE_ENTRIES = 10_000;
 const MAX_XLSX_PART_NAME_LENGTH = 1024;
+/** A section holds few members; these caps keep a hostile list small. */
+const MAX_UNSUPPORTED_QUERIES = 256;
+const MAX_QUERY_MEMBER_LENGTH = 1024;
+const MAX_QUERY_REASON_LENGTH = 64;
 const MAX_XLSX_CONTENT_TYPE_LENGTH = 256;
 const BASE64_PATTERN = /^(?:[A-Za-z\d+/]{4})*(?:[A-Za-z\d+/]{2}==|[A-Za-z\d+/]{3}=)?$/;
 const CONTENT_TYPE_PATTERN = /^[a-z\d!#$&^_.+-]+\/[a-z\d!#$&^_.+-]+$/i;
@@ -2761,6 +2765,24 @@ function validateXlsxSource(value: unknown, errors: DocumentValidationError[]): 
     if (queries !== undefined && (typeof queries !== "string" || !/^[0-9a-f]{16}$/.test(queries))) {
       invalid(errors, `${graphPath}.queries`, "queries must be a 64-bit hex digest");
     }
+
+    const unsupportedPath = `${graphPath}.unsupportedQueries`;
+    const unsupported = ownValue(graph, "unsupportedQueries");
+    const kept = unsupported === undefined ? [] : arrayAt(unsupported, unsupportedPath, errors);
+    if (kept && kept.length > MAX_UNSUPPORTED_QUERIES) {
+      invalid(errors, unsupportedPath, "unsupportedQueries holds too many members");
+    }
+    kept?.forEach((entry: unknown, entryIndex) => {
+      const entryPath = `${unsupportedPath}[${entryIndex}]`;
+      const record = recordAt(entry, entryPath, errors);
+      if (!record) return;
+      const member = requireString(record, "member", entryPath, errors, true);
+      if (member && member.length > MAX_QUERY_MEMBER_LENGTH)
+        invalid(errors, `${entryPath}.member`, "member is too long");
+      const reason = requireString(record, "reason", entryPath, errors, true);
+      if (reason && reason.length > MAX_QUERY_REASON_LENGTH)
+        invalid(errors, `${entryPath}.reason`, "reason is too long");
+    });
 
     const members = arrayAt(ownValue(graph, "parts"), `${graphPath}.parts`, errors);
     if (

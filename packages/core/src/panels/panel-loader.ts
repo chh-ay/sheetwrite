@@ -19,6 +19,7 @@ import type {
   openExplainPanel,
   openNamePanel,
   openPivotPanel,
+  openQueryPanel,
   openSortPanel,
   syncPivotPanel,
 } from "./panel-controller.js";
@@ -33,6 +34,7 @@ interface PanelController {
   openExplainPanel: typeof openExplainPanel;
   openNamePanel: typeof openNamePanel;
   openPivotPanel: typeof openPivotPanel;
+  openQueryPanel: typeof openQueryPanel;
   openSortPanel: typeof openSortPanel;
   syncPivotPanel: typeof syncPivotPanel;
 }
