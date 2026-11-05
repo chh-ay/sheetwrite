@@ -35,11 +35,22 @@ pub(crate) struct ColumnRef {
 }
 
 /// One relationship: `from` is the many side, `to` the one side.
+///
+/// A record whose `to.table` is empty is a measure of the data model,
+/// sent in the same payload: `from.table` is its home table, `from.column`
+/// its formula and `to.column` its name.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Relationship {
     pub(crate) id: String,
     pub(crate) from: ColumnRef,
     pub(crate) to: ColumnRef,
+}
+
+impl Relationship {
+    /// Whether this record is a measure rather than a relationship.
+    pub(crate) fn is_measure(&self) -> bool {
+        self.to.table.is_empty()
+    }
 }
 
 /// Why a relationship's keys do not resolve.
@@ -84,9 +95,10 @@ impl KeyColumn {
 
 #[wasm_bindgen]
 impl CellStore {
-    /// Replaces every relationship with the packed definitions: five strings
-    /// each, `[id, fromTable, fromColumn, toTable, toColumn]`, by stable
-    /// table and column IDs. Returns `false`, changing nothing, for a
+    /// Replaces every relationship and measure with the packed definitions:
+    /// five strings each, `[id, fromTable, fromColumn, toTable, toColumn]`,
+    /// by stable table and column IDs, or `[id, homeTable, formula, "",
+    /// name]` for a measure. Returns `false`, changing nothing, for a
     /// malformed payload.
     #[wasm_bindgen(js_name = setRelationships)]
     pub fn set_relationships(&mut self, strings: Vec<String>) -> bool {
@@ -134,11 +146,11 @@ impl CellStore {
     /// are checked now, from the settled cell values.
     #[wasm_bindgen(js_name = relationshipStatus)]
     pub fn relationship_status(&self, id: &str) -> Vec<u32> {
-        let Some(relationship) = self
-            .relationships
-            .as_deref()
-            .and_then(|relationships| relationships.iter().find(|candidate| candidate.id == id))
-        else {
+        let Some(relationship) = self.relationships.as_deref().and_then(|relationships| {
+            relationships
+                .iter()
+                .find(|candidate| !candidate.is_measure() && candidate.id == id)
+        }) else {
             return Vec::new();
         };
         let record = match self.relationship_rows(relationship) {

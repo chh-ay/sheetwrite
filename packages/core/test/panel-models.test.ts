@@ -250,6 +250,17 @@ describe("pivot field moves", () => {
     expect(removed.sort).toEqual([]);
   });
 
+  it("removes a measure value and leaves it in place for moves and shifts", () => {
+    const pivot: PivotDefinition = {
+      ...base,
+      values: [{ field: 1, aggregation: "SUM" }, { measure: "per-unit" }],
+    };
+    const measure = { area: "values", index: 1 } as const;
+
+    expect(removeField(pivot, measure).values).toEqual([{ field: 1, aggregation: "SUM" }]);
+    expect(shiftField(pivot, measure, -1, facts(undefined))).toBe(pivot);
+  });
+
   it("uses the table that holds the selection as the source", () => {
     const table = {
       id: "t1",
