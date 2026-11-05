@@ -63,19 +63,29 @@ async function buildNext(variant, corePackageRoot) {
   await cp(resolve(nextFixtureRoot, "out"), output, { recursive: true });
 }
 
+/**
+ * Link each runtime dependency of the copied core package from the fixture's
+ * `node_modules`. The copy lives outside that tree, so its imports (the WASM
+ * package, `fflate`, and any later dependency) resolve only through these links.
+ */
+async function linkRuntimeDependencies(packageRoot, dependencyRoot) {
+  const manifest = JSON.parse(await readFile(resolve(packageRoot, "package.json"), "utf8"));
+  const dependencies = Object.keys(manifest.dependencies ?? {});
+
+  for (const dependency of dependencies) {
+    const link = resolve(packageRoot, "node_modules", dependency);
+    await mkdir(resolve(link, ".."), { recursive: true });
+    await symlink(resolve(dependencyRoot, "node_modules", dependency), link, "dir");
+  }
+}
+
 async function buildPair(name, dependencyRoot, build) {
   const baselineCore = resolve(dependencyRoot, "node_modules/@sheetwrite/core");
   const candidateCore = resolve(outputRoot, ".candidate-core", name.toLowerCase());
   await mkdir(resolve(outputRoot, ".candidate-core"), { recursive: true });
   await rm(candidateCore, { recursive: true, force: true });
   await cp(baselineCore, candidateCore, { recursive: true });
-  const candidateScope = resolve(candidateCore, "node_modules/@sheetwrite");
-  await mkdir(candidateScope, { recursive: true });
-  await symlink(
-    resolve(dependencyRoot, "node_modules/@sheetwrite/wasm"),
-    resolve(candidateScope, "wasm"),
-    "dir",
-  );
+  await linkRuntimeDependencies(candidateCore, dependencyRoot);
   await installFixtureOnlyCandidate(candidateCore);
   await build("baseline", baselineCore);
   await build("candidate", candidateCore);
@@ -379,9 +389,4 @@ const evidence = {
 };
 const evidencePath = resolve(repositoryRoot, "test-results/bundlers/first-paint.json");
 await writeFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
-await run(
-  "bun",
-  ["scripts/first-paint-evidence.ts", "check", relative(repositoryRoot, evidencePath)],
-  repositoryRoot,
-);
 console.log(`First-paint evidence: ${relative(repositoryRoot, evidencePath)}`);

@@ -4,6 +4,7 @@ import {
   validateWorkbookSnapshot,
   WORKBOOK_SCHEMA_VERSION,
 } from "../document-protocol.js";
+import { cloneJsonValue } from "../plain-data.js";
 import { RangeSourceProjection } from "../reference.js";
 import type { CellValue } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
@@ -68,6 +69,7 @@ export function decodeWorkbookSnapshot(
         protectedRanges: cloneJsonValue(source.protectedRanges),
         notes: cloneJsonValue(source.notes),
         sortKeys: cloneJsonValue(source.sortKeys),
+        sortState: cloneJsonValue(source.sortState),
         filters: cloneJsonValue(source.filters),
         rowGroups: cloneJsonValue(source.rowGroups),
         tables: cloneJsonValue(source.tables),
@@ -159,6 +161,7 @@ export class StoreSnapshotCodec {
           : {}),
         ...(sheet.notes?.length ? { notes: cloneJsonValue(sheet.notes) } : {}),
         ...(sheet.sortKeys?.length ? { sortKeys: cloneJsonValue(sheet.sortKeys) } : {}),
+        ...(sheet.sortState ? { sortState: cloneJsonValue(sheet.sortState) } : {}),
         ...(sheet.filters?.length ? { filters: cloneJsonValue(sheet.filters) } : {}),
         ...(sheet.rowGroups?.length ? { rowGroups: cloneJsonValue(sheet.rowGroups) } : {}),
         ...(sheet.tables?.length ? { tables: cloneJsonValue(sheet.tables) } : {}),
@@ -197,10 +200,6 @@ export class StoreSnapshotCodec {
       sheets,
     };
   }
-}
-
-function cloneJsonValue<T>(value: T): T {
-  return value === undefined ? value : (JSON.parse(JSON.stringify(value)) as T);
 }
 
 /**

@@ -30,7 +30,14 @@
       "node": "./loader-node.mjs",
       "default": "./loader-browser.mjs"
     },
-    "./wasm": "./pkg/sheetwrite_wasm_bg.wasm"
+    "./wasm": "./pkg/sheetwrite_wasm_bg.wasm",
+    "./history": {
+      "types": "./history.d.ts",
+      "browser": "./history.mjs",
+      "node": "./history-node.mjs",
+      "default": "./history.mjs"
+    },
+    "./history/wasm": "./pkg-history/sheetwrite_history_bg.wasm"
   },
   "files": [
     "loader.mjs",
@@ -41,7 +48,13 @@
     "pkg/sheetwrite_wasm.js",
     "pkg/sheetwrite_wasm_factory.js",
     "pkg/sheetwrite_wasm.d.ts",
-    "pkg/sheetwrite_wasm_bg.wasm"
+    "pkg/sheetwrite_wasm_bg.wasm",
+    "history.mjs",
+    "history-node.mjs",
+    "history.d.ts",
+    "pkg-history/sheetwrite_history.js",
+    "pkg-history/sheetwrite_history.d.ts",
+    "pkg-history/sheetwrite_history_bg.wasm"
   ],
   "publishConfig": {
     "access": "public",
@@ -49,9 +62,9 @@
   },
   "sideEffects": false,
   "scripts": {
-    "build": "wasm-pack build --target web --out-dir pkg && bun ../../scripts/wasm-factory.ts .",
+    "build": "wasm-pack build --target web --out-dir pkg && wasm-pack build history --target web --out-dir ../pkg-history && bun ../../scripts/wasm-factory.ts .",
     "prepublishOnly": "bun run build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "clean": "rm -rf pkg target"
+    "clean": "rm -rf pkg pkg-history target history/target"
   }
 }

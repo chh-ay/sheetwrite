@@ -8,7 +8,7 @@ description: "HistoryGetRequest type in @sheetwrite/core/history: Fetch metadata
 Fetch metadata or a bounded immutable payload; leased reads renew their lease.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/types.ts#L128"><code>packages/core/src/version-history/types.ts#L128</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/types.ts#L135"><code>packages/core/src/version-history/types.ts#L135</code></a></dd></div>
 </dl>
 
 ## Declaration

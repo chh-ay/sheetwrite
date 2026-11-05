@@ -8,7 +8,7 @@ const EMPTY: CellStyle = {};
  * two styles that differ only in it share one id. The number format is
  * JSON-quoted because format codes may contain `|`.
  */
-function styleKey(style: CellStyle): string {
+export function styleKey(style: CellStyle): string {
   const border = style.border ? JSON.stringify(style.border) : "";
   const numberFormat = style.numberFormat === undefined ? "" : JSON.stringify(style.numberFormat);
   return `${style.bold ? 1 : 0}|${style.italic ? 1 : 0}|${style.underline ? 1 : 0}|${

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "c7ba58c4cabe8365de90264091abd8dea179e1cb037f08a3fff71f553bd2692c",
+  "sha256": "4fbfa8dcd1c29a58b51e43c53e0c214f1a30a492abc2feb7ca965c187a7858ae",
   "intentionalExports": [
     {
       "package": "@sheetwrite/charts",
@@ -187,6 +187,11 @@
         "PivotSource",
         "PivotSourceField",
         "PivotValueField",
+        "PowerQueryCodec",
+        "PowerQueryExport",
+        "PowerQueryImport",
+        "PowerQueryLoss",
+        "PowerQueryUnsupported",
         "PresenceActor",
         "PresenceCoordinator",
         "PresenceCoordinatorEvent",
@@ -212,6 +217,13 @@
         "ResolvedHyperlinkTarget",
         "ResourceOwnerBytes",
         "RestoreProvenance",
+        "RevisionAdapter",
+        "RevisionCoordinator",
+        "RevisionCoordinatorEvent",
+        "RevisionCoordinatorOptions",
+        "RevisionRestoreRequest",
+        "RevisionRestoreResponse",
+        "RevisionSummary",
         "RibbonConfig",
         "RibbonMode",
         "RowBridge",
@@ -500,9 +512,18 @@
       "entryPoint": "./history",
       "exports": [
         "DEFAULT_HISTORY_LIMITS",
+        "HISTORY_DIFF_NONE",
         "HistoryArchive",
         "HistoryArchiveOptions",
         "HistoryCommit",
+        "HistoryDiffCell",
+        "HistoryDiffCells",
+        "HistoryDiffCursor",
+        "HistoryDiffDetail",
+        "HistoryDiffFlag",
+        "HistoryDiffPage",
+        "HistoryDiffRequest",
+        "HistoryDiffSheet",
         "HistoryError",
         "HistoryErrorCode",
         "HistoryGetRequest",
@@ -524,6 +545,7 @@
         "HistoryStorageUsage",
         "HistoryStoredRecord",
         "HistoryVersion",
+        "MAX_HISTORY_DIFF_ENTRIES",
         "MemoryHistoryStorage"
       ]
     },
@@ -625,6 +647,7 @@
         "QuerySource",
         "QueryStep",
         "createQuerySession",
+        "loadPowerQueryCodec",
         "loadQueryEngine"
       ]
     },

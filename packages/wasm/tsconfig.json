@@ -4,5 +4,10 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["loader.d.ts", "pkg/sheetwrite_wasm.d.ts"]
+  "include": [
+    "loader.d.ts",
+    "pkg/sheetwrite_wasm.d.ts",
+    "history.d.ts",
+    "pkg-history/sheetwrite_history.d.ts"
+  ]
 }

@@ -230,7 +230,36 @@ pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
         | Func::Quotient
         | Func::Gcd
         | Func::Lcm
-        | Func::Subtotal => math_family(func, values),
+        | Func::Subtotal
+        | Func::IsEven
+        | Func::IsOdd
+        | Func::CeilingPrecise
+        | Func::FloorPrecise
+        | Func::IsoCeiling => math_family(func, values),
+        Func::Sin
+        | Func::Cos
+        | Func::Tan
+        | Func::Cot
+        | Func::Csc
+        | Func::Sec
+        | Func::Asin
+        | Func::Acos
+        | Func::Atan
+        | Func::Atan2
+        | Func::Acot
+        | Func::Sinh
+        | Func::Cosh
+        | Func::Tanh
+        | Func::Coth
+        | Func::Csch
+        | Func::Sech
+        | Func::Asinh
+        | Func::Acosh
+        | Func::Atanh
+        | Func::Acoth
+        | Func::Degrees
+        | Func::Radians => trigonometry_family(func, values),
+        Func::Roman | Func::Arabic | Func::Base | Func::Decimal => numeral_family(func, values),
         Func::Len
         | Func::Left
         | Func::Right
@@ -294,7 +323,14 @@ pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
         | Func::CovarianceP
         | Func::CountBlank
         | Func::MaxIfs
-        | Func::MinIfs => statistics_family(func, values),
+        | Func::MinIfs
+        | Func::AverageA
+        | Func::MaxA
+        | Func::MinA
+        | Func::StdevA
+        | Func::StdevPA
+        | Func::VarA
+        | Func::VarPA => statistics_family(func, values),
         Func::Pv
         | Func::Fv
         | Func::Pmt
@@ -313,6 +349,16 @@ pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
 #[inline(never)]
 fn math_family(func: Func, values: &FuncAccumulator) -> EvalResult {
     math::apply(func, values).unwrap_or(Value::Error(FormulaError::Value))
+}
+
+#[inline(never)]
+fn trigonometry_family(func: Func, values: &FuncAccumulator) -> EvalResult {
+    math::trigonometry::apply(func, values)
+}
+
+#[inline(never)]
+fn numeral_family(func: Func, values: &FuncAccumulator) -> EvalResult {
+    math::numerals::apply(func, values)
 }
 
 #[inline(never)]
@@ -625,7 +671,14 @@ pub(super) fn treats_cell_as_reference(func: Func) -> bool {
         | Func::GeoMean
         | Func::CountBlank
         | Func::Npv
-        | Func::Irr => true,
+        | Func::Irr
+        | Func::AverageA
+        | Func::MaxA
+        | Func::MinA
+        | Func::StdevA
+        | Func::StdevPA
+        | Func::VarA
+        | Func::VarPA => true,
         #[cfg(feature = "analysis")]
         Func::Analysis(id) => super::analysis::treats_cell_as_reference(super::analysis::name(id)),
         _ => false,

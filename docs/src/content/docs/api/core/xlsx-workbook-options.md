@@ -8,10 +8,10 @@ description: "XlsxWorkbookOptions interface in @sheetwrite/core: Shared options 
 Shared options passed to every registered table and workbook XLSX backend.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/xlsx-bridge.ts#L295"><code>packages/core/src/xlsx-bridge.ts#L295</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/xlsx-bridge.ts#L297"><code>packages/core/src/xlsx-bridge.ts#L297</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>4</span>
+## Members <span class="api-count" data-pagefind-ignore>5</span>
 
 <div class="api-member-list">
 
@@ -53,6 +53,19 @@ onWarning?: (warning: XlsxWorkbookWarning) => void;
 ```
 
 </details>
+
+<details class="api-member" id="xlsx-workbook-options-power-query" data-pagefind-weight="1">
+<summary><code>powerQuery</code> <span class="api-member-summary">Power Query translation for saved queries, such as loadPowerQueryCodec() from @sheetwrite/queries.</span></summary>
+
+```ts generated
+powerQuery?: PowerQueryCodec;
+```
+
+<p class="api-member-doc">Power Query translation for saved queries, such as `loadPowerQueryCodec()`
+from `@sheetwrite/queries`. Without it, import keeps query parts as opaque
+parts, and export writes them back only while `workbook.queries` is
+unchanged since import.</p>
+</details>
 </div>
 
 ## Declaration
@@ -66,6 +79,7 @@ export interface XlsxWorkbookOptions {
   maxCells?: number;
   resourceLimits?: Partial<Omit<XlsxResourceLimits, "maxCells">>;
   onWarning?: (warning: XlsxWorkbookWarning) => void;
+  powerQuery?: PowerQueryCodec;
 }
 ```
 

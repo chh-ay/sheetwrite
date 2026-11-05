@@ -14,7 +14,7 @@ import type { CellAddress, MergeRange, Range, SheetId } from "./coordinates.js";
 import type { DataModel, TableRelationship } from "./data-model.js";
 import type { PivotDefinition } from "./pivot.js";
 import type { SavedQuery } from "./query.js";
-import type { WorkbookTable, WorkbookTablePatch } from "./table.js";
+import type { WorkbookTable, WorkbookTablePatch, WorkbookTableXmlElement } from "./table.js";
 
 /** Stable reason codes returned by worksheet-name validation. */
 export type SheetNameIssueCode =
@@ -71,6 +71,13 @@ export interface Sheet {
   notes?: CellNote[];
   /** Persisted sort keys for the sheet's view. */
   sortKeys?: SortKey[];
+  /**
+   * The worksheet `sortState` of an imported XLSX file. Excel writes it after
+   * a sort whose cells it already moved, so Sheetwrite keeps it for export and
+   * does not apply it. Export writes it while its references lie inside the
+   * sheet; a view sort (`sortKeys`) replaces it.
+   */
+  sortState?: WorkbookTableXmlElement;
   /** Persisted column filters as JSON-safe index/value tuples. */
   filters?: Array<[col: number, filter: ColumnFilter]>;
   /** Persisted merged-cell regions; covered cells render/export from the anchor. */
@@ -421,6 +428,8 @@ export interface SheetSnapshot {
   protectedRanges?: ProtectedRange[];
   notes?: CellNote[];
   sortKeys?: SortKey[];
+  /** See `Sheet.sortState`. */
+  sortState?: WorkbookTableXmlElement;
   filters?: Array<[col: number, filter: ColumnFilter]>;
   rowGroups?: RowGroup[];
   tables?: WorkbookTable[];
@@ -465,6 +474,12 @@ export interface XlsxSourceGraph {
   readonly target: string;
   /** Pivot cache id written into `<pivotCaches>`. */
   readonly cacheId?: string;
+  /**
+   * 64-bit hex digest of `workbook.queries` at import, for graphs that hold
+   * saved query definitions (the DataMashup and its connections). Any query
+   * change makes the graph stale, so it is dropped.
+   */
+  readonly queries?: string;
   /** Every retained part reached from `target`, including `.rels` parts. */
   readonly parts: readonly string[];
   readonly dependencies: readonly XlsxSourceDependency[];

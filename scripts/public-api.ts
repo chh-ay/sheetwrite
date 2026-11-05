@@ -1,59 +1,35 @@
-import { createHash } from "node:crypto";
-import { access, readdir, readFile, rename, writeFile } from "node:fs/promises";
+import { access, readdir } from "node:fs/promises";
 import { join, relative, resolve, sep } from "node:path";
 
 import {
-  type Expression,
-  type ExpressionWithTypeArguments,
-  getJSDocTags,
-  getTextOfJSDocComment,
-  type HeritageClause,
-  type InterfaceDeclaration,
-  isAwaitExpression,
-  isBlock,
-  isCallExpression,
-  isClassDeclaration,
-  isElementAccessExpression,
   isEnumDeclaration,
-  isExportDeclaration,
-  isExportSpecifier,
-  isIdentifier,
-  isImportDeclaration,
-  isImportTypeNode,
   isInterfaceDeclaration,
-  isJSDoc,
-  isJSDocSeeTag,
-  isLiteralTypeNode,
-  isNamedExports,
-  isNamespaceImport,
-  isObjectBindingPattern,
-  isParenthesizedExpression,
-  isPropertyAccessExpression,
-  isQualifiedName,
-  isStringLiteral,
   isTypeAliasDeclaration,
-  isVariableDeclaration,
-  isVariableStatement,
-  type ModifiersBase,
-  type Node,
-  type NodeArray,
-  type PropertyName,
-  type SourceFile,
-  SyntaxKind,
 } from "typescript/unstable/ast";
-import {
-  API,
-  type Symbol as ApiSymbol,
-  type Diagnostic,
-  NodeBuilderFlags,
-  type Project,
-  type Signature,
-  SignatureKind,
-  SymbolFlags,
-  type Type,
-} from "typescript/unstable/async";
+import { API, type Project, type Symbol as ApiSymbol } from "typescript/unstable/async";
 
 import { PUBLIC_TYPE_DOMAINS } from "./check-import-cycles.js";
+import {
+  checkManifestBaseline,
+  readPublicApiBaseline,
+  validateManifest,
+  writePublicApiBaseline,
+} from "./public-api-baseline.js";
+import {
+  collectTags,
+  declarationSignature,
+  declarationsOf,
+  diagnosticText,
+  duplicateExportDiagnosticCode,
+  exportStatementDocumentation,
+  memberDocumentation,
+  mergeDocumentation,
+  resolvedSymbol,
+  symbolDocumentation,
+  symbolKind,
+  unstableErrorContract,
+} from "./public-api-declarations.js";
+import { findUnusedPublicExports } from "./public-api-usage.js";
 import { readJson } from "./script-io.js";
 
 export type ApiEntryClassification = "supported" | "internal" | "asset" | "test-only";
@@ -114,7 +90,7 @@ export interface ApiIssue {
   symbol?: string;
 }
 
-interface PackageJson {
+export interface PackageJson {
   name?: string;
   private?: boolean;
   workspaces?: string[];
@@ -168,7 +144,7 @@ const SUPPORTED_PACKAGES: Readonly<Record<string, true>> = {
   "@sheetwrite/xlsx": true,
 };
 
-async function exists(path: string): Promise<boolean> {
+export async function exists(path: string): Promise<boolean> {
   try {
     await access(path);
     return true;
@@ -239,7 +215,7 @@ async function resolveSource(packageRoot: string, target: string): Promise<strin
   return undefined;
 }
 
-async function packageDirectories(repositoryRoot: string): Promise<string[]> {
+export async function packageDirectories(repositoryRoot: string): Promise<string[]> {
   const rootManifest = await readJson<PackageJson>(join(repositoryRoot, "package.json"));
   const directories: string[] = [];
   for (const workspace of rootManifest.workspaces ?? []) {
@@ -267,6 +243,8 @@ function classifyEntry(
     subpath === "."
   )
     return "internal";
+  // `@sheetwrite/core/history` loads the diff kernel; hosts only point at its WASM asset.
+  if (packageName === "@sheetwrite/wasm" && subpath === "./history") return "internal";
   if (SUPPORTED_PACKAGES[packageName] === true) return "supported";
   return undefined;
 }
@@ -303,518 +281,6 @@ async function resolveEntries(
     });
   }
   return { entries, issues };
-}
-
-function normalizeText(text: string): string {
-  return text
-    .replace(/\/\*[\s\S]*?\*\//g, " ")
-    .replace(/(^|\s)\/\/[^\n\r]*/g, "$1")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-/**
- * `TypeFormatFlags` is not part of the TypeScript 7 API surface, but its values
- * are unchanged; these are the two flags the manifest has always rendered with.
- */
-const TYPE_FORMAT_FLAGS = {
-  NoTruncation: 1,
-  UseAliasDefinedOutsideCurrentScope: 1 << 14,
-} as const;
-
-const TYPE_STRING_FLAGS =
-  TYPE_FORMAT_FLAGS.NoTruncation | TYPE_FORMAT_FLAGS.UseAliasDefinedOutsideCurrentScope;
-
-/**
- * TypeScript 7 renders signatures as declaration nodes. These are the builder
- * flags classic `Checker.signatureToString` used: the flags mapped from
- * `TypeFormatFlags` plus `IgnoreErrors | WriteTypeParametersInQualifiedName`.
- */
-const SIGNATURE_BUILDER_FLAGS =
-  NodeBuilderFlags.NoTruncation |
-  NodeBuilderFlags.UseAliasDefinedOutsideCurrentScope |
-  NodeBuilderFlags.IgnoreErrors |
-  NodeBuilderFlags.WriteTypeParametersInQualifiedName;
-
-/** TypeScript reports an ambiguous duplicate re-export under this code. */
-const duplicateExportDiagnosticCode = 2308;
-
-/** `flattenDiagnosticMessageText` with the newline separator the report used. */
-function diagnosticText(diagnostic: Diagnostic, indent = 0): string {
-  const chain = diagnostic.messageChain ?? [];
-  return `${"\n".repeat(indent)}${diagnostic.text}${chain
-    .map((message) => diagnosticText(message, indent + 1))
-    .join("")}`;
-}
-
-/** Every member except call and index signatures carries a name. */
-type NamedElement = Node & { readonly name?: PropertyName };
-
-/** Types that can carry heritage clauses, so members can inherit documents. */
-type HeritageCarrier = Node & { readonly heritageClauses?: NodeArray<HeritageClause> };
-
-/**
- * `Symbol.declarations` holds node handles; the analysis walks real AST nodes.
- * Handles that no longer resolve are dropped, as if the declaration were absent.
- */
-async function declarationsOf(symbol: ApiSymbol, project: Project): Promise<Node[]> {
-  const declarations = await Promise.all(
-    symbol.declarations.map((handle) => handle.resolve(project)),
-  );
-  return declarations.filter((declaration): declaration is Node => declaration !== undefined);
-}
-
-/** `getModifiers` reported syntactic modifiers, so only the written ones count. */
-function hasModifier(node: Node, kind: SyntaxKind): boolean {
-  const modifiers = (node as ModifiersBase).modifiers;
-  return modifiers?.some((modifier) => modifier.kind === kind) === true;
-}
-
-/**
- * Comment text of the JSDoc blocks documenting a node, in source order. A
- * variable declaration is documented by the statement that declares it alone,
- * mirroring where the compiler looks for its comments.
- */
-function jsDocCommentTexts(node: Node): string[] {
-  const hosts = [node];
-  const statement = node.parent?.parent;
-  if (
-    statement !== undefined &&
-    isVariableStatement(statement) &&
-    statement.declarationList.declarations.length === 1 &&
-    statement.declarationList.declarations[0] === node
-  ) {
-    hosts.push(statement);
-  }
-  const comments: string[] = [];
-  for (const host of hosts) {
-    // Only the last block written on a node documents it; earlier blocks are
-    // stray prose the compiler ignores.
-    const block = (host.jsDoc ?? []).filter(isJSDoc).at(-1);
-    if (block === undefined) continue;
-    const comment = getTextOfJSDocComment(block.comment);
-    if (comment !== undefined && comment.length > 0) comments.push(comment);
-    // Inherited framework props keep their summaries, not upstream documentation tags.
-    if (host.getSourceFile().fileName.includes("node_modules")) continue;
-    for (const tag of block.tags ?? []) {
-      if (!["example", "see"].includes(tag.tagName.text)) continue;
-      const comment = getTextOfJSDocComment(tag.comment) ?? "";
-      const reference = isJSDocSeeTag(tag) ? tag.nameExpression?.getText() : undefined;
-      const text = [reference, comment].filter(Boolean).join(" ");
-      comments.push(`@${tag.tagName.text}\n${text}`);
-    }
-  }
-  return comments;
-}
-
-/** JSDoc comment text of a node, as `getJSDocCommentsAndTags` joined it. */
-function jsDocCommentText(node: Node): string {
-  return jsDocCommentTexts(node).join("\n").trim();
-}
-
-function mergeDocumentation(sources: readonly string[]): string {
-  const summaries: string[] = [];
-  const tags: string[] = [];
-  for (const source of sources) {
-    for (const block of source.split(/(?=^@(?:example|see)\b)/m)) {
-      const text = block.trim();
-      if (text.length === 0) continue;
-      (text.startsWith("@") ? tags : summaries).push(text);
-    }
-  }
-  // Re-export prose must precede tags, or it becomes part of the last tag's body.
-  return [...new Set(summaries), ...new Set(tags)].join("\n");
-}
-
-/**
- * Documentation of a symbol, as the classic `getDocumentationComment` reported
- * it: the JSDoc comments its own declarations carry, or — when they carry none
- * — the comments of the same-named member it inherits from a base type, which
- * is how implemented-interface documentation reaches a class member. Comments
- * come from the AST because the API server renders `{@link …}` links as plain
- * text, while the manifest documents them as links.
- */
-async function symbolDocumentation(
-  symbol: ApiSymbol,
-  project: Project,
-  visited: Set<ApiSymbol> = new Set(),
-): Promise<string> {
-  const declarations = await declarationsOf(symbol, project);
-  const comments: string[] = [];
-  for (const declaration of declarations) {
-    for (const comment of jsDocCommentTexts(declaration)) {
-      if (!comments.includes(comment)) comments.push(comment);
-    }
-  }
-  if (comments.length > 0) return mergeDocumentation(comments);
-  if (visited.has(symbol)) return "";
-  visited.add(symbol);
-  for (const declaration of declarations) {
-    const inherited = await inheritedMemberDocumentation(declaration, project, visited);
-    if (inherited.length > 0) return inherited;
-  }
-  return "";
-}
-
-/** Documentation a member declaration inherits from the base type declaring it. */
-async function inheritedMemberDocumentation(
-  declaration: Node,
-  project: Project,
-  visited: Set<ApiSymbol>,
-): Promise<string> {
-  const name = (declaration as Partial<NamedElement>).name?.getText();
-  if (name === undefined) return "";
-  const staticMember = hasModifier(declaration, SyntaxKind.StaticKeyword);
-  for (const clause of (declaration.parent as Partial<HeritageCarrier>).heritageClauses ?? []) {
-    for (const base of clause.types) {
-      const baseType = await project.checker.getTypeAtLocation(base);
-      if (baseType === undefined) continue;
-      // The static side of a base type is reachable through its value symbol.
-      const baseSymbol = staticMember ? await baseType.getSymbol() : undefined;
-      const inheritedType =
-        baseSymbol === undefined ? baseType : await project.checker.getTypeOfSymbol(baseSymbol);
-      if (inheritedType === undefined) continue;
-      const member = await project.checker.getPropertyOfType(inheritedType, name);
-      if (member === undefined || visited.has(member)) continue;
-      const documentation = await symbolDocumentation(member, project, visited);
-      if (documentation.length > 0) return documentation;
-    }
-  }
-  return "";
-}
-
-/**
- * Classic `Checker.signatureToString` printed call signatures through a
- * single-line writer that turned every line break into one space and dropped
- * indentation, and deferred the trailing semicolon; the emitter keeps the
- * declaration's own line breaks and terminates it.
- */
-async function signatureText(
-  signature: Signature,
-  declaration: Node,
-  project: Project,
-): Promise<string> {
-  const node = await project.checker.signatureToSignatureDeclaration(
-    signature,
-    SyntaxKind.CallSignature,
-    declaration,
-    SIGNATURE_BUILDER_FLAGS,
-  );
-  if (node === undefined) return "";
-  return (await project.emitter.printNode(node)).replace(/\n[ \t]*/g, " ").replace(/;$/, "");
-}
-
-/** Documentation attached to a signature's declaration. */
-async function signatureDocumentation(signature: Signature, project: Project): Promise<string> {
-  const declaration = await signature.declaration?.resolve(project);
-  if (declaration === undefined) return "";
-  return jsDocCommentTexts(declaration).join("\n");
-}
-
-function symbolKind(symbol: ApiSymbol): string {
-  const flags = symbol.flags;
-  if (flags & SymbolFlags.Class) return "class";
-  if (flags & SymbolFlags.Interface) return "interface";
-  if (flags & SymbolFlags.TypeAlias) return "type";
-  if (flags & SymbolFlags.Enum) return "enum";
-  if (flags & SymbolFlags.Function) return "function";
-  if (flags & SymbolFlags.Variable) return "variable";
-  if (flags & SymbolFlags.NamespaceModule) return "namespace";
-  return "symbol";
-}
-
-async function isPrivateSymbol(symbol: ApiSymbol, project: Project): Promise<boolean> {
-  const declarations = await declarationsOf(symbol, project);
-  return (
-    declarations.length > 0 &&
-    declarations.every((declaration) => hasModifier(declaration, SyntaxKind.PrivateKeyword))
-  );
-}
-
-async function publicPropertySignature(
-  symbol: ApiSymbol,
-  project: Project,
-  prefix = "",
-): Promise<string | undefined> {
-  if ((await isPrivateSymbol(symbol, project)) || symbol.name === "prototype") return undefined;
-  const location = (await declarationsOf(symbol, project))[0];
-  if (location === undefined) return undefined;
-  const checker = project.checker;
-  const type = await checker.getTypeOfSymbolAtLocation(symbol, location);
-  const optional = symbol.flags & SymbolFlags.Optional ? "?" : "";
-  return `${prefix}${symbol.name}${optional}: ${await checker.typeToString(
-    type,
-    location,
-    TYPE_STRING_FLAGS,
-  )}`;
-}
-
-async function memberDocumentation(symbol: ApiSymbol, project: Project): Promise<ApiMemberDoc[]> {
-  const checker = project.checker;
-  const docs = new Map<string, string>();
-  const record = (name: string, documentation: string): void => {
-    if (documentation.length > 0 && !docs.has(name)) docs.set(name, documentation);
-  };
-  const collectFromType = async (type: Type): Promise<void> => {
-    for (const property of await checker.getPropertiesOfType(type)) {
-      if ((await isPrivateSymbol(property, project)) || property.name === "prototype") continue;
-      record(property.name, (await symbolDocumentation(property, project)).trim());
-    }
-    const signatureKinds = [
-      [SignatureKind.Call, "call"],
-      [SignatureKind.Construct, "new"],
-    ] as const;
-    for (const [kind, name] of signatureKinds) {
-      for (const signature of await checker.getSignaturesOfType(type, kind)) {
-        record(name, (await signatureDocumentation(signature, project)).trim());
-      }
-    }
-    for (const info of await checker.getIndexInfosOfType(type)) {
-      const declaration = await info.declaration?.resolve(project);
-      if (declaration === undefined) continue;
-      record("index", jsDocCommentText(declaration));
-    }
-  };
-  const declarations = await declarationsOf(symbol, project);
-  if (symbol.flags & (SymbolFlags.Interface | SymbolFlags.Class)) {
-    await collectFromType(await checker.getDeclaredTypeOfSymbol(symbol));
-  }
-  const classDeclaration = declarations.find(isClassDeclaration);
-  if (classDeclaration !== undefined) {
-    await collectFromType(await checker.getTypeOfSymbolAtLocation(symbol, classDeclaration));
-  }
-  const aliasDeclaration = declarations.find(isTypeAliasDeclaration);
-  if (aliasDeclaration !== undefined) {
-    const aliasType = await checker.getTypeAtLocation(aliasDeclaration.type);
-    if (aliasType !== undefined) await collectFromType(aliasType);
-  }
-  return [...docs.entries()]
-    .map(([name, documentation]) => ({ name, documentation }))
-    .sort((left, right) => left.name.localeCompare(right.name));
-}
-
-async function classSignature(symbol: ApiSymbol, project: Project): Promise<string> {
-  const checker = project.checker;
-  const declaration = (await declarationsOf(symbol, project)).find(isClassDeclaration);
-  if (declaration === undefined) return `class ${symbol.name}`;
-  const instanceType = await checker.getDeclaredTypeOfSymbol(symbol);
-  const valueType = await checker.getTypeOfSymbolAtLocation(symbol, declaration);
-  const heritage = declaration.heritageClauses
-    ?.map((clause) => clause.getText(declaration.getSourceFile()).replace(/\s+/g, " ").trim())
-    .join(" ");
-  const constructors = (
-    await Promise.all(
-      (await checker.getSignaturesOfType(valueType, SignatureKind.Construct)).map((signature) =>
-        signatureText(signature, declaration, project),
-      ),
-    )
-  )
-    // `(args): Instance` is a call signature — invalid inside a class body.
-    .map((signature) => `constructor${signature.replace(/\)\s*:\s*[^:]*$/, ")")}`)
-    // A default constructor adds nothing the class name doesn't already say.
-    .filter((signature) => signature !== "constructor()");
-  const sourceFile = declaration.getSourceFile();
-  const declaredHere = async (property: ApiSymbol): Promise<ApiSymbol | undefined> => {
-    const memberDeclarations = await declarationsOf(property, project);
-    return memberDeclarations.some(
-      (memberDeclaration) =>
-        memberDeclaration.getSourceFile().fileName === sourceFile.fileName &&
-        memberDeclaration.pos >= declaration.pos &&
-        memberDeclaration.end <= declaration.end,
-    )
-      ? property
-      : undefined;
-  };
-  // Inherited platform members (Error.name/message/stack) are noise here, so
-  // only properties declared in the class body are listed.
-  const declaredMembers = async (type: Type): Promise<ApiSymbol[]> =>
-    (await Promise.all((await checker.getPropertiesOfType(type)).map(declaredHere))).filter(
-      (property): property is ApiSymbol => property !== undefined,
-    );
-  const members = (
-    await Promise.all(
-      (await declaredMembers(instanceType)).map((property) =>
-        publicPropertySignature(property, project),
-      ),
-    )
-  ).filter((signature): signature is string => signature !== undefined);
-  const staticMembers = (
-    await Promise.all(
-      (await declaredMembers(valueType)).map((property) =>
-        publicPropertySignature(property, project, "static "),
-      ),
-    )
-  ).filter((signature): signature is string => signature !== undefined);
-  const body = [...constructors, ...members.sort(), ...staticMembers.sort()].join("; ");
-  const head = heritage ? `class ${symbol.name} ${heritage}` : `class ${symbol.name}`;
-  return body.length > 0 ? `${head} { ${body} }` : `${head} {}`;
-}
-/**
- * True when a heritage base resolves to declarations owned by this repository
- * rather than a dependency or the TypeScript libs. Workspace packages resolve
- * through realpath, so third-party bases are exactly the ones that still live
- * under `node_modules`.
- */
-async function isSheetwriteOwnedBase(
-  base: ExpressionWithTypeArguments,
-  project: Project,
-): Promise<boolean> {
-  const type = await project.checker.getTypeAtLocation(base);
-  if (type === undefined) return false;
-  const aliasSymbol = await type.getAliasSymbol();
-  const symbol = aliasSymbol ?? (await type.getSymbol());
-  if (symbol === undefined) return false;
-  const declarations = await declarationsOf(symbol, project);
-  if (declarations.length === 0) return false;
-  return declarations.every(
-    (declaration) => !declaration.getSourceFile().fileName.includes("node_modules"),
-  );
-}
-
-/**
- * Interface signature with Sheetwrite-owned heritage flattened: members
- * inherited from bases declared in this repository are inlined so adapter and
- * option pages document their full usable surface, while framework/library
- * bases (React/Vue/Svelte attributes, lib utility types) stay heritage-only
- * and never dump third-party internals into the manifest.
- */
-async function interfaceSignature(
-  symbol: ApiSymbol,
-  declaration: InterfaceDeclaration,
-  project: Project,
-): Promise<string> {
-  const checker = project.checker;
-  const sourceFile = declaration.getSourceFile();
-  const externalHeritage: string[] = [];
-  let ownedBases = 0;
-  for (const clause of declaration.heritageClauses ?? []) {
-    for (const base of clause.types) {
-      if (await isSheetwriteOwnedBase(base, project)) ownedBases += 1;
-      else externalHeritage.push(normalizeText(base.getText(sourceFile)));
-    }
-  }
-  if (ownedBases === 0) return normalizeText(declaration.getText());
-
-  const members: string[] = [];
-  const seen = new Set<string>();
-  for (const member of declaration.members) {
-    const text = normalizeText(member.getText(sourceFile));
-    members.push(text.endsWith(";") || text.endsWith(",") ? text : `${text};`);
-    // Call and index signatures carry no name, so only named members are seen.
-    const name = (member as Partial<NamedElement>).name?.getText(sourceFile);
-    if (name !== undefined) seen.add(name.replace(/^["']|["']$/g, ""));
-  }
-  for (const property of await checker.getPropertiesOfType(
-    await checker.getDeclaredTypeOfSymbol(symbol),
-  )) {
-    const name = property.name;
-    if (seen.has(name) || (await isPrivateSymbol(property, project)) || name === "prototype") {
-      continue;
-    }
-    const memberDeclaration = (await declarationsOf(property, project))[0];
-    if (memberDeclaration === undefined) continue;
-    if (memberDeclaration.getSourceFile().fileName.includes("node_modules")) continue;
-    seen.add(name);
-    const text = normalizeText(memberDeclaration.getText());
-    members.push(text.endsWith(";") || text.endsWith(",") ? text : `${text};`);
-  }
-
-  const modifiers = declaration.modifiers?.map((modifier) => modifier.getText(sourceFile)) ?? [];
-  const typeParameters =
-    declaration.typeParameters === undefined || declaration.typeParameters.length === 0
-      ? ""
-      : `<${declaration.typeParameters
-          .map((parameter) => normalizeText(parameter.getText(sourceFile)))
-          .join(", ")}>`;
-  const heritage = externalHeritage.length > 0 ? ` extends ${externalHeritage.join(", ")}` : "";
-  const head = `${[...modifiers, "interface"].join(" ")} ${declaration.name.text}${typeParameters}${heritage}`;
-  return members.length > 0 ? `${head} { ${members.join(" ")} }` : `${head} {}`;
-}
-
-async function declarationSignature(symbol: ApiSymbol, project: Project): Promise<string> {
-  const checker = project.checker;
-  const declarations = await declarationsOf(symbol, project);
-  if (symbol.flags & SymbolFlags.Class) return classSignature(symbol, project);
-  if (symbol.flags & (SymbolFlags.Interface | SymbolFlags.TypeAlias | SymbolFlags.Enum)) {
-    const interfaceDeclarations = declarations.filter(isInterfaceDeclaration);
-    const [onlyInterfaceDeclaration] = interfaceDeclarations;
-    if (
-      interfaceDeclarations.length === 1 &&
-      onlyInterfaceDeclaration !== undefined &&
-      onlyInterfaceDeclaration.heritageClauses !== undefined
-    ) {
-      return interfaceSignature(symbol, onlyInterfaceDeclaration, project);
-    }
-    return declarations
-      .map((declaration) => normalizeText(declaration.getText()))
-      .sort()
-      .join(" | ");
-  }
-
-  const location = declarations[0];
-  if (location === undefined) return symbol.name;
-  const type = await checker.getTypeOfSymbolAtLocation(symbol, location);
-  const callSignatures = await checker.getSignaturesOfType(type, SignatureKind.Call);
-  if (callSignatures.length > 0) {
-    const rendered = await Promise.all(
-      callSignatures.map((signature) => signatureText(signature, location, project)),
-    );
-    return rendered.sort().join(" | ");
-  }
-  return checker.typeToString(type, location, TYPE_STRING_FLAGS);
-}
-
-async function exportStatementDocumentation(symbol: ApiSymbol, project: Project): Promise<string> {
-  for (const declaration of await declarationsOf(symbol, project)) {
-    if (!isExportSpecifier(declaration)) continue;
-    const comment = jsDocCommentText(declaration.parent.parent);
-    if (comment.length > 0) return comment;
-  }
-  return "";
-}
-
-async function collectTags(symbol: ApiSymbol, project: Project): Promise<string[]> {
-  const tags = new Set((await symbol.getJsDocTags(project.checker)).map((tag) => tag.name));
-  for (const declaration of await declarationsOf(symbol, project)) {
-    const visit = (node: Node): void => {
-      if (isBlock(node)) return;
-      if (hasModifier(node, SyntaxKind.PrivateKeyword)) return;
-      for (const tag of getJSDocTags(node)) tags.add(tag.tagName.text);
-      node.forEachChild(visit);
-    };
-    visit(declaration);
-  }
-  return [...tags].sort();
-}
-
-async function resolvedSymbol(symbol: ApiSymbol, project: Project): Promise<ApiSymbol> {
-  let current = symbol;
-  const seen = new Set<ApiSymbol>();
-  while (current.flags & SymbolFlags.Alias) {
-    if (seen.has(current)) break;
-    seen.add(current);
-    current = await project.checker.getAliasedSymbol(current);
-  }
-  return current;
-}
-
-function unstableErrorContract(apiExport: ApiExport): string | null {
-  if (
-    /\berror\??:\s*(?:unknown|Error)\b/.test(apiExport.signature) ||
-    /\(\s*_?error:\s*(?:unknown|Error)\b/.test(apiExport.signature)
-  ) {
-    return `${apiExport.name} exposes an untyped error boundary; use SheetwriteError`;
-  }
-  if (
-    apiExport.kind === "class" &&
-    apiExport.name !== "SheetwriteError" &&
-    /\bextends (?:Error|RangeError|TypeError|AggregateError|EvalError|ReferenceError|SyntaxError|URIError|DOMException)\b/.test(
-      apiExport.signature,
-    )
-  ) {
-    return `${apiExport.name} extends Error directly; public failures must extend SheetwriteError`;
-  }
-  return null;
 }
 
 /**
@@ -915,103 +381,11 @@ async function analyzeEntry(
   const mergedDeclarationSymbols: string[] = [];
   const apiExports: ApiExport[] = [];
   for (const exported of await checker.getExportsOfModule(moduleSymbol)) {
-    const target = await resolvedSymbol(exported, project);
-    const declarations = await declarationsOf(target, project);
-    const structuralDeclarations = declarations.filter(
-      (candidate) =>
-        isInterfaceDeclaration(candidate) ||
-        isTypeAliasDeclaration(candidate) ||
-        isEnumDeclaration(candidate),
-    );
-    if (structuralDeclarations.length > 1) mergedDeclarationSymbols.push(exported.name);
-    const owners = new Set(
-      declarations.map((declaration) =>
-        posix(relative(packageRoot, declaration.getSourceFile().fileName)),
-      ),
-    );
-    const declaration = declarations[0];
-    const source =
-      declaration === undefined
-        ? ""
-        : `${posix(relative(packageRoot, declaration.getSourceFile().fileName))}#L${
-            declaration.getSourceFile().getLineAndCharacterOfPosition(declaration.getStart()).line +
-            1
-          }`;
-    const tags = new Set([
-      ...(await collectTags(exported, project)),
-      ...(await collectTags(target, project)),
-    ]);
-    const documentation = [
-      await exportStatementDocumentation(exported, project),
-      ...(await Promise.all(
-        [exported, target].map(async (symbol) =>
-          (await symbolDocumentation(symbol, project)).trim(),
-        ),
-      )),
-    ].filter((value, index, values) => value.length > 0 && values.indexOf(value) === index);
-    const kind = symbolKind(target);
-    apiExports.push({
-      name: exported.name,
-      kind,
-      signature: await declarationSignature(target, project),
-      owners: [...owners].sort(),
-      source,
-      jsDocTags: [...tags].sort(),
-      documentation: mergeDocumentation(documentation),
-      memberDocs:
-        kind === "interface" || kind === "class" ? await memberDocumentation(target, project) : [],
-    });
+    apiExports.push(await describeExport(exported, packageRoot, project, mergedDeclarationSymbols));
   }
-  apiExports.sort((left, right) => left.name.localeCompare(right.name));
 
-  for (const symbol of mergedDeclarationSymbols) {
-    issues.push({
-      code: "duplicate-export",
-      message: `${packageName} ${entry.subpath} export ${symbol} merges multiple structural declarations; the joined signature cannot render as one declaration`,
-      package: packageName,
-      entryPoint: entry.subpath,
-      symbol,
-    });
-  }
-  for (const apiExport of apiExports) {
-    if (apiExport.owners.length > 1) {
-      issues.push({
-        code: "duplicate-export",
-        message: `${packageName} ${entry.subpath} gives ${apiExport.name} multiple owners: ${apiExport.owners.join(", ")}`,
-        package: packageName,
-        entryPoint: entry.subpath,
-        symbol: apiExport.name,
-      });
-    }
-    if (apiExport.jsDocTags.includes("deprecated")) {
-      issues.push({
-        code: "deprecated-symbol",
-        message: `${packageName} ${entry.subpath} exports deprecated symbol ${apiExport.name}`,
-        package: packageName,
-        entryPoint: entry.subpath,
-        symbol: apiExport.name,
-      });
-    }
-    if (entry.classification === "supported" && apiExport.documentation.trim().length === 0) {
-      issues.push({
-        code: "missing-documentation",
-        message: `${packageName} ${entry.subpath} export ${apiExport.name} has no source JSDoc summary`,
-        package: packageName,
-        entryPoint: entry.subpath,
-        symbol: apiExport.name,
-      });
-    }
-    const errorContractIssue = unstableErrorContract(apiExport);
-    if (entry.classification === "supported" && errorContractIssue !== null) {
-      issues.push({
-        code: "unstable-error-contract",
-        message: `${packageName} ${entry.subpath} export ${errorContractIssue}`,
-        package: packageName,
-        entryPoint: entry.subpath,
-        symbol: apiExport.name,
-      });
-    }
-  }
+  apiExports.sort((left, right) => left.name.localeCompare(right.name));
+  issues.push(...exportPolicyIssues(packageName, entry, apiExports, mergedDeclarationSymbols));
 
   return {
     entry: {
@@ -1026,451 +400,123 @@ async function analyzeEntry(
   };
 }
 
-export function validateManifest(value: unknown): ApiIssue[] {
-  const malformed = (message: string): ApiIssue[] => [
-    { code: "malformed-report", message: `Malformed public API report: ${message}` },
-  ];
-  if (value === null || typeof value !== "object") return malformed("root is not an object");
-  const report = value as Partial<PublicApiManifest>;
-  if (report.formatVersion !== 2) return malformed("formatVersion is not 2");
-  if (!Array.isArray(report.packages) || report.packages.length === 0) {
-    return malformed("packages is missing or empty");
-  }
-  for (const pkg of report.packages) {
-    if (typeof pkg?.name !== "string" || pkg.name.length === 0)
-      return malformed("package name missing");
-    if (!Array.isArray(pkg.entryPoints) || pkg.entryPoints.length === 0) {
-      return malformed(`${pkg.name} entryPoints is missing or empty`);
-    }
-    for (const entry of pkg.entryPoints) {
-      if (typeof entry.subpath !== "string" || !Array.isArray(entry.exports)) {
-        return malformed(`${pkg.name} contains a partial entry point`);
-      }
-      if (
-        entry.classification !== "supported" &&
-        entry.classification !== "internal" &&
-        entry.classification !== "asset" &&
-        entry.classification !== "test-only"
-      ) {
-        return malformed(`${pkg.name} ${entry.subpath} has no valid classification`);
-      }
-      const names = new Set<string>();
-      for (const apiExport of entry.exports) {
-        if (
-          typeof apiExport?.name !== "string" ||
-          typeof apiExport.kind !== "string" ||
-          typeof apiExport.signature !== "string" ||
-          !Array.isArray(apiExport.owners) ||
-          typeof apiExport.source !== "string" ||
-          !Array.isArray(apiExport.jsDocTags) ||
-          typeof apiExport.documentation !== "string" ||
-          !Array.isArray(apiExport.memberDocs) ||
-          apiExport.memberDocs.some(
-            (member) =>
-              typeof member?.name !== "string" || typeof member.documentation !== "string",
-          )
-        ) {
-          return malformed(`${pkg.name} ${entry.subpath} contains a partial export`);
-        }
-        if (names.has(apiExport.name))
-          return malformed(`${pkg.name} ${entry.subpath} repeats ${apiExport.name}`);
-        names.add(apiExport.name);
-      }
-    }
-  }
-  return [];
-}
-export interface PublicApiBaselineEntry {
-  package: string;
-  entryPoint: string;
-  exports: string[];
-}
+/**
+ * Read one export's declarations, source link, tags and documentation from
+ * the compiler. Exports that merge several structural declarations are
+ * recorded in `mergedDeclarationSymbols`.
+ */
+async function describeExport(
+  exported: ApiSymbol,
+  packageRoot: string,
+  project: Project,
+  mergedDeclarationSymbols: string[],
+): Promise<ApiExport> {
+  const target = await resolvedSymbol(exported, project);
+  const declarations = await declarationsOf(target, project);
+  const structuralDeclarations = declarations.filter(
+    (candidate) =>
+      isInterfaceDeclaration(candidate) ||
+      isTypeAliasDeclaration(candidate) ||
+      isEnumDeclaration(candidate),
+  );
+  if (structuralDeclarations.length > 1) mergedDeclarationSymbols.push(exported.name);
 
-export interface PublicApiBaseline {
-  schemaVersion: 2;
-  manifestFormatVersion: PublicApiManifest["formatVersion"];
-  sha256: string;
-  /** Reviewed public intent; baseline refreshes preserve this list rather than accepting new exports. */
-  intentionalExports: PublicApiBaselineEntry[];
-}
+  const owners = new Set(
+    declarations.map((declaration) =>
+      posix(relative(packageRoot, declaration.getSourceFile().fileName)),
+    ),
+  );
+  const declaration = declarations[0];
+  const source =
+    declaration === undefined
+      ? ""
+      : `${posix(relative(packageRoot, declaration.getSourceFile().fileName))}#L${
+          declaration.getSourceFile().getLineAndCharacterOfPosition(declaration.getStart()).line + 1
+        }`;
 
-const PUBLIC_API_BASELINE_PATH = "scripts/public-api-baseline.json";
-const SOURCE_FILE_PATTERN = /\.(?:[cm]?[jt]sx?|svelte|vue)$/;
-const IGNORED_SOURCE_DIRECTORIES: Readonly<Record<string, true>> = {
-  ".astro": true,
-  ".git": true,
-  ".vercel": true,
-  coverage: true,
-  dist: true,
-  node_modules: true,
-  pkg: true,
-  target: true,
-};
+  const tags = new Set([
+    ...(await collectTags(exported, project)),
+    ...(await collectTags(target, project)),
+  ]);
+  const documentation = [
+    await exportStatementDocumentation(exported, project),
+    ...(await Promise.all(
+      [exported, target].map(async (symbol) => (await symbolDocumentation(symbol, project)).trim()),
+    )),
+  ].filter((value, index, values) => value.length > 0 && values.indexOf(value) === index);
 
-function publicApiEntryKey(packageName: string, entryPoint: string): string {
-  return `${packageName}\0${entryPoint}`;
-}
-
-export function publicApiDigest(manifest: PublicApiManifest): string {
-  return createHash("sha256").update(JSON.stringify(manifest)).digest("hex");
-}
-
-export function parsePublicApiBaseline(value: unknown): PublicApiBaseline {
-  if (
-    typeof value !== "object" ||
-    value === null ||
-    !("schemaVersion" in value) ||
-    value.schemaVersion !== 2 ||
-    !("manifestFormatVersion" in value) ||
-    value.manifestFormatVersion !== 2 ||
-    !("sha256" in value) ||
-    typeof value.sha256 !== "string" ||
-    !/^[0-9a-f]{64}$/.test(value.sha256) ||
-    !("intentionalExports" in value) ||
-    !Array.isArray(value.intentionalExports)
-  ) {
-    throw new TypeError("Invalid public API baseline artifact");
-  }
-  const entries: PublicApiBaselineEntry[] = [];
-  for (const entry of value.intentionalExports) {
-    if (
-      typeof entry !== "object" ||
-      entry === null ||
-      !("package" in entry) ||
-      typeof entry.package !== "string" ||
-      !("entryPoint" in entry) ||
-      typeof entry.entryPoint !== "string" ||
-      !("exports" in entry) ||
-      !Array.isArray(entry.exports) ||
-      entry.exports.some((name: unknown) => typeof name !== "string")
-    ) {
-      throw new TypeError("Invalid public API baseline artifact");
-    }
-    const names = entry.exports as string[];
-    if (new Set(names).size !== names.length || names.join("\0") !== [...names].sort().join("\0")) {
-      throw new TypeError("Invalid public API baseline artifact");
-    }
-    entries.push({ package: entry.package, entryPoint: entry.entryPoint, exports: [...names] });
-  }
-  const keys = entries.map((entry) => publicApiEntryKey(entry.package, entry.entryPoint));
-  if (new Set(keys).size !== keys.length || keys.join("\0") !== [...keys].sort().join("\0")) {
-    throw new TypeError("Invalid public API baseline artifact");
-  }
+  const kind = symbolKind(target);
   return {
-    schemaVersion: 2,
-    manifestFormatVersion: 2,
-    sha256: value.sha256,
-    intentionalExports: entries,
+    name: exported.name,
+    kind,
+    signature: await declarationSignature(target, project),
+    owners: [...owners].sort(),
+    source,
+    jsDocTags: [...tags].sort(),
+    documentation: mergeDocumentation(documentation),
+    memberDocs:
+      kind === "interface" || kind === "class" ? await memberDocumentation(target, project) : [],
   };
 }
 
-export async function readPublicApiBaseline(repositoryRoot: string): Promise<PublicApiBaseline> {
-  const path = join(repositoryRoot, PUBLIC_API_BASELINE_PATH);
-  return parsePublicApiBaseline(JSON.parse(await readFile(path, "utf8")));
-}
-
-export async function writePublicApiBaseline(
-  repositoryRoot: string,
-  manifest: PublicApiManifest,
-): Promise<PublicApiBaseline> {
-  const previous = await readPublicApiBaseline(repositoryRoot);
-  const baseline: PublicApiBaseline = {
-    ...previous,
-    manifestFormatVersion: manifest.formatVersion,
-    sha256: publicApiDigest(manifest),
-  };
-  const path = join(repositoryRoot, PUBLIC_API_BASELINE_PATH);
-  const temporaryPath = `${path}.tmp`;
-  await writeFile(temporaryPath, `${JSON.stringify(baseline, null, 2)}\n`);
-  await rename(temporaryPath, path);
-  return baseline;
-}
-
-export function checkManifestBaseline(manifest: PublicApiManifest, expected: string): ApiIssue[] {
-  const actual = publicApiDigest(manifest);
-  return actual === expected
-    ? []
-    : [
-        {
-          code: "manifest-drift",
-          message: `Public API manifest digest changed: expected ${expected}, received ${actual}`,
-        },
-      ];
-}
-
-async function sourceFiles(directory: string): Promise<string[]> {
-  const files: string[] = [];
-  const entries = await readdir(directory, { withFileTypes: true });
-  entries.sort((left, right) => left.name.localeCompare(right.name));
-  for (const entry of entries) {
-    if (entry.isDirectory() && IGNORED_SOURCE_DIRECTORIES[entry.name] === true) continue;
-    const path = join(directory, entry.name);
-    if (entry.isDirectory()) files.push(...(await sourceFiles(path)));
-    else if (entry.isFile() && SOURCE_FILE_PATTERN.test(entry.name)) files.push(path);
-  }
-  return files;
-}
-
-function scriptFragments(path: string, source: string): string[] {
-  if (!/\.(?:svelte|vue)$/.test(path)) return [source];
-  return [...source.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
-    (match) => match[1] ?? "",
-  );
-}
-
-function collectImportedNames(
-  sourceFile: SourceFile,
-  specifiers: ReadonlyMap<string, string>,
-  consumed: Map<string, Set<string>>,
-): void {
-  const record = (specifier: string, name: string): void => {
-    const key = specifiers.get(specifier);
-    if (key === undefined) return;
-    const names = consumed.get(key) ?? new Set<string>();
-    names.add(name);
-    consumed.set(key, names);
-  };
-  const namespaceSpecifiers = new Map<string, string>();
-  const dynamicImportSpecifier = (expression: Expression): string | undefined => {
-    let current = expression;
-    while (isAwaitExpression(current) || isParenthesizedExpression(current)) {
-      current = current.expression;
-    }
-    if (!isCallExpression(current) || current.expression.kind !== SyntaxKind.ImportKeyword) {
-      return undefined;
-    }
-    const argument = current.arguments[0];
-    return current.arguments.length === 1 && argument !== undefined && isStringLiteral(argument)
-      ? argument.text
-      : undefined;
-  };
-  const visit = (node: Node): void => {
-    if (
-      isImportDeclaration(node) &&
-      isStringLiteral(node.moduleSpecifier) &&
-      node.importClause !== undefined
-    ) {
-      const specifier = node.moduleSpecifier.text;
-      if (node.importClause.name !== undefined) record(specifier, "default");
-      const bindings = node.importClause.namedBindings;
-      if (bindings !== undefined) {
-        if (isNamespaceImport(bindings)) {
-          namespaceSpecifiers.set(bindings.name.text, specifier);
-        } else {
-          for (const element of bindings.elements) {
-            record(specifier, element.propertyName?.text ?? element.name.text);
-          }
-        }
-      }
-    } else if (
-      isExportDeclaration(node) &&
-      node.moduleSpecifier !== undefined &&
-      isStringLiteral(node.moduleSpecifier) &&
-      node.exportClause !== undefined &&
-      isNamedExports(node.exportClause)
-    ) {
-      const specifier = node.moduleSpecifier.text;
-      for (const element of node.exportClause.elements) {
-        record(specifier, element.propertyName?.text ?? element.name.text);
-      }
-    } else if (isVariableDeclaration(node) && node.initializer !== undefined) {
-      const dynamicSpecifier = dynamicImportSpecifier(node.initializer);
-      if (dynamicSpecifier !== undefined) {
-        if (isIdentifier(node.name)) {
-          namespaceSpecifiers.set(node.name.text, dynamicSpecifier);
-        } else if (isObjectBindingPattern(node.name)) {
-          for (const element of node.name.elements) {
-            const importedName = element.propertyName ?? element.name;
-            if (
-              importedName !== undefined &&
-              (isIdentifier(importedName) || isStringLiteral(importedName))
-            ) {
-              record(dynamicSpecifier, importedName.text);
-            }
-          }
-        }
-      } else if (
-        isObjectBindingPattern(node.name) &&
-        isIdentifier(node.initializer) &&
-        namespaceSpecifiers.has(node.initializer.text)
-      ) {
-        const specifier = namespaceSpecifiers.get(node.initializer.text) ?? "";
-        for (const element of node.name.elements) {
-          const importedName = element.propertyName ?? element.name;
-          if (
-            importedName !== undefined &&
-            (isIdentifier(importedName) || isStringLiteral(importedName))
-          ) {
-            record(specifier, importedName.text);
-          }
-        }
-      }
-    } else if (isPropertyAccessExpression(node)) {
-      const dynamicSpecifier = dynamicImportSpecifier(node.expression);
-      if (dynamicSpecifier !== undefined) {
-        record(dynamicSpecifier, node.name.text);
-      } else if (isIdentifier(node.expression)) {
-        record(namespaceSpecifiers.get(node.expression.text) ?? "", node.name.text);
-      }
-    } else if (
-      isElementAccessExpression(node) &&
-      node.argumentExpression !== undefined &&
-      isStringLiteral(node.argumentExpression)
-    ) {
-      const dynamicSpecifier = dynamicImportSpecifier(node.expression);
-      if (dynamicSpecifier !== undefined) {
-        record(dynamicSpecifier, node.argumentExpression.text);
-      } else if (isIdentifier(node.expression)) {
-        record(namespaceSpecifiers.get(node.expression.text) ?? "", node.argumentExpression.text);
-      }
-    } else if (
-      isQualifiedName(node) &&
-      isIdentifier(node.left) &&
-      namespaceSpecifiers.has(node.left.text)
-    ) {
-      record(namespaceSpecifiers.get(node.left.text) ?? "", node.right.text);
-    } else if (
-      isImportTypeNode(node) &&
-      isLiteralTypeNode(node.argument) &&
-      isStringLiteral(node.argument.literal) &&
-      node.qualifier !== undefined
-    ) {
-      record(node.argument.literal.text, node.qualifier.getText(sourceFile).split(".")[0] ?? "");
-    }
-    node.forEachChild(visit);
-  };
-  visit(sourceFile);
-}
-
-async function crossWorkspaceConsumers(
-  repositoryRoot: string,
-  manifest: PublicApiManifest,
-): Promise<Map<string, Set<string>>> {
-  const packageRoots = await packageDirectories(repositoryRoot);
-  const packageWorkspaces = await Promise.all(
-    packageRoots.map(async (root) => ({
-      root,
-      manifest: await readJson<PackageJson>(join(root, "package.json")),
-    })),
-  );
-  const owningRoots = new Map(
-    packageWorkspaces
-      .filter(
-        (workspace): workspace is { root: string; manifest: PackageJson & { name: string } } =>
-          workspace.manifest.name !== undefined,
-      )
-      .map((workspace) => [workspace.manifest.name, workspace.root]),
-  );
-  const explicitConsumerRoots = await Promise.all(
-    ["bench", "docs", "scripts", "test"].map(async (directory) => {
-      const path = join(repositoryRoot, directory);
-      return (await exists(path)) ? path : undefined;
-    }),
-  );
-  const consumerRoots = [...new Set([...packageRoots, ...explicitConsumerRoots])].filter(
-    (root): root is string => root !== undefined,
-  );
-  const consumed = new Map<string, Set<string>>();
-  const virtualSources = new Map<string, string>();
-  const parseTargets: Array<{ path: string; specifiers: ReadonlyMap<string, string> }> = [];
-  for (const consumerRoot of consumerRoots) {
-    const specifiers = new Map<string, string>();
-    for (const pkg of manifest.packages) {
-      if (owningRoots.get(pkg.name) === consumerRoot) continue;
-      for (const entry of pkg.entryPoints) {
-        if (entry.kind !== "typescript") continue;
-        specifiers.set(
-          entry.subpath === "." ? pkg.name : `${pkg.name}/${entry.subpath.slice(2)}`,
-          publicApiEntryKey(pkg.name, entry.subpath),
-        );
-      }
-    }
-    if (specifiers.size === 0) continue;
-    for (const path of await sourceFiles(consumerRoot)) {
-      const source = await readFile(path, "utf8");
-      // The manifest only reads import bindings, so each file — and each
-      // `<script>` block — is parsed standalone as TSX through the API server,
-      // which has no text-to-AST entry point of its own.
-      scriptFragments(path, source).forEach((fragment, index) => {
-        const virtualPath = `${path}.${index}.tsx`;
-        virtualSources.set(virtualPath, fragment);
-        parseTargets.push({ path: virtualPath, specifiers });
-      });
-    }
-  }
-  if (parseTargets.length === 0) return consumed;
-
-  const api = new API({
-    cwd: repositoryRoot,
-    fs: {
-      // Virtual paths hold synthetic fragments; the untouched callbacks keep
-      // every other read on the real filesystem.
-      fileExists: (fileName) => (virtualSources.has(fileName) ? true : undefined),
-      readFile: (fileName) => virtualSources.get(fileName),
-    },
-  });
-  try {
-    const snapshot = await api.updateSnapshot({
-      openFiles: parseTargets.map((target) => target.path),
-    });
-    try {
-      for (const target of parseTargets) {
-        const project = await snapshot.getDefaultProjectForFile(target.path);
-        const sourceFile =
-          project === undefined ? undefined : await project.program.getSourceFile(target.path);
-        if (sourceFile === undefined) continue;
-        collectImportedNames(sourceFile, target.specifiers, consumed);
-      }
-    } finally {
-      await snapshot.dispose();
-    }
-  } finally {
-    await api.close();
-  }
-  return consumed;
-}
-
-export async function findUnusedPublicExports(
-  repositoryRoot: string,
-  manifest: PublicApiManifest,
-  baseline: PublicApiBaseline,
-): Promise<ApiIssue[]> {
-  const intended = new Map(
-    baseline.intentionalExports.map((entry) => [
-      publicApiEntryKey(entry.package, entry.entryPoint),
-      new Set(entry.exports),
-    ]),
-  );
-  const consumed = await crossWorkspaceConsumers(repositoryRoot, manifest);
+/** Export policy: one owner, no deprecated or merged symbols, documented and stable errors. */
+function exportPolicyIssues(
+  packageName: string,
+  entry: ResolvedEntry,
+  apiExports: readonly ApiExport[],
+  mergedDeclarationSymbols: readonly string[],
+): ApiIssue[] {
   const issues: ApiIssue[] = [];
-  for (const pkg of manifest.packages) {
-    for (const entry of pkg.entryPoints) {
-      if (entry.kind !== "typescript") continue;
-      const key = publicApiEntryKey(pkg.name, entry.subpath);
-      const intentionalNames = intended.get(key);
-      const consumedNames = consumed.get(key);
-      for (const apiExport of entry.exports) {
-        if (
-          intentionalNames?.has(apiExport.name) === true ||
-          consumedNames?.has(apiExport.name) === true
-        ) {
-          continue;
-        }
-        issues.push({
-          code: "unused-export",
-          message: `${pkg.name} ${entry.subpath} exports ${apiExport.name} without an intentional public contract or cross-workspace consumer`,
-          package: pkg.name,
-          entryPoint: entry.subpath,
-          symbol: apiExport.name,
-        });
-      }
+  const issue = (code: ApiIssue["code"], message: string, symbol: string): void => {
+    issues.push({ code, message, package: packageName, entryPoint: entry.subpath, symbol });
+  };
+
+  for (const symbol of mergedDeclarationSymbols) {
+    issue(
+      "duplicate-export",
+      `${packageName} ${entry.subpath} export ${symbol} merges multiple structural declarations; the joined signature cannot render as one declaration`,
+      symbol,
+    );
+  }
+
+  for (const apiExport of apiExports) {
+    if (apiExport.owners.length > 1) {
+      issue(
+        "duplicate-export",
+        `${packageName} ${entry.subpath} gives ${apiExport.name} multiple owners: ${apiExport.owners.join(", ")}`,
+        apiExport.name,
+      );
+    }
+
+    if (apiExport.jsDocTags.includes("deprecated")) {
+      issue(
+        "deprecated-symbol",
+        `${packageName} ${entry.subpath} exports deprecated symbol ${apiExport.name}`,
+        apiExport.name,
+      );
+    }
+
+    if (entry.classification !== "supported") continue;
+
+    if (apiExport.documentation.trim().length === 0) {
+      issue(
+        "missing-documentation",
+        `${packageName} ${entry.subpath} export ${apiExport.name} has no source JSDoc summary`,
+        apiExport.name,
+      );
+    }
+
+    const errorContractIssue = unstableErrorContract(apiExport);
+    if (errorContractIssue !== null) {
+      issue(
+        "unstable-error-contract",
+        `${packageName} ${entry.subpath} export ${errorContractIssue}`,
+        apiExport.name,
+      );
     }
   }
-  return issues.sort((left, right) =>
-    [left.package ?? "", left.entryPoint ?? "", left.symbol ?? ""]
-      .join("\0")
-      .localeCompare([right.package ?? "", right.entryPoint ?? "", right.symbol ?? ""].join("\0")),
-  );
+
+  return issues;
 }
 
 export async function analyzePublicApi(repositoryRoot: string): Promise<{

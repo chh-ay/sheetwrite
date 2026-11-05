@@ -17,16 +17,40 @@ export type ConformanceProducer =
   | "libreoffice"
   | "sheetwrite";
 
-export interface ConformanceResult {
-  type: ResultType;
-  value?: unknown;
-  error?: string;
-  rows?: number;
-  columns?: number;
-  displayedText?: string;
-  formula?: string;
-  tolerance?: { kind: "absolute" | "relative" | "ulp"; value: number };
+/** How far a numeric result may differ from its expectation. */
+export interface ResultTolerance {
+  kind: "absolute" | "relative" | "ulp";
+  value: number;
 }
+
+/** A single-cell result. */
+export type CellResult = Extract<
+  ConformanceResult,
+  { type: "blank" | "boolean" | "number" | "string" | "error" }
+>;
+
+/** One cell or workbook result; each type carries exactly the fields it needs. */
+export type ConformanceResult =
+  | { type: "blank"; formula?: string; displayedText?: string }
+  | { type: "boolean"; value: boolean; formula?: string; displayedText?: string }
+  | {
+      type: "number";
+      value: number;
+      displayedText?: string;
+      formula?: string;
+      tolerance?: ResultTolerance;
+    }
+  | { type: "string"; value: string; formula?: string; displayedText?: string }
+  | { type: "error"; error: string; formula?: string; displayedText?: string }
+  | {
+      type: "array";
+      value: readonly (readonly unknown[])[];
+      rows: number;
+      columns: number;
+      formula?: string;
+    }
+  | { type: "workbook"; value: unknown }
+  | { type: "unsupported" };
 
 export type SemanticCategory =
   | "normal"
@@ -113,15 +137,27 @@ export interface ConformanceManifest {
   };
 }
 
-export interface ConformanceObservation {
+interface ObservationCommon {
   producer: ConformanceProducer;
   producerVersion: string;
   capturedAt: string;
-  status: "reviewed" | "provisional" | "unavailable";
-  result?: ConformanceResult;
   artifactSha256?: string;
   notes?: string;
 }
+
+/** A reviewed observation always records the producer's result. */
+export interface ReviewedObservation extends ObservationCommon {
+  status: "reviewed";
+  result: ConformanceResult;
+}
+
+/** A producer result captured but not reviewed, or a producer that could not run the case. */
+export interface UnreviewedObservation extends ObservationCommon {
+  status: "provisional" | "unavailable";
+  result?: ConformanceResult;
+}
+
+export type ConformanceObservation = ReviewedObservation | UnreviewedObservation;
 
 export interface KnownDivergence {
   reason: string;

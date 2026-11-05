@@ -8,7 +8,7 @@ description: "Workbook interface in @sheetwrite/core: Live workbook schema conta
 Live workbook schema containing ordered sheets and the active sheet ID.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L129"><code>packages/core/src/types/document.ts#L129</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L136"><code>packages/core/src/types/document.ts#L136</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>

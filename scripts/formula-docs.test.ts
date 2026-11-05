@@ -28,7 +28,7 @@ describe("Excel function coverage", () => {
     const inventory = await loadFormulaContractInventory(ROOT);
     const page = renderExcelCoveragePage(
       inventory,
-      catalog(["SUM", "FORECAST", "REGEXTEST", "CELL", "SIN", "CUBEVALUE"]),
+      catalog(["SUM", "FORECAST", "REGEXTEST", "CELL", "FORECAST.ETS", "CUBEVALUE"]),
     );
     const rows = page.content.split("\n").filter((line) => line.startsWith("| [`"));
 
@@ -44,7 +44,7 @@ describe("Excel function coverage", () => {
     const cell = rows.find((row) => row.startsWith("| [`CELL`]"));
     expect(cell).toContain("| Partly supported | Partly supported |");
     expect(cell).toContain("Other info types return #VALUE!");
-    expect(rows.find((row) => row.startsWith("| [`SIN`]"))).toContain(
+    expect(rows.find((row) => row.startsWith("| [`FORECAST.ETS`]"))).toContain(
       "| Not supported | Not supported | Not registered in either engine.",
     );
     expect(rows.find((row) => row.startsWith("| [`CUBEVALUE`]"))).toContain(
