@@ -527,29 +527,14 @@ mod tests {
     use crate::types::{FormulaError, Value};
 
     use super::super::functions::FuncAccumulator;
-
-    fn accumulator(arguments: Vec<(bool, Vec<Value>)>) -> FuncAccumulator {
-        let mut values = FuncAccumulator::default();
-        for (from_range, argument) in arguments {
-            let cells = argument.len();
-            for value in argument {
-                if from_range {
-                    values.push_range(value).unwrap();
-                } else {
-                    values.push_scalar(value).unwrap();
-                }
-            }
-            values.finish_arg(cells, 1).unwrap();
-        }
-        values
-    }
+    use super::super::test_support::mixed_arguments;
 
     fn evaluate(func: Func, arguments: Vec<Value>) -> Value {
         let arguments = arguments
             .into_iter()
             .map(|value| (false, vec![value]))
             .collect();
-        apply(func, &accumulator(arguments)).unwrap()
+        apply(func, &mixed_arguments(arguments)).unwrap()
     }
 
     fn assert_number(value: Value, expected: f64) {
@@ -655,7 +640,7 @@ mod tests {
 
     #[test]
     fn product_and_sumproduct_obey_argument_provenance_and_shapes() {
-        let values = accumulator(vec![
+        let values = mixed_arguments(vec![
             (false, vec![Value::Bool(true)]),
             (false, vec![Value::text("3")]),
             (
@@ -670,7 +655,7 @@ mod tests {
         ]);
         assert_number(apply(Func::Product, &values).unwrap(), 6.0);
 
-        let paired = accumulator(vec![
+        let paired = mixed_arguments(vec![
             (
                 true,
                 vec![
@@ -692,7 +677,7 @@ mod tests {
         ]);
         assert_number(apply(Func::SumProduct, &paired).unwrap(), 6.0);
 
-        let mismatched = accumulator(vec![
+        let mismatched = mixed_arguments(vec![
             (true, vec![Value::number(1.0), Value::number(2.0)]),
             (true, vec![Value::number(3.0)]),
         ]);
@@ -711,7 +696,7 @@ mod tests {
             apply(Func::SumProduct, &dimensional_mismatch).unwrap(),
             Value::Error(FormulaError::Value)
         );
-        let error = accumulator(vec![
+        let error = mixed_arguments(vec![
             (
                 true,
                 vec![Value::number(1.0), Value::Error(FormulaError::Ref)],
@@ -767,25 +752,25 @@ mod tests {
             Value::Bool(true),
             Value::Blank,
         ];
-        let count = accumulator(vec![
+        let count = mixed_arguments(vec![
             (false, vec![Value::number(2.0)]),
             (true, range.clone()),
         ]);
         assert_number(apply(Func::Subtotal, &count).unwrap(), 2.0);
 
-        let count_a = accumulator(vec![
+        let count_a = mixed_arguments(vec![
             (false, vec![Value::number(3.0)]),
             (true, range.clone()),
         ]);
         assert_number(apply(Func::Subtotal, &count_a).unwrap(), 5.0);
 
-        let sum = accumulator(vec![(false, vec![Value::number(9.0)]), (true, range)]);
+        let sum = mixed_arguments(vec![(false, vec![Value::number(9.0)]), (true, range)]);
         assert_eq!(
             apply(Func::Subtotal, &sum).unwrap(),
             Value::Error(FormulaError::DivZero)
         );
 
-        let variance = accumulator(vec![
+        let variance = mixed_arguments(vec![
             (false, vec![Value::number(11.0)]),
             (
                 true,
@@ -802,13 +787,13 @@ mod tests {
             ),
         ]);
         assert_number(apply(Func::Subtotal, &variance).unwrap(), 4.0);
-        let average = accumulator(vec![
+        let average = mixed_arguments(vec![
             (false, vec![Value::number(1.0)]),
             (true, vec![Value::number(1e308), Value::number(1e308)]),
         ]);
         assert_number(apply(Func::Subtotal, &average).unwrap(), 1e308);
 
-        let invalid_code = accumulator(vec![
+        let invalid_code = mixed_arguments(vec![
             (false, vec![Value::number(12.0)]),
             (true, vec![Value::number(1.0)]),
         ]);
@@ -817,13 +802,13 @@ mod tests {
             Value::Error(FormulaError::Value)
         );
 
-        let hidden_row_code = accumulator(vec![
+        let hidden_row_code = mixed_arguments(vec![
             (false, vec![Value::number(109.0)]),
             (true, vec![Value::number(1.0), Value::number(2.0)]),
         ]);
         assert_number(apply(Func::Subtotal, &hidden_row_code).unwrap(), 3.0);
 
-        let past_hidden_row_codes = accumulator(vec![
+        let past_hidden_row_codes = mixed_arguments(vec![
             (false, vec![Value::number(112.0)]),
             (true, vec![Value::number(1.0)]),
         ]);
