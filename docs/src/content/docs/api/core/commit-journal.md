@@ -12,7 +12,7 @@ is called only when the journal needs a checkpoint. `HistoryArchive` from
 `@sheetwrite/core/history` implements this interface.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/transaction.ts#L178"><code>packages/core/src/types/transaction.ts#L178</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/transaction.ts#L192"><code>packages/core/src/types/transaction.ts#L192</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>1</span>

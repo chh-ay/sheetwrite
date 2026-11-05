@@ -36,8 +36,8 @@ describe("SheetwriteStore", () => {
     const store = new SheetwriteStore(makeWorkbook(4), makeColumnarData(4));
     try {
       const mutations = [
-        () => store.sortBy("s1", 1, false),
-        () => store.sortByMulti("s1", [{ col: 1, ascending: true }]),
+        () => store.setViewSort("s1", [{ col: 1, ascending: false }]),
+        () => store.setViewSort("s1", [{ col: 1, ascending: true }]),
         () => store.setColumnFilter("s1", 0, { kind: "contains", text: "Customer" }),
         () => store.filterBy("s1", 0, "Customer 0"),
         () => store.hideRows("s1", [0]),
@@ -62,7 +62,9 @@ describe("SheetwriteStore", () => {
       transactionResourceLimits: { maxOperations: 0 },
     });
     try {
-      expect(bounded.sortBy("s1", 0, true)).toMatchObject({ status: "rejected" });
+      expect(bounded.setViewSort("s1", [{ col: 0, ascending: true }])).toMatchObject({
+        status: "rejected",
+      });
       expect(bounded.hideRows("s1", [0])).toMatchObject({ status: "rejected" });
       expect(bounded.getWorkbook().sheets[0]?.sortKeys ?? []).toEqual([]);
       expect(bounded.hiddenRows("s1")).toEqual([]);
@@ -670,7 +672,7 @@ describe("SheetwriteStore", () => {
     store.hideRows("s1", [4]);
     expect(store.viewRowCount("s1")).toBe(3);
 
-    store.sortByMulti("s1", [
+    store.setViewSort("s1", [
       { col: 2, ascending: true },
       { col: 1, ascending: false },
     ]);
@@ -710,7 +712,7 @@ describe("SheetwriteStore", () => {
     store.setColumnFilter("s1", 0, { kind: "values", values: [true] });
     expect(store.getVisibleWindow("s1", { start: 0, end: 2 }, [0]).values).toEqual([true, true]);
     store.setColumnFilter("s1", 0, null);
-    store.sortBy("s1", 0, true);
+    store.setViewSort("s1", [{ col: 0, ascending: true }]);
     expect(store.getVisibleWindow("s1", { start: 0, end: 6 }, [0]).values).toEqual([
       7,
       false,

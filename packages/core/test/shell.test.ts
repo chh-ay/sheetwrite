@@ -59,7 +59,7 @@ describe("Grid.getCellInput / getActiveSheet / active-sheet event", () => {
     const { grid, store } = makeGrid();
 
     // Descending sort on Amount: view row 0 shows the LAST data row (19).
-    grid.sortBy(1, false);
+    grid.setViewSort([{ col: 1, ascending: false }]);
     const snapshot = grid.getCellInput(0, 1);
     expect(snapshot).not.toBeNull();
     expect(snapshot!.address).toEqual({ sheet: "s1", row: 19, col: 1 });
@@ -341,7 +341,7 @@ describe("createFormulaBar", () => {
     if (!(input instanceof HTMLInputElement)) throw new Error("formula bar must be an input");
 
     // Descending sort: view row 0 = data row 19.
-    grid.sortBy(1, false);
+    grid.setViewSort([{ col: 1, ascending: false }]);
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
     expect(input.value).toBe("Customer 19");
 
