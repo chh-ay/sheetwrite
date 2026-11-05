@@ -10661,7 +10661,12 @@ const snapshot: WorkbookSnapshot = {
       name: "Data",
       order: 0,
       rowCount: 10,
-      columns: ["A", "B", "C", "D"].map((key) => ({ key, header: key })),
+      columns: ["A", "B", "C", "D"].map((key) => ({
+        key,
+        header: key,
+        width: 100,
+        type: "text" as const,
+      })),
       tables: [
         {
           id: "orders",
