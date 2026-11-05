@@ -9,6 +9,7 @@ const NO_RESULT_POSITION: u32 = u32::MAX;
 const SLOT_CAPACITY_SLACK: usize = 4096;
 const SLOT_GROWTH_DIVISOR: usize = 8;
 const MIN_SLOT_GROWTH: usize = 1;
+
 /// Below this many slots, location growth takes several steps at once.
 const DOUBLING_SLOT_LIMIT: usize = 4096;
 
