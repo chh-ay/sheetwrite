@@ -386,7 +386,7 @@ fn fraction_floor(value: f64) -> f64 {
 
 // Series for P and modified Lentz fraction for Q. The requested small tail
 // is calculated directly; subtracting a tiny tail would lose its precision.
-fn gamma_probability(shape: f64, x: f64, is_right: bool) -> NumberResult {
+pub(super) fn gamma_probability(shape: f64, x: f64, is_right: bool) -> NumberResult {
     if x == 0.0 {
         return Ok(if is_right { 1.0 } else { 0.0 });
     }

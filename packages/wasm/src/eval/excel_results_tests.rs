@@ -84,6 +84,21 @@ fn lambda_arguments_can_be_errors_that_the_body_handles() {
     ]);
 }
 
+#[cfg(feature = "analysis")]
+#[test]
+fn engineering_functions_read_cells_and_ranges() {
+    assert_results(&[
+        ("=DEC2HEX(Data!B3)", "1E"),
+        ("=BIN2DEC(Data!A1&Data!A2-Data!A2)", "2"),
+        ("=BITAND(Data!B1,Data!A3)", "2"),
+        ("=CONVERT(Data!A1,\"m\",\"cm\")", "100"),
+        ("=IMSUM(Data!A1:A3)", "6"),
+        ("=IMSUM(Data!D1:D3)", "#NUM!"),
+        ("=IMPRODUCT(Data!A2:A3,COMPLEX(0,1))", "6i"),
+        ("=ERF(Data!F1)", "0"),
+    ]);
+}
+
 #[test]
 fn whole_columns_and_rows_read_the_used_part_of_the_sheet() {
     assert_results(&[
