@@ -610,7 +610,7 @@ export class SheetwriteStore implements Store {
       };
     }
 
-    return this.applyTransaction({ patches: [plan.operation] }, "sort");
+    return this.applyTransaction({ patches: plan.operations }, "sort");
   }
 
   setColumnFilter(
