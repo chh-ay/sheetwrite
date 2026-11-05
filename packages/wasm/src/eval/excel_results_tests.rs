@@ -87,9 +87,7 @@ fn lambda_arguments_can_be_errors_that_the_body_handles() {
 #[cfg(feature = "analysis")]
 #[test]
 fn convert_reads_cells() {
-    assert_results(&[
-        ("=CONVERT(Data!A1,\"m\",\"cm\")", "100"),
-    ]);
+    assert_results(&[("=CONVERT(Data!A1,\"m\",\"cm\")", "100")]);
 }
 
 #[cfg(feature = "analysis")]
