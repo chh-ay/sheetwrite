@@ -486,18 +486,8 @@ mod tests {
     use crate::calc::Func;
     use crate::types::{FormulaError, Value};
 
+    use super::super::test_support::{range_arguments, scalar};
     use super::{apply, FuncAccumulator};
-
-    fn accumulator(args: &[Vec<Value>]) -> FuncAccumulator {
-        let mut values = FuncAccumulator::default();
-        for arg in args {
-            for value in arg {
-                values.push_range(value.clone()).unwrap();
-            }
-            values.finish_arg(arg.len(), 1).unwrap();
-        }
-        values
-    }
 
     fn shaped_accumulator(args: &[(Vec<Value>, usize, usize)]) -> FuncAccumulator {
         let mut values = FuncAccumulator::default();
@@ -510,12 +500,8 @@ mod tests {
         values
     }
 
-    fn scalar(value: f64) -> Vec<Value> {
-        vec![Value::number(value)]
-    }
-
     fn result(func: Func, args: &[Vec<Value>]) -> Value {
-        apply(func, &accumulator(args)).unwrap()
+        apply(func, &range_arguments(args)).unwrap()
     }
 
     fn assert_near(actual: Value, expected: f64) {
