@@ -5,7 +5,7 @@ import {
   splitOversizedBlocks,
 } from "./atomic-batch.js";
 import { chartTouchesSheet, cloneChartDefinition } from "./chart-definition.js";
-import { cloneDashboardItem, findDashboardItem } from "./dashboard.js";
+import { findDashboardItem } from "./dashboard.js";
 import { cloneRelationship, findRelationship } from "./data-model.js";
 import {
   type AdmittedTransactionResources,
@@ -993,17 +993,15 @@ export class DocumentController {
           : [];
       }
 
-      case "setDashboardItem": {
-        const previous = findDashboardItem(this.sheetById(patch.sheet), patch.item.id);
-        return previous
-          ? [{ op: "setDashboardItem", sheet: patch.sheet, item: cloneDashboardItem(previous) }]
-          : [{ op: "removeDashboardItem", sheet: patch.sheet, id: patch.item.id }];
-      }
-
+      case "setDashboardItem":
       case "removeDashboardItem": {
-        const previous = findDashboardItem(this.sheetById(patch.sheet), patch.id);
-        return previous
-          ? [{ op: "setDashboardItem", sheet: patch.sheet, item: cloneDashboardItem(previous) }]
+        const id = patch.op === "setDashboardItem" ? patch.item.id : patch.id;
+        const previous = findDashboardItem(this.sheetById(patch.sheet), id);
+        if (previous) {
+          return [{ op: "setDashboardItem", sheet: patch.sheet, item: structuredClone(previous) }];
+        }
+        return patch.op === "setDashboardItem"
+          ? [{ op: "removeDashboardItem", sheet: patch.sheet, id }]
           : [];
       }
     }

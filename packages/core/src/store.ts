@@ -1,6 +1,6 @@
 import { atomicBatchLimits, isAtomicBatch } from "./atomic-batch.js";
 import { chartSourceRanges } from "./chart-definition.js";
-import { cloneDashboard, cloneDashboardItem, isDashboard } from "./dashboard.js";
+import { dashboardFields } from "./dashboard.js";
 import { cloneRelationship, cloneRelationships } from "./data-model.js";
 import {
   assertWorkbookAllocationLimits,
@@ -374,18 +374,17 @@ export class SheetwriteStore implements Store {
   /** A copy of the items of the dashboard `sheet`, or `null` when it is not a dashboard. */
   getDashboard(sheet: SheetId): Dashboard | null {
     const owner = this.engine.getWorkbook().sheets.find((candidate) => candidate.id === sheet);
-    if (!isDashboard(owner)) return null;
-    return cloneDashboard(owner?.dashboard ?? { items: [] });
+    return owner ? (dashboardFields(owner).dashboard ?? null) : null;
   }
 
   /**
    * Insert an item on the dashboard `sheet`, or replace the one with its ID.
-   * Items stay inside the 12 columns, do not overlap, and a pivot item shows
-   * a pivot of the same sheet; otherwise the result is a no-op.
+   * Items stay inside the 12 columns and do not overlap; otherwise the result
+   * is a no-op.
    */
   setDashboardItem(sheet: SheetId, item: DashboardItem): ApplyTransactionResult {
     return this.applyTransaction(
-      { patches: [{ op: "setDashboardItem", sheet, item: cloneDashboardItem(item) }] },
+      { patches: [{ op: "setDashboardItem", sheet, item: structuredClone(item) }] },
       "api",
     );
   }

@@ -15,7 +15,7 @@ import {
 import { capturedClearCells } from "../clear-capture.js";
 import { validConditionalRules } from "../conditional-format.js";
 import {
-  cloneDashboard,
+  dashboardFields,
   dashboardPivotAllowed,
   dashboardTakes,
   findDashboardItem,
@@ -4244,9 +4244,7 @@ export class StoreDataEngine {
     const sheet: Sheet = {
       id: snapshot.id,
       name: name.name,
-      ...(snapshot.kind === "dashboard"
-        ? { kind: "dashboard", dashboard: cloneDashboard(snapshot.dashboard ?? { items: [] }) }
-        : {}),
+      ...dashboardFields(snapshot),
       visibility: snapshot.visibility,
       rowCount: snapshot.rowCount,
       columns: snapshot.columns.map((column) => ({ ...column })),

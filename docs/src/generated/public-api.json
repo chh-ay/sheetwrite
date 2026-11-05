@@ -5765,7 +5765,7 @@
                 },
                 {
                   "name": "setDashboardItem",
-                  "documentation": "Insert an item on the dashboard `sheet`, or replace the one with its ID.\nItems stay inside the 12 columns, do not overlap, and a pivot item shows\na pivot of the same sheet; otherwise the result is a no-op."
+                  "documentation": "Insert an item on the dashboard `sheet`, or replace the one with its ID.\nItems stay inside the 12 columns and do not overlap; otherwise the result\nis a no-op."
                 },
                 {
                   "name": "setDetailedChangeCapture",

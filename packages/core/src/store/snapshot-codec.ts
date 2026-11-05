@@ -1,4 +1,4 @@
-import { cloneDashboard } from "../dashboard.js";
+import { dashboardFields } from "../dashboard.js";
 import {
   SnapshotValidationError,
   type SnapshotValidationOptions,
@@ -55,10 +55,7 @@ export function decodeWorkbookSnapshot(
       return {
         id: source.id,
         name: source.name,
-        // A dashboard always holds its item list, so every encode writes the same form.
-        ...(source.kind === "dashboard"
-          ? { kind: "dashboard", dashboard: cloneDashboard(source.dashboard ?? { items: [] }) }
-          : {}),
+        ...dashboardFields(source),
         visibility: source.visibility,
         rowCount: source.rowCount,
         columns: cloneJsonValue(source.columns) ?? [],
@@ -145,9 +142,7 @@ export class StoreSnapshotCodec {
         id: sheet.id,
         name: sheet.name,
         order,
-        ...(sheet.kind === "dashboard"
-          ? { kind: "dashboard", dashboard: cloneDashboard(sheet.dashboard ?? { items: [] }) }
-          : {}),
+        ...dashboardFields(sheet),
         ...(sheet.visibility !== undefined ? { visibility: sheet.visibility } : {}),
         rowCount: sheet.rowCount,
         columns: cloneJsonValue(sheet.columns) ?? [],

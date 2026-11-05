@@ -879,20 +879,15 @@ function operationContainsFormula(
 
 /** Two items of one dashboard whose boxes overlap: each is valid alone, not together. */
 function dashboardItemConflict(local: DocumentOp, remote: DocumentOp): TransformFailure | null {
-  if (local.op !== "setDashboardItem" || !("sheet" in remote) || remote.sheet !== local.sheet) {
-    return null;
-  }
-
   const overlapping =
+    local.op === "setDashboardItem" &&
     remote.op === "setDashboardItem" &&
+    remote.sheet === local.sheet &&
     remote.item.id !== local.item.id &&
     boxesOverlap(local.item.box, remote.item.box);
-  if (!overlapping) return null;
-
-  return {
-    code: "overlapping-edit",
-    message: "A pending dashboard item overlaps a concurrent item",
-  };
+  return overlapping
+    ? { code: "overlapping-edit", message: "A pending dashboard item overlaps a concurrent one" }
+    : null;
 }
 
 function lifecycleConflict(

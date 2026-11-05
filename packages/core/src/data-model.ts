@@ -29,12 +29,7 @@ function isBoundedId(value: unknown, max: number): value is string {
   return typeof value === "string" && value.length > 0 && value.length <= max;
 }
 
-/** Shape checks for one untrusted table and column reference. */
-export function validateColumnRefShape(
-  value: unknown,
-  path: string,
-  issues: DataModelIssueSink,
-): void {
+function validateColumnRefShape(value: unknown, path: string, issues: DataModelIssueSink): void {
   if (!isPlainRecord(value)) {
     issues.push({ path, code: "invalid-value", message: `${path} must be an object` });
     return;

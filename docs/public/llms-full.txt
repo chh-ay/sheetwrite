@@ -15346,8 +15346,8 @@ recalculation; this call uses `now` instead, until the next edit.
 - `removeRelationship` — Remove the relationship with `id`.
 - `replaceSnapshot` — Replace only after a separate store has validated and hydrated every sheet.
 - `setDashboardItem` — Insert an item on the dashboard `sheet`, or replace the one with its ID.
-Items stay inside the 12 columns, do not overlap, and a pivot item shows
-a pivot of the same sheet; otherwise the result is a no-op.
+Items stay inside the 12 columns and do not overlap; otherwise the result
+is a no-op.
 - `setDetailedChangeCapture` — Opt in to per-cell before/after capture for packed and clear operations.
 - `setPivot` — Insert or replace a pivot. `sheet` defaults to the sheet that holds the
 pivot's ID, then to the active sheet. The pivot's `savedOutput` is

@@ -680,8 +680,8 @@ setDashboardItem: (sheet: SheetId, item: DashboardItem) => ApplyTransactionResul
 ```
 
 <p class="api-member-doc">Insert an item on the dashboard `sheet`, or replace the one with its ID.
-Items stay inside the 12 columns, do not overlap, and a pivot item shows
-a pivot of the same sheet; otherwise the result is a no-op.</p>
+Items stay inside the 12 columns and do not overlap; otherwise the result
+is a no-op.</p>
 </details>
 
 <details class="api-member" id="sheetwrite-store-set-detailed-change-capture" data-pagefind-weight="1">
