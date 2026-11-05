@@ -49,6 +49,7 @@
     "size:history": "bun scripts/size-report.ts history",
     "size:record": "bun scripts/size-report.ts record",
     "size:first-paint": "node test/bundler-fixtures/run.mjs && node test/bundler-fixtures/first-paint/run.mjs",
+    "size:first-paint:check": "bun scripts/first-paint-evidence.ts check test-results/bundlers/first-paint.json",
     "release:artifacts": "bun scripts/release-artifacts.ts build --output test-results/release-artifacts",
     "release:artifacts:verify": "bun scripts/release-artifacts.ts verify --artifacts test-results/release-artifacts",
     "release:prepare": "bun scripts/release-artifacts.ts prepare",
