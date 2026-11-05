@@ -2,6 +2,7 @@
 // the store and the history: validation, cloning, structural rebase and the
 // WASM payload encoder. Nothing here touches the engine.
 
+import { isPlainRecord, ownValue, type PlainRecord } from "./plain-data.js";
 import { moveIndex, remapSpan } from "./store/ranges.js";
 import type { CellScalar } from "./types/cell.js";
 import type { Range, SheetId } from "./types/coordinates.js";
@@ -53,22 +54,6 @@ export interface PivotIssue {
 /** Where checks append issues; a `DocumentValidationError[]` qualifies. */
 export interface PivotIssueSink {
   push(...issues: PivotIssue[]): number;
-}
-
-type PlainRecord = Record<string, unknown>;
-
-function isPlainRecord(value: unknown): value is PlainRecord {
-  return (
-    value !== null &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
-    Object.getPrototypeOf(value) === Object.prototype
-  );
-}
-
-function ownValue(record: PlainRecord, key: string): unknown {
-  const descriptor = Object.getOwnPropertyDescriptor(record, key);
-  return descriptor?.enumerable && "value" in descriptor ? descriptor.value : undefined;
 }
 
 function isIndex(value: unknown, max = Number.MAX_SAFE_INTEGER): value is number {

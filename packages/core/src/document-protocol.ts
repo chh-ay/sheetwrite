@@ -32,7 +32,7 @@ import {
   validatePivotReferences,
   validatePivotShape,
 } from "./pivot.js";
-import { compareCodeUnits } from "./plain-data.js";
+import { compareCodeUnits, isPlainRecord, ownValue, type PlainRecord } from "./plain-data.js";
 import { preparedRestore } from "./transaction-preparation.js";
 import type { MergeRange, Range } from "./types/coordinates.js";
 import type {
@@ -474,8 +474,6 @@ export class SnapshotValidationError extends SheetwriteError {
   }
 }
 
-type PlainRecord = Record<string, unknown>;
-
 interface JsonSafetyIssue {
   path: string;
   code: "non-serializable" | "resource-limit";
@@ -525,20 +523,6 @@ function nonNegativeInteger(value: unknown): value is number {
 
 function finiteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
-}
-
-function isPlainRecord(value: unknown): value is PlainRecord {
-  return (
-    value !== null &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
-    Object.getPrototypeOf(value) === Object.prototype
-  );
-}
-
-function ownValue(record: PlainRecord, key: string): unknown {
-  const descriptor = Object.getOwnPropertyDescriptor(record, key);
-  return descriptor?.enumerable && "value" in descriptor ? descriptor.value : undefined;
 }
 
 function childPath(path: string, key: string): string {

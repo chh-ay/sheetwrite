@@ -1,4 +1,3 @@
-import { cloneRelationships } from "../data-model.js";
 import {
   SnapshotValidationError,
   type SnapshotValidationOptions,
@@ -38,7 +37,7 @@ export function decodeWorkbookSnapshot(
     calculation: snapshot.workbook.calculation,
     // An empty model and no model are the same document, so only a non-empty one is kept.
     dataModel: snapshot.workbook.dataModel?.relationships.length
-      ? { relationships: cloneRelationships(snapshot.workbook.dataModel) }
+      ? cloneJsonValue(snapshot.workbook.dataModel)
       : undefined,
     sheets: snapshot.sheets.map((source) => {
       const rowHeights = new Map<number, number>();
@@ -188,9 +187,7 @@ export class StoreSnapshotCodec {
         // Frozen by the store, so every snapshot shares it instead of copying the payloads.
         ...(this.workbook.xlsxSource ? { xlsxSource: this.workbook.xlsxSource } : {}),
         ...(this.workbook.calculation ? { calculation: { ...this.workbook.calculation } } : {}),
-        ...(this.workbook.dataModel
-          ? { dataModel: { relationships: cloneRelationships(this.workbook.dataModel) } }
-          : {}),
+        ...(this.workbook.dataModel ? { dataModel: cloneJsonValue(this.workbook.dataModel) } : {}),
       },
       sheets,
     };
