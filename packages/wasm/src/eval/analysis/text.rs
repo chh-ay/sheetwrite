@@ -1,7 +1,5 @@
 //! Text functions for the full engine. Regex uses the bounded `regex-lite` syntax.
 use crate::formula_slots::{FormulaResults, FormulaWork};
-use std::cell::RefCell;
-use std::rc::Rc;
 
 use regex_lite::{Captures, Regex, RegexBuilder};
 
@@ -30,18 +28,6 @@ const MAX_TEXT_BYTES: usize = MAX_TEXT_CHARS * 4;
 const MAX_MATCH_WORK: usize = 2_000_000;
 const MAX_REGEX_BYTES: usize = 2 * 1024 * 1024;
 const MAX_DECIMALS: i64 = 127;
-const REGEX_CACHE_CAPACITY: usize = 4;
-
-struct CachedRegex {
-    pattern: String,
-    insensitive: bool,
-    regex: Rc<Regex>,
-}
-
-thread_local! {
-    // Bound compiled-pattern memory without synchronizing independent evaluations.
-    static REGEX_CACHE: RefCell<Vec<CachedRegex>> = const { RefCell::new(Vec::new()) };
-}
 
 struct Context<'a, 'p> {
     store: &'a CellStore,
@@ -404,38 +390,18 @@ fn needs_unicode_case(pattern: &str, insensitive: bool) -> bool {
                 .any(|escape| pattern.contains(escape)))
 }
 
-fn compile_regex(pattern: &str, insensitive: bool) -> Result<Rc<Regex>, FormulaError> {
-    REGEX_CACHE.with(|cache| {
-        let mut cache = cache.borrow_mut();
-        if let Some(index) = cache
-            .iter()
-            .position(|entry| entry.insensitive == insensitive && entry.pattern == pattern)
-        {
-            let entry = cache.remove(index);
-            let regex = Rc::clone(&entry.regex);
-            cache.push(entry);
-            return Ok(regex);
-        }
-        if needs_unicode_case(pattern, insensitive) {
-            return Err(FormulaError::Value);
-        }
-        let regex = Rc::new(
-            RegexBuilder::new(pattern)
-                .case_insensitive(insensitive)
-                .size_limit(MAX_REGEX_BYTES)
-                .build()
-                .map_err(|_| FormulaError::Value)?,
-        );
-        if cache.len() == REGEX_CACHE_CAPACITY {
-            cache.remove(0);
-        }
-        cache.push(CachedRegex {
-            pattern: pattern.to_owned(),
-            insensitive,
-            regex: Rc::clone(&regex),
-        });
-        Ok(regex)
-    })
+/// Compiles `pattern` for one call. The compiled program lives only as long
+/// as the call, so no regex memory outlives the formula that needs it.
+fn compile_regex(pattern: &str, insensitive: bool) -> Result<Regex, FormulaError> {
+    if needs_unicode_case(pattern, insensitive) {
+        return Err(FormulaError::Value);
+    }
+
+    RegexBuilder::new(pattern)
+        .case_insensitive(insensitive)
+        .size_limit(MAX_REGEX_BYTES)
+        .build()
+        .map_err(|_| FormulaError::Value)
 }
 
 fn append_text(output: &mut String, text: &str) -> Result<(), FormulaError> {
@@ -845,6 +811,93 @@ mod tests {
         }
         assert_eq!(store.get_cell(sheet, 2, 2).kind(), 0);
         assert_eq!(store.get_cell(sheet, 4, 2).kind(), 0);
+    }
+
+    /// Six patterns read from cells, each in both case modes, give every
+    /// formula its own result, and an edited pattern recalculates each
+    /// REGEX function and the wildcard criteria that read the same text.
+    #[test]
+    fn regex_and_wildcard_results_follow_their_own_patterns() {
+        // https://support.microsoft.com/en-us/excel/functions/regextest-function
+        // https://support.microsoft.com/en-us/excel/functions/countif-function
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(6, 8);
+        let patterns = ["^a", "^b", "c$", "[0-9]+", "^AB", "x?y"];
+        for (row, pattern) in patterns.into_iter().enumerate() {
+            store.set_string(sheet, row, 0, pattern, 0);
+            store.set_formula(
+                sheet,
+                row,
+                1,
+                &format!("=VALUETOTEXT(REGEXTEST(\"ab12c\",A{}))", row + 1),
+                0,
+            );
+            store.set_formula(
+                sheet,
+                row,
+                2,
+                &format!("=VALUETOTEXT(REGEXTEST(\"ab12c\",A{},1))", row + 1),
+                0,
+            );
+            store.set_formula(
+                sheet,
+                row,
+                3,
+                &format!("=REGEXREPLACE(\"ab12c\",A{},\"-\",,1)", row + 1),
+                0,
+            );
+            store.set_formula(
+                sheet,
+                row,
+                4,
+                &format!("=IFNA(REGEXEXTRACT(\"ab12c\",A{},0,1),\"none\")", row + 1),
+                0,
+            );
+        }
+        store.set_formula(sheet, 6, 0, r#"=COUNTIF(A1:A6,"^?")"#, 0);
+        store.set_formula(sheet, 7, 0, r#"=COUNTIF(A1:A6,"*$")"#, 0);
+        store.recompute(sheet);
+
+        let expected = [
+            ["TRUE", "TRUE", "-b12c", "a"],
+            ["FALSE", "FALSE", "ab12c", "none"],
+            ["TRUE", "TRUE", "ab12-", "c"],
+            ["TRUE", "TRUE", "ab-c", "12"],
+            ["FALSE", "TRUE", "-12c", "ab"],
+            ["FALSE", "FALSE", "ab12c", "none"],
+        ];
+        assert_rows(&store, sheet, &expected);
+        assert_eq!(store.get_cell(sheet, 6, 0).num(), 2.0);
+        assert_eq!(store.get_cell(sheet, 7, 0).num(), 1.0);
+
+        store.set_string(sheet, 1, 0, "B1", 0);
+        store.set_string(sheet, 2, 0, "^c", 0);
+        store.recompute(sheet);
+
+        let edited = [
+            ["TRUE", "TRUE", "-b12c", "a"],
+            ["FALSE", "TRUE", "a-2c", "b1"],
+            ["FALSE", "FALSE", "ab12c", "none"],
+            ["TRUE", "TRUE", "ab-c", "12"],
+            ["FALSE", "TRUE", "-12c", "ab"],
+            ["FALSE", "FALSE", "ab12c", "none"],
+        ];
+        assert_rows(&store, sheet, &edited);
+        assert_eq!(store.get_cell(sheet, 6, 0).num(), 2.0);
+        assert_eq!(store.get_cell(sheet, 7, 0).num(), 0.0);
+    }
+
+    fn assert_rows(store: &CellStore, sheet: usize, rows: &[[&str; 4]]) {
+        for (row, columns) in rows.iter().enumerate() {
+            for (offset, expected) in columns.iter().enumerate() {
+                assert_eq!(
+                    store.get_cell(sheet, row, offset + 1).string().as_deref(),
+                    Some(*expected),
+                    "row {row}, column {}",
+                    offset + 1
+                );
+            }
+        }
     }
 
     #[test]
