@@ -1088,7 +1088,9 @@ impl CellStore {
         }
 
         let measure_cells = match &pivot.saved.source {
-            SourceRef::Model { table, .. } => self.pivot_measure_cells(cache, &layout, table),
+            SourceRef::Model { table, fields } => {
+                self.pivot_measure_cells(cache, &layout, table, fields)
+            }
             _ => Vec::new(),
         };
         let (changed, placed) =
@@ -1139,6 +1141,24 @@ impl CellStore {
             .model
             .as_mut()
             .map(|model| std::mem::take(&mut model.dependencies));
+        // A measure may read any model table, so a change in any of them
+        // recalculates the pivot.
+        if let Some(related) = pivot.related.as_mut().filter(|_| {
+            pivot
+                .saved
+                .definition
+                .values
+                .iter()
+                .any(|value| value.measure.is_some())
+        }) {
+            let mut rects = related.to_vec();
+            for rect in self.tables.values().map(SourceRect::table) {
+                if !rects.contains(&rect) {
+                    rects.push(rect);
+                }
+            }
+            *related = rects.into_boxed_slice();
+        }
 
         let pending = &mut pivot.pending;
         match pivot.cache.as_mut() {
@@ -1354,10 +1374,21 @@ impl CellStore {
                 })
             })
             .ok_or(FormulaError::Ref)?;
-        let (Some(cache), Some(layout)) = (&pivot.cache, &pivot.layout) else {
+        let (Some(cache), Some(layout), Some(attempt)) =
+            (&pivot.cache, &pivot.layout, pivot.attempt)
+        else {
             return Err(FormulaError::Ref);
         };
-        cache.data_value(layout, data_field, items)
+        let measure_value = |offset: usize| {
+            settled_cell_value(
+                &self.sheets[sheet],
+                &self.strings,
+                attempt.anchor.0 as usize + offset / layout.cols,
+                attempt.anchor.1 as usize + offset % layout.cols,
+                &self.formula_slots,
+            )
+        };
+        cache.data_value(layout, data_field, items, &measure_value)
     }
 
     /// Aggregate updates of pivot `index` on `sheet` since its cache was

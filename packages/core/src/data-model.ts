@@ -384,6 +384,24 @@ export function withoutMeasure(model: DataModel | undefined, id: string): DataMo
   return relationships.length > 0 ? { relationships } : undefined;
 }
 
+/**
+ * The model with `rename` applied to every measure formula, as Excel updates
+ * the formulas that name a renamed table, column or measure. Returns `model`
+ * itself when no formula changes.
+ */
+export function withRenamedReferences(
+  model: DataModel | undefined,
+  rename: (formula: string) => string,
+): DataModel | undefined {
+  let changed = false;
+  const measures = (model?.measures ?? []).map((measure) => {
+    const formula = rename(measure.formula);
+    changed ||= formula !== measure.formula;
+    return { ...cloneMeasure(measure), formula };
+  });
+  return changed ? { relationships: cloneRelationships(model), measures } : model;
+}
+
 /** Check identities and the home table when inserting or replacing a measure. */
 export function validateMeasureAdmission(
   measure: Measure,

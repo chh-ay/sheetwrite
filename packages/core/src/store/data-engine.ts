@@ -31,6 +31,7 @@ import {
   validateMeasureAdmission,
   withMeasure,
   withoutMeasure,
+  withRenamedReferences,
   validateRelationshipAdmission,
   withoutRelationship,
   withRelationship,
@@ -115,7 +116,7 @@ import type {
 } from "../types/cell.js";
 import type { ChartDefinition } from "../types/chart.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "../types/coordinates.js";
-import type { DataModel, RelationshipStatus } from "../types/data-model.js";
+import type { DataModel, Measure, RelationshipStatus } from "../types/data-model.js";
 import type {
   AggregateOp,
   ColumnarData,
@@ -1186,6 +1187,47 @@ export class StoreDataEngine {
       strings.push(measure.id, measure.table, measure.formula, "", measure.name);
     }
     return wasm.setRelationships(strings);
+  }
+
+  /**
+   * `model` with `measure` set; a new name also renames the `[Name]`
+   * references of every measure formula.
+   */
+  private withRenamedMeasure(model: DataModel | undefined, measure: Measure): DataModel {
+    const previous = findMeasure(model, measure.id)?.name;
+    const next = withMeasure(model, measure);
+    if (previous === undefined || previous === measure.name) return next;
+    return withRenamedReferences(next, (formula) =>
+      getEngine().renameStructuredReference(formula, "", previous, measure.name),
+    ) as DataModel;
+  }
+
+  /**
+   * Renames the table and column references of the measure formulas after
+   * `current` became `next`. Returns false when the engine refuses the
+   * rewritten measures.
+   */
+  private renameTableReferences(current: WorkbookTable, next: WorkbookTable): boolean {
+    const renames: [table: string, column: string, to: string][] = [];
+    if (current.name !== next.name) renames.push([current.name, "", next.name]);
+    for (const column of next.columns) {
+      const previous = current.columns.find((candidate) => candidate.id === column.id);
+      if (previous && previous.name !== column.name) {
+        renames.push([next.name, previous.name, column.name]);
+      }
+    }
+
+    const model = withRenamedReferences(this.workbook.dataModel, (formula) =>
+      renames.reduce(
+        (text, [table, column, to]) =>
+          getEngine().renameStructuredReference(text, table, column, to),
+        formula,
+      ),
+    );
+    if (model === this.workbook.dataModel) return true;
+    if (!this.syncRelationships(model)) return false;
+    this.workbook.dataModel = model;
+    return true;
   }
 
   private syncTable(table: WorkbookTable): boolean {
@@ -3582,7 +3624,7 @@ export class StoreDataEngine {
         const nextTables = [...tables];
         nextTables[index] = next;
         sheet.tables = nextTables;
-        return true;
+        return this.renameTableReferences(current, next);
       }
 
       case "removeTable": {
@@ -3753,7 +3795,7 @@ export class StoreDataEngine {
 
         const model =
           patch.op === "setMeasure"
-            ? withMeasure(current, patch.measure)
+            ? this.withRenamedMeasure(current, patch.measure)
             : withoutMeasure(current, patch.id);
         if (!this.syncRelationships(model)) return false;
         this.workbook.dataModel = model;

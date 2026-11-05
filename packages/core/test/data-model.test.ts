@@ -165,6 +165,58 @@ describe("saved measures", () => {
     expect(store.getMeasureStatus(revenueMeasure.id)).toEqual({ status: "missingTable" });
   });
 
+  it("renames table, column and measure references in measure formulas, undone in one step", () => {
+    const grid = mountGrid();
+    const apply = (operation: DocumentOp) => grid.applyTransaction({ patches: [operation] }).status;
+    const share = {
+      id: "share",
+      name: "Share",
+      table: "customers",
+      formula: "=[revenue] / COUNTA(Customers[id]) + orders[@Amount]",
+    };
+    const formulas = () =>
+      grid.store.getWorkbook().dataModel?.measures?.map((measure) => measure.formula);
+    expect(apply({ op: "setMeasure", measure: revenueMeasure })).toBe("applied");
+    expect(apply({ op: "setMeasure", measure: share })).toBe("applied");
+
+    const renamedTable: DocumentOp = {
+      op: "updateTable",
+      sheet: "data",
+      tableId: "orders",
+      patch: {
+        name: "Sales",
+        columns: [
+          { id: "customer", name: "customer" },
+          { id: "amount", name: "Net" },
+        ],
+      },
+    };
+    expect(apply(renamedTable)).toBe("applied");
+    expect(formulas()).toEqual([
+      "=SUM(Sales[Net])",
+      "=[revenue] / COUNTA(Customers[id]) + Sales[@Net]",
+    ]);
+
+    expect(apply({ op: "setMeasure", measure: { ...revenueMeasure, name: "Income" } })).toBe(
+      "applied",
+    );
+    expect(formulas()).toEqual([
+      "=SUM(orders[amount])",
+      "=[Income] / COUNTA(Customers[id]) + Sales[@Net]",
+    ]);
+
+    grid.undo();
+    expect(formulas()).toEqual([
+      "=SUM(Sales[Net])",
+      "=[Revenue] / COUNTA(Customers[id]) + Sales[@Net]",
+    ]);
+    grid.undo();
+    expect(formulas()).toEqual([
+      "=SUM(orders[amount])",
+      "=[Revenue] / COUNTA(Customers[id]) + orders[@amount]",
+    ]);
+  });
+
   it("validates saved measure names and formulas without parsing them in TypeScript", () => {
     expect(validateDocumentOperationShape({ op: "setMeasure", measure: revenueMeasure })).toEqual(
       [],
