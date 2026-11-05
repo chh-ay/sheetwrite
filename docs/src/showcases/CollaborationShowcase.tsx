@@ -199,7 +199,11 @@ const EMPTY_CLIENT_VIEW: ClientView = {
 
 let nextMutation = 1;
 
-export default function CollaborationShowcase() {
+/**
+ * Client state and lifetime for the collaboration showcase: both clients,
+ * the server, the durable outboxes and every drill the page can run.
+ */
+function useCollaborationClients() {
   const action = useAction();
   const chaosAction = useAction();
   const hostRefs: Record<ClientKey, React.RefObject<HTMLDivElement | null>> = {
@@ -1208,106 +1212,48 @@ export default function CollaborationShowcase() {
     views[key].syncState?.pendingCount === 0;
   const clientsAtHead = CLIENT_KEYS.filter(atHead).length;
 
+  return {
+    atHead,
+    action,
+    chaosAction,
+    status,
+    batchReport,
+    statusDetail,
+    chaos,
+    restoreRunning,
+    runChaos,
+    restoreUsage,
+    views,
+    serverVersion,
+    clientsAtHead,
+    hostRefs,
+    serverLog,
+    sampleAccount,
+    sampleEdit,
+    toggleOnline,
+    challengePhase,
+    challengeCopy,
+    loseNextAck,
+    retryPending,
+    holdNextBroadcast,
+    releaseHeld,
+    serverEdit,
+    resetDemo,
+  };
+}
+
+type CollaborationClients = ReturnType<typeof useCollaborationClients>;
+
+export default function CollaborationShowcase() {
+  const workbench = useCollaborationClients();
+  const { action, chaosAction, status, batchReport } = workbench;
+
   return (
     <section aria-label="Collaboration protocol showcase" className="sw-clb" data-state={status}>
       <ActionError error={action.error ?? chaosAction.error} />
-      <header className="sw-clb__bar">
-        <div className="sw-clb__bar-title">
-          <p>Two clients · one sequencing server</p>
-          <h2>Two analysts. One shared forecast.</h2>
-        </div>
-        <div className="sw-clb__bar-actions">
-          <div className="sw-clb__chaos" data-phase={chaos?.phase ?? "idle"}>
-            <button
-              className="sw-clb__button"
-              data-testid="clb-chaos"
-              {...pendingProps(chaosAction.pending)}
-              data-variant="primary"
-              disabled={
-                chaosAction.pending ||
-                status !== "ready" ||
-                chaos?.phase === "storm" ||
-                chaos?.phase === "settling" ||
-                restoreRunning
-              }
-              onClick={() =>
-                void chaosAction.run(runChaos, () => "The chaos test failed. Try again.")
-              }
-              type="button"
-            >
-              {chaos?.phase === "storm"
-                ? "Chaos running…"
-                : chaos?.phase === "settling"
-                  ? "Reconnecting…"
-                  : "Run a chaos test"}
-            </button>
-          </div>
-          <button
-            className="sw-clb__button"
-            data-testid="clb-restore"
-            disabled={
-              status !== "ready" ||
-              restoreRunning ||
-              chaos?.phase === "storm" ||
-              chaos?.phase === "settling"
-            }
-            onClick={restoreUsage}
-            type="button"
-          >
-            {restoreRunning ? "Restoring usage…" : "Clear 100,000 cells, then undo"}
-          </button>
-        </div>
-        <p className="sw-clb__status" data-status={status} data-testid="clb-status">
-          {status === "ready" ? "Live" : status === "error" ? "Error" : "Loading"}
-          <span className="sw-clb__status-detail">{statusDetail}</span>
-        </p>
-        <output aria-live="polite" className="sw-clb__chaos-report" data-testid="clb-chaos-report">
-          {chaos === null
-            ? "Six seconds of concurrent edits, dropped connections, and reordered broadcasts."
-            : chaos.phase === "converged"
-              ? `Converged: ${chaos.edits} edits, ${chaos.disconnects} disconnects, ${chaos.reorders} reordered broadcasts. All ${chaos.cells} cells match on both clients.`
-              : chaos.phase === "diverged"
-                ? `Not converged: ${chaos.mismatches} of ${chaos.cells} cells differ.`
-                : chaos.phase === "timed-out"
-                  ? `Not settled: work was still queued or recovering after ${CHAOS_DRAIN_MS / 1000} seconds.`
-                  : `${chaos.edits} edits · ${chaos.disconnects} disconnects · ${chaos.reorders} reordered · ${(chaos.ms / 1000).toFixed(1)} s`}
-        </output>
-      </header>
+      <ProtocolBar workbench={workbench} />
 
-      <section aria-label="Live forecast convergence" className="sw-clb__forecast-hud">
-        {CLIENT_KEYS.map((key) => {
-          const actor = key === "a" ? COLLABORATION_ACTORS[0] : COLLABORATION_ACTORS[1];
-          const pending = views[key].syncState?.pendingCount ?? 0;
-          const state = pending > 0 ? "queued" : !atHead(key) ? "behind" : "current";
-          return (
-            <div className="sw-clb__forecast-card" data-head={state} key={key}>
-              <header>
-                <span>{actor.displayName}'s forecast</span>
-                <output>
-                  {pending > 0
-                    ? `${pending} queued`
-                    : state === "behind"
-                      ? "Catching up"
-                      : "Caught up"}
-                </output>
-              </header>
-              <strong>{views[key].total}</strong>
-              <p>
-                Client version <b>v{views[key].syncState?.serverVersion ?? 0}</b>
-              </p>
-            </div>
-          );
-        })}
-        <div
-          aria-live="polite"
-          className="sw-clb__convergence"
-          data-state={clientsAtHead === 2 ? "current" : "waiting"}
-        >
-          <span>Server head</span>
-          <strong>v{serverVersion}</strong>
-          <output>{clientsAtHead === 2 ? "Both clients caught up" : "Waiting for clients"}</output>
-        </div>
-      </section>
+      <ForecastHud workbench={workbench} />
 
       {batchReport && (
         <div
@@ -1347,219 +1293,371 @@ export default function CollaborationShowcase() {
         </div>
       )}
 
-      <div className="sw-clb__workbench">
-        <ClientPanel
-          account={sampleAccount("a")}
-          actor={COLLABORATION_ACTORS[0]}
-          actionPending={action.pending}
-          onSampleEdit={() => sampleEdit("a")}
-          onToggleOnline={(online) => toggleOnline("a", online)}
-          slug="a"
-          view={views.a}
-        >
-          <div
-            aria-label={`${COLLABORATION_ACTORS[0].displayName}'s workbook`}
-            className="sw-clb__grid"
-            data-testid="clb-a-grid"
-            ref={hostRefs.a}
-            role="application"
-          />
-        </ClientPanel>
+      <ClientWorkbench workbench={workbench} />
 
-        <section
-          aria-labelledby="clb-sequence-title"
-          className="sw-clb__sequence"
-          data-phase={challengePhase}
-          data-testid="clb-sequence"
-        >
-          <header>
-            <span>Sequencing lane</span>
-            <output data-testid="clb-server-version">v{serverVersion}</output>
-          </header>
-          <div aria-live="polite" className="sw-clb__challenge">
-            <span className="sw-clb__challenge-state">{challengePhase}</span>
-            <h3 id="clb-sequence-title">{challengeCopy[0]}</h3>
-            <p>{challengeCopy[1]}</p>
-          </div>
-          <ol aria-label="Offline reconnect sequence" className="sw-clb__steps">
-            <li data-current={challengePhase === "initial" ? "true" : undefined}>
-              <button
-                className="sw-clb__button"
-                disabled={status !== "ready" || !views.b.online}
-                onClick={() => toggleOnline("b", false)}
-                type="button"
-              >
-                <span aria-hidden="true">01</span> Take Bram offline
-              </button>
-            </li>
-            <li data-current={challengePhase === "offline" ? "true" : undefined}>
-              <button
-                className="sw-clb__button"
-                disabled={status !== "ready" || views.b.online || action.pending}
-                aria-busy={action.pending || undefined}
-                onClick={() => sampleEdit("b")}
-                type="button"
-              >
-                <span aria-hidden="true">02</span>{" "}
-                {action.pending ? "Queuing edit…" : "Queue one Grid edit"}
-              </button>
-            </li>
-            <li data-current={challengePhase === "queued" ? "true" : undefined}>
-              <button
-                className="sw-clb__button"
-                disabled={status !== "ready" || views.b.online}
-                onClick={() => toggleOnline("b", true)}
-                type="button"
-              >
-                <span aria-hidden="true">03</span> Reconnect
-              </button>
-            </li>
-          </ol>
-          <div aria-hidden="true" className="sw-clb__direction">
-            <span>Ana</span>
-            <i>commit → order → broadcast</i>
-            <span>Bram</span>
-          </div>
-          <section aria-label="Recent server decisions" className="sw-clb__decisions">
-            <h3>Server decisions</h3>
-            <ol aria-live="polite" className="sw-clb__server-log" data-testid="clb-server-log">
-              {serverLog.length === 0 ? (
-                <li className="sw-clb__log-empty">Waiting for the first commit.</li>
-              ) : (
-                serverLog.map((entry) => (
-                  <li data-ack={entry.status} key={entry.id}>
-                    {entry.text}
-                  </li>
-                ))
-              )}
-            </ol>
-          </section>
-        </section>
-
-        <ClientPanel
-          account={sampleAccount("b")}
-          actor={COLLABORATION_ACTORS[1]}
-          actionPending={action.pending}
-          onSampleEdit={() => sampleEdit("b")}
-          onToggleOnline={(online) => toggleOnline("b", online)}
-          slug="b"
-          view={views.b}
-        >
-          <div
-            aria-label={`${COLLABORATION_ACTORS[1].displayName}'s workbook`}
-            className="sw-clb__grid"
-            data-testid="clb-b-grid"
-            ref={hostRefs.b}
-            role="application"
-          />
-        </ClientPanel>
-      </div>
-
-      <details className="sw-clb__advanced">
-        <summary>Advanced protocol faults</summary>
-        <div className="sw-clb__advanced-body">
-          {CLIENT_KEYS.map((key) => {
-            const actor = key === "a" ? COLLABORATION_ACTORS[0] : COLLABORATION_ACTORS[1];
-            const held = views[key].linkState?.heldBroadcasts ?? 0;
-            return (
-              <section
-                aria-labelledby={`clb-${key}-faults-title`}
-                className="sw-clb__fault-client"
-                data-fault-client={key}
-                key={key}
-              >
-                <h3 id={`clb-${key}-faults-title`}>{actor.displayName} · transport faults</h3>
-                <div
-                  aria-label={`${actor.displayName}'s advanced network controls`}
-                  className="sw-clb__controls"
-                  role="toolbar"
-                >
-                  <button
-                    className="sw-clb__button"
-                    data-variant="quiet"
-                    onClick={() => loseNextAck(key)}
-                    type="button"
-                  >
-                    Lose next ack
-                  </button>
-                  <button
-                    className="sw-clb__button"
-                    data-variant="quiet"
-                    onClick={() => retryPending(key)}
-                    type="button"
-                  >
-                    Retry pending
-                  </button>
-                  <button
-                    className="sw-clb__button"
-                    data-variant="quiet"
-                    onClick={() => holdNextBroadcast(key)}
-                    type="button"
-                  >
-                    Hold next broadcast
-                  </button>
-                  <button
-                    className="sw-clb__button"
-                    data-variant="quiet"
-                    onClick={() => releaseHeld(key)}
-                    type="button"
-                  >
-                    Release held
-                    {held > 0 ? <span className="sw-clb__held-count">{held}</span> : null}
-                  </button>
-                </div>
-                <ol
-                  aria-label={`${actor.displayName}'s sync events`}
-                  aria-live="polite"
-                  className="sw-clb__log"
-                  data-testid={`clb-${key}-log`}
-                >
-                  {views[key].log.length === 0 ? (
-                    <li className="sw-clb__log-empty">Sync events appear here.</li>
-                  ) : (
-                    views[key].log.map((entry) => (
-                      <li data-kind={entry.kind} key={entry.id}>
-                        {entry.text}
-                      </li>
-                    ))
-                  )}
-                </ol>
-              </section>
-            );
-          })}
-          <section aria-labelledby="clb-server-tools-title" className="sw-clb__server-tools">
-            <h3 id="clb-server-tools-title">Server and recovery</h3>
-            <div className="sw-clb__controls">
-              <button
-                className="sw-clb__button"
-                {...pendingProps(action.pending)}
-                onClick={serverEdit}
-                type="button"
-              >
-                {action.pending ? "Committing…" : "Server-authored commit"}
-              </button>
-              <button
-                className="sw-clb__button"
-                data-variant="danger"
-                {...pendingProps(action.pending)}
-                onClick={resetDemo}
-                type="button"
-              >
-                {action.pending ? "Resetting…" : "Reset demo"}
-              </button>
-            </div>
-            <p className="sw-clb__server-note">
-              <span className="sw-clb__server-note-tag">Demo-only</span>
-              <span>
-                This in-page sequencer makes the real <code>PersistenceAdapter</code> +{" "}
-                <code>RemoteOperationSource</code> boundary observable. Your backend supplies that
-                transport and durable store.
-              </span>
-            </p>
-          </section>
-        </div>
-      </details>
+      <AdvancedDrills workbench={workbench} />
     </section>
+  );
+}
+
+/** The protocol bar: connection state, drills and their actions. */
+function ProtocolBar({ workbench }: Readonly<{ workbench: CollaborationClients }>) {
+  const { chaosAction, status, statusDetail, chaos, restoreRunning, runChaos, restoreUsage } =
+    workbench;
+
+  return (
+    <header className="sw-clb__bar">
+      <div className="sw-clb__bar-title">
+        <p>Two clients · one sequencing server</p>
+        <h2>Two analysts. One shared forecast.</h2>
+      </div>
+      <div className="sw-clb__bar-actions">
+        <div className="sw-clb__chaos" data-phase={chaos?.phase ?? "idle"}>
+          <button
+            className="sw-clb__button"
+            data-testid="clb-chaos"
+            {...pendingProps(chaosAction.pending)}
+            data-variant="primary"
+            disabled={
+              chaosAction.pending ||
+              status !== "ready" ||
+              chaos?.phase === "storm" ||
+              chaos?.phase === "settling" ||
+              restoreRunning
+            }
+            onClick={() =>
+              void chaosAction.run(runChaos, () => "The chaos test failed. Try again.")
+            }
+            type="button"
+          >
+            {chaos?.phase === "storm"
+              ? "Chaos running…"
+              : chaos?.phase === "settling"
+                ? "Reconnecting…"
+                : "Run a chaos test"}
+          </button>
+        </div>
+        <button
+          className="sw-clb__button"
+          data-testid="clb-restore"
+          disabled={
+            status !== "ready" ||
+            restoreRunning ||
+            chaos?.phase === "storm" ||
+            chaos?.phase === "settling"
+          }
+          onClick={restoreUsage}
+          type="button"
+        >
+          {restoreRunning ? "Restoring usage…" : "Clear 100,000 cells, then undo"}
+        </button>
+      </div>
+      <p className="sw-clb__status" data-status={status} data-testid="clb-status">
+        {status === "ready" ? "Live" : status === "error" ? "Error" : "Loading"}
+        <span className="sw-clb__status-detail">{statusDetail}</span>
+      </p>
+      <output aria-live="polite" className="sw-clb__chaos-report" data-testid="clb-chaos-report">
+        {chaos === null
+          ? "Six seconds of concurrent edits, dropped connections, and reordered broadcasts."
+          : chaos.phase === "converged"
+            ? `Converged: ${chaos.edits} edits, ${chaos.disconnects} disconnects, ${chaos.reorders} reordered broadcasts. All ${chaos.cells} cells match on both clients.`
+            : chaos.phase === "diverged"
+              ? `Not converged: ${chaos.mismatches} of ${chaos.cells} cells differ.`
+              : chaos.phase === "timed-out"
+                ? `Not settled: work was still queued or recovering after ${CHAOS_DRAIN_MS / 1000} seconds.`
+                : `${chaos.edits} edits · ${chaos.disconnects} disconnects · ${chaos.reorders} reordered · ${(chaos.ms / 1000).toFixed(1)} s`}
+      </output>
+    </header>
+  );
+}
+
+/** Live forecast convergence across the two clients. */
+function ForecastHud({ workbench }: Readonly<{ workbench: CollaborationClients }>) {
+  const { atHead, views, serverVersion, clientsAtHead } = workbench;
+
+  return (
+    <section aria-label="Live forecast convergence" className="sw-clb__forecast-hud">
+      {CLIENT_KEYS.map((key) => {
+        const actor = key === "a" ? COLLABORATION_ACTORS[0] : COLLABORATION_ACTORS[1];
+        const pending = views[key].syncState?.pendingCount ?? 0;
+        const state = pending > 0 ? "queued" : !atHead(key) ? "behind" : "current";
+        return (
+          <div className="sw-clb__forecast-card" data-head={state} key={key}>
+            <header>
+              <span>{actor.displayName}'s forecast</span>
+              <output>
+                {pending > 0
+                  ? `${pending} queued`
+                  : state === "behind"
+                    ? "Catching up"
+                    : "Caught up"}
+              </output>
+            </header>
+            <strong>{views[key].total}</strong>
+            <p>
+              Client version <b>v{views[key].syncState?.serverVersion ?? 0}</b>
+            </p>
+          </div>
+        );
+      })}
+      <div
+        aria-live="polite"
+        className="sw-clb__convergence"
+        data-state={clientsAtHead === 2 ? "current" : "waiting"}
+      >
+        <span>Server head</span>
+        <strong>v{serverVersion}</strong>
+        <output>{clientsAtHead === 2 ? "Both clients caught up" : "Waiting for clients"}</output>
+      </div>
+    </section>
+  );
+}
+
+/** The two client panels and the shared server log. */
+function ClientWorkbench({ workbench }: Readonly<{ workbench: CollaborationClients }>) {
+  const {
+    action,
+    hostRefs,
+    status,
+    views,
+    serverLog,
+    serverVersion,
+    sampleAccount,
+    sampleEdit,
+    toggleOnline,
+    challengePhase,
+    challengeCopy,
+  } = workbench;
+
+  return (
+    <div className="sw-clb__workbench">
+      <ClientPanel
+        account={sampleAccount("a")}
+        actor={COLLABORATION_ACTORS[0]}
+        actionPending={action.pending}
+        onSampleEdit={() => sampleEdit("a")}
+        onToggleOnline={(online) => toggleOnline("a", online)}
+        slug="a"
+        view={views.a}
+      >
+        <div
+          aria-label={`${COLLABORATION_ACTORS[0].displayName}'s workbook`}
+          className="sw-clb__grid"
+          data-testid="clb-a-grid"
+          ref={hostRefs.a}
+          role="application"
+        />
+      </ClientPanel>
+
+      <section
+        aria-labelledby="clb-sequence-title"
+        className="sw-clb__sequence"
+        data-phase={challengePhase}
+        data-testid="clb-sequence"
+      >
+        <header>
+          <span>Sequencing lane</span>
+          <output data-testid="clb-server-version">v{serverVersion}</output>
+        </header>
+        <div aria-live="polite" className="sw-clb__challenge">
+          <span className="sw-clb__challenge-state">{challengePhase}</span>
+          <h3 id="clb-sequence-title">{challengeCopy[0]}</h3>
+          <p>{challengeCopy[1]}</p>
+        </div>
+        <ol aria-label="Offline reconnect sequence" className="sw-clb__steps">
+          <li data-current={challengePhase === "initial" ? "true" : undefined}>
+            <button
+              className="sw-clb__button"
+              disabled={status !== "ready" || !views.b.online}
+              onClick={() => toggleOnline("b", false)}
+              type="button"
+            >
+              <span aria-hidden="true">01</span> Take Bram offline
+            </button>
+          </li>
+          <li data-current={challengePhase === "offline" ? "true" : undefined}>
+            <button
+              className="sw-clb__button"
+              disabled={status !== "ready" || views.b.online || action.pending}
+              aria-busy={action.pending || undefined}
+              onClick={() => sampleEdit("b")}
+              type="button"
+            >
+              <span aria-hidden="true">02</span>{" "}
+              {action.pending ? "Queuing edit…" : "Queue one Grid edit"}
+            </button>
+          </li>
+          <li data-current={challengePhase === "queued" ? "true" : undefined}>
+            <button
+              className="sw-clb__button"
+              disabled={status !== "ready" || views.b.online}
+              onClick={() => toggleOnline("b", true)}
+              type="button"
+            >
+              <span aria-hidden="true">03</span> Reconnect
+            </button>
+          </li>
+        </ol>
+        <div aria-hidden="true" className="sw-clb__direction">
+          <span>Ana</span>
+          <i>commit → order → broadcast</i>
+          <span>Bram</span>
+        </div>
+        <section aria-label="Recent server decisions" className="sw-clb__decisions">
+          <h3>Server decisions</h3>
+          <ol aria-live="polite" className="sw-clb__server-log" data-testid="clb-server-log">
+            {serverLog.length === 0 ? (
+              <li className="sw-clb__log-empty">Waiting for the first commit.</li>
+            ) : (
+              serverLog.map((entry) => (
+                <li data-ack={entry.status} key={entry.id}>
+                  {entry.text}
+                </li>
+              ))
+            )}
+          </ol>
+        </section>
+      </section>
+
+      <ClientPanel
+        account={sampleAccount("b")}
+        actor={COLLABORATION_ACTORS[1]}
+        actionPending={action.pending}
+        onSampleEdit={() => sampleEdit("b")}
+        onToggleOnline={(online) => toggleOnline("b", online)}
+        slug="b"
+        view={views.b}
+      >
+        <div
+          aria-label={`${COLLABORATION_ACTORS[1].displayName}'s workbook`}
+          className="sw-clb__grid"
+          data-testid="clb-b-grid"
+          ref={hostRefs.b}
+          role="application"
+        />
+      </ClientPanel>
+    </div>
+  );
+}
+
+/** Recovery drills and the full event log. */
+function AdvancedDrills({ workbench }: Readonly<{ workbench: CollaborationClients }>) {
+  const {
+    action,
+    views,
+    loseNextAck,
+    retryPending,
+    holdNextBroadcast,
+    releaseHeld,
+    serverEdit,
+    resetDemo,
+  } = workbench;
+
+  return (
+    <details className="sw-clb__advanced">
+      <summary>Advanced protocol faults</summary>
+      <div className="sw-clb__advanced-body">
+        {CLIENT_KEYS.map((key) => {
+          const actor = key === "a" ? COLLABORATION_ACTORS[0] : COLLABORATION_ACTORS[1];
+          const held = views[key].linkState?.heldBroadcasts ?? 0;
+          return (
+            <section
+              aria-labelledby={`clb-${key}-faults-title`}
+              className="sw-clb__fault-client"
+              data-fault-client={key}
+              key={key}
+            >
+              <h3 id={`clb-${key}-faults-title`}>{actor.displayName} · transport faults</h3>
+              <div
+                aria-label={`${actor.displayName}'s advanced network controls`}
+                className="sw-clb__controls"
+                role="toolbar"
+              >
+                <button
+                  className="sw-clb__button"
+                  data-variant="quiet"
+                  onClick={() => loseNextAck(key)}
+                  type="button"
+                >
+                  Lose next ack
+                </button>
+                <button
+                  className="sw-clb__button"
+                  data-variant="quiet"
+                  onClick={() => retryPending(key)}
+                  type="button"
+                >
+                  Retry pending
+                </button>
+                <button
+                  className="sw-clb__button"
+                  data-variant="quiet"
+                  onClick={() => holdNextBroadcast(key)}
+                  type="button"
+                >
+                  Hold next broadcast
+                </button>
+                <button
+                  className="sw-clb__button"
+                  data-variant="quiet"
+                  onClick={() => releaseHeld(key)}
+                  type="button"
+                >
+                  Release held
+                  {held > 0 ? <span className="sw-clb__held-count">{held}</span> : null}
+                </button>
+              </div>
+              <ol
+                aria-label={`${actor.displayName}'s sync events`}
+                aria-live="polite"
+                className="sw-clb__log"
+                data-testid={`clb-${key}-log`}
+              >
+                {views[key].log.length === 0 ? (
+                  <li className="sw-clb__log-empty">Sync events appear here.</li>
+                ) : (
+                  views[key].log.map((entry) => (
+                    <li data-kind={entry.kind} key={entry.id}>
+                      {entry.text}
+                    </li>
+                  ))
+                )}
+              </ol>
+            </section>
+          );
+        })}
+        <section aria-labelledby="clb-server-tools-title" className="sw-clb__server-tools">
+          <h3 id="clb-server-tools-title">Server and recovery</h3>
+          <div className="sw-clb__controls">
+            <button
+              className="sw-clb__button"
+              {...pendingProps(action.pending)}
+              onClick={serverEdit}
+              type="button"
+            >
+              {action.pending ? "Committing…" : "Server-authored commit"}
+            </button>
+            <button
+              className="sw-clb__button"
+              data-variant="danger"
+              {...pendingProps(action.pending)}
+              onClick={resetDemo}
+              type="button"
+            >
+              {action.pending ? "Resetting…" : "Reset demo"}
+            </button>
+          </div>
+          <p className="sw-clb__server-note">
+            <span className="sw-clb__server-note-tag">Demo-only</span>
+            <span>
+              This in-page sequencer makes the real <code>PersistenceAdapter</code> +{" "}
+              <code>RemoteOperationSource</code> boundary observable. Your backend supplies that
+              transport and durable store.
+            </span>
+          </p>
+        </section>
+      </div>
+    </details>
   );
 }
 
