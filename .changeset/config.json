@@ -6,6 +6,7 @@
     [
       "@sheetwrite/wasm",
       "@sheetwrite/formulas",
+      "@sheetwrite/queries",
       "@sheetwrite/core",
       "@sheetwrite/xlsx",
       "@sheetwrite/charts",

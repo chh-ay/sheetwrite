@@ -23,6 +23,28 @@ export function compareCodeUnits(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
+/** An untrusted plain object whose fields are read one by one. */
+export type PlainRecord = Record<string, unknown>;
+
+/** Whether `value` is a plain object: not null, not an array, and with the `Object` prototype. */
+export function isPlainRecord(value: unknown): value is PlainRecord {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    Object.getPrototypeOf(value) === Object.prototype
+  );
+}
+
+/**
+ * The own enumerable data value of `record[key]`, or undefined. Getters and
+ * inherited fields are not read, so validation never runs caller code.
+ */
+export function ownValue(record: PlainRecord, key: string): unknown {
+  const descriptor = Object.getOwnPropertyDescriptor(record, key);
+  return descriptor?.enumerable && "value" in descriptor ? descriptor.value : undefined;
+}
+
 /** Own enumerable data properties of a plain object restricted to `allowed`; null otherwise. */
 export function dataProperties(
   value: unknown,

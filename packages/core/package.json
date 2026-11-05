@@ -45,6 +45,14 @@
       "types": "./dist/functions.d.ts",
       "default": "./dist/functions.js"
     },
+    "./history": {
+      "types": "./dist/history-archive.d.ts",
+      "default": "./dist/history-archive.js"
+    },
+    "./browser/history": {
+      "types": "./dist/history-indexeddb.d.ts",
+      "default": "./dist/history-indexeddb.js"
+    },
     "./shell": {
       "types": "./dist/shell.d.ts",
       "default": "./dist/shell.js"

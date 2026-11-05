@@ -8,7 +8,7 @@ description: "WorkbookSnapshot interface in @sheetwrite/core: Schema-versioned s
 Schema-versioned serializable workbook document.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L472"><code>packages/core/src/types/document.ts#L472</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L475"><code>packages/core/src/types/document.ts#L475</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>
@@ -46,7 +46,7 @@ version?: number;
 <summary><code>workbook</code></summary>
 
 ```ts generated
-workbook: { activeSheet: SheetId; namedRanges?: NamedRangeSnapshot[]; xlsxSource?: XlsxSourceSnapshot; calculation?: CalculationSettings; };
+workbook: { activeSheet: SheetId; namedRanges?: NamedRangeSnapshot[]; xlsxSource?: XlsxSourceSnapshot; calculation?: CalculationSettings; dataModel?: DataModel; };
 ```
 
 </details>
@@ -76,6 +76,7 @@ export interface WorkbookSnapshot {
     namedRanges?: NamedRangeSnapshot[];
     xlsxSource?: XlsxSourceSnapshot;
     calculation?: CalculationSettings;
+    dataModel?: DataModel;
   };
   sheets: SheetSnapshot[];
 }
@@ -92,6 +93,7 @@ export interface WorkbookSnapshot {
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/queries</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
@@ -101,6 +103,7 @@ export interface WorkbookSnapshot {
 <p class="api-consumers-label">Public exports naming <code>WorkbookSnapshot</code></p>
 
 <ul class="api-consumer-list">
+<li><a href="/docs/api/core/commit-journal/"><code>CommitJournal</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/document-validation-result/"><code>DocumentValidationResult</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/from-xlsx-workbook/"><code>fromXlsxWorkbook</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/from-xlsx-workbook-file/"><code>fromXlsxWorkbookFile</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
@@ -112,7 +115,6 @@ export interface WorkbookSnapshot {
 <li><a href="/docs/api/core/sheetwrite-store/"><code>SheetwriteStore</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/store/"><code>Store</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/sync-coordinator/"><code>SyncCoordinator</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li><a href="/docs/api/core/sync-coordinator-event/"><code>SyncCoordinatorEvent</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li class="api-consumer-more">and 7 more</li>
+<li class="api-consumer-more">and 10 more</li>
 </ul>
 </div>

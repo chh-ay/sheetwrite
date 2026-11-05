@@ -3883,18 +3883,16 @@ export class GridImpl implements Grid {
     }
   }
 
-  private requireCompleteExport(sheets: readonly Sheet[]): void {
-    if (!this.loadable) return;
-    for (const sheet of sheets) {
-      const capability = this.loadable.queryCapability(sheet.id);
-      if (capability.status === "incomplete") {
-        throw new IncompleteDataError(sheet.id, capability);
-      }
+  /** Both export formats write only the active sheet, so only its rows must be loaded. */
+  private requireCompleteSheet(): void {
+    const capability = this.loadable?.queryCapability(this.activeSheet);
+    if (capability?.status === "incomplete") {
+      throw new IncompleteDataError(this.activeSheet, capability);
     }
   }
 
   exportCsv(filename: string): void {
-    this.requireCompleteExport([this.sheet()]);
+    this.requireCompleteSheet();
     downloadBytesIn(
       this.lifetime,
       toCsv(this.sheet(), this.store),
@@ -3907,6 +3905,8 @@ export class GridImpl implements Grid {
     // Destroy aborts the export; its listeners on the signal go with this scope.
     const run = (this.documentOperations ??= new ScopeSlot(this.lifetime)).current().child();
     try {
+      this.requireCompleteSheet();
+
       // XLSX conversion is optional document work, not initial grid code.
       const { exportWorkbookFile } = await import("./workbook-io.js");
       await exportWorkbookFile(this, filename, run, this.lifetime);

@@ -1,7 +1,6 @@
 import { downloadBytesIn } from "./export.js";
 import type { RibbonButtonSpec } from "./ribbon/command-spec.js";
 import { Scope } from "./scope.js";
-import { IncompleteDataError, SheetwriteStore } from "./store.js";
 import type { WorkbookSnapshot } from "./types/document.js";
 import type { Grid } from "./types/grid.js";
 import { fromXlsxWorkbookFile, hasXlsxWorkbookBackend, toXlsxTable } from "./xlsx-bridge.js";
@@ -79,7 +78,11 @@ export async function pickXlsxWorkbook(
   }
 }
 
-/** Export is cold document work; replacement and destruction both cancel it. */
+/**
+ * Export is cold document work; replacement and destruction both cancel it.
+ * The grid checks that the active sheet is complete before it loads this
+ * module, so this lazy module does not import the store and its dependencies.
+ */
 export async function exportWorkbookFile(
   grid: Pick<Grid, "store" | "getActiveSheet">,
   filename: string,
@@ -95,12 +98,6 @@ export async function exportWorkbookFile(
     storedWorkbook.activeSheet === activeSheet
       ? storedWorkbook
       : { ...storedWorkbook, activeSheet };
-  const sheet =
-    workbook.sheets.find((candidate) => candidate.id === activeSheet) ?? workbook.sheets[0];
-  if (sheet && store instanceof SheetwriteStore) {
-    const capability = store.queryCapability(sheet.id);
-    if (capability.status === "incomplete") throw new IncompleteDataError(sheet.id, capability);
-  }
 
   const bytes = await toXlsxTable(workbook, store, { signal: run.signal });
   run.signal.throwIfAborted();

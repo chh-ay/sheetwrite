@@ -1,0 +1,50 @@
+{
+  "name": "@sheetwrite/queries",
+  "version": "0.6.1",
+  "type": "module",
+  "description": "Optional Rust columnar query execution for Sheetwrite.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chh-ay/sheetwrite.git",
+    "directory": "packages/queries"
+  },
+  "homepage": "https://www.sheetwrite.dev/",
+  "bugs": {
+    "url": "https://github.com/chh-ay/sheetwrite/issues"
+  },
+  "sideEffects": false,
+  "main": "./dist/node.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "node": {
+        "types": "./dist/node.d.ts",
+        "default": "./dist/node.js"
+      },
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./wasm": "./pkg/sheetwrite_queries_bg.wasm"
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "pkg/sheetwrite_queries.js",
+    "pkg/sheetwrite_queries.d.ts",
+    "pkg/sheetwrite_queries_bg.wasm"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "rm -rf dist && wasm-pack build engine --target web --out-dir ../pkg && bun build.ts && tsc -p tsconfig.build.json && rm -f dist/types.js && bun ../../scripts/package-dist.ts .",
+    "prepublishOnly": "bun run build",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@sheetwrite/core": "workspace:*"
+  }
+}
