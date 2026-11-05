@@ -89,7 +89,7 @@ The ribbon has these tabs, with Excel's group names, labels and order:
 | Home | **Undo**. **Clipboard**: Paste split button. **Font**: font name and size boxes, grow and shrink, bold, italic, underline, strikethrough, Borders, Fill Color and Font Color palettes. **Alignment**: top, middle, bottom, wrap, left, center, right, Merge & Center. **Number**: format box, currency, percent, comma, more and fewer decimals. **Cells**: Insert, Delete, Format. **Editing**: AutoSum, Clear, Sort & Filter, Find. |
 | Insert | **Rows & Columns**: Insert (rows above or below, columns left or right), Delete (rows or columns). **Tables**: PivotTable. **Charts**: Chart split button (column, bar, line, area, pie, doughnut, scatter). **Links**: link form. **Notes**: note form. |
 | Formulas | **Function Library**: Insert Function. Shows only while the store has [custom functions](/docs/features/formulas/custom-functions/), which need the full engine. **Formula Auditing**: Explain Formula. |
-| Data | **Sort & Filter**: Sort A to Z, Sort Z to A, Clear Filter. **Outline**: Group and Ungroup rows. **Show/Hide**: Hide Rows, Unhide Rows, Hide Columns, Unhide Columns. **Export**: Export CSV, Export XLSX (with the `export` flag). |
+| Data | **Sort & Filter**: Sort A to Z and Sort Z to A (sort the cells in place, as Excel does), Custom Sort (the Sort panel), Sort View A to Z and Sort View Z to A (sort the view only), Clear Filter. **Outline**: Group and Ungroup rows. **Show/Hide**: Hide Rows, Unhide Rows, Hide Columns, Unhide Columns. **Export**: Export CSV, Export XLSX (with the `export` flag). |
 | View | **Window**: Freeze Panes, Freeze Top Row, Freeze First Column, Unfreeze Panes. **Zoom**: zoom out, current percent, zoom in. |
 
 Every control reads the same `getCommandState` contract as host chrome. It disables while the grid is read-only.
@@ -252,7 +252,7 @@ These `GridConfig` fields ([`CommandFlags`](/docs/api/core/command-flags/)) choo
 | `border` | `true` | Borders. |
 | `clearFormat` | `true` | Clear (Clear All, Clear Formats, Clear Contents). |
 | `merge` | `true` | Merge & Center (also Merge Cells and Unmerge Cells). |
-| `sort` | `true` | Sort & Filter, Sort A to Z and Sort Z to A. |
+| `sort` | `true` | Sort & Filter, Sort A to Z, Sort Z to A, Custom Sort, Sort View A to Z and Sort View Z to A. |
 | `export` | `false` | Export CSV and Export XLSX, in the Data tab's Export group. |
 | `ribbon` | `false` | Show the ribbon instead of the toolbar. See [Compact ribbon](#compact-ribbon). |
 

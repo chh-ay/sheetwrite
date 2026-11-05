@@ -8,7 +8,7 @@ description: "InitOutput interface in @sheetwrite/wasm: Result of module initial
 Result of module initialization: the instantiated exports plus the shared linear memory.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/pkg/sheetwrite_wasm.d.ts#L648"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L648</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/pkg/sheetwrite_wasm.d.ts#L655"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L655</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -50,6 +50,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-columns-fully-loaded"><code>cellstore_columnsFullyLoaded</code></a>
 <a href="#init-output-cellstore-commit-sources"><code>cellstore_commitSources</code></a>
 <a href="#init-output-cellstore-compact-string-storage"><code>cellstore_compactStringStorage</code></a>
+<a href="#init-output-cellstore-current-region"><code>cellstore_currentRegion</code></a>
 <a href="#init-output-cellstore-data-edge"><code>cellstore_dataEdge</code></a>
 <a href="#init-output-cellstore-data-edge-ordered"><code>cellstore_dataEdgeOrdered</code></a>
 <a href="#init-output-cellstore-distinct-values"><code>cellstore_distinctValues</code></a>
@@ -172,7 +173,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-wbindgen-start"><code>__wbindgen_start</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>158</span>
+## Members <span class="api-count" data-pagefind-ignore>159</span>
 
 <div class="api-member-list">
 
@@ -514,6 +515,15 @@ readonly cellstore_commitSources: (a: number) => void;
 
 ```ts generated
 readonly cellstore_compactStringStorage: (a: number) => void;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-current-region" data-pagefind-weight="1">
+<summary><code>cellstore_currentRegion</code></summary>
+
+```ts generated
+readonly cellstore_currentRegion: (a: number, b: number, c: number, d: number) => [number, number];
 ```
 
 </details>
@@ -1727,6 +1737,12 @@ export interface InitOutput {
   ) => number;
   readonly cellstore_commitSources: (a: number) => void;
   readonly cellstore_compactStringStorage: (a: number) => void;
+  readonly cellstore_currentRegion: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+  ) => [number, number];
   readonly cellstore_dataEdge: (
     a: number,
     b: number,

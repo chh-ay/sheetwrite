@@ -9,7 +9,7 @@ Convert a workbook's formula sources in one JavaScript-to-WASM call.
 The consumed input vector can release each source as its result is produced.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/pkg/sheetwrite_wasm.d.ts#L597"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L597</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/pkg/sheetwrite_wasm.d.ts#L604"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L604</code></a></dd></div>
 </dl>
 
 ## Declaration

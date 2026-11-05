@@ -18,11 +18,12 @@ import { rejectionMessage } from "./panel-dom.js";
 import { nextPivotIdentity, pivotSourceFor } from "./pivot-model.js";
 import { pivotPanel } from "./pivot-panel.js";
 import { parseRangeText } from "./range-text.js";
+import { sortPanel } from "./sort-panel.js";
 
 /** What the open panel shows, so selection changes can switch or close it. */
 type OpenPanel =
   | { readonly kind: "chart" | "pivot"; readonly sheet: SheetId; readonly id: string }
-  | { readonly kind: "explain" | "names" };
+  | { readonly kind: "explain" | "names" | "sort" };
 
 interface PanelState {
   icons: IconOverrides | undefined;
@@ -88,6 +89,17 @@ export function openNamePanel(grid: Grid, define = false): void {
   const state = stateOf(grid);
   const open: OpenPanel = { kind: "names" };
   const panel = namePanel(grid, define);
+  grid.openPanel({
+    ...panel,
+    render: (body) => trackOpen(state, open, panel.render(body)),
+  });
+}
+
+/** Show the Sort panel for the selection or the current region. */
+export function openSortPanel(grid: Grid): void {
+  const state = stateOf(grid);
+  const open: OpenPanel = { kind: "sort" };
+  const panel = sortPanel(grid);
   grid.openPanel({
     ...panel,
     render: (body) => trackOpen(state, open, panel.render(body)),

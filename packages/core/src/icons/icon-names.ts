@@ -64,6 +64,8 @@ export const ICON_NAMES = [
   "sortDesc",
   "sortFilter",
   "clearFilter",
+  "sortCustom",
+  "sortView",
   "chart",
   "chartColumn",
   "chartBar",
