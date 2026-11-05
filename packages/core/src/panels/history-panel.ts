@@ -104,7 +104,26 @@ class HistoryPanel {
   private styles(): HTMLStyleElement {
     const style = document.createElement("style");
     // The rules travel with the panel chunk, not the grid's first-paint CSS.
-    style.textContent = `.sheetwrite-history{display:flex;flex-direction:column;gap:10px}.sheetwrite-history button,.sheetwrite-history select,.sheetwrite-history input{font:inherit}.sheetwrite-history button{cursor:pointer;max-width:100%;padding:6px 8px;border:1px solid currentColor;border-radius:4px;color:inherit;background:transparent}.sheetwrite-history button:focus-visible{outline:2px solid currentColor;outline-offset:2px}.sheetwrite-history [role=group]{display:flex;flex-direction:column;gap:6px}.sheetwrite-history .history-version{text-align:left}.sheetwrite-history [aria-pressed=true]{border-width:2px;font-weight:600}.sheetwrite-history .history-diff{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}.sheetwrite-history .history-change{padding:8px;border:1px solid currentColor;border-radius:4px;overflow-wrap:anywhere}.sheetwrite-history .history-added{border-style:dashed}.sheetwrite-history .history-removed{border-style:dotted}.sheetwrite-history .history-preview{height:260px;min-width:0}.sheetwrite-history [role=alertdialog]{padding:10px;border:2px solid currentColor;border-radius:4px}.sheetwrite-history small{display:block;opacity:.8}.sheetwrite-history h3{margin:12px 0 6px}.sheetwrite-history form{display:flex;flex-direction:column;gap:8px}.sheetwrite-history [hidden]{display:none}`;
+    // One string per rule; joining them gives the same bytes as minified CSS.
+    style.textContent = [
+      ".sheetwrite-history{display:flex;flex-direction:column;gap:10px}",
+      ".sheetwrite-history button,.sheetwrite-history select,.sheetwrite-history input{font:inherit}",
+      ".sheetwrite-history button{cursor:pointer;max-width:100%;padding:6px 8px;border:1px solid currentColor;border-radius:4px;color:inherit;background:transparent}",
+      ".sheetwrite-history button:focus-visible{outline:2px solid currentColor;outline-offset:2px}",
+      ".sheetwrite-history [role=group]{display:flex;flex-direction:column;gap:6px}",
+      ".sheetwrite-history .history-version{text-align:left}",
+      ".sheetwrite-history [aria-pressed=true]{border-width:2px;font-weight:600}",
+      ".sheetwrite-history .history-diff{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}",
+      ".sheetwrite-history .history-change{padding:8px;border:1px solid currentColor;border-radius:4px;overflow-wrap:anywhere}",
+      ".sheetwrite-history .history-added{border-style:dashed}",
+      ".sheetwrite-history .history-removed{border-style:dotted}",
+      ".sheetwrite-history .history-preview{height:260px;min-width:0}",
+      ".sheetwrite-history [role=alertdialog]{padding:10px;border:2px solid currentColor;border-radius:4px}",
+      ".sheetwrite-history small{display:block;opacity:.8}",
+      ".sheetwrite-history h3{margin:12px 0 6px}",
+      ".sheetwrite-history form{display:flex;flex-direction:column;gap:8px}",
+      ".sheetwrite-history [hidden]{display:none}",
+    ].join("");
     return style;
   }
 
@@ -132,11 +151,20 @@ class HistoryPanel {
       this.pending.textContent = "Local version archive. Only committed changes are saved.";
       return;
     }
-    const { connection, activity } = this.sync.state;
-    this.pending.textContent =
-      this.sync.pendingCount > 0
-        ? `${this.sync.pendingCount} pending change(s). They are not archived yet.`
-        : `${connection}; ${activity}. All local changes are committed.`;
+    const { connection } = this.sync.state;
+    const pending = this.sync.pendingCount;
+    const changes = pending === 1 ? "1 change" : `${pending} changes`;
+    const online = connection === "online";
+
+    if (pending === 0) {
+      this.pending.textContent = online
+        ? "Connected. All changes are saved."
+        : "Offline. All changes are saved.";
+    } else {
+      this.pending.textContent = online
+        ? `Saving ${changes}. Versions include them once they are saved.`
+        : `Offline: ${changes} waiting to sync.`;
+    }
   }
 
   private async save(): Promise<void> {
@@ -301,10 +329,12 @@ class HistoryPanel {
     if (page.cursor) {
       host.append(this.button("Next changes", () => this.showDiff(from, to, host, page.cursor)));
     }
+    const changed = page.cells.flags.length;
+    const cells = changed === 1 ? "1 changed cell" : `${changed} changed cells`;
     this.status.textContent =
-      page.cells.flags.length === 0 && page.sheets.length === 0 && page.workbook.length === 0
+      changed === 0 && page.sheets.length === 0 && page.workbook.length === 0
         ? "No source or style changes between these versions."
-        : `Showing ${page.cells.flags.length} cell change(s).${page.logComplete ? "" : " Some earlier authors are not known because the log is no longer retained."}`;
+        : `${cells}.${page.logComplete ? "" : " Some earlier authors are not known because the log is no longer retained."}`;
   }
 
   private renderDiff(page: HistoryDiffPage, host: HTMLElement): void {
