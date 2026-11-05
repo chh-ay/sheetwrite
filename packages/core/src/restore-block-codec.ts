@@ -5,7 +5,7 @@ import type { Range } from "./types/coordinates.js";
 import type { DocumentOp, PackedCellBlock } from "./types/document.js";
 
 export const MAX_RESTORE_BLOCK_DECODED_BYTES = 64 * 1024 * 1024;
-export const MAX_RESTORE_BLOCK_CELLS = 4_000_000;
+const MAX_RESTORE_BLOCK_CELLS = 4_000_000;
 type RestoreBlock = Extract<DocumentOp, { op: "restoreBlock" }>;
 
 /** A restore block that does not encode a valid cell block. */

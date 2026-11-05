@@ -7,10 +7,10 @@
 import { utf8CodePointBytes, utf8CodePointUnits } from "./utf8.js";
 
 /** Keys from the root to a value: numbers index arrays, strings name object fields. */
-export type JsonPathSegments = Array<string | number>;
+type JsonPathSegments = Array<string | number>;
 
 /** Why a value has no faithful JSON encoding inside the byte limit. */
-export interface JsonIssue {
+interface JsonIssue {
   /** `limit` when the encoding passes the byte limit; `invalid` when the value is not plain JSON data. */
   readonly kind: "limit" | "invalid";
   readonly message: string;
@@ -19,7 +19,7 @@ export interface JsonIssue {
 }
 
 /** Bytes counted so far, and the issue that stopped the walk. */
-export interface JsonMeasure {
+interface JsonMeasure {
   /** Exact encoded bytes; on a limit issue, the first total past the limit. */
   readonly bytes: number;
   readonly issue?: JsonIssue;
