@@ -8,7 +8,7 @@ description: "QueryBatch interface in @sheetwrite/queries: Equal-length columns 
 Equal-length columns with a u32 row count; returned buffers are owned by the caller.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/types.ts#L144"><code>packages/queries/src/types.ts#L144</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/types.ts#L85"><code>packages/queries/src/types.ts#L85</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>
@@ -61,6 +61,7 @@ export interface QueryBatch {
 
 <ul class="api-consumer-list">
 <li><a href="/docs/api/queries/query-engine/"><code>QueryEngine</code></a><span class="api-consumer-kind">@sheetwrite/queries</span></li>
+<li><a href="/docs/api/queries/query-fetch-result/"><code>QueryFetchResult</code></a><span class="api-consumer-kind">@sheetwrite/queries</span></li>
 <li><a href="/docs/api/queries/query-input/"><code>QueryInput</code></a><span class="api-consumer-kind">@sheetwrite/queries</span></li>
 </ul>
 </div>

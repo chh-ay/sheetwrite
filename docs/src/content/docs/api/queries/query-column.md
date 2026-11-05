@@ -8,7 +8,7 @@ description: "QueryColumn type in @sheetwrite/queries: Typed host buffers; valid
 Typed host buffers; validity and sparse error lanes preserve null/error distinctions.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/types.ts#L133"><code>packages/queries/src/types.ts#L133</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/types.ts#L74"><code>packages/queries/src/types.ts#L74</code></a></dd></div>
 </dl>
 
 ## Declaration

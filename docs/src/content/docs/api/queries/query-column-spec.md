@@ -8,7 +8,7 @@ description: "QueryColumnSpec interface in @sheetwrite/queries: Stable identity 
 Stable identity is separate from the field name used by source records.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/types.ts#L5"><code>packages/queries/src/types.ts#L5</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/query.d.ts#L6"><code>packages/core/dist/types/query.d.ts#L6</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>
@@ -70,6 +70,7 @@ export interface QueryColumnSpec {
 <p class="api-consumers-label">Public exports naming <code>QueryColumnSpec</code></p>
 
 <ul class="api-consumer-list">
+<li><a href="/docs/api/core/saved-query-source/"><code>SavedQuerySource</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/queries/query-source/"><code>QuerySource</code></a><span class="api-consumer-kind">@sheetwrite/queries</span></li>
 </ul>
 </div>

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "b33b5a189773b03a1e750a1517b9d008cbda23e5c1b1cef44dc26acfbd507587",
+  "sha256": "135a2ddef360f90d263768a94da57f04a8902693c368306b9b1157a1a8eb9318",
   "intentionalExports": [
     {
       "package": "@sheetwrite/charts",
@@ -570,17 +570,28 @@
         "QueryColumn",
         "QueryColumnSpec",
         "QueryColumnType",
+        "QueryDefinitionResult",
         "QueryDiagnostic",
         "QueryEngine",
         "QueryEngineOptions",
         "QueryError",
+        "QueryFetchContext",
+        "QueryFetchRequest",
+        "QueryFetchResult",
+        "QueryFetchSource",
         "QueryInput",
         "QueryJoinKind",
         "QueryLimits",
         "QueryMixedLanes",
+        "QueryOutputBlock",
         "QueryPredicate",
+        "QueryRefreshOptions",
+        "QueryRefreshResult",
+        "QuerySession",
+        "QuerySessionOptions",
         "QuerySource",
         "QueryStep",
+        "createQuerySession",
         "loadQueryEngine"
       ]
     },

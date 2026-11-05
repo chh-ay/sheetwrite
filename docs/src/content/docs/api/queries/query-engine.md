@@ -8,7 +8,7 @@ description: "QueryEngine interface in @sheetwrite/queries: Rust performs parsin
 Rust performs parsing and every step; this interface does no source fetching.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/types.ts#L156"><code>packages/queries/src/types.ts#L156</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/types.ts#L97"><code>packages/queries/src/types.ts#L97</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

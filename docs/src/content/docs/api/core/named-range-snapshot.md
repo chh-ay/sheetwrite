@@ -10,7 +10,7 @@ It refers to one rectangular range, or holds a formula such as a constant,
 an expression or a `LAMBDA`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L155"><code>packages/core/src/types/document.ts#L155</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L158"><code>packages/core/src/types/document.ts#L158</code></a></dd></div>
 </dl>
 
 ## Declaration

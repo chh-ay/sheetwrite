@@ -261,7 +261,7 @@ export function validateSavedQueryShape(
 }
 
 /** IDs of the saved queries that `query` joins, in step order. */
-export function queryDependencies(query: SavedQuery): string[] {
+function queryDependencies(query: SavedQuery): string[] {
   const inputs: string[] = [];
   for (const step of query.steps) {
     if (step.kind === "join") inputs.push(step.input);
@@ -472,7 +472,7 @@ export function cloneQuery(query: SavedQuery): SavedQuery {
 }
 
 /** Deep copies of `queries`, or none. */
-export function cloneQueries(queries: readonly SavedQuery[] | undefined): SavedQuery[] {
+function cloneQueries(queries: readonly SavedQuery[] | undefined): SavedQuery[] {
   return (queries ?? []).map(cloneQuery);
 }
 

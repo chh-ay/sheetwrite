@@ -8,7 +8,7 @@ description: "WORKBOOK_SCHEMA_VERSION variable in @sheetwrite/core: Current work
 Current workbook snapshot schema version accepted by Sheetwrite.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/document-protocol.ts#L56"><code>packages/core/src/document-protocol.ts#L56</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/document-protocol.ts#L57"><code>packages/core/src/document-protocol.ts#L57</code></a></dd></div>
 </dl>
 
 ## Declaration
