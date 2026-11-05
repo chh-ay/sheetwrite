@@ -1021,11 +1021,8 @@ fn column_major(key: AbsCellKey) -> (u32, u32, u32) {
 
 /// Affected formulas in column-major order, so a range finds its members
 /// without probing each of its cells.
-fn column_major_formulas(
-    sheets: &[SheetData],
-    keys: impl Iterator<Item = AbsCellKey>,
-) -> Vec<AbsCellKey> {
-    let mut formulas: Vec<AbsCellKey> = keys.filter(|&key| formula_exists(sheets, key)).collect();
+#[inline(never)]
+fn column_major_formulas(mut formulas: Vec<AbsCellKey>) -> Vec<AbsCellKey> {
     formulas.sort_unstable_by_key(|&key| column_major(key));
     formulas
 }
@@ -1044,7 +1041,13 @@ struct DependencyDepthWalk<'a> {
 
 impl<'a> DependencyDepthWalk<'a> {
     fn new(sheets: &'a [SheetData], slots: &'a FormulaStore, affected: &FormulaWork) -> Self {
-        let formulas = column_major_formulas(sheets, affected.keys(slots));
+        // Selected ids are already indexed; do not search their addresses again.
+        let formulas = column_major_formulas(
+            affected
+                .ids()
+                .filter_map(|id| slots.get(id).and_then(|_| slots.location(id)))
+                .collect(),
+        );
         let mut nodes = FxHashMap::with_capacity_and_hasher(formulas.len(), Default::default());
         nodes.extend(
             formulas
@@ -1242,7 +1245,13 @@ pub(super) fn circular_components(
     slots: &FormulaStore,
     cyclic: &[AbsCellKey],
 ) -> CircularComponents {
-    let formulas = column_major_formulas(sheets, cyclic.iter().copied());
+    let formulas = column_major_formulas(
+        cyclic
+            .iter()
+            .copied()
+            .filter(|&key| formula_exists(sheets, key))
+            .collect(),
+    );
     let mut nodes = FxHashMap::with_capacity_and_hasher(formulas.len(), Default::default());
     nodes.extend(
         formulas

@@ -898,11 +898,8 @@ impl CellStore {
             self.evaluate_pass(&mut pass, found_cycle);
 
             for id in affected.ids() {
-                let Some(key) = self.formula_slots.location(id) else {
-                    continue;
-                };
                 if let Some(result) = pass.results.remove(id) {
-                    self.store_formula_result(key, result);
+                    self.store_formula_result(id, result);
                 }
             }
 
@@ -1280,11 +1277,8 @@ impl CellStore {
         self.evaluate_pass(&mut pass, found_cycle);
 
         for id in affected.ids() {
-            let Some(key) = self.formula_slots.location(id) else {
-                continue;
-            };
             if let Some(result) = pass.results.remove(id) {
-                self.store_formula_result(key, result);
+                self.store_formula_result(id, result);
             }
         }
 
@@ -1352,7 +1346,16 @@ impl CellStore {
         })
     }
 
-    fn store_formula_result(&mut self, key: AbsCellKey, result: EvalResult) {
+    fn store_formula_result(&mut self, id: FormulaId, result: EvalResult) {
+        // A pass already owns the id; only liveness needs checking at write-back.
+        if self.formula_slots.get(id).is_none() {
+            return;
+        }
+
+        let Some(key) = self.formula_slots.location(id) else {
+            return;
+        };
+
         let interned = match &result {
             Value::Text(text) => Some(self.intern(text)),
             _ => None,
@@ -1368,9 +1371,6 @@ impl CellStore {
         }
 
         let index = data.cells.idx(row as usize, col as usize);
-        if !data.formulas.contains(key.local()) {
-            return;
-        }
 
         let (kind, payload) = match result {
             Value::Number(value) => (KIND_NUMBER, encode_num(value)),
