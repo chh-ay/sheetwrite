@@ -168,6 +168,8 @@ export const BUILT_IN_FUNCTIONS: BuiltInFunctionTable = {
     {"arguments":[{"name":"actualRange","types":["range","array","reference"],"optional":false,"repeating":false},{"name":"expectedRange","types":["range","array","reference"],"optional":false,"repeating":false}],"returnKind":"scalar"},
     {"arguments":[{"name":"array1","types":["range","array","reference"],"optional":false,"repeating":false},{"name":"array2","types":["range","array","reference"],"optional":false,"repeating":false},{"name":"tails","types":["scalar","reference"],"optional":false,"repeating":false},{"name":"type","types":["scalar","reference"],"optional":false,"repeating":false}],"returnKind":"scalar"},
     {"arguments":[{"name":"array","types":["range","array","reference"],"optional":false,"repeating":false},{"name":"x","types":["scalar","reference"],"optional":false,"repeating":false},{"name":"sigma","types":["scalar","reference"],"optional":true,"repeating":false}],"returnKind":"scalar"},
+    {"arguments":[{"name":"lookupValue","types":["scalar","reference"],"optional":false,"repeating":false},{"name":"lookupVector","types":["range","array","reference"],"optional":false,"repeating":false},{"name":"resultVector","types":["range","array","reference"],"optional":true,"repeating":false}],"returnKind":"scalar"},
+    {"arguments":[{"name":"range","types":["range","array","reference"],"optional":false,"repeating":false},{"name":"trimRows","types":["scalar","reference"],"optional":true,"repeating":false},{"name":"trimColumns","types":["scalar","reference"],"optional":true,"repeating":false}],"returnKind":"array"},
   ],
   functions: [
     ["ARRAYTOTEXT",8,5,4],
@@ -515,5 +517,7 @@ export const BUILT_IN_FUNCTIONS: BuiltInFunctionTable = {
     ["VARP",7,13,4],
     ["WEIBULL",7,89,4],
     ["ZTEST",7,149,4],
+    ["LOOKUP",5,150,6],
+    ["TRIMRANGE",0,151,6],
   ],
 };
