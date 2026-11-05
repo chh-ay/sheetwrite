@@ -5,7 +5,7 @@ description: "Every function in the pinned Microsoft Excel catalog, with full an
 
 This table covers **520 distinct Excel function names** from [Microsoft's category catalog](https://support.microsoft.com/en-us/excel/excel-functions-by-category), updated 2026-06-25 and retrieved 2026-10-30. It includes compatibility names and add-in functions. It is a pinned catalog, not a claim to cover functions Microsoft adds after that date.
 
-The full engine has **250 supported**, **93 partly supported**, and **177 not supported** names in this catalog. Aliases count as separate Excel names. Functions outside the catalog remain in the [function contract](/docs/reference/formula-functions/).
+The full engine has **273 supported**, **93 partly supported**, and **154 not supported** names in this catalog. Aliases count as separate Excel names. Functions outside the catalog remain in the [function contract](/docs/reference/formula-functions/).
 
 ## How to read the table
 
@@ -127,28 +127,28 @@ The full engine has **250 supported**, **93 partly supported**, and **177 not su
 | [`BESSELJ`](https://support.microsoft.com/en-us/excel/functions/besselj-function) | Not supported | Not supported | Not registered in either engine. |
 | [`BESSELK`](https://support.microsoft.com/en-us/excel/functions/besselk-function) | Not supported | Not supported | Not registered in either engine. |
 | [`BESSELY`](https://support.microsoft.com/en-us/excel/functions/bessely-function) | Not supported | Not supported | Not registered in either engine. |
-| [`BIN2DEC`](https://support.microsoft.com/en-us/excel/functions/bin2dec-function) | Not supported | Not supported | Not registered in either engine. |
-| [`BIN2HEX`](https://support.microsoft.com/en-us/excel/functions/bin2hex-function) | Not supported | Not supported | Not registered in either engine. |
-| [`BIN2OCT`](https://support.microsoft.com/en-us/excel/functions/bin2oct-function) | Not supported | Not supported | Not registered in either engine. |
-| [`BITAND`](https://support.microsoft.com/en-us/excel/functions/bitand-function) | Not supported | Not supported | Not registered in either engine. |
-| [`BITLSHIFT`](https://support.microsoft.com/en-us/excel/functions/bitlshift-function) | Not supported | Not supported | Not registered in either engine. |
-| [`BITOR`](https://support.microsoft.com/en-us/excel/functions/bitor-function) | Not supported | Not supported | Not registered in either engine. |
-| [`BITRSHIFT`](https://support.microsoft.com/en-us/excel/functions/bitrshift-function) | Not supported | Not supported | Not registered in either engine. |
-| [`BITXOR`](https://support.microsoft.com/en-us/excel/functions/bitxor-function) | Not supported | Not supported | Not registered in either engine. |
+| [`BIN2DEC`](https://support.microsoft.com/en-us/excel/functions/bin2dec-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`BIN2HEX`](https://support.microsoft.com/en-us/excel/functions/bin2hex-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`BIN2OCT`](https://support.microsoft.com/en-us/excel/functions/bin2oct-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`BITAND`](https://support.microsoft.com/en-us/excel/functions/bitand-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`BITLSHIFT`](https://support.microsoft.com/en-us/excel/functions/bitlshift-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`BITOR`](https://support.microsoft.com/en-us/excel/functions/bitor-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`BITRSHIFT`](https://support.microsoft.com/en-us/excel/functions/bitrshift-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`BITXOR`](https://support.microsoft.com/en-us/excel/functions/bitxor-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/engineering/) |
 | [`COMPLEX`](https://support.microsoft.com/en-us/excel/functions/complex-function) | Not supported | Not supported | Not registered in either engine. |
 | [`CONVERT`](https://support.microsoft.com/en-us/excel/functions/convert-function) | Not supported | Not supported | Not registered in either engine. |
-| [`DEC2BIN`](https://support.microsoft.com/en-us/excel/functions/dec2bin-function) | Not supported | Not supported | Not registered in either engine. |
-| [`DEC2HEX`](https://support.microsoft.com/en-us/excel/functions/dec2hex-function) | Not supported | Not supported | Not registered in either engine. |
-| [`DEC2OCT`](https://support.microsoft.com/en-us/excel/functions/dec2oct-function) | Not supported | Not supported | Not registered in either engine. |
-| [`DELTA`](https://support.microsoft.com/en-us/excel/functions/delta-function) | Not supported | Not supported | Not registered in either engine. |
-| [`ERF`](https://support.microsoft.com/en-us/excel/functions/erf-function) | Not supported | Not supported | Not registered in either engine. |
-| [`ERF.PRECISE`](https://support.microsoft.com/en-us/excel/functions/erf-precise-function) | Not supported | Not supported | Not registered in either engine. |
-| [`ERFC`](https://support.microsoft.com/en-us/excel/functions/erfc-function) | Not supported | Not supported | Not registered in either engine. |
-| [`ERFC.PRECISE`](https://support.microsoft.com/en-us/excel/functions/erfc-precise-function) | Not supported | Not supported | Not registered in either engine. |
-| [`GESTEP`](https://support.microsoft.com/en-us/excel/functions/gestep-function) | Not supported | Not supported | Not registered in either engine. |
-| [`HEX2BIN`](https://support.microsoft.com/en-us/excel/functions/hex2bin-function) | Not supported | Not supported | Not registered in either engine. |
-| [`HEX2DEC`](https://support.microsoft.com/en-us/excel/functions/hex2dec-function) | Not supported | Not supported | Not registered in either engine. |
-| [`HEX2OCT`](https://support.microsoft.com/en-us/excel/functions/hex2oct-function) | Not supported | Not supported | Not registered in either engine. |
+| [`DEC2BIN`](https://support.microsoft.com/en-us/excel/functions/dec2bin-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`DEC2HEX`](https://support.microsoft.com/en-us/excel/functions/dec2hex-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`DEC2OCT`](https://support.microsoft.com/en-us/excel/functions/dec2oct-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`DELTA`](https://support.microsoft.com/en-us/excel/functions/delta-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`ERF`](https://support.microsoft.com/en-us/excel/functions/erf-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`ERF.PRECISE`](https://support.microsoft.com/en-us/excel/functions/erf-precise-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`ERFC`](https://support.microsoft.com/en-us/excel/functions/erfc-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`ERFC.PRECISE`](https://support.microsoft.com/en-us/excel/functions/erfc-precise-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`GESTEP`](https://support.microsoft.com/en-us/excel/functions/gestep-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`HEX2BIN`](https://support.microsoft.com/en-us/excel/functions/hex2bin-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`HEX2DEC`](https://support.microsoft.com/en-us/excel/functions/hex2dec-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`HEX2OCT`](https://support.microsoft.com/en-us/excel/functions/hex2oct-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/engineering/) |
 | [`IMABS`](https://support.microsoft.com/en-us/excel/functions/imabs-function) | Not supported | Not supported | Not registered in either engine. |
 | [`IMAGINARY`](https://support.microsoft.com/en-us/excel/functions/imaginary-function) | Not supported | Not supported | Not registered in either engine. |
 | [`IMARGUMENT`](https://support.microsoft.com/en-us/excel/functions/imargument-function) | Not supported | Not supported | Not registered in either engine. |
@@ -174,9 +174,9 @@ The full engine has **250 supported**, **93 partly supported**, and **177 not su
 | [`IMSUB`](https://support.microsoft.com/en-us/excel/functions/imsub-function) | Not supported | Not supported | Not registered in either engine. |
 | [`IMSUM`](https://support.microsoft.com/en-us/excel/functions/imsum-function) | Not supported | Not supported | Not registered in either engine. |
 | [`IMTAN`](https://support.microsoft.com/en-us/excel/functions/imtan-function) | Not supported | Not supported | Not registered in either engine. |
-| [`OCT2BIN`](https://support.microsoft.com/en-us/excel/functions/oct2bin-function) | Not supported | Not supported | Not registered in either engine. |
-| [`OCT2DEC`](https://support.microsoft.com/en-us/excel/functions/oct2dec-function) | Not supported | Not supported | Not registered in either engine. |
-| [`OCT2HEX`](https://support.microsoft.com/en-us/excel/functions/oct2hex-function) | Not supported | Not supported | Not registered in either engine. |
+| [`OCT2BIN`](https://support.microsoft.com/en-us/excel/functions/oct2bin-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`OCT2DEC`](https://support.microsoft.com/en-us/excel/functions/oct2dec-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`OCT2HEX`](https://support.microsoft.com/en-us/excel/functions/oct2hex-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/engineering/) |
 
 ## Financial functions
 
