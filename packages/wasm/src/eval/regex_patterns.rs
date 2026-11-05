@@ -64,10 +64,7 @@ impl PartialEq for SharedPattern {
 
 impl std::fmt::Debug for SharedPattern {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter
-            .debug_tuple("SharedPattern")
-            .field(&self.text)
-            .finish()
+        formatter.write_str(&self.text)
     }
 }
 
@@ -83,30 +80,34 @@ pub(crate) struct PatternIndex {
 impl PatternIndex {
     /// The shared pattern for `text`, made when no formula holds one yet.
     fn shared(&mut self, text: &str) -> Rc<SharedPattern> {
-        match self
+        let found = self
             .entries
-            .binary_search_by(|(key, _)| key.as_ref().cmp(text))
-        {
+            .binary_search_by(|(key, _)| key.as_ref().cmp(text));
+        let key = match found {
             Ok(position) => {
-                let (key, entry) = &mut self.entries[position];
+                let (key, entry) = &self.entries[position];
                 if let Some(pattern) = entry.upgrade() {
                     return pattern;
                 }
-                let pattern = Rc::new(SharedPattern::new(Rc::clone(key)));
-                *entry = Rc::downgrade(&pattern);
-                pattern
+                Rc::clone(key)
             }
+            Err(_) => Rc::from(text),
+        };
+
+        let pattern = Rc::new(SharedPattern::new(Rc::clone(&key)));
+        let entry = (key, Rc::downgrade(&pattern));
+        match found {
+            Ok(position) => self.entries[position] = entry,
             Err(position) => {
-                let key: Rc<str> = Rc::from(text);
-                let pattern = Rc::new(SharedPattern::new(Rc::clone(&key)));
-                self.entries
-                    .insert(position, (key, Rc::downgrade(&pattern)));
+                self.entries.insert(position, entry);
                 self.sweep_when_grown();
-                pattern
             }
         }
+        pattern
     }
 
+    /// Drops the entries of patterns no formula holds, so the list holds at
+    /// most about twice its live entries.
     fn sweep_when_grown(&mut self) {
         if self.entries.len() < self.sweep_at.max(FIRST_SWEEP_LEN) {
             return;
@@ -114,7 +115,6 @@ impl PatternIndex {
 
         self.entries
             .retain(|(_, pattern)| pattern.strong_count() > 0);
-        self.entries.shrink_to_fit();
         self.sweep_at = self.entries.len() * 2;
     }
 
@@ -147,19 +147,14 @@ impl PatternIndex {
         }
     }
 
-    /// Counts the index, each pattern text once, and each live shared
-    /// pattern. Compiled programs are not counted: `regex-lite` does not
-    /// report their size.
+    /// Counts the index and each pattern text once. Compiled programs are not
+    /// counted: `regex-lite` does not report their size.
     pub(crate) fn add_memory_stats(&self, out: &mut MemoryOwnerStats) {
         let bytes = std::mem::size_of::<Self>();
         out.add_payload(bytes, bytes);
         out.add_vec::<(Rc<str>, Weak<SharedPattern>)>(self.entries.len(), self.entries.capacity());
-        for (text, pattern) in &self.entries {
+        for (text, _) in &self.entries {
             out.add_payload(text.len(), text.len());
-            if pattern.strong_count() > 0 {
-                let bytes = std::mem::size_of::<SharedPattern>();
-                out.add_payload(bytes, bytes);
-            }
         }
     }
 
