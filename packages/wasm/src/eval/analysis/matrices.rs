@@ -79,6 +79,7 @@ pub(crate) fn shape(
     name: &str,
     args: &[Ast],
     sheet: usize,
+    pass: &mut EvalPass<'_>,
 ) -> Result<(usize, usize, usize), FormulaError> {
     let (rows, cols) = match (name, args) {
         ("MUNIT", [dimension]) => {
@@ -86,13 +87,13 @@ pub(crate) fn shape(
             (dimension, dimension)
         }
         ("MINVERSE", [argument]) => {
-            let (rows, cols, _) = store.matrix_shape(argument, sheet)?;
+            let (rows, cols, _) = store.matrix_shape(argument, sheet, pass)?;
             let dimension = square_dimension(rows, cols)?;
             (dimension, dimension)
         }
         ("MMULT", [left, right]) => {
-            let (rows, inner, _) = store.matrix_shape(left, sheet)?;
-            let (right_rows, cols, _) = store.matrix_shape(right, sheet)?;
+            let (rows, inner, _) = store.matrix_shape(left, sheet, pass)?;
+            let (right_rows, cols, _) = store.matrix_shape(right, sheet, pass)?;
             if inner != right_rows {
                 return Err(FormulaError::Value);
             }
@@ -112,13 +113,14 @@ pub(crate) fn bound(
     name: &str,
     args: &[Ast],
     sheet: usize,
+    pass: &mut EvalPass<'_>,
 ) -> Result<usize, FormulaError> {
     if let ("MUNIT", [dimension]) = (name, args) {
         if literal_dimension(dimension).is_none() {
             return Ok(SPILL_MAX_CELLS);
         }
     }
-    shape(store, name, args, sheet).map(|(_, _, cells)| cells)
+    shape(store, name, args, sheet, pass).map(|(_, _, cells)| cells)
 }
 
 pub(crate) fn evaluate_matrix(

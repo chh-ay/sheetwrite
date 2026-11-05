@@ -114,6 +114,7 @@ fn source_extent(
     store: &CellStore,
     ast: &Ast,
     sheet: usize,
+    pass: &mut EvalPass<'_>,
 ) -> Result<Option<(usize, usize)>, FormulaError> {
     if !is_array_argument(ast, sheet) {
         return Ok(Some((1, 1)));
@@ -121,16 +122,16 @@ fn source_extent(
     if let Ast::Func(Func::Analysis(id), args) = ast {
         let name = super::name(*id);
         if NAMES.binary_search(&name).is_ok() {
-            return Ok(match estimate(store, name, args, sheet)? {
+            return Ok(match estimate(store, name, args, sheet, pass)? {
                 Estimate::Exact { rows, cols } => Some((rows, cols)),
                 Estimate::Approximate { .. } | Estimate::Unknown => None,
             });
         }
     }
-    match store.matrix_shape(ast, sheet) {
+    match store.matrix_shape(ast, sheet, pass) {
         Ok((rows, cols, _)) => Ok(Some((rows, cols))),
         Err(error) if range_from_ast(ast, sheet).is_some() => Err(error),
-        Err(_) => match store.dynamic_array_bound(ast, sheet) {
+        Err(_) => match store.dynamic_array_bound(ast, sheet, pass) {
             Some(Err(error)) => Err(error),
             Some(Ok(_)) | None => Ok(None),
         },
@@ -193,20 +194,22 @@ fn estimate(
     name: &str,
     args: &[Ast],
     sheet: usize,
+    pass: &mut EvalPass<'_>,
 ) -> Result<Estimate, FormulaError> {
     check_arity(name, args)?;
     if matches!(name, "HSTACK" | "VSTACK") {
         return Ok(
             match stack_extent(
                 name,
-                args.iter().map(|ast| source_extent(store, ast, sheet)),
+                args.iter()
+                    .map(|ast| source_extent(store, ast, sheet, pass)),
             )? {
                 Some((rows, cols)) => Estimate::Exact { rows, cols },
                 None => Estimate::Unknown,
             },
         );
     }
-    let Some((source_rows, source_cols)) = source_extent(store, &args[0], sheet)? else {
+    let Some((source_rows, source_cols)) = source_extent(store, &args[0], sheet, pass)? else {
         return Ok(Estimate::Unknown);
     };
     let cells = source_rows
@@ -289,8 +292,9 @@ pub(super) fn shape(
     name: &str,
     args: &[Ast],
     sheet: usize,
+    pass: &mut EvalPass<'_>,
 ) -> Result<(usize, usize, usize), FormulaError> {
-    let (rows, cols) = match estimate(store, name, args, sheet)? {
+    let (rows, cols) = match estimate(store, name, args, sheet, pass)? {
         Estimate::Exact { rows, cols } => (rows, cols),
         Estimate::Approximate {
             rows,
@@ -314,8 +318,9 @@ pub(super) fn bound(
     name: &str,
     args: &[Ast],
     sheet: usize,
+    pass: &mut EvalPass<'_>,
 ) -> Result<usize, FormulaError> {
-    match estimate(store, name, args, sheet)? {
+    match estimate(store, name, args, sheet, pass)? {
         Estimate::Exact { rows, cols } => EvalMatrix::validate_shape(rows, cols, 1, 0),
         Estimate::Approximate { max_cells, .. } => Ok(max_cells.min(SPILL_MAX_CELLS)),
         Estimate::Unknown => Ok(SPILL_MAX_CELLS),

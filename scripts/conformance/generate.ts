@@ -1,7 +1,7 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 
 import { authoredAssertions } from "./formula-evidence.js";
-import { canonicalJson, sha256 } from "./normalize.js";
+import { sha256 } from "./normalize.js";
 import type {
   ConformanceCase,
   ConformanceCorpus,
@@ -13,8 +13,8 @@ import type {
   SemanticCategory,
 } from "./types.js";
 
+/** The corpus path recorded in the manifest; the corpus is generated, not read from it. */
 export const CORPUS_PATH = "test/conformance/corpus.json";
-export const MANIFEST_PATH = "test/conformance/corpus.manifest.json";
 export const INVENTORY_PATH = "test/conformance/formula-contract.inventory.json";
 export const MAX_CORPUS_BYTES = 2 * 1024 * 1024;
 export const REQUIRED_COUNTS = { formula: 2000, mutation: 250, workbook: 100 } as const;
@@ -1213,24 +1213,13 @@ export async function readFormulaInventory(path = INVENTORY_PATH): Promise<Formu
   };
 }
 
-export async function readConformanceManifest(path = MANIFEST_PATH): Promise<ConformanceManifest> {
-  return JSON.parse(await readFile(path, "utf8")) as ConformanceManifest;
-}
-
-export async function writeConformanceEvidence(
+/**
+ * The compatibility test set and its manifest, generated from the inventory.
+ * Neither is committed: the generator spreads the formula cases across every
+ * supported function, so committing them made function pull requests conflict.
+ */
+export async function generatedConformanceEvidence(
   inventoryPath = INVENTORY_PATH,
-  corpusPath = CORPUS_PATH,
-  manifestPath = MANIFEST_PATH,
-): Promise<ConformanceManifest> {
-  const inventory = await readFormulaInventory(inventoryPath);
-  const { corpus, manifest } = generateConformanceEvidence(inventory);
-  const corpusBytes = `${canonicalJson(corpus)}\n`;
-  if (Buffer.byteLength(corpusBytes) > MAX_CORPUS_BYTES) {
-    throw new RangeError(`Generated corpus exceeds ${MAX_CORPUS_BYTES} bytes`);
-  }
-  await Promise.all([
-    writeFile(corpusPath, corpusBytes),
-    writeFile(manifestPath, `${canonicalJson(manifest)}\n`),
-  ]);
-  return manifest;
+): Promise<{ corpus: ConformanceCorpus; manifest: ConformanceManifest }> {
+  return generateConformanceEvidence(await readFormulaInventory(inventoryPath));
 }
