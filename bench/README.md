@@ -284,6 +284,12 @@ runs fit into 50 ms. Captures took 11 s each across four 7-pair gates (14
 captures, about 2.6 minutes per gate) on the shared laptop; one capture during
 heavier load took 60 s.
 
+`unicode-text-date-edit` also warms up, unchecked, for at least one second
+before its timed runs. On Linux, Bun's JavaScriptCore is still optimising its
+engine code after the three warm-up fixtures: in a fresh process a run takes
+4.5–4.8 ms for the first 50 ms and 1.6 ms after one second, so a 50 ms sample
+measured how fast that code was compiled, not the engine.
+
 The gate runs 7 pairs (`--pairs <n>` may add more, never fewer: the limits below
 were measured at 7) in AB, BA, AB order, so machine drift affects both sides.
 For each row it takes the median of the paired candidate/base ratios and
