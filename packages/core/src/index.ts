@@ -170,6 +170,11 @@ export {
 } from "./persistence.js";
 
 export {
+  type QueryCommands,
+  registerQueryCommands,
+  type UnsupportedQueryMember,
+} from "./query-commands.js";
+export {
   type DocumentRebaseResult,
   type RebaseConflict,
   type RebaseConflictCode,

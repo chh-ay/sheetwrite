@@ -18,6 +18,7 @@ import type {
   openExplainPanel,
   openNamePanel,
   openPivotPanel,
+  openQueryPanel,
   openSortPanel,
   syncPivotPanel,
 } from "./panel-controller.js";
@@ -31,6 +32,7 @@ interface PanelController {
   openExplainPanel: typeof openExplainPanel;
   openNamePanel: typeof openNamePanel;
   openPivotPanel: typeof openPivotPanel;
+  openQueryPanel: typeof openQueryPanel;
   openSortPanel: typeof openSortPanel;
   syncPivotPanel: typeof syncPivotPanel;
 }
@@ -139,6 +141,11 @@ export function showNameManager(grid: Grid): void {
 
 export function showDefineName(grid: Grid): void {
   requestPanel(grid, (controller) => controller.openNamePanel(grid, true));
+}
+
+/** Data › Get Data and Data › Queries & Connections open the query panel. */
+export function showQueryPanel(grid: Grid, create: boolean): void {
+  requestPanel(grid, (controller) => controller.openQueryPanel(grid, create));
 }
 
 /** Data › Custom Sort: open the Sort panel, loading the panels on first use. */

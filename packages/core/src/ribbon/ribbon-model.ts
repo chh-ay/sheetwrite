@@ -7,6 +7,7 @@
 // tab, group and glyph planned for each 0.7 feature are on the Toolbar and
 // ribbon docs page, so features that land separately still form one layout.
 
+import { actionFeedbackFor } from "../action-feedback.js";
 import { CHART_KINDS } from "../chart-kinds.js";
 import {
   ACCOUNTING_FORMAT,
@@ -30,7 +31,9 @@ import {
   showDefineName,
   showFormulaExplanation,
   showNameManager,
+  showQueryPanel,
 } from "../panels/panel-loader.js";
+import { queryCommandsOf, queryRefreshRunning, toggleQueryRefresh } from "../query-commands.js";
 import { storeEngine } from "../store/engine-registry.js";
 import type { ChartKind } from "../types/chart.js";
 import type { CellAddress } from "../types/coordinates.js";
@@ -88,6 +91,29 @@ function selectedRowSpans(grid: Grid): Array<[number, number]> {
 
 function rowSpan(a: number, b: number): [number, number] {
   return [Math.min(a, b), Math.max(a, b)];
+}
+
+/** The query commands show only while a query session is connected to the grid. */
+// They stay enabled in a read-only grid: the grid rejects the write and the
+// rejection message is shown, because no command state reports read-only alone.
+const queriesConnected = (grid: Grid): boolean => queryCommandsOf(grid) !== undefined;
+
+const QUERIES_REFRESHED = "Queries refreshed.";
+const QUERIES_REFRESHING = "Refreshing queries. Select Refresh All again to cancel.";
+
+/** Data › Refresh All: one refresh of every output table; a second press cancels it. */
+function refreshAllQueries(grid: Grid): void {
+  const feedback = actionFeedbackFor(grid);
+  if (queryRefreshRunning(grid)) {
+    // The running refresh reports its own cancellation.
+    void toggleQueryRefresh(grid, null);
+    return;
+  }
+
+  feedback?.show(QUERIES_REFRESHING);
+  void toggleQueryRefresh(grid, null).then((outcome) =>
+    feedback?.show(outcome ?? QUERIES_REFRESHED),
+  );
 }
 
 const button = (
@@ -695,8 +721,43 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
   },
   {
     label: "Data",
-    reduceOrder: ["export", "showHide", "outline", "sortFilter"],
+    reduceOrder: ["export", "showHide", "outline", "queries", "getTransform", "sortFilter"],
     groups: [
+      {
+        id: "getTransform",
+        label: "Get & Transform Data",
+        icon: "getData",
+        layout: "flow",
+        controls: [
+          {
+            ...button("Get Data", "getData", (grid) => showQueryPanel(grid, true), "view", {
+              large: true,
+            }),
+            available: queriesConnected,
+          },
+        ],
+      },
+      {
+        id: "queries",
+        label: "Queries & Connections",
+        icon: "queries",
+        layout: "flow",
+        controls: [
+          {
+            ...button("Refresh All", "refreshAll", refreshAllQueries, "view", { large: true }),
+            available: queriesConnected,
+          },
+          {
+            ...button(
+              "Queries & Connections",
+              "queries",
+              (grid) => showQueryPanel(grid, false),
+              "view",
+            ),
+            available: queriesConnected,
+          },
+        ],
+      },
       {
         id: "sortFilter",
         label: "Sort & Filter",
