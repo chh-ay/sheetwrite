@@ -1183,7 +1183,7 @@ impl CellStore {
             }
             for change in spill_changes {
                 stale_readers.extend(
-                    direct_readers(index, change.sheet, &change.cells)
+                    direct_readers(index, &self.formula_slots, change.sheet, &change.cells)
                         .into_iter()
                         .map(|reader| StaleReader {
                             reader,
