@@ -39,7 +39,6 @@ export type SheetwriteErrorOperation =
   | "history"
   | "synchronize"
   | "presence"
-  | "revision"
   | "comment"
   | "query"
   | "row-bridge"

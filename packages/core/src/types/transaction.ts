@@ -85,6 +85,13 @@ export interface RemoteOperationOptions {
   localReplay?: boolean;
 }
 
+/** The version a restore commit brings back and how much of the document it covers. */
+export interface RestoreProvenance {
+  /** ID of the restored history version. */
+  versionId: string;
+  scope: "workbook" | "sheet" | "range";
+}
+
 /** Immutable local operation batch awaiting a host acknowledgement. */
 export interface PendingCommit {
   documentId: string;
@@ -104,6 +111,11 @@ export interface PendingCommit {
    * before it records history. At most `maxMutationIdBytes` UTF-8 bytes.
    */
   readonly authorId?: string;
+  /**
+   * Present when the commit restores a history version. A restore is never
+   * rebased: a conflicting restore makes the client reload and restore again.
+   */
+  readonly restore?: RestoreProvenance;
 }
 
 /** Lifecycle state of one local mutation in the synchronization queue. */
@@ -166,6 +178,8 @@ export interface CommittedTransaction {
   time: number;
   /** The committed document operations, in order. */
   operations: readonly DocumentOp[];
+  /** Present when the transaction restores a history version. */
+  restore?: RestoreProvenance;
 }
 
 /**

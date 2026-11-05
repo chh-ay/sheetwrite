@@ -247,15 +247,17 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
     document.store ??= SheetwriteStore.fromSnapshot(document.initial);
     const store = document.store;
     try {
-      for (const operations of versions) {
+      for (const entry of entries) {
+        // The store keeps references to some operation payloads, so it gets the
+        // adapter's own copy, never the caller's (possibly frozen) objects.
         const outcome = store.applyTransaction(
-          { patches: operations.slice() },
+          { patches: cloneJsonValue(entry.operations.slice()) },
           { source: "remote", commitReason: "api" },
         );
         if (
           outcome.status === "conflict" ||
           outcome.status === "rejected" ||
-          (outcome.status === "noop" && operations.length > 0)
+          (outcome.status === "noop" && entry.operations.length > 0)
         ) {
           throw new PersistenceError("commit-rejected", "Persistence commit was rejected");
         }
@@ -272,6 +274,7 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
             authorId: request.authorId,
             time: committedAt,
             operations: versions.flat(),
+            ...(request.restore !== undefined ? { restore: { ...request.restore } } : {}),
           },
           () => ({ ...store.exportSnapshot(), version }),
         );

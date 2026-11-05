@@ -428,9 +428,25 @@ Two ordering rules keep recovery from losing work:
 
 Presence is advisory UI state. Do not use it for authorization, locking, or conflict prevention.
 
-## Revisions
+## Restoring versions
 
-`RevisionCoordinator` delegates revision listing, loading, and restore to a `RevisionAdapter`. Preview snapshots pass through the optional host schema migrator and mount with `readOnly: true`. Restore requests include `targetVersion`, current `baseVersion`, and a stable mutation ID. The adapter contract requires restore to create a newer auditable server version; it must never rewind database state in place.
+`HistoryArchive.restoreVersion(grid, versionId, scope, { sync })` from `@sheetwrite/core/history` restores a whole workbook, one sheet or one range of a history version. The grid commits it as one local transaction: one undo step, one `change` event, and one pending commit that `SyncCoordinator` sends as one transaction (an atomic batch when it needs several server versions). Every other client applies it as one remote transaction; it does not enter their undo history.
+
+Restore is strict about concurrency. It needs an online coordinator with no pending or conflicted commits, and it is rejected with `conflict` if the grid changes while the version is read. The pending commit carries `PendingCommit.restore` and is never rebased: if two people restore against the same server version, the first commit wins and `recoverConflict()` returns `reload-required` with reason `restore` for the other, who reloads, previews and restores again. See [Restore a version](/docs/features/data/persistence/#restore-a-version) for what each scope covers.
+
+### Migrating from `RevisionCoordinator`
+
+`RevisionCoordinator` and `RevisionAdapter` are removed. Replace them as follows:
+
+| Removed | Use instead |
+| --- | --- |
+| `RevisionAdapter.listRevisions` | `HistoryStorageAdapter` (`list`) behind `HistoryArchive.listVersions` |
+| `RevisionAdapter.loadRevision`, `RevisionCoordinator.preview` | `HistoryArchive.readVersion`, then `createGridFromSnapshot(host, snapshot, { readOnly: true })` |
+| `RevisionAdapter.restoreRevision`, `RevisionCoordinator.restore` | `HistoryArchive.restoreVersion`; the restore is an ordinary commit through `PersistenceAdapter.commit` or `commitBatch` |
+| `RevisionSummary` | `HistoryVersion` |
+| `revision-failed` errors | `HistoryError` codes |
+
+A server that kept revisions as full snapshots can serve them through a `HistoryStorageAdapter`, or start a history archive from its current snapshot with `HistoryArchive.initialize` and record commits with `CommitJournal`.
 
 ## Comments
 
