@@ -142,8 +142,8 @@ export function queryPanel(grid: Grid, create: boolean): GridPanel {
       load.checked = true;
       load.dataset.focusKey = "query-load";
       const loadLabel = document.createElement("label");
-      loadLabel.className = "sheetwrite-panel-field";
-      loadLabel.append(load, document.createTextNode(" Load to a table"));
+      loadLabel.className = "sheetwrite-panel-check";
+      loadLabel.append(load, "Load to a table");
       const tableName = panelField("Table name", textInput(), "query-table-name");
       const anchor = panelField("Top-left cell", textInput("A1"), "query-anchor");
 

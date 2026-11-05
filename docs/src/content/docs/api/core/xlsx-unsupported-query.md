@@ -8,7 +8,7 @@ description: "XlsxUnsupportedQuery interface in @sheetwrite/core: A kept Power Q
 A kept Power Query member and why the query engine cannot run it.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L486"><code>packages/core/src/types/document.ts#L486</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L495"><code>packages/core/src/types/document.ts#L495</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

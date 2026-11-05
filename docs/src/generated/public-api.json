@@ -434,7 +434,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L119",
+              "source": "src/types/document.ts#L126",
               "jsDocTags": [],
               "documentation": "Workbook calculation options, mirroring Excel's \"Enable iterative calculation\".\nA workbook without this record uses the defaults.",
               "memberDocs": [
@@ -495,7 +495,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L396",
+              "source": "src/types/document.ts#L403",
               "jsDocTags": [],
               "documentation": "Sparse row-major cells bounded by one rectangular block.",
               "memberDocs": []
@@ -682,7 +682,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L246",
+              "source": "src/types/document.ts#L253",
               "jsDocTags": [],
               "documentation": "Serializable plain-text note anchored to a cell.",
               "memberDocs": []
@@ -1200,7 +1200,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L101",
+              "source": "src/types/document.ts#L108",
               "jsDocTags": [],
               "documentation": "One column's filter predicate. All active column filters AND together;\nmatching is against the cell's resolved value (text or number).",
               "memberDocs": []
@@ -1380,7 +1380,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L259",
+              "source": "src/types/document.ts#L266",
               "jsDocTags": [],
               "documentation": "The gesture/operation that produced a committed transaction. Consumers\nswitching on reasons MUST keep a default branch — the union grows with new\nmutation features.",
               "memberDocs": []
@@ -1575,7 +1575,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L457",
+              "source": "src/grid.ts#L458",
               "jsDocTags": [
                 "example",
                 "see"
@@ -1602,7 +1602,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L1099",
+              "source": "src/row-bridge.ts#L1121",
               "jsDocTags": [
                 "example",
                 "see"
@@ -1798,7 +1798,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L191",
+              "source": "src/types/document.ts#L198",
               "jsDocTags": [],
               "documentation": "Native comparison semantics for numeric, date-serial, and text-length validation.\nInterval operands are inclusive; `notBetween` accepts values outside that interval.",
               "memberDocs": []
@@ -1810,7 +1810,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L210",
+              "source": "src/types/document.ts#L217",
               "jsDocTags": [],
               "documentation": "Serializable condition enforced by a data-validation rule.\n\n`min` and `max` remain inclusive legacy bounds. Use `comparison` when the\noperator itself is significant; comparison and legacy bounds are mutually exclusive.",
               "memberDocs": []
@@ -1822,7 +1822,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L228",
+              "source": "src/types/document.ts#L235",
               "jsDocTags": [],
               "documentation": "One stable, range-scoped data-entry rule. Blank cells are allowed unless disabled.",
               "memberDocs": []
@@ -1904,9 +1904,9 @@
               "kind": "variable",
               "signature": "Readonly<SyncCoordinatorLimits>",
               "owners": [
-                "src/sync.ts"
+                "src/sync-protocol.ts"
               ],
-              "source": "src/sync.ts#L165",
+              "source": "src/sync-protocol.ts#L64",
               "jsDocTags": [],
               "documentation": "Security and durability defaults bound hostile remote versions, recovery\nbuffers, acknowledgement memory, and the offline pending queue independently.",
               "memberDocs": []
@@ -1918,7 +1918,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L331",
+              "source": "src/grid.ts#L332",
               "jsDocTags": [],
               "documentation": "Default canvas theme used before CSS and explicit theme overrides.",
               "memberDocs": []
@@ -2076,7 +2076,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L522",
+              "source": "src/types/document.ts#L531",
               "jsDocTags": [],
               "documentation": "Exhaustive serializable operation union for workbook mutations.",
               "memberDocs": []
@@ -2088,7 +2088,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L3749",
+              "source": "src/document-protocol.ts#L3754",
               "jsDocTags": [],
               "documentation": "Exhaustive stable target identity used by persistence/logging layers.",
               "memberDocs": []
@@ -3083,7 +3083,7 @@
               "owners": [
                 "src/store/data-engine.ts"
               ],
-              "source": "src/store/data-engine.ts#L447",
+              "source": "src/store/data-engine.ts#L449",
               "jsDocTags": [],
               "documentation": "Error thrown when an operation requires datasource cells that are not loaded.",
               "memberDocs": []
@@ -3095,7 +3095,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L375",
+              "source": "src/grid.ts#L376",
               "jsDocTags": [
                 "example",
                 "see"
@@ -3146,7 +3146,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L387",
+              "source": "src/grid.ts#L388",
               "jsDocTags": [],
               "documentation": "Whether `initSheetwrite` has completed — the single readiness source.",
               "memberDocs": []
@@ -3412,7 +3412,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L303",
+              "source": "src/types/document.ts#L310",
               "jsDocTags": [],
               "documentation": "Structured warning or rejection produced while applying an operation.",
               "memberDocs": []
@@ -3424,7 +3424,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L252",
+              "source": "src/types/document.ts#L259",
               "jsDocTags": [],
               "documentation": "Atomic or partial handling for locally denied operations.",
               "memberDocs": []
@@ -3436,7 +3436,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L158",
+              "source": "src/types/document.ts#L165",
               "jsDocTags": [],
               "documentation": "A defined name: a workbook-global or sheet-scoped name that formulas use.\nIt refers to one rectangular range, or holds a formula such as a constant,\nan expression or a `LAMBDA`.",
               "memberDocs": []
@@ -3484,7 +3484,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L385",
+              "source": "src/types/document.ts#L392",
               "jsDocTags": [],
               "documentation": "Dense row-major mutation payload. Primitive arrays keep large paste/fill\noperations JSON-safe without allocating one operation object per cell.\nFormula/reference tuples are sparse exceptions keyed by row-major offset.",
               "memberDocs": []
@@ -3598,7 +3598,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L46",
+              "source": "src/sync.ts#L56",
               "jsDocTags": [],
               "documentation": "Mandatory bounds for one durable pending-commit restore.",
               "memberDocs": [
@@ -3623,7 +3623,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L57",
+              "source": "src/sync.ts#L67",
               "jsDocTags": [],
               "documentation": "Host-owned durable queue. Browser storage lives in the optional `./browser` entrypoint.",
               "memberDocs": [
@@ -4158,7 +4158,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L238",
+              "source": "src/types/document.ts#L245",
               "jsDocTags": [],
               "documentation": "Serializable client UX policy. A host resolver decides whether a local mutation may proceed.",
               "memberDocs": []
@@ -4170,7 +4170,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L284",
+              "source": "src/types/document.ts#L291",
               "jsDocTags": [],
               "documentation": "Local operation and protected-range context supplied to the host policy.",
               "memberDocs": []
@@ -4182,7 +4182,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L291",
+              "source": "src/types/document.ts#L298",
               "jsDocTags": [],
               "documentation": "Host-owned client UX permission callback for protected mutations.",
               "memberDocs": []
@@ -4508,7 +4508,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L392",
+              "source": "src/grid.ts#L393",
               "jsDocTags": [],
               "documentation": "Read `--sheetwrite-*` CSS custom properties into a partial theme.",
               "memberDocs": []
@@ -4586,7 +4586,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L403",
+              "source": "src/row-bridge.ts#L405",
               "jsDocTags": [],
               "documentation": "Projects canonical document transactions into host-owned row changes.\n\nThe bridge only owns compact data-space identity arrays. It never writes to\n`defaultRows`, never renders, and never creates a second document store.",
               "memberDocs": [
@@ -4853,7 +4853,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L1107",
+              "source": "src/row-bridge.ts#L1129",
               "jsDocTags": [],
               "documentation": "Compute a deterministic identity for a canonical transaction.",
               "memberDocs": []
@@ -4889,7 +4889,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L109",
+              "source": "src/types/document.ts#L116",
               "jsDocTags": [],
               "documentation": "A collapsible row group (data-row range, end-inclusive), Sheets-style.",
               "memberDocs": []
@@ -4901,7 +4901,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L368",
+              "source": "src/types/document.ts#L375",
               "jsDocTags": [],
               "documentation": "Persistent display and grouping metadata for one document row.",
               "memberDocs": []
@@ -5201,7 +5201,7 @@
             {
               "name": "Sheet",
               "kind": "interface",
-              "signature": "export interface Sheet { id: SheetId; name: string; visibility?: SheetVisibility; columns: Column[]; rowCount: number; rowHeights?: Map<number, number>; hiddenRows?: Set<number>; rowGroups?: RowGroup[]; conditionalFormats?: ConditionalFormatRule[]; hyperlinks?: CellHyperlink[]; validationRules?: DataValidationRule[]; protectedRanges?: ProtectedRange[]; notes?: CellNote[]; sortKeys?: SortKey[]; filters?: Array<[col: number, filter: ColumnFilter]>; merges?: MergeRange[]; frozenRows?: number; frozenCols?: number; tables?: WorkbookTable[]; charts?: ChartDefinition[]; pivots?: PivotDefinition[]; }",
+              "signature": "export interface Sheet { id: SheetId; name: string; visibility?: SheetVisibility; columns: Column[]; rowCount: number; rowHeights?: Map<number, number>; hiddenRows?: Set<number>; rowGroups?: RowGroup[]; conditionalFormats?: ConditionalFormatRule[]; hyperlinks?: CellHyperlink[]; validationRules?: DataValidationRule[]; protectedRanges?: ProtectedRange[]; notes?: CellNote[]; sortKeys?: SortKey[]; sortState?: WorkbookTableXmlElement; filters?: Array<[col: number, filter: ColumnFilter]>; merges?: MergeRange[]; frozenRows?: number; frozenCols?: number; tables?: WorkbookTable[]; charts?: ChartDefinition[]; pivots?: PivotDefinition[]; }",
               "owners": [
                 "src/types/document.ts"
               ],
@@ -5282,6 +5282,10 @@
                   "documentation": "Persisted sort keys for the sheet's view."
                 },
                 {
+                  "name": "sortState",
+                  "documentation": "The worksheet `sortState` of an imported XLSX file. Excel writes it after\na sort whose cells it already moved, so Sheetwrite keeps it for export and\ndoes not apply it. Export writes it while its references lie inside the\nsheet; a view sort (`sortKeys`) replaces it."
+                },
+                {
                   "name": "tables",
                   "documentation": "Native workbook tables anchored to this stable worksheet identity."
                 },
@@ -5314,7 +5318,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L294",
+              "source": "src/types/document.ts#L301",
               "jsDocTags": [],
               "documentation": "Stable lifecycle rejection codes suitable for inline sheet-management UI.",
               "memberDocs": []
@@ -5370,11 +5374,11 @@
             {
               "name": "SheetSnapshot",
               "kind": "interface",
-              "signature": "export interface SheetSnapshot { id: SheetId; name: string; order: number; visibility?: SheetVisibility; rowCount: number; columns: Column[]; frozenRows?: number; frozenCols?: number; rowMeta?: Array<[row: number, meta: RowMetadata]>; merges?: MergeRange[]; conditionalFormats?: ConditionalFormatRule[]; hyperlinks?: CellHyperlink[]; validationRules?: DataValidationRule[]; protectedRanges?: ProtectedRange[]; notes?: CellNote[]; sortKeys?: SortKey[]; filters?: Array<[col: number, filter: ColumnFilter]>; rowGroups?: RowGroup[]; tables?: WorkbookTable[]; charts?: ChartDefinition[]; pivots?: PivotDefinition[]; cells: CellBlock[]; }",
+              "signature": "export interface SheetSnapshot { id: SheetId; name: string; order: number; visibility?: SheetVisibility; rowCount: number; columns: Column[]; frozenRows?: number; frozenCols?: number; rowMeta?: Array<[row: number, meta: RowMetadata]>; merges?: MergeRange[]; conditionalFormats?: ConditionalFormatRule[]; hyperlinks?: CellHyperlink[]; validationRules?: DataValidationRule[]; protectedRanges?: ProtectedRange[]; notes?: CellNote[]; sortKeys?: SortKey[]; sortState?: WorkbookTableXmlElement; filters?: Array<[col: number, filter: ColumnFilter]>; rowGroups?: RowGroup[]; tables?: WorkbookTable[]; charts?: ChartDefinition[]; pivots?: PivotDefinition[]; cells: CellBlock[]; }",
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L405",
+              "source": "src/types/document.ts#L412",
               "jsDocTags": [],
               "documentation": "Serializable complete state for one workbook sheet.",
               "memberDocs": [
@@ -5385,6 +5389,10 @@
                 {
                   "name": "pivots",
                   "documentation": "Pivot tables anchored on this sheet."
+                },
+                {
+                  "name": "sortState",
+                  "documentation": "See `Sheet.sortState`."
                 },
                 {
                   "name": "visibility",
@@ -5553,7 +5561,7 @@
               "owners": [
                 "src/store.ts"
               ],
-              "source": "src/store.ts#L155",
+              "source": "src/store.ts#L164",
               "jsDocTags": [
                 "example",
                 "see"
@@ -5689,7 +5697,7 @@
               "owners": [
                 "src/store.ts"
               ],
-              "source": "src/store.ts#L85",
+              "source": "src/store.ts#L87",
               "jsDocTags": [],
               "documentation": "Storage layout plus snapshot and transaction resource ceilings for one store.",
               "memberDocs": [
@@ -5742,7 +5750,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L374",
+              "source": "src/types/document.ts#L381",
               "jsDocTags": [],
               "documentation": "Serializable cell value and optional style inside a snapshot block.",
               "memberDocs": []
@@ -5869,7 +5877,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L92",
+              "source": "src/types/document.ts#L99",
               "jsDocTags": [],
               "documentation": "One key of a multi-column sort, applied in array order (first = primary).",
               "memberDocs": []
@@ -6019,7 +6027,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L76",
+              "source": "src/sync.ts#L86",
               "jsDocTags": [],
               "documentation": "Current persistence activity reported by a sync coordinator.",
               "memberDocs": []
@@ -6031,7 +6039,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L305",
+              "source": "src/sync.ts#L212",
               "jsDocTags": [],
               "documentation": "Outcome of `SyncCoordinator.recoverConflict`.",
               "memberDocs": []
@@ -6043,7 +6051,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L288",
+              "source": "src/sync.ts#L195",
               "jsDocTags": [],
               "documentation": "Why a conflict cannot be recovered in place; the host reloads the document instead.",
               "memberDocs": []
@@ -6055,7 +6063,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L74",
+              "source": "src/sync.ts#L84",
               "jsDocTags": [],
               "documentation": "Host-controlled online state reported by synchronization.",
               "memberDocs": []
@@ -6067,7 +6075,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L356",
+              "source": "src/sync.ts#L263",
               "jsDocTags": [
                 "example",
                 "see"
@@ -6107,7 +6115,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L258",
+              "source": "src/sync.ts#L165",
               "jsDocTags": [],
               "documentation": "Queue, version, connection, or error transition emitted by synchronization.",
               "memberDocs": []
@@ -6117,9 +6125,9 @@
               "kind": "interface",
               "signature": "export interface SyncCoordinatorLimits { maxMutationIdBytes: number; maxOperationsPerVersion: number; maxVersionPayloadBytes: number; maxFutureVersionDistance: number; maxBufferedVersions: number; maxBufferedOperations: number; maxBufferedBytes: number; maxRecentAcknowledgements: number; maxBatchVersions: number; maxBatchBytes: number; maxPendingCommits: number; maxPendingOperations: number; maxPendingEncodedBytes: number; }",
               "owners": [
-                "src/sync.ts"
+                "src/sync-protocol.ts"
               ],
-              "source": "src/sync.ts#L128",
+              "source": "src/sync-protocol.ts#L27",
               "jsDocTags": [],
               "documentation": "Resource ceilings applied independently to remote collaboration input and local durability.",
               "memberDocs": [
@@ -6184,7 +6192,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L233",
+              "source": "src/sync.ts#L140",
               "jsDocTags": [],
               "documentation": "Document, version, durability, and online options for synchronization.",
               "memberDocs": [
@@ -6246,7 +6254,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L221",
+              "source": "src/sync.ts#L128",
               "jsDocTags": [],
               "documentation": "Typed local transaction rejection produced when the durable queue cannot reserve capacity.",
               "memberDocs": []
@@ -6258,7 +6266,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L86",
+              "source": "src/sync.ts#L96",
               "jsDocTags": [],
               "documentation": "Whether the durable local queue can currently admit another transaction.",
               "memberDocs": []
@@ -6268,9 +6276,9 @@
               "kind": "interface",
               "signature": "export interface SyncPendingQueueLimits { maxPendingCommits: number; maxPendingOperations: number; maxPendingEncodedBytes: number; }",
               "owners": [
-                "src/sync.ts"
+                "src/sync-protocol.ts"
               ],
-              "source": "src/sync.ts#L118",
+              "source": "src/sync-protocol.ts#L17",
               "jsDocTags": [],
               "documentation": "Aggregate ceilings for local commits retained until durable acknowledgement.",
               "memberDocs": [
@@ -6293,9 +6301,9 @@
               "kind": "class",
               "signature": "class SyncProtocolError extends SheetwriteError { constructor(code: SyncProtocolErrorCode, message: string, options?: ErrorOptions); code: SyncProtocolErrorCode; name: \"SyncProtocolError\" }",
               "owners": [
-                "src/sync.ts"
+                "src/sync-protocol.ts"
               ],
-              "source": "src/sync.ts#L211",
+              "source": "src/sync-protocol.ts#L110",
               "jsDocTags": [],
               "documentation": "Typed rejection of malformed or resource-exhausting synchronization input.",
               "memberDocs": []
@@ -6305,9 +6313,9 @@
               "kind": "type",
               "signature": "export type SyncProtocolErrorCode = | \"invalid-limits\" | \"invalid-version\" | \"invalid-id\" | \"invalid-operations\" | \"operation-limit\" | \"payload-limit\" | \"response-id-mismatch\" | \"future-distance-limit\" | \"buffer-count-limit\" | \"buffer-operation-limit\" | \"buffer-byte-limit\" | \"pending-count-limit\" | \"pending-operation-limit\" | \"pending-byte-limit\" | \"late-echo\" | \"remote-operations-rejected\" | \"invalid-batch\" | \"batch-limit\";",
               "owners": [
-                "src/sync.ts"
+                "src/sync-protocol.ts"
               ],
-              "source": "src/sync.ts#L190",
+              "source": "src/sync-protocol.ts#L89",
               "jsDocTags": [],
               "documentation": "Stable category identifying which synchronization protocol bound was violated.",
               "memberDocs": []
@@ -6319,7 +6327,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L94",
+              "source": "src/sync.ts#L104",
               "jsDocTags": [],
               "documentation": "Immutable observable synchronization state.",
               "memberDocs": [
@@ -6352,7 +6360,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L110",
+              "source": "src/sync.ts#L120",
               "jsDocTags": [],
               "documentation": "Contiguous-version recovery request produced when remote input skips ahead.",
               "memberDocs": []
@@ -6758,7 +6766,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L3709",
+              "source": "src/document-protocol.ts#L3714",
               "jsDocTags": [],
               "documentation": "Validate and canonically order a schema-1 snapshot without hydrating runtime state.",
               "memberDocs": []
@@ -6782,7 +6790,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L185",
+              "source": "src/types/document.ts#L192",
               "jsDocTags": [],
               "documentation": "Reject-or-warn policy attached to a data-validation rule.",
               "memberDocs": []
@@ -6985,7 +6993,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L129",
+              "source": "src/types/document.ts#L136",
               "jsDocTags": [],
               "documentation": "Live workbook schema containing ordered sheets and the active sheet ID.",
               "memberDocs": [
@@ -7038,7 +7046,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L502",
+              "source": "src/types/document.ts#L511",
               "jsDocTags": [],
               "documentation": "Schema-versioned serializable workbook document.",
               "memberDocs": []
@@ -7346,7 +7354,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L448",
+              "source": "src/types/document.ts#L457",
               "jsDocTags": [],
               "documentation": "What an opaque graph reads; any change to it drops the graph on save.",
               "memberDocs": [
@@ -7371,7 +7379,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L459",
+              "source": "src/types/document.ts#L468",
               "jsDocTags": [],
               "documentation": "One relationship from the package, workbook, or a sheet to a retained part graph.",
               "memberDocs": [
@@ -7408,7 +7416,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L437",
+              "source": "src/types/document.ts#L446",
               "jsDocTags": [],
               "documentation": "One retained OOXML part, kept as its original compressed ZIP payload so a\nsave copies it without inflating or recompressing. Runtime copies are frozen.",
               "memberDocs": [
@@ -7425,7 +7433,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L494",
+              "source": "src/types/document.ts#L503",
               "jsDocTags": [],
               "documentation": "Bounded, frozen record of the OOXML parts Sheetwrite does not model.",
               "memberDocs": [
@@ -7466,7 +7474,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L486",
+              "source": "src/types/document.ts#L495",
               "jsDocTags": [],
               "documentation": "A kept Power Query member and why the query engine cannot run it.",
               "memberDocs": [
@@ -7618,7 +7626,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L1099",
+              "source": "src/row-bridge.ts#L1121",
               "jsDocTags": [
                 "example",
                 "see"
@@ -8002,7 +8010,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L403",
+              "source": "src/row-bridge.ts#L405",
               "jsDocTags": [],
               "documentation": "Projects canonical document transactions into host-owned row changes.\n\nThe bridge only owns compact data-space identity arrays. It never writes to\n`defaultRows`, never renders, and never creates a second document store.",
               "memberDocs": [
@@ -8269,7 +8277,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L1107",
+              "source": "src/row-bridge.ts#L1129",
               "jsDocTags": [],
               "documentation": "Compute a deterministic identity for a canonical transaction.",
               "memberDocs": []
@@ -9875,7 +9883,7 @@
               "owners": [
                 "src/datasource-controller.ts"
               ],
-              "source": "src/datasource-controller.ts#L27",
+              "source": "src/datasource-controller.ts#L35",
               "jsDocTags": [],
               "documentation": "Installs a deterministic monotonic clock through the public testing entrypoint.",
               "memberDocs": []

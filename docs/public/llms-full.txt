@@ -8245,7 +8245,8 @@ workbooks and workbooks with only range names do not load the formula engine.
 | Named ranges and native booleans | Preserved. |
 | HTTPS/mailto and internal range hyperlinks | Preserved, with stable IDs in Sheetwrite metadata. |
 | Supported ordered conditional formats | Native rules preserve priority and stop behavior. |
-| Tables | Autofilter rules, sort state, calculated-column formulas and totals-row functions round-trip. |
+| Tables | Autofilter rules, sort state, calculated-column formulas and totals-row functions round-trip. An in-place sort of a table body records the table sort state, as Excel does. |
+| Sorting | An in-place sort writes the cells in their sorted rows, so the file opens sorted. A view sort writes the cells in source order and the worksheet `sortState`; Sheetwrite reads it back from its own metadata. An imported worksheet `sortState` is kept and written back, but not applied. |
 | Validation | Sheetwrite metadata preserved; supported list/numeric/date/text-length rules also emit native Excel validation. |
 | Protected ranges | Metadata preserved; no Excel sheet-protection claim is made. |
 | Cell notes | Metadata preserved and native Excel notes emitted. |
@@ -14972,7 +14973,7 @@ Registers the optional workbook XLSX implementation used by core.
 ##### `Sheet` — interface
 
 ```ts
-export interface Sheet { id: SheetId; name: string; visibility?: SheetVisibility; columns: Column[]; rowCount: number; rowHeights?: Map<number, number>; hiddenRows?: Set<number>; rowGroups?: RowGroup[]; conditionalFormats?: ConditionalFormatRule[]; hyperlinks?: CellHyperlink[]; validationRules?: DataValidationRule[]; protectedRanges?: ProtectedRange[]; notes?: CellNote[]; sortKeys?: SortKey[]; filters?: Array<[col: number, filter: ColumnFilter]>; merges?: MergeRange[]; frozenRows?: number; frozenCols?: number; tables?: WorkbookTable[]; charts?: ChartDefinition[]; pivots?: PivotDefinition[]; }
+export interface Sheet { id: SheetId; name: string; visibility?: SheetVisibility; columns: Column[]; rowCount: number; rowHeights?: Map<number, number>; hiddenRows?: Set<number>; rowGroups?: RowGroup[]; conditionalFormats?: ConditionalFormatRule[]; hyperlinks?: CellHyperlink[]; validationRules?: DataValidationRule[]; protectedRanges?: ProtectedRange[]; notes?: CellNote[]; sortKeys?: SortKey[]; sortState?: WorkbookTableXmlElement; filters?: Array<[col: number, filter: ColumnFilter]>; merges?: MergeRange[]; frozenRows?: number; frozenCols?: number; tables?: WorkbookTable[]; charts?: ChartDefinition[]; pivots?: PivotDefinition[]; }
 ```
 
 Workbook sheet schema used when creating a live grid.
@@ -14996,6 +14997,10 @@ Members:
 - `rowGroups` — Persisted collapsible row groups.
 - `rowHeights` — Sparse per-row height overrides; default comes from the theme.
 - `sortKeys` — Persisted sort keys for the sheet's view.
+- `sortState` — The worksheet `sortState` of an imported XLSX file. Excel writes it after
+a sort whose cells it already moved, so Sheetwrite keeps it for export and
+does not apply it. Export writes it while its references lie inside the
+sheet; a view sort (`sortKeys`) replaces it.
 - `tables` — Native workbook tables anchored to this stable worksheet identity.
 - `validationRules` — Serializable data-entry rules evaluated at the local mutation barrier.
 - `visibility` — Hidden worksheets remain addressable but are omitted from the tab strip.
@@ -15051,7 +15056,7 @@ Successful canonical name or an actionable validation failure.
 ##### `SheetSnapshot` — interface
 
 ```ts
-export interface SheetSnapshot { id: SheetId; name: string; order: number; visibility?: SheetVisibility; rowCount: number; columns: Column[]; frozenRows?: number; frozenCols?: number; rowMeta?: Array<[row: number, meta: RowMetadata]>; merges?: MergeRange[]; conditionalFormats?: ConditionalFormatRule[]; hyperlinks?: CellHyperlink[]; validationRules?: DataValidationRule[]; protectedRanges?: ProtectedRange[]; notes?: CellNote[]; sortKeys?: SortKey[]; filters?: Array<[col: number, filter: ColumnFilter]>; rowGroups?: RowGroup[]; tables?: WorkbookTable[]; charts?: ChartDefinition[]; pivots?: PivotDefinition[]; cells: CellBlock[]; }
+export interface SheetSnapshot { id: SheetId; name: string; order: number; visibility?: SheetVisibility; rowCount: number; columns: Column[]; frozenRows?: number; frozenCols?: number; rowMeta?: Array<[row: number, meta: RowMetadata]>; merges?: MergeRange[]; conditionalFormats?: ConditionalFormatRule[]; hyperlinks?: CellHyperlink[]; validationRules?: DataValidationRule[]; protectedRanges?: ProtectedRange[]; notes?: CellNote[]; sortKeys?: SortKey[]; sortState?: WorkbookTableXmlElement; filters?: Array<[col: number, filter: ColumnFilter]>; rowGroups?: RowGroup[]; tables?: WorkbookTable[]; charts?: ChartDefinition[]; pivots?: PivotDefinition[]; cells: CellBlock[]; }
 ```
 
 Serializable complete state for one workbook sheet.
@@ -15059,6 +15064,7 @@ Serializable complete state for one workbook sheet.
 Members:
 - `columns` — Keys are stable, unique document column identities as well as datasource keys.
 - `pivots` — Pivot tables anchored on this sheet.
+- `sortState` — See `Sheet.sortState`.
 - `visibility` — Hidden worksheets remain in the workbook and retain formulas/references.
 
 ##### `SheetVisibility` — type

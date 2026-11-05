@@ -9,7 +9,7 @@ One column's filter predicate. All active column filters AND together;
 matching is against the cell's resolved value (text or number).
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L101"><code>packages/core/src/types/document.ts#L101</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L108"><code>packages/core/src/types/document.ts#L108</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>5</span>
