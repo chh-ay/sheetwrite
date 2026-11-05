@@ -126,7 +126,7 @@ export {
   type XlsxWorkbookWarning,
 } from "./xlsx-bridge.js";
 
-export { convertXlsxFormulas } from "./engine.js";
+export { withXlsxFormulaEngine, type XlsxFormulaEngine } from "./xlsx-formulas.js";
 
 export {
   createGrid,
