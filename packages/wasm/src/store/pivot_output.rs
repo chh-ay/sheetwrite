@@ -176,7 +176,7 @@ impl CellStore {
             .is_some_and(|owners| {
                 owners <= self.spill_owner_cell_limit && spill_ownership_within_budget(owners)
             });
-        if !within_budget || !data.spill.reserve(cells, &mut data.cells) {
+        if !within_budget || !data.spill.reserve(range, &mut data.cells) {
             data.spill.compact(&mut data.cells);
             vacated_cells(&mut changed);
             return (changed, Err(FormulaError::Num));

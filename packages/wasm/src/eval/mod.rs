@@ -1332,7 +1332,7 @@ impl CellStore {
             results.insert(id, Value::Error(FormulaError::Num));
             return Vec::new();
         }
-        if !data.spill.reserve(matrix.values.len(), &mut data.cells) {
+        if !data.spill.reserve(range, &mut data.cells) {
             results.insert(id, Value::Error(FormulaError::Num));
             return Vec::new();
         }
