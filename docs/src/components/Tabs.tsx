@@ -24,6 +24,23 @@ interface TabsProps {
 
 const TAB_EVENT = "sheetwrite:docs-tab";
 
+/** Payload of the tab event: the synchronised group and the label it selected. */
+interface TabEventDetail {
+  readonly key: string;
+  readonly label: string;
+}
+
+function isTabEventDetail(value: unknown): value is TabEventDetail {
+  if (typeof value !== "object" || value === null) return false;
+
+  const detail: { key?: unknown; label?: unknown } = value;
+  return typeof detail.key === "string" && typeof detail.label === "string";
+}
+
+function tabEvent(detail: TabEventDetail): CustomEvent<TabEventDetail> {
+  return new CustomEvent(TAB_EVENT, { detail });
+}
+
 export function TabItem({ children }: Readonly<TabItemProps>) {
   return children;
 }
@@ -49,8 +66,12 @@ export function Tabs({ children, syncKey }: Readonly<TabsProps>) {
     if (index >= 0) setSelected(index);
 
     const onChange = (event: Event) => {
-      if (!(event instanceof CustomEvent) || event.detail?.key !== syncKey) return;
-      const next = tabs.findIndex((tab) => tab.props.label === event.detail.label);
+      if (!(event instanceof CustomEvent)) return;
+
+      const detail: unknown = event.detail;
+      if (!isTabEventDetail(detail) || detail.key !== syncKey) return;
+
+      const next = tabs.findIndex((tab) => tab.props.label === detail.label);
       if (next >= 0) setSelected(next);
     };
     window.addEventListener(TAB_EVENT, onChange);
@@ -64,7 +85,7 @@ export function Tabs({ children, syncKey }: Readonly<TabsProps>) {
     const label = labels[index];
     if (label === undefined) return;
     writePreference(syncKey, label);
-    window.dispatchEvent(new CustomEvent(TAB_EVENT, { detail: { key: syncKey, label } }));
+    window.dispatchEvent(tabEvent({ key: syncKey, label }));
   };
 
   if (tabs.length === 0) return null;

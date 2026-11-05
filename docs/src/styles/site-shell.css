@@ -1,4 +1,4 @@
-/* Documentation owns its layout here; shared prose, code, and product styles stay in site.css. */
+/* Documentation owns its layout here; shared prose, code, and product styles stay in site.css and its imports. */
 /* An open reading layout: the page is one surface, and hairlines (not boxed
    cards) separate navigation, text and outline. */
 .sw-docs {

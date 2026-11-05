@@ -199,9 +199,12 @@ const EMPTY_CLIENT_VIEW: ClientView = {
 
 let nextMutation = 1;
 
-export default function CollaborationShowcase() {
+/**
+ * Client state and lifetime for the collaboration showcase: both clients,
+ * the in-page server, the durable outboxes, recovery and the page logs.
+ */
+function useCollaborationClients() {
   const action = useAction();
-  const chaosAction = useAction();
   const hostRefs: Record<ClientKey, React.RefObject<HTMLDivElement | null>> = {
     a: useRef<HTMLDivElement>(null),
     b: useRef<HTMLDivElement>(null),
@@ -238,10 +241,6 @@ export default function CollaborationShowcase() {
   });
   const [serverLog, setServerLog] = useState<Array<LogEntry & { status: string }>>([]);
   const [serverVersion, setServerVersion] = useState(0);
-  const [chaos, setChaos] = useState<ChaosReport | null>(null);
-  const [batchReport, setBatchReport] = useState<BatchReport | null>(null);
-  const [restoreRunning, setRestoreRunning] = useState(false);
-  const chaosRunRef = useRef(0);
   const flashesRef = useRef<Record<ClientKey, Map<string, HighlightRange & { until: number }>>>({
     a: new Map(),
     b: new Map(),
@@ -733,282 +732,12 @@ export default function CollaborationShowcase() {
     readClient(key);
   };
 
-  /**
-   * A seconds-long storm: both clients edit their own rows while connections
-   * drop, reconnect, and broadcasts arrive out of order. Then both clients
-   * reconnect and the page compares their Grids cell by cell.
-   */
-  const runChaos = async () => {
-    const run = chaosRunRef.current + 1;
-    chaosRunRef.current = run;
-    const stillRunning = () =>
-      chaosRunRef.current === run && clientsRef.current.a !== null && clientsRef.current.b !== null;
-    const report: ChaosReport = {
-      phase: "storm",
-      edits: 0,
-      disconnects: 0,
-      reorders: 0,
-      mismatches: 0,
-      cells: 0,
-      ms: 0,
-    };
-    let started = performance.now();
-    let publishedAt = 0;
-    const publish = (force = true) => {
-      const now = performance.now();
-      if (!force && now - publishedAt < CHAOS_PUBLISH_MS) return;
-      publishedAt = now;
-      setChaos({ ...report, ms: now - started });
-    };
-    // Publishing first replaces any earlier verdict and keeps the button
-    // disabled while the clients leave the usage document of the batch drill.
-    publish();
-    try {
-      if (!(await showDocument("forecast"))) {
-        report.phase = "timed-out";
-        publish();
-        return;
-      }
-      started = performance.now();
-      // Read after the switch: a remount brings both clients back online.
-      const offline: Record<ClientKey, boolean> = {
-        a: clientsRef.current.a?.link.connected === false,
-        b: clientsRef.current.b?.link.connected === false,
-      };
-      // Bring the rows where Ana's half meets Bram's on screen in both Grids, so
-      // every edit and every synced arrival is visible while the storm runs.
-      for (const key of CLIENT_KEYS) {
-        showRows(key, CHAOS_VIEW_ROWS);
-        shownRowsRef.current[key] = visibleRows(key);
-      }
-      // Seeded per run, so a run's fault sequence can be reproduced exactly.
-      const random = seededRandom(run);
-
-      while (performance.now() - started < CHAOS_STORM_MS && stillRunning()) {
-        const key: ClientKey = random() < 0.5 ? "a" : "b";
-        const runtime = clientsRef.current[key];
-        // A recovering client is being remounted and accepts no new edits.
-        if (!runtime || recoveringRef.current[key]) {
-          await delay(CHAOS_TICK_MS);
-          continue;
-        }
-        const roll = random();
-        if (roll < 0.1) {
-          offline[key] = !offline[key];
-          if (offline[key]) report.disconnects += 1;
-          toggleOnline(key, !offline[key]);
-        } else if (roll < 0.18 && !offline[key]) {
-          holdNextBroadcast(key);
-          report.reorders += 1;
-        } else {
-          // Edit a row the reader can see in this analyst's Grid when one exists.
-          const owned = CHAOS_ROWS[key];
-          const view = shownRowsRef.current[key];
-          const onScreen = view ? owned.filter((r) => r >= view.first && r <= view.last) : [];
-          const rows = onScreen.length > 0 ? onScreen : owned;
-          const row = rows[Math.floor(random() * rows.length)];
-          if (row === undefined) throw new Error("The analyst has no forecast rows.");
-          const addr = { sheet: "plan", row, col: 2 };
-          const outcome = runtime.grid.applyTransaction({
-            patches: [
-              {
-                op: "set",
-                addr,
-                value: { kind: "literal", value: 10_000 + Math.floor(random() * 71) * 1_000 },
-              },
-            ],
-          });
-          if (outcome.status === "applied") report.edits += 1;
-        }
-        publish(false);
-        await delay(CHAOS_TICK_MS);
-      }
-
-      report.phase = "settling";
-      publish();
-      for (const key of CLIENT_KEYS) {
-        if (offline[key]) toggleOnline(key, true);
-        releaseHeld(key);
-      }
-      // Wait until both queues drain, no conflict recovery is still running, and
-      // both clients sit at the server head: a client stuck on a version gap has
-      // nothing queued but has not caught up.
-      const settleBy = performance.now() + CHAOS_DRAIN_MS;
-      const head = () => serversRef.current.forecast?.headVersion(DOCUMENT_ID.forecast) ?? -1;
-      const idle = () =>
-        CLIENT_KEYS.every(
-          (key) =>
-            (clientsRef.current[key]?.sync.pendingCommits().length ?? 1) === 0 &&
-            !recoveringRef.current[key] &&
-            clientsRef.current[key]?.sync.serverVersion === head(),
-        );
-      while (stillRunning() && performance.now() < settleBy && !idle()) {
-        for (const key of CLIENT_KEYS) releaseHeld(key);
-        await delay(CHAOS_TICK_MS);
-      }
-      await delay(CHAOS_TICK_MS * 4);
-      if (!stillRunning()) return;
-      if (!idle()) {
-        // Never call a still-moving state converged.
-        report.phase = "timed-out";
-        publish();
-        return;
-      }
-      const a = clientsRef.current.a?.grid;
-      const b = clientsRef.current.b?.grid;
-      if (!a || !b || !stillRunning()) return;
-      let mismatches = 0;
-      let cells = 0;
-      for (let row = 0; row < COLLABORATION_WORKBOOK_ROWS; row++) {
-        for (let col = 0; col < COLLABORATION_WORKBOOK_COLUMNS; col++) {
-          const addr = { sheet: "plan", row, col };
-          cells += 1;
-          if (a.store.getCell(addr).resolved !== b.store.getCell(addr).resolved) mismatches += 1;
-        }
-      }
-      report.cells = cells;
-      report.mismatches = mismatches;
-      report.phase = mismatches === 0 ? "converged" : "diverged";
-      publish();
-    } finally {
-      if (stillRunning()) {
-        if (report.phase === "storm" || report.phase === "settling") {
-          report.phase = "timed-out";
-          publish();
-        }
-        for (const key of CLIENT_KEYS) {
-          toggleOnline(key, true);
-          releaseHeld(key);
-        }
-      }
-    }
-  };
-
   const clientsBusy = () =>
     CLIENT_KEYS.some(
       (key) =>
         (clientsRef.current[key]?.sync.pendingCommits().length ?? 1) > 0 ||
         recoveringRef.current[key],
     );
-
-  /**
-   * 0.5.0 atomic batch: clear 100,000 metered-usage cells on Ana's client,
-   * then undo it once. The restore is far above one server version, so the
-   * engine splits it into one atomic multi-version batch; Bram applies every
-   * version in a single transaction or none of them.
-   */
-  const restoreUsage = () => {
-    const started = performance.now();
-    setRestoreRunning(true);
-    setBatchReport(null);
-    drillRef.current = true;
-    void (async () => {
-      try {
-        if (!(await showDocument("usage"))) {
-          pushClientLog(
-            "a",
-            "warn",
-            "Restore drill stopped: the clients could not open the usage document.",
-          );
-          return;
-        }
-        const restorer = clientsRef.current.a;
-        const peer = clientsRef.current.b;
-        const server = serversRef.current.usage;
-        if (!restorer || !peer || !server) return;
-        const settleBy = performance.now() + CHAOS_SETTLE_MS;
-        while (performance.now() < settleBy && clientsBusy()) await delay(CHAOS_TICK_MS);
-        if (clientsBusy()) {
-          pushClientLog("a", "warn", "Restore drill stopped: a client still has queued work.");
-          return;
-        }
-        const totalBefore = Number(restorer.grid.store.getCell(USAGE_TOTAL_CELL).resolved);
-        await restorer.sync.flush();
-        const cleared = restorer.grid.applyTransaction({
-          patches: [{ op: "clearRange", range: USAGE_RANGE, contents: true }],
-        });
-        if (cleared.status !== "applied") {
-          pushClientLog("a", "error", `Usage clear was ${cleared.status}.`);
-          return;
-        }
-        await restorer.sync.flush();
-        await waitForPeerHead(peer, restorer.sync.serverVersion);
-        // The batch window starts here: only the batch may touch Bram's Grid.
-        let versions = 0;
-        let pieces = 0;
-        let operationBytes = 0;
-        let peerChanges = 0;
-        const stopServer = server.observeCommits((record) => {
-          if (record.batchVersions && record.batchVersions > 1) versions = record.batchVersions;
-        });
-        const stopPeer = peer.grid.on("change", (event) => {
-          if (event.source === "remote") peerChanges += 1;
-        });
-        const stopUndo = restorer.grid.on("change", (event) => {
-          if (event.commitReason !== "undo") return;
-          pieces += event.transaction.patches.length;
-          operationBytes += new TextEncoder().encode(
-            JSON.stringify(event.transaction.patches),
-          ).length;
-        });
-        try {
-          restorer.grid.undo();
-          await restorer.sync.flush();
-          const reachedHead = await waitForPeerHead(peer, restorer.sync.serverVersion);
-          const totalAfter = Number(restorer.grid.store.getCell(USAGE_TOTAL_CELL).resolved);
-          const peerTotal = Number(peer.grid.store.getCell(USAGE_TOTAL_CELL).resolved);
-          const passed =
-            versions > 1 &&
-            pieces > 1 &&
-            totalAfter === totalBefore &&
-            peerTotal === totalBefore &&
-            peerChanges === 1 &&
-            reachedHead;
-          setBatchReport({
-            versions,
-            pieces,
-            operationBytes,
-            peerChanges,
-            totalBefore,
-            totalAfter,
-            peerTotal,
-            ms: performance.now() - started,
-            passed,
-          });
-          pushClientLog(
-            "a",
-            passed ? "commit" : "warn",
-            passed
-              ? `Undo committed ${versions} versions of one atomic batch; Bram applied the batch once (${peerChanges} transaction).`
-              : "The batch drill did not meet every check.",
-          );
-        } finally {
-          stopServer();
-          stopPeer();
-          stopUndo();
-        }
-      } catch (error) {
-        pushClientLog("a", "error", errorText(error));
-      } finally {
-        drillRef.current = false;
-        setRestoreRunning(false);
-      }
-    })();
-  };
-
-  /** Waits until one client is at the given server version with nothing queued. */
-  const waitForPeerHead = async (peer: ClientRuntime, version: number): Promise<boolean> => {
-    const deadline = performance.now() + CHAOS_SETTLE_MS;
-    const atHead = () =>
-      peer.sync.serverVersion >= version && peer.sync.pendingCommits().length === 0;
-    while (performance.now() < deadline && !atHead()) await delay(CHAOS_TICK_MS);
-    return atHead();
-  };
-
-  const loseNextAck = (key: ClientKey) => {
-    clientsRef.current[key]?.link.dropNextAcknowledgement();
-    pushClientLog(key, "info", "The next acknowledgement (and its echo) will be lost in transit");
-  };
 
   const retryPending = (key: ClientKey) => {
     const runtime = clientsRef.current[key];
@@ -1022,39 +751,6 @@ export default function CollaborationShowcase() {
     void runtime.sync.retry(head.clientMutationId).catch(() => {});
   };
 
-  const holdNextBroadcast = (key: ClientKey) => {
-    clientsRef.current[key]?.link.holdNextBroadcast();
-    pushClientLog(key, "info", "The next inbound broadcast will be held back (delivery reordered)");
-  };
-
-  const releaseHeld = (key: ClientKey) => {
-    clientsRef.current[key]?.link.releaseHeldBroadcasts();
-  };
-
-  const serverEdit = () => {
-    void action.run(
-      async () => {
-        if (!(await showDocument("forecast"))) throw new Error("The forecast is not ready.");
-        const server = serversRef.current.forecast;
-        if (!server) return;
-        const runtime = clientsRef.current.a ?? clientsRef.current.b;
-        const addr = { sheet: "plan", row: 4, col: 2 };
-        const current = runtime?.grid.store.getCell(addr).resolved;
-        const forecast =
-          typeof current === "number" ? current + FORECAST_ADJUSTMENT : FORECAST_ADJUSTMENT;
-        await server.commitServerOperations(DOCUMENT_ID.forecast, [
-          { op: "set", addr, value: { kind: "literal", value: forecast } },
-        ]);
-      },
-      () => "Cannot commit the server edit. Try again.",
-    );
-  };
-
-  /**
-   * Documented host recovery. Recover on the live Grid when the missed server
-   * versions touch other cells; otherwise rebase, clear stale durable ids,
-   * remount, and resubmit.
-   */
   const recoverClient = async (key: ClientKey, response: ConflictResponse) => {
     if (recoveringRef.current[key]) return;
     recoveringRef.current[key] = true;
@@ -1208,106 +904,396 @@ export default function CollaborationShowcase() {
     views[key].syncState?.pendingCount === 0;
   const clientsAtHead = CLIENT_KEYS.filter(atHead).length;
 
+  return {
+    atHead,
+    action,
+    status,
+    statusDetail,
+    views,
+    serverVersion,
+    clientsAtHead,
+    hostRefs,
+    serverLog,
+    sampleAccount,
+    sampleEdit,
+    toggleOnline,
+    challengePhase,
+    challengeCopy,
+    retryPending,
+    resetDemo,
+    serversRef,
+    clientsRef,
+    drillRef,
+    recoveringRef,
+    shownRowsRef,
+    visibleRows,
+    showRows,
+    pushClientLog,
+    showDocument,
+    clientsBusy,
+  };
+}
+
+type CollaborationClientState = ReturnType<typeof useCollaborationClients>;
+
+/**
+ * Fault drills run against live clients: the chaos run, the bulk restore and
+ * the lost-acknowledgement, held-broadcast and server-edit steps.
+ */
+function useCollaborationDrills(clients: CollaborationClientState) {
+  const {
+    action,
+    serversRef,
+    clientsRef,
+    drillRef,
+    recoveringRef,
+    shownRowsRef,
+    visibleRows,
+    showRows,
+    pushClientLog,
+    showDocument,
+    toggleOnline,
+    clientsBusy,
+  } = clients;
+
+  const chaosAction = useAction();
+  const [chaos, setChaos] = useState<ChaosReport | null>(null);
+  const [batchReport, setBatchReport] = useState<BatchReport | null>(null);
+  const [restoreRunning, setRestoreRunning] = useState(false);
+  const chaosRunRef = useRef(0);
+
+  /**
+   * A seconds-long storm: both clients edit their own rows while connections
+   * drop, reconnect, and broadcasts arrive out of order. Then both clients
+   * reconnect and the page compares their Grids cell by cell.
+   */
+  const runChaos = async () => {
+    const run = chaosRunRef.current + 1;
+    chaosRunRef.current = run;
+    const stillRunning = () =>
+      chaosRunRef.current === run && clientsRef.current.a !== null && clientsRef.current.b !== null;
+    const report: ChaosReport = {
+      phase: "storm",
+      edits: 0,
+      disconnects: 0,
+      reorders: 0,
+      mismatches: 0,
+      cells: 0,
+      ms: 0,
+    };
+    let started = performance.now();
+    let publishedAt = 0;
+    const publish = (force = true) => {
+      const now = performance.now();
+      if (!force && now - publishedAt < CHAOS_PUBLISH_MS) return;
+      publishedAt = now;
+      setChaos({ ...report, ms: now - started });
+    };
+    // Publishing first replaces any earlier verdict and keeps the button
+    // disabled while the clients leave the usage document of the batch drill.
+    publish();
+    try {
+      if (!(await showDocument("forecast"))) {
+        report.phase = "timed-out";
+        publish();
+        return;
+      }
+      started = performance.now();
+      // Read after the switch: a remount brings both clients back online.
+      const offline: Record<ClientKey, boolean> = {
+        a: clientsRef.current.a?.link.connected === false,
+        b: clientsRef.current.b?.link.connected === false,
+      };
+      // Bring the rows where Ana's half meets Bram's on screen in both Grids, so
+      // every edit and every synced arrival is visible while the storm runs.
+      for (const key of CLIENT_KEYS) {
+        showRows(key, CHAOS_VIEW_ROWS);
+        shownRowsRef.current[key] = visibleRows(key);
+      }
+      // Seeded per run, so a run's fault sequence can be reproduced exactly.
+      const random = seededRandom(run);
+
+      while (performance.now() - started < CHAOS_STORM_MS && stillRunning()) {
+        const key: ClientKey = random() < 0.5 ? "a" : "b";
+        const runtime = clientsRef.current[key];
+        // A recovering client is being remounted and accepts no new edits.
+        if (!runtime || recoveringRef.current[key]) {
+          await delay(CHAOS_TICK_MS);
+          continue;
+        }
+        const roll = random();
+        if (roll < 0.1) {
+          offline[key] = !offline[key];
+          if (offline[key]) report.disconnects += 1;
+          toggleOnline(key, !offline[key]);
+        } else if (roll < 0.18 && !offline[key]) {
+          holdNextBroadcast(key);
+          report.reorders += 1;
+        } else {
+          // Edit a row the reader can see in this analyst's Grid when one exists.
+          const owned = CHAOS_ROWS[key];
+          const view = shownRowsRef.current[key];
+          const onScreen = view ? owned.filter((r) => r >= view.first && r <= view.last) : [];
+          const rows = onScreen.length > 0 ? onScreen : owned;
+          const row = rows[Math.floor(random() * rows.length)];
+          if (row === undefined) throw new Error("The analyst has no forecast rows.");
+          const addr = { sheet: "plan", row, col: 2 };
+          const outcome = runtime.grid.applyTransaction({
+            patches: [
+              {
+                op: "set",
+                addr,
+                value: { kind: "literal", value: 10_000 + Math.floor(random() * 71) * 1_000 },
+              },
+            ],
+          });
+          if (outcome.status === "applied") report.edits += 1;
+        }
+        publish(false);
+        await delay(CHAOS_TICK_MS);
+      }
+
+      report.phase = "settling";
+      publish();
+      for (const key of CLIENT_KEYS) {
+        if (offline[key]) toggleOnline(key, true);
+        releaseHeld(key);
+      }
+      // Wait until both queues drain, no conflict recovery is still running, and
+      // both clients sit at the server head: a client stuck on a version gap has
+      // nothing queued but has not caught up.
+      const settleBy = performance.now() + CHAOS_DRAIN_MS;
+      const head = () => serversRef.current.forecast?.headVersion(DOCUMENT_ID.forecast) ?? -1;
+      const idle = () =>
+        CLIENT_KEYS.every(
+          (key) =>
+            (clientsRef.current[key]?.sync.pendingCommits().length ?? 1) === 0 &&
+            !recoveringRef.current[key] &&
+            clientsRef.current[key]?.sync.serverVersion === head(),
+        );
+      while (stillRunning() && performance.now() < settleBy && !idle()) {
+        for (const key of CLIENT_KEYS) releaseHeld(key);
+        await delay(CHAOS_TICK_MS);
+      }
+      await delay(CHAOS_TICK_MS * 4);
+      if (!stillRunning()) return;
+      if (!idle()) {
+        // Never call a still-moving state converged.
+        report.phase = "timed-out";
+        publish();
+        return;
+      }
+      const a = clientsRef.current.a?.grid;
+      const b = clientsRef.current.b?.grid;
+      if (!a || !b || !stillRunning()) return;
+      let mismatches = 0;
+      let cells = 0;
+      for (let row = 0; row < COLLABORATION_WORKBOOK_ROWS; row++) {
+        for (let col = 0; col < COLLABORATION_WORKBOOK_COLUMNS; col++) {
+          const addr = { sheet: "plan", row, col };
+          cells += 1;
+          if (a.store.getCell(addr).resolved !== b.store.getCell(addr).resolved) mismatches += 1;
+        }
+      }
+      report.cells = cells;
+      report.mismatches = mismatches;
+      report.phase = mismatches === 0 ? "converged" : "diverged";
+      publish();
+    } finally {
+      if (stillRunning()) {
+        if (report.phase === "storm" || report.phase === "settling") {
+          report.phase = "timed-out";
+          publish();
+        }
+        for (const key of CLIENT_KEYS) {
+          toggleOnline(key, true);
+          releaseHeld(key);
+        }
+      }
+    }
+  };
+
+  /**
+   * 0.5.0 atomic batch: clear 100,000 metered-usage cells on Ana's client,
+   * then undo it once. The restore is far above one server version, so the
+   * engine splits it into one atomic multi-version batch; Bram applies every
+   * version in a single transaction or none of them.
+   */
+  const restoreUsage = () => {
+    const started = performance.now();
+    setRestoreRunning(true);
+    setBatchReport(null);
+    drillRef.current = true;
+    void (async () => {
+      try {
+        if (!(await showDocument("usage"))) {
+          pushClientLog(
+            "a",
+            "warn",
+            "Restore drill stopped: the clients could not open the usage document.",
+          );
+          return;
+        }
+        const restorer = clientsRef.current.a;
+        const peer = clientsRef.current.b;
+        const server = serversRef.current.usage;
+        if (!restorer || !peer || !server) return;
+        const settleBy = performance.now() + CHAOS_SETTLE_MS;
+        while (performance.now() < settleBy && clientsBusy()) await delay(CHAOS_TICK_MS);
+        if (clientsBusy()) {
+          pushClientLog("a", "warn", "Restore drill stopped: a client still has queued work.");
+          return;
+        }
+        const totalBefore = Number(restorer.grid.store.getCell(USAGE_TOTAL_CELL).resolved);
+        await restorer.sync.flush();
+        const cleared = restorer.grid.applyTransaction({
+          patches: [{ op: "clearRange", range: USAGE_RANGE, contents: true }],
+        });
+        if (cleared.status !== "applied") {
+          pushClientLog("a", "error", `Usage clear was ${cleared.status}.`);
+          return;
+        }
+        await restorer.sync.flush();
+        await waitForPeerHead(peer, restorer.sync.serverVersion);
+        // The batch window starts here: only the batch may touch Bram's Grid.
+        let versions = 0;
+        let pieces = 0;
+        let operationBytes = 0;
+        let peerChanges = 0;
+        const stopServer = server.observeCommits((record) => {
+          if (record.batchVersions && record.batchVersions > 1) versions = record.batchVersions;
+        });
+        const stopPeer = peer.grid.on("change", (event) => {
+          if (event.source === "remote") peerChanges += 1;
+        });
+        const stopUndo = restorer.grid.on("change", (event) => {
+          if (event.commitReason !== "undo") return;
+          pieces += event.transaction.patches.length;
+          operationBytes += new TextEncoder().encode(
+            JSON.stringify(event.transaction.patches),
+          ).length;
+        });
+        try {
+          restorer.grid.undo();
+          await restorer.sync.flush();
+          const reachedHead = await waitForPeerHead(peer, restorer.sync.serverVersion);
+          const totalAfter = Number(restorer.grid.store.getCell(USAGE_TOTAL_CELL).resolved);
+          const peerTotal = Number(peer.grid.store.getCell(USAGE_TOTAL_CELL).resolved);
+          const passed =
+            versions > 1 &&
+            pieces > 1 &&
+            totalAfter === totalBefore &&
+            peerTotal === totalBefore &&
+            peerChanges === 1 &&
+            reachedHead;
+          setBatchReport({
+            versions,
+            pieces,
+            operationBytes,
+            peerChanges,
+            totalBefore,
+            totalAfter,
+            peerTotal,
+            ms: performance.now() - started,
+            passed,
+          });
+          pushClientLog(
+            "a",
+            passed ? "commit" : "warn",
+            passed
+              ? `Undo committed ${versions} versions of one atomic batch; Bram applied the batch once (${peerChanges} transaction).`
+              : "The batch drill did not meet every check.",
+          );
+        } finally {
+          stopServer();
+          stopPeer();
+          stopUndo();
+        }
+      } catch (error) {
+        pushClientLog("a", "error", errorText(error));
+      } finally {
+        drillRef.current = false;
+        setRestoreRunning(false);
+      }
+    })();
+  };
+
+  /** Waits until one client is at the given server version with nothing queued. */
+  const waitForPeerHead = async (peer: ClientRuntime, version: number): Promise<boolean> => {
+    const deadline = performance.now() + CHAOS_SETTLE_MS;
+    const atHead = () =>
+      peer.sync.serverVersion >= version && peer.sync.pendingCommits().length === 0;
+    while (performance.now() < deadline && !atHead()) await delay(CHAOS_TICK_MS);
+    return atHead();
+  };
+
+  const loseNextAck = (key: ClientKey) => {
+    clientsRef.current[key]?.link.dropNextAcknowledgement();
+    pushClientLog(key, "info", "The next acknowledgement (and its echo) will be lost in transit");
+  };
+
+  const holdNextBroadcast = (key: ClientKey) => {
+    clientsRef.current[key]?.link.holdNextBroadcast();
+    pushClientLog(key, "info", "The next inbound broadcast will be held back (delivery reordered)");
+  };
+
+  const releaseHeld = (key: ClientKey) => {
+    clientsRef.current[key]?.link.releaseHeldBroadcasts();
+  };
+
+  const serverEdit = () => {
+    void action.run(
+      async () => {
+        if (!(await showDocument("forecast"))) throw new Error("The forecast is not ready.");
+        const server = serversRef.current.forecast;
+        if (!server) return;
+        const runtime = clientsRef.current.a ?? clientsRef.current.b;
+        const addr = { sheet: "plan", row: 4, col: 2 };
+        const current = runtime?.grid.store.getCell(addr).resolved;
+        const forecast =
+          typeof current === "number" ? current + FORECAST_ADJUSTMENT : FORECAST_ADJUSTMENT;
+        await server.commitServerOperations(DOCUMENT_ID.forecast, [
+          { op: "set", addr, value: { kind: "literal", value: forecast } },
+        ]);
+      },
+      () => "Cannot commit the server edit. Try again.",
+    );
+  };
+
+  /**
+   * Documented host recovery. Recover on the live Grid when the missed server
+   * versions touch other cells; otherwise rebase, clear stale durable ids,
+   * remount, and resubmit.
+   */
+
+  return {
+    chaosAction,
+    chaos,
+    batchReport,
+    restoreRunning,
+    runChaos,
+    restoreUsage,
+    loseNextAck,
+    holdNextBroadcast,
+    releaseHeld,
+    serverEdit,
+  };
+}
+
+type CollaborationClients = CollaborationClientState & ReturnType<typeof useCollaborationDrills>;
+
+export default function CollaborationShowcase() {
+  const clients = useCollaborationClients();
+  const drills = useCollaborationDrills(clients);
+  const workbench = { ...clients, ...drills };
+  const { action, chaosAction, status, batchReport } = workbench;
+
   return (
     <section aria-label="Collaboration protocol showcase" className="sw-clb" data-state={status}>
       <ActionError error={action.error ?? chaosAction.error} />
-      <header className="sw-clb__bar">
-        <div className="sw-clb__bar-title">
-          <p>Two clients · one sequencing server</p>
-          <h2>Two analysts. One shared forecast.</h2>
-        </div>
-        <div className="sw-clb__bar-actions">
-          <div className="sw-clb__chaos" data-phase={chaos?.phase ?? "idle"}>
-            <button
-              className="sw-clb__button"
-              data-testid="clb-chaos"
-              {...pendingProps(chaosAction.pending)}
-              data-variant="primary"
-              disabled={
-                chaosAction.pending ||
-                status !== "ready" ||
-                chaos?.phase === "storm" ||
-                chaos?.phase === "settling" ||
-                restoreRunning
-              }
-              onClick={() =>
-                void chaosAction.run(runChaos, () => "The chaos test failed. Try again.")
-              }
-              type="button"
-            >
-              {chaos?.phase === "storm"
-                ? "Chaos running…"
-                : chaos?.phase === "settling"
-                  ? "Reconnecting…"
-                  : "Run a chaos test"}
-            </button>
-          </div>
-          <button
-            className="sw-clb__button"
-            data-testid="clb-restore"
-            disabled={
-              status !== "ready" ||
-              restoreRunning ||
-              chaos?.phase === "storm" ||
-              chaos?.phase === "settling"
-            }
-            onClick={restoreUsage}
-            type="button"
-          >
-            {restoreRunning ? "Restoring usage…" : "Clear 100,000 cells, then undo"}
-          </button>
-        </div>
-        <p className="sw-clb__status" data-status={status} data-testid="clb-status">
-          {status === "ready" ? "Live" : status === "error" ? "Error" : "Loading"}
-          <span className="sw-clb__status-detail">{statusDetail}</span>
-        </p>
-        <output aria-live="polite" className="sw-clb__chaos-report" data-testid="clb-chaos-report">
-          {chaos === null
-            ? "Six seconds of concurrent edits, dropped connections, and reordered broadcasts."
-            : chaos.phase === "converged"
-              ? `Converged: ${chaos.edits} edits, ${chaos.disconnects} disconnects, ${chaos.reorders} reordered broadcasts. All ${chaos.cells} cells match on both clients.`
-              : chaos.phase === "diverged"
-                ? `Not converged: ${chaos.mismatches} of ${chaos.cells} cells differ.`
-                : chaos.phase === "timed-out"
-                  ? `Not settled: work was still queued or recovering after ${CHAOS_DRAIN_MS / 1000} seconds.`
-                  : `${chaos.edits} edits · ${chaos.disconnects} disconnects · ${chaos.reorders} reordered · ${(chaos.ms / 1000).toFixed(1)} s`}
-        </output>
-      </header>
+      <ProtocolBar workbench={workbench} />
 
-      <section aria-label="Live forecast convergence" className="sw-clb__forecast-hud">
-        {CLIENT_KEYS.map((key) => {
-          const actor = key === "a" ? COLLABORATION_ACTORS[0] : COLLABORATION_ACTORS[1];
-          const pending = views[key].syncState?.pendingCount ?? 0;
-          const state = pending > 0 ? "queued" : !atHead(key) ? "behind" : "current";
-          return (
-            <div className="sw-clb__forecast-card" data-head={state} key={key}>
-              <header>
-                <span>{actor.displayName}'s forecast</span>
-                <output>
-                  {pending > 0
-                    ? `${pending} queued`
-                    : state === "behind"
-                      ? "Catching up"
-                      : "Caught up"}
-                </output>
-              </header>
-              <strong>{views[key].total}</strong>
-              <p>
-                Client version <b>v{views[key].syncState?.serverVersion ?? 0}</b>
-              </p>
-            </div>
-          );
-        })}
-        <div
-          aria-live="polite"
-          className="sw-clb__convergence"
-          data-state={clientsAtHead === 2 ? "current" : "waiting"}
-        >
-          <span>Server head</span>
-          <strong>v{serverVersion}</strong>
-          <output>{clientsAtHead === 2 ? "Both clients caught up" : "Waiting for clients"}</output>
-        </div>
-      </section>
+      <ForecastHud workbench={workbench} />
 
       {batchReport && (
         <div
@@ -1347,219 +1333,371 @@ export default function CollaborationShowcase() {
         </div>
       )}
 
-      <div className="sw-clb__workbench">
-        <ClientPanel
-          account={sampleAccount("a")}
-          actor={COLLABORATION_ACTORS[0]}
-          actionPending={action.pending}
-          onSampleEdit={() => sampleEdit("a")}
-          onToggleOnline={(online) => toggleOnline("a", online)}
-          slug="a"
-          view={views.a}
-        >
-          <div
-            aria-label={`${COLLABORATION_ACTORS[0].displayName}'s workbook`}
-            className="sw-clb__grid"
-            data-testid="clb-a-grid"
-            ref={hostRefs.a}
-            role="application"
-          />
-        </ClientPanel>
+      <ClientWorkbench workbench={workbench} />
 
-        <section
-          aria-labelledby="clb-sequence-title"
-          className="sw-clb__sequence"
-          data-phase={challengePhase}
-          data-testid="clb-sequence"
-        >
-          <header>
-            <span>Sequencing lane</span>
-            <output data-testid="clb-server-version">v{serverVersion}</output>
-          </header>
-          <div aria-live="polite" className="sw-clb__challenge">
-            <span className="sw-clb__challenge-state">{challengePhase}</span>
-            <h3 id="clb-sequence-title">{challengeCopy[0]}</h3>
-            <p>{challengeCopy[1]}</p>
-          </div>
-          <ol aria-label="Offline reconnect sequence" className="sw-clb__steps">
-            <li data-current={challengePhase === "initial" ? "true" : undefined}>
-              <button
-                className="sw-clb__button"
-                disabled={status !== "ready" || !views.b.online}
-                onClick={() => toggleOnline("b", false)}
-                type="button"
-              >
-                <span aria-hidden="true">01</span> Take Bram offline
-              </button>
-            </li>
-            <li data-current={challengePhase === "offline" ? "true" : undefined}>
-              <button
-                className="sw-clb__button"
-                disabled={status !== "ready" || views.b.online || action.pending}
-                aria-busy={action.pending || undefined}
-                onClick={() => sampleEdit("b")}
-                type="button"
-              >
-                <span aria-hidden="true">02</span>{" "}
-                {action.pending ? "Queuing edit…" : "Queue one Grid edit"}
-              </button>
-            </li>
-            <li data-current={challengePhase === "queued" ? "true" : undefined}>
-              <button
-                className="sw-clb__button"
-                disabled={status !== "ready" || views.b.online}
-                onClick={() => toggleOnline("b", true)}
-                type="button"
-              >
-                <span aria-hidden="true">03</span> Reconnect
-              </button>
-            </li>
-          </ol>
-          <div aria-hidden="true" className="sw-clb__direction">
-            <span>Ana</span>
-            <i>commit → order → broadcast</i>
-            <span>Bram</span>
-          </div>
-          <section aria-label="Recent server decisions" className="sw-clb__decisions">
-            <h3>Server decisions</h3>
-            <ol aria-live="polite" className="sw-clb__server-log" data-testid="clb-server-log">
-              {serverLog.length === 0 ? (
-                <li className="sw-clb__log-empty">Waiting for the first commit.</li>
-              ) : (
-                serverLog.map((entry) => (
-                  <li data-ack={entry.status} key={entry.id}>
-                    {entry.text}
-                  </li>
-                ))
-              )}
-            </ol>
-          </section>
-        </section>
-
-        <ClientPanel
-          account={sampleAccount("b")}
-          actor={COLLABORATION_ACTORS[1]}
-          actionPending={action.pending}
-          onSampleEdit={() => sampleEdit("b")}
-          onToggleOnline={(online) => toggleOnline("b", online)}
-          slug="b"
-          view={views.b}
-        >
-          <div
-            aria-label={`${COLLABORATION_ACTORS[1].displayName}'s workbook`}
-            className="sw-clb__grid"
-            data-testid="clb-b-grid"
-            ref={hostRefs.b}
-            role="application"
-          />
-        </ClientPanel>
-      </div>
-
-      <details className="sw-clb__advanced">
-        <summary>Advanced protocol faults</summary>
-        <div className="sw-clb__advanced-body">
-          {CLIENT_KEYS.map((key) => {
-            const actor = key === "a" ? COLLABORATION_ACTORS[0] : COLLABORATION_ACTORS[1];
-            const held = views[key].linkState?.heldBroadcasts ?? 0;
-            return (
-              <section
-                aria-labelledby={`clb-${key}-faults-title`}
-                className="sw-clb__fault-client"
-                data-fault-client={key}
-                key={key}
-              >
-                <h3 id={`clb-${key}-faults-title`}>{actor.displayName} · transport faults</h3>
-                <div
-                  aria-label={`${actor.displayName}'s advanced network controls`}
-                  className="sw-clb__controls"
-                  role="toolbar"
-                >
-                  <button
-                    className="sw-clb__button"
-                    data-variant="quiet"
-                    onClick={() => loseNextAck(key)}
-                    type="button"
-                  >
-                    Lose next ack
-                  </button>
-                  <button
-                    className="sw-clb__button"
-                    data-variant="quiet"
-                    onClick={() => retryPending(key)}
-                    type="button"
-                  >
-                    Retry pending
-                  </button>
-                  <button
-                    className="sw-clb__button"
-                    data-variant="quiet"
-                    onClick={() => holdNextBroadcast(key)}
-                    type="button"
-                  >
-                    Hold next broadcast
-                  </button>
-                  <button
-                    className="sw-clb__button"
-                    data-variant="quiet"
-                    onClick={() => releaseHeld(key)}
-                    type="button"
-                  >
-                    Release held
-                    {held > 0 ? <span className="sw-clb__held-count">{held}</span> : null}
-                  </button>
-                </div>
-                <ol
-                  aria-label={`${actor.displayName}'s sync events`}
-                  aria-live="polite"
-                  className="sw-clb__log"
-                  data-testid={`clb-${key}-log`}
-                >
-                  {views[key].log.length === 0 ? (
-                    <li className="sw-clb__log-empty">Sync events appear here.</li>
-                  ) : (
-                    views[key].log.map((entry) => (
-                      <li data-kind={entry.kind} key={entry.id}>
-                        {entry.text}
-                      </li>
-                    ))
-                  )}
-                </ol>
-              </section>
-            );
-          })}
-          <section aria-labelledby="clb-server-tools-title" className="sw-clb__server-tools">
-            <h3 id="clb-server-tools-title">Server and recovery</h3>
-            <div className="sw-clb__controls">
-              <button
-                className="sw-clb__button"
-                {...pendingProps(action.pending)}
-                onClick={serverEdit}
-                type="button"
-              >
-                {action.pending ? "Committing…" : "Server-authored commit"}
-              </button>
-              <button
-                className="sw-clb__button"
-                data-variant="danger"
-                {...pendingProps(action.pending)}
-                onClick={resetDemo}
-                type="button"
-              >
-                {action.pending ? "Resetting…" : "Reset demo"}
-              </button>
-            </div>
-            <p className="sw-clb__server-note">
-              <span className="sw-clb__server-note-tag">Demo-only</span>
-              <span>
-                This in-page sequencer makes the real <code>PersistenceAdapter</code> +{" "}
-                <code>RemoteOperationSource</code> boundary observable. Your backend supplies that
-                transport and durable store.
-              </span>
-            </p>
-          </section>
-        </div>
-      </details>
+      <AdvancedDrills workbench={workbench} />
     </section>
+  );
+}
+
+/** The protocol bar: connection state, drills and their actions. */
+function ProtocolBar({ workbench }: Readonly<{ workbench: CollaborationClients }>) {
+  const { chaosAction, status, statusDetail, chaos, restoreRunning, runChaos, restoreUsage } =
+    workbench;
+
+  return (
+    <header className="sw-clb__bar">
+      <div className="sw-clb__bar-title">
+        <p>Two clients · one sequencing server</p>
+        <h2>Two analysts. One shared forecast.</h2>
+      </div>
+      <div className="sw-clb__bar-actions">
+        <div className="sw-clb__chaos" data-phase={chaos?.phase ?? "idle"}>
+          <button
+            className="sw-clb__button"
+            data-testid="clb-chaos"
+            {...pendingProps(chaosAction.pending)}
+            data-variant="primary"
+            disabled={
+              chaosAction.pending ||
+              status !== "ready" ||
+              chaos?.phase === "storm" ||
+              chaos?.phase === "settling" ||
+              restoreRunning
+            }
+            onClick={() =>
+              void chaosAction.run(runChaos, () => "The chaos test failed. Try again.")
+            }
+            type="button"
+          >
+            {chaos?.phase === "storm"
+              ? "Chaos running…"
+              : chaos?.phase === "settling"
+                ? "Reconnecting…"
+                : "Run a chaos test"}
+          </button>
+        </div>
+        <button
+          className="sw-clb__button"
+          data-testid="clb-restore"
+          disabled={
+            status !== "ready" ||
+            restoreRunning ||
+            chaos?.phase === "storm" ||
+            chaos?.phase === "settling"
+          }
+          onClick={restoreUsage}
+          type="button"
+        >
+          {restoreRunning ? "Restoring usage…" : "Clear 100,000 cells, then undo"}
+        </button>
+      </div>
+      <p className="sw-clb__status" data-status={status} data-testid="clb-status">
+        {status === "ready" ? "Live" : status === "error" ? "Error" : "Loading"}
+        <span className="sw-clb__status-detail">{statusDetail}</span>
+      </p>
+      <output aria-live="polite" className="sw-clb__chaos-report" data-testid="clb-chaos-report">
+        {chaos === null
+          ? "Six seconds of concurrent edits, dropped connections, and reordered broadcasts."
+          : chaos.phase === "converged"
+            ? `Converged: ${chaos.edits} edits, ${chaos.disconnects} disconnects, ${chaos.reorders} reordered broadcasts. All ${chaos.cells} cells match on both clients.`
+            : chaos.phase === "diverged"
+              ? `Not converged: ${chaos.mismatches} of ${chaos.cells} cells differ.`
+              : chaos.phase === "timed-out"
+                ? `Not settled: work was still queued or recovering after ${CHAOS_DRAIN_MS / 1000} seconds.`
+                : `${chaos.edits} edits · ${chaos.disconnects} disconnects · ${chaos.reorders} reordered · ${(chaos.ms / 1000).toFixed(1)} s`}
+      </output>
+    </header>
+  );
+}
+
+/** Live forecast convergence across the two clients. */
+function ForecastHud({ workbench }: Readonly<{ workbench: CollaborationClients }>) {
+  const { atHead, views, serverVersion, clientsAtHead } = workbench;
+
+  return (
+    <section aria-label="Live forecast convergence" className="sw-clb__forecast-hud">
+      {CLIENT_KEYS.map((key) => {
+        const actor = key === "a" ? COLLABORATION_ACTORS[0] : COLLABORATION_ACTORS[1];
+        const pending = views[key].syncState?.pendingCount ?? 0;
+        const state = pending > 0 ? "queued" : !atHead(key) ? "behind" : "current";
+        return (
+          <div className="sw-clb__forecast-card" data-head={state} key={key}>
+            <header>
+              <span>{actor.displayName}'s forecast</span>
+              <output>
+                {pending > 0
+                  ? `${pending} queued`
+                  : state === "behind"
+                    ? "Catching up"
+                    : "Caught up"}
+              </output>
+            </header>
+            <strong>{views[key].total}</strong>
+            <p>
+              Client version <b>v{views[key].syncState?.serverVersion ?? 0}</b>
+            </p>
+          </div>
+        );
+      })}
+      <div
+        aria-live="polite"
+        className="sw-clb__convergence"
+        data-state={clientsAtHead === 2 ? "current" : "waiting"}
+      >
+        <span>Server head</span>
+        <strong>v{serverVersion}</strong>
+        <output>{clientsAtHead === 2 ? "Both clients caught up" : "Waiting for clients"}</output>
+      </div>
+    </section>
+  );
+}
+
+/** The two client panels and the shared server log. */
+function ClientWorkbench({ workbench }: Readonly<{ workbench: CollaborationClients }>) {
+  const {
+    action,
+    hostRefs,
+    status,
+    views,
+    serverLog,
+    serverVersion,
+    sampleAccount,
+    sampleEdit,
+    toggleOnline,
+    challengePhase,
+    challengeCopy,
+  } = workbench;
+
+  return (
+    <div className="sw-clb__workbench">
+      <ClientPanel
+        account={sampleAccount("a")}
+        actor={COLLABORATION_ACTORS[0]}
+        actionPending={action.pending}
+        onSampleEdit={() => sampleEdit("a")}
+        onToggleOnline={(online) => toggleOnline("a", online)}
+        slug="a"
+        view={views.a}
+      >
+        <div
+          aria-label={`${COLLABORATION_ACTORS[0].displayName}'s workbook`}
+          className="sw-clb__grid"
+          data-testid="clb-a-grid"
+          ref={hostRefs.a}
+          role="application"
+        />
+      </ClientPanel>
+
+      <section
+        aria-labelledby="clb-sequence-title"
+        className="sw-clb__sequence"
+        data-phase={challengePhase}
+        data-testid="clb-sequence"
+      >
+        <header>
+          <span>Sequencing lane</span>
+          <output data-testid="clb-server-version">v{serverVersion}</output>
+        </header>
+        <div aria-live="polite" className="sw-clb__challenge">
+          <span className="sw-clb__challenge-state">{challengePhase}</span>
+          <h3 id="clb-sequence-title">{challengeCopy[0]}</h3>
+          <p>{challengeCopy[1]}</p>
+        </div>
+        <ol aria-label="Offline reconnect sequence" className="sw-clb__steps">
+          <li data-current={challengePhase === "initial" ? "true" : undefined}>
+            <button
+              className="sw-clb__button"
+              disabled={status !== "ready" || !views.b.online}
+              onClick={() => toggleOnline("b", false)}
+              type="button"
+            >
+              <span aria-hidden="true">01</span> Take Bram offline
+            </button>
+          </li>
+          <li data-current={challengePhase === "offline" ? "true" : undefined}>
+            <button
+              className="sw-clb__button"
+              disabled={status !== "ready" || views.b.online || action.pending}
+              aria-busy={action.pending || undefined}
+              onClick={() => sampleEdit("b")}
+              type="button"
+            >
+              <span aria-hidden="true">02</span>{" "}
+              {action.pending ? "Queuing edit…" : "Queue one Grid edit"}
+            </button>
+          </li>
+          <li data-current={challengePhase === "queued" ? "true" : undefined}>
+            <button
+              className="sw-clb__button"
+              disabled={status !== "ready" || views.b.online}
+              onClick={() => toggleOnline("b", true)}
+              type="button"
+            >
+              <span aria-hidden="true">03</span> Reconnect
+            </button>
+          </li>
+        </ol>
+        <div aria-hidden="true" className="sw-clb__direction">
+          <span>Ana</span>
+          <i>commit → order → broadcast</i>
+          <span>Bram</span>
+        </div>
+        <section aria-label="Recent server decisions" className="sw-clb__decisions">
+          <h3>Server decisions</h3>
+          <ol aria-live="polite" className="sw-clb__server-log" data-testid="clb-server-log">
+            {serverLog.length === 0 ? (
+              <li className="sw-clb__log-empty">Waiting for the first commit.</li>
+            ) : (
+              serverLog.map((entry) => (
+                <li data-ack={entry.status} key={entry.id}>
+                  {entry.text}
+                </li>
+              ))
+            )}
+          </ol>
+        </section>
+      </section>
+
+      <ClientPanel
+        account={sampleAccount("b")}
+        actor={COLLABORATION_ACTORS[1]}
+        actionPending={action.pending}
+        onSampleEdit={() => sampleEdit("b")}
+        onToggleOnline={(online) => toggleOnline("b", online)}
+        slug="b"
+        view={views.b}
+      >
+        <div
+          aria-label={`${COLLABORATION_ACTORS[1].displayName}'s workbook`}
+          className="sw-clb__grid"
+          data-testid="clb-b-grid"
+          ref={hostRefs.b}
+          role="application"
+        />
+      </ClientPanel>
+    </div>
+  );
+}
+
+/** Recovery drills and the full event log. */
+function AdvancedDrills({ workbench }: Readonly<{ workbench: CollaborationClients }>) {
+  const {
+    action,
+    views,
+    loseNextAck,
+    retryPending,
+    holdNextBroadcast,
+    releaseHeld,
+    serverEdit,
+    resetDemo,
+  } = workbench;
+
+  return (
+    <details className="sw-clb__advanced">
+      <summary>Advanced protocol faults</summary>
+      <div className="sw-clb__advanced-body">
+        {CLIENT_KEYS.map((key) => {
+          const actor = key === "a" ? COLLABORATION_ACTORS[0] : COLLABORATION_ACTORS[1];
+          const held = views[key].linkState?.heldBroadcasts ?? 0;
+          return (
+            <section
+              aria-labelledby={`clb-${key}-faults-title`}
+              className="sw-clb__fault-client"
+              data-fault-client={key}
+              key={key}
+            >
+              <h3 id={`clb-${key}-faults-title`}>{actor.displayName} · transport faults</h3>
+              <div
+                aria-label={`${actor.displayName}'s advanced network controls`}
+                className="sw-clb__controls"
+                role="toolbar"
+              >
+                <button
+                  className="sw-clb__button"
+                  data-variant="quiet"
+                  onClick={() => loseNextAck(key)}
+                  type="button"
+                >
+                  Lose next ack
+                </button>
+                <button
+                  className="sw-clb__button"
+                  data-variant="quiet"
+                  onClick={() => retryPending(key)}
+                  type="button"
+                >
+                  Retry pending
+                </button>
+                <button
+                  className="sw-clb__button"
+                  data-variant="quiet"
+                  onClick={() => holdNextBroadcast(key)}
+                  type="button"
+                >
+                  Hold next broadcast
+                </button>
+                <button
+                  className="sw-clb__button"
+                  data-variant="quiet"
+                  onClick={() => releaseHeld(key)}
+                  type="button"
+                >
+                  Release held
+                  {held > 0 ? <span className="sw-clb__held-count">{held}</span> : null}
+                </button>
+              </div>
+              <ol
+                aria-label={`${actor.displayName}'s sync events`}
+                aria-live="polite"
+                className="sw-clb__log"
+                data-testid={`clb-${key}-log`}
+              >
+                {views[key].log.length === 0 ? (
+                  <li className="sw-clb__log-empty">Sync events appear here.</li>
+                ) : (
+                  views[key].log.map((entry) => (
+                    <li data-kind={entry.kind} key={entry.id}>
+                      {entry.text}
+                    </li>
+                  ))
+                )}
+              </ol>
+            </section>
+          );
+        })}
+        <section aria-labelledby="clb-server-tools-title" className="sw-clb__server-tools">
+          <h3 id="clb-server-tools-title">Server and recovery</h3>
+          <div className="sw-clb__controls">
+            <button
+              className="sw-clb__button"
+              {...pendingProps(action.pending)}
+              onClick={serverEdit}
+              type="button"
+            >
+              {action.pending ? "Committing…" : "Server-authored commit"}
+            </button>
+            <button
+              className="sw-clb__button"
+              data-variant="danger"
+              {...pendingProps(action.pending)}
+              onClick={resetDemo}
+              type="button"
+            >
+              {action.pending ? "Resetting…" : "Reset demo"}
+            </button>
+          </div>
+          <p className="sw-clb__server-note">
+            <span className="sw-clb__server-note-tag">Demo-only</span>
+            <span>
+              This in-page sequencer makes the real <code>PersistenceAdapter</code> +{" "}
+              <code>RemoteOperationSource</code> boundary observable. Your backend supplies that
+              transport and durable store.
+            </span>
+          </p>
+        </section>
+      </div>
+    </details>
   );
 }
 
