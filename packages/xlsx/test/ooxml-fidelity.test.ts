@@ -162,9 +162,32 @@ describe("raw spec-authored OOXML fidelity", () => {
     expect(values[27]).toEqual({ kind: "formula", src: "='Q1'!AB1&\"A1\"" });
   });
 
-  it("warns and keeps a cell's own text or scans references when a shared master does not lex", async () => {
+  it("moves whole columns and rows of a shared master and keeps names past the last column", async () => {
+    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
+      rawWorkbook(
+        sheet(
+          '<dimension ref="A1:D4"/><sheetData>' +
+            '<row r="1"><c r="C1"><f t="shared" si="0" ref="C1:D1">SUM(A:A)+XYZ1</f></c><c r="D1"><f t="shared" si="0"/></c></row>' +
+            '<row r="3"><c r="A3"><f t="shared" si="1" ref="A3:A4">SUM(1:1)*XFD1</f></c></row>' +
+            '<row r="4"><c r="A4"><f t="shared" si="1"/></c></row>' +
+            "</sheetData>",
+        ),
+      ),
+    );
+    const values = imported.sheets[0]?.cells.flatMap((block) =>
+      block.cells.map((cell) => cell.value),
+    );
+    expect(values).toEqual([
+      { kind: "formula", src: "=SUM(A:A)+XYZ1" },
+      { kind: "formula", src: "=SUM(B:B)+XYZ1" },
+      { kind: "formula", src: "=SUM(1:1)*XFD1" },
+      { kind: "formula", src: "=SUM(2:2)*XFD2" },
+    ]);
+  });
+
+  it("warns and keeps a cell's own text or the master's text when a shared master does not lex", async () => {
     const warnings: XlsxWorkbookWarning[] = [];
-    // An unterminated string: neither the engine nor the reader's copy rule can lex it.
+    // An unterminated string: the engine's lexer cannot read it.
     const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
       rawWorkbook(
         sheet(
@@ -183,7 +206,7 @@ describe("raw spec-authored OOXML fidelity", () => {
     expect(values).toEqual([
       { kind: "formula", src: '=B1&$C$1&"open' },
       { kind: "formula", src: '=B2&$C$1&"own' },
-      { kind: "formula", src: '=B3&$C$1&"open' },
+      { kind: "formula", src: '=B1&$C$1&"open' },
     ]);
     expect(
       warnings

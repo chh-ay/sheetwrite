@@ -11,13 +11,11 @@ import {
   CHART_NS,
   CHART_REL,
   DRAWING_CONTENT,
-  DRAWINGML_NS,
   EMU_PER_PIXEL,
-  RELATIONSHIPS_NS,
-  relationshipsPartOf,
   SPREADSHEET_DRAWING_NS,
 } from "./chart-xml.js";
-import { type ContentTypeOverride, relationshipsXml } from "./opc.js";
+import { DRAWINGML_NS, RELATIONSHIPS_NS } from "./format.js";
+import { type ContentTypeOverride, relationshipsPart, relationshipsXml } from "./opc.js";
 import type { XlsxCodecContext } from "./resources.js";
 import { encodeXstring, escapeXml, XmlBuffer } from "./xml.js";
 import type { ZipPart } from "./zip.js";
@@ -242,7 +240,7 @@ export function chartDrawingParts(
   return {
     parts: [
       { name: part, data: xml.finish() },
-      { name: relationshipsPartOf(part), data: relationshipsXml(relationships, context) },
+      { name: relationshipsPart(part), data: relationshipsXml(relationships, context) },
     ],
     override: { part, contentType: DRAWING_CONTENT },
   };

@@ -1,6 +1,7 @@
 import type { CellBorder, CellStyle, CellVerticalAlign } from "@sheetwrite/core";
 import { isCellFontFamily } from "@sheetwrite/core";
 
+import { DRAWINGML_NAMESPACES, MAIN_NAMESPACES, MAIN_NS } from "./format.js";
 import {
   assertResource,
   boundedErrorText,
@@ -49,14 +50,6 @@ const BUILTIN_NUMBER_FORMATS: Readonly<Record<number, string>> = {
   49: "@",
 };
 
-const MAIN_NAMESPACES = [
-  "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
-  "http://purl.oclc.org/ooxml/spreadsheetml/main",
-] as const;
-const DRAWING_NAMESPACES = [
-  "http://schemas.openxmlformats.org/drawingml/2006/main",
-  "http://purl.oclc.org/ooxml/drawingml/main",
-] as const;
 const INDEXED_COLORS = [
   "000000",
   "FFFFFF",
@@ -233,7 +226,7 @@ function parsedThemeColors(
 ): ReadonlyMap<number, string> {
   const colors = new Map<number, string>();
   if (!root) return colors;
-  assertXmlRoot(root, "theme", DRAWING_NAMESPACES, part);
+  assertXmlRoot(root, "theme", DRAWINGML_NAMESPACES, part);
   const scheme = xmlChild(xmlChild(root, "themeElements") ?? root, "clrScheme");
   if (!scheme) return colors;
   const names = [
@@ -610,7 +603,7 @@ export class StylesRegistry {
 
     const xml = new XmlBuffer(this.#context);
     xml.append('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
-    xml.append('<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">');
+    xml.append(`<styleSheet xmlns="${MAIN_NS}">`);
     if (customFormats.length > 0) {
       xml.append(`<numFmts count="${customFormats.length}">`);
       for (let index = 0; index < customFormats.length; index++) {

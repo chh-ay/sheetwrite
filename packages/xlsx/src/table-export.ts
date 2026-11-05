@@ -7,11 +7,8 @@ import type {
   XlsxWorkbookOptions,
 } from "@sheetwrite/core";
 
-import { assertResource, checkAbort, createCodecContext, xlsxFailure } from "./resources.js";
-import { streamTable, writeTable } from "./table-stream.js";
-
-/** Model rows built between two abort checks. */
-const ABORT_CHECK_ROWS = 4096;
+import { createCodecContext, xlsxFailure } from "./resources.js";
+import { projectedRows, projectTable, streamTable, writeTable } from "./table-stream.js";
 
 /** Implementation-neutral cell in the first-sheet table export model. */
 export interface XlsxModelCell {
@@ -30,84 +27,54 @@ export interface XlsxModel {
   rows: (XlsxModelCell | null)[][];
 }
 
-/** Materialize the active-sheet table model. The bounded writer uses tableSource instead. */
+/** Materialize the active-sheet table model from the projection the bounded writer streams. */
 export function buildXlsxModel(
   workbook: Workbook,
   store: Store,
   options?: XlsxWorkbookOptions,
 ): XlsxModel | null {
-  const sheet =
-    workbook.sheets.find((candidate) => candidate.id === workbook.activeSheet) ??
-    workbook.sheets[0];
-  if (!sheet) return null;
   const context = createCodecContext("export", options);
-  const visibleColumns: number[] = [];
-  for (let col = 0; col < sheet.columns.length; col++) {
-    if (sheet.columns[col]!.visible !== false) visibleColumns.push(col);
-  }
-  assertResource(context, "maxRowsPerSheet", sheet.rowCount + 1);
-  assertResource(context, "maxColumnsPerSheet", visibleColumns.length);
-  assertResource(context, "maxCells", (sheet.rowCount + 1) * visibleColumns.length);
-  const columnCount = visibleColumns.length;
-  const view = store.getVisibleWindow(sheet.id, { start: 0, end: sheet.rowCount }, visibleColumns);
-  const outputColumn = new Map(visibleColumns.map((col, index) => [col, index]));
-  const mergeByAnchor = new Map<number, { columnSpan: number; rowSpan: number }>();
-  const covered = new Set<number>();
-  for (const merge of sheet.merges ?? []) {
-    const anchorCol = outputColumn.get(merge.c0);
-    if (anchorCol === undefined || merge.r0 < 0 || merge.r0 >= sheet.rowCount) continue;
-    const spanColumns = visibleColumns.filter((col) => col >= merge.c0 && col <= merge.c1);
-    if (spanColumns.length === 0) continue;
-    const rowSpan = Math.min(merge.r1, sheet.rowCount - 1) - merge.r0 + 1;
-    mergeByAnchor.set(merge.r0 * columnCount + anchorCol, {
-      columnSpan: spanColumns.length,
-      rowSpan,
-    });
-    for (let row = merge.r0; row < merge.r0 + rowSpan; row++) {
-      for (const col of spanColumns) {
-        const visible = outputColumn.get(col)!;
-        if (row !== merge.r0 || visible !== anchorCol) covered.add(row * columnCount + visible);
-      }
-    }
-  }
-  const rows: (XlsxModelCell | null)[][] = [
-    visibleColumns.map((col) => {
-      const column = sheet.columns[col]!;
-      return {
-        value: column.header,
-        ...(column.headerStyle ? { style: structuredClone(column.headerStyle) } : {}),
-      };
-    }),
-  ];
-  for (let row = 0; row < sheet.rowCount; row++) {
-    if (row % ABORT_CHECK_ROWS === 0) checkAbort(context);
-    const output: (XlsxModelCell | null)[] = new Array(columnCount);
-    for (let visibleCol = 0; visibleCol < columnCount; visibleCol++) {
-      const flat = row * columnCount + visibleCol;
-      if (covered.has(flat)) {
-        output[visibleCol] = null;
+  const projection = projectTable(workbook, context);
+  if (!projection) return null;
+
+  const { sheet, columns, merges } = projection;
+  const rows: (XlsxModelCell | null)[][] = [];
+  for (const { row, cells } of projectedRows(projection, store, context)) {
+    const output = new Array<XlsxModelCell | null>(columns.length).fill(null);
+    for (const cell of cells) {
+      const value = cell.source.value.kind === "literal" ? cell.source.value.value : null;
+      const style = cell.source.style;
+      if (row === 0) {
+        output[cell.col] = { value, ...(style ? { style: structuredClone(style) } : {}) };
         continue;
       }
-      const column = sheet.columns[visibleColumns[visibleCol]!]!;
-      const mergedStyle = { ...column.cellStyle, ...view.styles[view.styleIds[flat] ?? 0] };
-      const numberFormat = mergedStyle.numberFormat ?? column.numberFormat;
-      const value = view.values[flat] ?? null;
-      const merge = mergeByAnchor.get(flat);
-      output[visibleCol] =
-        value === null && Object.keys(mergedStyle).length === 0 && !merge
-          ? null
-          : {
-              value,
-              ...(Object.keys(mergedStyle).length > 0 ? { style: mergedStyle } : {}),
-              ...(numberFormat ? { numberFormat } : {}),
-              ...(merge ?? {}),
-            };
+
+      const numberFormat =
+        style?.numberFormat ?? sheet.columns[columns[cell.col] ?? -1]?.numberFormat;
+      output[cell.col] = {
+        value,
+        ...(style ? { style } : {}),
+        ...(numberFormat ? { numberFormat } : {}),
+      };
     }
     rows.push(output);
   }
+
+  // A merge anchor is a model cell even when it is empty.
+  for (const merge of merges) {
+    const row = rows[merge.r0];
+    if (!row) continue;
+    const numberFormat = sheet.columns[columns[merge.c0] ?? -1]?.numberFormat;
+    row[merge.c0] = {
+      ...(row[merge.c0] ?? { value: null, ...(numberFormat ? { numberFormat } : {}) }),
+      columnSpan: merge.c1 - merge.c0 + 1,
+      rowSpan: merge.r1 - merge.r0 + 1,
+    };
+  }
+
   return {
     sheetName: sheet.name,
-    columnWidths: visibleColumns.map((col) => sheet.columns[col]!.width),
+    columnWidths: columns.map((col) => sheet.columns[col]?.width ?? 0),
     rowHeights: [
       undefined,
       ...Array.from({ length: sheet.rowCount }, (_unused, row) => sheet.rowHeights?.get(row)),

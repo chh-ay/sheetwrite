@@ -6,6 +6,7 @@
 // and the names the active engine and the store do not know.
 
 import { getEngine } from "./engine.js";
+import { ENGINE_KINDS, type RawKind, TOKEN_FIELDS } from "./formula-token-kinds.js";
 import type { FormulaArgumentMetadata, FormulaFunctionMetadata } from "./functions/types.js";
 
 /** A problem in a formula, with the span of text it marks. */
@@ -20,30 +21,6 @@ export interface FormulaDiagnostic {
   readonly incomplete: boolean;
 }
 
-/** The token kinds of `formulaTokens`, in the order of `TokenKind` in formula_tokens.rs. */
-const ENGINE_KINDS = [
-  "num",
-  "str",
-  "bool",
-  "error",
-  "ident",
-  "quoted",
-  "structured",
-  "op",
-  "colon",
-  "bang",
-  "hash",
-  "comma",
-  "semicolon",
-  "lparen",
-  "rparen",
-  "lbrace",
-  "rbrace",
-  "bad",
-] as const;
-
-type RawKind = (typeof ENGINE_KINDS)[number];
-
 /** One token of the engine's lexer, with its text. Offsets are UTF-16 indices. */
 export interface RawToken {
   readonly kind: RawKind;
@@ -51,9 +28,6 @@ export interface RawToken {
   readonly to: number;
   readonly text: string;
 }
-
-/** `kind`, `from`, `to` and the whitespace flag of each token in `formulaTokens`. */
-const TOKEN_FIELDS = 4;
 
 /** Names the engine reads as Excel's future-function prefixes, not as unknown names. */
 const FUTURE_FUNCTION_PREFIX = "_XL";
