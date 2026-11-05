@@ -26,15 +26,17 @@ const MAX_CHART_TEXT_LENGTH = 255;
 /** Anchor offset and size ceiling in CSS pixels; the largest canvas edge browsers allocate. */
 const MAX_CHART_PIXELS = 32_767;
 
-const CHART_KINDS: ReadonlySet<unknown> = new Set<ChartKind>([
-  "column",
-  "bar",
-  "line",
-  "area",
-  "pie",
-  "doughnut",
-  "scatter",
-]);
+/** Every chart kind with the name the UI shows for it. */
+export const CHART_KIND_LABELS: Readonly<Record<ChartKind, string>> = {
+  column: "Column",
+  bar: "Bar",
+  line: "Line",
+  area: "Area",
+  pie: "Pie",
+  doughnut: "Doughnut",
+  scatter: "Scatter",
+};
+
 const LEGEND_POSITIONS: ReadonlySet<unknown> = new Set(["none", "top", "right", "bottom", "left"]);
 const CHART_KEYS = new Set(["id", "kind", "title", "axes", "legend", "anchor", "series"]);
 const AXES_KEYS = new Set(["xTitle", "yTitle"]);
@@ -49,7 +51,7 @@ export interface ChartSheetBounds {
 }
 
 function isChartKind(value: unknown): value is ChartKind {
-  return CHART_KINDS.has(value);
+  return typeof value === "string" && Object.hasOwn(CHART_KIND_LABELS, value);
 }
 
 function isLegendPosition(value: unknown): value is NonNullable<ChartDefinition["legend"]> {

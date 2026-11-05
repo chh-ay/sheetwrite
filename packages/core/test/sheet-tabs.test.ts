@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
+import { POPUP_VIEWPORT_MARGIN } from "../src/menu-surface.js";
 import { type SheetTabRecord, SheetTabs, type SheetTabsOptions } from "../src/sheet-tabs.js";
 import type { SheetLifecycleResult } from "../src/types/grid.js";
 
@@ -258,6 +259,42 @@ describe("SheetTabs", () => {
       triggerTop = 300;
       document.dispatchEvent(new Event("scroll"));
       expect(host.querySelector('[role="menu"]')).toBeNull();
+    } finally {
+      Reflect.deleteProperty(HTMLElement.prototype, "getBoundingClientRect");
+    }
+  });
+
+  it("keeps the options menu the shared popup margin inside the viewport", () => {
+    tabs.destroy();
+    tabs = new SheetTabs(host, { onActivate: () => {}, onRename: (id) => applied(id) });
+    tabs.update(SHEETS, "b");
+    const menuWidth = 160;
+    const menuHeight = 120;
+    Object.defineProperty(HTMLElement.prototype, "getBoundingClientRect", {
+      configurable: true,
+      value(this: HTMLElement) {
+        if (this.classList.contains("sheetwrite-tab-options-button")) {
+          const left = window.innerWidth - 20;
+          const top = window.innerHeight - 24;
+          return { left, right: left + 20, top, bottom: top + 24, width: 20, height: 24 };
+        }
+        return {
+          left: 0,
+          right: menuWidth,
+          top: 0,
+          bottom: menuHeight,
+          width: menuWidth,
+          height: menuHeight,
+        };
+      },
+    });
+    try {
+      host.querySelector<HTMLButtonElement>('[aria-label="Options for Sales sheet"]')!.click();
+      const menu = host.querySelector<HTMLElement>('[role="menu"]')!;
+      expect(Number.parseFloat(menu.style.left)).toBe(
+        window.innerWidth - menuWidth - POPUP_VIEWPORT_MARGIN,
+      );
+      expect(Number.parseFloat(menu.style.top)).toBe(window.innerHeight - 24 - menuHeight);
     } finally {
       Reflect.deleteProperty(HTMLElement.prototype, "getBoundingClientRect");
     }

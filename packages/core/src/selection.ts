@@ -1,4 +1,36 @@
-import type { Range, Selection, SheetId } from "./types/coordinates.js";
+import type { CellAddress, Range, Selection, SheetId } from "./types/coordinates.js";
+
+/**
+ * The cell that cell-level commands (formula bar, link, note, pivot fields)
+ * act on: the selected cell, or the top-left cell of a range. With several
+ * ranges it is the top-left cell of the last one, which holds Excel's active
+ * cell. Whole rows and columns give null.
+ */
+export function selectionCell(selection: Selection | null): CellAddress | null {
+  if (selection === null) return null;
+
+  switch (selection.kind) {
+    case "cell":
+      return selection.addr;
+    case "range":
+      return rangeTopLeft(selection.range);
+    case "multi": {
+      const last = selection.ranges.at(-1);
+      return last === undefined ? null : rangeTopLeft(last);
+    }
+    case "row":
+    case "column":
+      return null;
+  }
+}
+
+function rangeTopLeft(range: Range): CellAddress {
+  return {
+    sheet: range.sheet,
+    row: Math.min(range.start.row, range.end.row),
+    col: Math.min(range.start.col, range.end.col),
+  };
+}
 
 export interface CellRef {
   row: number;

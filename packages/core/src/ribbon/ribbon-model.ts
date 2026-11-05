@@ -33,9 +33,9 @@ import {
   showNameManager,
 } from "../panels/panel-loader.js";
 import { queryCommandsOf, queryRefreshRunning, toggleQueryRefresh } from "../query-commands.js";
+import { selectionCell } from "../selection.js";
 import { storeEngine } from "../store/engine-registry.js";
 import type { ChartKind } from "../types/chart.js";
-import type { CellAddress } from "../types/coordinates.js";
 import type { BorderPreset, CommandFlags, Grid, GridCommandName } from "../types/grid.js";
 import { xlsxImportCommand } from "../workbook-io.js";
 import type {
@@ -60,16 +60,6 @@ const EXCEL_THEME_FILL = "#ffff00";
 
 const PERCENT_SCALE = 100;
 const MAX_FONT_SIZE_PT = 409;
-
-/** The cell link and note forms act on: a single cell, or a range's anchor. */
-export function focusAddress(grid: Grid): CellAddress | null {
-  const selection = grid.getSelection();
-  if (selection?.kind === "cell") return selection.addr;
-  if (selection?.kind === "range") {
-    return { sheet: selection.range.sheet, ...selection.range.start };
-  }
-  return null;
-}
 
 /** Inclusive data-row spans of the selection, for row grouping. */
 function selectedRowSpans(grid: Grid): Array<[number, number]> {
@@ -388,7 +378,7 @@ function hostFunctions(grid: Grid): readonly FormulaFunctionMetadata[] {
  * same coordinates the formula bar edits with.
  */
 function startFormula(grid: Grid, name: string): void {
-  const cell = focusAddress(grid);
+  const cell = selectionCell(grid.getSelection());
   if (cell !== null) grid.beginEdit(cell.row, cell.col, `=${name}(`);
 }
 

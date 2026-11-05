@@ -51,6 +51,7 @@ const STORE_EDGES: Readonly<Record<string, readonly string[]>> = {
   "wasm-contract.ts": [],
   "wire-tags.ts": [],
   "window-reader.ts": [
+    "../conditional-format.ts",
     "../errors.ts",
     "../style-dictionary.ts",
     "../utf8.ts",
