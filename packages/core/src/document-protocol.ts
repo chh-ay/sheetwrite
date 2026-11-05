@@ -3025,47 +3025,23 @@ function validateXlsxSource(value: unknown, errors: DocumentValidationError[]): 
       invalid(errors, `${graphPath}.queries`, "queries must be a 64-bit hex digest");
     }
 
+    const unsupportedPath = `${graphPath}.unsupportedQueries`;
     const unsupported = ownValue(graph, "unsupportedQueries");
-    if (unsupported !== undefined) {
-      const unsupportedPath = `${graphPath}.unsupportedQueries`;
-      if (!Array.isArray(unsupported) || unsupported.length > MAX_UNSUPPORTED_QUERIES) {
-        invalid(
-          errors,
-          unsupportedPath,
-          `unsupportedQueries must be an array of at most ${MAX_UNSUPPORTED_QUERIES} members`,
-        );
-      } else {
-        unsupported.forEach((entry: unknown, entryIndex) => {
-          const entryPath = `${unsupportedPath}[${entryIndex}]`;
-          const record = recordAt(entry, entryPath, errors);
-          if (!record) return;
-          const member = ownValue(record, "member");
-          if (
-            typeof member !== "string" ||
-            member.length === 0 ||
-            member.length > MAX_QUERY_MEMBER_LENGTH
-          ) {
-            invalid(
-              errors,
-              `${entryPath}.member`,
-              `member must be 1 to ${MAX_QUERY_MEMBER_LENGTH} characters`,
-            );
-          }
-          const reason = ownValue(record, "reason");
-          if (
-            typeof reason !== "string" ||
-            reason.length === 0 ||
-            reason.length > MAX_QUERY_REASON_LENGTH
-          ) {
-            invalid(
-              errors,
-              `${entryPath}.reason`,
-              `reason must be 1 to ${MAX_QUERY_REASON_LENGTH} characters`,
-            );
-          }
-        });
-      }
+    const kept = unsupported === undefined ? [] : arrayAt(unsupported, unsupportedPath, errors);
+    if (kept && kept.length > MAX_UNSUPPORTED_QUERIES) {
+      invalid(errors, unsupportedPath, "unsupportedQueries holds too many members");
     }
+    kept?.forEach((entry: unknown, entryIndex) => {
+      const entryPath = `${unsupportedPath}[${entryIndex}]`;
+      const record = recordAt(entry, entryPath, errors);
+      if (!record) return;
+      const member = requireString(record, "member", entryPath, errors, true);
+      if (member && member.length > MAX_QUERY_MEMBER_LENGTH)
+        invalid(errors, `${entryPath}.member`, "member is too long");
+      const reason = requireString(record, "reason", entryPath, errors, true);
+      if (reason && reason.length > MAX_QUERY_REASON_LENGTH)
+        invalid(errors, `${entryPath}.reason`, "reason is too long");
+    });
 
     const members = arrayAt(ownValue(graph, "parts"), `${graphPath}.parts`, errors);
     if (
