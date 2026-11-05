@@ -2,6 +2,7 @@
 // shape checks, structural checks and copies of table relationships. Nothing
 // here reads cells; the engine checks key values (#229).
 
+import { isPlainRecord, ownValue } from "./plain-data.js";
 import type { DataModel, TableColumnRef, TableRelationship } from "./types/data-model.js";
 import type { Sheet } from "./types/document.js";
 
@@ -22,21 +23,6 @@ export interface DataModelIssue {
 /** Where checks append issues; a `DocumentValidationError[]` qualifies. */
 export interface DataModelIssueSink {
   push(...issues: DataModelIssue[]): number;
-}
-
-type PlainRecord = Record<string, unknown>;
-
-function isPlainRecord(value: unknown): value is PlainRecord {
-  return (
-    value !== null &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
-    Object.getPrototypeOf(value) === Object.prototype
-  );
-}
-
-function ownValue(record: PlainRecord, key: string): unknown {
-  return Object.hasOwn(record, key) ? record[key] : undefined;
 }
 
 function isBoundedId(value: unknown, max: number): value is string {
