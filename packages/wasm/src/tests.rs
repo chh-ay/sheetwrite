@@ -5839,6 +5839,25 @@ mod reference_operators {
     }
 
     #[test]
+    fn sheet_numbers_follow_added_and_moved_tabs() {
+        let (mut store, [first, middle, last, summary]) = span_workbook();
+        store.set_formula(summary, 0, 0, "=SHEETS()", 0);
+        store.set_formula(summary, 1, 0, "=SHEET()", 0);
+        store.set_formula(summary, 2, 0, "=SHEET(\"middle\")", 0);
+        store.commit_sources();
+        assert_close(number(&store, summary, 0, 0), 4.0);
+        assert_close(number(&store, summary, 1, 0), 4.0);
+        assert_close(number(&store, summary, 2, 0), 2.0);
+
+        let added = store.add_sheet(2, 2);
+        assert_close(number(&store, summary, 0, 0), 5.0);
+
+        assert!(store.set_sheet_order(&order(&[summary, last, middle, first, added])));
+        assert_close(number(&store, summary, 1, 0), 1.0);
+        assert_close(number(&store, summary, 2, 0), 3.0);
+    }
+
+    #[test]
     fn a_three_d_reference_aggregates_the_same_cells_on_every_sheet_of_the_span() {
         let (mut store, [_, middle, last, summary]) = span_workbook();
         let cases = [

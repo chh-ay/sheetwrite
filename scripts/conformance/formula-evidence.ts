@@ -183,6 +183,13 @@ export const AUTHORED_ASSERTIONS: Readonly<Record<string, readonly [string, stri
   RATE: ["ABS(RATE(1,0,-100,110)-0.1)<0.0000001", "RATE(1,0,-100,120)>0"],
   IPMT: ["IPMT(0,1,10,1000)=0", "IPMT(0,2,10,1000)=0"],
   PPMT: ["PPMT(0,1,10,1000)=-100", "PPMT(0,2,10,1000)=-100"],
+  "ERROR.TYPE": ["ERROR.TYPE(1/0)=2", "ERROR.TYPE(NA())=7"],
+  ISEVEN: ["ISEVEN(2.5)", "NOT(ISEVEN(5))"],
+  ISODD: ["ISODD(5)", "NOT(ISODD(2.5))"],
+  ISNONTEXT: ["ISNONTEXT(1)", 'NOT(ISNONTEXT("a"))'],
+  ISREF: ["ISREF(A1)", "NOT(ISREF(1))"],
+  SHEET: ["SHEET()=1", "SHEET(A1)=1"],
+  SHEETS: ["SHEETS()>=1", "SHEETS(A1)=1"],
 };
 
 export function authoredAssertions(name: string): readonly [string, string] {

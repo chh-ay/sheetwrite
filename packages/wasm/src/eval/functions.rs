@@ -230,7 +230,9 @@ pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
         | Func::Quotient
         | Func::Gcd
         | Func::Lcm
-        | Func::Subtotal => math_family(func, values),
+        | Func::Subtotal
+        | Func::IsEven
+        | Func::IsOdd => math_family(func, values),
         Func::Len
         | Func::Left
         | Func::Right

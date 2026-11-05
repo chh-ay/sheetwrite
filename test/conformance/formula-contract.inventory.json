@@ -3953,6 +3953,30 @@
         }
       ],
       "returns": "scalar"
+    },
+    "sheet-value": {
+      "arguments": [
+        {
+          "name": "value",
+          "required": false,
+          "default": "formula-sheet",
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "sheets-reference": {
+      "arguments": [
+        {
+          "name": "reference",
+          "required": false,
+          "default": "workbook",
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
     }
   },
   "semanticsProfiles": {
@@ -5320,7 +5344,11 @@
       },
       "evaluator": {
         "status": "implemented",
-        "paths": ["packages/wasm/src/eval/mod.rs", "packages/wasm/src/eval/functions.rs"]
+        "paths": [
+          "packages/wasm/src/eval/mod.rs",
+          "packages/wasm/src/eval/functions.rs",
+          "packages/wasm/src/eval/math.rs"
+        ]
       },
       "assist": {
         "status": "implemented",
@@ -5623,7 +5651,7 @@
       },
       "evaluator": {
         "status": "implemented",
-        "paths": ["packages/wasm/src/eval/info.rs"]
+        "paths": ["packages/wasm/src/eval/info.rs", "packages/wasm/src/store.rs"]
       },
       "assist": {
         "status": "implemented",
@@ -5716,7 +5744,7 @@
       "title": "External data functions",
       "status": "unsupported",
       "scope": "Functions that query external providers or live data connections are not evaluated.",
-      "examples": ["GOOGLEFINANCE", "IMPORTDATA", "IMPORTHTML", "IMPORTXML", "RTD"],
+      "examples": ["GOOGLEFINANCE", "IMPORTDATA", "IMPORTHTML", "IMPORTXML", "RTD", "STOCKHISTORY"],
       "source": "microsoft-excel-functions",
       "section": "Add-in and Automation functions",
       "implementation": {
@@ -5755,6 +5783,24 @@
       "examples": ["'[Book.xlsx]Sheet1'!A1"],
       "source": "microsoft-excel-functions",
       "section": "Lookup and reference functions",
+      "implementation": {
+        "status": "missing",
+        "paths": []
+      },
+      "evidence": {
+        "status": "registration-tested",
+        "paths": ["scripts/formula-contract.test.ts"]
+      },
+      "version": 1
+    },
+    {
+      "id": "host-environment",
+      "title": "Host environment functions",
+      "status": "unsupported",
+      "scope": "INFO reports the operating system, folder and memory of the program that runs Excel. Formula evaluation does not read the host environment, so the result would not be the same in every browser and server.",
+      "examples": ["INFO"],
+      "source": "microsoft-excel-functions",
+      "section": "Information functions",
       "implementation": {
         "status": "missing",
         "paths": []
@@ -9870,6 +9916,90 @@
       "implementation": "analysis-hypothesis",
       "version": 1,
       "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "ERROR.TYPE",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "supported",
+      "signature": "unary-value",
+      "semantics": "information",
+      "dialects": "excel-documented",
+      "implementation": "implemented-reference-information",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ISEVEN",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "information",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ISNONTEXT",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "supported",
+      "signature": "unary-value",
+      "semantics": "information",
+      "dialects": "excel-documented",
+      "implementation": "implemented-reference-information",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ISODD",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "information",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ISREF",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "supported",
+      "signature": "unary-value",
+      "semantics": "information",
+      "dialects": "excel-documented",
+      "implementation": "implemented-reference-information",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "SHEET",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "supported",
+      "signature": "sheet-value",
+      "semantics": "information",
+      "dialects": "excel-documented",
+      "implementation": "implemented-reference-information",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "SHEETS",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "supported",
+      "signature": "sheets-reference",
+      "semantics": "information",
+      "dialects": "excel-documented",
+      "implementation": "implemented-reference-information",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
     }
   ],
   "operators": [

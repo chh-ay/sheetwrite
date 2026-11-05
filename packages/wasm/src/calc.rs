@@ -217,6 +217,13 @@ pub enum Func {
     Offset,
     Indirect,
     Areas,
+    ErrorType,
+    IsEven,
+    IsNonText,
+    IsOdd,
+    IsRef,
+    Sheet,
+    Sheets,
     /// `A1#`: the current spill of the anchor cell. Only `#` after a cell
     /// reference makes it; the name is not in the function table.
     AnchorArray,
@@ -390,6 +397,8 @@ define_function_registry! {
         Floor => "FLOOR";
         Index => "INDEX";
         IsErr => "ISERR";
+        IsOdd => "ISODD";
+        IsRef => "ISREF";
         Large => "LARGE";
         Log10 => "LOG10";
         Lower => "LOWER";
@@ -398,6 +407,7 @@ define_function_registry! {
         Power => "POWER";
         Right => "RIGHT";
         Round => "ROUND";
+        Sheet => "SHEET";
         Small => "SMALL";
         SumIf => "SUMIF";
         Today => "TODAY";
@@ -412,6 +422,7 @@ define_function_registry! {
         Correl => "CORREL";
         CountA => "COUNTA";
         Filter => "FILTER";
+        IsEven => "ISEVEN";
         IsText => "ISTEXT";
         MaxIfs => "MAXIFS";
         Median => "MEDIAN";
@@ -422,6 +433,7 @@ define_function_registry! {
         Proper => "PROPER";
         Search => "SEARCH";
         Second => "SECOND";
+        Sheets => "SHEETS";
         SumIfs => "SUMIFS";
         Switch => "SWITCH";
         Unique => "UNIQUE";
@@ -463,6 +475,7 @@ define_function_registry! {
         Hyperlink => "HYPERLINK";
         IsFormula => "ISFORMULA";
         IsLogical => "ISLOGICAL";
+        IsNonText => "ISNONTEXT";
         ModeSngl => "MODE.SNGL";
         RoundDown => "ROUNDDOWN";
         TimeValue => "TIMEVALUE";
@@ -471,6 +484,7 @@ define_function_registry! {
         ChooseCols => "CHOOSECOLS";
         ChooseRows => "CHOOSEROWS";
         CountBlank => "COUNTBLANK";
+        ErrorType => "ERROR.TYPE";
         Substitute => "SUBSTITUTE";
         SumProduct => "SUMPRODUCT";
         Concatenate => "CONCATENATE";

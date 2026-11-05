@@ -96,7 +96,7 @@ impl CellStore {
         }
     }
 
-    fn area_count(
+    pub(super) fn area_count(
         &self,
         reference: &Ast,
         sheet: usize,

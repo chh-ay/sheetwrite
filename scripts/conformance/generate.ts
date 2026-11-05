@@ -121,6 +121,8 @@ const ARGUMENTS_BY_SIGNATURE: Record<string, string> = {
   "optional-reference": "A1",
   "optional-variadic-values": "1,2,3",
   "pair-arrays": "A1:A3,B1:B3",
+  "sheet-value": "A1",
+  "sheets-reference": "A1",
   percentile: "A1:A3,0.5",
   "period-payment": "0.1,1,10,1000",
   "pv-fv-pmt": "0.1,10,-100",
@@ -158,6 +160,7 @@ const ARGUMENTS_BY_SIGNATURE: Record<string, string> = {
 
 const ARGUMENTS_BY_FUNCTION: Record<string, string> = {
   COUNTBLANK: "A1:A3",
+  "ERROR.TYPE": "1/0",
   DATEVALUE: '"2020-01-01"',
   TIMEVALUE: '"12:00"',
   "QUARTILE.INC": "B1:B3,2",

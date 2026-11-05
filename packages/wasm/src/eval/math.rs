@@ -94,6 +94,7 @@ pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> 
         Func::Gcd => gcd_lcm(values, false),
         Func::Lcm => gcd_lcm(values, true),
         Func::Subtotal => subtotal(values),
+        Func::IsEven | Func::IsOdd => parity(values, func == Func::IsOdd),
         _ => return None,
     };
     Some(result)
@@ -162,6 +163,22 @@ fn significance(
         finite(number_format::significant(multiples * significance))
     });
     result.map_or_else(Value::Error, Value::number)
+}
+
+/// ISEVEN and ISODD test the truncated number. A logical value is
+/// `#VALUE!`, as in Excel.
+fn parity(values: &FuncAccumulator, is_odd: bool) -> Value {
+    let result = require_arity(values, 1, 1).and_then(|_| {
+        if matches!(values.arg_value(0), Some(Value::Bool(_))) {
+            return Err(FormulaError::Value);
+        }
+
+        let number = number_arg(values, 0, None)?.trunc();
+
+        Ok((number % 2.0 != 0.0) == is_odd)
+    });
+
+    result.map_or_else(Value::Error, Value::Bool)
 }
 
 /// The two numeric arguments of a two-argument function.
