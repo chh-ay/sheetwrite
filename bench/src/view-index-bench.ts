@@ -1,6 +1,7 @@
 import { fullGC, heapStats } from "bun:jsc";
 import { fileURLToPath } from "node:url";
 
+import { SheetRegistry } from "../../packages/core/src/store/sheet-registry.js";
 import { StoreViewState } from "../../packages/core/src/store/view-state.js";
 import type { RecomputingCellStore } from "../../packages/core/src/store/wasm-contract.js";
 import type { Workbook } from "../../packages/core/src/types.js";
@@ -149,7 +150,9 @@ function productionView(
       },
     ],
   };
-  const view = new StoreViewState(wasm, workbook, new Map([["bench", 0]]));
+  const sheets = new SheetRegistry(workbook);
+  sheets.handles.set("bench", 0);
+  const view = new StoreViewState(wasm, sheets);
   view.metadataChanged("bench");
   return {
     view,
@@ -287,11 +290,12 @@ function resourceScenarios(): {
   }));
   const workbook: Workbook = { activeSheet: "s0", sheets };
   const orders = sheets.map((_, handle) => (handle % 2 === 0 ? new Uint32Array(0) : sparseOrder));
-  const handles = new Map(sheets.map((sheet, handle) => [sheet.id, handle]));
+  const registry = new SheetRegistry(workbook);
+  for (const [handle, sheet] of sheets.entries()) registry.handles.set(sheet.id, handle);
   const wasm = {
     sortRowsMulti: (handle: number) => orders[handle]!,
   } as unknown as RecomputingCellStore;
-  const aggregateView = new StoreViewState(wasm, workbook, handles);
+  const aggregateView = new StoreViewState(wasm, registry);
   const aggregateStarted = now();
   for (let handle = 0; handle < sheets.length; handle++) {
     const sheet = sheets[handle]!;
