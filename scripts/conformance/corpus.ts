@@ -1,11 +1,6 @@
 import { verifyCaptureArtifacts } from "./capture.js";
-import {
-  INVENTORY_PATH,
-  MANIFEST_PATH,
-  readConformanceManifest,
-  readFormulaInventory,
-} from "./generate.js";
-import { isObject } from "./normalize.js";
+import { generateConformanceEvidence, INVENTORY_PATH, readFormulaInventory } from "./generate.js";
+import { canonicalJson, isObject } from "./normalize.js";
 import { readCorpusJson, SHA256_PATTERN, validateCorpus } from "./schema.js";
 import type { ConformanceCorpus } from "./types.js";
 
@@ -27,19 +22,25 @@ function declaredArtifactHashes(value: unknown): Set<string> {
   return hashes;
 }
 
+/**
+ * The compatibility test set, validated with its captured observations. It is
+ * generated from the inventory; `path` instead reads a corpus file, which must
+ * equal the generated one.
+ */
 export async function loadCorpus(
-  path = "test/conformance/corpus.json",
+  path?: string,
   paths: {
-    manifest?: string;
     inventory?: string;
     captures?: string;
   } = {},
 ): Promise<ConformanceCorpus> {
-  const [value, manifest, inventory] = await Promise.all([
-    readCorpusJson(path),
-    readConformanceManifest(paths.manifest ?? MANIFEST_PATH),
-    readFormulaInventory(paths.inventory ?? INVENTORY_PATH),
-  ]);
+  const inventory = await readFormulaInventory(paths.inventory ?? INVENTORY_PATH);
+  const generated = generateConformanceEvidence(inventory);
+  const manifest = generated.manifest;
+  // Canonical key order, as a corpus file has: published results list case
+  // fields in this order.
+  const value: unknown =
+    path === undefined ? JSON.parse(canonicalJson(generated.corpus)) : await readCorpusJson(path);
   const structuralIssues = validateCorpus(
     value,
     manifest,

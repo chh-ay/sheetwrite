@@ -125,6 +125,7 @@ export interface HistoryPublishRequest extends HistoryStorageRequest {
 export interface HistoryPinRequest extends HistoryStorageRequest {
   kind: "pin" | "release";
   token: string;
+  /** Marker ID, or `"head"` to lease the committed head returned in the manifest. */
   versionId: string;
 }
 

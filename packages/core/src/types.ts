@@ -4,6 +4,7 @@
 export type * from "./types/cell.js";
 export type * from "./types/chart.js";
 export type * from "./types/coordinates.js";
+export type * from "./types/dashboard.js";
 export type * from "./types/data.js";
 export type * from "./types/data-model.js";
 export type * from "./types/document.js";

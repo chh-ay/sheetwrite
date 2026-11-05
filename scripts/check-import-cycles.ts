@@ -26,6 +26,7 @@ const STORE_EDGES: Readonly<Record<string, readonly string[]>> = {
   "ranges.ts": ["../types/cell.ts", "../types/coordinates.ts", "../types/document.ts"],
   "sheet-registry.ts": ["../errors.ts", "../types/coordinates.ts", "../types/document.ts"],
   "snapshot-codec.ts": [
+    "../dashboard.ts",
     "../document-protocol.ts",
     "../plain-data.ts",
     "../reference.ts",
@@ -103,6 +104,18 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
     dependencies: ["table"],
     exports: ["DataModel", "RelationshipStatus", "TableColumnRef", "TableRelationship"],
   },
+  dashboard: {
+    source: "packages/core/src/types/dashboard.ts",
+    dependencies: ["cell", "data-model"],
+    exports: [
+      "Dashboard",
+      "DashboardBox",
+      "DashboardItem",
+      "DashboardPivotItem",
+      "DashboardSlicerItem",
+      "SheetKind",
+    ],
+  },
   pivot: {
     source: "packages/core/src/types/pivot.ts",
     dependencies: ["cell", "coordinates", "data-model", "table"],
@@ -179,7 +192,16 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
   },
   document: {
     source: "packages/core/src/types/document.ts",
-    dependencies: ["cell", "chart", "coordinates", "data-model", "pivot", "query", "table"],
+    dependencies: [
+      "cell",
+      "chart",
+      "coordinates",
+      "dashboard",
+      "data-model",
+      "pivot",
+      "query",
+      "table",
+    ],
     exports: [
       "AddSheetInput",
       "CalculationSettings",

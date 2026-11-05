@@ -24,7 +24,7 @@ import { relationshipPanel } from "./relationship-panel.js";
 /** What the open panel shows, so selection changes can switch or close it. */
 type OpenPanel =
   | { readonly kind: "chart" | "pivot"; readonly sheet: SheetId; readonly id: string }
-  | { readonly kind: "explain" | "names" | "queries" | "sort" | "dataModel" };
+  | { readonly kind: "explain" | "names" | "queries" | "sort" | "dataModel" | "history" };
 
 interface PanelState {
   icons: IconOverrides | undefined;
@@ -123,6 +123,11 @@ export function openQueryPanel(grid: Grid, create: boolean): void {
     const { queryPanel } = await import("./query-panel.js");
     return (target) => queryPanel(target, create);
   });
+}
+
+/** Open an opted-in history panel in its own lazy chunk. */
+export function openHistoryPanel(grid: Grid, load: () => Promise<(grid: Grid) => GridPanel>): void {
+  openLazyPanel(grid, { kind: "history" }, load);
 }
 
 /**

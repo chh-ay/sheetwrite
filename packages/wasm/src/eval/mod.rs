@@ -950,7 +950,11 @@ impl CellStore {
                     }
 
                     let ast = entry.ast.as_ref()?;
-                    self.dynamic_array_bound(ast, key.sheet as usize)
+                    let mut pass = EvalPass {
+                        affected: &affected,
+                        results: &mut memo,
+                    };
+                    self.dynamic_array_bound(ast, key.sheet as usize, &mut pass)
                         .is_some()
                         .then(|| (key, ast.clone(), entry.has_spill_refs()))
                 })
@@ -998,7 +1002,7 @@ impl CellStore {
                     ast
                 };
 
-                let evaluated = match self.dynamic_array_bound(&ast, output_sheet) {
+                let evaluated = match self.dynamic_array_bound(&ast, output_sheet, &mut pass) {
                     _ if cyclic.contains(&key) => Err(FormulaError::Cycle),
                     Some(Ok(bound)) => match dynamic_recompute_within_limit(spill_work, bound) {
                         Some(total) => {
