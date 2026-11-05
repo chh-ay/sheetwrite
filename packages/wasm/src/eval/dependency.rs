@@ -221,6 +221,13 @@ impl DepIndex {
         matches.retain(|group| row_matches.binary_search(group).is_ok());
     }
 
+    /// The id of the group for `range` and the number of groups, when more
+    /// than one formula reads the range.
+    pub(crate) fn shared_range_group(&self, range: CellRange) -> Option<(usize, usize)> {
+        let group = self.find_range_group(range).ok()?;
+        (self.group_readers(group).len() > 1).then_some((group, self.range_groups.len()))
+    }
+
     fn find_range_group(&self, range: CellRange) -> Result<usize, usize> {
         self.range_groups
             .binary_search_by(|group| group.range.cmp(&range))
