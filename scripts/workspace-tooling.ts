@@ -132,6 +132,7 @@ export const TOOLING_TEST_PATHS = [
   "scripts/check-local-paths.test.ts",
   "scripts/verify-example-xlsx-isolation.test.ts",
   "scripts/wasm-function-sizes.test.ts",
+  "scripts/check-engine-bindings.test.ts",
 ] as const;
 
 export const UNIT_TEST_PATHS = [

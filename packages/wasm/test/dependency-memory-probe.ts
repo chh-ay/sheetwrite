@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import { CellStore, initSync } from "../pkg/sheetwrite_wasm.js";
+import { writeEngineCell } from "../../../test/engine-input.js";
 
 const ROWS = 2_048;
 // A supplied binary lets the same fixture exercise the pre-fix engine without
@@ -14,8 +15,8 @@ try {
   const sheet = store.addSheet(2, ROWS);
   const source = `=SUM(A1:A${ROWS})`;
   for (let row = 0; row < ROWS; row++) {
-    store.setFormula(sheet, row, 0, "=1", 0);
-    store.setFormula(sheet, row, 1, source, 0);
+    writeEngineCell(store, sheet, row, 0, { formula: "=1" }, 0);
+    writeEngineCell(store, sheet, row, 1, { formula: source }, 0);
   }
 
   // Linear memory cannot shrink, so its high-water mark includes temporary

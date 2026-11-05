@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
 import type { Workbook } from "@sheetwrite/core";
+import { writeEngineColumn } from "../../test/engine-input.js";
 
 import type * as CoreEngineModule from "../../packages/core/src/engine.js";
 import type * as CoreGridModule from "../../packages/core/src/grid.js";
@@ -36,13 +37,7 @@ for (let sample = 0; sample <= 7; sample++) {
     const sheet = engine.addSheet(1, INGEST_ROWS);
     const start = performance.now();
     for (let row = 0; row < INGEST_ROWS; row += BATCH_ROWS) {
-      engine.setColumnStrings(
-        sheet,
-        0,
-        row,
-        Array.from({ length: BATCH_ROWS }, (_, offset) => `distinct-${row + offset}`),
-        0,
-      );
+      writeEngineColumn(engine, sheet, 0, row, Array.from({ length: BATCH_ROWS }, (_, offset) => `distinct-${row + offset}`), 0);
     }
     if (sample > 0) ingestSamples.push(performance.now() - start);
     const last = engine.getCell(sheet, INGEST_ROWS - 1, 0);

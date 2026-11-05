@@ -39,6 +39,7 @@ mod range_transfer;
 mod tests;
 mod transfer;
 
+#[cfg(test)]
 fn utf16_slices<'a>(buf: &'a str, utf16_lens: &[u32], limit: usize) -> Vec<&'a str> {
     let mut slices = Vec::with_capacity(limit);
 
@@ -89,29 +90,34 @@ pub struct SourceSnapshot {
 
 #[wasm_bindgen]
 impl SourceSnapshot {
-    #[wasm_bindgen(js_name = formulaOffsets)]
-    pub fn formula_offsets(&self) -> Vec<u32> {
-        self.formula_offsets.clone()
+    /// Transfer row-major formula offsets, leaving an empty buffer.
+    #[wasm_bindgen(js_name = takeFormulaOffsets)]
+    pub fn take_formula_offsets(&mut self) -> Vec<u32> {
+        std::mem::take(&mut self.formula_offsets)
     }
 
-    #[wasm_bindgen(js_name = formulaSources)]
-    pub fn formula_sources(&self) -> Vec<String> {
-        self.formula_sources.clone()
+    /// Transfer formula source text aligned with the formula offsets.
+    #[wasm_bindgen(js_name = takeFormulaSources)]
+    pub fn take_formula_sources(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.formula_sources)
     }
 
-    #[wasm_bindgen(js_name = referenceOffsets)]
-    pub fn reference_offsets(&self) -> Vec<u32> {
-        self.reference_offsets.clone()
+    /// Transfer row-major reference offsets, leaving an empty buffer.
+    #[wasm_bindgen(js_name = takeReferenceOffsets)]
+    pub fn take_reference_offsets(&mut self) -> Vec<u32> {
+        std::mem::take(&mut self.reference_offsets)
     }
 
-    #[wasm_bindgen(js_name = referenceTargets)]
-    pub fn reference_targets(&self) -> Vec<u32> {
-        self.reference_targets.clone()
+    /// Transfer sheet/row/column triples aligned with the reference offsets.
+    #[wasm_bindgen(js_name = takeReferenceTargets)]
+    pub fn take_reference_targets(&mut self) -> Vec<u32> {
+        std::mem::take(&mut self.reference_targets)
     }
 
-    #[wasm_bindgen(js_name = spillDerived)]
-    pub fn spill_derived(&self) -> Vec<u8> {
-        self.spill_derived.clone()
+    /// Transfer the per-cell spill-child mask, leaving an empty buffer.
+    #[wasm_bindgen(js_name = takeSpillDerived)]
+    pub fn take_spill_derived(&mut self) -> Vec<u8> {
+        std::mem::take(&mut self.spill_derived)
     }
 }
 
@@ -902,7 +908,7 @@ impl CellStore {
         self.sheets.get(sheet).map_or(0, |s| s.cells.n_cols())
     }
 
-    #[wasm_bindgen(js_name = setNumber)]
+    #[cfg(test)]
     pub fn set_number(&mut self, sheet: usize, row: usize, col: usize, value: f64, style: u32) {
         let revision = self.local_dirty_revision();
 
@@ -919,7 +925,7 @@ impl CellStore {
         });
     }
 
-    #[wasm_bindgen(js_name = setBool)]
+    #[cfg(test)]
     pub fn set_bool(&mut self, sheet: usize, row: usize, col: usize, value: bool, style: u32) {
         let revision = self.local_dirty_revision();
 
@@ -936,7 +942,7 @@ impl CellStore {
         });
     }
 
-    #[wasm_bindgen(js_name = setString)]
+    #[cfg(test)]
     pub fn set_string(&mut self, sheet: usize, row: usize, col: usize, value: &str, style: u32) {
         if cell_key(row, col).is_none() {
             return;
@@ -968,7 +974,7 @@ impl CellStore {
         });
     }
 
-    #[wasm_bindgen(js_name = clearCell)]
+    #[cfg(test)]
     pub fn clear_cell(&mut self, sheet: usize, row: usize, col: usize, style: u32) {
         let revision = self.local_dirty_revision();
 
@@ -1784,7 +1790,7 @@ impl CellStore {
     }
 
     /// Bulk-load one column with numbers starting at `start_row`.
-    #[wasm_bindgen(js_name = setColumnNumbers)]
+    #[cfg(test)]
     pub fn set_column_numbers(
         &mut self,
         sheet: usize,
@@ -1836,7 +1842,7 @@ impl CellStore {
     }
 
     /// Bulk-load one column with strings starting at `start_row`.
-    #[wasm_bindgen(js_name = setColumnStrings)]
+    #[cfg(test)]
     pub fn set_column_strings(
         &mut self,
         sheet: usize,
@@ -1894,7 +1900,7 @@ impl CellStore {
     /// per-row lengths in UTF-16 code units (the JS `string.length` unit).
     /// One boundary decode and one Rust allocation for the whole column,
     /// instead of one per row — the dominant ingest cost for text columns.
-    #[wasm_bindgen(js_name = setColumnStringsPacked)]
+    #[cfg(test)]
     pub fn set_column_strings_packed(
         &mut self,
         sheet: usize,
@@ -2406,7 +2412,7 @@ impl CellStore {
     /// the formula reads or whether it produces an array. A constant-only edit
     /// keeps the cached index, so its next recompute visits just the edited
     /// formula and its dependents instead of every formula in the workbook.
-    #[wasm_bindgen(js_name = setFormula)]
+    #[cfg(test)]
     pub fn set_formula(
         &mut self,
         sheet: usize,
@@ -3797,22 +3803,22 @@ impl CellOut {
 
 #[wasm_bindgen]
 impl CellOut {
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, js_name = kind)]
     pub fn kind(&self) -> u8 {
         self.kind
     }
 
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, js_name = num)]
     pub fn num(&self) -> f64 {
         self.num
     }
 
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, js_name = string)]
     pub fn string(&self) -> Option<String> {
         self.string.clone()
     }
 
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, js_name = style)]
     pub fn style(&self) -> u32 {
         self.style
     }
@@ -3834,29 +3840,33 @@ pub struct CellSnapshot {
 
 #[wasm_bindgen]
 impl CellSnapshot {
-    #[wasm_bindgen(getter)]
-    pub fn kinds(&self) -> Vec<u8> {
-        self.kinds.clone()
+    /// Transfer resolved kind tags in requested-cell order.
+    #[wasm_bindgen(js_name = takeKinds)]
+    pub fn take_kinds(&mut self) -> Vec<u8> {
+        std::mem::take(&mut self.kinds)
     }
 
-    #[wasm_bindgen(getter)]
-    pub fn numbers(&self) -> Vec<f64> {
-        self.numbers.clone()
+    /// Transfer numeric payloads in requested-cell order.
+    #[wasm_bindgen(js_name = takeNumbers)]
+    pub fn take_numbers(&mut self) -> Vec<f64> {
+        std::mem::take(&mut self.numbers)
     }
 
-    #[wasm_bindgen(getter)]
-    pub fn styles(&self) -> Vec<u32> {
-        self.styles.clone()
+    /// Transfer store style IDs in requested-cell order.
+    #[wasm_bindgen(js_name = takeStyles)]
+    pub fn take_styles(&mut self) -> Vec<u32> {
+        std::mem::take(&mut self.styles)
     }
 
-    /// Entry in [`Self::strings`] per cell, or `-1` for a cell without text.
-    #[wasm_bindgen(getter, js_name = textIndex)]
-    pub fn text_index(&self) -> Vec<i32> {
-        self.text_index.clone()
+    /// Transfer text slots per cell, or `-1` for a cell without text.
+    #[wasm_bindgen(js_name = takeTextIndex)]
+    pub fn take_text_index(&mut self) -> Vec<i32> {
+        std::mem::take(&mut self.text_index)
     }
 
-    #[wasm_bindgen(getter)]
-    pub fn strings(&self) -> Vec<String> {
-        self.strings.clone()
+    /// Transfer text owned by this snapshot, leaving an empty buffer.
+    #[wasm_bindgen(js_name = takeStrings)]
+    pub fn take_strings(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.strings)
     }
 }

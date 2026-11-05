@@ -1581,8 +1581,8 @@ export class StoreDataEngine {
 
     const list = this.wasm.pivotFields(this.handleOf(sheet), index);
     try {
-      const names = list.names();
-      const types = list.types();
+      const names = list.takeNames();
+      const types = list.takeTypes();
       return names.map((header, field) => ({
         index: field,
         header,
@@ -1697,7 +1697,7 @@ export class StoreDataEngine {
     const formulas: Array<{ offset: number; source: string }> = [];
     const refs: Array<{ offset: number; target: CellAddress }> = [];
     const sourceSnapshot = this.windowReader.captureSourcesForRows(sheet, dataRows, cols);
-    const spillDerived = sourceSnapshot?.spillDerived() ?? new Uint8Array();
+    const spillDerived = sourceSnapshot?.takeSpillDerived() ?? new Uint8Array();
     if (sourceSnapshot) {
       const sources = consumeSourceSnapshot(sourceSnapshot, this.sheetIdsByHandle);
       for (let index = 0; index < sources.formulaOffsets.length; index++) {
@@ -1772,7 +1772,7 @@ export class StoreDataEngine {
     if (!snapshot) return false;
 
     try {
-      return snapshot.formulaOffsets().length > 0 || snapshot.referenceOffsets().length > 0;
+      return snapshot.takeFormulaOffsets().length > 0 || snapshot.takeReferenceOffsets().length > 0;
     } finally {
       snapshot.free();
     }
@@ -1792,9 +1792,14 @@ export class StoreDataEngine {
    * Distinct resolved values of a column in first-seen order, capped at `limit`
    * distinct values (`0` = uncapped). Blanks collapse to a single `null` entry.
    */
-  distinctValues(sheet: SheetId, col: number, limit = DEFAULT_DISTINCT_VALUES_LIMIT): CellScalar[] {
+  distinctValues(
+    sheet: SheetId,
+    col: number,
+    limit = DEFAULT_DISTINCT_VALUES_LIMIT,
+    rows?: { start: number; end: number },
+  ): CellScalar[] {
     this.requireCompleteQuery(sheet);
-    return this.view.distinctValues(sheet, col, limit);
+    return this.view.distinctValues(sheet, col, limit, rows);
   }
 
   /** The sheet's explicitly hidden data rows, ascending. */
@@ -1997,7 +2002,7 @@ export class StoreDataEngine {
       const snapshot = this.windowReader.captureSourcesForRows(sheet, Uint32Array.from(rows), cols);
       if (!snapshot) continue;
 
-      const spillDerived = snapshot.spillDerived();
+      const spillDerived = snapshot.takeSpillDerived();
       const sources = consumeSourceSnapshot(snapshot, this.sheetIdsByHandle);
       for (const [rowIndex, row] of rows.entries()) {
         const columns = byRow.get(row);
@@ -4786,7 +4791,11 @@ function consumeCellSnapshots(
 ): ResolvedCell[] {
   if (!snapshot) throw new Error("Sheetwrite: cell snapshot batch has mismatched coordinates");
   try {
-    const { kinds, numbers, styles, textIndex, strings } = snapshot;
+    const kinds = snapshot.takeKinds();
+    const numbers = snapshot.takeNumbers();
+    const styles = snapshot.takeStyles();
+    const textIndex = snapshot.takeTextIndex();
+    const strings = snapshot.takeStrings();
     const cells = new Array<ResolvedCell>(kinds.length);
     for (const [index, kind] of kinds.entries()) {
       const slot = textIndex[index] ?? -1;

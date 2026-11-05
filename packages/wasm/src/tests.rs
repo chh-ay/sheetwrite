@@ -2261,6 +2261,37 @@ fn distinct_values_limit_stops_the_first_seen_scan() {
 }
 
 #[test]
+fn distinct_values_range_uses_canonical_rows_on_the_requested_sheet() {
+    let mut store = CellStore::new();
+    let other = store.add_sheet(1, 6);
+    let source = store.add_sheet(1, 6);
+    store.set_string(other, 2, 0, "other sheet", 0);
+    store.set_string(source, 0, 0, "header", 0);
+    store.set_string(source, 1, 0, "outside", 0);
+    store.set_string(source, 2, 0, "inside", 0);
+    store.set_formula(source, 3, 0, "=1/0", 0);
+    store.set_string(source, 4, 0, "#DIV/0!", 0);
+    store.set_string(source, 5, 0, "after", 0);
+    store.recompute(source);
+
+    let mut column = store.distinct_values_range(source, 0, 2, 5, 0);
+    assert_eq!(column.take_kinds(), vec![2, 2]);
+    assert_eq!(column.take_texts(), vec!["inside", "#DIV/0!"]);
+    assert!(column.take_texts().is_empty());
+
+    let mut limited = store.distinct_values_range(source, 0, 2, 6, 1);
+    assert_eq!(limited.take_texts(), vec!["inside"]);
+    assert!(store
+        .distinct_values_range(source, 0, 5, 2, 0)
+        .take_kinds()
+        .is_empty());
+    assert!(store
+        .distinct_values_range(source, 0, 6, usize::MAX, 0)
+        .take_kinds()
+        .is_empty());
+}
+
+#[test]
 fn mixed_block_owns_formula_and_reference_sources_and_recomputes_once() {
     let mut store = CellStore::new();
     let _earlier_sheet = store.add_sheet(1, 1);

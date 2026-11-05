@@ -7,6 +7,7 @@ import { pathToFileURL } from "node:url";
 import { initSheetwrite, SheetwriteStore } from "@sheetwrite/core";
 import * as formulas from "@sheetwrite/formulas";
 import * as defaultEngine from "@sheetwrite/wasm";
+import { writeEngineCell, writeEngineColumn } from "../../test/engine-input.js";
 
 const ENGINE_PACKAGE = process.env.SHEETWRITE_BENCH_ENGINE === "full" ? "formulas" : "wasm";
 /**
@@ -452,7 +453,7 @@ function assert(condition: unknown, message: string): asserts condition {
 
 function setFormulas(store: CellStore, sheet: number, formulas: readonly FormulaCell[]): void {
   for (const formula of formulas) {
-    store.setFormula(sheet, formula.row, formula.col, formula.src, 0);
+    writeEngineCell(store, sheet, formula.row, formula.col, { formula: formula.src }, 0);
   }
 }
 
@@ -697,13 +698,7 @@ export function collectFixture(
 function independentLoadFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, count);
-  store.setColumnNumbers(
-    sheet,
-    0,
-    0,
-    numericColumn(count, (row) => row),
-    0,
-  );
+  writeEngineColumn(store, sheet, 0, 0, numericColumn(count, (row) => row), 0);
   const formulas = independentFormulas(count);
   return {
     store,
@@ -719,13 +714,7 @@ function independentLoadFixture(count: number): TimedFixture {
 function independentRecomputeFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, count);
-  store.setColumnNumbers(
-    sheet,
-    0,
-    0,
-    numericColumn(count, (row) => row),
-    0,
-  );
+  writeEngineColumn(store, sheet, 0, 0, numericColumn(count, (row) => row), 0);
   setFormulas(store, sheet, independentFormulas(count));
   return {
     store,
@@ -738,7 +727,7 @@ function independentRecomputeFixture(count: number): TimedFixture {
 function chainFixture(depth: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(1, depth);
-  store.setNumber(sheet, 0, 0, 1, 0);
+  writeEngineCell(store, sheet, 0, 0, 1, 0);
   setFormulas(store, sheet, linearChain(depth));
   return {
     store,
@@ -756,20 +745,20 @@ function fanOutEditFixture(count: number, unrelated = false): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, Math.max(1, count));
   const editedColumn = unrelated ? 2 : 0;
-  store.setNumber(sheet, 0, 0, FAN_OUT_SOURCE_VALUE, 0);
+  writeEngineCell(store, sheet, 0, 0, FAN_OUT_SOURCE_VALUE, 0);
   setFormulas(store, sheet, fanOutFormulas(count));
   store.recompute(sheet);
   return {
     store,
     run: () => {
-      store.setNumber(sheet, 0, editedColumn, FAN_OUT_EDITED_VALUE, 0);
+      writeEngineCell(store, sheet, 0, editedColumn, FAN_OUT_EDITED_VALUE, 0);
       store.recompute(sheet);
     },
     check: () => numberAt(store, sheet, count - 1, 1),
     dispose: () => store.free(),
     restore: () => {
-      if (unrelated) store.clearCell(sheet, 0, editedColumn, 0);
-      else store.setNumber(sheet, 0, editedColumn, FAN_OUT_SOURCE_VALUE, 0);
+      if (unrelated) writeEngineCell(store, sheet, 0, editedColumn, null, 0);
+      else writeEngineCell(store, sheet, 0, editedColumn, FAN_OUT_SOURCE_VALUE, 0);
       store.recompute(sheet);
     },
   };
@@ -783,34 +772,22 @@ const CONSTANT_EDIT_EDITED_BASE = 2;
 export function constantEditFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, count);
-  store.setColumnNumbers(
-    sheet,
-    0,
-    0,
-    numericColumn(count, (row) => row),
-    0,
-  );
-  store.setColumnNumbers(
-    sheet,
-    1,
-    0,
-    numericColumn(count, () => CONSTANT_EDIT_FILL),
-    0,
-  );
+  writeEngineColumn(store, sheet, 0, 0, numericColumn(count, (row) => row), 0);
+  writeEngineColumn(store, sheet, 1, 0, numericColumn(count, () => CONSTANT_EDIT_FILL), 0);
   for (let row = 0; row < count; row++) {
-    store.setFormula(sheet, row, 2, `=A${row + 1}+B${row + 1}+${CONSTANT_EDIT_BASE}`, 0);
+    writeEngineCell(store, sheet, row, 2, { formula: `=A${row + 1}+B${row + 1}+${CONSTANT_EDIT_BASE}` }, 0);
   }
   store.recompute(sheet);
   return {
     store,
     run: () => {
-      store.setFormula(sheet, 0, 2, `=A1+B1+${CONSTANT_EDIT_EDITED_BASE}`, 0);
+      writeEngineCell(store, sheet, 0, 2, { formula: `=A1+B1+${CONSTANT_EDIT_EDITED_BASE}` }, 0);
       store.recompute(sheet);
     },
     check: () => `${numberAt(store, sheet, 0, 2)}:${numberAt(store, sheet, count - 1, 2)}`,
     dispose: () => store.free(),
     restore: () => {
-      store.setFormula(sheet, 0, 2, `=A1+B1+${CONSTANT_EDIT_BASE}`, 0);
+      writeEngineCell(store, sheet, 0, 2, { formula: `=A1+B1+${CONSTANT_EDIT_BASE}` }, 0);
       store.recompute(sheet);
     },
   };
@@ -892,7 +869,7 @@ function restoreNumber(
   cell: { row: number; col: number; value: number },
 ): () => void {
   return () => {
-    store.setNumber(sheet, cell.row, cell.col, cell.value, 0);
+    writeEngineCell(store, sheet, cell.row, cell.col, cell.value, 0);
     store.recompute(sheet);
   };
 }
@@ -900,13 +877,13 @@ function restoreNumber(
 function diamondFixture(levels: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(4, levels);
-  store.setNumber(sheet, 0, 0, 1, 0);
+  writeEngineCell(store, sheet, 0, 0, 1, 0);
   setFormulas(store, sheet, diamondFormulas(levels));
   store.recompute(sheet);
   return {
     store,
     run: () => {
-      store.setNumber(sheet, 0, 0, 2, 0);
+      writeEngineCell(store, sheet, 0, 0, 2, 0);
       store.recompute(sheet);
     },
     check: () => numberAt(store, sheet, levels - 1, 3),
@@ -918,19 +895,13 @@ function diamondFixture(levels: number): TimedFixture {
 function sharedRangeFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, Math.max(count, 100));
-  store.setColumnNumbers(
-    sheet,
-    0,
-    0,
-    numericColumn(100, () => 1),
-    0,
-  );
+  writeEngineColumn(store, sheet, 0, 0, numericColumn(100, () => 1), 0);
   setFormulas(store, sheet, sharedRangeFormulas(count));
   store.recompute(sheet);
   return {
     store,
     run: () => {
-      store.setNumber(sheet, 0, 0, 2, 0);
+      writeEngineCell(store, sheet, 0, 0, 2, 0);
       store.recompute(sheet);
     },
     check: () => numberAt(store, sheet, count - 1, 1),
@@ -943,19 +914,13 @@ function distinctRangeFixture(count: number): TimedFixture {
   const rows = count * 10;
   const store = new CellStore();
   const sheet = store.addSheet(2, rows);
-  store.setColumnNumbers(
-    sheet,
-    0,
-    0,
-    numericColumn(rows, () => 1),
-    0,
-  );
+  writeEngineColumn(store, sheet, 0, 0, numericColumn(rows, () => 1), 0);
   setFormulas(store, sheet, distinctRangeFormulas(count));
   store.recompute(sheet);
   return {
     store,
     run: () => {
-      store.setNumber(sheet, 0, 0, 2, 0);
+      writeEngineCell(store, sheet, 0, 0, 2, 0);
       store.recompute(sheet);
     },
     check: () => `${numberAt(store, sheet, 0, 1)}:${numberAt(store, sheet, count - 1, 1)}`,
@@ -970,21 +935,15 @@ function crossSheetFixture(count: number): TimedFixture {
   const summary = store.addSheet(1, count);
   store.setSheetName(source, "source", "Source");
   store.setSheetName(summary, "summary", "Summary");
-  store.setColumnNumbers(
-    source,
-    0,
-    0,
-    numericColumn(100, () => 1),
-    0,
-  );
+  writeEngineColumn(store, source, 0, 0, numericColumn(100, () => 1), 0);
   for (let row = 0; row < count; row++) {
-    store.setFormula(summary, row, 0, `=SUM(Source!A1:A100)+${row}`, 0);
+    writeEngineCell(store, summary, row, 0, { formula: `=SUM(Source!A1:A100)+${row}` }, 0);
   }
   store.recompute(summary);
   return {
     store,
     run: () => {
-      store.setNumber(source, 0, 0, 2, 0);
+      writeEngineCell(store, source, 0, 0, 2, 0);
       store.recompute(source);
     },
     check: () => numberAt(store, summary, count - 1, 0),
@@ -996,22 +955,16 @@ function crossSheetFixture(count: number): TimedFixture {
 function topologyFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, count);
-  store.setColumnNumbers(
-    sheet,
-    0,
-    0,
-    numericColumn(count, (row) => row),
-    0,
-  );
+  writeEngineColumn(store, sheet, 0, 0, numericColumn(count, (row) => row), 0);
   setFormulas(store, sheet, independentFormulas(count));
   store.recompute(sheet);
   return {
     store,
     run: () => {
-      for (let row = 0; row < count; row += 2) store.clearCell(sheet, row, 1, 0);
+      for (let row = 0; row < count; row += 2) writeEngineCell(store, sheet, row, 1, null, 0);
       store.recompute(sheet);
       for (let row = 0; row < count; row += 2) {
-        store.setFormula(sheet, row, 1, `=A${row + 1}+2`, 0);
+        writeEngineCell(store, sheet, row, 1, { formula: `=A${row + 1}+2` }, 0);
       }
       store.recompute(sheet);
     },
@@ -1024,8 +977,8 @@ function cycleFixture(pairs: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, pairs);
   for (let row = 0; row < pairs; row++) {
-    store.setFormula(sheet, row, 0, `=B${row + 1}`, 0);
-    store.setFormula(sheet, row, 1, `=A${row + 1}`, 0);
+    writeEngineCell(store, sheet, row, 0, { formula: `=B${row + 1}` }, 0);
+    writeEngineCell(store, sheet, row, 1, { formula: `=A${row + 1}` }, 0);
   }
   return {
     store,
@@ -1041,8 +994,8 @@ function refRemovalFixture(count: number): TimedFixture {
   const summary = store.addSheet(1, count);
   store.setSheetName(source, "source", "Source");
   store.setSheetName(summary, "summary", "Summary");
-  store.setNumber(source, 0, 0, 1, 0);
-  for (let row = 0; row < count; row++) store.setFormula(summary, row, 0, "=Source!A1", 0);
+  writeEngineCell(store, source, 0, 0, 1, 0);
+  for (let row = 0; row < count; row++) writeEngineCell(store, summary, row, 0, { formula: "=Source!A1" }, 0);
   store.recompute(summary);
   return {
     store,
@@ -1057,8 +1010,8 @@ function refRemovalFixture(count: number): TimedFixture {
 function errorPropagationFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, count);
-  store.setFormula(sheet, 0, 0, "=1/0", 0);
-  for (let row = 0; row < count; row++) store.setFormula(sheet, row, 1, "=$A$1", 0);
+  writeEngineCell(store, sheet, 0, 0, { formula: "=1/0" }, 0);
+  for (let row = 0; row < count; row++) writeEngineCell(store, sheet, row, 1, { formula: "=$A$1" }, 0);
   return {
     store,
     run: () => store.recompute(sheet),
@@ -1070,27 +1023,15 @@ function errorPropagationFixture(count: number): TimedFixture {
 function criteriaRangeFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, count);
-  store.setColumnNumbers(
-    sheet,
-    0,
-    0,
-    numericColumn(count, (row) => row),
-    0,
-  );
-  store.setColumnNumbers(
-    sheet,
-    1,
-    0,
-    numericColumn(count, () => 1),
-    0,
-  );
+  writeEngineColumn(store, sheet, 0, 0, numericColumn(count, (row) => row), 0);
+  writeEngineColumn(store, sheet, 1, 0, numericColumn(count, () => 1), 0);
   const threshold = Math.floor(count / 2);
-  store.setFormula(sheet, 0, 2, `=SUMIF(A1:A${count},">=${threshold}",B1:B${count})`, 0);
+  writeEngineCell(store, sheet, 0, 2, { formula: `=SUMIF(A1:A${count},">=${threshold}",B1:B${count})` }, 0);
   store.recompute(sheet);
   return {
     store,
     run: () => {
-      store.setNumber(sheet, 0, 0, count, 0);
+      writeEngineCell(store, sheet, 0, 0, count, 0);
       store.recompute(sheet);
     },
     check: () => numberAt(store, sheet, 0, 2),
@@ -1102,27 +1043,15 @@ function criteriaRangeFixture(count: number): TimedFixture {
 function lookupRangeFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(4, count);
-  store.setColumnNumbers(
-    sheet,
-    0,
-    0,
-    numericColumn(count, (row) => row),
-    0,
-  );
-  store.setColumnNumbers(
-    sheet,
-    1,
-    0,
-    numericColumn(count, (row) => row * 2),
-    0,
-  );
-  store.setNumber(sheet, 0, 2, 0, 0);
-  store.setFormula(sheet, 0, 3, `=XLOOKUP(C1,A1:A${count},B1:B${count})`, 0);
+  writeEngineColumn(store, sheet, 0, 0, numericColumn(count, (row) => row), 0);
+  writeEngineColumn(store, sheet, 1, 0, numericColumn(count, (row) => row * 2), 0);
+  writeEngineCell(store, sheet, 0, 2, 0, 0);
+  writeEngineCell(store, sheet, 0, 3, { formula: `=XLOOKUP(C1,A1:A${count},B1:B${count})` }, 0);
   store.recompute(sheet);
   return {
     store,
     run: () => {
-      store.setNumber(sheet, 0, 2, count - 1, 0);
+      writeEngineCell(store, sheet, 0, 2, count - 1, 0);
       store.recompute(sheet);
     },
     check: () => numberAt(store, sheet, 0, 3),
@@ -1150,20 +1079,8 @@ const TEXT_LOOKUP_APPROXIMATE_ROW = 36;
 function lookupTableStore(tableRows: number): { store: CellStore; sheet: number } {
   const store = new CellStore();
   const sheet = store.addSheet(4, tableRows);
-  store.setColumnNumbers(
-    sheet,
-    0,
-    0,
-    numericColumn(tableRows, (row) => row + 1),
-    0,
-  );
-  store.setColumnNumbers(
-    sheet,
-    1,
-    0,
-    numericColumn(tableRows, (row) => (row + 1) * LOOKUP_RESULT_FACTOR),
-    0,
-  );
+  writeEngineColumn(store, sheet, 0, 0, numericColumn(tableRows, (row) => row + 1), 0);
+  writeEngineColumn(store, sheet, 1, 0, numericColumn(tableRows, (row) => (row + 1) * LOOKUP_RESULT_FACTOR), 0);
   return { store, sheet };
 }
 
@@ -1187,22 +1104,16 @@ function textLookupTableStore(tableRows: number): { store: CellStore; sheet: num
   const store = new CellStore();
   const sheet = store.addSheet(4, tableRows);
   for (let row = 0; row < tableRows; row++) {
-    store.setString(sheet, row, 0, textLookupKeyAt(row), 0);
+    writeEngineCell(store, sheet, row, 0, textLookupKeyAt(row), 0);
   }
-  store.setColumnNumbers(
-    sheet,
-    1,
-    0,
-    numericColumn(tableRows, (row) => (row + 1) * LOOKUP_RESULT_FACTOR),
-    0,
-  );
+  writeEngineColumn(store, sheet, 1, 0, numericColumn(tableRows, (row) => (row + 1) * LOOKUP_RESULT_FACTOR), 0);
   return { store, sheet };
 }
 
 /** The shared key cell takes a number for numeric tables and text for text tables. */
 function writeLookupKey(store: CellStore, sheet: number, key: number | string): void {
-  if (typeof key === "number") store.setNumber(sheet, 0, 2, key, 0);
-  else store.setString(sheet, 0, 2, key, 0);
+  if (typeof key === "number") writeEngineCell(store, sheet, 0, 2, key, 0);
+  else writeEngineCell(store, sheet, 0, 2, key, 0);
 }
 
 interface LookupVariant {
@@ -1299,7 +1210,7 @@ function lookupFixture(count: number, phase: LookupPhase, variant: LookupVariant
   const { store, sheet } = variant.table(tableRows);
   writeLookupKey(store, sheet, variant.initialKey);
   const source = variant.formula(tableRows);
-  for (let row = 0; row < count; row++) store.setFormula(sheet, row, 3, source, 0);
+  for (let row = 0; row < count; row++) writeEngineCell(store, sheet, row, 3, { formula: source }, 0);
   const editsKey = phase === "key-edit";
   const expectedValue = editsKey ? variant.editedValue : variant.initialValue;
   const expectedKey = editsKey ? variant.editedKey : variant.initialKey;
@@ -1334,27 +1245,21 @@ function lookupFixture(count: number, phase: LookupPhase, variant: LookupVariant
 function spillFilterResizeFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, count);
-  store.setColumnNumbers(
-    sheet,
-    0,
-    0,
-    numericColumn(count, (row) => row),
-    0,
-  );
-  for (let row = 0; row < count; row++) store.setBool(sheet, row, 1, row + 1 < count, 0);
-  store.setFormula(sheet, 0, 2, `=FILTER(A1:A${count},B1:B${count})`, 0);
+  writeEngineColumn(store, sheet, 0, 0, numericColumn(count, (row) => row), 0);
+  for (let row = 0; row < count; row++) writeEngineCell(store, sheet, row, 1, row + 1 < count, 0);
+  writeEngineCell(store, sheet, 0, 2, { formula: `=FILTER(A1:A${count},B1:B${count})` }, 0);
   store.recompute(sheet);
   return {
     store,
     run: () => {
-      store.setBool(sheet, count - 1, 1, true, 0);
+      writeEngineCell(store, sheet, count - 1, 1, true, 0);
       store.recompute(sheet);
     },
     check: () =>
       `${numberAt(store, sheet, count - 1, 2)}:${store.spillAnchorRow(sheet, count - 1, 2)}`,
     dispose: () => store.free(),
     restore: () => {
-      store.setBool(sheet, count - 1, 1, false, 0);
+      writeEngineCell(store, sheet, count - 1, 1, false, 0);
       store.recompute(sheet);
     },
   };
@@ -1363,7 +1268,7 @@ function spillFilterResizeFixture(count: number): TimedFixture {
 function spillSequenceAdmissionFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(1, count);
-  store.setFormula(sheet, 0, 0, `=SEQUENCE(${count})`, 0);
+  writeEngineCell(store, sheet, 0, 0, { formula: `=SEQUENCE(${count})` }, 0);
   return {
     store,
     run: () => store.recompute(sheet),
@@ -1376,26 +1281,14 @@ function spillSequenceAdmissionFixture(count: number): TimedFixture {
 function sumProductVectorFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, count);
-  store.setColumnNumbers(
-    sheet,
-    0,
-    0,
-    numericColumn(count, (row) => (row % 10) + 1),
-    0,
-  );
-  store.setColumnNumbers(
-    sheet,
-    1,
-    0,
-    numericColumn(count, () => 2),
-    0,
-  );
-  store.setFormula(sheet, 0, 2, `=SUMPRODUCT(A1:A${count},B1:B${count})`, 0);
+  writeEngineColumn(store, sheet, 0, 0, numericColumn(count, (row) => (row % 10) + 1), 0);
+  writeEngineColumn(store, sheet, 1, 0, numericColumn(count, () => 2), 0);
+  writeEngineCell(store, sheet, 0, 2, { formula: `=SUMPRODUCT(A1:A${count},B1:B${count})` }, 0);
   store.recompute(sheet);
   return {
     store,
     run: () => {
-      store.setNumber(sheet, 0, 0, 3, 0);
+      writeEngineCell(store, sheet, 0, 0, 3, 0);
       store.recompute(sheet);
     },
     check: () => numberAt(store, sheet, 0, 2),
@@ -1411,27 +1304,15 @@ function sumProductMatrixFixture(elements: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(columns * 2 + 1, rows);
   for (let col = 0; col < columns; col++) {
-    store.setColumnNumbers(
-      sheet,
-      col,
-      0,
-      numericColumn(rows, () => 1),
-      0,
-    );
-    store.setColumnNumbers(
-      sheet,
-      columns + col,
-      0,
-      numericColumn(rows, () => 2),
-      0,
-    );
+    writeEngineColumn(store, sheet, col, 0, numericColumn(rows, () => 1), 0);
+    writeEngineColumn(store, sheet, columns + col, 0, numericColumn(rows, () => 2), 0);
   }
-  store.setFormula(sheet, 0, columns * 2, `=SUMPRODUCT(A1:J${rows},K1:T${rows})`, 0);
+  writeEngineCell(store, sheet, 0, columns * 2, { formula: `=SUMPRODUCT(A1:J${rows},K1:T${rows})` }, 0);
   store.recompute(sheet);
   return {
     store,
     run: () => {
-      store.setNumber(sheet, 0, 0, 3, 0);
+      writeEngineCell(store, sheet, 0, 0, 3, 0);
       store.recompute(sheet);
     },
     check: () => numberAt(store, sheet, 0, columns * 2),
@@ -1443,40 +1324,16 @@ function sumProductMatrixFixture(elements: number): TimedFixture {
 function criteriaMultiRangeFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(4, count);
-  store.setColumnNumbers(
-    sheet,
-    0,
-    0,
-    numericColumn(count, (row) => row),
-    0,
-  );
-  store.setColumnNumbers(
-    sheet,
-    1,
-    0,
-    numericColumn(count, (row) => row % 2),
-    0,
-  );
-  store.setColumnNumbers(
-    sheet,
-    2,
-    0,
-    numericColumn(count, () => 2),
-    0,
-  );
+  writeEngineColumn(store, sheet, 0, 0, numericColumn(count, (row) => row), 0);
+  writeEngineColumn(store, sheet, 1, 0, numericColumn(count, (row) => row % 2), 0);
+  writeEngineColumn(store, sheet, 2, 0, numericColumn(count, () => 2), 0);
   const threshold = count / 2;
-  store.setFormula(
-    sheet,
-    0,
-    3,
-    `=SUMIFS(C1:C${count},A1:A${count},">=${threshold}",B1:B${count},1)+COUNTIFS(A1:A${count},"<${threshold}",B1:B${count},0)`,
-    0,
-  );
+  writeEngineCell(store, sheet, 0, 3, { formula: `=SUMIFS(C1:C${count},A1:A${count},">=${threshold}",B1:B${count},1)+COUNTIFS(A1:A${count},"<${threshold}",B1:B${count},0)` }, 0);
   store.recompute(sheet);
   return {
     store,
     run: () => {
-      store.setNumber(sheet, 0, 0, count, 0);
+      writeEngineCell(store, sheet, 0, 0, count, 0);
       store.recompute(sheet);
     },
     check: () => numberAt(store, sheet, 0, 3),
@@ -1492,21 +1349,9 @@ const COUNTIF_MATCH_SHARE = 2;
 function sumMultiRangeFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, count);
-  store.setColumnNumbers(
-    sheet,
-    0,
-    0,
-    numericColumn(count, (row) => row),
-    0,
-  );
-  store.setColumnNumbers(
-    sheet,
-    1,
-    0,
-    numericColumn(count, () => SUM_MULTI_RANGE_FILL),
-    0,
-  );
-  store.setFormula(sheet, 0, 2, `=SUM(A1:A${count},B1:B${count})`, 0);
+  writeEngineColumn(store, sheet, 0, 0, numericColumn(count, (row) => row), 0);
+  writeEngineColumn(store, sheet, 1, 0, numericColumn(count, () => SUM_MULTI_RANGE_FILL), 0);
+  writeEngineCell(store, sheet, 0, 2, { formula: `=SUM(A1:A${count},B1:B${count})` }, 0);
   return {
     store,
     run: () => store.recompute(sheet),
@@ -1533,43 +1378,13 @@ function sumifsCriteriaTotal(count: number): number {
 function sumifsCriteriaFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(5, count);
-  store.setColumnNumbers(
-    sheet,
-    0,
-    0,
-    numericColumn(count, (row) => row),
-    0,
-  );
-  store.setColumnNumbers(
-    sheet,
-    1,
-    0,
-    numericColumn(count, (row) => row % 2),
-    0,
-  );
+  writeEngineColumn(store, sheet, 0, 0, numericColumn(count, (row) => row), 0);
+  writeEngineColumn(store, sheet, 1, 0, numericColumn(count, (row) => row % 2), 0);
   for (let row = 0; row < count; row++) {
-    store.setString(
-      sheet,
-      row,
-      2,
-      row % (SUMIFS_CRITERIA_PERIOD / 2) === 0 ? SUMIFS_TEXT_MATCH : SUMIFS_TEXT_OTHER,
-      0,
-    );
+    writeEngineCell(store, sheet, row, 2, row % (SUMIFS_CRITERIA_PERIOD / 2) === 0 ? SUMIFS_TEXT_MATCH : SUMIFS_TEXT_OTHER, 0);
   }
-  store.setColumnNumbers(
-    sheet,
-    3,
-    0,
-    numericColumn(count, (row) => row + 1),
-    0,
-  );
-  store.setFormula(
-    sheet,
-    0,
-    4,
-    `=SUMIFS(D1:D${count},A1:A${count},">=${Math.floor(count / COUNTIF_MATCH_SHARE)}",B1:B${count},1,C1:C${count},"${SUMIFS_TEXT_MATCH}")`,
-    0,
-  );
+  writeEngineColumn(store, sheet, 3, 0, numericColumn(count, (row) => row + 1), 0);
+  writeEngineCell(store, sheet, 0, 4, { formula: `=SUMIFS(D1:D${count},A1:A${count},">=${Math.floor(count / COUNTIF_MATCH_SHARE)}",B1:B${count},1,C1:C${count},"${SUMIFS_TEXT_MATCH}")` }, 0);
   return {
     store,
     run: () => store.recompute(sheet),
@@ -1581,20 +1396,8 @@ function sumifsCriteriaFixture(count: number): TimedFixture {
 function countifFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, count);
-  store.setColumnNumbers(
-    sheet,
-    0,
-    0,
-    numericColumn(count, (row) => row),
-    0,
-  );
-  store.setFormula(
-    sheet,
-    0,
-    1,
-    `=COUNTIF(A1:A${count},">=${Math.floor(count / COUNTIF_MATCH_SHARE)}")`,
-    0,
-  );
+  writeEngineColumn(store, sheet, 0, 0, numericColumn(count, (row) => row), 0);
+  writeEngineCell(store, sheet, 0, 1, { formula: `=COUNTIF(A1:A${count},">=${Math.floor(count / COUNTIF_MATCH_SHARE)}")` }, 0);
   return {
     store,
     run: () => store.recompute(sheet),
@@ -1606,21 +1409,21 @@ function countifFixture(count: number): TimedFixture {
 function unicodeTextDateFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, count);
-  store.setString(sheet, 0, 0, "café😀-2024-02-29", 0);
+  writeEngineCell(store, sheet, 0, 0, "café😀-2024-02-29", 0);
   for (let row = 0; row < count; row++) {
-    store.setFormula(sheet, row, 1, "=UNICODE(MID($A$1,5,1))+DATEVALUE(RIGHT($A$1,10))", 0);
+    writeEngineCell(store, sheet, row, 1, { formula: "=UNICODE(MID($A$1,5,1))+DATEVALUE(RIGHT($A$1,10))" }, 0);
   }
   store.recompute(sheet);
   return {
     store,
     run: () => {
-      store.setString(sheet, 0, 0, "naïv😀-2024-03-01", 0);
+      writeEngineCell(store, sheet, 0, 0, "naïv😀-2024-03-01", 0);
       store.recompute(sheet);
     },
     check: () => numberAt(store, sheet, count - 1, 1),
     dispose: () => store.free(),
     restore: () => {
-      store.setString(sheet, 0, 0, "café😀-2024-02-29", 0);
+      writeEngineCell(store, sheet, 0, 0, "café😀-2024-02-29", 0);
       store.recompute(sheet);
     },
   };
@@ -1629,27 +1432,9 @@ function unicodeTextDateFixture(count: number): TimedFixture {
 function percentileCovarianceFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, count);
-  store.setColumnNumbers(
-    sheet,
-    0,
-    0,
-    numericColumn(count, (row) => row + 1),
-    0,
-  );
-  store.setColumnNumbers(
-    sheet,
-    1,
-    0,
-    numericColumn(count, (row) => 2 * (row + 1) + 3),
-    0,
-  );
-  store.setFormula(
-    sheet,
-    0,
-    2,
-    `=PERCENTILE.INC(A1:A${count},0.9)+COVARIANCE.P(A1:A${count},B1:B${count})`,
-    0,
-  );
+  writeEngineColumn(store, sheet, 0, 0, numericColumn(count, (row) => row + 1), 0);
+  writeEngineColumn(store, sheet, 1, 0, numericColumn(count, (row) => 2 * (row + 1) + 3), 0);
+  writeEngineCell(store, sheet, 0, 2, { formula: `=PERCENTILE.INC(A1:A${count},0.9)+COVARIANCE.P(A1:A${count},B1:B${count})` }, 0);
   return {
     store,
     run: () => store.recompute(sheet),
@@ -1661,19 +1446,13 @@ function percentileCovarianceFixture(count: number): TimedFixture {
 function letReuseFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, count);
-  store.setColumnNumbers(
-    sheet,
-    0,
-    0,
-    numericColumn(count, () => 1),
-    0,
-  );
-  store.setFormula(sheet, 0, 1, `=LET(total,SUM(A1:A${count}),total+total+total)`, 0);
+  writeEngineColumn(store, sheet, 0, 0, numericColumn(count, () => 1), 0);
+  writeEngineCell(store, sheet, 0, 1, { formula: `=LET(total,SUM(A1:A${count}),total+total+total)` }, 0);
   store.recompute(sheet);
   return {
     store,
     run: () => {
-      store.setNumber(sheet, 0, 0, 2, 0);
+      writeEngineCell(store, sheet, 0, 0, 2, 0);
       store.recompute(sheet);
     },
     check: () => numberAt(store, sheet, 0, 1),
@@ -1688,27 +1467,15 @@ const LET_REPEAT_FACTOR = 3;
 function letRepeatFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(4, count);
-  store.setColumnNumbers(
-    sheet,
-    0,
-    0,
-    numericColumn(count, (row) => row + 1),
-    0,
-  );
-  store.setColumnNumbers(
-    sheet,
-    1,
-    0,
-    numericColumn(count, (row) => (row + 1) * LOOKUP_RESULT_FACTOR),
-    0,
-  );
-  store.setNumber(sheet, 0, 2, count, 0);
-  store.setFormula(sheet, 0, 3, `=LET(x,XLOOKUP($C$1,A1:A${count},B1:B${count}),x+x+x)`, 0);
+  writeEngineColumn(store, sheet, 0, 0, numericColumn(count, (row) => row + 1), 0);
+  writeEngineColumn(store, sheet, 1, 0, numericColumn(count, (row) => (row + 1) * LOOKUP_RESULT_FACTOR), 0);
+  writeEngineCell(store, sheet, 0, 2, count, 0);
+  writeEngineCell(store, sheet, 0, 3, { formula: `=LET(x,XLOOKUP($C$1,A1:A${count},B1:B${count}),x+x+x)` }, 0);
   store.recompute(sheet);
   return {
     store,
     run: () => {
-      store.setNumber(sheet, 0, 2, count - 1, 0);
+      writeEngineCell(store, sheet, 0, 2, count - 1, 0);
       store.recompute(sheet);
     },
     check: () => `${numberAt(store, sheet, 0, 3)}:${numberAt(store, sheet, 0, 2)}`,
@@ -1721,9 +1488,9 @@ function iterativeFinanceFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, count);
   const cashflows = [-70_000, 12_000, 15_000, 18_000, 21_000, 26_000];
-  for (const [row, value] of cashflows.entries()) store.setNumber(sheet, row, 0, value, 0);
+  for (const [row, value] of cashflows.entries()) writeEngineCell(store, sheet, row, 0, value, 0);
   for (let row = 0; row < count; row++) {
-    store.setFormula(sheet, row, 1, "=IRR($A$1:$A$6)+RATE(10,-150,1000)", 0);
+    writeEngineCell(store, sheet, row, 1, { formula: "=IRR($A$1:$A$6)+RATE(10,-150,1000)" }, 0);
   }
   return {
     store,
@@ -1736,19 +1503,13 @@ function iterativeFinanceFixture(count: number): TimedFixture {
 function incrementalDependencyClosureFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, count);
-  store.setColumnNumbers(
-    sheet,
-    0,
-    0,
-    numericColumn(count, (row) => row),
-    0,
-  );
+  writeEngineColumn(store, sheet, 0, 0, numericColumn(count, (row) => row), 0);
   setFormulas(store, sheet, dependencyClosureFormulas(count));
   store.recompute(sheet);
   return {
     store,
     run: () => {
-      store.setNumber(sheet, 0, 0, 10, 0);
+      writeEngineCell(store, sheet, 0, 0, 10, 0);
       store.recompute(sheet);
     },
     check: () => `${numberAt(store, sheet, 0, 2)}:${numberAt(store, sheet, count - 1, 2)}`,
@@ -1932,13 +1693,7 @@ function runMemoryMode(formulas: number): FormulaMemoryResult {
   const before = wasm.memory.buffer.byteLength;
   const store = new CellStore();
   const sheet = store.addSheet(2, formulas);
-  store.setColumnNumbers(
-    sheet,
-    0,
-    0,
-    numericColumn(formulas, (row) => row),
-    0,
-  );
+  writeEngineColumn(store, sheet, 0, 0, numericColumn(formulas, (row) => row), 0);
   setFormulas(store, sheet, independentFormulas(formulas));
   store.recompute(sheet);
   assert(numberAt(store, sheet, formulas - 1, 1) === formulas, "memory fixture");

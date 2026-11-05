@@ -597,14 +597,16 @@ pub struct PivotFields {
 
 #[wasm_bindgen]
 impl PivotFields {
-    /// Field names: header text, or `ColumnN` for a blank header.
-    pub fn names(&self) -> Vec<String> {
-        self.names.clone()
+    /// Transfer field names: header text, or `ColumnN` for a blank header.
+    #[wasm_bindgen(js_name = takeNames)]
+    pub fn take_names(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.names)
     }
 
-    /// Field types: 0 blank, 1 number, 2 text, 3 boolean, 4 mixed.
-    pub fn types(&self) -> Vec<u8> {
-        self.types.clone()
+    /// Transfer field types: 0 blank, 1 number, 2 text, 3 boolean, 4 mixed.
+    #[wasm_bindgen(js_name = takeTypes)]
+    pub fn take_types(&mut self) -> Vec<u8> {
+        std::mem::take(&mut self.types)
     }
 }
 

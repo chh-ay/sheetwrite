@@ -31,8 +31,8 @@ export type RecomputingCellStore = Omit<CellStore, "setSavedPivots" | "setHostFu
 
 /** Source fields reported by the full engine; free after reading. */
 interface PivotFieldList {
-  names(): string[];
+  takeNames(): string[];
   /** 0 blank, 1 number, 2 text, 3 boolean, 4 mixed. */
-  types(): Uint8Array;
+  takeTypes(): Uint8Array;
   free(): void;
 }

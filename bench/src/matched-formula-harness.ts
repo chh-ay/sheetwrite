@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type * as WasmModule from "../../packages/wasm/pkg/sheetwrite_wasm.js";
+import { writeEngineCell, writeEngineColumn } from "../../test/engine-input.js";
 
 const root = resolve(import.meta.dir, "../..");
 const candidateCommit = Bun.env.CANDIDATE_COMMIT;
@@ -81,17 +82,11 @@ const factories: Record<string, (wasm: Wasm) => Fixture> = {
     const count = 1_000;
     const store = new wasm.CellStore();
     const sheet = store.addSheet(2, count);
-    store.setColumnNumbers(
-      sheet,
-      0,
-      0,
-      Float64Array.from({ length: count }, (_, row) => row),
-      0,
-    );
+    writeEngineColumn(store, sheet, 0, 0, Float64Array.from({ length: count }, (_, row) => row), 0);
     return {
       store,
       run: () => {
-        for (let row = 0; row < count; row++) store.setFormula(sheet, row, 1, `=A${row + 1}+1`, 0);
+        for (let row = 0; row < count; row++) writeEngineCell(store, sheet, row, 1, { formula: `=A${row + 1}+1` }, 0);
       },
       check: () => {
         store.recompute(sheet);
@@ -103,8 +98,8 @@ const factories: Record<string, (wasm: Wasm) => Fixture> = {
     const count = 1_000;
     const store = new wasm.CellStore();
     const sheet = store.addSheet(2, count);
-    store.setFormula(sheet, 0, 0, "=1/0", 0);
-    for (let row = 0; row < count; row++) store.setFormula(sheet, row, 1, "=$A$1", 0);
+    writeEngineCell(store, sheet, 0, 0, { formula: "=1/0" }, 0);
+    for (let row = 0; row < count; row++) writeEngineCell(store, sheet, row, 1, { formula: "=$A$1" }, 0);
     return {
       store,
       run: () => store.recompute(sheet),
@@ -117,13 +112,13 @@ const factories: Record<string, (wasm: Wasm) => Fixture> = {
     const count = 1_000;
     const store = new wasm.CellStore();
     const sheet = store.addSheet(3, count);
-    store.setNumber(sheet, 0, 0, 1, 0);
-    for (let row = 0; row < count; row++) store.setFormula(sheet, row, 1, `=$A$1+${row + 1}`, 0);
+    writeEngineCell(store, sheet, 0, 0, 1, 0);
+    for (let row = 0; row < count; row++) writeEngineCell(store, sheet, row, 1, { formula: `=$A$1+${row + 1}` }, 0);
     store.recompute(sheet);
     return {
       store,
       run: () => {
-        store.setNumber(sheet, 0, 0, 10, 0);
+        writeEngineCell(store, sheet, 0, 0, 10, 0);
         store.recompute(sheet);
       },
       check: () => {
@@ -135,19 +130,13 @@ const factories: Record<string, (wasm: Wasm) => Fixture> = {
     const count = 1_000;
     const store = new wasm.CellStore();
     const sheet = store.addSheet(2, count);
-    store.setColumnNumbers(
-      sheet,
-      0,
-      0,
-      Float64Array.from({ length: 100 }, () => 1),
-      0,
-    );
-    for (let row = 0; row < count; row++) store.setFormula(sheet, row, 1, "=SUM($A$1:$A$100)", 0);
+    writeEngineColumn(store, sheet, 0, 0, Float64Array.from({ length: 100 }, () => 1), 0);
+    for (let row = 0; row < count; row++) writeEngineCell(store, sheet, row, 1, { formula: "=SUM($A$1:$A$100)" }, 0);
     store.recompute(sheet);
     return {
       store,
       run: () => {
-        store.setNumber(sheet, 0, 0, 2, 0);
+        writeEngineCell(store, sheet, 0, 0, 2, 0);
         store.recompute(sheet);
       },
       check: () => {
@@ -162,8 +151,8 @@ const factories: Record<string, (wasm: Wasm) => Fixture> = {
     const summary = store.addSheet(1, count);
     store.setSheetName(source, "source", "Source");
     store.setSheetName(summary, "summary", "Summary");
-    store.setNumber(source, 0, 0, 1, 0);
-    for (let row = 0; row < count; row++) store.setFormula(summary, row, 0, "=Source!A1", 0);
+    writeEngineCell(store, source, 0, 0, 1, 0);
+    for (let row = 0; row < count; row++) writeEngineCell(store, summary, row, 0, { formula: "=Source!A1" }, 0);
     store.recompute(summary);
     return {
       store,
@@ -179,13 +168,13 @@ const factories: Record<string, (wasm: Wasm) => Fixture> = {
     const count = 1_000;
     const store = new wasm.CellStore();
     const sheet = store.addSheet(3, count);
-    store.setNumber(sheet, 0, 0, 1, 0);
-    for (let row = 0; row < count; row++) store.setFormula(sheet, row, 1, `=$A$1+${row + 1}`, 0);
+    writeEngineCell(store, sheet, 0, 0, 1, 0);
+    for (let row = 0; row < count; row++) writeEngineCell(store, sheet, row, 1, { formula: `=$A$1+${row + 1}` }, 0);
     store.recompute(sheet);
     return {
       store,
       run: () => {
-        store.setNumber(sheet, 0, 0, 10, 0);
+        writeEngineCell(store, sheet, 0, 0, 10, 0);
         store.recompute(sheet);
       },
       check: () => {
@@ -197,13 +186,13 @@ const factories: Record<string, (wasm: Wasm) => Fixture> = {
     const count = 100_000;
     const store = new wasm.CellStore();
     const sheet = store.addSheet(3, count);
-    store.setNumber(sheet, 0, 0, 1, 0);
-    for (let row = 0; row < count; row++) store.setFormula(sheet, row, 1, `=$A$1+${row + 1}`, 0);
+    writeEngineCell(store, sheet, 0, 0, 1, 0);
+    for (let row = 0; row < count; row++) writeEngineCell(store, sheet, row, 1, { formula: `=$A$1+${row + 1}` }, 0);
     store.recompute(sheet);
     return {
       store,
       run: () => {
-        store.setNumber(sheet, 0, 0, 10, 0);
+        writeEngineCell(store, sheet, 0, 0, 10, 0);
         store.recompute(sheet);
       },
       check: () => {

@@ -232,7 +232,6 @@ fn anchor_reference(tokens: &[Spanned<'_>], function: usize) -> Option<(usize, u
 
 /// Remove only identifier prefixes. Quoted text, sheet names and structured
 /// references are not function or parameter names and must remain unchanged.
-#[wasm_bindgen(js_name = formulaFromXlsx)]
 pub fn formula_from_xlsx(source: &str) -> String {
     let tokens = lex_tolerant(source);
     let mut result = String::with_capacity(source.len());
@@ -361,7 +360,6 @@ fn bindings<'a>(tokens: &'a [Spanned<'_>]) -> Vec<Binding<'a>> {
 /// Write future-function, local-binding and spill spellings for OOXML formulas.
 /// This is lexical: unknown future functions and incomplete formulas still
 /// round-trip without a parse/serialize pass changing their source text.
-#[wasm_bindgen(js_name = formulaToXlsx)]
 pub fn formula_to_xlsx(source: &str) -> String {
     let tokens = lex_tolerant(source);
     let bindings = bindings(&tokens);

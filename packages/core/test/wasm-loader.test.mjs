@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { readFile } from "node:fs/promises";
 
 import { createLoader } from "../../wasm/loader-state.mjs";
+import { writeEngineCell } from "../../../test/engine-input.js";
 
 describe("WASM loader lifecycle", () => {
   it("deduplicates one source, rejects a conflicting source, and retries after failure", async () => {
@@ -144,8 +145,8 @@ describe("WASM loader lifecycle", () => {
       try {
         left.addSheet(1, 10);
         right.addSheet(1, 10);
-        left.setNumber(0, 0, 0, 42);
-        right.setNumber(0, 0, 0, 7);
+        writeEngineCell(left, 0, 0, 0, 42, 0);
+        writeEngineCell(right, 0, 0, 0, 7, 0);
         const a = left.getCell(0, 0, 0);
         const b = right.getCell(0, 0, 0);
 

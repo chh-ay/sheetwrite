@@ -27,7 +27,11 @@ describe("full engine package loaders", () => {
                ["=NORM.DIST(0,0,1,FALSE)", 1 / Math.sqrt(2 * Math.PI)],
                ["=SUM(2,3)", 5],
              ]) {
-               store.setFormula(sheet, 0, 0, formula, 0);
+               assert.equal(store.setBlockPacked(
+                 sheet, 0, 0, 1, 1, Uint8Array.of(0), Float64Array.of(0),
+                 new Uint8Array(), Uint32Array.of(0), Uint32Array.of(0),
+                 Uint32Array.of(0), [formula], new Uint32Array(), new Uint32Array(),
+               ), 0);
                store.recompute(sheet);
                const cell = store.getCell(sheet, 0, 0);
                try { assert.ok(Math.abs(cell.num - expected) < 1e-12, formula); }

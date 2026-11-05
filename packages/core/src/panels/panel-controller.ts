@@ -4,9 +4,11 @@
 // once per grid. Everything goes through the public Grid API.
 
 import { colToA1 } from "../a1.js";
+import { MAX_CHART_POINTS } from "../charts-live.js";
 import { sheetNameKey } from "../name-key.js";
 import type { ChartKind, ChartRef } from "../types/chart.js";
-import type { CellAddress, SheetId } from "../types/coordinates.js";
+import type { CellScalar } from "../types/cell.js";
+import type { CellAddress, Range, SheetId } from "../types/coordinates.js";
 import type { SheetSnapshot } from "../types/document.js";
 import type { Grid, IconOverrides } from "../types/grid.js";
 import type { PivotDefinition } from "../types/pivot.js";
@@ -142,7 +144,7 @@ export function insertChart(grid: Grid, kind: ChartKind = "column"): boolean {
 
   const chart = chartFromRange(
     range,
-    (row, col) => grid.store.getCell({ sheet: range.sheet, row, col }).resolved,
+    chartSourceReader(grid, range),
     nextChartId(grid.getCharts(range.sheet)),
     owner.columns.length,
     kind,
@@ -152,6 +154,36 @@ export function insertChart(grid: Grid, kind: ChartKind = "column"): boolean {
   grid.selectChart(chart.id, range.sheet);
   openChartPanel(grid, { sheet: range.sheet, id: chart.id });
   return true;
+}
+
+/**
+ * Read only the two bands used for chart inference. Canonical windows must not
+ * apply the current sort/filter view, and a whole-column selection stays bounded.
+ */
+function chartSourceReader(grid: Grid, range: Range): (row: number, col: number) => CellScalar {
+  const store = grid.store;
+  if (!store.getDataWindow) {
+    // Custom stores without canonical windows retain their scalar read contract.
+    return (row, col) => store.getCell({ sheet: range.sheet, row, col }).resolved;
+  }
+
+  const { start, end } = range;
+  const columns = Array.from({ length: end.col - start.col + 1 }, (_, index) => start.col + index);
+  const header = store.getDataWindow(range.sheet, { start: start.row, end: start.row + 1 }, columns);
+  const categoryEnd = Math.min(end.row, start.row + MAX_CHART_POINTS) + 1;
+  const categories =
+    categoryEnd > start.row + 1
+      ? store.getDataWindow(
+          range.sheet,
+          { start: start.row + 1, end: categoryEnd },
+          [start.col],
+        )
+      : null;
+
+  return (row, col) =>
+    row === start.row
+      ? (header.values[col - start.col] ?? null)
+      : (categories?.values[row - start.row - 1] ?? null);
 }
 
 /** Where Insert › PivotTable puts the new pivot. */

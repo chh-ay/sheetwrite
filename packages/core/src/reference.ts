@@ -58,7 +58,7 @@ export class RangeSourceProjection {
 }
 
 /**
- * Copy one opaque WASM source snapshot into a transaction/document-local
+ * Transfer one opaque WASM source snapshot into a transaction/document-local
  * projection, then release the WASM allocation even when decoding fails.
  */
 export function consumeSourceSnapshot(
@@ -67,10 +67,10 @@ export function consumeSourceSnapshot(
 ): RangeSourceProjection {
   try {
     return new RangeSourceProjection(
-      snapshot.formulaOffsets(),
-      snapshot.formulaSources(),
-      snapshot.referenceOffsets(),
-      snapshot.referenceTargets(),
+      snapshot.takeFormulaOffsets(),
+      snapshot.takeFormulaSources(),
+      snapshot.takeReferenceOffsets(),
+      snapshot.takeReferenceTargets(),
       sheetIds,
     );
   } finally {

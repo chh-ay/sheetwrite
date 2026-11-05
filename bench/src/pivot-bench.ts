@@ -3,6 +3,7 @@ import { cpus, hostname } from "node:os";
 import { parseArgs } from "node:util";
 
 import { CellStore, load } from "@sheetwrite/formulas";
+import { writeEngineCell, writeEngineColumn } from "../../test/engine-input.js";
 
 import { protocolCaptureMeta } from "./protocol-meta.js";
 import { now, summarize } from "./stats.js";
@@ -34,11 +35,11 @@ try {
   const output = store.addSheet(OUTPUT_COLS, OUTPUT_ROWS);
   const maxOutput = store.addSheet(OUTPUT_COLS, OUTPUT_ROWS);
   for (let field = 0; field < SOURCE_FIELDS; field++) {
-    store.setString(source, 0, field, `Field${field}`, 0);
+    writeEngineCell(store, source, 0, field, `Field${field}`, 0);
     const values = Float64Array.from({ length: SOURCE_ROWS }, (_, row) =>
       field < 4 ? Math.floor(row / AXIS_CARDINALITY ** field) % AXIS_CARDINALITY : row + field,
     );
-    store.setColumnNumbers(source, field, 1, values, 0);
+    writeEngineColumn(store, source, field, 1, values, 0);
   }
   store.commitSources();
   const baselineBytes = retainedBytes(store.memoryStats());
@@ -122,7 +123,7 @@ try {
     if (status[0] !== 0) throw new Error(`Pivot failed: ${Array.from(status).join(",")}`);
     const editStart = now();
     for (let edit = 0; edit < EDITS_PER_SAMPLE; edit++) {
-      store.setNumber(source, 1, 4, ++editValue, 0);
+      writeEngineCell(store, source, 1, 4, ++editValue, 0);
       store.recompute(source);
     }
     const editMs = (now() - editStart) / EDITS_PER_SAMPLE;
@@ -144,7 +145,7 @@ try {
     // leaves the source as it was.
     const keyEditStart = now();
     for (let edit = 0; edit < EDITS_PER_SAMPLE; edit++) {
-      store.setNumber(source, 1, 0, edit % 2 === 0 ? 1 : 0, 0);
+      writeEngineCell(store, source, 1, 0, edit % 2 === 0 ? 1 : 0, 0);
       store.recompute(source);
     }
     const keyEditMs = (now() - keyEditStart) / EDITS_PER_SAMPLE;
@@ -167,17 +168,17 @@ try {
     expectMax(extreme, "after build");
     const maxEditStart = now();
     for (let edit = 0; edit < EDITS_PER_SAMPLE; edit++) {
-      store.setNumber(source, extremeRow, MAX_FIELD, edit % 2 === 0 ? 0 : extreme, 0);
+      writeEngineCell(store, source, extremeRow, MAX_FIELD, edit % 2 === 0 ? 0 : extreme, 0);
       store.recompute(source);
     }
     const maxEditMs = (now() - maxEditStart) / EDITS_PER_SAMPLE;
 
     // An even count restores the extreme; one more edit removes it again.
     expectMax(extreme, "after restore");
-    store.setNumber(source, extremeRow, MAX_FIELD, 0, 0);
+    writeEngineCell(store, source, extremeRow, MAX_FIELD, 0, 0);
     store.recompute(source);
     expectMax(nextExtreme, "after removing the extreme");
-    store.setNumber(source, extremeRow, MAX_FIELD, extreme, 0);
+    writeEngineCell(store, source, extremeRow, MAX_FIELD, extreme, 0);
     store.recompute(source);
     store.setPivots(maxOutput, new Float64Array(), []);
     store.recompute(maxOutput);

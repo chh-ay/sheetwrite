@@ -91,7 +91,6 @@ describe("XLSX package registration", () => {
       const readyAfterTemporary = isSheetwriteReady();
       let instances = 0;
       let batches = 0;
-      let scalars = 0;
       await initSheetwrite(undefined, {
         ...wasm,
         createEngine: async (...args) => {
@@ -100,8 +99,6 @@ describe("XLSX package registration", () => {
           return {
             ...engine,
             convertXlsxFormulas: (...args) => { batches += 1; return engine.convertXlsxFormulas(...args); },
-            formulaToXlsx: (...args) => { scalars += 1; return engine.formulaToXlsx(...args); },
-            formulaFromXlsx: (...args) => { scalars += 1; return engine.formulaFromXlsx(...args); },
           };
         },
       });
@@ -109,9 +106,9 @@ describe("XLSX package registration", () => {
       const exportBatches = batches;
       batches = 0;
       const restored = await backend.fromXlsxWorkbook(bytes);
-      console.log(JSON.stringify({
+      process.stdout.write(JSON.stringify({
         before, afterRangeOnly, readyAfterTemporary, instances, exportBatches,
-        importBatches: batches, scalars,
+        importBatches: batches,
         cell: restored.sheets[0].cells[0].cells[0].value,
         name: restored.workbook.namedRanges.find((named) => named.name === "Plus"),
       }));
@@ -133,7 +130,6 @@ describe("XLSX package registration", () => {
       instances: 1,
       exportBatches: 1,
       importBatches: 1,
-      scalars: 0,
       cell: { kind: "formula", src: "=LET(x,1,x+1)" },
       name: { name: "Plus", formula: "=LAMBDA(v,v+1)" },
     });

@@ -4,6 +4,7 @@
 // `grid.setPivot`, so it is one undo step and the output updates at once.
 
 import { Scope } from "../scope.js";
+import { storeEngine } from "../store/engine-registry.js";
 import type { CellScalar } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
 import type { Grid, GridPanel } from "../types/grid.js";
@@ -102,6 +103,18 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
     const tables = grid.store.getWorkbook().sheets.flatMap((candidate) => candidate.tables ?? []);
     const range = sourceDataRange(pivot.source, tables);
     if (range === null) return [];
+
+    const engine = storeEngine(grid.store);
+    if (engine) {
+      return engine
+        .distinctValues(range.sheet, range.start.col + field, MAX_FILTER_VALUES + 1, {
+          start: range.start.row,
+          end: range.end.row + 1,
+        })
+        .sort(compareScalars);
+    }
+
+    // Custom stores without an engine retain their scalar read contract.
     const seen = new Set<CellScalar>();
     const col = range.start.col + field;
     for (let row = range.start.row; row <= range.end.row; row++) {

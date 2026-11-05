@@ -37,6 +37,7 @@
  * All ingest iterations close and replace their global happy-dom Window outside
  * timing; this releases document-owned selector caches without private symbols.
  */
+import { writeEngineTextColumn } from "../../test/engine-input.js";
 
 import { mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
@@ -785,14 +786,7 @@ function probeQueryResources(ds: ColumnarDataset): QueryResourceMetrics {
   try {
     const sheet = store.addSheet(2, ds.rowCount);
     for (const [col, values] of [ds.city, ds.customer].entries()) {
-      store.setColumnStringsPacked(
-        sheet,
-        col,
-        0,
-        values.join(""),
-        Uint32Array.from(values, (value) => value.length),
-        0,
-      );
+      writeEngineTextColumn(store, sheet, col, 0, values.join(""), Uint32Array.from(values, (value) => value.length), 0);
     }
 
     store.resetQueryResourceStats();

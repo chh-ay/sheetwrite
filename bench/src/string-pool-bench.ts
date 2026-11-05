@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 
 import type * as WasmModule from "@sheetwrite/wasm";
 import type { CellStore as WasmCellStore } from "@sheetwrite/wasm";
+import { writeEngineCell, writeEngineColumn } from "../../test/engine-input.js";
 
 import { median } from "./stats.js";
 
@@ -25,15 +26,9 @@ function measure(operation: () => void): number {
 
 function ingest(store: WasmCellStore, sheet: number, distinct: boolean): void {
   for (let start = 0; start < ROWS; start += BATCH) {
-    store.setColumnStrings(
-      sheet,
-      0,
-      start,
-      Array.from({ length: BATCH }, (_, offset) =>
-        distinct ? `distinct-${start + offset}` : `category-${offset % 100}`,
-      ),
-      0,
-    );
+    writeEngineColumn(store, sheet, 0, start, Array.from({ length: BATCH }, (_, offset) =>
+      distinct ? `distinct-${start + offset}` : `category-${offset % 100}`,
+    ), 0);
   }
 }
 
@@ -50,7 +45,7 @@ function controls() {
         edit: measure(() => {
           for (let edit = 0; edit < EDITS; edit++) {
             store.beginMutation();
-            store.setString(sheet, 0, 0, `category-${edit % 100}`, 0);
+            writeEngineCell(store, sheet, 0, 0, `category-${edit % 100}`, 0);
             store.commitSources();
           }
         }),
@@ -109,7 +104,7 @@ function lifetime() {
 
     for (let edit = 0; edit < EDITS; edit++) {
       store.beginMutation();
-      store.setString(sheet, 0, 0, `unique-edit-${edit}-${"x".repeat(128)}`, 0);
+      writeEngineCell(store, sheet, 0, 0, `unique-edit-${edit}-${"x".repeat(128)}`, 0);
       store.commitSources();
     }
 

@@ -811,8 +811,23 @@ impl CellStore {
         out
     }
 
+    /// First-seen distinct resolved values from the whole canonical column.
     #[wasm_bindgen(js_name = distinctValues)]
     pub fn distinct_values(&self, sheet: usize, col: usize, limit: usize) -> DistinctColumn {
+        self.distinct_values_range(sheet, col, 0, usize::MAX, limit)
+    }
+
+    /// First-seen distinct resolved values in an end-exclusive canonical row range.
+    /// A zero limit returns every value; a nonzero limit stops the scan early.
+    #[wasm_bindgen(js_name = distinctValuesRange)]
+    pub fn distinct_values_range(
+        &self,
+        sheet: usize,
+        col: usize,
+        start_row: usize,
+        end_row: usize,
+        limit: usize,
+    ) -> DistinctColumn {
         let mut out = DistinctColumn::default();
         let Some(data) = self.sheets.get(sheet) else {
             return out;
@@ -833,7 +848,7 @@ impl CellStore {
             let mut stamps = PoolIdStamps::new();
             let mut seen: HashSet<DistinctKey<'_>> = HashSet::new();
             let mut needs_content = false;
-            for row in 0..data.cells.row_count() {
+            for row in start_row.min(data.cells.row_count())..end_row.min(data.cells.row_count()) {
                 let index = col * data.cells.row_count() + row;
                 let kind = resolved_kind(data, index);
                 let fresh = match kind {

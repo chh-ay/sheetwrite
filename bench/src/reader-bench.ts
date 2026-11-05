@@ -20,6 +20,8 @@
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import type { CellStore } from "@sheetwrite/wasm";
+import { writeEngineCell, writeEngineColumn, writeEngineTextColumn } from "../../test/engine-input.js";
 
 import { validateExactMatrix } from "./gate-protocol.js";
 import { now, summarize } from "./stats.js";
@@ -215,28 +217,10 @@ interface RangeSnapshotHandle {
   kinds(): Uint8Array;
   free(): void;
 }
-/** The `CellStore` surface the readers use; present in 0.5.x and later engines. */
+/** The mixed-block input and reader surface shared by both measured engines. */
 interface Engine {
   addSheet(nCols: number, rowCount: number): number;
-  setNumber(sheet: number, row: number, col: number, value: number, style: number): void;
-  setString(sheet: number, row: number, col: number, value: string, style: number): void;
-  setBool(sheet: number, row: number, col: number, value: boolean, style: number): void;
-  setFormula(sheet: number, row: number, col: number, src: string, style: number): number;
-  setColumnNumbers(
-    sheet: number,
-    col: number,
-    startRow: number,
-    values: Float64Array,
-    style: number,
-  ): void;
-  setColumnStringsPacked(
-    sheet: number,
-    col: number,
-    startRow: number,
-    buf: string,
-    utf16Lens: Uint32Array,
-    style: number,
-  ): void;
+  setBlockPacked: CellStore["setBlockPacked"];
   setConditionalRules(
     sheet: number,
     kinds: Uint8Array,
@@ -445,9 +429,7 @@ function writeFormula(
   col: number,
   source: string,
 ): void {
-  if (Number.isNaN(store.setFormula(sheet, row, col, source, DEFAULT_STYLE))) {
-    throw new Error(`setFormula rejected ${source}`);
-  }
+  writeEngineCell(store, sheet, row, col, { formula: source }, DEFAULT_STYLE);
 }
 
 /** A recomputed formula cell must hold a number; an error reads as text. */
@@ -486,14 +468,14 @@ class FixtureWriter {
     const store = this.#store;
     const sheet = store.addSheet(columns, ROWS);
     const columnA = this.#randomNumbers(ROWS);
-    store.setColumnNumbers(sheet, COLUMN_A, 0, columnA, DEFAULT_STYLE);
+    writeEngineColumn(store, sheet, COLUMN_A, 0, columnA, DEFAULT_STYLE);
     this.#writeLabels(sheet, COLUMN_B);
     this.#writeMixed(sheet, COLUMN_C);
     this.#writeDoublingFormulas(sheet, COLUMN_D);
     if (columns === MAIN_COLUMNS) {
       this.#writeNumbersWithGaps(sheet, COLUMN_E);
       for (let col = COLUMN_E + 1; col < MAIN_COLUMNS; col++) {
-        store.setColumnNumbers(sheet, col, 0, this.#randomNumbers(ROWS), DEFAULT_STYLE);
+        writeEngineColumn(store, sheet, col, 0, this.#randomNumbers(ROWS), DEFAULT_STYLE);
       }
     }
 
@@ -515,7 +497,7 @@ class FixtureWriter {
       () => `item-${Math.floor(this.nextUnit() * DISTINCT_LABELS)}`,
     );
     const lengths = Uint32Array.from(labels, (label) => label.length);
-    this.#store.setColumnStringsPacked(sheet, col, 0, labels.join(""), lengths, DEFAULT_STYLE);
+    writeEngineTextColumn(this.#store, sheet, col, 0, labels.join(""), lengths, DEFAULT_STYLE);
   }
 
   /** Column C: number, text, boolean and blank cells in turn. */
@@ -524,11 +506,11 @@ class FixtureWriter {
     for (let row = 0; row < ROWS; row++) {
       const kind = row % MIXED_KINDS;
       if (kind === MIXED_NUMBER_KIND) {
-        store.setNumber(sheet, row, col, row, DEFAULT_STYLE);
+        writeEngineCell(store, sheet, row, col, row, DEFAULT_STYLE);
       } else if (kind === MIXED_TEXT_KIND) {
-        store.setString(sheet, row, col, `x${row % MIXED_TEXT_VARIANTS}`, DEFAULT_STYLE);
+        writeEngineCell(store, sheet, row, col, `x${row % MIXED_TEXT_VARIANTS}`, DEFAULT_STYLE);
       } else if (kind === MIXED_BOOLEAN_KIND) {
-        store.setBool(sheet, row, col, row % TRUE_EVERY_ROWS === TRUE_ROW_REMAINDER, DEFAULT_STYLE);
+        writeEngineCell(store, sheet, row, col, row % TRUE_EVERY_ROWS === TRUE_ROW_REMAINDER, DEFAULT_STYLE);
       }
     }
   }
@@ -555,13 +537,7 @@ class FixtureWriter {
     let start = 0;
     for (const gap of [...EDGE_GAP_ROWS, ROWS]) {
       if (gap > start) {
-        this.#store.setColumnNumbers(
-          sheet,
-          col,
-          start,
-          this.#randomNumbers(gap - start),
-          DEFAULT_STYLE,
-        );
+        writeEngineColumn(this.#store, sheet, col, start, this.#randomNumbers(gap - start), DEFAULT_STYLE);
       }
       start = gap + 1;
     }
@@ -629,15 +605,9 @@ function rangeScenario(
 
   const lastRow = ROWS - 1;
   return (iteration, sink) => {
-    store.setNumber(sheet, lastRow, COLUMN_A, iteration % NUMBER_SCALE, DEFAULT_STYLE);
-    store.setString(
-      sheet,
-      lastRow,
-      COLUMN_B,
-      `item-${iteration % EDIT_LABEL_VARIANTS}`,
-      DEFAULT_STYLE,
-    );
-    store.setNumber(sheet, lastRow, COLUMN_C, iteration % MIXED_TEXT_VARIANTS, DEFAULT_STYLE);
+    writeEngineCell(store, sheet, lastRow, COLUMN_A, iteration % NUMBER_SCALE, DEFAULT_STYLE);
+    writeEngineCell(store, sheet, lastRow, COLUMN_B, `item-${iteration % EDIT_LABEL_VARIANTS}`, DEFAULT_STYLE);
+    writeEngineCell(store, sheet, lastRow, COLUMN_C, iteration % MIXED_TEXT_VARIANTS, DEFAULT_STYLE);
     store.recompute(sheet);
     for (let row = 0; row < RANGE_FORMULAS_PER_SCENARIO; row++) {
       consumeCell(store, sheet, row, RANGE_RESULT_COLUMN, sink);
