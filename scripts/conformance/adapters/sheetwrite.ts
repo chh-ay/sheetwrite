@@ -5,7 +5,7 @@ import type { SheetwriteStore } from "../../../packages/core/src/store.js";
 import type { CellScalar, CellValue, Column } from "../../../packages/core/src/types/cell.js";
 import type { DocumentOp, Workbook } from "../../../packages/core/src/types/document.js";
 import { canonicalJson, isNonemptyString } from "../normalize.js";
-import type { ConformanceCase, ConformanceResult } from "../types.js";
+import type { CellResult, ConformanceCase, ConformanceResult } from "../types.js";
 
 function a1(cell: string): { row: number; col: number } {
   const match = /^([A-Z]+)([1-9][0-9]*)$/.exec(cell);
@@ -38,7 +38,7 @@ function classify(
   value: CellScalar,
   numberFormat: string | undefined,
   formatter: typeof formatNumberType,
-): ConformanceResult {
+): CellResult {
   const displayedText =
     numberFormat !== undefined && (typeof value === "number" || typeof value === "string")
       ? formatter(value, numberFormat, "en-US")

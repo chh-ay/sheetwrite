@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 import { packageTargets } from "./package-targets.js";
-import { PUBLISHABLE_PACKAGE_ORDER, validateWorkspaceGraph } from "./workspace-tooling.js";
+import { publishableIndex, validateWorkspaceGraph } from "./workspace-tooling.js";
 
 interface PackageManifest {
   readonly name?: string;
@@ -69,7 +69,7 @@ export function validateExportTargets(root: string): readonly string[] {
     const manifest = JSON.parse(
       readFileSync(resolve(packageRoot, "package.json"), "utf8"),
     ) as PackageManifest;
-    if (!manifest.name || !PUBLISHABLE_PACKAGE_ORDER.includes(manifest.name as never)) continue;
+    if (!manifest.name || publishableIndex(manifest.name) === -1) continue;
     for (const target of packageTargets(manifest)) {
       checked.push(`${manifest.name}:./${target}`);
       if (!existsSync(resolve(packageRoot, target))) missing.push(`${manifest.name}:./${target}`);
