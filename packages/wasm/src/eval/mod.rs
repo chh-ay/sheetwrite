@@ -1592,7 +1592,11 @@ impl CellStore {
                 pass,
                 depth + 1,
             ),
-            Ast::SheetCell(..) | Ast::InvalidRef => Value::Error(FormulaError::Ref),
+            // A sheet reference that ingest did not resolve names another
+            // workbook, which has no values here.
+            Ast::SheetCell(..) | Ast::SheetRange(..) | Ast::InvalidRef => {
+                Value::Error(FormulaError::Ref)
+            }
             Ast::LetSlot { slot, expression } => match cached_let_slot(*slot) {
                 Some(value) => value,
                 None => {
@@ -1635,7 +1639,6 @@ impl CellStore {
             | Ast::NamedRange(_)
             | Ast::Range(..)
             | Ast::AbsRange(..)
-            | Ast::SheetRange(..)
             | Ast::SheetSpan(_) => Value::Error(FormulaError::Value),
             Ast::Neg(expr) | Ast::Pos(expr) | Ast::Percent(expr) => {
                 let op = match ast {
