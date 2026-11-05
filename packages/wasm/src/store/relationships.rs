@@ -171,6 +171,7 @@ impl CellStore {
             &self.strings,
             (column.first_row + row) as usize,
             column.col as usize,
+            &self.formula_slots,
         )
     }
 

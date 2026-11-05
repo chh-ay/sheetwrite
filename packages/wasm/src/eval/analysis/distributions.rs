@@ -49,6 +49,9 @@ const CONTINUED_FRACTION_FLOOR: f64 = 1e-300;
 const MAX_DEGREES: f64 = 1e10;
 const LOG_SQRT_TWO_PI: f64 = 0.9189385332046727;
 const HALF: f64 = 0.5;
+/// The relative rounding error of a continued-fraction cumulative
+/// probability.
+const CUMULATIVE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
 
 type NumberResult = Result<f64, FormulaError>;
 
@@ -312,7 +315,7 @@ fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
     }
 }
 
-fn ensure(is_valid: bool) -> Result<(), FormulaError> {
+pub(super) fn ensure(is_valid: bool) -> Result<(), FormulaError> {
     if is_valid {
         Ok(())
     } else {
@@ -320,14 +323,14 @@ fn ensure(is_valid: bool) -> Result<(), FormulaError> {
     }
 }
 
-fn degrees_arg(values: &FuncAccumulator, index: usize) -> NumberResult {
+pub(super) fn degrees_arg(values: &FuncAccumulator, index: usize) -> NumberResult {
     let degrees = number_arg(values, index, None)?.trunc();
     ensure((1.0..=MAX_DEGREES).contains(&degrees))?;
     Ok(degrees)
 }
 
 // Lanczos coefficients (g = 7), evaluated in log space to avoid overflow.
-fn log_gamma(x: f64) -> f64 {
+pub(super) fn log_gamma(x: f64) -> f64 {
     const COEFFICIENTS: [f64; 9] = [
         0.9999999999998099,
         676.5203681218851,
@@ -386,7 +389,7 @@ fn fraction_floor(value: f64) -> f64 {
 
 // Series for P and modified Lentz fraction for Q. The requested small tail
 // is calculated directly; subtracting a tiny tail would lose its precision.
-fn gamma_probability(shape: f64, x: f64, is_right: bool) -> NumberResult {
+pub(super) fn gamma_probability(shape: f64, x: f64, is_right: bool) -> NumberResult {
     if x == 0.0 {
         return Ok(if is_right { 1.0 } else { 0.0 });
     }
@@ -460,7 +463,7 @@ fn beta_fraction(x: f64, alpha: f64, beta: f64) -> NumberResult {
     Err(FormulaError::Num)
 }
 
-fn beta_probability(x: f64, alpha: f64, beta: f64) -> NumberResult {
+pub(super) fn beta_probability(x: f64, alpha: f64, beta: f64) -> NumberResult {
     if x <= 0.0 {
         return Ok(0.0);
     }
@@ -502,7 +505,7 @@ fn normal_density(x: f64) -> f64 {
     (-x * x * HALF - LOG_SQRT_TWO_PI).exp()
 }
 
-fn normal_cdf(x: f64) -> NumberResult {
+pub(super) fn normal_cdf(x: f64) -> NumberResult {
     let tail = HALF * gamma_probability(HALF, x * x * HALF, true)?;
     Ok(if x < 0.0 { tail } else { 1.0 - tail })
 }
@@ -524,7 +527,7 @@ fn normal_inverse(probability: f64) -> NumberResult {
     Ok(if is_negative { -quantile } else { quantile })
 }
 
-fn student_tail(x: f64, degrees: f64) -> NumberResult {
+pub(super) fn student_tail(x: f64, degrees: f64) -> NumberResult {
     Ok(HALF * beta_probability(degrees / (degrees + x * x), degrees * HALF, HALF)?)
 }
 
@@ -554,7 +557,12 @@ fn student_inverse(probability: f64, degrees: f64) -> NumberResult {
     Ok(if is_negative { -quantile } else { quantile })
 }
 
-fn f_probability(x: f64, numerator: f64, denominator: f64, is_right: bool) -> NumberResult {
+pub(super) fn f_probability(
+    x: f64,
+    numerator: f64,
+    denominator: f64,
+    is_right: bool,
+) -> NumberResult {
     if x == 0.0 {
         return Ok(if is_right { 1.0 } else { 0.0 });
     }
@@ -710,6 +718,80 @@ fn bisect(
         }
     }
     Err(FormulaError::Num)
+}
+
+/// The natural logarithm of the binomial coefficient `C(total, chosen)`.
+fn log_choose(total: f64, chosen: f64) -> f64 {
+    log_gamma(total + 1.0) - log_gamma(chosen + 1.0) - log_gamma(total - chosen + 1.0)
+}
+
+/// The binomial cumulative probability of at most `successes` successes.
+fn binomial_cumulative(successes: f64, trials: f64, probability: f64) -> NumberResult {
+    if successes >= trials {
+        return Ok(1.0);
+    }
+
+    beta_probability(1.0 - probability, trials - successes, successes + 1.0)
+}
+
+/// The smallest number of successes whose binomial cumulative probability is
+/// at least `criterion`. Arguments must already be truncated and validated.
+///
+/// The cumulative probability rises with the count, so a bisection over the
+/// integer counts needs about 34 steps for the largest trial counts. A
+/// cumulative probability within rounding error of `criterion` meets it, so
+/// exact cases such as 1/16 for no successes in 4 fair trials stop there.
+pub(super) fn binomial_inverse(trials: f64, probability: f64, criterion: f64) -> NumberResult {
+    let threshold = criterion - criterion * CUMULATIVE_TOLERANCE;
+    let mut lower = 0.0;
+    let mut upper = trials;
+
+    while lower < upper {
+        let middle = (lower + (upper - lower) * HALF).floor();
+
+        if binomial_cumulative(middle, trials, probability)? >= threshold {
+            upper = middle;
+        } else {
+            lower = middle + 1.0;
+        }
+    }
+
+    Ok(lower)
+}
+
+/// The hypergeometric probability of exactly `sample_successes` successes in
+/// a sample of `sample_size` items drawn without replacement. Arguments must
+/// already be truncated and validated.
+pub(super) fn hypergeometric_mass(
+    sample_successes: f64,
+    sample_size: f64,
+    population_successes: f64,
+    population_size: f64,
+) -> f64 {
+    let failures = population_size - population_successes;
+    let sample_failures = sample_size - sample_successes;
+
+    (log_choose(population_successes, sample_successes) + log_choose(failures, sample_failures)
+        - log_choose(population_size, sample_size))
+    .exp()
+}
+
+/// The negative binomial probability of exactly `failures` failures before
+/// the `successes`-th success. Arguments must already be truncated and
+/// validated.
+pub(super) fn negative_binomial_mass(failures: f64, successes: f64, probability: f64) -> f64 {
+    if probability == 0.0 {
+        return 0.0;
+    }
+
+    if probability == 1.0 {
+        return if failures == 0.0 { 1.0 } else { 0.0 };
+    }
+
+    (log_choose(failures + successes - 1.0, failures)
+        + successes * probability.ln()
+        + failures * (-probability).ln_1p())
+    .exp()
 }
 
 #[cfg(test)]

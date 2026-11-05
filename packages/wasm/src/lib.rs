@@ -33,6 +33,8 @@ mod formula_reads;
 #[cfg(feature = "formula-engine")]
 mod formula_rewrite;
 #[cfg(feature = "formula-engine")]
+mod formula_slots;
+#[cfg(feature = "formula-engine")]
 mod formula_tokens;
 #[cfg(feature = "formula-engine")]
 mod formula_xlsx;

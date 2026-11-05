@@ -84,3 +84,48 @@ fn structural_edits_keep_the_text_of_formulas_they_do_not_move() {
     );
     assert_eq!(store.get_cell(reader, 0, 0).num(), 7.0);
 }
+
+#[test]
+fn formula_ids_survive_structural_edits_and_slot_reuse() {
+    use crate::types::AbsCellKey;
+
+    let (mut store, sheet, reader) = sheet_with_reference();
+    let original = store.formula_id(AbsCellKey::new(sheet, 0, 1)).unwrap();
+    let reader_id = store.formula_id(AbsCellKey::new(reader, 0, 0)).unwrap();
+
+    assert!(store.add_rows(sheet, 0, 1));
+    assert!(store.insert_cols(sheet, 0, 1));
+    store.commit_sources();
+    assert_eq!(
+        store.formula_id(AbsCellKey::new(sheet, 1, 2)),
+        Some(original)
+    );
+    assert_eq!(
+        store.formula_id(AbsCellKey::new(reader, 0, 0)),
+        Some(reader_id)
+    );
+    assert_eq!(store.get_cell(sheet, 1, 2).num(), 7.0);
+    assert_eq!(store.get_cell(reader, 0, 0).num(), 7.0);
+
+    assert!(store.remove_rows(sheet, 0, 1));
+    assert!(store.remove_cols(sheet, 0, 1));
+    store.commit_sources();
+    assert_eq!(
+        store.formula_id(AbsCellKey::new(sheet, 0, 1)),
+        Some(original)
+    );
+
+    // A new source may reuse the removed reader's slot, never the live source.
+    assert!(store.remove_sheet(reader));
+    store.set_formula(sheet, 0, 0, "=B1+10", 0);
+    store.commit_sources();
+    assert_eq!(
+        store.formula_id(AbsCellKey::new(sheet, 0, 1)),
+        Some(original)
+    );
+    assert_ne!(
+        store.formula_id(AbsCellKey::new(sheet, 0, 0)),
+        Some(original)
+    );
+    assert_eq!(store.get_cell(sheet, 0, 0).num(), 17.0);
+}
