@@ -127,6 +127,8 @@ fn lookup_and_trimrange_follow_the_microsoft_rules() {
         ("=SUM(TRIMRANGE(Data!A1:B10))", "66"),
         ("=TRIMRANGE(Data!F1:F3)", "#REF!"),
         ("=TRIMRANGE(Data!A1:A3,4)", "#VALUE!"),
+        ("=TRIMRANGE(Data!A2)", "2"),
+        ("=TRIMRANGE(Data!F1)", "#REF!"),
     ]);
 }
 

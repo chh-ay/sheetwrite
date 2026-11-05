@@ -234,9 +234,9 @@ const CATEGORY_ASSERTIONS_BY_FUNCTION: Readonly<
   ISTEXT: { error: "NOT(ISTEXT(1/0))" },
   ISLOGICAL: { error: "NOT(ISLOGICAL(1/0))" },
   TRIMRANGE: {
-    empty: "ISERROR(TRIMRANGE(C1))=ISBLANK(C1)",
-    mixed: "TRIMRANGE(C1)=C1",
-    boundary: "ISERROR(TRIMRANGE(C1))=ISBLANK(C1)",
+    empty: "ISERROR(TRIMRANGE(C1))",
+    mixed: 'TRIMRANGE(C1)="2"',
+    boundary: "TRIMRANGE(C1)=0",
   },
   LOOKUP: {
     "range-array": "ISERROR(LOOKUP(C1:C2,A1:A3,B1:B3))=ISERROR(VLOOKUP(C1:C2,A1:B3,2))",

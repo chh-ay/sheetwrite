@@ -877,7 +877,14 @@ impl CellStore {
             return Err(FormulaError::Value);
         }
 
-        let source = self.eval_array_matrix_arg(&args[0], sheet, pass, depth + 1)?;
+        // A single cell is a 1 x 1 range.
+        let source = match self.eval_dynamic_array(&args[0], sheet, pass, depth + 1) {
+            Some(result) => result?,
+            None => match self.eval_ast(&args[0], sheet, pass, depth + 1) {
+                Value::Error(error) => return Err(error),
+                value => EvalMatrix::new(1, 1, vec![value]),
+            },
+        };
         let trim_rows = self.trim_mode(optional_ast(args, 1), sheet, pass, depth)?;
         let trim_cols = self.trim_mode(optional_ast(args, 2), sheet, pass, depth)?;
         let filled =
