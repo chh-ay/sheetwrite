@@ -1027,6 +1027,9 @@ impl PagedStorage {
         true
     }
 
+    /// Writes a source cell: a revisioned write lands in the dirty overlay, an
+    /// unrevisioned one updates a dirty cell in place or the clean page.
+    #[inline(never)]
     pub(super) fn write(
         &mut self,
         row: usize,
@@ -1052,6 +1055,7 @@ impl PagedStorage {
         true
     }
 
+    #[inline(never)]
     pub(super) fn hydrate(
         &mut self,
         row: usize,
@@ -1291,6 +1295,7 @@ impl PagedStorage {
         Some(id)
     }
 
+    #[inline(never)]
     pub(super) fn set_calculated(
         &mut self,
         row: usize,
@@ -1331,6 +1336,7 @@ impl PagedStorage {
         true
     }
 
+    #[inline(never)]
     pub(super) fn remove_calculated(&mut self, row: usize, col: usize) {
         let (index, offset) = self.calculated_split(row);
         let id = self.calculated.get(col, index);
