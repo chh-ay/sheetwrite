@@ -290,6 +290,9 @@ export function expectedFormulaWorkloadKeys(mode: BenchmarkMode): string[] {
       formulaWorkloadKey({ id: variant.id, size: lookupFormulas }),
       formulaWorkloadKey({ id: `${variant.id}${LOOKUP_EDIT_SUFFIX}`, size: lookupFormulas }),
     ]),
+    ...(smoke ? [MIXED_LOOKUP_SMOKE_ROWS] : MIXED_LOOKUP_SIZES).map((size) =>
+      formulaWorkloadKey({ id: "xlookup-mixed-exact", size }),
+    ),
     formulaWorkloadKey({ id: "spill-filter-resize", size: range }),
     formulaWorkloadKey({ id: "sumproduct-vector-edit", size: range }),
     formulaWorkloadKey({ id: "sumproduct-matrix-edit", size: range }),
@@ -309,6 +312,7 @@ export function expectedFormulaWorkloadKeys(mode: BenchmarkMode): string[] {
 }
 
 const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
+  "xlookup-mixed-exact",
   "formula-constant-edit",
   "vlookup-many",
   "vlookup-many-edit",
@@ -395,6 +399,8 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
       return "#DIV/0!";
     case "criteria-range-edit":
       return size - Math.floor(size / 2) + 1;
+    case "xlookup-mixed-exact":
+      return mixedLookupOutput(size);
     case "lookup-range-edit":
       return (size - 1) * 2;
     case "spill-filter-resize":
@@ -1331,6 +1337,83 @@ function lookupFixture(count: number, phase: LookupPhase, variant: LookupVariant
   };
 }
 
+/** Key-table sizes of the mixed-type exact lookup rows. */
+const MIXED_LOOKUP_SIZES = [10_000, 100_000] as const;
+const MIXED_LOOKUP_SMOKE_ROWS = 1_000;
+
+/** Table rows per lookup formula of the mixed-type rows. */
+const MIXED_LOOKUP_ROWS_PER_FORMULA = 10;
+
+/** Even rows hold numbers and odd rows text, so one key column mixes types. */
+function mixedLookupKeyAt(row: number): number | string {
+  return row % 2 === 0 ? row : `Key${row}`;
+}
+
+/** Formula `formula` looks up table row `formula * 10 + formula % 2`, so the
+ * keys alternate between numbers and text. Text keys differ from the table
+ * only in case. */
+function mixedLookupRowOf(formula: number): number {
+  return formula * MIXED_LOOKUP_ROWS_PER_FORMULA + (formula % 2);
+}
+
+function mixedLookupOutput(tableRows: number): string {
+  const last = tableRows / MIXED_LOOKUP_ROWS_PER_FORMULA - 1;
+  return `${mixedLookupRowOf(last) + 1}`;
+}
+
+/**
+ * Exact `XLOOKUP`s on one key column that mixes numbers and text. The timed
+ * unit is the first recalculation of all formulas; every result is checked
+ * outside the timed interval.
+ */
+function mixedLookupFixture(tableRows: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(4, tableRows);
+  for (let row = 0; row < tableRows; row++) {
+    const key = mixedLookupKeyAt(row);
+    if (typeof key === "number") store.setNumber(sheet, row, 0, key, 0);
+    else store.setString(sheet, row, 0, key, 0);
+  }
+  store.setColumnNumbers(
+    sheet,
+    1,
+    0,
+    numericColumn(tableRows, (row) => row + 1),
+    0,
+  );
+
+  const formulas = tableRows / MIXED_LOOKUP_ROWS_PER_FORMULA;
+  for (let formula = 0; formula < formulas; formula++) {
+    const key = mixedLookupKeyAt(mixedLookupRowOf(formula));
+    if (typeof key === "number") store.setNumber(sheet, formula, 2, key, 0);
+    else store.setString(sheet, formula, 2, key.toLowerCase(), 0);
+    store.setFormula(
+      sheet,
+      formula,
+      3,
+      `=XLOOKUP(C${formula + 1},A1:A${tableRows},B1:B${tableRows})`,
+      0,
+    );
+  }
+
+  return {
+    store,
+    run: () => store.recompute(sheet),
+    check: () => {
+      for (let formula = 0; formula < formulas; formula++) {
+        const value = numberAt(store, sheet, formula, 3);
+        const expected = mixedLookupRowOf(formula) + 1;
+        assert(
+          value === expected,
+          `xlookup-mixed-exact row ${formula} expected ${expected}, observed ${value}`,
+        );
+      }
+      return mixedLookupOutput(tableRows);
+    },
+    dispose: () => store.free(),
+  };
+}
+
 function spillFilterResizeFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, count);
@@ -1797,6 +1880,9 @@ function formulaWorkloads(smoke: boolean): FormulaWorkload[] {
   add("error-propagation", 1_000, () => errorPropagationFixture(1_000));
   add("criteria-range-edit", range, () => criteriaRangeFixture(range));
   add("lookup-range-edit", range, () => lookupRangeFixture(range));
+  for (const size of smoke ? [MIXED_LOOKUP_SMOKE_ROWS] : MIXED_LOOKUP_SIZES) {
+    add("xlookup-mixed-exact", size, () => mixedLookupFixture(size));
+  }
   for (const variant of LOOKUP_VARIANTS) {
     add(variant.id, lookupFormulas, () =>
       lookupFixture(lookupFormulas, "first-recompute", variant),

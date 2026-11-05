@@ -123,11 +123,6 @@ impl SpillState {
         self.ranges.is_empty() && self.owners.is_empty()
     }
 
-    #[inline]
-    pub(crate) fn has_owners(&self) -> bool {
-        !self.owners.is_empty()
-    }
-
     pub(crate) fn owner_count(&self) -> usize {
         self.owners.len()
     }
