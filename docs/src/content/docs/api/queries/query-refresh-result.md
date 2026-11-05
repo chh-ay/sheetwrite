@@ -8,7 +8,7 @@ description: "QueryRefreshResult type in @sheetwrite/queries: One refresh commit
 One refresh commits every requested output in one transaction, or none.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/session.ts#L68"><code>packages/queries/src/session.ts#L68</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/session.ts#L70"><code>packages/queries/src/session.ts#L70</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>7</span>

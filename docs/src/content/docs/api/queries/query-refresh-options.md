@@ -8,7 +8,7 @@ description: "QueryRefreshOptions interface in @sheetwrite/queries: The signal c
 The signal cancels a pending refresh before it writes anything.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/session.ts#L79"><code>packages/queries/src/session.ts#L79</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/session.ts#L81"><code>packages/queries/src/session.ts#L81</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>1</span>

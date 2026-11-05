@@ -8,7 +8,7 @@ description: "QuerySessionOptions interface in @sheetwrite/queries: Host I/O for
 Host I/O for a session; the engine limits apply to every parse and execution.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/session.ts#L54"><code>packages/queries/src/session.ts#L54</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/session.ts#L56"><code>packages/queries/src/session.ts#L56</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

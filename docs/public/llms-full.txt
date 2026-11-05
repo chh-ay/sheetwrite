@@ -4608,6 +4608,39 @@ sources load. Growth into non-empty cells, or into another table, is
 - Saved locators are public. A locator with a user name or password is
 rejected, and credentials stay in the host's callback.
 
+### Query commands in the ribbon
+
+While a query session is alive, the ribbon, the compact ribbon and the toolbar
+show three Data commands. `session.dispose()` removes them again.
+
+| Command | Ribbon place | What it does |
+| --- | --- | --- |
+| Get Data | Data › Get & Transform Data | Opens Queries & Connections with an empty query form. |
+| Refresh All | Data › Queries & Connections | Runs `refreshAll`. Press it again while the refresh runs to cancel it. |
+| Queries & Connections | Data › Queries & Connections | Lists the saved queries, to refresh, edit, rename, remove or select the output table of each. |
+
+The panel loads as its own chunk the first time it opens. Its form saves
+through `define`, so the engine checks the plan first. Each step is one line
+that names columns as they are before the step:
+
+| Step | Line |
+| --- | --- |
+| Filter rows | `Total >= 100`, `Region is null`, `Region contains "North"`, `not …` |
+| Choose columns | `Region, Total` |
+| Rename columns | `Total -> Amount` |
+| Change type | `Total: number`, or `Total: number or null` to make failed conversions null |
+| Merge queries | `Regions (left) on Region = Code` |
+| Group by | `Region: Total = sum(Amount), Rows = countRows()` |
+| Unpivot columns | `Jan, Feb -> Month, Value` |
+
+Names with spaces or symbols go in double quotes. A read-only grid keeps the
+commands; the grid rejects the write and the panel or the status line shows why.
+
+An XLSX file can hold Power Query members that the engine cannot run. When the
+file was imported with a Power Query codec, the panel lists them as read-only entries with the reason. They stay in the file
+unchanged while the saved queries are not edited; after an edit, the next XLSX
+save drops them (see [Power Query in XLSX](#power-query-in-xlsx)).
+
 ## Power Query in XLSX
 
 Pass a Power Query codec to XLSX export and import to write saved queries as
@@ -14224,6 +14257,19 @@ export type QueryColumnType = "number" | "logical" | "text" | "date" | "dateTime
 
 Physical column types; mixed columns use compact typed payload lanes.
 
+##### `QueryCommands` — interface
+
+```ts
+export interface QueryCommands { define(query: SavedQuery): string | null; refresh(ids: readonly string[] | null, signal: AbortSignal): Promise<string | null>; }
+```
+
+What the Data commands need from a query session. Messages are for the user.
+
+Members:
+- `define` — Checks the plan in the engine, then saves it; returns why it was not saved, or null.
+- `refresh` — Refreshes the given queries, or every query with an output table when
+`ids` is null. Resolves to why nothing was written, or null when it was.
+
 ##### `QueryJoinKind` — type
 
 ```ts
@@ -14308,6 +14354,16 @@ column edit moves, so such a rebase needs `initSheetwrite()` first.
 ```
 
 Sentinel shown for a reference that participates in a cycle.
+
+##### `registerQueryCommands` — function
+
+```ts
+(grid: Grid, commands: QueryCommands): () => void
+```
+
+Shows the grid's Get Data, Refresh All and Queries & Connections commands
+and connects them to `commands`. Returns the function that removes them.
+`@sheetwrite/queries` calls this from `createQuerySession`.
 
 ##### `RelationshipStatus` — type
 
@@ -16213,7 +16269,7 @@ Members:
 ##### `XlsxSourceGraph` — interface
 
 ```ts
-export interface XlsxSourceGraph { readonly owner: "root" | "workbook" | "sheet"; readonly sheetId?: SheetId; readonly type: string; readonly target: string; readonly cacheId?: string; readonly queries?: string; readonly parts: readonly string[]; readonly dependencies: readonly XlsxSourceDependency[]; }
+export interface XlsxSourceGraph { readonly owner: "root" | "workbook" | "sheet"; readonly sheetId?: SheetId; readonly type: string; readonly target: string; readonly cacheId?: string; readonly queries?: string; readonly unsupportedQueries?: readonly XlsxUnsupportedQuery[]; readonly parts: readonly string[]; readonly dependencies: readonly XlsxSourceDependency[]; }
 ```
 
 One relationship from the package, workbook, or a sheet to a retained part graph.
@@ -16226,6 +16282,9 @@ saved query definitions (the DataMashup and its connections). Any query
 change makes the graph stale, so it is dropped.
 - `target` — Relationship target part.
 - `type` — OPC relationship type URI.
+- `unsupportedQueries` — Power Query members of a kept DataMashup that no saved query represents,
+with the codec's reason. They leave with the graph, so a list never names
+a member that the next XLSX save would drop.
 
 ##### `XlsxSourcePart` — interface
 
@@ -16267,6 +16326,18 @@ export interface XlsxTableImportBackend { name: string; fromXlsxTable( data: Arr
 Pluggable table import backend. Parses raw `.xlsx` bytes into the same
 `ColumnarData` shape `fromCsv` returns, so host ingestion code can stay
 format-agnostic.
+
+##### `XlsxUnsupportedQuery` — interface
+
+```ts
+export interface XlsxUnsupportedQuery { readonly member: string; readonly reason: string; }
+```
+
+A kept Power Query member and why the query engine cannot run it.
+
+Members:
+- `member` — Section member name, at most 1,024 characters.
+- `reason` — The codec's reason code, at most 64 characters.
 
 ##### `XlsxWorkbookBackend` — interface
 

@@ -8,7 +8,7 @@ description: "QueryFetchRequest interface in @sheetwrite/queries: What the host 
 What the host must load for one saved query. It never carries credentials.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/session.ts#L28"><code>packages/queries/src/session.ts#L28</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/session.ts#L30"><code>packages/queries/src/session.ts#L30</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>

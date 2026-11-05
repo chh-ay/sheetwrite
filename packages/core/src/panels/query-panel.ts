@@ -416,9 +416,12 @@ export function queryPanel(grid: Grid, create: boolean): GridPanel {
         showStatus();
       };
 
-      // Unsupported members come from the codec, which reads the kept part.
-      const unsupportedRequest = queryCommandsOf(grid)?.unsupported();
-      void unsupportedRequest?.then((members) => {
+      const drawKept = (): void => {
+        // XLSX import records them on the kept DataMashup graph; they leave with it.
+        const members =
+          grid.store
+            .getWorkbook()
+            .xlsxSource?.graphs.flatMap((graph) => graph.unsupportedQueries ?? []) ?? [];
         keptEntries.replaceChildren(
           ...members.map((member) => {
             const row = document.createElement("div");
@@ -431,13 +434,21 @@ export function queryPanel(grid: Grid, create: boolean): GridPanel {
           }),
         );
         kept.hidden = members.length === 0;
-      });
+      };
 
       syncKind();
       syncLoad();
       draw();
-      if (create) edit(undefined);
-      const stopChange = grid.on("change", draw);
+      drawKept();
+      if (create) {
+        edit(undefined);
+        // The side panel focuses its first control after render; Get Data starts at the name.
+        queueMicrotask(() => name.control.focus());
+      }
+      const stopChange = grid.on("change", () => {
+        draw();
+        drawKept();
+      });
       const stopCommands = onQueryCommandsChange(grid, showStatus);
       return () => {
         stopChange();

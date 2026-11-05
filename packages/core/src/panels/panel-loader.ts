@@ -145,11 +145,6 @@ export function showDefineName(grid: Grid): void {
   requestPanel(grid, (controller) => controller.openNamePanel(grid, true));
 }
 
-/** Data › Get Data and Data › Queries & Connections open the query panel. */
-export function showQueryPanel(grid: Grid, create: boolean): void {
-  requestPanel(grid, (controller) => controller.openQueryPanel(grid, create));
-}
-
 /** Data › Custom Sort: open the Sort panel, loading the panels on first use. */
 export function showSortPanel(grid: Grid): void {
   requestPanel(grid, (controller) => controller.openSortPanel(grid));

@@ -3,6 +3,7 @@ import { afterEach, beforeAll, beforeEach, expect, it } from "bun:test";
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { loadPanels } from "../src/panels/panel-loader.js";
 import { type QueryCommands, registerQueryCommands } from "../src/query-commands.js";
+import { createToolbar } from "../src/shell.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { SavedQuery, Workbook } from "../src/types.js";
@@ -46,10 +47,7 @@ class FakeCommands implements QueryCommands {
   readonly refreshes: Array<{ ids: readonly string[] | null; signal: AbortSignal }> = [];
   private release: (() => void) | undefined;
 
-  constructor(
-    private readonly grid: GridImpl,
-    private readonly members: readonly { member: string; reason: string }[] = [],
-  ) {}
+  constructor(private readonly grid: GridImpl) {}
 
   define(query: SavedQuery): string | null {
     this.defined.push(query);
@@ -68,14 +66,11 @@ class FakeCommands implements QueryCommands {
   finish(): void {
     this.release?.();
   }
-
-  unsupported(): Promise<readonly { member: string; reason: string }[]> {
-    return Promise.resolve(this.members);
-  }
 }
 
-async function setup() {
+async function setup(xlsxSource?: Workbook["xlsxSource"]) {
   const workbook: Workbook = {
+    ...(xlsxSource === undefined ? {} : { xlsxSource }),
     activeSheet: "s1",
     sheets: [
       {
@@ -144,13 +139,28 @@ it("shows the Data query commands only while a session is registered", async () 
   openTab("Data");
   expect(commandButton("getData")).toBeNull();
 
+  const toolbarHost = document.createElement("div");
+  document.body.appendChild(toolbarHost);
+  const toolbar = createToolbar(toolbarHost, grid);
+  // The toolbar places a newly available command at its next fit, one frame later.
+  const toolbarShows = async (id: string): Promise<boolean> => {
+    const frame = Promise.withResolvers<void>();
+    requestAnimationFrame(() => frame.resolve());
+    await frame.promise;
+    return toolbar.element.querySelector<HTMLElement>(`[data-command="${id}"]`)?.hidden === false;
+  };
+  expect(await toolbarShows("refreshAll")).toBe(false);
+
   const unregister = registerQueryCommands(grid, new FakeCommands(grid));
   expect(commandButton("getData")).not.toBeNull();
   expect(commandButton("refreshAll")).not.toBeNull();
   expect(commandButton("queries")).not.toBeNull();
+  expect(await toolbarShows("refreshAll")).toBe(true);
 
   unregister();
   expect(commandButton("refreshAll")).toBeNull();
+  expect(await toolbarShows("refreshAll")).toBe(false);
+  toolbar.destroy();
 });
 
 it("runs one Refresh All, and a second press cancels it", async () => {
@@ -226,11 +236,33 @@ it("saves a new query from Get Data through the session's define", async () => {
 });
 
 it("lists saved queries, removes one undoably and shows kept unsupported members read-only", async () => {
-  const { grid, host, commandButton, openTab, press, panelOpened, buttonLabelled } = await setup();
+  const { grid, host, commandButton, openTab, press, panelOpened, buttonLabelled } = await setup({
+    parts: [
+      {
+        name: "customXml/item1.xml",
+        contentType: "application/xml",
+        method: 0,
+        crc32: 0,
+        uncompressedSize: 0,
+        data: "",
+      },
+    ],
+    graphs: [
+      {
+        owner: "workbook",
+        type: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml",
+        target: "customXml/item1.xml",
+        queries: "0123456789abcdef",
+        unsupportedQueries: [{ member: "Budget", reason: "schema" }],
+        parts: ["customXml/item1.xml"],
+        dependencies: [],
+      },
+    ],
+  });
   expect(grid.applyTransaction({ patches: [{ op: "setQuery", query: sales }] }).status).toBe(
     "applied",
   );
-  registerQueryCommands(grid, new FakeCommands(grid, [{ member: "Budget", reason: "schema" }]));
+  registerQueryCommands(grid, new FakeCommands(grid));
   openTab("Data");
   const queries = commandButton("queries");
   if (queries === null) throw new Error("no Queries & Connections");

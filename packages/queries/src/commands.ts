@@ -1,8 +1,4 @@
-import type {
-  ApplyTransactionResult,
-  QueryCommands,
-  UnsupportedQueryMember,
-} from "@sheetwrite/core";
+import type { ApplyTransactionResult, QueryCommands } from "@sheetwrite/core";
 
 import type { QueryDefinitionResult, QueryRefreshResult, QuerySession } from "./session.js";
 import type { QueryDiagnostic } from "./types.js";
@@ -32,12 +28,12 @@ function diagnosticMessage(diagnostic: QueryDiagnostic): string {
   return `The query engine reported ${diagnostic.code}${at.length > 0 ? ` at ${at.join(", ")}` : ""}.`;
 }
 
-export function definitionMessage(result: QueryDefinitionResult): string | null {
+function definitionMessage(result: QueryDefinitionResult): string | null {
   if (result.status === "invalid") return diagnosticMessage(result.diagnostic);
   return transactionMessage(result);
 }
 
-export function refreshMessage(result: QueryRefreshResult): string | null {
+function refreshMessage(result: QueryRefreshResult): string | null {
   switch (result.status) {
     case "applied":
       return transactionMessage(result.transaction);
@@ -56,11 +52,8 @@ export function refreshMessage(result: QueryRefreshResult): string | null {
   }
 }
 
-/** The grid commands' view of a session; `unsupported` lists kept M members. */
-export function sessionCommands(
-  session: QuerySession,
-  unsupported: () => Promise<readonly UnsupportedQueryMember[]>,
-): QueryCommands {
+/** The grid commands' view of a session. */
+export function sessionCommands(session: QuerySession): QueryCommands {
   return {
     define: (query) => definitionMessage(session.define(query)),
     async refresh(ids, signal) {
@@ -71,6 +64,5 @@ export function sessionCommands(
       }
       return null;
     },
-    unsupported,
   };
 }

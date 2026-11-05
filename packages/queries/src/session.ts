@@ -508,10 +508,7 @@ export function createSessionWithEngine(
 
   // The grid's Get Data, Refresh All and Queries & Connections commands appear
   // while this session is alive.
-  const unregister = registerQueryCommands(
-    grid,
-    sessionCommands(session, async () => []),
-  );
+  const unregister = registerQueryCommands(grid, sessionCommands(session));
 
   return session;
 }

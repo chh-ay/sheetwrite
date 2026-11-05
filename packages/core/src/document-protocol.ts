@@ -2892,6 +2892,10 @@ function rangeInSheet(range: Range, sheet: SheetSnapshot): boolean {
 const MAX_XLSX_SOURCE_COMPRESSED_BYTES = 256 * 1024 * 1024;
 const MAX_XLSX_SOURCE_ENTRIES = 10_000;
 const MAX_XLSX_PART_NAME_LENGTH = 1024;
+/** A section holds few members; these caps keep a hostile list small. */
+const MAX_UNSUPPORTED_QUERIES = 256;
+const MAX_QUERY_MEMBER_LENGTH = 1024;
+const MAX_QUERY_REASON_LENGTH = 64;
 const MAX_XLSX_CONTENT_TYPE_LENGTH = 256;
 const BASE64_PATTERN = /^(?:[A-Za-z\d+/]{4})*(?:[A-Za-z\d+/]{2}==|[A-Za-z\d+/]{3}=)?$/;
 const CONTENT_TYPE_PATTERN = /^[a-z\d!#$&^_.+-]+\/[a-z\d!#$&^_.+-]+$/i;
@@ -3019,6 +3023,48 @@ function validateXlsxSource(value: unknown, errors: DocumentValidationError[]): 
     const queries = ownValue(graph, "queries");
     if (queries !== undefined && (typeof queries !== "string" || !/^[0-9a-f]{16}$/.test(queries))) {
       invalid(errors, `${graphPath}.queries`, "queries must be a 64-bit hex digest");
+    }
+
+    const unsupported = ownValue(graph, "unsupportedQueries");
+    if (unsupported !== undefined) {
+      const unsupportedPath = `${graphPath}.unsupportedQueries`;
+      if (!Array.isArray(unsupported) || unsupported.length > MAX_UNSUPPORTED_QUERIES) {
+        invalid(
+          errors,
+          unsupportedPath,
+          `unsupportedQueries must be an array of at most ${MAX_UNSUPPORTED_QUERIES} members`,
+        );
+      } else {
+        unsupported.forEach((entry: unknown, entryIndex) => {
+          const entryPath = `${unsupportedPath}[${entryIndex}]`;
+          const record = recordAt(entry, entryPath, errors);
+          if (!record) return;
+          const member = ownValue(record, "member");
+          if (
+            typeof member !== "string" ||
+            member.length === 0 ||
+            member.length > MAX_QUERY_MEMBER_LENGTH
+          ) {
+            invalid(
+              errors,
+              `${entryPath}.member`,
+              `member must be 1 to ${MAX_QUERY_MEMBER_LENGTH} characters`,
+            );
+          }
+          const reason = ownValue(record, "reason");
+          if (
+            typeof reason !== "string" ||
+            reason.length === 0 ||
+            reason.length > MAX_QUERY_REASON_LENGTH
+          ) {
+            invalid(
+              errors,
+              `${entryPath}.reason`,
+              `reason must be 1 to ${MAX_QUERY_REASON_LENGTH} characters`,
+            );
+          }
+        });
+      }
     }
 
     const members = arrayAt(ownValue(graph, "parts"), `${graphPath}.parts`, errors);

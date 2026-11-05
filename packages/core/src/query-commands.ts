@@ -6,12 +6,6 @@
 import type { Grid } from "./types/grid.js";
 import type { SavedQuery } from "./types/query.js";
 
-/** A Power Query member that the codec cannot run; it stays in the file as M text. */
-export interface UnsupportedQueryMember {
-  readonly member: string;
-  readonly reason: string;
-}
-
 /** What the Data commands need from a query session. Messages are for the user. */
 export interface QueryCommands {
   /** Checks the plan in the engine, then saves it; returns why it was not saved, or null. */
@@ -21,8 +15,6 @@ export interface QueryCommands {
    * `ids` is null. Resolves to why nothing was written, or null when it was.
    */
   refresh(ids: readonly string[] | null, signal: AbortSignal): Promise<string | null>;
-  /** Members of the kept Power Query part that no saved query represents. */
-  unsupported(): Promise<readonly UnsupportedQueryMember[]>;
 }
 
 interface QueryCommandState {

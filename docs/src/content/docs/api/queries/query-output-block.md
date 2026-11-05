@@ -8,7 +8,7 @@ description: "QueryOutputBlock type in @sheetwrite/queries: Why an output table 
 Why an output table could not be written without touching unrelated cells.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/session.ts#L60"><code>packages/queries/src/session.ts#L60</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/session.ts#L62"><code>packages/queries/src/session.ts#L62</code></a></dd></div>
 </dl>
 
 ## Declaration

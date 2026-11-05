@@ -31,7 +31,6 @@ import {
   showDefineName,
   showFormulaExplanation,
   showNameManager,
-  showQueryPanel,
 } from "../panels/panel-loader.js";
 import { queryCommandsOf, queryRefreshRunning, toggleQueryRefresh } from "../query-commands.js";
 import { storeEngine } from "../store/engine-registry.js";
@@ -91,6 +90,15 @@ function selectedRowSpans(grid: Grid): Array<[number, number]> {
 
 function rowSpan(a: number, b: number): [number, number] {
   return [Math.min(a, b), Math.max(a, b)];
+}
+
+/**
+ * Data › Get Data and Queries & Connections. The opener lives in this lazy
+ * ribbon chunk rather than the panel loader, so grids without queries carry
+ * none of it.
+ */
+function showQueryPanel(grid: Grid, create: boolean): void {
+  void loadPanels(grid).then((controller) => controller.openQueryPanel(grid, create));
 }
 
 /** The query commands show only while a query session is connected to the grid. */

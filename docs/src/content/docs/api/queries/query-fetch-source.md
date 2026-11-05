@@ -8,7 +8,7 @@ description: "QueryFetchSource type in @sheetwrite/queries: The only path to sou
 The only path to source data; the session never calls a global `fetch`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/session.ts#L48"><code>packages/queries/src/session.ts#L48</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/session.ts#L50"><code>packages/queries/src/session.ts#L50</code></a></dd></div>
 </dl>
 
 ## Declaration

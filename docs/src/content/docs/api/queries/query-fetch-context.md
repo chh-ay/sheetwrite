@@ -8,7 +8,7 @@ description: "QueryFetchContext interface in @sheetwrite/queries: The signal abo
 The signal aborts when the refresh is cancelled or the session is disposed.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/session.ts#L43"><code>packages/queries/src/session.ts#L43</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/session.ts#L45"><code>packages/queries/src/session.ts#L45</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>1</span>

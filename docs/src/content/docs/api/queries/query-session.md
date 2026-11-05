@@ -8,7 +8,7 @@ description: "QuerySession interface in @sheetwrite/queries: Defines, removes an
 Defines, removes and refreshes the saved queries of one grid.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/session.ts#L84"><code>packages/queries/src/session.ts#L84</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/session.ts#L86"><code>packages/queries/src/session.ts#L86</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>

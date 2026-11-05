@@ -8,7 +8,7 @@ description: "QueryDefinitionResult type in @sheetwrite/queries: A definition th
 A definition the engine rejects, or the store's transaction result.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/session.ts#L63"><code>packages/queries/src/session.ts#L63</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/session.ts#L65"><code>packages/queries/src/session.ts#L65</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>2</span>
