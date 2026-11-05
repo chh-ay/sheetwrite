@@ -1,21 +1,18 @@
 /* ==========================================================================
    Landing (root route)
 
-   HeroApp and ArchitectureScene use seekable scripted timelines.
-   Numbered chapter buttons restart from that chapter; reduced motion keeps
-   the selected frame still. Both pause while off screen. Feature cards and
-   the story reel use CSS keyframes with informative non-animated states;
-   useScenePlayback pauses them off screen. GridGlow lights the background
-   grid around a mouse pointer.
+   The hero is a static preview of the workbook that becomes the live engine
+   when the reader reaches for it or the page goes idle (LiveGrid). The
+   architecture scene uses a seekable scripted timeline; numbered chapter
+   buttons restart from that chapter, reduced motion keeps the selected frame
+   still, and it pauses while off screen.
    ========================================================================== */
 
-/* Page parts, in cascade order: later parts and the responsive rules override earlier ones. */
+/* Page parts, in cascade order. */
 @import "./landing/base.css";
 @import "./landing/hero.css";
+@import "./landing/sections.css";
 @import "./landing/architecture.css";
-@import "./landing/features.css";
 @import "./landing/code.css";
 @import "./landing/benchmarks.css";
 @import "./landing/footer.css";
-@import "./landing/story-reel.css";
-@import "./landing/responsive.css";

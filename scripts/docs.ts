@@ -393,6 +393,11 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
       path: join(generatedDataRoot, "compatibility-results.json"),
       content: stableJson(publishedCompatibilityResults),
     },
+    // The landing shows the counts only; the full results ship with their own page.
+    {
+      path: join(generatedDataRoot, "compatibility-summary.json"),
+      content: stableJson(publishedCompatibilityResults.testSet),
+    },
     ...splitPerformancePages(await renderEvidenceText()).map((page) => ({
       path: join(contentRoot, page.route),
       content: page.content,

@@ -133,17 +133,24 @@ test("sidebar marks only the nearest documentation route as current", async ({ p
 
 test("site root serves the product landing", async ({ page }) => {
   const errors = collectErrors(page);
-  const wasmRequests: string[] = [];
-  page.on("request", (request) => {
-    if (/\.wasm(?:$|\?)/.test(request.url())) wasmRequests.push(request.url());
-  });
   const response = await page.goto(siteUrl("/"));
   expect(response?.ok()).toBe(true);
-  // Semantic contract: exactly one H1, and no live grid runtime on the landing.
+  // Semantic contract: exactly one H1, and the hero grid is a static preview
+  // until the page has loaded: the engine never competes with the first paint.
   await expect(page.locator("main h1")).toHaveCount(1);
-  await expect(page.locator("main canvas, main .sheetwrite")).toHaveCount(0);
-  await expect(page.getByTestId("landing-product-story")).toBeVisible();
-  expect(wasmRequests).toEqual([]);
+  const liveGrid = page.getByTestId("landing-live-grid");
+  await expect(liveGrid).toBeVisible();
+  const engineAfterLoad = await page.evaluate(() => {
+    const [navigation] = performance.getEntriesByType(
+      "navigation",
+    ) as PerformanceNavigationTiming[];
+    const loadEnd = navigation?.loadEventEnd ?? 0;
+    return performance
+      .getEntriesByType("resource")
+      .filter((entry) => /\.wasm(?:$|\?)/.test(entry.name))
+      .every((entry) => entry.startTime >= loadEnd);
+  });
+  expect(engineAfterLoad).toBe(true);
   await expect(page).toHaveTitle(SITE_TITLE);
   for (const selector of [
     'meta[name="description"]',
@@ -183,8 +190,9 @@ test("site root serves the product landing", async ({ page }) => {
     license: "https://opensource.org/license/mit",
     version,
   });
-  // Benchmark section publishes real generated numbers, never placeholders.
+  // Every number on the landing comes from generated sources, never placeholders.
   await expect(page.locator("#benchmarks li").first()).toContainText(/\d/);
+  await expect(page.locator(".sw-lp-evidence dt").first()).toContainText(/\d/);
   expect(errors.page).toEqual([]);
   expect(errors.console).toEqual([]);
   await page.getByRole("link", { name: /Performance & scale/ }).click();
@@ -194,54 +202,41 @@ test("site root serves the product landing", async ({ page }) => {
   await expect(page).toHaveURL(docsUrl("start/installation/"));
 });
 
-test("landing animations are bounded, replayable, and reduced-motion complete", async ({
-  page,
-}) => {
-  // The hero is a scripted timeline: each frame writes styles and text into its parts.
-  const frameOf = (root: Element) =>
-    [...root.querySelectorAll<HTMLElement>("[data-part]")]
-      .map((part) => `${part.style.cssText}|${part.textContent}`)
-      .join("\n");
+test("the hero grid becomes the live engine and recalculates", async ({ page }) => {
+  const errors = collectErrors(page);
+  await page.goto(siteUrl("/"));
+  await waitForHydration(page);
+  const liveGrid = page.getByTestId("landing-live-grid");
+  // Reaching for the grid starts the engine at once.
+  await liveGrid.hover();
+  await expect(liveGrid).toHaveAttribute("data-state", "live");
+  await expect(liveGrid.locator("canvas").first()).toBeVisible();
+  // The name box selects a computed cell; the formula bar shows its formula.
+  const nameBox = liveGrid.getByRole("textbox", { name: "Cell reference" });
+  await nameBox.fill("D2");
+  await nameBox.press("Enter");
+  await expect(liveGrid.getByRole("textbox", { name: "Formula bar" })).toHaveValue("=B2*C2");
+  expect(errors.page).toEqual([]);
+});
+
+test("landing animations are bounded, seekable, and reduced-motion complete", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto(siteUrl("/"));
   await waitForHydration(page);
-  const story = page.getByTestId("landing-product-story");
-  // Reduced motion: the loop does not run, and the still picture is the finished
-  // edit: the chart is in and the recalculated total shows.
-  await expect(story).toHaveAttribute("data-landing-running", "false");
-  await expect(story.locator('[data-part="d6"]')).toHaveText("$21,808");
-  const still = await story.evaluate(frameOf);
-  await page.waitForTimeout(400);
-  expect(await story.evaluate(frameOf)).toBe(still);
+  const scene = page.locator(".sw-arch");
+  await scene.scrollIntoViewIfNeeded();
+  // Reduced motion: the loop does not run.
+  await expect(scene).toHaveAttribute("data-landing-running", "false");
   // Seeking in either direction must work without enabling animation.
-  for (const selector of [".ha-acts", ".sw-arch__steps"]) {
-    const chapters = page.locator(`${selector} button`);
-    for (let index = (await chapters.count()) - 1; index >= 0; index--) {
-      await chapters.nth(index).focus();
-      await page.keyboard.press("Enter");
-      await expect(chapters.nth(index)).toHaveAttribute("aria-current", "step");
-      await expect(page.locator(`${selector} [aria-current="step"]`)).toHaveCount(1);
-    }
+  const chapters = page.locator(".sw-arch__steps button");
+  for (let index = (await chapters.count()) - 1; index >= 0; index--) {
+    await chapters.nth(index).focus();
+    await page.keyboard.press("Enter");
+    await expect(chapters.nth(index)).toHaveAttribute("aria-current", "step");
+    await expect(page.locator('.sw-arch__steps [aria-current="step"]')).toHaveCount(1);
   }
-  await expect(story.locator('[data-part="d6"]')).toHaveText("$19,696");
-  await expect(story).toHaveAttribute("data-landing-running", "false");
-
-  await page.emulateMedia({ reducedMotion: "no-preference" });
-  await story.getByRole("button", { name: "Replay animation" }).click();
-  await expect(story).toHaveAttribute("data-landing-running", "true");
-  const playing = await story.evaluate(frameOf);
-  await expect.poll(() => story.evaluate(frameOf)).not.toBe(playing);
-  // Off screen, the illustration stops; back on screen, it resumes.
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-  await expect(story).toHaveAttribute("data-landing-running", "false");
-  const paused = await story.evaluate(frameOf);
-  await page.waitForTimeout(400);
-  expect(await story.evaluate(frameOf)).toBe(paused);
-  await story.scrollIntoViewIfNeeded();
-  await expect(story).toHaveAttribute("data-landing-running", "true");
-  await expect.poll(() => story.evaluate(frameOf)).not.toBe(paused);
+  await expect(scene).toHaveAttribute("data-landing-running", "false");
   await page.goto(docsUrl("start/installation/"));
-  await expect(story).toHaveCount(0);
   expect(
     await page.evaluate(
       () =>
@@ -253,7 +248,7 @@ test("landing animations are bounded, replayable, and reduced-motion complete", 
 test("landing tab lists follow arrow, Home, and End keys", async ({ page }) => {
   await page.goto(siteUrl("/"));
   await waitForHydration(page);
-  for (const prefix of ["landing-story-", "landing-tab-"]) {
+  for (const prefix of ["landing-tab-"]) {
     const tabs = page.locator(`[role="tab"][id^="${prefix}"]`);
     const count = await tabs.count();
     expect(count).toBeGreaterThan(2);
