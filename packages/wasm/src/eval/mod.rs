@@ -20,6 +20,8 @@ mod lookup;
 mod math;
 mod matrix;
 mod number_format;
+#[cfg(test)]
+mod number_format_corpus_tests;
 mod operators;
 mod random;
 mod range_fold;

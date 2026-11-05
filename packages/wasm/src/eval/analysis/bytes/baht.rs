@@ -1,5 +1,6 @@
 //! `BAHTTEXT`: a number as Thai words, in baht and satang.
 
+use crate::float_text::fixed_text;
 use crate::types::{EvalResult, Value};
 
 use super::super::super::functions::{number_arg, require_arity, FuncAccumulator};
@@ -31,6 +32,8 @@ const EXACT: &str = "ถ้วน";
 const MINUS: &str = "ลบ";
 /// Thai numbers group digits by millions.
 const GROUP_DIGITS: usize = 6;
+/// Satang are hundredths of a baht.
+const SATANG_PLACES: u32 = 2;
 
 /// `BAHTTEXT(number)`: the number rounded to satang (two decimal places).
 pub(super) fn baht_text(values: &FuncAccumulator) -> EvalResult {
@@ -42,7 +45,7 @@ pub(super) fn baht_text(values: &FuncAccumulator) -> EvalResult {
 }
 
 fn words(number: f64) -> String {
-    let digits = format!("{:.2}", number.abs());
+    let digits = fixed_text(number.abs(), SATANG_PLACES);
     let (baht, satang) = digits.split_at(digits.len() - 3);
     let satang = &satang[1..];
     let has_baht = baht != "0";
