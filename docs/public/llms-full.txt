@@ -4509,6 +4509,59 @@ The host owns source fetching and credentials. These entry points accept bytes
 or typed batches; they never fetch a URL. See the
 [query package reference](https://www.sheetwrite.dev/docs/api/queries/) for the full interface.
 
+## Saved queries and refresh
+
+A workbook can save queries in `workbook.queries`. Each saved query has a source,
+its steps, and an optional output table. `createQuerySession` is the only call
+that loads the query engine. It binds the saved queries of one grid to the
+host's `fetchSource` callback.
+
+```ts
+import type { Grid } from "@sheetwrite/core";
+import { createQuerySession } from "@sheetwrite/queries";
+
+async function refreshSales(grid: Grid) {
+  const session = await createQuerySession(grid, {
+    // The host applies its own credentials and network policy here.
+    fetchSource: async (request, { signal }) => {
+      const response = await fetch(`/sources/${request.sourceId}`, { signal });
+      return { kind: "bytes", bytes: new Uint8Array(await response.arrayBuffer()) };
+    },
+  });
+
+  session.define({
+    id: "sales",
+    name: "Sales",
+    source: {
+      kind: "csv",
+      sourceId: "sales-feed",
+      columns: [
+        { id: "region", name: "Region", type: "text" },
+        { id: "total", name: "Total", type: "number" },
+      ],
+    },
+    steps: [{ kind: "filter", predicate: { kind: "compare", column: "total", op: "gt", value: 0 } }],
+    output: { table: "sales", tableName: "Sales", anchor: { sheet: "sheet1", row: 0, col: 0 } },
+  });
+
+  return session.refresh("sales");
+}
+```
+
+- `define` runs the plan on zero-row inputs in the engine before it saves, so a
+missing column or a wrong type is reported as `invalid` and nothing is saved.
+- `refresh` loads the query and every query it joins, then writes the output
+table in one undoable transaction. `refreshAll` writes every output table in
+one transaction, or none if any query fails.
+- The output table holds the saved values. Formulas and pivots read it as an
+ordinary table. Undo and redo restore the recorded values without another
+fetch. Synced peers receive the written values and never fetch.
+- A refresh is `stale` if a definition or its output table changes while the
+sources load. Growth into non-empty cells, or into another table, is
+`blocked`. In both cases nothing is written.
+- Saved locators are public. A locator with a user name or password is
+rejected, and credentials stay in the host's callback.
+
 ## See also
 
 - [Interaction](https://www.sheetwrite.dev/docs/features/grid/selection-and-keyboard/) for clipboard TSV and the toolbar sort control.
@@ -12380,7 +12433,7 @@ Diff two validated phases of the same operation by exclusive resource owner.
 ##### `DocumentOp` — type
 
 ```ts
-export type DocumentOp = | { op: "set"; addr: CellAddress; value: CellValue; style?: CellStyle } | { op: "setRange"; range: Range; cells: SnapshotCell[] } | { op: "setBlock"; range: Range; block: PackedCellBlock } | { op: "restoreBlock"; range: Range; encoding: "deflate-json-v1"; decodedBytes: number; data: string; } | { op: "setRangeStyle"; range: Range; style: Partial<CellStyle> | null } | { op: "clearRange"; range: Range; contents?: boolean; style?: boolean } | { op: "addRows"; sheet: SheetId; at: number; count: number } | { op: "removeRows"; sheet: SheetId; at: number; count: number } | { op: "moveRows"; sheet: SheetId; from: number; count: number; to: number } | { op: "addColumns"; sheet: SheetId; at: number; columns: Column[] } | { op: "removeColumns"; sheet: SheetId; at: number; count: number } | { op: "moveColumns"; sheet: SheetId; from: number; count: number; to: number } | { op: "setColumn"; sheet: SheetId; col: number; patch: Partial<Column> } | { op: "setRowMeta"; sheet: SheetId; row: number; meta: RowMetadata | null } | { op: "addMerge"; sheet: SheetId; merge: MergeRange } | { op: "removeMerge"; sheet: SheetId; merge: MergeRange } | { op: "addSheet"; sheet: SheetSnapshot } | { op: "removeSheet"; sheet: SheetId } | { op: "renameSheet"; sheet: SheetId; name: string } | { op: "moveSheet"; sheet: SheetId; to: number } | { op: "setSheetVisibility"; sheet: SheetId; visibility: SheetVisibility } | { op: "addTable"; table: WorkbookTable } | { op: "updateTable"; sheet: SheetId; tableId: string; patch: WorkbookTablePatch } | { op: "removeTable"; sheet: SheetId; tableId: string } | { op: "setSheetMeta"; sheet: SheetId; patch: { frozenRows?: number; frozenCols?: number; conditionalFormats?: ConditionalFormatRule[]; rowGroups?: RowGroup[]; sortKeys?: SortKey[]; filters?: Array<[col: number, filter: ColumnFilter]>; }; } | { op: "setValidationRule"; sheet: SheetId; rule: DataValidationRule } | { op: "removeValidationRule"; sheet: SheetId; id: string } | { op: "setHyperlink"; sheet: SheetId; hyperlink: CellHyperlink } | { op: "removeHyperlink"; sheet: SheetId; id: string } | { op: "setProtectedRange"; sheet: SheetId; protectedRange: ProtectedRange } | { op: "removeProtectedRange"; sheet: SheetId; id: string } | { op: "setNote"; addr: CellAddress; text: string | null } | { op: "setNamedRange"; namedRange: NamedRangeSnapshot } | { op: "removeNamedRange"; name: string; scope?: SheetId } | { op: "setCalculation"; calculation: CalculationSettings } | { op: "setRelationship"; relationship: TableRelationship } | { op: "removeRelationship"; id: string } | { op: "setChart"; sheet: SheetId; chart: ChartDefinition } | { op: "removeChart"; sheet: SheetId; id: string } | { op: "setPivot"; sheet: SheetId; pivot: PivotDefinition } | { op: "removePivot"; sheet: SheetId; id: string };
+export type DocumentOp = | { op: "set"; addr: CellAddress; value: CellValue; style?: CellStyle } | { op: "setRange"; range: Range; cells: SnapshotCell[] } | { op: "setBlock"; range: Range; block: PackedCellBlock } | { op: "restoreBlock"; range: Range; encoding: "deflate-json-v1"; decodedBytes: number; data: string; } | { op: "setRangeStyle"; range: Range; style: Partial<CellStyle> | null } | { op: "clearRange"; range: Range; contents?: boolean; style?: boolean } | { op: "addRows"; sheet: SheetId; at: number; count: number } | { op: "removeRows"; sheet: SheetId; at: number; count: number } | { op: "moveRows"; sheet: SheetId; from: number; count: number; to: number } | { op: "addColumns"; sheet: SheetId; at: number; columns: Column[] } | { op: "removeColumns"; sheet: SheetId; at: number; count: number } | { op: "moveColumns"; sheet: SheetId; from: number; count: number; to: number } | { op: "setColumn"; sheet: SheetId; col: number; patch: Partial<Column> } | { op: "setRowMeta"; sheet: SheetId; row: number; meta: RowMetadata | null } | { op: "addMerge"; sheet: SheetId; merge: MergeRange } | { op: "removeMerge"; sheet: SheetId; merge: MergeRange } | { op: "addSheet"; sheet: SheetSnapshot } | { op: "removeSheet"; sheet: SheetId } | { op: "renameSheet"; sheet: SheetId; name: string } | { op: "moveSheet"; sheet: SheetId; to: number } | { op: "setSheetVisibility"; sheet: SheetId; visibility: SheetVisibility } | { op: "addTable"; table: WorkbookTable } | { op: "updateTable"; sheet: SheetId; tableId: string; patch: WorkbookTablePatch } | { op: "removeTable"; sheet: SheetId; tableId: string } | { op: "setSheetMeta"; sheet: SheetId; patch: { frozenRows?: number; frozenCols?: number; conditionalFormats?: ConditionalFormatRule[]; rowGroups?: RowGroup[]; sortKeys?: SortKey[]; filters?: Array<[col: number, filter: ColumnFilter]>; }; } | { op: "setValidationRule"; sheet: SheetId; rule: DataValidationRule } | { op: "removeValidationRule"; sheet: SheetId; id: string } | { op: "setHyperlink"; sheet: SheetId; hyperlink: CellHyperlink } | { op: "removeHyperlink"; sheet: SheetId; id: string } | { op: "setProtectedRange"; sheet: SheetId; protectedRange: ProtectedRange } | { op: "removeProtectedRange"; sheet: SheetId; id: string } | { op: "setNote"; addr: CellAddress; text: string | null } | { op: "setNamedRange"; namedRange: NamedRangeSnapshot } | { op: "removeNamedRange"; name: string; scope?: SheetId } | { op: "setCalculation"; calculation: CalculationSettings } | { op: "setRelationship"; relationship: TableRelationship } | { op: "removeRelationship"; id: string } | { op: "setQuery"; query: SavedQuery } | { op: "removeQuery"; id: string } | { op: "setChart"; sheet: SheetId; chart: ChartDefinition } | { op: "removeChart"; sheet: SheetId; id: string } | { op: "setPivot"; sheet: SheetId; pivot: PivotDefinition } | { op: "removePivot"; sheet: SheetId; id: string };
 ```
 
 Exhaustive serializable operation union for workbook mutations.
@@ -13850,6 +13903,14 @@ export type ProtectionResolver = (request: ProtectionRequest) => "allow" | "deny
 
 Host-owned client UX permission callback for protected mutations.
 
+##### `QueryAggregate` — interface
+
+```ts
+export interface QueryAggregate { readonly id: string; readonly name: string; readonly op: "countRows" | "count" | "sum" | "average" | "min" | "max"; readonly column?: string; }
+```
+
+Column is required except for countRows; numeric aggregates ignore nulls.
+
 ##### `QueryCapability` — type
 
 ```ts
@@ -13857,6 +13918,47 @@ export type QueryCapability = | { status: "complete" } | { status: "incomplete";
 ```
 
 Whether a query is complete for the currently loaded datasource pages.
+
+##### `QueryColumnSpec` — interface
+
+```ts
+export interface QueryColumnSpec { readonly id: string; readonly name: string; readonly type: QueryColumnType; }
+```
+
+Stable identity is separate from the field name used by source records.
+
+##### `QueryColumnType` — type
+
+```ts
+export type QueryColumnType = "number" | "logical" | "text" | "date" | "dateTime" | "mixed";
+```
+
+Physical column types; mixed columns use compact typed payload lanes.
+
+##### `QueryJoinKind` — type
+
+```ts
+export type QueryJoinKind = | "inner" | "left" | "right" | "full" | "leftSemi" | "rightSemi" | "leftAnti" | "rightAnti";
+```
+
+Join kinds retain duplicate matches and match null keys to null keys.
+
+##### `QueryPredicate` — type
+
+```ts
+export type QueryPredicate = | { readonly kind: "compare"; readonly column: string; readonly op: "eq" | "neq" | "lt" | "lte" | "gt" | "gte"; readonly value: string | number | boolean | null; } | { readonly kind: "isNull"; readonly column: string } | { readonly kind: "contains"; readonly column: string; readonly text: string } | { readonly kind: "and" | "or"; readonly predicates: readonly QueryPredicate[] } | { readonly kind: "not"; readonly predicate: QueryPredicate };
+```
+
+Data-only predicate trees use M null logic; only logical true selects a row.
+
+##### `QueryStep` — type
+
+```ts
+export type QueryStep = | { readonly kind: "filter"; readonly predicate: QueryPredicate } | { readonly kind: "select"; readonly columns: readonly string[] } | { readonly kind: "rename"; readonly columns: readonly (readonly [id: string, name: string])[] } | { readonly kind: "changeType"; readonly column: string; readonly type: QueryColumnType; readonly onError: "error" | "null"; } | { readonly kind: "join"; readonly input: string; readonly keys: readonly (readonly [left: string, right: string])[]; readonly join: QueryJoinKind; } | { readonly kind: "group"; readonly keys: readonly string[]; readonly aggregates: readonly QueryAggregate[]; } | { readonly kind: "unpivot"; readonly columns: readonly string[]; readonly attribute: { readonly id: string; readonly name: string }; readonly value: { readonly id: string; readonly name: string }; };
+```
+
+Saved step order is execution order; each column reference is a stable identity.
+In a saved query, a join `input` is the ID of another saved query.
 
 ##### `Range` — interface
 
@@ -14230,7 +14332,7 @@ Context supplied when a canonical row insertion needs a host identity.
 ##### `RowBridgeMetadataDelta` — interface
 
 ```ts
-export interface RowBridgeMetadataDelta<Id extends RowBridgeId = RowBridgeId> { readonly kind: "metadata"; readonly metadata: | "column" | "row" | "sheet" | "merge" | "table" | "validation" | "hyperlink" | "protected-range" | "note" | "named-range" | "calculation" | "relationship" | "chart" | "pivot"; readonly transaction: RowBridgeTransaction; readonly transactionId: string; readonly source: OperationSource; readonly previous: unknown; readonly next: unknown; readonly operation: DocumentOp; readonly rowIds: readonly (Id | null)[]; }
+export interface RowBridgeMetadataDelta<Id extends RowBridgeId = RowBridgeId> { readonly kind: "metadata"; readonly metadata: | "column" | "row" | "sheet" | "merge" | "table" | "validation" | "hyperlink" | "protected-range" | "note" | "named-range" | "calculation" | "relationship" | "query" | "chart" | "pivot"; readonly transaction: RowBridgeTransaction; readonly transactionId: string; readonly source: OperationSource; readonly previous: unknown; readonly next: unknown; readonly operation: DocumentOp; readonly rowIds: readonly (Id | null)[]; }
 ```
 
 A document operation that changes workbook or column metadata.
@@ -14411,6 +14513,44 @@ Sanitize one untrusted clipboard/snapshot value without cloning its object graph
 ```
 
 Convert an untrusted style into one bounded, plain renderer-safe value.
+
+##### `SavedQuery` — interface
+
+```ts
+export interface SavedQuery { readonly id: string; readonly name: string; readonly source: SavedQuerySource; readonly steps: readonly QueryStep[]; readonly output?: SavedQueryOutput; }
+```
+
+One saved, refreshable query. Definitions never contain host credentials.
+
+Members:
+- `id` — Stable identity, unique in the workbook.
+- `name` — Display name, unique in the workbook when ASCII letter case is ignored.
+- `output` — Absent for a query that only feeds other queries.
+
+##### `SavedQueryOutput` — interface
+
+```ts
+export interface SavedQueryOutput { readonly table: WorkbookTableId; readonly tableName: string; readonly anchor: CellAddress; }
+```
+
+The workbook table that holds a query's last refreshed values. Its top-left
+cell is `anchor`; the first row is the header row. The table cells are the
+saved result, so a workbook without the query engine still reads them.
+
+Members:
+- `table` — Stable `WorkbookTable.id`; refresh creates the table if it is absent.
+- `tableName` — Structured-reference name used when refresh creates the table.
+
+##### `SavedQuerySource` — type
+
+```ts
+export type SavedQuerySource = | { readonly kind: "csv"; readonly sourceId: string; readonly locator?: string; readonly columns: readonly QueryColumnSpec[]; readonly delimiter?: number; readonly headers?: boolean; readonly emptyIsNull?: boolean; } | { readonly kind: "json"; readonly sourceId: string; readonly locator?: string; readonly columns: readonly QueryColumnSpec[]; readonly path?: readonly string[]; } | { readonly kind: "host"; readonly sourceId: string; readonly columns: readonly QueryColumnSpec[]; };
+```
+
+Where a saved query reads its data. The host's fetch callback resolves
+`sourceId` to bytes or batches and applies any credentials itself. A
+`locator` is a public, credential-free address such as an `https` URL;
+it never holds tokens, signed parameters or passwords.
 
 ##### `SearchOptions` — interface
 
@@ -15611,7 +15751,7 @@ One retained-memory owner reported by the WASM cell store.
 ##### `Workbook` — interface
 
 ```ts
-export interface Workbook { sheets: Sheet[]; activeSheet: SheetId; namedRanges?: NamedRangeSnapshot[]; xlsxSource?: XlsxSourceSnapshot; calculation?: CalculationSettings; dataModel?: DataModel; }
+export interface Workbook { sheets: Sheet[]; activeSheet: SheetId; namedRanges?: NamedRangeSnapshot[]; xlsxSource?: XlsxSourceSnapshot; calculation?: CalculationSettings; dataModel?: DataModel; queries?: SavedQuery[]; }
 ```
 
 Live workbook schema containing ordered sheets and the active sheet ID.
@@ -15621,6 +15761,7 @@ Members:
 - `calculation` — Iterative calculation options; absent means the defaults.
 - `dataModel` — Relationships between workbook tables; absent means none.
 - `namedRanges` — Formula names shared by the workbook or shadowed within a sheet scope.
+- `queries` — Saved refreshable queries; absent means none.
 - `sheets` — Sheets in display/tab order.
 - `xlsxSource` — Opaque OOXML graphs from an imported file; edits drop the graphs that depend on them.
 
@@ -15635,7 +15776,7 @@ Current workbook snapshot schema version accepted by Sheetwrite.
 ##### `WorkbookSnapshot` — interface
 
 ```ts
-export interface WorkbookSnapshot { schemaVersion: 1; documentId?: string; version?: number; workbook: { activeSheet: SheetId; namedRanges?: NamedRangeSnapshot[]; xlsxSource?: XlsxSourceSnapshot; calculation?: CalculationSettings; dataModel?: DataModel; }; sheets: SheetSnapshot[]; }
+export interface WorkbookSnapshot { schemaVersion: 1; documentId?: string; version?: number; workbook: { activeSheet: SheetId; namedRanges?: NamedRangeSnapshot[]; xlsxSource?: XlsxSourceSnapshot; calculation?: CalculationSettings; dataModel?: DataModel; queries?: SavedQuery[]; }; sheets: SheetSnapshot[]; }
 ```
 
 Schema-versioned serializable workbook document.
@@ -16271,7 +16412,7 @@ Context supplied when a canonical row insertion needs a host identity.
 ##### `RowBridgeMetadataDelta` — interface
 
 ```ts
-export interface RowBridgeMetadataDelta<Id extends RowBridgeId = RowBridgeId> { readonly kind: "metadata"; readonly metadata: | "column" | "row" | "sheet" | "merge" | "table" | "validation" | "hyperlink" | "protected-range" | "note" | "named-range" | "calculation" | "relationship" | "chart" | "pivot"; readonly transaction: RowBridgeTransaction; readonly transactionId: string; readonly source: OperationSource; readonly previous: unknown; readonly next: unknown; readonly operation: DocumentOp; readonly rowIds: readonly (Id | null)[]; }
+export interface RowBridgeMetadataDelta<Id extends RowBridgeId = RowBridgeId> { readonly kind: "metadata"; readonly metadata: | "column" | "row" | "sheet" | "merge" | "table" | "validation" | "hyperlink" | "protected-range" | "note" | "named-range" | "calculation" | "relationship" | "query" | "chart" | "pivot"; readonly transaction: RowBridgeTransaction; readonly transactionId: string; readonly source: OperationSource; readonly previous: unknown; readonly next: unknown; readonly operation: DocumentOp; readonly rowIds: readonly (Id | null)[]; }
 ```
 
 A document operation that changes workbook or column metadata.
@@ -17817,6 +17958,32 @@ Declaration target: `./dist/index.d.ts`
 Source entry: `src/index.ts`
 Page: https://www.sheetwrite.dev/docs/api/queries/
 
+##### `createQuerySession` — function
+
+```ts
+(grid: Grid, options: QuerySessionOptions & QueryEngineOptions): Promise<QuerySession>
+```
+
+The one registration call for workbook queries: loads the engine and binds
+saved queries of `grid` to the host's `fetchSource`. Workbooks that never
+call it load no query code or WASM.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+import { createQuerySession } from "@sheetwrite/queries";
+
+async function refreshSales(grid: Grid) {
+ const session = await createQuerySession(grid, {
+ fetchSource: async (request, { signal }) => {
+ const response = await fetch(`/sources/${request.sourceId}`, { signal });
+ return { kind: "bytes", bytes: new Uint8Array(await response.arrayBuffer()) };
+ },
+ });
+
+ return session.refreshAll();
+}
+```
+
 ##### `loadQueryEngine` — function
 
 ```ts
@@ -17881,6 +18048,14 @@ export type QueryColumnType = "number" | "logical" | "text" | "date" | "dateTime
 
 Physical column types; mixed columns use compact typed payload lanes.
 
+##### `QueryDefinitionResult` — type
+
+```ts
+export type QueryDefinitionResult = | { readonly status: "invalid"; readonly diagnostic: QueryDiagnostic } | ApplyTransactionResult;
+```
+
+A definition the engine rejects, or the store's transaction result.
+
 ##### `QueryDiagnostic` — interface
 
 ```ts
@@ -17923,6 +18098,42 @@ Fatal source or plan failure; cell-level errors stay in the returned column lane
 Members:
 - `new` — Diagnostic codes remain stable even when their human-readable context changes.
 
+##### `QueryFetchContext` — interface
+
+```ts
+export interface QueryFetchContext { readonly signal: AbortSignal; }
+```
+
+The signal aborts when the refresh is cancelled or the session is disposed.
+
+##### `QueryFetchRequest` — interface
+
+```ts
+export interface QueryFetchRequest { readonly queryId: string; readonly sourceId: string; readonly kind: SavedQuerySource["kind"]; readonly locator?: string; }
+```
+
+What the host must load for one saved query. It never carries credentials.
+
+Members:
+- `locator` — Public, credential-free locator from the saved definition, if any.
+- `sourceId` — Host-defined source identity; the host maps it to its own credentials and policy.
+
+##### `QueryFetchResult` — type
+
+```ts
+export type QueryFetchResult = | { readonly kind: "bytes"; readonly bytes: Uint8Array } | { readonly kind: "batch"; readonly batch: QueryBatch };
+```
+
+CSV and JSON sources return bytes; host sources return typed batches.
+
+##### `QueryFetchSource` — type
+
+```ts
+export type QueryFetchSource = ( request: QueryFetchRequest, context: QueryFetchContext, ) => Promise<QueryFetchResult>;
+```
+
+The only path to source data; the session never calls a global `fetch`.
+
 ##### `QueryInput` — interface
 
 ```ts
@@ -17934,7 +18145,7 @@ One execution-local named input, consumed by join steps without a result cache.
 ##### `QueryJoinKind` — type
 
 ```ts
-export type QueryJoinKind = | "inner" | "left" | "right" | "full" | "leftSemi" | "rightSemi" | "leftAnti" | "rightAnti";
+export type QueryJoinKind = "inner" | "left" | "right" | "full" | "leftSemi" | "rightSemi" | "leftAnti" | "rightAnti";
 ```
 
 Join kinds retain duplicate matches and match null keys to null keys.
@@ -17962,13 +18173,60 @@ Members:
 - `indexes` — Index in the typed lane selected by the row's tag.
 - `tags` — 0 = null, 1 = number, 2 = logical, 3 = text, 4 = date, 5 = dateTime, 6 = error.
 
+##### `QueryOutputBlock` — type
+
+```ts
+export type QueryOutputBlock = "missing-sheet" | "too-wide" | "occupied";
+```
+
+Why an output table could not be written without touching unrelated cells.
+
 ##### `QueryPredicate` — type
 
 ```ts
-export type QueryPredicate = | { readonly kind: "compare"; readonly column: string; readonly op: "eq" | "neq" | "lt" | "lte" | "gt" | "gte"; readonly value: string | number | boolean | null; } | { readonly kind: "isNull"; readonly column: string } | { readonly kind: "contains"; readonly column: string; readonly text: string } | { readonly kind: "and" | "or"; readonly predicates: readonly QueryPredicate[] } | { readonly kind: "not"; readonly predicate: QueryPredicate };
+export type QueryPredicate = { readonly kind: "compare"; readonly column: string; readonly op: "eq" | "neq" | "lt" | "lte" | "gt" | "gte"; readonly value: string | number | boolean | null; } | { readonly kind: "isNull"; readonly column: string; } | { readonly kind: "contains"; readonly column: string; readonly text: string; } | { readonly kind: "and" | "or"; readonly predicates: readonly QueryPredicate[]; } | { readonly kind: "not"; readonly predicate: QueryPredicate; };
 ```
 
 Data-only predicate trees use M null logic; only logical true selects a row.
+
+##### `QueryRefreshOptions` — interface
+
+```ts
+export interface QueryRefreshOptions { readonly signal?: AbortSignal; }
+```
+
+The signal cancels a pending refresh before it writes anything.
+
+##### `QueryRefreshResult` — type
+
+```ts
+export type QueryRefreshResult = | { readonly status: "applied"; readonly transaction: ApplyTransactionResult } | { readonly status: "failed"; readonly queryId: string; readonly diagnostic: QueryDiagnostic } | { readonly status: "blocked"; readonly queryId: string; readonly reason: QueryOutputBlock } | { readonly status: "missing"; readonly queryId: string } | { readonly status: "stale" } | { readonly status: "aborted" } | { readonly status: "rejected"; readonly transaction: ApplyTransactionResult };
+```
+
+One refresh commits every requested output in one transaction, or none.
+
+##### `QuerySession` — interface
+
+```ts
+export interface QuerySession { define(query: SavedQuery): QueryDefinitionResult; remove(id: string): ApplyTransactionResult; refresh(id: string, options?: QueryRefreshOptions): Promise<QueryRefreshResult>; refreshAll(options?: QueryRefreshOptions): Promise<QueryRefreshResult>; dispose(): void; }
+```
+
+Defines, removes and refreshes the saved queries of one grid.
+
+Members:
+- `define` — Checks the plan in the engine, then saves it as one undoable change.
+- `dispose` — Aborts pending refreshes; later calls are rejected.
+- `refresh` — Refreshes one query and the queries it joins, as one undoable change.
+- `refreshAll` — Refreshes every query with an output table, as one undoable change.
+- `remove` — Removes a saved query; its output table and values stay.
+
+##### `QuerySessionOptions` — interface
+
+```ts
+export interface QuerySessionOptions { readonly fetchSource: QueryFetchSource; readonly limits?: Partial<QueryLimits>; }
+```
+
+Host I/O for a session; the engine limits apply to every parse and execution.
 
 ##### `QuerySource` — type
 
@@ -17981,10 +18239,11 @@ Host-owned UTF-8 bytes are parsed against an explicit schema, without type guess
 ##### `QueryStep` — type
 
 ```ts
-export type QueryStep = | { readonly kind: "filter"; readonly predicate: QueryPredicate } | { readonly kind: "select"; readonly columns: readonly string[] } | { readonly kind: "rename"; readonly columns: readonly (readonly [id: string, name: string])[] } | { readonly kind: "changeType"; readonly column: string; readonly type: QueryColumnType; readonly onError: "error" | "null"; } | { readonly kind: "join"; readonly input: string; readonly keys: readonly (readonly [left: string, right: string])[]; readonly join: QueryJoinKind; } | { readonly kind: "group"; readonly keys: readonly string[]; readonly aggregates: readonly QueryAggregate[]; } | { readonly kind: "unpivot"; readonly columns: readonly string[]; readonly attribute: { readonly id: string; readonly name: string }; readonly value: { readonly id: string; readonly name: string }; };
+export type QueryStep = { readonly kind: "filter"; readonly predicate: QueryPredicate; } | { readonly kind: "select"; readonly columns: readonly string[]; } | { readonly kind: "rename"; readonly columns: readonly (readonly [id: string, name: string])[]; } | { readonly kind: "changeType"; readonly column: string; readonly type: QueryColumnType; readonly onError: "error" | "null"; } | { readonly kind: "join"; readonly input: string; readonly keys: readonly (readonly [left: string, right: string])[]; readonly join: QueryJoinKind; } | { readonly kind: "group"; readonly keys: readonly string[]; readonly aggregates: readonly QueryAggregate[]; } | { readonly kind: "unpivot"; readonly columns: readonly string[]; readonly attribute: { readonly id: string; readonly name: string; }; readonly value: { readonly id: string; readonly name: string; }; };
 ```
 
 Saved step order is execution order; each column reference is a stable identity.
+In a saved query, a join `input` is the ID of another saved query.
 
 #### `@sheetwrite/queries/wasm` — asset
 

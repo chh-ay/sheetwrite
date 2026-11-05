@@ -176,6 +176,45 @@ fn csv_quoting_json_path_dates_and_missing_fields_follow_schema() {
 }
 
 #[test]
+fn ragged_csv_records_pad_missing_fields_with_null_and_ignore_extras() {
+    for headers in [true, false] {
+        let schema = SourceSpec::Csv {
+            columns: vec![
+                column("name", "Name", ColumnType::Text),
+                column("number", "Value", ColumnType::Number),
+            ],
+            delimiter: b',',
+            headers,
+            empty_is_null: true,
+        };
+        let body = "a\nb,2,extra,more\n";
+        let bytes = if headers {
+            format!("Name,Value\n{body}")
+        } else {
+            body.to_owned()
+        };
+        let batch = parse_source(bytes.as_bytes(), &schema, &Limits::default()).unwrap();
+
+        assert_eq!(batch.row_count(), 2, "headers: {headers}");
+        assert_eq!(
+            batch.value(1, 0).unwrap(),
+            Value::Null,
+            "headers: {headers}"
+        );
+        assert_eq!(
+            batch.value(0, 1).unwrap(),
+            Value::Text("b"),
+            "headers: {headers}"
+        );
+        assert_eq!(
+            batch.value(1, 1).unwrap(),
+            Value::Number(2.0),
+            "headers: {headers}"
+        );
+    }
+}
+
+#[test]
 fn malformed_sources_and_duplicate_definitions_are_rejected() {
     let schema = SourceSpec::Json {
         columns: vec![column("key", "Key", ColumnType::Text)],

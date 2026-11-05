@@ -73,6 +73,13 @@ import {
   type TransientResourcePeak,
 } from "../resource-accounting.js";
 import { restoreBlockFacts } from "../restore-block.js";
+import {
+  type SavedQueryIssue,
+  validateQueryAdmission,
+  validateQueryRemoval,
+  withoutQuery,
+  withQuery,
+} from "../saved-query.js";
 import { canAddSheetSnapshot } from "../sheet-lifecycle.js";
 import { validateSheetName } from "../sheet-name.js";
 import { StyleDictionary } from "../style-dictionary.js";
@@ -2450,6 +2457,8 @@ export class StoreDataEngine {
           patch.op !== "setCalculation" &&
           patch.op !== "setRelationship" &&
           patch.op !== "removeRelationship" &&
+          patch.op !== "setQuery" &&
+          patch.op !== "removeQuery" &&
           patch.op !== "removeSheet"
         ) {
           touchedSheets.add(patch.op === "addSheet" ? patch.sheet.id : patch.sheet);
@@ -3423,6 +3432,22 @@ export class StoreDataEngine {
         const model = withoutRelationship(this.workbook.dataModel, patch.id);
         if (!this.syncRelationships(model)) return false;
         this.workbook.dataModel = model;
+        return true;
+      }
+
+      case "setQuery": {
+        const issues: SavedQueryIssue[] = [];
+        validateQueryAdmission(patch.query, this.workbook.queries, issues);
+        if (issues.length > 0) return false;
+        this.workbook.queries = withQuery(this.workbook.queries, patch.query);
+        return true;
+      }
+
+      case "removeQuery": {
+        const issues: SavedQueryIssue[] = [];
+        validateQueryRemoval(patch.id, this.workbook.queries, issues);
+        if (issues.length > 0) return false;
+        this.workbook.queries = withoutQuery(this.workbook.queries, patch.id);
         return true;
       }
     }
