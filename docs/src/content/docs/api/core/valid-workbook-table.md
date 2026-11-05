@@ -8,7 +8,7 @@ description: "validWorkbookTable function in @sheetwrite/core: Validate one cano
 Validate one canonical table against sheet bounds and workbook-global identities.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/workbook-table.ts#L376"><code>packages/core/src/workbook-table.ts#L376</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/workbook-table.ts#L377"><code>packages/core/src/workbook-table.ts#L377</code></a></dd></div>
 </dl>
 
 ## Declaration

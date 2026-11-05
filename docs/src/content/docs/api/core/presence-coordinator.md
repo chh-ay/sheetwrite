@@ -8,7 +8,7 @@ description: "PresenceCoordinator class in @sheetwrite/core: Ephemeral presence 
 Ephemeral presence lifecycle; it never calls a document mutation API.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/collaboration.ts#L77"><code>packages/core/src/collaboration.ts#L77</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/collaboration.ts#L79"><code>packages/core/src/collaboration.ts#L79</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>6</span>

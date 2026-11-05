@@ -88,6 +88,12 @@ import {
   removeRowGroup,
   visibleSheetNeighbor,
 } from "./store/ranges.js";
+import {
+  clearViewPatch,
+  columnFilterPatch,
+  rowVisibilityPatches,
+  viewSortPatch,
+} from "./store/view-patches.js";
 import { StyleActions } from "./style-actions.js";
 import {
   beginGridTransactionAdmission,
@@ -3709,29 +3715,12 @@ export class GridImpl implements Grid {
   }
 
   clearView(): void {
-    this.document.commit(
-      [
-        {
-          op: "setSheetMeta",
-          sheet: this.activeSheet,
-          patch: { sortKeys: [], filters: [] },
-        },
-      ],
-      "structure",
-    );
+    const patch = clearViewPatch(this.sheet());
+    if (patch) this.document.commit([patch], "structure");
   }
 
   setViewSort(keys: readonly SortKey[]): ApplyTransactionResult {
-    return this.document.commit(
-      [
-        {
-          op: "setSheetMeta",
-          sheet: this.activeSheet,
-          patch: { sortKeys: keys.map((key) => ({ ...key })) },
-        },
-      ],
-      "structure",
-    );
+    return this.document.commit([viewSortPatch(this.activeSheet, keys)], "structure");
   }
 
   sortRange(
@@ -3814,19 +3803,8 @@ export class GridImpl implements Grid {
   }
 
   setColumnFilter(col: number, filter: ColumnFilter | null): void {
-    const filters = new Map(this.sheet().filters ?? []);
-    if (filter === null) filters.delete(col);
-    else filters.set(col, structuredClone(filter));
-    this.document.commit(
-      [
-        {
-          op: "setSheetMeta",
-          sheet: this.activeSheet,
-          patch: { filters: [...filters] },
-        },
-      ],
-      "structure",
-    );
+    const patch = columnFilterPatch(this.sheet(), col, filter);
+    if (patch) this.document.commit([patch], "structure");
   }
 
   getColumnFilters(): ReadonlyMap<number, ColumnFilter> {
@@ -3838,33 +3816,12 @@ export class GridImpl implements Grid {
   }
 
   hideRows(rows: readonly number[]): void {
-    const sheet = this.sheet();
-    const patches: DocumentOp[] = [];
-    for (const row of new Set(rows)) {
-      if (row < 0 || row >= sheet.rowCount) continue;
-      patches.push({
-        op: "setRowMeta",
-        sheet: this.activeSheet,
-        row,
-        meta: { height: sheet.rowHeights?.get(row), hidden: true },
-      });
-    }
-    this.document.commit(patches, "structure");
+    this.document.commit(rowVisibilityPatches(this.sheet(), rows, true), "structure");
   }
 
   showRows(rows?: readonly number[]): void {
     const sheet = this.sheet();
-    const targets = rows ?? [...(sheet.hiddenRows ?? [])];
-    const patches: DocumentOp[] = [];
-    for (const row of new Set(targets)) {
-      if (row < 0 || row >= sheet.rowCount) continue;
-      patches.push({
-        op: "setRowMeta",
-        sheet: this.activeSheet,
-        row,
-        meta: { height: sheet.rowHeights?.get(row), hidden: false },
-      });
-    }
+    const patches = rowVisibilityPatches(sheet, rows ?? [...(sheet.hiddenRows ?? [])], false);
     this.document.commit(patches, "structure");
   }
 

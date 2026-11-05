@@ -1659,7 +1659,8 @@ impl CellStore {
                 | Func::Take
                 | Func::Drop
                 | Func::ChooseCols
-                | Func::ChooseRows,
+                | Func::ChooseRows
+                | Func::TrimRange,
                 _,
             ) => {
                 match self
@@ -1854,6 +1855,7 @@ impl CellStore {
             | Func::AverageIf
             | Func::MaxIfs
             | Func::MinIfs => return self.eval_criteria_family(func, args, sheet, pass, depth + 1),
+            Func::Lookup => return self.eval_vector_lookup(args, sheet, pass, depth + 1),
             Func::Index
             | Func::Match
             | Func::VLookup

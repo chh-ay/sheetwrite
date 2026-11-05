@@ -2,6 +2,7 @@
 
 mod aggregate;
 mod bessel;
+mod bytes;
 mod compatibility;
 mod complex;
 mod database;
@@ -162,6 +163,13 @@ const FAMILIES: &[Family] = &[
         names: units::NAMES,
         reference_cells: &[],
         evaluate: Some(units::evaluate),
+        evaluate_ast: None,
+        array: None,
+    },
+    Family {
+        names: bytes::NAMES,
+        reference_cells: &[],
+        evaluate: Some(bytes::evaluate),
         evaluate_ast: None,
         array: None,
     },

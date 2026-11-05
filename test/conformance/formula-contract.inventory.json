@@ -5455,6 +5455,58 @@
         }
       ],
       "returns": "scalar"
+    },
+    "vector-lookup": {
+      "arguments": [
+        {
+          "name": "lookupValue",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "lookupVector",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "resultVector",
+          "required": false,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "trim-range": {
+      "arguments": [
+        {
+          "name": "range",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "trimRows",
+          "required": false,
+          "default": 3,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "trimColumns",
+          "required": false,
+          "default": 3,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "array"
     }
   },
   "semanticsProfiles": {
@@ -6903,6 +6955,23 @@
       "divergences": [
         "INFO returns #N/A for \"directory\", \"origin\", \"osversion\", \"release\" and \"system\", which describe the desktop program and its window. \"numfile\" is the number of sheets and \"recalc\" is \"Automatic\"."
       ]
+    },
+    "excel-single-byte": {
+      "excel": "documented",
+      "googleSheets": "unverified",
+      "openFormula": "unverified",
+      "divergences": [
+        "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?.",
+        "LENB, LEFTB, RIGHTB, MIDB, REPLACEB, FINDB and SEARCHB count one byte per character, as Excel does when the default editing language is not a double-byte language. Excel counts two bytes for a double-byte character only when such a language is the default."
+      ]
+    },
+    "analysis-text-width": {
+      "excel": "documented",
+      "googleSheets": "unverified",
+      "openFormula": "unverified",
+      "divergences": [
+        "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?."
+      ]
     }
   },
   "implementationProfiles": {
@@ -6937,7 +7006,9 @@
           "packages/wasm/src/eval/math.rs",
           "packages/wasm/src/eval/math/trigonometry.rs",
           "packages/wasm/src/eval/math/numerals.rs",
-          "packages/wasm/src/eval/statistics.rs"
+          "packages/wasm/src/eval/statistics.rs",
+          "packages/wasm/src/eval/lookup.rs",
+          "packages/wasm/src/eval/array.rs"
         ]
       },
       "assist": {
@@ -7372,6 +7443,28 @@
         "status": "source-linked",
         "paths": ["scripts/formula-contract.test.ts"]
       }
+    },
+    "analysis-bytes": {
+      "parser": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/calc.rs"]
+      },
+      "evaluator": {
+        "status": "implemented",
+        "paths": [
+          "packages/wasm/src/eval/analysis/bytes.rs",
+          "packages/wasm/src/eval/analysis/bytes/width.rs",
+          "packages/wasm/src/eval/analysis/bytes/baht.rs"
+        ]
+      },
+      "assist": {
+        "status": "implemented",
+        "paths": ["packages/core/src/formula-assist.ts"]
+      },
+      "evidence": {
+        "status": "source-linked",
+        "paths": ["scripts/formula-contract.test.ts"]
+      }
     }
   },
   "unsupportedCategories": [
@@ -7455,6 +7548,24 @@
       "examples": ["'[Book.xlsx]Sheet1'!A1"],
       "source": "microsoft-excel-functions",
       "section": "Lookup and reference functions",
+      "implementation": {
+        "status": "missing",
+        "paths": []
+      },
+      "evidence": {
+        "status": "registration-tested",
+        "paths": ["scripts/formula-contract.test.ts"]
+      },
+      "version": 1
+    },
+    {
+      "id": "language-services",
+      "title": "Language services",
+      "status": "unsupported",
+      "scope": "DETECTLANGUAGE and TRANSLATE call a translation service, and PHONETIC reads furigana that cells do not store. Formula evaluation calls no service and stores no phonetic text.",
+      "examples": ["DETECTLANGUAGE", "PHONETIC", "TRANSLATE"],
+      "source": "microsoft-excel-functions",
+      "section": "Text functions",
       "implementation": {
         "status": "missing",
         "paths": []
@@ -13248,6 +13359,150 @@
       "semantics": "information",
       "dialects": "excel-info",
       "implementation": "implemented-reference-information",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "LENB",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "unary-value",
+      "semantics": "text",
+      "dialects": "excel-single-byte",
+      "implementation": "analysis-bytes",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "LEFTB",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "left-right",
+      "semantics": "text",
+      "dialects": "excel-single-byte",
+      "implementation": "analysis-bytes",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "RIGHTB",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "left-right",
+      "semantics": "text",
+      "dialects": "excel-single-byte",
+      "implementation": "analysis-bytes",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "MIDB",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "mid",
+      "semantics": "text",
+      "dialects": "excel-single-byte",
+      "implementation": "analysis-bytes",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "REPLACEB",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "replace",
+      "semantics": "text-sensitive",
+      "dialects": "excel-single-byte",
+      "implementation": "analysis-bytes",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "FINDB",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "find-search",
+      "semantics": "text-sensitive",
+      "dialects": "excel-single-byte",
+      "implementation": "analysis-bytes",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "SEARCHB",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "find-search",
+      "semantics": "text-search",
+      "dialects": "excel-single-byte",
+      "implementation": "analysis-bytes",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ASC",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "unary-value",
+      "semantics": "text",
+      "dialects": "analysis-text-width",
+      "implementation": "analysis-bytes",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "DBCS",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "unary-value",
+      "semantics": "text",
+      "dialects": "analysis-text-width",
+      "implementation": "analysis-bytes",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "BAHTTEXT",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "text",
+      "dialects": "analysis-text-width",
+      "implementation": "analysis-bytes",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "LOOKUP",
+      "aliases": [],
+      "family": "lookup-reference",
+      "contractStatus": "supported",
+      "signature": "vector-lookup",
+      "semantics": "lookup",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "TRIMRANGE",
+      "aliases": [],
+      "family": "array",
+      "contractStatus": "supported",
+      "signature": "trim-range",
+      "semantics": "array",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     }

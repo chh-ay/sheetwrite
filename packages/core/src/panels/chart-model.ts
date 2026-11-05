@@ -2,6 +2,7 @@
 // data, so the rules are tested without a DOM.
 
 import { MAX_CHART_POINTS } from "../charts-live.js";
+import { cellRange, normalizedRange } from "../store/ranges.js";
 import type { CellScalar } from "../types/cell.js";
 import type { ChartAnchor, ChartDefinition, ChartKind, ChartSeries } from "../types/chart.js";
 import type { Range, Selection, SheetId } from "../types/coordinates.js";
@@ -28,23 +29,9 @@ export function selectionRange(
   if (selection === null) return null;
   switch (selection.kind) {
     case "cell":
-      return {
-        sheet: selection.addr.sheet,
-        start: { row: selection.addr.row, col: selection.addr.col },
-        end: { row: selection.addr.row, col: selection.addr.col },
-      };
+      return cellRange(selection.addr);
     case "range":
-      return {
-        sheet: selection.range.sheet,
-        start: {
-          row: Math.min(selection.range.start.row, selection.range.end.row),
-          col: Math.min(selection.range.start.col, selection.range.end.col),
-        },
-        end: {
-          row: Math.max(selection.range.start.row, selection.range.end.row),
-          col: Math.max(selection.range.start.col, selection.range.end.col),
-        },
-      };
+      return normalizedRange(selection.range);
     case "multi": {
       const first = selection.ranges[0];
       return first === undefined ? null : selectionRange({ kind: "range", range: first }, sheets);

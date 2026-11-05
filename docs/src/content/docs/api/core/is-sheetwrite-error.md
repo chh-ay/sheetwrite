@@ -12,7 +12,7 @@ check `code` against a list, so a code from a newer Sheetwrite still passes;
 handle unknown codes in the `default` branch of a `switch`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/errors.ts#L527"><code>packages/core/src/errors.ts#L527</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/errors.ts#L513"><code>packages/core/src/errors.ts#L513</code></a></dd></div>
 </dl>
 
 ## Declaration

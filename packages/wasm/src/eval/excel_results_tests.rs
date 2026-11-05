@@ -133,6 +133,56 @@ fn legacy_statistics_names_read_references_as_their_successors() {
     ]);
 }
 
+/// The vector example of the LOOKUP page on Microsoft Support, the array
+/// form in both orientations, and TRIMRANGE on a column with blank rows.
+#[test]
+fn lookup_and_trimrange_follow_the_microsoft_rules() {
+    assert_results(&[
+        (
+            "=LOOKUP(4.19,{4.14;4.19;5.17;5.77;6.39},{\"red\";\"orange\";\"yellow\";\"green\";\"blue\"})",
+            "orange",
+        ),
+        (
+            "=LOOKUP(5.75,{4.14;4.19;5.17;5.77;6.39},{\"red\";\"orange\";\"yellow\";\"green\";\"blue\"})",
+            "yellow",
+        ),
+        (
+            "=LOOKUP(7.66,{4.14;4.19;5.17;5.77;6.39},{\"red\";\"orange\";\"yellow\";\"green\";\"blue\"})",
+            "blue",
+        ),
+        (
+            "=LOOKUP(0,{4.14;4.19;5.17;5.77;6.39},{\"red\";\"orange\";\"yellow\";\"green\";\"blue\"})",
+            "#N/A",
+        ),
+        ("=LOOKUP(2.5,Data!A1:A3,Data!B1:B3)", "20"),
+        ("=LOOKUP(3,Data!A1:A3)", "3"),
+        ("=LOOKUP(2,Data!A1:B3)", "20"),
+        ("=LOOKUP(15,{10,20,30;1,2,3})", "1"),
+        ("=ROWS(TRIMRANGE(Data!A1:A10))", "3"),
+        ("=ROWS(TRIMRANGE(Data!A1:A10,1))", "10"),
+        ("=SUM(TRIMRANGE(Data!A1:B10))", "66"),
+        ("=TRIMRANGE(Data!F1:F3)", "#REF!"),
+        ("=TRIMRANGE(Data!A1:A3,4)", "#VALUE!"),
+        ("=TRIMRANGE(Data!A2)", "2"),
+        ("=TRIMRANGE(Data!F1)", "#REF!"),
+    ]);
+}
+
+/// The byte functions count one byte per character; ASC and DBCS change
+/// character width; BAHTTEXT shows the example of its Microsoft page.
+#[cfg(feature = "analysis")]
+#[test]
+fn byte_width_and_baht_functions_read_cells() {
+    assert_results(&[
+        ("=LENB(Data!D2)", "1"),
+        ("=LEFTB(Data!A3&\"ab\",2)", "3a"),
+        ("=FINDB(\"x\",Data!D2)", "1"),
+        ("=DBCS(Data!D2)", "ｘ"),
+        ("=ASC(DBCS(Data!D2&Data!A1))", "x1"),
+        ("=BAHTTEXT(1234)", "หนึ่งพันสองร้อยสามสิบสี่บาทถ้วน"),
+    ]);
+}
+
 /// The examples of the ERROR.TYPE, ISEVEN, ISODD, SHEET and SHEETS pages on
 /// Microsoft Support, and the IS functions page for ISNONTEXT and ISREF.
 #[test]
