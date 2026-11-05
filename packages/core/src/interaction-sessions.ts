@@ -1,8 +1,8 @@
-import { isDashboard } from "./dashboard.js";
 import { cellA1, rangeA1, shiftA1Refs } from "./a1.js";
 import { cellDisplayText, cellScalarToText, parseCellInput } from "./cell-input.js";
 import { ContextMenu } from "./context-menu.js";
 import { CustomEditorController } from "./custom-editor.js";
+import { isDashboard } from "./dashboard.js";
 import { EditController, type EditNavigate } from "./editor.js";
 import { detectFillSeries, type FillSeries, type FillSourceCell } from "./fill-series.js";
 import { FILL_HANDLE_HIT_RADIUS, FALLBACK_CHARACTER_WIDTH } from "./grid-constants.js";
