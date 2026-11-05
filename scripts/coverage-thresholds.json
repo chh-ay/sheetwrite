@@ -101,6 +101,10 @@
       "reason": "Module wiring only; query behavior is covered through crate contract tests"
     },
     {
+      "path": "packages/core/src/version-history/panel-contract.ts",
+      "reason": "Type-only history panel contract is verified by package and consumer typechecks"
+    },
+    {
       "path": "packages/queries/src/types.ts",
       "reason": "Type-only query contracts are verified by package and consumer typechecks"
     },
