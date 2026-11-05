@@ -47,6 +47,8 @@ const QUERY_PANEL_MARKER = "Kept from the file";
 // A row of the generated table that functions/registry.ts loads on demand.
 const FUNCTION_TABLE_MARKER = '["SUM",';
 const FIND_MARKER = "sheetwrite-find-replace-row";
+// The dashboard view and the New Dashboard command load with the first dashboard.
+const DASHBOARD_MARKERS = ["sheetwrite-dashboard", 'kind:"dashboard"'];
 const IMPORT_MARKER = "Import XLSX";
 const SUMMARY_MARKER = "numericCount";
 const REPLACEMENT_MARKER = "Disconnect collaboration before import";
@@ -56,6 +58,7 @@ const sortPanelChunks = [];
 const queryPanelChunks = [];
 const functionTableChunks = [];
 const findChunks = [];
+const dashboardChunks = [];
 const workers = [];
 const documentChunks = [];
 const chromeCode = [];
@@ -69,6 +72,7 @@ for (const file of lazyChunks) {
     chromeChunks.push(file);
     chromeCode.push(code);
   } else if (code.includes(FIND_MARKER)) findChunks.push(file);
+  else if (DASHBOARD_MARKERS.some((marker) => code.includes(marker))) dashboardChunks.push(file);
   else if (
     [IMPORT_MARKER, SUMMARY_MARKER, REPLACEMENT_MARKER].some((marker) => code.includes(marker))
   )
