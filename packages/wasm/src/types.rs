@@ -338,42 +338,24 @@ fn ast_is_volatile(ast: &Ast) -> bool {
         ) => true,
         #[cfg(feature = "analysis")]
         Ast::Func(Func::Analysis(crate::eval::analysis::GETPIVOTDATA_ID), _) => true,
-        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => args.iter().any(ast_is_volatile),
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-            ast_is_volatile(left) || ast_is_volatile(right)
-        }
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => ast_is_volatile(inner),
-        Ast::LetSlot { expression, .. } => ast_is_volatile(expression),
         Ast::NamedFormula(named) => ast_is_volatile(&named.expression),
-        _ => false,
+        _ => ast.any_child(&mut ast_is_volatile),
     }
 }
 
 fn ast_contains_let(ast: &Ast) -> bool {
     match ast {
         Ast::Func(Func::Let, _) => true,
-        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => args.iter().any(ast_contains_let),
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-            ast_contains_let(left) || ast_contains_let(right)
-        }
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => ast_contains_let(inner),
-        Ast::LetSlot { expression, .. } => ast_contains_let(expression),
         Ast::NamedFormula(named) => ast_contains_let(&named.expression),
-        _ => false,
+        _ => ast.any_child(&mut ast_contains_let),
     }
 }
 
 fn ast_contains_spill_ref(ast: &Ast) -> bool {
     match ast {
         Ast::Func(Func::AnchorArray | Func::Offset | Func::Indirect, _) => true,
-        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => args.iter().any(ast_contains_spill_ref),
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-            ast_contains_spill_ref(left) || ast_contains_spill_ref(right)
-        }
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => ast_contains_spill_ref(inner),
-        Ast::LetSlot { expression, .. } => ast_contains_spill_ref(expression),
         Ast::NamedFormula(named) => ast_contains_spill_ref(&named.expression),
-        _ => false,
+        _ => ast.any_child(&mut ast_contains_spill_ref),
     }
 }
 

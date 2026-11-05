@@ -31,6 +31,8 @@ mod statistics;
 mod subtotal;
 #[cfg(test)]
 mod subtotal_tests;
+#[cfg(test)]
+mod test_support;
 mod text;
 mod value;
 mod wildcard;
@@ -39,7 +41,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
 use std::cmp::Ordering;
 
-use crate::calc::{Ast, Func, SHEET_COLS, SHEET_ROWS};
+use crate::calc::{write_col, Ast, Func, SHEET_COLS, SHEET_ROWS};
 use crate::cells::{encode_num, encode_str_id, payload_num, payload_str_id, DenseSourceRun};
 use crate::formula_slots::{FormulaId, FormulaResults, FormulaStore, FormulaWork};
 use crate::graph::DirtySeeds;
@@ -456,18 +458,8 @@ fn address_text(
         if col_absolute {
             output.push('$');
         }
-        let mut value = col + 1;
-        let mut reversed = [0u8; 3];
-        let mut length = 0;
-        while value > 0 {
-            value -= 1;
-            reversed[length] = b'A' + (value % 26) as u8;
-            length += 1;
-            value /= 26;
-        }
-        for byte in reversed[..length].iter().rev() {
-            output.push(char::from(*byte));
-        }
+        // The check above keeps the column inside the sheet, so it fits in `u32`.
+        write_col(col as u32, &mut output);
         if row_absolute {
             output.push('$');
         }
