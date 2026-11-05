@@ -117,7 +117,8 @@ impl Default for DirtyState {
 }
 
 // Bound a scalar insert or delete's shifts to one small row band, not a column.
-const FORMULA_INDEX_PAGE_ROWS: u32 = 256;
+// The exact-reader index uses the same bands, so a topology patch is as local.
+pub(crate) const FORMULA_INDEX_PAGE_ROWS: u32 = 256;
 const FORMULA_INDEX_INITIAL_CAPACITY: usize = 1;
 const FULL_PAGE_CELLS: usize = FORMULA_INDEX_PAGE_ROWS as usize;
 
@@ -134,7 +135,7 @@ struct FormulaColumn {
 /// Contiguous bands and full pages hold each key at its own offset. Check that
 /// slot first, so a dense column needs no binary search on the pass hot path.
 #[inline]
-fn offset_or_search<T>(
+pub(crate) fn offset_or_search<T>(
     items: &[T],
     key: u32,
     offset: u32,
@@ -416,8 +417,9 @@ impl SheetFormulas {
         self.replace(key, None, 0, slots);
     }
 
-    /// Returns the replaced entry and the id of the entry now stored, so the
-    /// caller reads the new entry without another address lookup.
+    /// Returns the replaced entry and the id of the changed formula: the id of
+    /// the entry now stored, or the retired id of a removed one. The caller
+    /// then needs no other address lookup.
     fn replace(
         &mut self,
         key: CellKey,
@@ -434,7 +436,7 @@ impl SheetFormulas {
                 self.subtotal_count += usize::from(slots.is_subtotal(id));
                 (previous, Some(id))
             }
-            (Some(id), None) => (self.remove_id(key, id, slots), None),
+            (Some(id), None) => (self.remove_id(key, id, slots), Some(id)),
             (None, Some(entry)) => {
                 let Some(id) = slots.allocate(AbsCellKey::from_local(sheet, key), entry) else {
                     return (None, None);
@@ -846,25 +848,30 @@ impl FormulaGraph {
         entry: Option<FormulaEntry>,
     ) {
         let stores_formula = entry.is_some();
-        let (previous, stored) = formulas.replace(key, entry, sheet, slots);
+        let (previous, changed) = formulas.replace(key, entry, sheet, slots);
         // A literal written over a literal is the bulk-load case: the index
         // has no change to record.
         if !stores_formula && previous.is_none() {
             return;
         }
 
-        let next = stored.and_then(|id| slots.get(id));
-        self.record_replacement(AbsCellKey::from_local(sheet, key), previous, next);
-        // Pending graph edits own read sets and cell addresses, not slot ids.
-        // No pass can overlap this mutable source edit, so reuse is now safe.
+        let Some(id) = changed else {
+            return;
+        };
+
+        // A removed formula's retired slot holds no entry, so `next` is `None`.
+        let next = slots.get(id);
+        self.record_replacement(id, previous, next);
+        // A reused id is safe in the pending queue: that queue keeps the first
+        // reads recorded for an id and reads the current entry when applied.
         slots.release_retired();
     }
 
     /// The index half of [`Self::replace_entry`] for callers that changed the
-    /// entries themselves; `next` is the entry now stored at `formula`.
+    /// entries themselves; `next` is the entry now stored for `formula`.
     pub(crate) fn record_replacement(
         &mut self,
-        formula: AbsCellKey,
+        formula: FormulaId,
         previous: Option<FormulaEntry>,
         next: Option<&FormulaEntry>,
     ) {
