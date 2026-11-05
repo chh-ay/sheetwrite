@@ -32,7 +32,7 @@ const config: GridConfig = {
 - [ContextMenuItem](/docs/api/core/context-menu-item/)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/grid.ts#L531"><code>packages/core/src/types/grid.ts#L531</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/grid.ts#L537"><code>packages/core/src/types/grid.ts#L537</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -48,6 +48,7 @@ const config: GridConfig = {
 <a href="#grid-config-sort"><code>sort</code></a>
 <a href="#grid-config-export"><code>export</code></a>
 <a href="#grid-config-ribbon"><code>ribbon</code></a>
+<a href="#grid-config-history"><code>history</code></a>
 <a href="#grid-config-icons"><code>icons</code></a>
 <a href="#grid-config-context-menu"><code>contextMenu</code></a>
 <a href="#grid-config-undo"><code>undo</code></a>
@@ -56,7 +57,7 @@ const config: GridConfig = {
 <a href="#grid-config-keyboard"><code>keyboard</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>18</span>
+## Members <span class="api-count" data-pagefind-ignore>19</span>
 
 <div class="api-member-list">
 
@@ -176,6 +177,17 @@ or automatic layout. A custom `toolbar` item list still renders the
 toolbar instead.</p>
 </details>
 
+<details class="api-member" id="grid-config-history" data-pagefind-weight="1">
+<summary><code>history</code> <span class="api-member-summary">Optional history command capability, supplied by createHistoryCommands from @sheetwrite/core/history.</span></summary>
+
+```ts generated
+history?: (grid: Grid, action: "open" | "save") => void;
+```
+
+<p class="api-member-doc">Optional history command capability, supplied by `createHistoryCommands`
+from `@sheetwrite/core/history`. No history code loads until it is invoked.</p>
+</details>
+
 <details class="api-member" id="grid-config-icons" data-pagefind-weight="1">
 <summary><code>icons</code> <span class="api-member-summary">Replace built-in command icons by glyph name, in the toolbar, ribbon, ribbon menus and context menu.</span></summary>
 
@@ -258,6 +270,7 @@ export interface GridConfig {
   sort?: boolean;
   export?: boolean;
   ribbon?: boolean | RibbonConfig;
+  history?: (grid: Grid, action: "open" | "save") => void;
   icons?: IconOverrides;
   contextMenu?: boolean | ContextMenuItems;
   undo?: boolean;
@@ -293,6 +306,7 @@ export interface GridConfig {
 <li><a href="/docs/api/core/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/grid-options/"><code>GridOptions</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core-adapter/grid-controller/"><code>GridController</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core-history/create-history-commands/"><code>createHistoryCommands</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core-shell/spreadsheet-shell/"><code>SpreadsheetShell</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/react/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/react</span></li>
 <li><a href="/docs/api/react/sheetwrite-grid-props/"><code>SheetwriteGridProps</code></a><span class="api-consumer-kind">@sheetwrite/react</span></li>

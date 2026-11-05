@@ -645,7 +645,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L713",
+              "source": "src/types/grid.ts#L724",
               "jsDocTags": [],
               "documentation": "View-aware editable snapshot of one cell, for hosts building a detached\nformula bar or cell inspector. `address` is the translated *data* address —\nthe correct target for `Grid.applyTransaction` even under an active\nsort/filter view — while the `(row, col)` inputs of\n{@link Grid.getCellInput} are active-sheet view coordinates.",
               "memberDocs": [
@@ -1212,7 +1212,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L366",
+              "source": "src/types/grid.ts#L372",
               "jsDocTags": [],
               "documentation": "The `GridConfig` switches that choose built-in commands. They apply to every\nrenderer of the command model: the toolbar, the full ribbon and the compact\nribbon. Each defaults to true, except `export`.",
               "memberDocs": []
@@ -1462,7 +1462,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L382",
+              "source": "src/types/grid.ts#L388",
               "jsDocTags": [],
               "documentation": "Built-in action names accepted by custom context-menu rows.",
               "memberDocs": []
@@ -1474,7 +1474,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L414",
+              "source": "src/types/grid.ts#L420",
               "jsDocTags": [],
               "documentation": "Cell and viewport coordinates resolved for one bundled context-menu opening.",
               "memberDocs": [
@@ -1499,7 +1499,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L475",
+              "source": "src/types/grid.ts#L481",
               "jsDocTags": [
                 "example",
                 "see"
@@ -1551,7 +1551,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L504",
+              "source": "src/types/grid.ts#L510",
               "jsDocTags": [],
               "documentation": "Static rows or a context-aware factory evaluated each time the menu opens.",
               "memberDocs": []
@@ -1575,7 +1575,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L457",
+              "source": "src/grid.ts#L459",
               "jsDocTags": [
                 "example",
                 "see"
@@ -1918,7 +1918,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L331",
+              "source": "src/grid.ts#L333",
               "jsDocTags": [],
               "documentation": "Default canvas theme used before CSS and explicit theme overrides.",
               "memberDocs": []
@@ -2255,7 +2255,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L800",
+              "source": "src/types/grid.ts#L811",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2579,7 +2579,7 @@
             {
               "name": "GridActions",
               "kind": "interface",
-              "signature": "export interface GridActions { toggleBold(): void; toggleItalic(): void; toggleUnderline(): void; toggleStrikethrough(): void; setAlign(align: CellAlign): void; setTextColor(color: string | null): void; setFillColor(color: string | null): void; toggleBorder(): void; setBorders(preset: BorderPreset): void; setFontFamily(family: string | null): void; setFontSize(size: number | null): void; stepFontSize(direction: 1 | -1): void; setVerticalAlign(align: CellVerticalAlign): void; toggleWrap(): void; setNumberFormat(code: string | null): void; stepDecimals(direction: 1 | -1): void; mergeAndCenter(): void; clearAll(): void; autoSum(): void; find(): void; freezePanes(): void; clearFormat(): void; merge(): void; unmerge(): void; sort(ascending: boolean): void; sortView(ascending: boolean): void; customSort(): void; insertRowAbove(): void; insertRowBelow(): void; deleteRow(): void; insertColumnLeft(): void; insertColumnRight(): void; deleteColumn(): void; hideRows(rows?: readonly number[]): void; showRows(rows?: readonly number[]): void; autoFitRows(): void; hideColumns(cols?: readonly number[]): void; showColumns(cols?: readonly number[]): void; autoFitColumns(cols?: readonly number[]): void; clearFilter(col?: number): void; copy(): Promise<ClipboardOutcome>; cut(): Promise<ClipboardOutcome>; paste(): Promise<ClipboardOutcome>; pasteValues(): Promise<ClipboardOutcome>; clearContents(): void; exportCsv(filename?: string): void; exportXlsx(filename?: string): Promise<void>; importXlsx(): Promise<void>; editNote(): void; deleteNote(): void; showPivotFields(): void; undo(): void; redo(): void; }",
+              "signature": "export interface GridActions { versionHistory(): void; saveVersion(): void; toggleBold(): void; toggleItalic(): void; toggleUnderline(): void; toggleStrikethrough(): void; setAlign(align: CellAlign): void; setTextColor(color: string | null): void; setFillColor(color: string | null): void; toggleBorder(): void; setBorders(preset: BorderPreset): void; setFontFamily(family: string | null): void; setFontSize(size: number | null): void; stepFontSize(direction: 1 | -1): void; setVerticalAlign(align: CellVerticalAlign): void; toggleWrap(): void; setNumberFormat(code: string | null): void; stepDecimals(direction: 1 | -1): void; mergeAndCenter(): void; clearAll(): void; autoSum(): void; find(): void; freezePanes(): void; clearFormat(): void; merge(): void; unmerge(): void; sort(ascending: boolean): void; sortView(ascending: boolean): void; customSort(): void; insertRowAbove(): void; insertRowBelow(): void; deleteRow(): void; insertColumnLeft(): void; insertColumnRight(): void; deleteColumn(): void; hideRows(rows?: readonly number[]): void; showRows(rows?: readonly number[]): void; autoFitRows(): void; hideColumns(cols?: readonly number[]): void; showColumns(cols?: readonly number[]): void; autoFitColumns(cols?: readonly number[]): void; clearFilter(col?: number): void; copy(): Promise<ClipboardOutcome>; cut(): Promise<ClipboardOutcome>; paste(): Promise<ClipboardOutcome>; pasteValues(): Promise<ClipboardOutcome>; clearContents(): void; exportCsv(filename?: string): void; exportXlsx(filename?: string): Promise<void>; importXlsx(): Promise<void>; editNote(): void; deleteNote(): void; showPivotFields(): void; undo(): void; redo(): void; }",
               "owners": [
                 "src/types/grid.ts"
               ],
@@ -2648,6 +2648,10 @@
                   "documentation": "Paste keeping only resolved values — no formulas, no styles (Ctrl+Shift+V). Never rejects."
                 },
                 {
+                  "name": "saveVersion",
+                  "documentation": "Open the configured named-version form. Requires `GridConfig.history`."
+                },
+                {
                   "name": "setBorders",
                   "documentation": "Apply an Excel border preset to the selection. Edge presets (`top`,\n`bottom`, `left`, `right`, `outside`, `thickOutside`) touch only the\nselection's outer cells and keep each cell's other sides."
                 },
@@ -2690,6 +2694,10 @@
                 {
                   "name": "stepFontSize",
                   "documentation": "Step the focus cell's font size to the next larger (1) or smaller (-1) standard size."
+                },
+                {
+                  "name": "versionHistory",
+                  "documentation": "Open the configured version history panel. Requires `GridConfig.history`."
                 }
               ]
             },
@@ -2700,7 +2708,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L278",
+              "source": "src/types/grid.ts#L284",
               "jsDocTags": [],
               "documentation": "Built-in command names accepted by state queries and change events.",
               "memberDocs": []
@@ -2712,7 +2720,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L281",
+              "source": "src/types/grid.ts#L287",
               "jsDocTags": [],
               "documentation": "Observable availability and selection-derived activity for one command.",
               "memberDocs": []
@@ -2724,7 +2732,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L287",
+              "source": "src/types/grid.ts#L293",
               "jsDocTags": [],
               "documentation": "Complete command-state snapshot emitted whenever availability or activity can change.",
               "memberDocs": []
@@ -2732,11 +2740,11 @@
             {
               "name": "GridConfig",
               "kind": "interface",
-              "signature": "export interface GridConfig { toolbar?: boolean | ToolbarItem[]; bold?: boolean; italic?: boolean; align?: boolean; textColor?: boolean; fillColor?: boolean; border?: boolean; clearFormat?: boolean; merge?: boolean; sort?: boolean; export?: boolean; ribbon?: boolean | RibbonConfig; icons?: IconOverrides; contextMenu?: boolean | ContextMenuItems; undo?: boolean; find?: boolean; tabs?: boolean; keyboard?: boolean | KeyboardOptions | ((e: KeyboardEvent, grid: Grid) => boolean); }",
+              "signature": "export interface GridConfig { toolbar?: boolean | ToolbarItem[]; bold?: boolean; italic?: boolean; align?: boolean; textColor?: boolean; fillColor?: boolean; border?: boolean; clearFormat?: boolean; merge?: boolean; sort?: boolean; export?: boolean; ribbon?: boolean | RibbonConfig; history?: (grid: Grid, action: \"open\" | \"save\") => void; icons?: IconOverrides; contextMenu?: boolean | ContextMenuItems; undo?: boolean; find?: boolean; tabs?: boolean; keyboard?: boolean | KeyboardOptions | ((e: KeyboardEvent, grid: Grid) => boolean); }",
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L531",
+              "source": "src/types/grid.ts#L537",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2774,6 +2782,10 @@
                 {
                   "name": "find",
                   "documentation": "Built-in Ctrl+F find widget: enabled (true, default) or disabled (false)."
+                },
+                {
+                  "name": "history",
+                  "documentation": "Optional history command capability, supplied by `createHistoryCommands`\nfrom `@sheetwrite/core/history`. No history code loads until it is invoked."
                 },
                 {
                   "name": "icons",
@@ -2824,7 +2836,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L733",
+              "source": "src/types/grid.ts#L744",
               "jsDocTags": [],
               "documentation": "Payload map for events emitted by a Grid.",
               "memberDocs": [
@@ -2869,7 +2881,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L606",
+              "source": "src/types/grid.ts#L617",
               "jsDocTags": [
                 "example",
                 "see"
@@ -3071,7 +3083,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L330",
+              "source": "src/types/grid.ts#L336",
               "jsDocTags": [],
               "documentation": "Per-glyph icon overrides, keyed by the names on the command icon sheet\n(`ICON_NAMES`). One override applies wherever the glyph shows: the flat\ntoolbar, the ribbon and ribbon menus, and the context menu. Strings render\nas plain text; DOM nodes and node factories support SVG or HTML icons. To\nreplace every glyph at once, set the `--sheetwrite-icon-sheet` CSS property\nto a sheet drawn on the layout in `@sheetwrite/core/icons.json`.",
               "memberDocs": []
@@ -3095,7 +3107,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L375",
+              "source": "src/grid.ts#L377",
               "jsDocTags": [
                 "example",
                 "see"
@@ -3146,7 +3158,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L387",
+              "source": "src/grid.ts#L389",
               "jsDocTags": [],
               "documentation": "Whether `initSheetwrite` has completed — the single readiness source.",
               "memberDocs": []
@@ -3182,7 +3194,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L441",
+              "source": "src/types/grid.ts#L447",
               "jsDocTags": [],
               "documentation": "Built-in actions that can be rebound without replacing navigation.",
               "memberDocs": []
@@ -3194,7 +3206,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L454",
+              "source": "src/types/grid.ts#L460",
               "jsDocTags": [],
               "documentation": "Overrides replace all default keys for an action; null disables that action's keys.",
               "memberDocs": []
@@ -3206,7 +3218,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L429",
+              "source": "src/types/grid.ts#L435",
               "jsDocTags": [],
               "documentation": "A compact modified key combination or a key object. Modifiers may appear in\nany order before the final key, for example \"Mod+Shift+K\" or \"Ctrl+Alt+Delete\".\n`Mod`/`mod` means Command on macOS and Control elsewhere; Ctrl and Meta are literal.\nThe parser rejects unknown/repeated modifiers and missing keys.",
               "memberDocs": []
@@ -4406,7 +4418,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L699",
+              "source": "src/types/grid.ts#L710",
               "jsDocTags": [],
               "documentation": "Replacement count and refreshed search state returned by replace-all.",
               "memberDocs": [
@@ -4475,7 +4487,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L392",
+              "source": "src/grid.ts#L394",
               "jsDocTags": [],
               "documentation": "Read `--sheetwrite-*` CSS custom properties into a partial theme.",
               "memberDocs": []
@@ -4520,7 +4532,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L354",
+              "source": "src/types/grid.ts#L360",
               "jsDocTags": [],
               "documentation": "Initial layout settings for the built-in or composable ribbon.",
               "memberDocs": [
@@ -4541,7 +4553,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L351",
+              "source": "src/types/grid.ts#L357",
               "jsDocTags": [],
               "documentation": "Layout of the Excel-style ribbon. `auto` chooses compact below the configured width.",
               "memberDocs": []
@@ -5034,7 +5046,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L677",
+              "source": "src/types/grid.ts#L688",
               "jsDocTags": [],
               "documentation": "Case, whole-cell, sheet, and column constraints for grid search.",
               "memberDocs": [
@@ -5063,7 +5075,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L689",
+              "source": "src/types/grid.ts#L700",
               "jsDocTags": [],
               "documentation": "Ordered matches and active index produced by a grid search.",
               "memberDocs": [
@@ -5293,7 +5305,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L723",
+              "source": "src/types/grid.ts#L734",
               "jsDocTags": [],
               "documentation": "Actionable transaction outcome for a stable sheet lifecycle target.",
               "memberDocs": []
@@ -6469,11 +6481,11 @@
             {
               "name": "ToolbarActionName",
               "kind": "type",
-              "signature": "export type ToolbarActionName = | \"bold\" | \"italic\" | \"underline\" | \"strikethrough\" | \"alignLeft\" | \"alignCenter\" | \"alignRight\" | \"alignTop\" | \"alignMiddle\" | \"alignBottom\" | \"wrap\" | \"textColor\" | \"fillColor\" | \"border\" | \"clearFormat\" | \"merge\" | \"unmerge\" | \"sortAsc\" | \"sortDesc\" | \"exportCsv\" | \"exportXlsx\" | \"importXlsx\" | \"undo\" | \"redo\" | \"separator\";",
+              "signature": "export type ToolbarActionName = | \"bold\" | \"italic\" | \"underline\" | \"strikethrough\" | \"alignLeft\" | \"alignCenter\" | \"alignRight\" | \"alignTop\" | \"alignMiddle\" | \"alignBottom\" | \"wrap\" | \"textColor\" | \"fillColor\" | \"border\" | \"clearFormat\" | \"merge\" | \"unmerge\" | \"sortAsc\" | \"sortDesc\" | \"exportCsv\" | \"exportXlsx\" | \"importXlsx\" | \"versionHistory\" | \"saveVersion\" | \"undo\" | \"redo\" | \"separator\";",
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L250",
+              "source": "src/types/grid.ts#L254",
               "jsDocTags": [],
               "documentation": "Built-in action names accepted by custom toolbar items.",
               "memberDocs": []
@@ -6485,7 +6497,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L320",
+              "source": "src/types/grid.ts#L326",
               "jsDocTags": [],
               "documentation": "Text, DOM node, or node factory used as toolbar icon content.",
               "memberDocs": []
@@ -6497,7 +6509,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L336",
+              "source": "src/types/grid.ts#L342",
               "jsDocTags": [],
               "documentation": "Built-in, separator, or custom callback item in the grid toolbar. A built-in\n`action` renders the same command, glyph and state as the ribbon.",
               "memberDocs": [
@@ -8761,6 +8773,18 @@
           "classification": "supported",
           "exports": [
             {
+              "name": "createHistoryCommands",
+              "kind": "function",
+              "signature": "(options: HistoryCommandsOptions): NonNullable<GridConfig[\"history\"]>",
+              "owners": [
+                "src/version-history/history-ui.ts"
+              ],
+              "source": "src/version-history/history-ui.ts#L10",
+              "jsDocTags": [],
+              "documentation": "Opt in to Review › Version History and Save Version in every command\nrenderer. Set the returned capability as `GridConfig.history`. The panel\nand its code load only when either command runs; archive recording stays\nunder the host's existing committed-transaction journal.",
+              "memberDocs": []
+            },
+            {
               "name": "DEFAULT_HISTORY_LIMITS",
               "kind": "variable",
               "signature": "Readonly<HistoryLimits>",
@@ -8791,7 +8815,7 @@
               "owners": [
                 "src/history-archive.ts"
               ],
-              "source": "src/history-archive.ts#L515",
+              "source": "src/history-archive.ts#L520",
               "jsDocTags": [],
               "documentation": "Opt-in archive of named and automatic versions for one document. It stores\ncontent-addressed checkpoints plus the committed transactions since each\none, through a host `HistoryStorageAdapter`. A grid that never imports this\nmodule has no history state.\n\nCalls that change the archive run one at a time. Each publishes atomically,\nso a failure or abort leaves the last durable version readable.",
               "memberDocs": [
@@ -8848,10 +8872,39 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L185",
+              "source": "src/version-history/types.ts#L186",
               "jsDocTags": [],
               "documentation": "Host-controlled archive configuration. No history is created until explicitly opened.",
               "memberDocs": []
+            },
+            {
+              "name": "HistoryCommandsOptions",
+              "kind": "interface",
+              "signature": "export interface HistoryCommandsOptions { archive: HistoryPanelArchive; authorId: string; sync?: (grid: Grid) => SyncCoordinator; authorName?: (authorId: string) => string; }",
+              "owners": [
+                "src/version-history/panel-contract.ts"
+              ],
+              "source": "src/version-history/panel-contract.ts#L33",
+              "jsDocTags": [],
+              "documentation": "Host identity and persistence used by the optional history panel.",
+              "memberDocs": [
+                {
+                  "name": "archive",
+                  "documentation": "Archive of the committed document shown by the grid."
+                },
+                {
+                  "name": "authorId",
+                  "documentation": "Authenticated person saving named versions."
+                },
+                {
+                  "name": "authorName",
+                  "documentation": "Display name for an authenticated author ID; the ID is shown when omitted."
+                },
+                {
+                  "name": "sync",
+                  "documentation": "The grid's coordinator, resolved when a command runs. Omit for a local archive."
+                }
+              ]
             },
             {
               "name": "HistoryDiffCell",
@@ -9074,7 +9127,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L135",
+              "source": "src/version-history/types.ts#L136",
               "jsDocTags": [],
               "documentation": "Fetch metadata or a bounded immutable payload; leased reads renew their lease.",
               "memberDocs": []
@@ -9196,7 +9249,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L161",
+              "source": "src/version-history/types.ts#L162",
               "jsDocTags": [],
               "documentation": "Metadata-only response in newest-first order.",
               "memberDocs": []
@@ -9208,7 +9261,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L151",
+              "source": "src/version-history/types.ts#L152",
               "jsDocTags": [],
               "documentation": "Bounded metadata-only page. Cursors are scoped to a manifest generation.",
               "memberDocs": []
@@ -9231,6 +9284,18 @@
               ]
             },
             {
+              "name": "HistoryPanelArchive",
+              "kind": "interface",
+              "signature": "export interface HistoryPanelArchive { saveVersion( name: string, authorId: string, time: number, signal?: AbortSignal, ): Promise<HistoryVersion>; listVersions(options?: { maxEntries?: number; cursor?: string; signal?: AbortSignal; }): Promise<HistoryListPage>; readVersion(id: string, signal?: AbortSignal): Promise<WorkbookSnapshot>; diffVersions(request: HistoryDiffRequest): Promise<HistoryDiffPage>; restoreVersion( grid: Grid, id: string, scope: HistoryRestoreScope, options?: HistoryRestoreOptions, ): Promise<ApplyTransactionResult>; }",
+              "owners": [
+                "src/version-history/panel-contract.ts"
+              ],
+              "source": "src/version-history/panel-contract.ts#L10",
+              "jsDocTags": [],
+              "documentation": "The archive calls the version history panel makes; `HistoryArchive` provides them.",
+              "memberDocs": []
+            },
+            {
               "name": "HistoryPinRequest",
               "kind": "interface",
               "signature": "export interface HistoryPinRequest { kind: \"pin\" | \"release\"; token: string; versionId: string; documentId: string; limits: Readonly<HistoryLimits>; signal?: AbortSignal; }",
@@ -9240,7 +9305,12 @@
               "source": "src/version-history/types.ts#L125",
               "jsDocTags": [],
               "documentation": "Acquire or release a five-minute renewable reader lease through the storage seam.",
-              "memberDocs": []
+              "memberDocs": [
+                {
+                  "name": "versionId",
+                  "documentation": "Marker ID, or `\"head\"` to lease the committed head returned in the manifest."
+                }
+              ]
             },
             {
               "name": "HistoryPruneRequest",
@@ -9249,7 +9319,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L169",
+              "source": "src/version-history/types.ts#L170",
               "jsDocTags": [],
               "documentation": "Retention removes automatic markers, or one explicitly selected named marker.",
               "memberDocs": []
@@ -9273,7 +9343,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L132",
+              "source": "src/version-history/types.ts#L133",
               "jsDocTags": [],
               "documentation": "A storage write either publishes one complete revision or manages a reader lease.",
               "memberDocs": []
@@ -9285,7 +9355,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L143",
+              "source": "src/version-history/types.ts#L144",
               "jsDocTags": [],
               "documentation": "Metadata for one immutable record; listings never return payload bytes.",
               "memberDocs": []
@@ -9326,7 +9396,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L192",
+              "source": "src/version-history/types.ts#L193",
               "jsDocTags": [],
               "documentation": "Snapshot provider invoked only when a checkpoint is due. Must describe the committed head.",
               "memberDocs": []
@@ -9338,7 +9408,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L177",
+              "source": "src/version-history/types.ts#L178",
               "jsDocTags": [],
               "documentation": "Atomic storage seam for local databases and host-owned history backends.",
               "memberDocs": []
@@ -9452,7 +9522,7 @@
               "owners": [
                 "src/version-history/storage.ts"
               ],
-              "source": "src/version-history/storage.ts#L794",
+              "source": "src/version-history/storage.ts#L807",
               "jsDocTags": [],
               "documentation": "In-memory history for one page session and for tests. Transactions run one\nat a time per adapter and write through `PendingMapWrites`, so a failure or\nan abort leaves the stored maps unchanged without copying them.",
               "memberDocs": []
@@ -11057,7 +11127,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L645",
+              "source": "../core/dist/types/grid.d.ts#L654",
               "jsDocTags": [
                 "example",
                 "see"
@@ -11385,7 +11455,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L191",
+              "source": "../core/dist/types/grid.d.ts#L195",
               "jsDocTags": [],
               "documentation": "Built-in command names accepted by state queries and change events.",
               "memberDocs": []
@@ -11397,7 +11467,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L193",
+              "source": "../core/dist/types/grid.d.ts#L197",
               "jsDocTags": [],
               "documentation": "Observable availability and selection-derived activity for one command.",
               "memberDocs": []
@@ -12072,7 +12142,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L645",
+              "source": "../core/dist/types/grid.d.ts#L654",
               "jsDocTags": [
                 "example",
                 "see"
@@ -12400,7 +12470,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L191",
+              "source": "../core/dist/types/grid.d.ts#L195",
               "jsDocTags": [],
               "documentation": "Built-in command names accepted by state queries and change events.",
               "memberDocs": []
@@ -12412,7 +12482,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L193",
+              "source": "../core/dist/types/grid.d.ts#L197",
               "jsDocTags": [],
               "documentation": "Observable availability and selection-derived activity for one command.",
               "memberDocs": []
@@ -13073,7 +13143,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L645",
+              "source": "../core/dist/types/grid.d.ts#L654",
               "jsDocTags": [
                 "example",
                 "see"
@@ -13401,7 +13471,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L191",
+              "source": "../core/dist/types/grid.d.ts#L195",
               "jsDocTags": [],
               "documentation": "Built-in command names accepted by state queries and change events.",
               "memberDocs": []
@@ -13413,7 +13483,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L193",
+              "source": "../core/dist/types/grid.d.ts#L197",
               "jsDocTags": [],
               "documentation": "Observable availability and selection-derived activity for one command.",
               "memberDocs": []

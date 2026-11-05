@@ -14,7 +14,7 @@ Calls that change the archive run one at a time. Each publishes atomically,
 so a failure or abort leaves the last durable version readable.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/history-archive.ts#L515"><code>packages/core/src/history-archive.ts#L515</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/history-archive.ts#L520"><code>packages/core/src/history-archive.ts#L520</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>

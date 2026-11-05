@@ -8,7 +8,7 @@ description: "ToolbarIcon type in @sheetwrite/core: Text, DOM node, or node fact
 Text, DOM node, or node factory used as toolbar icon content.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/grid.ts#L320"><code>packages/core/src/types/grid.ts#L320</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/grid.ts#L326"><code>packages/core/src/types/grid.ts#L326</code></a></dd></div>
 </dl>
 
 ## Declaration

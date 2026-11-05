@@ -119,6 +119,7 @@ export type ApplyTransactionResult =
 <li><a href="/docs/api/core/sheetwrite-store/"><code>SheetwriteStore</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/store/"><code>Store</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core-history/history-archive/"><code>HistoryArchive</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core-history/history-panel-archive/"><code>HistoryPanelArchive</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/queries/query-definition-result/"><code>QueryDefinitionResult</code></a><span class="api-consumer-kind">@sheetwrite/queries</span></li>
 <li><a href="/docs/api/queries/query-refresh-result/"><code>QueryRefreshResult</code></a><span class="api-consumer-kind">@sheetwrite/queries</span></li>
 <li><a href="/docs/api/queries/query-session/"><code>QuerySession</code></a><span class="api-consumer-kind">@sheetwrite/queries</span></li>

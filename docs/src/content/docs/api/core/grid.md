@@ -28,7 +28,7 @@ function updateTotal(grid: Grid) {
 - [Grid.applyTransaction](/docs/api/core/grid/#grid-apply-transaction)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/grid.ts#L800"><code>packages/core/src/types/grid.ts#L800</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/grid.ts#L811"><code>packages/core/src/types/grid.ts#L811</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -1524,6 +1524,6 @@ export interface Grid {
 <li><a href="/docs/api/core/to-xlsx-workbook-stream/"><code>toXlsxWorkbookStream</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core-adapter/grid-controller/"><code>GridController</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core-adapter/grid-publication-adapter/"><code>GridPublicationAdapter</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li class="api-consumer-more">and 20 more</li>
+<li class="api-consumer-more">and 22 more</li>
 </ul>
 </div>

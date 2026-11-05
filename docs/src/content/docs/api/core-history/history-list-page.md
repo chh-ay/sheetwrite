@@ -8,7 +8,7 @@ description: "HistoryListPage interface in @sheetwrite/core/history: Metadata-on
 Metadata-only response in newest-first order.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/types.ts#L161"><code>packages/core/src/version-history/types.ts#L161</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/types.ts#L162"><code>packages/core/src/version-history/types.ts#L162</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>
@@ -88,6 +88,7 @@ export interface HistoryListPage {
 
 <ul class="api-consumer-list">
 <li><a href="/docs/api/core-history/history-archive/"><code>HistoryArchive</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core-history/history-panel-archive/"><code>HistoryPanelArchive</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core-history/history-storage-adapter/"><code>HistoryStorageAdapter</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>

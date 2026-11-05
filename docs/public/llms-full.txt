@@ -1829,9 +1829,11 @@ Every control reads the same `getCommandState` contract as host chrome. It disab
 
 **Data Model** and **Relationships** (Data › Data Tools) open the [data model](https://www.sheetwrite.dev/docs/features/analysis/data-model/) panel. Data Model appears when the workbook has a table, and Relationships when it has two.
 
+**Version History** and **Save Version** (Review › Version History) appear when the host opts in with `GridConfig.history`; see [Version history panel](https://www.sheetwrite.dev/docs/features/data/persistence/#version-history-panel). The panel is a separate chunk that loads on the first command.
+
 ### Layout for the 0.7 features
 
-The 0.7 features get their commands in the places below. Insert Function, Explain Formula, the Defined Names commands, Data Model and Relationships are in the ribbon now; each other command appears in the full ribbon, the compact ribbon and the toolbar when its feature ships. The glyphs are on the icon sheet now, so `IconOverrides` and replacement sheets can use their names.
+The 0.7 features get their commands in the places below. Insert Function, Explain Formula, the Defined Names commands, Data Model, Relationships and the Version History commands are in the ribbon now; each other command appears in the full ribbon, the compact ribbon and the toolbar when its feature ships. The glyphs are on the icon sheet now, so `IconOverrides` and replacement sheets can use their names.
 
 Two tabs are new, in Excel's order: **Formulas** goes after Insert, and **Review** goes after Data. Groups fold in the order of the last column, first group first.
 
@@ -5218,6 +5220,36 @@ deleted, `author` is `HISTORY_DIFF_NONE` and `logComplete` is `false`.
 A page holds at most 1,000 changes (`maxEntries`). Nothing is kept between pages: each
 request rebuilds both versions and continues from `cursor`, so a closed or aborted diff
 holds no memory.
+
+`diffVersions({ from, to: "head" })` compares a version with the committed head. The
+head is leased for the call, so a concurrent prune cannot remove its records.
+
+### Version history panel
+
+Pass `createHistoryCommands` from `@sheetwrite/core/history` as `GridConfig.history`
+to show Review › **Version History** and **Save Version** in the full ribbon, the
+compact ribbon and the toolbar. The grid's first paint does not change: the panel
+loads as a separate chunk on the first command.
+
+```ts
+import { createGrid } from "@sheetwrite/core";
+import { createHistoryCommands, type HistoryArchive } from "@sheetwrite/core/history";
+
+function mount(host: HTMLElement, archive: HistoryArchive, authorId: string) {
+  return createGrid(host, {
+    workbook: { activeSheet: "s1", sheets: [{ id: "s1", name: "Sheet1", rowCount: 10, columns: [] }] },
+    config: { ribbon: true, history: createHistoryCommands({ archive, authorId }) },
+  });
+}
+```
+
+The panel lists versions with their author and time and names the committed head
+after pending changes are sent. It compares a version with a later version or the
+current committed document, page by page, with added (+), removed (−) and changed (≠)
+cells, before and after, and authors. It opens a read-only preview, and restores the
+workbook, one sheet or a range after a confirmation. Pass `sync` so the panel waits
+for pending changes and restores through the coordinator, and `authorName` to show
+display names instead of IDs.
 
 ## Large undo
 
@@ -13100,7 +13132,7 @@ Grid.redo
 ##### `GridActions` — interface
 
 ```ts
-export interface GridActions { toggleBold(): void; toggleItalic(): void; toggleUnderline(): void; toggleStrikethrough(): void; setAlign(align: CellAlign): void; setTextColor(color: string | null): void; setFillColor(color: string | null): void; toggleBorder(): void; setBorders(preset: BorderPreset): void; setFontFamily(family: string | null): void; setFontSize(size: number | null): void; stepFontSize(direction: 1 | -1): void; setVerticalAlign(align: CellVerticalAlign): void; toggleWrap(): void; setNumberFormat(code: string | null): void; stepDecimals(direction: 1 | -1): void; mergeAndCenter(): void; clearAll(): void; autoSum(): void; find(): void; freezePanes(): void; clearFormat(): void; merge(): void; unmerge(): void; sort(ascending: boolean): void; sortView(ascending: boolean): void; customSort(): void; insertRowAbove(): void; insertRowBelow(): void; deleteRow(): void; insertColumnLeft(): void; insertColumnRight(): void; deleteColumn(): void; hideRows(rows?: readonly number[]): void; showRows(rows?: readonly number[]): void; autoFitRows(): void; hideColumns(cols?: readonly number[]): void; showColumns(cols?: readonly number[]): void; autoFitColumns(cols?: readonly number[]): void; clearFilter(col?: number): void; copy(): Promise<ClipboardOutcome>; cut(): Promise<ClipboardOutcome>; paste(): Promise<ClipboardOutcome>; pasteValues(): Promise<ClipboardOutcome>; clearContents(): void; exportCsv(filename?: string): void; exportXlsx(filename?: string): Promise<void>; importXlsx(): Promise<void>; editNote(): void; deleteNote(): void; showPivotFields(): void; undo(): void; redo(): void; }
+export interface GridActions { versionHistory(): void; saveVersion(): void; toggleBold(): void; toggleItalic(): void; toggleUnderline(): void; toggleStrikethrough(): void; setAlign(align: CellAlign): void; setTextColor(color: string | null): void; setFillColor(color: string | null): void; toggleBorder(): void; setBorders(preset: BorderPreset): void; setFontFamily(family: string | null): void; setFontSize(size: number | null): void; stepFontSize(direction: 1 | -1): void; setVerticalAlign(align: CellVerticalAlign): void; toggleWrap(): void; setNumberFormat(code: string | null): void; stepDecimals(direction: 1 | -1): void; mergeAndCenter(): void; clearAll(): void; autoSum(): void; find(): void; freezePanes(): void; clearFormat(): void; merge(): void; unmerge(): void; sort(ascending: boolean): void; sortView(ascending: boolean): void; customSort(): void; insertRowAbove(): void; insertRowBelow(): void; deleteRow(): void; insertColumnLeft(): void; insertColumnRight(): void; deleteColumn(): void; hideRows(rows?: readonly number[]): void; showRows(rows?: readonly number[]): void; autoFitRows(): void; hideColumns(cols?: readonly number[]): void; showColumns(cols?: readonly number[]): void; autoFitColumns(cols?: readonly number[]): void; clearFilter(col?: number): void; copy(): Promise<ClipboardOutcome>; cut(): Promise<ClipboardOutcome>; paste(): Promise<ClipboardOutcome>; pasteValues(): Promise<ClipboardOutcome>; clearContents(): void; exportCsv(filename?: string): void; exportXlsx(filename?: string): Promise<void>; importXlsx(): Promise<void>; editNote(): void; deleteNote(): void; showPivotFields(): void; undo(): void; redo(): void; }
 ```
 
 Imperative operations the toolbar and context menu bind to; also exposed as `Grid.actions`.
@@ -13128,6 +13160,7 @@ Does nothing without a selection; focusing A1 unfreezes both axes.
 - `mergeAndCenter` — Merge the selection and center its text, as one undoable step.
 - `paste` — Paste at the focus cell. Never rejects.
 - `pasteValues` — Paste keeping only resolved values — no formulas, no styles (Ctrl+Shift+V). Never rejects.
+- `saveVersion` — Open the configured named-version form. Requires `GridConfig.history`.
 - `setBorders` — Apply an Excel border preset to the selection. Edge presets (`top`,
 `bottom`, `left`, `right`, `outside`, `thickOutside`) touch only the
 selection's outer cells and keep each cell's other sides.
@@ -13143,6 +13176,7 @@ read-only grid.
 - `sortView` — Sort the displayed rows by the focus column without moving cells.
 - `stepDecimals` — Show one more (1) or one fewer (-1) decimal place than the focus cell does.
 - `stepFontSize` — Step the focus cell's font size to the next larger (1) or smaller (-1) standard size.
+- `versionHistory` — Open the configured version history panel. Requires `GridConfig.history`.
 
 ##### `GridCommandName` — type
 
@@ -13171,7 +13205,7 @@ Complete command-state snapshot emitted whenever availability or activity can ch
 ##### `GridConfig` — interface
 
 ```ts
-export interface GridConfig { toolbar?: boolean | ToolbarItem[]; bold?: boolean; italic?: boolean; align?: boolean; textColor?: boolean; fillColor?: boolean; border?: boolean; clearFormat?: boolean; merge?: boolean; sort?: boolean; export?: boolean; ribbon?: boolean | RibbonConfig; icons?: IconOverrides; contextMenu?: boolean | ContextMenuItems; undo?: boolean; find?: boolean; tabs?: boolean; keyboard?: boolean | KeyboardOptions | ((e: KeyboardEvent, grid: Grid) => boolean); }
+export interface GridConfig { toolbar?: boolean | ToolbarItem[]; bold?: boolean; italic?: boolean; align?: boolean; textColor?: boolean; fillColor?: boolean; border?: boolean; clearFormat?: boolean; merge?: boolean; sort?: boolean; export?: boolean; ribbon?: boolean | RibbonConfig; history?: (grid: Grid, action: "open" | "save") => void; icons?: IconOverrides; contextMenu?: boolean | ContextMenuItems; undo?: boolean; find?: boolean; tabs?: boolean; keyboard?: boolean | KeyboardOptions | ((e: KeyboardEvent, grid: Grid) => boolean); }
 ```
 
 Toolbar / feature configuration. When `config` is set the built-in toolbar is
@@ -13206,6 +13240,8 @@ Members:
 - `export` — Show the Export CSV and Export XLSX commands (default false).
 - `fillColor` — Show the Fill Color command (default true).
 - `find` — Built-in Ctrl+F find widget: enabled (true, default) or disabled (false).
+- `history` — Optional history command capability, supplied by `createHistoryCommands`
+from `@sheetwrite/core/history`. No history code loads until it is invoked.
 - `icons` — Replace built-in command icons by glyph name, in the toolbar, ribbon, ribbon menus and context menu. See {@link IconOverrides}.
 - `italic` — Show Italic, and Underline and Strikethrough with Bold (default true).
 - `keyboard` — Built-in keyboard handling. `true` (default) keeps the stock Sheets-style
@@ -15730,7 +15766,7 @@ Export UTF-8 CSV on demand, retaining only one store window and one byte chunk.
 ##### `ToolbarActionName` — type
 
 ```ts
-export type ToolbarActionName = | "bold" | "italic" | "underline" | "strikethrough" | "alignLeft" | "alignCenter" | "alignRight" | "alignTop" | "alignMiddle" | "alignBottom" | "wrap" | "textColor" | "fillColor" | "border" | "clearFormat" | "merge" | "unmerge" | "sortAsc" | "sortDesc" | "exportCsv" | "exportXlsx" | "importXlsx" | "undo" | "redo" | "separator";
+export type ToolbarActionName = | "bold" | "italic" | "underline" | "strikethrough" | "alignLeft" | "alignCenter" | "alignRight" | "alignTop" | "alignMiddle" | "alignBottom" | "wrap" | "textColor" | "fillColor" | "border" | "clearFormat" | "merge" | "unmerge" | "sortAsc" | "sortDesc" | "exportCsv" | "exportXlsx" | "importXlsx" | "versionHistory" | "saveVersion" | "undo" | "redo" | "separator";
 ```
 
 Built-in action names accepted by custom toolbar items.
@@ -17221,6 +17257,17 @@ Declaration target: `./dist/history-archive.d.ts`
 Source entry: `src/history-archive.ts`
 Page: https://www.sheetwrite.dev/docs/api/core-history/
 
+##### `createHistoryCommands` — function
+
+```ts
+(options: HistoryCommandsOptions): NonNullable<GridConfig["history"]>
+```
+
+Opt in to Review › Version History and Save Version in every command
+renderer. Set the returned capability as `GridConfig.history`. The panel
+and its code load only when either command runs; archive recording stays
+under the host's existing committed-transaction journal.
+
 ##### `DEFAULT_HISTORY_LIMITS` — variable
 
 ```ts
@@ -17296,6 +17343,20 @@ export interface HistoryArchiveOptions { documentId: string; storage: HistorySto
 ```
 
 Host-controlled archive configuration. No history is created until explicitly opened.
+
+##### `HistoryCommandsOptions` — interface
+
+```ts
+export interface HistoryCommandsOptions { archive: HistoryPanelArchive; authorId: string; sync?: (grid: Grid) => SyncCoordinator; authorName?: (authorId: string) => string; }
+```
+
+Host identity and persistence used by the optional history panel.
+
+Members:
+- `archive` — Archive of the committed document shown by the grid.
+- `authorId` — Authenticated person saving named versions.
+- `authorName` — Display name for an authenticated author ID; the ID is shown when omitted.
+- `sync` — The grid's coordinator, resolved when a command runs. Omit for a local archive.
 
 ##### `HistoryDiffCell` — interface
 
@@ -17490,6 +17551,14 @@ Archive state, read without fetching any payload.
 Members:
 - `generation` — Increases on each publication or prune; writers compare it to detect a concurrent writer.
 
+##### `HistoryPanelArchive` — interface
+
+```ts
+export interface HistoryPanelArchive { saveVersion( name: string, authorId: string, time: number, signal?: AbortSignal, ): Promise<HistoryVersion>; listVersions(options?: { maxEntries?: number; cursor?: string; signal?: AbortSignal; }): Promise<HistoryListPage>; readVersion(id: string, signal?: AbortSignal): Promise<WorkbookSnapshot>; diffVersions(request: HistoryDiffRequest): Promise<HistoryDiffPage>; restoreVersion( grid: Grid, id: string, scope: HistoryRestoreScope, options?: HistoryRestoreOptions, ): Promise<ApplyTransactionResult>; }
+```
+
+The archive calls the version history panel makes; `HistoryArchive` provides them.
+
 ##### `HistoryPinRequest` — interface
 
 ```ts
@@ -17497,6 +17566,9 @@ export interface HistoryPinRequest { kind: "pin" | "release"; token: string; ver
 ```
 
 Acquire or release a five-minute renewable reader lease through the storage seam.
+
+Members:
+- `versionId` — Marker ID, or `"head"` to lease the committed head returned in the manifest.
 
 ##### `HistoryPruneRequest` — interface
 

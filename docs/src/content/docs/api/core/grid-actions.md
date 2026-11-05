@@ -12,6 +12,8 @@ Imperative operations the toolbar and context menu bind to; also exposed as `Gri
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#grid-actions-version-history"><code>versionHistory</code></a>
+<a href="#grid-actions-save-version"><code>saveVersion</code></a>
 <a href="#grid-actions-toggle-bold"><code>toggleBold</code></a>
 <a href="#grid-actions-toggle-italic"><code>toggleItalic</code></a>
 <a href="#grid-actions-toggle-underline"><code>toggleUnderline</code></a>
@@ -67,9 +69,29 @@ Imperative operations the toolbar and context menu bind to; also exposed as `Gri
 <a href="#grid-actions-redo"><code>redo</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>53</span>
+## Members <span class="api-count" data-pagefind-ignore>55</span>
 
 <div class="api-member-list">
+
+<details class="api-member" id="grid-actions-version-history" data-pagefind-weight="1">
+<summary><code>versionHistory</code> <span class="api-member-summary">Open the configured version history panel.</span></summary>
+
+```ts generated
+versionHistory(): void;
+```
+
+<p class="api-member-doc">Open the configured version history panel. Requires `GridConfig.history`.</p>
+</details>
+
+<details class="api-member" id="grid-actions-save-version" data-pagefind-weight="1">
+<summary><code>saveVersion</code> <span class="api-member-summary">Open the configured named-version form.</span></summary>
+
+```ts generated
+saveVersion(): void;
+```
+
+<p class="api-member-doc">Open the configured named-version form. Requires `GridConfig.history`.</p>
+</details>
 
 <details class="api-member" id="grid-actions-toggle-bold" data-pagefind-weight="1">
 <summary><code>toggleBold</code></summary>
@@ -577,6 +599,8 @@ redo(): void;
 
 ```ts generated
 export interface GridActions {
+  versionHistory(): void;
+  saveVersion(): void;
   toggleBold(): void;
   toggleItalic(): void;
   toggleUnderline(): void;

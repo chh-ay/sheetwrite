@@ -8,7 +8,7 @@ description: "API reference for @sheetwrite/core/history."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/history-archive.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>35</dd></div>
+<div><dt>Exports</dt><dd>38</dd></div>
 </dl>
 
 Source entry: `packages/core/src/history-archive.ts`
@@ -23,10 +23,17 @@ Source entry: `packages/core/src/history-archive.ts`
 <a class="api-symbol-card" href="/docs/api/core-history/memory-history-storage/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>MemoryHistoryStorage</code></span><span class="api-symbol-card__desc">In-memory history for one page session and for tests.</span></a>
 </div>
 
-### Interfaces <span class="api-count" data-pagefind-ignore>23</span>
+### Functions <span class="api-count" data-pagefind-ignore>1</span>
+
+<div class="api-symbol-grid">
+<a class="api-symbol-card" href="/docs/api/core-history/create-history-commands/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>createHistoryCommands</code></span><span class="api-symbol-card__desc">Opt in to Review › Version History and Save Version in every command renderer.</span></a>
+</div>
+
+### Interfaces <span class="api-count" data-pagefind-ignore>25</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core-history/history-archive-options/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>HistoryArchiveOptions</code></span><span class="api-symbol-card__desc">Host-controlled archive configuration.</span></a>
+<a class="api-symbol-card" href="/docs/api/core-history/history-commands-options/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>HistoryCommandsOptions</code></span><span class="api-symbol-card__desc">Host identity and persistence used by the optional history panel.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-history/history-diff-cell/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>HistoryDiffCell</code></span><span class="api-symbol-card__desc">Source and style of one cell in one version.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-history/history-diff-cells/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>HistoryDiffCells</code></span><span class="api-symbol-card__desc">Changed cells of one page as parallel typed columns, in sheet order and then row by row.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-history/history-diff-cursor/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>HistoryDiffCursor</code></span><span class="api-symbol-card__desc">Where the next page of a diff starts.</span></a>
@@ -39,6 +46,7 @@ Source entry: `packages/core/src/history-archive.ts`
 <a class="api-symbol-card" href="/docs/api/core-history/history-list-page/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>HistoryListPage</code></span><span class="api-symbol-card__desc">Metadata-only response in newest-first order.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-history/history-list-request/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>HistoryListRequest</code></span><span class="api-symbol-card__desc">Bounded metadata-only page.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-history/history-manifest/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>HistoryManifest</code></span><span class="api-symbol-card__desc">Archive state, read without fetching any payload.</span></a>
+<a class="api-symbol-card" href="/docs/api/core-history/history-panel-archive/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>HistoryPanelArchive</code></span><span class="api-symbol-card__desc">The archive calls the version history panel makes; HistoryArchive provides them.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-history/history-pin-request/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>HistoryPinRequest</code></span><span class="api-symbol-card__desc">Acquire or release a five-minute renewable reader lease through the storage seam.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-history/history-prune-request/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>HistoryPruneRequest</code></span><span class="api-symbol-card__desc">Retention removes automatic markers, or one explicitly selected named marker.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-history/history-publish-request/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>HistoryPublishRequest</code></span><span class="api-symbol-card__desc">Atomically publish immutable records and a new head or version marker.</span></a>

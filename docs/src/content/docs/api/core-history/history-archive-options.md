@@ -8,7 +8,7 @@ description: "HistoryArchiveOptions interface in @sheetwrite/core/history: Host-
 Host-controlled archive configuration. No history is created until explicitly opened.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/types.ts#L185"><code>packages/core/src/version-history/types.ts#L185</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/types.ts#L186"><code>packages/core/src/version-history/types.ts#L186</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

@@ -34,7 +34,7 @@ token: string;
 </details>
 
 <details class="api-member" id="history-pin-request-version-id" data-pagefind-weight="1">
-<summary><code>versionId</code></summary>
+<summary><code>versionId</code> <span class="api-member-summary">Marker ID, or &quot;head&quot; to lease the committed head returned in the manifest.</span></summary>
 
 ```ts generated
 versionId: string;

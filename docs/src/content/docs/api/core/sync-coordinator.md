@@ -322,6 +322,7 @@ class SyncCoordinator {
 <p class="api-consumers-label">Public exports naming <code>SyncCoordinator</code></p>
 
 <ul class="api-consumer-list">
+<li><a href="/docs/api/core-history/history-commands-options/"><code>HistoryCommandsOptions</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core-history/history-restore-options/"><code>HistoryRestoreOptions</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>

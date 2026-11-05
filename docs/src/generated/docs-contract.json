@@ -250,9 +250,9 @@
     "toXlsxWorkbook"
   ],
   "entryPointCount": 31,
-  "exportCount": 694,
-  "symbolPageCount": 694,
-  "apiSha256": "598463b9cc682a85435a0e2aa573380db07b79cad89043b2b21ed3d1be837109",
+  "exportCount": 697,
+  "symbolPageCount": 697,
+  "apiSha256": "9a17e243155475766da81283eaba46759335668282f0ad7263d325b8eb0ee300",
   "compatibilitySha256": "39dd14155e04fdbb0816f506e1490faecdd3ca08ae72470187d871527fe14245",
   "formulaContractSha256": "d2df33032cb2193123d824351356dab000dee66c790492c74aa56a1f9b3be5c2"
 }

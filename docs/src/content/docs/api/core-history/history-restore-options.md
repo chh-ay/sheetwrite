@@ -68,5 +68,6 @@ export interface HistoryRestoreOptions {
 
 <ul class="api-consumer-list">
 <li><a href="/docs/api/core-history/history-archive/"><code>HistoryArchive</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core-history/history-panel-archive/"><code>HistoryPanelArchive</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>
