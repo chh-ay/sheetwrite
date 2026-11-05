@@ -3,6 +3,7 @@
  * Notes and hyperlinks are cell properties, so they move with their row, as
  * in an Excel sort. A merged cell moves only as a whole record of rows.
  */
+import type { PermuteRowsOperation } from "../row-order.js";
 import type { CellHyperlink } from "../types/cell.js";
 import type { MergeRange, Range } from "../types/coordinates.js";
 import type { CellNote } from "../types/document.js";
@@ -137,3 +138,13 @@ export function tablesAllowRowMove(tables: readonly WorkbookTable[], bounds: Ran
     );
   });
 }
+
+/** Excel's message when merged cells of different sizes block a sort. */
+export const MERGED_CELLS_SORT_MESSAGE =
+  "This operation requires the merged cells to be identically sized.";
+
+/** How a sort request changes a range. */
+export type SortRangePlan =
+  | { kind: "move"; operation: PermuteRowsOperation }
+  | { kind: "unchanged" }
+  | { kind: "refused"; message: string };

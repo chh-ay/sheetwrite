@@ -141,9 +141,11 @@ import {
 } from "../workbook-table.js";
 import { PagedDirtyPreflight } from "./paged-dirty-preflight.js";
 import {
+  MERGED_CELLS_SORT_MESSAGE,
   permutedHyperlinks,
   permutedMerges,
   permutedNotes,
+  type SortRangePlan,
   tablesAllowRowMove,
 } from "./permute-rows.js";
 import {
@@ -1992,16 +1994,12 @@ export class StoreDataEngine {
   }
 
   /**
-   * The `permuteRows` operation that sorts the data rows of `range` by
-   * `keys`, or `null` when no row moves. Rows that are hidden or filtered
-   * out keep their place, as in Excel; the others take the sorted order
-   * among the visible positions. Keys are columns inside the range.
+   * The plan that sorts the data rows of `range` by `keys`: a `permuteRows`
+   * operation, no change, or Excel's refusal. Rows that are hidden or
+   * filtered out keep their place, as in Excel; the others take the sorted
+   * order among the visible positions. Keys are columns inside the range.
    */
-  sortRangeOperation(
-    range: Range,
-    keys: readonly SortKey[],
-    hasHeader: boolean,
-  ): PermuteRowsOperation | null {
+  sortRangePlan(range: Range, keys: readonly SortKey[], hasHeader: boolean): SortRangePlan {
     const bounds = normalizedRange(range);
     const sheet = this.sheetMeta(bounds.sheet);
     const dataStart = bounds.start.row + (hasHeader ? 1 : 0);
@@ -2017,47 +2015,100 @@ export class StoreDataEngine {
       bounds.end.col >= sheet.columns.length ||
       dataStart > bounds.end.row
     ) {
-      return null;
+      return { kind: "unchanged" };
     }
 
-    const visible = this.visibleRowsBetween(bounds.sheet, dataStart, bounds.end.row);
-    if (visible.length < 2) return null;
+    const height = this.recordHeight(sheet, bounds, dataStart);
+    if (height === null) return { kind: "refused", message: MERGED_CELLS_SORT_MESSAGE };
+
+    const starts = this.visibleRecordStarts(bounds.sheet, dataStart, bounds.end.row, height);
+    if (starts.length < 2) return { kind: "unchanged" };
 
     const cols = Uint32Array.from(keys, (key) => key.col);
     const ascending = Uint8Array.from(keys, (key) => (key.ascending ? 1 : 0));
-    const sorted = this.wasm.sortRowsMulti(this.handleOf(bounds.sheet), cols, ascending, visible);
+    const sorted = this.wasm.sortRowsMulti(this.handleOf(bounds.sheet), cols, ascending, starts);
 
     const order = new Uint32Array(bounds.end.row - dataStart + 1);
     for (let offset = 0; offset < order.length; offset++) order[offset] = offset;
-    for (const [position, target] of visible.entries()) {
-      order[target - dataStart] = (sorted[position] ?? target) - dataStart;
+    for (const [position, target] of starts.entries()) {
+      const source = sorted[position] ?? target;
+      for (let row = 0; row < height; row++) {
+        order[target - dataStart + row] = source - dataStart + row;
+      }
     }
 
     return {
-      op: "permuteRows",
-      range: {
-        sheet: bounds.sheet,
-        start: { row: dataStart, col: bounds.start.col },
-        end: { row: bounds.end.row, col: bounds.end.col },
+      kind: "move",
+      operation: {
+        op: "permuteRows",
+        range: {
+          sheet: bounds.sheet,
+          start: { row: dataStart, col: bounds.start.col },
+          end: { row: bounds.end.row, col: bounds.end.col },
+        },
+        encoding: ROW_ORDER_ENCODING,
+        order: encodeRowOrder(order),
       },
-      encoding: ROW_ORDER_ENCODING,
-      order: encodeRowOrder(order),
     };
   }
 
-  /** Rows from `first` to `last` that the view shows, in sheet order. */
-  private visibleRowsBetween(sheet: SheetId, first: number, last: number): Uint32Array {
+  /**
+   * Visible rows from `first` to `last` that start a record of `height`
+   * rows, in sheet order. A record is visible when its first row is.
+   */
+  private visibleRecordStarts(
+    sheet: SheetId,
+    first: number,
+    last: number,
+    height: number,
+  ): Uint32Array {
     const hidden = this.sheetMeta(sheet).hiddenRows;
     const filtered = this.view.hasView(sheet);
-    const rows = new Uint32Array(last - first + 1);
+    const rows = new Uint32Array(Math.ceil((last - first + 1) / height));
     let count = 0;
-    for (let row = first; row <= last; row++) {
+    for (let row = first; row <= last; row += height) {
       if (hidden?.has(row)) continue;
       if (filtered && this.view.viewRowOf(sheet, row) === null) continue;
       rows[count] = row;
       count += 1;
     }
     return rows.subarray(0, count);
+  }
+
+  /**
+   * Rows per sorted record, or `null` when Excel refuses the sort. Merged
+   * cells in the data rows must all have the same size, start on record
+   * boundaries, lie inside the range and repeat in every record; they then
+   * make records of their height, which sort as units. Microsoft Learn, "An
+   * error message when you sort a range that contains merged cells in Excel".
+   */
+  private recordHeight(sheet: Sheet, bounds: Range, dataStart: number): number | null {
+    const merges = (sheet.merges ?? []).filter(
+      (merge) =>
+        merge.r0 <= bounds.end.row &&
+        merge.r1 >= dataStart &&
+        merge.c0 <= bounds.end.col &&
+        merge.c1 >= bounds.start.col,
+    );
+    const [first] = merges;
+    if (!first) return 1;
+
+    const rows = bounds.end.row - dataStart + 1;
+    const height = first.r1 - first.r0 + 1;
+    const width = first.c1 - first.c0 + 1;
+    if (rows % height !== 0) return null;
+
+    const recordColumns = new Set<number>();
+    for (const merge of merges) {
+      const sameSize = merge.r1 - merge.r0 + 1 === height && merge.c1 - merge.c0 + 1 === width;
+      const inside =
+        merge.r0 >= dataStart && merge.c0 >= bounds.start.col && merge.c1 <= bounds.end.col;
+      if (!sameSize || !inside || (merge.r0 - dataStart) % height !== 0) return null;
+      recordColumns.add(merge.c0);
+    }
+
+    const everyRecordMerged = merges.length === (rows / height) * recordColumns.size;
+    return everyRecordMerged ? height : null;
   }
 
   /**

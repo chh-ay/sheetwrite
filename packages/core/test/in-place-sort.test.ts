@@ -199,6 +199,50 @@ describe("in-place sort", () => {
     }
   });
 
+  /** Microsoft Learn: identically sized merged cells sort as whole records. */
+  it("sorts records of identically sized merged cells as units", () => {
+    const { store, controller } = setup([
+      literal(0, 0, "b"),
+      literal(1, 1, "b second"),
+      literal(2, 0, "a"),
+      literal(3, 1, "a second"),
+    ]);
+    try {
+      store.applyTransaction({
+        patches: [
+          { op: "addMerge", sheet: "s1", merge: { r0: 0, c0: 0, r1: 1, c1: 0 } },
+          { op: "addMerge", sheet: "s1", merge: { r0: 2, c0: 0, r1: 3, c1: 0 } },
+        ],
+      });
+
+      expect(store.sortRange(block(0, 3, 1), [{ col: 0, ascending: true }]).status).toBe("applied");
+
+      expect(column(store, 0, 4)).toEqual(["a", null, "b", null]);
+      expect(column(store, 1, 4)).toEqual([null, "a second", null, "b second"]);
+    } finally {
+      controller.destroy();
+      store.dispose();
+    }
+  });
+
+  /** Microsoft Learn: merged cells that are not all the same size block a sort. */
+  it("refuses merged cells that are not all the same size", () => {
+    const { store, controller } = setup([literal(0, 0, 2), literal(1, 0, 1), literal(2, 0, 3)]);
+    try {
+      store.applyTransaction({
+        patches: [{ op: "addMerge", sheet: "s1", merge: { r0: 0, c0: 1, r1: 1, c1: 1 } }],
+      });
+
+      expect(store.sortRange(block(0, 2, 1), [{ col: 0, ascending: true }]).status).toBe(
+        "rejected",
+      );
+      expect(column(store, 0)).toEqual([2, 1, 3]);
+    } finally {
+      controller.destroy();
+      store.dispose();
+    }
+  });
+
   /** Microsoft Support: a sort in a table covers the whole table body. */
   it("sorts a table body and rejects a range that crosses the table edge", () => {
     const { store, controller } = setup([literal(1, 0, 2), literal(2, 0, 1)]);

@@ -535,10 +535,24 @@ export class SheetwriteStore implements Store {
     options: { hasHeader?: boolean } = {},
   ): ApplyTransactionResult {
     this.requireCompleteQuery(range.sheet);
-    const operation = this.engine.sortRangeOperation(range, keys, options.hasHeader ?? false);
-    if (!operation) return { status: "noop", epoch: this.epoch, reason: "empty" };
+    const plan = this.engine.sortRangePlan(range, keys, options.hasHeader ?? false);
+    if (plan.kind === "unchanged") return { status: "noop", epoch: this.epoch, reason: "empty" };
+    if (plan.kind === "refused") {
+      return {
+        status: "rejected",
+        epoch: this.epoch,
+        issues: [
+          {
+            kind: "invalid-operation",
+            severity: "error",
+            operationIndex: 0,
+            message: plan.message,
+          },
+        ],
+      };
+    }
 
-    return this.applyTransaction({ patches: [operation] }, "sort");
+    return this.applyTransaction({ patches: [plan.operation] }, "sort");
   }
 
   setColumnFilter(
