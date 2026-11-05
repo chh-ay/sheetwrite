@@ -1,16 +1,15 @@
 //! Formula dependency indexes, affected-set growth, and depth/cycle checks.
 
 use std::cmp::Ordering;
-use std::collections::VecDeque;
 
+use crate::formula_slots::{FormulaResults, FormulaStore, FormulaWork};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::graph::{DirtyRect, DirtySeeds};
 use crate::memory::MemoryOwnerStats;
 use crate::sheet::SheetData;
 use crate::types::{
-    AbsCellKey, CellRange, EvalResult, FormulaEntry, FormulaError, ReadSet, Value,
-    FORMULA_RECURSION_LIMIT,
+    AbsCellKey, CellRange, FormulaEntry, FormulaError, ReadSet, Value, FORMULA_RECURSION_LIMIT,
 };
 
 /// Queued formula changes always patch the index below this count. Above it, a
@@ -163,7 +162,7 @@ impl DepIndex {
     /// changed reads · log changed reads), never one list scan per reader. All
     /// removals run before any addition, so a read kept across the change is
     /// removed and re-added without diffing old reads against new ones.
-    pub(crate) fn apply_pending(&mut self, sheets: &[SheetData]) {
+    pub(crate) fn apply_pending(&mut self, sheets: &[SheetData], slots: &FormulaStore) {
         if self.pending.is_empty() {
             return;
         }
@@ -185,7 +184,7 @@ impl DepIndex {
 
         let removed_range_edges = range_edges.len();
         for &formula in pending.keys() {
-            let Some(entry) = formula_entry(sheets, formula) else {
+            let Some(entry) = formula_entry(sheets, slots, formula) else {
                 continue;
             };
 
@@ -429,7 +428,7 @@ impl RangeInterval {
 /// [`DepIndex::apply_pending`] and [`DepIndex::queue_replacement`] patch. A new
 /// dependency-relevant field must be added to all three, or a replacement that
 /// changes it will leave the index stale.
-pub(crate) fn build_dep_index(sheets: &[SheetData]) -> DepIndex {
+pub(crate) fn build_dep_index(sheets: &[SheetData], slots: &FormulaStore) -> DepIndex {
     let mut exact_dependents: FxHashMap<AbsCellKey, Vec<AbsCellKey>> = FxHashMap::default();
     let mut range_dependents: FxHashMap<CellRange, Vec<AbsCellKey>> = FxHashMap::default();
     let mut dynamic_array_formulas = 0;
@@ -445,7 +444,7 @@ pub(crate) fn build_dep_index(sheets: &[SheetData]) -> DepIndex {
     let mut has_formula_dependencies = false;
 
     for (sheet_index, sheet) in sheets.iter().enumerate() {
-        for (formula_cell, entry) in sheet.formulas.iter() {
+        for (formula_cell, entry) in sheet.formulas.iter(slots) {
             dynamic_array_formulas += usize::from(entry.produces_array());
             let formula_abs = AbsCellKey::from_local(sheet_index, formula_cell);
             for &cell in &entry.reads.cells {
@@ -570,193 +569,214 @@ fn next_match_stamp(marks: &mut [u32], stamp: &mut u32) -> u32 {
     current
 }
 
+/// Collect every seed into one id worklist so shared readers enter it once.
 pub(super) fn collect_affected_formulas(
     sheets: &[SheetData],
-    seed_sheet: usize,
+    slots: &FormulaStore,
+    seeds: &[usize],
     index: &DepIndex,
-) -> FxHashSet<AbsCellKey> {
-    let mut affected: FxHashSet<AbsCellKey> = FxHashSet::default();
-    let mut queue: VecDeque<AbsCellKey> = VecDeque::new();
-    let mut range_matches: Vec<usize> = Vec::new();
-    let mut row_matches: Vec<usize> = Vec::new();
-    let mut range_marks = vec![0; index.range_groups.len()];
-    let mut range_stamp = 1;
-    let mut fired_groups = vec![false; index.range_groups.len()];
-    if let Some(sheet) = sheets.get(seed_sheet) {
+    affected: FormulaWork,
+) -> FormulaWork {
+    let mut walk = DirtyWalk {
+        sheets,
+        slots,
+        index,
+        affected,
+        range_matches: Vec::new(),
+        row_matches: Vec::new(),
+        range_marks: vec![0; index.range_groups.len()],
+        range_stamp: 1,
+        fired_groups: vec![false; index.range_groups.len()],
+    };
+    for &seed in seeds {
+        walk.seed_sheet(seed);
+    }
+
+    let mut cursor = 0;
+    while let Some(id) = walk.affected.id_at(cursor) {
+        cursor += 1;
+        if let Some(key) = slots.location(id) {
+            walk.readers(key);
+        }
+    }
+    walk.affected
+}
+
+struct DirtyWalk<'a> {
+    sheets: &'a [SheetData],
+    slots: &'a FormulaStore,
+    index: &'a DepIndex,
+    affected: FormulaWork,
+    range_matches: Vec<usize>,
+    row_matches: Vec<usize>,
+    range_marks: Vec<u32>,
+    range_stamp: u32,
+    fired_groups: Vec<bool>,
+}
+
+impl DirtyWalk<'_> {
+    fn select(&mut self, cell: AbsCellKey) {
+        if let Some(id) = self
+            .sheets
+            .get(cell.sheet as usize)
+            .and_then(|sheet| sheet.formulas.id(cell.local()))
+        {
+            self.affected.insert(id);
+        }
+    }
+
+    fn fire_group(&mut self, group: usize) {
+        let Some(fired) = self.fired_groups.get_mut(group) else {
+            return;
+        };
+        if std::mem::replace(fired, true) {
+            return;
+        }
+        let Some(group) = self.index.range_groups.get(group) else {
+            return;
+        };
+        for &reader in &group.dependents {
+            self.select(reader);
+        }
+    }
+
+    fn readers(&mut self, cell: AbsCellKey) {
+        if let Some(dependents) = self.index.exact_dependents.get(&cell) {
+            for &dependent in dependents {
+                self.select(dependent);
+            }
+        }
+        self.index.collect_matching_range_groups(
+            cell,
+            &mut self.range_matches,
+            &mut self.row_matches,
+            &mut self.range_marks,
+            &mut self.range_stamp,
+        );
+        let mut offset = 0;
+        while let Some(&group) = self.range_matches.get(offset) {
+            offset += 1;
+            debug_assert!(self
+                .index
+                .range_groups
+                .get(group)
+                .is_some_and(|group| group.range.contains(cell)));
+            self.fire_group(group);
+        }
+    }
+
+    fn seed_cell(&mut self, cell: AbsCellKey) {
+        if let Some(id) = self
+            .sheets
+            .get(cell.sheet as usize)
+            .and_then(|sheet| sheet.formulas.id(cell.local()))
+        {
+            self.affected.insert(id);
+        } else {
+            // A literal has no formula id but still seeds its address's readers.
+            self.readers(cell);
+        }
+    }
+
+    fn seed_sheet(&mut self, seed: usize) {
+        let Some(sheet) = self.sheets.get(seed) else {
+            return;
+        };
         match sheet.formulas.dirty_seeds() {
             DirtySeeds::Cells(cells) => {
                 for &cell in cells {
-                    let abs = AbsCellKey::from_local(seed_sheet, cell);
-                    if formula_exists(sheets, abs) {
-                        affected.insert(abs);
-                    }
-                    queue.push_back(abs);
+                    self.seed_cell(AbsCellKey::from_local(seed, cell));
                 }
             }
-            DirtySeeds::Ranges(rects) => {
-                // Small rectangles are cheaper to walk than every formula/read key.
-                const ENUMERATED_RECT_CELLS: u64 = 4096;
-                let area = |rect: &DirtyRect| {
-                    (u64::from(rect.row_end - rect.row_start) + 1)
-                        .saturating_mul(u64::from(rect.col_end - rect.col_start) + 1)
-                };
-
-                // Many single-cell writes followed by a bulk write leave many
-                // small rectangles. Walking all of their cells can cost more
-                // than one scan of the registered sources, so the scan takes
-                // every rectangle when the walk would visit more cells.
-                let registered_sources = (sheet.formulas.len() as u64)
-                    .saturating_add(index.exact_dependents.len() as u64)
-                    .saturating_add(index.range_groups.len() as u64);
-                let walked_cells = rects
-                    .iter()
-                    .map(area)
-                    .filter(|&cells| cells <= ENUMERATED_RECT_CELLS)
-                    .fold(0u64, u64::saturating_add);
-                let walks_cells = walked_cells <= registered_sources;
-                let is_small =
-                    |rect: &DirtyRect| walks_cells && area(rect) <= ENUMERATED_RECT_CELLS;
-                for rect in rects.iter().filter(|rect| is_small(rect)) {
-                    for row in rect.row_start..=rect.row_end {
-                        for col in rect.col_start..=rect.col_end {
-                            let abs = AbsCellKey::from_local(seed_sheet, (row, col));
-                            if formula_exists(sheets, abs) {
-                                affected.insert(abs);
-                            }
-                            queue.push_back(abs);
-                        }
-                    }
-                }
-
-                if rects.iter().any(|rect| !is_small(rect)) {
-                    // Large edits scan registered sources, never the rectangle area.
-                    let contains = |cell| {
-                        rects
-                            .iter()
-                            .filter(|rect| !is_small(rect))
-                            .any(|rect| rect.contains(cell))
-                    };
-                    for cell in sheet.formulas.keys().filter(|&cell| contains(cell)) {
-                        let abs = AbsCellKey::from_local(seed_sheet, cell);
-                        if affected.insert(abs) {
-                            queue.push_back(abs);
-                        }
-                    }
-
-                    for (&cell, dependents) in &index.exact_dependents {
-                        if cell.sheet == seed_sheet as u32 && contains(cell.local()) {
-                            for &dependent in dependents {
-                                if affected.insert(dependent) {
-                                    queue.push_back(dependent);
-                                }
-                            }
-                        }
-                    }
-
-                    for (group_index, group) in index.range_groups.iter().enumerate() {
-                        let range = group.range;
-                        if range.sheet == seed_sheet as u32
-                            && rects.iter().filter(|rect| !is_small(rect)).any(|rect| {
-                                rect.intersects(DirtyRect {
-                                    row_start: range.row_start,
-                                    col_start: range.col_start,
-                                    row_end: range.row_end,
-                                    col_end: range.col_end,
-                                })
-                            })
-                        {
-                            fired_groups[group_index] = true;
-                            for &dependent in &group.dependents {
-                                if affected.insert(dependent) {
-                                    queue.push_back(dependent);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            DirtySeeds::Ranges(rects) => self.seed_rectangles(seed, rects),
             DirtySeeds::All => {
-                // Seed every formula on the sheet plus every formula registered as
-                // reading any of its cells or ranges; the BFS below grows
-                // transitive dependents as usual. This is bounded by
-                // formula/read-set counts, never by row count.
-                let seed = seed_sheet as u32;
-                for cell in sheet.formulas.keys() {
-                    let abs = AbsCellKey::from_local(seed_sheet, cell);
-                    if affected.insert(abs) {
-                        queue.push_back(abs);
-                    }
+                for id in sheet.formulas.ids() {
+                    self.affected.insert(id);
                 }
-                for (&cell, dependents) in &index.exact_dependents {
-                    if cell.sheet != seed {
-                        continue;
-                    }
-                    for &dependent in dependents {
-                        if affected.insert(dependent) {
-                            queue.push_back(dependent);
+                for (&cell, dependents) in &self.index.exact_dependents {
+                    if cell.sheet == seed as u32 {
+                        for &dependent in dependents {
+                            self.select(dependent);
                         }
                     }
                 }
-                for (group_index, group) in index.range_groups.iter().enumerate() {
-                    if group.range.sheet != seed {
-                        continue;
-                    }
-                    fired_groups[group_index] = true;
-                    for &dependent in &group.dependents {
-                        if affected.insert(dependent) {
-                            queue.push_back(dependent);
-                        }
+                for (group, entry) in self.index.range_groups.iter().enumerate() {
+                    if entry.range.sheet == seed as u32 {
+                        self.fire_group(group);
                     }
                 }
             }
         }
-
-        // Volatile formulas recalculate on every pass, as in Excel. Seeding
-        // them here instead of marking them dirty keeps the dirty state exact
-        // and costs O(volatile cells); the BFS below adds their dependents.
-        for cell in sheet.formulas.volatile_keys() {
-            let abs = AbsCellKey::from_local(seed_sheet, cell);
-            if affected.insert(abs) {
-                queue.push_back(abs);
+        if sheet.formulas.has_volatile() {
+            for cell in sheet.formulas.volatile_keys(self.slots) {
+                self.select(AbsCellKey::from_local(seed, cell));
             }
         }
     }
 
-    while let Some(cell) = queue.pop_front() {
-        if formula_exists(sheets, cell) {
-            affected.insert(cell);
-        }
-
-        if let Some(dependents) = index.exact_dependents.get(&cell) {
-            for &dependent in dependents {
-                if affected.insert(dependent) {
-                    queue.push_back(dependent);
+    fn seed_rectangles(&mut self, seed: usize, rects: &[DirtyRect]) {
+        const ENUMERATED_RECT_CELLS: u64 = 4096;
+        let Some(sheet) = self.sheets.get(seed) else {
+            return;
+        };
+        let area = |rect: &DirtyRect| {
+            (u64::from(rect.row_end - rect.row_start) + 1)
+                .saturating_mul(u64::from(rect.col_end - rect.col_start) + 1)
+        };
+        let registered_sources = (sheet.formulas.len() as u64)
+            .saturating_add(self.index.exact_dependents.len() as u64)
+            .saturating_add(self.index.range_groups.len() as u64);
+        let walked_cells = rects
+            .iter()
+            .map(area)
+            .filter(|&cells| cells <= ENUMERATED_RECT_CELLS)
+            .fold(0u64, u64::saturating_add);
+        let walks_cells = walked_cells <= registered_sources;
+        let is_small = |rect: &DirtyRect| walks_cells && area(rect) <= ENUMERATED_RECT_CELLS;
+        for rect in rects.iter().filter(|rect| is_small(rect)) {
+            for row in rect.row_start..=rect.row_end {
+                for col in rect.col_start..=rect.col_end {
+                    self.seed_cell(AbsCellKey::from_local(seed, (row, col)));
                 }
             }
         }
+        if !rects.iter().any(|rect| !is_small(rect)) {
+            return;
+        }
 
-        index.collect_matching_range_groups(
-            cell,
-            &mut range_matches,
-            &mut row_matches,
-            &mut range_marks,
-            &mut range_stamp,
-        );
-        for &group in &range_matches {
-            if std::mem::replace(&mut fired_groups[group], true) {
-                continue;
-            }
-            let range_group = &index.range_groups[group];
-            debug_assert!(range_group.range.contains(cell));
-            for &dependent in &range_group.dependents {
-                if affected.insert(dependent) {
-                    queue.push_back(dependent);
+        // Large edits scan registered sources, never the logical rectangle area.
+        let contains = |cell| {
+            rects
+                .iter()
+                .filter(|rect| !is_small(rect))
+                .any(|rect| rect.contains(cell))
+        };
+        for cell in sheet.formulas.keys().filter(|&cell| contains(cell)) {
+            self.select(AbsCellKey::from_local(seed, cell));
+        }
+        for (&cell, dependents) in &self.index.exact_dependents {
+            if cell.sheet == seed as u32 && contains(cell.local()) {
+                for &dependent in dependents {
+                    self.select(dependent);
                 }
+            }
+        }
+        for (group, entry) in self.index.range_groups.iter().enumerate() {
+            let range = entry.range;
+            if range.sheet == seed as u32
+                && rects.iter().filter(|rect| !is_small(rect)).any(|rect| {
+                    rect.intersects(DirtyRect {
+                        row_start: range.row_start,
+                        col_start: range.col_start,
+                        row_end: range.row_end,
+                        col_end: range.col_end,
+                    })
+                })
+            {
+                self.fire_group(group);
             }
         }
     }
-
-    affected
 }
 
 /// Formulas that read any of `cells` directly, by cell or by range. Unlike
@@ -794,59 +814,68 @@ pub(super) fn direct_readers(
     readers
 }
 
-fn formula_entry(sheets: &[SheetData], key: AbsCellKey) -> Option<&FormulaEntry> {
-    sheets
-        .get(key.sheet as usize)
-        .and_then(|sheet| sheet.formulas.get(key.local()))
+fn formula_entry<'a>(
+    sheets: &[SheetData],
+    slots: &'a FormulaStore,
+    key: AbsCellKey,
+) -> Option<&'a FormulaEntry> {
+    let id = sheets.get(key.sheet as usize)?.formulas.id(key.local())?;
+    slots.get(id)
 }
 
 fn formula_exists(sheets: &[SheetData], key: AbsCellKey) -> bool {
-    formula_entry(sheets, key).is_some()
+    sheets
+        .get(key.sheet as usize)
+        .is_some_and(|sheet| sheet.formulas.contains(key.local()))
 }
 
-/// Seeds `memo` with the depth and cycle errors of `affected`. Returns whether
+/// Seeds indexed results with the depth and cycle errors of `affected`. Returns whether
 /// any formula met a circular reference, so iterative calculation runs its
 /// component pass only for workbooks that have one.
 pub(super) fn seed_dependency_depth_errors(
     sheets: &[SheetData],
-    affected: &FxHashSet<AbsCellKey>,
+    slots: &FormulaStore,
+    affected: &FormulaWork,
     index: &DepIndex,
-    memo: &mut FxHashMap<AbsCellKey, EvalResult>,
+    results: &mut FormulaResults,
 ) -> bool {
-    seed_depth_errors(sheets, affected, index, memo, false)
+    seed_depth_errors(sheets, slots, affected, index, results, false)
 }
 
 /// Spill expansion may add formulas, but must not replace values of components
 /// that iterative calculation has already settled before installing spills.
 pub(super) fn seed_additional_depth_errors(
     sheets: &[SheetData],
-    affected: &FxHashSet<AbsCellKey>,
+    slots: &FormulaStore,
+    affected: &FormulaWork,
     index: &DepIndex,
-    memo: &mut FxHashMap<AbsCellKey, EvalResult>,
+    results: &mut FormulaResults,
 ) -> bool {
-    seed_depth_errors(sheets, affected, index, memo, true)
+    seed_depth_errors(sheets, slots, affected, index, results, true)
 }
 
 fn seed_depth_errors(
     sheets: &[SheetData],
-    affected: &FxHashSet<AbsCellKey>,
+    slots: &FormulaStore,
+    affected: &FormulaWork,
     index: &DepIndex,
-    memo: &mut FxHashMap<AbsCellKey, EvalResult>,
+    results: &mut FormulaResults,
     preserve_results: bool,
 ) -> bool {
     if !index.has_formula_dependencies {
         return false;
     }
 
-    let mut walk = DependencyDepthWalk::new(sheets, affected);
+    let mut walk = DependencyDepthWalk::new(sheets, slots, affected);
     let mut found_cycle = false;
-    for &key in affected {
+    for id in affected.ids() {
+        let Some(key) = slots.location(id) else {
+            continue;
+        };
         if let Err(error) = walk.depth(key) {
             found_cycle |= error == FormulaError::Cycle;
-            if preserve_results {
-                memo.entry(key).or_insert(Value::Error(error));
-            } else {
-                memo.insert(key, Value::Error(error));
+            if !preserve_results || results.get(id).is_none() {
+                results.insert(id, Value::Error(error));
             }
         }
     }
@@ -885,9 +914,14 @@ struct EdgeCursor<'a> {
 }
 
 impl<'a> EdgeCursor<'a> {
-    fn new(sheets: &'a [SheetData], formulas: &[AbsCellKey], node: DependencyNode) -> Self {
+    fn new(
+        sheets: &'a [SheetData],
+        slots: &'a FormulaStore,
+        formulas: &[AbsCellKey],
+        node: DependencyNode,
+    ) -> Self {
         let (cells, ranges, next): (&'a [AbsCellKey], &'a [CellRange], usize) = match node {
-            DependencyNode::Formula(key) => formula_entry(sheets, key)
+            DependencyNode::Formula(key) => formula_entry(sheets, slots, key)
                 .map_or((&[], &[], 0), |entry| {
                     (&entry.reads.cells, &entry.reads.ranges, 0)
                 }),
@@ -987,11 +1021,8 @@ fn column_major(key: AbsCellKey) -> (u32, u32, u32) {
 
 /// Affected formulas in column-major order, so a range finds its members
 /// without probing each of its cells.
-fn column_major_formulas(
-    sheets: &[SheetData],
-    keys: impl Iterator<Item = AbsCellKey>,
-) -> Vec<AbsCellKey> {
-    let mut formulas: Vec<AbsCellKey> = keys.filter(|&key| formula_exists(sheets, key)).collect();
+#[inline(never)]
+fn column_major_formulas(mut formulas: Vec<AbsCellKey>) -> Vec<AbsCellKey> {
     formulas.sort_unstable_by_key(|&key| column_major(key));
     formulas
 }
@@ -1002,14 +1033,21 @@ fn column_major_formulas(
 /// entries in place.
 struct DependencyDepthWalk<'a> {
     sheets: &'a [SheetData],
+    slots: &'a FormulaStore,
     formulas: Vec<AbsCellKey>,
     nodes: FxHashMap<DependencyNode, NodeDepth>,
     stack: Vec<DependencyFrame<'a>>,
 }
 
 impl<'a> DependencyDepthWalk<'a> {
-    fn new(sheets: &'a [SheetData], affected: &FxHashSet<AbsCellKey>) -> Self {
-        let formulas = column_major_formulas(sheets, affected.iter().copied());
+    fn new(sheets: &'a [SheetData], slots: &'a FormulaStore, affected: &FormulaWork) -> Self {
+        // Selected ids are already indexed; do not search their addresses again.
+        let formulas = column_major_formulas(
+            affected
+                .ids()
+                .filter_map(|id| slots.get(id).and_then(|_| slots.location(id)))
+                .collect(),
+        );
         let mut nodes = FxHashMap::with_capacity_and_hasher(formulas.len(), Default::default());
         nodes.extend(
             formulas
@@ -1018,6 +1056,7 @@ impl<'a> DependencyDepthWalk<'a> {
         );
         Self {
             sheets,
+            slots,
             formulas,
             nodes,
             stack: Vec::new(),
@@ -1067,7 +1106,7 @@ impl<'a> DependencyDepthWalk<'a> {
     fn enter(&mut self, node: DependencyNode) {
         self.nodes.insert(node, NodeDepth::Visiting);
         self.stack.push(DependencyFrame {
-            edges: EdgeCursor::new(self.sheets, &self.formulas, node),
+            edges: EdgeCursor::new(self.sheets, self.slots, &self.formulas, node),
             deepest: Ok(0),
         });
     }
@@ -1117,6 +1156,7 @@ struct ComponentFrame<'a> {
 /// walk. One pass: O(formulas + ranges + edges) time and one entry per node.
 struct ComponentWalk<'a> {
     sheets: &'a [SheetData],
+    slots: &'a FormulaStore,
     formulas: Vec<AbsCellKey>,
     nodes: FxHashMap<DependencyNode, ComponentState>,
     /// Entered nodes not yet assigned to a component.
@@ -1132,7 +1172,7 @@ impl<'a> ComponentWalk<'a> {
         self.nodes.insert(node, ComponentState::Open(index));
         self.open.push(node);
         self.stack.push(ComponentFrame {
-            edges: EdgeCursor::new(self.sheets, &self.formulas, node),
+            edges: EdgeCursor::new(self.sheets, self.slots, &self.formulas, node),
             index,
             low_link: index,
             reads_itself: false,
@@ -1202,9 +1242,16 @@ impl<'a> ComponentWalk<'a> {
 
 pub(super) fn circular_components(
     sheets: &[SheetData],
+    slots: &FormulaStore,
     cyclic: &[AbsCellKey],
 ) -> CircularComponents {
-    let formulas = column_major_formulas(sheets, cyclic.iter().copied());
+    let formulas = column_major_formulas(
+        cyclic
+            .iter()
+            .copied()
+            .filter(|&key| formula_exists(sheets, key))
+            .collect(),
+    );
     let mut nodes = FxHashMap::with_capacity_and_hasher(formulas.len(), Default::default());
     nodes.extend(
         formulas
@@ -1218,6 +1265,7 @@ pub(super) fn circular_components(
     };
     let mut walk = ComponentWalk {
         sheets,
+        slots,
         formulas,
         nodes,
         open: Vec::new(),
@@ -1246,17 +1294,25 @@ mod tests {
         store.set_formula(sheet, 0, 1, "=A1+SUM(A1:A1)", 0);
         let left = AbsCellKey::new(sheet, 0, 0);
         let right = AbsCellKey::new(sheet, 0, 1);
-        let affected = FxHashSet::from_iter([left, right]);
-        let index = build_dep_index(&store.sheets);
+        let mut affected = FormulaWork::default();
+        affected.select(&store.sheets, left);
+        affected.select(&store.sheets, right);
+        let index = build_dep_index(&store.sheets, &store.formula_slots);
 
-        let mut memo = FxHashMap::default();
-        seed_dependency_depth_errors(&store.sheets, &affected, &index, &mut memo);
+        let mut memo = FormulaResults::default();
+        seed_dependency_depth_errors(
+            &store.sheets,
+            &store.formula_slots,
+            &affected,
+            &index,
+            &mut memo,
+        );
         assert!(matches!(
-            memo.get(&left),
+            memo.get(store.formula_id(left).expect("left formula")),
             Some(Value::Error(FormulaError::Cycle))
         ));
         assert!(matches!(
-            memo.get(&right),
+            memo.get(store.formula_id(right).expect("right formula")),
             Some(Value::Error(FormulaError::Cycle))
         ));
     }
@@ -1327,8 +1383,10 @@ mod tests {
     /// Applies the queued patch and checks it against a rebuild of the same
     /// entries. The dependency flag may stay set after a delete, never unset.
     fn assert_patch_matches_rebuild(store: &mut CellStore) {
-        let rebuilt = build_dep_index(&store.sheets);
-        let patched = store.graph.ensure_index(&store.sheets);
+        let rebuilt = build_dep_index(&store.sheets, &store.formula_slots);
+        let patched = store
+            .graph
+            .ensure_index(&store.sheets, &store.formula_slots);
 
         assert!(patched.pending.is_empty());
         assert_eq!(index_contents(patched), index_contents(&rebuilt));
@@ -1467,15 +1525,15 @@ mod tests {
         let mut store = CellStore::new();
         let sheet = store.add_sheet(2, ROWS);
         let reader = format!("=SUM(A1:A{ROWS})+SUM(A2:A{ROWS})");
-        let mut affected = FxHashSet::default();
+        let mut affected = FormulaWork::default();
         for row in 0..ROWS {
             store.set_formula(sheet, row, 0, "=1", 0);
             store.set_formula(sheet, row, 1, &reader, 0);
-            affected.insert(AbsCellKey::new(sheet, row as u32, 0));
-            affected.insert(AbsCellKey::new(sheet, row as u32, 1));
+            affected.select(&store.sheets, AbsCellKey::new(sheet, row as u32, 0));
+            affected.select(&store.sheets, AbsCellKey::new(sheet, row as u32, 1));
         }
 
-        let mut walk = DependencyDepthWalk::new(&store.sheets, &affected);
+        let mut walk = DependencyDepthWalk::new(&store.sheets, &store.formula_slots, &affected);
         for row in 0..ROWS {
             assert_eq!(walk.depth(AbsCellKey::new(sheet, row as u32, 1)), Ok(2));
         }
@@ -1484,17 +1542,31 @@ mod tests {
         assert_eq!(walk.nodes.len(), 2 * ROWS + 2);
 
         store.set_formula(sheet, 0, 0, "=B1", 0);
-        let index = build_dep_index(&store.sheets);
-        let mut memo = FxHashMap::default();
-        seed_dependency_depth_errors(&store.sheets, &affected, &index, &mut memo);
+        let index = build_dep_index(&store.sheets, &store.formula_slots);
+        let mut memo = FormulaResults::default();
+        seed_dependency_depth_errors(
+            &store.sheets,
+            &store.formula_slots,
+            &affected,
+            &index,
+            &mut memo,
+        );
         assert_eq!(memo.len(), ROWS + 1);
         assert!(matches!(
-            memo.get(&AbsCellKey::new(sheet, 0, 0)),
+            memo.get(
+                store
+                    .formula_id(AbsCellKey::new(sheet, 0, 0))
+                    .expect("formula")
+            ),
             Some(Value::Error(FormulaError::Cycle))
         ));
         for row in 0..ROWS {
             assert!(matches!(
-                memo.get(&AbsCellKey::new(sheet, row as u32, 1)),
+                memo.get(
+                    store
+                        .formula_id(AbsCellKey::new(sheet, row as u32, 1))
+                        .expect("formula")
+                ),
                 Some(Value::Error(FormulaError::Cycle))
             ));
         }
@@ -1511,7 +1583,7 @@ mod tests {
                 for reads_range in [false, true] {
                     let mut store = CellStore::new();
                     let sheet = store.add_sheet(1, CHAIN_ROWS);
-                    let mut affected = FxHashSet::default();
+                    let mut affected = FormulaWork::default();
                     store.set_formula(sheet, 0, 0, "=1", 0);
                     for row in 0..CHAIN_ROWS {
                         if row > 0 {
@@ -1522,33 +1594,46 @@ mod tests {
                             };
                             store.set_formula(sheet, row, 0, &source, 0);
                         }
-                        affected.insert(AbsCellKey::new(sheet, row as u32, 0));
+                        affected.select(&store.sheets, AbsCellKey::new(sheet, row as u32, 0));
                     }
 
-                    let index = build_dep_index(&store.sheets);
-                    let mut memo = FxHashMap::default();
-                    seed_dependency_depth_errors(&store.sheets, &affected, &index, &mut memo);
+                    let index = build_dep_index(&store.sheets, &store.formula_slots);
+                    let mut memo = FormulaResults::default();
+                    seed_dependency_depth_errors(
+                        &store.sheets,
+                        &store.formula_slots,
+                        &affected,
+                        &index,
+                        &mut memo,
+                    );
                     assert_eq!(memo.len(), CHAIN_ROWS - FORMULA_RECURSION_LIMIT);
                     for row in 0..CHAIN_ROWS {
                         let key = AbsCellKey::new(sheet, row as u32, 0);
                         if row < FORMULA_RECURSION_LIMIT {
-                            assert!(!memo.contains_key(&key));
+                            assert!(memo.get(store.formula_id(key).expect("formula")).is_none());
                         } else {
                             assert!(matches!(
-                                memo.get(&key),
+                                memo.get(store.formula_id(key).expect("formula")),
                                 Some(Value::Error(FormulaError::Num))
                             ));
                         }
                     }
 
                     store.set_formula(sheet, 0, 0, &format!("=A{CHAIN_ROWS}"), 0);
-                    let index = build_dep_index(&store.sheets);
+                    let index = build_dep_index(&store.sheets, &store.formula_slots);
                     memo.clear();
-                    seed_dependency_depth_errors(&store.sheets, &affected, &index, &mut memo);
+                    seed_dependency_depth_errors(
+                        &store.sheets,
+                        &store.formula_slots,
+                        &affected,
+                        &index,
+                        &mut memo,
+                    );
                     assert_eq!(memo.len(), CHAIN_ROWS);
-                    assert!(memo
-                        .values()
-                        .all(|value| matches!(value, Value::Error(FormulaError::Cycle))));
+                    assert!(affected.keys(&store.formula_slots).all(|key| matches!(
+                        memo.get(store.formula_id(key).expect("formula")),
+                        Some(Value::Error(FormulaError::Cycle))
+                    )));
                 }
             })
             .expect("create bounded-stack dependency test thread")

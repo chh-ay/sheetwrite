@@ -6188,6 +6188,7 @@ await initSheetwrite(undefined, formulas);
 | Family | Examples |
 | --- | --- |
 | Distributions | `NORM.DIST`, `T.INV.2T`, `CHISQ.DIST.RT`, `BINOM.DIST`, `GAMMA.INV`, `CONFIDENCE.T` |
+| Excel 2007 compatibility | `STDEV`, `VAR`, `NORMDIST`, `TDIST`, `CHITEST`, `TTEST` |
 | Descriptive statistics | `TRIMMEAN`, `PERCENTILE.EXC`, `RANK.AVG`, `SKEW`, `KURT`, `FORECAST.LINEAR` |
 | Regression | `LINEST`, `LOGEST`, `TREND`, `GROWTH`, `FREQUENCY`, `MODE.MULT` |
 | Finance | `XIRR`, `XNPV`, `MIRR`, `NPER`, `CUMIPMT`, `DDB` |

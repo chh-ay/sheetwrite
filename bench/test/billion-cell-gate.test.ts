@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import {
+  assertCapturedOnRunningMachine,
   type BillionCellBenchmarkArtifact,
   deriveBillionCellGateChecks,
   STARTUP_METADATA_LIMIT_BYTES,
@@ -25,6 +26,14 @@ type DeepMutable<T> = T extends boolean
 
 function clone(artifact: BillionCellBenchmarkArtifact): DeepMutable<BillionCellBenchmarkArtifact> {
   return structuredClone(artifact) as unknown as DeepMutable<BillionCellBenchmarkArtifact>;
+}
+
+/** Returns a platform and architecture that differ from the running process. */
+function otherMachine(): { platform: string; architecture: string } {
+  return {
+    platform: process.platform === "linux" ? "darwin" : "linux",
+    architecture: process.arch === "x64" ? "arm64" : "x64",
+  };
 }
 
 describe("two-dimensional billion-cell resource gate", () => {
@@ -108,5 +117,49 @@ describe("two-dimensional billion-cell resource gate", () => {
     cases.push(wrongSum);
 
     for (const candidate of cases) expect(() => validateBillionCellBenchmark(candidate)).toThrow();
+  });
+
+  it("accepts committed evidence captured on a different machine", async () => {
+    const artifact = clone(await checkedArtifact());
+    const machine = otherMachine();
+    artifact.toolchain.platform = machine.platform;
+    artifact.toolchain.architecture = machine.architecture;
+    artifact.toolchain.bunVersion = "0.0.0-other";
+
+    expect(() => validateBillionCellBenchmark(artifact)).not.toThrow();
+  });
+
+  it("rejects committed evidence with an incomplete toolchain record", async () => {
+    const artifact = await checkedArtifact();
+    const fields = ["bunVersion", "typescriptVersion", "platform", "architecture"] as const;
+
+    for (const field of fields) {
+      const tampered = clone(artifact);
+      tampered.toolchain[field] = "";
+      expect(() => validateBillionCellBenchmark(tampered), field).toThrow();
+    }
+  });
+
+  it("rejects a new capture that does not record the running machine", async () => {
+    const recorded = (await checkedArtifact()).toolchain;
+    const running = {
+      ...recorded,
+      bunVersion: Bun.version,
+      platform: process.platform,
+      architecture: process.arch,
+    };
+
+    expect(() => assertCapturedOnRunningMachine(running)).not.toThrow();
+
+    const machine = otherMachine();
+    const foreign = [
+      { ...running, platform: machine.platform },
+      { ...running, architecture: machine.architecture },
+      { ...running, bunVersion: "0.0.0-other" },
+    ];
+
+    for (const toolchain of foreign) {
+      expect(() => assertCapturedOnRunningMachine(toolchain)).toThrow();
+    }
   });
 });
