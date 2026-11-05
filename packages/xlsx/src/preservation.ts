@@ -523,10 +523,31 @@ function relationshipTargets(
 
 /**
  * Check a graph from a possibly untrusted snapshot: payload CRCs and sizes, and
- * that its relationships stay inside the graph. Results are cached per frozen
- * part, whose bytes cannot change, so saving the same workbook again is free.
+ * that its relationships parse and stay inside the graph. Returns why the
+ * graph is dropped, or undefined to keep it.
  */
 function verifyGraph(
+  graph: XlsxSourceGraph,
+  partsByName: ReadonlyMap<string, XlsxSourcePart>,
+  context: XlsxCodecContext,
+): string | undefined {
+  try {
+    return graphProblem(graph, partsByName, context);
+  } catch (error) {
+    // Corrupt, over-limit or malformed parts drop only their graph, so a
+    // persisted workbook still opens; abort errors still fail the whole operation.
+    if (isAbort(context, error)) throw error;
+    if (error instanceof TypeError || error instanceof XlsxResourceError) return error.message;
+    throw error;
+  }
+}
+
+/**
+ * The first problem of a graph, or undefined. Payload and relationship results
+ * are cached per frozen part, whose bytes cannot change, so saving the same
+ * workbook again is free.
+ */
+function graphProblem(
   graph: XlsxSourceGraph,
   partsByName: ReadonlyMap<string, XlsxSourcePart>,
   context: XlsxCodecContext,
@@ -537,15 +558,7 @@ function verifyGraph(
     const part = partsByName.get(name);
     if (!part) return `${name} is missing`;
     if (!verifiedParts.has(part)) {
-      try {
-        validateStoredEntry(storedEntry(part), context);
-      } catch (error) {
-        // Corrupt or over-limit payloads drop only their graph, so a persisted
-        // workbook still opens; abort errors still fail the whole operation.
-        if (isAbort(context, error)) throw error;
-        if (error instanceof TypeError || error instanceof XlsxResourceError) return error.message;
-        throw error;
-      }
+      validateStoredEntry(storedEntry(part), context);
       if (Object.isFrozen(part)) verifiedParts.add(part);
     }
     if (!name.endsWith(".rels")) continue;

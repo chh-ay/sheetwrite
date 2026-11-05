@@ -272,7 +272,7 @@ export function contentTypesXml(
     left.part.localeCompare(right.part),
   )) {
     xml.append(
-      `<Override PartName="/${normalizePartName(override.part)}" ContentType="${override.contentType}"/>`,
+      `<Override PartName="/${escapeXml(normalizePartName(override.part))}" ContentType="${escapeXml(override.contentType)}"/>`,
     );
   }
   xml.append("</Types>");
