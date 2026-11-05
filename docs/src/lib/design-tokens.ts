@@ -23,11 +23,15 @@ function declarations(body: string): Array<[string, string]> {
   return found;
 }
 
-/** Bodies of the top-level rules whose selector is exactly `selector`. */
+/** Bodies of the top-level rules whose selector list includes `selector`. */
 function ruleBodies(css: string, selector: string): string[] {
-  const escaped = selector.replace(/[[\]"]/g, (character) => `\\${character}`);
-  const pattern = new RegExp(`(?:^|\\n)${escaped}\\s*\\{([^}]*)\\}`, "g");
-  return [...css.matchAll(pattern)].map((match) => match[1] ?? "");
+  const bodies: string[] = [];
+  // Top-level rules start a line; at-rules and nested blocks are not token rules.
+  for (const match of css.matchAll(/(?:^|\n)([^@\s/{}][^{}]*?)\s*\{([^{}]*)\}/g)) {
+    const selectors = (match[1] ?? "").split(",").map((part) => part.trim());
+    if (selectors.includes(selector)) bodies.push(match[2] ?? "");
+  }
+  return bodies;
 }
 
 /**

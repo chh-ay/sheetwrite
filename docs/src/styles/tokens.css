@@ -234,8 +234,11 @@
 
 /* ── Dark theme ───────────────────────────────────────────────────────────
    A deep navy ground (not black), raised navy cards, soft white text near
-   14:1 and a bright mint brand kept for actions, links and focus. */
-:root[data-theme="dark"] {
+   14:1 and a bright mint brand kept for actions, links and focus.
+   `.sw-inverse` marks a band (the landing hero) that uses these colours in
+   either theme, so its text, buttons and accents keep their contrast. */
+:root[data-theme="dark"],
+.sw-inverse {
   color-scheme: dark;
 
   --sw-surface-0: #0a101c;
