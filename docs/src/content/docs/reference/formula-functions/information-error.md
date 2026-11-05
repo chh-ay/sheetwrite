@@ -3,7 +3,7 @@ title: "Information and error functions"
 description: "Every information and error formula function, its engine build, and its signature, semantic, dialect, and implementation profiles."
 ---
 
-This page lists the 16 functions of the information and error family. Taxonomy/source: [Information functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb). The [formula function contract](/docs/reference/formula-functions/) has every family, the engine builds, and the evaluation limits.
+This page lists the 24 functions of the information and error family. Taxonomy/source: [Information functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb). The [formula function contract](/docs/reference/formula-functions/) has every family, the engine builds, and the evaluation limits.
 
 ## Functions
 
@@ -28,6 +28,14 @@ This page lists the 16 functions of the information and error family. Taxonomy/s
 <tr data-formula-name="NA" data-engine="default"><td><code>NA</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-zero">Signature: <code>zero</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="CELL" data-engine="default"><td><code>CELL</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-cell-info">Signature: <code>cell-info</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-reference-information">Dialect: <code>excel-reference-information</code></a><br /><a href="#implementation-implemented-reference-information">Implementation: <code>implemented-reference-information</code></a></details></td></tr>
 <tr data-formula-name="ISOMITTED" data-engine="full"><td><code>ISOMITTED</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-lambda-isomitted">Signature: <code>lambda-isomitted</code></a><br /><a href="#semantics-analysis-lambda">Semantics: <code>analysis-lambda</code></a><br /><a href="#dialect-analysis-lambda">Dialect: <code>analysis-lambda</code></a><br /><a href="#implementation-analysis-lambda">Implementation: <code>analysis-lambda</code></a></details></td></tr>
+<tr data-formula-name="ERROR.TYPE" data-engine="default"><td><code>ERROR.TYPE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-reference-information">Implementation: <code>implemented-reference-information</code></a></details></td></tr>
+<tr data-formula-name="ISEVEN" data-engine="default"><td><code>ISEVEN</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="ISNONTEXT" data-engine="default"><td><code>ISNONTEXT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-reference-information">Implementation: <code>implemented-reference-information</code></a></details></td></tr>
+<tr data-formula-name="ISODD" data-engine="default"><td><code>ISODD</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="ISREF" data-engine="default"><td><code>ISREF</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-reference-information">Implementation: <code>implemented-reference-information</code></a></details></td></tr>
+<tr data-formula-name="SHEET" data-engine="default"><td><code>SHEET</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-sheet-value">Signature: <code>sheet-value</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-reference-information">Implementation: <code>implemented-reference-information</code></a></details></td></tr>
+<tr data-formula-name="SHEETS" data-engine="default"><td><code>SHEETS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-sheets-reference">Signature: <code>sheets-reference</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-reference-information">Implementation: <code>implemented-reference-information</code></a></details></td></tr>
+<tr data-formula-name="INFO" data-engine="default"><td><code>INFO</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-info-type">Signature: <code>info-type</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-info">Dialect: <code>excel-info</code></a><br /><a href="#implementation-implemented-reference-information">Implementation: <code>implemented-reference-information</code></a></details></td></tr>
 </tbody></table>
 
 </section>
@@ -97,6 +105,46 @@ Return shape: `scalar`.
 | Argument | Required | Default | Accepts | Repetition |
 | --- | --- | --- | --- | --- |
 | `value` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+
+</details>
+
+<details id="signature-unary-number"><summary>Signature: unary-number</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `number` | yes | none | `scalar`, `reference` | `once` |
+
+</details>
+
+<details id="signature-sheet-value"><summary>Signature: sheet-value</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `value` | no | formula-sheet | `scalar`, `range`, `array`, `reference` | `once` |
+
+</details>
+
+<details id="signature-sheets-reference"><summary>Signature: sheets-reference</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `reference` | no | workbook | `range`, `array`, `reference` | `once` |
+
+</details>
+
+<details id="signature-info-type"><summary>Signature: info-type</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `typeText` | yes | none | `scalar`, `reference` | `once` |
 
 </details>
 
@@ -184,6 +232,18 @@ Limitations: Available only in @sheetwrite/formulas. Both engines support plain 
 
 </details>
 
+<details id="dialect-excel-info"><summary>Dialect: excel-info</summary>
+
+| Dialect | Status |
+| --- | --- |
+| Microsoft Excel | documented |
+| Google Sheets | unverified |
+| OpenFormula | unverified |
+
+Limitations: INFO returns #N/A for "directory", "origin", "osversion", "release" and "system", which describe the desktop program and its window. "numfile" is the number of sheets and "recalc" is "Automatic".
+
+</details>
+
 ## Implementation profiles
 
 <details id="implementation-implemented-assisted"><summary>Implementation: implemented-assisted</summary>
@@ -191,7 +251,7 @@ Limitations: Available only in @sheetwrite/formulas. Both engines support plain 
 | Layer | Status and source/evidence |
 | --- | --- |
 | Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/calc.rs) |
-| Evaluator | implemented<br />[`packages/wasm/src/eval/mod.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/mod.rs)<br />[`packages/wasm/src/eval/functions.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/functions.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/mod.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/mod.rs)<br />[`packages/wasm/src/eval/functions.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/functions.rs)<br />[`packages/wasm/src/eval/math.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/math.rs) |
 | Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/formula-assist.ts) |
 | Evidence | source-linked<br />[`packages/wasm/src/tests.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/tests.rs)<br />[`packages/core/test/formula-assist.test.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/test/formula-assist.test.ts) |
 
@@ -202,7 +262,7 @@ Limitations: Available only in @sheetwrite/formulas. Both engines support plain 
 | Layer | Status and source/evidence |
 | --- | --- |
 | Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/calc.rs) |
-| Evaluator | implemented<br />[`packages/wasm/src/eval/info.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/info.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/info.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/info.rs)<br />[`packages/wasm/src/store.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/store.rs) |
 | Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/formula-assist.ts) |
 | Evidence | source-linked<br />[`packages/wasm/src/tests.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/tests.rs)<br />[`packages/core/test/formula-assist.test.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/test/formula-assist.test.ts) |
 

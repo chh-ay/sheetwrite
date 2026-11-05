@@ -5,7 +5,7 @@ description: "Every function in the pinned Microsoft Excel catalog, with full an
 
 This table covers **520 distinct Excel function names** from [Microsoft's category catalog](https://support.microsoft.com/en-us/excel/excel-functions-by-category), updated 2026-06-25 and retrieved 2026-10-30. It includes compatibility names and add-in functions. It is a pinned catalog, not a claim to cover functions Microsoft adds after that date.
 
-The full engine has **250 supported**, **93 partly supported**, and **177 not supported** names in this catalog. Aliases count as separate Excel names. Functions outside the catalog remain in the [function contract](/docs/reference/formula-functions/).
+The full engine has **258 supported**, **93 partly supported**, and **169 not supported** names in this catalog. Aliases count as separate Excel names. Functions outside the catalog remain in the [function contract](/docs/reference/formula-functions/).
 
 ## How to read the table
 
@@ -243,26 +243,26 @@ The full engine has **250 supported**, **93 partly supported**, and **177 not su
 | Excel function | Full engine | Lite engine | Notes and differences |
 | --- | --- | --- | --- |
 | [`CELL`](https://support.microsoft.com/en-us/excel/functions/cell-function) | Partly supported | Partly supported | CELL supports the info types address, col, contents, row and type. Other info types return #VALUE!. CELL without a reference describes the cell of the formula, as in LibreOffice. Excel uses the last changed cell. A formula that reads its own cell with FORMULATEXT, ISFORMULA or CELL is a #CYCLE! error. Cells inside a spilled range and host-linked reference cells hold no formula. For them, FORMULATEXT returns #N/A and ISFORMULA returns FALSE. [Contract](/docs/reference/formula-functions/information-error/) |
-| [`ERROR.TYPE`](https://support.microsoft.com/en-us/excel/functions/error-type-function) | Not supported | Not supported | Not registered in either engine. |
-| [`INFO`](https://support.microsoft.com/en-us/excel/functions/info-function) | Not supported | Not supported | Not registered in either engine. |
+| [`ERROR.TYPE`](https://support.microsoft.com/en-us/excel/functions/error-type-function) | Supported | Supported | [Contract](/docs/reference/formula-functions/information-error/) |
+| [`INFO`](https://support.microsoft.com/en-us/excel/functions/info-function) | Supported | Supported | INFO returns #N/A for "directory", "origin", "osversion", "release" and "system", which describe the desktop program and its window. "numfile" is the number of sheets and "recalc" is "Automatic". [Contract](/docs/reference/formula-functions/information-error/) |
 | [`ISBLANK`](https://support.microsoft.com/en-us/excel/is-functions) | Supported | Supported | [Contract](/docs/reference/formula-functions/information-error/) |
 | [`ISERR`](https://support.microsoft.com/en-us/excel/is-functions) | Supported | Supported | [Contract](/docs/reference/formula-functions/information-error/) |
 | [`ISERROR`](https://support.microsoft.com/en-us/excel/is-functions) | Supported | Supported | [Contract](/docs/reference/formula-functions/information-error/) |
-| [`ISEVEN`](https://support.microsoft.com/en-us/excel/functions/iseven-function) | Not supported | Not supported | Not registered in either engine. |
+| [`ISEVEN`](https://support.microsoft.com/en-us/excel/functions/iseven-function) | Supported | Supported | [Contract](/docs/reference/formula-functions/information-error/) |
 | [`ISFORMULA`](https://support.microsoft.com/en-us/excel/functions/isformula-function) | Partly supported | Partly supported | CELL supports the info types address, col, contents, row and type. Other info types return #VALUE!. CELL without a reference describes the cell of the formula, as in LibreOffice. Excel uses the last changed cell. A formula that reads its own cell with FORMULATEXT, ISFORMULA or CELL is a #CYCLE! error. Cells inside a spilled range and host-linked reference cells hold no formula. For them, FORMULATEXT returns #N/A and ISFORMULA returns FALSE. [Contract](/docs/reference/formula-functions/information-error/) |
 | [`ISLOGICAL`](https://support.microsoft.com/en-us/excel/is-functions) | Supported | Supported | [Contract](/docs/reference/formula-functions/information-error/) |
 | [`ISNA`](https://support.microsoft.com/en-us/excel/is-functions) | Supported | Supported | [Contract](/docs/reference/formula-functions/information-error/) |
-| [`ISNONTEXT`](https://support.microsoft.com/en-us/excel/is-functions) | Not supported | Not supported | Not registered in either engine. |
+| [`ISNONTEXT`](https://support.microsoft.com/en-us/excel/is-functions) | Supported | Supported | [Contract](/docs/reference/formula-functions/information-error/) |
 | [`ISNUMBER`](https://support.microsoft.com/en-us/excel/is-functions) | Supported | Supported | [Contract](/docs/reference/formula-functions/information-error/) |
-| [`ISODD`](https://support.microsoft.com/en-us/excel/is-functions) | Not supported | Not supported | Not registered in either engine. |
+| [`ISODD`](https://support.microsoft.com/en-us/excel/is-functions) | Supported | Supported | [Contract](/docs/reference/formula-functions/information-error/) |
 | [`ISOMITTED`](https://support.microsoft.com/en-us/excel/functions/isomitted-function) | Partly supported | Not supported | Lite engine: not registered. Both engines support plain defined-name formulas; named LAMBDA calls require the full engine. LAMBDA uses lexical parameters and LET bindings. Calls are limited to depth 64 and 2000000 work units. Helpers reject nested arrays. [Contract](/docs/reference/formula-functions/information-error/) |
-| [`ISREF`](https://support.microsoft.com/en-us/excel/is-functions) | Not supported | Not supported | Not registered in either engine. |
+| [`ISREF`](https://support.microsoft.com/en-us/excel/is-functions) | Supported | Supported | [Contract](/docs/reference/formula-functions/information-error/) |
 | [`ISTEXT`](https://support.microsoft.com/en-us/excel/is-functions) | Supported | Supported | [Contract](/docs/reference/formula-functions/information-error/) |
 | [`N`](https://support.microsoft.com/en-us/excel/functions/n-function) | Supported | Supported | [Contract](/docs/reference/formula-functions/information-error/) |
 | [`NA`](https://support.microsoft.com/en-us/excel/functions/na-function) | Supported | Supported | [Contract](/docs/reference/formula-functions/information-error/) |
-| [`SHEET`](https://support.microsoft.com/en-us/excel/functions/sheet-function) | Not supported | Not supported | Not registered in either engine. |
-| [`SHEETS`](https://support.microsoft.com/en-us/excel/functions/sheets-function) | Not supported | Not supported | Not registered in either engine. |
-| [`STOCKHISTORY`](https://support.microsoft.com/en-us/excel/functions/stockhistory-function) | Not supported | Not supported | Not registered in either engine. |
+| [`SHEET`](https://support.microsoft.com/en-us/excel/functions/sheet-function) | Supported | Supported | [Contract](/docs/reference/formula-functions/information-error/) |
+| [`SHEETS`](https://support.microsoft.com/en-us/excel/functions/sheets-function) | Supported | Supported | [Contract](/docs/reference/formula-functions/information-error/) |
+| [`STOCKHISTORY`](https://support.microsoft.com/en-us/excel/functions/stockhistory-function) | Not supported | Not supported | Unsupported by design: Functions that query external providers or live data connections are not evaluated. |
 | [`TYPE`](https://support.microsoft.com/en-us/excel/functions/type-function) | Supported | Supported | [Contract](/docs/reference/formula-functions/information-error/) |
 
 ## Logical functions

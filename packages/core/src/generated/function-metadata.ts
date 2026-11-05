@@ -168,6 +168,9 @@ export const BUILT_IN_FUNCTIONS: BuiltInFunctionTable = {
     {"arguments":[{"name":"actualRange","types":["range","array","reference"],"optional":false,"repeating":false},{"name":"expectedRange","types":["range","array","reference"],"optional":false,"repeating":false}],"returnKind":"scalar"},
     {"arguments":[{"name":"array1","types":["range","array","reference"],"optional":false,"repeating":false},{"name":"array2","types":["range","array","reference"],"optional":false,"repeating":false},{"name":"tails","types":["scalar","reference"],"optional":false,"repeating":false},{"name":"type","types":["scalar","reference"],"optional":false,"repeating":false}],"returnKind":"scalar"},
     {"arguments":[{"name":"array","types":["range","array","reference"],"optional":false,"repeating":false},{"name":"x","types":["scalar","reference"],"optional":false,"repeating":false},{"name":"sigma","types":["scalar","reference"],"optional":true,"repeating":false}],"returnKind":"scalar"},
+    {"arguments":[{"name":"value","types":["scalar","range","array","reference"],"optional":true,"repeating":false}],"returnKind":"scalar"},
+    {"arguments":[{"name":"reference","types":["range","array","reference"],"optional":true,"repeating":false}],"returnKind":"scalar"},
+    {"arguments":[{"name":"typeText","types":["scalar","reference"],"optional":false,"repeating":false}],"returnKind":"scalar"},
   ],
   functions: [
     ["ARRAYTOTEXT",8,5,4],
@@ -515,5 +518,13 @@ export const BUILT_IN_FUNCTIONS: BuiltInFunctionTable = {
     ["VARP",7,13,4],
     ["WEIBULL",7,89,4],
     ["ZTEST",7,149,4],
+    ["ERROR.TYPE",3,10,6],
+    ["ISEVEN",3,11,6],
+    ["ISNONTEXT",3,10,6],
+    ["ISODD",3,11,6],
+    ["ISREF",3,10,6],
+    ["SHEET",3,150,7],
+    ["SHEETS",3,151,7],
+    ["INFO",3,152,7],
   ],
 };
