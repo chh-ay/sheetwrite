@@ -161,7 +161,10 @@ fn push_data(
         let is_skipped = source.is_some_and(|(range, sheet)| {
             let row = range.row_start + (index / matrix.cols) as u32;
             let col = range.col_start + (index % matrix.cols) as u32;
-            options.skipped.skips_row(sheet, row) || options.skipped.skips_cell(sheet, row, col)
+            options.skipped.skips_row(sheet, row)
+                || options
+                    .skipped
+                    .skips_cell(sheet, row, col, &context.store.formula_slots)
         });
         let is_ignored_error = options.ignores_errors && matches!(value, Value::Error(_));
         values.push_range(if is_skipped || is_ignored_error {

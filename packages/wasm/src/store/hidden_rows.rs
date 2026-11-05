@@ -52,13 +52,15 @@ impl CellStore {
 
         let mut seeds = Vec::new();
         for (index, data) in self.sheets.iter_mut().enumerate() {
-            let Some(keys) = data.formulas.subtotal_keys() else {
+            let Some(keys) = data.formulas.subtotal_keys(&self.formula_slots) else {
                 continue;
             };
             let readers: Vec<CellKey> = keys
-                .iter()
-                .copied()
-                .filter(|&key| data.formulas.get(key).is_some_and(reads_sheet))
+                .filter(|&key| {
+                    data.formulas
+                        .get(key, &self.formula_slots)
+                        .is_some_and(reads_sheet)
+                })
                 .collect();
             if readers.is_empty() {
                 continue;

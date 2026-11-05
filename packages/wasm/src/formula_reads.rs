@@ -5,6 +5,7 @@ use std::collections::{BTreeMap, HashSet};
 
 use wasm_bindgen::prelude::*;
 
+use crate::formula_slots::FormulaStore;
 use crate::sheet::SheetData;
 use crate::store::CellStore;
 use crate::types::{cell_key, CellKey, CellRange};
@@ -37,7 +38,7 @@ impl CellStore {
         if data.formulas.is_empty() {
             return Vec::new();
         }
-        let mut walk = ReadWalk::new(data, handle, max_cells);
+        let mut walk = ReadWalk::new(data, &self.formula_slots, handle, max_cells);
         let end_row = end_row.min(data.cells.row_count());
         for &col in cols {
             for row in start_row..end_row {
@@ -53,6 +54,7 @@ impl CellStore {
 
 struct ReadWalk<'a> {
     data: &'a SheetData,
+    slots: &'a FormulaStore,
     handle: u32,
     remaining_cells: usize,
     visited: HashSet<CellKey>,
@@ -62,9 +64,10 @@ struct ReadWalk<'a> {
 }
 
 impl<'a> ReadWalk<'a> {
-    fn new(data: &'a SheetData, handle: u32, max_cells: usize) -> Self {
+    fn new(data: &'a SheetData, slots: &'a FormulaStore, handle: u32, max_cells: usize) -> Self {
         Self {
             data,
+            slots,
             handle,
             remaining_cells: max_cells,
             visited: HashSet::new(),
@@ -83,7 +86,7 @@ impl<'a> ReadWalk<'a> {
 
     fn run(&mut self) {
         while let Some(key) = self.pending.pop() {
-            let Some(entry) = self.data.formulas.get(key) else {
+            let Some(entry) = self.data.formulas.get(key, self.slots) else {
                 continue;
             };
 

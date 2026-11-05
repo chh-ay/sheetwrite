@@ -143,12 +143,12 @@ impl CellStore {
         let affected = pass.affected;
         let Some(limits) = self.iteration.as_deref().copied() else {
             // The depth walk can resolve the whole pass to errors. Those
-            // memoized results need no formula dispatch or value cloning.
-            if pass.memo.len() == affected.len() {
+            // stored errors need no formula dispatch or value cloning.
+            if pass.results.len() == affected.len() {
                 return;
             }
-            for &key in affected {
-                let _ = self.eval_formula_cell(key, pass, 0);
+            for id in affected.ids() {
+                let _ = self.eval_formula_id(id, pass, 0);
             }
             return;
         };
@@ -156,8 +156,8 @@ impl CellStore {
         if found_cycle {
             self.settle_circular_references(pass, limits, true);
         }
-        for &key in affected {
-            let _ = self.eval_formula_cell(key, pass, 0);
+        for id in affected.ids() {
+            let _ = self.eval_formula_id(id, pass, 0);
         }
     }
 
@@ -194,7 +194,8 @@ impl CellStore {
             return Value::Number(0.0);
         }
 
-        let error = formula_error_with_entry(sheet, local, sheet.formulas.get(local));
+        let error =
+            formula_error_with_entry(sheet, local, sheet.formulas.get(local, &self.formula_slots));
         let index = sheet.cells.idx(row, col);
         match cached_formula_value(sheet, &self.strings, index, error) {
             Value::Error(FormulaError::Cycle) => Value::Number(0.0),
@@ -209,10 +210,13 @@ impl CellStore {
     fn is_scalar_formula(&self, key: AbsCellKey) -> bool {
         let local = key.local();
         self.sheets.get(key.sheet as usize).is_some_and(|sheet| {
-            sheet.formulas.get(local).is_some_and(|entry| {
-                !entry.produces_array()
-                    || (entry.has_spill_refs() && sheet.spill.installed(local).is_none())
-            })
+            sheet
+                .formulas
+                .get(local, &self.formula_slots)
+                .is_some_and(|entry| {
+                    !entry.produces_array()
+                        || (entry.has_spill_refs() && sheet.spill.installed(local).is_none())
+                })
         })
     }
 
@@ -226,21 +230,30 @@ impl CellStore {
     ) {
         let cyclic: Vec<AbsCellKey> = pass
             .affected
-            .iter()
-            .copied()
-            .filter(|key| matches!(pass.memo.get(key), Some(Value::Error(FormulaError::Cycle))))
+            .ids()
+            .filter(|&id| {
+                matches!(
+                    pass.results.get(id),
+                    Some(Value::Error(FormulaError::Cycle))
+                )
+            })
+            .filter_map(|id| self.formula_slots.location(id))
             .collect();
         for key in &cyclic {
-            pass.memo.remove(key);
+            if let Some(id) = self.formula_id(*key) {
+                pass.results.remove(id);
+            }
         }
 
-        let components = circular_components(&self.sheets, &cyclic);
+        let components = circular_components(&self.sheets, &self.formula_slots, &cyclic);
         for (members, circular) in components.iter() {
             if circular && members.iter().all(|&key| self.is_scalar_formula(key)) {
                 self.iterate_component(members, pass, limits);
             } else if circular {
                 for &key in members {
-                    pass.memo.insert(key, Value::Error(FormulaError::Cycle));
+                    if let Some(id) = self.formula_id(key) {
+                        pass.results.insert(id, Value::Error(FormulaError::Cycle));
+                    }
                 }
             } else if evaluate_readers {
                 for &key in members {
@@ -271,14 +284,19 @@ impl CellStore {
             }
         });
         for &key in &members {
-            pass.memo.insert(key, self.starting_value(key));
+            if let Some(id) = self.formula_id(key) {
+                pass.results.insert(id, self.starting_value(key));
+            }
         }
 
         for _ in 0..limits.max_iterations {
             let mut converged = true;
             for &key in &members {
-                let next = self.eval_formula_body(key, pass, 0);
-                if let Some(current) = pass.memo.get_mut(&key) {
+                let Some(id) = self.formula_id(key) else {
+                    continue;
+                };
+                let next = self.eval_formula_body(id, pass, 0);
+                if let Some(current) = pass.results.get_mut(id) {
                     converged &= !limits.moved(current, &next);
                     *current = next;
                 }
@@ -334,8 +352,9 @@ impl CellStore {
         for _ in 1..limits.max_iterations {
             let mut converged = true;
             for &member in &members {
-                let next = self.eval_formula_body(member, pass, 0);
-                if let Some(current) = pass.memo.get_mut(&member) {
+                let id = self.formula_id(member)?;
+                let next = self.eval_formula_body(id, pass, 0);
+                if let Some(current) = pass.results.get_mut(id) {
                     converged &= !limits.moved(current, &next);
                     *current = next;
                 }
@@ -344,6 +363,6 @@ impl CellStore {
                 break;
             }
         }
-        pass.memo.get(&key).cloned()
+        pass.results.get(self.formula_id(key)?).cloned()
     }
 }
