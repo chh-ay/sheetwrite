@@ -1,0 +1,47 @@
+```ts prelude="core" title="queries.ts"
+import { createQuerySession } from "@sheetwrite/queries";
+
+// The only path to source data: the host loads it, with its own credentials.
+const session = await createQuerySession(grid, {
+  fetchSource: async (request, { signal }) => {
+    const response = await fetch(`/sources/${request.sourceId}`, { signal });
+    return { kind: "bytes", bytes: new Uint8Array(await response.arrayBuffer()) };
+  },
+});
+
+// Orders from a CSV feed: keep shipped ones, merge the region list, group by region.
+session.define({
+  id: "region-totals",
+  name: "Region totals",
+  source: {
+    kind: "csv",
+    sourceId: "orders-feed",
+    columns: [
+      { id: "region", name: "Region", type: "text" },
+      { id: "status", name: "Status", type: "text" },
+      { id: "amount", name: "Amount", type: "number" },
+    ],
+  },
+  steps: [
+    { kind: "filter", predicate: { kind: "compare", column: "status", op: "eq", value: "Shipped" } },
+    { kind: "join", input: "regions", keys: [["region", "code"]], join: "left" },
+    {
+      kind: "group",
+      keys: ["regionName"],
+      aggregates: [
+        { id: "revenue", name: "Revenue", op: "sum", column: "amount" },
+        { id: "orders", name: "Orders", op: "countRows" },
+      ],
+    },
+    { kind: "rename", columns: [["regionName", "Region"]] },
+  ],
+  output: {
+    table: "region-totals",
+    tableName: "RegionTotals",
+    anchor: { sheet: "report", row: 0, col: 0 },
+  },
+});
+
+// Every output table in one transaction, or none if a query fails.
+await session.refreshAll();
+```

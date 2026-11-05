@@ -53,6 +53,22 @@ export function requireApplied(
   throw new Error(`${what} failed: ${result.issues?.[0]?.message ?? result.status}`);
 }
 
+/**
+ * Press a ribbon command as a reader would: select its tab, then click the
+ * button with its `data-command`. Panels that only the ribbon opens, such as
+ * Queries & Connections or Relationships, open this way.
+ */
+export function pressRibbonCommand(shell: HTMLElement, tabLabel: string, command: string): void {
+  const tab = Array.from(shell.querySelectorAll<HTMLButtonElement>('[role="tab"]')).find(
+    (candidate) => candidate.textContent === tabLabel,
+  );
+  if (!tab) throw new Error(`The ribbon has no ${tabLabel} tab`);
+  tab.click();
+  const button = shell.querySelector<HTMLElement>(`[data-command="${command}"]`);
+  if (!button) throw new Error(`The ${tabLabel} tab has no ${command} command`);
+  button.click();
+}
+
 /** The listeners of a scenario's snapshot. */
 export function createListeners() {
   const listeners = new Set<() => void>();

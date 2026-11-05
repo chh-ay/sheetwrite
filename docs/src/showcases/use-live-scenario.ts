@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 
 import { errorText } from "../lib/errors.js";
+import { useAction } from "../lib/use-action.js";
 
 /** A framework-neutral showcase scenario: a live grid and a snapshot of what it shows. */
 export interface LiveScenario<Snapshot> {
@@ -57,4 +58,21 @@ export function useLiveScenario<Snapshot, Scenario extends LiveScenario<Snapshot
   }, [create]);
 
   return { hostRef, scenario, snapshot, error };
+}
+
+/**
+ * Run a side-panel action on the scenario. A failure shows as the action's
+ * error, named by `what`; the controls stay disabled until the scenario is ready.
+ */
+export function useScenarioAction<Scenario>(scenario: Scenario | null) {
+  const action = useAction();
+  const run = (what: string, call: (current: Scenario) => unknown) =>
+    action.run(
+      async () => {
+        if (scenario) await call(scenario);
+      },
+      (cause) => `${what} failed: ${errorText(cause)}`,
+    );
+
+  return { run, disabled: scenario === null || action.pending, error: action.error };
 }

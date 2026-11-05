@@ -25,7 +25,8 @@ export type CapabilityOwnerId =
   | "host-rows"
   | "spreadsheet"
   | "analysis"
-  | "sort";
+  | "sort"
+  | "queries";
 
 export type CapabilityArea =
   | "editing"
@@ -221,6 +222,15 @@ export const CAPABILITY_OWNERS: readonly CapabilityOwner[] = [
     routeFile: "docs/src/routes/showcases.sort.tsx",
     responsibility:
       "Excel's in-place sort of a range by several keys, the Sort panel, and the view-only sort, with formulas that read the sorted cells.",
+    kind: "capability",
+  },
+  {
+    id: "queries",
+    label: "Saved queries",
+    href: "/showcases/queries/",
+    routeFile: "docs/src/routes/showcases.queries.tsx",
+    responsibility:
+      "Power Query-style saved queries over host-loaded CSV and JSON sources: steps, merge, group, refresh into tables, and Queries & Connections.",
     kind: "capability",
   },
 ];
@@ -566,6 +576,21 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     sharedModules: ["docs/src/showcases/scenarios/sort.ts"],
     boundary:
       "Sorting runs on the client document; servers that validate operations must accept `permuteRows` and the `sort` commit reason.",
+  },
+  {
+    id: "data.saved-queries",
+    title: "Saved queries and refresh",
+    area: "modeling",
+    primary: "queries",
+    interaction:
+      "Refresh two saved queries into tables, add orders to the host feed, change a filter step and refresh again; formulas over the output tables follow, and undo fetches nothing.",
+    scope: "browser",
+    accessibility:
+      "Labeled buttons and radio group, a polite refresh status, and the formula results as text.",
+    testPath: "test/browser/showcase-queries.spec.ts",
+    sharedModules: ["docs/src/showcases/scenarios/queries.ts"],
+    boundary:
+      "Source fetching, credentials and network policy are host-owned; the session never calls fetch itself.",
   },
   {
     id: "workflow.ribbon",

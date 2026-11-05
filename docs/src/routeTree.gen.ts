@@ -28,6 +28,7 @@ import { Route as ShowcasesFormulasRouteImport } from './routes/showcases.formul
 import { Route as ShowcasesHostRowsRouteImport } from './routes/showcases.host-rows'
 import { Route as ShowcasesInteroperabilityRouteImport } from './routes/showcases.interoperability'
 import { Route as ShowcasesPerformanceRouteImport } from './routes/showcases.performance'
+import { Route as ShowcasesQueriesRouteImport } from './routes/showcases.queries'
 import { Route as ShowcasesSortRouteImport } from './routes/showcases.sort'
 import { Route as ShowcasesSpreadsheetRouteImport } from './routes/showcases.spreadsheet'
 import { Route as TestCollaborationRouteImport } from './routes/test.collaboration'
@@ -135,6 +136,11 @@ const ShowcasesPerformanceRoute = ShowcasesPerformanceRouteImport.update({
   path: '/showcases/performance',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ShowcasesQueriesRoute = ShowcasesQueriesRouteImport.update({
+  id: '/showcases/queries',
+  path: '/showcases/queries',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ShowcasesSortRoute = ShowcasesSortRouteImport.update({
   id: '/showcases/sort',
   path: '/showcases/sort',
@@ -205,6 +211,7 @@ export interface FileRoutesByFullPath {
   '/showcases/host-rows': typeof ShowcasesHostRowsRoute
   '/showcases/interoperability': typeof ShowcasesInteroperabilityRoute
   '/showcases/performance': typeof ShowcasesPerformanceRoute
+  '/showcases/queries': typeof ShowcasesQueriesRoute
   '/showcases/sort': typeof ShowcasesSortRoute
   '/showcases/spreadsheet': typeof ShowcasesSpreadsheetRoute
   '/test/collaboration': typeof TestCollaborationRoute
@@ -236,6 +243,7 @@ export interface FileRoutesByTo {
   '/showcases/host-rows': typeof ShowcasesHostRowsRoute
   '/showcases/interoperability': typeof ShowcasesInteroperabilityRoute
   '/showcases/performance': typeof ShowcasesPerformanceRoute
+  '/showcases/queries': typeof ShowcasesQueriesRoute
   '/showcases/sort': typeof ShowcasesSortRoute
   '/showcases/spreadsheet': typeof ShowcasesSpreadsheetRoute
   '/test/collaboration': typeof TestCollaborationRoute
@@ -268,6 +276,7 @@ export interface FileRoutesById {
   '/showcases/host-rows': typeof ShowcasesHostRowsRoute
   '/showcases/interoperability': typeof ShowcasesInteroperabilityRoute
   '/showcases/performance': typeof ShowcasesPerformanceRoute
+  '/showcases/queries': typeof ShowcasesQueriesRoute
   '/showcases/sort': typeof ShowcasesSortRoute
   '/showcases/spreadsheet': typeof ShowcasesSpreadsheetRoute
   '/test/collaboration': typeof TestCollaborationRoute
@@ -301,6 +310,7 @@ export interface FileRouteTypes {
     | '/showcases/host-rows'
     | '/showcases/interoperability'
     | '/showcases/performance'
+    | '/showcases/queries'
     | '/showcases/sort'
     | '/showcases/spreadsheet'
     | '/test/collaboration'
@@ -332,6 +342,7 @@ export interface FileRouteTypes {
     | '/showcases/host-rows'
     | '/showcases/interoperability'
     | '/showcases/performance'
+    | '/showcases/queries'
     | '/showcases/sort'
     | '/showcases/spreadsheet'
     | '/test/collaboration'
@@ -363,6 +374,7 @@ export interface FileRouteTypes {
     | '/showcases/host-rows'
     | '/showcases/interoperability'
     | '/showcases/performance'
+    | '/showcases/queries'
     | '/showcases/sort'
     | '/showcases/spreadsheet'
     | '/test/collaboration'
@@ -395,6 +407,7 @@ export interface RootRouteChildren {
   ShowcasesHostRowsRoute: typeof ShowcasesHostRowsRoute
   ShowcasesInteroperabilityRoute: typeof ShowcasesInteroperabilityRoute
   ShowcasesPerformanceRoute: typeof ShowcasesPerformanceRoute
+  ShowcasesQueriesRoute: typeof ShowcasesQueriesRoute
   ShowcasesSortRoute: typeof ShowcasesSortRoute
   ShowcasesSpreadsheetRoute: typeof ShowcasesSpreadsheetRoute
   TestCollaborationRoute: typeof TestCollaborationRoute
@@ -544,6 +557,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShowcasesPerformanceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/showcases/queries': {
+      id: '/showcases/queries'
+      path: '/showcases/queries'
+      fullPath: '/showcases/queries'
+      preLoaderRoute: typeof ShowcasesQueriesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/showcases/sort': {
       id: '/showcases/sort'
       path: '/showcases/sort'
@@ -635,6 +655,7 @@ const rootRouteChildren: RootRouteChildren = {
   ShowcasesHostRowsRoute: ShowcasesHostRowsRoute,
   ShowcasesInteroperabilityRoute: ShowcasesInteroperabilityRoute,
   ShowcasesPerformanceRoute: ShowcasesPerformanceRoute,
+  ShowcasesQueriesRoute: ShowcasesQueriesRoute,
   ShowcasesSortRoute: ShowcasesSortRoute,
   ShowcasesSpreadsheetRoute: ShowcasesSpreadsheetRoute,
   TestCollaborationRoute: TestCollaborationRoute,

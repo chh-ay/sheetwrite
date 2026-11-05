@@ -1,14 +1,7 @@
 import type { CommitReason } from "@sheetwrite/core";
-import {
-  ArrowDownWideNarrow,
-  Eye,
-  EyeOff,
-  ListOrdered,
-  SlidersHorizontal,
-  Undo2,
-} from "lucide-react";
+import { ArrowDownWideNarrow, Eye, EyeOff, SlidersHorizontal, Undo2 } from "lucide-react";
 
-import { useAction, ActionError } from "../lib/use-action.js";
+import { ActionError } from "../lib/use-action.js";
 import { ControlActions, ControlButton, DemoGrid } from "./feature-controls.js";
 import {
   ShowcaseControlGroup,
@@ -27,7 +20,7 @@ import {
   type SortSnapshot,
 } from "./scenarios/sort.js";
 import SortSnippet from "./snippets/sort.mdx";
-import { useLiveScenario } from "./use-live-scenario.js";
+import { useLiveScenario, useScenarioAction } from "./use-live-scenario.js";
 
 import "@sheetwrite/core/styles.css";
 import "@sheetwrite/core/shell.css";
@@ -80,15 +73,7 @@ function SortControls({
   readonly scenario: SortScenario | null;
   readonly snapshot: SortSnapshot | null;
 }) {
-  const action = useAction();
-  const disabled = scenario === null || action.pending;
-  const run = (what: string, call: (current: SortScenario) => void) =>
-    action.run(
-      () => {
-        if (scenario) call(scenario);
-      },
-      (cause) => `${what} failed: ${String(cause)}`,
-    );
+  const { run, disabled, error } = useScenarioAction(scenario);
 
   return (
     <>
@@ -157,7 +142,7 @@ function SortControls({
             Undo
           </ControlButton>
         </ControlActions>
-        <ActionError error={action.error} />
+        <ActionError error={error} />
       </ShowcaseControlGroup>
     </>
   );
