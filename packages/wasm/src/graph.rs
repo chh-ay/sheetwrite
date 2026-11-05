@@ -130,6 +130,22 @@ struct FormulaColumn {
     pages: Vec<FormulaPage>,
 }
 
+/// Contiguous bands and full pages hold each key at its own offset. Check that
+/// slot first, so a dense column needs no binary search on the pass hot path.
+#[inline]
+fn offset_or_search<T>(
+    items: &[T],
+    key: u32,
+    offset: u32,
+    key_of: impl Fn(&T) -> u32,
+) -> Option<usize> {
+    let offset = offset as usize;
+    if items.get(offset).is_some_and(|item| key_of(item) == key) {
+        return Some(offset);
+    }
+    items.binary_search_by_key(&key, key_of).ok()
+}
+
 struct FormulaAddresses<'a> {
     columns: std::slice::Iter<'a, FormulaColumn>,
     pages: std::slice::Iter<'a, FormulaPage>,
@@ -220,9 +236,10 @@ impl SheetFormulas {
             .ok()?;
         let pages = &self.columns.get(column)?.pages;
         let band = row / FORMULA_INDEX_PAGE_ROWS;
-        let page = pages.binary_search_by_key(&band, |page| page.band).ok()?;
+        let first_band = pages.first()?.band;
+        let page = offset_or_search(pages, band, band.wrapping_sub(first_band), |page| page.band)?;
         let cells = &pages.get(page)?.cells;
-        let offset = cells.binary_search_by_key(&row, |&(row, _)| row).ok()?;
+        let offset = offset_or_search(cells, row, row % FORMULA_INDEX_PAGE_ROWS, |&(row, _)| row)?;
         cells.get(offset).map(|&(_, id)| id)
     }
 

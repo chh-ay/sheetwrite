@@ -619,11 +619,19 @@ impl FormulaResults {
         self.count = 0;
     }
 
-    /// Release transient results before saving the cleared primary work space.
+    /// Release wide result buffers before saving the cleared primary work space.
     pub(crate) fn finish(&mut self, mut work: FormulaWork) {
         self.clear();
-        self.values = Vec::new();
-        self.used = Vec::new();
+
+        // Small edits reuse one page of empty buffers instead of two
+        // allocations per pass; wide passes must not pin their size.
+        if self.values.capacity() > SLOT_PAGE_LEN {
+            self.values = Vec::new();
+        }
+        if self.used.capacity() > SLOT_PAGE_LEN {
+            self.used = Vec::new();
+        }
+
         // Reuse primary pass storage, never formula values or selected ids.
         work.clear();
         self.work = work;
