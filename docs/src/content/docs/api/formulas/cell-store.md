@@ -56,6 +56,8 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-named-formula-source"><code>namedFormulaSource</code></a>
 <a href="#cell-store-paged-dirty-coordinates"><code>pagedDirtyCoordinates</code></a>
 <a href="#cell-store-paged-stats"><code>pagedStats</code></a>
+<a href="#cell-store-permute-rows"><code>permuteRows</code></a>
+<a href="#cell-store-permute-rows-losses"><code>permuteRowsLosses</code></a>
 <a href="#cell-store-persisted-cell-data"><code>persistedCellData</code></a>
 <a href="#cell-store-pin-read-window"><code>pinReadWindow</code></a>
 <a href="#cell-store-pin-viewport-bands"><code>pinViewportBands</code></a>
@@ -81,6 +83,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-reset-query-resource-stats"><code>resetQueryResourceStats</code></a>
 <a href="#cell-store-restore-range"><code>restoreRange</code></a>
 <a href="#cell-store-row-count"><code>rowCount</code></a>
+<a href="#cell-store-row-order-targets"><code>rowOrderTargets</code></a>
 <a href="#cell-store-search"><code>search</code></a>
 <a href="#cell-store-set-block-packed"><code>setBlockPacked</code></a>
 <a href="#cell-store-set-bool"><code>setBool</code></a>
@@ -116,7 +119,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-import-memory-state"><code>importMemoryState</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>102</span>
+## Members <span class="api-count" data-pagefind-ignore>105</span>
 
 <div class="api-member-list">
 
@@ -574,6 +577,34 @@ pagedStats: (sheet: number) => Float64Array;
 
 </details>
 
+<details class="api-member" id="cell-store-permute-rows" data-pagefind-weight="1">
+<summary><code>permuteRows</code> <span class="api-member-summary">Move the rows of a rectangle: target row offset i gets the cells of source row offset order[i], for the cols columns from startcol.</span></summary>
+
+```ts generated
+permuteRows: (sheet: number, start_row: number, start_col: number, cols: number, order: Uint32Array) => number;
+```
+
+<p class="api-member-doc">Move the rows of a rectangle: target row offset `i` gets the cells of
+source row offset `order[i]`, for the `cols` columns from `start_col`.
+`order` must be a permutation of `0..order.len()`. Status: `0`
+success, `1` invalid shape, bounds or order, `3` dirty-capacity
+rejection, `4` a spill range that the rectangle moves only in part.</p>
+</details>
+
+<details class="api-member" id="cell-store-permute-rows-losses" data-pagefind-weight="1">
+<summary><code>permuteRowsLosses</code> <span class="api-member-summary">Offsets, row-major in the rectangle before the move, of the formula cells whose adjusted text the inverse order cannot restore: a reference that leaves the sheet becomes #REF!.</span></summary>
+
+```ts generated
+permuteRowsLosses: (sheet: number, start_row: number, start_col: number, cols: number, order: Uint32Array) => Uint32Array;
+```
+
+<p class="api-member-doc">Offsets, row-major in the rectangle before the move, of the formula
+cells whose adjusted text the inverse order cannot restore: a
+reference that leaves the sheet becomes `#REF!`. Undo restores these
+cells from a capture, so their order does not matter. An invalid
+shape or order gives no offsets.</p>
+</details>
+
 <details class="api-member" id="cell-store-persisted-cell-data" data-pagefind-weight="1">
 <summary><code>persistedCellData</code> <span class="api-member-summary">Sparse persisted-cell records.</span></summary>
 
@@ -827,6 +858,18 @@ restoreRange: (sheet: number, r0: number, c0: number, snapshot: RangeSnapshot) =
 rowCount: (sheet: number) => number;
 ```
 
+</details>
+
+<details class="api-member" id="cell-store-row-order-targets" data-pagefind-weight="1">
+<summary><code>rowOrderTargets</code> <span class="api-member-summary">Where each row of order goes: entry i is the new row offset of source row offset i, which is also the order that moves every row back.</span></summary>
+
+```ts generated
+rowOrderTargets: (order: Uint32Array) => Uint32Array;
+```
+
+<p class="api-member-doc">Where each row of `order` goes: entry `i` is the new row offset of
+source row offset `i`, which is also the order that moves every row
+back. Empty when `order` is not a permutation of `0..order.len()`.</p>
 </details>
 
 <details class="api-member" id="cell-store-search" data-pagefind-weight="1">
@@ -1395,6 +1438,20 @@ class CellStore {
   namedFormulaSource: (name: string, scope: number) => string | undefined;
   pagedDirtyCoordinates: (sheet: number) => Float64Array;
   pagedStats: (sheet: number) => Float64Array;
+  permuteRows: (
+    sheet: number,
+    start_row: number,
+    start_col: number,
+    cols: number,
+    order: Uint32Array,
+  ) => number;
+  permuteRowsLosses: (
+    sheet: number,
+    start_row: number,
+    start_col: number,
+    cols: number,
+    order: Uint32Array,
+  ) => Uint32Array;
   persistedCellData: (sheet: number) => Float64Array;
   pinReadWindow: (
     sheet: number,
@@ -1458,6 +1515,7 @@ class CellStore {
     snapshot: RangeSnapshot,
   ) => boolean;
   rowCount: (sheet: number) => number;
+  rowOrderTargets: (order: Uint32Array) => Uint32Array;
   search: (
     sheet: number,
     cols: Uint32Array,
