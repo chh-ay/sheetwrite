@@ -8,6 +8,7 @@ mod database;
 mod dates;
 mod depreciation;
 mod descriptive;
+mod discrete;
 mod distributions;
 mod engineering;
 mod finance;
@@ -119,6 +120,13 @@ const FAMILIES: &[Family] = &[
         names: compatibility::NAMES,
         reference_cells: compatibility::REFERENCE_CELLS,
         evaluate: Some(compatibility::evaluate),
+        evaluate_ast: None,
+        array: None,
+    },
+    Family {
+        names: discrete::NAMES,
+        reference_cells: &[],
+        evaluate: Some(discrete::evaluate),
         evaluate_ast: None,
         array: None,
     },
