@@ -36,3 +36,17 @@ it("takes colour and stroke from the page, with the accent token as the only oth
     }
   }
 });
+
+it("draws each CSS mask icon with its sprite symbol's paths", () => {
+  const components = readFileSync(new URL("../src/styles/components.css", import.meta.url), "utf8");
+  const masks = [
+    ...components.matchAll(/--sw-icon-mask-([a-z-]+): url\("data:image\/svg\+xml,([^"]+)"\)/g),
+  ];
+  expect(masks.length).toBeGreaterThan(0);
+  for (const [, name, encoded = ""] of masks) {
+    const symbol = SYMBOLS.find((candidate) => candidate[1] === name);
+    expect({ name, inSprite: symbol !== undefined }).toEqual({ name, inSprite: true });
+    const maskBody = /'%3E(.*)%3C\/svg%3E$/.exec(encoded)?.[1] ?? "";
+    expect(decodeURIComponent(maskBody).replaceAll("'", '"')).toBe(symbol?.[3] ?? "");
+  }
+});
