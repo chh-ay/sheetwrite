@@ -43,7 +43,7 @@ import { setTransactionStorageRevision } from "./transaction-admission.js";
 import { preparedRestore, TransactionPreparation } from "./transaction-preparation.js";
 import type { CellScalar, Column } from "./types/cell.js";
 import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
-import type { TableRelationship } from "./types/data-model.js";
+import type { RelationshipStatus, TableRelationship } from "./types/data-model.js";
 import type { AggregateOp, ColumnarData, DataSourceColumnBand, RowData } from "./types/data.js";
 import type {
   ColumnFilter,
@@ -341,6 +341,15 @@ export class SheetwriteStore implements Store {
   /** Clones of the workbook's table relationships; readable without the engine. */
   getRelationships(): TableRelationship[] {
     return cloneRelationships(this.engine.getWorkbook().dataModel);
+  }
+
+  /**
+   * Whether the keys of the relationship with `id` resolve, checked now from
+   * the cell values. The default engine checks no keys and reports
+   * `unavailable`, as it does for an unknown ID.
+   */
+  getRelationshipStatus(id: string): RelationshipStatus {
+    return this.engine.getRelationshipStatus(id);
   }
 
   /**
