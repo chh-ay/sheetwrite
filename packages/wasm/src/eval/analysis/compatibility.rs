@@ -5,9 +5,9 @@
 //! that function. The other names keep their own argument order or tail.
 
 use super::super::functions::{apply_func, number_arg, require_arity, FuncAccumulator};
+use super::discrete;
 use super::distributions::{
-    self, beta_probability, binomial_inverse, degrees_arg, ensure, hypergeometric_mass,
-    negative_binomial_mass, normal_cdf, student_tail,
+    self, beta_probability, binomial_inverse, degrees_arg, ensure, normal_cdf, student_tail,
 };
 use crate::calc::Func;
 use crate::types::{EvalResult, FormulaError, Value};
@@ -119,9 +119,9 @@ fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
     match name {
         "BETADIST" => beta_cumulative(values),
         "CRITBINOM" => critical_binomial(values),
-        "HYPGEOMDIST" => hypergeometric(values),
+        "HYPGEOMDIST" => discrete::hypergeometric(values, false),
         "LOGNORMDIST" => lognormal_cumulative(values),
-        "NEGBINOMDIST" => negative_binomial(values),
+        "NEGBINOMDIST" => discrete::negative_binomial(values, false),
         "NORMSDIST" => {
             require_arity(values, 1, 1)?;
             normal_cdf(number_arg(values, 0, None)?)
@@ -159,29 +159,6 @@ fn critical_binomial(values: &FuncAccumulator) -> NumberResult {
     binomial_inverse(trials, probability, criterion)
 }
 
-/// `HYPGEOMDIST(sample_s, number_sample, population_s, number_pop)`: the
-/// probability mass only.
-fn hypergeometric(values: &FuncAccumulator) -> NumberResult {
-    require_arity(values, 4, 4)?;
-    let sample_successes = number_arg(values, 0, None)?.trunc();
-    let sample_size = number_arg(values, 1, None)?.trunc();
-    let population_successes = number_arg(values, 2, None)?.trunc();
-    let population_size = number_arg(values, 3, None)?.trunc();
-
-    ensure(population_size > 0.0)?;
-    ensure(sample_size > 0.0 && sample_size <= population_size)?;
-    ensure(population_successes > 0.0 && population_successes <= population_size)?;
-    ensure(sample_successes >= 0.0 && sample_successes <= sample_size.min(population_successes))?;
-    ensure(sample_successes >= sample_size - population_size + population_successes)?;
-
-    Ok(hypergeometric_mass(
-        sample_successes,
-        sample_size,
-        population_successes,
-        population_size,
-    ))
-}
-
 /// `LOGNORMDIST(x, mean, standard_dev)`: always the cumulative probability.
 fn lognormal_cumulative(values: &FuncAccumulator) -> NumberResult {
     require_arity(values, 3, 3)?;
@@ -192,20 +169,6 @@ fn lognormal_cumulative(values: &FuncAccumulator) -> NumberResult {
     ensure(x > 0.0 && deviation > 0.0)?;
 
     normal_cdf((x.ln() - mean) / deviation)
-}
-
-/// `NEGBINOMDIST(number_f, number_s, probability_s)`: the probability mass
-/// only.
-fn negative_binomial(values: &FuncAccumulator) -> NumberResult {
-    require_arity(values, 3, 3)?;
-    let failures = number_arg(values, 0, None)?.trunc();
-    let successes = number_arg(values, 1, None)?.trunc();
-    let probability = number_arg(values, 2, None)?;
-
-    ensure((0.0..=1.0).contains(&probability))?;
-    ensure(failures >= 0.0 && successes >= 1.0)?;
-
-    Ok(negative_binomial_mass(failures, successes, probability))
 }
 
 /// `TDIST(x, deg_freedom, tails)`: the right tail, or both tails, of a

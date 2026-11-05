@@ -51,9 +51,10 @@ import {
   SCALE_THEME,
   type ScanAttempt,
 } from "../showcases/scenarios/scale.js";
+import type { RendererState, RenderingMode } from "../showcases/ui/rendering-mode.js";
 
-import stylesheet from "../styles/showcase-performance.css?url";
 import "@sheetwrite/core/styles.css";
+import stylesheet from "../styles/showcase-performance.css?url";
 
 declare global {
   interface Window {
@@ -98,12 +99,6 @@ const COMPARISON_LOG_TICKS = Array.from(
 function comparisonLogPercent(ratio: number): number {
   if (!Number.isFinite(ratio) || ratio <= 1) return 0;
   return Math.min(100, (Math.log10(ratio) / COMPARISON_LOG_MAX_EXPONENT) * 100);
-}
-
-interface RendererState {
-  requested: "canvas" | "worker";
-  active: "canvas" | "worker";
-  fallback: string | null;
 }
 
 interface VisibleWindow {
@@ -273,7 +268,11 @@ function throttled<T>(apply: (value: T) => void, ms = 100) {
   };
 }
 
-function PerformanceRoute() {
+/**
+ * Grid, datasource and flight state for the performance page, plus the
+ * cache, crossing and evidence reports its sections show.
+ */
+function usePerformanceWorkbench() {
   const hostRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<Grid | null>(null);
   const zoomRef = useRef(1);
@@ -284,7 +283,7 @@ function PerformanceRoute() {
     firstColumn: 0,
     lastColumn: 0,
   });
-  const [renderer, setRenderer] = useState<"canvas" | "worker">("canvas");
+  const [renderer, setRenderer] = useState<RenderingMode>("canvas");
   const [rendererState, setRendererState] = useState<RendererState | null>(null);
   const [gridState, setGridState] = useState<"loading" | "ready" | "error">("loading");
   const [telemetry, setTelemetry] = useState<DatasourceTelemetry>(emptyTelemetry);
@@ -643,6 +642,65 @@ function PerformanceRoute() {
   const interactionWins = interactionWinList();
 
   const selectedFormula = gridRef.current?.store.getFormula(selectedAddress) ?? null;
+  return {
+    hostRef,
+    gridRef,
+    renderer,
+    setRenderer,
+    rendererState,
+    gridState,
+    telemetry,
+    stats,
+    selection,
+    zoom,
+    evictionStress,
+    setEvictionStress,
+    jumpRow,
+    setJumpRow,
+    jumpColumn,
+    setJumpColumn,
+    status,
+    setStatus,
+    evictionWatch,
+    activeStorage,
+    jumpTo,
+    handleJump,
+    handleZoom,
+    firstColumn,
+    lastColumn,
+    firstRow,
+    lastRow,
+    windowA1,
+    cachePercent,
+    cacheCeilingMiB,
+    stressCeilingMiB,
+    defaultCeilingMiB,
+    recentTiles,
+    recentEvictions,
+    residentTiles,
+    selectedFormula,
+    visible,
+    exportAttempt,
+    scan,
+    handleScan,
+    handleExport,
+    currentColumns,
+    averageRequestedColumns,
+    resourceOwners,
+    crossings,
+    resourceDelta,
+    handleCrossings,
+    changedResourceOwners,
+    latestCrossing,
+    interactionWins,
+  };
+}
+
+type PerformanceWorkbench = ReturnType<typeof usePerformanceWorkbench>;
+
+function PerformanceRoute() {
+  const workbench = usePerformanceWorkbench();
+
   return (
     <div className="sw-sp-frame">
       <SiteTopbar active="performance" />
@@ -664,937 +722,1012 @@ function PerformanceRoute() {
           title="A billion cells. Within reach."
         />
 
-        <section
-          aria-label="Billion-address Grid workbench"
-          className="sw-sp-section sw-sp-stage-section"
-          id="million-rows"
-        >
-          <div className="sw-sp-workbench" data-state={gridState}>
-            <ScaleFlightDeck
-              grid={() => gridRef.current}
-              onJump={(row, column) => jumpTo(row, column, "landmark")}
-              onStatus={setStatus}
-              ready={gridState === "ready"}
-              requests={telemetry.requests}
-              resident={{
-                bytes: stats.paged?.allocatedBytes ?? 0,
-                cells: stats.paged?.loadedCells ?? 0,
-              }}
-              tiles={recentTiles}
-              window={{ firstRow, lastRow, firstColumn, lastColumn }}
-            />
-            <div className="sw-sp-scale-strip">
-              <div className="sw-sp-position">
-                <span>YOUR WINDOW IN {SCALE_ROWS.toLocaleString()} ROWS</span>
-                <strong data-testid="scale-readable-rows">
-                  Rows {(firstRow + 1).toLocaleString()}–{(lastRow + 1).toLocaleString()}
-                </strong>
-                {/* An ARIA meter keeps the same track geometry in every browser. */}
-                <div
-                  aria-label="Position in the million-row sheet"
-                  aria-valuemin={0}
-                  aria-valuemax={SCALE_ROWS - 1}
-                  aria-valuenow={firstRow}
-                  className="sw-sp-position-gauge"
-                  role="meter"
-                >
-                  <span style={{ width: `${(firstRow / (SCALE_ROWS - 1)) * 100}%` }} />
-                </div>
-                <div className="sw-sp-scale-ticks" aria-hidden="true">
-                  <span>1</span>
-                  <span>{Math.floor(SCALE_ROWS / 2).toLocaleString()}</span>
-                  <span>{SCALE_ROWS.toLocaleString()}</span>
-                </div>
-                <small>
-                  {((firstRow / (SCALE_ROWS - 1)) * 100).toFixed(2)}% through the sheet ·{" "}
-                  {(lastRow - firstRow + 1).toLocaleString()} rows in view
-                </small>
-              </div>
-              <fieldset className="sw-sp-quick-jumps" aria-label="Explore the sheet">
-                {[
-                  { label: "Start", row: 0 },
-                  { label: "Middle", row: Math.floor(SCALE_ROWS / 2) },
-                  { label: "End", row: SCALE_ROWS - 1 },
-                ].map(({ label, row }) => (
-                  <button
-                    disabled={gridState !== "ready"}
-                    key={label}
-                    onClick={() => jumpTo(row, firstColumn, "landmark")}
-                    type="button"
-                  >
-                    {label}
-                  </button>
-                ))}
+        <WorkbenchSection workbench={workbench} />
+
+        <PagingSection workbench={workbench} />
+
+        <ResourcesSection workbench={workbench} />
+
+        <CrossingsSection workbench={workbench} />
+
+        <EvidenceSection workbench={workbench} />
+      </main>
+    </div>
+  );
+}
+
+/** The billion-address Grid with flight controls and the live cache readout. */
+function WorkbenchSection({ workbench }: Readonly<{ workbench: PerformanceWorkbench }>) {
+  const {
+    hostRef,
+    gridRef,
+    renderer,
+    setRenderer,
+    rendererState,
+    gridState,
+    telemetry,
+    stats,
+    selection,
+    zoom,
+    evictionStress,
+    setEvictionStress,
+    jumpRow,
+    setJumpRow,
+    jumpColumn,
+    setJumpColumn,
+    status,
+    setStatus,
+    evictionWatch,
+    activeStorage,
+    jumpTo,
+    handleJump,
+    handleZoom,
+    firstColumn,
+    lastColumn,
+    firstRow,
+    lastRow,
+    windowA1,
+    cachePercent,
+    cacheCeilingMiB,
+    stressCeilingMiB,
+    defaultCeilingMiB,
+    recentTiles,
+    recentEvictions,
+    residentTiles,
+    selectedFormula,
+  } = workbench;
+
+  return (
+    <section
+      aria-label="Billion-address Grid workbench"
+      className="sw-sp-section sw-sp-stage-section"
+      id="million-rows"
+    >
+      <div className="sw-sp-workbench" data-state={gridState}>
+        <ScaleFlightDeck
+          grid={() => gridRef.current}
+          onJump={(row, column) => jumpTo(row, column, "landmark")}
+          onStatus={setStatus}
+          ready={gridState === "ready"}
+          requests={telemetry.requests}
+          resident={{
+            bytes: stats.paged?.allocatedBytes ?? 0,
+            cells: stats.paged?.loadedCells ?? 0,
+          }}
+          tiles={recentTiles}
+          window={{ firstRow, lastRow, firstColumn, lastColumn }}
+        />
+        <div className="sw-sp-scale-strip">
+          <div className="sw-sp-position">
+            <span>YOUR WINDOW IN {SCALE_ROWS.toLocaleString()} ROWS</span>
+            <strong data-testid="scale-readable-rows">
+              Rows {(firstRow + 1).toLocaleString()}–{(lastRow + 1).toLocaleString()}
+            </strong>
+            {/* An ARIA meter keeps the same track geometry in every browser. */}
+            <div
+              aria-label="Position in the million-row sheet"
+              aria-valuemin={0}
+              aria-valuemax={SCALE_ROWS - 1}
+              aria-valuenow={firstRow}
+              className="sw-sp-position-gauge"
+              role="meter"
+            >
+              <span style={{ width: `${(firstRow / (SCALE_ROWS - 1)) * 100}%` }} />
+            </div>
+            <div className="sw-sp-scale-ticks" aria-hidden="true">
+              <span>1</span>
+              <span>{Math.floor(SCALE_ROWS / 2).toLocaleString()}</span>
+              <span>{SCALE_ROWS.toLocaleString()}</span>
+            </div>
+            <small>
+              {((firstRow / (SCALE_ROWS - 1)) * 100).toFixed(2)}% through the sheet ·{" "}
+              {(lastRow - firstRow + 1).toLocaleString()} rows in view
+            </small>
+          </div>
+          <fieldset className="sw-sp-quick-jumps" aria-label="Explore the sheet">
+            {[
+              { label: "Start", row: 0 },
+              { label: "Middle", row: Math.floor(SCALE_ROWS / 2) },
+              { label: "End", row: SCALE_ROWS - 1 },
+            ].map(({ label, row }) => (
+              <button
+                disabled={gridState !== "ready"}
+                key={label}
+                onClick={() => jumpTo(row, firstColumn, "landmark")}
+                type="button"
+              >
+                {label}
+              </button>
+            ))}
+            <button
+              disabled={gridState !== "ready"}
+              onClick={() =>
+                jumpTo(Math.floor(Math.random() * SCALE_ROWS), firstColumn, "landmark")
+              }
+              type="button"
+            >
+              Random row
+            </button>
+          </fieldset>
+          <div className="sw-sp-live-loading" aria-live="polite">
+            <strong>
+              {recentTiles.filter((tile) => tile.state === "requested").length > 0
+                ? "Loading requested tiles…"
+                : "Visited tiles loaded"}
+            </strong>
+            <span>
+              {telemetry.requests.toLocaleString()} requests · {telemetry.aborted.toLocaleString()}{" "}
+              aborted
+            </span>
+            <span>
+              {formatBytes(stats.paged?.allocatedBytes ?? 0, { kib: 1, mib: 1, gib: 2 })} resident /{" "}
+              {cacheCeilingMiB.toLocaleString()} MiB ceiling
+            </span>
+          </div>
+        </div>
+        <div className="sw-sp-stage-body">
+          <div className="sw-sp-grid-shell">
+            <div className="sw-sp-grid-instructions">
+              <span data-state={gridState}>
+                {gridState === "ready"
+                  ? "Grid ready"
+                  : gridState === "error"
+                    ? "Grid unavailable"
+                    : "Loading Grid"}
+              </span>
+              <span>
+                Columns {colToA1(firstColumn)}–{colToA1(lastColumn)} of {colToA1(SCALE_COLUMNS - 1)}{" "}
+                · Shift-wheel to scroll wide
+              </span>
+              <fieldset aria-label="Grid zoom" className="sw-sp-zoom">
                 <button
-                  disabled={gridState !== "ready"}
-                  onClick={() =>
-                    jumpTo(Math.floor(Math.random() * SCALE_ROWS), firstColumn, "landmark")
-                  }
+                  aria-label="Zoom out"
+                  disabled={gridState !== "ready" || zoom <= 0.5}
+                  onClick={() => handleZoom(zoom - 0.25)}
                   type="button"
                 >
-                  Random row
+                  −
+                </button>
+                <output aria-label="Current zoom" data-testid="scale-zoom-value">
+                  {Math.round(zoom * 100)}%
+                </output>
+                <button
+                  aria-label="Zoom in"
+                  disabled={gridState !== "ready" || zoom >= 2}
+                  onClick={() => handleZoom(zoom + 0.25)}
+                  type="button"
+                >
+                  +
+                </button>
+                <button
+                  className="sw-sp-zoom__reset"
+                  disabled={gridState !== "ready" || zoom === 1}
+                  onClick={() => handleZoom(1)}
+                  type="button"
+                >
+                  Reset
                 </button>
               </fieldset>
-              <div className="sw-sp-live-loading" aria-live="polite">
-                <strong>
-                  {recentTiles.filter((tile) => tile.state === "requested").length > 0
-                    ? "Loading requested tiles…"
-                    : "Visited tiles loaded"}
-                </strong>
-                <span>
-                  {telemetry.requests.toLocaleString()} requests ·{" "}
-                  {telemetry.aborted.toLocaleString()} aborted
-                </span>
-                <span>
-                  {formatBytes(stats.paged?.allocatedBytes ?? 0, { kib: 1, mib: 1, gib: 2 })}{" "}
-                  resident / {cacheCeilingMiB.toLocaleString()} MiB ceiling
-                </span>
-              </div>
             </div>
-            <div className="sw-sp-stage-body">
-              <div className="sw-sp-grid-shell">
-                <div className="sw-sp-grid-instructions">
-                  <span data-state={gridState}>
-                    {gridState === "ready"
-                      ? "Grid ready"
-                      : gridState === "error"
-                        ? "Grid unavailable"
-                        : "Loading Grid"}
-                  </span>
-                  <span>
-                    Columns {colToA1(firstColumn)}–{colToA1(lastColumn)} of{" "}
-                    {colToA1(SCALE_COLUMNS - 1)} · Shift-wheel to scroll wide
-                  </span>
-                  <fieldset aria-label="Grid zoom" className="sw-sp-zoom">
-                    <button
-                      aria-label="Zoom out"
-                      disabled={gridState !== "ready" || zoom <= 0.5}
-                      onClick={() => handleZoom(zoom - 0.25)}
-                      type="button"
-                    >
-                      −
-                    </button>
-                    <output aria-label="Current zoom" data-testid="scale-zoom-value">
-                      {Math.round(zoom * 100)}%
-                    </output>
-                    <button
-                      aria-label="Zoom in"
-                      disabled={gridState !== "ready" || zoom >= 2}
-                      onClick={() => handleZoom(zoom + 0.25)}
-                      type="button"
-                    >
-                      +
-                    </button>
-                    <button
-                      className="sw-sp-zoom__reset"
-                      disabled={gridState !== "ready" || zoom === 1}
-                      onClick={() => handleZoom(1)}
-                      type="button"
-                    >
-                      Reset
-                    </button>
-                  </fieldset>
-                </div>
-                {/* Sheetwrite upgrades this host into a virtualized ARIA grid. */}
-                <div
-                  aria-label="Million-row financial operations grid — one-billion-address Sheetwrite Grid"
-                  className="sw-sp-grid"
-                  data-cache-bytes={activeStorage.cacheBytes}
-                  data-chunk-rows={activeStorage.chunkRows}
-                  data-testid="scale-grid"
-                  ref={hostRef}
-                  role="grid"
-                />
-              </div>
+            {/* Sheetwrite upgrades this host into a virtualized ARIA grid. */}
+            <div
+              aria-label="Million-row financial operations grid — one-billion-address Sheetwrite Grid"
+              className="sw-sp-grid"
+              data-cache-bytes={activeStorage.cacheBytes}
+              data-chunk-rows={activeStorage.chunkRows}
+              data-testid="scale-grid"
+              ref={hostRef}
+              role="grid"
+            />
+          </div>
 
-              <aside className="sw-sp-instrument" aria-label="Grid navigator and live instrument">
-                <section className="sw-sp-challenge" aria-labelledby="scale-challenge-title">
-                  <p>Go to any address</p>
-                  <h3 id="scale-challenge-title">Choose a row and column</h3>
-                  <form
-                    className="sw-sp-jump"
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      handleJump();
-                    }}
-                  >
-                    <fieldset>
-                      <legend>Exact accessible jump</legend>
-                      <label htmlFor="scale-jump-row">
-                        Row
-                        <input
-                          data-testid="scale-jump-row"
-                          id="scale-jump-row"
-                          inputMode="numeric"
-                          max={SCALE_ROWS}
-                          min={1}
-                          onChange={(event) => setJumpRow(event.currentTarget.value)}
-                          type="number"
-                          value={jumpRow}
-                        />
-                      </label>
-                      <label htmlFor="scale-jump-column">
-                        Column
-                        <input
-                          data-testid="scale-jump-column"
-                          id="scale-jump-column"
-                          inputMode="numeric"
-                          max={SCALE_COLUMNS}
-                          min={1}
-                          onChange={(event) => setJumpColumn(event.currentTarget.value)}
-                          type="number"
-                          value={jumpColumn}
-                        />
-                      </label>
-                      <button
-                        data-testid="scale-jump"
-                        disabled={gridState !== "ready"}
-                        type="submit"
-                      >
-                        Jump to cell
-                      </button>
-                    </fieldset>
-                  </form>
-                </section>
-
-                <section className="sw-sp-navigator" aria-labelledby="scale-navigator-title">
-                  <div className="sw-sp-overview-head">
-                    <span id="scale-navigator-title">Sheet navigator</span>
-                    <strong>
-                      Row {Math.round((firstRow / (SCALE_ROWS - 1)) * 100)}% · Column{" "}
-                      {Math.round((firstColumn / (SCALE_COLUMNS - 1)) * 100)}%
-                    </strong>
-                  </div>
-                  <div className="sw-sp-overview-track">
+          <aside className="sw-sp-instrument" aria-label="Grid navigator and live instrument">
+            <section className="sw-sp-challenge" aria-labelledby="scale-challenge-title">
+              <p>Go to any address</p>
+              <h3 id="scale-challenge-title">Choose a row and column</h3>
+              <form
+                className="sw-sp-jump"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  handleJump();
+                }}
+              >
+                <fieldset>
+                  <legend>Exact accessible jump</legend>
+                  <label htmlFor="scale-jump-row">
+                    Row
                     <input
-                      aria-label="Vertical sheet overview"
-                      aria-valuetext={`Row ${firstRow + 1} of ${SCALE_ROWS}`}
-                      data-testid="scale-overview"
-                      disabled={gridState !== "ready"}
-                      max={SCALE_ROWS - 1}
-                      min={0}
-                      onChange={(event) =>
-                        jumpTo(Number(event.currentTarget.value), firstColumn, "overview")
-                      }
-                      step={1}
-                      type="range"
-                      value={firstRow}
-                    />
-                    <div aria-hidden="true" className="sw-sp-tile-map">
-                      {recentTiles.map((tile) => (
-                        <span
-                          data-state={tile.residence}
-                          key={tile.id}
-                          style={{ top: `${(tile.start / (SCALE_ROWS - 1)) * 100}%` }}
-                        />
-                      ))}
-                    </div>
-                    <div className="sw-sp-landmarks">
-                      {LANDMARKS.map((landmark) => (
-                        <button
-                          data-testid={`scale-landmark-${landmark.label.replace("%", "")}`}
-                          key={landmark.label}
-                          onClick={() =>
-                            jumpTo(
-                              Math.round((SCALE_ROWS - 1) * landmark.ratio),
-                              firstColumn,
-                              "landmark",
-                            )
-                          }
-                          style={{ top: `${landmark.ratio * 100}%` }}
-                          type="button"
-                        >
-                          {landmark.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <label className="sw-sp-column-overview">
-                    <span>
-                      <strong>Columns</strong>
-                      <small>
-                        {colToA1(firstColumn)} of {colToA1(SCALE_COLUMNS - 1)}
-                      </small>
-                    </span>
-                    <input
-                      aria-label="Horizontal sheet overview"
-                      aria-valuetext={`Column ${firstColumn + 1} (${colToA1(firstColumn)}) of ${SCALE_COLUMNS}`}
-                      data-testid="scale-column-overview"
-                      disabled={gridState !== "ready"}
-                      max={SCALE_COLUMNS - 1}
-                      min={0}
-                      onChange={(event) =>
-                        jumpTo(firstRow, Number(event.currentTarget.value), "column-overview")
-                      }
-                      step={1}
-                      type="range"
-                      value={firstColumn}
+                      data-testid="scale-jump-row"
+                      id="scale-jump-row"
+                      inputMode="numeric"
+                      max={SCALE_ROWS}
+                      min={1}
+                      onChange={(event) => setJumpRow(event.currentTarget.value)}
+                      type="number"
+                      value={jumpRow}
                     />
                   </label>
-                </section>
-              </aside>
-            </div>
-            <div className="sw-sp-secondary">
-              <dl className="sw-sp-readout" aria-label="Live window and residency instrument">
-                <div>
-                  <dt>Address / window</dt>
-                  <dd data-testid="scale-current-a1">{selection}</dd>
-                  <dd data-testid="scale-window-a1">{windowA1}</dd>
-                  <dd className="sw-sp-readout__bounds">
-                    <span data-testid="scale-window-rows">
-                      {firstRow + 1}–{lastRow + 1}
-                    </span>
-                    <span data-testid="scale-window-columns">
-                      {colToA1(firstColumn)}–{colToA1(lastColumn)}
-                    </span>
-                  </dd>
-                </div>
-                <div>
-                  <dt>Selected cell input</dt>
-                  <dd className="sw-sp-readout__formula" data-testid="scale-selected-formula">
-                    {selectedFormula ?? "Literal value"}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Requests / aborts</dt>
-                  <dd>
-                    {telemetry.requests.toLocaleString()} / {telemetry.aborted.toLocaleString()}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Resident tiles</dt>
-                  <dd>
-                    {residentTiles} live · {recentEvictions} evicted
-                  </dd>
-                </div>
-                <div>
-                  <dt>Resident tile payload</dt>
-                  <dd>
-                    {formatBytes(stats.paged?.allocatedBytes ?? 0, { kib: 1, mib: 1, gib: 2 })}
-                  </dd>
-                  <dd className="sw-sp-readout__context">
-                    {cacheCeilingMiB.toLocaleString()} MiB cache ceiling ·{" "}
-                    {Math.round(cachePercent)}% resident
-                  </dd>
-                </div>
-                <div>
-                  <dt>Renderer</dt>
-                  <dd data-testid="scale-renderer-active">{rendererState?.active ?? renderer}</dd>
-                </div>
-              </dl>
-
-              <div className="sw-sp-instrument-stack">
-                <details className="sw-sp-render-details">
-                  <summary>
-                    <span className="sw-sp-disclosure-copy">
-                      <strong>Drawing path</strong>
-                      <small>{rendererState?.active ?? renderer} renderer</small>
-                    </span>
-                    <span aria-hidden="true" className="sw-sp-disclosure-chevron">
-                      ›
-                    </span>
-                  </summary>
-                  <fieldset className="sw-sp-render-switch">
-                    <legend>Grid drawing path</legend>
-                    <button
-                      aria-pressed={renderer === "canvas"}
-                      data-testid="scale-renderer-canvas"
-                      onClick={() => setRenderer("canvas")}
-                      type="button"
-                    >
-                      Main canvas
-                    </button>
-                    <button
-                      aria-pressed={renderer === "worker"}
-                      data-testid="scale-renderer-worker"
-                      onClick={() => setRenderer("worker")}
-                      type="button"
-                    >
-                      Worker canvas
-                    </button>
-                  </fieldset>
-                  {rendererState && (
-                    <p className="sw-sp-rendererstate" data-testid="scale-renderer-state">
-                      Requested <strong>{rendererState.requested}</strong>; running{" "}
-                      <strong>{rendererState.active}</strong>
-                      {rendererState.fallback
-                        ? ` — Worker construction failed, so Grid reported and used its main-canvas fallback: ${rendererState.fallback}`
-                        : "."}
-                    </p>
-                  )}
-                </details>
-                <div className="sw-sp-stress">
-                  <h3>Clean-cache ceiling</h3>
-                  <p id="scale-stress-description">
-                    Remounts this Grid with a deliberately tight {stressCeilingMiB} MiB ceiling so
-                    clean tiles evict early; sparse edits survive.
-                  </p>
-                  <button
-                    aria-describedby="scale-stress-description"
-                    aria-pressed={evictionStress}
-                    data-testid="scale-eviction-stress"
-                    disabled={gridState === "loading"}
-                    onClick={() => setEvictionStress((active) => !active)}
-                    type="button"
-                  >
-                    {evictionStress ? "Tight ceiling active" : "Use the tight ceiling"}
+                  <label htmlFor="scale-jump-column">
+                    Column
+                    <input
+                      data-testid="scale-jump-column"
+                      id="scale-jump-column"
+                      inputMode="numeric"
+                      max={SCALE_COLUMNS}
+                      min={1}
+                      onChange={(event) => setJumpColumn(event.currentTarget.value)}
+                      type="number"
+                      value={jumpColumn}
+                    />
+                  </label>
+                  <button data-testid="scale-jump" disabled={gridState !== "ready"} type="submit">
+                    Jump to cell
                   </button>
-                  <small>
-                    Currently {evictionStress ? stressCeilingMiB : defaultCeilingMiB} MiB (
-                    {evictionStress ? "stress" : "product default"}).
-                  </small>
+                </fieldset>
+              </form>
+            </section>
+
+            <section className="sw-sp-navigator" aria-labelledby="scale-navigator-title">
+              <div className="sw-sp-overview-head">
+                <span id="scale-navigator-title">Sheet navigator</span>
+                <strong>
+                  Row {Math.round((firstRow / (SCALE_ROWS - 1)) * 100)}% · Column{" "}
+                  {Math.round((firstColumn / (SCALE_COLUMNS - 1)) * 100)}%
+                </strong>
+              </div>
+              <div className="sw-sp-overview-track">
+                <input
+                  aria-label="Vertical sheet overview"
+                  aria-valuetext={`Row ${firstRow + 1} of ${SCALE_ROWS}`}
+                  data-testid="scale-overview"
+                  disabled={gridState !== "ready"}
+                  max={SCALE_ROWS - 1}
+                  min={0}
+                  onChange={(event) =>
+                    jumpTo(Number(event.currentTarget.value), firstColumn, "overview")
+                  }
+                  step={1}
+                  type="range"
+                  value={firstRow}
+                />
+                <div aria-hidden="true" className="sw-sp-tile-map">
+                  {recentTiles.map((tile) => (
+                    <span
+                      data-state={tile.residence}
+                      key={tile.id}
+                      style={{ top: `${(tile.start / (SCALE_ROWS - 1)) * 100}%` }}
+                    />
+                  ))}
+                </div>
+                <div className="sw-sp-landmarks">
+                  {LANDMARKS.map((landmark) => (
+                    <button
+                      data-testid={`scale-landmark-${landmark.label.replace("%", "")}`}
+                      key={landmark.label}
+                      onClick={() =>
+                        jumpTo(
+                          Math.round((SCALE_ROWS - 1) * landmark.ratio),
+                          firstColumn,
+                          "landmark",
+                        )
+                      }
+                      style={{ top: `${landmark.ratio * 100}%` }}
+                      type="button"
+                    >
+                      {landmark.label}
+                    </button>
+                  ))}
                 </div>
               </div>
-            </div>
-
-            {evictionWatch && (
-              <p
-                className="sw-sp-eviction-watch"
-                data-clean-state={evictionWatch.cleanState}
-                data-testid="scale-eviction-watch"
-              >
-                <strong>
-                  Edited {cellA1(evictionWatch.dirty.row, evictionWatch.dirty.col)} ={" "}
-                  {evictionWatch.value}
-                </strong>
+              <label className="sw-sp-column-overview">
                 <span>
-                  dirty owner {evictionWatch.dirtyState} · clean comparison{" "}
-                  {cellA1(evictionWatch.clean.row, evictionWatch.clean.col)}{" "}
-                  {evictionWatch.cleanState}
+                  <strong>Columns</strong>
+                  <small>
+                    {colToA1(firstColumn)} of {colToA1(SCALE_COLUMNS - 1)}
+                  </small>
                 </span>
-                {evictionWatch.cleanState === "unloaded" && (
-                  <em>Clean tile evicted; sparse dirty value retained for revisit.</em>
-                )}
-              </p>
-            )}
-            <p aria-live="polite" className="sw-sp-status" data-testid="scale-status" role="status">
-              {status}
-            </p>
-          </div>
-        </section>
-
-        <section aria-labelledby="paging-title" className="sw-sp-section" id="paging">
-          <p className="sw-sp-kicker">Paging</p>
-          <h2 id="paging-title">Only the columns on screen are loaded.</h2>
-          <p>
-            Each request names the exact columns it needs, and the source returns only those, with
-            explicit <code>null</code> blanks. The source setting is{" "}
-            <code>{`{ protocol: 2, columns: "windowed" }`}</code>.
-          </p>
-
-          <details className="sw-sp-diagnostics">
-            <summary>
-              <span className="sw-sp-disclosure-copy">
-                <strong>Inspect live requests, tile memory, and loading history</strong>
-                <small>Live source counters</small>
-              </span>
-              <span aria-hidden="true" className="sw-sp-disclosure-chevron">
-                ›
-              </span>
-            </summary>
-            <dl className="sw-sp-stats" data-testid="scale-stats">
-              <div>
-                <dt>Requests / aborts</dt>
-                <dd data-testid="scale-requests">
-                  {telemetry.requests.toLocaleString()} / {telemetry.aborted.toLocaleString()}
-                </dd>
-              </div>
-              <div>
-                <dt>Requested cells</dt>
-                <dd data-testid="scale-requested-cells">
-                  {telemetry.requestedCells.toLocaleString()}
-                </dd>
-                <dd className="sw-sp-stat-context">
-                  {formatBytes(telemetry.requestBytes, { kib: 1, mib: 1, gib: 2 })} request JSON
-                </dd>
-              </div>
-              <div>
-                <dt>Returned cells</dt>
-                <dd data-testid="scale-returned-cells">
-                  {telemetry.returnedCells.toLocaleString()}
-                </dd>
-                <dd className="sw-sp-stat-context">
-                  {formatBytes(telemetry.returnedBytes, { kib: 1, mib: 1, gib: 2 })} row JSON
-                </dd>
-              </div>
-              <div>
-                <dt>Columns / returned row</dt>
-                <dd data-testid="scale-column-amplification">
-                  {averageRequestedColumns.toFixed(2)}
-                </dd>
-                <dd className="sw-sp-stat-context">current visible width {currentColumns}</dd>
-              </div>
-              <div>
-                <dt>Resident tile payload</dt>
-                <dd data-testid="scale-allocated">
-                  {formatBytes(stats.paged?.allocatedBytes ?? 0, { kib: 1, mib: 1, gib: 2 })}
-                </dd>
-                <dd className="sw-sp-stat-context">
-                  {cacheCeilingMiB.toLocaleString()} MiB cache ceiling · {Math.round(cachePercent)}%{" "}
-                  resident
-                </dd>
-              </div>
-              <div>
-                <dt>Dirty overlay</dt>
-                <dd data-testid="scale-dirty-cells">
-                  {(stats.paged?.dirtyCells ?? 0).toLocaleString()} cells
-                </dd>
-                <dd className="sw-sp-stat-context">
-                  {formatBytes(stats.paged?.dirtyAllocatedBytes ?? 0, { kib: 1, mib: 1, gib: 2 })}{" "}
-                  outside clean budget
-                </dd>
-              </div>
-            </dl>
-
-            <div className="sw-sp-cache-meter">
-              <span>Cache use</span>
-              {/* An ARIA meter keeps the same track geometry in every browser. */}
-              <div
-                aria-label="Resident tile cache use"
-                aria-valuemax={100}
-                aria-valuemin={0}
-                aria-valuenow={Math.round(cachePercent)}
-                className="sw-sp-cache-gauge"
-                role="meter"
-              >
-                <span style={{ width: `${Math.min(cachePercent, 100)}%` }} />
-              </div>
-              <strong>
-                {Math.round(cachePercent)}% of {cacheCeilingMiB.toLocaleString()} MiB
-              </strong>
-            </div>
-
-            <div className="sw-sp-last-tile" data-testid="scale-last-band">
-              <span>Last returned tile</span>
-              {telemetry.lastReturn ? (
-                <strong>
-                  rows {telemetry.lastReturn.start + 1}–{telemetry.lastReturn.end} · columns{" "}
-                  {columnBandsLabel(telemetry.lastReturn.columns)} ·{" "}
-                  {telemetry.lastReturn.cells.toLocaleString()} cells ·{" "}
-                  {formatBytes(telemetry.lastReturn.returnedBytes, { kib: 1, mib: 1, gib: 2 })} ·{" "}
-                  {telemetry.lastReturn.latencyMs?.toFixed(1)} ms
-                </strong>
-              ) : (
-                <strong>Waiting for the first returned tile</strong>
-              )}
-            </div>
-
-            <div className="sw-sp-tile-list">
-              <div className="sw-sp-tile-list__head">
-                <h3>Recent tile map</h3>
-                <span data-testid="scale-recent-evictions">
-                  {recentEvictions} evicted · public load state at each tile origin
+                <input
+                  aria-label="Horizontal sheet overview"
+                  aria-valuetext={`Column ${firstColumn + 1} (${colToA1(firstColumn)}) of ${SCALE_COLUMNS}`}
+                  data-testid="scale-column-overview"
+                  disabled={gridState !== "ready"}
+                  max={SCALE_COLUMNS - 1}
+                  min={0}
+                  onChange={(event) =>
+                    jumpTo(firstRow, Number(event.currentTarget.value), "column-overview")
+                  }
+                  step={1}
+                  type="range"
+                  value={firstColumn}
+                />
+              </label>
+            </section>
+          </aside>
+        </div>
+        <div className="sw-sp-secondary">
+          <dl className="sw-sp-readout" aria-label="Live window and residency instrument">
+            <div>
+              <dt>Address / window</dt>
+              <dd data-testid="scale-current-a1">{selection}</dd>
+              <dd data-testid="scale-window-a1">{windowA1}</dd>
+              <dd className="sw-sp-readout__bounds">
+                <span data-testid="scale-window-rows">
+                  {firstRow + 1}–{lastRow + 1}
                 </span>
-              </div>
-              {recentTiles.length === 0 ? (
-                <p>Move the Grid to populate this bounded request history.</p>
-              ) : (
-                <ol data-testid="scale-tile-list">
-                  {recentTiles.slice(0, 10).map((tile) => (
-                    <li data-state={tile.residence} key={tile.id}>
-                      <span>{tile.residence}</span>
-                      <strong>
-                        {tile.start + 1}–{tile.end} / {columnBandsLabel(tile.columns)}
-                      </strong>
-                      <small>{tile.cells.toLocaleString()} cells</small>
-                    </li>
-                  ))}
-                </ol>
-              )}
+                <span data-testid="scale-window-columns">
+                  {colToA1(firstColumn)}–{colToA1(lastColumn)}
+                </span>
+              </dd>
             </div>
-          </details>
-
-          <details className="sw-sp-debug-disclosure" data-testid="scale-global-details">
-            <summary>
-              <span className="sw-sp-disclosure-copy">
-                <strong>Try incomplete global operations</strong>
-                <small>SUM + full-sheet CSV</small>
-              </span>
-              <span aria-hidden="true" className="sw-sp-disclosure-chevron">
-                ›
-              </span>
-            </summary>
-            <div className="sw-sp-console">
-              <div className="sw-sp-console__intro">
-                <h3>Whole-sheet answers need the whole sheet</h3>
-                <p>
-                  With only part of the sheet loaded, a whole-sheet SUM or CSV export cannot be
-                  correct. These controls call the real APIs, which refuse with{" "}
-                  <code>IncompleteDataError</code> and report how much is loaded.
-                </p>
-              </div>
-              <div className="sw-sp-actions">
-                <button data-testid="scale-scan-attempt" onClick={handleScan} type="button">
-                  Try SUM over all rows
-                </button>
-                <button data-testid="scale-export-attempt" onClick={handleExport} type="button">
-                  Try full-sheet CSV
-                </button>
-              </div>
-              {scan && (
-                <p
-                  className="sw-sp-verdictline"
-                  data-state={scan.ok ? "complete" : "incomplete"}
-                  data-testid="scale-scan-report"
-                >
-                  <span>{scan.ok ? "Complete" : "Expected typed refusal"}</span>{" "}
-                  {scan.ok
-                    ? `${scan.op} = ${scan.value.toLocaleString()} in ${scan.durationMs.toFixed(1)} ms.`
-                    : `${scan.op} stopped in ${scan.durationMs.toFixed(1)} ms: ${scan.loadedCells.toLocaleString()} of ${scan.totalCells.toLocaleString()} logical cells are loaded. IncompleteDataError: ${scan.message}`}
-                </p>
-              )}
-              {exportAttempt && (
-                <p
-                  className="sw-sp-verdictline"
-                  data-state={exportAttempt.ok ? "complete" : "incomplete"}
-                  data-testid="scale-export-report"
-                >
-                  <span>{exportAttempt.ok ? "Complete" : "Expected typed refusal"}</span>{" "}
-                  {exportAttempt.ok
-                    ? `CSV completed at ${formatBytes(exportAttempt.bytes, { kib: 1, mib: 1, gib: 2 })}.`
-                    : `${exportAttempt.loadedCells.toLocaleString()} of ${exportAttempt.totalCells.toLocaleString()} logical cells are loaded. IncompleteDataError prevented a partial file: ${exportAttempt.message}`}
-                </p>
-              )}
-              {stats.query?.status === "incomplete" && (
-                <p className="sw-sp-note" data-testid="scale-query-state">
-                  Public query capability: incomplete — {stats.query.loadedCells.toLocaleString()}{" "}
-                  of {stats.query.totalCells.toLocaleString()} logical cells loaded.
-                </p>
-              )}
+            <div>
+              <dt>Selected cell input</dt>
+              <dd className="sw-sp-readout__formula" data-testid="scale-selected-formula">
+                {selectedFormula ?? "Literal value"}
+              </dd>
             </div>
-          </details>
-        </section>
+            <div>
+              <dt>Requests / aborts</dt>
+              <dd>
+                {telemetry.requests.toLocaleString()} / {telemetry.aborted.toLocaleString()}
+              </dd>
+            </div>
+            <div>
+              <dt>Resident tiles</dt>
+              <dd>
+                {residentTiles} live · {recentEvictions} evicted
+              </dd>
+            </div>
+            <div>
+              <dt>Resident tile payload</dt>
+              <dd>{formatBytes(stats.paged?.allocatedBytes ?? 0, { kib: 1, mib: 1, gib: 2 })}</dd>
+              <dd className="sw-sp-readout__context">
+                {cacheCeilingMiB.toLocaleString()} MiB cache ceiling · {Math.round(cachePercent)}%
+                resident
+              </dd>
+            </div>
+            <div>
+              <dt>Renderer</dt>
+              <dd data-testid="scale-renderer-active">{rendererState?.active ?? renderer}</dd>
+            </div>
+          </dl>
 
-        <section aria-labelledby="resource-title" className="sw-sp-section" id="resources">
-          <div className="sw-sp-resource-copy">
-            <p className="sw-sp-kicker">Memory</p>
-            <h2 id="resource-title">Data size, allocated memory and WASM pages, apart.</h2>
-            <p>
-              The public resource report
-              <span data-testid="scale-resource-schema" data-empty={!stats.resource}>
-                {stats.resource ? ` v${stats.resource.schemaVersion}` : " (loading report)"}
-              </span>{" "}
-              shows each separately. The page cache and the unsaved edits are counted on their own.
-            </p>
-          </div>
-          <div className="sw-sp-resource-panel">
-            <dl className="sw-sp-stats" data-testid="scale-resource-summary">
-              <div>
-                <dt>Data size</dt>
-                <dd data-testid="scale-resource-logical">
-                  {formatBytes(stats.resource?.totals.logicalLiveBytes ?? 0, {
-                    kib: 1,
-                    mib: 1,
-                    gib: 2,
-                  })}
-                </dd>
-              </div>
-              <div>
-                <dt>Allocated memory</dt>
-                <dd data-testid="scale-resource-allocated">
-                  {formatBytes(stats.resource?.totals.allocatedCapacityBytes ?? 0, {
-                    kib: 1,
-                    mib: 1,
-                    gib: 2,
-                  })}
-                </dd>
-              </div>
-              <div>
-                <dt>WASM pages</dt>
-                <dd data-testid="scale-resource-committed">
-                  {stats.resource?.wasm.wasmCommittedBytes == null
-                    ? "Unavailable"
-                    : formatBytes(stats.resource.wasm.wasmCommittedBytes, {
-                        kib: 1,
-                        mib: 1,
-                        gib: 2,
-                      })}
-                </dd>
-              </div>
-            </dl>
-            <details className="sw-sp-debug-disclosure">
+          <div className="sw-sp-instrument-stack">
+            <details className="sw-sp-render-details">
               <summary>
                 <span className="sw-sp-disclosure-copy">
-                  <strong>Inspect exclusive runtime owners</strong>
-                  <small>{resourceOwners.length} active owners</small>
+                  <strong>Drawing path</strong>
+                  <small>{rendererState?.active ?? renderer} renderer</small>
                 </span>
                 <span aria-hidden="true" className="sw-sp-disclosure-chevron">
                   ›
                 </span>
               </summary>
-              <div className="sw-sp-tablewrap">
-                <table className="sw-sp-table" data-testid="scale-resource-owners">
-                  <caption>Largest exclusive live owners in this mounted Grid.</caption>
-                  <thead>
-                    <tr>
-                      <th scope="col">Owner</th>
-                      <th className="sw-sp-table__num" scope="col">
-                        Logical
-                      </th>
-                      <th className="sw-sp-table__num" scope="col">
-                        Allocated
-                      </th>
-                      <th className="sw-sp-table__num" scope="col">
-                        Entries
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {resourceOwners.map((owner) => (
-                      <tr key={owner.owner}>
-                        <th scope="row">
-                          <code>{owner.owner}</code>
-                        </th>
-                        <td className="sw-sp-table__num" data-label="Logical">
-                          {formatBytes(owner.logicalBytes, { kib: 1, mib: 1, gib: 2 })}
-                        </td>
-                        <td className="sw-sp-table__num" data-label="Allocated">
-                          {formatBytes(owner.allocatedBytes, { kib: 1, mib: 1, gib: 2 })}
-                        </td>
-                        <td className="sw-sp-table__num" data-label="Entries">
-                          {owner.entries.toLocaleString()}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <fieldset className="sw-sp-render-switch">
+                <legend>Grid drawing path</legend>
+                <button
+                  aria-pressed={renderer === "canvas"}
+                  data-testid="scale-renderer-canvas"
+                  onClick={() => setRenderer("canvas")}
+                  type="button"
+                >
+                  Main canvas
+                </button>
+                <button
+                  aria-pressed={renderer === "worker"}
+                  data-testid="scale-renderer-worker"
+                  onClick={() => setRenderer("worker")}
+                  type="button"
+                >
+                  Worker canvas
+                </button>
+              </fieldset>
+              {rendererState && (
+                <p className="sw-sp-rendererstate" data-testid="scale-renderer-state">
+                  Requested <strong>{rendererState.requested}</strong>; running{" "}
+                  <strong>{rendererState.active}</strong>
+                  {rendererState.fallback
+                    ? ` — Worker construction failed, so Grid reported and used its main-canvas fallback: ${rendererState.fallback}`
+                    : "."}
+                </p>
+              )}
             </details>
+            <div className="sw-sp-stress">
+              <h3>Clean-cache ceiling</h3>
+              <p id="scale-stress-description">
+                Remounts this Grid with a deliberately tight {stressCeilingMiB} MiB ceiling so clean
+                tiles evict early; sparse edits survive.
+              </p>
+              <button
+                aria-describedby="scale-stress-description"
+                aria-pressed={evictionStress}
+                data-testid="scale-eviction-stress"
+                disabled={gridState === "loading"}
+                onClick={() => setEvictionStress((active) => !active)}
+                type="button"
+              >
+                {evictionStress ? "Tight ceiling active" : "Use the tight ceiling"}
+              </button>
+              <small>
+                Currently {evictionStress ? stressCeilingMiB : defaultCeilingMiB} MiB (
+                {evictionStress ? "stress" : "product default"}).
+              </small>
+            </div>
           </div>
-        </section>
+        </div>
 
-        <section aria-labelledby="crossing-title" className="sw-sp-section" id="wasm-crossings">
-          <p className="sw-sp-kicker">Engine calls</p>
-          <h2 id="crossing-title">Every call into the engine is counted.</h2>
-          <p>
-            Each control commits a real 20,000-cell edit and reads the engine's public counters
-            before and after it.
+        {evictionWatch && (
+          <p
+            className="sw-sp-eviction-watch"
+            data-clean-state={evictionWatch.cleanState}
+            data-testid="scale-eviction-watch"
+          >
+            <strong>
+              Edited {cellA1(evictionWatch.dirty.row, evictionWatch.dirty.col)} ={" "}
+              {evictionWatch.value}
+            </strong>
+            <span>
+              dirty owner {evictionWatch.dirtyState} · clean comparison{" "}
+              {cellA1(evictionWatch.clean.row, evictionWatch.clean.col)} {evictionWatch.cleanState}
+            </span>
+            {evictionWatch.cleanState === "unloaded" && (
+              <em>Clean tile evicted; sparse dirty value retained for revisit.</em>
+            )}
           </p>
-          <details className="sw-sp-debug-disclosure" data-testid="scale-crossing-details">
-            <summary>
-              <span className="sw-sp-disclosure-copy">
-                <strong>Run raw mutation diagnostics</strong>
-                <small>20,000-cell transactions</small>
-              </span>
-              <span aria-hidden="true" className="sw-sp-disclosure-chevron">
-                ›
-              </span>
-            </summary>
-            <div className="sw-sp-console">
-              <div className="sw-sp-actions">
-                <button
-                  data-testid="scale-crossings-values"
-                  onClick={() => handleCrossings("values")}
-                  type="button"
-                >
-                  Commit 20,000 values
-                </button>
-                <button
-                  data-testid="scale-crossings-styles"
-                  onClick={() => handleCrossings("styles")}
-                  type="button"
-                >
-                  Style 20,000 cells
-                </button>
-              </div>
-              {latestCrossing && (
-                <dl className="sw-sp-operation" data-testid="scale-crossings-latest">
-                  <div>
-                    <dt>Cells</dt>
-                    <dd>{latestCrossing.cells.toLocaleString()}</dd>
-                  </div>
-                  <div>
-                    <dt>JS↔WASM calls</dt>
-                    <dd data-testid="scale-crossings-ffi">{latestCrossing.ffiCalls}</dd>
-                  </div>
-                  <div>
-                    <dt>Largest array</dt>
-                    <dd>{latestCrossing.maxTransferredArrayLength.toLocaleString()}</dd>
-                  </div>
-                  <div>
-                    <dt>Measured time</dt>
-                    <dd>{latestCrossing.durationMs.toFixed(1)} ms</dd>
-                  </div>
-                </dl>
-              )}
-              {resourceDelta && (
-                <div className="sw-sp-resource-delta" data-testid="scale-resource-delta">
-                  <h3>
-                    Retained owner delta: {resourceDelta.from} → {resourceDelta.to}
-                  </h3>
-                  {changedResourceOwners.length === 0 ? (
-                    <p>No retained owner changed; existing capacity was reused.</p>
-                  ) : (
-                    <ul>
-                      {changedResourceOwners.map((owner) => (
-                        <li key={owner.owner}>
-                          <code>{owner.owner}</code>: logical {formatByteDelta(owner.logicalBytes)},
-                          allocated {formatByteDelta(owner.allocatedBytes)}, entries{" "}
-                          {owner.entries > 0 ? "+" : ""}
-                          {owner.entries.toLocaleString()}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-            </div>
-          </details>
-        </section>
+        )}
+        <p aria-live="polite" className="sw-sp-status" data-testid="scale-status" role="status">
+          {status}
+        </p>
+      </div>
+    </section>
+  );
+}
 
-        <section
-          aria-labelledby="evidence-title"
-          className="sw-sp-section sw-sp-proof"
-          id="evidence"
-        >
-          <div className="sw-sp-proof-heading">
-            <div>
-              <p className="sw-sp-kicker">Benchmark</p>
-              <h2 id="evidence-title">The working set stays bounded as the address space grows.</h2>
-            </div>
+/** Datasource paging: tiles, residence and prefetch decisions. */
+function PagingSection({ workbench }: Readonly<{ workbench: PerformanceWorkbench }>) {
+  const {
+    telemetry,
+    stats,
+    exportAttempt,
+    scan,
+    handleScan,
+    handleExport,
+    currentColumns,
+    averageRequestedColumns,
+    cachePercent,
+    cacheCeilingMiB,
+    recentTiles,
+    recentEvictions,
+  } = workbench;
+
+  return (
+    <section aria-labelledby="paging-title" className="sw-sp-section" id="paging">
+      <p className="sw-sp-kicker">Paging</p>
+      <h2 id="paging-title">Only the columns on screen are loaded.</h2>
+      <p>
+        Each request names the exact columns it needs, and the source returns only those, with
+        explicit <code>null</code> blanks. The source setting is{" "}
+        <code>{`{ protocol: 2, columns: "windowed" }`}</code>.
+      </p>
+
+      <details className="sw-sp-diagnostics">
+        <summary>
+          <span className="sw-sp-disclosure-copy">
+            <strong>Inspect live requests, tile memory, and loading history</strong>
+            <small>Live source counters</small>
+          </span>
+          <span aria-hidden="true" className="sw-sp-disclosure-chevron">
+            ›
+          </span>
+        </summary>
+        <dl className="sw-sp-stats" data-testid="scale-stats">
+          <div>
+            <dt>Requests / aborts</dt>
+            <dd data-testid="scale-requests">
+              {telemetry.requests.toLocaleString()} / {telemetry.aborted.toLocaleString()}
+            </dd>
+          </div>
+          <div>
+            <dt>Requested cells</dt>
+            <dd data-testid="scale-requested-cells">{telemetry.requestedCells.toLocaleString()}</dd>
+            <dd className="sw-sp-stat-context">
+              {formatBytes(telemetry.requestBytes, { kib: 1, mib: 1, gib: 2 })} request JSON
+            </dd>
+          </div>
+          <div>
+            <dt>Returned cells</dt>
+            <dd data-testid="scale-returned-cells">{telemetry.returnedCells.toLocaleString()}</dd>
+            <dd className="sw-sp-stat-context">
+              {formatBytes(telemetry.returnedBytes, { kib: 1, mib: 1, gib: 2 })} row JSON
+            </dd>
+          </div>
+          <div>
+            <dt>Columns / returned row</dt>
+            <dd data-testid="scale-column-amplification">{averageRequestedColumns.toFixed(2)}</dd>
+            <dd className="sw-sp-stat-context">current visible width {currentColumns}</dd>
+          </div>
+          <div>
+            <dt>Resident tile payload</dt>
+            <dd data-testid="scale-allocated">
+              {formatBytes(stats.paged?.allocatedBytes ?? 0, { kib: 1, mib: 1, gib: 2 })}
+            </dd>
+            <dd className="sw-sp-stat-context">
+              {cacheCeilingMiB.toLocaleString()} MiB cache ceiling · {Math.round(cachePercent)}%{" "}
+              resident
+            </dd>
+          </div>
+          <div>
+            <dt>Dirty overlay</dt>
+            <dd data-testid="scale-dirty-cells">
+              {(stats.paged?.dirtyCells ?? 0).toLocaleString()} cells
+            </dd>
+            <dd className="sw-sp-stat-context">
+              {formatBytes(stats.paged?.dirtyAllocatedBytes ?? 0, { kib: 1, mib: 1, gib: 2 })}{" "}
+              outside clean budget
+            </dd>
+          </div>
+        </dl>
+
+        <div className="sw-sp-cache-meter">
+          <span>Cache use</span>
+          {/* An ARIA meter keeps the same track geometry in every browser. */}
+          <div
+            aria-label="Resident tile cache use"
+            aria-valuemax={100}
+            aria-valuemin={0}
+            aria-valuenow={Math.round(cachePercent)}
+            className="sw-sp-cache-gauge"
+            role="meter"
+          >
+            <span style={{ width: `${Math.min(cachePercent, 100)}%` }} />
+          </div>
+          <strong>
+            {Math.round(cachePercent)}% of {cacheCeilingMiB.toLocaleString()} MiB
+          </strong>
+        </div>
+
+        <div className="sw-sp-last-tile" data-testid="scale-last-band">
+          <span>Last returned tile</span>
+          {telemetry.lastReturn ? (
+            <strong>
+              rows {telemetry.lastReturn.start + 1}–{telemetry.lastReturn.end} · columns{" "}
+              {columnBandsLabel(telemetry.lastReturn.columns)} ·{" "}
+              {telemetry.lastReturn.cells.toLocaleString()} cells ·{" "}
+              {formatBytes(telemetry.lastReturn.returnedBytes, { kib: 1, mib: 1, gib: 2 })} ·{" "}
+              {telemetry.lastReturn.latencyMs?.toFixed(1)} ms
+            </strong>
+          ) : (
+            <strong>Waiting for the first returned tile</strong>
+          )}
+        </div>
+
+        <div className="sw-sp-tile-list">
+          <div className="sw-sp-tile-list__head">
+            <h3>Recent tile map</h3>
+            <span data-testid="scale-recent-evictions">
+              {recentEvictions} evicted · public load state at each tile origin
+            </span>
+          </div>
+          {recentTiles.length === 0 ? (
+            <p>Move the Grid to populate this bounded request history.</p>
+          ) : (
+            <ol data-testid="scale-tile-list">
+              {recentTiles.slice(0, 10).map((tile) => (
+                <li data-state={tile.residence} key={tile.id}>
+                  <span>{tile.residence}</span>
+                  <strong>
+                    {tile.start + 1}–{tile.end} / {columnBandsLabel(tile.columns)}
+                  </strong>
+                  <small>{tile.cells.toLocaleString()} cells</small>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+      </details>
+
+      <details className="sw-sp-debug-disclosure" data-testid="scale-global-details">
+        <summary>
+          <span className="sw-sp-disclosure-copy">
+            <strong>Try incomplete global operations</strong>
+            <small>SUM + full-sheet CSV</small>
+          </span>
+          <span aria-hidden="true" className="sw-sp-disclosure-chevron">
+            ›
+          </span>
+        </summary>
+        <div className="sw-sp-console">
+          <div className="sw-sp-console__intro">
+            <h3>Whole-sheet answers need the whole sheet</h3>
             <p>
-              The live Grid is the product proof. This secondary record answers one decision:
-              repeated measured runs did not require a resident billion-cell matrix.
+              With only part of the sheet loaded, a whole-sheet SUM or CSV export cannot be correct.
+              These controls call the real APIs, which refuse with <code>IncompleteDataError</code>{" "}
+              and report how much is loaded.
             </p>
           </div>
+          <div className="sw-sp-actions">
+            <button data-testid="scale-scan-attempt" onClick={handleScan} type="button">
+              Try SUM over all rows
+            </button>
+            <button data-testid="scale-export-attempt" onClick={handleExport} type="button">
+              Try full-sheet CSV
+            </button>
+          </div>
+          {scan && (
+            <p
+              className="sw-sp-verdictline"
+              data-state={scan.ok ? "complete" : "incomplete"}
+              data-testid="scale-scan-report"
+            >
+              <span>{scan.ok ? "Complete" : "Expected typed refusal"}</span>{" "}
+              {scan.ok
+                ? `${scan.op} = ${scan.value.toLocaleString()} in ${scan.durationMs.toFixed(1)} ms.`
+                : `${scan.op} stopped in ${scan.durationMs.toFixed(1)} ms: ${scan.loadedCells.toLocaleString()} of ${scan.totalCells.toLocaleString()} logical cells are loaded. IncompleteDataError: ${scan.message}`}
+            </p>
+          )}
+          {exportAttempt && (
+            <p
+              className="sw-sp-verdictline"
+              data-state={exportAttempt.ok ? "complete" : "incomplete"}
+              data-testid="scale-export-report"
+            >
+              <span>{exportAttempt.ok ? "Complete" : "Expected typed refusal"}</span>{" "}
+              {exportAttempt.ok
+                ? `CSV completed at ${formatBytes(exportAttempt.bytes, { kib: 1, mib: 1, gib: 2 })}.`
+                : `${exportAttempt.loadedCells.toLocaleString()} of ${exportAttempt.totalCells.toLocaleString()} logical cells are loaded. IncompleteDataError prevented a partial file: ${exportAttempt.message}`}
+            </p>
+          )}
+          {stats.query?.status === "incomplete" && (
+            <p className="sw-sp-note" data-testid="scale-query-state">
+              Public query capability: incomplete — {stats.query.loadedCells.toLocaleString()} of{" "}
+              {stats.query.totalCells.toLocaleString()} logical cells loaded.
+            </p>
+          )}
+        </div>
+      </details>
+    </section>
+  );
+}
 
-          <div className="sw-sp-proof-layout">
-            {COMPARISON_EVIDENCE.available && (
-              <article className="sw-sp-scale-curve" data-testid="scale-evidence-compare">
-                <header>
-                  <p>Scenario median</p>
-                  <strong>
-                    {COMPARISON_EVIDENCE.sizes[COMPARISON_EVIDENCE.sizes.length - 1]?.medianRatio}×
-                  </strong>
-                  <span>at one million rows</span>
-                </header>
-                <div aria-hidden="true" className="sw-sp-scale-curve__axis">
-                  <span />
-                  <div>
-                    {COMPARISON_LOG_TICKS.map((tick) => (
-                      <span key={tick}>{tick.toLocaleString()}×</span>
-                    ))}
-                  </div>
-                  <span>log₁₀</span>
-                </div>
-                <ol aria-label="Median comparison ratio by row count, logarithmic scale">
-                  {COMPARISON_EVIDENCE.sizes.map((size) => (
-                    <li key={size.size}>
-                      <span>{size.size.toLocaleString()}</span>
-                      <span className="sw-sp-scale-curve__track">
-                        <span
-                          aria-hidden="true"
-                          style={{
-                            width: `${comparisonLogPercent(size.medianRatio)}%`,
-                          }}
-                        />
-                      </span>
-                      <strong>{size.medianRatio.toFixed(1)}×</strong>
+/** Memory and resource reports for the loaded workbook. */
+function ResourcesSection({ workbench }: Readonly<{ workbench: PerformanceWorkbench }>) {
+  const { stats, resourceOwners } = workbench;
+
+  return (
+    <section aria-labelledby="resource-title" className="sw-sp-section" id="resources">
+      <div className="sw-sp-resource-copy">
+        <p className="sw-sp-kicker">Memory</p>
+        <h2 id="resource-title">Data size, allocated memory and WASM pages, apart.</h2>
+        <p>
+          The public resource report
+          <span data-testid="scale-resource-schema" data-empty={!stats.resource}>
+            {stats.resource ? ` v${stats.resource.schemaVersion}` : " (loading report)"}
+          </span>{" "}
+          shows each separately. The page cache and the unsaved edits are counted on their own.
+        </p>
+      </div>
+      <div className="sw-sp-resource-panel">
+        <dl className="sw-sp-stats" data-testid="scale-resource-summary">
+          <div>
+            <dt>Data size</dt>
+            <dd data-testid="scale-resource-logical">
+              {formatBytes(stats.resource?.totals.logicalLiveBytes ?? 0, {
+                kib: 1,
+                mib: 1,
+                gib: 2,
+              })}
+            </dd>
+          </div>
+          <div>
+            <dt>Allocated memory</dt>
+            <dd data-testid="scale-resource-allocated">
+              {formatBytes(stats.resource?.totals.allocatedCapacityBytes ?? 0, {
+                kib: 1,
+                mib: 1,
+                gib: 2,
+              })}
+            </dd>
+          </div>
+          <div>
+            <dt>WASM pages</dt>
+            <dd data-testid="scale-resource-committed">
+              {stats.resource?.wasm.wasmCommittedBytes == null
+                ? "Unavailable"
+                : formatBytes(stats.resource.wasm.wasmCommittedBytes, {
+                    kib: 1,
+                    mib: 1,
+                    gib: 2,
+                  })}
+            </dd>
+          </div>
+        </dl>
+        <details className="sw-sp-debug-disclosure">
+          <summary>
+            <span className="sw-sp-disclosure-copy">
+              <strong>Inspect exclusive runtime owners</strong>
+              <small>{resourceOwners.length} active owners</small>
+            </span>
+            <span aria-hidden="true" className="sw-sp-disclosure-chevron">
+              ›
+            </span>
+          </summary>
+          <div className="sw-sp-tablewrap">
+            <table className="sw-sp-table" data-testid="scale-resource-owners">
+              <caption>Largest exclusive live owners in this mounted Grid.</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Owner</th>
+                  <th className="sw-sp-table__num" scope="col">
+                    Logical
+                  </th>
+                  <th className="sw-sp-table__num" scope="col">
+                    Allocated
+                  </th>
+                  <th className="sw-sp-table__num" scope="col">
+                    Entries
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {resourceOwners.map((owner) => (
+                  <tr key={owner.owner}>
+                    <th scope="row">
+                      <code>{owner.owner}</code>
+                    </th>
+                    <td className="sw-sp-table__num" data-label="Logical">
+                      {formatBytes(owner.logicalBytes, { kib: 1, mib: 1, gib: 2 })}
+                    </td>
+                    <td className="sw-sp-table__num" data-label="Allocated">
+                      {formatBytes(owner.allocatedBytes, { kib: 1, mib: 1, gib: 2 })}
+                    </td>
+                    <td className="sw-sp-table__num" data-label="Entries">
+                      {owner.entries.toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      </div>
+    </section>
+  );
+}
+
+/** Engine calls: WASM boundary crossings per interaction. */
+function CrossingsSection({ workbench }: Readonly<{ workbench: PerformanceWorkbench }>) {
+  const { resourceDelta, handleCrossings, changedResourceOwners, latestCrossing } = workbench;
+
+  return (
+    <section aria-labelledby="crossing-title" className="sw-sp-section" id="wasm-crossings">
+      <p className="sw-sp-kicker">Engine calls</p>
+      <h2 id="crossing-title">Every call into the engine is counted.</h2>
+      <p>
+        Each control commits a real 20,000-cell edit and reads the engine's public counters before
+        and after it.
+      </p>
+      <details className="sw-sp-debug-disclosure" data-testid="scale-crossing-details">
+        <summary>
+          <span className="sw-sp-disclosure-copy">
+            <strong>Run raw mutation diagnostics</strong>
+            <small>20,000-cell transactions</small>
+          </span>
+          <span aria-hidden="true" className="sw-sp-disclosure-chevron">
+            ›
+          </span>
+        </summary>
+        <div className="sw-sp-console">
+          <div className="sw-sp-actions">
+            <button
+              data-testid="scale-crossings-values"
+              onClick={() => handleCrossings("values")}
+              type="button"
+            >
+              Commit 20,000 values
+            </button>
+            <button
+              data-testid="scale-crossings-styles"
+              onClick={() => handleCrossings("styles")}
+              type="button"
+            >
+              Style 20,000 cells
+            </button>
+          </div>
+          {latestCrossing && (
+            <dl className="sw-sp-operation" data-testid="scale-crossings-latest">
+              <div>
+                <dt>Cells</dt>
+                <dd>{latestCrossing.cells.toLocaleString()}</dd>
+              </div>
+              <div>
+                <dt>JS↔WASM calls</dt>
+                <dd data-testid="scale-crossings-ffi">{latestCrossing.ffiCalls}</dd>
+              </div>
+              <div>
+                <dt>Largest array</dt>
+                <dd>{latestCrossing.maxTransferredArrayLength.toLocaleString()}</dd>
+              </div>
+              <div>
+                <dt>Measured time</dt>
+                <dd>{latestCrossing.durationMs.toFixed(1)} ms</dd>
+              </div>
+            </dl>
+          )}
+          {resourceDelta && (
+            <div className="sw-sp-resource-delta" data-testid="scale-resource-delta">
+              <h3>
+                Retained owner delta: {resourceDelta.from} → {resourceDelta.to}
+              </h3>
+              {changedResourceOwners.length === 0 ? (
+                <p>No retained owner changed; existing capacity was reused.</p>
+              ) : (
+                <ul>
+                  {changedResourceOwners.map((owner) => (
+                    <li key={owner.owner}>
+                      <code>{owner.owner}</code>: logical {formatByteDelta(owner.logicalBytes)},
+                      allocated {formatByteDelta(owner.allocatedBytes)}, entries{" "}
+                      {owner.entries > 0 ? "+" : ""}
+                      {owner.entries.toLocaleString()}
                     </li>
                   ))}
-                </ol>
-                <p>
-                  Log₁₀ axis: 1× is the parity baseline; farther right means a larger measured
-                  ratio. Exact ratios remain labeled.{" "}
-                  {COMPARISON_EVIDENCE.sizes.at(-1)?.comparedScenarios} matched scenarios at the
-                  largest capture size.
-                </p>
-              </article>
-            )}
-
-            <div className="sw-sp-proof-wins" data-testid="scale-evidence-interaction">
-              {interactionWins.map((win) => (
-                <article key={win.label}>
-                  <span>{win.label}</span>
-                  <div className="sw-sp-proof-wins__value">
-                    <strong {...(win.testId ? { "data-testid": win.testId } : {})}>
-                      {win.value}
-                    </strong>
-                    {win.delta && (
-                      <span className="sw-sp-evidence-delta" data-direction={win.delta.direction}>
-                        {win.delta.text}
-                      </span>
-                    )}
-                  </div>
-                  <p>{win.note}</p>
-                </article>
-              ))}
-            </div>
-          </div>
-
-          <details className="sw-sp-proof-sources">
-            <summary>
-              <span className="sw-sp-disclosure-copy">
-                <strong>Inspect sources and methodology</strong>
-                <small>3 committed evidence files</small>
-              </span>
-              <span aria-hidden="true" className="sw-sp-disclosure-chevron">
-                ›
-              </span>
-            </summary>
-            <div className="sw-sp-proof-sources__body">
-              <section>
-                <p className="sw-sp-provenance" data-testid="scale-evidence-paged-provenance">
-                  <code>{PAGED_EVIDENCE.source}</code>
-                  <span>
-                    {PAGED_EVIDENCE.protocol} · {PAGED_EVIDENCE.rows.toLocaleString()} rows ×{" "}
-                    {PAGED_EVIDENCE.columns} columns · {PAGED_EVIDENCE.pageRows}-row pages
-                  </span>
-                </p>
-                <dl className="sw-sp-proof-distribution" data-testid="scale-evidence-paged">
-                  <div>
-                    <dt>Startup</dt>
-                    <dd>{PAGED_EVIDENCE.startup.medianMs.toFixed(2)} ms median</dd>
-                    <dd>{PAGED_EVIDENCE.startup.p95Ms.toFixed(2)} ms p95</dd>
-                  </div>
-                  <div>
-                    <dt>First page</dt>
-                    <dd>{PAGED_EVIDENCE.firstPage.medianMs.toFixed(2)} ms median</dd>
-                    <dd>{PAGED_EVIDENCE.firstPage.p95Ms.toFixed(2)} ms p95</dd>
-                  </div>
-                  <div>
-                    <dt>Distant page</dt>
-                    <dd>{PAGED_EVIDENCE.distantPage.medianMs.toFixed(2)} ms median</dd>
-                    <dd>{PAGED_EVIDENCE.distantPage.p95Ms.toFixed(2)} ms p95</dd>
-                  </div>
-                  <div>
-                    <dt>Peak allocated</dt>
-                    <dd>
-                      {formatBytes(PAGED_EVIDENCE.peakAllocatedBytes, { kib: 1, mib: 1, gib: 2 })}
-                    </dd>
-                  </div>
-                </dl>
-              </section>
-              <section>
-                <p className="sw-sp-provenance" data-testid="scale-evidence-interaction-provenance">
-                  <code>{INTERACTION_EVIDENCE.source}</code>
-                  <span>
-                    {INTERACTION_EVIDENCE.protocol} · {INTERACTION_EVIDENCE.capture.samples} samples
-                    · {INTERACTION_EVIDENCE.capture.browser} · commit{" "}
-                    {INTERACTION_EVIDENCE.capture.commit.slice(0, 10)}
-                  </span>
-                </p>
-              </section>
-              {COMPARISON_EVIDENCE.available && (
-                <section>
-                  <p className="sw-sp-provenance" data-testid="scale-evidence-compare-provenance">
-                    <code>{COMPARISON_EVIDENCE.source}</code>
-                    <span>
-                      {COMPARISON_EVIDENCE.capture.browser} · {COMPARISON_EVIDENCE.capture.rounds}{" "}
-                      rounds · commit {COMPARISON_EVIDENCE.capture.commit.slice(0, 10)}
-                    </span>
-                  </p>
-                </section>
+                </ul>
               )}
             </div>
-          </details>
+          )}
+        </div>
+      </details>
+    </section>
+  );
+}
 
-          <p className="sw-sp-note sw-sp-note--rule">
-            The live source adds a measured {PAGE_LATENCY_MS} ms delay after its first request so
-            loading remains observable. Live diagnostics and checked captures stay separate.
-          </p>
-        </section>
-      </main>
-    </div>
+/** Recorded evidence and the challenge form. */
+function EvidenceSection({ workbench }: Readonly<{ workbench: PerformanceWorkbench }>) {
+  const { interactionWins } = workbench;
+
+  return (
+    <section aria-labelledby="evidence-title" className="sw-sp-section sw-sp-proof" id="evidence">
+      <div className="sw-sp-proof-heading">
+        <div>
+          <p className="sw-sp-kicker">Benchmark</p>
+          <h2 id="evidence-title">The working set stays bounded as the address space grows.</h2>
+        </div>
+        <p>
+          The live Grid is the product proof. This secondary record answers one decision: repeated
+          measured runs did not require a resident billion-cell matrix.
+        </p>
+      </div>
+
+      <div className="sw-sp-proof-layout">
+        {COMPARISON_EVIDENCE.available && (
+          <article className="sw-sp-scale-curve" data-testid="scale-evidence-compare">
+            <header>
+              <p>Scenario median</p>
+              <strong>
+                {COMPARISON_EVIDENCE.sizes[COMPARISON_EVIDENCE.sizes.length - 1]?.medianRatio}×
+              </strong>
+              <span>at one million rows</span>
+            </header>
+            <div aria-hidden="true" className="sw-sp-scale-curve__axis">
+              <span />
+              <div>
+                {COMPARISON_LOG_TICKS.map((tick) => (
+                  <span key={tick}>{tick.toLocaleString()}×</span>
+                ))}
+              </div>
+              <span>log₁₀</span>
+            </div>
+            <ol aria-label="Median comparison ratio by row count, logarithmic scale">
+              {COMPARISON_EVIDENCE.sizes.map((size) => (
+                <li key={size.size}>
+                  <span>{size.size.toLocaleString()}</span>
+                  <span className="sw-sp-scale-curve__track">
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        width: `${comparisonLogPercent(size.medianRatio)}%`,
+                      }}
+                    />
+                  </span>
+                  <strong>{size.medianRatio.toFixed(1)}×</strong>
+                </li>
+              ))}
+            </ol>
+            <p>
+              Log₁₀ axis: 1× is the parity baseline; farther right means a larger measured ratio.
+              Exact ratios remain labeled. {COMPARISON_EVIDENCE.sizes.at(-1)?.comparedScenarios}{" "}
+              matched scenarios at the largest capture size.
+            </p>
+          </article>
+        )}
+
+        <div className="sw-sp-proof-wins" data-testid="scale-evidence-interaction">
+          {interactionWins.map((win) => (
+            <article key={win.label}>
+              <span>{win.label}</span>
+              <div className="sw-sp-proof-wins__value">
+                <strong {...(win.testId ? { "data-testid": win.testId } : {})}>{win.value}</strong>
+                {win.delta && (
+                  <span className="sw-sp-evidence-delta" data-direction={win.delta.direction}>
+                    {win.delta.text}
+                  </span>
+                )}
+              </div>
+              <p>{win.note}</p>
+            </article>
+          ))}
+        </div>
+      </div>
+
+      <details className="sw-sp-proof-sources">
+        <summary>
+          <span className="sw-sp-disclosure-copy">
+            <strong>Inspect sources and methodology</strong>
+            <small>3 committed evidence files</small>
+          </span>
+          <span aria-hidden="true" className="sw-sp-disclosure-chevron">
+            ›
+          </span>
+        </summary>
+        <div className="sw-sp-proof-sources__body">
+          <section>
+            <p className="sw-sp-provenance" data-testid="scale-evidence-paged-provenance">
+              <code>{PAGED_EVIDENCE.source}</code>
+              <span>
+                {PAGED_EVIDENCE.protocol} · {PAGED_EVIDENCE.rows.toLocaleString()} rows ×{" "}
+                {PAGED_EVIDENCE.columns} columns · {PAGED_EVIDENCE.pageRows}-row pages
+              </span>
+            </p>
+            <dl className="sw-sp-proof-distribution" data-testid="scale-evidence-paged">
+              <div>
+                <dt>Startup</dt>
+                <dd>{PAGED_EVIDENCE.startup.medianMs.toFixed(2)} ms median</dd>
+                <dd>{PAGED_EVIDENCE.startup.p95Ms.toFixed(2)} ms p95</dd>
+              </div>
+              <div>
+                <dt>First page</dt>
+                <dd>{PAGED_EVIDENCE.firstPage.medianMs.toFixed(2)} ms median</dd>
+                <dd>{PAGED_EVIDENCE.firstPage.p95Ms.toFixed(2)} ms p95</dd>
+              </div>
+              <div>
+                <dt>Distant page</dt>
+                <dd>{PAGED_EVIDENCE.distantPage.medianMs.toFixed(2)} ms median</dd>
+                <dd>{PAGED_EVIDENCE.distantPage.p95Ms.toFixed(2)} ms p95</dd>
+              </div>
+              <div>
+                <dt>Peak allocated</dt>
+                <dd>
+                  {formatBytes(PAGED_EVIDENCE.peakAllocatedBytes, { kib: 1, mib: 1, gib: 2 })}
+                </dd>
+              </div>
+            </dl>
+          </section>
+          <section>
+            <p className="sw-sp-provenance" data-testid="scale-evidence-interaction-provenance">
+              <code>{INTERACTION_EVIDENCE.source}</code>
+              <span>
+                {INTERACTION_EVIDENCE.protocol} · {INTERACTION_EVIDENCE.capture.samples} samples ·{" "}
+                {INTERACTION_EVIDENCE.capture.browser} · commit{" "}
+                {INTERACTION_EVIDENCE.capture.commit.slice(0, 10)}
+              </span>
+            </p>
+          </section>
+          {COMPARISON_EVIDENCE.available && (
+            <section>
+              <p className="sw-sp-provenance" data-testid="scale-evidence-compare-provenance">
+                <code>{COMPARISON_EVIDENCE.source}</code>
+                <span>
+                  {COMPARISON_EVIDENCE.capture.browser} · {COMPARISON_EVIDENCE.capture.rounds}{" "}
+                  rounds · commit {COMPARISON_EVIDENCE.capture.commit.slice(0, 10)}
+                </span>
+              </p>
+            </section>
+          )}
+        </div>
+      </details>
+
+      <p className="sw-sp-note sw-sp-note--rule">
+        The live source adds a measured {PAGE_LATENCY_MS} ms delay after its first request so
+        loading remains observable. Live diagnostics and checked captures stay separate.
+      </p>
+    </section>
   );
 }

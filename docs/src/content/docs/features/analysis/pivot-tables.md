@@ -114,6 +114,8 @@ sheet or a cell. Then the field list opens in the side panel.
 - Each change is one undo step. Select a cell in a pivot's output, or
   right-click it and choose **PivotTable Fields**, to open its field list again.
   Hosts can do the same with `grid.actions.showPivotFields()`.
+- A pivot over a table also lists the columns of related tables. See
+  [Pivots across related tables](/docs/features/analysis/data-model/#pivots-across-related-tables).
 
 With the default engine, **Insert › PivotTable** is disabled, and its tooltip
 says that pivot tables need the full engine.

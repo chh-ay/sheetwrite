@@ -8,7 +8,7 @@ description: "HistorySnapshotProvider type in @sheetwrite/core/history: Snapshot
 Snapshot provider invoked only when a checkpoint is due. Must describe the committed head.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/types.ts#L185"><code>packages/core/src/version-history/types.ts#L185</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/types.ts#L192"><code>packages/core/src/version-history/types.ts#L192</code></a></dd></div>
 </dl>
 
 ## Declaration

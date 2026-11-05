@@ -160,6 +160,8 @@ import {
   permutedNotes,
   type SortRangePlan,
   tablesAllowRowMove,
+  tableSortState,
+  tableWithBody,
 } from "./permute-rows.js";
 import {
   integerAt,
@@ -1538,6 +1540,47 @@ export class StoreDataEngine {
     return history;
   }
 
+  /**
+   * Engine transfer bytes of one rectangle: source kinds, payloads, style IDs,
+   * strings and formula sources, with no JavaScript object per cell. The
+   * history diff kernel reads them; the engine copy is freed before return.
+   */
+  captureRangeTransfer(input: Range): Uint8Array | null {
+    const range = normalizedRange(input);
+    const sheet = this.sheetMeta(range.sheet);
+    if (
+      range.start.row < 0 ||
+      range.start.col < 0 ||
+      range.end.row >= sheet.rowCount ||
+      range.end.col >= sheet.columns.length
+    ) {
+      return null;
+    }
+
+    const handle = this.handleOf(range.sheet);
+    const resource = this.wasm.captureRange(
+      handle,
+      range.start.row,
+      range.start.col,
+      range.end.row - range.start.row + 1,
+      range.end.col - range.start.col + 1,
+    );
+    if (!resource) {
+      return null;
+    }
+
+    try {
+      return resource.exportMemoryState(handle);
+    } finally {
+      resource.free();
+    }
+  }
+
+  /** Style of each store style ID, as stored in cells; ID 0 is the empty style. */
+  styleTable(): readonly CellStyle[] {
+    return this.styles.table;
+  }
+
   getWorkbook(): Workbook {
     return this.workbook;
   }
@@ -2140,23 +2183,35 @@ export class StoreDataEngine {
     for (let offset = 0; offset < order.length; offset++) order[offset] = offset;
     for (const [position, target] of starts.entries()) {
       const source = sorted[position] ?? target;
-      for (let row = 0; row < height; row++)
+      for (let row = 0; row < height; row++) {
         order[target - dataStart + row] = source - dataStart + row;
+      }
     }
 
-    return {
-      kind: "move",
-      operation: {
-        op: "permuteRows",
-        range: {
-          sheet: bounds.sheet,
-          start: { row: dataStart, col: bounds.start.col },
-          end: { row: bounds.end.row, col: bounds.end.col },
-        },
-        encoding: ROW_ORDER_ENCODING,
-        order: encodeRowOrder(order),
-      },
+    const sortedRange: Range = {
+      sheet: bounds.sheet,
+      start: { row: dataStart, col: bounds.start.col },
+      end: { row: bounds.end.row, col: bounds.end.col },
     };
+    const permute: PermuteRowsOperation = {
+      op: "permuteRows",
+      range: sortedRange,
+      encoding: ROW_ORDER_ENCODING,
+      order: encodeRowOrder(order),
+    };
+    const table = tableWithBody(sheet.tables ?? [], sortedRange);
+    const operations: DocumentOp[] = table
+      ? [
+          permute,
+          {
+            op: "updateTable",
+            sheet: bounds.sheet,
+            tableId: table.id,
+            patch: { sortState: tableSortState(sortedRange, keys) },
+          },
+        ]
+      : [permute];
+    return { kind: "move", operations };
   }
 
   /**
@@ -4216,6 +4271,7 @@ export class StoreDataEngine {
       protectedRanges: cloneJsonValue(snapshot.protectedRanges),
       notes: cloneJsonValue(snapshot.notes),
       sortKeys: cloneJsonValue(snapshot.sortKeys),
+      sortState: cloneJsonValue(snapshot.sortState),
       filters: cloneJsonValue(snapshot.filters),
       rowGroups: snapshot.rowGroups?.map((group) => ({ ...group })),
       tables: structuredClone(snapshot.tables),

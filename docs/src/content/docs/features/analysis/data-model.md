@@ -92,6 +92,8 @@ A relationship refers to tables and columns by their stable IDs, so renames, col
 
 Removing a table or a column keeps the relationships that refer to it, and undo restores a working model.
 
+A [query](/docs/api/queries/) refresh keeps the ID and column IDs of its output table, so relationships to that table stay. Pivots over related tables update in the same undo step as the refresh.
+
 ## Undo and collaboration
 
 `setRelationship` and `removeRelationship` are document operations. Each change is one undo step, and it is saved and synchronized like other workbook metadata. Two concurrent relationship changes conflict, because the rules apply to the whole model. A pending relationship also conflicts with a concurrent change to one of its tables, or with the removal of a sheet.
@@ -148,6 +150,8 @@ The result equals a pivot over the table you get by looking up each related colu
 | The many-side key is an error | That error |
 
 A duplicate one-side key or a key type mismatch shows `#VALUE!` at the anchor. A missing table, column or relationship shows `#REF!`. The default engine keeps and syncs model pivots but does not compute them. XLSX export keeps them in Sheetwrite metadata, because Excel needs its own data-model binary for a model pivot.
+
+In the pivot field list, a pivot over a table shows a **Related** section for each table that its table reaches through relationships. The actions menu of a related column adds it to an area. A table source then becomes a model source whose first fields are the table's columns, so the fields in use keep their indices. This is one undo step. The field list names a related field with its table, for example `Customers › Region`.
 
 ## XLSX files
 

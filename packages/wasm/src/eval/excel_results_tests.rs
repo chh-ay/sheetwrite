@@ -133,6 +133,61 @@ fn legacy_statistics_names_read_references_as_their_successors() {
     ]);
 }
 
+/// The byte functions count one byte per character; ASC and DBCS change
+/// character width; BAHTTEXT shows the example of its Microsoft page.
+#[cfg(feature = "analysis")]
+#[test]
+fn byte_width_and_baht_functions_read_cells() {
+    assert_results(&[
+        ("=LENB(Data!D2)", "1"),
+        ("=LEFTB(Data!A3&\"ab\",2)", "3a"),
+        ("=FINDB(\"x\",Data!D2)", "1"),
+        ("=DBCS(Data!D2)", "ｘ"),
+        ("=ASC(DBCS(Data!D2&Data!A1))", "x1"),
+        ("=BAHTTEXT(1234)", "หนึ่งพันสองร้อยสามสิบสี่บาทถ้วน"),
+    ]);
+}
+
+/// The examples of the ERROR.TYPE, ISEVEN, ISODD, SHEET and SHEETS pages on
+/// Microsoft Support, and the IS functions page for ISNONTEXT and ISREF.
+#[test]
+fn information_functions_follow_the_microsoft_examples() {
+    assert_results(&[
+        ("=ERROR.TYPE(1/0)", "2"),
+        ("=ERROR.TYPE(NA())", "7"),
+        ("=ERROR.TYPE(Data!A1)", "#N/A"),
+        ("=ISEVEN(-1)", "FALSE"),
+        ("=ISEVEN(2.5)", "TRUE"),
+        ("=ISEVEN(5)", "FALSE"),
+        ("=ISEVEN(0)", "TRUE"),
+        ("=ISEVEN(DATE(2011,12,23))", "TRUE"),
+        ("=ISODD(-1)", "TRUE"),
+        ("=ISODD(2.5)", "FALSE"),
+        ("=ISODD(5)", "TRUE"),
+        ("=ISEVEN(TRUE)", "#VALUE!"),
+        ("=ISNONTEXT(Data!F1)", "TRUE"),
+        ("=ISNONTEXT(Data!D2)", "FALSE"),
+        ("=ISNONTEXT(1/0)", "TRUE"),
+        ("=ISREF(Data!A1)", "TRUE"),
+        ("=ISREF(Data!A1:B2)", "TRUE"),
+        ("=ISREF(INDIRECT(\"Data!A1\"))", "TRUE"),
+        ("=ISREF(1)", "FALSE"),
+        ("=ISREF(\"A1\")", "FALSE"),
+        ("=SHEET()", "1"),
+        ("=SHEET(Data!A1)", "2"),
+        ("=SHEET(\"data\")", "2"),
+        ("=SHEET(\"Missing\")", "#N/A"),
+        ("=SHEETS()", "2"),
+        ("=SHEETS(Data!A1)", "1"),
+        ("=SHEETS(Report:Data!A1)", "2"),
+        ("=INFO(\"numfile\")", "2"),
+        ("=INFO(\"RECALC\")", "Automatic"),
+        ("=INFO(\"osversion\")", "#N/A"),
+        ("=INFO(\"memavail\")", "#N/A"),
+        ("=INFO(\"colour\")", "#VALUE!"),
+    ]);
+}
+
 #[cfg(feature = "analysis")]
 #[test]
 fn financial_functions_read_cells_text_dates_and_blanks() {
@@ -152,6 +207,30 @@ fn financial_functions_read_cells_text_dates_and_blanks() {
             "180",
         ),
         ("=COUPPCD(\"2011-01-25\",\"2011-11-15\",2,1)", "40497"),
+    ]);
+}
+
+#[test]
+fn trigonometry_and_numeral_functions_read_cells() {
+    assert_results(&[
+        ("=DEGREES(ATAN2(Data!A1,Data!A1))", "45"),
+        ("=SIN(Data!F1)", "0"),
+        ("=COS(Data!F1)", "1"),
+        ("=ROMAN(Data!B3*10+Data!A3)", "CCCIII"),
+        ("=ARABIC(ROMAN(1999,4))", "1999"),
+        ("=BASE(Data!B2,16,4)", "0014"),
+        ("=DECIMAL(\"ff\",Data!A2*8)", "255"),
+        ("=CEILING.PRECISE(-Data!A3-0.5,Data!A2)", "-2"),
+    ]);
+}
+
+#[test]
+fn counted_statistics_read_text_and_logical_values() {
+    assert_results(&[
+        ("=AVERAGEA(Data!D1:D3)", "2.5"),
+        ("=MAXA(Data!D2,-1)", "0"),
+        ("=VARPA(Data!A1:A3,TRUE)", "0.6875"),
+        ("=ROUND(STDEVA(\"2\",4),6)", "1.414214"),
     ]);
 }
 

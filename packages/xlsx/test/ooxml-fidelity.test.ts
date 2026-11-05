@@ -480,7 +480,8 @@ describe("raw spec-authored OOXML fidelity", () => {
     );
     expect(imported.sheets[0]!.filters).toBeUndefined();
     expect(imported.sheets[0]!.protectedRanges).toBeUndefined();
-    expect(imported.sheets[0]!.sortKeys).toEqual([{ col: 0, ascending: false }]);
+    expect(imported.sheets[0]?.sortKeys).toBeUndefined();
+    expect(imported.sheets[0]?.sortState?.attributes.ref).toBe("A1:A2");
     expect(warnings).toEqual([
       expect.objectContaining({ code: "unsupported-feature", sheet: "Raw" }),
       expect.objectContaining({ code: "unsupported-feature", sheet: "Raw" }),
