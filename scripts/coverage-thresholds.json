@@ -49,6 +49,10 @@
       "reason": "Type-only modules are verified by package and consumer typechecks"
     },
     {
+      "path": "packages/core/src/types/data-model.ts",
+      "reason": "Type-only modules are verified by package and consumer typechecks"
+    },
+    {
       "path": "packages/core/src/types/document.ts",
       "reason": "Type-only modules are verified by package and consumer typechecks"
     },

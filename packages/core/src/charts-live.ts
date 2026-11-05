@@ -464,6 +464,11 @@ function classifyPatch(patch: DocumentOp, context: PatchContext): void {
       // Presentation metadata does not change canonical source values.
       return;
 
+    case "setRelationship":
+    case "removeRelationship":
+      // A relationship is a link between tables; it writes no cell.
+      return;
+
     default: {
       const unhandled: never = patch;
       return unhandled;

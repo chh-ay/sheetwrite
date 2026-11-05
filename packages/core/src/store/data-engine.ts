@@ -14,6 +14,13 @@ import {
 } from "../chart-definition.js";
 import { capturedClearCells } from "../clear-capture.js";
 import { validConditionalRules } from "../conditional-format.js";
+import {
+  type DataModelIssue,
+  findRelationship,
+  validateRelationshipAdmission,
+  withoutRelationship,
+  withRelationship,
+} from "../data-model.js";
 import { dateToSerial } from "../date-serial.js";
 import { isValidCalculationSettings, storedCalculationSettings } from "../document-protocol.js";
 import { ENGINE_LOAD_HINT, getEngine, isEngineLoaded as isLoaded } from "../engine.js";
@@ -2375,6 +2382,8 @@ export class StoreDataEngine {
           patch.op !== "setNamedRange" &&
           patch.op !== "removeNamedRange" &&
           patch.op !== "setCalculation" &&
+          patch.op !== "setRelationship" &&
+          patch.op !== "removeRelationship" &&
           patch.op !== "removeSheet"
         ) {
           touchedSheets.add(patch.op === "addSheet" ? patch.sheet.id : patch.sheet);
@@ -3325,6 +3334,25 @@ export class StoreDataEngine {
       case "setCalculation": {
         if (!this.syncCalculation(patch.calculation)) return false;
         this.workbook.calculation = storedCalculationSettings(patch.calculation);
+        return true;
+      }
+
+      case "setRelationship": {
+        const issues: DataModelIssue[] = [];
+        validateRelationshipAdmission(
+          patch.relationship,
+          this.workbook.dataModel,
+          this.workbook.sheets,
+          issues,
+        );
+        if (issues.length > 0) return false;
+        this.workbook.dataModel = withRelationship(this.workbook.dataModel, patch.relationship);
+        return true;
+      }
+
+      case "removeRelationship": {
+        if (!findRelationship(this.workbook.dataModel, patch.id)) return false;
+        this.workbook.dataModel = withoutRelationship(this.workbook.dataModel, patch.id);
         return true;
       }
     }

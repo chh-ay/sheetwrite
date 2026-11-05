@@ -8,7 +8,7 @@ description: "API reference for @sheetwrite/core."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/index.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>379</dd></div>
+<div><dt>Exports</dt><dd>382</dd></div>
 </dl>
 
 Source entry: `packages/core/src/index.ts`
@@ -114,7 +114,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/workbook-table-name-key/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>workbookTableNameKey</code></span><span class="api-symbol-card__desc">Locale-independent key used for table and table-column collision checks.</span></a>
 </div>
 
-### Interfaces <span class="api-count" data-pagefind-ignore>166</span>
+### Interfaces <span class="api-count" data-pagefind-ignore>169</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/boundary-operation-stats/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>BoundaryOperationStats</code></span><span class="api-symbol-card__desc">Fixed-cardinality boundary crossing counters for one operation.</span></a>
@@ -156,6 +156,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/conditional-format-rule/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>ConditionalFormatRule</code></span><span class="api-symbol-card__desc">Ordered condition and style applied to a cell range.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/context-menu-context/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>ContextMenuContext</code></span><span class="api-symbol-card__desc">Cell and viewport coordinates resolved for one bundled context-menu opening.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/context-menu-item/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>ContextMenuItem</code></span><span class="api-symbol-card__desc">Built-in, separator, or custom callback row in the right-click menu.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/data-model/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>DataModel</code></span><span class="api-symbol-card__desc">The workbook's data model.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/data-source/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>DataSource</code></span><span class="api-symbol-card__desc">Host callback that asynchronously loads cancellable rectangular pages.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/data-source-capabilities/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>DataSourceCapabilities</code></span><span class="api-symbol-card__desc">Declares whether a source can load only the requested column runs.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/data-source-column-band/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>DataSourceColumnBand</code></span><span class="api-symbol-card__desc">One half-open run of workbook columns, in stable sheet order.</span></a>
@@ -255,6 +256,8 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/sync-pending-queue-limits/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>SyncPendingQueueLimits</code></span><span class="api-symbol-card__desc">Aggregate ceilings for local commits retained until durable acknowledgement.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/sync-state-snapshot/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>SyncStateSnapshot</code></span><span class="api-symbol-card__desc">Immutable observable synchronization state.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/sync-version-gap-request/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>SyncVersionGapRequest</code></span><span class="api-symbol-card__desc">Contiguous-version recovery request produced when remote input skips ahead.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/table-column-ref/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>TableColumnRef</code></span><span class="api-symbol-card__desc">One column of a workbook table, by stable IDs that survive renames and moves.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/table-relationship/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>TableRelationship</code></span><span class="api-symbol-card__desc">One-to-many link between two workbook tables with a single key column on each side.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/theme/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>Theme</code></span><span class="api-symbol-card__desc">Resolved canvas colors, typography, and geometry used for painting.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/toolbar-item/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>ToolbarItem</code></span><span class="api-symbol-card__desc">Built-in, separator, or custom callback item in the grid toolbar.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/transaction/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>Transaction</code></span><span class="api-symbol-card__desc">Low-level Store transaction.</span></a>
