@@ -38,9 +38,11 @@ export function decodeWorkbookSnapshot(
     // The engine copies non-default settings and drops defaults, so re-encoding never grows the snapshot.
     calculation: snapshot.workbook.calculation,
     // An empty model and no model are the same document, so only a non-empty one is kept.
-    dataModel: snapshot.workbook.dataModel?.relationships.length
-      ? cloneJsonValue(snapshot.workbook.dataModel)
-      : undefined,
+    dataModel:
+      snapshot.workbook.dataModel?.relationships.length ||
+      snapshot.workbook.dataModel?.measures?.length
+        ? cloneJsonValue(snapshot.workbook.dataModel)
+        : undefined,
     // No queries and an empty list are the same document, so only a non-empty list is kept.
     queries: snapshot.workbook.queries?.length
       ? cloneJsonValue(snapshot.workbook.queries)

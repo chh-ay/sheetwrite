@@ -419,6 +419,8 @@ export type {
   SyncMutationStatus,
   TableColumnRef,
   TableRelationship,
+  Measure,
+  MeasureStatus,
   Theme,
   ToolbarActionName,
   ToolbarIcon,
