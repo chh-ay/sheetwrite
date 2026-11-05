@@ -17,7 +17,8 @@ import {
   posix,
   repositoryRoot,
 } from "./docs-shared.js";
-import { fenceBlocks } from "./markdown-fences.js";
+import { headingAnchors } from "./markdown-anchors.js";
+import { fenceBlocks, maskFences } from "./markdown-fences.js";
 import type { PublicApiManifest } from "./public-api.js";
 
 interface SiteLink {
@@ -174,17 +175,6 @@ function fenceMetaValue(meta: string, name: string): string | undefined {
   return match?.[1] ?? match?.[2];
 }
 
-/** Blanks every fenced block, keeping line breaks so line numbers still match. */
-function maskFences(content: string): string {
-  const lines = content.split("\n");
-  for (const block of fenceBlocks(lines)) {
-    for (let index = block.start; index <= block.end; index += 1) {
-      lines[index] = " ".repeat(lines[index]?.length ?? 0);
-    }
-  }
-  return lines.join("\n");
-}
-
 function maskCode(content: string): string {
   return maskFences(content).replace(/`[^`\n]*`/g, (code) => " ".repeat(code.length));
 }
@@ -197,43 +187,6 @@ export function contentPathForRoute(
   return documents.find(
     (document) => routeForContentPath(contentRoot, document.path) === normalizedRoute,
   )?.path;
-}
-
-/**
- * Every fragment the site gives a page. Explicit `id` attributes keep their
- * value. Headings get the slug of their text, and a repeated slug gets `-1`,
- * `-2` and so on in page order, as `rehype-slug` (github-slugger) does in
- * `docs/vite.config.ts`.
- */
-export function headingAnchors(content: string): Set<string> {
-  const anchors = new Set<string>();
-  const occurrences = new Map<string, number>();
-  for (const line of maskFences(content).split("\n")) {
-    const explicit = /<[a-z][^>]*\sid=["']([^"']+)["']/i.exec(line);
-    if (explicit !== null) anchors.add(explicit[1] ?? "");
-    const heading =
-      /^#{1,6}\s+(.+?)\s*$/.exec(line)?.[1] ??
-      (explicit === null ? /<h[1-6](?:\s[^>]*)?>(.*?)<\/h[1-6]>/i.exec(line)?.[1] : undefined);
-    if (heading === undefined) continue;
-
-    const base = heading
-      .replace(/<[^>]+>/g, "")
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-      .replace(/[`*_~]/g, "")
-      .trim()
-      .toLowerCase()
-      .replace(/[^\p{L}\p{N}\s-]/gu, "")
-      .replace(/\s/g, "-");
-    let slug = base;
-    while (occurrences.has(slug)) {
-      const count = (occurrences.get(base) ?? 0) + 1;
-      occurrences.set(base, count);
-      slug = `${base}-${count}`;
-    }
-    occurrences.set(slug, 0);
-    if (slug.length > 0) anchors.add(slug);
-  }
-  return anchors;
 }
 
 function packageAndSubpath(
@@ -418,6 +371,8 @@ export async function validateMarkdown(
   const failures: string[] = [];
   const hoverAnalyzer = new SheetwriteTypeEngine({ cwd: join(repositoryRoot, "docs") });
   const compiled: Array<{ document: MarkdownDocument; fence: Fence }> = [];
+  // Generated pages are checked as rendered, before any copy is on disk.
+  const documentPaths = new Set(documents.map((document) => document.path));
   for (const document of documents) {
     let fences: Fence[];
     try {
@@ -515,7 +470,10 @@ export async function validateMarkdown(
           targetPath = `${targetPath}.md`;
         }
       }
-      if (targetPath === undefined || !(await exists(targetPath))) {
+      if (
+        targetPath === undefined ||
+        (!documentPaths.has(targetPath) && !(await exists(targetPath)))
+      ) {
         failures.push(
           `${posix(relative(repositoryRoot, document.path))} links missing target ${rawTarget}`,
         );

@@ -39,3 +39,14 @@ export function fenceBlocks(lines: readonly string[]): FenceBlock[] {
   }
   return blocks;
 }
+
+/** Blanks every fenced block, keeping line breaks so line numbers still match. */
+export function maskFences(content: string): string {
+  const lines = content.split("\n");
+  for (const block of fenceBlocks(lines)) {
+    for (let index = block.start; index <= block.end; index += 1) {
+      lines[index] = " ".repeat(lines[index]?.length ?? 0);
+    }
+  }
+  return lines.join("\n");
+}
