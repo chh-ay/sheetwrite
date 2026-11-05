@@ -3769,7 +3769,7 @@ export class GridImpl implements Grid {
       return { status: "rejected", epoch: this.storeEpoch, issues: [issue] };
     }
 
-    return this.document.commit([plan.operation], "sort");
+    return this.document.commit(plan.operations, "sort");
   }
 
   /**

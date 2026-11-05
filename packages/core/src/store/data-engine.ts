@@ -160,6 +160,8 @@ import {
   permutedNotes,
   type SortRangePlan,
   tablesAllowRowMove,
+  tableSortState,
+  tableWithBody,
 } from "./permute-rows.js";
 import {
   integerAt,
@@ -2181,23 +2183,35 @@ export class StoreDataEngine {
     for (let offset = 0; offset < order.length; offset++) order[offset] = offset;
     for (const [position, target] of starts.entries()) {
       const source = sorted[position] ?? target;
-      for (let row = 0; row < height; row++)
+      for (let row = 0; row < height; row++) {
         order[target - dataStart + row] = source - dataStart + row;
+      }
     }
 
-    return {
-      kind: "move",
-      operation: {
-        op: "permuteRows",
-        range: {
-          sheet: bounds.sheet,
-          start: { row: dataStart, col: bounds.start.col },
-          end: { row: bounds.end.row, col: bounds.end.col },
-        },
-        encoding: ROW_ORDER_ENCODING,
-        order: encodeRowOrder(order),
-      },
+    const sortedRange: Range = {
+      sheet: bounds.sheet,
+      start: { row: dataStart, col: bounds.start.col },
+      end: { row: bounds.end.row, col: bounds.end.col },
     };
+    const permute: PermuteRowsOperation = {
+      op: "permuteRows",
+      range: sortedRange,
+      encoding: ROW_ORDER_ENCODING,
+      order: encodeRowOrder(order),
+    };
+    const table = tableWithBody(sheet.tables ?? [], sortedRange);
+    const operations: DocumentOp[] = table
+      ? [
+          permute,
+          {
+            op: "updateTable",
+            sheet: bounds.sheet,
+            tableId: table.id,
+            patch: { sortState: tableSortState(sortedRange, keys) },
+          },
+        ]
+      : [permute];
+    return { kind: "move", operations };
   }
 
   /**
@@ -4257,6 +4271,7 @@ export class StoreDataEngine {
       protectedRanges: cloneJsonValue(snapshot.protectedRanges),
       notes: cloneJsonValue(snapshot.notes),
       sortKeys: cloneJsonValue(snapshot.sortKeys),
+      sortState: cloneJsonValue(snapshot.sortState),
       filters: cloneJsonValue(snapshot.filters),
       rowGroups: snapshot.rowGroups?.map((group) => ({ ...group })),
       tables: structuredClone(snapshot.tables),

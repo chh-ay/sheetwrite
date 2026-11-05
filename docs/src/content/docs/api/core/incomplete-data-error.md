@@ -8,7 +8,7 @@ description: "IncompleteDataError class in @sheetwrite/core: Error thrown when a
 Error thrown when an operation requires datasource cells that are not loaded.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/store/data-engine.ts#L447"><code>packages/core/src/store/data-engine.ts#L447</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/store/data-engine.ts#L449"><code>packages/core/src/store/data-engine.ts#L449</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>
