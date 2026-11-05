@@ -1478,6 +1478,12 @@ fn getpivotdata_reads_the_value_cell_of_the_named_items() {
             "=GETPIVOTDATA(\"Sales\",Output!A1,\"Quarter\",2,\"Region\",1)",
             16.0,
         ),
+        // A date item is its serial: 1900-01-02 is 2, so quarter 2 is
+        // 2 + 5 + 8 + 11.
+        (
+            "=GETPIVOTDATA(\"Sales\",Output!A1,\"Quarter\",DATE(1900,1,2))",
+            26.0,
+        ),
     ];
 
     for &(formula, expected) in cases {
