@@ -8,7 +8,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::cells::{dense_resolved, payload_num, payload_str_id, source_kind, CellRun};
 use crate::sheet::{formula_error_at, SheetData};
-use crate::sort_text::compare_sort_text;
+use crate::sort_text::push_collation_key;
 use crate::store::CellStore;
 use crate::types::{
     cell_key, string_from_pool_ref, CellKey, FormulaError, FormulaValueKind, StringStorage,
@@ -532,7 +532,7 @@ impl CellStore {
         // (one pool deref per row) instead of rebuilding both operands inside
         // the comparator — a comparison sort would otherwise reconstruct keys
         // ~2·n·log2(n) times, each a scattered heap deref for text cells.
-        let mut keys: Vec<ComparableCell> = Vec::with_capacity(s.cells.row_count());
+        let mut keys = SortKeys::with_capacity(s.cells.row_count());
         let mut start = base;
         let end = base + s.cells.row_count();
         while start < end {
@@ -545,12 +545,7 @@ impl CellStore {
 
         let mut order: Vec<u32> = (0..s.cells.row_count() as u32).collect();
         order.sort_unstable_by(|&a, &b| {
-            // SAFETY: `order` holds only rows from `0..row_count` and `keys`
-            // has exactly `row_count` entries.
-            let ka = unsafe { keys.get_unchecked(a as usize) };
-            // SAFETY: as above.
-            let kb = unsafe { keys.get_unchecked(b as usize) };
-            let ord = ka.sort_cmp(kb, ascending);
+            let ord = keys.compare(a as usize, b as usize, ascending);
             if ord == Ordering::Equal {
                 a.cmp(&b)
             } else {
@@ -602,7 +597,7 @@ impl CellStore {
         // key ~2·n·log2(n) times, and a text key costs a scattered pool deref
         // every time. Keys are stored key-major so the first key — the one that
         // decides nearly every comparison — stays contiguous.
-        let mut keys: Vec<ComparableCell<'_>> = Vec::with_capacity(row_count * cols.len());
+        let mut keys = SortKeys::with_capacity(row_count * cols.len());
         for &col in cols {
             let base = col as usize * data.cells.row_count();
 
@@ -621,9 +616,11 @@ impl CellStore {
         // NaN keys compare equal to other numeric keys; a stable sort preserves ties.
         positions.sort_by(|&left, &right| {
             for key in 0..cols.len() {
-                let a = &keys[key * row_count + left as usize];
-                let b = &keys[key * row_count + right as usize];
-                let order = a.sort_cmp(b, ascending.get(key).copied().unwrap_or(1) != 0);
+                let order = keys.compare(
+                    key * row_count + left as usize,
+                    key * row_count + right as usize,
+                    ascending.get(key).copied().unwrap_or(1) != 0,
+                );
                 if order != Ordering::Equal {
                     return order;
                 }
@@ -1546,36 +1543,115 @@ impl<'a> ComparableCell<'a> {
     }
 }
 
-impl ComparableCell<'_> {
-    /// Excel's sort order: numbers, text, `FALSE` before `TRUE`, then errors,
-    /// which are all equal. A descending sort reverses this order, but blank
-    /// cells are last in both directions.
-    pub(crate) fn sort_cmp(&self, other: &Self, ascending: bool) -> Ordering {
-        match (self, other) {
-            (ComparableCell::Empty, ComparableCell::Empty) => Ordering::Equal,
-            (ComparableCell::Empty, _) => Ordering::Greater,
-            (_, ComparableCell::Empty) => Ordering::Less,
-            _ if ascending => self.ascending_cmp(other),
-            _ => other.ascending_cmp(self),
-        }
-    }
+/// One decorated sort key. Text holds the span of its collation key in the
+/// arena of its [`SortKeys`].
+#[derive(Clone, Copy)]
+enum SortKey {
+    Number(OrderedNumber),
+    Text {
+        start: u32,
+        end: u32,
+        has_hyphen: bool,
+    },
+    Bool(bool),
+    Error,
+    Empty,
+}
 
-    fn ascending_cmp(&self, other: &Self) -> Ordering {
-        match (self, other) {
-            (ComparableCell::Number(a), ComparableCell::Number(b)) => a.cmp(b),
-            (ComparableCell::Text(a), ComparableCell::Text(b)) => compare_sort_text(a, b),
-            (ComparableCell::Bool(a), ComparableCell::Bool(b)) => a.cmp(b),
-            _ => self.type_rank().cmp(&other.type_rank()),
-        }
-    }
-
-    fn type_rank(&self) -> u8 {
+impl SortKey {
+    fn type_rank(self) -> u8 {
         match self {
-            ComparableCell::Number(_) => 0,
-            ComparableCell::Text(_) => 1,
-            ComparableCell::Bool(_) => 2,
-            ComparableCell::Error => 3,
-            ComparableCell::Empty => 4,
+            SortKey::Number(_) => 0,
+            SortKey::Text { .. } => 1,
+            SortKey::Bool(_) => 2,
+            SortKey::Error => 3,
+            SortKey::Empty => 4,
+        }
+    }
+}
+
+/// Sort keys decorated once per row. Text is collated a single time into one
+/// flat byte arena, so a comparison is a plain byte comparison of two slices
+/// and the sort holds no per-row heap objects.
+pub(crate) struct SortKeys {
+    keys: Vec<SortKey>,
+    arena: Vec<u8>,
+}
+
+impl SortKeys {
+    pub(crate) fn with_capacity(rows: usize) -> Self {
+        Self {
+            keys: Vec::with_capacity(rows),
+            arena: Vec::new(),
+        }
+    }
+
+    pub(crate) fn push(&mut self, cell: ComparableCell<'_>) {
+        let key = match cell {
+            ComparableCell::Number(number) => SortKey::Number(number),
+            ComparableCell::Bool(value) => SortKey::Bool(value),
+            ComparableCell::Error => SortKey::Error,
+            ComparableCell::Empty => SortKey::Empty,
+            ComparableCell::Text(text) => {
+                let start = self.arena.len() as u32;
+                let has_hyphen = push_collation_key(text, &mut self.arena);
+                SortKey::Text {
+                    start,
+                    end: self.arena.len() as u32,
+                    has_hyphen,
+                }
+            }
+        };
+        self.keys.push(key);
+    }
+
+    /// Bytes the collation arena has allocated.
+    #[cfg(test)]
+    pub(crate) fn arena_bytes(&self) -> usize {
+        self.arena.capacity()
+    }
+
+    /// Bytes of collation keys in the arena.
+    #[cfg(test)]
+    pub(crate) fn arena_len(&self) -> usize {
+        self.arena.len()
+    }
+
+    /// Excel's sort order of keys `left` and `right`: numbers, text, `FALSE`
+    /// before `TRUE`, then errors, which are all equal. A descending sort
+    /// reverses this order, but blank cells are last in both directions.
+    pub(crate) fn compare(&self, left: usize, right: usize, ascending: bool) -> Ordering {
+        let (a, b) = (self.keys[left], self.keys[right]);
+        match (a, b) {
+            (SortKey::Empty, SortKey::Empty) => Ordering::Equal,
+            (SortKey::Empty, _) => Ordering::Greater,
+            (_, SortKey::Empty) => Ordering::Less,
+            _ if ascending => self.ascending(a, b),
+            _ => self.ascending(b, a),
+        }
+    }
+
+    fn ascending(&self, a: SortKey, b: SortKey) -> Ordering {
+        match (a, b) {
+            (SortKey::Number(a), SortKey::Number(b)) => a.cmp(&b),
+            (SortKey::Bool(a), SortKey::Bool(b)) => a.cmp(&b),
+            (
+                SortKey::Text {
+                    start: a_start,
+                    end: a_end,
+                    has_hyphen: a_hyphen,
+                },
+                SortKey::Text {
+                    start: b_start,
+                    end: b_end,
+                    has_hyphen: b_hyphen,
+                },
+            ) => {
+                let a_key = &self.arena[a_start as usize..a_end as usize];
+                let b_key = &self.arena[b_start as usize..b_end as usize];
+                a_key.cmp(b_key).then(a_hyphen.cmp(&b_hyphen))
+            }
+            _ => a.type_rank().cmp(&b.type_rank()),
         }
     }
 }

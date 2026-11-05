@@ -3,6 +3,7 @@
 //! "Learn about sort orders"). Each test sorts one column and checks the
 //! data-row permutation for both directions.
 
+use crate::query::{ComparableCell, SortKeys};
 use crate::store::CellStore;
 
 const SORT_COLUMN: usize = 0;
@@ -157,4 +158,24 @@ fn types_sort_as_numbers_text_logical_values_errors_then_blanks() {
 
     assert_eq!(sorted(&store, sheet, true), vec![7, 4, 3, 5, 2, 6, 1, 0]);
     assert_eq!(sorted(&store, sheet, false), vec![1, 6, 2, 5, 3, 4, 7, 0]);
+}
+
+/// The collation arena holds one byte per ASCII character that is not an
+/// apostrophe or a hyphen, and nothing per row besides.
+#[test]
+fn the_collation_arena_holds_one_byte_per_collated_ascii_character() {
+    const ROWS: usize = 100_000;
+    const DISTINCT_LABELS: usize = 5_000;
+
+    let labels: Vec<String> = (0..ROWS)
+        .map(|row| format!("item-{}", row % DISTINCT_LABELS))
+        .collect();
+    let mut keys = SortKeys::with_capacity(ROWS);
+    for label in &labels {
+        keys.push(ComparableCell::Text(label));
+    }
+
+    let collated: usize = labels.iter().map(|label| label.len() - 1).sum();
+    assert_eq!(keys.arena_len(), collated);
+    assert!(keys.arena_bytes() < 2 * collated);
 }
