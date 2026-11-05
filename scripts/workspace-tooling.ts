@@ -13,8 +13,8 @@ export const CARGO_LLVM_COV_VERSION = "0.8.7";
 export const PUBLISHABLE_PACKAGE_ORDER = [
   "@sheetwrite/wasm",
   "@sheetwrite/formulas",
-  "@sheetwrite/queries",
   "@sheetwrite/core",
+  "@sheetwrite/queries",
   "@sheetwrite/xlsx",
   "@sheetwrite/charts",
   "@sheetwrite/react",

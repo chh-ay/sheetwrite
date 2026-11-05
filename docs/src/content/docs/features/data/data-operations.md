@@ -169,6 +169,15 @@ unpivot. Joins use sorted flat row indexes; grouping folds adjacent key runs.
 Typed output columns keep null and error bitsets, with separate sparse error
 codes. No step runs on JavaScript row objects.
 
+Null keys match null keys in joins and form one group, as in the
+[M equality operator](https://learn.microsoft.com/en-us/powerquery-m/m-spec-operators#equality-operators),
+[`Table.Join`](https://learn.microsoft.com/en-us/powerquery-m/table-join), and
+[`Table.Group`](https://learn.microsoft.com/en-us/powerquery-m/table-group). A sum
+of only null values is null, as in
+[`List.Sum`](https://learn.microsoft.com/en-us/powerquery-m/list-sum).
+Fatal failures throw `QueryError`, a `SheetwriteError` with a structured
+`diagnostic`.
+
 The host owns source fetching and credentials. These entry points accept bytes
 or typed batches; they never fetch a URL. See the
 [query package reference](/docs/api/queries/) for the full interface.

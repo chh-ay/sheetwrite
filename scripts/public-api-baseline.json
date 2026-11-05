@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "ec1144db491681464af44120a2a19f621983aafb00c504d31c56f1763c90b320",
+  "sha256": "d49fd3d2883b4a26d2bceab21797953577d7cd418a75c5a550a905f825eec450",
   "intentionalExports": [
     {
       "package": "@sheetwrite/charts",
@@ -555,6 +555,29 @@
         "moveFormulaAxis",
         "shiftFormulaAxis",
         "translateFormula"
+      ]
+    },
+    {
+      "package": "@sheetwrite/queries",
+      "entryPoint": ".",
+      "exports": [
+        "QueryAggregate",
+        "QueryBatch",
+        "QueryColumn",
+        "QueryColumnSpec",
+        "QueryColumnType",
+        "QueryDiagnostic",
+        "QueryEngine",
+        "QueryEngineOptions",
+        "QueryError",
+        "QueryInput",
+        "QueryJoinKind",
+        "QueryLimits",
+        "QueryMixedLanes",
+        "QueryPredicate",
+        "QuerySource",
+        "QueryStep",
+        "loadQueryEngine"
       ]
     },
     {

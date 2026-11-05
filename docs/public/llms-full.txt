@@ -4464,6 +4464,44 @@ console.log(grid.getZoom());
 scrolls. `setZoom(z)` clamps to `0.5`-`2` and scales painted row/column geometry
 and fonts; workbook widths/heights remain in base units.
 
+## Headless columnar queries
+
+Use `@sheetwrite/queries` to parse host-provided CSV or JSON and run saved step
+lists in Rust. It is separate from worksheet display views and does not edit a
+workbook. Importing the package loads no query WASM; the explicit load call does.
+
+```ts
+import { loadQueryEngine } from "@sheetwrite/queries";
+
+const engine = await loadQueryEngine();
+const source = engine.parse(
+  new TextEncoder().encode('[{"Total":120},{"Total":75}]'),
+  { format: "json", columns: [{ id: "total", name: "Total", type: "number" }] },
+);
+
+const output = engine.execute(source, [
+  { kind: "filter", predicate: { kind: "compare", column: "total", op: "gte", value: 100 } },
+]);
+```
+
+The engine supports filter, select, rename, change type, join, group, and
+unpivot. Joins use sorted flat row indexes; grouping folds adjacent key runs.
+Typed output columns keep null and error bitsets, with separate sparse error
+codes. No step runs on JavaScript row objects.
+
+Null keys match null keys in joins and form one group, as in the
+[M equality operator](https://learn.microsoft.com/en-us/powerquery-m/m-spec-operators#equality-operators),
+[`Table.Join`](https://learn.microsoft.com/en-us/powerquery-m/table-join), and
+[`Table.Group`](https://learn.microsoft.com/en-us/powerquery-m/table-group). A sum
+of only null values is null, as in
+[`List.Sum`](https://learn.microsoft.com/en-us/powerquery-m/list-sum).
+Fatal failures throw `QueryError`, a `SheetwriteError` with a structured
+`diagnostic`.
+
+The host owns source fetching and credentials. These entry points accept bytes
+or typed batches; they never fetch a URL. See the
+[query package reference](https://www.sheetwrite.dev/docs/api/queries/) for the full interface.
+
 ## See also
 
 - [Interaction](https://www.sheetwrite.dev/docs/features/grid/selection-and-keyboard/) for clipboard TSV and the toolbar sort control.
@@ -17072,6 +17110,185 @@ Members:
 
 Declaration target: `./pkg/sheetwrite_wasm_bg.wasm`
 Page: https://www.sheetwrite.dev/docs/api/formulas-wasm/
+
+### `@sheetwrite/queries`
+
+#### `@sheetwrite/queries` — supported
+
+Declaration target: `./dist/index.d.ts`
+Source entry: `src/index.ts`
+Page: https://www.sheetwrite.dev/docs/api/queries/
+
+##### `loadQueryEngine` — function
+
+```ts
+(options?: QueryEngineOptions): Promise<QueryEngine>
+```
+
+Importing this package loads no WASM; only this explicit call loads query execution.
+@example
+```ts
+import { loadQueryEngine } from "@sheetwrite/queries";
+
+async function selectLargeTotals() {
+ const engine = await loadQueryEngine();
+ const source = engine.parse(
+ new TextEncoder().encode('[{"Total":120},{"Total":75}]'),
+ { format: "json", columns: [{ id: "total", name: "Total", type: "number" }] },
+ );
+
+ return engine.execute(source, [
+ { kind: "filter", predicate: { kind: "compare", column: "total", op: "gte", value: 100 } },
+ ]);
+}
+```
+
+##### `QueryAggregate` — interface
+
+```ts
+export interface QueryAggregate { readonly id: string; readonly name: string; readonly op: "countRows" | "count" | "sum" | "average" | "min" | "max"; readonly column?: string; }
+```
+
+Column is required except for countRows; numeric aggregates ignore nulls.
+
+##### `QueryBatch` — interface
+
+```ts
+export interface QueryBatch { readonly rowCount: number; readonly columns: readonly QueryColumn[]; }
+```
+
+Equal-length columns with a u32 row count; returned buffers are owned by the caller.
+
+##### `QueryColumn` — type
+
+```ts
+export type QueryColumn = ColumnState & ( | { readonly type: "number"; readonly values: Float64Array } | { readonly type: "logical"; readonly values: Uint8Array } | { readonly type: "text"; readonly bytes: Uint8Array; readonly offsets: Uint32Array } | { readonly type: "date"; readonly values: Int32Array } | { readonly type: "dateTime"; readonly values: BigInt64Array } | ({ readonly type: "mixed" } & QueryMixedLanes) );
+```
+
+Typed host buffers; validity and sparse error lanes preserve null/error distinctions.
+
+##### `QueryColumnSpec` — interface
+
+```ts
+export interface QueryColumnSpec { readonly id: string; readonly name: string; readonly type: QueryColumnType; }
+```
+
+Stable identity is separate from the field name used by source records.
+
+##### `QueryColumnType` — type
+
+```ts
+export type QueryColumnType = "number" | "logical" | "text" | "date" | "dateTime" | "mixed";
+```
+
+Physical column types; mixed columns use compact typed payload lanes.
+
+##### `QueryDiagnostic` — interface
+
+```ts
+export interface QueryDiagnostic { readonly code: string; readonly step: number | null; readonly column: string | null; readonly row: number | null; }
+```
+
+A stable failure code and optional coordinates, without source values or credentials.
+
+##### `QueryEngine` — interface
+
+```ts
+export interface QueryEngine { parse(bytes: Uint8Array, source: QuerySource, limits?: Partial<QueryLimits>): QueryBatch; execute( source: QueryBatch, steps: readonly QueryStep[], inputs?: readonly QueryInput[], limits?: Partial<QueryLimits>, ): QueryBatch; }
+```
+
+Rust performs parsing and every step; this interface does no source fetching.
+
+Members:
+- `execute` — Execute an ordered plan; cell errors stay in the typed output buffers.
+- `parse` — Parse host-provided bytes; fatal failures throw QueryError.
+
+##### `QueryEngineOptions` — interface
+
+```ts
+export interface QueryEngineOptions { readonly wasm?: WebAssembly.Module | BufferSource; }
+```
+
+Hosts can provide the compiled artifact instead of using browser artifact loading.
+
+##### `QueryError` — class
+
+```ts
+class QueryError extends SheetwriteError { constructor(diagnostic: QueryDiagnostic); code: "invalid-argument" | "resource-limit"; diagnostic: QueryDiagnostic; name: "QueryError" }
+```
+
+Fatal source or plan failure; cell-level errors stay in the returned column lanes.
+
+Members:
+- `new` — Diagnostic codes remain stable even when their human-readable context changes.
+
+##### `QueryInput` — interface
+
+```ts
+export interface QueryInput { readonly id: string; readonly batch: QueryBatch; }
+```
+
+One execution-local named input, consumed by join steps without a result cache.
+
+##### `QueryJoinKind` — type
+
+```ts
+export type QueryJoinKind = | "inner" | "left" | "right" | "full" | "leftSemi" | "rightSemi" | "leftAnti" | "rightAnti";
+```
+
+Join kinds retain duplicate matches and match null keys to null keys.
+
+##### `QueryLimits` — interface
+
+```ts
+export interface QueryLimits { readonly maxRows: number; readonly maxCells: number; readonly maxSourceBytes: number; readonly maxOutputBytes: number; readonly maxSteps: number; }
+```
+
+Per-execution ceilings; expanding operations reject output before allocation.
+
+Members:
+- `maxOutputBytes` — Conservative cell payload budget across all columns, checked before each append.
+
+##### `QueryMixedLanes` — interface
+
+```ts
+export interface QueryMixedLanes { readonly tags: Uint8Array; readonly indexes: Uint32Array; readonly numbers: Float64Array; readonly logical: Uint8Array; readonly text: Uint8Array; readonly offsets: Uint32Array; readonly dates: Int32Array; readonly dateTimes: BigInt64Array; }
+```
+
+The tag selects a compact lane; indexes address that lane or the error-code pool.
+
+Members:
+- `indexes` — Index in the typed lane selected by the row's tag.
+- `tags` — 0 = null, 1 = number, 2 = logical, 3 = text, 4 = date, 5 = dateTime, 6 = error.
+
+##### `QueryPredicate` — type
+
+```ts
+export type QueryPredicate = | { readonly kind: "compare"; readonly column: string; readonly op: "eq" | "neq" | "lt" | "lte" | "gt" | "gte"; readonly value: string | number | boolean | null; } | { readonly kind: "isNull"; readonly column: string } | { readonly kind: "contains"; readonly column: string; readonly text: string } | { readonly kind: "and" | "or"; readonly predicates: readonly QueryPredicate[] } | { readonly kind: "not"; readonly predicate: QueryPredicate };
+```
+
+Data-only predicate trees use M null logic; only logical true selects a row.
+
+##### `QuerySource` — type
+
+```ts
+export type QuerySource = | { readonly format: "json"; readonly columns: readonly QueryColumnSpec[]; readonly path?: readonly string[]; } | { readonly format: "csv"; readonly columns: readonly QueryColumnSpec[]; readonly delimiter?: number; readonly headers?: boolean; readonly emptyIsNull?: boolean; };
+```
+
+Host-owned UTF-8 bytes are parsed against an explicit schema, without type guessing.
+
+##### `QueryStep` — type
+
+```ts
+export type QueryStep = | { readonly kind: "filter"; readonly predicate: QueryPredicate } | { readonly kind: "select"; readonly columns: readonly string[] } | { readonly kind: "rename"; readonly columns: readonly (readonly [id: string, name: string])[] } | { readonly kind: "changeType"; readonly column: string; readonly type: QueryColumnType; readonly onError: "error" | "null"; } | { readonly kind: "join"; readonly input: string; readonly keys: readonly (readonly [left: string, right: string])[]; readonly join: QueryJoinKind; } | { readonly kind: "group"; readonly keys: readonly string[]; readonly aggregates: readonly QueryAggregate[]; } | { readonly kind: "unpivot"; readonly columns: readonly string[]; readonly attribute: { readonly id: string; readonly name: string }; readonly value: { readonly id: string; readonly name: string }; };
+```
+
+Saved step order is execution order; each column reference is a stable identity.
+
+#### `@sheetwrite/queries/wasm` — asset
+
+Declaration target: `./pkg/sheetwrite_queries_bg.wasm`
+Page: https://www.sheetwrite.dev/docs/api/queries-wasm/
 
 ### `@sheetwrite/react`
 

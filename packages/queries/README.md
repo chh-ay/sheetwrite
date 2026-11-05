@@ -105,15 +105,17 @@ logical, text, date, date/time. Null sorts first in keys and is skipped by
 aggregates. Same-type text uses UTF-16 ordinal order; logical false precedes
 true. Values of different types are not equal.
 
-Null-key equality follows the [M equality rules](https://learn.microsoft.com/en-us/powerquery-m/m-spec-operators#equality-operators),
-[`Table.Join`](https://learn.microsoft.com/en-us/powerquery-m/table-join), and
-[`Table.Group`](https://learn.microsoft.com/en-us/powerquery-m/table-group).
-Empty sum behavior follows [`List.Sum`](https://learn.microsoft.com/en-us/powerquery-m/list-sum).
+Null-key equality follows the Power Query M equality operator, `Table.Join`, and
+`Table.Group`. An empty sum follows `List.Sum`. The
+[data operations guide](https://www.sheetwrite.dev/docs/features/data/data-operations/#headless-columnar-queries)
+links each rule.
 
 ## Failures and limits
 
-Fatal failures throw `QueryError`. Its `diagnostic` has a stable `code` and
-optional zero-based `step`, `row`, and stable `column` identity. Diagnostics do
+Fatal failures throw `QueryError`, a `SheetwriteError` with operation `query`.
+Its code is `resource-limit` for a limit failure and `invalid-argument`
+otherwise. Its `diagnostic` has a stable `code` and optional zero-based `step`,
+`row`, and stable `column` identity. Diagnostics do
 not include source values or credentials. Cell errors stay in the returned
 column's error lanes and do not become exceptions merely because they are read.
 

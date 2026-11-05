@@ -1,5 +1,7 @@
 import { beforeAll, expect, test } from "bun:test";
 
+import { isSheetwriteError } from "@sheetwrite/core";
+
 import { QueryError, loadQueryEngine } from "../src/node.js";
 import type {
   QueryBatch,
@@ -236,4 +238,20 @@ test("invalid host offsets and scalar widths are rejected rather than trapped or
       engine.parse(encoder.encode('[{"Value":1}]'), numericSource, { maxOutputBytes: 8 }),
     ).code,
   ).toBe("limit");
+});
+
+test("fatal failures use the shared serializable error envelope", () => {
+  let failure: unknown;
+  try {
+    engine.parse(encoder.encode('[{"Value":1},{"Value":2}]'), numericSource, { maxRows: 1 });
+  } catch (error) {
+    failure = error;
+  }
+
+  expect(isSheetwriteError(failure)).toBe(true);
+  expect(JSON.parse(JSON.stringify(failure))).toMatchObject({
+    code: "resource-limit",
+    operation: "query",
+    context: { diagnostic: "limit", step: null, row: null, column: null },
+  });
 });
