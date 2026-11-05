@@ -1,14 +1,14 @@
 ---
 title: "CellEditorContext | @sheetwrite/react"
-description: "CellEditorContext interface in @sheetwrite/react: Source summary unavailable; docs:check rejects this omission."
+description: "CellEditorContext interface in @sheetwrite/react: Immutable state and guarded completion callbacks for one mounted editor."
 ---
 <!-- api-export:@sheetwrite/react|.|CellEditorContext -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/react/">@sheetwrite/react</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Source summary unavailable; docs:check rejects this omission.
+Immutable state and guarded completion callbacks for one mounted editor.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/grid.d.ts#L26"><code>packages/core/dist/types/grid.d.ts#L26</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/grid.d.ts#L37"><code>packages/core/dist/types/grid.d.ts#L37</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>

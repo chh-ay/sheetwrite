@@ -1,14 +1,14 @@
 ---
 title: "MountedChart | @sheetwrite/charts"
-description: "MountedChart interface in @sheetwrite/charts: Source summary unavailable; docs:check rejects this omission."
+description: "MountedChart interface in @sheetwrite/charts: Draws one chart into a box that core places and sizes."
 ---
 <!-- api-export:@sheetwrite/charts|.|MountedChart -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/charts/">@sheetwrite/charts</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Source summary unavailable; docs:check rejects this omission.
+Draws one chart into a box that core places and sizes.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/chart.d.ts#L58"><code>packages/core/dist/types/chart.d.ts#L58</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/chart.d.ts#L93"><code>packages/core/dist/types/chart.d.ts#L93</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>
@@ -16,7 +16,7 @@ Source summary unavailable; docs:check rejects this omission.
 <div class="api-member-list">
 
 <details class="api-member" id="mounted-chart-resize" data-pagefind-weight="1">
-<summary><code>resize</code></summary>
+<summary><code>resize</code> <span class="api-member-summary">Core calls this after it changes the box size in CSS pixels.</span></summary>
 
 ```ts generated
 resize(width: number, height: number): void;

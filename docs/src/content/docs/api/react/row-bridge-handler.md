@@ -1,14 +1,14 @@
 ---
 title: "RowBridgeHandler | @sheetwrite/react"
-description: "RowBridgeHandler type in @sheetwrite/react: Source summary unavailable; docs:check rejects this omission."
+description: "RowBridgeHandler type in @sheetwrite/react: Callback accepted by imperative and framework adapters."
 ---
 <!-- api-export:@sheetwrite/react|.|RowBridgeHandler -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/react/">@sheetwrite/react</a><span class="api-status" data-kind="type">type</span></div>
 
-Source summary unavailable; docs:check rejects this omission.
+Callback accepted by imperative and framework adapters.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/row-bridge.d.ts#L113"><code>packages/core/dist/row-bridge.d.ts#L113</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/row-bridge.d.ts#L138"><code>packages/core/dist/row-bridge.d.ts#L138</code></a></dd></div>
 </dl>
 
 ## Declaration

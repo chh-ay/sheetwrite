@@ -1,14 +1,17 @@
 ---
 title: "RowBridge | @sheetwrite/react"
-description: "RowBridge class in @sheetwrite/react: Source summary unavailable; docs:check rejects this omission."
+description: "RowBridge class in @sheetwrite/react: Projects canonical document transactions into host-owned row changes."
 ---
 <!-- api-export:@sheetwrite/react|.|RowBridge -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/react/">@sheetwrite/react</a><span class="api-status" data-kind="class">class</span></div>
 
-Source summary unavailable; docs:check rejects this omission.
+Projects canonical document transactions into host-owned row changes.
+
+The bridge only owns compact data-space identity arrays. It never writes to
+`defaultRows`, never renders, and never creates a second document store.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/row-bridge.d.ts#L114"><code>packages/core/dist/row-bridge.d.ts#L114</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/row-bridge.d.ts#L145"><code>packages/core/dist/row-bridge.d.ts#L145</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>
@@ -25,7 +28,7 @@ constructor<Id extends RowBridgeId = RowBridgeId, Row extends Record<string, Cel
 </details>
 
 <details class="api-member" id="row-bridge-column-keys" data-pagefind-weight="1">
-<summary><code>columnKeys</code></summary>
+<summary><code>columnKeys</code> <span class="api-member-summary">Current semantic column keys in canonical column order.</span></summary>
 
 ```ts generated
 columnKeys: (sheet?: SheetId) => readonly string[];
@@ -34,7 +37,7 @@ columnKeys: (sheet?: SheetId) => readonly string[];
 </details>
 
 <details class="api-member" id="row-bridge-project" data-pagefind-weight="1">
-<summary><code>project</code></summary>
+<summary><code>project</code> <span class="api-member-summary">Project an applied Grid change as an accepted, transformed, or remote result.</span></summary>
 
 ```ts generated
 project: (event: ChangeEvent, requestedOperations?: readonly DocumentOp[], transactionId?: string) => RowBridgeProjection<Id>;
@@ -43,7 +46,7 @@ project: (event: ChangeEvent, requestedOperations?: readonly DocumentOp[], trans
 </details>
 
 <details class="api-member" id="row-bridge-reconcile" data-pagefind-weight="1">
-<summary><code>reconcile</code></summary>
+<summary><code>reconcile</code> <span class="api-member-summary">Reconcile a canonical transaction response without synchronizing host rows implicitly.</span></summary>
 
 ```ts generated
 reconcile: (input: RowBridgeReconciliationInput<Id>) => RowBridgeProjection<Id>;
@@ -52,7 +55,7 @@ reconcile: (input: RowBridgeReconciliationInput<Id>) => RowBridgeProjection<Id>;
 </details>
 
 <details class="api-member" id="row-bridge-row-ids" data-pagefind-weight="1">
-<summary><code>rowIds</code></summary>
+<summary><code>rowIds</code> <span class="api-member-summary">Current data-space row identities; visual sort and filters do not affect this order.</span></summary>
 
 ```ts generated
 rowIds: (sheet?: SheetId) => readonly (Id | null)[]

@@ -1,14 +1,14 @@
 ---
 title: "GridCommandState | @sheetwrite/vue"
-description: "GridCommandState interface in @sheetwrite/vue: Source summary unavailable; docs:check rejects this omission."
+description: "GridCommandState interface in @sheetwrite/vue: Observable availability and selection-derived activity for one command."
 ---
 <!-- api-export:@sheetwrite/vue|.|GridCommandState -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/vue/">@sheetwrite/vue</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Source summary unavailable; docs:check rejects this omission.
+Observable availability and selection-derived activity for one command.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/grid.d.ts#L109"><code>packages/core/dist/types/grid.d.ts#L109</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/grid.d.ts#L193"><code>packages/core/dist/types/grid.d.ts#L193</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

@@ -1,14 +1,14 @@
 ---
 title: "ChartAnchor | @sheetwrite/charts"
-description: "ChartAnchor interface in @sheetwrite/charts: Source summary unavailable; docs:check rejects this omission."
+description: "ChartAnchor interface in @sheetwrite/charts: Position in worksheet coordinates; dimensions and offsets use CSS pixels."
 ---
 <!-- api-export:@sheetwrite/charts|.|ChartAnchor -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/charts/">@sheetwrite/charts</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Source summary unavailable; docs:check rejects this omission.
+Position in worksheet coordinates; dimensions and offsets use CSS pixels.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/chart.d.ts#L4"><code>packages/core/dist/types/chart.d.ts#L4</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/chart.d.ts#L7"><code>packages/core/dist/types/chart.d.ts#L7</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>6</span>
@@ -16,7 +16,7 @@ Source summary unavailable; docs:check rejects this omission.
 <div class="api-member-list">
 
 <details class="api-member" id="chart-anchor-row" data-pagefind-weight="1">
-<summary><code>row</code></summary>
+<summary><code>row</code> <span class="api-member-summary">0-based row of the cell that holds the top-left corner.</span></summary>
 
 ```ts generated
 row: number;
@@ -25,7 +25,7 @@ row: number;
 </details>
 
 <details class="api-member" id="chart-anchor-col" data-pagefind-weight="1">
-<summary><code>col</code></summary>
+<summary><code>col</code> <span class="api-member-summary">0-based column of the cell that holds the top-left corner.</span></summary>
 
 ```ts generated
 col: number;

@@ -1,14 +1,14 @@
 ---
 title: "ChartSeriesView | @sheetwrite/charts"
-description: "ChartSeriesView interface in @sheetwrite/charts: Source summary unavailable; docs:check rejects this omission."
+description: "ChartSeriesView interface in @sheetwrite/charts: Resolved plain data; the renderer does not read cells."
 ---
 <!-- api-export:@sheetwrite/charts|.|ChartSeriesView -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/charts/">@sheetwrite/charts</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Source summary unavailable; docs:check rejects this omission.
+Resolved plain data; the renderer does not read cells. Arrays follow source cells in row-major order.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/chart.d.ts#L30"><code>packages/core/dist/types/chart.d.ts#L30</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/chart.d.ts#L41"><code>packages/core/dist/types/chart.d.ts#L41</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -36,7 +36,7 @@ name: string;
 </details>
 
 <details class="api-member" id="chart-series-view-values" data-pagefind-weight="1">
-<summary><code>values</code></summary>
+<summary><code>values</code> <span class="api-member-summary">Numeric cells; text, booleans, errors and empty cells are null (a gap).</span></summary>
 
 ```ts generated
 values: Array<number | null>;
@@ -54,7 +54,7 @@ categories: Array<string | number | boolean | null>;
 </details>
 
 <details class="api-member" id="chart-series-view-number-formats" data-pagefind-weight="1">
-<summary><code>numberFormats</code></summary>
+<summary><code>numberFormats</code> <span class="api-member-summary">Excel format code per value, as the grid paints it: cell style, then column style, then column format.</span></summary>
 
 ```ts generated
 numberFormats: Array<string | null>;
@@ -63,7 +63,7 @@ numberFormats: Array<string | null>;
 </details>
 
 <details class="api-member" id="chart-series-view-category-formats" data-pagefind-weight="1">
-<summary><code>categoryFormats</code></summary>
+<summary><code>categoryFormats</code> <span class="api-member-summary">Format code per category; date categories are serial numbers and need it to show as dates.</span></summary>
 
 ```ts generated
 categoryFormats: Array<string | null>;
@@ -72,7 +72,7 @@ categoryFormats: Array<string | null>;
 </details>
 
 <details class="api-member" id="chart-series-view-number-locale" data-pagefind-weight="1">
-<summary><code>numberLocale</code></summary>
+<summary><code>numberLocale</code> <span class="api-member-summary">BCP 47 locale of the first value column, for separators; null keeps the default.</span></summary>
 
 ```ts generated
 numberLocale: string | null;
@@ -81,16 +81,17 @@ numberLocale: string | null;
 </details>
 
 <details class="api-member" id="chart-series-view-truncated" data-pagefind-weight="1">
-<summary><code>truncated</code></summary>
+<summary><code>truncated</code> <span class="api-member-summary">A source had more than MAXCHARTPOINTS cells and its tail was dropped.</span></summary>
 
 ```ts generated
 truncated: boolean;
 ```
 
+<p class="api-member-doc">A source had more than `MAX_CHART_POINTS` cells and its tail was dropped.</p>
 </details>
 
 <details class="api-member" id="chart-series-view-reference-error" data-pagefind-weight="1">
-<summary><code>referenceError</code></summary>
+<summary><code>referenceError</code> <span class="api-member-summary">A source was deleted; that source reads as empty.</span></summary>
 
 ```ts generated
 referenceError: boolean;

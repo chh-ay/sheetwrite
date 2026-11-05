@@ -1,14 +1,14 @@
 ---
 title: "CellEditorNavigation | @sheetwrite/vue"
-description: "CellEditorNavigation type in @sheetwrite/vue: Source summary unavailable; docs:check rejects this omission."
+description: "CellEditorNavigation type in @sheetwrite/vue: Selection movement applied after a successful editor commit."
 ---
 <!-- api-export:@sheetwrite/vue|.|CellEditorNavigation -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/vue/">@sheetwrite/vue</a><span class="api-status" data-kind="type">type</span></div>
 
-Source summary unavailable; docs:check rejects this omission.
+Selection movement applied after a successful editor commit.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/grid.d.ts#L19"><code>packages/core/dist/types/grid.d.ts#L19</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/grid.d.ts#L28"><code>packages/core/dist/types/grid.d.ts#L28</code></a></dd></div>
 </dl>
 
 ## Declaration

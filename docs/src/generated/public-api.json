@@ -18,10 +18,19 @@
               "owners": [
                 "../core/dist/types/chart.d.ts"
               ],
-              "source": "../core/dist/types/chart.d.ts#L4",
+              "source": "../core/dist/types/chart.d.ts#L7",
               "jsDocTags": [],
-              "documentation": "",
-              "memberDocs": []
+              "documentation": "Position in worksheet coordinates; dimensions and offsets use CSS pixels.",
+              "memberDocs": [
+                {
+                  "name": "col",
+                  "documentation": "0-based column of the cell that holds the top-left corner."
+                },
+                {
+                  "name": "row",
+                  "documentation": "0-based row of the cell that holds the top-left corner."
+                }
+              ]
             },
             {
               "name": "ChartChangeEvent",
@@ -30,10 +39,19 @@
               "owners": [
                 "../core/dist/types/chart.d.ts"
               ],
-              "source": "../core/dist/types/chart.d.ts#L48",
+              "source": "../core/dist/types/chart.d.ts#L72",
               "jsDocTags": [],
-              "documentation": "",
-              "memberDocs": []
+              "documentation": "Charts whose `ChartView` may differ after one store commit. Emitted at most\nonce per commit, only when `charts` is not empty; each chart appears once.\nA chart that no longer exists resolves to `null`.",
+              "memberDocs": [
+                {
+                  "name": "charts",
+                  "documentation": "Charts to resolve again, in commit order of the edits that touched them."
+                },
+                {
+                  "name": "epoch",
+                  "documentation": "Store epoch after the commit. `undefined` when the store sent its change\nevent without an epoch, which a custom `Store` can do."
+                }
+              ]
             },
             {
               "name": "ChartDefinition",
@@ -42,10 +60,23 @@
               "owners": [
                 "../core/dist/types/chart.d.ts"
               ],
-              "source": "../core/dist/types/chart.d.ts#L18",
+              "source": "../core/dist/types/chart.d.ts#L25",
               "jsDocTags": [],
-              "documentation": "",
-              "memberDocs": []
+              "documentation": "Persisted chart definition; IDs are unique within the owning sheet.",
+              "memberDocs": [
+                {
+                  "name": "axes",
+                  "documentation": "Axis titles; `undefined` shows no axis titles."
+                },
+                {
+                  "name": "legend",
+                  "documentation": "Legend position; `undefined` lets the renderer use its default position."
+                },
+                {
+                  "name": "title",
+                  "documentation": "Text above the chart; `undefined` shows no title."
+                }
+              ]
             },
             {
               "name": "ChartKind",
@@ -54,9 +85,9 @@
               "owners": [
                 "../core/dist/types/chart.d.ts"
               ],
-              "source": "../core/dist/types/chart.d.ts#L2",
+              "source": "../core/dist/types/chart.d.ts#L3",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Chart families that the document model supports.",
               "memberDocs": []
             },
             {
@@ -66,9 +97,9 @@
               "owners": [
                 "../core/dist/types/chart.d.ts"
               ],
-              "source": "../core/dist/types/chart.d.ts#L3",
+              "source": "../core/dist/types/chart.d.ts#L5",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "A deleted source remains explicit instead of silently reading another cell.",
               "memberDocs": []
             },
             {
@@ -78,9 +109,9 @@
               "owners": [
                 "../core/dist/types/chart.d.ts"
               ],
-              "source": "../core/dist/types/chart.d.ts#L44",
+              "source": "../core/dist/types/chart.d.ts#L63",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Stable identity of one chart: the sheet that owns it and its ID on that sheet.",
               "memberDocs": []
             },
             {
@@ -90,10 +121,15 @@
               "owners": [
                 "../core/dist/types/chart.d.ts"
               ],
-              "source": "../core/dist/types/chart.d.ts#L62",
+              "source": "../core/dist/types/chart.d.ts#L99",
               "jsDocTags": [],
-              "documentation": "",
-              "memberDocs": []
+              "documentation": "Draws charts into host elements that the grid's object layer owns.",
+              "memberDocs": [
+                {
+                  "name": "mount",
+                  "documentation": "`host` is an empty element that core owns, positions and clips."
+                }
+              ]
             },
             {
               "name": "ChartSeries",
@@ -102,9 +138,9 @@
               "owners": [
                 "../core/dist/types/chart.d.ts"
               ],
-              "source": "../core/dist/types/chart.d.ts#L12",
+              "source": "../core/dist/types/chart.d.ts#L18",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Sources are read in row-major order.",
               "memberDocs": []
             },
             {
@@ -114,10 +150,35 @@
               "owners": [
                 "../core/dist/types/chart.d.ts"
               ],
-              "source": "../core/dist/types/chart.d.ts#L30",
+              "source": "../core/dist/types/chart.d.ts#L41",
               "jsDocTags": [],
-              "documentation": "",
-              "memberDocs": []
+              "documentation": "Resolved plain data; the renderer does not read cells. Arrays follow source cells in row-major order.",
+              "memberDocs": [
+                {
+                  "name": "categoryFormats",
+                  "documentation": "Format code per category; date categories are serial numbers and need it to show as dates."
+                },
+                {
+                  "name": "numberFormats",
+                  "documentation": "Excel format code per value, as the grid paints it: cell style, then column style, then column format."
+                },
+                {
+                  "name": "numberLocale",
+                  "documentation": "BCP 47 locale of the first value column, for separators; `null` keeps the default."
+                },
+                {
+                  "name": "referenceError",
+                  "documentation": "A source was deleted; that source reads as empty."
+                },
+                {
+                  "name": "truncated",
+                  "documentation": "A source had more than `MAX_CHART_POINTS` cells and its tail was dropped."
+                },
+                {
+                  "name": "values",
+                  "documentation": "Numeric cells; text, booleans, errors and empty cells are `null` (a gap)."
+                }
+              ]
             },
             {
               "name": "ChartSize",
@@ -155,9 +216,9 @@
               "owners": [
                 "../core/dist/types/chart.d.ts"
               ],
-              "source": "../core/dist/types/chart.d.ts#L40",
+              "source": "../core/dist/types/chart.d.ts#L58",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "One immutable-by-convention rendering input, refreshed on chart-change events.",
               "memberDocs": []
             },
             {
@@ -207,10 +268,15 @@
               "owners": [
                 "../core/dist/types/chart.d.ts"
               ],
-              "source": "../core/dist/types/chart.d.ts#L58",
+              "source": "../core/dist/types/chart.d.ts#L93",
               "jsDocTags": [],
-              "documentation": "",
-              "memberDocs": []
+              "documentation": "Draws one chart into a box that core places and sizes.",
+              "memberDocs": [
+                {
+                  "name": "resize",
+                  "documentation": "Core calls this after it changes the box size in CSS pixels."
+                }
+              ]
             },
             {
               "name": "registerChartsBackend",
@@ -10543,9 +10609,9 @@
               "owners": [
                 "../core/dist/types/query.d.ts"
               ],
-              "source": "../core/dist/types/query.d.ts#L29",
+              "source": "../core/dist/types/query.d.ts#L34",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Column is required except for countRows; numeric aggregates ignore nulls.",
               "memberDocs": []
             },
             {
@@ -10579,9 +10645,9 @@
               "owners": [
                 "../core/dist/types/query.d.ts"
               ],
-              "source": "../core/dist/types/query.d.ts#L4",
+              "source": "../core/dist/types/query.d.ts#L6",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Stable identity is separate from the field name used by source records.",
               "memberDocs": []
             },
             {
@@ -10591,9 +10657,9 @@
               "owners": [
                 "../core/dist/types/query.d.ts"
               ],
-              "source": "../core/dist/types/query.d.ts#L3",
+              "source": "../core/dist/types/query.d.ts#L4",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Physical column types; mixed columns use compact typed payload lanes.",
               "memberDocs": []
             },
             {
@@ -10751,9 +10817,9 @@
               "owners": [
                 "../core/dist/types/query.d.ts"
               ],
-              "source": "../core/dist/types/query.d.ts#L28",
+              "source": "../core/dist/types/query.d.ts#L32",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Join kinds retain duplicate matches and match null keys to null keys.",
               "memberDocs": []
             },
             {
@@ -10813,9 +10879,9 @@
               "owners": [
                 "../core/dist/types/query.d.ts"
               ],
-              "source": "../core/dist/types/query.d.ts#L9",
+              "source": "../core/dist/types/query.d.ts#L12",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Data-only predicate trees use M null logic; only logical true selects a row.",
               "memberDocs": []
             },
             {
@@ -10906,9 +10972,9 @@
               "owners": [
                 "../core/dist/types/query.d.ts"
               ],
-              "source": "../core/dist/types/query.d.ts#L35",
+              "source": "../core/dist/types/query.d.ts#L44",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Saved step order is execution order; each column reference is a stable identity.\nIn a saved query, a join `input` is the ID of another saved query.",
               "memberDocs": []
             }
           ]
@@ -10939,9 +11005,9 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L47",
+              "source": "../core/dist/types/grid.d.ts#L60",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Framework-neutral named editor definition registered through GridOptions.editors.",
               "memberDocs": []
             },
             {
@@ -10951,9 +11017,9 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L26",
+              "source": "../core/dist/types/grid.d.ts#L37",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Immutable state and guarded completion callbacks for one mounted editor.",
               "memberDocs": []
             },
             {
@@ -10963,9 +11029,9 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L40",
+              "source": "../core/dist/types/grid.d.ts#L52",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Retained lifecycle returned by a custom editor's mount method.",
               "memberDocs": []
             },
             {
@@ -10975,9 +11041,9 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L19",
+              "source": "../core/dist/types/grid.d.ts#L28",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Selection movement applied after a successful editor commit.",
               "memberDocs": []
             },
             {
@@ -10987,9 +11053,9 @@
               "owners": [
                 "../core/dist/types/cell.d.ts"
               ],
-              "source": "../core/dist/types/cell.d.ts#L69",
+              "source": "../core/dist/types/cell.d.ts#L112",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "A scalar that can be displayed directly.",
               "memberDocs": []
             },
             {
@@ -10999,10 +11065,326 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L287",
-              "jsDocTags": [],
-              "documentation": "",
-              "memberDocs": []
+              "source": "../core/dist/types/grid.d.ts#L645",
+              "jsDocTags": [
+                "example",
+                "see"
+              ],
+              "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction updateTotal(grid: Grid) {\n  const sheet = grid.getActiveSheet();\n  const result = grid.applyTransaction({\n    patches: [{ op: \"set\", addr: { sheet, row: 0, col: 0 }, value: { kind: \"literal\", value: 42 } }],\n  });\n  if (result.status === \"applied\") grid.scrollToCell({ sheet, row: 0, col: 0 });\n  return grid.aggregate(0, \"sum\");\n}\n```\n@see\ncreateGrid\n@see\nGrid.applyTransaction",
+              "memberDocs": [
+                {
+                  "name": "actions",
+                  "documentation": "Imperative action surface for binding custom toolbars/menus."
+                },
+                {
+                  "name": "activateHyperlink",
+                  "documentation": "Validate and emit a host-owned activation event. External targets are never\nopened by Sheetwrite; internal navigation occurs only under the explicit policy."
+                },
+                {
+                  "name": "addSheet",
+                  "documentation": "Add a sheet with a stable ID and return its actionable transaction outcome."
+                },
+                {
+                  "name": "aggregate",
+                  "documentation": "Column aggregate over the active sheet's data.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction total(grid: Grid) {\n  return grid.aggregate(1, \"sum\");\n}\n```\n@see\nSheetwriteStore.aggregate"
+                },
+                {
+                  "name": "applyRemoteOperations",
+                  "documentation": "Apply host-supplied operations without undo history or outgoing dirty state.\nThe resulting change event has `source: \"remote\"`."
+                },
+                {
+                  "name": "applyTransaction",
+                  "documentation": "Apply arbitrary patches as one undoable Grid commit. No-op when read-only.\nUse `Store.applyTransaction` only for low-level writes that intentionally\nbypass Grid history and policy.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction setFirstCell(grid: Grid) {\n  return grid.applyTransaction({ patches: [\n    { op: \"set\", addr: { sheet: grid.getActiveSheet(), row: 0, col: 0 },\n      value: { kind: \"literal\", value: 42 } },\n  ] });\n}\n```\n@see\nTransaction"
+                },
+                {
+                  "name": "autoFitColumns",
+                  "documentation": "Explicitly resize columns from a bulk worksheet read."
+                },
+                {
+                  "name": "autoFitRows",
+                  "documentation": "Explicitly resize rows to fit wrapped content; never runs during paint."
+                },
+                {
+                  "name": "beginEdit",
+                  "documentation": "Open the cell editor at a view cell, optionally seeding text / selecting all."
+                },
+                {
+                  "name": "clearSearch",
+                  "documentation": "Clear the current search and its highlights."
+                },
+                {
+                  "name": "clearView",
+                  "documentation": "Clear any active sort/filter view."
+                },
+                {
+                  "name": "dataEdge",
+                  "documentation": "Ctrl+Arrow-style jump target: the data-run edge from (row, col) on the\nmoved axis (row for vertical moves, col for horizontal), or null when the\nstore is not columnar. Under an active sort/filter view, `row` is a view\nposition and vertical moves return view positions. For hosts building\ntheir own keymaps (`config.keyboard`)."
+                },
+                {
+                  "name": "destroy",
+                  "documentation": "Free everything this grid owns: its DOM, listeners, timers, renderer,\nworker and caches, and the store that it created. Call it when the host\nview is removed; a second call does nothing."
+                },
+                {
+                  "name": "distinctValues",
+                  "documentation": "Distinct resolved values of a column in first-seen order. Defaults to\n1,000 values for bounded filter menus; pass 0 to request an uncapped scan."
+                },
+                {
+                  "name": "exportCsv",
+                  "documentation": "Download the active sheet as CSV.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction downloadCsv(grid: Grid) {\n  grid.exportCsv(\"sales.csv\");\n}\n```"
+                },
+                {
+                  "name": "exportSnapshot",
+                  "documentation": "Deterministically export the complete authoritative workbook document."
+                },
+                {
+                  "name": "exportXlsx",
+                  "documentation": "Download the active sheet through the registered XLSX backend.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\nimport { registerXlsxBackends } from \"@sheetwrite/xlsx\";\n\nasync function downloadXlsx(grid: Grid) {\n  await registerXlsxBackends();\n  await grid.exportXlsx(\"sales.xlsx\");\n}\n```\n@see\ntoXlsxWorkbook"
+                },
+                {
+                  "name": "filterBy",
+                  "documentation": "Filter the displayed rows to those whose column text contains `needle`.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction showOpenRows(grid: Grid) {\n  grid.filterBy(0, \"Open\");\n}\n```\n@see\nGrid.clearView"
+                },
+                {
+                  "name": "findNext",
+                  "documentation": "Move the active match to the next match and scroll it into view."
+                },
+                {
+                  "name": "findPrev",
+                  "documentation": "Move the active match to the previous match and scroll it into view."
+                },
+                {
+                  "name": "getActiveSheet",
+                  "documentation": "Id of the currently visible sheet."
+                },
+                {
+                  "name": "getCellAtPoint",
+                  "documentation": "Resolve browser viewport coordinates to an active-sheet cell for host-owned\nmenus and interactions. Returns null outside the cell body."
+                },
+                {
+                  "name": "getCellInput",
+                  "documentation": "Editable snapshot of the cell at a view position on the active sheet, or\nnull when out of bounds. See {@link CellInputSnapshot}."
+                },
+                {
+                  "name": "getCharts",
+                  "documentation": "Clones of the chart definitions on `sheet` (default: the active sheet)."
+                },
+                {
+                  "name": "getColumnFilters",
+                  "documentation": "Active column filters on the active sheet, keyed by column index."
+                },
+                {
+                  "name": "getCommandState",
+                  "documentation": "Query undo/redo availability and formatting active/mixed/disabled state."
+                },
+                {
+                  "name": "getEffectiveTheme",
+                  "documentation": "The effective (post-zoom) theme the renderer is currently painting with."
+                },
+                {
+                  "name": "getFocusCellStyle",
+                  "documentation": "Effective style of the focus cell: its own style over its column's\n`cellStyle`. Empty when nothing is selected."
+                },
+                {
+                  "name": "getPivotFields",
+                  "documentation": "Source fields for the field list; empty on the default engine."
+                },
+                {
+                  "name": "getPivotResult",
+                  "documentation": "Plain-JSON output of one pivot. The default engine reports the saved\noutput (`saved`), or `unavailable` without one. Null when `sheet` holds\nno pivot with `id`."
+                },
+                {
+                  "name": "getPivots",
+                  "documentation": "Clones of the pivot definitions on `sheet`, or on every sheet; no engine is needed."
+                },
+                {
+                  "name": "getRuntimeResourceSnapshot",
+                  "documentation": "Versioned coarse runtime ownership snapshot, including datasource state."
+                },
+                {
+                  "name": "getShortcutLabel",
+                  "documentation": "Platform-aware label for a bound action, or an empty string when disabled."
+                },
+                {
+                  "name": "getTheme",
+                  "documentation": "Resolved base theme, before zoom scaling. The returned object is a copy."
+                },
+                {
+                  "name": "groupRows",
+                  "documentation": "Define a collapsible row group over a data-row range (end-inclusive)."
+                },
+                {
+                  "name": "hiddenColumns",
+                  "documentation": "Currently hidden columns on the active sheet."
+                },
+                {
+                  "name": "hiddenRows",
+                  "documentation": "Currently hidden data rows on the active sheet."
+                },
+                {
+                  "name": "hideColumns",
+                  "documentation": "Hide columns through one bulk-safe metadata transaction."
+                },
+                {
+                  "name": "hideRows",
+                  "documentation": "Hide the given data rows (composes with filters/sort)."
+                },
+                {
+                  "name": "highlightCells",
+                  "documentation": "Draw temporary highlights outside document history. Pass `null` to clear all\nhighlights: `grid.highlightCells(null)`. Per-range `color` wins over the call color.\nUndo does not clear highlights; use `styleRange` for persistent cell fills."
+                },
+                {
+                  "name": "importWorkbook",
+                  "documentation": "Replace the document without recreating the grid or chrome. A new import\naborts the previous loader. Failure keeps the document and history; success\nclears undo and redo. Import is not undoable, like Excel Open.\nInjected stores, datasource grids and attached collaboration sessions reject."
+                },
+                {
+                  "name": "openPanel",
+                  "documentation": "Show `panel` on the grid's right edge and shrink the cells to make room;\n`null` closes the open panel. One panel shows at a time: opening a panel\ncloses the previous one. Escape and the close button close it and return\nfocus to the grid."
+                },
+                {
+                  "name": "redo",
+                  "documentation": "Redo the last undone cell edit."
+                },
+                {
+                  "name": "removeChart",
+                  "documentation": "Remove a chart from `sheet` (default: the first sheet that holds it) as one undo entry."
+                },
+                {
+                  "name": "removePivot",
+                  "documentation": "Remove a pivot from `sheet` (default: the sheet that holds it) as one undo entry."
+                },
+                {
+                  "name": "removeSheet",
+                  "documentation": "Remove a sheet while preserving at least one visible worksheet."
+                },
+                {
+                  "name": "rendererKind",
+                  "documentation": "Which renderer is actually active: `\"worker\"` when the OffscreenCanvas\nworker constructed successfully, `\"canvas\"` otherwise (including after a\n`renderer-fallback`)."
+                },
+                {
+                  "name": "replaceAll",
+                  "documentation": "Replace every current match in a single undoable transaction (one\n`undo()` restores them all), then re-scan. Formula/ref cells are skipped\nand not counted. No-op when read-only."
+                },
+                {
+                  "name": "replaceCurrent",
+                  "documentation": "Replace the active match with `replacement`, then advance to the next match\n(re-scanning against the new data). Only literal text/number cells are\neligible; formula and ref cells are skipped (formula source is never\nrewritten). Honors the active {@link SearchOptions} (matchCase; `wholeCell`\nswaps the entire cell). The write flows through the grid's commit path as\none undoable step. No-op when read-only or when there is no active match."
+                },
+                {
+                  "name": "replaceTheme",
+                  "documentation": "Option-level replacement: re-run construction-time resolution\n(`DEFAULT_THEME < CSS custom properties < theme`) with the new partial.\n`undefined` restores the CSS-variable/default resolution. Adapters call\nthis for their declarative `theme` prop; imperative patching stays on\n{@link setTheme}."
+                },
+                {
+                  "name": "rowGroups",
+                  "documentation": "Row groups on the active sheet."
+                },
+                {
+                  "name": "search",
+                  "documentation": "Find cells matching `query`; highlights matches, emits `search`, returns the result."
+                },
+                {
+                  "name": "selectChart",
+                  "documentation": "Select the chart object `id` on `sheet` (default: the active sheet), or\ndeselect with `null`. Selecting a chart on another sheet activates that\nsheet first. Emits `chart-select`."
+                },
+                {
+                  "name": "setChart",
+                  "documentation": "Insert or replace the chart with `chart.id` as one undo entry. `sheet`\ndefaults to the active sheet; chart IDs are unique only within a sheet."
+                },
+                {
+                  "name": "setColumnFilter",
+                  "documentation": "Set or clear (null) one column's filter. All column filters AND together\nand compose with the active sort and hidden rows."
+                },
+                {
+                  "name": "setColumnWidth",
+                  "documentation": "Set one column's width via an undoable `setColumn` patch."
+                },
+                {
+                  "name": "setConfig",
+                  "documentation": "Reconfigure built-in chrome and keyboard handling without replacing the\nGrid or clearing selection/history. Construction-bound GridOptions are not\naccepted here."
+                },
+                {
+                  "name": "setFrozen",
+                  "documentation": "Pin the first `rows` view rows and `cols` columns; they stay visible while\nthe body scrolls (0 = unfreeze that axis). Persisted on the active sheet."
+                },
+                {
+                  "name": "setGroupCollapsed",
+                  "documentation": "Collapse/expand a row group; collapsing hides its rows."
+                },
+                {
+                  "name": "setMinColumns",
+                  "documentation": "Live-update the minimum rendered column count. Increasing the minimum\nsilently extends presentation padding; `undefined` restores the default."
+                },
+                {
+                  "name": "setOverscan",
+                  "documentation": "Live-update the render window overscan (row/column positions painted past\neach edge); `undefined` restores the default of 6."
+                },
+                {
+                  "name": "setPivot",
+                  "documentation": "Insert or replace a pivot as one undo entry. `sheet` defaults to the sheet\nthat holds the pivot's ID, then to the active sheet. The pivot's\n`savedOutput` is removed, because it does not match a changed definition."
+                },
+                {
+                  "name": "setPresenceOverlays",
+                  "documentation": "Replace ephemeral remote-presence overlays; null clears every collaborator."
+                },
+                {
+                  "name": "setReadOnly",
+                  "documentation": "Update editability without replacing the Grid or clearing session state.\nHas no effect after `engine-failed`: that grid stays read-only."
+                },
+                {
+                  "name": "setRowHeight",
+                  "documentation": "Set one row's persistent display height through document history."
+                },
+                {
+                  "name": "setSheetVisibility",
+                  "documentation": "Set host-visible worksheet state; stock UI never offers `veryHidden`."
+                },
+                {
+                  "name": "setTheme",
+                  "documentation": "Imperative patch: merge `theme` into the accumulated base theme."
+                },
+                {
+                  "name": "setViewSort",
+                  "documentation": "Sort the displayed rows of the active sheet by `keys` (first key primary;\nstable) without moving any cell; an empty list clears the view sort. The\nkeys are saved with the sheet and export to XLSX as `sortState`.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction showLargestFirst(grid: Grid) {\n  grid.setViewSort([{ col: 1, ascending: false }]);\n}\n```\n@see\nGrid.clearView"
+                },
+                {
+                  "name": "setZoom",
+                  "documentation": "Content zoom factor (0.5–2): scales row/column geometry and fonts."
+                },
+                {
+                  "name": "showColumns",
+                  "documentation": "Show columns through one bulk-safe metadata transaction."
+                },
+                {
+                  "name": "showRows",
+                  "documentation": "Show the given data rows again, or every hidden row when omitted."
+                },
+                {
+                  "name": "sortBy",
+                  "documentation": "Excel's quick sort by column `col`: sort the cells of the table body\nthat holds the focus cell, or else of the selected range, or else of the\ncurrent region around the focus cell. A first row of text over other\nvalues stays as a header.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction largestFirst(grid: Grid) {\n  grid.sortBy(1, false);\n}\n```\n@see\nGrid.sortRange"
+                },
+                {
+                  "name": "sortRange",
+                  "documentation": "Sort the cells of `range` in place, as Excel's Sort does: one undoable\nchange that collaborators receive as one transaction. With `hasHeader`\nthe first row stays. Merged cells of different sizes reject the sort and\nemit `mutation-rejected`.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction sortOrders(grid: Grid) {\n  grid.sortRange(\n    { sheet: \"s1\", start: { row: 0, col: 0 }, end: { row: 99, col: 3 } },\n    [{ col: 2, ascending: false }],\n    { hasHeader: true },\n  );\n}\n```"
+                },
+                {
+                  "name": "styleRange",
+                  "documentation": "Merge `style` into every cell of `range` (null clears cell styles) as one\nundoable transaction. Styles land in the store and paint in the canvas —\nunlike {@link highlightCells}, which draws a translucent overlay above it."
+                },
+                {
+                  "name": "summarizeSelection",
+                  "documentation": "Totals for the current selection, for a status bar. Large selections are\nread in chunks between frames, so the page stays responsive; abort\n`signal` to stop early, which rejects with the signal's reason.\n`destroy()` stops every running summary the same way, with an\n`AbortError`. Resolves null when nothing is selected."
+                },
+                {
+                  "name": "trimMemory",
+                  "documentation": "Drop the memory this grid can build again: decoded cell strings, rendered\nnumber text, compiled number formats, text measurement and unused overlay\nnodes, in the grid and in its worker renderer. Document data, undo history\nand the visible output do not change. The next frame and the next use\nbuild again what they need. Call it on a memory signal or when the page\ngoes to the background; it does nothing after `destroy()`.\n\nNumber format caches are shared by all grids on the page, so a trim also\ndrops them for the other grids. WebAssembly memory does not shrink; call\n`releaseEngineMemory()` for that.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction trimWhenHidden(grid: Grid) {\n  document.addEventListener(\"visibilitychange\", () => {\n    if (document.visibilityState === \"hidden\") grid.trimMemory();\n  });\n}\n```"
+                },
+                {
+                  "name": "undo",
+                  "documentation": "Undo the last recorded cell edit. If the restored data is above the\ntransaction resource limits, nothing changes: the Grid emits\n`mutation-rejected` and removes that entry, so older edits stay undoable.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction undoAndRestore(grid: Grid) {\n  grid.undo();\n  grid.redo();\n}\n```\n@see\nGrid.redo"
+                },
+                {
+                  "name": "ungroupRows",
+                  "documentation": "Remove a row group (rows become visible if the group was collapsed)."
+                }
+              ]
             },
             {
               "name": "GridCommandName",
@@ -11011,9 +11393,9 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L108",
+              "source": "../core/dist/types/grid.d.ts#L191",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Built-in command names accepted by state queries and change events.",
               "memberDocs": []
             },
             {
@@ -11023,9 +11405,9 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L109",
+              "source": "../core/dist/types/grid.d.ts#L193",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Observable availability and selection-derived activity for one command.",
               "memberDocs": []
             },
             {
@@ -11035,10 +11417,23 @@
               "owners": [
                 "../core/dist/adapter.d.ts"
               ],
-              "source": "../core/dist/adapter.d.ts#L30",
+              "source": "../core/dist/adapter.d.ts#L34",
               "jsDocTags": [],
-              "documentation": "",
-              "memberDocs": []
+              "documentation": "Grid handle, generation, and reason published after adapter initialization.",
+              "memberDocs": [
+                {
+                  "name": "generation",
+                  "documentation": "One-based adapter generation, incremented whenever a Grid is replaced."
+                },
+                {
+                  "name": "grid",
+                  "documentation": "Live handle just published by the adapter; replaced on the next reset generation."
+                },
+                {
+                  "name": "reason",
+                  "documentation": "Whether readiness followed first initialization, an input reset, or a renderer reset."
+                }
+              ]
             },
             {
               "name": "RowBridge",
@@ -11047,10 +11442,27 @@
               "owners": [
                 "../core/dist/row-bridge.d.ts"
               ],
-              "source": "../core/dist/row-bridge.d.ts#L114",
+              "source": "../core/dist/row-bridge.d.ts#L145",
               "jsDocTags": [],
-              "documentation": "",
-              "memberDocs": []
+              "documentation": "Projects canonical document transactions into host-owned row changes.\n\nThe bridge only owns compact data-space identity arrays. It never writes to\n`defaultRows`, never renders, and never creates a second document store.",
+              "memberDocs": [
+                {
+                  "name": "columnKeys",
+                  "documentation": "Current semantic column keys in canonical column order."
+                },
+                {
+                  "name": "project",
+                  "documentation": "Project an applied Grid change as an accepted, transformed, or remote result."
+                },
+                {
+                  "name": "reconcile",
+                  "documentation": "Reconcile a canonical transaction response without synchronizing host rows implicitly."
+                },
+                {
+                  "name": "rowIds",
+                  "documentation": "Current data-space row identities; visual sort and filters do not affect this order."
+                }
+              ]
             },
             {
               "name": "RowBridgeDelta",
@@ -11059,9 +11471,9 @@
               "owners": [
                 "../core/dist/row-bridge.d.ts"
               ],
-              "source": "../core/dist/row-bridge.d.ts#L95",
+              "source": "../core/dist/row-bridge.d.ts#L114",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Every possible projection produced by a row bridge.",
               "memberDocs": []
             },
             {
@@ -11071,9 +11483,9 @@
               "owners": [
                 "../core/dist/row-bridge.d.ts"
               ],
-              "source": "../core/dist/row-bridge.d.ts#L113",
+              "source": "../core/dist/row-bridge.d.ts#L138",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Callback accepted by imperative and framework adapters.",
               "memberDocs": []
             },
             {
@@ -11083,9 +11495,9 @@
               "owners": [
                 "../core/dist/row-bridge.d.ts"
               ],
-              "source": "../core/dist/row-bridge.d.ts#L5",
+              "source": "../core/dist/row-bridge.d.ts#L6",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "A stable host identity for one data-space row.",
               "memberDocs": []
             },
             {
@@ -11095,9 +11507,9 @@
               "owners": [
                 "../core/dist/row-bridge.d.ts"
               ],
-              "source": "../core/dist/row-bridge.d.ts#L108",
+              "source": "../core/dist/row-bridge.d.ts#L132",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Result of projection or reconciliation.",
               "memberDocs": []
             },
             {
@@ -11133,7 +11545,7 @@
             {
               "name": "SheetwriteGridProps",
               "kind": "interface",
-              "signature": "export interface SheetwriteGridProps<Id extends RowBridgeId = RowBridgeId> { rowBridge?: RowBridge<Id>; onRowDelta?: RowBridgeHandler<Id>; onMutationRejected?: GridAdapterEventHandlers[\"onMutationRejected\"]; onRendererFallback?: GridAdapterEventHandlers[\"onRendererFallback\"]; onDatasourceError?: GridAdapterEventHandlers[\"onDatasourceError\"]; onExportError?: GridAdapterEventHandlers[\"onExportError\"]; onReady?: GridAdapterEventHandlers[\"onReady\"]; className?: string; style?: CSSProperties; fallback?: ReactNode; height?: number | string; fill?: true; onGridChange?: (event: ChangeEvent) => void; onSelectionChange?: (selection: Selection | null) => void; onViewportChange?: (event: GridEvents[\"scroll\"]) => void; onEditBegin?: (event: GridEvents[\"edit-begin\"]) => void; onEditCommit?: (event: GridEvents[\"edit-commit\"]) => void; onSearch?: (result: GridEvents[\"search\"]) => void; onActiveSheetChange?: (event: GridEvents[\"active-sheet\"]) => void; onCommandStateChange?: (event: GridEvents[\"command-state-change\"]) => void; onInitializationError?: (error: SheetwriteError) => void; wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module; workbook: Workbook; data?: ColumnarData; datasource?: DataSource; datasourceStorage?: DataSourceStorageOptions; renderer?: \"canvas\" | \"worker\"; workerUrl?: string | URL; presentation?: GridPresentation; theme?: Partial<Theme>; readOnly?: boolean; hyperlinkActivation?: \"event-only\" | \"internal-navigation\" | \"disabled\"; protectionResolver?: ProtectionResolver; mutationPolicy?: MutationPolicyMode; transactionResourceLimits?: Partial<TransactionResourceLimits>; renderers?: Record<string, CellRenderer>; editors?: Record<string, CellEditor>; overscan?: number; minColumns?: number; config?: GridConfig; }",
+              "signature": "export interface SheetwriteGridProps<Id extends RowBridgeId = RowBridgeId> { rowBridge?: RowBridge<Id>; onRowDelta?: RowBridgeHandler<Id>; onMutationRejected?: GridAdapterEventHandlers[\"onMutationRejected\"]; onRendererFallback?: GridAdapterEventHandlers[\"onRendererFallback\"]; onDatasourceError?: GridAdapterEventHandlers[\"onDatasourceError\"]; onExportError?: GridAdapterEventHandlers[\"onExportError\"]; onReady?: GridAdapterEventHandlers[\"onReady\"]; className?: string; style?: CSSProperties; fallback?: ReactNode; height?: number | string; fill?: true; onGridChange?: (event: ChangeEvent) => void; onSelectionChange?: (selection: Selection | null) => void; workbook: Workbook; data?: ColumnarData; datasource?: DataSource; datasourceStorage?: DataSourceStorageOptions; renderer?: \"canvas\" | \"worker\"; workerUrl?: string | URL; presentation?: GridPresentation; theme?: Partial<Theme>; readOnly?: boolean; hyperlinkActivation?: \"event-only\" | \"internal-navigation\" | \"disabled\"; protectionResolver?: ProtectionResolver; mutationPolicy?: MutationPolicyMode; transactionResourceLimits?: Partial<TransactionResourceLimits>; renderers?: Record<string, CellRenderer>; editors?: Record<string, CellEditor>; overscan?: number; minColumns?: number; config?: GridConfig; onViewportChange?: (event: GridEvents[\"scroll\"]) => void; onEditBegin?: (event: GridEvents[\"edit-begin\"]) => void; onEditCommit?: (event: GridEvents[\"edit-commit\"]) => void; onSearch?: (result: GridEvents[\"search\"]) => void; onActiveSheetChange?: (event: GridEvents[\"active-sheet\"]) => void; onCommandStateChange?: (event: GridEvents[\"command-state-change\"]) => void; onInitializationError?: (error: SheetwriteError) => void; wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module; }",
               "owners": [
                 "src/index.tsx"
               ],
@@ -11354,6 +11766,26 @@
                   "documentation": "Additional class appended to the required `sheetwrite` host class."
                 },
                 {
+                  "name": "config",
+                  "documentation": "Built-in UI controls; providing an object enables the toolbar unless `toolbar` is false."
+                },
+                {
+                  "name": "data",
+                  "documentation": "Eager column-major values loaded into `workbook.activeSheet`; use instead of `datasource`."
+                },
+                {
+                  "name": "datasource",
+                  "documentation": "Lazy row provider requested for visible windows; use instead of eager `data`."
+                },
+                {
+                  "name": "datasourceStorage",
+                  "documentation": "Allocation and cache policy for datasource-backed cell storage."
+                },
+                {
+                  "name": "editors",
+                  "documentation": "Named custom editors resolved from each column's `editor` field."
+                },
+                {
                   "name": "fallback",
                   "documentation": "Content shown while WASM is loading or after initialization fails."
                 },
@@ -11366,6 +11798,10 @@
                   "documentation": "Host height in CSS pixels for numbers or any CSS length string."
                 },
                 {
+                  "name": "hyperlinkActivation",
+                  "documentation": "Hyperlink activation never opens a browser URL. `event-only` (default)\nemits a safe resolved target; `internal-navigation` additionally moves to\nstable internal destinations; `disabled` rejects every activation request."
+                },
+                {
                   "name": "inputMode",
                   "documentation": "Hints at the type of data that might be entered by the user while editing the element or its contents"
                 },
@@ -11374,12 +11810,44 @@
                   "documentation": "Specify that a standard HTML element should behave like a defined custom built-in element"
                 },
                 {
+                  "name": "minColumns",
+                  "documentation": "Render at least this many columns, adding empty columns past the data. A\nspreadsheet also adds empty columns to fill the host width; a data grid\nadds them only through this option."
+                },
+                {
+                  "name": "mutationPolicy",
+                  "documentation": "Atomic rejects the transaction; partial skips denied operation objects."
+                },
+                {
+                  "name": "onActiveSheetChange",
+                  "documentation": "Fires after the visible sheet changes."
+                },
+                {
+                  "name": "onCommandStateChange",
+                  "documentation": "Receives observable undo/redo and formatting command state."
+                },
+                {
                   "name": "onDatasourceError",
                   "documentation": "Receives failed datasource requests and their errors."
                 },
                 {
+                  "name": "onEditBegin",
+                  "documentation": "Fires when cell editing begins."
+                },
+                {
+                  "name": "onEditCommit",
+                  "documentation": "Fires after an edit commits its parsed cell value."
+                },
+                {
                   "name": "onExportError",
                   "documentation": "Receives failures from built-in XLSX export actions."
+                },
+                {
+                  "name": "onGridChange",
+                  "documentation": "Receives every committed Grid change, including its applied transaction."
+                },
+                {
+                  "name": "onInitializationError",
+                  "documentation": "Receives a WASM initialization failure while the adapter remains mounted."
                 },
                 {
                   "name": "onMutationRejected",
@@ -11398,12 +11866,68 @@
                   "documentation": "Receives one accepted or reconciled row projection."
                 },
                 {
+                  "name": "onSearch",
+                  "documentation": "Receives refreshed search matches and active-match index."
+                },
+                {
+                  "name": "onSelectionChange",
+                  "documentation": "Receives the current selection, or `null` after it is cleared."
+                },
+                {
+                  "name": "onViewportChange",
+                  "documentation": "Receives visible row bounds and vertical scroll offset after scrolling."
+                },
+                {
+                  "name": "overscan",
+                  "documentation": "Extra row and visible-column positions painted on each viewport edge.\nDefaults to 6; use 0 to disable the buffer."
+                },
+                {
+                  "name": "presentation",
+                  "documentation": "Header presentation. Spreadsheet mode (default) paints positional A/B/C\nlabels; data-grid mode paints each column's semantic `header`. Cell\naddressing, row indices, clipboard values, formulas, and exports are\nunchanged in both modes."
+                },
+                {
+                  "name": "protectionResolver",
+                  "documentation": "Host-owned client UX permission check. Servers must independently authorize\nevery submitted operation; this resolver is not an authentication boundary."
+                },
+                {
+                  "name": "readOnly",
+                  "documentation": "Disables mutating interactions while preserving navigation and selection."
+                },
+                {
+                  "name": "renderer",
+                  "documentation": "Paint backend; defaults to main-thread `canvas` and falls back there if a worker fails."
+                },
+                {
+                  "name": "renderers",
+                  "documentation": "Custom cell renderers registered up front; also see `Grid.defineCellRenderer`."
+                },
+                {
                   "name": "rowBridge",
                   "documentation": "Projects canonical changes to host-owned row identities."
                 },
                 {
                   "name": "style",
                   "documentation": "Host styles merged before adapter sizing styles."
+                },
+                {
+                  "name": "theme",
+                  "documentation": "Overrides merged over the default theme and host CSS custom properties."
+                },
+                {
+                  "name": "transactionResourceLimits",
+                  "documentation": "Overrides inclusive operation-count and encoded-byte ceilings for every atomic mutation."
+                },
+                {
+                  "name": "wasmSource",
+                  "documentation": "Explicit source passed to process-wide WASM initialization; concurrent initialization is first-source-wins."
+                },
+                {
+                  "name": "workbook",
+                  "documentation": "Live workbook schema adopted by the store and updated by document operations."
+                },
+                {
+                  "name": "workerUrl",
+                  "documentation": "URL of the worker renderer module (`renderer: \"worker\"`), as served to the\nBROWSER. Usually not needed: by default the grid creates its worker as\n`new Worker(new URL(\"./worker.js\", import.meta.url))`, which bundlers such\nas Vite build together with the worker's imports. Pass a URL when there\nis no bundler, or when yours copies the file instead of building it, for\nexample a copy of `@sheetwrite/core/dist/` in your public assets (see\n`/docs/features/worker-rendering/`). A bare specifier like\n`new URL(\"@sheetwrite/core/worker\", import.meta.url)` is NOT reliable: the\nplatform `Worker` constructor does not consult package exports. If the\nworker can't be constructed or fails to load, the grid falls back to the\nmain-thread canvas renderer and emits `renderer-fallback` once."
                 }
               ]
             },
@@ -11426,10 +11950,47 @@
               "owners": [
                 "../core/dist/adapter.d.ts"
               ],
-              "source": "../core/dist/adapter.d.ts#L88",
+              "source": "../core/dist/adapter.d.ts#L137",
               "jsDocTags": [],
-              "documentation": "",
-              "memberDocs": []
+              "documentation": "Column definition accepted by the adapters’ simple row-object API.",
+              "memberDocs": [
+                {
+                  "name": "cellStyle",
+                  "documentation": "Base style merged beneath cell-specific styles."
+                },
+                {
+                  "name": "editor",
+                  "documentation": "Name of a custom editor registered through `GridOptions.editors`."
+                },
+                {
+                  "name": "headerStyle",
+                  "documentation": "Style applied to the painted column header."
+                },
+                {
+                  "name": "key",
+                  "documentation": "Non-empty row-object key, unique within the column list."
+                },
+                {
+                  "name": "numberFormat",
+                  "documentation": "Excel number-format code used for number, date, or currency display."
+                },
+                {
+                  "name": "title",
+                  "documentation": "Semantic title painted in data-grid mode and written by table exports."
+                },
+                {
+                  "name": "type",
+                  "documentation": "Input and formatting type; defaults to `text`."
+                },
+                {
+                  "name": "visible",
+                  "documentation": "Set to `false` to exclude the column from the live view and table exports."
+                },
+                {
+                  "name": "width",
+                  "documentation": "Unzoomed width in CSS pixels; defaults to 120."
+                }
+              ]
             }
           ]
         },
@@ -11459,9 +12020,9 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L47",
+              "source": "../core/dist/types/grid.d.ts#L60",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Framework-neutral named editor definition registered through GridOptions.editors.",
               "memberDocs": []
             },
             {
@@ -11471,9 +12032,9 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L26",
+              "source": "../core/dist/types/grid.d.ts#L37",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Immutable state and guarded completion callbacks for one mounted editor.",
               "memberDocs": []
             },
             {
@@ -11483,9 +12044,9 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L40",
+              "source": "../core/dist/types/grid.d.ts#L52",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Retained lifecycle returned by a custom editor's mount method.",
               "memberDocs": []
             },
             {
@@ -11495,9 +12056,9 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L19",
+              "source": "../core/dist/types/grid.d.ts#L28",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Selection movement applied after a successful editor commit.",
               "memberDocs": []
             },
             {
@@ -11507,9 +12068,9 @@
               "owners": [
                 "../core/dist/types/cell.d.ts"
               ],
-              "source": "../core/dist/types/cell.d.ts#L69",
+              "source": "../core/dist/types/cell.d.ts#L112",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "A scalar that can be displayed directly.",
               "memberDocs": []
             },
             {
@@ -11519,10 +12080,326 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L287",
-              "jsDocTags": [],
-              "documentation": "",
-              "memberDocs": []
+              "source": "../core/dist/types/grid.d.ts#L645",
+              "jsDocTags": [
+                "example",
+                "see"
+              ],
+              "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction updateTotal(grid: Grid) {\n  const sheet = grid.getActiveSheet();\n  const result = grid.applyTransaction({\n    patches: [{ op: \"set\", addr: { sheet, row: 0, col: 0 }, value: { kind: \"literal\", value: 42 } }],\n  });\n  if (result.status === \"applied\") grid.scrollToCell({ sheet, row: 0, col: 0 });\n  return grid.aggregate(0, \"sum\");\n}\n```\n@see\ncreateGrid\n@see\nGrid.applyTransaction",
+              "memberDocs": [
+                {
+                  "name": "actions",
+                  "documentation": "Imperative action surface for binding custom toolbars/menus."
+                },
+                {
+                  "name": "activateHyperlink",
+                  "documentation": "Validate and emit a host-owned activation event. External targets are never\nopened by Sheetwrite; internal navigation occurs only under the explicit policy."
+                },
+                {
+                  "name": "addSheet",
+                  "documentation": "Add a sheet with a stable ID and return its actionable transaction outcome."
+                },
+                {
+                  "name": "aggregate",
+                  "documentation": "Column aggregate over the active sheet's data.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction total(grid: Grid) {\n  return grid.aggregate(1, \"sum\");\n}\n```\n@see\nSheetwriteStore.aggregate"
+                },
+                {
+                  "name": "applyRemoteOperations",
+                  "documentation": "Apply host-supplied operations without undo history or outgoing dirty state.\nThe resulting change event has `source: \"remote\"`."
+                },
+                {
+                  "name": "applyTransaction",
+                  "documentation": "Apply arbitrary patches as one undoable Grid commit. No-op when read-only.\nUse `Store.applyTransaction` only for low-level writes that intentionally\nbypass Grid history and policy.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction setFirstCell(grid: Grid) {\n  return grid.applyTransaction({ patches: [\n    { op: \"set\", addr: { sheet: grid.getActiveSheet(), row: 0, col: 0 },\n      value: { kind: \"literal\", value: 42 } },\n  ] });\n}\n```\n@see\nTransaction"
+                },
+                {
+                  "name": "autoFitColumns",
+                  "documentation": "Explicitly resize columns from a bulk worksheet read."
+                },
+                {
+                  "name": "autoFitRows",
+                  "documentation": "Explicitly resize rows to fit wrapped content; never runs during paint."
+                },
+                {
+                  "name": "beginEdit",
+                  "documentation": "Open the cell editor at a view cell, optionally seeding text / selecting all."
+                },
+                {
+                  "name": "clearSearch",
+                  "documentation": "Clear the current search and its highlights."
+                },
+                {
+                  "name": "clearView",
+                  "documentation": "Clear any active sort/filter view."
+                },
+                {
+                  "name": "dataEdge",
+                  "documentation": "Ctrl+Arrow-style jump target: the data-run edge from (row, col) on the\nmoved axis (row for vertical moves, col for horizontal), or null when the\nstore is not columnar. Under an active sort/filter view, `row` is a view\nposition and vertical moves return view positions. For hosts building\ntheir own keymaps (`config.keyboard`)."
+                },
+                {
+                  "name": "destroy",
+                  "documentation": "Free everything this grid owns: its DOM, listeners, timers, renderer,\nworker and caches, and the store that it created. Call it when the host\nview is removed; a second call does nothing."
+                },
+                {
+                  "name": "distinctValues",
+                  "documentation": "Distinct resolved values of a column in first-seen order. Defaults to\n1,000 values for bounded filter menus; pass 0 to request an uncapped scan."
+                },
+                {
+                  "name": "exportCsv",
+                  "documentation": "Download the active sheet as CSV.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction downloadCsv(grid: Grid) {\n  grid.exportCsv(\"sales.csv\");\n}\n```"
+                },
+                {
+                  "name": "exportSnapshot",
+                  "documentation": "Deterministically export the complete authoritative workbook document."
+                },
+                {
+                  "name": "exportXlsx",
+                  "documentation": "Download the active sheet through the registered XLSX backend.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\nimport { registerXlsxBackends } from \"@sheetwrite/xlsx\";\n\nasync function downloadXlsx(grid: Grid) {\n  await registerXlsxBackends();\n  await grid.exportXlsx(\"sales.xlsx\");\n}\n```\n@see\ntoXlsxWorkbook"
+                },
+                {
+                  "name": "filterBy",
+                  "documentation": "Filter the displayed rows to those whose column text contains `needle`.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction showOpenRows(grid: Grid) {\n  grid.filterBy(0, \"Open\");\n}\n```\n@see\nGrid.clearView"
+                },
+                {
+                  "name": "findNext",
+                  "documentation": "Move the active match to the next match and scroll it into view."
+                },
+                {
+                  "name": "findPrev",
+                  "documentation": "Move the active match to the previous match and scroll it into view."
+                },
+                {
+                  "name": "getActiveSheet",
+                  "documentation": "Id of the currently visible sheet."
+                },
+                {
+                  "name": "getCellAtPoint",
+                  "documentation": "Resolve browser viewport coordinates to an active-sheet cell for host-owned\nmenus and interactions. Returns null outside the cell body."
+                },
+                {
+                  "name": "getCellInput",
+                  "documentation": "Editable snapshot of the cell at a view position on the active sheet, or\nnull when out of bounds. See {@link CellInputSnapshot}."
+                },
+                {
+                  "name": "getCharts",
+                  "documentation": "Clones of the chart definitions on `sheet` (default: the active sheet)."
+                },
+                {
+                  "name": "getColumnFilters",
+                  "documentation": "Active column filters on the active sheet, keyed by column index."
+                },
+                {
+                  "name": "getCommandState",
+                  "documentation": "Query undo/redo availability and formatting active/mixed/disabled state."
+                },
+                {
+                  "name": "getEffectiveTheme",
+                  "documentation": "The effective (post-zoom) theme the renderer is currently painting with."
+                },
+                {
+                  "name": "getFocusCellStyle",
+                  "documentation": "Effective style of the focus cell: its own style over its column's\n`cellStyle`. Empty when nothing is selected."
+                },
+                {
+                  "name": "getPivotFields",
+                  "documentation": "Source fields for the field list; empty on the default engine."
+                },
+                {
+                  "name": "getPivotResult",
+                  "documentation": "Plain-JSON output of one pivot. The default engine reports the saved\noutput (`saved`), or `unavailable` without one. Null when `sheet` holds\nno pivot with `id`."
+                },
+                {
+                  "name": "getPivots",
+                  "documentation": "Clones of the pivot definitions on `sheet`, or on every sheet; no engine is needed."
+                },
+                {
+                  "name": "getRuntimeResourceSnapshot",
+                  "documentation": "Versioned coarse runtime ownership snapshot, including datasource state."
+                },
+                {
+                  "name": "getShortcutLabel",
+                  "documentation": "Platform-aware label for a bound action, or an empty string when disabled."
+                },
+                {
+                  "name": "getTheme",
+                  "documentation": "Resolved base theme, before zoom scaling. The returned object is a copy."
+                },
+                {
+                  "name": "groupRows",
+                  "documentation": "Define a collapsible row group over a data-row range (end-inclusive)."
+                },
+                {
+                  "name": "hiddenColumns",
+                  "documentation": "Currently hidden columns on the active sheet."
+                },
+                {
+                  "name": "hiddenRows",
+                  "documentation": "Currently hidden data rows on the active sheet."
+                },
+                {
+                  "name": "hideColumns",
+                  "documentation": "Hide columns through one bulk-safe metadata transaction."
+                },
+                {
+                  "name": "hideRows",
+                  "documentation": "Hide the given data rows (composes with filters/sort)."
+                },
+                {
+                  "name": "highlightCells",
+                  "documentation": "Draw temporary highlights outside document history. Pass `null` to clear all\nhighlights: `grid.highlightCells(null)`. Per-range `color` wins over the call color.\nUndo does not clear highlights; use `styleRange` for persistent cell fills."
+                },
+                {
+                  "name": "importWorkbook",
+                  "documentation": "Replace the document without recreating the grid or chrome. A new import\naborts the previous loader. Failure keeps the document and history; success\nclears undo and redo. Import is not undoable, like Excel Open.\nInjected stores, datasource grids and attached collaboration sessions reject."
+                },
+                {
+                  "name": "openPanel",
+                  "documentation": "Show `panel` on the grid's right edge and shrink the cells to make room;\n`null` closes the open panel. One panel shows at a time: opening a panel\ncloses the previous one. Escape and the close button close it and return\nfocus to the grid."
+                },
+                {
+                  "name": "redo",
+                  "documentation": "Redo the last undone cell edit."
+                },
+                {
+                  "name": "removeChart",
+                  "documentation": "Remove a chart from `sheet` (default: the first sheet that holds it) as one undo entry."
+                },
+                {
+                  "name": "removePivot",
+                  "documentation": "Remove a pivot from `sheet` (default: the sheet that holds it) as one undo entry."
+                },
+                {
+                  "name": "removeSheet",
+                  "documentation": "Remove a sheet while preserving at least one visible worksheet."
+                },
+                {
+                  "name": "rendererKind",
+                  "documentation": "Which renderer is actually active: `\"worker\"` when the OffscreenCanvas\nworker constructed successfully, `\"canvas\"` otherwise (including after a\n`renderer-fallback`)."
+                },
+                {
+                  "name": "replaceAll",
+                  "documentation": "Replace every current match in a single undoable transaction (one\n`undo()` restores them all), then re-scan. Formula/ref cells are skipped\nand not counted. No-op when read-only."
+                },
+                {
+                  "name": "replaceCurrent",
+                  "documentation": "Replace the active match with `replacement`, then advance to the next match\n(re-scanning against the new data). Only literal text/number cells are\neligible; formula and ref cells are skipped (formula source is never\nrewritten). Honors the active {@link SearchOptions} (matchCase; `wholeCell`\nswaps the entire cell). The write flows through the grid's commit path as\none undoable step. No-op when read-only or when there is no active match."
+                },
+                {
+                  "name": "replaceTheme",
+                  "documentation": "Option-level replacement: re-run construction-time resolution\n(`DEFAULT_THEME < CSS custom properties < theme`) with the new partial.\n`undefined` restores the CSS-variable/default resolution. Adapters call\nthis for their declarative `theme` prop; imperative patching stays on\n{@link setTheme}."
+                },
+                {
+                  "name": "rowGroups",
+                  "documentation": "Row groups on the active sheet."
+                },
+                {
+                  "name": "search",
+                  "documentation": "Find cells matching `query`; highlights matches, emits `search`, returns the result."
+                },
+                {
+                  "name": "selectChart",
+                  "documentation": "Select the chart object `id` on `sheet` (default: the active sheet), or\ndeselect with `null`. Selecting a chart on another sheet activates that\nsheet first. Emits `chart-select`."
+                },
+                {
+                  "name": "setChart",
+                  "documentation": "Insert or replace the chart with `chart.id` as one undo entry. `sheet`\ndefaults to the active sheet; chart IDs are unique only within a sheet."
+                },
+                {
+                  "name": "setColumnFilter",
+                  "documentation": "Set or clear (null) one column's filter. All column filters AND together\nand compose with the active sort and hidden rows."
+                },
+                {
+                  "name": "setColumnWidth",
+                  "documentation": "Set one column's width via an undoable `setColumn` patch."
+                },
+                {
+                  "name": "setConfig",
+                  "documentation": "Reconfigure built-in chrome and keyboard handling without replacing the\nGrid or clearing selection/history. Construction-bound GridOptions are not\naccepted here."
+                },
+                {
+                  "name": "setFrozen",
+                  "documentation": "Pin the first `rows` view rows and `cols` columns; they stay visible while\nthe body scrolls (0 = unfreeze that axis). Persisted on the active sheet."
+                },
+                {
+                  "name": "setGroupCollapsed",
+                  "documentation": "Collapse/expand a row group; collapsing hides its rows."
+                },
+                {
+                  "name": "setMinColumns",
+                  "documentation": "Live-update the minimum rendered column count. Increasing the minimum\nsilently extends presentation padding; `undefined` restores the default."
+                },
+                {
+                  "name": "setOverscan",
+                  "documentation": "Live-update the render window overscan (row/column positions painted past\neach edge); `undefined` restores the default of 6."
+                },
+                {
+                  "name": "setPivot",
+                  "documentation": "Insert or replace a pivot as one undo entry. `sheet` defaults to the sheet\nthat holds the pivot's ID, then to the active sheet. The pivot's\n`savedOutput` is removed, because it does not match a changed definition."
+                },
+                {
+                  "name": "setPresenceOverlays",
+                  "documentation": "Replace ephemeral remote-presence overlays; null clears every collaborator."
+                },
+                {
+                  "name": "setReadOnly",
+                  "documentation": "Update editability without replacing the Grid or clearing session state.\nHas no effect after `engine-failed`: that grid stays read-only."
+                },
+                {
+                  "name": "setRowHeight",
+                  "documentation": "Set one row's persistent display height through document history."
+                },
+                {
+                  "name": "setSheetVisibility",
+                  "documentation": "Set host-visible worksheet state; stock UI never offers `veryHidden`."
+                },
+                {
+                  "name": "setTheme",
+                  "documentation": "Imperative patch: merge `theme` into the accumulated base theme."
+                },
+                {
+                  "name": "setViewSort",
+                  "documentation": "Sort the displayed rows of the active sheet by `keys` (first key primary;\nstable) without moving any cell; an empty list clears the view sort. The\nkeys are saved with the sheet and export to XLSX as `sortState`.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction showLargestFirst(grid: Grid) {\n  grid.setViewSort([{ col: 1, ascending: false }]);\n}\n```\n@see\nGrid.clearView"
+                },
+                {
+                  "name": "setZoom",
+                  "documentation": "Content zoom factor (0.5–2): scales row/column geometry and fonts."
+                },
+                {
+                  "name": "showColumns",
+                  "documentation": "Show columns through one bulk-safe metadata transaction."
+                },
+                {
+                  "name": "showRows",
+                  "documentation": "Show the given data rows again, or every hidden row when omitted."
+                },
+                {
+                  "name": "sortBy",
+                  "documentation": "Excel's quick sort by column `col`: sort the cells of the table body\nthat holds the focus cell, or else of the selected range, or else of the\ncurrent region around the focus cell. A first row of text over other\nvalues stays as a header.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction largestFirst(grid: Grid) {\n  grid.sortBy(1, false);\n}\n```\n@see\nGrid.sortRange"
+                },
+                {
+                  "name": "sortRange",
+                  "documentation": "Sort the cells of `range` in place, as Excel's Sort does: one undoable\nchange that collaborators receive as one transaction. With `hasHeader`\nthe first row stays. Merged cells of different sizes reject the sort and\nemit `mutation-rejected`.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction sortOrders(grid: Grid) {\n  grid.sortRange(\n    { sheet: \"s1\", start: { row: 0, col: 0 }, end: { row: 99, col: 3 } },\n    [{ col: 2, ascending: false }],\n    { hasHeader: true },\n  );\n}\n```"
+                },
+                {
+                  "name": "styleRange",
+                  "documentation": "Merge `style` into every cell of `range` (null clears cell styles) as one\nundoable transaction. Styles land in the store and paint in the canvas —\nunlike {@link highlightCells}, which draws a translucent overlay above it."
+                },
+                {
+                  "name": "summarizeSelection",
+                  "documentation": "Totals for the current selection, for a status bar. Large selections are\nread in chunks between frames, so the page stays responsive; abort\n`signal` to stop early, which rejects with the signal's reason.\n`destroy()` stops every running summary the same way, with an\n`AbortError`. Resolves null when nothing is selected."
+                },
+                {
+                  "name": "trimMemory",
+                  "documentation": "Drop the memory this grid can build again: decoded cell strings, rendered\nnumber text, compiled number formats, text measurement and unused overlay\nnodes, in the grid and in its worker renderer. Document data, undo history\nand the visible output do not change. The next frame and the next use\nbuild again what they need. Call it on a memory signal or when the page\ngoes to the background; it does nothing after `destroy()`.\n\nNumber format caches are shared by all grids on the page, so a trim also\ndrops them for the other grids. WebAssembly memory does not shrink; call\n`releaseEngineMemory()` for that.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction trimWhenHidden(grid: Grid) {\n  document.addEventListener(\"visibilitychange\", () => {\n    if (document.visibilityState === \"hidden\") grid.trimMemory();\n  });\n}\n```"
+                },
+                {
+                  "name": "undo",
+                  "documentation": "Undo the last recorded cell edit. If the restored data is above the\ntransaction resource limits, nothing changes: the Grid emits\n`mutation-rejected` and removes that entry, so older edits stay undoable.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction undoAndRestore(grid: Grid) {\n  grid.undo();\n  grid.redo();\n}\n```\n@see\nGrid.redo"
+                },
+                {
+                  "name": "ungroupRows",
+                  "documentation": "Remove a row group (rows become visible if the group was collapsed)."
+                }
+              ]
             },
             {
               "name": "GridCommandName",
@@ -11531,9 +12408,9 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L108",
+              "source": "../core/dist/types/grid.d.ts#L191",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Built-in command names accepted by state queries and change events.",
               "memberDocs": []
             },
             {
@@ -11543,9 +12420,9 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L109",
+              "source": "../core/dist/types/grid.d.ts#L193",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Observable availability and selection-derived activity for one command.",
               "memberDocs": []
             },
             {
@@ -11555,10 +12432,23 @@
               "owners": [
                 "../core/dist/adapter.d.ts"
               ],
-              "source": "../core/dist/adapter.d.ts#L30",
+              "source": "../core/dist/adapter.d.ts#L34",
               "jsDocTags": [],
-              "documentation": "",
-              "memberDocs": []
+              "documentation": "Grid handle, generation, and reason published after adapter initialization.",
+              "memberDocs": [
+                {
+                  "name": "generation",
+                  "documentation": "One-based adapter generation, incremented whenever a Grid is replaced."
+                },
+                {
+                  "name": "grid",
+                  "documentation": "Live handle just published by the adapter; replaced on the next reset generation."
+                },
+                {
+                  "name": "reason",
+                  "documentation": "Whether readiness followed first initialization, an input reset, or a renderer reset."
+                }
+              ]
             },
             {
               "name": "RowBridge",
@@ -11567,10 +12457,27 @@
               "owners": [
                 "../core/dist/row-bridge.d.ts"
               ],
-              "source": "../core/dist/row-bridge.d.ts#L114",
+              "source": "../core/dist/row-bridge.d.ts#L145",
               "jsDocTags": [],
-              "documentation": "",
-              "memberDocs": []
+              "documentation": "Projects canonical document transactions into host-owned row changes.\n\nThe bridge only owns compact data-space identity arrays. It never writes to\n`defaultRows`, never renders, and never creates a second document store.",
+              "memberDocs": [
+                {
+                  "name": "columnKeys",
+                  "documentation": "Current semantic column keys in canonical column order."
+                },
+                {
+                  "name": "project",
+                  "documentation": "Project an applied Grid change as an accepted, transformed, or remote result."
+                },
+                {
+                  "name": "reconcile",
+                  "documentation": "Reconcile a canonical transaction response without synchronizing host rows implicitly."
+                },
+                {
+                  "name": "rowIds",
+                  "documentation": "Current data-space row identities; visual sort and filters do not affect this order."
+                }
+              ]
             },
             {
               "name": "RowBridgeDelta",
@@ -11579,9 +12486,9 @@
               "owners": [
                 "../core/dist/row-bridge.d.ts"
               ],
-              "source": "../core/dist/row-bridge.d.ts#L95",
+              "source": "../core/dist/row-bridge.d.ts#L114",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Every possible projection produced by a row bridge.",
               "memberDocs": []
             },
             {
@@ -11591,9 +12498,9 @@
               "owners": [
                 "../core/dist/row-bridge.d.ts"
               ],
-              "source": "../core/dist/row-bridge.d.ts#L113",
+              "source": "../core/dist/row-bridge.d.ts#L138",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Callback accepted by imperative and framework adapters.",
               "memberDocs": []
             },
             {
@@ -11603,9 +12510,9 @@
               "owners": [
                 "../core/dist/row-bridge.d.ts"
               ],
-              "source": "../core/dist/row-bridge.d.ts#L5",
+              "source": "../core/dist/row-bridge.d.ts#L6",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "A stable host identity for one data-space row.",
               "memberDocs": []
             },
             {
@@ -11615,9 +12522,9 @@
               "owners": [
                 "../core/dist/row-bridge.d.ts"
               ],
-              "source": "../core/dist/row-bridge.d.ts#L108",
+              "source": "../core/dist/row-bridge.d.ts#L132",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Result of projection or reconciliation.",
               "memberDocs": []
             },
             {
@@ -11916,6 +12823,66 @@
                   "documentation": "Atomic or partial denial policy."
                 },
                 {
+                  "name": "onActiveSheetChange",
+                  "documentation": "Fires after the visible sheet changes."
+                },
+                {
+                  "name": "onCommandStateChange",
+                  "documentation": "Receives observable undo/redo and formatting command state."
+                },
+                {
+                  "name": "onDatasourceError",
+                  "documentation": "Receives failed datasource requests and their errors."
+                },
+                {
+                  "name": "onEditBegin",
+                  "documentation": "Fires when cell editing begins."
+                },
+                {
+                  "name": "onEditCommit",
+                  "documentation": "Fires after an edit commits its parsed cell value."
+                },
+                {
+                  "name": "onExportError",
+                  "documentation": "Receives failures from built-in XLSX export actions."
+                },
+                {
+                  "name": "onGridChange",
+                  "documentation": "Receives every committed Grid change, including its applied transaction."
+                },
+                {
+                  "name": "onInitializationError",
+                  "documentation": "Receives a WASM initialization failure while the adapter remains mounted."
+                },
+                {
+                  "name": "onMutationRejected",
+                  "documentation": "Receives structured issues when a Grid mutation is rejected."
+                },
+                {
+                  "name": "onReady",
+                  "documentation": "Fires after the adapter publishes a ready Grid generation."
+                },
+                {
+                  "name": "onRendererFallback",
+                  "documentation": "Fires when worker rendering falls back to the main-thread canvas renderer."
+                },
+                {
+                  "name": "onRowDelta",
+                  "documentation": "Receives projected host-row effects when a row bridge is attached."
+                },
+                {
+                  "name": "onSearch",
+                  "documentation": "Receives refreshed search matches and active-match index."
+                },
+                {
+                  "name": "onSelectionChange",
+                  "documentation": "Receives the current selection, or `null` after it is cleared."
+                },
+                {
+                  "name": "onViewportChange",
+                  "documentation": "Receives visible row bounds and vertical scroll offset after scrolling."
+                },
+                {
                   "name": "overscan",
                   "documentation": "Extra rows painted around the viewport."
                 },
@@ -11952,6 +12919,10 @@
                   "documentation": "Overrides inclusive operation-count and encoded-byte ceilings for every atomic mutation."
                 },
                 {
+                  "name": "wasmSource",
+                  "documentation": "Explicit source passed to process-wide WASM initialization; concurrent initialization is first-source-wins."
+                },
+                {
                   "name": "workbook",
                   "documentation": "Live workbook schema adopted by the Grid."
                 },
@@ -11980,10 +12951,47 @@
               "owners": [
                 "../core/dist/adapter.d.ts"
               ],
-              "source": "../core/dist/adapter.d.ts#L88",
+              "source": "../core/dist/adapter.d.ts#L137",
               "jsDocTags": [],
-              "documentation": "",
-              "memberDocs": []
+              "documentation": "Column definition accepted by the adapters’ simple row-object API.",
+              "memberDocs": [
+                {
+                  "name": "cellStyle",
+                  "documentation": "Base style merged beneath cell-specific styles."
+                },
+                {
+                  "name": "editor",
+                  "documentation": "Name of a custom editor registered through `GridOptions.editors`."
+                },
+                {
+                  "name": "headerStyle",
+                  "documentation": "Style applied to the painted column header."
+                },
+                {
+                  "name": "key",
+                  "documentation": "Non-empty row-object key, unique within the column list."
+                },
+                {
+                  "name": "numberFormat",
+                  "documentation": "Excel number-format code used for number, date, or currency display."
+                },
+                {
+                  "name": "title",
+                  "documentation": "Semantic title painted in data-grid mode and written by table exports."
+                },
+                {
+                  "name": "type",
+                  "documentation": "Input and formatting type; defaults to `text`."
+                },
+                {
+                  "name": "visible",
+                  "documentation": "Set to `false` to exclude the column from the live view and table exports."
+                },
+                {
+                  "name": "width",
+                  "documentation": "Unzoomed width in CSS pixels; defaults to 120."
+                }
+              ]
             }
           ]
         },
@@ -12013,9 +13021,9 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L47",
+              "source": "../core/dist/types/grid.d.ts#L60",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Framework-neutral named editor definition registered through GridOptions.editors.",
               "memberDocs": []
             },
             {
@@ -12025,9 +13033,9 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L26",
+              "source": "../core/dist/types/grid.d.ts#L37",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Immutable state and guarded completion callbacks for one mounted editor.",
               "memberDocs": []
             },
             {
@@ -12037,9 +13045,9 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L40",
+              "source": "../core/dist/types/grid.d.ts#L52",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Retained lifecycle returned by a custom editor's mount method.",
               "memberDocs": []
             },
             {
@@ -12049,9 +13057,9 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L19",
+              "source": "../core/dist/types/grid.d.ts#L28",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Selection movement applied after a successful editor commit.",
               "memberDocs": []
             },
             {
@@ -12061,9 +13069,9 @@
               "owners": [
                 "../core/dist/types/cell.d.ts"
               ],
-              "source": "../core/dist/types/cell.d.ts#L69",
+              "source": "../core/dist/types/cell.d.ts#L112",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "A scalar that can be displayed directly.",
               "memberDocs": []
             },
             {
@@ -12073,10 +13081,326 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L287",
-              "jsDocTags": [],
-              "documentation": "",
-              "memberDocs": []
+              "source": "../core/dist/types/grid.d.ts#L645",
+              "jsDocTags": [
+                "example",
+                "see"
+              ],
+              "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction updateTotal(grid: Grid) {\n  const sheet = grid.getActiveSheet();\n  const result = grid.applyTransaction({\n    patches: [{ op: \"set\", addr: { sheet, row: 0, col: 0 }, value: { kind: \"literal\", value: 42 } }],\n  });\n  if (result.status === \"applied\") grid.scrollToCell({ sheet, row: 0, col: 0 });\n  return grid.aggregate(0, \"sum\");\n}\n```\n@see\ncreateGrid\n@see\nGrid.applyTransaction",
+              "memberDocs": [
+                {
+                  "name": "actions",
+                  "documentation": "Imperative action surface for binding custom toolbars/menus."
+                },
+                {
+                  "name": "activateHyperlink",
+                  "documentation": "Validate and emit a host-owned activation event. External targets are never\nopened by Sheetwrite; internal navigation occurs only under the explicit policy."
+                },
+                {
+                  "name": "addSheet",
+                  "documentation": "Add a sheet with a stable ID and return its actionable transaction outcome."
+                },
+                {
+                  "name": "aggregate",
+                  "documentation": "Column aggregate over the active sheet's data.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction total(grid: Grid) {\n  return grid.aggregate(1, \"sum\");\n}\n```\n@see\nSheetwriteStore.aggregate"
+                },
+                {
+                  "name": "applyRemoteOperations",
+                  "documentation": "Apply host-supplied operations without undo history or outgoing dirty state.\nThe resulting change event has `source: \"remote\"`."
+                },
+                {
+                  "name": "applyTransaction",
+                  "documentation": "Apply arbitrary patches as one undoable Grid commit. No-op when read-only.\nUse `Store.applyTransaction` only for low-level writes that intentionally\nbypass Grid history and policy.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction setFirstCell(grid: Grid) {\n  return grid.applyTransaction({ patches: [\n    { op: \"set\", addr: { sheet: grid.getActiveSheet(), row: 0, col: 0 },\n      value: { kind: \"literal\", value: 42 } },\n  ] });\n}\n```\n@see\nTransaction"
+                },
+                {
+                  "name": "autoFitColumns",
+                  "documentation": "Explicitly resize columns from a bulk worksheet read."
+                },
+                {
+                  "name": "autoFitRows",
+                  "documentation": "Explicitly resize rows to fit wrapped content; never runs during paint."
+                },
+                {
+                  "name": "beginEdit",
+                  "documentation": "Open the cell editor at a view cell, optionally seeding text / selecting all."
+                },
+                {
+                  "name": "clearSearch",
+                  "documentation": "Clear the current search and its highlights."
+                },
+                {
+                  "name": "clearView",
+                  "documentation": "Clear any active sort/filter view."
+                },
+                {
+                  "name": "dataEdge",
+                  "documentation": "Ctrl+Arrow-style jump target: the data-run edge from (row, col) on the\nmoved axis (row for vertical moves, col for horizontal), or null when the\nstore is not columnar. Under an active sort/filter view, `row` is a view\nposition and vertical moves return view positions. For hosts building\ntheir own keymaps (`config.keyboard`)."
+                },
+                {
+                  "name": "destroy",
+                  "documentation": "Free everything this grid owns: its DOM, listeners, timers, renderer,\nworker and caches, and the store that it created. Call it when the host\nview is removed; a second call does nothing."
+                },
+                {
+                  "name": "distinctValues",
+                  "documentation": "Distinct resolved values of a column in first-seen order. Defaults to\n1,000 values for bounded filter menus; pass 0 to request an uncapped scan."
+                },
+                {
+                  "name": "exportCsv",
+                  "documentation": "Download the active sheet as CSV.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction downloadCsv(grid: Grid) {\n  grid.exportCsv(\"sales.csv\");\n}\n```"
+                },
+                {
+                  "name": "exportSnapshot",
+                  "documentation": "Deterministically export the complete authoritative workbook document."
+                },
+                {
+                  "name": "exportXlsx",
+                  "documentation": "Download the active sheet through the registered XLSX backend.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\nimport { registerXlsxBackends } from \"@sheetwrite/xlsx\";\n\nasync function downloadXlsx(grid: Grid) {\n  await registerXlsxBackends();\n  await grid.exportXlsx(\"sales.xlsx\");\n}\n```\n@see\ntoXlsxWorkbook"
+                },
+                {
+                  "name": "filterBy",
+                  "documentation": "Filter the displayed rows to those whose column text contains `needle`.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction showOpenRows(grid: Grid) {\n  grid.filterBy(0, \"Open\");\n}\n```\n@see\nGrid.clearView"
+                },
+                {
+                  "name": "findNext",
+                  "documentation": "Move the active match to the next match and scroll it into view."
+                },
+                {
+                  "name": "findPrev",
+                  "documentation": "Move the active match to the previous match and scroll it into view."
+                },
+                {
+                  "name": "getActiveSheet",
+                  "documentation": "Id of the currently visible sheet."
+                },
+                {
+                  "name": "getCellAtPoint",
+                  "documentation": "Resolve browser viewport coordinates to an active-sheet cell for host-owned\nmenus and interactions. Returns null outside the cell body."
+                },
+                {
+                  "name": "getCellInput",
+                  "documentation": "Editable snapshot of the cell at a view position on the active sheet, or\nnull when out of bounds. See {@link CellInputSnapshot}."
+                },
+                {
+                  "name": "getCharts",
+                  "documentation": "Clones of the chart definitions on `sheet` (default: the active sheet)."
+                },
+                {
+                  "name": "getColumnFilters",
+                  "documentation": "Active column filters on the active sheet, keyed by column index."
+                },
+                {
+                  "name": "getCommandState",
+                  "documentation": "Query undo/redo availability and formatting active/mixed/disabled state."
+                },
+                {
+                  "name": "getEffectiveTheme",
+                  "documentation": "The effective (post-zoom) theme the renderer is currently painting with."
+                },
+                {
+                  "name": "getFocusCellStyle",
+                  "documentation": "Effective style of the focus cell: its own style over its column's\n`cellStyle`. Empty when nothing is selected."
+                },
+                {
+                  "name": "getPivotFields",
+                  "documentation": "Source fields for the field list; empty on the default engine."
+                },
+                {
+                  "name": "getPivotResult",
+                  "documentation": "Plain-JSON output of one pivot. The default engine reports the saved\noutput (`saved`), or `unavailable` without one. Null when `sheet` holds\nno pivot with `id`."
+                },
+                {
+                  "name": "getPivots",
+                  "documentation": "Clones of the pivot definitions on `sheet`, or on every sheet; no engine is needed."
+                },
+                {
+                  "name": "getRuntimeResourceSnapshot",
+                  "documentation": "Versioned coarse runtime ownership snapshot, including datasource state."
+                },
+                {
+                  "name": "getShortcutLabel",
+                  "documentation": "Platform-aware label for a bound action, or an empty string when disabled."
+                },
+                {
+                  "name": "getTheme",
+                  "documentation": "Resolved base theme, before zoom scaling. The returned object is a copy."
+                },
+                {
+                  "name": "groupRows",
+                  "documentation": "Define a collapsible row group over a data-row range (end-inclusive)."
+                },
+                {
+                  "name": "hiddenColumns",
+                  "documentation": "Currently hidden columns on the active sheet."
+                },
+                {
+                  "name": "hiddenRows",
+                  "documentation": "Currently hidden data rows on the active sheet."
+                },
+                {
+                  "name": "hideColumns",
+                  "documentation": "Hide columns through one bulk-safe metadata transaction."
+                },
+                {
+                  "name": "hideRows",
+                  "documentation": "Hide the given data rows (composes with filters/sort)."
+                },
+                {
+                  "name": "highlightCells",
+                  "documentation": "Draw temporary highlights outside document history. Pass `null` to clear all\nhighlights: `grid.highlightCells(null)`. Per-range `color` wins over the call color.\nUndo does not clear highlights; use `styleRange` for persistent cell fills."
+                },
+                {
+                  "name": "importWorkbook",
+                  "documentation": "Replace the document without recreating the grid or chrome. A new import\naborts the previous loader. Failure keeps the document and history; success\nclears undo and redo. Import is not undoable, like Excel Open.\nInjected stores, datasource grids and attached collaboration sessions reject."
+                },
+                {
+                  "name": "openPanel",
+                  "documentation": "Show `panel` on the grid's right edge and shrink the cells to make room;\n`null` closes the open panel. One panel shows at a time: opening a panel\ncloses the previous one. Escape and the close button close it and return\nfocus to the grid."
+                },
+                {
+                  "name": "redo",
+                  "documentation": "Redo the last undone cell edit."
+                },
+                {
+                  "name": "removeChart",
+                  "documentation": "Remove a chart from `sheet` (default: the first sheet that holds it) as one undo entry."
+                },
+                {
+                  "name": "removePivot",
+                  "documentation": "Remove a pivot from `sheet` (default: the sheet that holds it) as one undo entry."
+                },
+                {
+                  "name": "removeSheet",
+                  "documentation": "Remove a sheet while preserving at least one visible worksheet."
+                },
+                {
+                  "name": "rendererKind",
+                  "documentation": "Which renderer is actually active: `\"worker\"` when the OffscreenCanvas\nworker constructed successfully, `\"canvas\"` otherwise (including after a\n`renderer-fallback`)."
+                },
+                {
+                  "name": "replaceAll",
+                  "documentation": "Replace every current match in a single undoable transaction (one\n`undo()` restores them all), then re-scan. Formula/ref cells are skipped\nand not counted. No-op when read-only."
+                },
+                {
+                  "name": "replaceCurrent",
+                  "documentation": "Replace the active match with `replacement`, then advance to the next match\n(re-scanning against the new data). Only literal text/number cells are\neligible; formula and ref cells are skipped (formula source is never\nrewritten). Honors the active {@link SearchOptions} (matchCase; `wholeCell`\nswaps the entire cell). The write flows through the grid's commit path as\none undoable step. No-op when read-only or when there is no active match."
+                },
+                {
+                  "name": "replaceTheme",
+                  "documentation": "Option-level replacement: re-run construction-time resolution\n(`DEFAULT_THEME < CSS custom properties < theme`) with the new partial.\n`undefined` restores the CSS-variable/default resolution. Adapters call\nthis for their declarative `theme` prop; imperative patching stays on\n{@link setTheme}."
+                },
+                {
+                  "name": "rowGroups",
+                  "documentation": "Row groups on the active sheet."
+                },
+                {
+                  "name": "search",
+                  "documentation": "Find cells matching `query`; highlights matches, emits `search`, returns the result."
+                },
+                {
+                  "name": "selectChart",
+                  "documentation": "Select the chart object `id` on `sheet` (default: the active sheet), or\ndeselect with `null`. Selecting a chart on another sheet activates that\nsheet first. Emits `chart-select`."
+                },
+                {
+                  "name": "setChart",
+                  "documentation": "Insert or replace the chart with `chart.id` as one undo entry. `sheet`\ndefaults to the active sheet; chart IDs are unique only within a sheet."
+                },
+                {
+                  "name": "setColumnFilter",
+                  "documentation": "Set or clear (null) one column's filter. All column filters AND together\nand compose with the active sort and hidden rows."
+                },
+                {
+                  "name": "setColumnWidth",
+                  "documentation": "Set one column's width via an undoable `setColumn` patch."
+                },
+                {
+                  "name": "setConfig",
+                  "documentation": "Reconfigure built-in chrome and keyboard handling without replacing the\nGrid or clearing selection/history. Construction-bound GridOptions are not\naccepted here."
+                },
+                {
+                  "name": "setFrozen",
+                  "documentation": "Pin the first `rows` view rows and `cols` columns; they stay visible while\nthe body scrolls (0 = unfreeze that axis). Persisted on the active sheet."
+                },
+                {
+                  "name": "setGroupCollapsed",
+                  "documentation": "Collapse/expand a row group; collapsing hides its rows."
+                },
+                {
+                  "name": "setMinColumns",
+                  "documentation": "Live-update the minimum rendered column count. Increasing the minimum\nsilently extends presentation padding; `undefined` restores the default."
+                },
+                {
+                  "name": "setOverscan",
+                  "documentation": "Live-update the render window overscan (row/column positions painted past\neach edge); `undefined` restores the default of 6."
+                },
+                {
+                  "name": "setPivot",
+                  "documentation": "Insert or replace a pivot as one undo entry. `sheet` defaults to the sheet\nthat holds the pivot's ID, then to the active sheet. The pivot's\n`savedOutput` is removed, because it does not match a changed definition."
+                },
+                {
+                  "name": "setPresenceOverlays",
+                  "documentation": "Replace ephemeral remote-presence overlays; null clears every collaborator."
+                },
+                {
+                  "name": "setReadOnly",
+                  "documentation": "Update editability without replacing the Grid or clearing session state.\nHas no effect after `engine-failed`: that grid stays read-only."
+                },
+                {
+                  "name": "setRowHeight",
+                  "documentation": "Set one row's persistent display height through document history."
+                },
+                {
+                  "name": "setSheetVisibility",
+                  "documentation": "Set host-visible worksheet state; stock UI never offers `veryHidden`."
+                },
+                {
+                  "name": "setTheme",
+                  "documentation": "Imperative patch: merge `theme` into the accumulated base theme."
+                },
+                {
+                  "name": "setViewSort",
+                  "documentation": "Sort the displayed rows of the active sheet by `keys` (first key primary;\nstable) without moving any cell; an empty list clears the view sort. The\nkeys are saved with the sheet and export to XLSX as `sortState`.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction showLargestFirst(grid: Grid) {\n  grid.setViewSort([{ col: 1, ascending: false }]);\n}\n```\n@see\nGrid.clearView"
+                },
+                {
+                  "name": "setZoom",
+                  "documentation": "Content zoom factor (0.5–2): scales row/column geometry and fonts."
+                },
+                {
+                  "name": "showColumns",
+                  "documentation": "Show columns through one bulk-safe metadata transaction."
+                },
+                {
+                  "name": "showRows",
+                  "documentation": "Show the given data rows again, or every hidden row when omitted."
+                },
+                {
+                  "name": "sortBy",
+                  "documentation": "Excel's quick sort by column `col`: sort the cells of the table body\nthat holds the focus cell, or else of the selected range, or else of the\ncurrent region around the focus cell. A first row of text over other\nvalues stays as a header.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction largestFirst(grid: Grid) {\n  grid.sortBy(1, false);\n}\n```\n@see\nGrid.sortRange"
+                },
+                {
+                  "name": "sortRange",
+                  "documentation": "Sort the cells of `range` in place, as Excel's Sort does: one undoable\nchange that collaborators receive as one transaction. With `hasHeader`\nthe first row stays. Merged cells of different sizes reject the sort and\nemit `mutation-rejected`.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction sortOrders(grid: Grid) {\n  grid.sortRange(\n    { sheet: \"s1\", start: { row: 0, col: 0 }, end: { row: 99, col: 3 } },\n    [{ col: 2, ascending: false }],\n    { hasHeader: true },\n  );\n}\n```"
+                },
+                {
+                  "name": "styleRange",
+                  "documentation": "Merge `style` into every cell of `range` (null clears cell styles) as one\nundoable transaction. Styles land in the store and paint in the canvas —\nunlike {@link highlightCells}, which draws a translucent overlay above it."
+                },
+                {
+                  "name": "summarizeSelection",
+                  "documentation": "Totals for the current selection, for a status bar. Large selections are\nread in chunks between frames, so the page stays responsive; abort\n`signal` to stop early, which rejects with the signal's reason.\n`destroy()` stops every running summary the same way, with an\n`AbortError`. Resolves null when nothing is selected."
+                },
+                {
+                  "name": "trimMemory",
+                  "documentation": "Drop the memory this grid can build again: decoded cell strings, rendered\nnumber text, compiled number formats, text measurement and unused overlay\nnodes, in the grid and in its worker renderer. Document data, undo history\nand the visible output do not change. The next frame and the next use\nbuild again what they need. Call it on a memory signal or when the page\ngoes to the background; it does nothing after `destroy()`.\n\nNumber format caches are shared by all grids on the page, so a trim also\ndrops them for the other grids. WebAssembly memory does not shrink; call\n`releaseEngineMemory()` for that.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction trimWhenHidden(grid: Grid) {\n  document.addEventListener(\"visibilitychange\", () => {\n    if (document.visibilityState === \"hidden\") grid.trimMemory();\n  });\n}\n```"
+                },
+                {
+                  "name": "undo",
+                  "documentation": "Undo the last recorded cell edit. If the restored data is above the\ntransaction resource limits, nothing changes: the Grid emits\n`mutation-rejected` and removes that entry, so older edits stay undoable.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction undoAndRestore(grid: Grid) {\n  grid.undo();\n  grid.redo();\n}\n```\n@see\nGrid.redo"
+                },
+                {
+                  "name": "ungroupRows",
+                  "documentation": "Remove a row group (rows become visible if the group was collapsed)."
+                }
+              ]
             },
             {
               "name": "GridCommandName",
@@ -12085,9 +13409,9 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L108",
+              "source": "../core/dist/types/grid.d.ts#L191",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Built-in command names accepted by state queries and change events.",
               "memberDocs": []
             },
             {
@@ -12097,9 +13421,9 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L109",
+              "source": "../core/dist/types/grid.d.ts#L193",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Observable availability and selection-derived activity for one command.",
               "memberDocs": []
             },
             {
@@ -12109,10 +13433,23 @@
               "owners": [
                 "../core/dist/adapter.d.ts"
               ],
-              "source": "../core/dist/adapter.d.ts#L30",
+              "source": "../core/dist/adapter.d.ts#L34",
               "jsDocTags": [],
-              "documentation": "",
-              "memberDocs": []
+              "documentation": "Grid handle, generation, and reason published after adapter initialization.",
+              "memberDocs": [
+                {
+                  "name": "generation",
+                  "documentation": "One-based adapter generation, incremented whenever a Grid is replaced."
+                },
+                {
+                  "name": "grid",
+                  "documentation": "Live handle just published by the adapter; replaced on the next reset generation."
+                },
+                {
+                  "name": "reason",
+                  "documentation": "Whether readiness followed first initialization, an input reset, or a renderer reset."
+                }
+              ]
             },
             {
               "name": "RowBridge",
@@ -12121,10 +13458,27 @@
               "owners": [
                 "../core/dist/row-bridge.d.ts"
               ],
-              "source": "../core/dist/row-bridge.d.ts#L114",
+              "source": "../core/dist/row-bridge.d.ts#L145",
               "jsDocTags": [],
-              "documentation": "",
-              "memberDocs": []
+              "documentation": "Projects canonical document transactions into host-owned row changes.\n\nThe bridge only owns compact data-space identity arrays. It never writes to\n`defaultRows`, never renders, and never creates a second document store.",
+              "memberDocs": [
+                {
+                  "name": "columnKeys",
+                  "documentation": "Current semantic column keys in canonical column order."
+                },
+                {
+                  "name": "project",
+                  "documentation": "Project an applied Grid change as an accepted, transformed, or remote result."
+                },
+                {
+                  "name": "reconcile",
+                  "documentation": "Reconcile a canonical transaction response without synchronizing host rows implicitly."
+                },
+                {
+                  "name": "rowIds",
+                  "documentation": "Current data-space row identities; visual sort and filters do not affect this order."
+                }
+              ]
             },
             {
               "name": "RowBridgeDelta",
@@ -12133,9 +13487,9 @@
               "owners": [
                 "../core/dist/row-bridge.d.ts"
               ],
-              "source": "../core/dist/row-bridge.d.ts#L95",
+              "source": "../core/dist/row-bridge.d.ts#L114",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Every possible projection produced by a row bridge.",
               "memberDocs": []
             },
             {
@@ -12145,9 +13499,9 @@
               "owners": [
                 "../core/dist/row-bridge.d.ts"
               ],
-              "source": "../core/dist/row-bridge.d.ts#L113",
+              "source": "../core/dist/row-bridge.d.ts#L138",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Callback accepted by imperative and framework adapters.",
               "memberDocs": []
             },
             {
@@ -12157,9 +13511,9 @@
               "owners": [
                 "../core/dist/row-bridge.d.ts"
               ],
-              "source": "../core/dist/row-bridge.d.ts#L5",
+              "source": "../core/dist/row-bridge.d.ts#L6",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "A stable host identity for one data-space row.",
               "memberDocs": []
             },
             {
@@ -12169,9 +13523,9 @@
               "owners": [
                 "../core/dist/row-bridge.d.ts"
               ],
-              "source": "../core/dist/row-bridge.d.ts#L108",
+              "source": "../core/dist/row-bridge.d.ts#L132",
               "jsDocTags": [],
-              "documentation": "",
+              "documentation": "Result of projection or reconciliation.",
               "memberDocs": []
             },
             {
@@ -12519,10 +13873,47 @@
               "owners": [
                 "../core/dist/adapter.d.ts"
               ],
-              "source": "../core/dist/adapter.d.ts#L88",
+              "source": "../core/dist/adapter.d.ts#L137",
               "jsDocTags": [],
-              "documentation": "",
-              "memberDocs": []
+              "documentation": "Column definition accepted by the adapters’ simple row-object API.",
+              "memberDocs": [
+                {
+                  "name": "cellStyle",
+                  "documentation": "Base style merged beneath cell-specific styles."
+                },
+                {
+                  "name": "editor",
+                  "documentation": "Name of a custom editor registered through `GridOptions.editors`."
+                },
+                {
+                  "name": "headerStyle",
+                  "documentation": "Style applied to the painted column header."
+                },
+                {
+                  "name": "key",
+                  "documentation": "Non-empty row-object key, unique within the column list."
+                },
+                {
+                  "name": "numberFormat",
+                  "documentation": "Excel number-format code used for number, date, or currency display."
+                },
+                {
+                  "name": "title",
+                  "documentation": "Semantic title painted in data-grid mode and written by table exports."
+                },
+                {
+                  "name": "type",
+                  "documentation": "Input and formatting type; defaults to `text`."
+                },
+                {
+                  "name": "visible",
+                  "documentation": "Set to `false` to exclude the column from the live view and table exports."
+                },
+                {
+                  "name": "width",
+                  "documentation": "Unzoomed width in CSS pixels; defaults to 120."
+                }
+              ]
             }
           ]
         },

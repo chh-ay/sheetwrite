@@ -1,14 +1,14 @@
 ---
 title: "RowBridgeDelta | @sheetwrite/svelte"
-description: "RowBridgeDelta type in @sheetwrite/svelte: Source summary unavailable; docs:check rejects this omission."
+description: "RowBridgeDelta type in @sheetwrite/svelte: Every possible projection produced by a row bridge."
 ---
 <!-- api-export:@sheetwrite/svelte|.|RowBridgeDelta -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="type">type</span></div>
 
-Source summary unavailable; docs:check rejects this omission.
+Every possible projection produced by a row bridge.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/row-bridge.d.ts#L95"><code>packages/core/dist/row-bridge.d.ts#L95</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/row-bridge.d.ts#L114"><code>packages/core/dist/row-bridge.d.ts#L114</code></a></dd></div>
 </dl>
 
 ## Declaration

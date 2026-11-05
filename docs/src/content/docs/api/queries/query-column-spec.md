@@ -1,14 +1,14 @@
 ---
 title: "QueryColumnSpec | @sheetwrite/queries"
-description: "QueryColumnSpec interface in @sheetwrite/queries: Source summary unavailable; docs:check rejects this omission."
+description: "QueryColumnSpec interface in @sheetwrite/queries: Stable identity is separate from the field name used by source records."
 ---
 <!-- api-export:@sheetwrite/queries|.|QueryColumnSpec -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/queries/">@sheetwrite/queries</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Source summary unavailable; docs:check rejects this omission.
+Stable identity is separate from the field name used by source records.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/query.d.ts#L4"><code>packages/core/dist/types/query.d.ts#L4</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/query.d.ts#L6"><code>packages/core/dist/types/query.d.ts#L6</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

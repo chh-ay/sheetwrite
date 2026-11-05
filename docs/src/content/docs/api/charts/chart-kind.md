@@ -1,14 +1,14 @@
 ---
 title: "ChartKind | @sheetwrite/charts"
-description: "ChartKind type in @sheetwrite/charts: Source summary unavailable; docs:check rejects this omission."
+description: "ChartKind type in @sheetwrite/charts: Chart families that the document model supports."
 ---
 <!-- api-export:@sheetwrite/charts|.|ChartKind -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/charts/">@sheetwrite/charts</a><span class="api-status" data-kind="type">type</span></div>
 
-Source summary unavailable; docs:check rejects this omission.
+Chart families that the document model supports.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/chart.d.ts#L2"><code>packages/core/dist/types/chart.d.ts#L2</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/chart.d.ts#L3"><code>packages/core/dist/types/chart.d.ts#L3</code></a></dd></div>
 </dl>
 
 ## Declaration

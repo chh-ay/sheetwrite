@@ -1,14 +1,14 @@
 ---
 title: "CellEditorInstance | @sheetwrite/react"
-description: "CellEditorInstance interface in @sheetwrite/react: Source summary unavailable; docs:check rejects this omission."
+description: "CellEditorInstance interface in @sheetwrite/react: Retained lifecycle returned by a custom editor's mount method."
 ---
 <!-- api-export:@sheetwrite/react|.|CellEditorInstance -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/react/">@sheetwrite/react</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Source summary unavailable; docs:check rejects this omission.
+Retained lifecycle returned by a custom editor's mount method.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/grid.d.ts#L40"><code>packages/core/dist/types/grid.d.ts#L40</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/grid.d.ts#L52"><code>packages/core/dist/types/grid.d.ts#L52</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>

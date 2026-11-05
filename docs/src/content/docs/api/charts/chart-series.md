@@ -1,14 +1,14 @@
 ---
 title: "ChartSeries | @sheetwrite/charts"
-description: "ChartSeries interface in @sheetwrite/charts: Source summary unavailable; docs:check rejects this omission."
+description: "ChartSeries interface in @sheetwrite/charts: Sources are read in row-major order."
 ---
 <!-- api-export:@sheetwrite/charts|.|ChartSeries -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/charts/">@sheetwrite/charts</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Source summary unavailable; docs:check rejects this omission.
+Sources are read in row-major order.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/chart.d.ts#L12"><code>packages/core/dist/types/chart.d.ts#L12</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/chart.d.ts#L18"><code>packages/core/dist/types/chart.d.ts#L18</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>

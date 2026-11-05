@@ -1,14 +1,14 @@
 ---
 title: "RowBridgeProjection | @sheetwrite/svelte"
-description: "RowBridgeProjection interface in @sheetwrite/svelte: Source summary unavailable; docs:check rejects this omission."
+description: "RowBridgeProjection interface in @sheetwrite/svelte: Result of projection or reconciliation."
 ---
 <!-- api-export:@sheetwrite/svelte|.|RowBridgeProjection -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Source summary unavailable; docs:check rejects this omission.
+Result of projection or reconciliation.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/row-bridge.d.ts#L108"><code>packages/core/dist/row-bridge.d.ts#L108</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/row-bridge.d.ts#L132"><code>packages/core/dist/row-bridge.d.ts#L132</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

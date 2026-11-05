@@ -26,14 +26,6 @@ Advanced framework adapter props for workbook data or datasource ownership.
 <a href="#sheetwrite-grid-props-fill"><code>fill</code></a>
 <a href="#sheetwrite-grid-props-on-grid-change"><code>onGridChange</code></a>
 <a href="#sheetwrite-grid-props-on-selection-change"><code>onSelectionChange</code></a>
-<a href="#sheetwrite-grid-props-on-viewport-change"><code>onViewportChange</code></a>
-<a href="#sheetwrite-grid-props-on-edit-begin"><code>onEditBegin</code></a>
-<a href="#sheetwrite-grid-props-on-edit-commit"><code>onEditCommit</code></a>
-<a href="#sheetwrite-grid-props-on-search"><code>onSearch</code></a>
-<a href="#sheetwrite-grid-props-on-active-sheet-change"><code>onActiveSheetChange</code></a>
-<a href="#sheetwrite-grid-props-on-command-state-change"><code>onCommandStateChange</code></a>
-<a href="#sheetwrite-grid-props-on-initialization-error"><code>onInitializationError</code></a>
-<a href="#sheetwrite-grid-props-wasm-source"><code>wasmSource</code></a>
 <a href="#sheetwrite-grid-props-workbook"><code>workbook</code></a>
 <a href="#sheetwrite-grid-props-data"><code>data</code></a>
 <a href="#sheetwrite-grid-props-datasource"><code>datasource</code></a>
@@ -52,6 +44,14 @@ Advanced framework adapter props for workbook data or datasource ownership.
 <a href="#sheetwrite-grid-props-overscan"><code>overscan</code></a>
 <a href="#sheetwrite-grid-props-min-columns"><code>minColumns</code></a>
 <a href="#sheetwrite-grid-props-config"><code>config</code></a>
+<a href="#sheetwrite-grid-props-on-viewport-change"><code>onViewportChange</code></a>
+<a href="#sheetwrite-grid-props-on-edit-begin"><code>onEditBegin</code></a>
+<a href="#sheetwrite-grid-props-on-edit-commit"><code>onEditCommit</code></a>
+<a href="#sheetwrite-grid-props-on-search"><code>onSearch</code></a>
+<a href="#sheetwrite-grid-props-on-active-sheet-change"><code>onActiveSheetChange</code></a>
+<a href="#sheetwrite-grid-props-on-command-state-change"><code>onCommandStateChange</code></a>
+<a href="#sheetwrite-grid-props-on-initialization-error"><code>onInitializationError</code></a>
+<a href="#sheetwrite-grid-props-wasm-source"><code>wasmSource</code></a>
 </nav>
 
 ## Members <span class="api-count" data-pagefind-ignore>40</span>
@@ -167,7 +167,7 @@ fill?: true;
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-on-grid-change" data-pagefind-weight="1">
-<summary><code>onGridChange</code></summary>
+<summary><code>onGridChange</code> <span class="api-member-summary">Receives every committed Grid change, including its applied transaction.</span></summary>
 
 ```ts generated
 onGridChange?: (event: ChangeEvent) => void;
@@ -176,7 +176,7 @@ onGridChange?: (event: ChangeEvent) => void;
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-on-selection-change" data-pagefind-weight="1">
-<summary><code>onSelectionChange</code></summary>
+<summary><code>onSelectionChange</code> <span class="api-member-summary">Receives the current selection, or null after it is cleared.</span></summary>
 
 ```ts generated
 onSelectionChange?: (selection: Selection | null) => void;
@@ -184,80 +184,8 @@ onSelectionChange?: (selection: Selection | null) => void;
 
 </details>
 
-<details class="api-member" id="sheetwrite-grid-props-on-viewport-change" data-pagefind-weight="1">
-<summary><code>onViewportChange</code></summary>
-
-```ts generated
-onViewportChange?: (event: GridEvents["scroll"]) => void;
-```
-
-</details>
-
-<details class="api-member" id="sheetwrite-grid-props-on-edit-begin" data-pagefind-weight="1">
-<summary><code>onEditBegin</code></summary>
-
-```ts generated
-onEditBegin?: (event: GridEvents["edit-begin"]) => void;
-```
-
-</details>
-
-<details class="api-member" id="sheetwrite-grid-props-on-edit-commit" data-pagefind-weight="1">
-<summary><code>onEditCommit</code></summary>
-
-```ts generated
-onEditCommit?: (event: GridEvents["edit-commit"]) => void;
-```
-
-</details>
-
-<details class="api-member" id="sheetwrite-grid-props-on-search" data-pagefind-weight="1">
-<summary><code>onSearch</code></summary>
-
-```ts generated
-onSearch?: (result: GridEvents["search"]) => void;
-```
-
-</details>
-
-<details class="api-member" id="sheetwrite-grid-props-on-active-sheet-change" data-pagefind-weight="1">
-<summary><code>onActiveSheetChange</code></summary>
-
-```ts generated
-onActiveSheetChange?: (event: GridEvents["active-sheet"]) => void;
-```
-
-</details>
-
-<details class="api-member" id="sheetwrite-grid-props-on-command-state-change" data-pagefind-weight="1">
-<summary><code>onCommandStateChange</code></summary>
-
-```ts generated
-onCommandStateChange?: (event: GridEvents["command-state-change"]) => void;
-```
-
-</details>
-
-<details class="api-member" id="sheetwrite-grid-props-on-initialization-error" data-pagefind-weight="1">
-<summary><code>onInitializationError</code></summary>
-
-```ts generated
-onInitializationError?: (error: SheetwriteError) => void;
-```
-
-</details>
-
-<details class="api-member" id="sheetwrite-grid-props-wasm-source" data-pagefind-weight="1">
-<summary><code>wasmSource</code></summary>
-
-```ts generated
-wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module;
-```
-
-</details>
-
 <details class="api-member" id="sheetwrite-grid-props-workbook" data-pagefind-weight="1">
-<summary><code>workbook</code></summary>
+<summary><code>workbook</code> <span class="api-member-summary">Live workbook schema adopted by the store and updated by document operations.</span></summary>
 
 ```ts generated
 workbook: Workbook;
@@ -266,7 +194,7 @@ workbook: Workbook;
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-data" data-pagefind-weight="1">
-<summary><code>data</code></summary>
+<summary><code>data</code> <span class="api-member-summary">Eager column-major values loaded into workbook.activeSheet; use instead of datasource.</span></summary>
 
 ```ts generated
 data?: ColumnarData;
@@ -275,7 +203,7 @@ data?: ColumnarData;
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-datasource" data-pagefind-weight="1">
-<summary><code>datasource</code></summary>
+<summary><code>datasource</code> <span class="api-member-summary">Lazy row provider requested for visible windows; use instead of eager data.</span></summary>
 
 ```ts generated
 datasource?: DataSource;
@@ -284,7 +212,7 @@ datasource?: DataSource;
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-datasource-storage" data-pagefind-weight="1">
-<summary><code>datasourceStorage</code></summary>
+<summary><code>datasourceStorage</code> <span class="api-member-summary">Allocation and cache policy for datasource-backed cell storage.</span></summary>
 
 ```ts generated
 datasourceStorage?: DataSourceStorageOptions;
@@ -293,7 +221,7 @@ datasourceStorage?: DataSourceStorageOptions;
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-renderer" data-pagefind-weight="1">
-<summary><code>renderer</code></summary>
+<summary><code>renderer</code> <span class="api-member-summary">Paint backend; defaults to main-thread canvas and falls back there if a worker fails.</span></summary>
 
 ```ts generated
 renderer?: "canvas" | "worker";
@@ -302,25 +230,40 @@ renderer?: "canvas" | "worker";
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-worker-url" data-pagefind-weight="1">
-<summary><code>workerUrl</code></summary>
+<summary><code>workerUrl</code> <span class="api-member-summary">URL of the worker renderer module (renderer: &quot;worker&quot;), as served to the BROWSER.</span></summary>
 
 ```ts generated
 workerUrl?: string | URL;
 ```
 
+<p class="api-member-doc">URL of the worker renderer module (`renderer: &quot;worker&quot;`), as served to the
+BROWSER. Usually not needed: by default the grid creates its worker as
+`new Worker(new URL(&quot;./worker.js&quot;, import.meta.url))`, which bundlers such
+as Vite build together with the worker's imports. Pass a URL when there
+is no bundler, or when yours copies the file instead of building it, for
+example a copy of `@sheetwrite/core/dist/` in your public assets (see
+`/docs/features/worker-rendering/`). A bare specifier like
+`new URL(&quot;@sheetwrite/core/worker&quot;, import.meta.url)` is NOT reliable: the
+platform `Worker` constructor does not consult package exports. If the
+worker can't be constructed or fails to load, the grid falls back to the
+main-thread canvas renderer and emits `renderer-fallback` once.</p>
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-presentation" data-pagefind-weight="1">
-<summary><code>presentation</code></summary>
+<summary><code>presentation</code> <span class="api-member-summary">Header presentation. Spreadsheet mode (default) paints positional A/B/C labels; data-grid mode paints each column's semantic header.</span></summary>
 
 ```ts generated
 presentation?: GridPresentation;
 ```
 
+<p class="api-member-doc">Header presentation. Spreadsheet mode (default) paints positional A/B/C
+labels; data-grid mode paints each column's semantic `header`. Cell
+addressing, row indices, clipboard values, formulas, and exports are
+unchanged in both modes.</p>
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-theme" data-pagefind-weight="1">
-<summary><code>theme</code></summary>
+<summary><code>theme</code> <span class="api-member-summary">Overrides merged over the default theme and host CSS custom properties.</span></summary>
 
 ```ts generated
 theme?: Partial<Theme>;
@@ -329,7 +272,7 @@ theme?: Partial<Theme>;
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-read-only" data-pagefind-weight="1">
-<summary><code>readOnly</code></summary>
+<summary><code>readOnly</code> <span class="api-member-summary">Disables mutating interactions while preserving navigation and selection.</span></summary>
 
 ```ts generated
 readOnly?: boolean;
@@ -338,25 +281,30 @@ readOnly?: boolean;
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-hyperlink-activation" data-pagefind-weight="1">
-<summary><code>hyperlinkActivation</code></summary>
+<summary><code>hyperlinkActivation</code> <span class="api-member-summary">Hyperlink activation never opens a browser URL.</span></summary>
 
 ```ts generated
 hyperlinkActivation?: "event-only" | "internal-navigation" | "disabled";
 ```
 
+<p class="api-member-doc">Hyperlink activation never opens a browser URL. `event-only` (default)
+emits a safe resolved target; `internal-navigation` additionally moves to
+stable internal destinations; `disabled` rejects every activation request.</p>
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-protection-resolver" data-pagefind-weight="1">
-<summary><code>protectionResolver</code></summary>
+<summary><code>protectionResolver</code> <span class="api-member-summary">Host-owned client UX permission check.</span></summary>
 
 ```ts generated
 protectionResolver?: ProtectionResolver;
 ```
 
+<p class="api-member-doc">Host-owned client UX permission check. Servers must independently authorize
+every submitted operation; this resolver is not an authentication boundary.</p>
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-mutation-policy" data-pagefind-weight="1">
-<summary><code>mutationPolicy</code></summary>
+<summary><code>mutationPolicy</code> <span class="api-member-summary">Atomic rejects the transaction; partial skips denied operation objects.</span></summary>
 
 ```ts generated
 mutationPolicy?: MutationPolicyMode;
@@ -365,7 +313,7 @@ mutationPolicy?: MutationPolicyMode;
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-transaction-resource-limits" data-pagefind-weight="1">
-<summary><code>transactionResourceLimits</code></summary>
+<summary><code>transactionResourceLimits</code> <span class="api-member-summary">Overrides inclusive operation-count and encoded-byte ceilings for every atomic mutation.</span></summary>
 
 ```ts generated
 transactionResourceLimits?: Partial<TransactionResourceLimits>;
@@ -374,7 +322,7 @@ transactionResourceLimits?: Partial<TransactionResourceLimits>;
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-renderers" data-pagefind-weight="1">
-<summary><code>renderers</code></summary>
+<summary><code>renderers</code> <span class="api-member-summary">Custom cell renderers registered up front; also see Grid.defineCellRenderer.</span></summary>
 
 ```ts generated
 renderers?: Record<string, CellRenderer>;
@@ -383,7 +331,7 @@ renderers?: Record<string, CellRenderer>;
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-editors" data-pagefind-weight="1">
-<summary><code>editors</code></summary>
+<summary><code>editors</code> <span class="api-member-summary">Named custom editors resolved from each column's editor field.</span></summary>
 
 ```ts generated
 editors?: Record<string, CellEditor>;
@@ -392,28 +340,105 @@ editors?: Record<string, CellEditor>;
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-overscan" data-pagefind-weight="1">
-<summary><code>overscan</code></summary>
+<summary><code>overscan</code> <span class="api-member-summary">Extra row and visible-column positions painted on each viewport edge.</span></summary>
 
 ```ts generated
 overscan?: number;
 ```
 
+<p class="api-member-doc">Extra row and visible-column positions painted on each viewport edge.
+Defaults to 6; use 0 to disable the buffer.</p>
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-min-columns" data-pagefind-weight="1">
-<summary><code>minColumns</code></summary>
+<summary><code>minColumns</code> <span class="api-member-summary">Render at least this many columns, adding empty columns past the data.</span></summary>
 
 ```ts generated
 minColumns?: number;
 ```
 
+<p class="api-member-doc">Render at least this many columns, adding empty columns past the data. A
+spreadsheet also adds empty columns to fill the host width; a data grid
+adds them only through this option.</p>
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-config" data-pagefind-weight="1">
-<summary><code>config</code></summary>
+<summary><code>config</code> <span class="api-member-summary">Built-in UI controls; providing an object enables the toolbar unless toolbar is false.</span></summary>
 
 ```ts generated
 config?: GridConfig;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-on-viewport-change" data-pagefind-weight="1">
+<summary><code>onViewportChange</code> <span class="api-member-summary">Receives visible row bounds and vertical scroll offset after scrolling.</span></summary>
+
+```ts generated
+onViewportChange?: (event: GridEvents["scroll"]) => void;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-on-edit-begin" data-pagefind-weight="1">
+<summary><code>onEditBegin</code> <span class="api-member-summary">Fires when cell editing begins.</span></summary>
+
+```ts generated
+onEditBegin?: (event: GridEvents["edit-begin"]) => void;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-on-edit-commit" data-pagefind-weight="1">
+<summary><code>onEditCommit</code> <span class="api-member-summary">Fires after an edit commits its parsed cell value.</span></summary>
+
+```ts generated
+onEditCommit?: (event: GridEvents["edit-commit"]) => void;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-on-search" data-pagefind-weight="1">
+<summary><code>onSearch</code> <span class="api-member-summary">Receives refreshed search matches and active-match index.</span></summary>
+
+```ts generated
+onSearch?: (result: GridEvents["search"]) => void;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-on-active-sheet-change" data-pagefind-weight="1">
+<summary><code>onActiveSheetChange</code> <span class="api-member-summary">Fires after the visible sheet changes.</span></summary>
+
+```ts generated
+onActiveSheetChange?: (event: GridEvents["active-sheet"]) => void;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-on-command-state-change" data-pagefind-weight="1">
+<summary><code>onCommandStateChange</code> <span class="api-member-summary">Receives observable undo/redo and formatting command state.</span></summary>
+
+```ts generated
+onCommandStateChange?: (event: GridEvents["command-state-change"]) => void;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-on-initialization-error" data-pagefind-weight="1">
+<summary><code>onInitializationError</code> <span class="api-member-summary">Receives a WASM initialization failure while the adapter remains mounted.</span></summary>
+
+```ts generated
+onInitializationError?: (error: SheetwriteError) => void;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-wasm-source" data-pagefind-weight="1">
+<summary><code>wasmSource</code> <span class="api-member-summary">Explicit source passed to process-wide WASM initialization; concurrent initialization is first-source-wins.</span></summary>
+
+```ts generated
+wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module;
 ```
 
 </details>
@@ -440,14 +465,6 @@ export interface SheetwriteGridProps<Id extends RowBridgeId = RowBridgeId> {
   fill?: true;
   onGridChange?: (event: ChangeEvent) => void;
   onSelectionChange?: (selection: Selection | null) => void;
-  onViewportChange?: (event: GridEvents["scroll"]) => void;
-  onEditBegin?: (event: GridEvents["edit-begin"]) => void;
-  onEditCommit?: (event: GridEvents["edit-commit"]) => void;
-  onSearch?: (result: GridEvents["search"]) => void;
-  onActiveSheetChange?: (event: GridEvents["active-sheet"]) => void;
-  onCommandStateChange?: (event: GridEvents["command-state-change"]) => void;
-  onInitializationError?: (error: SheetwriteError) => void;
-  wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module;
   workbook: Workbook;
   data?: ColumnarData;
   datasource?: DataSource;
@@ -466,6 +483,14 @@ export interface SheetwriteGridProps<Id extends RowBridgeId = RowBridgeId> {
   overscan?: number;
   minColumns?: number;
   config?: GridConfig;
+  onViewportChange?: (event: GridEvents["scroll"]) => void;
+  onEditBegin?: (event: GridEvents["edit-begin"]) => void;
+  onEditCommit?: (event: GridEvents["edit-commit"]) => void;
+  onSearch?: (result: GridEvents["search"]) => void;
+  onActiveSheetChange?: (event: GridEvents["active-sheet"]) => void;
+  onCommandStateChange?: (event: GridEvents["command-state-change"]) => void;
+  onInitializationError?: (error: SheetwriteError) => void;
+  wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module;
 }
 ```
 

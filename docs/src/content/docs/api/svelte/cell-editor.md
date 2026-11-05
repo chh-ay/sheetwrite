@@ -1,14 +1,14 @@
 ---
 title: "CellEditor | @sheetwrite/svelte"
-description: "CellEditor interface in @sheetwrite/svelte: Source summary unavailable; docs:check rejects this omission."
+description: "CellEditor interface in @sheetwrite/svelte: Framework-neutral named editor definition registered through GridOptions.editors."
 ---
 <!-- api-export:@sheetwrite/svelte|.|CellEditor -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Source summary unavailable; docs:check rejects this omission.
+Framework-neutral named editor definition registered through GridOptions.editors.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/grid.d.ts#L47"><code>packages/core/dist/types/grid.d.ts#L47</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/grid.d.ts#L60"><code>packages/core/dist/types/grid.d.ts#L60</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>1</span>

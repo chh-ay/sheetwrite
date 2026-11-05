@@ -1,14 +1,14 @@
 ---
 title: "CellScalar | @sheetwrite/svelte"
-description: "CellScalar type in @sheetwrite/svelte: Source summary unavailable; docs:check rejects this omission."
+description: "CellScalar type in @sheetwrite/svelte: A scalar that can be displayed directly."
 ---
 <!-- api-export:@sheetwrite/svelte|.|CellScalar -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="type">type</span></div>
 
-Source summary unavailable; docs:check rejects this omission.
+A scalar that can be displayed directly.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/cell.d.ts#L69"><code>packages/core/dist/types/cell.d.ts#L69</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/cell.d.ts#L112"><code>packages/core/dist/types/cell.d.ts#L112</code></a></dd></div>
 </dl>
 
 ## Declaration
