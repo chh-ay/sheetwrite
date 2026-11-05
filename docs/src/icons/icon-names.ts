@@ -44,6 +44,8 @@ export const ICON_NAMES = [
   "cloud",
   "cloud-off",
   "monitor",
+  "laptop",
+  "server",
   "shield",
   "lock",
   "eye",
