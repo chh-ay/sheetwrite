@@ -109,6 +109,16 @@ const REQUIRED_FILES: Readonly<Record<string, readonly string[]>> = {
     "pkg/sheetwrite_wasm.js",
     "pkg/sheetwrite_wasm_bg.wasm",
   ],
+  "@sheetwrite/queries": [
+    "README.md",
+    "LICENSE",
+    "dist/index.d.ts",
+    "dist/index.js",
+    "dist/node.d.ts",
+    "dist/node.js",
+    "pkg/sheetwrite_queries.js",
+    "pkg/sheetwrite_queries_bg.wasm",
+  ],
   "@sheetwrite/core": [
     "README.md",
     "LICENSE",

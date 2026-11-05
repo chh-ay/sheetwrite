@@ -63,7 +63,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Install pinned Rust toolchain
-        run: rustup toolchain install "$RUST_VERSION" --profile minimal --component clippy --component llvm-tools-preview --target "$WASM_TARGET"
+        run: rustup toolchain install "$RUST_VERSION" --profile minimal --component clippy --component rustfmt --component llvm-tools-preview --target "$WASM_TARGET"
       - name: Assert clean checkout and exact toolchain
         run: |
           test -z "$(git status --porcelain --untracked-files=all)"
@@ -95,6 +95,9 @@ jobs:
         run: command -v cargo-audit >/dev/null || cargo install cargo-audit --version "$CARGO_AUDIT_VERSION" --locked
       - name: Rust dependency audit
         working-directory: packages/wasm
+        run: cargo audit
+      - name: Query dependency audit
+        working-directory: packages/queries/engine
         run: cargo audit
       - name: Rust lint
         run: bun run lint:rust
@@ -189,6 +192,7 @@ jobs:
           bun run test:unit
           cargo test --manifest-path packages/wasm/Cargo.toml
           cargo test --manifest-path packages/wasm/Cargo.toml --features analysis
+          cargo test --manifest-path packages/queries/engine/Cargo.toml
       - name: Type checks, public API and committed generated docs
         run: |
           bun run typecheck

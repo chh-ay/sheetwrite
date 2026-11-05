@@ -138,6 +138,7 @@ Sheetwrite packages are released together at version 0.6.1. This index is genera
 ## More guides
 
 - [Concepts](https://www.sheetwrite.dev/docs/concepts/): How Sheetwrite works: who owns the runtime and the data, how the calculation engine recalculates, how documents change, and how errors surface.
+- [Data model](https://www.sheetwrite.dev/docs/features/analysis/data-model/): Relate workbook tables with one-to-many relationships that are saved in the workbook, undone and synchronized.
 - [Import and export](https://www.sheetwrite.dev/docs/import-export/): Read and write XLSX, CSV and TSV with Sheetwrite: what each format keeps, how large files stream, and how round trips with other apps behave.
 - [Getting started](https://www.sheetwrite.dev/docs/start/): Install Sheetwrite, build your first grid, choose between the default and full formula engines, and upgrade from an earlier release.
 - [Tutorials](https://www.sheetwrite.dev/docs/tutorials/): Step-by-step Sheetwrite tutorials: an Excel-style spreadsheet in plain JavaScript, React, Vue, Svelte or Node.js, and a full app with the ribbon.
@@ -146,8 +147,9 @@ Sheetwrite packages are released together at version 0.6.1. This index is genera
 
 - [API reference](https://www.sheetwrite.dev/docs/api/): Generated reference for every classified Sheetwrite package entry point.
 - [`@sheetwrite/charts`](https://www.sheetwrite.dev/docs/api/charts/): 18 exports across 2 entry points (primary entry point: supported).
-- [`@sheetwrite/core`](https://www.sheetwrite.dev/docs/api/core/): 379 exports across 11 entry points (primary entry point: supported).
+- [`@sheetwrite/core`](https://www.sheetwrite.dev/docs/api/core/): 383 exports across 13 entry points (primary entry point: supported).
 - [`@sheetwrite/formulas`](https://www.sheetwrite.dev/docs/api/formulas/): 26 exports across 2 entry points (primary entry point: internal).
+- [`@sheetwrite/queries`](https://www.sheetwrite.dev/docs/api/queries/): 17 exports across 2 entry points (primary entry point: supported).
 - [`@sheetwrite/react`](https://www.sheetwrite.dev/docs/api/react/): 19 exports across 2 entry points (primary entry point: supported).
 - [`@sheetwrite/svelte`](https://www.sheetwrite.dev/docs/api/svelte/): 19 exports across 2 entry points (primary entry point: supported).
 - [`@sheetwrite/vue`](https://www.sheetwrite.dev/docs/api/vue/): 22 exports across 2 entry points (primary entry point: supported).

@@ -91,6 +91,11 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "WorkbookTableXmlElement",
     ],
   },
+  "data-model": {
+    source: "packages/core/src/types/data-model.ts",
+    dependencies: ["table"],
+    exports: ["DataModel", "RelationshipStatus", "TableColumnRef", "TableRelationship"],
+  },
   pivot: {
     source: "packages/core/src/types/pivot.ts",
     dependencies: ["cell", "coordinates", "table"],
@@ -147,7 +152,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
   },
   document: {
     source: "packages/core/src/types/document.ts",
-    dependencies: ["cell", "chart", "coordinates", "pivot", "table"],
+    dependencies: ["cell", "chart", "coordinates", "data-model", "pivot", "table"],
     exports: [
       "AddSheetInput",
       "CalculationSettings",

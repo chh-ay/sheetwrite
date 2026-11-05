@@ -320,6 +320,8 @@ export function patchSheetId(patch: DocumentOp): SheetId | null {
     case "setNamedRange":
     case "removeNamedRange":
     case "setCalculation":
+    case "setRelationship":
+    case "removeRelationship":
       return null;
     case "addSheet":
       return patch.sheet.id;

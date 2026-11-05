@@ -11,7 +11,9 @@ description: "Compiler-backed classification of every publishable Sheetwrite pac
 | `@sheetwrite/core` | `./dist/index.d.ts` | supported | [Reference](/docs/api/core/) |
 | `@sheetwrite/core/adapter` | `./dist/adapter.d.ts` | supported | [Reference](/docs/api/core-adapter/) |
 | `@sheetwrite/core/browser` | `./dist/indexeddb.d.ts` | supported | [Reference](/docs/api/core-browser/) |
+| `@sheetwrite/core/browser/history` | `./dist/history-indexeddb.d.ts` | supported | [Reference](/docs/api/core-browser-history/) |
 | `@sheetwrite/core/functions` | `./dist/functions.d.ts` | supported | [Reference](/docs/api/core-functions/) |
+| `@sheetwrite/core/history` | `./dist/history-archive.d.ts` | supported | [Reference](/docs/api/core-history/) |
 | `@sheetwrite/core/icons.json` | `./dist/icons.json` | asset | [Reference](/docs/api/core-icons-json/) |
 | `@sheetwrite/core/icons.svg` | `./dist/icons.svg` | asset | [Reference](/docs/api/core-icons-svg/) |
 | `@sheetwrite/core/shell` | `./dist/shell.d.ts` | supported | [Reference](/docs/api/core-shell/) |
@@ -21,6 +23,8 @@ description: "Compiler-backed classification of every publishable Sheetwrite pac
 | `@sheetwrite/core/worker` | `./dist/worker.d.ts` | supported | [Reference](/docs/api/core-worker/) |
 | `@sheetwrite/formulas` | `./loader.d.ts` | internal | [Reference](/docs/api/formulas/) |
 | `@sheetwrite/formulas/wasm` | `./pkg/sheetwrite_wasm_bg.wasm` | asset | [Reference](/docs/api/formulas-wasm/) |
+| `@sheetwrite/queries` | `./dist/index.d.ts` | supported | [Reference](/docs/api/queries/) |
+| `@sheetwrite/queries/wasm` | `./pkg/sheetwrite_queries_bg.wasm` | asset | [Reference](/docs/api/queries-wasm/) |
 | `@sheetwrite/react` | `./dist/index.d.ts` | supported | [Reference](/docs/api/react/) |
 | `@sheetwrite/react/styles.css` | `./styles.css` | asset | [Reference](/docs/api/react-styles-css/) |
 | `@sheetwrite/svelte` | `./src/index.ts` | supported | [Reference](/docs/api/svelte/) |
