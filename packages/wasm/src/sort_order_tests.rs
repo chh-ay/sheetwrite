@@ -3,7 +3,7 @@
 //! "Learn about sort orders"). Each test sorts one column and checks the
 //! data-row permutation for both directions.
 
-use crate::query::{ComparableCell, SortKeys};
+use crate::query::{ComparableCell, SortKeyBuilder};
 use crate::store::CellStore;
 
 const SORT_COLUMN: usize = 0;
@@ -171,7 +171,7 @@ fn each_distinct_string_is_collated_once() {
     let labels: Vec<String> = (0..DISTINCT_LABELS)
         .map(|label| format!("item-{label}"))
         .collect();
-    let mut keys = SortKeys::with_capacity(ROWS);
+    let mut keys = SortKeyBuilder::with_capacity(ROWS);
     for row in 0..ROWS {
         let id = row % DISTINCT_LABELS;
         keys.push(ComparableCell::Text {
