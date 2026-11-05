@@ -101,7 +101,8 @@ function snapshot(): WorkbookSnapshot {
         },
         rowCount: 0,
         columns: [],
-        pivots: [byRegion(0)],
+        // Dashboard pivots place no output, so they can share the anchor A1.
+        pivots: [byRegion(0), { ...byRegion(0), id: "second" }],
         cells: [],
       },
     ],
@@ -125,16 +126,17 @@ it("computes a dashboard pivot without cells, equal to the same pivot on a works
   };
 
   expect(cells("dash", "on-dashboard")).toEqual([
-    "Row Labels",
+    "Region",
     "Sum of Amount",
     "East",
     4,
     "West",
     2,
-    "Grand Total",
+    "Total",
     6,
   ]);
   expect(cells("dash", "on-dashboard")).toEqual(cells("data", "on-sheet"));
+  expect(cells("dash", "second")).toEqual(cells("data", "on-sheet"));
 
   grid.applyTransaction({
     patches: [
@@ -157,9 +159,9 @@ it("shows the pivot result as a table in the dashboard view", async () => {
     [...row.children].map((cell) => cell.textContent),
   );
   expect(rows).toEqual([
-    ["Row Labels", "Sum of Amount"],
+    ["Region", "Sum of Amount"],
     ["East", "4"],
     ["West", "2"],
-    ["Grand Total", "6"],
+    ["Total", "6"],
   ]);
 });

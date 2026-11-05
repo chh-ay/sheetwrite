@@ -799,6 +799,71 @@ impl CellStore {
         let (names, types) = fields.unwrap_or_default();
         PivotFields { names, types }
     }
+
+    /// The output cells of pivot `index` on a sheet without cells (a
+    /// dashboard), in row-major order; empty while the pivot has no layout.
+    #[wasm_bindgen(js_name = pivotOutput)]
+    pub fn pivot_output(&self, sheet: usize, index: usize) -> PivotOutput {
+        let mut output = PivotOutput::default();
+        let Some(pivot) = self
+            .pivots
+            .as_deref()
+            .and_then(|registry| registry.sheets.get(&sheet)?.get(index))
+        else {
+            return output;
+        };
+        let (Some(layout), Some(cache)) = (pivot.layout.as_ref(), pivot.cache.as_ref()) else {
+            return output;
+        };
+        for offset in 0..layout.rows * layout.cols {
+            output.push(&cache.cell(layout, offset));
+        }
+        output
+    }
+}
+
+/// The output cells of a dashboard pivot, in row-major order.
+#[wasm_bindgen]
+#[derive(Default)]
+pub struct PivotOutput {
+    kinds: Vec<u8>,
+    numbers: Vec<f64>,
+    texts: Vec<String>,
+}
+
+impl PivotOutput {
+    fn push(&mut self, value: &Value) {
+        let (kind, number) = match value {
+            Value::Blank => (0, 0.0),
+            Value::Number(number) => (1, *number),
+            Value::Text(text) => {
+                self.texts.push(text.to_string());
+                (2, 0.0)
+            }
+            Value::Bool(flag) => (3, f64::from(u8::from(*flag))),
+            Value::Error(error) => (4, error.slot() as f64),
+        };
+        self.kinds.push(kind);
+        self.numbers.push(number);
+    }
+}
+
+#[wasm_bindgen]
+impl PivotOutput {
+    /// Cell kinds: 0 blank, 1 number, 2 text, 3 boolean, 4 error.
+    pub fn kinds(&self) -> Vec<u8> {
+        self.kinds.clone()
+    }
+
+    /// Per cell: the number, the boolean as 0 or 1, or the error slot.
+    pub fn numbers(&self) -> Vec<f64> {
+        self.numbers.clone()
+    }
+
+    /// The text cells, in order.
+    pub fn texts(&self) -> Vec<String> {
+        self.texts.clone()
+    }
 }
 
 impl CellStore {
@@ -971,8 +1036,10 @@ impl CellStore {
                 *anchor_counts.entry(pivot.saved.anchor).or_insert(0) += 1;
             }
 
+            // Dashboard pivots place no output, so their anchors never collide.
+            let detached = self.sheets[owner].cells.n_cols() == 0;
             for pivot in pivots {
-                let output_changed = if anchor_counts[&pivot.saved.anchor] > 1 {
+                let output_changed = if !detached && anchor_counts[&pivot.saved.anchor] > 1 {
                     // Structural deletion can clamp distinct anchors together.
                     // Keep both definitions, but let neither install output.
                     pivot.pending.clear();
@@ -1039,6 +1106,16 @@ impl CellStore {
             Ok(layout) => layout,
             Err(error) => return self.show_pivot_error(owner, pivot, error, None),
         };
+        // A sheet without columns is a dashboard: it has no cells to hold
+        // output, so the pivot keeps its layout and `pivotOutput` reads the
+        // cells from the cache. No cell changes, so no sheet is dirty.
+        if self.sheets[owner].cells.n_cols() == 0 {
+            footprints[index].attempt = None;
+            pivot.attempt = None;
+            pivot.error = None;
+            pivot.layout = Some(layout);
+            return false;
+        }
         let Some(range) = SpillRange::new(anchor, layout.rows, layout.cols) else {
             return self.show_pivot_error(owner, pivot, FormulaError::Num, None);
         };

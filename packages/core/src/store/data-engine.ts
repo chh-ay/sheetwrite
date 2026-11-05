@@ -1839,13 +1839,10 @@ export class StoreDataEngine {
       };
     }
 
-    const cols = Array.from({ length: record.cols }, (_, offset) => record.col + offset);
-    const window = this.getDataWindow(
-      sheet,
-      { start: record.row, end: record.row + record.rows },
-      cols,
-    );
-    const cells = Array.from(window.values);
+    const owner = this.workbook.sheets.find((candidate) => candidate.id === sheet);
+    const cells = isDashboard(owner)
+      ? this.dashboardPivotCells(sheet, index)
+      : this.pivotWindowCells(sheet, record);
     return {
       status: "ok",
       anchor: { sheet, row: record.row, col: record.col },
@@ -1855,6 +1852,39 @@ export class StoreDataEngine {
       labelCols: record.labelCols,
       cells,
     };
+  }
+
+  /** Output cells that a worksheet pivot placed, read from the sheet. */
+  private pivotWindowCells(sheet: SheetId, record: PivotStatusRecord): CellScalar[] {
+    const cols = Array.from({ length: record.cols }, (_, offset) => record.col + offset);
+    const window = this.getDataWindow(
+      sheet,
+      { start: record.row, end: record.row + record.rows },
+      cols,
+    );
+    return Array.from(window.values);
+  }
+
+  /** Output cells of a dashboard pivot, read from its cache: a dashboard has no cells. */
+  private dashboardPivotCells(sheet: SheetId, index: number): CellScalar[] {
+    if (!this.wasm.pivotOutput) return [];
+    const output = this.wasm.pivotOutput(this.sheets.handleOf(sheet), index);
+    try {
+      const kinds = output.kinds();
+      const numbers = output.numbers();
+      const texts = output.texts();
+      let text = 0;
+      return Array.from(kinds, (kind, cell): CellScalar => {
+        const number = numbers[cell] ?? 0;
+        if (kind === 1) return number;
+        if (kind === 2) return texts[text++] ?? "";
+        if (kind === 3) return number !== 0;
+        if (kind === 4) return PIVOT_ERRORS[number] ?? "#VALUE!";
+        return null;
+      });
+    } finally {
+      output.free();
+    }
   }
 
   /**
