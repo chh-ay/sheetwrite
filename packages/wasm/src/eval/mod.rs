@@ -22,6 +22,7 @@ mod matrix;
 mod number_format;
 mod operators;
 mod random;
+mod range_fold;
 mod range_reader;
 mod reference;
 mod statistics;
@@ -79,17 +80,13 @@ use range_reader::RangeReader;
 use reference::{finish_runtime_reads, start_runtime_reads, RewriteScope, RuntimeReads};
 pub(crate) use subtotal::ast_calls_subtotal;
 use subtotal::SkippedCells;
-use value::{
-    aggregate_number, bool_from_value, cached_formula_value, compare_values, text_from_value,
-};
+use value::{bool_from_value, cached_formula_value, compare_values, text_from_value};
 
 const LET_BINDING_LIMIT: usize = 126;
 const LET_EXPANDED_NODE_LIMIT: usize = 16_384;
 
 thread_local! {
     static FORMULA_ORIGINS: RefCell<Vec<(u32, u32)>> = const { RefCell::new(Vec::new()) };
-    static RANGE_SUM_CACHE: RefCell<FxHashMap<CellRange, EvalResult>> =
-        RefCell::new(FxHashMap::default());
     /// Values of the LET bindings of the evaluation in progress, indexed by
     /// the slots of its expanded expression. Empty while no LET is running,
     /// which leaves a slot use to evaluate its expression directly.
@@ -797,7 +794,6 @@ impl CellStore {
     /// Ends a pass of a workbook without formulas. No formula reads the edited
     /// values, so only the sums cached by the last pass and the dirty seeds go.
     fn finish_formula_free_pass(&mut self, seeds: &[usize]) {
-        RANGE_SUM_CACHE.with(|cache| cache.borrow_mut().clear());
         self.finish_recompute(seeds.iter().copied(), None);
         self.graph.invalidate();
         self.formula_slots = FormulaStore::default();
@@ -822,7 +818,6 @@ impl CellStore {
             return;
         }
 
-        RANGE_SUM_CACHE.with(|cache| cache.borrow_mut().clear());
         let _lookup_pass = LookupPassGuard::begin();
         let _iteration_pass = IterationPassGuard::begin(self.iteration.is_some());
 
@@ -1862,36 +1857,9 @@ impl CellStore {
             _ => {}
         }
 
-        if func == Func::Sum && args.len() == 1 {
-            let range = match &args[0] {
-                Ast::Range(row_start, col_start, row_end, col_end, _) => Some(CellRange::new(
-                    sheet as u32,
-                    *row_start,
-                    *col_start,
-                    *row_end,
-                    *col_end,
-                )),
-                Ast::AbsRange(sheet_ref, row_start, col_start, row_end, col_end, _) => Some(
-                    CellRange::new(sheet_ref.handle, *row_start, *col_start, *row_end, *col_end),
-                ),
-                Ast::NamedRange(named) => Some(CellRange::new(
-                    named.sheet,
-                    named.row_start,
-                    named.col_start,
-                    named.row_end,
-                    named.col_end,
-                )),
-                Ast::Structured(reference) => Some(CellRange::new(
-                    reference.sheet,
-                    reference.row_start,
-                    reference.col,
-                    reference.row_end,
-                    reference.col,
-                )),
-                _ => None,
-            };
-            if let Some(range) = range {
-                return self.eval_sum_range(range, pass, depth + 1);
+        if func == Func::Sum {
+            if let Some(result) = self.eval_sum_family(args, sheet, pass, depth + 1) {
+                return result;
             }
         }
 
@@ -2450,20 +2418,8 @@ impl CellStore {
             ranges.push(range_from_ast(arg, sheet)?);
         }
         for range in ranges {
-            let mut reader = match RangeReader::new(self, range, depth) {
-                Ok(reader) => reader,
-                Err(error) => return Some(Value::Error(error)),
-            };
-            loop {
-                match reader.next(pass) {
-                    Ok(Some(value)) => {
-                        if let Err(error) = fold.push(&value) {
-                            return Some(Value::Error(error));
-                        }
-                    }
-                    Ok(None) => break,
-                    Err(error) => return Some(Value::Error(error)),
-                }
+            if let Err(error) = self.fold_range(range, &mut fold, false, pass, depth) {
+                return Some(Value::Error(error));
             }
         }
         Some(fold.finish())
@@ -3218,92 +3174,6 @@ impl CellStore {
             }
             _ => Value::Error(FormulaError::Value),
         }
-    }
-
-    fn eval_sum_range(
-        &self,
-        range: CellRange,
-        pass: &mut EvalPass<'_>,
-        depth: usize,
-    ) -> EvalResult {
-        if depth > FORMULA_RECURSION_LIMIT {
-            return Value::Error(FormulaError::Num);
-        }
-        let sheet = range.sheet as usize;
-        let Some(data) = self.sheets.get(sheet) else {
-            return Value::Error(FormulaError::Ref);
-        };
-        if data.cells.row_count() == 0
-            || data.cells.n_cols() == 0
-            || range.row_start as usize >= data.cells.row_count()
-            || range.col_start as usize >= data.cells.n_cols()
-        {
-            return Value::Error(FormulaError::Ref);
-        }
-        let row_start = range.row_start as usize;
-        let col_start = range.col_start as usize;
-        let row_end = (range.row_end as usize).min(data.cells.row_count() - 1);
-        let col_end = (range.col_end as usize).min(data.cells.n_cols() - 1);
-        let total = (row_end - row_start + 1) as u64 * (col_end - col_start + 1) as u64;
-        if total > RANGE_CELL_LIMIT {
-            return Value::Error(FormulaError::Num);
-        }
-        if let Some(cached) = RANGE_SUM_CACHE.with(|cache| cache.borrow().get(&range).cloned()) {
-            return cached;
-        }
-
-        let mut sum: f64 = 0.0;
-        let mut cacheable = true;
-        let has_spill_cells = data.spill.has_owners();
-        let literals = LiteralSources::new(data, depth);
-        for row in row_start..=row_end {
-            for col in col_start..=col_end {
-                if !data.cells.is_loaded(row, col) {
-                    return Value::Error(FormulaError::Loading);
-                }
-                let index = data.cells.idx(row, col);
-                // Literal sources are never formulas or owned spill output, so
-                // only non-literal cells need the resolved kind and the
-                // cacheability checks.
-                let value = if let Some(value) =
-                    literals.and_then(|sources| sources.value_at(&self.strings, index))
-                {
-                    value
-                } else {
-                    let kind = data.cells.kind_at(index);
-                    // A sum over formula cells or spilled output can change
-                    // without a write to this range, so only plain values are cached.
-                    if cacheable
-                        && (kind == KIND_FORMULA
-                            || (has_spill_cells
-                                && data.spill.owner((row as u32, col as u32)).is_some()))
-                    {
-                        cacheable = false;
-                    }
-                    if kind == KIND_EMPTY {
-                        Value::Blank
-                    } else {
-                        self.eval_at(sheet, row, col, pass, depth + 1)
-                    }
-                };
-                match aggregate_number(&value, true) {
-                    Ok(Some(number)) => sum += number,
-                    Ok(None) => {}
-                    Err(error) => return Value::Error(error),
-                }
-            }
-        }
-        let result = if sum.is_finite() {
-            Value::Number(sum)
-        } else {
-            Value::Error(FormulaError::Num)
-        };
-        if cacheable {
-            RANGE_SUM_CACHE.with(|cache| {
-                cache.borrow_mut().insert(range, result.clone());
-            });
-        }
-        result
     }
 
     fn eval_range_values(
