@@ -27,6 +27,7 @@ const STORE_EDGES: Readonly<Record<string, readonly string[]>> = {
   "sheet-registry.ts": ["../errors.ts", "../types/coordinates.ts", "../types/document.ts"],
   "snapshot-codec.ts": [
     "../document-protocol.ts",
+    "../plain-data.ts",
     "../reference.ts",
     "../types/cell.ts",
     "../types/coordinates.ts",
