@@ -47,7 +47,8 @@ const RUST_CRATES = [
   {
     name: "queries",
     directory: "packages/queries/engine",
-    testArguments: [],
+    // Both artifacts' bindings are scored, so coverage compiles both features.
+    testArguments: ["--features", "power-query"],
   },
 ] as const;
 
