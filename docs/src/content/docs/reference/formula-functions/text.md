@@ -3,7 +3,7 @@ title: "Text functions"
 description: "Every text formula function, its engine build, and its signature, semantic, dialect, and implementation profiles."
 ---
 
-This page lists the 34 functions of the text family. Taxonomy/source: [Text functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb). The [formula function contract](/docs/reference/formula-functions/) has every family, the engine builds, and the evaluation limits.
+This page lists the 44 functions of the text family. Taxonomy/source: [Text functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb). The [formula function contract](/docs/reference/formula-functions/) has every family, the engine builds, and the evaluation limits.
 
 ## Functions
 
@@ -46,6 +46,16 @@ This page lists the 34 functions of the text family. Taxonomy/source: [Text func
 <tr data-formula-name="UNICODE" data-engine="default"><td><code>UNICODE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="PROPER" data-engine="default"><td><code>PROPER</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 <tr data-formula-name="NUMBERVALUE" data-engine="default"><td><code>NUMBERVALUE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-number-value">Signature: <code>number-value</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="LENB" data-engine="default"><td><code>LENB</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-single-byte">Dialect: <code>excel-single-byte</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="LEFTB" data-engine="default"><td><code>LEFTB</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-left-right">Signature: <code>left-right</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-single-byte">Dialect: <code>excel-single-byte</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="RIGHTB" data-engine="default"><td><code>RIGHTB</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-left-right">Signature: <code>left-right</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-single-byte">Dialect: <code>excel-single-byte</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="MIDB" data-engine="default"><td><code>MIDB</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-mid">Signature: <code>mid</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-single-byte">Dialect: <code>excel-single-byte</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="REPLACEB" data-engine="default"><td><code>REPLACEB</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-replace">Signature: <code>replace</code></a><br /><a href="#semantics-text-sensitive">Semantics: <code>text-sensitive</code></a><br /><a href="#dialect-excel-single-byte">Dialect: <code>excel-single-byte</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="FINDB" data-engine="default"><td><code>FINDB</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-find-search">Signature: <code>find-search</code></a><br /><a href="#semantics-text-sensitive">Semantics: <code>text-sensitive</code></a><br /><a href="#dialect-excel-single-byte">Dialect: <code>excel-single-byte</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="SEARCHB" data-engine="default"><td><code>SEARCHB</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-find-search">Signature: <code>find-search</code></a><br /><a href="#semantics-text-search">Semantics: <code>text-search</code></a><br /><a href="#dialect-excel-single-byte">Dialect: <code>excel-single-byte</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="ASC" data-engine="default"><td><code>ASC</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="DBCS" data-engine="default"><td><code>DBCS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="BAHTTEXT" data-engine="default"><td><code>BAHTTEXT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 </tbody></table>
 
 </section>
@@ -390,6 +400,18 @@ Limitations: REGEXTEST, REGEXEXTRACT, and REGEXREPLACE use the regex-lite syntax
 
 </details>
 
+<details id="dialect-excel-single-byte"><summary>Dialect: excel-single-byte</summary>
+
+| Dialect | Status |
+| --- | --- |
+| Microsoft Excel | documented |
+| Google Sheets | unverified |
+| OpenFormula | unverified |
+
+Limitations: LENB, LEFTB, RIGHTB, MIDB, REPLACEB, FINDB and SEARCHB count one byte per character, as Excel does when the default editing language is not a double-byte language. Excel counts two bytes for a double-byte character only when such a language is the default.
+
+</details>
+
 ## Implementation profiles
 
 <details id="implementation-text-analysis"><summary>Implementation: text-analysis</summary>
@@ -408,7 +430,7 @@ Limitations: REGEXTEST, REGEXEXTRACT, and REGEXREPLACE use the regex-lite syntax
 | Layer | Status and source/evidence |
 | --- | --- |
 | Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/calc.rs) |
-| Evaluator | implemented<br />[`packages/wasm/src/eval/mod.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/mod.rs)<br />[`packages/wasm/src/eval/functions.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/functions.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/mod.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/mod.rs)<br />[`packages/wasm/src/eval/functions.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/functions.rs)<br />[`packages/wasm/src/eval/text.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/text.rs)<br />[`packages/wasm/src/eval/text/width.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/text/width.rs)<br />[`packages/wasm/src/eval/text/baht.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/text/baht.rs) |
 | Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/formula-assist.ts) |
 | Evidence | source-linked<br />[`packages/wasm/src/tests.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/tests.rs)<br />[`packages/core/test/formula-assist.test.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/test/formula-assist.test.ts) |
 

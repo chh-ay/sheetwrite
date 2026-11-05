@@ -184,6 +184,7 @@
   "semantics-text-sensitive": "/docs/reference/formula-functions/text/#semantics-text-sensitive",
   "semantics-text-search": "/docs/reference/formula-functions/text/#semantics-text-search",
   "dialect-regex-lite-subset": "/docs/reference/formula-functions/text/#dialect-regex-lite-subset",
+  "dialect-excel-single-byte": "/docs/reference/formula-functions/text/#dialect-excel-single-byte",
   "implementation-text-analysis": "/docs/reference/formula-functions/text/#implementation-text-analysis",
   "signature-database": "/docs/reference/formula-functions/database/#signature-database",
   "semantics-analysis-database": "/docs/reference/formula-functions/database/#semantics-analysis-database",
