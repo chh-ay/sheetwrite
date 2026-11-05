@@ -1,23 +1,22 @@
 import { runSheetwriteCase } from "./adapters/sheetwrite.js";
 import { verifyCaptureArtifacts } from "./capture.js";
 import { compareResults, compareReviewedObservation } from "./compare.js";
-import { readConformanceManifest, readFormulaInventory } from "./generate.js";
+import { generateConformanceEvidence, readFormulaInventory } from "./generate.js";
 import { validateCorpus } from "./schema.js";
 import type { ConformanceCorpus, OfflineConformanceResult } from "./types.js";
 
 export async function runOffline(
   corpus: ConformanceCorpus,
   paths: {
-    manifest?: string;
     inventory?: string;
     captures?: string;
   } = {},
 ): Promise<OfflineConformanceResult> {
-  const [artifacts, manifest, inventory] = await Promise.all([
+  const [artifacts, inventory] = await Promise.all([
     verifyCaptureArtifacts(corpus, paths.captures),
-    readConformanceManifest(paths.manifest),
     readFormulaInventory(paths.inventory),
   ]);
+  const { manifest } = generateConformanceEvidence(inventory);
   const corpusIssues = [
     ...artifacts.issues,
     ...validateCorpus(corpus, manifest, inventory, artifacts.verified),

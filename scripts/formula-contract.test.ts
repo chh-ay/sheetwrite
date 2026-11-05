@@ -9,6 +9,15 @@ const INVENTORY = JSON.parse(
   readFileSync(resolve(ROOT, "test/conformance/formula-contract.inventory.json"), "utf8"),
 ) as MutableContract;
 
+/** Every spelling (canonical name and aliases) of the functions in one build. */
+function spellingsIn(build: string): Set<string> {
+  return new Set(
+    INVENTORY.functions
+      .filter((entry) => entry.builds.includes(build))
+      .flatMap((entry) => [entry.canonical, ...entry.aliases]),
+  );
+}
+
 interface MutableFunction {
   canonical: string;
   aliases: string[];
@@ -113,13 +122,17 @@ describe("formula capability contract", () => {
   test("validates the checked-in schema, inventory, parser, assist, and evidence paths", async () => {
     const result = await validateFormulaContractRepository(ROOT);
     expect(result.issues).toEqual([]);
+    // Counts come from the inventory, so pull requests that add different
+    // functions do not edit the same lines here.
+    const parserSpellings = spellingsIn("@sheetwrite/wasm");
+    const formulasSpellings = spellingsIn("@sheetwrite/formulas");
     expect(result.summary).toEqual({
-      functions: 494,
+      functions: INVENTORY.functions.length,
       requiredSupported: 100,
-      unsupportedCategories: 6,
-      parserSpellings: 212,
-      assistSpellings: 497,
-      formulasSpellings: 497,
+      unsupportedCategories: INVENTORY.unsupportedCategories.length,
+      parserSpellings: parserSpellings.size,
+      assistSpellings: new Set([...parserSpellings, ...formulasSpellings]).size,
+      formulasSpellings: formulasSpellings.size,
     });
   });
 
