@@ -164,6 +164,49 @@ describe("saved query refresh", () => {
     expect(tableRange(grid)?.end.row).toBe(1);
   });
 
+  it("writes logical, date-time and mixed values with their worksheet types", async () => {
+    const grid = mount();
+    const events: SavedQuery = {
+      id: "events",
+      name: "Events",
+      source: {
+        kind: "json",
+        sourceId: "events-feed",
+        columns: [
+          { id: "at", name: "At", type: "dateTime" },
+          { id: "open", name: "Open", type: "logical" },
+          { id: "count", name: "Count", type: "number" },
+        ],
+      },
+      steps: [
+        {
+          kind: "unpivot",
+          columns: ["open", "count"],
+          attribute: { id: "field", name: "Field" },
+          value: { id: "value", name: "Value" },
+        },
+      ],
+      output: {
+        table: "events-table",
+        tableName: "Events",
+        anchor: { sheet: "data", row: 0, col: 0 },
+      },
+    };
+    const session = await connect(grid, {
+      "events-feed": '[{"At":"2024-01-02T12:00:00","Open":true,"Count":"bad"}]',
+    });
+
+    expect(session.define(events).status).toBe("applied");
+    expect((await session.refresh("events")).status).toBe("applied");
+
+    expect([cell(grid, 1, 0), cell(grid, 1, 1), cell(grid, 1, 2)]).toEqual([45293.5, "Open", true]);
+    expect(cell(grid, 2, 1)).toBe("Count");
+    expect(grid.store.getFormula({ sheet: "data", row: 2, col: 2 })).toBe("=#VALUE!");
+    expect(grid.store.getCell({ sheet: "data", row: 1, col: 0 }).style.numberFormat).toBe(
+      "yyyy-mm-dd hh:mm:ss",
+    );
+  });
+
   it("is one undoable change that redo restores without another fetch", async () => {
     const grid = mount();
     const requests: QueryFetchRequest[] = [];
