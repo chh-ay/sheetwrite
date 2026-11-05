@@ -235,6 +235,7 @@ const CATEGORY_ASSERTIONS_BY_FUNCTION: Readonly<
   ISTEXT: { error: "NOT(ISTEXT(1/0))" },
   ISLOGICAL: { error: "NOT(ISLOGICAL(1/0))" },
   "ERROR.TYPE": {
+    error: "ERROR.TYPE(1/0)=2",
     empty: "ISNA(ERROR.TYPE(C1))",
     mixed: "ISNA(ERROR.TYPE(C1))",
     boundary: "ISNA(ERROR.TYPE(C1))",
