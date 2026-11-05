@@ -95,10 +95,11 @@ impl CellStore {
         BLOCK_OK
     }
 
-    /// Row-major offsets, in the rectangle before the move, of the formula
+    /// Offsets, row-major in the rectangle before the move, of the formula
     /// cells whose adjusted text the inverse order cannot restore: a
     /// reference that leaves the sheet becomes `#REF!`. Undo restores these
-    /// cells from a capture. An invalid shape or order gives no offsets.
+    /// cells from a capture, so their order does not matter. An invalid
+    /// shape or order gives no offsets.
     #[wasm_bindgen(js_name = permuteRowsLosses)]
     pub fn permute_rows_losses(
         &self,
@@ -135,7 +136,6 @@ impl CellStore {
                 }
             }
         }
-        losses.sort_unstable();
         losses
     }
 
