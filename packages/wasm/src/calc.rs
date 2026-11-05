@@ -714,6 +714,12 @@ pub enum Ast {
         cols: usize,
         values: std::rc::Rc<Vec<crate::types::Value>>,
     },
+    /// The literal pattern of a REGEX call, shared by every formula in the
+    /// store with the same pattern text. Its compiled programs live as long
+    /// as the formulas that hold it.
+    #[cfg(feature = "analysis")]
+    #[allow(private_interfaces)] // Shared patterns are not part of the public AST API.
+    RegexPattern(std::rc::Rc<crate::eval::analysis::regex_patterns::SharedPattern>),
     Name(String),
     NamedRange(NamedRangeRef),
     /// A defined name that holds a formula. Shared, because one name can be
@@ -778,6 +784,9 @@ impl Ast {
             Ast::BoundMatrix { values, .. } => {
                 out.add_vec::<crate::types::Value>(values.len(), values.capacity());
             }
+            // The store's pattern index counts each shared pattern once.
+            #[cfg(feature = "analysis")]
+            Ast::RegexPattern(_) => {}
             Ast::Str(value) | Ast::Name(value) => add_string_memory(value, out),
             Ast::NamedRange(value) => add_string_memory(&value.name, out),
             // A shared expansion is counted once, by the store's cache that
@@ -2535,6 +2544,8 @@ fn translate_relative_refs_inner(
         | Ast::Array { .. } => true,
         #[cfg(feature = "analysis")]
         Ast::BoundMatrix { .. } => true,
+        #[cfg(feature = "analysis")]
+        Ast::RegexPattern(_) => true,
     }
 }
 
@@ -3045,6 +3056,8 @@ pub(crate) fn write_ast(ast: &Ast, out: &mut String) {
         Ast::Missing => {}
         #[cfg(feature = "analysis")]
         Ast::BoundMatrix { .. } => out.push_str("#CALC!"),
+        #[cfg(feature = "analysis")]
+        Ast::RegexPattern(pattern) => write_text(pattern.text(), out),
         Ast::InvalidRef => out.push_str("#REF!"),
         Ast::Array { cols, values } => {
             out.push('{');

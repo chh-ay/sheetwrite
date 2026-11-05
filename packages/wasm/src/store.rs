@@ -284,6 +284,11 @@ pub struct CellStore {
     /// has the field, so the default engine store does not grow.
     #[cfg(feature = "host-functions")]
     pub(crate) custom_functions: Option<Box<crate::eval::custom::CustomFunctions>>,
+    /// Weak index of the literal REGEX patterns this store's formulas share.
+    /// `None` until a formula uses one, and only the full engine has it.
+    #[cfg(feature = "analysis")]
+    regex_patterns:
+        std::cell::RefCell<Option<Box<crate::eval::analysis::regex_patterns::PatternIndex>>>,
     loading_page: usize,
     defined_names: HashMap<(Option<u32>, String), names::DefinedName>,
     tables: HashMap<String, TableDefinition>,
@@ -393,6 +398,8 @@ impl CellStore {
             conditional_rules: ConditionalRules::default(),
             #[cfg(feature = "host-functions")]
             custom_functions: None,
+            #[cfg(feature = "analysis")]
+            regex_patterns: std::cell::RefCell::new(None),
             loading_page: 0,
             mutation_revision: 0,
             active_mutation_revision: None,
@@ -3302,6 +3309,10 @@ impl CellStore {
                 .add_payload(bytes, bytes);
             results.add_memory_stats(&mut stats);
         }
+        #[cfg(feature = "analysis")]
+        if let Some(patterns) = &*self.regex_patterns.borrow() {
+            patterns.add_memory_stats(stats.owner_mut(crate::memory::FORMULAS));
+        }
 
         self.graph.add_memory_stats(&mut stats);
         self.conditional_rules.add_memory_stats(&mut stats);
@@ -3622,7 +3633,7 @@ impl CellStore {
         let ast = self.resolve_sheets(ast)?;
         let placement = names::NamePlacement::new(formula_row, formula_col);
         let ast = self.resolve_defined_names(ast, formula_sheet, &placement);
-        Ok(resolve_structured_refs(
+        let mut ast = resolve_structured_refs(
             ast,
             formula_sheet,
             formula_row,
@@ -3630,7 +3641,24 @@ impl CellStore {
             &|reference, sheet, row, col| {
                 self.resolve_structured_reference(reference, sheet, row, col)
             },
-        ))
+        );
+        #[cfg(feature = "analysis")]
+        self.bind_regex_patterns(source, &mut ast);
+        Ok(ast)
+    }
+
+    /// Points the literal REGEX patterns of a new formula at the patterns the
+    /// store's formulas share, so formulas with one pattern compile it once.
+    #[cfg(feature = "analysis")]
+    fn bind_regex_patterns(&self, source: &str, ast: &mut Ast) {
+        if !crate::eval::analysis::regex_patterns::may_call_regex(source) {
+            return;
+        }
+
+        self.regex_patterns
+            .borrow_mut()
+            .get_or_insert_with(Box::default)
+            .bind(ast);
     }
 
     /// Resolve the sheet names of a parsed formula to stable handles.
