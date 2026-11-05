@@ -1692,7 +1692,7 @@ export class StoreDataEngine {
    */
   captureRangeTransfer(input: Range): Uint8Array | null {
     const range = normalizedRange(input);
-    const sheet = this.sheetMeta(range.sheet);
+    const sheet = this.sheets.sheetMeta(range.sheet);
     if (
       range.start.row < 0 ||
       range.start.col < 0 ||
@@ -1702,7 +1702,7 @@ export class StoreDataEngine {
       return null;
     }
 
-    const handle = this.handleOf(range.sheet);
+    const handle = this.sheets.handleOf(range.sheet);
     const resource = this.wasm.captureRange(
       handle,
       range.start.row,
