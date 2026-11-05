@@ -84,6 +84,16 @@ impl Criterion {
         }
     }
 
+    /// The operator and number a finite number cell is compared with, or
+    /// `None` when the criterion is text, a boolean or a pattern: then every
+    /// finite number gets the same answer, [`Self::matches_number`]'s.
+    pub(super) fn number_comparison(&self) -> Option<(CmpOp, f64)> {
+        match self.operand {
+            Value::Number(operand) if self.wildcard.is_none() => Some((self.op, operand)),
+            _ => None,
+        }
+    }
+
     /// [`Self::matches`] for a finite number cell, without building a `Value`.
     pub(super) fn matches_number(&self, number: f64) -> bool {
         // A pattern never matches a number.

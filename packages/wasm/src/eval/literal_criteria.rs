@@ -13,6 +13,7 @@
 use super::criteria::{Criterion, IfExtreme, IfSum};
 use super::range_reader::LiteralColumns;
 
+use crate::calc::CmpOp;
 use crate::cells::{payload_num, payload_str_id};
 use crate::store::CellStore;
 use crate::types::{
@@ -37,11 +38,20 @@ pub(super) enum CriteriaFold {
     Extreme { maximum: bool },
 }
 
+/// How a criterion answers a finite number cell: one comparison, or the same
+/// answer for every number (text, boolean and pattern criteria).
+#[derive(Clone, Copy)]
+enum NumberTest {
+    Compare(CmpOp, f64),
+    Always(bool),
+}
+
 /// A criterion with its answers, decided once per call, for the cells that
-/// need no comparison: blanks, booleans, non-finite numbers (which read as
-/// `#NUM!`) and text missing from the pool (which reads as `#REF!`).
+/// need no text comparison: numbers, blanks, booleans, non-finite numbers
+/// (which read as `#NUM!`) and text missing from the pool (`#REF!`).
 struct CellTest<'c> {
     criterion: &'c Criterion,
+    number: NumberTest,
     blank: bool,
     when_true: bool,
     when_false: bool,
@@ -51,8 +61,16 @@ struct CellTest<'c> {
 
 impl<'c> CellTest<'c> {
     fn new(criterion: &'c Criterion) -> Self {
+        // Any finite number answers like `matches_number` when there is no
+        // comparison; zero is one.
+        let number = criterion.number_comparison().map_or(
+            NumberTest::Always(criterion.matches_number(0.0)),
+            |(op, operand)| NumberTest::Compare(op, operand),
+        );
+
         Self {
             criterion,
+            number,
             blank: criterion.matches(&Value::Blank),
             when_true: criterion.matches(&Value::Bool(true)),
             when_false: criterion.matches(&Value::Bool(false)),
@@ -62,16 +80,24 @@ impl<'c> CellTest<'c> {
     }
 
     /// Whether the literal cell `(kind, payload)` matches, as
-    /// `Criterion::matches` would on the cell's value.
+    /// `Criterion::matches` would on the cell's value. The float operators
+    /// answer as the `partial_cmp` ordering `Criterion::matches` uses.
     #[inline]
     fn matches(&self, strings: &StringStorage, kind: u8, payload: u64) -> bool {
         match kind {
             KIND_NUMBER => {
                 let number = payload_num(payload);
-                if number.is_finite() {
-                    self.criterion.matches_number(number)
-                } else {
-                    self.non_finite
+                if !number.is_finite() {
+                    return self.non_finite;
+                }
+                match self.number {
+                    NumberTest::Compare(CmpOp::Eq, operand) => number == operand,
+                    NumberTest::Compare(CmpOp::Ne, operand) => number != operand,
+                    NumberTest::Compare(CmpOp::Lt, operand) => number < operand,
+                    NumberTest::Compare(CmpOp::Le, operand) => number <= operand,
+                    NumberTest::Compare(CmpOp::Gt, operand) => number > operand,
+                    NumberTest::Compare(CmpOp::Ge, operand) => number >= operand,
+                    NumberTest::Always(answer) => answer,
                 }
             }
             KIND_STRING => string_from_pool_ref(strings, payload_str_id(payload))
