@@ -392,7 +392,8 @@
     display: grid;
     width: 100%;
     min-height: 2.15rem;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-columns: minmax(0, 1fr);
+    grid-auto-flow: column;
     gap: var(--sw-space-1);
     padding: var(--sw-space-1);
     border: 1px solid var(--sw-border);
@@ -423,8 +424,8 @@
     background: transparent;
     cursor: pointer;
     transition:
-      background 120ms ease,
-      color 120ms ease;
+      background var(--sw-motion-fast) var(--sw-motion-standard),
+      color var(--sw-motion-fast) var(--sw-motion-standard);
   }
 
   .sw-demo-radio-item:hover:not([data-checked]) {
