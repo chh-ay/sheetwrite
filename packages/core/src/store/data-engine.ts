@@ -207,7 +207,7 @@ import {
 import { SheetRegistry } from "./sheet-registry.js";
 import { StoreSnapshotCodec } from "./snapshot-codec.js";
 import { StoreViewState } from "./view-state.js";
-import type { RecomputingCellStore } from "./wasm-contract.js";
+import type { PivotOutputCells, RecomputingCellStore } from "./wasm-contract.js";
 import { StoreWindowReader } from "./window-reader.js";
 import {
   KIND_BOOL,
@@ -235,7 +235,7 @@ const PIVOT_FIELD_TYPES: readonly PivotFieldType[] = [
 const PIVOT_STATUS_STRIDE = 7;
 
 /** Error sentinels by engine `FormulaError` slot; `pivotStatus` sends slot + 1. */
-const PIVOT_ERRORS: readonly string[] = [
+export const PIVOT_ERRORS: readonly string[] = [
   "#CYCLE!",
   "#DIV/0!",
   "#REF!",
@@ -1834,13 +1834,9 @@ export class StoreDataEngine {
       };
     }
 
-    const cols = Array.from({ length: record.cols }, (_, offset) => record.col + offset);
-    const window = this.getDataWindow(
-      sheet,
-      { start: record.row, end: record.row + record.rows },
-      cols,
-    );
-    const cells = Array.from(window.values);
+    const owner = this.workbook.sheets.find((candidate) => candidate.id === sheet);
+    // A dashboard has no cells: its view reads the output with `dashboardPivotOutput`.
+    const cells = isDashboard(owner) ? [] : this.pivotWindowCells(sheet, record);
     return {
       status: "ok",
       anchor: { sheet, row: record.row, col: record.col },
@@ -1850,6 +1846,30 @@ export class StoreDataEngine {
       labelCols: record.labelCols,
       cells,
     };
+  }
+
+  /** Output cells that a worksheet pivot placed, read from the sheet. */
+  private pivotWindowCells(sheet: SheetId, record: PivotStatusRecord): CellScalar[] {
+    const cols = Array.from({ length: record.cols }, (_, offset) => record.col + offset);
+    const window = this.getDataWindow(
+      sheet,
+      { start: record.row, end: record.row + record.rows },
+      cols,
+    );
+    return Array.from(window.values);
+  }
+
+  /**
+   * The engine output of a pivot on a dashboard, which places none in cells;
+   * the caller frees it. Null on the default engine or for an unknown pivot.
+   */
+  dashboardPivotOutput(sheet: SheetId, id: string): PivotOutputCells | null {
+    const index =
+      this.workbook.sheets
+        .find((candidate) => candidate.id === sheet)
+        ?.pivots?.findIndex((pivot) => pivot.id === id) ?? -1;
+    if (index < 0 || !this.wasm.pivotOutput) return null;
+    return this.wasm.pivotOutput(this.sheets.handleOf(sheet), index);
   }
 
   /**
