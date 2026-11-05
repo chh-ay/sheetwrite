@@ -27,7 +27,10 @@ mock.module("../src/panels/panel-controller.js", () => {
 await initSheetwrite();
 const restore = installCanvasTestStubs();
 const host = document.createElement("div");
-Object.defineProperties(host, { clientWidth: { value: 900 }, clientHeight: { value: 500 } });
+Object.defineProperties(host, {
+  clientWidth: { value: 900 },
+  clientHeight: { value: 500 },
+});
 document.body.appendChild(host);
 const grid = new GridImpl(host, {
   workbook: {
@@ -43,20 +46,40 @@ const grid = new GridImpl(host, {
   },
   config: { ribbon: true },
 });
+/** How long the lazy ribbon may take to mount before the probe fails. */
+const RIBBON_MOUNT_TIMEOUT_MS = 5_000;
+
+/**
+ * The ribbon tab with this name, once the lazy ribbon has mounted. A second
+ * `import()` of the ribbon module can settle before the grid's own import
+ * callback mounts the ribbon, so the probe waits for the mount itself.
+ */
+async function ribbonTab(name: string): Promise<HTMLElement> {
+  const deadline = Date.now() + RIBBON_MOUNT_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    const tab = [...host.querySelectorAll<HTMLElement>('[role="tab"]')].find(
+      (candidate) => candidate.textContent === name,
+    );
+    if (tab) return tab;
+
+    await Bun.sleep(0);
+  }
+  throw new Error(`The ribbon did not mount its ${name} tab`);
+}
+
 try {
-  // The ribbon itself is lazy; await its mount without requesting the panels.
-  await import("../src/ribbon/ribbon.js");
+  const insert = await ribbonTab("Insert");
   assert.equal(evaluations, 0, "construction must not import the panels");
   grid.applyTransaction({
     patches: [
-      { op: "set", addr: { sheet: "s1", row: 0, col: 0 }, value: { kind: "literal", value: 8 } },
+      {
+        op: "set",
+        addr: { sheet: "s1", row: 0, col: 0 },
+        value: { kind: "literal", value: 8 },
+      },
     ],
   });
   grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
-  const insert = [...host.querySelectorAll<HTMLElement>('[role="tab"]')].find(
-    (tab) => tab.textContent === "Insert",
-  );
-  assert.ok(insert);
   insert.click();
   assert.equal(
     evaluations,

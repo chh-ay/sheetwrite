@@ -6,6 +6,7 @@
 import { Scope } from "../scope.js";
 import type { CellScalar } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
+import type { TableColumnRef } from "../types/data-model.js";
 import type { Grid, GridPanel } from "../types/grid.js";
 import type { PivotDefinition, PivotFieldType, PivotSourceField } from "../types/pivot.js";
 import { panelSection, rebuildPanel, rejectionMessage, selectOf } from "./panel-dom.js";
@@ -23,6 +24,10 @@ import {
   setSortOrder,
   shiftField,
   sourceDataRange,
+  baseTable,
+  relatedTables,
+  valuesType,
+  withModelField,
   type FieldFacts,
   type PivotArea,
   type PivotPlacement,
@@ -151,6 +156,71 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
     commit(next, `${to}-${placed}-menu`);
   };
 
+  /**
+   * Add `column` of a related table to `to`. A table source becomes a model
+   * source in the same change, so it stays one undo step.
+   */
+  const addRelated = (pivot: PivotDefinition, column: TableColumnRef, to: PivotArea): void => {
+    const tables = grid.store.getWorkbook().sheets.flatMap((candidate) => candidate.tables ?? []);
+    const added = withModelField(pivot, tables, column);
+    if (added === null) return;
+    const values = distinctValues(added.pivot, added.field);
+    if (to === "filters" && values.length > MAX_FILTER_VALUES) {
+      message = TOO_MANY_VALUES;
+      refresh(true);
+      return;
+    }
+    const facts = { type: valuesType(values), distinctValues: () => values };
+    const next = placeField(added.pivot, added.field, to, facts, null);
+    const placed =
+      to === "values" ? next.values.length - 1 : areaFields(next, to).lastIndexOf(added.field);
+    commit(next, `${to}-${placed}-menu`);
+  };
+
+  /**
+   * One section per table that the pivot's base table reaches through
+   * relationships, with the columns the pivot does not read yet.
+   */
+  const appendRelatedTables = (target: HTMLElement, pivot: PivotDefinition): void => {
+    const base = baseTable(pivot.source);
+    if (base === undefined) return;
+    const workbook = grid.store.getWorkbook();
+    const tables = workbook.sheets.flatMap((candidate) => candidate.tables ?? []);
+    const reads = "model" in pivot.source ? pivot.source.model.fields : [];
+    for (const table of relatedTables(base, tables, workbook.dataModel?.relationships ?? [])) {
+      const section = panelSection(`Related: ${table.name}`);
+      const list = document.createElement("ul");
+      list.className = "sheetwrite-panel-fields";
+      list.setAttribute("aria-label", `${table.name} fields`);
+      for (const column of table.columns) {
+        const ref = { table: table.id, column: column.id };
+        if (reads.some((field) => field.table === ref.table && field.column === ref.column))
+          continue;
+        const item = document.createElement("li");
+        item.className = "sheetwrite-panel-field-item";
+        const name = document.createElement("span");
+        name.className = "sheetwrite-panel-field-name";
+        name.textContent = column.name;
+        const label = `${table.name} › ${column.name}`;
+        const menu = menuButton(
+          `${label} field actions`,
+          `related-${table.id}-${column.id}-menu`,
+          () =>
+            PIVOT_AREAS.map(([area, areaLabel]) => ({
+              label: `Add to ${areaLabel}`,
+              run: () => addRelated(pivot, ref, area),
+            })),
+          lifetime.signal,
+        );
+        item.append(name, menu);
+        list.appendChild(item);
+      }
+      if (list.childElementCount === 0) continue;
+      section.appendChild(list);
+      target.appendChild(section);
+    }
+  };
+
   const build = (target: HTMLElement): void => {
     const pivot = read();
     if (pivot === null) {
@@ -163,8 +233,17 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
       target.appendChild(note(NEEDS_FULL_ENGINE));
       return;
     }
-    const header = (field: number): string =>
-      fields.find((candidate) => candidate.index === field)?.header ?? `Field ${field + 1}`;
+    const tables = grid.store.getWorkbook().sheets.flatMap((candidate) => candidate.tables ?? []);
+    const model = "model" in pivot.source ? pivot.source.model : undefined;
+    // A related field names its table, since two tables can share a column name.
+    const header = (field: number): string => {
+      const name =
+        fields.find((candidate) => candidate.index === field)?.header ?? `Field ${field + 1}`;
+      const ref = model?.fields[field];
+      if (ref === undefined || ref.table === model?.table) return name;
+      const table = tables.find((candidate) => candidate.id === ref.table);
+      return `${table?.name ?? ref.table} › ${name}`;
+    };
 
     // Source fields. Dropping an entry here removes it from its area.
     const fieldSection = panelSection("Fields");
@@ -179,12 +258,12 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
       if (used.has(field.index)) item.dataset.used = "";
       const name = document.createElement("span");
       name.className = "sheetwrite-panel-field-name";
-      name.textContent = field.header;
+      name.textContent = header(field.index);
       const badge = document.createElement("span");
       badge.className = "sheetwrite-panel-badge";
       badge.textContent = TYPE_BADGES[field.type];
       const menu = menuButton(
-        `${field.header} field actions`,
+        `${header(field.index)} field actions`,
         `field-${field.index}-menu`,
         () =>
           PIVOT_AREAS.map(([area, label]) => ({
@@ -216,6 +295,7 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
     });
     fieldSection.appendChild(fieldList);
     target.appendChild(fieldSection);
+    appendRelatedTables(target, pivot);
 
     for (const [area, label] of PIVOT_AREAS) {
       target.appendChild(
@@ -238,12 +318,13 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
     }
   };
 
-  /** Rebuild when the definition, its fields or the message changed. */
+  /** Rebuild when the definition, its fields, the relationships or the message changed. */
   const refresh = (force = false): void => {
     const pivot = read();
     const signature = JSON.stringify([
       pivot,
       pivot === null ? [] : grid.getPivotFields(sheet, id),
+      grid.store.getWorkbook().dataModel,
       message,
     ]);
     if (!force && signature === rendered) return;

@@ -434,7 +434,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L126",
+              "source": "src/types/document.ts#L119",
               "jsDocTags": [],
               "documentation": "Workbook calculation options, mirroring Excel's \"Enable iterative calculation\".\nA workbook without this record uses the defaults.",
               "memberDocs": [
@@ -495,7 +495,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L403",
+              "source": "src/types/document.ts#L396",
               "jsDocTags": [],
               "documentation": "Sparse row-major cells bounded by one rectangular block.",
               "memberDocs": []
@@ -682,7 +682,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L253",
+              "source": "src/types/document.ts#L246",
               "jsDocTags": [],
               "documentation": "Serializable plain-text note anchored to a cell.",
               "memberDocs": []
@@ -1200,7 +1200,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L108",
+              "source": "src/types/document.ts#L101",
               "jsDocTags": [],
               "documentation": "One column's filter predicate. All active column filters AND together;\nmatching is against the cell's resolved value (text or number).",
               "memberDocs": []
@@ -1380,7 +1380,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L266",
+              "source": "src/types/document.ts#L259",
               "jsDocTags": [],
               "documentation": "The gesture/operation that produced a committed transaction. Consumers\nswitching on reasons MUST keep a default branch — the union grows with new\nmutation features.",
               "memberDocs": []
@@ -1798,7 +1798,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L198",
+              "source": "src/types/document.ts#L191",
               "jsDocTags": [],
               "documentation": "Native comparison semantics for numeric, date-serial, and text-length validation.\nInterval operands are inclusive; `notBetween` accepts values outside that interval.",
               "memberDocs": []
@@ -1810,7 +1810,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L217",
+              "source": "src/types/document.ts#L210",
               "jsDocTags": [],
               "documentation": "Serializable condition enforced by a data-validation rule.\n\n`min` and `max` remain inclusive legacy bounds. Use `comparison` when the\noperator itself is significant; comparison and legacy bounds are mutually exclusive.",
               "memberDocs": []
@@ -1822,7 +1822,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L235",
+              "source": "src/types/document.ts#L228",
               "jsDocTags": [],
               "documentation": "One stable, range-scoped data-entry rule. Blank cells are allowed unless disabled.",
               "memberDocs": []
@@ -1954,7 +1954,7 @@
               "owners": [
                 "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-bridge.ts#L55",
+              "source": "src/xlsx-bridge.ts#L56",
               "jsDocTags": [],
               "documentation": "Codec defaults combine SpreadsheetML worksheet dimensions with independent\nZIP/XML and aggregate-work ceilings for untrusted in-memory conversion.",
               "memberDocs": []
@@ -2076,7 +2076,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L511",
+              "source": "src/types/document.ts#L508",
               "jsDocTags": [],
               "documentation": "Exhaustive serializable operation union for workbook mutations.",
               "memberDocs": []
@@ -2213,7 +2213,7 @@
               "owners": [
                 "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-bridge.ts#L257",
+              "source": "src/xlsx-bridge.ts#L258",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2228,7 +2228,7 @@
               "owners": [
                 "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-bridge.ts#L480",
+              "source": "src/xlsx-bridge.ts#L489",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2243,7 +2243,7 @@
               "owners": [
                 "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-bridge.ts#L440",
+              "source": "src/xlsx-bridge.ts#L449",
               "jsDocTags": [],
               "documentation": "Import a File/Blob. The built-in backend reads it without buffering the compressed workbook.",
               "memberDocs": []
@@ -3083,7 +3083,7 @@
               "owners": [
                 "src/store/data-engine.ts"
               ],
-              "source": "src/store/data-engine.ts#L449",
+              "source": "src/store/data-engine.ts#L447",
               "jsDocTags": [],
               "documentation": "Error thrown when an operation requires datasource cells that are not loaded.",
               "memberDocs": []
@@ -3412,7 +3412,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L310",
+              "source": "src/types/document.ts#L303",
               "jsDocTags": [],
               "documentation": "Structured warning or rejection produced while applying an operation.",
               "memberDocs": []
@@ -3424,7 +3424,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L259",
+              "source": "src/types/document.ts#L252",
               "jsDocTags": [],
               "documentation": "Atomic or partial handling for locally denied operations.",
               "memberDocs": []
@@ -3436,7 +3436,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L165",
+              "source": "src/types/document.ts#L158",
               "jsDocTags": [],
               "documentation": "A defined name: a workbook-global or sheet-scoped name that formulas use.\nIt refers to one rectangular range, or holds a formula such as a constant,\nan expression or a `LAMBDA`.",
               "memberDocs": []
@@ -3484,7 +3484,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L392",
+              "source": "src/types/document.ts#L385",
               "jsDocTags": [],
               "documentation": "Dense row-major mutation payload. Primitive arrays keep large paste/fill\noperations JSON-safe without allocating one operation object per cell.\nFormula/reference tuples are sparse exceptions keyed by row-major offset.",
               "memberDocs": []
@@ -3943,6 +3943,102 @@
               ]
             },
             {
+              "name": "PowerQueryCodec",
+              "kind": "interface",
+              "signature": "export interface PowerQueryCodec { encode(queries: readonly SavedQuery[]): PowerQueryExport; decode(section: string): PowerQueryImport; }",
+              "owners": [
+                "src/types/query.ts"
+              ],
+              "source": "src/types/query.ts#L179",
+              "jsDocTags": [],
+              "documentation": "Translates saved queries to and from Power Query M. Import reads text only:\nit never evaluates M or fetches a source. `@sheetwrite/queries` provides one.",
+              "memberDocs": [
+                {
+                  "name": "decode",
+                  "documentation": "Throws when the text is not a `section Section1;` document."
+                }
+              ]
+            },
+            {
+              "name": "PowerQueryExport",
+              "kind": "interface",
+              "signature": "export interface PowerQueryExport { readonly section: string; readonly members: readonly string[]; readonly losses: readonly PowerQueryLoss[]; }",
+              "owners": [
+                "src/types/query.ts"
+              ],
+              "source": "src/types/query.ts#L151",
+              "jsDocTags": [],
+              "documentation": "A `Section1.m` document and the member name each query was written under.",
+              "memberDocs": [
+                {
+                  "name": "members",
+                  "documentation": "Section member name for each query, in the order the queries were given."
+                }
+              ]
+            },
+            {
+              "name": "PowerQueryImport",
+              "kind": "interface",
+              "signature": "export interface PowerQueryImport { readonly queries: readonly SavedQuery[]; readonly unsupported: readonly PowerQueryUnsupported[]; }",
+              "owners": [
+                "src/types/query.ts"
+              ],
+              "source": "src/types/query.ts#L170",
+              "jsDocTags": [],
+              "documentation": "Queries read from M, without outputs; the XLSX reader binds them to tables.",
+              "memberDocs": []
+            },
+            {
+              "name": "PowerQueryLoss",
+              "kind": "interface",
+              "signature": "export interface PowerQueryLoss { readonly query: string; readonly step: number | null; readonly code: string; }",
+              "owners": [
+                "src/types/query.ts"
+              ],
+              "source": "src/types/query.ts#L141",
+              "jsDocTags": [],
+              "documentation": "One place where exported M behaves differently from the Sheetwrite engine.",
+              "memberDocs": [
+                {
+                  "name": "code",
+                  "documentation": "Stable code, such as `host-source` or `outer-join-order`."
+                },
+                {
+                  "name": "query",
+                  "documentation": "Saved query identity."
+                },
+                {
+                  "name": "step",
+                  "documentation": "Zero-based step, or null for the source or the query as a whole."
+                }
+              ]
+            },
+            {
+              "name": "PowerQueryUnsupported",
+              "kind": "interface",
+              "signature": "export interface PowerQueryUnsupported { readonly member: string; readonly reason: string; readonly detail: string; readonly text: string; }",
+              "owners": [
+                "src/types/query.ts"
+              ],
+              "source": "src/types/query.ts#L159",
+              "jsDocTags": [],
+              "documentation": "An imported section member outside the supported subset, kept as text.",
+              "memberDocs": [
+                {
+                  "name": "detail",
+                  "documentation": "The M function or form involved, if known."
+                },
+                {
+                  "name": "reason",
+                  "documentation": "Stable code, such as `syntax`, `source`, `step` or `dependency`."
+                },
+                {
+                  "name": "text",
+                  "documentation": "The member's original text."
+                }
+              ]
+            },
+            {
               "name": "PresenceActor",
               "kind": "interface",
               "signature": "export interface PresenceActor { id: string; displayName?: string; color?: string; }",
@@ -4062,7 +4158,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L245",
+              "source": "src/types/document.ts#L238",
               "jsDocTags": [],
               "documentation": "Serializable client UX policy. A host resolver decides whether a local mutation may proceed.",
               "memberDocs": []
@@ -4074,7 +4170,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L291",
+              "source": "src/types/document.ts#L284",
               "jsDocTags": [],
               "documentation": "Local operation and protected-range context supplied to the host policy.",
               "memberDocs": []
@@ -4086,7 +4182,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L298",
+              "source": "src/types/document.ts#L291",
               "jsDocTags": [],
               "documentation": "Host-owned client UX permission callback for protected mutations.",
               "memberDocs": []
@@ -4760,7 +4856,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L116",
+              "source": "src/types/document.ts#L109",
               "jsDocTags": [],
               "documentation": "A collapsible row group (data-row range, end-inclusive), Sheets-style.",
               "memberDocs": []
@@ -4772,7 +4868,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L375",
+              "source": "src/types/document.ts#L368",
               "jsDocTags": [],
               "documentation": "Persistent display and grouping metadata for one document row.",
               "memberDocs": []
@@ -5040,7 +5136,7 @@
               "owners": [
                 "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-bridge.ts#L117",
+              "source": "src/xlsx-bridge.ts#L118",
               "jsDocTags": [],
               "documentation": "Registers the optional table XLSX export implementation used by core.",
               "memberDocs": []
@@ -5052,7 +5148,7 @@
               "owners": [
                 "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-bridge.ts#L235",
+              "source": "src/xlsx-bridge.ts#L236",
               "jsDocTags": [],
               "documentation": "Registers the optional table XLSX import implementation used by core.",
               "memberDocs": []
@@ -5064,7 +5160,7 @@
               "owners": [
                 "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-bridge.ts#L339",
+              "source": "src/xlsx-bridge.ts#L348",
               "jsDocTags": [],
               "documentation": "Registers the optional workbook XLSX implementation used by core.",
               "memberDocs": []
@@ -5072,7 +5168,7 @@
             {
               "name": "Sheet",
               "kind": "interface",
-              "signature": "export interface Sheet { id: SheetId; name: string; visibility?: SheetVisibility; columns: Column[]; rowCount: number; rowHeights?: Map<number, number>; hiddenRows?: Set<number>; rowGroups?: RowGroup[]; conditionalFormats?: ConditionalFormatRule[]; hyperlinks?: CellHyperlink[]; validationRules?: DataValidationRule[]; protectedRanges?: ProtectedRange[]; notes?: CellNote[]; sortKeys?: SortKey[]; sortState?: WorkbookTableXmlElement; filters?: Array<[col: number, filter: ColumnFilter]>; merges?: MergeRange[]; frozenRows?: number; frozenCols?: number; tables?: WorkbookTable[]; charts?: ChartDefinition[]; pivots?: PivotDefinition[]; }",
+              "signature": "export interface Sheet { id: SheetId; name: string; visibility?: SheetVisibility; columns: Column[]; rowCount: number; rowHeights?: Map<number, number>; hiddenRows?: Set<number>; rowGroups?: RowGroup[]; conditionalFormats?: ConditionalFormatRule[]; hyperlinks?: CellHyperlink[]; validationRules?: DataValidationRule[]; protectedRanges?: ProtectedRange[]; notes?: CellNote[]; sortKeys?: SortKey[]; filters?: Array<[col: number, filter: ColumnFilter]>; merges?: MergeRange[]; frozenRows?: number; frozenCols?: number; tables?: WorkbookTable[]; charts?: ChartDefinition[]; pivots?: PivotDefinition[]; }",
               "owners": [
                 "src/types/document.ts"
               ],
@@ -5153,10 +5249,6 @@
                   "documentation": "Persisted sort keys for the sheet's view."
                 },
                 {
-                  "name": "sortState",
-                  "documentation": "The worksheet `sortState` of an imported XLSX file. Excel writes it after\na sort whose cells it already moved, so Sheetwrite keeps it for export and\ndoes not apply it. Export writes it while its references lie inside the\nsheet; a view sort (`sortKeys`) replaces it."
-                },
-                {
                   "name": "tables",
                   "documentation": "Native workbook tables anchored to this stable worksheet identity."
                 },
@@ -5189,7 +5281,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L301",
+              "source": "src/types/document.ts#L294",
               "jsDocTags": [],
               "documentation": "Stable lifecycle rejection codes suitable for inline sheet-management UI.",
               "memberDocs": []
@@ -5245,11 +5337,11 @@
             {
               "name": "SheetSnapshot",
               "kind": "interface",
-              "signature": "export interface SheetSnapshot { id: SheetId; name: string; order: number; visibility?: SheetVisibility; rowCount: number; columns: Column[]; frozenRows?: number; frozenCols?: number; rowMeta?: Array<[row: number, meta: RowMetadata]>; merges?: MergeRange[]; conditionalFormats?: ConditionalFormatRule[]; hyperlinks?: CellHyperlink[]; validationRules?: DataValidationRule[]; protectedRanges?: ProtectedRange[]; notes?: CellNote[]; sortKeys?: SortKey[]; sortState?: WorkbookTableXmlElement; filters?: Array<[col: number, filter: ColumnFilter]>; rowGroups?: RowGroup[]; tables?: WorkbookTable[]; charts?: ChartDefinition[]; pivots?: PivotDefinition[]; cells: CellBlock[]; }",
+              "signature": "export interface SheetSnapshot { id: SheetId; name: string; order: number; visibility?: SheetVisibility; rowCount: number; columns: Column[]; frozenRows?: number; frozenCols?: number; rowMeta?: Array<[row: number, meta: RowMetadata]>; merges?: MergeRange[]; conditionalFormats?: ConditionalFormatRule[]; hyperlinks?: CellHyperlink[]; validationRules?: DataValidationRule[]; protectedRanges?: ProtectedRange[]; notes?: CellNote[]; sortKeys?: SortKey[]; filters?: Array<[col: number, filter: ColumnFilter]>; rowGroups?: RowGroup[]; tables?: WorkbookTable[]; charts?: ChartDefinition[]; pivots?: PivotDefinition[]; cells: CellBlock[]; }",
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L412",
+              "source": "src/types/document.ts#L405",
               "jsDocTags": [],
               "documentation": "Serializable complete state for one workbook sheet.",
               "memberDocs": [
@@ -5260,10 +5352,6 @@
                 {
                   "name": "pivots",
                   "documentation": "Pivot tables anchored on this sheet."
-                },
-                {
-                  "name": "sortState",
-                  "documentation": "See `Sheet.sortState`."
                 },
                 {
                   "name": "visibility",
@@ -5621,7 +5709,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L381",
+              "source": "src/types/document.ts#L374",
               "jsDocTags": [],
               "documentation": "Serializable cell value and optional style inside a snapshot block.",
               "memberDocs": []
@@ -5748,7 +5836,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L99",
+              "source": "src/types/document.ts#L92",
               "jsDocTags": [],
               "documentation": "One key of a multi-column sort, applied in array order (first = primary).",
               "memberDocs": []
@@ -6465,7 +6553,7 @@
               "owners": [
                 "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-bridge.ts#L183",
+              "source": "src/xlsx-bridge.ts#L184",
               "jsDocTags": [
                 "example",
                 "see"
@@ -6480,7 +6568,7 @@
               "owners": [
                 "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-bridge.ts#L203",
+              "source": "src/xlsx-bridge.ts#L204",
               "jsDocTags": [],
               "documentation": "Stream table XLSX bytes without materializing the finished archive.",
               "memberDocs": []
@@ -6492,7 +6580,7 @@
               "owners": [
                 "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-bridge.ts#L399",
+              "source": "src/xlsx-bridge.ts#L408",
               "jsDocTags": [
                 "example",
                 "see"
@@ -6507,7 +6595,7 @@
               "owners": [
                 "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-bridge.ts#L420",
+              "source": "src/xlsx-bridge.ts#L429",
               "jsDocTags": [],
               "documentation": "Stream formula-preserving workbook XLSX with backpressure and cancellation.",
               "memberDocs": []
@@ -6661,7 +6749,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L192",
+              "source": "src/types/document.ts#L185",
               "jsDocTags": [],
               "documentation": "Reject-or-warn policy attached to a data-validation rule.",
               "memberDocs": []
@@ -6864,7 +6952,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L136",
+              "source": "src/types/document.ts#L129",
               "jsDocTags": [],
               "documentation": "Live workbook schema containing ordered sheets and the active sheet ID.",
               "memberDocs": [
@@ -6917,7 +7005,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L491",
+              "source": "src/types/document.ts#L488",
               "jsDocTags": [],
               "documentation": "Schema-versioned serializable workbook document.",
               "memberDocs": []
@@ -7128,7 +7216,7 @@
               "owners": [
                 "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-bridge.ts#L82",
+              "source": "src/xlsx-bridge.ts#L83",
               "jsDocTags": [],
               "documentation": "Stable resource-limit failure surfaced before an XLSX codec allocates unsafe data.",
               "memberDocs": []
@@ -7140,7 +7228,7 @@
               "owners": [
                 "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-bridge.ts#L12",
+              "source": "src/xlsx-bridge.ts#L13",
               "jsDocTags": [],
               "documentation": "Resource dimensions bounded by every XLSX import and export path.",
               "memberDocs": [
@@ -7225,7 +7313,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L457",
+              "source": "src/types/document.ts#L448",
               "jsDocTags": [],
               "documentation": "What an opaque graph reads; any change to it drops the graph on save.",
               "memberDocs": [
@@ -7246,11 +7334,11 @@
             {
               "name": "XlsxSourceGraph",
               "kind": "interface",
-              "signature": "export interface XlsxSourceGraph { readonly owner: \"root\" | \"workbook\" | \"sheet\"; readonly sheetId?: SheetId; readonly type: string; readonly target: string; readonly cacheId?: string; readonly parts: readonly string[]; readonly dependencies: readonly XlsxSourceDependency[]; }",
+              "signature": "export interface XlsxSourceGraph { readonly owner: \"root\" | \"workbook\" | \"sheet\"; readonly sheetId?: SheetId; readonly type: string; readonly target: string; readonly cacheId?: string; readonly queries?: string; readonly parts: readonly string[]; readonly dependencies: readonly XlsxSourceDependency[]; }",
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L468",
+              "source": "src/types/document.ts#L459",
               "jsDocTags": [],
               "documentation": "One relationship from the package, workbook, or a sheet to a retained part graph.",
               "memberDocs": [
@@ -7261,6 +7349,10 @@
                 {
                   "name": "parts",
                   "documentation": "Every retained part reached from `target`, including `.rels` parts."
+                },
+                {
+                  "name": "queries",
+                  "documentation": "64-bit hex digest of `workbook.queries` at import, for graphs that hold\nsaved query definitions (the DataMashup and its connections). Any query\nchange makes the graph stale, so it is dropped."
                 },
                 {
                   "name": "target",
@@ -7279,7 +7371,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L446",
+              "source": "src/types/document.ts#L437",
               "jsDocTags": [],
               "documentation": "One retained OOXML part, kept as its original compressed ZIP payload so a\nsave copies it without inflating or recompressing. Runtime copies are frozen.",
               "memberDocs": [
@@ -7296,7 +7388,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L483",
+              "source": "src/types/document.ts#L480",
               "jsDocTags": [],
               "documentation": "Bounded, frozen record of the OOXML parts Sheetwrite does not model.",
               "memberDocs": [
@@ -7313,7 +7405,7 @@
               "owners": [
                 "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-bridge.ts#L104",
+              "source": "src/xlsx-bridge.ts#L105",
               "jsDocTags": [],
               "documentation": "Pluggable first-row-header, first-sheet table export backend.",
               "memberDocs": []
@@ -7325,7 +7417,7 @@
               "owners": [
                 "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-bridge.ts#L224",
+              "source": "src/xlsx-bridge.ts#L225",
               "jsDocTags": [],
               "documentation": "Pluggable table import backend. Parses raw `.xlsx` bytes into the same\n`ColumnarData` shape `fromCsv` returns, so host ingestion code can stay\nformat-agnostic.",
               "memberDocs": []
@@ -7337,7 +7429,7 @@
               "owners": [
                 "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-bridge.ts#L315",
+              "source": "src/xlsx-bridge.ts#L324",
               "jsDocTags": [
                 "internal"
               ],
@@ -7347,17 +7439,21 @@
             {
               "name": "XlsxWorkbookOptions",
               "kind": "interface",
-              "signature": "export interface XlsxWorkbookOptions { signal?: AbortSignal; maxCells?: number; resourceLimits?: Partial<Omit<XlsxResourceLimits, \"maxCells\">>; onWarning?: (warning: XlsxWorkbookWarning) => void; }",
+              "signature": "export interface XlsxWorkbookOptions { signal?: AbortSignal; maxCells?: number; resourceLimits?: Partial<Omit<XlsxResourceLimits, \"maxCells\">>; onWarning?: (warning: XlsxWorkbookWarning) => void; powerQuery?: PowerQueryCodec; }",
               "owners": [
                 "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-bridge.ts#L295",
+              "source": "src/xlsx-bridge.ts#L297",
               "jsDocTags": [],
               "documentation": "Shared options passed to every registered table and workbook XLSX backend.",
               "memberDocs": [
                 {
                   "name": "maxCells",
                   "documentation": "Cells accounted by the active conversion path; defaults to 1,000,000."
+                },
+                {
+                  "name": "powerQuery",
+                  "documentation": "Power Query translation for saved queries, such as `loadPowerQueryCodec()`\nfrom `@sheetwrite/queries`. Without it, import keeps query parts as opaque\nparts, and export writes them back only while `workbook.queries` is\nunchanged since import."
                 },
                 {
                   "name": "resourceLimits",
@@ -7372,11 +7468,11 @@
             {
               "name": "XlsxWorkbookWarning",
               "kind": "interface",
-              "signature": "export interface XlsxWorkbookWarning { code: | \"boolean-literal\" | \"rich-text\" | \"hyperlink\" | \"unsupported-cell-value\" | \"unsupported-feature\" | \"external-relationship\" | \"external-formula\" | \"format-loss\" | \"validation-loss\" | \"invalid-metadata\"; message: string; sheet?: string; cell?: string; part?: string; }",
+              "signature": "export interface XlsxWorkbookWarning { code: | \"boolean-literal\" | \"rich-text\" | \"hyperlink\" | \"unsupported-cell-value\" | \"unsupported-feature\" | \"external-relationship\" | \"external-formula\" | \"format-loss\" | \"validation-loss\" | \"invalid-metadata\" | \"query-loss\"; message: string; sheet?: string; cell?: string; part?: string; }",
               "owners": [
                 "src/xlsx-bridge.ts"
               ],
-              "source": "src/xlsx-bridge.ts#L276",
+              "source": "src/xlsx-bridge.ts#L277",
               "jsDocTags": [],
               "documentation": "Structured fidelity warning emitted during XLSX conversion.",
               "memberDocs": []
@@ -10241,7 +10337,21 @@
               "jsDocTags": [
                 "example"
               ],
-              "documentation": "The one registration call for workbook queries: loads the engine and binds\nsaved queries of `grid` to the host's `fetchSource`. Workbooks that never\ncall it load no query code or WASM.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\nimport { createQuerySession } from \"@sheetwrite/queries\";\n\nasync function refreshSales(grid: Grid) {\n  const session = await createQuerySession(grid, {\n    fetchSource: async (request, { signal }) => {\n      const response = await fetch(`/sources/${request.sourceId}`, { signal });\n      return { kind: \"bytes\", bytes: new Uint8Array(await response.arrayBuffer()) };\n    },\n  });\n\n  return session.refreshAll();\n}\n```",
+              "documentation": "The one registration call for workbook queries: loads the engine and binds\nsaved queries of `grid` to the host's `fetchSource`. Workbooks that never\ncall it load no query code or WASM.\n@example\n```ts\nimport type { Grid, PowerQueryCodec } from \"@sheetwrite/core\";\nimport { createQuerySession } from \"@sheetwrite/queries\";\n\nasync function refreshSales(grid: Grid) {\n  const session = await createQuerySession(grid, {\n    fetchSource: async (request, { signal }) => {\n      const response = await fetch(`/sources/${request.sourceId}`, { signal });\n      return { kind: \"bytes\", bytes: new Uint8Array(await response.arrayBuffer()) };\n    },\n  });\n\n  return session.refreshAll();\n}\n```",
+              "memberDocs": []
+            },
+            {
+              "name": "loadPowerQueryCodec",
+              "kind": "function",
+              "signature": "(options?: QueryEngineOptions): Promise<PowerQueryCodec>",
+              "owners": [
+                "src/index.ts"
+              ],
+              "source": "src/index.ts#L119",
+              "jsDocTags": [
+                "example"
+              ],
+              "documentation": "Loads the Power Query codec for XLSX import and export. It translates saved\nqueries to M and reads imported M as text; it never evaluates M.\n@example\n```ts\nimport type { WorkbookSnapshot } from \"@sheetwrite/core\";\nimport { loadPowerQueryCodec } from \"@sheetwrite/queries\";\n\nasync function exportedM(snapshot: WorkbookSnapshot) {\n  const codec = await loadPowerQueryCodec();\n  return codec.encode(snapshot.workbook.queries ?? []).section;\n}\n```",
               "memberDocs": []
             },
             {
@@ -14263,7 +14373,7 @@
               "owners": [
                 "src/workbook.ts"
               ],
-              "source": "src/workbook.ts#L9",
+              "source": "src/workbook.ts#L29",
               "jsDocTags": [],
               "documentation": "Deterministic optional OOXML workbook backend implemented by Sheetwrite.",
               "memberDocs": []

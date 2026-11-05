@@ -8,7 +8,7 @@ description: "DocumentOp type in @sheetwrite/core: Exhaustive serializable opera
 Exhaustive serializable operation union for workbook mutations.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L511"><code>packages/core/src/types/document.ts#L511</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L508"><code>packages/core/src/types/document.ts#L508</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>44</span>

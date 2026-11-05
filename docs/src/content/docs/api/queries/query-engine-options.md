@@ -51,6 +51,7 @@ export interface QueryEngineOptions {
 
 <ul class="api-consumer-list">
 <li><a href="/docs/api/queries/create-query-session/"><code>createQuerySession</code></a><span class="api-consumer-kind">@sheetwrite/queries</span></li>
+<li><a href="/docs/api/queries/load-power-query-codec/"><code>loadPowerQueryCodec</code></a><span class="api-consumer-kind">@sheetwrite/queries</span></li>
 <li><a href="/docs/api/queries/load-query-engine/"><code>loadQueryEngine</code></a><span class="api-consumer-kind">@sheetwrite/queries</span></li>
 </ul>
 </div>

@@ -125,6 +125,10 @@
       "dependencies": {
         "@sheetwrite/core": "workspace:*",
       },
+      "devDependencies": {
+        "@sheetwrite/xlsx": "workspace:*",
+        "fflate": "0.8.3",
+      },
     },
     "packages/react": {
       "name": "@sheetwrite/react",
