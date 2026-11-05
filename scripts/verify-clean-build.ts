@@ -19,6 +19,8 @@ interface PackageManifest {
 const GENERATED_OUTPUTS = [
   "packages/wasm/pkg",
   "packages/wasm/target",
+  "packages/wasm/pkg-history",
+  "packages/wasm/history/target",
   "packages/formulas/pkg",
   "packages/formulas/loader.mjs",
   "packages/formulas/loader-browser.mjs",

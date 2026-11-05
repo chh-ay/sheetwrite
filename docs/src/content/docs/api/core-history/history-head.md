@@ -8,13 +8,14 @@ description: "HistoryHead interface in @sheetwrite/core/history: Durable recorde
 Durable recorder cursor: the newest checkpoint, the log tail since it, and cadence counters.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/types.ts#L68"><code>packages/core/src/version-history/types.ts#L68</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/types.ts#L73"><code>packages/core/src/version-history/types.ts#L73</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
 <a href="#history-head-revision"><code>revision</code></a>
 <a href="#history-head-checkpoint"><code>checkpoint</code></a>
 <a href="#history-head-tail"><code>tail</code></a>
+<a href="#history-head-checkpoints"><code>checkpoints</code></a>
 <a href="#history-head-time"><code>time</code></a>
 <a href="#history-head-active-ms"><code>activeMs</code></a>
 <a href="#history-head-automatic-at"><code>automaticAt</code></a>
@@ -23,7 +24,7 @@ Durable recorder cursor: the newest checkpoint, the log tail since it, and caden
 <a href="#history-head-checkpoint-log-bytes"><code>checkpointLogBytes</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>9</span>
+## Members <span class="api-count" data-pagefind-ignore>10</span>
 
 <div class="api-member-list">
 
@@ -50,6 +51,15 @@ checkpoint: string;
 
 ```ts generated
 tail: readonly string[];
+```
+
+</details>
+
+<details class="api-member" id="history-head-checkpoints" data-pagefind-weight="1">
+<summary><code>checkpoints</code> <span class="api-member-summary">Checkpoints made since the newest version marker; the next marker takes them over.</span></summary>
+
+```ts generated
+checkpoints: readonly string[];
 ```
 
 </details>
@@ -119,6 +129,7 @@ export interface HistoryHead {
   revision: number;
   checkpoint: string;
   tail: readonly string[];
+  checkpoints: readonly string[];
   time: number;
   activeMs: number;
   automaticAt: number;

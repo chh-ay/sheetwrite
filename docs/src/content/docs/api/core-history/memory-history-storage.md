@@ -10,7 +10,7 @@ at a time per adapter and write through `PendingMapWrites`, so a failure or
 an abort leaves the stored maps unchanged without copying them.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/storage.ts#L786"><code>packages/core/src/version-history/storage.ts#L786</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/storage.ts#L794"><code>packages/core/src/version-history/storage.ts#L794</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>1</span>
