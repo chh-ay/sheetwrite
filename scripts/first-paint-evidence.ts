@@ -107,7 +107,18 @@ function signedSizes(value: unknown, label: string): FirstPaintSizes {
 // operation for operation, because the stored summary must equal its recomputation
 // exactly. The runner is plain Node and cannot import `bench/src/stats.ts`.
 function percentile(sorted: readonly number[], fraction: number): number {
-  return sorted[Math.max(0, Math.ceil(sorted.length * fraction) - 1)]!;
+  const sample = sorted[Math.max(0, Math.ceil(sorted.length * fraction) - 1)];
+  if (sample === undefined) throw new Error("A percentile needs at least one sample");
+
+  return sample;
+}
+
+/** The sorted sample at `index`; timing validation has already proved there are enough. */
+function percentileAt(sorted: readonly number[], index: number): number {
+  const sample = sorted[index];
+  if (sample === undefined) throw new Error(`Timing has no sample at ${index}`);
+
+  return sample;
 }
 
 function timing(value: unknown, label: string): FirstPaintTiming {
@@ -121,10 +132,9 @@ function timing(value: unknown, label: string): FirstPaintTiming {
   }
   const samplesMs = [...input.samplesMs].sort((left, right) => left - right) as number[];
   const middle = Math.floor(samplesMs.length / 2);
+  const upper = percentileAt(samplesMs, middle);
   const expectedMedian =
-    samplesMs.length % 2 === 0
-      ? (samplesMs[middle - 1]! + samplesMs[middle]!) / 2
-      : samplesMs[middle]!;
+    samplesMs.length % 2 === 0 ? (percentileAt(samplesMs, middle - 1) + upper) / 2 : upper;
   const expectedP95 = percentile(samplesMs, 0.95);
   if (input.medianMs !== expectedMedian || input.p95Ms !== expectedP95) {
     throw new Error(`${label} timing summary does not match retained samples`);
@@ -271,11 +281,12 @@ export function validateFirstPaintEvidence(value: unknown): FirstPaintEvidence {
       delta: { ...deltaSizes, brotliPercent: deltaInput.brotliPercent },
     } as FirstPaintFixtureEvidence;
   });
-  if (!seen.has("next") || !seen.has("vite")) {
+  const next = fixtures.find((fixture) => fixture.bundler === "next");
+  const vite = fixtures.find((fixture) => fixture.bundler === "vite");
+  if (!next || !vite) {
     throw new Error("First-paint evidence requires one Next.js and one Vite fixture");
   }
-  const next = fixtures.find((fixture) => fixture.bundler === "next")!;
-  const vite = fixtures.find((fixture) => fixture.bundler === "vite")!;
+
   for (const field of [
     "buildMode",
     "minified",
