@@ -392,14 +392,14 @@ fn needs_unicode_case(pattern: &str, insensitive: bool) -> bool {
 }
 
 /// The compiled program for `pattern`. Formulas in one recalculation that use
-/// the same pattern and case mode in a row share one program, which the pass
-/// drops when it ends, so no regex memory outlives the recalculation.
+/// the same pattern and case mode share one program, which the pass drops when
+/// it ends, so no regex memory outlives the recalculation.
 fn compile_regex(
     results: &mut FormulaResults,
     pattern: &str,
     insensitive: bool,
 ) -> Result<Rc<Regex>, FormulaError> {
-    if let Some(regex) = results.last_regex(pattern, insensitive) {
+    if let Some(regex) = results.pass_regex(pattern, insensitive) {
         return Ok(regex);
     }
 
@@ -640,20 +640,28 @@ pub(super) fn evaluate_matrix(
         _ => Err(FormulaError::Value),
     }
 }
+/// The shape of `name`'s result. It evaluates in a workspace of its own, which
+/// borrows the pass's compiled regex programs so that sizing a spill and
+/// evaluating it compile each pattern once.
 pub(super) fn shape(
     store: &CellStore,
     name: &str,
     args: &[Ast],
     sheet: usize,
+    outer: &mut EvalPass<'_>,
 ) -> Result<(usize, usize, usize), FormulaError> {
     let affected = FormulaWork::default();
     let mut results = FormulaResults::default();
+    results.swap_regexes(outer.results);
 
     let mut pass = EvalPass {
         affected: &affected,
         results: &mut results,
     };
-    let matrix = evaluate_matrix(store, name, args, sheet, &mut pass, 0)?;
+    let matrix = evaluate_matrix(store, name, args, sheet, &mut pass, 0);
+
+    results.swap_regexes(outer.results);
+    let matrix = matrix?;
     Ok((matrix.rows, matrix.cols, matrix.values.len()))
 }
 pub(super) fn bound(
@@ -661,8 +669,9 @@ pub(super) fn bound(
     name: &str,
     args: &[Ast],
     sheet: usize,
+    pass: &mut EvalPass<'_>,
 ) -> Result<usize, FormulaError> {
-    shape(store, name, args, sheet).map(|shape| shape.2)
+    shape(store, name, args, sheet, pass).map(|shape| shape.2)
 }
 
 #[cfg(test)]
@@ -951,6 +960,49 @@ mod tests {
                 Some(starts),
                 "row {row}"
             );
+        }
+    }
+
+    /// Rows cycle through more patterns than one recalculation keeps, so
+    /// patterns are replaced while the pass runs, and spilling REGEXEXTRACT
+    /// anchors are sized and evaluated with the same programs.
+    #[test]
+    fn more_patterns_than_a_pass_keeps_give_each_row_its_own_match() {
+        // https://support.microsoft.com/en-us/excel/functions/regexextract-function
+        const ROWS: usize = 30;
+        const LETTERS: [char; 6] = ['a', 'b', 'c', 'd', 'e', 'f'];
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, ROWS);
+        store.set_string(sheet, 0, 0, "aabbbccccdddddeeeeeefffffff", 0);
+        for row in 0..ROWS {
+            let letter = LETTERS[row % LETTERS.len()];
+            store.set_formula(
+                sheet,
+                row,
+                1,
+                &format!("=REGEXEXTRACT($A$1,\"{letter}+\")"),
+                0,
+            );
+            store.set_formula(
+                sheet,
+                row,
+                2,
+                &format!("=REGEXEXTRACT($A$1,\"{letter}+\",1)"),
+                0,
+            );
+        }
+        store.recompute(sheet);
+
+        for row in 0..ROWS {
+            let letter = LETTERS[row % LETTERS.len()];
+            let run = letter.to_string().repeat(row % LETTERS.len() + 2);
+            for column in [1, 2] {
+                assert_eq!(
+                    store.get_cell(sheet, row, column).string().as_deref(),
+                    Some(run.as_str()),
+                    "row {row}, column {column}"
+                );
+            }
         }
     }
 

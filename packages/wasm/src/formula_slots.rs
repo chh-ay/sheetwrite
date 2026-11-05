@@ -570,14 +570,28 @@ pub(crate) struct FormulaResults {
     pub(crate) visiting: FormulaBits,
     range_sums: RangeSums,
     /// Boxed, so the pass workspace the store keeps between passes grows by
-    /// one pointer, not by the whole entry.
+    /// one pointer, not by the whole table.
     #[cfg(feature = "analysis")]
-    last_regex: Option<Box<PassRegex>>,
+    regexes: Option<Box<PassRegexes>>,
 }
 
-/// The last regex pattern this pass compiled, with its case mode. Formulas
-/// that use one pattern usually evaluate in a row, so they share one compiled
-/// program; it is dropped when the pass ends.
+/// Compiled regex programs one pass keeps at once. Formulas that alternate
+/// between a few patterns still share their programs, while a pass holds at
+/// most this many of them.
+#[cfg(feature = "analysis")]
+const PASS_REGEX_CAPACITY: usize = 4;
+
+/// The regex patterns this pass compiled, with their case modes. A new
+/// pattern replaces the oldest entry; the whole table is dropped when the
+/// pass ends.
+#[cfg(feature = "analysis")]
+#[derive(Default)]
+struct PassRegexes {
+    entries: [Option<PassRegex>; PASS_REGEX_CAPACITY],
+    /// The entry the next new pattern replaces.
+    next: usize,
+}
+
 #[cfg(feature = "analysis")]
 struct PassRegex {
     pattern: String,
@@ -732,21 +746,24 @@ impl FormulaResults {
         self.range_sums.last = Some((range, sum));
     }
 
-    /// The program this pass last compiled for `pattern` in this case mode.
+    /// The program this pass compiled for exactly `pattern` in this case mode.
     #[cfg(feature = "analysis")]
-    pub(crate) fn last_regex(
+    pub(crate) fn pass_regex(
         &self,
         pattern: &str,
         insensitive: bool,
     ) -> Option<std::rc::Rc<regex_lite::Regex>> {
-        self.last_regex
-            .as_ref()
-            .filter(|last| last.insensitive == insensitive && last.pattern == pattern)
-            .map(|last| std::rc::Rc::clone(&last.regex))
+        self.regexes
+            .as_ref()?
+            .entries
+            .iter()
+            .flatten()
+            .find(|entry| entry.insensitive == insensitive && entry.pattern == pattern)
+            .map(|entry| std::rc::Rc::clone(&entry.regex))
     }
 
     /// Keeps `regex` for later formulas of this pass that use the same
-    /// pattern, in place of the program kept before it.
+    /// pattern, in place of the oldest program when the table is full.
     #[cfg(feature = "analysis")]
     pub(crate) fn share_regex(
         &mut self,
@@ -754,11 +771,21 @@ impl FormulaResults {
         insensitive: bool,
         regex: std::rc::Rc<regex_lite::Regex>,
     ) {
-        self.last_regex = Some(Box::new(PassRegex {
+        let table = self.regexes.get_or_insert_with(Box::default);
+        table.entries[table.next] = Some(PassRegex {
             pattern: pattern.to_owned(),
             insensitive,
             regex,
-        }));
+        });
+        table.next = (table.next + 1) % PASS_REGEX_CAPACITY;
+    }
+
+    /// Exchanges this workspace's regex programs with `other`'s. A nested
+    /// evaluation with its own workspace borrows the pass programs this way
+    /// and gives them back when it ends.
+    #[cfg(feature = "analysis")]
+    pub(crate) fn swap_regexes(&mut self, other: &mut FormulaResults) {
+        std::mem::swap(&mut self.regexes, &mut other.regexes);
     }
 
     /// Clear touched positions so a small edit does not scan all slots.
@@ -774,7 +801,7 @@ impl FormulaResults {
         self.range_sums.last = None;
         #[cfg(feature = "analysis")]
         {
-            self.last_regex = None;
+            self.regexes = None;
         }
         self.count = 0;
     }
