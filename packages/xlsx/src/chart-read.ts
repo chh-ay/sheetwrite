@@ -16,11 +16,11 @@ import {
   DEFAULT_ROW_PIXELS,
   EMU_PER_PIXEL,
   elementXml,
-  relationshipsPartOf,
 } from "./chart-xml.js";
 import {
   type OpcPackage,
   type OpcRelationship,
+  relationshipsPart,
   relationshipsXml,
   relationshipTypeMatches,
 } from "./opc.js";
@@ -537,7 +537,7 @@ export async function readCharts(
       const kept = read.relationships
         .filter((entry) => !modelled.has(entry.target))
         .map((entry) => ({ ...entry, target: entry.external ? entry.target : `/${entry.target}` }));
-      replacements.set(relationshipsPartOf(drawing.target), relationshipsXml(kept, context));
+      replacements.set(relationshipsPart(drawing.target), relationshipsXml(kept, context));
     }
   }
   return { modelled, replacements };

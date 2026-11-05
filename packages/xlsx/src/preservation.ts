@@ -10,15 +10,13 @@ import { XlsxResourceError } from "@sheetwrite/core";
 import { inflateSync } from "fflate";
 
 import type { DrawingChart } from "./chart-write.js";
-import {
-  CHART_REL,
-  elementXml,
-  PACKAGE_RELATIONSHIPS_NS,
-  relationshipsPartOf,
-} from "./chart-xml.js";
+import { CHART_REL, elementXml } from "./chart-xml.js";
+import { PACKAGE_RELATIONSHIPS_NS } from "./format.js";
 import {
   type OpcPackage,
   type OpcRelationship,
+  relationshipSourcePart,
+  relationshipsPart,
   relationshipTypeMatches,
   resolveRelationshipTarget,
 } from "./opc.js";
@@ -36,6 +34,7 @@ import {
   xmlLocalName,
 } from "./xml.js";
 import {
+  asciiFold,
   markStoredEntryVerified,
   storedEntryFromBytes,
   type StoredZipEntry,
@@ -107,12 +106,6 @@ const relationshipTargetCache = new WeakMap<XlsxSourcePart, readonly string[]>()
 
 function relationshipKind(type: string): string {
   return type.slice(type.lastIndexOf("/") + 1);
-}
-
-function sourcePartOfRelationships(part: string): string {
-  const match = /^(.*\/)?_rels\/([^/]+)\.rels$/.exec(part);
-  if (!match) throw new TypeError(`Sheetwrite: ${part} is not a relationships part`);
-  return `${match[1] ?? ""}${match[2] ?? ""}`;
 }
 
 function encodeBase64(bytes: Uint8Array): string {
@@ -278,8 +271,8 @@ function reachableParts(
     if (members.has(part)) continue;
     if (!packageFile.archive.has(part) || REWRITTEN_PART.test(part)) return undefined;
     members.add(part);
-    const relationshipsPart = relationshipsPartOf(part);
-    if (packageFile.archive.has(relationshipsPart)) members.add(relationshipsPart);
+    const relationships = relationshipsPart(part);
+    if (packageFile.archive.has(relationships)) members.add(relationships);
     for (const relationship of packageFile.relationships(part)) {
       if (!relationship.external && !modelled.has(relationship.target))
         pending.push(relationship.target);
@@ -366,7 +359,7 @@ export async function capturePreserved(
   const retained = new Map<string, XlsxSourcePart>();
   const compressedSizes = new Map<string, number>();
   for (const [name, entry] of packageFile.archive.entries) {
-    compressedSizes.set(name.toLowerCase(), entry.compressedSize);
+    compressedSizes.set(asciiFold(name), entry.compressedSize);
   }
   let retainedBytes = 0;
   for (const unit of units) {
@@ -374,7 +367,7 @@ export async function capturePreserved(
       (part) => !retained.has(part),
     );
     const unitBytes = unitParts.reduce(
-      (total, part) => total + (compressedSizes.get(part.toLowerCase()) ?? 0),
+      (total, part) => total + (compressedSizes.get(asciiFold(part)) ?? 0),
       0,
     );
     if (retainedBytes + unitBytes > context.limits.maxPreservedBytes) {
@@ -478,7 +471,7 @@ function appendChartsToDrawing(
   charts: readonly DrawingChart[],
   context: XlsxCodecContext,
 ): Map<string, Uint8Array> {
-  const relationshipsName = relationshipsPartOf(drawing.name);
+  const relationshipsName = relationshipsPart(drawing.name);
   const root = parseXml(partBytes(drawing), drawing.name, context);
   const relationshipsRoot = relationships
     ? parseXml(partBytes(relationships), relationshipsName, context)
@@ -517,7 +510,7 @@ function relationshipTargets(
   const cached = relationshipTargetCache.get(part);
   if (cached) return cached;
   const bytes = partBytes(part);
-  const sourcePart = sourcePartOfRelationships(name);
+  const sourcePart = relationshipSourcePart(name);
   const targets = xmlChildren(parseXml(bytes, name, context), "Relationship").flatMap(
     (relationship) =>
       xmlAttribute(relationship, "TargetMode") === "External"
@@ -690,10 +683,10 @@ export function preparePreserved(
       const drawing = graph && partsByName.get(graph.target);
       if (!drawing) return false;
 
-      const relationshipsPart = partsByName.get(relationshipsPartOf(drawing.name));
+      const drawingRelationships = partsByName.get(relationshipsPart(drawing.name));
       for (const [name, bytes] of appendChartsToDrawing(
         drawing,
-        relationshipsPart,
+        drawingRelationships,
         charts,
         context,
       )) {
