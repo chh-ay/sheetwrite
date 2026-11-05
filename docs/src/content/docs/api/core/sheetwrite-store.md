@@ -61,6 +61,7 @@ async function total(workbook: Workbook) {
 <a href="#sheetwrite-store-get-pivots"><code>getPivots</code></a>
 <a href="#sheetwrite-store-get-range-mutation-allocation-stats"><code>getRangeMutationAllocationStats</code></a>
 <a href="#sheetwrite-store-get-ref-target"><code>getRefTarget</code></a>
+<a href="#sheetwrite-store-get-relationship-status"><code>getRelationshipStatus</code></a>
 <a href="#sheetwrite-store-get-relationships"><code>getRelationships</code></a>
 <a href="#sheetwrite-store-get-runtime-resource-snapshot"><code>getRuntimeResourceSnapshot</code></a>
 <a href="#sheetwrite-store-get-spill-anchor"><code>getSpillAnchor</code></a>
@@ -103,7 +104,7 @@ async function total(workbook: Workbook) {
 <a href="#sheetwrite-store-from-snapshot"><code>fromSnapshot</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>68</span>
+## Members <span class="api-count" data-pagefind-ignore>69</span>
 
 <div class="api-member-list">
 
@@ -389,6 +390,18 @@ getRangeMutationAllocationStats: () => RangeMutationAllocationStats;
 getRefTarget: (addr: CellAddress) => CellAddress | null;
 ```
 
+</details>
+
+<details class="api-member" id="sheetwrite-store-get-relationship-status" data-pagefind-weight="1">
+<summary><code>getRelationshipStatus</code> <span class="api-member-summary">Whether the keys of the relationship with id resolve, checked now from the cell values.</span></summary>
+
+```ts generated
+getRelationshipStatus: (id: string) => RelationshipStatus;
+```
+
+<p class="api-member-doc">Whether the keys of the relationship with `id` resolve, checked now from
+the cell values. The default engine checks no keys and reports
+`unavailable`, as it does for an unknown ID.</p>
 </details>
 
 <details class="api-member" id="sheetwrite-store-get-relationships" data-pagefind-weight="1">
@@ -842,6 +855,7 @@ class SheetwriteStore implements Store {
   getPivots: (sheet?: SheetId) => PivotDefinition[];
   getRangeMutationAllocationStats: () => RangeMutationAllocationStats;
   getRefTarget: (addr: CellAddress) => CellAddress | null;
+  getRelationshipStatus: (id: string) => RelationshipStatus;
   getRelationships: () => TableRelationship[];
   getRuntimeResourceSnapshot: (
     operation: RuntimeResourceOperation,

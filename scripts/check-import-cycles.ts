@@ -94,7 +94,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
   "data-model": {
     source: "packages/core/src/types/data-model.ts",
     dependencies: ["table"],
-    exports: ["DataModel", "TableColumnRef", "TableRelationship"],
+    exports: ["DataModel", "RelationshipStatus", "TableColumnRef", "TableRelationship"],
   },
   pivot: {
     source: "packages/core/src/types/pivot.ts",
