@@ -15,6 +15,7 @@ import {
   MAX_CONDITIONAL_FORMAT_FORMULA_LENGTH,
   MAX_CONDITIONAL_FORMAT_RULES,
 } from "./conditional-format.js";
+import { validateDataModelShape, validateRelationshipShape } from "./data-model.js";
 import { boundedJsonByteLength, JsonByteLengthError, SheetwriteError } from "./errors.js";
 import {
   cloneCellHyperlink,
@@ -31,7 +32,7 @@ import {
   validatePivotReferences,
   validatePivotShape,
 } from "./pivot.js";
-import { compareCodeUnits } from "./plain-data.js";
+import { compareCodeUnits, isPlainRecord, ownValue, type PlainRecord } from "./plain-data.js";
 import { preparedRestore } from "./transaction-preparation.js";
 import type { MergeRange, Range } from "./types/coordinates.js";
 import type {
@@ -473,8 +474,6 @@ export class SnapshotValidationError extends SheetwriteError {
   }
 }
 
-type PlainRecord = Record<string, unknown>;
-
 interface JsonSafetyIssue {
   path: string;
   code: "non-serializable" | "resource-limit";
@@ -524,20 +523,6 @@ function nonNegativeInteger(value: unknown): value is number {
 
 function finiteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
-}
-
-function isPlainRecord(value: unknown): value is PlainRecord {
-  return (
-    value !== null &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
-    Object.getPrototypeOf(value) === Object.prototype
-  );
-}
-
-function ownValue(record: PlainRecord, key: string): unknown {
-  const descriptor = Object.getOwnPropertyDescriptor(record, key);
-  return descriptor?.enumerable && "value" in descriptor ? descriptor.value : undefined;
 }
 
 function childPath(path: string, key: string): string {
@@ -2640,6 +2625,18 @@ export function validateDocumentOperationShape(
       validateCalculationShape(ownValue(operation, "calculation"), `${path}.calculation`, errors);
       break;
 
+    case "setRelationship":
+      validateRelationshipShape(
+        ownValue(operation, "relationship"),
+        `${path}.relationship`,
+        errors,
+      );
+      break;
+
+    case "removeRelationship":
+      requireString(operation, "id", path, errors, true);
+      break;
+
     case "setChart":
       validateOperationSheetId(operation, path, errors);
       validateChartShape(ownValue(operation, "chart"), `${path}.chart`, errors);
@@ -3162,6 +3159,11 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
     const calculation = ownValue(workbook, "calculation");
     if (calculation !== undefined) {
       validateCalculationShape(calculation, "workbook.calculation", errors);
+    }
+
+    const dataModel = ownValue(workbook, "dataModel");
+    if (dataModel !== undefined) {
+      validateDataModelShape(dataModel, "workbook.dataModel", errors);
     }
   }
 
@@ -3749,6 +3751,12 @@ export function documentOpTarget(operation: DocumentOp): string {
 
     case "setCalculation":
       return "calculation";
+
+    case "setRelationship":
+      return `relationship:${operation.relationship.id}`;
+
+    case "removeRelationship":
+      return `relationship:${operation.id}`;
 
     default: {
       const exhaustive: never = operation;

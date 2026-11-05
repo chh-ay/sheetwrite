@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "a764709cc8fa015ae780e038539c6474e2fd512a9e00957b63027a338bbc8685",
+  "sha256": "db1c0031e9f42291d13f5c8ba1832063f075bfffe95a3e3cecea6ed54ed5814a",
   "intentionalExports": [
     {
       "package": "@sheetwrite/charts",
@@ -108,6 +108,7 @@
         "DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS",
         "DEFAULT_XLSX_RESOURCE_LIMITS",
         "DataCell",
+        "DataModel",
         "DataSource",
         "DataSourceCapabilities",
         "DataSourceColumnBand",
@@ -297,6 +298,8 @@
         "SyncProtocolErrorCode",
         "SyncStateSnapshot",
         "SyncVersionGapRequest",
+        "TableColumnRef",
+        "TableRelationship",
         "Theme",
         "ToolbarActionName",
         "ToolbarIcon",

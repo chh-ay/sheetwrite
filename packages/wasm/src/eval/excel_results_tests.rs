@@ -84,6 +84,19 @@ fn lambda_arguments_can_be_errors_that_the_body_handles() {
     ]);
 }
 
+#[cfg(feature = "analysis")]
+#[test]
+fn legacy_statistics_names_read_references_as_their_successors() {
+    assert_results(&[
+        ("=STDEV(Data!A1:A3)", "1"),
+        ("=VAR(Report:Data!C1:C3)", "1"),
+        ("=MODE((Data!A1:A2,Data!A2:A3))", "2"),
+        ("=VARP(Data!D1:D3,Data!A1)", "4"),
+        ("=ZTEST(Data!D2:D3,1)", "#N/A"),
+        ("=CHITEST(Data!A1:A3,Data!B1:B2)", "#N/A"),
+    ]);
+}
+
 #[test]
 fn whole_columns_and_rows_read_the_used_part_of_the_sheet() {
     assert_results(&[

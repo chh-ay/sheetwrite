@@ -3724,6 +3724,235 @@
         }
       ],
       "returns": "scalar"
+    },
+    "beta-cumulative": {
+      "arguments": [
+        {
+          "name": "x",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "alpha",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "beta",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "lower",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "upper",
+          "required": false,
+          "default": 1,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "binom-inverse": {
+      "arguments": [
+        {
+          "name": "trials",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "probability",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "alpha",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "hypgeom-mass": {
+      "arguments": [
+        {
+          "name": "sampleSuccesses",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "sampleSize",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "populationSuccesses",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "populationSize",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "negbinom-mass": {
+      "arguments": [
+        {
+          "name": "failures",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "successes",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "probability",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "t-dist-tails": {
+      "arguments": [
+        {
+          "name": "x",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "degreesFreedom",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "tails",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "chi-test": {
+      "arguments": [
+        {
+          "name": "actualRange",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "expectedRange",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "t-test": {
+      "arguments": [
+        {
+          "name": "array1",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "array2",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "tails",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "type",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "z-test": {
+      "arguments": [
+        {
+          "name": "array",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "x",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "sigma",
+          "required": false,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
     }
   },
   "semanticsProfiles": {
@@ -5045,6 +5274,24 @@
         "Available only in @sheetwrite/formulas. Both engines support plain defined-name formulas; named LAMBDA calls require the full engine.",
         "LAMBDA uses lexical parameters and LET bindings. Calls are limited to depth 64 and 2000000 work units. Helpers reject nested arrays."
       ]
+    },
+    "analysis-compatibility": {
+      "excel": "documented",
+      "googleSheets": "unverified",
+      "openFormula": "unverified",
+      "divergences": [
+        "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?.",
+        "STDEV, STDEVP, VAR, VARP, MODE and COVAR evaluate with STDEV.S, STDEV.P, VAR.S, VAR.P, MODE.SNGL and COVARIANCE.P."
+      ]
+    },
+    "analysis-hypothesis": {
+      "excel": "documented",
+      "googleSheets": "unverified",
+      "openFormula": "unverified",
+      "divergences": [
+        "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?.",
+        "CHITEST and paired TTEST skip pairs where either value is not a number. TTEST type 3 uses Welch's degrees of freedom without rounding."
+      ]
     }
   },
   "implementationProfiles": {
@@ -5385,6 +5632,45 @@
       "evidence": {
         "status": "source-linked",
         "paths": ["packages/wasm/src/tests.rs", "packages/core/test/formula-assist.test.ts"]
+      }
+    },
+    "analysis-compatibility": {
+      "parser": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/calc.rs"]
+      },
+      "evaluator": {
+        "status": "implemented",
+        "paths": [
+          "packages/wasm/src/eval/analysis/compatibility.rs",
+          "packages/wasm/src/eval/analysis/distributions.rs"
+        ]
+      },
+      "assist": {
+        "status": "implemented",
+        "paths": ["packages/core/src/formula-assist.ts"]
+      },
+      "evidence": {
+        "status": "source-linked",
+        "paths": ["scripts/formula-contract.test.ts"]
+      }
+    },
+    "analysis-hypothesis": {
+      "parser": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/calc.rs"]
+      },
+      "evaluator": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/eval/analysis/hypothesis.rs"]
+      },
+      "assist": {
+        "status": "implemented",
+        "paths": ["packages/core/src/formula-assist.ts"]
+      },
+      "evidence": {
+        "status": "source-linked",
+        "paths": ["scripts/formula-contract.test.ts"]
       }
     }
   },
@@ -9176,6 +9462,414 @@
       "implementation": "analysis-groupby",
       "builds": ["@sheetwrite/formulas"],
       "version": 1
+    },
+    {
+      "canonical": "BETADIST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "beta-cumulative",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-compatibility",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "BETAINV",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "beta-inverse",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-compatibility",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "BINOMDIST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "binom-dist",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-compatibility",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "CHIDIST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "distribution-tail",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-compatibility",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "CHIINV",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "distribution-inverse",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-compatibility",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "CHITEST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "chi-test",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-hypothesis",
+      "implementation": "analysis-hypothesis",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "CONFIDENCE",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "confidence",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-compatibility",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "COVAR",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "pair-arrays",
+      "semantics": "aggregate",
+      "dialects": "analysis-compatibility",
+      "implementation": "analysis-compatibility",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "CRITBINOM",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "binom-inverse",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-compatibility",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "EXPONDIST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "expon-dist",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-compatibility",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "FDIST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "f-tail",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-compatibility",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "FINV",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "f-inverse",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-compatibility",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "FTEST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "pair-arrays",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-hypothesis",
+      "implementation": "analysis-hypothesis",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "GAMMADIST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "gamma-dist",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-compatibility",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "GAMMAINV",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "gamma-inverse",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-compatibility",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "HYPGEOMDIST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "hypgeom-mass",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-compatibility",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "LOGINV",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "lognorm-inverse",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-compatibility",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "LOGNORMDIST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "standardize",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-compatibility",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "MODE",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "aggregate",
+      "dialects": "analysis-compatibility",
+      "implementation": "analysis-compatibility",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "NEGBINOMDIST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "negbinom-mass",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-compatibility",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "NORMDIST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "norm-dist",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-compatibility",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "NORMINV",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "norm-inv",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-compatibility",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "NORMSDIST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-compatibility",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "NORMSINV",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-compatibility",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "POISSON",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "poisson-dist",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-compatibility",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "STDEV",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "aggregate",
+      "dialects": "analysis-compatibility",
+      "implementation": "analysis-compatibility",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "STDEVP",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "aggregate",
+      "dialects": "analysis-compatibility",
+      "implementation": "analysis-compatibility",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "TDIST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "t-dist-tails",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-compatibility",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "TINV",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "distribution-inverse",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-compatibility",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "TTEST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "t-test",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-hypothesis",
+      "implementation": "analysis-hypothesis",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "VAR",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "aggregate",
+      "dialects": "analysis-compatibility",
+      "implementation": "analysis-compatibility",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "VARP",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "aggregate",
+      "dialects": "analysis-compatibility",
+      "implementation": "analysis-compatibility",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "WEIBULL",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "weibull-dist",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-compatibility",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "ZTEST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "z-test",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-hypothesis",
+      "implementation": "analysis-hypothesis",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
     }
   ],
   "operators": [

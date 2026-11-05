@@ -11,6 +11,10 @@ import {
   type WorkflowJob,
 } from "./workflow-contract.js";
 
+// The guard test runs about 40 real git commands in a temporary repository.
+// They take about 5 s on a loaded machine, which is Bun's default test limit.
+const GIT_REPOSITORY_TEST_TIMEOUT_MS = 30_000;
+
 const root = resolve(import.meta.dir, "..");
 const workflowSources = {
   ci: readFileSync(resolve(root, ".github/workflows/ci.yml"), "utf8"),
@@ -121,84 +125,88 @@ describe("CI and release workflow contracts", () => {
     }
   });
 
-  it("deploys only develop commits that npm already released", async () => {
-    const guard = stepRun(job("docs", "build"), "Require a released commit on develop");
-    const repository = await mkdtemp(join(tmpdir(), "sheetwrite-docs-guard-"));
-    // Outside the repository, so commits never pick it up.
-    const output = `${repository}.output`;
-    const git = (...args: string[]): string => {
-      const result = Bun.spawnSync(["git", ...args], { cwd: repository, stdout: "pipe" });
-      if (result.exitCode !== 0) throw new Error(`git ${args.join(" ")} failed`);
-      return result.stdout.toString().trim();
-    };
-    const runGuard = (commit: string): number => {
-      git("checkout", "--quiet", "--detach", commit);
-      return Bun.spawnSync(["bash", "-e", "-c", guard], {
-        cwd: repository,
-        env: { ...process.env, GITHUB_OUTPUT: output },
-        stdout: "pipe",
-        stderr: "pipe",
-      }).exitCode;
-    };
-
-    try {
-      git("init", "--quiet");
-      const commit = (message: string): string => {
-        git("add", "--all");
-        git(
-          "-c",
-          "user.name=test",
-          "-c",
-          "user.email=test@example.com",
-          "commit",
-          "--quiet",
-          "--allow-empty",
-          "-m",
-          message,
-        );
-        return git("rev-parse", "HEAD");
+  it(
+    "deploys only develop commits that npm already released",
+    async () => {
+      const guard = stepRun(job("docs", "build"), "Require a released commit on develop");
+      const repository = await mkdtemp(join(tmpdir(), "sheetwrite-docs-guard-"));
+      // Outside the repository, so commits never pick it up.
+      const output = `${repository}.output`;
+      const git = (...args: string[]): string => {
+        const result = Bun.spawnSync(["git", ...args], { cwd: repository, stdout: "pipe" });
+        if (result.exitCode !== 0) throw new Error(`git ${args.join(" ")} failed`);
+        return result.stdout.toString().trim();
       };
-      const changeset = join(repository, ".changeset", "feature.md");
-      const corePackage = join(repository, "packages", "core", "package.json");
-      const setVersion = (version: string) =>
-        writeFile(corePackage, `${JSON.stringify({ name: "@sheetwrite/core", version })}\n`);
-      await mkdir(join(repository, ".changeset"));
-      await mkdir(join(repository, "packages", "core"), { recursive: true });
-      await writeFile(join(repository, ".changeset", "README.md"), "Changesets\n");
-      await setVersion("1.0.0");
-      const released = commit("released 1.0.0");
-      git("tag", "@sheetwrite/core@1.0.0");
-      await writeFile(changeset, "---\n'@sheetwrite/core': minor\n---\n\nA feature.\n");
-      const unreleased = commit("feature with a pending changeset");
-      await rm(changeset);
-      await setVersion("1.1.0");
-      const versioned = commit("version packages, not yet published");
-      const unpublishedDocs = commit("docs fix before publication");
-      git("update-ref", "refs/remotes/origin/develop", unpublishedDocs);
+      const runGuard = (commit: string): number => {
+        git("checkout", "--quiet", "--detach", commit);
+        return Bun.spawnSync(["bash", "-e", "-c", guard], {
+          cwd: repository,
+          env: { ...process.env, GITHUB_OUTPUT: output },
+          stdout: "pipe",
+          stderr: "pipe",
+        }).exitCode;
+      };
 
-      // npm does not have 1.1.0 yet: only the 1.0.0 release may deploy.
-      expect(runGuard(versioned)).not.toBe(0);
-      expect(runGuard(unpublishedDocs)).not.toBe(0);
-      expect(runGuard(unreleased)).not.toBe(0);
-      expect(runGuard(released)).toBe(0);
-      expect(await readFile(output, "utf8")).toBe(`commit=${released}\n`);
+      try {
+        git("init", "--quiet");
+        const commit = (message: string): string => {
+          git("add", "--all");
+          git(
+            "-c",
+            "user.name=test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "--quiet",
+            "--allow-empty",
+            "-m",
+            message,
+          );
+          return git("rev-parse", "HEAD");
+        };
+        const changeset = join(repository, ".changeset", "feature.md");
+        const corePackage = join(repository, "packages", "core", "package.json");
+        const setVersion = (version: string) =>
+          writeFile(corePackage, `${JSON.stringify({ name: "@sheetwrite/core", version })}\n`);
+        await mkdir(join(repository, ".changeset"));
+        await mkdir(join(repository, "packages", "core"), { recursive: true });
+        await writeFile(join(repository, ".changeset", "README.md"), "Changesets\n");
+        await setVersion("1.0.0");
+        const released = commit("released 1.0.0");
+        git("tag", "@sheetwrite/core@1.0.0");
+        await writeFile(changeset, "---\n'@sheetwrite/core': minor\n---\n\nA feature.\n");
+        const unreleased = commit("feature with a pending changeset");
+        await rm(changeset);
+        await setVersion("1.1.0");
+        const versioned = commit("version packages, not yet published");
+        const unpublishedDocs = commit("docs fix before publication");
+        git("update-ref", "refs/remotes/origin/develop", unpublishedDocs);
 
-      // The release workflow tags 1.1.0 after npm publishes it.
-      git("checkout", "--quiet", "--detach", unpublishedDocs);
-      git("tag", "@sheetwrite/core@1.1.0");
-      const docsFix = commit("docs-only fix after publication");
-      git("update-ref", "refs/remotes/origin/develop", docsFix);
-      git("checkout", "--quiet", "--detach", released);
-      const unreviewed = commit("unreviewed branch");
+        // npm does not have 1.1.0 yet: only the 1.0.0 release may deploy.
+        expect(runGuard(versioned)).not.toBe(0);
+        expect(runGuard(unpublishedDocs)).not.toBe(0);
+        expect(runGuard(unreleased)).not.toBe(0);
+        expect(runGuard(released)).toBe(0);
+        expect(await readFile(output, "utf8")).toBe(`commit=${released}\n`);
 
-      expect(runGuard(versioned)).toBe(0);
-      expect(runGuard(docsFix)).toBe(0);
-      expect(runGuard(unreviewed)).not.toBe(0);
-    } finally {
-      await rm(repository, { recursive: true, force: true });
-      await rm(output, { force: true });
-    }
-  });
+        // The release workflow tags 1.1.0 after npm publishes it.
+        git("checkout", "--quiet", "--detach", unpublishedDocs);
+        git("tag", "@sheetwrite/core@1.1.0");
+        const docsFix = commit("docs-only fix after publication");
+        git("update-ref", "refs/remotes/origin/develop", docsFix);
+        git("checkout", "--quiet", "--detach", released);
+        const unreviewed = commit("unreviewed branch");
+
+        expect(runGuard(versioned)).toBe(0);
+        expect(runGuard(docsFix)).toBe(0);
+        expect(runGuard(unreviewed)).not.toBe(0);
+      } finally {
+        await rm(repository, { recursive: true, force: true });
+        await rm(output, { force: true });
+      }
+    },
+    GIT_REPOSITORY_TEST_TIMEOUT_MS,
+  );
 
   it("fails Required CI when required docs or browser checks do not pass", () => {
     const required = job("ci", "required");

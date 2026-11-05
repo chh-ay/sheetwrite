@@ -40,7 +40,7 @@ readonly kind: "metadata";
 <summary><code>metadata</code></summary>
 
 ```ts generated
-readonly metadata: | "column" | "row" | "sheet" | "merge" | "table" | "validation" | "hyperlink" | "protected-range" | "note" | "named-range" | "calculation" | "chart" | "pivot";
+readonly metadata: | "column" | "row" | "sheet" | "merge" | "table" | "validation" | "hyperlink" | "protected-range" | "note" | "named-range" | "calculation" | "relationship" | "chart" | "pivot";
 ```
 
 </details>
@@ -131,6 +131,7 @@ export interface RowBridgeMetadataDelta<
     | "note"
     | "named-range"
     | "calculation"
+    | "relationship"
     | "chart"
     | "pivot";
   readonly transaction: RowBridgeTransaction;
