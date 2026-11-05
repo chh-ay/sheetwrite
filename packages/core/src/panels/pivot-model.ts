@@ -407,3 +407,25 @@ export function nextPivotIdentity(pivots: readonly PivotDefinition[]): {
   while (ids.has(`pivot-${number}`) || names.has(`PivotTable${number}`)) number += 1;
   return { id: `pivot-${number}`, name: `PivotTable${number}` };
 }
+
+/** Sort order of filter values: numbers, then text, then logicals, then blank. */
+export function compareScalars(a: CellScalar, b: CellScalar): number {
+  const rank = (value: CellScalar): number =>
+    typeof value === "number"
+      ? 0
+      : typeof value === "string"
+        ? 1
+        : typeof value === "boolean"
+          ? 2
+          : 3;
+  const byRank = rank(a) - rank(b);
+  if (byRank !== 0) return byRank;
+  if (typeof a === "number" && typeof b === "number") return a - b;
+  if (typeof a === "string" && typeof b === "string") return a.localeCompare(b);
+  return Number(a) - Number(b);
+}
+
+/** The label of a filter or slicer value; a blank shows as "(blank)", as in Excel. */
+export function scalarLabel(value: CellScalar): string {
+  return value === null || value === "" ? "(blank)" : String(value);
+}
