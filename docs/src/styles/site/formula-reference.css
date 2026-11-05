@@ -2,18 +2,18 @@
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 0.75rem;
-  padding: 1rem;
+  gap: var(--sw-space-3);
+  padding: var(--sw-space-4);
   border: 1px solid var(--sw-border);
-  border-radius: 0.6rem;
+  border-radius: var(--sw-radius-md);
   background: var(--sw-surface-1);
 }
 .sw-formula-filter label,
 .sw-formula-filter__engine {
   display: grid;
   flex: 1 1 12rem;
-  gap: 0.35rem;
-  font-size: 0.8rem;
+  gap: var(--sw-space-1-5);
+  font-size: var(--sw-text-caption);
   color: var(--sw-fg-muted);
 }
 .sw-formula-filter input,
@@ -21,9 +21,9 @@
   width: 100%;
   min-width: 0;
   min-height: 2.6rem;
-  padding: 0.6rem;
+  padding: var(--sw-space-2);
   border: 1px solid var(--sw-field-edge, var(--sw-border-strong));
-  border-radius: 0.35rem;
+  border-radius: var(--sw-radius-sm);
   background: var(--sw-surface-0);
   color: var(--sw-fg-strong);
   font: inherit;
@@ -31,13 +31,13 @@
 /* The engine filter's label matches the search field's label. */
 .sw-formula-filter__engine .sw-demo-select__label {
   color: var(--sw-fg-muted);
-  font-size: 0.8rem;
-  font-weight: 400;
+  font-size: var(--sw-text-caption);
+  font-weight: var(--sw-weight-regular);
 }
 /* Prose styles centre buttons; the select trigger keeps its value left, chevron right. */
 .sw-formula-filter__engine .sw-demo-select__trigger {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--sw-space-2);
   align-items: center;
   justify-content: space-between;
   margin: 0;
@@ -45,9 +45,9 @@
 }
 .sw-prose .sw-formula-filter p {
   margin: 0;
-  padding: 0.6rem 0;
+  padding: var(--sw-space-2) 0;
   color: var(--sw-fg-muted);
-  font-size: 0.8rem;
+  font-size: var(--sw-text-caption);
 }
 .sw-prose .sw-formula-family[hidden],
 .sw-prose .sw-formula-table tr[hidden] {
@@ -71,7 +71,7 @@
 }
 .sw-prose .sw-formula-table small {
   display: block;
-  margin-top: 0.3rem;
+  margin-top: var(--sw-space-1);
 }
 .sw-prose .sw-formula-table details {
   margin: 0;
@@ -81,69 +81,69 @@
 }
 .sw-prose .sw-formula-table summary {
   white-space: nowrap;
-  font-size: 0.8rem;
+  font-size: var(--sw-text-caption);
 }
 .sw-prose .sw-formula-table details a {
-  font-size: 0.8rem;
+  font-size: var(--sw-text-caption);
 }
 .sw-formula-build {
   display: inline-block;
-  padding: 0.15rem 0.45rem;
-  border-radius: 0.25rem;
+  padding: var(--sw-space-0-5) var(--sw-space-2);
+  border-radius: var(--sw-radius-xs);
   background: color-mix(in srgb, var(--sw-accent) 10%, transparent);
   color: var(--sw-accent);
-  font-size: 0.75rem;
+  font-size: var(--sw-text-eyebrow);
   white-space: nowrap;
 }
 .sw-formula-build[data-build="full"] {
-  background: color-mix(in srgb, var(--sw-type-keyword) 10%, transparent);
-  color: var(--sw-type-keyword);
+  background: color-mix(in srgb, var(--sw-code-keyword) 10%, transparent);
+  color: var(--sw-code-keyword);
 }
 
 .sw-prose .sw-memory-comparison {
-  margin: 1.5rem 0;
+  margin: var(--sw-space-6) 0;
 }
 .sw-prose .sw-memory-comparison figcaption {
   color: var(--sw-fg-strong);
-  font-weight: 600;
+  font-weight: var(--sw-weight-semibold);
 }
 .sw-prose .sw-memory-comparison figcaption > span {
   display: block;
-  margin-top: 0.25rem;
+  margin-top: var(--sw-space-1);
   color: var(--sw-fg-muted);
-  font-size: 0.8rem;
-  font-weight: 400;
+  font-size: var(--sw-text-caption);
+  font-weight: var(--sw-weight-regular);
 }
 .sw-prose .sw-memory-comparison__case {
-  padding: 1rem 0;
+  padding: var(--sw-space-4) 0;
   border-bottom: 1px solid var(--sw-border);
 }
 .sw-prose .sw-memory-comparison__case > p {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
-  gap: 0.25rem 1rem;
-  margin: 0 0 0.75rem;
-  font-size: 0.9rem;
+  gap: var(--sw-space-1) var(--sw-space-4);
+  margin: 0 0 var(--sw-space-3);
+  font-size: var(--sw-text-small);
 }
 .sw-prose .sw-memory-comparison__case > p > span {
   color: var(--sw-fg-muted);
-  font-size: 0.8rem;
+  font-size: var(--sw-text-caption);
 }
 .sw-prose .sw-memory-comparison__case > div {
   display: grid;
   grid-template-columns: 3.5rem minmax(0, 1fr) 5rem;
   align-items: center;
-  gap: 0.75rem;
+  gap: var(--sw-space-3);
   min-height: 1.8rem;
-  font: 400 0.8rem / 1.5 var(--sw-font-mono);
+  font: var(--sw-weight-regular) var(--sw-text-caption) / 1.5 var(--sw-font-mono);
   color: var(--sw-fg-muted);
 }
 .sw-prose .sw-memory-comparison__case i {
   display: block;
   height: 0.65rem;
   border-radius: 0 0.15rem 0.15rem 0;
-  background: var(--sw-fg-dim);
+  background: var(--sw-fg-muted);
 }
 .sw-prose .sw-memory-comparison__case [data-after] i {
   background: var(--sw-accent);
@@ -151,43 +151,43 @@
 .sw-prose .sw-memory-comparison__case > div > strong {
   text-align: right;
   white-space: nowrap;
-  font-weight: 500;
+  font-weight: var(--sw-weight-medium);
   font-variant-numeric: tabular-nums;
 }
 
 .sw-prose .sw-key-preview {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1.5rem;
-  margin: 1.25rem 0;
-  padding: 1.5rem;
+  gap: var(--sw-space-6);
+  margin: var(--sw-space-5) 0;
+  padding: var(--sw-space-6);
   border: 1px solid var(--sw-border);
-  border-radius: 0.75rem;
+  border-radius: var(--sw-radius-lg);
   background: var(--sw-surface-1);
 }
 .sw-prose .sw-key-preview > div > span,
 .sw-prose .sw-command-states__label {
   color: var(--sw-fg-muted);
-  font: 500 0.8rem / 1.5 var(--sw-font-mono);
+  font: var(--sw-weight-medium) var(--sw-text-caption) / 1.5 var(--sw-font-mono);
 }
 .sw-prose .sw-key-preview p {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem;
-  margin: 0.75rem 0 0;
+  gap: var(--sw-space-1-5);
+  margin: var(--sw-space-3) 0 0;
 }
 .sw-prose .sw-key-preview kbd {
   display: inline-grid;
   place-items: center;
   min-width: 2.5rem;
   min-height: 2.75rem;
-  padding: 0.2rem 0.55rem;
+  padding: var(--sw-space-1) var(--sw-space-2);
   border: 1px solid var(--sw-border);
   border-bottom-width: 3px;
-  border-radius: 0.4rem;
+  border-radius: var(--sw-radius-sm);
   background: var(--sw-surface-0);
   color: var(--sw-fg-strong);
-  font: 600 1rem / 1.5 var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-body) / 1.5 var(--sw-font-mono);
 }
 .sw-prose .sw-key-preview > code {
   grid-column: 1 / -1;
@@ -199,38 +199,38 @@
   gap: 1px;
   overflow: hidden;
   padding: 0;
-  margin: 1.25rem 0;
+  margin: var(--sw-space-5) 0;
   list-style: none;
   border: 1px solid var(--sw-border);
-  border-radius: 0.75rem;
+  border-radius: var(--sw-radius-lg);
   background: var(--sw-border);
 }
 .sw-prose .sw-command-states > li {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.8rem;
+  gap: var(--sw-space-3);
   margin: 0;
-  padding: 1.25rem;
+  padding: var(--sw-space-5);
   background: var(--sw-surface-1);
 }
 .sw-prose .sw-command-states__button,
 .sw-prose .sw-command-states__error {
-  padding: 0.45rem 0.65rem;
+  padding: var(--sw-space-2) var(--sw-space-3);
   border: 1px solid var(--sw-border);
-  border-radius: 0.35rem;
+  border-radius: var(--sw-radius-sm);
   color: var(--sw-fg-strong);
-  font: 600 0.85rem / 1.5 var(--sw-font-body);
+  font: var(--sw-weight-semibold) var(--sw-text-small) / 1.5 var(--sw-font-body);
 }
 .sw-prose .sw-command-states__button[data-state="busy"] {
   color: var(--sw-accent);
 }
 .sw-prose .sw-command-states__error {
-  color: var(--sw-type-number);
+  color: var(--sw-code-number);
 }
 .sw-prose .sw-command-states p {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: var(--sw-text-small);
   color: var(--sw-fg-muted);
 }
 @media (max-width: 40rem) {

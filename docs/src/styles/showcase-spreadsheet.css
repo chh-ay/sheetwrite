@@ -1,65 +1,65 @@
 .sw-spreadsheet-frame {
   min-height: 100vh;
-  background: var(--sw-demo-deep);
-  color: var(--sw-demo-fg);
+  background: var(--sw-surface-0);
+  color: var(--sw-fg);
 }
 
 /* Same page inset as every other capability showcase. */
 .sw-spreadsheet {
   width: calc(100% - 2 * var(--sw-page-inset));
   margin-inline: auto;
-  padding-block: 2rem 4rem;
+  padding-block: var(--sw-space-8) var(--sw-space-16);
 }
 
 .sw-spreadsheet-workspace {
   overflow: hidden;
-  border: 1px solid var(--sw-demo-border);
-  border-radius: 1rem;
-  background: var(--sw-demo-surface);
-  box-shadow: var(--sw-demo-shadow);
+  border: 1px solid var(--sw-border);
+  border-radius: var(--sw-radius-xl);
+  background: var(--sw-surface-1);
+  box-shadow: var(--sw-shadow-lg);
 }
 
 .sw-spreadsheet-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 0.75rem 1.25rem;
-  border-bottom: 1px solid var(--sw-demo-border);
-  color: var(--sw-demo-fg-strong);
+  gap: var(--sw-space-4);
+  padding: var(--sw-space-3) var(--sw-space-5);
+  border-bottom: 1px solid var(--sw-border);
+  color: var(--sw-fg-strong);
 }
 
 .sw-spreadsheet-widths {
   display: flex;
-  gap: 0.25rem;
+  gap: var(--sw-space-1);
 }
 
 .sw-spreadsheet-widths button {
   min-height: 2.25rem;
-  padding: 0.35rem 0.85rem;
-  border: 1px solid var(--sw-demo-border-strong);
-  border-radius: 0.4rem;
-  background: var(--sw-demo-raised);
-  color: var(--sw-demo-fg);
+  padding: var(--sw-space-1-5) var(--sw-space-3);
+  border: 1px solid var(--sw-border-strong);
+  border-radius: var(--sw-radius-sm);
+  background: var(--sw-surface-2);
+  color: var(--sw-fg);
   font: inherit;
-  font-size: 0.82rem;
+  font-size: var(--sw-text-caption);
   cursor: pointer;
 }
 
 .sw-spreadsheet-widths button[aria-pressed="true"] {
-  border-color: var(--sw-demo-accent);
-  color: var(--sw-demo-accent);
+  border-color: var(--sw-accent);
+  color: var(--sw-accent);
 }
 
 .sw-spreadsheet-widths button:focus-visible {
-  outline: 2px solid var(--sw-demo-accent);
+  outline: 2px solid var(--sw-accent);
   outline-offset: 3px;
 }
 
 /* The window narrows in place so the ribbon's fold is visible, not simulated. */
 .sw-spreadsheet-window {
   margin: 0 auto;
-  border-inline: 1px solid var(--sw-demo-border);
+  border-inline: 1px solid var(--sw-border);
   transition: max-width 0.25s ease;
 }
 
@@ -71,35 +71,35 @@
 .sw-spreadsheet-notes {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 2rem;
-  margin-top: 2rem;
+  gap: var(--sw-space-8);
+  margin-top: var(--sw-space-8);
 }
 
 .sw-spreadsheet-notes > div {
   min-width: 0;
-  padding: 1.5rem;
-  border: 1px solid var(--sw-demo-border);
-  border-radius: 0.75rem;
-  background: var(--sw-demo-panel);
+  padding: var(--sw-space-6);
+  border: 1px solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-1);
 }
 
 .sw-spreadsheet-notes h2 {
-  margin: 0 0 1rem;
-  color: var(--sw-demo-fg-strong);
-  font-size: 1.25rem;
-  font-weight: 650;
+  margin: 0 0 var(--sw-space-4);
+  color: var(--sw-fg-strong);
+  font-size: var(--sw-text-h3);
+  font-weight: var(--sw-weight-semibold);
 }
 
 .sw-spreadsheet-notes h3 {
-  margin: 1.5rem 0 0.75rem;
-  color: var(--sw-demo-fg-strong);
-  font-size: 1rem;
-  font-weight: 650;
+  margin: var(--sw-space-6) 0 var(--sw-space-3);
+  color: var(--sw-fg-strong);
+  font-size: var(--sw-text-body);
+  font-weight: var(--sw-weight-semibold);
 }
 
 .sw-spreadsheet-notes p {
   margin: 0;
-  color: var(--sw-demo-muted);
+  color: var(--sw-fg-muted);
   line-height: 1.6;
 }
 
@@ -116,10 +116,10 @@
 .sw-spreadsheet-steps li {
   position: relative;
   display: grid;
-  gap: 0.25rem;
+  gap: var(--sw-space-1);
   justify-items: start;
-  padding: 0.9rem 0 0.9rem 2.75rem;
-  border-top: 1px solid var(--sw-demo-border);
+  padding: var(--sw-space-4) 0 var(--sw-space-4) var(--sw-space-12);
+  border-top: 1px solid var(--sw-border);
   counter-increment: step;
 }
 
@@ -131,38 +131,38 @@
   width: 1.75rem;
   height: 1.75rem;
   place-items: center;
-  border: 1px solid var(--sw-demo-border-strong);
+  border: 1px solid var(--sw-border-strong);
   border-radius: 50%;
-  color: var(--sw-demo-fg-strong);
-  font-size: 0.85rem;
-  font-weight: 650;
+  color: var(--sw-fg-strong);
+  font-size: var(--sw-text-small);
+  font-weight: var(--sw-weight-semibold);
   font-variant-numeric: tabular-nums;
   content: counter(step);
 }
 
 .sw-spreadsheet-steps strong {
-  color: var(--sw-demo-fg-strong);
+  color: var(--sw-fg-strong);
 }
 
 .sw-spreadsheet-steps span {
-  color: var(--sw-demo-muted);
+  color: var(--sw-fg-muted);
   line-height: 1.5;
 }
 
 .sw-spreadsheet-steps .sw-spreadsheet-steps__result {
-  color: var(--sw-demo-accent-strong);
+  color: var(--sw-accent-strong);
 }
 
 .sw-spreadsheet-steps button {
-  margin-top: 0.4rem;
+  margin-top: var(--sw-space-1-5);
   min-height: 2.25rem;
-  padding: 0.35rem 0.85rem;
-  border: 1px solid var(--sw-demo-accent);
-  border-radius: 0.4rem;
-  background: color-mix(in srgb, var(--sw-demo-accent) 14%, var(--sw-demo-raised));
-  color: var(--sw-demo-fg-strong);
+  padding: var(--sw-space-1-5) var(--sw-space-3);
+  border: 1px solid var(--sw-accent);
+  border-radius: var(--sw-radius-sm);
+  background: color-mix(in srgb, var(--sw-accent) 14%, var(--sw-surface-2));
+  color: var(--sw-fg-strong);
   font: inherit;
-  font-size: 0.85rem;
+  font-size: var(--sw-text-small);
   cursor: pointer;
 }
 
@@ -172,14 +172,14 @@
 }
 
 .sw-spreadsheet-steps button:focus-visible {
-  outline: 2px solid var(--sw-demo-accent);
+  outline: 2px solid var(--sw-accent);
   outline-offset: 3px;
 }
 
 /* Expressive Code owns the token colours; this only fits its frame to the column. */
 .sw-spreadsheet-code {
   min-width: 0;
-  margin: 0 0 1rem;
+  margin: 0 0 var(--sw-space-4);
 }
 
 .sw-spreadsheet-code .expressive-code {
@@ -187,7 +187,7 @@
 }
 
 .sw-spreadsheet-code .expressive-code pre {
-  font-size: 0.8rem;
+  font-size: var(--sw-text-caption);
   line-height: 1.6;
 }
 
@@ -200,31 +200,31 @@
 .sw-spreadsheet-keys div {
   display: grid;
   grid-template-columns: 9rem minmax(0, 1fr);
-  gap: 1rem;
+  gap: var(--sw-space-4);
   align-items: center;
-  padding: 0.5rem 0;
-  border-top: 1px solid var(--sw-demo-border);
+  padding: var(--sw-space-2) 0;
+  border-top: 1px solid var(--sw-border);
 }
 
 .sw-spreadsheet-keys dt {
   display: flex;
-  gap: 0.3rem;
+  gap: var(--sw-space-1);
 }
 
 .sw-spreadsheet-keys dd {
   margin: 0;
-  color: var(--sw-demo-muted);
+  color: var(--sw-fg-muted);
 }
 
 .sw-spreadsheet-keys kbd {
   min-width: 1.75rem;
-  padding: 0.15rem 0.45rem;
-  border: 1px solid var(--sw-demo-border-strong);
+  padding: var(--sw-space-0-5) var(--sw-space-2);
+  border: 1px solid var(--sw-border-strong);
   border-bottom-width: 2px;
-  border-radius: 0.3rem;
-  background: var(--sw-demo-raised);
-  color: var(--sw-demo-fg-strong);
-  font: 0.8rem / 1.4 var(--sw-font-body);
+  border-radius: var(--sw-radius-xs);
+  background: var(--sw-surface-2);
+  color: var(--sw-fg-strong);
+  font: var(--sw-text-caption) / 1.4 var(--sw-font-body);
   text-align: center;
 }
 

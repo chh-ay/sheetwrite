@@ -18,6 +18,7 @@ import remarkGfm from "remark-gfm";
 import remarkMdxFrontmatter from "remark-mdx-frontmatter";
 import { defineConfig, type Plugin } from "vite";
 
+import { FORMULA_LANGUAGE, siteCodeThemes } from "./src/lib/code-theme.ts";
 import { dedupeCodePopovers } from "./src/lib/dedupe-code-popovers.ts";
 import { renderGridResults } from "./src/lib/grid-result.ts";
 import { renderSectionCards } from "./src/lib/section-cards.ts";
@@ -234,9 +235,48 @@ function markShortInlineCode() {
 
 const expressiveCodeOptions: RehypeExpressiveCodeOptions = {
   defaultProps: { wrap: false },
+  themes: siteCodeThemes(),
+  // The token colours are measured against AA in tokens.css; keep them exact.
+  minSyntaxHighlightingColorContrast: 0,
+  shiki: { langs: [FORMULA_LANGUAGE] },
   styleOverrides: {
     codeFontFamily: "var(--sw-font-mono)",
+    codeFontSize: "var(--sw-text-code)",
+    codeLineHeight: "var(--sw-leading-code)",
+    codePaddingBlock: "var(--sw-space-4)",
+    codePaddingInline: "var(--sw-space-5)",
     uiFontFamily: "var(--sw-font-body)",
+    uiFontSize: "var(--sw-text-caption)",
+    uiFontWeight: "var(--sw-weight-semibold)",
+    borderRadius: "var(--sw-radius-lg)",
+    borderColor: "var(--sw-border)",
+    focusBorder: "var(--sw-accent)",
+    scrollbarThumbColor: "var(--sw-border-strong)",
+    scrollbarThumbHoverColor: "var(--sw-field-edge)",
+    frames: {
+      shadowColor: "transparent",
+      editorActiveTabBackground: "var(--sw-code-bg)",
+      editorActiveTabForeground: "var(--sw-fg-strong)",
+      editorActiveTabIndicatorTopColor: "var(--sw-accent)",
+      editorActiveTabIndicatorBottomColor: "transparent",
+      editorTabBarBackground: "var(--sw-surface-2)",
+      editorTabBarBorderBottomColor: "var(--sw-border)",
+      terminalTitlebarBackground: "var(--sw-surface-2)",
+      terminalTitlebarForeground: "var(--sw-fg-muted)",
+      terminalTitlebarBorderBottomColor: "var(--sw-border)",
+      terminalTitlebarDotsForeground: "var(--sw-border-strong)",
+      terminalTitlebarDotsOpacity: "1",
+      terminalBackground: "var(--sw-code-bg)",
+      inlineButtonForeground: "var(--sw-fg-muted)",
+      inlineButtonBorder: "var(--sw-border-strong)",
+      inlineButtonBackground: "var(--sw-surface-1)",
+      tooltipSuccessBackground: "var(--sw-accent)",
+      tooltipSuccessForeground: "var(--sw-accent-ink)",
+    },
+    textMarkers: {
+      markBackground: "var(--sw-code-line-highlight)",
+      markBorderColor: "var(--sw-code-line-marker)",
+    },
   },
   useDarkModeMediaQuery: false,
   themeCssSelector: (theme: ExpressiveCodeTheme) => `[data-theme='${theme.type}']`,

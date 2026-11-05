@@ -5,7 +5,7 @@
 .sw-arch {
   overflow: hidden;
   border: 1px solid var(--sw-border-strong);
-  border-radius: 1rem;
+  border-radius: var(--sw-radius-xl);
   background: color-mix(in srgb, var(--sw-surface-1) 92%, transparent);
 }
 
@@ -13,7 +13,7 @@
   display: block;
   width: 100%;
   height: auto;
-  padding: 1.25rem 1.5rem 0.75rem;
+  padding: var(--sw-space-5) var(--sw-space-6) var(--sw-space-3);
 }
 
 .as text {
@@ -39,9 +39,9 @@
 }
 
 .as .as-owner {
-  fill: var(--sw-fg-dim);
-  font: 650 11px var(--sw-font-mono);
-  letter-spacing: 0.08em;
+  fill: var(--sw-fg-muted);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) var(--sw-font-mono);
+  letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
 
@@ -51,12 +51,12 @@
 
 .as .as-title {
   fill: var(--sw-fg-strong);
-  font: 650 17px var(--sw-font-display);
+  font: var(--sw-weight-semibold) var(--sw-text-h4) var(--sw-font-display);
 }
 
 .as .as-line {
   fill: var(--sw-fg-muted);
-  font-size: 13px;
+  font-size: var(--sw-text-caption);
 }
 
 .as-divider {
@@ -82,18 +82,18 @@
 }
 
 .as .as-caption {
-  fill: var(--sw-fg-dim);
-  font: 600 11px var(--sw-font-mono);
+  fill: var(--sw-fg-muted);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) var(--sw-font-mono);
 }
 
 .as .as-log {
   fill: var(--sw-accent-strong);
-  font: 600 11.5px var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) var(--sw-font-mono);
 }
 
 .as .as-log-detail {
   fill: var(--sw-fg-muted);
-  font-weight: 400;
+  font-weight: var(--sw-weight-regular);
 }
 
 .sw-arch[data-landing-running="false"] .as-lanes line {
@@ -118,8 +118,8 @@
 }
 
 .as .as-lanes text {
-  fill: var(--sw-fg-dim);
-  font: 600 11px var(--sw-font-mono);
+  fill: var(--sw-fg-muted);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) var(--sw-font-mono);
   text-anchor: middle;
 }
 
@@ -131,8 +131,8 @@
 
 .as .as-server > text {
   fill: var(--sw-fg);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--sw-text-caption);
+  font-weight: var(--sw-weight-semibold);
   text-anchor: middle;
 }
 
@@ -142,7 +142,7 @@
 
 .as .as-version text {
   fill: var(--sw-accent-ink);
-  font: 700 11px var(--sw-font-mono);
+  font: var(--sw-weight-bold) var(--sw-text-eyebrow) var(--sw-font-mono);
   text-anchor: middle;
 }
 
@@ -164,7 +164,7 @@
 
 .as .as-packet text {
   fill: var(--sw-accent-ink);
-  font: 700 11px var(--sw-font-mono);
+  font: var(--sw-weight-bold) var(--sw-text-eyebrow) var(--sw-font-mono);
 }
 
 .as-edit {
@@ -189,14 +189,14 @@
 .sw-arch__steps li {
   position: relative;
   min-width: 0;
-  color: var(--sw-fg-dim);
-  font-size: var(--sw-type-sm);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
   line-height: 1.5;
   transition: color 0.3s ease;
 }
 
 .sw-arch__steps button {
-  padding: 1rem 1.1rem 1.15rem;
+  padding: var(--sw-space-4) var(--sw-space-4) var(--sw-space-5);
 }
 
 .sw-arch__steps li + li {
@@ -205,9 +205,9 @@
 
 .sw-arch__steps li span {
   display: block;
-  margin-bottom: 0.35rem;
-  color: var(--sw-fg-dim);
-  font: 650 var(--sw-type-xs) / 1 var(--sw-font-mono);
+  margin-bottom: var(--sw-space-1-5);
+  color: var(--sw-fg-muted);
+  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1 var(--sw-font-mono);
 }
 
 .sw-arch__steps li::before {
