@@ -90,6 +90,53 @@ if (wasm.length < 8 || wasm.subarray(0, 4).toString("hex") !== "0061736d") {
   throw new Error("The packed WASM export is not a WebAssembly binary");
 }
 
+const historyWasm = await readFile(
+  fileURLToPath(import.meta.resolve("@sheetwrite/wasm/history/wasm")),
+);
+if (historyWasm.subarray(0, 4).toString("hex") !== "0061736d") {
+  throw new Error("The packed history kernel export is not a WebAssembly binary");
+}
+
+// Packed core must find the packed history kernel when a diff first runs.
+const { HistoryArchive, MemoryHistoryStorage } = await import("@sheetwrite/core/history");
+const historySnapshot = {
+  schemaVersion: 1,
+  documentId: "packed",
+  version: 0,
+  workbook: { activeSheet: "s" },
+  sheets: [
+    {
+      id: "s",
+      name: "S",
+      order: 0,
+      rowCount: 1,
+      columns: [{ key: "a", header: "A", width: 80, type: "number" }],
+      cells: [],
+    },
+  ],
+};
+const archive = await HistoryArchive.open({
+  documentId: "packed",
+  storage: new MemoryHistoryStorage(),
+});
+await archive.initialize(historySnapshot, 0);
+const before = await archive.saveVersion("Before", "packed", 0);
+await archive.record({
+  baseRevision: 0,
+  revision: 1,
+  mutationId: "packed-1",
+  authorId: "packed",
+  time: 1,
+  operations: [
+    { op: "set", addr: { sheet: "s", row: 0, col: 0 }, value: { kind: "literal", value: 1 } },
+  ],
+});
+const after = await archive.saveVersion("After", "packed", 1);
+const historyDiff = await archive.diffVersions({ from: before.id, to: after.id });
+if (historyDiff.cells.flags.length !== 1 || historyDiff.authors[0] !== "packed") {
+  throw new Error("The packed history diff did not report the changed cell");
+}
+
 const tableWorkbook = {
   activeSheet: "table",
   sheets: [

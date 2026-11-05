@@ -345,6 +345,27 @@ describe("history diff", () => {
     expect(seen).toEqual(Array.from({ length: 6 }, (_, row) => [`${row}:1`, `${row}:2`]).flat());
   });
 
+  it("scans a large sheet in bounded windows and continues across a window boundary", async () => {
+    const authority = await Authority.open();
+    await authority.commit("alice", [{ op: "addRows", sheet: "data", at: 6, count: 39_994 }]);
+    const start = await authority.save("Start");
+
+    await authority.commit("bob", [set("data", 10, 2, 1), set("data", 39_000, 1, 2)]);
+    const end = await authority.save("End");
+
+    const first = await diff(authority, { from: start.id, to: end.id, maxEntries: 1 });
+    expect(rows(first).map((change) => [change.row, change.col])).toEqual([[10, 2]]);
+
+    const second = await diff(authority, {
+      from: start.id,
+      to: end.id,
+      maxEntries: 1,
+      cursor: first.cursor,
+    });
+    expect(rows(second).map((change) => [change.row, change.col])).toEqual([[39_000, 1]]);
+    expect(second.cursor?.row).toBeGreaterThan(0);
+  });
+
   it("rejects an aborted request with its reason and a page larger than 1,000", async () => {
     const authority = await Authority.open();
     const start = await authority.save("Start");
