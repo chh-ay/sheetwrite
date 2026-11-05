@@ -28,7 +28,7 @@ async function renderFunctionMetadataModule(repositoryRoot: string): Promise<str
 }
 
 /** Writes the table unless it is already current. */
-async function generateFunctionMetadata(repositoryRoot: string): Promise<void> {
+export async function generateFunctionMetadata(repositoryRoot: string): Promise<void> {
   await writeIfChanged(
     join(repositoryRoot, FUNCTION_METADATA_PATH),
     await renderFunctionMetadataModule(repositoryRoot),

@@ -5,12 +5,14 @@
  * which import generated JSON. This entry writes that JSON first, from the
  * same sources the generator uses, and only then loads the generator, so
  * both modes work in a checkout that has never generated docs. Package
- * declarations must be built first: the API pages read them.
+ * declarations must be built first: the API pages read them. `generate` also
+ * writes core's function table, because the site compiles core's sources.
  */
 import { resolve } from "node:path";
 
 import { siteDataFiles } from "./docs-site-data.js";
 import { loadFormulaContractInventory, renderFormulaFunctionPages } from "./formula-docs.js";
+import { generateFunctionMetadata } from "./function-metadata.js";
 import { analyzePublicApi } from "./public-api.js";
 import { writeIfChanged } from "./script-io.js";
 
@@ -29,7 +31,9 @@ async function runDocs(mode: string | undefined): Promise<string> {
   }
   // Loaded after the JSON above exists: a static import would fail to resolve it.
   const { generateDocs, verifyDocs } = await import("./docs.js");
-  return mode === "generate" ? generateDocs(analysis) : verifyDocs(analysis);
+  if (mode === "check") return verifyDocs(analysis);
+  await generateFunctionMetadata(repositoryRoot);
+  return generateDocs(analysis);
 }
 
 if (import.meta.main) {
