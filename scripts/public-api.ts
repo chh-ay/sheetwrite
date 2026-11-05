@@ -10,7 +10,7 @@ import { API, type Project, type Symbol as ApiSymbol } from "typescript/unstable
 
 import { PUBLIC_TYPE_DOMAINS } from "./check-import-cycles.js";
 import {
-  checkManifestBaseline,
+  checkPublicApiBaseline,
   readPublicApiBaseline,
   validateManifest,
   writePublicApiBaseline,
@@ -29,7 +29,6 @@ import {
   symbolKind,
   unstableErrorContract,
 } from "./public-api-declarations.js";
-import { findUnusedPublicExports } from "./public-api-usage.js";
 import { readJson } from "./script-io.js";
 
 export type ApiEntryClassification = "supported" | "internal" | "asset" | "test-only";
@@ -77,12 +76,13 @@ export interface ApiIssue {
     | "malformed-report"
     | "missing-documentation"
     | "missing-export"
+    | "changed-signature"
     | "parse-error"
-    | "manifest-drift"
+    | "removed-export"
     | "unclassified-entry"
     | "wrong-owner"
     | "unstable-error-contract"
-    | "unused-export"
+    | "unlisted-export"
     | "unresolved-entry";
   message: string;
   package?: string;
@@ -519,10 +519,13 @@ function exportPolicyIssues(
   return issues;
 }
 
-export async function analyzePublicApi(repositoryRoot: string): Promise<{
+/** The public API manifest of the workspace and every policy issue found while building it. */
+export interface PublicApiAnalysis {
   manifest: PublicApiManifest;
   issues: ApiIssue[];
-}> {
+}
+
+export async function analyzePublicApi(repositoryRoot: string): Promise<PublicApiAnalysis> {
   const packages: ApiPackage[] = [];
   const issues: ApiIssue[] = [];
   const packageEntries: Array<{
@@ -666,10 +669,8 @@ function formatIssues(issues: readonly ApiIssue[]): string {
 if (import.meta.main) {
   const mode = process.argv[2];
   const repositoryRoot = resolve(process.argv[3] ?? join(import.meta.dir, ".."));
-  if (mode !== "report" && mode !== "check" && mode !== "baseline" && mode !== "unused") {
-    throw new Error(
-      "Usage: bun scripts/public-api.ts <report|check|baseline|unused> [repository-root]",
-    );
+  if (mode !== "report" && mode !== "check" && mode !== "baseline") {
+    throw new Error("Usage: bun scripts/public-api.ts <report|check|baseline> [repository-root]");
   }
   const result = await analyzePublicApi(repositoryRoot);
   if (mode === "report") {
@@ -685,30 +686,14 @@ if (import.meta.main) {
     }
     process.stdout.write(`${JSON.stringify(result.manifest, null, 2)}\n`);
   } else if (mode === "baseline") {
-    const existingBaseline = await readPublicApiBaseline(repositoryRoot);
-    const unusedIssues = await findUnusedPublicExports(
-      repositoryRoot,
-      result.manifest,
-      existingBaseline,
-    );
-    const issues = [...result.issues, ...unusedIssues];
-    if (issues.length > 0) throw new Error(formatIssues(issues));
+    if (result.issues.length > 0) throw new Error(formatIssues(result.issues));
     const baseline = await writePublicApiBaseline(repositoryRoot, result.manifest);
-    console.log(`Public API baseline updated: ${baseline.sha256}`);
+    const exportCount = Object.keys(baseline.exports).length;
+    process.stdout.write(`Public API baseline lists ${exportCount} exports\n`);
   } else {
     const baseline = await readPublicApiBaseline(repositoryRoot);
-    const unusedIssues = await findUnusedPublicExports(repositoryRoot, result.manifest, baseline);
-    const issues =
-      mode === "unused"
-        ? [...result.issues, ...unusedIssues]
-        : [
-            ...result.issues,
-            ...unusedIssues,
-            ...checkManifestBaseline(result.manifest, baseline.sha256),
-          ];
+    const issues = [...result.issues, ...checkPublicApiBaseline(result.manifest, baseline)];
     if (issues.length > 0) throw new Error(formatIssues(issues));
-    console.log(
-      mode === "unused" ? "Unused public export check passed" : "Public API policy check passed",
-    );
+    process.stdout.write("Public API policy check passed\n");
   }
 }
