@@ -1,8 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from "bun:test";
 
 import { validateTransactionResources } from "../src/document-protocol.js";
-import type { XlsxTableExportBackend } from "../src/export.js";
-import { setXlsxTableExportBackend } from "../src/export.js";
 import {
   AUTO_FIT_CHUNK_CELLS,
   createGrid,
@@ -26,6 +24,8 @@ import type {
   Store,
   Workbook,
 } from "../src/types.js";
+import type { XlsxTableExportBackend } from "../src/xlsx-bridge.js";
+import { setXlsxTableExportBackend } from "../src/xlsx-bridge.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 /** A pure-JS Store double; `getCell` is a tripwire for hot-path misuse. */

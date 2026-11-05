@@ -104,20 +104,22 @@ export {
 } from "./errors.js";
 
 export {
-  DEFAULT_XLSX_RESOURCE_LIMITS,
   downloadBytes,
   fromCsv,
-  fromXlsxTable,
-  fromXlsxWorkbookFile,
-  fromXlsxWorkbook,
   parseCsv,
-  setXlsxTableExportBackend,
-  setXlsxTableImportBackend,
-  setXlsxWorkbookBackend,
   toCsv,
   toCsvStream,
   toTsv,
   toTsvStream,
+} from "./export.js";
+export {
+  DEFAULT_XLSX_RESOURCE_LIMITS,
+  fromXlsxTable,
+  fromXlsxWorkbookFile,
+  fromXlsxWorkbook,
+  setXlsxTableExportBackend,
+  setXlsxTableImportBackend,
+  setXlsxWorkbookBackend,
   toXlsxTable,
   toXlsxTableStream,
   toXlsxWorkbook,
@@ -129,7 +131,7 @@ export {
   type XlsxWorkbookBackend,
   type XlsxWorkbookOptions,
   type XlsxWorkbookWarning,
-} from "./export.js";
+} from "./xlsx-bridge.js";
 
 export { convertXlsxFormulas } from "./engine.js";
 

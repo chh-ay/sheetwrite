@@ -86,4 +86,5 @@
   <g id="kpiCard" transform="translate(72 360)"><path d="M4.5 5h15a1.5 1.5 0 0 1 1.5 1.5v11a1.5 1.5 0 0 1-1.5 1.5h-15a1.5 1.5 0 0 1-1.5-1.5v-11a1.5 1.5 0 0 1 1.5-1.5Z"/><path d="m7 15 3.5-3.5 2.5 2.5L17 9.5"/><path d="M14 9.5h3v3"/></g>
   <g id="versionHistory" transform="translate(108 360)"><path d="M4.5 12A7.5 7.5 0 1 0 6.7 6.7L4.5 8.9"/><path d="M4.5 5.5v3.4h3.4"/><path d="M12 8v4l2.5 2.5"/></g>
   <g id="saveVersion" transform="translate(144 360)"><path d="M6.5 3h11A1.5 1.5 0 0 1 19 4.5V21l-7-4.5L5 21V4.5A1.5 1.5 0 0 1 6.5 3Z"/><path d="M12 7v6M9 10h6"/></g>
+  <g id="importXlsx" transform="translate(0 396)"><path d="M6.5 3H14l4.5 4.5v12A1.5 1.5 0 0 1 17 21H6.5A1.5 1.5 0 0 1 5 19.5v-15A1.5 1.5 0 0 1 6.5 3Z"/><path d="M14 3v4.5h4.5"/><path d="M2 12h10m-3-3 3 3-3 3"/><path d="M9 18h6"/></g>
 </svg>

@@ -21,7 +21,6 @@ import {
   type SheetwriteErrorCode,
   type SheetwriteErrorOperation,
 } from "../src/errors.js";
-import { XlsxResourceError } from "../src/export.js";
 import { SheetwriteError as FullSheetwriteError } from "../src/index.js";
 import { IndexedDbPendingCommitStorageError } from "../src/indexeddb.js";
 import { PersistenceError } from "../src/persistence.js";
@@ -31,6 +30,7 @@ import { createRowBridge } from "../src/row-bridge.js";
 import { IncompleteDataError } from "../src/store/data-engine.js";
 import { SyncPendingCapacityError, SyncProtocolError } from "../src/sync.js";
 import type { Workbook } from "../src/types/document.js";
+import { XlsxResourceError } from "../src/xlsx-bridge.js";
 
 const MAX_ERROR_TEXT_BYTES = 8 * 1024;
 const utf8Bytes = (text: string): number => new TextEncoder().encode(text).length;

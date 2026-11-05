@@ -472,6 +472,13 @@ export class ClipboardController {
     this.reads = new ScopeSlot(deps.lifetime);
   }
 
+  /** A new document must not accept a pending paste or retain the old rich copy. */
+  cancel(): void {
+    this.writes.close();
+    this.reads.close();
+    this.trusted = null;
+  }
+
   async copy(): Promise<ClipboardOutcome> {
     const snapshot = this.capture(false);
     if (!snapshot) return "empty";

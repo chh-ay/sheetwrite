@@ -9,23 +9,25 @@ import {
 import {
   downloadBytes,
   fromCsv,
-  fromXlsxTable,
-  fromXlsxWorkbook,
   parseCsv,
-  setXlsxTableExportBackend,
-  setXlsxTableImportBackend,
-  setXlsxWorkbookBackend,
   toCsv,
   toCsvStream,
   toTsv,
   toTsvStream,
-  toXlsxTable,
-  toXlsxWorkbook,
-  XlsxResourceError,
 } from "../src/export.js";
 import { initSheetwrite } from "../src/grid.js";
 import { IncompleteDataError, SheetwriteStore } from "../src/store.js";
 import type { Column, Workbook, WorkbookSnapshot } from "../src/types.js";
+import {
+  fromXlsxTable,
+  fromXlsxWorkbook,
+  setXlsxTableExportBackend,
+  setXlsxTableImportBackend,
+  setXlsxWorkbookBackend,
+  toXlsxTable,
+  toXlsxWorkbook,
+  XlsxResourceError,
+} from "../src/xlsx-bridge.js";
 
 beforeAll(async () => {
   await initSheetwrite();

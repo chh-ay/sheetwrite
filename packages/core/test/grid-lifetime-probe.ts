@@ -86,6 +86,43 @@ function useAndDestroy(index: number): TrackedObject[] {
   return objects;
 }
 
+/** Keep the grid alive while proving the replaced document no longer has owners. */
+async function useAndImport(): Promise<{ grid: Grid; objects: TrackedObject[] }> {
+  const host = document.createElement("div");
+  document.body.append(host);
+  const grid = createGrid(host, {
+    workbook: workbook(),
+    data: {
+      rowCount: 200,
+      columns: { name: Array.from({ length: 200 }, (_, row) => `Old ${row}`) },
+    },
+  });
+  grid.search("Old");
+  grid.refresh();
+  const oldWorkbook = grid.store.getWorkbook();
+  const merges = oldWorkbook.sheets[0]?.merges;
+  const objects = [
+    ...tracked("replaced workbook", oldWorkbook),
+    ...tracked("replaced engine", storeEngine(grid.store)),
+    ...tracked("replaced merge index", merges ? prepareMergeIndex(merges) : undefined),
+  ];
+  await grid.importWorkbook({
+    schemaVersion: 1,
+    workbook: { activeSheet: "new" },
+    sheets: [
+      {
+        id: "new",
+        name: "New",
+        order: 0,
+        rowCount: 1,
+        columns: [{ key: "n", header: "N", type: "number", width: 100 }],
+        cells: [],
+      },
+    ],
+  });
+  return { grid, objects };
+}
+
 /** Collect from a timer callback, so no caller frame still holds a referent. */
 function collectInFreshStack(): Promise<void> {
   return new Promise((resolve) => {
@@ -100,10 +137,14 @@ const restoreStubs = installCanvasTestStubs();
 await initSheetwrite();
 let objects: TrackedObject[] = [];
 for (let index = 0; index < GRIDS; index++) objects = objects.concat(useAndDestroy(index));
+const imported = await useAndImport();
+objects = objects.concat(imported.objects);
 for (let turn = 0; turn < GC_TURNS; turn++) await collectInFreshStack();
 restoreStubs();
 
 const retained = objects.filter((object) => object.ref.deref() !== undefined);
+imported.grid.destroy();
+document.body.replaceChildren();
 process.stdout.write(
   `${JSON.stringify({ tracked: objects.length, retained: retained.map((object) => object.name) })}\n`,
 );
