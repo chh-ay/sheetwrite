@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-
 import type { ExpressiveCodeTheme } from "@expressive-code/core";
 import { nodeTypes } from "@mdx-js/mdx";
 import mdx from "@mdx-js/rollup";
@@ -21,6 +19,7 @@ import remarkMdxFrontmatter from "remark-mdx-frontmatter";
 import { defineConfig, type Plugin } from "vite";
 
 import type { IconName } from "./src/icons/icon-names.ts";
+import { inlineIcon } from "./src/icons/inline-icon.ts";
 import { FORMULA_LANGUAGE, siteCodeThemes } from "./src/lib/code-theme.ts";
 import { dedupeCodePopovers } from "./src/lib/dedupe-code-popovers.ts";
 import { renderGridResults } from "./src/lib/grid-result.ts";
@@ -91,20 +90,6 @@ const ALERT_CALLOUTS: Readonly<Record<string, CalloutTone>> = {
 };
 const ALERT_MARKER = /^\s*\[!(NOTE|IMPORTANT|TIP|WARNING|CAUTION)\]\s*/;
 
-const ICON_SPRITE = readFileSync(new URL("./src/icons/sprite.svg", import.meta.url), "utf8");
-
-/**
- * One sprite icon as standalone markup. Static Markdown inlines its few icons
- * instead of referencing the sprite file, so a callout needs no JavaScript.
- */
-function inlineIcon(name: IconName): string {
-  const symbol = new RegExp(`<symbol id="${name}" viewBox="([^"]+)">(.*?)</symbol>`).exec(
-    ICON_SPRITE,
-  );
-  if (symbol === null) throw new Error(`The icon sprite has no symbol "${name}"`);
-  return `<svg aria-hidden="true" class="sw-icon" data-size="md" focusable="false" viewBox="${symbol[1]}">${symbol[2]}</svg>`;
-}
-
 /**
  * A Markdown alert (`> [!NOTE]`, `> [!TIP]`, `> [!WARNING]`, `> [!CAUTION]`)
  * becomes a static callout with the site's icon and tone, so callouts are
@@ -139,7 +124,7 @@ function alertCallout(blockquote: HastNode): HastNode | undefined {
     textOf(firstParagraph).trim().length === 0
       ? children.filter((child) => child !== firstParagraph)
       : children;
-  const icon = inlineIcon(callout.icon);
+  const icon = inlineIcon(callout.icon, "md");
   return {
     type: "element",
     tagName: "aside",

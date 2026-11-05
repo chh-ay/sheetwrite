@@ -9,6 +9,7 @@ import type {
   WorkbookTable,
 } from "@sheetwrite/core";
 import {
+  cellA1,
   colToA1,
   DEFAULT_MAX_CHANGE,
   DEFAULT_MAX_ITERATIONS,
@@ -18,8 +19,16 @@ import {
   validateSheetName,
 } from "@sheetwrite/core";
 
+import { areaA1 } from "./cell-reference.js";
 import { chartDrawingParts, type DrawingChart, freePartName, writeCharts } from "./chart-write.js";
 import { DRAWING_REL } from "./chart-xml.js";
+import {
+  columnWidthCharacters,
+  MAIN_NS,
+  META_MARKER,
+  META_STEM,
+  RELATIONSHIPS_NS,
+} from "./format.js";
 import { convertWorkbookFormulas, formulaContainsExternalReference } from "./formula.js";
 import { type ContentTypeOverride, contentTypesXml, relationshipsXml } from "./opc.js";
 import { preparePivots } from "./pivot.js";
@@ -41,15 +50,13 @@ import { StylesRegistry } from "./styles.js";
 import { encodeXstring, escapeXml, XmlBuffer } from "./xml.js";
 import { writeZip, zipChunks, type ZipPart } from "./zip.js";
 
-const MAIN_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-const REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
-const OFFICE_DOCUMENT_REL = `${REL_NS}/officeDocument`;
-const WORKSHEET_REL = `${REL_NS}/worksheet`;
-const STYLES_REL = `${REL_NS}/styles`;
-const COMMENTS_REL = `${REL_NS}/comments`;
-const VML_REL = `${REL_NS}/vmlDrawing`;
-const TABLE_REL = `${REL_NS}/table`;
-const HYPERLINK_REL = `${REL_NS}/hyperlink`;
+const OFFICE_DOCUMENT_REL = `${RELATIONSHIPS_NS}/officeDocument`;
+const WORKSHEET_REL = `${RELATIONSHIPS_NS}/worksheet`;
+const STYLES_REL = `${RELATIONSHIPS_NS}/styles`;
+const COMMENTS_REL = `${RELATIONSHIPS_NS}/comments`;
+const VML_REL = `${RELATIONSHIPS_NS}/vmlDrawing`;
+const TABLE_REL = `${RELATIONSHIPS_NS}/table`;
+const HYPERLINK_REL = `${RELATIONSHIPS_NS}/hyperlink`;
 const WORKBOOK_CONTENT =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml";
 const WORKSHEET_CONTENT =
@@ -58,8 +65,6 @@ const STYLES_CONTENT = "application/vnd.openxmlformats-officedocument.spreadshee
 const COMMENTS_CONTENT = "application/vnd.openxmlformats-officedocument.spreadsheetml.comments+xml";
 const VML_CONTENT = "application/vnd.openxmlformats-officedocument.vmlDrawing";
 const TABLE_CONTENT = "application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml";
-const META_MARKER = "sheetwrite-workbook-metadata-v1";
-const META_STEM = "__sheetwrite_meta__";
 const META_CHUNK = 30_000;
 
 export interface AbsoluteCell {
@@ -132,7 +137,7 @@ function formulaForReference(snapshot: WorkbookSnapshot, source: SnapshotCell["v
   if (source.kind !== "ref") throw new TypeError("Sheetwrite: expected reference cell");
   const target = snapshot.sheets.find((sheet) => sheet.id === source.target.sheet);
   if (!target) return "#REF!";
-  return `${quotedSheet(target.name)}!${colToA1(source.target.col)}${source.target.row + 1}`;
+  return `${quotedSheet(target.name)}!${cellA1(source.target.row, source.target.col)}`;
 }
 
 function canonicalJsonValue(value: unknown): unknown {
@@ -248,14 +253,6 @@ function preflightSnapshot(snapshot: WorkbookSnapshot, context: XlsxCodecContext
   }
 }
 
-function validationRange(rule: DataValidationRule): string {
-  const row0 = Math.min(rule.range.start.row, rule.range.end.row);
-  const row1 = Math.max(rule.range.start.row, rule.range.end.row);
-  const col0 = Math.min(rule.range.start.col, rule.range.end.col);
-  const col1 = Math.max(rule.range.start.col, rule.range.end.col);
-  return `${colToA1(col0)}${row0 + 1}:${colToA1(col1)}${row1 + 1}`;
-}
-
 function validationXml(
   rule: DataValidationRule,
   context: XlsxCodecContext,
@@ -321,7 +318,7 @@ function validationXml(
   const attributes = [
     `type="${type}"`,
     ...(operator ? [`operator="${operator}"`] : []),
-    `sqref="${validationRange(rule)}"`,
+    `sqref="${areaA1(rule.range)}"`,
     `allowBlank="${rule.allowBlank === false ? 0 : 1}"`,
     `showInputMessage="${helpText ? 1 : 0}"`,
     `showErrorMessage="${rule.policy === "allow" ? 0 : 1}"`,
@@ -352,7 +349,7 @@ function conditionalFormatXml(
 ): string | null {
   const startCol = Math.min(rule.range.start.col, rule.range.end.col);
   const startRow = Math.min(rule.range.start.row, rule.range.end.row);
-  const range = `${colToA1(startCol)}${startRow + 1}:${colToA1(Math.max(rule.range.start.col, rule.range.end.col))}${Math.max(rule.range.start.row, rule.range.end.row) + 1}`;
+  const range = areaA1(rule.range);
   const stopIfTrue = rule.stopIfTrue ? ' stopIfTrue="1"' : "";
   if (rule.when.kind === "formula") {
     const source = rule.when.source.startsWith("=") ? rule.when.source.slice(1) : rule.when.source;
@@ -361,14 +358,14 @@ function conditionalFormatXml(
   if (rule.when.kind === "contains") {
     const text = rule.when.text;
     const formulaText = text.replaceAll('"', '""');
-    const anchor = `${colToA1(startCol)}${startRow + 1}`;
+    const anchor = cellA1(startRow, startCol);
     if (rule.when.matchCase) {
       return `<conditionalFormatting sqref="${range}"><cfRule type="expression" dxfId="${dxfId}" priority="${priority}"${stopIfTrue}><formula>ISNUMBER(FIND("${escapeXml(encodeXstring(formulaText))}",${anchor}))</formula></cfRule></conditionalFormatting>`;
     }
     return `<conditionalFormatting sqref="${range}"><cfRule type="containsText" dxfId="${dxfId}" priority="${priority}"${stopIfTrue} operator="containsText" text="${escapeXml(encodeXstring(text))}"><formula>NOT(ISERROR(SEARCH("${escapeXml(encodeXstring(formulaText))}",${anchor})))</formula></cfRule></conditionalFormatting>`;
   }
   if (rule.when.kind === "equal" && rule.when.value === null) {
-    const anchor = `${colToA1(startCol)}${startRow + 1}`;
+    const anchor = cellA1(startRow, startCol);
     return `<conditionalFormatting sqref="${range}"><cfRule type="containsBlanks" dxfId="${dxfId}" priority="${priority}"${stopIfTrue}><formula>LEN(TRIM(${anchor}))=0</formula></cfRule></conditionalFormatting>`;
   }
   const formula = conditionalScalar(rule.when.value);
@@ -395,7 +392,7 @@ function cellXml(
     Object.keys(mergedStyle).length > 0 ? mergedStyle : undefined,
     mergedStyle.numberFormat ?? column.numberFormat,
   );
-  const reference = `${colToA1(cell.col)}${cell.row + 1}`;
+  const reference = cellA1(cell.row, cell.col);
   const styleAttribute = styleId ? ` s="${styleId}"` : "";
   const value = cell.source.value;
   if (value.kind === "formula" || value.kind === "ref") {
@@ -439,7 +436,7 @@ function commentsXml(sheet: SheetSnapshot, context: XlsxCodecContext): Uint8Arra
   );
   for (const note of sheet.notes ?? []) {
     xml.append(
-      `<comment ref="${colToA1(note.addr.col)}${note.addr.row + 1}" authorId="0"><text><r><t xml:space="preserve">`,
+      `<comment ref="${cellA1(note.addr.row, note.addr.col)}" authorId="0"><text><r><t xml:space="preserve">`,
     );
     xml.appendText(note.text);
     xml.append("</t></r></text></comment>");
@@ -516,9 +513,8 @@ function anchoredTableRule(
   const c1 = table.range.end.col;
   const firstData = table.range.start.row + (table.headerRow ? 1 : 0);
   const lastData = table.range.end.row - (table.totalsRow ? 1 : 0);
-  const rows = (from: number): string => `${from + 1}`;
   const span = (left: number, right: number, top: number): string =>
-    `${colToA1(left)}${rows(top)}:${colToA1(right)}${rows(lastData)}`;
+    `${cellA1(top, left)}:${cellA1(lastData, right)}`;
   if (rule.name === "autoFilter") {
     const children: WorkbookTableXmlElement[] = [];
     for (const child of rule.children) {
@@ -582,7 +578,7 @@ function tableXml(
   styles: StylesRegistry,
   queryTable: boolean,
 ): Uint8Array {
-  const ref = `${colToA1(table.range.start.col)}${table.range.start.row + 1}:${colToA1(table.range.end.col)}${table.range.end.row + 1}`;
+  const ref = areaA1(table.range);
   const xml = new XmlBuffer(context);
   xml.append('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
   xml.append(
@@ -704,9 +700,6 @@ function* hyperlinkStyledRows(
   for (const { row, cells } of rows) yield { row, cells: applyStyles(row, cells) };
 }
 
-const MAXIMUM_DIGIT_WIDTH_PX = 7;
-const COLUMN_WIDTH_FRACTIONS = 256;
-
 function* writeSheet(
   snapshot: WorkbookSnapshot,
   sheet: SheetSnapshot,
@@ -754,14 +747,14 @@ function* writeSheet(
   ]);
   const xml = new XmlBuffer(context);
   xml.append('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
-  xml.append(`<worksheet xmlns="${MAIN_NS}" xmlns:r="${REL_NS}">`);
+  xml.append(`<worksheet xmlns="${MAIN_NS}" xmlns:r="${RELATIONSHIPS_NS}">`);
   if (sheet.rowGroups?.length) xml.append('<sheetPr><outlinePr summaryBelow="1"/></sheetPr>');
   const maxRow = Math.max(1, sheet.rowCount);
   const maxCol = Math.max(0, sheet.columns.length - 1);
-  xml.append(`<dimension ref="A1:${colToA1(maxCol)}${maxRow}"/>`);
+  xml.append(`<dimension ref="A1:${cellA1(maxRow - 1, maxCol)}"/>`);
   xml.append('<sheetViews><sheetView workbookViewId="0">');
   if ((sheet.frozenRows ?? 0) > 0 || (sheet.frozenCols ?? 0) > 0) {
-    const topLeft = `${colToA1(sheet.frozenCols ?? 0)}${(sheet.frozenRows ?? 0) + 1}`;
+    const topLeft = cellA1(sheet.frozenRows ?? 0, sheet.frozenCols ?? 0);
     const activePane =
       sheet.frozenRows && sheet.frozenCols
         ? "bottomRight"
@@ -778,9 +771,7 @@ function* writeSheet(
     for (let index = 0; index < sheet.columns.length; index++) {
       const column = sheet.columns[index]!;
       // The stored character width includes OOXML's five-pixel padding.
-      const width =
-        Math.floor((column.width / MAXIMUM_DIGIT_WIDTH_PX) * COLUMN_WIDTH_FRACTIONS) /
-        COLUMN_WIDTH_FRACTIONS;
+      const width = columnWidthCharacters(column.width);
       const styleId = styles.register(
         column.cellStyle,
         column.cellStyle?.numberFormat ?? column.numberFormat,
@@ -822,11 +813,11 @@ function* writeSheet(
   }
   xml.append("</sheetData>");
   if (sheet.sortKeys?.length && sheet.rowCount > 0) {
-    const reference = `A1:${colToA1(maxCol)}${maxRow}`;
+    const reference = `A1:${cellA1(maxRow - 1, maxCol)}`;
     xml.append(`<sortState ref="${reference}">`);
     for (const key of sheet.sortKeys) {
       xml.append(
-        `<sortCondition ref="${colToA1(key.col)}1:${colToA1(key.col)}${maxRow}"${key.ascending ? "" : ' descending="1"'}/>`,
+        `<sortCondition ref="${cellA1(0, key.col)}:${cellA1(maxRow - 1, key.col)}"${key.ascending ? "" : ' descending="1"'}/>`,
       );
     }
     xml.append("</sortState>");
@@ -845,9 +836,7 @@ function* writeSheet(
   if (sheet.merges?.length) {
     xml.append(`<mergeCells count="${sheet.merges.length}">`);
     for (const merge of sheet.merges) {
-      xml.append(
-        `<mergeCell ref="${colToA1(merge.c0)}${merge.r0 + 1}:${colToA1(merge.c1)}${merge.r1 + 1}"/>`,
-      );
+      xml.append(`<mergeCell ref="${cellA1(merge.r0, merge.c0)}:${cellA1(merge.r1, merge.c1)}"/>`);
     }
     xml.append("</mergeCells>");
   }
@@ -1120,7 +1109,7 @@ function workbookXml(
     });
   }
   xml.append(
-    `<workbook xmlns="${MAIN_NS}" xmlns:r="${REL_NS}"><bookViews><workbookView activeTab="${activeTab}"/></bookViews><sheets>`,
+    `<workbook xmlns="${MAIN_NS}" xmlns:r="${RELATIONSHIPS_NS}"><bookViews><workbookView activeTab="${activeTab}"/></bookViews><sheets>`,
   );
   for (let index = 0; index < ordered.length; index++) {
     const sheet = ordered[index]!;

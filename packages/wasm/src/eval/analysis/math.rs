@@ -87,6 +87,7 @@ pub(in crate::eval) fn streamed_sum_squares(
 struct RangeContext<'a, 'p> {
     store: &'a CellStore,
     pass: &'a mut EvalPass<'p>,
+    /// Depth of the function call; the cells it reads evaluate one level deeper.
     depth: usize,
 }
 
