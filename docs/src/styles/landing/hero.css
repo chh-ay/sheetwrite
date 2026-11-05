@@ -78,7 +78,7 @@
   border: 1px solid var(--sw-border-strong);
   border-radius: 1rem;
   background: var(--sw-surface-1);
-  box-shadow: var(--sw-shadow);
+  box-shadow: var(--sw-shadow-lg);
   color: var(--sw-fg);
   font: 400 0.8125rem / 1.3 var(--sw-font-body);
   user-select: none;
@@ -169,7 +169,7 @@
 
 .ha-group__label {
   padding: 0.2rem 0 0.35rem;
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   font-size: 0.6875rem;
   text-align: center;
 }
@@ -245,7 +245,7 @@
   border: 1px solid var(--sw-border-strong);
   border-radius: 0.45rem;
   background: var(--sw-surface-1);
-  box-shadow: var(--sw-shadow);
+  box-shadow: var(--sw-shadow-lg);
   opacity: 0;
   transform: translateY(-4px);
 }
@@ -295,7 +295,7 @@
 }
 
 .ha-bar__fx {
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   font-style: italic;
 }
 
@@ -389,7 +389,7 @@
 }
 
 .ha-cell[data-total] {
-  border-top: 1px solid var(--sw-fg-dim);
+  border-top: 1px solid var(--sw-fg-muted);
   color: var(--sw-fg-strong);
   font-weight: 650;
 }
@@ -481,7 +481,7 @@
 }
 
 .ha-chart__axis {
-  fill: var(--sw-fg-dim);
+  fill: var(--sw-fg-muted);
   font: 9px var(--sw-font-body);
   text-anchor: end;
 }
@@ -554,7 +554,8 @@
   padding: 0.75rem;
   border-left: 1px solid var(--sw-border);
   background: var(--sw-surface-1);
-  box-shadow: -10px 0 24px -18px color-mix(in srgb, var(--sw-fg) 45%, transparent);
+  box-shadow: -10px 0 24px -18px
+    color-mix(in srgb, var(--sw-fg) 45%, transparent);
 }
 
 .ha-fields strong {
@@ -598,7 +599,7 @@
 
 .ha-fields__area {
   margin-top: 0.3rem;
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   font-size: 0.6875rem;
 }
 
@@ -640,7 +641,7 @@
 }
 
 .ha-sheets .ha-sheets__add {
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
 }
 
 .sw-hero-app[data-pivot-tab="false"] [data-sheet-tab="pivot"] {
@@ -664,7 +665,7 @@
   padding: 0.4rem 0.8rem;
   border: 1px solid color-mix(in srgb, var(--sw-accent) 45%, var(--sw-border));
   background: var(--sw-surface-1);
-  box-shadow: var(--sw-shadow);
+  box-shadow: var(--sw-shadow-lg);
   color: var(--sw-fg-strong);
 }
 
@@ -733,8 +734,8 @@
 .ha-acts li {
   position: relative;
   min-width: 0;
-  color: var(--sw-fg-dim);
-  font: 550 var(--sw-type-sm) / 1.4 var(--sw-font-body);
+  color: var(--sw-fg-muted);
+  font: 550 var(--sw-text-small) / 1.4 var(--sw-font-body);
   counter-increment: act;
   transition: color 0.4s ease;
 }
@@ -746,9 +747,9 @@
 .ha-acts button::before {
   display: block;
   margin-bottom: 0.2rem;
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   content: "0" counter(act);
-  font: 650 var(--sw-type-xs) / 1 var(--sw-font-mono);
+  font: 650 var(--sw-text-caption) / 1 var(--sw-font-mono);
 }
 
 .ha-acts li::after {
@@ -809,8 +810,8 @@
   align-items: center;
   justify-content: space-between;
   margin-top: 0.75rem;
-  color: var(--sw-fg-dim);
-  font-size: var(--sw-type-xs);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
 }
 
 .sw-hero-app__replay {
@@ -819,7 +820,7 @@
   border-radius: 999px;
   background: transparent;
   color: var(--sw-fg-muted);
-  font: 600 var(--sw-type-xs) / 1 var(--sw-font-body);
+  font: 600 var(--sw-text-caption) / 1 var(--sw-font-body);
   cursor: pointer;
 }
 
@@ -908,7 +909,7 @@
 .sw-lp-facts dd {
   margin: 0.3rem 0 0;
   color: var(--sw-fg-muted);
-  font-size: var(--sw-type-sm);
+  font-size: var(--sw-text-small);
   line-height: 1.4;
 }
 

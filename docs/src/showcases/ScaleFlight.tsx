@@ -27,7 +27,8 @@ const LAST_ROW = SCALE_ROWS - 1;
 const LAST_COLUMN = SCALE_COLUMNS - 1;
 const TELEPORT_HOPS = 12;
 
-const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
+const easeInOut = (t: number) =>
+  t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
 
 /**
  * Share of each leg spent moving. The rest of the leg holds still at the stop,
@@ -59,7 +60,13 @@ const FLIGHTS: Readonly<Record<FlightKind, FlightPlan>> = {
       // Move on a log scale, so every leg covers one order of magnitude evenly.
       const from = Math.log10((DEPTH_STOPS[leg] ?? 0) + 1);
       const to = Math.log10((DEPTH_STOPS[leg + 1] ?? LAST_ROW) + 1);
-      return { row: Math.min(LAST_ROW, Math.round(10 ** (from + (to - from) * move) - 1)), col: 0 };
+      return {
+        row: Math.min(
+          LAST_ROW,
+          Math.round(10 ** (from + (to - from) * move) - 1),
+        ),
+        col: 0,
+      };
     },
   },
   corner: {
@@ -72,7 +79,10 @@ const FLIGHTS: Readonly<Record<FlightKind, FlightPlan>> = {
       const { leg, move } = legAt(t, CORNER_STOPS.length - 1);
       const from = CORNER_STOPS[leg] ?? 0;
       const share = from + ((CORNER_STOPS[leg + 1] ?? 1) - from) * move;
-      return { row: Math.round(share * LAST_ROW), col: Math.round(share * LAST_COLUMN) };
+      return {
+        row: Math.round(share * LAST_ROW),
+        col: Math.round(share * LAST_COLUMN),
+      };
     },
   },
   teleport: {
@@ -127,7 +137,10 @@ function seededRandom(seed: number): () => number {
 
 function percentile(sorted: readonly number[], fraction: number): number {
   if (sorted.length === 0) return 0;
-  const index = Math.min(sorted.length - 1, Math.ceil(sorted.length * fraction) - 1);
+  const index = Math.min(
+    sorted.length - 1,
+    Math.ceil(sorted.length * fraction) - 1,
+  );
   return sorted[Math.max(0, index)] ?? 0;
 }
 
@@ -138,7 +151,12 @@ interface ScaleFlightDeckProps {
   /** The latest paged-store sample from the page, shown when no flight is running. */
   resident: { bytes: number; cells: number };
   tiles: readonly (DatasourceTile & { residence: string })[];
-  window: { firstRow: number; lastRow: number; firstColumn: number; lastColumn: number };
+  window: {
+    firstRow: number;
+    lastRow: number;
+    firstColumn: number;
+    lastColumn: number;
+  };
   onJump(row: number, col: number): void;
   onStatus(message: string): void;
 }
@@ -173,7 +191,9 @@ export function ScaleFlightDeck({
     const controller = new AbortController();
     abortRef.current = controller;
     const plan = FLIGHTS[kind];
-    const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reducedMotion = matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
     const random = seededRandom(0x5eed + Math.floor(performance.now()));
     const startRequests = requestsRef.current;
     const frameGaps: number[] = [];
@@ -195,7 +215,10 @@ export function ScaleFlightDeck({
       if (!stats) return { residentBytes: 0, loadedCells: 0 };
       peakResidentBytes = Math.max(peakResidentBytes, stats.allocatedBytes);
       peakLoadedCells = Math.max(peakLoadedCells, stats.loadedCells);
-      return { residentBytes: stats.allocatedBytes, loadedCells: stats.loadedCells };
+      return {
+        residentBytes: stats.allocatedBytes,
+        loadedCells: stats.loadedCells,
+      };
     };
 
     const finish = (now: number) => {
@@ -238,7 +261,9 @@ export function ScaleFlightDeck({
       else frameGaps.push(now - previousFrame);
       previousFrame = now;
       // Reduced motion: no animation. The Grid goes straight to the destination.
-      const progress = reducedMotion ? 1 : Math.min(1, (now - start) / plan.durationMs);
+      const progress = reducedMotion
+        ? 1
+        : Math.min(1, (now - start) / plan.durationMs);
       const shown = progress;
       const hop =
         kind === "teleport"
@@ -246,13 +271,23 @@ export function ScaleFlightDeck({
           : -1;
       if (kind !== "teleport" || hop !== lastHop) {
         const next =
-          progress >= 1 && kind !== "teleport" ? plan.at(1, random) : plan.at(shown, random);
+          progress >= 1 && kind !== "teleport"
+            ? plan.at(1, random)
+            : plan.at(shown, random);
         lastHop = hop;
-        if (next.row !== last.row || next.col !== last.col || visited.size === 0) {
+        if (
+          next.row !== last.row ||
+          next.col !== last.col ||
+          visited.size === 0
+        ) {
           last = next;
           visited.add(next.row * SCALE_COLUMNS + next.col);
           // Scrolling alone moves the view; the destination is selected once, at the end.
-          mounted.scrollToCell({ sheet: FEED_SHEET, row: next.row, col: next.col });
+          mounted.scrollToCell({
+            sheet: FEED_SHEET,
+            row: next.row,
+            col: next.col,
+          });
         }
       }
       const resident = sample();
@@ -280,7 +315,9 @@ export function ScaleFlightDeck({
 
   const stop = () => {
     abortRef.current?.abort();
-    onStatus("Flight stopped. The Grid stays where it is; you can edit any visible cell.");
+    onStatus(
+      "Flight stopped. The Grid stays where it is; you can edit any visible cell.",
+    );
   };
 
   const flying = live !== null;
@@ -299,7 +336,8 @@ export function ScaleFlightDeck({
         <p className="sw-sp-flight__kicker">Flight deck</p>
         <h2 id="scale-flight-title">Fly the Grid through a billion cells.</h2>
         <p>
-          Each flight drives the real Grid below with public API calls. Nothing is pre-rendered.
+          Each flight drives the real Grid below with public API calls. Nothing
+          is pre-rendered.
         </p>
         <fieldset className="sw-sp-flight__routes" aria-label="Choose a flight">
           {(Object.keys(FLIGHTS) as FlightKind[]).map((kind) => (
@@ -323,11 +361,17 @@ export function ScaleFlightDeck({
         )}
       </div>
 
-      <dl className="sw-sp-flight__hud" aria-label="Live flight readout" aria-live="off">
+      <dl
+        className="sw-sp-flight__hud"
+        aria-label="Live flight readout"
+        aria-live="off"
+      >
         <div className="sw-sp-flight__hud-address">
           <dt>Now at</dt>
           <dd data-testid="scale-flight-address">
-            {live?.address ?? report?.finalAddress ?? cellA1(view.firstRow, view.firstColumn)}
+            {live?.address ??
+              report?.finalAddress ??
+              cellA1(view.firstRow, view.firstColumn)}
           </dd>
           {flying && (
             <dd className="sw-sp-flight__progress" aria-hidden="true">
@@ -337,7 +381,10 @@ export function ScaleFlightDeck({
         </div>
         <div>
           <dt>Frames per second</dt>
-          <dd data-testid="scale-flight-fps" data-empty={!live && (!report || report.instant)}>
+          <dd
+            data-testid="scale-flight-fps"
+            data-empty={!live && (!report || report.instant)}
+          >
             {live
               ? live.fps.toFixed(0)
               : report && !report.instant
@@ -363,22 +410,33 @@ export function ScaleFlightDeck({
           <dt>Cells loaded in memory</dt>
           <dd>{shownCells.toLocaleString()}</dd>
           <dd className="sw-sp-flight__fine">
-            {residentShare < 0.0001 && shownCells > 0 ? "<0.0001" : residentShare.toFixed(4)}% of
-            the billion · {formatBytes(shownBytes, { kib: 1, mib: 1, gib: 2 })}
+            {residentShare < 0.0001 && shownCells > 0
+              ? "<0.0001"
+              : residentShare.toFixed(4)}
+            % of the billion ·{" "}
+            {formatBytes(shownBytes, { kib: 1, mib: 1, gib: 2 })}
           </dd>
         </div>
         <div>
           <dt>Tile requests</dt>
-          <dd>{(report && !flying ? report.requests : requests).toLocaleString()}</dd>
+          <dd>
+            {(report && !flying ? report.requests : requests).toLocaleString()}
+          </dd>
           <dd className="sw-sp-flight__fine">
-            {report && !flying ? "during the last flight" : "since the page opened"}
+            {report && !flying
+              ? "during the last flight"
+              : "since the page opened"}
           </dd>
         </div>
       </dl>
 
       <ScaleMinimap onJump={onJump} tiles={tiles} window={view} />
 
-      <p aria-live="polite" className="sw-sp-flight__report" data-testid="scale-flight-report">
+      <p
+        aria-live="polite"
+        className="sw-sp-flight__report"
+        data-testid="scale-flight-report"
+      >
         {report && !flying
           ? report.instant
             ? `${FLIGHTS[report.kind].label}: jumped straight to ${report.finalAddress} because reduced motion is on. Peak resident ${formatBytes(report.peakResidentBytes, { kib: 1, mib: 1, gib: 2 })} while addressing ${SCALE_LOGICAL_CELLS.toLocaleString()} cells.`
@@ -394,7 +452,12 @@ const MAP_HEIGHT = 216;
 
 interface ScaleMinimapProps {
   tiles: readonly (DatasourceTile & { residence: string })[];
-  window: { firstRow: number; lastRow: number; firstColumn: number; lastColumn: number };
+  window: {
+    firstRow: number;
+    lastRow: number;
+    firstColumn: number;
+    lastColumn: number;
+  };
   onJump(row: number, col: number): void;
 }
 
@@ -404,12 +467,21 @@ interface ScaleMinimapProps {
  * as a pointer shortcut; the jump form and the row and column sliders beside
  * the Grid are the keyboard controls for the same navigation.
  */
-function ScaleMinimap({ tiles, window: view, onJump }: Readonly<ScaleMinimapProps>) {
+function ScaleMinimap({
+  tiles,
+  window: view,
+  onJump,
+}: Readonly<ScaleMinimapProps>) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const seenRef = useRef(new Map<number, DatasourceTile & { residence: string }>());
+  const seenRef = useRef(
+    new Map<number, DatasourceTile & { residence: string }>(),
+  );
   // Canvas colors are resolved at draw time, so a theme change must redraw.
   const [themeRevision, setThemeRevision] = useState(0);
-  useEffect(() => observeSiteTheme(() => setThemeRevision((revision) => revision + 1)), []);
+  useEffect(
+    () => observeSiteTheme(() => setThemeRevision((revision) => revision + 1)),
+    [],
+  );
 
   for (const tile of tiles) seenRef.current.set(tile.id, tile);
 
@@ -433,7 +505,7 @@ function ScaleMinimap({ tiles, window: view, onJump }: Readonly<ScaleMinimapProp
     const accent = color("--sw-accent", "#10b981");
     const muted = color("--sw-border", "#cbd5e1");
     const strong = color("--sw-fg-strong", "#0f172a");
-    const warn = color("--sw-demo-warn", "#f59e0b");
+    const warn = color("--sw-warning", "#f59e0b");
 
     context.clearRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
     context.strokeStyle = muted;
@@ -449,17 +521,28 @@ function ScaleMinimap({ tiles, window: view, onJump }: Readonly<ScaleMinimapProp
 
     for (const tile of seenRef.current.values()) {
       context.fillStyle =
-        tile.residence === "evicted" ? muted : tile.state === "requested" ? warn : accent;
+        tile.residence === "evicted"
+          ? muted
+          : tile.state === "requested"
+            ? warn
+            : accent;
       const y = (tile.start / SCALE_ROWS) * MAP_HEIGHT;
-      const height = Math.max(1.5, ((tile.end - tile.start) / SCALE_ROWS) * MAP_HEIGHT);
+      const height = Math.max(
+        1.5,
+        ((tile.end - tile.start) / SCALE_ROWS) * MAP_HEIGHT,
+      );
       for (const band of tile.columns) {
         const x = (band.start / SCALE_COLUMNS) * MAP_WIDTH;
-        const width = Math.max(1.5, ((band.end - band.start) / SCALE_COLUMNS) * MAP_WIDTH);
+        const width = Math.max(
+          1.5,
+          ((band.end - band.start) / SCALE_COLUMNS) * MAP_WIDTH,
+        );
         context.fillRect(x, y, width, height);
       }
     }
 
-    const x = ((view.firstColumn + view.lastColumn) / 2 / SCALE_COLUMNS) * MAP_WIDTH;
+    const x =
+      ((view.firstColumn + view.lastColumn) / 2 / SCALE_COLUMNS) * MAP_WIDTH;
     const y = ((view.firstRow + view.lastRow) / 2 / SCALE_ROWS) * MAP_HEIGHT;
     // Keep the finder inside the map: at A1 an unclamped marker would sit half
     // outside the canvas and read as a rendering fault.
@@ -477,8 +560,20 @@ function ScaleMinimap({ tiles, window: view, onJump }: Readonly<ScaleMinimapProp
     context.stroke();
     context.globalAlpha = 1;
     context.lineWidth = 2;
-    context.strokeRect(markerX - markerHalf, markerY - markerHalf, markerHalf * 2, markerHalf * 2);
-  }, [tiles, view.firstRow, view.lastRow, view.firstColumn, view.lastColumn, themeRevision]);
+    context.strokeRect(
+      markerX - markerHalf,
+      markerY - markerHalf,
+      markerHalf * 2,
+      markerHalf * 2,
+    );
+  }, [
+    tiles,
+    view.firstRow,
+    view.lastRow,
+    view.firstColumn,
+    view.lastColumn,
+    themeRevision,
+  ]);
 
   // Clicking is a pointer shortcut only, so it is attached outside the
   // accessibility tree; the jump form and sliders are the keyboard path.
@@ -510,7 +605,9 @@ function ScaleMinimap({ tiles, window: view, onJump }: Readonly<ScaleMinimapProp
       <figcaption>
         <span>A1</span>
         <span>ALL1000000</span>
-        <small>The whole sheet. Lit tiles were loaded. Click to teleport.</small>
+        <small>
+          The whole sheet. Lit tiles were loaded. Click to teleport.
+        </small>
       </figcaption>
     </figure>
   );

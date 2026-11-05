@@ -107,7 +107,7 @@
 
   .sw-reel__tabs button {
     padding: 0.75rem 0.6rem;
-    font-size: var(--sw-type-xs);
+    font-size: var(--sw-text-caption);
   }
 }
 

@@ -41,7 +41,7 @@
   border: 0;
   background: transparent;
   color: var(--sw-fg-muted);
-  font: 650 var(--sw-type-sm) / 1.2 var(--sw-font-body);
+  font: 650 var(--sw-text-small) / 1.2 var(--sw-font-body);
   text-align: left;
   cursor: pointer;
   transition:
@@ -119,7 +119,7 @@
   border-radius: 999px;
   background: transparent;
   color: var(--sw-fg-muted);
-  font: 600 var(--sw-type-xs) var(--sw-font-body);
+  font: 600 var(--sw-text-caption) var(--sw-font-body);
   cursor: pointer;
 }
 
@@ -170,7 +170,7 @@
 }
 
 .sr .sr-head {
-  fill: var(--sw-fg-dim);
+  fill: var(--sw-fg-muted);
   font-size: 12px;
   font-weight: 650;
 }
@@ -197,7 +197,7 @@
 .sr .sr-note,
 .sr .sr-sub,
 .sr .sr-block-sub {
-  fill: var(--sw-fg-dim);
+  fill: var(--sw-fg-muted);
   font-size: 12px;
 }
 
@@ -223,7 +223,7 @@
 }
 
 .sr-flash {
-  fill: var(--sw-demo-warn);
+  fill: var(--sw-warning);
   opacity: 0;
 }
 
@@ -238,7 +238,7 @@
 
 .sr-link {
   fill: none;
-  stroke: var(--sw-demo-warn);
+  stroke: var(--sw-warning);
   stroke-dasharray: 4 4;
   stroke-width: 1.5;
 }
@@ -278,8 +278,8 @@
 }
 
 .sr-outbox rect {
-  fill: color-mix(in srgb, var(--sw-demo-warn) 26%, transparent);
-  stroke: var(--sw-demo-warn);
+  fill: color-mix(in srgb, var(--sw-warning) 26%, transparent);
+  stroke: var(--sw-warning);
 }
 
 .sr .sr-outbox text {
@@ -297,8 +297,8 @@
 }
 
 .sr-packet[data-tone="pending"] rect {
-  fill: color-mix(in srgb, var(--sw-demo-warn) 26%, var(--sw-surface-2));
-  stroke: var(--sw-demo-warn);
+  fill: color-mix(in srgb, var(--sw-warning) 26%, var(--sw-surface-2));
+  stroke: var(--sw-warning);
 }
 
 .sr .sr-packet text {
@@ -320,11 +320,11 @@
 
 .sr-cleared rect {
   fill: var(--sw-surface-2);
-  stroke: var(--sw-demo-warn);
+  stroke: var(--sw-warning);
 }
 
 .sr .sr-cleared text {
-  fill: var(--sw-demo-warn);
+  fill: var(--sw-warning);
   font: 650 12px var(--sw-font-mono);
 }
 
@@ -587,7 +587,8 @@
 .sr-undo .sr-block {
   transform-box: fill-box;
   transform-origin: center;
-  animation: sr-restore-send 1s cubic-bezier(0.45, 0, 0.55, 1) var(--restore-send) both;
+  animation: sr-restore-send 1s cubic-bezier(0.45, 0, 0.55, 1)
+    var(--restore-send) both;
 }
 
 /* Inside the server it becomes five versions, then one outline groups them. */
@@ -604,7 +605,8 @@
 .sr-undo .sr-batch-group {
   transform-box: fill-box;
   transform-origin: center;
-  animation: sr-batch-send 0.7s cubic-bezier(0.45, 0, 0.55, 1) var(--batch-send) both;
+  animation: sr-batch-send 0.7s cubic-bezier(0.45, 0, 0.55, 1) var(--batch-send)
+    both;
 }
 
 /* The peer's cells empty with the clear (v50), then all fill at once when the
@@ -681,7 +683,7 @@
   }
   10%,
   49% {
-    fill: var(--sw-demo-warn);
+    fill: var(--sw-warning);
   }
   50%,
   100% {
@@ -727,7 +729,7 @@
   }
   10%,
   49% {
-    stroke: var(--sw-fg-dim);
+    stroke: var(--sw-fg-muted);
     stroke-dasharray: 3 5;
   }
   50%,
@@ -742,13 +744,13 @@
     fill: color-mix(in srgb, var(--sw-fg) 7%, transparent);
   }
   to {
-    fill: color-mix(in srgb, var(--sw-demo-warn) 45%, transparent);
+    fill: color-mix(in srgb, var(--sw-warning) 45%, transparent);
   }
 }
 
 @keyframes sr-cell-commit {
   from {
-    fill: color-mix(in srgb, var(--sw-demo-warn) 45%, transparent);
+    fill: color-mix(in srgb, var(--sw-warning) 45%, transparent);
   }
   30% {
     fill: var(--sw-accent);

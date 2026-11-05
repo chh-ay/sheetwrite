@@ -15,7 +15,7 @@
   background: var(--sw-surface-1);
 }
 .sw-prose .sw-fw-facts dt {
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   font: 600 0.68rem / 1.6 var(--sw-font-mono);
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -50,7 +50,7 @@
   transform: translateY(-1px);
 }
 .sw-prose .sw-next-links span {
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   font: 600 0.68rem / 1.6 var(--sw-font-mono);
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -98,7 +98,7 @@
   font-weight: 650;
 }
 .sw-collab-flow__lane-detail {
-  fill: var(--sw-fg-dim);
+  fill: var(--sw-fg-muted);
   font-family: var(--sw-font-mono);
   font-size: 10.5px;
 }
@@ -118,19 +118,19 @@
   stroke-width: 4px;
 }
 .sw-collab-flow__message[data-kind="conflict"] line {
-  stroke: var(--sw-type-number);
+  stroke: var(--sw-code-number);
   stroke-dasharray: 6 4;
 }
 .sw-collab-flow__message[data-kind="conflict"] path {
-  fill: var(--sw-type-number);
+  fill: var(--sw-code-number);
 }
 .sw-collab-flow__note rect {
   fill: color-mix(in srgb, var(--sw-accent) 9%, var(--sw-surface-1));
   stroke: color-mix(in srgb, var(--sw-accent) 35%, var(--sw-border));
 }
 .sw-collab-flow__note[data-kind="conflict"] rect {
-  fill: color-mix(in srgb, var(--sw-type-number) 10%, var(--sw-surface-1));
-  stroke: color-mix(in srgb, var(--sw-type-number) 40%, var(--sw-border));
+  fill: color-mix(in srgb, var(--sw-code-number) 10%, var(--sw-surface-1));
+  stroke: color-mix(in srgb, var(--sw-code-number) 40%, var(--sw-border));
 }
 .sw-collab-flow__note text {
   fill: var(--sw-fg);
@@ -138,11 +138,11 @@
 }
 .sw-collab-flow__alt rect {
   fill: none;
-  stroke: color-mix(in srgb, var(--sw-type-number) 45%, var(--sw-border));
+  stroke: color-mix(in srgb, var(--sw-code-number) 45%, var(--sw-border));
   stroke-dasharray: 5 4;
 }
 .sw-collab-flow__alt text {
-  fill: var(--sw-type-number);
+  fill: var(--sw-code-number);
   font-family: var(--sw-font-mono);
   font-size: 10.5px;
   font-weight: 600;
@@ -159,18 +159,18 @@
   margin: 1.25rem 0;
   min-width: 0;
   overflow: hidden;
-  border: 1px solid var(--sw-demo-border);
+  border: 1px solid var(--sw-border);
   border-radius: 0.65rem;
-  background: var(--sw-demo-deep);
-  color: var(--sw-demo-fg);
+  background: var(--sw-surface-0);
+  color: var(--sw-fg);
 }
 .sw-terminal__bar {
   display: flex;
   align-items: center;
   gap: 1.25rem;
   padding: 0 0.8rem 0 1rem;
-  border-bottom: 1px solid var(--sw-demo-border);
-  background: var(--sw-demo-raised);
+  border-bottom: 1px solid var(--sw-border);
+  background: var(--sw-surface-2);
 }
 .sw-terminal__dots {
   display: flex;
@@ -180,16 +180,16 @@
   width: 0.55rem;
   height: 0.55rem;
   border-radius: 50%;
-  background: var(--sw-demo-muted);
+  background: var(--sw-fg-muted);
 }
 .sw-terminal__dots i:first-child {
-  background: var(--sw-demo-danger);
+  background: var(--sw-danger);
 }
 .sw-terminal__dots i:nth-child(2) {
-  background: var(--sw-demo-warn);
+  background: var(--sw-warning);
 }
 .sw-terminal__dots i:last-child {
-  background: var(--sw-demo-accent);
+  background: var(--sw-accent);
 }
 .sw-terminal__tabs {
   display: flex;
@@ -199,7 +199,7 @@
 .sw-terminal__copy {
   border: 0;
   background: transparent;
-  color: var(--sw-demo-muted);
+  color: var(--sw-fg-muted);
   font: 500 0.8rem / 1.5 var(--sw-font-mono);
   cursor: pointer;
 }
@@ -210,11 +210,11 @@
 }
 .sw-terminal__tabs button:hover,
 .sw-terminal__copy:hover {
-  color: var(--sw-demo-fg-strong);
+  color: var(--sw-fg-strong);
 }
 .sw-terminal__tabs button[aria-selected="true"] {
-  color: var(--sw-demo-fg-strong);
-  border-bottom-color: var(--sw-demo-accent);
+  color: var(--sw-fg-strong);
+  border-bottom-color: var(--sw-accent);
 }
 .sw-terminal__copy {
   margin-left: auto;
@@ -223,7 +223,7 @@
   font-family: var(--sw-font-body);
 }
 .sw-terminal__copy:hover {
-  background: var(--sw-demo-surface);
+  background: var(--sw-surface-1);
 }
 .sw-prose .sw-terminal__body,
 .sw-terminal__body {
@@ -233,7 +233,7 @@
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: var(--sw-demo-fg-strong);
+  color: var(--sw-fg-strong);
   font: 0.88rem / 1.65 var(--sw-font-mono);
 }
 .sw-terminal__body code {
@@ -244,13 +244,13 @@
   font: inherit;
 }
 .sw-terminal__prompt {
-  color: var(--sw-demo-muted);
+  color: var(--sw-fg-muted);
   user-select: none;
 }
 .sw-terminal__note {
   margin: 0;
   padding: 0 1.25rem 1.15rem;
-  color: var(--sw-demo-muted);
+  color: var(--sw-fg-muted);
   font-size: 0.8rem;
   line-height: 1.6;
 }

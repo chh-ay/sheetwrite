@@ -32,8 +32,8 @@
   color: var(--sw-fg);
   text-decoration: none;
   transition:
-    border-color var(--sw-demo-transition),
-    translate var(--sw-demo-transition);
+    border-color var(--sw-motion-fast) var(--sw-motion-decelerate),
+    translate var(--sw-motion-fast) var(--sw-motion-decelerate);
 }
 
 .sw-features a:hover {
@@ -64,14 +64,14 @@
 .sw-features__summary {
   padding: 0.5rem 1.25rem 0;
   color: var(--sw-fg-muted);
-  font-size: var(--sw-type-sm);
+  font-size: var(--sw-text-small);
   line-height: 1.55;
 }
 
 .sw-features__cta {
   padding: 1rem 1.25rem 1.15rem;
   color: var(--sw-accent-strong);
-  font-size: var(--sw-type-sm);
+  font-size: var(--sw-text-small);
   font-weight: 650;
 }
 
@@ -128,7 +128,7 @@
 }
 
 .fg .fg-tag {
-  fill: var(--sw-fg-dim);
+  fill: var(--sw-fg-muted);
   text-anchor: middle;
 }
 
@@ -142,7 +142,7 @@
 }
 
 .fg-edit[data-client="b"] {
-  fill: color-mix(in srgb, var(--sw-demo-danger) 34%, transparent);
+  fill: color-mix(in srgb, var(--sw-danger) 34%, transparent);
 }
 
 .fg-cursor[data-client="a"] {
@@ -150,7 +150,7 @@
 }
 
 .fg-cursor[data-client="b"] {
-  fill: var(--sw-demo-danger);
+  fill: var(--sw-danger);
 }
 
 .fg-version rect {
@@ -169,8 +169,8 @@
 }
 
 .fg-commit rect {
-  fill: color-mix(in srgb, var(--sw-demo-warn) 28%, transparent);
-  stroke: var(--sw-demo-warn);
+  fill: color-mix(in srgb, var(--sw-warning) 28%, transparent);
+  stroke: var(--sw-warning);
 }
 
 .fg-reload path {
@@ -269,7 +269,7 @@
 }
 
 .fg .fg-fx {
-  fill: var(--sw-fg-dim);
+  fill: var(--sw-fg-muted);
   font: italic 600 8px var(--sw-font-body);
 }
 

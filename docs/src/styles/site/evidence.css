@@ -18,8 +18,16 @@
 
 /* Capture vintages differ: a caution tone, not the "validated" accent. */
 .evidence-mixed {
-  border-color: color-mix(in srgb, var(--sw-state-pending) 45%, var(--sw-border));
-  background: color-mix(in srgb, var(--sw-state-pending) 6%, var(--sw-surface-1));
+  border-color: color-mix(
+    in srgb,
+    var(--sw-state-pending) 45%,
+    var(--sw-border)
+  );
+  background: color-mix(
+    in srgb,
+    var(--sw-state-pending) 6%,
+    var(--sw-surface-1)
+  );
 }
 
 .error-catalog {
@@ -134,13 +142,21 @@
 }
 
 .compat-result__meta [data-status="supported"] {
-  border-color: color-mix(in srgb, var(--sw-state-resolved) 35%, var(--sw-border));
+  border-color: color-mix(
+    in srgb,
+    var(--sw-state-resolved) 35%,
+    var(--sw-border)
+  );
   color: var(--sw-state-resolved);
 }
 
 .compat-result__meta [data-status="warning"],
 .compat-result__meta [data-status="partial"] {
-  border-color: color-mix(in srgb, var(--sw-state-pending) 35%, var(--sw-border));
+  border-color: color-mix(
+    in srgb,
+    var(--sw-state-pending) 35%,
+    var(--sw-border)
+  );
   color: var(--sw-state-pending);
 }
 
@@ -148,13 +164,13 @@
   flex: 0 0 auto;
   width: 1rem;
   height: 1rem;
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 1.5;
-  transition: transform var(--sw-demo-transition);
+  transition: transform var(--sw-motion-fast) var(--sw-motion-decelerate);
 }
 
 .compat-result[open] .compat-result__fold {
@@ -179,7 +195,7 @@
 
 .compat-result__body dt {
   margin-bottom: 0.25rem;
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   font: 650 0.58rem / 1.4 var(--sw-font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -226,14 +242,17 @@
 }
 
 /* Resource ceilings read as compact records instead of five squeezed prose columns. */
-.sw-prose--resource-limits table:has(> thead > tr > th:nth-child(5):last-child) {
+.sw-prose--resource-limits
+  table:has(> thead > tr > th:nth-child(5):last-child) {
   display: block;
   overflow: visible;
   border: 0;
   background: transparent;
 }
 
-.sw-prose--resource-limits table:has(> thead > tr > th:nth-child(5):last-child) > thead {
+.sw-prose--resource-limits
+  table:has(> thead > tr > th:nth-child(5):last-child)
+  > thead {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -243,14 +262,19 @@
   white-space: nowrap;
 }
 
-.sw-prose--resource-limits table:has(> thead > tr > th:nth-child(5):last-child) > tbody {
+.sw-prose--resource-limits
+  table:has(> thead > tr > th:nth-child(5):last-child)
+  > tbody {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.8rem;
   align-items: start;
 }
 
-.sw-prose--resource-limits table:has(> thead > tr > th:nth-child(5):last-child) > tbody > tr {
+.sw-prose--resource-limits
+  table:has(> thead > tr > th:nth-child(5):last-child)
+  > tbody
+  > tr {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0;
@@ -260,7 +284,11 @@
   background: var(--sw-surface-1);
 }
 
-.sw-prose--resource-limits table:has(> thead > tr > th:nth-child(5):last-child) > tbody > tr > td {
+.sw-prose--resource-limits
+  table:has(> thead > tr > th:nth-child(5):last-child)
+  > tbody
+  > tr
+  > td {
   display: block;
   min-width: 0;
   border: 0;
@@ -280,7 +308,7 @@
   > td::before {
   display: block;
   margin-bottom: 0.25rem;
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   font: 650 0.56rem / 1.4 var(--sw-font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -383,19 +411,26 @@
   content: "Override";
 }
 
-.sw-prose--resource-limits table:has(> thead > tr > th:nth-child(5):last-child) code {
+.sw-prose--resource-limits
+  table:has(> thead > tr > th:nth-child(5):last-child)
+  code {
   white-space: normal;
   overflow-wrap: anywhere;
 }
 
 @media (max-width: 52rem) {
-  .sw-prose--resource-limits table:has(> thead > tr > th:nth-child(5):last-child) > tbody {
+  .sw-prose--resource-limits
+    table:has(> thead > tr > th:nth-child(5):last-child)
+    > tbody {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 
 @media (max-width: 42rem) {
-  .sw-prose--resource-limits table:has(> thead > tr > th:nth-child(5):last-child) > tbody > tr {
+  .sw-prose--resource-limits
+    table:has(> thead > tr > th:nth-child(5):last-child)
+    > tbody
+    > tr {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -492,7 +527,7 @@
 
 .compat-evidence-file dt {
   margin-bottom: 0.18rem;
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   font: 650 0.52rem / 1.4 var(--sw-font-mono);
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -580,7 +615,7 @@
   display: flex;
   gap: 0.45rem;
   align-items: center;
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   font: 600 0.9rem / 1 var(--sw-font-mono);
 }
 
@@ -596,7 +631,7 @@
 .size-history__arrow {
   width: 1.1rem;
   height: 1.1rem;
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -606,13 +641,13 @@
 .size-history__fold {
   width: 1rem;
   height: 1rem;
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 1.5;
-  transition: transform var(--sw-demo-transition);
+  transition: transform var(--sw-motion-fast) var(--sw-motion-decelerate);
 }
 
 .size-history__release[open] .size-history__fold {
@@ -621,7 +656,7 @@
 
 .size-history__release-head time {
   margin-left: auto;
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   font: 550 0.75rem / 1 var(--sw-font-mono);
 }
 
@@ -651,7 +686,7 @@
 .sw-prose .size-history__table thead th {
   border-top: 0;
   padding-top: 0;
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   font: 650 0.56rem / 1.4 var(--sw-font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -693,7 +728,7 @@
 
 .size-history__table td small span + span::before {
   margin-right: 0.25rem;
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   content: "·";
 }
 
@@ -702,7 +737,7 @@
 }
 
 .size-history__table td small[data-direction="flat"] {
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
 }
 
 .size-history__footer {
@@ -711,7 +746,7 @@
   align-items: center;
   border-top: 1px solid var(--sw-border);
   padding: 0.65rem 1.25rem;
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   font: 600 0.6rem / 1.4 var(--sw-font-mono);
 }
 
@@ -734,7 +769,7 @@
   border: 0;
   padding: 0;
   background: transparent;
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
 }
 
 @media (max-width: 40rem) {
@@ -831,7 +866,7 @@
 }
 
 .bench-meta dt {
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   font: 650 0.62rem / 1.8 var(--sw-font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -986,9 +1021,9 @@
 }
 
 .bench-viz__row[data-outcome="slower"] .bench-viz__ratio {
-  border-color: color-mix(in srgb, var(--sw-type-number) 38%, var(--sw-border));
-  color: color-mix(in srgb, var(--sw-type-number) 80%, var(--sw-fg));
-  background: color-mix(in srgb, var(--sw-type-number) 9%, var(--sw-surface-2));
+  border-color: color-mix(in srgb, var(--sw-code-number) 38%, var(--sw-border));
+  color: color-mix(in srgb, var(--sw-code-number) 80%, var(--sw-fg));
+  background: color-mix(in srgb, var(--sw-code-number) 9%, var(--sw-surface-2));
 }
 
 .bench-bar {
@@ -1017,7 +1052,8 @@
   height: 0.62rem;
   border-radius: 0.25rem;
   background: var(--sw-surface-2);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sw-border) 55%, transparent);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--sw-border) 55%, transparent);
 }
 
 .bench-bar__track i {
@@ -1069,7 +1105,7 @@
 }
 
 .bench-num[data-stat="p95"] {
-  color: color-mix(in srgb, var(--sw-fg-dim) 80%, transparent);
+  color: color-mix(in srgb, var(--sw-fg-muted) 80%, transparent);
   font-weight: 500;
 }
 
@@ -1079,7 +1115,7 @@
   gap: 0.35rem;
   align-items: center;
   justify-self: end;
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   font: 650 0.62rem / 1 var(--sw-font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1099,7 +1135,7 @@
 
 .bench-viz figcaption {
   margin: 0.9rem 0.1rem 0;
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   font-size: 0.74rem;
   line-height: 1.6;
 }
@@ -1187,9 +1223,15 @@
 #bench-size-1000:checked ~ .bench-widget__tabs label[for="bench-size-1000"],
 #bench-size-10000:checked ~ .bench-widget__tabs label[for="bench-size-10000"],
 #bench-size-100000:checked ~ .bench-widget__tabs label[for="bench-size-100000"],
-#bench-size-1000000:checked ~ .bench-widget__tabs label[for="bench-size-1000000"],
-#bench-metric-speed:checked ~ .bench-widget__tabs label[for="bench-metric-speed"],
-#bench-metric-memory:checked ~ .bench-widget__tabs label[for="bench-metric-memory"] {
+#bench-size-1000000:checked
+  ~ .bench-widget__tabs
+  label[for="bench-size-1000000"],
+#bench-metric-speed:checked
+  ~ .bench-widget__tabs
+  label[for="bench-metric-speed"],
+#bench-metric-memory:checked
+  ~ .bench-widget__tabs
+  label[for="bench-metric-memory"] {
   color: var(--sw-accent-strong);
   background: color-mix(in srgb, var(--sw-accent) 12%, var(--sw-surface-2));
 }
@@ -1222,13 +1264,26 @@
 }
 
 /* Keyboard focus on the hidden radios surfaces on the active label. */
-#bench-size-1000:focus-visible ~ .bench-widget__tabs label[for="bench-size-1000"],
-#bench-size-10000:focus-visible ~ .bench-widget__tabs label[for="bench-size-10000"],
-#bench-size-100000:focus-visible ~ .bench-widget__tabs label[for="bench-size-100000"],
-#bench-size-1000000:focus-visible ~ .bench-widget__tabs label[for="bench-size-1000000"],
-#bench-metric-speed:focus-visible ~ .bench-widget__tabs label[for="bench-metric-speed"],
-#bench-metric-memory:focus-visible ~ .bench-widget__tabs label[for="bench-metric-memory"] {
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sw-accent) 45%, transparent);
+#bench-size-1000:focus-visible
+  ~ .bench-widget__tabs
+  label[for="bench-size-1000"],
+#bench-size-10000:focus-visible
+  ~ .bench-widget__tabs
+  label[for="bench-size-10000"],
+#bench-size-100000:focus-visible
+  ~ .bench-widget__tabs
+  label[for="bench-size-100000"],
+#bench-size-1000000:focus-visible
+  ~ .bench-widget__tabs
+  label[for="bench-size-1000000"],
+#bench-metric-speed:focus-visible
+  ~ .bench-widget__tabs
+  label[for="bench-metric-speed"],
+#bench-metric-memory:focus-visible
+  ~ .bench-widget__tabs
+  label[for="bench-metric-memory"] {
+  box-shadow: inset 0 0 0 2px
+    color-mix(in srgb, var(--sw-accent) 45%, transparent);
 }
 
 /* An engine that never finished lays it down honestly. */
@@ -1238,9 +1293,10 @@
 
 .bench-crash {
   padding: 0.1rem 0.6rem;
-  border: 1px dashed color-mix(in srgb, var(--sw-type-number) 55%, var(--sw-border));
+  border: 1px dashed
+    color-mix(in srgb, var(--sw-code-number) 55%, var(--sw-border));
   border-radius: 0.35rem;
-  color: var(--sw-type-number);
+  color: var(--sw-code-number);
   font: 600 0.68rem / 1.6 var(--sw-font-mono);
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -1249,14 +1305,16 @@
 
 .bench-viz__ratio[data-kind="crashed"],
 .bench-viz__ratio[data-kind="solo"] {
-  color: var(--sw-type-number);
+  color: var(--sw-code-number);
 }
 
 /* Default widget state (100k / speed) when no radio has been touched yet.
    The generator cannot emit `checked` - hydrated React would treat the
    input as controlled and revert every user toggle. */
-.bench-widget:not(:has(input[name="bench-size"]:checked)) label[for="bench-size-100000"],
-.bench-widget:not(:has(input[name="bench-metric"]:checked)) label[for="bench-metric-speed"] {
+.bench-widget:not(:has(input[name="bench-size"]:checked))
+  label[for="bench-size-100000"],
+.bench-widget:not(:has(input[name="bench-metric"]:checked))
+  label[for="bench-metric-speed"] {
   color: var(--sw-accent-strong);
   background: color-mix(in srgb, var(--sw-accent) 12%, var(--sw-surface-2));
 }
@@ -1290,7 +1348,8 @@
 
 #bench-data-1000:checked ~ .bench-widget__tabs label[for="bench-data-1000"],
 #bench-data-10000:checked ~ .bench-widget__tabs label[for="bench-data-10000"],
-.bench-widget--data:not(:has(input[name="bench-data-size"]:checked)) label[for="bench-data-10000"] {
+.bench-widget--data:not(:has(input[name="bench-data-size"]:checked))
+  label[for="bench-data-10000"] {
   color: var(--sw-accent-strong);
   background: color-mix(in srgb, var(--sw-accent) 12%, var(--sw-surface-2));
 }

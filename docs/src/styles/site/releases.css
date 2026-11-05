@@ -14,12 +14,12 @@
   --result-hue: var(--sw-accent);
 }
 .sw-prose .sw-results__group[data-kind="slower"] {
-  --result-hue: var(--sw-type-number);
-  border-color: color-mix(in srgb, var(--sw-type-number) 35%, var(--sw-border));
+  --result-hue: var(--sw-code-number);
+  border-color: color-mix(in srgb, var(--sw-code-number) 35%, var(--sw-border));
 }
 .sw-prose .sw-results__title {
   margin: 0 0 0.35rem;
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   font: 600 0.72rem / 1.5 var(--sw-font-mono);
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -56,7 +56,7 @@
 }
 .sw-prose .sw-results__detail {
   grid-column: 1 / -1;
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
 }

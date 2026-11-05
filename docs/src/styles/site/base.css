@@ -45,7 +45,11 @@ a {
    colors keeps the UA scrollbar untouched. */
 @media (forced-colors: none) {
   :root {
-    --sw-scrollbar-thumb: color-mix(in srgb, var(--sw-fg-dim) 55%, transparent);
+    --sw-scrollbar-thumb: color-mix(
+      in srgb,
+      var(--sw-fg-muted) 55%,
+      transparent
+    );
     --sw-scrollbar-track: transparent;
     scrollbar-width: thin;
   }
@@ -71,7 +75,7 @@ a {
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: color-mix(in srgb, var(--sw-fg-dim) 78%, transparent);
+    background: color-mix(in srgb, var(--sw-fg-muted) 78%, transparent);
   }
 
   ::-webkit-scrollbar-corner {
@@ -92,7 +96,8 @@ a {
 }
 
 .expressive-code pre:focus-visible {
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sw-accent) 40%, transparent);
+  box-shadow: inset 0 0 0 2px
+    color-mix(in srgb, var(--sw-accent) 40%, transparent);
 }
 
 /* Forced-colors mode removes box shadows, so the focus ring above disappears.
@@ -224,7 +229,7 @@ a {
   border: 1px solid var(--sw-border);
   border-radius: 0.3rem;
   padding: 0 0.4rem;
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   background: var(--sw-surface-1);
   font: 600 0.7rem / 1.55 var(--sw-font-mono);
 }
@@ -240,7 +245,7 @@ a {
   padding: 0;
   color: var(--sw-fg);
   background: var(--sw-surface-1);
-  box-shadow: var(--sw-shadow);
+  box-shadow: var(--sw-shadow-lg);
 }
 
 .sw-search-dialog::backdrop {
@@ -284,7 +289,7 @@ a {
   border: 1px solid var(--sw-border);
   border-radius: 0.35rem;
   padding: 0.25rem 0.45rem;
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   background: var(--sw-surface-2);
   font: 600 0.7rem var(--sw-font-mono);
 }
@@ -413,7 +418,7 @@ a {
 }
 
 .sw-prose li::marker {
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
 }
 
 /* Links carry an underline at rest so they never rely on color alone; hover
@@ -467,12 +472,18 @@ a {
   margin: 1.75rem -0.75rem 2.25rem;
   overflow-x: auto;
   background:
-    linear-gradient(to right, var(--sw-surface-1) 40%, transparent) left / 2rem 100% no-repeat local,
-    linear-gradient(to left, var(--sw-surface-1) 40%, transparent) right / 2rem 100% no-repeat local,
-    radial-gradient(farthest-side at 0 50%, var(--sw-shadow-edge), transparent) left / 0.8rem 100%
-      no-repeat scroll,
-    radial-gradient(farthest-side at 100% 50%, var(--sw-shadow-edge), transparent) right / 0.8rem
-      100% no-repeat scroll;
+    linear-gradient(to right, var(--sw-surface-1) 40%, transparent) left / 2rem
+      100% no-repeat local,
+    linear-gradient(to left, var(--sw-surface-1) 40%, transparent) right / 2rem
+      100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, var(--sw-shadow-edge), transparent)
+      left / 0.8rem 100% no-repeat scroll,
+    radial-gradient(
+        farthest-side at 100% 50%,
+        var(--sw-shadow-edge),
+        transparent
+      )
+      right / 0.8rem 100% no-repeat scroll;
   --sw-shadow-edge: color-mix(in srgb, var(--sw-fg-strong) 22%, transparent);
 }
 
@@ -659,7 +670,7 @@ a {
 
 .sw-architecture__step > span {
   display: block;
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   text-align: center;
 }
 
@@ -680,7 +691,7 @@ a {
 
 .sw-architecture figcaption {
   margin: 0.8rem 0.25rem 0;
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   font-size: 0.74rem;
 }
 
@@ -703,7 +714,7 @@ body .sw-code-popover__tag-link:hover {
   margin-top: 5rem;
   padding-top: 1.5rem;
   border-top: 1px solid var(--sw-border);
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   font-size: 0.75rem;
 }
 
@@ -742,11 +753,19 @@ body .sw-code-popover__tag-link:hover {
 
 .sw-prose .expressive-code figure.frame.has-title > figcaption.header::before,
 .sw-prose .expressive-code figure.frame.has-title > figcaption.header::after,
-.sw-prose .expressive-code figure.frame.has-title > figcaption.header > span.title::after {
+.sw-prose
+  .expressive-code
+  figure.frame.has-title
+  > figcaption.header
+  > span.title::after {
   content: none;
 }
 
-.sw-prose .expressive-code figure.frame.has-title > figcaption.header > span.title {
+.sw-prose
+  .expressive-code
+  figure.frame.has-title
+  > figcaption.header
+  > span.title {
   position: static;
   display: inline-flex;
   height: auto;

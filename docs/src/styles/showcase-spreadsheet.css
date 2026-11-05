@@ -1,7 +1,7 @@
 .sw-spreadsheet-frame {
   min-height: 100vh;
-  background: var(--sw-demo-deep);
-  color: var(--sw-demo-fg);
+  background: var(--sw-surface-0);
+  color: var(--sw-fg);
 }
 
 /* Same page inset as every other capability showcase. */
@@ -13,10 +13,10 @@
 
 .sw-spreadsheet-workspace {
   overflow: hidden;
-  border: 1px solid var(--sw-demo-border);
+  border: 1px solid var(--sw-border);
   border-radius: 1rem;
-  background: var(--sw-demo-surface);
-  box-shadow: var(--sw-demo-shadow);
+  background: var(--sw-surface-1);
+  box-shadow: var(--sw-shadow-lg);
 }
 
 .sw-spreadsheet-bar {
@@ -25,8 +25,8 @@
   justify-content: space-between;
   gap: 1rem;
   padding: 0.75rem 1.25rem;
-  border-bottom: 1px solid var(--sw-demo-border);
-  color: var(--sw-demo-fg-strong);
+  border-bottom: 1px solid var(--sw-border);
+  color: var(--sw-fg-strong);
 }
 
 .sw-spreadsheet-widths {
@@ -37,29 +37,29 @@
 .sw-spreadsheet-widths button {
   min-height: 2.25rem;
   padding: 0.35rem 0.85rem;
-  border: 1px solid var(--sw-demo-border-strong);
+  border: 1px solid var(--sw-border-strong);
   border-radius: 0.4rem;
-  background: var(--sw-demo-raised);
-  color: var(--sw-demo-fg);
+  background: var(--sw-surface-2);
+  color: var(--sw-fg);
   font: inherit;
   font-size: 0.82rem;
   cursor: pointer;
 }
 
 .sw-spreadsheet-widths button[aria-pressed="true"] {
-  border-color: var(--sw-demo-accent);
-  color: var(--sw-demo-accent);
+  border-color: var(--sw-accent);
+  color: var(--sw-accent);
 }
 
 .sw-spreadsheet-widths button:focus-visible {
-  outline: 2px solid var(--sw-demo-accent);
+  outline: 2px solid var(--sw-accent);
   outline-offset: 3px;
 }
 
 /* The window narrows in place so the ribbon's fold is visible, not simulated. */
 .sw-spreadsheet-window {
   margin: 0 auto;
-  border-inline: 1px solid var(--sw-demo-border);
+  border-inline: 1px solid var(--sw-border);
   transition: max-width 0.25s ease;
 }
 
@@ -78,28 +78,28 @@
 .sw-spreadsheet-notes > div {
   min-width: 0;
   padding: 1.5rem;
-  border: 1px solid var(--sw-demo-border);
+  border: 1px solid var(--sw-border);
   border-radius: 0.75rem;
-  background: var(--sw-demo-panel);
+  background: var(--sw-surface-1);
 }
 
 .sw-spreadsheet-notes h2 {
   margin: 0 0 1rem;
-  color: var(--sw-demo-fg-strong);
+  color: var(--sw-fg-strong);
   font-size: 1.25rem;
   font-weight: 650;
 }
 
 .sw-spreadsheet-notes h3 {
   margin: 1.5rem 0 0.75rem;
-  color: var(--sw-demo-fg-strong);
+  color: var(--sw-fg-strong);
   font-size: 1rem;
   font-weight: 650;
 }
 
 .sw-spreadsheet-notes p {
   margin: 0;
-  color: var(--sw-demo-muted);
+  color: var(--sw-fg-muted);
   line-height: 1.6;
 }
 
@@ -119,7 +119,7 @@
   gap: 0.25rem;
   justify-items: start;
   padding: 0.9rem 0 0.9rem 2.75rem;
-  border-top: 1px solid var(--sw-demo-border);
+  border-top: 1px solid var(--sw-border);
   counter-increment: step;
 }
 
@@ -131,9 +131,9 @@
   width: 1.75rem;
   height: 1.75rem;
   place-items: center;
-  border: 1px solid var(--sw-demo-border-strong);
+  border: 1px solid var(--sw-border-strong);
   border-radius: 50%;
-  color: var(--sw-demo-fg-strong);
+  color: var(--sw-fg-strong);
   font-size: 0.85rem;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
@@ -141,26 +141,26 @@
 }
 
 .sw-spreadsheet-steps strong {
-  color: var(--sw-demo-fg-strong);
+  color: var(--sw-fg-strong);
 }
 
 .sw-spreadsheet-steps span {
-  color: var(--sw-demo-muted);
+  color: var(--sw-fg-muted);
   line-height: 1.5;
 }
 
 .sw-spreadsheet-steps .sw-spreadsheet-steps__result {
-  color: var(--sw-demo-accent-strong);
+  color: var(--sw-accent-strong);
 }
 
 .sw-spreadsheet-steps button {
   margin-top: 0.4rem;
   min-height: 2.25rem;
   padding: 0.35rem 0.85rem;
-  border: 1px solid var(--sw-demo-accent);
+  border: 1px solid var(--sw-accent);
   border-radius: 0.4rem;
-  background: color-mix(in srgb, var(--sw-demo-accent) 14%, var(--sw-demo-raised));
-  color: var(--sw-demo-fg-strong);
+  background: color-mix(in srgb, var(--sw-accent) 14%, var(--sw-surface-2));
+  color: var(--sw-fg-strong);
   font: inherit;
   font-size: 0.85rem;
   cursor: pointer;
@@ -172,7 +172,7 @@
 }
 
 .sw-spreadsheet-steps button:focus-visible {
-  outline: 2px solid var(--sw-demo-accent);
+  outline: 2px solid var(--sw-accent);
   outline-offset: 3px;
 }
 
@@ -203,7 +203,7 @@
   gap: 1rem;
   align-items: center;
   padding: 0.5rem 0;
-  border-top: 1px solid var(--sw-demo-border);
+  border-top: 1px solid var(--sw-border);
 }
 
 .sw-spreadsheet-keys dt {
@@ -213,17 +213,17 @@
 
 .sw-spreadsheet-keys dd {
   margin: 0;
-  color: var(--sw-demo-muted);
+  color: var(--sw-fg-muted);
 }
 
 .sw-spreadsheet-keys kbd {
   min-width: 1.75rem;
   padding: 0.15rem 0.45rem;
-  border: 1px solid var(--sw-demo-border-strong);
+  border: 1px solid var(--sw-border-strong);
   border-bottom-width: 2px;
   border-radius: 0.3rem;
-  background: var(--sw-demo-raised);
-  color: var(--sw-demo-fg-strong);
+  background: var(--sw-surface-2);
+  color: var(--sw-fg-strong);
   font: 0.8rem / 1.4 var(--sw-font-body);
   text-align: center;
 }

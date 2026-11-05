@@ -13,96 +13,111 @@
 @source "../../public/llms.txt";
 @source "../../public/llms-full.txt";
 
-/* Colours are mixed in OKLCH (a blue-navy neutral at hue 258, a green accent at
-   hue 163) and written as hex because the canvas grid reads them through
-   computed styles. Dark: a deep navy ground, not near-black; body text about
-   14:1; a vivid accent kept for the primary action, links and focus, never
-   for large fills. Field edges meet 3:1. */
+/*
+ * The site's design tokens. Every page, showcase and component reads these;
+ * no stylesheet sets its own font size, spacing step or colour.
+ *
+ * Theme-independent scales come first (type, spacing, radius, icons, motion,
+ * layout), then the colour roles for the light theme and the dark theme.
+ * Colours are hex because the canvas grid reads them through computed styles.
+ * `test/design-tokens.test.ts` measures every text and icon pair below
+ * against WCAG AA in both themes.
+ */
 :root {
-  color-scheme: light;
-  --sw-accent: #007f53;
-  --sw-accent-strong: #006540;
-  --sw-accent-soft: #d7f7e7;
-  --sw-accent-ink: #f7fefa;
-  --sw-surface-0: #f5f8fc;
-  --sw-surface-1: #fdfeff;
-  --sw-surface-2: #ecf0f6;
-  --sw-surface-3: #e0e5ed;
-  --sw-fg: #202938;
-  --sw-fg-strong: #0c1626;
-  --sw-fg-muted: #525b69;
-  --sw-fg-dim: #5b6471;
-  --sw-border: #d8dde4;
-  --sw-border-strong: #c1c8d2;
-  /* Background grid lines: about 1.2:1 on surface-0, visible but quieter than
-     any content border. */
-  --sw-grid-line: #dfe5ed;
-  --sw-shadow: 0 1.2rem 3rem rgb(15 23 42 / 10%);
+  /* ── Type ─────────────────────────────────────────────────────────────
+     Three families: Space Grotesk for display and headings, Inter for body
+     and interface text, JetBrains Mono for code and eyebrows. Roles, not raw
+     sizes: a stylesheet picks the role that matches the text's job. */
   --sw-font-body: "Inter Variable", Inter, system-ui, sans-serif;
-  --sw-font-display: "Space Grotesk Variable", "Space Grotesk", system-ui, sans-serif;
+  --sw-font-display:
+    "Space Grotesk Variable", "Space Grotesk", system-ui, sans-serif;
   --sw-font-mono: "JetBrains Mono", ui-monospace, monospace;
-  --sw-type-keyword: #6d28d9;
-  --sw-type-name: #0369a1;
-  --sw-type-string: #047857;
-  --sw-type-number: #a34d08;
-  --sw-header-height: 4rem;
-  --sw-sidebar-width: 17.5rem;
-  --sw-content-width: 51rem;
-  /* One page frame for the hub, every showcase and the product bar: content and
-     the brand mark share the same left and right edges at every width. */
-  --sw-page-gutter: clamp(1rem, 4vw, 4rem);
-  --sw-page-max: 92rem;
-  --sw-page-inset: max(var(--sw-page-gutter), (100% - var(--sw-page-max)) / 2);
   --font-sans: var(--sw-font-body);
   --font-display: var(--sw-font-display);
   --font-mono: var(--sw-font-mono);
-  --sw-type-xs: 0.75rem;
-  --sw-type-sm: 0.84rem;
-  --sw-type-base: 1rem;
-  --color-fw-react: #61dafb;
-  --color-fw-vue: #42b883;
-  --color-fw-svelte: #ff5a1f;
-  /* Demo surfaces follow the page theme. Accents are darker in light mode so
-     accent text and white on-accent ink both clear AA contrast on white. */
-  --sw-demo-surface: #fdfeff;
-  --sw-demo-raised: #ecf0f6;
-  --sw-demo-deep: #f5f8fc;
-  --sw-demo-panel: #fdfeff;
-  --sw-demo-border: #d8dde4;
-  --sw-demo-border-strong: #c1c8d2;
-  --sw-demo-fg: #202938;
-  --sw-demo-fg-strong: #0c1626;
-  --sw-demo-fg-soft: #202938;
-  --sw-demo-muted: #525b69;
-  --sw-demo-dim: #5b6471;
-  --sw-demo-dimmer: #5b6471;
-  --sw-demo-ink: #f7fefa;
-  --sw-demo-accent: #007f53;
-  --sw-demo-shadow: 0 1.5rem 4rem rgb(15 23 42 / 10%);
-  --sw-demo-popup-shadow: 0 1rem 2.5rem rgb(15 23 42 / 16%);
-  --sw-demo-accent-strong: #006540;
-  --sw-demo-react-accent: #0e7490;
-  --sw-demo-react-accent-strong: #155e75;
-  --sw-demo-vue-accent: #2f855a;
-  --sw-demo-vue-accent-strong: #276749;
-  --sw-demo-svelte-accent: #c2410c;
-  --sw-demo-svelte-accent-strong: #9a3412;
-  --sw-demo-warn: #b45309;
-  --sw-demo-danger: #be123c;
-  --sw-demo-space-1: 0.25rem;
-  --sw-demo-space-2: 0.5rem;
-  --sw-demo-space-3: 0.75rem;
-  --sw-demo-space-4: 1rem;
-  --sw-demo-radius-1: 0.25rem;
-  --sw-demo-radius-2: 0.5rem;
-  --sw-demo-radius-3: 0.75rem;
-  --sw-demo-transition: 140ms cubic-bezier(0.16, 1, 0.3, 1);
-  --sw-state-resolved: var(--sw-accent);
-  --sw-state-requested: #2563eb;
-  --sw-state-pending: #b45309;
-  --sw-state-error: #b91c1c;
-  --sw-state-cached: var(--sw-fg-dim);
-  --sw-window-radius: 0.85rem;
+
+  /* Landing and showcase hero headline. */
+  --sw-text-display: clamp(2.375rem, 1.55rem + 3.4vw, 4.25rem);
+  /* Page title (h1) and landing section titles. */
+  --sw-text-h1: clamp(1.875rem, 1.45rem + 1.7vw, 2.75rem);
+  /* Section heading (h2). */
+  --sw-text-h2: clamp(1.5rem, 1.32rem + 0.75vw, 1.875rem);
+  /* Subsection heading (h3) and card titles in feature grids. */
+  --sw-text-h3: 1.25rem;
+  /* Minor heading (h4), card titles in dense grids. */
+  --sw-text-h4: 1.0625rem;
+  /* Introductory paragraph under a title. */
+  --sw-text-lead: clamp(1.0625rem, 1rem + 0.3vw, 1.1875rem);
+  /* Running text. */
+  --sw-text-body: 1rem;
+  /* Interface text: navigation, buttons, table cells, card bodies. */
+  --sw-text-small: 0.875rem;
+  /* Captions, metadata, badges and footnotes. */
+  --sw-text-caption: 0.8125rem;
+  /* Uppercase eyebrows and keyboard hints; always mono, always tracked. */
+  --sw-text-eyebrow: 0.75rem;
+  /* Code blocks; inline code is 0.9em of the surrounding text. */
+  --sw-text-code: 0.8125rem;
+  --sw-text-code-inline: 0.9em;
+
+  --sw-leading-display: 1.05;
+  --sw-leading-heading: 1.2;
+  --sw-leading-ui: 1.45;
+  --sw-leading-body: 1.65;
+  --sw-leading-code: 1.7;
+
+  --sw-weight-regular: 400;
+  --sw-weight-medium: 500;
+  --sw-weight-semibold: 600;
+  --sw-weight-bold: 700;
+
+  --sw-tracking-display: -0.025em;
+  --sw-tracking-heading: -0.015em;
+  --sw-tracking-eyebrow: 0.08em;
+
+  /* Line lengths: prose stays near 70 characters, leads a little shorter. */
+  --sw-measure-prose: 70ch;
+  --sw-measure-lead: 60ch;
+
+  /* ── Spacing ──────────────────────────────────────────────────────────
+     A 4 px step. Density rules:
+     - controls and table cells: 1–3 (4–12 px)
+     - inside cards and panels: 4–6 (16–24 px)
+     - between cards in a grid: 4 on phones, 6 from tablets up
+     - between blocks of a section: 8–12; between sections: --sw-space-section */
+  --sw-space-0-5: 0.125rem;
+  --sw-space-1: 0.25rem;
+  --sw-space-1-5: 0.375rem;
+  --sw-space-2: 0.5rem;
+  --sw-space-3: 0.75rem;
+  --sw-space-4: 1rem;
+  --sw-space-5: 1.25rem;
+  --sw-space-6: 1.5rem;
+  --sw-space-8: 2rem;
+  --sw-space-10: 2.5rem;
+  --sw-space-12: 3rem;
+  --sw-space-16: 4rem;
+  --sw-space-20: 5rem;
+  --sw-space-section: clamp(4rem, 2.75rem + 5vw, 7rem);
+
+  /* ── Radius, borders, elevation ─────────────────────────────────────── */
+  --sw-radius-xs: 0.25rem;
+  --sw-radius-sm: 0.375rem;
+  --sw-radius-md: 0.5rem;
+  --sw-radius-lg: 0.75rem;
+  --sw-radius-xl: 1rem;
+  --sw-radius-pill: 999px;
+  --sw-border-width: 1px;
+  --sw-focus-ring-width: 2px;
+
+  /* ── Icons ────────────────────────────────────────────────────────────
+     One set (Lucide), one stroke, three sizes on a 4 px grid. */
+  --sw-icon-sm: 1rem;
+  --sw-icon-md: 1.25rem;
+  --sw-icon-lg: 1.5rem;
+  --sw-icon-stroke: 1.75;
+
+  /* ── Motion ───────────────────────────────────────────────────────── */
   --sw-motion-fast: 120ms;
   --sw-motion-base: 240ms;
   --sw-motion-slow: 480ms;
@@ -110,66 +125,169 @@
   --sw-motion-decelerate: cubic-bezier(0.16, 1, 0.3, 1);
   --sw-motion-accelerate: cubic-bezier(0.4, 0, 1, 1);
   --sw-motion-stagger: 60ms;
-  /* Overlays and masks. The mask colour is alpha only: masks read opacity, not hue. */
-  --sw-mask-opaque: #000;
-  --sw-backdrop: rgb(19 26 35 / 45%);
-  --sw-popover-shadow: 0 1.25rem 3rem rgb(19 26 35 / 18%), 0 2px 8px rgb(19 26 35 / 8%);
-  --sw-field-edge: #79818c;
+
+  /* ── Layout ───────────────────────────────────────────────────────────
+     One page frame for the landing, the hub, every showcase and the product
+     bar: content and the brand mark share the same edges at every width. */
+  --sw-header-height: 4rem;
+  --sw-sidebar-width: 17.5rem;
+  --sw-content-width: 51rem;
+  --sw-page-gutter: clamp(1rem, 4vw, 4rem);
+  --sw-page-max: 92rem;
+  --sw-page-inset: max(var(--sw-page-gutter), (100% - var(--sw-page-max)) / 2);
+  --sw-control-height: 2.25rem;
+  --sw-control-height-lg: 2.75rem;
+
+  /* Framework brand colours, used only for framework marks. */
+  --color-fw-react: #61dafb;
+  --color-fw-vue: #42b883;
+  --color-fw-svelte: #ff5a1f;
 }
 
+/* ── Light theme ──────────────────────────────────────────────────────────
+   A cool blue-grey ground with white cards, near-black navy text and a deep
+   green brand. Text on every surface clears 4.5:1; borders that mark a field
+   clear 3:1. */
+:root {
+  color-scheme: light;
+
+  --sw-surface-0: #f5f7fb;
+  --sw-surface-1: #ffffff;
+  --sw-surface-2: #eef2f8;
+  --sw-surface-3: #e1e7f0;
+  /* A deep navy band for emphasis sections; it keeps dark-theme text tokens. */
+  --sw-surface-inverse: #0c1830;
+  --sw-fg-inverse: #f2f6fb;
+  --sw-fg-inverse-muted: #b4c0d3;
+
+  --sw-fg: #1a2333;
+  --sw-fg-strong: #0a1220;
+  --sw-fg-muted: #4b5567;
+  --sw-border: #d6dde7;
+  --sw-border-strong: #b9c3d1;
+  /* Field and control edges: 3:1 on every surface. */
+  --sw-field-edge: #747e8e;
+  /* Background grid lines: visible, but quieter than any content border. */
+  --sw-grid-line: #e2e7ef;
+
+  /* Brand green. `accent` is text-safe on surfaces 0–3 and carries white
+     ink on fills; `accent-strong` is the hover and pressed step. */
+  --sw-accent: #00744f;
+  --sw-accent-strong: #005a3d;
+  --sw-accent-soft: #d6f5e6;
+  --sw-accent-ink: #ffffff;
+  /* Secondary brand: violet, for highlights that must not read as success. */
+  --sw-violet: #6a32d8;
+  --sw-violet-soft: #ece4ff;
+
+  --sw-info: #1d5fd6;
+  --sw-info-soft: #e1ebff;
+  --sw-success: var(--sw-accent);
+  --sw-success-soft: var(--sw-accent-soft);
+  --sw-warning: #9a4700;
+  --sw-warning-soft: #fdecd2;
+  --sw-danger: #c0182f;
+  --sw-danger-soft: #fde3e6;
+
+  /* Framework accents for framework-specific workbenches; text-safe like `accent`. */
+  --sw-fw-react: #0b6f8a;
+  --sw-fw-react-strong: #08566b;
+  --sw-fw-vue: #1a7048;
+  --sw-fw-vue-strong: #125536;
+  --sw-fw-svelte: #b33d0a;
+  --sw-fw-svelte-strong: #8c2f06;
+
+  --sw-shadow-sm: 0 1px 2px rgb(15 23 42 / 6%), 0 1px 3px rgb(15 23 42 / 8%);
+  --sw-shadow-md:
+    0 0.5rem 1.5rem rgb(15 23 42 / 8%), 0 2px 6px rgb(15 23 42 / 6%);
+  --sw-shadow-lg:
+    0 1.25rem 3rem rgb(15 23 42 / 12%), 0 2px 8px rgb(15 23 42 / 8%);
+  --sw-backdrop: rgb(10 18 32 / 45%);
+  /* Overlays and masks. The mask colour is alpha only: masks read opacity, not hue. */
+  --sw-mask-opaque: #000;
+
+  /* Code: one theme, the same hue for each role in both modes. */
+  --sw-code-bg: #f7f9fc;
+  --sw-code-fg: #1f2a3c;
+  --sw-code-comment: #5c6779;
+  --sw-code-keyword: #8a2bb9;
+  --sw-code-function: #1a5fc8;
+  --sw-code-string: #0d7148;
+  --sw-code-number: #a64300;
+  --sw-code-type: #00728a;
+  --sw-code-property: #b0225a;
+  --sw-code-punctuation: #4b5567;
+  --sw-code-line-highlight: #e3ecff;
+  --sw-code-line-marker: #1d5fd6;
+
+  /* Live demo status colours. */
+  --sw-state-resolved: var(--sw-accent);
+  --sw-state-requested: var(--sw-info);
+  --sw-state-pending: var(--sw-warning);
+  --sw-state-error: var(--sw-danger);
+  --sw-state-cached: var(--sw-fg-muted);
+}
+
+/* ── Dark theme ───────────────────────────────────────────────────────────
+   A deep navy ground (not black), raised navy cards, soft white text near
+   14:1 and a bright mint brand kept for actions, links and focus. */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --sw-accent: #3bd99e;
-  --sw-accent-strong: #80eaba;
-  --sw-accent-soft: #063725;
+
+  --sw-surface-0: #0a101c;
+  --sw-surface-1: #101828;
+  --sw-surface-2: #172235;
+  --sw-surface-3: #202d44;
+  --sw-surface-inverse: #17284a;
+  --sw-fg-inverse: #f2f6fb;
+  --sw-fg-inverse-muted: #b4c0d3;
+
+  --sw-fg: #d9e1ec;
+  --sw-fg-strong: #f4f7fb;
+  --sw-fg-muted: #a2adbf;
+  --sw-border: #26324a;
+  --sw-border-strong: #3a4862;
+  --sw-field-edge: #6f7d95;
+  --sw-grid-line: #151f31;
+
+  --sw-accent: #3edc9b;
+  --sw-accent-strong: #7eeabd;
+  --sw-accent-soft: #0b3a2a;
   --sw-accent-ink: #03190f;
-  --sw-surface-0: #0a111b;
-  --sw-surface-1: #101723;
-  --sw-surface-2: #17202d;
-  --sw-surface-3: #212b39;
-  --sw-fg: #dae0e9;
-  --sw-fg-strong: #f0f4f9;
-  --sw-fg-muted: #a9b2bf;
-  --sw-fg-dim: #9aa4b2;
-  --sw-border: #273140;
-  --sw-border-strong: #394455;
-  --sw-grid-line: #1a2331;
-  --sw-shadow: 0 1.5rem 4rem rgb(0 0 0 / 40%);
-  --sw-type-keyword: #c4b5fd;
-  --sw-type-name: #7dd3fc;
-  --sw-type-string: #6ee7b7;
-  --sw-type-number: #fbbf24;
-  --sw-state-requested: #60a5fa;
-  --sw-state-pending: #fbbf24;
-  --sw-state-error: #fb7185;
-  --sw-demo-surface: #101723;
-  --sw-demo-raised: #17202d;
-  --sw-demo-deep: #0a111b;
-  --sw-demo-panel: #101723;
-  --sw-demo-border: #273140;
-  --sw-demo-border-strong: #394455;
-  --sw-demo-fg: #dae0e9;
-  --sw-demo-fg-strong: #f0f4f9;
-  --sw-demo-fg-soft: #dae0e9;
-  --sw-demo-muted: #a9b2bf;
-  --sw-demo-dim: #9aa4b2;
-  --sw-demo-dimmer: #9aa4b2;
-  --sw-demo-ink: #03190f;
-  --sw-demo-accent: #3bd99e;
-  --sw-demo-shadow: 0 2rem 6rem rgb(0 0 0 / 32%);
-  --sw-demo-popup-shadow: 0 1rem 2.5rem rgb(0 0 0 / 45%);
-  --sw-demo-accent-strong: #80eaba;
-  --sw-demo-react-accent: #58c4dc;
-  --sw-demo-react-accent-strong: #8bd8e8;
-  --sw-demo-vue-accent: #42b883;
-  --sw-demo-vue-accent-strong: #75d0aa;
-  --sw-demo-svelte-accent: #e7653d;
-  --sw-demo-svelte-accent-strong: #ff8a68;
-  --sw-demo-warn: #fbbf24;
-  --sw-demo-danger: #fb7185;
-  --sw-backdrop: rgb(10 12 16 / 62%);
-  --sw-popover-shadow: 0 1.5rem 3.5rem rgb(5 7 10 / 50%), 0 2px 8px rgb(5 7 10 / 35%);
-  --sw-field-edge: #6a7586;
+  --sw-violet: #b69cff;
+  --sw-violet-soft: #2a1f4d;
+
+  --sw-info: #6aa5ff;
+  --sw-info-soft: #13274a;
+  --sw-warning: #f5b544;
+  --sw-warning-soft: #3a2a0c;
+  --sw-danger: #ff7a8a;
+  --sw-danger-soft: #45161f;
+
+  --sw-fw-react: #58c4dc;
+  --sw-fw-react-strong: #8bd8e8;
+  --sw-fw-vue: #42b883;
+  --sw-fw-vue-strong: #75d0aa;
+  --sw-fw-svelte: #ff7a4d;
+  --sw-fw-svelte-strong: #ffa07f;
+
+  --sw-shadow-sm: 0 1px 2px rgb(0 0 0 / 30%);
+  --sw-shadow-md: 0 0.5rem 1.5rem rgb(0 0 0 / 35%), 0 2px 6px rgb(0 0 0 / 25%);
+  --sw-shadow-lg: 0 1.5rem 3.5rem rgb(0 0 0 / 50%), 0 2px 8px rgb(0 0 0 / 35%);
+  --sw-backdrop: rgb(4 8 16 / 62%);
+
+  --sw-code-bg: #0d1524;
+  --sw-code-fg: #d9e1ec;
+  --sw-code-comment: #8a96aa;
+  --sw-code-keyword: #d49bff;
+  --sw-code-function: #7cb4ff;
+  --sw-code-string: #6fe0a8;
+  --sw-code-number: #ffb370;
+  --sw-code-type: #5fd4e8;
+  --sw-code-property: #ff8fb8;
+  --sw-code-punctuation: #a2adbf;
+  --sw-code-line-highlight: #16284a;
+  --sw-code-line-marker: #6aa5ff;
 }
 
 @media (prefers-reduced-motion: reduce) {

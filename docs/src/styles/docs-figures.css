@@ -65,7 +65,7 @@
 .sw-prose .sw-grid-result__sheet thead th,
 .sw-prose .sw-grid-result__sheet tbody th {
   background: var(--sw-surface-2);
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   font: 600 0.7rem / 1.4 var(--sw-font-mono);
   text-align: center;
 }
@@ -93,7 +93,8 @@
 }
 .sw-prose .sw-grid-result__sheet tr.sw-grid-result__edge > :last-child {
   mask-image:
-    linear-gradient(to right, #000, transparent), linear-gradient(to bottom, #000, transparent);
+    linear-gradient(to right, #000, transparent),
+    linear-gradient(to bottom, #000, transparent);
   mask-composite: intersect;
 }
 .sw-prose .sw-grid-result__row-id {
@@ -241,7 +242,8 @@
   border: 1px solid var(--sw-border);
   border-radius: 0.45rem;
   background: var(--sw-surface-2);
-  box-shadow: 0 6px 18px color-mix(in srgb, var(--sw-fg-strong) 12%, transparent);
+  box-shadow: 0 6px 18px
+    color-mix(in srgb, var(--sw-fg-strong) 12%, transparent);
 }
 .sw-mini-search > div {
   display: flex;
@@ -263,7 +265,7 @@
   color: var(--sw-fg-strong);
 }
 .sw-mini-search > div:last-child > span:first-child {
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
 }
 /* The match count is a label, not a control. */
 .sw-mini-search > div:first-child > span:nth-child(2) {
@@ -281,7 +283,8 @@
   border: 1px solid var(--sw-border);
   border-radius: 0.35rem;
   background: var(--sw-surface-2);
-  box-shadow: 0 6px 18px color-mix(in srgb, var(--sw-fg-strong) 12%, transparent);
+  box-shadow: 0 6px 18px
+    color-mix(in srgb, var(--sw-fg-strong) 12%, transparent);
   font-size: 0.82rem;
 }
 /* Under a result sheet the menu opens from the clicked cell, past the row numbers. */
@@ -344,7 +347,7 @@
   text-align: center;
 }
 .sw-chrome-result [aria-disabled="true"] {
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   opacity: 0.65;
 }
 .sw-mini-search mark {

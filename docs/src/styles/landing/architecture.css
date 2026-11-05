@@ -35,11 +35,13 @@
   stroke: var(--sw-accent);
   stroke-width: 2;
   opacity: 0;
-  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--sw-accent) 55%, transparent));
+  filter: drop-shadow(
+    0 0 10px color-mix(in srgb, var(--sw-accent) 55%, transparent)
+  );
 }
 
 .as .as-owner {
-  fill: var(--sw-fg-dim);
+  fill: var(--sw-fg-muted);
   font: 650 11px var(--sw-font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -82,7 +84,7 @@
 }
 
 .as .as-caption {
-  fill: var(--sw-fg-dim);
+  fill: var(--sw-fg-muted);
   font: 600 11px var(--sw-font-mono);
 }
 
@@ -118,7 +120,7 @@
 }
 
 .as .as-lanes text {
-  fill: var(--sw-fg-dim);
+  fill: var(--sw-fg-muted);
   font: 600 11px var(--sw-font-mono);
   text-anchor: middle;
 }
@@ -159,7 +161,9 @@
 
 .as-packet rect {
   fill: var(--sw-accent-strong);
-  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--sw-accent) 60%, transparent));
+  filter: drop-shadow(
+    0 0 8px color-mix(in srgb, var(--sw-accent) 60%, transparent)
+  );
 }
 
 .as .as-packet text {
@@ -189,8 +193,8 @@
 .sw-arch__steps li {
   position: relative;
   min-width: 0;
-  color: var(--sw-fg-dim);
-  font-size: var(--sw-type-sm);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
   line-height: 1.5;
   transition: color 0.3s ease;
 }
@@ -206,8 +210,8 @@
 .sw-arch__steps li span {
   display: block;
   margin-bottom: 0.35rem;
-  color: var(--sw-fg-dim);
-  font: 650 var(--sw-type-xs) / 1 var(--sw-font-mono);
+  color: var(--sw-fg-muted);
+  font: 650 var(--sw-text-caption) / 1 var(--sw-font-mono);
 }
 
 .sw-arch__steps li::before {

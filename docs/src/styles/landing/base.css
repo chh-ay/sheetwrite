@@ -31,7 +31,7 @@
 .sw-lp-eyebrow {
   margin: 0 0 1rem;
   color: var(--sw-accent-strong);
-  font: 650 var(--sw-type-xs) / 1.4 var(--sw-font-mono);
+  font: 650 var(--sw-text-caption) / 1.4 var(--sw-font-mono);
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -54,12 +54,16 @@
   font: 650 0.95rem / 1 var(--sw-font-body);
   text-decoration: none;
   transition:
-    background var(--sw-demo-transition),
-    border-color var(--sw-demo-transition);
+    background var(--sw-motion-fast) var(--sw-motion-decelerate),
+    border-color var(--sw-motion-fast) var(--sw-motion-decelerate);
 }
 
 .sw-lp-button:hover {
-  background: color-mix(in srgb, var(--sw-accent-strong) 86%, var(--sw-fg-strong));
+  background: color-mix(
+    in srgb,
+    var(--sw-accent-strong) 86%,
+    var(--sw-fg-strong)
+  );
 }
 
 .sw-lp-button--ghost {

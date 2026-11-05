@@ -96,8 +96,8 @@
   white-space: nowrap;
 }
 .sw-formula-build[data-build="full"] {
-  background: color-mix(in srgb, var(--sw-type-keyword) 10%, transparent);
-  color: var(--sw-type-keyword);
+  background: color-mix(in srgb, var(--sw-code-keyword) 10%, transparent);
+  color: var(--sw-code-keyword);
 }
 
 .sw-prose .sw-memory-comparison {
@@ -143,7 +143,7 @@
   display: block;
   height: 0.65rem;
   border-radius: 0 0.15rem 0.15rem 0;
-  background: var(--sw-fg-dim);
+  background: var(--sw-fg-muted);
 }
 .sw-prose .sw-memory-comparison__case [data-after] i {
   background: var(--sw-accent);
@@ -226,7 +226,7 @@
   color: var(--sw-accent);
 }
 .sw-prose .sw-command-states__error {
-  color: var(--sw-type-number);
+  color: var(--sw-code-number);
 }
 .sw-prose .sw-command-states p {
   margin: 0;

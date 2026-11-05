@@ -52,7 +52,7 @@
   border-radius: 0.5rem;
   background: transparent;
   color: var(--sw-fg-muted);
-  font: 600 var(--sw-type-sm) / 1 var(--sw-font-body);
+  font: 600 var(--sw-text-small) / 1 var(--sw-font-body);
   cursor: pointer;
 }
 
@@ -118,15 +118,15 @@
 .sw-lp-result thead th {
   background: var(--sw-surface-2);
   color: var(--sw-fg-strong);
-  font: 650 var(--sw-type-sm) / 1.2 var(--sw-font-body);
+  font: 650 var(--sw-text-small) / 1.2 var(--sw-font-body);
 }
 
 .sw-lp-result th:first-child {
   width: 2.5rem;
   border-right: 1px solid var(--sw-border);
   background: var(--sw-surface-2);
-  color: var(--sw-fg-dim);
-  font: 600 var(--sw-type-xs) / 1.2 var(--sw-font-mono);
+  color: var(--sw-fg-muted);
+  font: 600 var(--sw-text-caption) / 1.2 var(--sw-font-mono);
   text-align: center;
 }
 
@@ -142,7 +142,7 @@
 .sw-lp-result figcaption {
   margin-top: 0.75rem;
   color: var(--sw-fg-muted);
-  font-size: var(--sw-type-sm);
+  font-size: var(--sw-text-small);
   line-height: 1.55;
 }
 
@@ -171,7 +171,7 @@
 
 .sw-lp-engines__choices article > span {
   color: var(--sw-accent-strong);
-  font: 650 var(--sw-type-xs) / 1 var(--sw-font-mono);
+  font: 650 var(--sw-text-caption) / 1 var(--sw-font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -195,12 +195,12 @@
   border-radius: 0.45rem;
   background: var(--sw-surface-0);
   color: var(--sw-fg);
-  font-size: var(--sw-type-sm);
+  font-size: var(--sw-text-small);
 }
 
 .sw-lp-engines__choices .sw-lp-engines__size {
   color: var(--sw-fg-muted);
-  font-size: var(--sw-type-sm);
+  font-size: var(--sw-text-small);
 }
 
 .sw-lp-engines__size b {
@@ -227,7 +227,7 @@
 .sw-lp-new h3 {
   margin: 0;
   color: var(--sw-accent-strong);
-  font: 650 var(--sw-type-xs) / 1.4 var(--sw-font-mono);
+  font: 650 var(--sw-text-caption) / 1.4 var(--sw-font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -246,7 +246,7 @@
   position: relative;
   padding-left: 1.1rem;
   color: var(--sw-fg);
-  font-size: var(--sw-type-sm);
+  font-size: var(--sw-text-small);
   line-height: 1.5;
 }
 

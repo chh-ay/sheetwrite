@@ -59,13 +59,13 @@
   .sw-capability-hero__facts dt {
     margin: 0;
     color: var(--sw-fg-muted);
-    font-size: var(--sw-type-sm);
+    font-size: var(--sw-text-small);
   }
 
   .sw-capability-hero__facts dd {
     margin: 0;
     color: var(--sw-fg-strong);
-    font-size: var(--sw-type-sm);
+    font-size: var(--sw-text-small);
     font-weight: 650;
     text-align: right;
     overflow-wrap: anywhere;

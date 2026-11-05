@@ -20,13 +20,13 @@
 }
 .sw-prose .sw-upgrade__step[data-impact="api"],
 .sw-prose .sw-upgrade__step[data-impact="breaking"] {
-  --step-hue: var(--sw-type-number);
+  --step-hue: var(--sw-code-number);
 }
 .sw-prose .sw-upgrade__step[data-impact="behavior"] {
-  --step-hue: var(--sw-type-name);
+  --step-hue: var(--sw-code-function);
 }
 .sw-prose .sw-upgrade__step[data-impact="optional"] {
-  --step-hue: var(--sw-fg-dim);
+  --step-hue: var(--sw-fg-muted);
 }
 .sw-prose .sw-upgrade__step::before {
   content: counter(upgrade-step);
@@ -110,7 +110,7 @@
 }
 .sw-prose .sw-upgrade__compare span {
   width: 3.5rem;
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   font: 600 0.7rem / 1.6 var(--sw-font-mono);
   text-transform: uppercase;
 }

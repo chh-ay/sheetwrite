@@ -1,17 +1,16 @@
 /* DemoSelect styles. Showcases and documentation pages (the formula reference
    engine filter) both use the control, so every route loads this file. The
-   popup renders in a portal outside the page frame, so it reads the global
-   --sw-demo-* tokens. The trigger prefers the showcase frame's --demo-* tokens
-   and falls back to the global ones on documentation pages. */
+   popup renders in a portal outside the page frame, so it reads only the
+   global site tokens. */
 @layer components {
   .sw-demo-select {
     min-width: 0;
   }
 
   .sw-demo-select__label {
-    color: var(--demo-muted, var(--sw-demo-muted));
+    color: var(--sw-fg-muted);
     cursor: default;
-    font-size: var(--sw-type-xs);
+    font-size: var(--sw-text-caption);
     font-weight: 600;
   }
 
@@ -23,29 +22,29 @@
     align-items: center;
     justify-content: space-between;
     padding: 0.42rem 0.55rem;
-    border: 1px solid var(--demo-border, var(--sw-demo-border));
+    border: 1px solid var(--sw-border);
     border-radius: 0.35rem;
     outline: 0;
-    background: var(--demo-surface, var(--sw-demo-surface));
-    color: var(--demo-fg, var(--sw-demo-fg));
-    font: 550 var(--sw-type-sm) var(--font-sans);
+    background: var(--sw-surface-1);
+    color: var(--sw-fg);
+    font: 550 var(--sw-text-small) var(--font-sans);
     cursor: pointer;
   }
 
   .sw-demo-select__trigger:hover,
   .sw-demo-select__trigger[data-popup-open],
   .sw-demo-select__trigger:focus-visible {
-    border-color: var(--demo-accent, var(--sw-demo-accent));
+    border-color: var(--demo-accent, var(--sw-accent));
   }
 
   .sw-demo-select__trigger:focus-visible {
     box-shadow: inset 0 0 0 2px
-      color-mix(in srgb, var(--demo-accent, var(--sw-demo-accent)) 32%, transparent);
+      color-mix(in srgb, var(--demo-accent, var(--sw-accent)) 32%, transparent);
   }
 
   .sw-demo-select__icon {
     display: flex;
-    color: var(--demo-muted, var(--sw-demo-muted));
+    color: var(--sw-fg-muted);
     transition: transform 120ms ease;
   }
 
@@ -61,12 +60,12 @@
   .sw-demo-select__popup {
     min-width: var(--anchor-width);
     overflow: hidden;
-    border: 1px solid var(--sw-demo-border-strong);
+    border: 1px solid var(--sw-border-strong);
     border-radius: 0.5rem;
     outline: 0;
-    background: var(--sw-demo-raised);
-    color: var(--sw-demo-fg);
-    box-shadow: var(--sw-demo-popup-shadow);
+    background: var(--sw-surface-2);
+    color: var(--sw-fg);
+    box-shadow: var(--sw-shadow-lg);
     transform-origin: var(--transform-origin);
     transition:
       opacity 100ms ease,
@@ -94,25 +93,25 @@
     padding: 0.4rem 0.6rem;
     border-radius: 0.35rem;
     outline: 0;
-    color: var(--sw-demo-fg-soft);
-    font: 550 var(--sw-type-sm) var(--font-sans);
+    color: var(--sw-fg);
+    font: 550 var(--sw-text-small) var(--font-sans);
     cursor: default;
   }
 
   /* Pointer and keyboard focus: a quiet wash, no ring. */
   .sw-demo-select__item[data-highlighted] {
-    background: color-mix(in srgb, var(--sw-demo-fg) 8%, var(--sw-demo-raised));
-    color: var(--sw-demo-fg-strong);
+    background: color-mix(in srgb, var(--sw-fg) 8%, var(--sw-surface-2));
+    color: var(--sw-fg-strong);
   }
 
   /* The current value: the check mark and a heavier weight carry it. */
   .sw-demo-select__item[data-selected] {
-    color: var(--sw-demo-fg-strong);
+    color: var(--sw-fg-strong);
     font-weight: 650;
   }
 
   .sw-demo-select__indicator {
     display: flex;
-    color: var(--sw-demo-accent);
+    color: var(--sw-accent);
   }
 }
