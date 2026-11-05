@@ -44,6 +44,8 @@ pub(crate) struct DepIndex {
     /// replaced entry, so queueing a change copies no read set.
     pending: Vec<(FormulaId, ReadSet)>,
     /// The ids in `pending`, so only the first change of a formula is kept.
+    /// Its cleared words stay allocated, so each small edit does not allocate
+    /// and zero one bit per formula again.
     pending_ids: FormulaBits,
     /// Per-group scratch reused by every walk over range groups.
     group_marks: RefCell<GroupMarks>,
@@ -105,6 +107,85 @@ impl ExactBand {
     fn edges(&self) -> impl Iterator<Item = (u32, &[FormulaId])> + '_ {
         (0..self.sources.len()).map(|source| (self.sources[source].0, self.readers_at(source)))
     }
+
+    /// Drops every `reader` edge of source `row` in place.
+    fn remove_edge(&mut self, row: u32, reader: FormulaId) {
+        let Ok(source) = self.sources.binary_search_by_key(&row, |&(row, _)| row) else {
+            return;
+        };
+        let start = source
+            .checked_sub(1)
+            .map_or(0, |previous| self.sources[previous].1);
+        let removed = remove_reader(&mut self.readers, start, self.sources[source].1, reader);
+        if removed == 0 {
+            return;
+        }
+
+        for (_, end) in &mut self.sources[source..] {
+            *end -= removed;
+        }
+        if self.sources[source].1 == start {
+            self.sources.remove(source);
+        }
+        trim_spare(&mut self.sources);
+        trim_spare(&mut self.readers);
+    }
+
+    /// Adds one `reader` edge to source `row` in place.
+    fn add_edge(&mut self, row: u32, reader: FormulaId) {
+        let source = match self.sources.binary_search_by_key(&row, |&(row, _)| row) {
+            Ok(source) => source,
+            Err(source) => {
+                let start = source
+                    .checked_sub(1)
+                    .map_or(0, |previous| self.sources[previous].1);
+                reserve_one(&mut self.sources);
+                self.sources.insert(source, (row, start));
+                source
+            }
+        };
+        reserve_one(&mut self.readers);
+        self.readers.insert(self.sources[source].1 as usize, reader);
+        for (_, end) in &mut self.sources[source..] {
+            *end += 1;
+        }
+    }
+}
+
+/// Patches of at most this many edges per band or per range batch edit the
+/// flat arrays in place; larger ones rebuild what they touch once.
+const IN_PLACE_EDGES: usize = 16;
+
+/// In-place edits keep at most `len / SPARE_DIVISOR + SPARE_FLOOR` unused
+/// capacity, so a band or group array never doubles for one edit.
+const SPARE_DIVISOR: usize = 64;
+const SPARE_FLOOR: usize = 8;
+
+fn reserve_one<T>(items: &mut Vec<T>) {
+    if items.len() == items.capacity() {
+        items.reserve_exact(items.len() / SPARE_DIVISOR + 1);
+    }
+}
+
+fn trim_spare<T>(items: &mut Vec<T>) {
+    let keep = items.len() + items.len() / SPARE_DIVISOR;
+    if items.capacity() > keep + SPARE_FLOOR {
+        items.shrink_to(keep);
+    }
+}
+
+/// Removes every `reader` in `readers[start..end]` and returns how many.
+fn remove_reader(readers: &mut Vec<FormulaId>, start: u32, end: u32, reader: FormulaId) -> u32 {
+    let (start, end) = (start as usize, end as usize);
+    let mut write = start;
+    for read in start..end {
+        if readers[read] != reader {
+            readers[write] = readers[read];
+            write += 1;
+        }
+    }
+    readers.drain(write..end);
+    (end - write) as u32
 }
 
 struct RangeGroup {
@@ -318,7 +399,6 @@ impl DepIndex {
             exact_changes.extend(entry.reads.cells.iter().map(|&cell| (cell, *formula, true)));
             range_additions.extend(entry.reads.ranges.iter().map(|&range| (range, *formula)));
         }
-        self.pending_ids.release_if_empty();
 
         self.patch_exact(&mut exact_changes);
         self.patch_ranges(&mut range_removals, &mut range_additions);
@@ -356,6 +436,27 @@ impl DepIndex {
             };
             let bands = &mut self.exact[column].bands;
             let position = bands.binary_search_by_key(&band, |band| band.band);
+            if let (Ok(position), true) = (position, run.len() <= IN_PLACE_EDGES) {
+                let stored = &mut bands[position];
+                self.exact_sources -= stored.sources.len();
+
+                // The removals of a run sort before its additions.
+                for &(cell, reader, added) in run {
+                    if added {
+                        stored.add_edge(cell.row, reader);
+                    } else {
+                        stored.remove_edge(cell.row, reader);
+                    }
+                }
+                self.exact_sources += stored.sources.len();
+                if stored.readers.is_empty() {
+                    bands.remove(position);
+                }
+                if bands.is_empty() {
+                    self.exact.remove(column);
+                }
+                continue;
+            }
 
             // The removals of a run sort before its additions.
             let removed = |row: u32, reader: FormulaId| {
@@ -418,6 +519,24 @@ impl DepIndex {
         }
         removals.sort_unstable();
         additions.sort_unstable();
+        if removals.len() + additions.len() <= IN_PLACE_EDGES {
+            let mut regrouped = false;
+            for &(range, reader) in removals.iter() {
+                regrouped |= self.remove_range_reader(range, reader);
+            }
+            for &(range, reader) in additions.iter() {
+                regrouped |= self.add_range_reader(range, reader);
+            }
+            if regrouped {
+                for sheet in &mut self.range_sheets {
+                    accumulate_max_end(&mut sheet.row_intervals);
+                    accumulate_max_end(&mut sheet.col_intervals);
+                }
+            }
+            trim_spare(&mut self.range_groups);
+            trim_spare(&mut self.range_readers);
+            return;
+        }
 
         let previous = std::mem::take(&mut self.range_groups);
         let previous_readers = std::mem::take(&mut self.range_readers);
@@ -519,6 +638,109 @@ impl DepIndex {
             accumulate_max_end(&mut sheet.row_intervals);
             accumulate_max_end(&mut sheet.col_intervals);
         }
+    }
+
+    /// Drops every `reader` edge of `range` in place, and the group when it
+    /// loses its last reader. Returns whether a group was dropped.
+    fn remove_range_reader(&mut self, range: CellRange, reader: FormulaId) -> bool {
+        let Ok(group) = self.find_range_group(range) else {
+            return false;
+        };
+        let start = group
+            .checked_sub(1)
+            .map_or(0, |previous| self.range_groups[previous].end);
+        let removed = remove_reader(
+            &mut self.range_readers,
+            start,
+            self.range_groups[group].end,
+            reader,
+        );
+        if removed == 0 {
+            return false;
+        }
+
+        for later in &mut self.range_groups[group..] {
+            later.end -= removed;
+        }
+        if self.range_groups[group].end != start {
+            return false;
+        }
+
+        // Group ids are positions: drop this group's intervals and renumber
+        // the later ones, which keeps every interval list sorted.
+        self.range_groups.remove(group);
+        for sheet in &mut self.range_sheets {
+            for intervals in [&mut sheet.row_intervals, &mut sheet.col_intervals] {
+                intervals.retain_mut(|interval| {
+                    if interval.group == group {
+                        return false;
+                    }
+                    if interval.group > group {
+                        interval.group -= 1;
+                    }
+                    true
+                });
+            }
+        }
+        true
+    }
+
+    /// Adds one `reader` edge to `range` in place, with a new group when no
+    /// group covers the range. Returns whether a group was added.
+    fn add_range_reader(&mut self, range: CellRange, reader: FormulaId) -> bool {
+        let group = match self.find_range_group(range) {
+            Ok(group) => {
+                reserve_one(&mut self.range_readers);
+                self.range_readers
+                    .insert(self.range_groups[group].end as usize, reader);
+                for later in &mut self.range_groups[group..] {
+                    later.end += 1;
+                }
+                return false;
+            }
+            Err(group) => group,
+        };
+
+        let start = group
+            .checked_sub(1)
+            .map_or(0, |previous| self.range_groups[previous].end);
+        reserve_one(&mut self.range_readers);
+        self.range_readers.insert(start as usize, reader);
+        reserve_one(&mut self.range_groups);
+        self.range_groups.insert(
+            group,
+            RangeGroup {
+                range,
+                end: start + 1,
+            },
+        );
+        for later in &mut self.range_groups[group + 1..] {
+            later.end += 1;
+        }
+
+        for sheet in &mut self.range_sheets {
+            for intervals in [&mut sheet.row_intervals, &mut sheet.col_intervals] {
+                for interval in intervals
+                    .iter_mut()
+                    .filter(|interval| interval.group >= group)
+                {
+                    interval.group += 1;
+                }
+            }
+        }
+        if let Some(sheet) = self.range_sheets.get_mut(range.sheet as usize) {
+            reserve_one(&mut sheet.row_intervals);
+            reserve_one(&mut sheet.col_intervals);
+            merge_intervals(
+                &mut sheet.row_intervals,
+                vec![RangeInterval::new(range.row_start, range.row_end, group)],
+            );
+            merge_intervals(
+                &mut sheet.col_intervals,
+                vec![RangeInterval::new(range.col_start, range.col_end, group)],
+            );
+        }
+        true
     }
 
     /// Whether rewriting one formula entry leaves every field
@@ -784,6 +1006,9 @@ impl GroupMarks {
     }
 }
 
+/// A walk that reached at most this many groups keeps its cleared member list.
+const RETAINED_GROUP_MEMBERS: usize = 64;
+
 /// Runs `walk` with the index's group marks, reset for its groups. A nested
 /// use gets its own marks instead of failing.
 fn with_group_marks<R>(index: &DepIndex, walk: impl FnOnce(&mut GroupMarks) -> R) -> R {
@@ -796,8 +1021,11 @@ fn with_group_marks<R>(index: &DepIndex, walk: impl FnOnce(&mut GroupMarks) -> R
     marks.reset(index.range_groups.len());
     let result = walk(marks);
 
-    // Group state belongs to one walk; only the slot array is reused.
-    marks.members = Vec::new();
+    // Group state belongs to one walk; a wide walk must not pin its members.
+    marks.members.clear();
+    if marks.members.capacity() > RETAINED_GROUP_MEMBERS {
+        marks.members = Vec::new();
+    }
     result
 }
 
