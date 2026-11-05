@@ -15,6 +15,7 @@ import {
   MAX_CONDITIONAL_FORMAT_FORMULA_LENGTH,
   MAX_CONDITIONAL_FORMAT_RULES,
 } from "./conditional-format.js";
+import { validateDataModelShape, validateRelationshipShape } from "./data-model.js";
 import { boundedJsonByteLength, JsonByteLengthError, SheetwriteError } from "./errors.js";
 import {
   cloneCellHyperlink,
@@ -2640,6 +2641,18 @@ export function validateDocumentOperationShape(
       validateCalculationShape(ownValue(operation, "calculation"), `${path}.calculation`, errors);
       break;
 
+    case "setRelationship":
+      validateRelationshipShape(
+        ownValue(operation, "relationship"),
+        `${path}.relationship`,
+        errors,
+      );
+      break;
+
+    case "removeRelationship":
+      requireString(operation, "id", path, errors, true);
+      break;
+
     case "setChart":
       validateOperationSheetId(operation, path, errors);
       validateChartShape(ownValue(operation, "chart"), `${path}.chart`, errors);
@@ -3162,6 +3175,11 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
     const calculation = ownValue(workbook, "calculation");
     if (calculation !== undefined) {
       validateCalculationShape(calculation, "workbook.calculation", errors);
+    }
+
+    const dataModel = ownValue(workbook, "dataModel");
+    if (dataModel !== undefined) {
+      validateDataModelShape(dataModel, "workbook.dataModel", errors);
     }
   }
 
@@ -3749,6 +3767,12 @@ export function documentOpTarget(operation: DocumentOp): string {
 
     case "setCalculation":
       return "calculation";
+
+    case "setRelationship":
+      return `relationship:${operation.relationship.id}`;
+
+    case "removeRelationship":
+      return `relationship:${operation.id}`;
 
     default: {
       const exhaustive: never = operation;
