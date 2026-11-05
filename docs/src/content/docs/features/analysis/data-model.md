@@ -91,3 +91,16 @@ Removing a table or a column keeps the relationships that refer to it, and undo 
 | `getRelationships()` | Copies of the saved relationships |
 | `setRelationship(relationship)` | Inserts it, or replaces the one with its ID |
 | `removeRelationship(id)` | Removes it |
+| `getRelationshipStatus(id)` | Whether the keys resolve, checked from the current cells |
+
+## Key checks
+
+The full engine checks the key values each time `getRelationshipStatus` is called. Keys match as pivot group keys do: numbers by value, and text without case. A blank key matches nothing.
+
+| Status | Meaning |
+| --- | --- |
+| `ok` | Every non-blank one-side key is unique. `unmatched` counts the non-blank many-side keys that no one-side row holds. |
+| `missingTable`, `missingColumn` | A table or a column was removed. |
+| `typeMismatch` | The key at `row` on side `from` or `to` is a boolean, an error on the one side, or a number among text keys (or text among numbers). |
+| `duplicateKey` | Two one-side rows hold equal keys. `rows` are their data-row offsets. |
+| `unavailable` | The default engine checks no keys, or no relationship has this ID. |

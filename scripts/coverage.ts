@@ -26,6 +26,7 @@ const TYPESCRIPT_ROOTS = [
   "packages/svelte/src",
   "packages/xlsx/src",
   "packages/charts/src",
+  "packages/queries/src",
 ] as const;
 const TYPESCRIPT_EXTENSIONS = new Set([".ts", ".tsx", ".svelte"]);
 const TYPESCRIPT_TEST_ROOTS = [
@@ -35,6 +36,19 @@ const TYPESCRIPT_TEST_ROOTS = [
   "packages/svelte/test",
   "packages/xlsx/test",
   "packages/charts/test",
+  "packages/queries/test",
+] as const;
+const RUST_CRATES = [
+  {
+    name: "wasm",
+    directory: "packages/wasm",
+    testArguments: ["--features", "analysis"],
+  },
+  {
+    name: "queries",
+    directory: "packages/queries/engine",
+    testArguments: [],
+  },
 ] as const;
 
 async function filesRecursively(root: string): Promise<string[]> {
@@ -54,7 +68,12 @@ export async function discoverRuntimePaths(
   if (language === "rust") {
     // `tests.rs` and `*_tests.rs` hold only #[cfg(test)] modules. cargo-llvm-cov
     // leaves such files out of its report, so they are not runtime sources.
-    return (await filesRecursively(resolve(root, "packages/wasm/src")))
+    const paths: string[] = [];
+    for (const crate of RUST_CRATES) {
+      paths.push(...(await filesRecursively(resolve(root, crate.directory, "src"))));
+    }
+
+    return paths
       .filter((path) => extname(path) === ".rs" && !/(?:\/|_)tests\.rs$/u.test(path))
       .map((path) => path.slice(resolve(root).length + 1).replaceAll("\\", "/"))
       .sort();
@@ -250,45 +269,53 @@ export async function runRustCoverage(root = resolve(import.meta.dir, "..")): Pr
     throw new Error(`Expected rustc ${RUST_VERSION}, received ${rustVersion || "no version"}`);
   }
 
-  const common = ["--manifest-path", "packages/wasm/Cargo.toml"] as const;
   const repositorySources = ["--ignore-filename-regex", String.raw`\.cargo|\.rustup`] as const;
-  // The full engine builds every source file; no code is compiled only without it.
-  await run(["cargo", "llvm-cov", ...common, "--features", "analysis", "--no-report"], root);
-  await run(
-    [
-      "cargo",
-      "llvm-cov",
-      "report",
-      ...common,
-      ...repositorySources,
-      "--lcov",
-      "--output-path",
-      `${rawRoot}/lcov.info`,
-    ],
-    root,
-  );
-  await run(
-    [
-      "cargo",
-      "llvm-cov",
-      "report",
-      ...common,
-      ...repositorySources,
-      "--json",
-      "--output-path",
-      `${rawRoot}/raw.json`,
-    ],
-    root,
-  );
+  const normalized: CoverageRecord[] = [];
+
+  for (const crate of RUST_CRATES) {
+    const common = ["--manifest-path", `${crate.directory}/Cargo.toml`] as const;
+    const crateRawRoot = `${rawRoot}/${crate.name}`;
+    await mkdir(resolve(root, crateRawRoot), { recursive: true });
+
+    // Each independent crate owns its instrumented target and raw reports.
+    await run(["cargo", "llvm-cov", ...common, ...crate.testArguments, "--no-report"], root);
+    await run(
+      [
+        "cargo",
+        "llvm-cov",
+        "report",
+        ...common,
+        ...repositorySources,
+        "--lcov",
+        "--output-path",
+        `${crateRawRoot}/lcov.info`,
+      ],
+      root,
+    );
+    await run(
+      [
+        "cargo",
+        "llvm-cov",
+        "report",
+        ...common,
+        ...repositorySources,
+        "--json",
+        "--output-path",
+        `${crateRawRoot}/raw.json`,
+      ],
+      root,
+    );
+
+    const lcovText = await readFile(resolve(root, crateRawRoot, "lcov.info"), "utf8");
+    const lcovRecords = parseLcov(lcovText, root, "recompute");
+    const llvmJson: unknown = JSON.parse(
+      await readFile(resolve(root, crateRawRoot, "raw.json"), "utf8"),
+    );
+    normalized.push(...normalizeRustCoverage(llvmJson, lcovRecords, root));
+  }
 
   const policy = await loadPolicy(root);
   const scoredPaths = scoredRuntimePaths(policy, "rust", await discoverRuntimePaths(root, "rust"));
-  const lcovText = await readFile(resolve(root, rawRoot, "lcov.info"), "utf8");
-  const lcovRecords = parseLcov(lcovText, root, "recompute");
-  const llvmJson = JSON.parse(
-    await readFile(resolve(root, rawRoot, "raw.json"), "utf8"),
-  ) as unknown;
-  const normalized = normalizeRustCoverage(llvmJson, lcovRecords, root);
   const records = filterRuntimeRecords(normalized, scoredPaths);
   await writeArtifacts({ root, language: "rust", artifactRoot, records });
   const totals = evaluateCoveragePolicy({ policy, language: "rust", records, scoredPaths });

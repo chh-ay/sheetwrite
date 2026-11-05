@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "e0c3555b1d1476ce261e5d9f379282e062e643b53a6f22eac40178d18e95abd2",
+  "sha256": "b934928576318ea6e7128f2e06bf0b0dcd3f67cd66ec40da4b4d6016713f062c",
   "intentionalExports": [
     {
       "package": "@sheetwrite/charts",
@@ -202,6 +202,7 @@
         "Range",
         "RebaseConflict",
         "RebaseConflictCode",
+        "RelationshipStatus",
         "RemoteOperationOptions",
         "RemoteOperationSource",
         "ReplaceResult",
@@ -593,6 +594,29 @@
         "moveFormulaAxis",
         "shiftFormulaAxis",
         "translateFormula"
+      ]
+    },
+    {
+      "package": "@sheetwrite/queries",
+      "entryPoint": ".",
+      "exports": [
+        "QueryAggregate",
+        "QueryBatch",
+        "QueryColumn",
+        "QueryColumnSpec",
+        "QueryColumnType",
+        "QueryDiagnostic",
+        "QueryEngine",
+        "QueryEngineOptions",
+        "QueryError",
+        "QueryInput",
+        "QueryJoinKind",
+        "QueryLimits",
+        "QueryMixedLanes",
+        "QueryPredicate",
+        "QuerySource",
+        "QueryStep",
+        "loadQueryEngine"
       ]
     },
     {

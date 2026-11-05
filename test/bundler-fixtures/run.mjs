@@ -17,6 +17,7 @@ const packageDirectories = [
   "packages/core",
   "packages/xlsx",
   "packages/charts",
+  "packages/queries",
   "packages/react",
   "packages/vue",
   "packages/svelte",
@@ -146,6 +147,51 @@ async function assertLifecyclePages(browser, root, pages) {
   });
 }
 
+async function assertQueryPage(browser, root) {
+  await withStaticServer(root, async (origin) => {
+    const page = await browser.newPage();
+    const errors = [];
+    const wasmRequests = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("console", (message) => {
+      if (message.type() === "error") errors.push(message.text());
+    });
+    page.on("request", (request) => {
+      if (new URL(request.url()).pathname.endsWith(".wasm")) wasmRequests.push(request.url());
+    });
+
+    try {
+      await page.goto(`${origin}/queries.html`, { waitUntil: "domcontentloaded" });
+      await page.waitForFunction(
+        () => document.querySelector("#load-queries")?.getAttribute("data-ready") === "false",
+      );
+      if (wasmRequests.length !== 0) throw new Error("Unused query page fetched WASM");
+
+      const button = page.locator("#load-queries");
+      await button.click();
+      await page.waitForFunction(
+        () => document.querySelector("#load-queries")?.getAttribute("data-ready") === "true",
+        undefined,
+        { timeout: 20_000 },
+      );
+      if (
+        (await button.getAttribute("data-result")) !== "3" ||
+        (await button.getAttribute("data-rows")) !== "1"
+      ) {
+        throw new Error("The bundled query did not return one row with total 3");
+      }
+
+      if (wasmRequests.length !== 1)
+        throw new Error("Query initialization did not fetch WASM once");
+      if (errors.length > 0) throw new Error(`Query browser errors:\n${errors.join("\n")}`);
+    } catch (error) {
+      throw new Error(`Query browser contract failed:\n${errors.join("\n")}`, { cause: error });
+    } finally {
+      await page.close();
+    }
+  });
+}
+
 await rm(tarballRoot, { recursive: true, force: true });
 await rm(join(repositoryRoot, "test-results/bundlers"), {
   recursive: true,
@@ -226,6 +272,7 @@ try {
     ["/vue.html", "vue ready/edit/reset/unmount passed"],
     ["/svelte.html", "svelte ready/edit/reset/unmount passed"],
   ]);
+  await assertQueryPage(browser, join(fixturesRoot, "vite/dist"));
   await assertLifecyclePages(browser, join(fixturesRoot, "next/out"), [
     ["/", "next ready/edit/reset/unmount passed"],
   ]);

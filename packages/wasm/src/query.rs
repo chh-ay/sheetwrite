@@ -9,6 +9,7 @@ use wasm_bindgen::prelude::*;
 use crate::cells::{dense_resolved, payload_num, payload_str_id, source_kind, CellRun};
 use crate::formula_slots::FormulaStore;
 use crate::sheet::{formula_error_at, SheetData};
+use crate::sort_text::push_collation_key;
 use crate::store::CellStore;
 use crate::types::{
     cell_key, string_from_pool_ref, CellKey, FormulaError, FormulaValueKind, StringStorage,
@@ -533,7 +534,7 @@ impl CellStore {
         // (one pool deref per row) instead of rebuilding both operands inside
         // the comparator — a comparison sort would otherwise reconstruct keys
         // ~2·n·log2(n) times, each a scattered heap deref for text cells.
-        let mut keys: Vec<ComparableCell> = Vec::with_capacity(s.cells.row_count());
+        let mut keys = SortKeyBuilder::with_capacity(s.cells.row_count());
         let mut start = base;
         let end = base + s.cells.row_count();
         while start < end {
@@ -549,16 +550,11 @@ impl CellStore {
             }
             start = run.end;
         }
+        let keys = keys.rank();
 
         let mut order: Vec<u32> = (0..s.cells.row_count() as u32).collect();
         order.sort_unstable_by(|&a, &b| {
-            // SAFETY: `order` holds only rows from `0..row_count` and `keys`
-            // has exactly `row_count` entries.
-            let ka = unsafe { keys.get_unchecked(a as usize) };
-            // SAFETY: as above.
-            let kb = unsafe { keys.get_unchecked(b as usize) };
-            let ord = ka.cmp(kb);
-            let ord = if ascending { ord } else { ord.reverse() };
+            let ord = keys.compare(a as usize, b as usize, ascending);
             if ord == Ordering::Equal {
                 a.cmp(&b)
             } else {
@@ -610,7 +606,7 @@ impl CellStore {
         // key ~2·n·log2(n) times, and a text key costs a scattered pool deref
         // every time. Keys are stored key-major so the first key — the one that
         // decides nearly every comparison — stays contiguous.
-        let mut keys: Vec<ComparableCell<'_>> = Vec::with_capacity(row_count * cols.len());
+        let mut keys = SortKeyBuilder::with_capacity(row_count * cols.len());
         for &col in cols {
             let base = col as usize * data.cells.row_count();
 
@@ -631,17 +627,17 @@ impl CellStore {
                 ));
             }
         }
+        let keys = keys.rank();
+
         let mut positions: Vec<u32> = (0..row_count as u32).collect();
         // NaN keys compare equal to other numeric keys; a stable sort preserves ties.
         positions.sort_by(|&left, &right| {
             for key in 0..cols.len() {
-                let a = &keys[key * row_count + left as usize];
-                let b = &keys[key * row_count + right as usize];
-                let order = if ascending.get(key).copied().unwrap_or(1) != 0 {
-                    a.cmp(b)
-                } else {
-                    b.cmp(a)
-                };
+                let order = keys.compare(
+                    key * row_count + left as usize,
+                    key * row_count + right as usize,
+                    ascending.get(key).copied().unwrap_or(1) != 0,
+                );
                 if order != Ordering::Equal {
                     return order;
                 }
@@ -1508,11 +1504,17 @@ fn edge_scan(mut pos: usize, limit: usize, step: isize, occupied: impl Fn(usize)
     }
 }
 
+/// The value of a sort key cell, as Excel's sort compares it.
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) enum ComparableCell<'a> {
     Number(OrderedNumber),
     Bool(bool),
-    Text(&'a str),
+    /// A string of the pool and its id.
+    Text {
+        id: u32,
+        text: &'a str,
+    },
+    Error,
     Empty,
 }
 
@@ -1530,24 +1532,28 @@ impl<'a> ComparableCell<'a> {
                 let Some(key) = key_for_index(sheet, index) else {
                     return ComparableCell::Empty;
                 };
-                if let Some(error) = formula_error_at(sheet, key, slots) {
-                    ComparableCell::Text(error.sentinel())
+                if formula_error_at(sheet, key, slots).is_some() {
+                    ComparableCell::Error
                 } else if sheet.cells.formula_value_kind(index) == FormulaValueKind::Blank {
                     ComparableCell::Empty
                 } else if sheet.cells.formula_value_kind(index) == FormulaValueKind::Bool {
                     ComparableCell::Bool(sheet.cells.num_at(index) != 0.0)
-                } else if let Some(text) =
-                    string_from_pool_ref(strings, sheet.cells.str_id_at(index))
-                {
-                    ComparableCell::Text(text)
+                } else if let Some(text) = Self::pool_text(strings, sheet.cells.str_id_at(index)) {
+                    text
                 } else {
                     ComparableCell::Number(OrderedNumber(sheet.cells.num_at(index)))
                 }
             }
-            KIND_STRING => string_from_pool_ref(strings, sheet.cells.str_id_at(index))
-                .map_or(ComparableCell::Empty, ComparableCell::Text),
+            KIND_STRING => Self::pool_text(strings, sheet.cells.str_id_at(index))
+                .unwrap_or(ComparableCell::Empty),
             _ => ComparableCell::Empty,
         }
+    }
+
+    /// Text of pool string `id`, which keeps its id so that a sort collates
+    /// each distinct string once.
+    fn pool_text(strings: &'a StringStorage, id: u32) -> Option<Self> {
+        string_from_pool_ref(strings, id).map(|text| Self::Text { id, text })
     }
 
     fn from_run(
@@ -1571,23 +1577,20 @@ impl<'a> ComparableCell<'a> {
         match kind {
             KIND_NUMBER => Self::Number(OrderedNumber(f64::from_bits(payload))),
             KIND_BOOL => Self::Bool(payload_num(payload) != 0.0),
-            KIND_STRING => string_from_pool_ref(strings, payload_str_id(payload))
-                .map_or(Self::Empty, Self::Text),
+            KIND_STRING => Self::pool_text(strings, payload_str_id(payload)).unwrap_or(Self::Empty),
             KIND_FORMULA => {
                 let Some(key) = key_for_index(sheet, index) else {
                     return Self::Empty;
                 };
-                if let Some(error) = formula_error_at(sheet, key, slots) {
-                    return Self::Text(error.sentinel());
+                if formula_error_at(sheet, key, slots).is_some() {
+                    return Self::Error;
                 }
                 let (kind, payload) = run.resolved(index);
                 match kind {
                     KIND_EMPTY => Self::Empty,
                     KIND_BOOL => Self::Bool(payload_num(payload) != 0.0),
-                    KIND_STRING => string_from_pool_ref(strings, payload_str_id(payload)).map_or(
-                        Self::Number(OrderedNumber(payload_num(payload))),
-                        Self::Text,
-                    ),
+                    KIND_STRING => Self::pool_text(strings, payload_str_id(payload))
+                        .unwrap_or(Self::Number(OrderedNumber(payload_num(payload)))),
                     _ => Self::Number(OrderedNumber(payload_num(payload))),
                 }
             }
@@ -1596,26 +1599,174 @@ impl<'a> ComparableCell<'a> {
     }
 }
 
-impl Ord for ComparableCell<'_> {
-    fn cmp(&self, other: &Self) -> Ordering {
-        match (self, other) {
-            (ComparableCell::Empty, ComparableCell::Empty) => Ordering::Equal,
-            (ComparableCell::Empty, _) => Ordering::Greater,
-            (_, ComparableCell::Empty) => Ordering::Less,
-            (ComparableCell::Number(a), ComparableCell::Number(b)) => a.cmp(b),
-            (ComparableCell::Text(a), ComparableCell::Text(b)) => a.cmp(b),
-            (ComparableCell::Bool(a), ComparableCell::Bool(b)) => a.cmp(b),
-            (ComparableCell::Number(_), _) => Ordering::Less,
-            (_, ComparableCell::Number(_)) => Ordering::Greater,
-            (ComparableCell::Text(_), ComparableCell::Bool(_)) => Ordering::Less,
-            (ComparableCell::Bool(_), ComparableCell::Text(_)) => Ordering::Greater,
+/// Classes of sort keys, in Excel's ascending order of value types. Blank
+/// cells have the highest class because they sort last in both directions.
+const CLASS_NUMBER: u8 = 0;
+const CLASS_TEXT: u8 = 1;
+const CLASS_BOOL: u8 = 2;
+const CLASS_ERROR: u8 = 3;
+const CLASS_EMPTY: u8 = 4;
+
+/// The collation key of one distinct string: its span in the arena, and
+/// whether the string holds a hyphen, which decides a tie.
+#[derive(Clone, Copy)]
+struct CollatedText {
+    start: u32,
+    end: u32,
+    has_hyphen: bool,
+}
+
+/// Marks a pool id whose string is not collated yet.
+const NOT_COLLATED: u32 = u32::MAX;
+
+/// Sort keys of one sort call while its rows are read. Each key is a class
+/// and a 64-bit value in flat arrays. Each distinct pool string is collated
+/// once into one byte arena; a flat table indexed by pool id finds the key
+/// of a string seen before. A text value holds the index of its string
+/// until [`Self::rank`] replaces it by the string's rank.
+pub(crate) struct SortKeyBuilder {
+    classes: Vec<u8>,
+    values: Vec<u64>,
+    texts: Vec<CollatedText>,
+    text_by_pool_id: Vec<u32>,
+    arena: Vec<u8>,
+}
+
+impl SortKeyBuilder {
+    pub(crate) fn with_capacity(rows: usize) -> Self {
+        Self {
+            classes: Vec::with_capacity(rows),
+            values: Vec::with_capacity(rows),
+            texts: Vec::new(),
+            text_by_pool_id: Vec::new(),
+            arena: Vec::new(),
         }
+    }
+
+    pub(crate) fn push(&mut self, cell: ComparableCell<'_>) {
+        let (class, value) = match cell {
+            ComparableCell::Number(number) => (CLASS_NUMBER, number.0.to_bits()),
+            ComparableCell::Text { id, text } => (CLASS_TEXT, u64::from(self.collate(id, text))),
+            ComparableCell::Bool(value) => (CLASS_BOOL, u64::from(value)),
+            ComparableCell::Error => (CLASS_ERROR, 0),
+            ComparableCell::Empty => (CLASS_EMPTY, 0),
+        };
+
+        self.classes.push(class);
+        self.values.push(value);
+    }
+
+    /// The index of the collation key of pool string `id`, collated on its
+    /// first use.
+    fn collate(&mut self, id: u32, text: &str) -> u32 {
+        let slot = id as usize;
+        if slot >= self.text_by_pool_id.len() {
+            self.text_by_pool_id.resize(slot + 1, NOT_COLLATED);
+        }
+
+        let known = self.text_by_pool_id[slot];
+        if known != NOT_COLLATED {
+            return known;
+        }
+
+        let start = self.arena.len() as u32;
+        let has_hyphen = push_collation_key(text, &mut self.arena);
+        let index = self.texts.len() as u32;
+        self.texts.push(CollatedText {
+            start,
+            end: self.arena.len() as u32,
+            has_hyphen,
+        });
+        self.text_by_pool_id[slot] = index;
+        index
+    }
+
+    /// Bytes allocated for collation: the arena, the distinct-text spans and
+    /// the pool-id table.
+    #[cfg(test)]
+    pub(crate) fn collation_bytes(&self) -> usize {
+        self.arena.capacity()
+            + self.texts.capacity() * std::mem::size_of::<CollatedText>()
+            + self.text_by_pool_id.capacity() * std::mem::size_of::<u32>()
+    }
+
+    /// Bytes of collation keys in the arena.
+    #[cfg(test)]
+    pub(crate) fn arena_len(&self) -> usize {
+        self.arena.len()
+    }
+
+    /// Sort the distinct strings once and give each its rank in collation
+    /// order; equal keys get equal ranks. Rows then compare text by rank, so
+    /// the row sort makes no byte comparison. The arena is dropped here.
+    pub(crate) fn rank(mut self) -> SortKeys {
+        let mut order: Vec<u32> = (0..self.texts.len() as u32).collect();
+        order.sort_unstable_by(|&a, &b| self.collation_cmp(a, b));
+
+        let mut ranks = vec![0u32; self.texts.len()];
+        let mut rank = 0u32;
+        for (position, &text) in order.iter().enumerate() {
+            if position > 0 && self.collation_cmp(order[position - 1], text) != Ordering::Equal {
+                rank += 1;
+            }
+            ranks[text as usize] = rank;
+        }
+
+        for (class, value) in self.classes.iter().zip(self.values.iter_mut()) {
+            if *class == CLASS_TEXT {
+                *value = u64::from(ranks[*value as usize]);
+            }
+        }
+
+        SortKeys {
+            classes: self.classes,
+            values: self.values,
+        }
+    }
+
+    fn collation_cmp(&self, a: u32, b: u32) -> Ordering {
+        let a = self.texts[a as usize];
+        let b = self.texts[b as usize];
+        let a_key = &self.arena[a.start as usize..a.end as usize];
+        let b_key = &self.arena[b.start as usize..b.end as usize];
+        a_key.cmp(b_key).then(a.has_hyphen.cmp(&b.has_hyphen))
     }
 }
 
-impl PartialOrd for ComparableCell<'_> {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
+/// Ranked sort keys of one sort call: a class and a value per key. A number
+/// value holds its `f64` bits, text its collation rank, and a logical value
+/// 0 or 1.
+pub(crate) struct SortKeys {
+    classes: Vec<u8>,
+    values: Vec<u64>,
+}
+
+impl SortKeys {
+    /// Excel's sort order of keys `left` and `right`: numbers, text, `FALSE`
+    /// before `TRUE`, then errors, which are all equal. A descending sort
+    /// reverses this order, but blank cells are last in both directions.
+    pub(crate) fn compare(&self, left: usize, right: usize, ascending: bool) -> Ordering {
+        let class_left = self.classes[left];
+        let class_right = self.classes[right];
+        if class_left == CLASS_EMPTY || class_right == CLASS_EMPTY {
+            return class_left.cmp(&class_right);
+        }
+
+        let order = if class_left != class_right {
+            class_left.cmp(&class_right)
+        } else if class_left == CLASS_NUMBER {
+            let a = f64::from_bits(self.values[left]);
+            let b = f64::from_bits(self.values[right]);
+            a.partial_cmp(&b).unwrap_or(Ordering::Equal)
+        } else {
+            self.values[left].cmp(&self.values[right])
+        };
+
+        if ascending {
+            order
+        } else {
+            order.reverse()
+        }
     }
 }
 

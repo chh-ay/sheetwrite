@@ -249,10 +249,10 @@
     "SnapshotValidationError",
     "toXlsxWorkbook"
   ],
-  "entryPointCount": 27,
-  "exportCount": 642,
-  "symbolPageCount": 642,
-  "apiSha256": "e0c3555b1d1476ce261e5d9f379282e062e643b53a6f22eac40178d18e95abd2",
+  "entryPointCount": 29,
+  "exportCount": 660,
+  "symbolPageCount": 660,
+  "apiSha256": "b934928576318ea6e7128f2e06bf0b0dcd3f67cd66ec40da4b4d6016713f062c",
   "compatibilitySha256": "39dd14155e04fdbb0816f506e1490faecdd3ca08ae72470187d871527fe14245",
   "formulaContractSha256": "06b6e1a6f1220f22ac87327224bc53823df98bbe9cde37a1bd9d33fc5e043bf5"
 }
