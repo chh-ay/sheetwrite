@@ -92,7 +92,7 @@ function LatestReleaseCard({
       <strong>Sheetwrite {LATEST_RELEASE.version}</strong>
       <span className="sw-release-card__summary">{LATEST_RELEASE.summary}</span>
       <span className="sw-release-card__more">
-        Read the release notes <span aria-hidden="true">→</span>
+        Read the release notes <Icon name="arrow-right" />
       </span>
     </Link>
   );

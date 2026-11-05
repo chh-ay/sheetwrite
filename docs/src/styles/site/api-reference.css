@@ -92,13 +92,17 @@
   text-decoration: none;
 }
 
+/* The sprite's arrow, mirrored to point back to the entry point. */
 .sw-prose .api-backlink::before {
-  content: "←";
-  color: var(--sw-fg-muted);
+  content: "";
+  width: var(--sw-icon-sm);
+  height: var(--sw-icon-sm);
+  background: currentColor;
+  mask: var(--sw-icon-mask-arrow-right) center / contain no-repeat;
+  transform: scaleX(-1);
 }
 
-.sw-prose .api-backlink:hover,
-.sw-prose .api-backlink:hover::before {
+.sw-prose .api-backlink:hover {
   color: var(--sw-accent-strong);
 }
 
@@ -371,21 +375,20 @@
 .api-declaration summary::before {
   content: "";
   flex: none;
-  width: 0.42rem;
-  height: 0.42rem;
-  border-right: 1.5px solid currentColor;
-  border-bottom: 1.5px solid currentColor;
+  width: var(--sw-icon-sm);
+  height: var(--sw-icon-sm);
+  background: currentColor;
   color: var(--sw-fg-muted);
-  transform: rotate(-45deg);
+  mask: var(--sw-icon-mask-chevron-right) center / contain no-repeat;
   transition:
-    transform 140ms ease,
-    color 140ms ease;
+    transform var(--sw-motion-fast) var(--sw-motion-standard),
+    color var(--sw-motion-fast) var(--sw-motion-standard);
 }
 
 .api-member[open] > summary::before,
 .api-declaration[open] > summary::before {
   color: var(--sw-accent);
-  transform: translateY(-0.1rem) rotate(45deg);
+  transform: rotate(90deg);
 }
 
 /* Hover tints the row; keyboard focus keeps a quiet inset ring — the loud

@@ -81,6 +81,9 @@
   line-height: var(--sw-leading-ui);
 }
 .sw-release-card__more {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sw-space-1);
   margin-top: var(--sw-space-0-5);
   color: var(--sw-accent-strong);
   font-size: var(--sw-text-caption);
@@ -351,6 +354,31 @@ details[open] > summary > .sw-disclosure-icon {
 .sw-docs .sw-prose li,
 .sw-docs .sw-prose blockquote {
   max-width: var(--sw-measure-prose);
+}
+/* Plain Markdown disclosures (formula contracts, long examples) use the
+   sprite chevron instead of the browser's triangle. Classed disclosures (API
+   members, evidence rows) draw their own. */
+.sw-prose details:not([class]) > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--sw-space-1);
+  cursor: pointer;
+  list-style: none;
+}
+.sw-prose details:not([class]) > summary::-webkit-details-marker {
+  display: none;
+}
+.sw-prose details:not([class]) > summary::before {
+  content: "";
+  flex: none;
+  width: var(--sw-icon-sm);
+  height: var(--sw-icon-sm);
+  background: currentColor;
+  mask: var(--sw-icon-mask-chevron-right) center / contain no-repeat;
+  transition: transform var(--sw-motion-fast) var(--sw-motion-standard);
+}
+.sw-prose details:not([class])[open] > summary::before {
+  transform: rotate(90deg);
 }
 
 .sw-toc {

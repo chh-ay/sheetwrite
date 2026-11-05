@@ -7,6 +7,12 @@
    which symbols open a panel with a dotted underline; screens without hover
    show the underline all the time. Rules are scoped to `.expressive-code` so
    they win over the prose link style on symbols that are also links. */
+.expressive-code {
+  /* The symbol highlight: every code token colour keeps 4.5:1 on it in both
+     themes (measured: 4.8:1 for the weakest token). */
+  --sw-code-symbol-highlight: color-mix(in srgb, var(--sw-accent-soft) 70%, var(--sw-code-bg));
+}
+
 .expressive-code .sw-code-popover__trigger {
   border-radius: var(--sw-radius-xs);
   color: inherit;
@@ -39,7 +45,7 @@
 .expressive-code .sw-code-popover__trigger:hover,
 .expressive-code .sw-code-popover__trigger[data-popover-open="true"],
 .expressive-code .sw-code-popover__trigger[data-popover-related] {
-  background: var(--sw-accent-soft);
+  background: var(--sw-code-symbol-highlight);
   text-decoration-color: transparent;
 }
 
@@ -49,7 +55,7 @@
 
 /* An outline, not a shadow, so the ring stays visible in forced-colors mode. */
 .expressive-code .sw-code-popover__trigger:focus-visible {
-  background: var(--sw-accent-soft);
+  background: var(--sw-code-symbol-highlight);
   outline: var(--sw-focus-ring-width) solid var(--sw-accent);
   outline-offset: var(--sw-border-width);
 }
@@ -192,6 +198,19 @@
 .sw-code-popover__link:hover {
   background: var(--sw-surface-2);
   color: var(--sw-accent-strong);
+}
+
+.sw-code-popover__link::after {
+  content: "";
+  width: var(--sw-icon-sm);
+  height: var(--sw-icon-sm);
+  background: currentColor;
+  mask: var(--sw-icon-mask-arrow-right) center / contain no-repeat;
+  transition: transform var(--sw-motion-fast) var(--sw-motion-decelerate);
+}
+
+.sw-code-popover__link:hover::after {
+  transform: translateX(var(--sw-space-0-5));
 }
 
 .sw-code-popover__accessible-signature {
