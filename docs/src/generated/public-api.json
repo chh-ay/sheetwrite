@@ -3746,7 +3746,7 @@
               "owners": [
                 "src/types/pivot.ts"
               ],
-              "source": "src/types/pivot.ts#L9",
+              "source": "src/types/pivot.ts#L10",
               "jsDocTags": [],
               "documentation": "Aggregation applied to one value field. Semantics match PIVOTBY's aggregations.",
               "memberDocs": []
@@ -3758,7 +3758,7 @@
               "owners": [
                 "src/types/pivot.ts"
               ],
-              "source": "src/types/pivot.ts#L64",
+              "source": "src/types/pivot.ts#L69",
               "jsDocTags": [],
               "documentation": "Serializable pivot-table definition, owned by the sheet that holds its\nanchor. The output starts at `anchor` and spills right and down.",
               "memberDocs": [
@@ -3827,7 +3827,7 @@
               "owners": [
                 "src/types/pivot.ts"
               ],
-              "source": "src/types/pivot.ts#L121",
+              "source": "src/types/pivot.ts#L126",
               "jsDocTags": [],
               "documentation": "Inferred type of one source field from its data rows.",
               "memberDocs": []
@@ -3839,7 +3839,7 @@
               "owners": [
                 "src/types/pivot.ts"
               ],
-              "source": "src/types/pivot.ts#L45",
+              "source": "src/types/pivot.ts#L50",
               "jsDocTags": [],
               "documentation": "Keep-list filter: only source rows whose `field` value is in `values` contribute.",
               "memberDocs": []
@@ -3851,7 +3851,7 @@
               "owners": [
                 "src/types/pivot.ts"
               ],
-              "source": "src/types/pivot.ts#L58",
+              "source": "src/types/pivot.ts#L63",
               "jsDocTags": [],
               "documentation": "Layout of row labels: one indented label column, or one label column per row field.",
               "memberDocs": []
@@ -3863,7 +3863,7 @@
               "owners": [
                 "src/types/pivot.ts"
               ],
-              "source": "src/types/pivot.ts#L147",
+              "source": "src/types/pivot.ts#L152",
               "jsDocTags": [],
               "documentation": "Plain-JSON view of one pivot's output, for the field list and other UI.\n\n- `ok`: the output occupies `rows` x `cols` cells from `anchor`; `cells`\n  holds their values row-major. The first `headerRows` rows hold column\n  labels and the first `labelCols` columns hold row labels.\n- `error`: the anchor shows `error` (for example `#SPILL!` or `#REF!`)\n  and `cells` is empty.\n- `unavailable`: the loaded engine computes no pivots (the default\n  engine) and the pivot has no saved output. The definition is still\n  kept, saved and synchronized.\n- `saved`: the default engine shows `savedOutput`, which a file saved;\n  `cells` holds those values and `headerRows`/`labelCols` are 0.",
               "memberDocs": []
@@ -3875,7 +3875,7 @@
               "owners": [
                 "src/types/pivot.ts"
               ],
-              "source": "src/types/pivot.ts#L51",
+              "source": "src/types/pivot.ts#L56",
               "jsDocTags": [],
               "documentation": "Sort of one axis field by its labels. Fields without a sort key sort ascending.",
               "memberDocs": []
@@ -3883,13 +3883,13 @@
             {
               "name": "PivotSource",
               "kind": "type",
-              "signature": "export type PivotSource = | { range: Range; invalid?: true } | { table: WorkbookTableId; invalid?: true };",
+              "signature": "export type PivotSource = | { range: Range; invalid?: true } | { table: WorkbookTableId; invalid?: true } | { model: { table: WorkbookTableId; fields: TableColumnRef[] }; invalid?: true };",
               "owners": [
                 "src/types/pivot.ts"
               ],
-              "source": "src/types/pivot.ts#L30",
+              "source": "src/types/pivot.ts#L34",
               "jsDocTags": [],
-              "documentation": "Data a pivot summarizes.\n\n- A range source includes its header row: the first range row names the\n  fields, and field `i` is the column `range.start.col + i`.\n- A table source names a workbook table by its stable `WorkbookTable.id`.\n  Field `i` is table column `i`; header and totals rows are excluded.\n\nWhen the source disappears (its sheet, its table, or every source row or\ncolumn is deleted), core sets `invalid: true` and keeps the reference\nunchanged. The engine then shows `#REF!` at the anchor.",
+              "documentation": "Data a pivot summarizes.\n\n- A range source includes its header row: the first range row names the\n  fields, and field `i` is the column `range.start.col + i`.\n- A table source names a workbook table by its stable `WorkbookTable.id`.\n  Field `i` is table column `i`; header and totals rows are excluded.\n- A model source has one base table (the many side). Field `i` names\n  `model.fields[i]` by stable table and column IDs. Other tables must be\n  reachable from the base by following many-to-one relationships.\n\nWhen the source disappears (its sheet, its table, or every source row or\ncolumn is deleted), core sets `invalid: true` and keeps the reference\nunchanged. The engine then shows `#REF!` at the anchor.",
               "memberDocs": []
             },
             {
@@ -3899,7 +3899,7 @@
               "owners": [
                 "src/types/pivot.ts"
               ],
-              "source": "src/types/pivot.ts#L124",
+              "source": "src/types/pivot.ts#L129",
               "jsDocTags": [],
               "documentation": "One source field offered by the field list.",
               "memberDocs": [
@@ -3924,7 +3924,7 @@
               "owners": [
                 "src/types/pivot.ts"
               ],
-              "source": "src/types/pivot.ts#L35",
+              "source": "src/types/pivot.ts#L40",
               "jsDocTags": [],
               "documentation": "One aggregated value field. `name` replaces the default caption.",
               "memberDocs": [
@@ -5886,7 +5886,7 @@
               "owners": [
                 "src/charts-live.ts"
               ],
-              "source": "src/charts-live.ts#L552",
+              "source": "src/charts-live.ts#L553",
               "jsDocTags": [],
               "documentation": "Listen for commits that change any chart's `ChartView`. Edited rectangles are\nmatched against an index of series ranges, so edits outside every series\nrange cost no chart work. Charts that read formulas, references or spills\nalso change on any commit that changes cell values. Returns an unsubscribe\nfunction; the index is dropped with the last listener.",
               "memberDocs": []
