@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "817ee5dddafec99744515401990305cda39c1ea702534a7587b4a388c2f59b84",
+  "sha256": "03dd6d93d4bd2de98b325e121b56fb11c478389ca2f5661d9543c0e907f86546",
   "intentionalExports": [
     {
       "package": "@sheetwrite/charts",
@@ -109,6 +109,11 @@
         "DEFAULT_TRANSACTION_RESOURCE_LIMITS",
         "DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS",
         "DEFAULT_XLSX_RESOURCE_LIMITS",
+        "Dashboard",
+        "DashboardBox",
+        "DashboardItem",
+        "DashboardPivotItem",
+        "DashboardSlicerItem",
         "DataCell",
         "DataModel",
         "DataSource",
@@ -264,6 +269,7 @@
         "Selection",
         "Sheet",
         "SheetId",
+        "SheetKind",
         "SheetLifecycleIssueCode",
         "SheetLifecycleResult",
         "SheetNameIssueCode",

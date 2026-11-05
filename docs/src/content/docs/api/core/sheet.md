@@ -8,12 +8,14 @@ description: "Sheet interface in @sheetwrite/core: Workbook sheet schema used wh
 Workbook sheet schema used when creating a live grid.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L45"><code>packages/core/src/types/document.ts#L45</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L46"><code>packages/core/src/types/document.ts#L46</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
 <a href="#sheet-id"><code>id</code></a>
 <a href="#sheet-name"><code>name</code></a>
+<a href="#sheet-kind"><code>kind</code></a>
+<a href="#sheet-dashboard"><code>dashboard</code></a>
 <a href="#sheet-visibility"><code>visibility</code></a>
 <a href="#sheet-columns"><code>columns</code></a>
 <a href="#sheet-row-count"><code>rowCount</code></a>
@@ -35,7 +37,7 @@ Workbook sheet schema used when creating a live grid.
 <a href="#sheet-pivots"><code>pivots</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>21</span>
+## Members <span class="api-count" data-pagefind-ignore>23</span>
 
 <div class="api-member-list">
 
@@ -53,6 +55,24 @@ id: SheetId;
 
 ```ts generated
 name: string;
+```
+
+</details>
+
+<details class="api-member" id="sheet-kind" data-pagefind-weight="1">
+<summary><code>kind</code> <span class="api-member-summary">A dashboard holds items and no cells; absent means a worksheet.</span></summary>
+
+```ts generated
+kind?: SheetKind;
+```
+
+</details>
+
+<details class="api-member" id="sheet-dashboard" data-pagefind-weight="1">
+<summary><code>dashboard</code> <span class="api-member-summary">Items of a dashboard sheet; only on kind: &quot;dashboard&quot;.</span></summary>
+
+```ts generated
+dashboard?: Dashboard;
 ```
 
 </details>
@@ -238,6 +258,8 @@ pivots?: PivotDefinition[];
 export interface Sheet {
   id: SheetId;
   name: string;
+  kind?: SheetKind;
+  dashboard?: Dashboard;
   visibility?: SheetVisibility;
   columns: Column[];
   rowCount: number;

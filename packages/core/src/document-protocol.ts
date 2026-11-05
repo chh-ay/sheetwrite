@@ -15,6 +15,7 @@ import {
   MAX_CONDITIONAL_FORMAT_FORMULA_LENGTH,
   MAX_CONDITIONAL_FORMAT_RULES,
 } from "./conditional-format.js";
+import { cloneDashboard, validateDashboardItemShape, validateSheetKindShape } from "./dashboard.js";
 import { validateDataModelShape, validateRelationshipShape } from "./data-model.js";
 import { boundedJsonByteLength, JsonByteLengthError, SheetwriteError } from "./errors.js";
 import {
@@ -1829,7 +1830,8 @@ function validateSheetShape(value: unknown, path: string, errors: DocumentValida
   }
 
   const columns = arrayAt(ownValue(sheet, "columns"), `${path}.columns`, errors);
-  if (columns && columns.length === 0) {
+  // A dashboard has no columns; `validateSheetKindShape` checks it.
+  if (columns && columns.length === 0 && ownValue(sheet, "kind") !== "dashboard") {
     invalid(errors, `${path}.columns`, "A sheet needs at least one column");
   }
   columns?.forEach((column, index) => {
@@ -1995,6 +1997,8 @@ function validateSheetShape(value: unknown, path: string, errors: DocumentValida
       validateCellShape(cellEntry, `${blockPath}.cells[${cellIndex}]`, errors);
     });
   });
+
+  validateSheetKindShape(sheet, path, errors);
 }
 
 function validateOperationSheetId(
@@ -2670,8 +2674,14 @@ export function validateDocumentOperationShape(
 
     case "removeChart":
     case "removePivot":
+    case "removeDashboardItem":
       validateOperationSheetId(operation, path, errors);
       requireString(operation, "id", path, errors, true);
+      break;
+
+    case "setDashboardItem":
+      validateOperationSheetId(operation, path, errors);
+      validateDashboardItemShape(ownValue(operation, "item"), `${path}.item`, errors);
       break;
 
     default: {
@@ -3538,6 +3548,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
             .map((table) => structuredClone(table))
         : undefined,
       charts: sheet.charts?.map((chart) => structuredClone(chart)),
+      dashboard: sheet.dashboard ? cloneDashboard(sheet.dashboard) : undefined,
       pivots: sheet.pivots
         ? [...sheet.pivots].sort((a, b) => compareCodeUnits(a.id, b.id)).map(clonePivot)
         : undefined,
@@ -3560,6 +3571,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
     if (normalizedSheet.tables === undefined) delete normalizedSheet.tables;
     if (normalizedSheet.charts === undefined) delete normalizedSheet.charts;
     if (normalizedSheet.pivots === undefined) delete normalizedSheet.pivots;
+    if (normalizedSheet.dashboard === undefined) delete normalizedSheet.dashboard;
     normalizedSheets.push(normalizedSheet);
   }
 
@@ -3770,6 +3782,8 @@ export function documentOpTarget(operation: DocumentOp): string {
     case "removeChart":
     case "setPivot":
     case "removePivot":
+    case "setDashboardItem":
+    case "removeDashboardItem":
       return operation.sheet;
 
     case "addSheet":

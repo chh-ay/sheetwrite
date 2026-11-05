@@ -8,7 +8,7 @@ description: "API reference for @sheetwrite/core."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/index.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>392</dd></div>
+<div><dt>Exports</dt><dd>398</dd></div>
 </dl>
 
 Source entry: `packages/core/src/index.ts`
@@ -113,7 +113,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/workbook-table-name-key/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>workbookTableNameKey</code></span><span class="api-symbol-card__desc">Locale-independent key used for table and table-column collision checks.</span></a>
 </div>
 
-### Interfaces <span class="api-count" data-pagefind-ignore>176</span>
+### Interfaces <span class="api-count" data-pagefind-ignore>180</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/boundary-operation-stats/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>BoundaryOperationStats</code></span><span class="api-symbol-card__desc">Fixed-cardinality boundary crossing counters for one operation.</span></a>
@@ -157,6 +157,10 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/conditional-format-rule/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>ConditionalFormatRule</code></span><span class="api-symbol-card__desc">Ordered condition and style applied to a cell range.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/context-menu-context/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>ContextMenuContext</code></span><span class="api-symbol-card__desc">Cell and viewport coordinates resolved for one bundled context-menu opening.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/context-menu-item/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>ContextMenuItem</code></span><span class="api-symbol-card__desc">Built-in, separator, or custom callback row in the right-click menu.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/dashboard/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>Dashboard</code></span><span class="api-symbol-card__desc">The layout of a dashboard sheet.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/dashboard-box/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>DashboardBox</code></span><span class="api-symbol-card__desc">Position and size of a dashboard item in grid units.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/dashboard-pivot-item/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>DashboardPivotItem</code></span><span class="api-symbol-card__desc">A pivot of the dashboard sheet, shown in a box.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/dashboard-slicer-item/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>DashboardSlicerItem</code></span><span class="api-symbol-card__desc">A slicer: the distinct values of one table column, of which selected pass.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/data-model/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>DataModel</code></span><span class="api-symbol-card__desc">The workbook's data model.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/data-source/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>DataSource</code></span><span class="api-symbol-card__desc">Host callback that asynchronously loads cancellable rectangular pages.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/data-source-capabilities/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>DataSourceCapabilities</code></span><span class="api-symbol-card__desc">Declares whether a source can load only the requested column runs.</span></a>
@@ -294,7 +298,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/xlsx-workbook-warning/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>XlsxWorkbookWarning</code></span><span class="api-symbol-card__desc">Structured fidelity warning emitted during XLSX conversion.</span></a>
 </div>
 
-### Types <span class="api-count" data-pagefind-ignore>101</span>
+### Types <span class="api-count" data-pagefind-ignore>103</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/aggregate-op/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>AggregateOp</code></span><span class="api-symbol-card__desc">Column aggregate operation for Grid.aggregate / Store data ops.</span></a>
@@ -323,6 +327,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/conditional-format-predicate/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>ConditionalFormatPredicate</code></span><span class="api-symbol-card__desc">Predicate used to decide whether a conditional format applies.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/context-menu-action-name/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>ContextMenuActionName</code></span><span class="api-symbol-card__desc">Built-in action names accepted by custom context-menu rows.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/context-menu-items/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>ContextMenuItems</code></span><span class="api-symbol-card__desc">Static rows or a context-aware factory evaluated each time the menu opens.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/dashboard-item/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>DashboardItem</code></span><span class="api-symbol-card__desc">One item of a dashboard.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/data-cell/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>DataCell</code></span><span class="api-symbol-card__desc">Datasource cell value with optional cell-specific styling.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/data-validation-comparison/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>DataValidationComparison</code></span><span class="api-symbol-card__desc">Native comparison semantics for numeric, date-serial, and text-length validation.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/data-validation-condition/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>DataValidationCondition</code></span><span class="api-symbol-card__desc">Serializable condition enforced by a data-validation rule.</span></a>
@@ -369,6 +374,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/saved-query-source/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SavedQuerySource</code></span><span class="api-symbol-card__desc">Where a saved query reads its data.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/selection/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>Selection</code></span><span class="api-symbol-card__desc">Current cell, range, row, column, or multi-range selection.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/sheet-id/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SheetId</code></span><span class="api-symbol-card__desc">Stable identifier used to address a workbook sheet.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/sheet-kind/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SheetKind</code></span><span class="api-symbol-card__desc">The kind of a sheet: cells, or a dashboard of items.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/sheet-lifecycle-issue-code/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SheetLifecycleIssueCode</code></span><span class="api-symbol-card__desc">Stable lifecycle rejection codes suitable for inline sheet-management UI.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/sheet-lifecycle-result/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SheetLifecycleResult</code></span><span class="api-symbol-card__desc">Actionable transaction outcome for a stable sheet lifecycle target.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/sheet-name-issue-code/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SheetNameIssueCode</code></span><span class="api-symbol-card__desc">Stable reason codes returned by worksheet-name validation.</span></a>

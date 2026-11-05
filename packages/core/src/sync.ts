@@ -2321,6 +2321,8 @@ const DOCUMENT_OPERATION_KINDS: Record<DocumentOp["op"], true> = {
   removeChart: true,
   setPivot: true,
   removePivot: true,
+  setDashboardItem: true,
+  removeDashboardItem: true,
 };
 
 function assertPendingCommit(

@@ -60,7 +60,8 @@ function addSheetSnapshotIssue(
   if (!integerAt(snapshot.order) || snapshot.order > existing.length) return "invalid-position";
   if (
     !integerAt(snapshot.rowCount) ||
-    snapshot.columns.length === 0 ||
+    // A dashboard has no columns; the snapshot shape checks prove it has no cells either.
+    (snapshot.columns.length === 0 && snapshot.kind !== "dashboard") ||
     !uniqueColumnKeys(snapshot.columns)
   ) {
     return "invalid-sheet";

@@ -29,7 +29,7 @@ async function total(workbook: Workbook) {
 - [createGrid](/docs/api/core/create-grid/)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/store.ts#L155"><code>packages/core/src/store.ts#L155</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/store.ts#L157"><code>packages/core/src/store.ts#L157</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -52,6 +52,7 @@ async function total(workbook: Workbook) {
 <a href="#sheetwrite-store-get-cell"><code>getCell</code></a>
 <a href="#sheetwrite-store-get-cell-load-state"><code>getCellLoadState</code></a>
 <a href="#sheetwrite-store-get-clipboard-window"><code>getClipboardWindow</code></a>
+<a href="#sheetwrite-store-get-dashboard"><code>getDashboard</code></a>
 <a href="#sheetwrite-store-get-data-window"><code>getDataWindow</code></a>
 <a href="#sheetwrite-store-get-formula"><code>getFormula</code></a>
 <a href="#sheetwrite-store-get-formula-matrix-resource-peak"><code>getFormulaMatrixResourcePeak</code></a>
@@ -77,6 +78,7 @@ async function total(workbook: Workbook) {
 <a href="#sheetwrite-store-on"><code>on</code></a>
 <a href="#sheetwrite-store-query-capability"><code>queryCapability</code></a>
 <a href="#sheetwrite-store-recalculate-volatile"><code>recalculateVolatile</code></a>
+<a href="#sheetwrite-store-remove-dashboard-item"><code>removeDashboardItem</code></a>
 <a href="#sheetwrite-store-remove-pivot"><code>removePivot</code></a>
 <a href="#sheetwrite-store-remove-relationship"><code>removeRelationship</code></a>
 <a href="#sheetwrite-store-remove-sheet-formula-identity"><code>removeSheetFormulaIdentity</code></a>
@@ -89,6 +91,7 @@ async function total(workbook: Workbook) {
 <a href="#sheetwrite-store-search-cells"><code>searchCells</code></a>
 <a href="#sheetwrite-store-search-cells-flat"><code>searchCellsFlat</code></a>
 <a href="#sheetwrite-store-set-column-filter"><code>setColumnFilter</code></a>
+<a href="#sheetwrite-store-set-dashboard-item"><code>setDashboardItem</code></a>
 <a href="#sheetwrite-store-set-detailed-change-capture"><code>setDetailedChangeCapture</code></a>
 <a href="#sheetwrite-store-set-group-collapsed"><code>setGroupCollapsed</code></a>
 <a href="#sheetwrite-store-set-pivot"><code>setPivot</code></a>
@@ -104,7 +107,7 @@ async function total(workbook: Workbook) {
 <a href="#sheetwrite-store-from-snapshot"><code>fromSnapshot</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>69</span>
+## Members <span class="api-count" data-pagefind-ignore>72</span>
 
 <div class="api-member-list">
 
@@ -304,6 +307,15 @@ getClipboardWindow: (sheet: SheetId, viewRows: { start: number; end: number; }, 
 
 <p class="api-member-doc">Optional packed clipboard read. Custom stores may omit it; the controller
 preserves the per-cell Store fallback contract.</p>
+</details>
+
+<details class="api-member" id="sheetwrite-store-get-dashboard" data-pagefind-weight="1">
+<summary><code>getDashboard</code> <span class="api-member-summary">A copy of the items of the dashboard sheet, or null when it is not a dashboard.</span></summary>
+
+```ts generated
+getDashboard: (sheet: SheetId) => Dashboard | null;
+```
+
 </details>
 
 <details class="api-member" id="sheetwrite-store-get-data-window" data-pagefind-weight="1">
@@ -543,6 +555,15 @@ Edits already recompute volatile formulas and read the clock once per
 recalculation; this call uses `now` instead, until the next edit.</p>
 </details>
 
+<details class="api-member" id="sheetwrite-store-remove-dashboard-item" data-pagefind-weight="1">
+<summary><code>removeDashboardItem</code> <span class="api-member-summary">Remove the item with id from the dashboard sheet.</span></summary>
+
+```ts generated
+removeDashboardItem: (sheet: SheetId, id: string) => ApplyTransactionResult;
+```
+
+</details>
+
 <details class="api-member" id="sheetwrite-store-remove-pivot" data-pagefind-weight="1">
 <summary><code>removePivot</code> <span class="api-member-summary">Remove a pivot; sheet defaults to the sheet that holds it.</span></summary>
 
@@ -649,6 +670,18 @@ searchCellsFlat: (sheet: SheetId, query: string, opts?: { matchCase?: boolean; w
 setColumnFilter: (sheet: SheetId, col: number, filter: ColumnFilter | null) => ApplyTransactionResult;
 ```
 
+</details>
+
+<details class="api-member" id="sheetwrite-store-set-dashboard-item" data-pagefind-weight="1">
+<summary><code>setDashboardItem</code> <span class="api-member-summary">Insert an item on the dashboard sheet, or replace the one with its ID.</span></summary>
+
+```ts generated
+setDashboardItem: (sheet: SheetId, item: DashboardItem) => ApplyTransactionResult;
+```
+
+<p class="api-member-doc">Insert an item on the dashboard `sheet`, or replace the one with its ID.
+Items stay inside the 12 columns, do not overlap, and a pivot item shows
+a pivot of the same sheet; otherwise the result is a no-op.</p>
 </details>
 
 <details class="api-member" id="sheetwrite-store-set-detailed-change-capture" data-pagefind-weight="1">
@@ -874,6 +907,7 @@ class SheetwriteStore implements Store {
     },
     cols: readonly number[],
   ) => ClipboardWindowView;
+  getDashboard: (sheet: SheetId) => Dashboard | null;
   getDataWindow: (
     sheet: SheetId,
     rows: {
@@ -930,6 +964,7 @@ class SheetwriteStore implements Store {
   on: (_evt: "change", fn: ChangeListener) => () => void;
   queryCapability: (sheet: SheetId) => QueryCapability;
   recalculateVolatile: (now?: Date) => void;
+  removeDashboardItem: (sheet: SheetId, id: string) => ApplyTransactionResult;
   removePivot: (id: string, sheet?: SheetId) => ApplyTransactionResult;
   removeRelationship: (id: string) => ApplyTransactionResult;
   removeSheetFormulaIdentity: (sheet: SheetId) => boolean;
@@ -961,6 +996,10 @@ class SheetwriteStore implements Store {
     sheet: SheetId,
     col: number,
     filter: ColumnFilter | null,
+  ) => ApplyTransactionResult;
+  setDashboardItem: (
+    sheet: SheetId,
+    item: DashboardItem,
   ) => ApplyTransactionResult;
   setDetailedChangeCapture: (enabled: boolean) => void;
   setGroupCollapsed: (

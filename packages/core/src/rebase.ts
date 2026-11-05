@@ -1,5 +1,6 @@
 import { remapFormulaA1Refs } from "./a1.js";
 import { chartTouchesSheet } from "./chart-definition.js";
+import { boxesOverlap } from "./dashboard.js";
 import { decodeRestoreBlock, encodeRestoreBlock } from "./restore-block.js";
 import type { CellValue } from "./types/cell.js";
 import type { ChartDefinition, ChartRange } from "./types/chart.js";
@@ -265,6 +266,7 @@ function remoteFootprint(operation: DocumentOp): DocumentOp {
     case "setSheetMeta":
     case "setChart":
     case "setPivot":
+    case "setDashboardItem":
       return cloneJsonValue(operation);
     default:
       return { ...operation };
@@ -590,6 +592,9 @@ function transformDirectTarget(
     case "removeQuery":
     case "removeChart":
     case "removePivot":
+    // A dashboard has no rows or columns, so axis edits never move its items.
+    case "setDashboardItem":
+    case "removeDashboardItem":
       return null;
   }
 }
@@ -872,6 +877,24 @@ function operationContainsFormula(
   }
 }
 
+/** Two items of one dashboard whose boxes overlap: each is valid alone, not together. */
+function dashboardItemConflict(local: DocumentOp, remote: DocumentOp): TransformFailure | null {
+  if (local.op !== "setDashboardItem" || !("sheet" in remote) || remote.sheet !== local.sheet) {
+    return null;
+  }
+
+  const overlapping =
+    remote.op === "setDashboardItem" &&
+    remote.item.id !== local.item.id &&
+    boxesOverlap(local.item.box, remote.item.box);
+  if (!overlapping) return null;
+
+  return {
+    code: "overlapping-edit",
+    message: "A pending dashboard item overlaps a concurrent item",
+  };
+}
+
 function lifecycleConflict(
   local: DocumentOp,
   remote: DocumentOp,
@@ -904,6 +927,9 @@ function lifecycleConflict(
       message: "A pending relationship names a table that a concurrent edit removed or changed",
     };
   }
+
+  const dashboardConflict = dashboardItemConflict(local, remote);
+  if (dashboardConflict) return dashboardConflict;
 
   if (remote.op === "addSheet" && local.op === "addSheet" && local.sheet.id === remote.sheet.id) {
     return {
@@ -1171,6 +1197,10 @@ function operationIdentity(operation: DocumentOp): string {
 
     case "removePivot":
       return `pivot:${operation.id}`;
+
+    case "setDashboardItem":
+    case "removeDashboardItem":
+      return `dashboard:${operation.sheet}:${operation.op === "setDashboardItem" ? operation.item.id : operation.id}`;
 
     default:
       return "";

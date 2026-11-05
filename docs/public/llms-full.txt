@@ -86,6 +86,7 @@ Packages: 0.6.1. Canonical HTML: https://www.sheetwrite.dev/docs/
 - [Sheetwrite 0.5.1](#sheetwrite-0-5-1)
 - [Sheetwrite 0.5.0](#sheetwrite-0-5-0)
 - [Concepts](#concepts)
+- [Dashboards](#dashboards)
 - [Data model](#data-model)
 - [Import and export](#import-and-export)
 - [Getting started](#getting-started)
@@ -10993,6 +10994,124 @@ collaboration.
 - [Documents and operations](https://www.sheetwrite.dev/docs/concepts/documents-and-operations/): Understand authoritative workbook snapshots, document operations, storage transactions, and cell inputs.
 - [Error handling](https://www.sheetwrite.dev/docs/concepts/error-handling/): Typed failures, stable codes, recovery paths, event direction, validation, and incomplete-data behavior.
 
+<a id="dashboards"></a>
+
+### Dashboards
+
+Source: https://www.sheetwrite.dev/docs/features/analysis/dashboards/
+
+A dashboard is a sheet of the workbook with `kind: "dashboard"`. It has a tab, a name, an order and a visibility like a worksheet, but it has no cells, rows or columns. It holds items on a grid of 12 columns:
+
+- a **pivot** item shows a pivot of the same sheet,
+- a **slicer** item lists the values of one table column and holds the values that pass.
+
+A dashboard view, slicer filtering, charts and KPI cards follow in later releases ([#231](https://github.com/chh-ay/sheetwrite/issues/231)).
+
+## Add a dashboard
+
+```ts
+grid.addSheet({ name: "Report", kind: "dashboard" });
+```
+
+A dashboard snapshot has `rowCount: 0`, no columns and no cells. Cell, row, column, table and sheet-format operations that target a dashboard leave it unchanged. Its pivots read a table or the data model, not a range, because slicers filter tables.
+
+## Items
+
+```ts
+import { initSheetwrite, SheetwriteStore, type WorkbookSnapshot } from "@sheetwrite/core";
+
+await initSheetwrite();
+
+const snapshot: WorkbookSnapshot = {
+  schemaVersion: 1,
+  workbook: { activeSheet: "data" },
+  sheets: [
+    {
+      id: "data",
+      name: "Data",
+      order: 0,
+      rowCount: 3,
+      columns: [
+        { key: "a", header: "A", width: 80, type: "text" },
+        { key: "b", header: "B", width: 80, type: "number" },
+      ],
+      tables: [
+        {
+          id: "orders",
+          name: "Orders",
+          range: { sheet: "data", start: { row: 0, col: 0 }, end: { row: 2, col: 1 } },
+          columns: [
+            { id: "region", name: "Region" },
+            { id: "amount", name: "Amount" },
+          ],
+          headerRow: true,
+          totalsRow: false,
+        },
+      ],
+      cells: [],
+    },
+    {
+      id: "dash",
+      name: "Dash",
+      order: 1,
+      kind: "dashboard",
+      rowCount: 0,
+      columns: [],
+      pivots: [
+        {
+          id: "by-region",
+          name: "By region",
+          source: { table: "orders" },
+          anchor: { row: 0, col: 0 },
+          rows: [0],
+          columns: [],
+          values: [{ field: 1, aggregation: "SUM" }],
+        },
+      ],
+      cells: [],
+    },
+  ],
+};
+
+const store = SheetwriteStore.fromSnapshot(snapshot);
+
+store.setDashboardItem("dash", {
+  id: "sales",
+  box: { x: 0, y: 0, w: 8, h: 6 },
+  kind: "pivot",
+  pivot: "by-region",
+});
+
+store.setDashboardItem("dash", {
+  id: "region",
+  box: { x: 8, y: 0, w: 4, h: 6 },
+  kind: "slicer",
+  field: { table: "orders", column: "region" },
+  selected: ["East"],
+});
+```
+
+| Field | Meaning |
+| --- | --- |
+| `id` | A stable ID, unique on the dashboard. |
+| `box` | Column `x` (0–11) and row `y`, width `w` and height `h` (1–64) in grid units. `x + w` is at most 12. |
+| `pivot` | The ID of a pivot on the same sheet. If that pivot is removed, the item stays and shows `#REF!`; undo brings the pivot back. |
+| `field` | The table and column IDs whose values a slicer lists. |
+| `selected` | The values that pass, at most 10,000; absent means every value passes. |
+| `title` | The caption of a slicer; absent shows the column name. |
+
+Items do not overlap, and a dashboard holds at most 64 items. They are kept in reading order: by `box.y`, then by `box.x`.
+
+## Undo and collaboration
+
+`setDashboardItem` (insert or replace by ID) and `removeDashboardItem` are document operations. Each change is one undo step, and it is saved and synchronized like other sheet metadata. A slicer selection is a change of its item, so it is saved too, as Excel saves slicer state. Two concurrent changes to the same item conflict, and so do two concurrent items whose boxes overlap. A version-history restore brings the items and pivots of a dashboard back in place.
+
+| Store method | Result |
+| --- | --- |
+| `getDashboard(sheet)` | A copy of the items, or `null` for a worksheet |
+| `setDashboardItem(sheet, item)` | Inserts it, or replaces the item with its ID |
+| `removeDashboardItem(sheet, id)` | Removes it |
+
 <a id="data-model"></a>
 
 ### Data model
@@ -12324,6 +12443,68 @@ RowBridge
 
 Build and validate one operation-phase snapshot without double-counting runtime observations.
 
+##### `Dashboard` — interface
+
+```ts
+export interface Dashboard { items: DashboardItem[]; }
+```
+
+The layout of a dashboard sheet.
+
+Members:
+- `items` — Items in reading order: by `box.y`, then by `box.x`.
+
+##### `DashboardBox` — interface
+
+```ts
+export interface DashboardBox { x: number; y: number; w: number; h: number; }
+```
+
+Position and size of a dashboard item in grid units. The grid has 12
+columns; rows grow downward. Items do not overlap.
+
+Members:
+- `h` — Height in rows, 1 to 64.
+- `w` — Width in columns, 1 to 12.
+- `x` — First column, 0-based; `x + w` is at most 12.
+- `y` — First row, 0-based.
+
+##### `DashboardItem` — type
+
+```ts
+export type DashboardItem = DashboardPivotItem | DashboardSlicerItem;
+```
+
+One item of a dashboard.
+
+##### `DashboardPivotItem` — interface
+
+```ts
+export interface DashboardPivotItem { id: string; box: DashboardBox; kind: "pivot"; pivot: string; }
+```
+
+A pivot of the dashboard sheet, shown in a box.
+
+Members:
+- `id` — Stable ID, unique on the dashboard.
+- `pivot` — `PivotDefinition.id` of a pivot on the same dashboard sheet.
+
+##### `DashboardSlicerItem` — interface
+
+```ts
+export interface DashboardSlicerItem { id: string; box: DashboardBox; kind: "slicer"; field: TableColumnRef; selected?: CellScalar[]; title?: string; }
+```
+
+A slicer: the distinct values of one table column, of which `selected`
+pass. Every slicer of a dashboard filters every item that reads its table
+through relationships.
+
+Members:
+- `field` — The table column whose values the slicer lists.
+- `id` — Stable ID, unique on the dashboard.
+- `selected` — Values that pass; absent means every value passes.
+- `title` — Caption; absent shows the column name.
+
 ##### `DataCell` — type
 
 ```ts
@@ -12627,7 +12808,7 @@ Diff two validated phases of the same operation by exclusive resource owner.
 ##### `DocumentOp` — type
 
 ```ts
-export type DocumentOp = | { op: "set"; addr: CellAddress; value: CellValue; style?: CellStyle } | { op: "setRange"; range: Range; cells: SnapshotCell[] } | { op: "setBlock"; range: Range; block: PackedCellBlock } | { op: "restoreBlock"; range: Range; encoding: "deflate-json-v1"; decodedBytes: number; data: string; } | { op: "setRangeStyle"; range: Range; style: Partial<CellStyle> | null } | { op: "clearRange"; range: Range; contents?: boolean; style?: boolean } | { op: "permuteRows"; range: Range; encoding: "u32le-base64-v1"; order: string } | { op: "addRows"; sheet: SheetId; at: number; count: number } | { op: "removeRows"; sheet: SheetId; at: number; count: number } | { op: "moveRows"; sheet: SheetId; from: number; count: number; to: number } | { op: "addColumns"; sheet: SheetId; at: number; columns: Column[] } | { op: "removeColumns"; sheet: SheetId; at: number; count: number } | { op: "moveColumns"; sheet: SheetId; from: number; count: number; to: number } | { op: "setColumn"; sheet: SheetId; col: number; patch: Partial<Column> } | { op: "setRowMeta"; sheet: SheetId; row: number; meta: RowMetadata | null } | { op: "addMerge"; sheet: SheetId; merge: MergeRange } | { op: "removeMerge"; sheet: SheetId; merge: MergeRange } | { op: "addSheet"; sheet: SheetSnapshot } | { op: "removeSheet"; sheet: SheetId } | { op: "renameSheet"; sheet: SheetId; name: string } | { op: "moveSheet"; sheet: SheetId; to: number } | { op: "setSheetVisibility"; sheet: SheetId; visibility: SheetVisibility } | { op: "addTable"; table: WorkbookTable } | { op: "updateTable"; sheet: SheetId; tableId: string; patch: WorkbookTablePatch } | { op: "removeTable"; sheet: SheetId; tableId: string } | { op: "setSheetMeta"; sheet: SheetId; patch: { frozenRows?: number; frozenCols?: number; conditionalFormats?: ConditionalFormatRule[]; rowGroups?: RowGroup[]; sortKeys?: SortKey[]; filters?: Array<[col: number, filter: ColumnFilter]>; }; } | { op: "setValidationRule"; sheet: SheetId; rule: DataValidationRule } | { op: "removeValidationRule"; sheet: SheetId; id: string } | { op: "setHyperlink"; sheet: SheetId; hyperlink: CellHyperlink } | { op: "removeHyperlink"; sheet: SheetId; id: string } | { op: "setProtectedRange"; sheet: SheetId; protectedRange: ProtectedRange } | { op: "removeProtectedRange"; sheet: SheetId; id: string } | { op: "setNote"; addr: CellAddress; text: string | null } | { op: "setNamedRange"; namedRange: NamedRangeSnapshot } | { op: "removeNamedRange"; name: string; scope?: SheetId } | { op: "setCalculation"; calculation: CalculationSettings } | { op: "setRelationship"; relationship: TableRelationship } | { op: "removeRelationship"; id: string } | { op: "setQuery"; query: SavedQuery } | { op: "removeQuery"; id: string } | { op: "setChart"; sheet: SheetId; chart: ChartDefinition } | { op: "removeChart"; sheet: SheetId; id: string } | { op: "setPivot"; sheet: SheetId; pivot: PivotDefinition } | { op: "removePivot"; sheet: SheetId; id: string };
+export type DocumentOp = | { op: "set"; addr: CellAddress; value: CellValue; style?: CellStyle } | { op: "setRange"; range: Range; cells: SnapshotCell[] } | { op: "setBlock"; range: Range; block: PackedCellBlock } | { op: "restoreBlock"; range: Range; encoding: "deflate-json-v1"; decodedBytes: number; data: string; } | { op: "setRangeStyle"; range: Range; style: Partial<CellStyle> | null } | { op: "clearRange"; range: Range; contents?: boolean; style?: boolean } | { op: "permuteRows"; range: Range; encoding: "u32le-base64-v1"; order: string } | { op: "addRows"; sheet: SheetId; at: number; count: number } | { op: "removeRows"; sheet: SheetId; at: number; count: number } | { op: "moveRows"; sheet: SheetId; from: number; count: number; to: number } | { op: "addColumns"; sheet: SheetId; at: number; columns: Column[] } | { op: "removeColumns"; sheet: SheetId; at: number; count: number } | { op: "moveColumns"; sheet: SheetId; from: number; count: number; to: number } | { op: "setColumn"; sheet: SheetId; col: number; patch: Partial<Column> } | { op: "setRowMeta"; sheet: SheetId; row: number; meta: RowMetadata | null } | { op: "addMerge"; sheet: SheetId; merge: MergeRange } | { op: "removeMerge"; sheet: SheetId; merge: MergeRange } | { op: "addSheet"; sheet: SheetSnapshot } | { op: "removeSheet"; sheet: SheetId } | { op: "renameSheet"; sheet: SheetId; name: string } | { op: "moveSheet"; sheet: SheetId; to: number } | { op: "setSheetVisibility"; sheet: SheetId; visibility: SheetVisibility } | { op: "addTable"; table: WorkbookTable } | { op: "updateTable"; sheet: SheetId; tableId: string; patch: WorkbookTablePatch } | { op: "removeTable"; sheet: SheetId; tableId: string } | { op: "setSheetMeta"; sheet: SheetId; patch: { frozenRows?: number; frozenCols?: number; conditionalFormats?: ConditionalFormatRule[]; rowGroups?: RowGroup[]; sortKeys?: SortKey[]; filters?: Array<[col: number, filter: ColumnFilter]>; }; } | { op: "setValidationRule"; sheet: SheetId; rule: DataValidationRule } | { op: "removeValidationRule"; sheet: SheetId; id: string } | { op: "setHyperlink"; sheet: SheetId; hyperlink: CellHyperlink } | { op: "removeHyperlink"; sheet: SheetId; id: string } | { op: "setProtectedRange"; sheet: SheetId; protectedRange: ProtectedRange } | { op: "removeProtectedRange"; sheet: SheetId; id: string } | { op: "setNote"; addr: CellAddress; text: string | null } | { op: "setNamedRange"; namedRange: NamedRangeSnapshot } | { op: "removeNamedRange"; name: string; scope?: SheetId } | { op: "setCalculation"; calculation: CalculationSettings } | { op: "setRelationship"; relationship: TableRelationship } | { op: "removeRelationship"; id: string } | { op: "setQuery"; query: SavedQuery } | { op: "removeQuery"; id: string } | { op: "setChart"; sheet: SheetId; chart: ChartDefinition } | { op: "removeChart"; sheet: SheetId; id: string } | { op: "setPivot"; sheet: SheetId; pivot: PivotDefinition } | { op: "removePivot"; sheet: SheetId; id: string } | { op: "setDashboardItem"; sheet: SheetId; item: DashboardItem } | { op: "removeDashboardItem"; sheet: SheetId; id: string };
 ```
 
 Exhaustive serializable operation union for workbook mutations.
@@ -14566,7 +14747,7 @@ Context supplied when a canonical row insertion needs a host identity.
 ##### `RowBridgeMetadataDelta` — interface
 
 ```ts
-export interface RowBridgeMetadataDelta<Id extends RowBridgeId = RowBridgeId> { readonly kind: "metadata"; readonly metadata: | "column" | "row" | "sheet" | "merge" | "table" | "validation" | "hyperlink" | "protected-range" | "note" | "named-range" | "calculation" | "relationship" | "query" | "chart" | "pivot"; readonly transaction: RowBridgeTransaction; readonly transactionId: string; readonly source: OperationSource; readonly previous: unknown; readonly next: unknown; readonly operation: DocumentOp; readonly rowIds: readonly (Id | null)[]; }
+export interface RowBridgeMetadataDelta<Id extends RowBridgeId = RowBridgeId> { readonly kind: "metadata"; readonly metadata: | "column" | "row" | "sheet" | "merge" | "table" | "validation" | "hyperlink" | "protected-range" | "note" | "named-range" | "calculation" | "relationship" | "query" | "chart" | "pivot" | "dashboard"; readonly transaction: RowBridgeTransaction; readonly transactionId: string; readonly source: OperationSource; readonly previous: unknown; readonly next: unknown; readonly operation: DocumentOp; readonly rowIds: readonly (Id | null)[]; }
 ```
 
 A document operation that changes workbook or column metadata.
@@ -14876,7 +15057,7 @@ Registers the optional workbook XLSX implementation used by core.
 ##### `Sheet` — interface
 
 ```ts
-export interface Sheet { id: SheetId; name: string; visibility?: SheetVisibility; columns: Column[]; rowCount: number; rowHeights?: Map<number, number>; hiddenRows?: Set<number>; rowGroups?: RowGroup[]; conditionalFormats?: ConditionalFormatRule[]; hyperlinks?: CellHyperlink[]; validationRules?: DataValidationRule[]; protectedRanges?: ProtectedRange[]; notes?: CellNote[]; sortKeys?: SortKey[]; filters?: Array<[col: number, filter: ColumnFilter]>; merges?: MergeRange[]; frozenRows?: number; frozenCols?: number; tables?: WorkbookTable[]; charts?: ChartDefinition[]; pivots?: PivotDefinition[]; }
+export interface Sheet { id: SheetId; name: string; kind?: SheetKind; dashboard?: Dashboard; visibility?: SheetVisibility; columns: Column[]; rowCount: number; rowHeights?: Map<number, number>; hiddenRows?: Set<number>; rowGroups?: RowGroup[]; conditionalFormats?: ConditionalFormatRule[]; hyperlinks?: CellHyperlink[]; validationRules?: DataValidationRule[]; protectedRanges?: ProtectedRange[]; notes?: CellNote[]; sortKeys?: SortKey[]; filters?: Array<[col: number, filter: ColumnFilter]>; merges?: MergeRange[]; frozenRows?: number; frozenCols?: number; tables?: WorkbookTable[]; charts?: ChartDefinition[]; pivots?: PivotDefinition[]; }
 ```
 
 Workbook sheet schema used when creating a live grid.
@@ -14885,12 +15066,14 @@ Members:
 - `charts` — Charts anchored to this sheet; series sources use stable sheet IDs.
 - `columns` — Ordered schema; array positions are the zero-based column coordinates.
 - `conditionalFormats` — Conditional styles folded into the bulk render-window style dictionary.
+- `dashboard` — Items of a dashboard sheet; only on `kind: "dashboard"`.
 - `filters` — Persisted column filters as JSON-safe index/value tuples.
 - `frozenCols` — Leading columns pinned left of the scrolling body (0/undefined = none).
 - `frozenRows` — Leading view rows pinned above the scrolling body (0/undefined = none).
 - `hiddenRows` — Persisted hidden data rows; runtime form is sparse and non-JSON.
 - `hyperlinks` — Stable, serializable range hyperlinks; external URLs pass the shared safety policy.
 - `id` — Stable identifier, unique within the workbook and used by every cell address.
+- `kind` — A dashboard holds items and no cells; absent means a worksheet.
 - `merges` — Persisted merged-cell regions; covered cells render/export from the anchor.
 - `name` — User-facing sheet name shown in tabs and workbook exports.
 - `notes` — Simple cell notes. Discussion threads live outside the document model.
@@ -14911,6 +15094,14 @@ export type SheetId = string;
 ```
 
 Stable identifier used to address a workbook sheet.
+
+##### `SheetKind` — type
+
+```ts
+export type SheetKind = "worksheet" | "dashboard";
+```
+
+The kind of a sheet: cells, or a dashboard of items. Absent means `"worksheet"`.
 
 ##### `SheetLifecycleIssueCode` — type
 
@@ -14955,13 +15146,15 @@ Successful canonical name or an actionable validation failure.
 ##### `SheetSnapshot` — interface
 
 ```ts
-export interface SheetSnapshot { id: SheetId; name: string; order: number; visibility?: SheetVisibility; rowCount: number; columns: Column[]; frozenRows?: number; frozenCols?: number; rowMeta?: Array<[row: number, meta: RowMetadata]>; merges?: MergeRange[]; conditionalFormats?: ConditionalFormatRule[]; hyperlinks?: CellHyperlink[]; validationRules?: DataValidationRule[]; protectedRanges?: ProtectedRange[]; notes?: CellNote[]; sortKeys?: SortKey[]; filters?: Array<[col: number, filter: ColumnFilter]>; rowGroups?: RowGroup[]; tables?: WorkbookTable[]; charts?: ChartDefinition[]; pivots?: PivotDefinition[]; cells: CellBlock[]; }
+export interface SheetSnapshot { id: SheetId; name: string; order: number; kind?: SheetKind; dashboard?: Dashboard; visibility?: SheetVisibility; rowCount: number; columns: Column[]; frozenRows?: number; frozenCols?: number; rowMeta?: Array<[row: number, meta: RowMetadata]>; merges?: MergeRange[]; conditionalFormats?: ConditionalFormatRule[]; hyperlinks?: CellHyperlink[]; validationRules?: DataValidationRule[]; protectedRanges?: ProtectedRange[]; notes?: CellNote[]; sortKeys?: SortKey[]; filters?: Array<[col: number, filter: ColumnFilter]>; rowGroups?: RowGroup[]; tables?: WorkbookTable[]; charts?: ChartDefinition[]; pivots?: PivotDefinition[]; cells: CellBlock[]; }
 ```
 
 Serializable complete state for one workbook sheet.
 
 Members:
 - `columns` — Keys are stable, unique document column identities as well as datasource keys.
+- `dashboard` — Items of a dashboard sheet; only on `kind: "dashboard"`.
+- `kind` — A dashboard holds items and no cells; absent means a worksheet.
 - `pivots` — Pivot tables anchored on this sheet.
 - `visibility` — Hidden worksheets remain in the workbook and retain formulas/references.
 
@@ -15078,7 +15271,7 @@ Members:
 ##### `SheetwriteStore` — class
 
 ```ts
-class SheetwriteStore implements Store { constructor(workbook: Workbook, data?: ColumnarData, options?: SheetwriteStoreOptions); acknowledgeOperations: (operations: readonly DocumentOp[], storageRevision?: bigint) => void; aggregate: (sheet: SheetId, col: number, op: AggregateOp) => number; applyTransaction: (tx: Transaction, reasonOrOptions?: CommitReason | TransactionApplicationOptions) => ApplyTransactionResult; areColumnsFullyLoaded: (sheet: SheetId, startRow: number, endRow: number, columns: readonly number[]) => boolean; canApplyLocally: (patch: DocumentOp) => boolean; captureRangeHistory: (input: Range) => CompactRangeHistory | null; clearView: (sheet: SheetId) => ApplyTransactionResult; columnFilters: (sheet: SheetId) => ReadonlyMap<number, ColumnFilter>; dataEdge: (sheet: SheetId, row: number, col: number, dRow: number, dCol: number) => number; dataRowAt: (sheet: SheetId, viewRow: number) => number; dispose: () => void; distinctValues: (sheet: SheetId, col: number, limit?: number) => CellScalar[]; ensureColumns: (sheet: SheetId, columns: readonly Column[]) => void; exportSnapshot: () => WorkbookSnapshot; filterBy: (sheet: SheetId, col: number, needle: string) => ApplyTransactionResult; getCell: (addr: CellAddress) => ResolvedCell; getCellLoadState: (addr: CellAddress) => CellLoadState; getClipboardWindow: (sheet: SheetId, viewRows: { start: number; end: number; }, cols: readonly number[]) => ClipboardWindowView; getDataWindow: (sheet: SheetId, rows: { start: number; end: number; }, cols: readonly number[]) => VisibleWindowView; getFormula: (addr: CellAddress) => string | null; getFormulaMatrixResourcePeak: () => TransientResourcePeak; getPagedStats: (sheet: SheetId) => PagedStoreStats; getPivotFields: (sheet: SheetId, id: string) => PivotSourceField[]; getPivotResult: (sheet: SheetId, id: string) => PivotResultView | null; getPivots: (sheet?: SheetId) => PivotDefinition[]; getRangeMutationAllocationStats: () => RangeMutationAllocationStats; getRefTarget: (addr: CellAddress) => CellAddress | null; getRelationshipStatus: (id: string) => RelationshipStatus; getRelationships: () => TableRelationship[]; getRuntimeResourceSnapshot: (operation: RuntimeResourceOperation, phase: RuntimeResourcePhase, runtime?: RuntimeMemoryObservation) => RuntimeResourceSnapshot; getSpillAnchor: (addr: CellAddress) => CellAddress | null; getVisibleWindow: (sheet: SheetId, rows: { start: number; end: number; }, cols: readonly number[]) => VisibleWindowView; getWorkbook: () => Workbook; groupRows: (sheet: SheetId, start: number, end: number) => ApplyTransactionResult; hasView: (sheet: SheetId) => boolean; hiddenRows: (sheet: SheetId) => number[]; hideRows: (sheet: SheetId, rows: readonly number[]) => ApplyTransactionResult; isPaged: (sheet: SheetId) => boolean; isRangeFullyLoaded: (input: Range) => boolean; loadPage: (sheet: SheetId, start: number, columns: readonly DataSourceColumnBand[], rows: readonly RowData[], protect?: (addr: CellAddress) => boolean) => void; on: (_evt: "change", fn: ChangeListener) => () => void; queryCapability: (sheet: SheetId) => QueryCapability; recalculateVolatile: (now?: Date) => void; removePivot: (id: string, sheet?: SheetId) => ApplyTransactionResult; removeRelationship: (id: string) => ApplyTransactionResult; removeSheetFormulaIdentity: (sheet: SheetId) => boolean; renameSheetFormulaIdentity: (sheet: SheetId, name: string) => boolean; replaceSnapshot: (snapshot: WorkbookSnapshot) => void; resetFormulaMatrixResourcePeak: () => void; resetRangeMutationAllocationStats: () => void; resetRuntimeResourceAccounting: () => void; rowGroups: (sheet: SheetId) => readonly RowGroup[]; searchCells: (sheet: SheetId, query: string, opts?: { matchCase?: boolean; wholeCell?: boolean; columns?: number[]; }) => CellAddress[]; searchCellsFlat: (sheet: SheetId, query: string, opts?: { matchCase?: boolean; wholeCell?: boolean; columns?: number[]; }) => Uint32Array; setColumnFilter: (sheet: SheetId, col: number, filter: ColumnFilter | null) => ApplyTransactionResult; setDetailedChangeCapture: (enabled: boolean) => void; setGroupCollapsed: (sheet: SheetId, start: number, collapsed: boolean) => ApplyTransactionResult; setPivot: (pivot: PivotDefinition, sheet?: SheetId) => ApplyTransactionResult; setProtectionResolver: (resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode) => void; setRelationship: (relationship: TableRelationship) => ApplyTransactionResult; setViewSort: (sheet: SheetId, keys: readonly SortKey[]) => ApplyTransactionResult; showRows: (sheet: SheetId, rows?: readonly number[]) => ApplyTransactionResult; sortRange: (range: Range, keys: readonly SortKey[], options?: { hasHeader?: boolean; }) => ApplyTransactionResult; ungroupRows: (sheet: SheetId, start: number, end: number) => ApplyTransactionResult; viewRowCount: (sheet: SheetId) => number; viewRowOf: (sheet: SheetId, dataRow: number) => number | null; withResourceOperation: <T>(operation: RuntimeResourceOperation, run: () => T) => T; static fromSnapshot: (input: unknown, options?: SheetwriteStoreOptions) => SheetwriteStore }
+class SheetwriteStore implements Store { constructor(workbook: Workbook, data?: ColumnarData, options?: SheetwriteStoreOptions); acknowledgeOperations: (operations: readonly DocumentOp[], storageRevision?: bigint) => void; aggregate: (sheet: SheetId, col: number, op: AggregateOp) => number; applyTransaction: (tx: Transaction, reasonOrOptions?: CommitReason | TransactionApplicationOptions) => ApplyTransactionResult; areColumnsFullyLoaded: (sheet: SheetId, startRow: number, endRow: number, columns: readonly number[]) => boolean; canApplyLocally: (patch: DocumentOp) => boolean; captureRangeHistory: (input: Range) => CompactRangeHistory | null; clearView: (sheet: SheetId) => ApplyTransactionResult; columnFilters: (sheet: SheetId) => ReadonlyMap<number, ColumnFilter>; dataEdge: (sheet: SheetId, row: number, col: number, dRow: number, dCol: number) => number; dataRowAt: (sheet: SheetId, viewRow: number) => number; dispose: () => void; distinctValues: (sheet: SheetId, col: number, limit?: number) => CellScalar[]; ensureColumns: (sheet: SheetId, columns: readonly Column[]) => void; exportSnapshot: () => WorkbookSnapshot; filterBy: (sheet: SheetId, col: number, needle: string) => ApplyTransactionResult; getCell: (addr: CellAddress) => ResolvedCell; getCellLoadState: (addr: CellAddress) => CellLoadState; getClipboardWindow: (sheet: SheetId, viewRows: { start: number; end: number; }, cols: readonly number[]) => ClipboardWindowView; getDashboard: (sheet: SheetId) => Dashboard | null; getDataWindow: (sheet: SheetId, rows: { start: number; end: number; }, cols: readonly number[]) => VisibleWindowView; getFormula: (addr: CellAddress) => string | null; getFormulaMatrixResourcePeak: () => TransientResourcePeak; getPagedStats: (sheet: SheetId) => PagedStoreStats; getPivotFields: (sheet: SheetId, id: string) => PivotSourceField[]; getPivotResult: (sheet: SheetId, id: string) => PivotResultView | null; getPivots: (sheet?: SheetId) => PivotDefinition[]; getRangeMutationAllocationStats: () => RangeMutationAllocationStats; getRefTarget: (addr: CellAddress) => CellAddress | null; getRelationshipStatus: (id: string) => RelationshipStatus; getRelationships: () => TableRelationship[]; getRuntimeResourceSnapshot: (operation: RuntimeResourceOperation, phase: RuntimeResourcePhase, runtime?: RuntimeMemoryObservation) => RuntimeResourceSnapshot; getSpillAnchor: (addr: CellAddress) => CellAddress | null; getVisibleWindow: (sheet: SheetId, rows: { start: number; end: number; }, cols: readonly number[]) => VisibleWindowView; getWorkbook: () => Workbook; groupRows: (sheet: SheetId, start: number, end: number) => ApplyTransactionResult; hasView: (sheet: SheetId) => boolean; hiddenRows: (sheet: SheetId) => number[]; hideRows: (sheet: SheetId, rows: readonly number[]) => ApplyTransactionResult; isPaged: (sheet: SheetId) => boolean; isRangeFullyLoaded: (input: Range) => boolean; loadPage: (sheet: SheetId, start: number, columns: readonly DataSourceColumnBand[], rows: readonly RowData[], protect?: (addr: CellAddress) => boolean) => void; on: (_evt: "change", fn: ChangeListener) => () => void; queryCapability: (sheet: SheetId) => QueryCapability; recalculateVolatile: (now?: Date) => void; removeDashboardItem: (sheet: SheetId, id: string) => ApplyTransactionResult; removePivot: (id: string, sheet?: SheetId) => ApplyTransactionResult; removeRelationship: (id: string) => ApplyTransactionResult; removeSheetFormulaIdentity: (sheet: SheetId) => boolean; renameSheetFormulaIdentity: (sheet: SheetId, name: string) => boolean; replaceSnapshot: (snapshot: WorkbookSnapshot) => void; resetFormulaMatrixResourcePeak: () => void; resetRangeMutationAllocationStats: () => void; resetRuntimeResourceAccounting: () => void; rowGroups: (sheet: SheetId) => readonly RowGroup[]; searchCells: (sheet: SheetId, query: string, opts?: { matchCase?: boolean; wholeCell?: boolean; columns?: number[]; }) => CellAddress[]; searchCellsFlat: (sheet: SheetId, query: string, opts?: { matchCase?: boolean; wholeCell?: boolean; columns?: number[]; }) => Uint32Array; setColumnFilter: (sheet: SheetId, col: number, filter: ColumnFilter | null) => ApplyTransactionResult; setDashboardItem: (sheet: SheetId, item: DashboardItem) => ApplyTransactionResult; setDetailedChangeCapture: (enabled: boolean) => void; setGroupCollapsed: (sheet: SheetId, start: number, collapsed: boolean) => ApplyTransactionResult; setPivot: (pivot: PivotDefinition, sheet?: SheetId) => ApplyTransactionResult; setProtectionResolver: (resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode) => void; setRelationship: (relationship: TableRelationship) => ApplyTransactionResult; setViewSort: (sheet: SheetId, keys: readonly SortKey[]) => ApplyTransactionResult; showRows: (sheet: SheetId, rows?: readonly number[]) => ApplyTransactionResult; sortRange: (range: Range, keys: readonly SortKey[], options?: { hasHeader?: boolean; }) => ApplyTransactionResult; ungroupRows: (sheet: SheetId, start: number, end: number) => ApplyTransactionResult; viewRowCount: (sheet: SheetId) => number; viewRowOf: (sheet: SheetId, dataRow: number) => number | null; withResourceOperation: <T>(operation: RuntimeResourceOperation, run: () => T) => T; static fromSnapshot: (input: unknown, options?: SheetwriteStoreOptions) => SheetwriteStore }
 ```
 
 Stable public facade and the sole transaction, epoch, policy, and event barrier.
@@ -15127,6 +15320,7 @@ NOT for the render hot path — renderers use `getVisibleWindow`.
 - `getCellLoadState` — Loaded/empty/local state; dense stores always return a loaded state.
 - `getClipboardWindow` — Optional packed clipboard read. Custom stores may omit it; the controller
 preserves the per-cell Store fallback contract.
+- `getDashboard` — A copy of the items of the dashboard `sheet`, or `null` when it is not a dashboard.
 - `getDataWindow` — Optional packed canonical data-row window used by file export. Unlike
 `getVisibleWindow`, sort/filter state never remaps `rows`.
 - `getFormula` — Formula source at `addr`, or null when the cell is not a formula.
@@ -15147,9 +15341,13 @@ the cell values. The default engine checks no keys and reports
 `INDIRECT`) from one captured instant. The supplied Date is interpreted as an absolute UTC instant.
 Edits already recompute volatile formulas and read the clock once per
 recalculation; this call uses `now` instead, until the next edit.
+- `removeDashboardItem` — Remove the item with `id` from the dashboard `sheet`.
 - `removePivot` — Remove a pivot; `sheet` defaults to the sheet that holds it.
 - `removeRelationship` — Remove the relationship with `id`.
 - `replaceSnapshot` — Replace only after a separate store has validated and hydrated every sheet.
+- `setDashboardItem` — Insert an item on the dashboard `sheet`, or replace the one with its ID.
+Items stay inside the 12 columns, do not overlap, and a pivot item shows
+a pivot of the same sheet; otherwise the result is a no-op.
 - `setDetailedChangeCapture` — Opt in to per-cell before/after capture for packed and clear operations.
 - `setPivot` — Insert or replace a pivot. `sheet` defaults to the sheet that holds the
 pivot's ID, then to the active sheet. The pivot's `savedOutput` is
@@ -16684,7 +16882,7 @@ Context supplied when a canonical row insertion needs a host identity.
 ##### `RowBridgeMetadataDelta` — interface
 
 ```ts
-export interface RowBridgeMetadataDelta<Id extends RowBridgeId = RowBridgeId> { readonly kind: "metadata"; readonly metadata: | "column" | "row" | "sheet" | "merge" | "table" | "validation" | "hyperlink" | "protected-range" | "note" | "named-range" | "calculation" | "relationship" | "query" | "chart" | "pivot"; readonly transaction: RowBridgeTransaction; readonly transactionId: string; readonly source: OperationSource; readonly previous: unknown; readonly next: unknown; readonly operation: DocumentOp; readonly rowIds: readonly (Id | null)[]; }
+export interface RowBridgeMetadataDelta<Id extends RowBridgeId = RowBridgeId> { readonly kind: "metadata"; readonly metadata: | "column" | "row" | "sheet" | "merge" | "table" | "validation" | "hyperlink" | "protected-range" | "note" | "named-range" | "calculation" | "relationship" | "query" | "chart" | "pivot" | "dashboard"; readonly transaction: RowBridgeTransaction; readonly transactionId: string; readonly source: OperationSource; readonly previous: unknown; readonly next: unknown; readonly operation: DocumentOp; readonly rowIds: readonly (Id | null)[]; }
 ```
 
 A document operation that changes workbook or column metadata.

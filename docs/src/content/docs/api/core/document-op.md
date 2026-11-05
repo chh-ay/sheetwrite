@@ -8,10 +8,10 @@ description: "DocumentOp type in @sheetwrite/core: Exhaustive serializable opera
 Exhaustive serializable operation union for workbook mutations.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L508"><code>packages/core/src/types/document.ts#L508</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L519"><code>packages/core/src/types/document.ts#L519</code></a></dd></div>
 </dl>
 
-## Variants <span class="api-count" data-pagefind-ignore>44</span>
+## Variants <span class="api-count" data-pagefind-ignore>46</span>
 
 <div class="api-variant-list" data-pagefind-ignore>
 <div class="api-variant">
@@ -416,6 +416,24 @@ Exhaustive serializable operation union for workbook mutations.
 ```
 
 </div>
+<div class="api-variant">
+
+```ts generated
+{
+  op: "setDashboardItem";
+  sheet: SheetId;
+  item: DashboardItem;
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ op: "removeDashboardItem"; sheet: SheetId; id: string }
+```
+
+</div>
 </div>
 
 ## Declaration
@@ -656,6 +674,16 @@ export type DocumentOp =
     }
   | {
       op: "removePivot";
+      sheet: SheetId;
+      id: string;
+    }
+  | {
+      op: "setDashboardItem";
+      sheet: SheetId;
+      item: DashboardItem;
+    }
+  | {
+      op: "removeDashboardItem";
       sheet: SheetId;
       id: string;
     };

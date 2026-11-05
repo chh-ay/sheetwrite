@@ -8,13 +8,15 @@ description: "SheetSnapshot interface in @sheetwrite/core: Serializable complete
 Serializable complete state for one workbook sheet.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L405"><code>packages/core/src/types/document.ts#L405</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L412"><code>packages/core/src/types/document.ts#L412</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
 <a href="#sheet-snapshot-id"><code>id</code></a>
 <a href="#sheet-snapshot-name"><code>name</code></a>
 <a href="#sheet-snapshot-order"><code>order</code></a>
+<a href="#sheet-snapshot-kind"><code>kind</code></a>
+<a href="#sheet-snapshot-dashboard"><code>dashboard</code></a>
 <a href="#sheet-snapshot-visibility"><code>visibility</code></a>
 <a href="#sheet-snapshot-row-count"><code>rowCount</code></a>
 <a href="#sheet-snapshot-columns"><code>columns</code></a>
@@ -36,7 +38,7 @@ Serializable complete state for one workbook sheet.
 <a href="#sheet-snapshot-cells"><code>cells</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>22</span>
+## Members <span class="api-count" data-pagefind-ignore>24</span>
 
 <div class="api-member-list">
 
@@ -63,6 +65,24 @@ name: string;
 
 ```ts generated
 order: number;
+```
+
+</details>
+
+<details class="api-member" id="sheet-snapshot-kind" data-pagefind-weight="1">
+<summary><code>kind</code> <span class="api-member-summary">A dashboard holds items and no cells; absent means a worksheet.</span></summary>
+
+```ts generated
+kind?: SheetKind;
+```
+
+</details>
+
+<details class="api-member" id="sheet-snapshot-dashboard" data-pagefind-weight="1">
+<summary><code>dashboard</code> <span class="api-member-summary">Items of a dashboard sheet; only on kind: &quot;dashboard&quot;.</span></summary>
+
+```ts generated
+dashboard?: Dashboard;
 ```
 
 </details>
@@ -249,6 +269,8 @@ export interface SheetSnapshot {
   id: SheetId;
   name: string;
   order: number;
+  kind?: SheetKind;
+  dashboard?: Dashboard;
   visibility?: SheetVisibility;
   rowCount: number;
   columns: Column[];

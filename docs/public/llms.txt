@@ -138,6 +138,7 @@ Sheetwrite packages are released together at version 0.6.1. This index is genera
 ## More guides
 
 - [Concepts](https://www.sheetwrite.dev/docs/concepts/): How Sheetwrite works: who owns the runtime and the data, how the calculation engine recalculates, how documents change, and how errors surface.
+- [Dashboards](https://www.sheetwrite.dev/docs/features/analysis/dashboards/): Arrange pivots and slicers on a dashboard sheet with a grid layout that is saved, undone and synchronized.
 - [Data model](https://www.sheetwrite.dev/docs/features/analysis/data-model/): Relate workbook tables with one-to-many relationships that are saved in the workbook, undone and synchronized.
 - [Import and export](https://www.sheetwrite.dev/docs/import-export/): Read and write XLSX, CSV and TSV with Sheetwrite: what each format keeps, how large files stream, and how round trips with other apps behave.
 - [Getting started](https://www.sheetwrite.dev/docs/start/): Install Sheetwrite, build your first grid, choose between the default and full formula engines, and upgrade from an earlier release.
@@ -147,7 +148,7 @@ Sheetwrite packages are released together at version 0.6.1. This index is genera
 
 - [API reference](https://www.sheetwrite.dev/docs/api/): Generated reference for every classified Sheetwrite package entry point.
 - [`@sheetwrite/charts`](https://www.sheetwrite.dev/docs/api/charts/): 18 exports across 2 entry points (primary entry point: supported).
-- [`@sheetwrite/core`](https://www.sheetwrite.dev/docs/api/core/): 392 exports across 13 entry points (primary entry point: supported).
+- [`@sheetwrite/core`](https://www.sheetwrite.dev/docs/api/core/): 398 exports across 13 entry points (primary entry point: supported).
 - [`@sheetwrite/formulas`](https://www.sheetwrite.dev/docs/api/formulas/): 26 exports across 2 entry points (primary entry point: internal).
 - [`@sheetwrite/queries`](https://www.sheetwrite.dev/docs/api/queries/): 29 exports across 2 entry points (primary entry point: supported).
 - [`@sheetwrite/react`](https://www.sheetwrite.dev/docs/api/react/): 19 exports across 2 entry points (primary entry point: supported).

@@ -355,6 +355,8 @@ export class StoreMutationPolicy {
       case "removeQuery":
       case "setPivot":
       case "removePivot":
+      case "setDashboardItem":
+      case "removeDashboardItem":
       // A chart only reads its sources, so protection and validation never apply.
       case "setChart":
       case "removeChart":

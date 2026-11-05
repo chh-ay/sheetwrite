@@ -67,6 +67,7 @@ export interface TableColumnRef {
 <p class="api-consumers-label">Public exports naming <code>TableColumnRef</code></p>
 
 <ul class="api-consumer-list">
+<li><a href="/docs/api/core/dashboard-slicer-item/"><code>DashboardSlicerItem</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/pivot-source/"><code>PivotSource</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/table-relationship/"><code>TableRelationship</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
