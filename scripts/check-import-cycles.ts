@@ -212,6 +212,8 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "ApplyTransactionResult",
       "CellChange",
       "ChangeEvent",
+      "CommitJournal",
+      "CommittedTransaction",
       "GridTransaction",
       "OperationSource",
       "PendingCommit",

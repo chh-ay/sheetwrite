@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "2df3ee5355aa1a854792ca7ab690db8218af73a27766d7abd16afecfdb4c97de",
+  "sha256": "3dee9418f0274b3ccf8ef33f8dcdb8554a7836be3aac785b2354762fbb5234e9",
   "intentionalExports": [
     {
       "package": "@sheetwrite/charts",
@@ -93,7 +93,9 @@
         "CommentMutationRequest",
         "CommentMutationResponse",
         "CommentThread",
+        "CommitJournal",
         "CommitReason",
+        "CommittedTransaction",
         "ConditionalFormatPredicate",
         "ConditionalFormatRule",
         "ContextMenuActionName",
