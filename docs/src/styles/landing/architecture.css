@@ -1,0 +1,235 @@
+/* ---- Architecture illustration --------------------------------------------- */
+/* ArchitectureScene.tsx draws each frame (transforms, opacity, data-state);
+   these rules only paint. */
+
+.sw-arch {
+  overflow: hidden;
+  border: 1px solid var(--sw-border-strong);
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--sw-surface-1) 92%, transparent);
+}
+
+.sw-arch .as {
+  display: block;
+  width: 100%;
+  height: auto;
+  padding: 1.25rem 1.5rem 0.75rem;
+}
+
+.as text {
+  font-family: var(--sw-font-body);
+  font-variant-numeric: tabular-nums;
+}
+
+.as-box {
+  fill: var(--sw-surface-2);
+  stroke: var(--sw-border-strong);
+}
+
+.as-layer[data-layer="app"] .as-box {
+  stroke-dasharray: 6 5;
+}
+
+.as-glow {
+  fill: none;
+  stroke: var(--sw-accent);
+  stroke-width: 2;
+  opacity: 0;
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--sw-accent) 55%, transparent));
+}
+
+.as .as-owner {
+  fill: var(--sw-fg-dim);
+  font: 650 11px var(--sw-font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.as-layer:not([data-layer="app"]) .as-owner {
+  fill: var(--sw-accent-strong);
+}
+
+.as .as-title {
+  fill: var(--sw-fg-strong);
+  font: 650 17px var(--sw-font-display);
+}
+
+.as .as-line {
+  fill: var(--sw-fg-muted);
+  font-size: 13px;
+}
+
+.as-divider {
+  stroke: var(--sw-border);
+}
+
+.as-cell {
+  fill: color-mix(in srgb, var(--sw-fg) 7%, transparent);
+  transition: fill 0.25s ease;
+}
+
+.as-cell[data-filled="true"] {
+  fill: color-mix(in srgb, var(--sw-accent) 34%, transparent);
+}
+
+.as-cell[data-painted="true"] {
+  fill: var(--sw-accent-strong);
+  transition: none;
+}
+
+.as-column {
+  fill: color-mix(in srgb, var(--sw-accent) 55%, transparent);
+}
+
+.as .as-caption {
+  fill: var(--sw-fg-dim);
+  font: 600 11px var(--sw-font-mono);
+}
+
+.as .as-log {
+  fill: var(--sw-accent-strong);
+  font: 600 11.5px var(--sw-font-mono);
+}
+
+.as .as-log-detail {
+  fill: var(--sw-fg-muted);
+  font-weight: 400;
+}
+
+.sw-arch[data-landing-running="false"] .as-lanes line {
+  animation-play-state: paused;
+}
+
+.as-lanes line {
+  stroke: var(--sw-border-strong);
+  stroke-dasharray: 4 5;
+  stroke-width: 1.5;
+}
+
+.as-lanes line[data-flowing="true"] {
+  stroke: var(--sw-accent);
+  animation: as-flow 0.5s linear infinite;
+}
+
+@keyframes as-flow {
+  to {
+    stroke-dashoffset: -9;
+  }
+}
+
+.as .as-lanes text {
+  fill: var(--sw-fg-dim);
+  font: 600 11px var(--sw-font-mono);
+  text-anchor: middle;
+}
+
+.as-server > rect {
+  fill: var(--sw-surface-2);
+  stroke: var(--sw-border-strong);
+  stroke-dasharray: 6 5;
+}
+
+.as .as-server > text {
+  fill: var(--sw-fg);
+  font-size: 13px;
+  font-weight: 600;
+  text-anchor: middle;
+}
+
+.as-version rect {
+  fill: var(--sw-accent-strong);
+}
+
+.as .as-version text {
+  fill: var(--sw-accent-ink);
+  font: 700 11px var(--sw-font-mono);
+  text-anchor: middle;
+}
+
+.as-packet,
+.as-edit {
+  transform-box: view-box;
+  transform-origin: 0 0;
+}
+
+.as-version {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.as-packet rect {
+  fill: var(--sw-accent-strong);
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--sw-accent) 60%, transparent));
+}
+
+.as .as-packet text {
+  fill: var(--sw-accent-ink);
+  font: 700 11px var(--sw-font-mono);
+}
+
+.as-edit {
+  fill: var(--sw-accent-strong);
+}
+
+/* Hidden until the timeline shows them. */
+.as-packet,
+.as-edit {
+  opacity: 0;
+}
+
+.sw-arch__steps {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--sw-border);
+  list-style: none;
+}
+
+.sw-arch__steps li {
+  position: relative;
+  min-width: 0;
+  color: var(--sw-fg-dim);
+  font-size: var(--sw-type-sm);
+  line-height: 1.5;
+  transition: color 0.3s ease;
+}
+
+.sw-arch__steps button {
+  padding: 1rem 1.1rem 1.15rem;
+}
+
+.sw-arch__steps li + li {
+  border-left: 1px solid var(--sw-border);
+}
+
+.sw-arch__steps li span {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: var(--sw-fg-dim);
+  font: 650 var(--sw-type-xs) / 1 var(--sw-font-mono);
+}
+
+.sw-arch__steps li::before {
+  position: absolute;
+  top: -1px;
+  right: 0;
+  left: 0;
+  height: 2px;
+  background: var(--sw-accent-strong);
+  content: "";
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.sw-arch__steps li[data-current="true"] {
+  color: var(--sw-fg-strong);
+}
+
+.sw-arch__steps li[data-current="true"] span {
+  color: var(--sw-accent-strong);
+}
+
+.sw-arch__steps li[data-current="true"]::before {
+  transform: scaleX(1);
+}
