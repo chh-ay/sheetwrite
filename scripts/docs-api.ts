@@ -378,15 +378,18 @@ async function readDeclarationShape(
 ): Promise<DeclarationShape> {
   const sourceFile = await project.program.getSourceFile(path);
   const declaration = sourceFile?.statements[0];
+
   if (sourceFile === undefined || declaration === undefined) {
     return { formatted: signature, members: [], variants: [] };
   }
+
   const memberNodes: readonly Node[] =
     isInterfaceDeclaration(declaration) || isClassDeclaration(declaration)
       ? declaration.members
       : isTypeAliasDeclaration(declaration) && isTypeLiteralNode(declaration.type)
         ? declaration.type.members
         : [];
+
   return {
     formatted: await project.emitter.printNode(declaration),
     members: memberNodes.map((member, index) => ({
