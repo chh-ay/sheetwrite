@@ -312,6 +312,30 @@ function rebasePatches(
       continue;
     }
 
+    if (patch.op === "permuteRows") {
+      const start = mapAddr({ sheet: patch.range.sheet, ...patch.range.start });
+      const end = mapAddr({ sheet: patch.range.sheet, ...patch.range.end });
+      // The order names each row of the range, so it fits only a range that
+      // kept its row count.
+      if (
+        start &&
+        end &&
+        start.sheet === end.sheet &&
+        end.row - start.row === patch.range.end.row - patch.range.start.row
+      ) {
+        out.push({
+          ...patch,
+          range: {
+            sheet: start.sheet,
+            start: { row: start.row, col: start.col },
+            end: { row: end.row, col: end.col },
+          },
+        });
+      }
+
+      continue;
+    }
+
     if (patch.op === "addTable") {
       const start = mapAddr({ sheet: patch.table.range.sheet, ...patch.table.range.start });
       const end = mapAddr({ sheet: patch.table.range.sheet, ...patch.table.range.end });

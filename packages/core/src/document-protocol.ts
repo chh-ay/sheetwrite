@@ -33,6 +33,7 @@ import {
   validatePivotShape,
 } from "./pivot.js";
 import { compareCodeUnits, isPlainRecord, ownValue, type PlainRecord } from "./plain-data.js";
+import { ROW_ORDER_ENCODING } from "./row-order.js";
 import { validateSavedQueriesShape, validateSavedQueryShape } from "./saved-query.js";
 import { preparedRestore } from "./transaction-preparation.js";
 import type { MergeRange, Range } from "./types/coordinates.js";
@@ -2387,6 +2388,17 @@ export function validateDocumentOperationShape(
       optionalBoolean(operation, "style", path, errors);
       break;
 
+    case "permuteRows":
+      validateRangeShape(ownValue(operation, "range"), `${path}.range`, errors);
+      if (ownValue(operation, "encoding") !== ROW_ORDER_ENCODING) {
+        invalid(errors, `${path}.encoding`, "Row order encoding is invalid");
+      }
+
+      if (typeof ownValue(operation, "order") !== "string") {
+        invalid(errors, `${path}.order`, "Row order must be a string");
+      }
+      break;
+
     case "addRows":
     case "removeRows":
       validateOperationSheetId(operation, path, errors);
@@ -3720,6 +3732,7 @@ export function documentOpTarget(operation: DocumentOp): string {
     case "restoreBlock":
     case "setRangeStyle":
     case "clearRange":
+    case "permuteRows":
       return operation.range.sheet;
 
     case "addTable":
