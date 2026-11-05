@@ -217,6 +217,8 @@ pub enum Func {
     Offset,
     Indirect,
     Areas,
+    Lookup,
+    TrimRange,
     ErrorType,
     Info,
     IsEven,
@@ -491,6 +493,7 @@ define_function_registry! {
         Filter => "FILTER";
         IsEven => "ISEVEN";
         IsText => "ISTEXT";
+        Lookup => "LOOKUP";
         MaxIfs => "MAXIFS";
         Median => "MEDIAN";
         MinIfs => "MINIFS";
@@ -553,6 +556,7 @@ define_function_registry! {
         RoundDown => "ROUNDDOWN";
         TimeValue => "TIMEVALUE";
         Transpose => "TRANSPOSE";
+        TrimRange => "TRIMRANGE";
         AverageIfs => "AVERAGEIFS";
         ChooseCols => "CHOOSECOLS";
         ChooseRows => "CHOOSEROWS";

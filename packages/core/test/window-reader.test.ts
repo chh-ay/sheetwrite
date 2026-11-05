@@ -1,10 +1,21 @@
 import { describe, expect, it } from "bun:test";
 
+import { SheetRegistry } from "../src/store/sheet-registry.js";
 import type { RecomputingCellStore } from "../src/store/wasm-contract.js";
 import { decodePackedWindow, StoreWindowReader } from "../src/store/window-reader.js";
 import { KIND_BOOL, KIND_EMPTY, KIND_NUMBER, KIND_STRING } from "../src/store/wire-tags.js";
 import { StyleDictionary } from "../src/style-dictionary.js";
+import type { Workbook } from "../src/types.js";
 import { makeWorkbook } from "./fixtures.js";
+
+function sheetRegistry(
+  document: Workbook,
+  handles: ReadonlyArray<[string, number]>,
+): SheetRegistry {
+  const sheets = new SheetRegistry(document);
+  for (const [sheet, handle] of handles) sheets.handles.set(sheet, handle);
+  return sheets;
+}
 
 const HEADER_BYTES = 40;
 
@@ -107,8 +118,7 @@ function makeEpochReader() {
   };
   const reader = new StoreWindowReader(
     wasm as unknown as RecomputingCellStore,
-    makeWorkbook(2),
-    new Map([["s1", 0]]),
+    sheetRegistry(makeWorkbook(2), [["s1", 0]]),
     new StyleDictionary(),
   );
   const readVisible = () => reader.read("s1", { start: 0, end: 2 }, [0, 1], undefined, false);

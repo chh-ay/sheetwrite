@@ -13,7 +13,6 @@ import {
 } from "../src/document-protocol.js";
 import {
   isSheetwriteError,
-  JsonByteLengthError,
   normalizeSheetwriteError,
   SHEETWRITE_ERROR_CODES,
   SHEETWRITE_ERROR_OPERATIONS,
@@ -23,6 +22,7 @@ import {
 } from "../src/errors.js";
 import { SheetwriteError as FullSheetwriteError } from "../src/index.js";
 import { IndexedDbPendingCommitStorageError } from "../src/indexeddb.js";
+import { JsonByteLengthError } from "../src/json-bytes.js";
 import { PersistenceError } from "../src/persistence.js";
 import { decodeStoreMemoryStats } from "../src/resource-accounting.js";
 import { encodeRestoreBlock } from "../src/restore-block.js";

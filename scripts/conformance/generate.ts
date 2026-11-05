@@ -121,6 +121,8 @@ const ARGUMENTS_BY_SIGNATURE: Record<string, string> = {
   "optional-reference": "A1",
   "optional-variadic-values": "1,2,3",
   "pair-arrays": "A1:A3,B1:B3",
+  "trim-range": "A1:B3",
+  "vector-lookup": "60,A1:A3,B1:B3",
   "info-type": '"numfile"',
   "sheet-value": "A1",
   "sheets-reference": "A1",
@@ -243,6 +245,14 @@ const CATEGORY_ASSERTIONS_BY_FUNCTION: Readonly<
   ISNUMBER: { empty: "NOT(ISNUMBER(C1))", error: "NOT(ISNUMBER(1/0))" },
   ISTEXT: { error: "NOT(ISTEXT(1/0))" },
   ISLOGICAL: { error: "NOT(ISLOGICAL(1/0))" },
+  TRIMRANGE: {
+    empty: "ISERROR(TRIMRANGE(C1))",
+    mixed: 'TRIMRANGE(C1)="2"',
+    boundary: "TRIMRANGE(C1)=0",
+  },
+  LOOKUP: {
+    "range-array": "ISERROR(LOOKUP(C1:C2,A1:A3,B1:B3))=ISERROR(VLOOKUP(C1:C2,A1:B3,2))",
+  },
   "ERROR.TYPE": {
     error: "ERROR.TYPE(1/0)=2",
     empty: "ISNA(ERROR.TYPE(C1))",

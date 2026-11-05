@@ -35,7 +35,7 @@ grid.destroy();
 - [GridOptions](/docs/api/core/grid-options/)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/grid.ts#L458"><code>packages/core/src/grid.ts#L458</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/grid.ts#L464"><code>packages/core/src/grid.ts#L464</code></a></dd></div>
 </dl>
 
 ## Declaration

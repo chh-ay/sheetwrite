@@ -16,7 +16,7 @@ import {
   MAX_CONDITIONAL_FORMAT_RULES,
 } from "./conditional-format.js";
 import { validateDataModelShape, validateRelationshipShape } from "./data-model.js";
-import { boundedJsonByteLength, JsonByteLengthError, SheetwriteError } from "./errors.js";
+import { SheetwriteError } from "./errors.js";
 import {
   cloneCellHyperlink,
   isSafeExternalHyperlink,
@@ -25,6 +25,7 @@ import {
   MAX_HYPERLINK_DISPLAY_LENGTH,
   MAX_HYPERLINKS_PER_SHEET,
 } from "./hyperlink.js";
+import { boundedJsonByteLength, JsonByteLengthError, measureJson } from "./json-bytes.js";
 import { formulaNameKey } from "./name-key.js";
 import {
   clonePivot,
@@ -35,6 +36,7 @@ import {
 import { compareCodeUnits, isPlainRecord, ownValue, type PlainRecord } from "./plain-data.js";
 import { ROW_ORDER_ENCODING } from "./row-order.js";
 import { validateSavedQueriesShape, validateSavedQueryShape } from "./saved-query.js";
+import { normalizeMerge } from "./store/ranges.js";
 import { preparedRestore } from "./transaction-preparation.js";
 import type { MergeRange, Range } from "./types/coordinates.js";
 import type {
@@ -476,17 +478,6 @@ export class SnapshotValidationError extends SheetwriteError {
   }
 }
 
-interface JsonSafetyIssue {
-  path: string;
-  code: "non-serializable" | "resource-limit";
-  message: string;
-}
-
-interface JsonInspectionState {
-  readonly maxBytes: number;
-  bytes: number;
-}
-
 interface ResolvedSnapshotValidationOptions {
   readonly storage: SnapshotStorageMode;
   readonly limits: SnapshotResourceLimits;
@@ -536,90 +527,7 @@ function childPath(path: string, key: string): string {
     : `${path}[${JSON.stringify(key)}]`;
 }
 
-function consumeBytes(state: JsonInspectionState, count: number): boolean {
-  if (count > state.maxBytes - state.bytes) return false;
-  state.bytes += count;
-  return true;
-}
-
-function consumeJsonString(state: JsonInspectionState, value: string): boolean {
-  if (!consumeBytes(state, 2)) return false;
-  for (let index = 0; index < value.length; index++) {
-    const code = value.charCodeAt(index);
-    let bytes: number;
-    if (code === 0x22 || code === 0x5c || code === 0x08 || code === 0x09 || code === 0x0a) {
-      bytes = 2;
-    } else if (code === 0x0c || code === 0x0d) {
-      bytes = 2;
-    } else if (code < 0x20) {
-      bytes = 6;
-    } else if (code < 0x80) {
-      bytes = 1;
-    } else if (code < 0x800) {
-      bytes = 2;
-    } else if (code >= 0xd800 && code <= 0xdbff) {
-      const next = value.charCodeAt(index + 1);
-      if (next >= 0xdc00 && next <= 0xdfff) {
-        bytes = 4;
-        index += 1;
-      } else {
-        bytes = 6;
-      }
-    } else if (code >= 0xdc00 && code <= 0xdfff) {
-      bytes = 6;
-    } else {
-      bytes = 3;
-    }
-
-    if (!consumeBytes(state, bytes)) return false;
-  }
-
-  return true;
-}
-
-/** `String(n)` spells an integer below 10^21 as plain digits, and exponent notation from there. */
-const PLAIN_INTEGER_DIGITS = 21;
-const DECIMAL_BASE = 10;
-/** Exact doubles 10^0 … 10^21, so each digit costs one compare. */
-const POWERS_OF_TEN = Float64Array.from(
-  { length: PLAIN_INTEGER_DIGITS + 1 },
-  (_unused, exponent) => DECIMAL_BASE ** exponent,
-);
-
-/**
- * Length of a finite number's JSON text. Integers, the common cell value, are
- * measured against exact powers of ten instead of allocating their text.
- */
-function jsonNumberLength(value: number): number {
-  const magnitude = Math.abs(value);
-  if (!Number.isInteger(value) || magnitude >= (POWERS_OF_TEN[PLAIN_INTEGER_DIGITS] ?? 0)) {
-    return String(value).length;
-  }
-  // -0 is written "0", and `value < 0` is false for it.
-  let length = value < 0 ? 2 : 1;
-  for (let digits = 1; digits < PLAIN_INTEGER_DIGITS; digits++) {
-    if (magnitude < (POWERS_OF_TEN[digits] ?? 0)) break;
-    length += 1;
-  }
-  return length;
-}
-
-function serializedLimitIssue(path: string, maxBytes: number): JsonSafetyIssue {
-  return {
-    path,
-    code: "resource-limit",
-    message: `Snapshot maxSerializedBytes limit ${maxBytes} exceeded`,
-  };
-}
-
-/**
- * Keys from the snapshot root to the value being inspected: numbers are array
- * indexes, strings are object keys. Large snapshots have millions of values and
- * almost never fail, so the text path is only built when an issue is reported.
- */
-type JsonPathSegments = Array<string | number>;
-
-function jsonPath(segments: JsonPathSegments): string {
+function jsonPath(segments: readonly (string | number)[]): string {
   let path = "$";
   for (const segment of segments) {
     path = typeof segment === "number" ? `${path}[${segment}]` : childPath(path, segment);
@@ -627,190 +535,22 @@ function jsonPath(segments: JsonPathSegments): string {
   return path;
 }
 
+/** The first value of `input` that JSON cannot carry, or the point where it passes `maxBytes`. */
 function findJsonSafetyIssue(
-  value: unknown,
-  segments: JsonPathSegments,
-  ancestors: Set<object>,
-  state: JsonInspectionState,
-): JsonSafetyIssue | undefined {
-  if (value === undefined) {
-    return {
-      path: jsonPath(segments),
-      code: "non-serializable",
-      message: "undefined is not JSON-safe",
-    };
-  }
+  input: unknown,
+  maxBytes: number,
+): DocumentValidationError | undefined {
+  const { issue } = measureJson(input, maxBytes);
+  if (issue === undefined) return undefined;
 
-  if (typeof value === "number") {
-    if (!Number.isFinite(value)) {
-      return {
-        path: jsonPath(segments),
-        code: "non-serializable",
-        message: "Numbers must be finite",
-      };
-    }
-
-    return consumeBytes(state, jsonNumberLength(value))
-      ? undefined
-      : serializedLimitIssue(jsonPath(segments), state.maxBytes);
-  }
-
-  if (typeof value === "function" || typeof value === "symbol" || typeof value === "bigint") {
-    return {
-      path: jsonPath(segments),
-      code: "non-serializable",
-      message: `${typeof value} values are not JSON-safe`,
-    };
-  }
-
-  if (value === null) {
-    return consumeBytes(state, 4)
-      ? undefined
-      : serializedLimitIssue(jsonPath(segments), state.maxBytes);
-  }
-
-  if (typeof value === "boolean") {
-    return consumeBytes(state, value ? 4 : 5)
-      ? undefined
-      : serializedLimitIssue(jsonPath(segments), state.maxBytes);
-  }
-
-  if (typeof value === "string") {
-    return consumeJsonString(state, value)
-      ? undefined
-      : serializedLimitIssue(jsonPath(segments), state.maxBytes);
-  }
-
-  if (typeof value !== "object") {
-    return {
-      path: jsonPath(segments),
-      code: "non-serializable",
-      message: "Value is not JSON-safe",
-    };
-  }
-
-  if (ancestors.has(value)) {
-    return {
-      path: jsonPath(segments),
-      code: "non-serializable",
-      message: "Cyclic values are not JSON-safe",
-    };
-  }
-
-  if (Array.isArray(value)) {
-    if (Object.getPrototypeOf(value) !== Array.prototype) {
-      return {
-        path: jsonPath(segments),
-        code: "non-serializable",
-        message: "Arrays with custom prototypes are not JSON-safe",
-      };
-    }
-
-    if (!consumeBytes(state, 2 + Math.max(0, value.length - 1))) {
-      return serializedLimitIssue(jsonPath(segments), state.maxBytes);
-    }
-
-    ancestors.add(value);
-    for (let index = 0; index < value.length; index++) {
-      segments.push(index);
-      const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
-      if (!descriptor?.enumerable || !("value" in descriptor)) {
-        ancestors.delete(value);
-        return {
-          path: jsonPath(segments),
-          code: "non-serializable",
-          message: "Array entries must be enumerable data properties",
-        };
+  const path = jsonPath(issue.segments);
+  return issue.kind === "limit"
+    ? {
+        path,
+        code: "resource-limit",
+        message: `Snapshot maxSerializedBytes limit ${maxBytes} exceeded`,
       }
-
-      const issue = findJsonSafetyIssue(descriptor.value, segments, ancestors, state);
-      if (issue) {
-        ancestors.delete(value);
-        return issue;
-      }
-
-      segments.pop();
-    }
-
-    for (const key in value) {
-      if (!Object.hasOwn(value, key)) continue;
-      if (!/^(0|[1-9]\d*)$/.test(key) || Number(key) >= value.length) {
-        ancestors.delete(value);
-        return {
-          path: childPath(jsonPath(segments), key),
-          code: "non-serializable",
-          message: "Arrays may contain only indexed data properties",
-        };
-      }
-    }
-
-    if (Object.getOwnPropertySymbols(value).length > 0) {
-      ancestors.delete(value);
-      return {
-        path: jsonPath(segments),
-        code: "non-serializable",
-        message: "Symbol-keyed properties are not JSON-safe",
-      };
-    }
-
-    ancestors.delete(value);
-    return undefined;
-  }
-
-  if (!isPlainRecord(value)) {
-    return {
-      path: jsonPath(segments),
-      code: "non-serializable",
-      message: "Only plain objects are JSON-safe",
-    };
-  }
-
-  if (!consumeBytes(state, 2)) return serializedLimitIssue(jsonPath(segments), state.maxBytes);
-  ancestors.add(value);
-  let propertyCount = 0;
-  for (const key in value) {
-    if (!Object.hasOwn(value, key)) continue;
-    segments.push(key);
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
-    if (!descriptor?.enumerable || !("value" in descriptor)) {
-      ancestors.delete(value);
-      return {
-        path: jsonPath(segments),
-        code: "non-serializable",
-        message: "Object properties must be enumerable data properties",
-      };
-    }
-
-    if (
-      (propertyCount > 0 && !consumeBytes(state, 1)) ||
-      !consumeJsonString(state, key) ||
-      !consumeBytes(state, 1)
-    ) {
-      ancestors.delete(value);
-      return serializedLimitIssue(jsonPath(segments), state.maxBytes);
-    }
-
-    propertyCount += 1;
-    const issue = findJsonSafetyIssue(descriptor.value, segments, ancestors, state);
-    if (issue) {
-      ancestors.delete(value);
-      return issue;
-    }
-
-    segments.pop();
-  }
-
-  if (Object.getOwnPropertySymbols(value).length > 0) {
-    ancestors.delete(value);
-    return {
-      path: jsonPath(segments),
-      code: "non-serializable",
-      message: "Symbol-keyed properties are not JSON-safe",
-    };
-  }
-
-  ancestors.delete(value);
-  return undefined;
+    : { path, code: "non-serializable", message: issue.message };
 }
 
 function resourceValidationError(
@@ -2688,15 +2428,6 @@ export function validateDocumentOperationShape(
   return errors;
 }
 
-function normalizedMerge(merge: MergeRange): MergeRange {
-  return {
-    r0: Math.min(merge.r0, merge.r1),
-    c0: Math.min(merge.c0, merge.c1),
-    r1: Math.max(merge.r0, merge.r1),
-    c1: Math.max(merge.c0, merge.c1),
-  };
-}
-
 interface IndexedMerge extends MergeRange {
   index: number;
 }
@@ -3252,7 +2983,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
 
     const merges: MergeRange[] = [];
     for (const [mergeIndex, sourceMerge] of (sheet.merges ?? []).entries()) {
-      const merge = normalizedMerge(sourceMerge);
+      const merge = normalizeMerge(sourceMerge);
       lastMergeValidationStats.normalized += 1;
       const mergePath = `${path}.merges[${mergeIndex}]`;
       if (merge.r1 >= sheet.rowCount || merge.c1 >= sheet.columns.length) {
@@ -3698,17 +3429,8 @@ export function validateWorkbookSnapshot(
     if ("code" in resolved) return { ok: false, errors: [resolved] };
     const resourceIssue = preflightSnapshotResources(input, resolved);
     if (resourceIssue) return { ok: false, errors: [resourceIssue] };
-    const issue = findJsonSafetyIssue(input, [], new Set<object>(), {
-      bytes: 0,
-      maxBytes: resolved.limits.maxSerializedBytes,
-    });
-
-    if (issue) {
-      return {
-        ok: false,
-        errors: [{ path: issue.path, code: issue.code, message: issue.message }],
-      };
-    }
+    const issue = findJsonSafetyIssue(input, resolved.limits.maxSerializedBytes);
+    if (issue) return { ok: false, errors: [issue] };
 
     return validateJsonSafeSnapshot(input);
   } catch (error) {

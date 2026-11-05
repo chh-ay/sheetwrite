@@ -2,6 +2,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
 
+import { MAX_ATOMIC_BATCH_VERSIONS } from "../src/atomic-batch.js";
 import {
   createGridFromSnapshot,
   initSheetwrite,
@@ -350,6 +351,33 @@ describe("durable offline sync", () => {
     }
   });
 
+  it("rejects a stored batch whose version counts have holes", async () => {
+    const storage = new FakePendingStorage();
+    const sparseCounts = new Array<number>(3);
+    sparseCounts[0] = 1;
+    sparseCounts[2] = 1;
+    storage.records.set("sparse-batch", {
+      documentId: "offline-doc",
+      baseVersion: 4,
+      clientMutationId: "sparse-batch",
+      operations: [setValue(9), setValue(8)],
+      versionOperationCounts: sparseCounts,
+    });
+    const grid = mountGrid();
+    const coordinator = new SyncCoordinator(grid, new ControlledAdapter(snapshot()), {
+      documentId: "offline-doc",
+      serverVersion: 4,
+      pendingStorage: storage,
+      initialConnection: "offline",
+    });
+    try {
+      await expect(coordinator.ready()).rejects.toMatchObject({ code: "invalid-batch" });
+    } finally {
+      coordinator.destroy();
+      grid.destroy();
+    }
+  });
+
   it("does not turn storage cancellation during destroy into a hydration failure", async () => {
     const loading = Promise.withResolvers<readonly PendingCommit[]>();
     const started = Promise.withResolvers<AbortSignal | undefined>();
@@ -449,6 +477,14 @@ describe("durable offline sync", () => {
       sparseCounts[2] = 1;
       await expect(
         reopenedStorage.put({ ...pending, versionOperationCounts: sparseCounts }),
+      ).rejects.toMatchObject({ code: "transaction" });
+      const tooManyVersions = MAX_ATOMIC_BATCH_VERSIONS + 1;
+      await expect(
+        reopenedStorage.put({
+          ...pending,
+          operations: Array.from({ length: tooManyVersions }, () => setValue(9)),
+          versionOperationCounts: Array.from({ length: tooManyVersions }, () => 1),
+        }),
       ).rejects.toMatchObject({ code: "transaction" });
       expect(await reopenedStorage.load("offline-doc", loadOptions)).toEqual([]);
     } finally {
