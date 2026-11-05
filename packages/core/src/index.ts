@@ -381,6 +381,7 @@ export type {
   QueryPredicate,
   QueryStep,
   Range,
+  RelationshipStatus,
   RemoteOperationOptions,
   RemoteOperationSource,
   ReplaceResult,

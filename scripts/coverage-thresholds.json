@@ -93,6 +93,14 @@
       "reason": "Bun unit coverage cannot execute the browser Worker entrypoint faithfully"
     },
     {
+      "path": "packages/queries/engine/src/lib.rs",
+      "reason": "Module wiring only; query behavior is covered through crate contract tests"
+    },
+    {
+      "path": "packages/queries/src/types.ts",
+      "reason": "Type-only query contracts are verified by package and consumer typechecks"
+    },
+    {
       "path": "packages/svelte/src/Grid.svelte",
       "reason": "Compiled Svelte template coverage does not map faithfully to this source file"
     },

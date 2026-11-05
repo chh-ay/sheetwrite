@@ -15,6 +15,10 @@
       ],
       "project": ["src/**/*.ts", "test/**/*.ts"]
     },
+    "packages/queries": {
+      "entry": ["src/index.ts", "src/node.ts", "test/**/*.test.ts"],
+      "project": ["src/**/*.ts", "test/**/*.ts"]
+    },
     "packages/react": {
       "entry": ["src/index.tsx", "test/**/*.test.ts?(x)"],
       "project": ["src/**/*.ts?(x)", "test/**/*.ts?(x)"]
