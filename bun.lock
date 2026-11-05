@@ -53,6 +53,7 @@
         "@sheetwrite/charts": "workspace:*",
         "@sheetwrite/core": "workspace:*",
         "@sheetwrite/formulas": "workspace:*",
+        "@sheetwrite/queries": "workspace:*",
         "@sheetwrite/react": "workspace:*",
         "@sheetwrite/svelte": "workspace:*",
         "@sheetwrite/vue": "workspace:*",
@@ -121,6 +122,9 @@
     "packages/queries": {
       "name": "@sheetwrite/queries",
       "version": "0.6.1",
+      "dependencies": {
+        "@sheetwrite/core": "workspace:*",
+      },
     },
     "packages/react": {
       "name": "@sheetwrite/react",
