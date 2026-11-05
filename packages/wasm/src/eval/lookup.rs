@@ -5,10 +5,13 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::types::{CellRange, FormulaError, Value};
+use crate::calc::Ast;
+use crate::store::CellStore;
+use crate::types::{CellRange, EvalResult, FormulaError, Value};
 
 use super::criteria::WildcardPattern;
 use super::value::{compare_text_case_insensitive, compare_values, number_from_value};
+use super::EvalPass;
 
 /// A position or count argument. Excel truncates its fraction, so
 /// `CHOOSE(1.5,…)` picks the first choice.
@@ -800,6 +803,89 @@ pub(super) fn remember_result(range: CellRange, state: ReuseEntry<CachedResult>)
     CACHED_RESULTS.with(|results| {
         results.borrow_mut().insert(range, state);
     });
+}
+
+/// Next smaller match by binary search over an ascending list, as
+/// `VLOOKUP` with `range_lookup` TRUE.
+const NEXT_SMALLER: i32 = -1;
+const BINARY_ASCENDING: i32 = 2;
+
+impl CellStore {
+    /// LOOKUP(lookup_value, lookup_vector, [result_vector]) and
+    /// LOOKUP(lookup_value, array). The search finds the largest value at
+    /// or below `lookup_value` in an ascending list. The array form
+    /// searches the first row of an array wider than it is tall, and the
+    /// first column otherwise, and returns the value at the same position
+    /// in the last row or column.
+    #[inline(never)]
+    pub(super) fn eval_vector_lookup(
+        &self,
+        args: &[Ast],
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> EvalResult {
+        self.vector_lookup(args, sheet, pass, depth)
+            .unwrap_or_else(Value::Error)
+    }
+
+    fn vector_lookup(
+        &self,
+        args: &[Ast],
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> Result<Value, FormulaError> {
+        if !(2..=3).contains(&args.len()) {
+            return Err(FormulaError::Value);
+        }
+
+        let key = match self.eval_ast(&args[0], sheet, pass, depth + 1) {
+            Value::Error(error) => return Err(error),
+            key => key,
+        };
+        let list = self.lookup_list_argument(&args[1], sheet, pass, depth + 1)?;
+        let (rows, cols) = list.shape();
+        let is_vector = rows == 1 || cols == 1;
+
+        if !is_vector && args.len() == 3 {
+            return Err(FormulaError::Na);
+        }
+
+        if is_vector {
+            let found =
+                find_match_index_indexed(list.search(), &key, NEXT_SMALLER, BINARY_ASCENDING)?
+                    .ok_or(FormulaError::Na)?;
+
+            if args.len() == 2 {
+                return list
+                    .search()
+                    .values()
+                    .get(found)
+                    .cloned()
+                    .ok_or(FormulaError::Na);
+            }
+
+            let result = self.lookup_result_argument(&args[2], sheet, pass, depth + 1)?;
+
+            return result.value(found).cloned().ok_or(FormulaError::Na);
+        }
+
+        let part = if cols > rows {
+            TablePart::FirstRow
+        } else {
+            TablePart::FirstColumn
+        };
+        let table = self.lookup_table_argument(&args[1], sheet, part, pass, depth + 1)?;
+        let found = find_match_index_indexed(table.search(), &key, NEXT_SMALLER, BINARY_ASCENDING)?
+            .ok_or(FormulaError::Na)?;
+        let value = match part {
+            TablePart::FirstRow => table.cell(rows - 1, found),
+            TablePart::FirstColumn => table.cell(found, cols - 1),
+        };
+
+        value.cloned().ok_or(FormulaError::Na)
+    }
 }
 
 #[cfg(test)]

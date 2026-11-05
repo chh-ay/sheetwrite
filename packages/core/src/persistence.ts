@@ -1,10 +1,13 @@
+import { validVersionOperationCounts } from "./atomic-batch.js";
 import {
   type SnapshotResourceLimits,
   SnapshotValidationError,
   validateWorkbookSnapshot,
 } from "./document-protocol.js";
-import { boundedJsonByteLength, JsonByteLengthError, SheetwriteError } from "./errors.js";
+import { SheetwriteError } from "./errors.js";
 import { GridImpl } from "./grid.js";
+import { boundedJsonByteLength, JsonByteLengthError } from "./json-bytes.js";
+import { cloneJsonValue } from "./plain-data.js";
 import { SheetwriteStore } from "./store.js";
 import { DEFAULT_SYNC_COORDINATOR_LIMITS } from "./sync-protocol.js";
 import type { DocumentOp, WorkbookSnapshot } from "./types/document.js";
@@ -125,7 +128,7 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
         throw new PersistenceError("invalid-snapshot", "Memory snapshots require documentId");
       }
       const version = checked.value.version ?? 0;
-      const initial = cloneSnapshot({ ...checked.value, version });
+      const initial = cloneJsonValue({ ...checked.value, version });
       this.documents.set(checked.value.documentId, {
         initial,
         store: undefined,
@@ -306,7 +309,7 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
 }
 
 function currentSnapshot(document: MemoryDocument): WorkbookSnapshot {
-  if (!document.store) return cloneSnapshot({ ...document.initial, version: document.version });
+  if (!document.store) return cloneJsonValue({ ...document.initial, version: document.version });
   return { ...document.store.exportSnapshot(), version: document.version };
 }
 
@@ -342,14 +345,17 @@ function splitBatchVersions(request: PersistenceBatchCommitRequest): DocumentOp[
   const reject = (message: string): never => {
     throw new PersistenceError("commit-rejected", `Atomic batch was rejected: ${message}`);
   };
-  if (!Array.isArray(counts) || counts.length < 2 || counts.length > limits.maxBatchVersions) {
-    reject(`it needs 2 to ${limits.maxBatchVersions} versions`);
+  if (!validVersionOperationCounts(counts, request.operations.length, limits.maxBatchVersions)) {
+    reject(
+      `its version counts must split the operations into 2 to ${limits.maxBatchVersions} versions`,
+    );
   }
+
   const versions: DocumentOp[][] = [];
   let start = 0;
   let batchBytes = 0;
   for (const count of counts) {
-    if (!Number.isSafeInteger(count) || count <= 0 || count > limits.maxOperationsPerVersion) {
+    if (count > limits.maxOperationsPerVersion) {
       reject(`a version needs 1 to ${limits.maxOperationsPerVersion} operations`);
     }
     const operations = request.operations.slice(start, start + count);
@@ -366,7 +372,6 @@ function splitBatchVersions(request: PersistenceBatchCommitRequest): DocumentOp[
     }
     versions.push(operations);
   }
-  if (start !== request.operations.length) reject("the version counts do not cover the operations");
   if (batchBytes > limits.maxBatchBytes) reject(`it exceeds ${limits.maxBatchBytes} bytes`);
   return versions;
 }
@@ -377,12 +382,4 @@ function throwIfAborted(signal?: AbortSignal): void {
       cause: signal.reason,
     });
   }
-}
-
-function cloneSnapshot(snapshot: WorkbookSnapshot): WorkbookSnapshot {
-  return JSON.parse(JSON.stringify(snapshot)) as WorkbookSnapshot;
-}
-
-function cloneJsonValue<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
 }

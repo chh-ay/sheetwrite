@@ -14,7 +14,7 @@ import {
   validateDocumentOperationShape,
 } from "./document-protocol.js";
 import { engineFailedError, engineGeneration, isEngineTrap, stopEngine } from "./engine.js";
-import { SheetwriteError, unknownSheetError } from "./errors.js";
+import { SheetwriteError } from "./errors.js";
 import { DEFAULT_DISTINCT_VALUES_LIMIT } from "./grid-constants.js";
 import { clonePivots, pivotOwner, withoutSavedOutput } from "./pivot.js";
 import type {
@@ -40,6 +40,12 @@ import {
 import { StoreMutationPolicy } from "./store/mutation-policy.js";
 import { addRowGroup, collapseRowGroup, patchSheetId, removeRowGroup } from "./store/ranges.js";
 import { decodeWorkbookSnapshot, freezeXlsxSource } from "./store/snapshot-codec.js";
+import {
+  clearViewPatch,
+  columnFilterPatch,
+  rowVisibilityPatches,
+  viewSortPatch,
+} from "./store/view-patches.js";
 import { setTransactionStorageRevision } from "./transaction-admission.js";
 import { preparedRestore, TransactionPreparation } from "./transaction-preparation.js";
 import type { CellScalar, Column } from "./types/cell.js";
@@ -552,19 +558,8 @@ export class SheetwriteStore implements Store {
    * ```
    */
   setViewSort(sheet: SheetId, keys: readonly SortKey[]): ApplyTransactionResult {
-    if (keys.length > 0) this.requireCompleteQuery(sheet);
-    return this.applyTransaction(
-      {
-        patches: [
-          {
-            op: "setSheetMeta",
-            sheet,
-            patch: { sortKeys: keys.map((key) => ({ ...key })) },
-          },
-        ],
-      },
-      "structure",
-    );
+    if (keys.length > 0) this.engine.requireCompleteQuery(sheet);
+    return this.applyTransaction({ patches: [viewSortPatch(sheet, keys)] }, "structure");
   }
 
   /**
@@ -592,7 +587,7 @@ export class SheetwriteStore implements Store {
     keys: readonly SortKey[],
     options: { hasHeader?: boolean } = {},
   ): ApplyTransactionResult {
-    this.requireCompleteQuery(range.sheet);
+    this.engine.requireCompleteQuery(range.sheet);
     const plan = this.engine.sortRangePlan(range, keys, options.hasHeader ?? false);
     if (plan.kind === "unchanged") return { status: "noop", epoch: this.epoch, reason: "empty" };
     if (plan.kind === "refused") {
@@ -618,19 +613,11 @@ export class SheetwriteStore implements Store {
     col: number,
     filter: ColumnFilter | null,
   ): ApplyTransactionResult {
-    if (filter !== null) this.requireCompleteQuery(sheet);
-    const filters = new Map(this.sheetMeta(sheet).filters ?? []);
-    if (filter === null) {
-      if (!filters.delete(col)) return { status: "noop", epoch: this.epoch, reason: "empty" };
-    } else {
-      filters.set(col, JSON.parse(JSON.stringify(filter)));
-    }
-    return this.applyTransaction(
-      {
-        patches: [{ op: "setSheetMeta", sheet, patch: { filters: [...filters] } }],
-      },
-      "structure",
-    );
+    if (filter !== null) this.engine.requireCompleteQuery(sheet);
+    const patch = columnFilterPatch(this.engine.sheets.sheetMeta(sheet), col, filter);
+    if (!patch) return { status: "noop", epoch: this.epoch, reason: "empty" };
+
+    return this.applyTransaction({ patches: [patch] }, "structure");
   }
 
   filterBy(sheet: SheetId, col: number, needle: string): ApplyTransactionResult {
@@ -646,33 +633,13 @@ export class SheetwriteStore implements Store {
   }
 
   hideRows(sheet: SheetId, rows: readonly number[]): ApplyTransactionResult {
-    const meta = this.sheetMeta(sheet);
-    const patches: DocumentOp[] = [];
-    for (const row of new Set(rows)) {
-      if (!Number.isInteger(row) || row < 0 || row >= meta.rowCount) continue;
-      patches.push({
-        op: "setRowMeta",
-        sheet,
-        row,
-        meta: { height: meta.rowHeights?.get(row), hidden: true },
-      });
-    }
+    const patches = rowVisibilityPatches(this.engine.sheets.sheetMeta(sheet), rows, true);
     return this.applyTransaction({ patches }, "structure");
   }
 
   showRows(sheet: SheetId, rows?: readonly number[]): ApplyTransactionResult {
-    const meta = this.sheetMeta(sheet);
-    const targets = rows ?? [...(meta.hiddenRows ?? [])];
-    const patches: DocumentOp[] = [];
-    for (const row of new Set(targets)) {
-      if (!Number.isInteger(row) || row < 0 || row >= meta.rowCount) continue;
-      patches.push({
-        op: "setRowMeta",
-        sheet,
-        row,
-        meta: { height: meta.rowHeights?.get(row), hidden: false },
-      });
-    }
+    const meta = this.engine.sheets.sheetMeta(sheet);
+    const patches = rowVisibilityPatches(meta, rows ?? [...(meta.hiddenRows ?? [])], false);
     return this.applyTransaction({ patches }, "structure");
   }
 
@@ -681,7 +648,7 @@ export class SheetwriteStore implements Store {
   }
 
   groupRows(sheet: SheetId, start: number, end: number): ApplyTransactionResult {
-    const groups = addRowGroup(this.sheetMeta(sheet).rowGroups, start, end);
+    const groups = addRowGroup(this.engine.sheets.sheetMeta(sheet).rowGroups, start, end);
     return this.applyTransaction(
       { patches: [{ op: "setSheetMeta", sheet, patch: { rowGroups: groups } }] },
       "structure",
@@ -689,7 +656,7 @@ export class SheetwriteStore implements Store {
   }
 
   ungroupRows(sheet: SheetId, start: number, end: number): ApplyTransactionResult {
-    const groups = removeRowGroup(this.sheetMeta(sheet).rowGroups, start, end);
+    const groups = removeRowGroup(this.engine.sheets.sheetMeta(sheet).rowGroups, start, end);
     return this.applyTransaction(
       { patches: [{ op: "setSheetMeta", sheet, patch: { rowGroups: groups } }] },
       "structure",
@@ -697,7 +664,11 @@ export class SheetwriteStore implements Store {
   }
 
   setGroupCollapsed(sheet: SheetId, start: number, collapsed: boolean): ApplyTransactionResult {
-    const groups = collapseRowGroup(this.sheetMeta(sheet).rowGroups, start, collapsed);
+    const groups = collapseRowGroup(
+      this.engine.sheets.sheetMeta(sheet).rowGroups,
+      start,
+      collapsed,
+    );
     return this.applyTransaction(
       { patches: [{ op: "setSheetMeta", sheet, patch: { rowGroups: groups } }] },
       "structure",
@@ -729,14 +700,10 @@ export class SheetwriteStore implements Store {
   }
 
   clearView(sheet: SheetId): ApplyTransactionResult {
-    const meta = this.sheetMeta(sheet);
-    if ((meta.sortKeys?.length ?? 0) === 0 && (meta.filters?.length ?? 0) === 0) {
-      return { status: "noop", epoch: this.epoch, reason: "empty" };
-    }
-    return this.applyTransaction(
-      { patches: [{ op: "setSheetMeta", sheet, patch: { sortKeys: [], filters: [] } }] },
-      "structure",
-    );
+    const patch = clearViewPatch(this.engine.sheets.sheetMeta(sheet));
+    if (!patch) return { status: "noop", epoch: this.epoch, reason: "empty" };
+
+    return this.applyTransaction({ patches: [patch] }, "structure");
   }
 
   viewRowCount(sheet: SheetId): number {
@@ -1075,17 +1042,6 @@ export class SheetwriteStore implements Store {
     }
 
     return undefined;
-  }
-
-  private requireCompleteQuery(sheet: SheetId): void {
-    const capability = this.engine.queryCapability(sheet);
-    if (capability.status === "incomplete") throw new IncompleteDataError(sheet, capability);
-  }
-
-  private sheetMeta(sheet: SheetId) {
-    const meta = this.engine.getWorkbook().sheets.find((candidate) => candidate.id === sheet);
-    if (!meta) throw unknownSheetError(sheet);
-    return meta;
   }
 }
 

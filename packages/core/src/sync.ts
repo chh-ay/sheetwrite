@@ -5,12 +5,13 @@ import {
   partitionVersionOperations,
 } from "./atomic-batch.js";
 import {
-  JsonByteLengthError,
   normalizeSheetwriteError,
   SheetwriteError,
   type SheetwriteErrorContext,
 } from "./errors.js";
-import { type RebaseConflict, rebaseDocumentOperations } from "./rebase.js";
+import { JsonByteLengthError } from "./json-bytes.js";
+import { cloneJsonValue } from "./plain-data.js";
+import { changesStructure, type RebaseConflict, rebaseDocumentOperations } from "./rebase.js";
 import { restoreProvenanceOf } from "./restore-commit.js";
 import {
   assertAuthorId,
@@ -27,7 +28,6 @@ import {
   inspectVersionedOperation,
   resolveLimits,
   type SyncCoordinatorLimits,
-  utf8ByteLength,
   SyncProtocolError,
   validReceivedVersion,
 } from "./sync-protocol.js";
@@ -51,6 +51,7 @@ import type {
   SyncMutationRecord,
   VersionedOperation,
 } from "./types/transaction.js";
+import { utf8ByteLength } from "./utf8.js";
 
 /** Mandatory bounds for one durable pending-commit restore. */
 export interface PendingCommitLoadOptions {
@@ -1997,21 +1998,6 @@ interface QueueBase {
   replacements: PendingCommit[];
 }
 
-/** Whether an operation inserts, deletes, or moves rows or columns. */
-function changesStructure(operation: DocumentOp): boolean {
-  switch (operation.op) {
-    case "addRows":
-    case "removeRows":
-    case "moveRows":
-    case "addColumns":
-    case "removeColumns":
-    case "moveColumns":
-      return true;
-    default:
-      return false;
-  }
-}
-
 /** Groups consecutive versions so each atomic batch applies as one transaction. */
 function groupAtomicBatches(versions: readonly VersionedOperation[]): VersionedOperation[][] {
   const groups: VersionedOperation[][] = [];
@@ -2104,8 +2090,4 @@ function deepFreeze<T>(value: T): T {
     Object.freeze(value);
   }
   return value;
-}
-
-function cloneJsonValue<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
 }

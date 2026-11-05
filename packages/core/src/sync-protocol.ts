@@ -1,10 +1,15 @@
-import { MAX_ATOMIC_BATCH_ENCODED_BYTES, MAX_ATOMIC_BATCH_VERSIONS } from "./atomic-batch.js";
+import {
+  MAX_ATOMIC_BATCH_ENCODED_BYTES,
+  MAX_ATOMIC_BATCH_VERSIONS,
+  validVersionOperationCounts,
+} from "./atomic-batch.js";
 import {
   DEFAULT_TRANSACTION_RESOURCE_LIMITS,
   validateDocumentOperationShape,
   validateWorkbookSnapshot,
 } from "./document-protocol.js";
-import { boundedJsonByteLength, JsonByteLengthError, SheetwriteError } from "./errors.js";
+import { SheetwriteError } from "./errors.js";
+import { boundedJsonByteLength, JsonByteLengthError } from "./json-bytes.js";
 import type { DocumentOp } from "./types/document.js";
 import type {
   PendingCommit,
@@ -12,6 +17,7 @@ import type {
   RestoreProvenance,
   VersionBatchMember,
 } from "./types/transaction.js";
+import { utf8ByteLength } from "./utf8.js";
 
 /** Aggregate ceilings for local commits retained until durable acknowledgement. */
 export interface SyncPendingQueueLimits {
@@ -173,11 +179,7 @@ export function assertPendingCommit(
   if (counts === undefined) return bytes;
   const operationCount = (operations as readonly DocumentOp[]).length;
   if (
-    !Array.isArray(counts) ||
-    counts.length < 2 ||
-    counts.length > limits.maxBatchVersions ||
-    !counts.every((count) => Number.isSafeInteger(count) && count > 0) ||
-    counts.reduce((total: number, count: number) => total + count, 0) !== operationCount ||
+    !validVersionOperationCounts(counts, operationCount, limits.maxBatchVersions) ||
     bytes > limits.maxBatchBytes
   ) {
     throw new SyncProtocolError(
@@ -579,29 +581,6 @@ export function asSyncProtocolError(error: unknown): SyncProtocolError {
     : new SyncProtocolError("invalid-operations", "Synchronization input is invalid", {
         cause: error,
       });
-}
-
-/** UTF-8 byte length of a string, stopping once it passes `stopAfter`. */
-export function utf8ByteLength(value: string, stopAfter: number): number {
-  let bytes = 0;
-  for (let index = 0; index < value.length; index++) {
-    const code = value.charCodeAt(index);
-    if (code <= 0x7f) bytes += 1;
-    else if (code <= 0x7ff) bytes += 2;
-    else if (code >= 0xd800 && code <= 0xdbff) {
-      const next = value.charCodeAt(index + 1);
-      if (next >= 0xdc00 && next <= 0xdfff) {
-        bytes += 4;
-        index += 1;
-      } else {
-        bytes += 3;
-      }
-    } else {
-      bytes += 3;
-    }
-    if (bytes > stopAfter) return bytes;
-  }
-  return bytes;
 }
 
 function jsonEncodedByteLength(value: unknown, limit: number): number {
