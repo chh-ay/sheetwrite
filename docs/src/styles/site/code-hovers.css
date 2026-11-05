@@ -5,8 +5,9 @@
 /* ── Triggers ─────────────────────────────────────────────────────────────
    At rest code reads as plain highlighted code. Pointing at a block reveals
    which symbols open a panel with a dotted underline; screens without hover
-   show the underline all the time. */
-.sw-code-popover__trigger {
+   show the underline all the time. Rules are scoped to `.expressive-code` so
+   they win over the prose link style on symbols that are also links. */
+.expressive-code .sw-code-popover__trigger {
   border-radius: var(--sw-radius-xs);
   color: inherit;
   text-decoration: underline dotted transparent;
@@ -19,7 +20,7 @@
     text-decoration-color var(--sw-motion-fast) var(--sw-motion-standard);
 }
 
-a.sw-code-popover__trigger {
+.expressive-code a.sw-code-popover__trigger {
   cursor: pointer;
 }
 
@@ -28,27 +29,29 @@ a.sw-code-popover__trigger {
 }
 
 @media (hover: none) {
-  .sw-code-popover__trigger {
+  .expressive-code .sw-code-popover__trigger {
     text-decoration-color: var(--sw-border-strong);
   }
 }
 
 /* The open symbol and its other mentions in the same block share one tint;
    the open one adds an accent edge. */
-.sw-code-popover__trigger:hover,
-.sw-code-popover__trigger[data-popover-open="true"],
-.sw-code-popover__trigger[data-popover-related] {
+.expressive-code .sw-code-popover__trigger:hover,
+.expressive-code .sw-code-popover__trigger[data-popover-open="true"],
+.expressive-code .sw-code-popover__trigger[data-popover-related] {
   background: var(--sw-accent-soft);
   text-decoration-color: transparent;
 }
 
-.sw-code-popover__trigger[data-popover-open="true"] {
+.expressive-code .sw-code-popover__trigger[data-popover-open="true"] {
   box-shadow: inset 0 0 0 var(--sw-border-width) var(--sw-accent);
 }
 
-.sw-code-popover__trigger:focus-visible {
+/* An outline, not a shadow, so the ring stays visible in forced-colors mode. */
+.expressive-code .sw-code-popover__trigger:focus-visible {
   background: var(--sw-accent-soft);
-  box-shadow: 0 0 0 var(--sw-focus-ring-width) var(--sw-accent);
+  outline: var(--sw-focus-ring-width) solid var(--sw-accent);
+  outline-offset: var(--sw-border-width);
 }
 
 /* Identifiers in generated declarations link to their API pages. */
