@@ -49,6 +49,9 @@ const CONTINUED_FRACTION_FLOOR: f64 = 1e-300;
 const MAX_DEGREES: f64 = 1e10;
 const LOG_SQRT_TWO_PI: f64 = 0.9189385332046727;
 const HALF: f64 = 0.5;
+/// The relative rounding error of a continued-fraction cumulative
+/// probability.
+const CUMULATIVE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
 
 type NumberResult = Result<f64, FormulaError>;
 
@@ -735,15 +738,18 @@ fn binomial_cumulative(successes: f64, trials: f64, probability: f64) -> NumberR
 /// at least `criterion`. Arguments must already be truncated and validated.
 ///
 /// The cumulative probability rises with the count, so a bisection over the
-/// integer counts needs about 34 steps for the largest trial counts.
+/// integer counts needs about 34 steps for the largest trial counts. A
+/// cumulative probability within rounding error of `criterion` meets it, so
+/// exact cases such as 1/16 for no successes in 4 fair trials stop there.
 pub(super) fn binomial_inverse(trials: f64, probability: f64, criterion: f64) -> NumberResult {
+    let threshold = criterion - criterion * CUMULATIVE_TOLERANCE;
     let mut lower = 0.0;
     let mut upper = trials;
 
     while lower < upper {
         let middle = (lower + (upper - lower) * HALF).floor();
 
-        if binomial_cumulative(middle, trials, probability)? >= criterion {
+        if binomial_cumulative(middle, trials, probability)? >= threshold {
             upper = middle;
         } else {
             lower = middle + 1.0;
