@@ -330,7 +330,10 @@ fn ast_is_volatile(ast: &Ast) -> bool {
             | Func::Rand
             | Func::RandBetween
             | Func::Offset
-            | Func::Indirect,
+            | Func::Indirect
+            | Func::Sheet
+            | Func::Sheets
+            | Func::Info,
             _,
         ) => true,
         #[cfg(feature = "analysis")]

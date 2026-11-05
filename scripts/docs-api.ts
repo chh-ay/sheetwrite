@@ -20,7 +20,7 @@ import { API, type Project } from "typescript/unstable/async";
 import { MOVED_PAGES, type MovedPage } from "../docs/src/lib/moved-pages.js";
 import { repositorySourceUrl } from "../docs/src/lib/repository.js";
 import { formatDeclaration, formatTypeExpression } from "../docs/src/lib/sheetwrite-code-hovers.js";
-import { contentPathForRoute, headingAnchors } from "./docs-content-checks.js";
+import { contentPathForRoute } from "./docs-content-checks.js";
 import { entryLabel, entrySlug } from "./docs-paths.js";
 import {
   exists,
@@ -32,6 +32,7 @@ import {
   REQUIRED_SEARCH_TARGETS,
 } from "./docs-shared.js";
 import { html, readableId } from "./evidence-format.js";
+import { headingAnchors } from "./markdown-anchors.js";
 import type { ApiEntryPoint, ApiExport, ApiPackage, PublicApiManifest } from "./public-api.js";
 
 function packageSourcePath(packageName: string, source: string): string {

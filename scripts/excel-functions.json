@@ -1614,19 +1614,23 @@
         },
         {
           "name": "FORECAST.ETS",
-          "url": "https://support.microsoft.com/en-us/excel/forecasting-functions-reference#_forecast.ets"
+          "url": "https://support.microsoft.com/en-us/excel/forecasting-functions-reference#_forecast.ets",
+          "issue": 384
         },
         {
           "name": "FORECAST.ETS.CONFINT",
-          "url": "https://support.microsoft.com/en-us/excel/forecasting-functions-reference#_forecast.ets.confint"
+          "url": "https://support.microsoft.com/en-us/excel/forecasting-functions-reference#_forecast.ets.confint",
+          "issue": 384
         },
         {
           "name": "FORECAST.ETS.SEASONALITY",
-          "url": "https://support.microsoft.com/en-us/excel/forecasting-functions-reference#_forecast.ets.seasonality"
+          "url": "https://support.microsoft.com/en-us/excel/forecasting-functions-reference#_forecast.ets.seasonality",
+          "issue": 384
         },
         {
           "name": "FORECAST.ETS.STAT",
-          "url": "https://support.microsoft.com/en-us/excel/forecasting-functions-reference#_forecast.ets.stat"
+          "url": "https://support.microsoft.com/en-us/excel/forecasting-functions-reference#_forecast.ets.stat",
+          "issue": 384
         },
         {
           "name": "FORECAST.LINEAR",

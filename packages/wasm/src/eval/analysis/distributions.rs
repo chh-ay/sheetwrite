@@ -24,6 +24,7 @@ pub(crate) const NAMES: &[&str] = &[
     "GAMMA.DIST",
     "GAMMA.INV",
     "GAMMALN",
+    "GAMMALN.PRECISE",
     "GAUSS",
     "LOGNORM.DIST",
     "LOGNORM.INV",
@@ -76,7 +77,8 @@ fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
         "LOGNORM.DIST" => (4, 4),
         "NORM.S.DIST" | "T.DIST.2T" | "T.DIST.RT" | "T.INV" | "T.INV.2T" | "CHISQ.DIST.RT"
         | "CHISQ.INV" | "CHISQ.INV.RT" => (2, 2),
-        "NORM.S.INV" | "GAMMA" | "GAMMALN" | "FISHER" | "FISHERINV" | "PHI" | "GAUSS" => (1, 1),
+        "NORM.S.INV" | "GAMMA" | "GAMMALN" | "GAMMALN.PRECISE" | "FISHER" | "FISHERINV" | "PHI"
+        | "GAUSS" => (1, 1),
         _ => return Err(FormulaError::Name),
     };
     require_arity(values, minimum, maximum)?;
@@ -93,7 +95,7 @@ fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
         }
         "FISHERINV" => Ok(x.tanh()),
         "GAMMA" => gamma(x),
-        "GAMMALN" => {
+        "GAMMALN" | "GAMMALN.PRECISE" => {
             ensure(x > 0.0)?;
             Ok(log_gamma(x))
         }
@@ -905,6 +907,7 @@ mod tests {
             "10.0000112",
         ),
         ("gammaln", "GAMMALN", &[4.0], "1.7917595"),
+        ("gammaln-precise", "GAMMALN.PRECISE", &[4.0], "1.7917595"),
         ("gauss", "GAUSS", &[2.0], "0.47725"),
         (
             "lognorm-dist",

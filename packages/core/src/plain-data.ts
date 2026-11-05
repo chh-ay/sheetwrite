@@ -96,3 +96,11 @@ export function sanitizeRange(value: unknown): Range | null {
     end: { row: Math.max(start.row, end.row), col: Math.max(start.col, end.col) },
   };
 }
+
+/**
+ * Deep copy of JSON data through a JSON round trip, so the copy holds only
+ * what the document stores: undefined fields drop out and -0 becomes 0.
+ */
+export function cloneJsonValue<T>(value: T): T {
+  return value === undefined ? value : (JSON.parse(JSON.stringify(value)) as T);
+}
