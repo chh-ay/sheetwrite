@@ -1,0 +1,39 @@
+[package]
+name = "sheetwrite-formula-native"
+version = "0.0.0"
+edition = "2021"
+license = "MIT"
+description = "Native replay of the formula gate workloads, and ideal-layout floor loops, for profiling the formula engine."
+publish = false
+
+# Standalone: the engine crate is not a workspace member, and this crate's
+# profile must not change how the shipped engine builds.
+[workspace]
+
+[features]
+# Build the full engine (`@sheetwrite/formulas`) instead of the default one.
+analysis = ["sheetwrite-wasm/analysis"]
+# Count heap allocations made during each timed run. Off for timing runs: the
+# counting allocator adds work to every allocation.
+count-allocations = []
+
+[dependencies]
+sheetwrite-wasm = { path = "../../packages/wasm" }
+libc = "0.2"
+
+[[bin]]
+name = "formula-replay"
+path = "src/replay.rs"
+
+[[bin]]
+name = "formula-floor"
+path = "src/floor.rs"
+
+# The engine's release settings, plus line tables so profiles resolve inlined
+# frames. Build with `RUSTFLAGS="-C force-frame-pointers=yes"` for `perf
+# record --call-graph fp`.
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+debug = "line-tables-only"

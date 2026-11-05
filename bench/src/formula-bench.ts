@@ -24,7 +24,12 @@ const engine: typeof defaultEngine =
     : await import(
         pathToFileURL(resolve(ENGINE_ROOT, `packages/${ENGINE_PACKAGE}/loader-node.mjs`)).href
       );
-const { CellStore, initSync } = engine;
+const { CellStore: EngineCellStore, initSync } = engine;
+/** `formula-trace.ts` sets this to record each fixture's engine calls for a native replay. */
+const CellStore =
+  process.env.SHEETWRITE_BENCH_TRACE === "1"
+    ? recordingCellStore(EngineCellStore)
+    : EngineCellStore;
 // Fixtures run on either provider, so they use the store type both share.
 type CellStore = InstanceType<defaultEngine.EngineInstance["CellStore"]>;
 
@@ -39,6 +44,12 @@ import {
   linearChain,
   sharedRangeFormulas,
 } from "./formula-dataset.js";
+import {
+  beginTraceWorkload,
+  endTraceWorkload,
+  recordingCellStore,
+  traceFixturePhase,
+} from "./formula-trace-recorder.js";
 import {
   assertFiniteNonNegative,
   assertGateIdentity,
@@ -70,6 +81,7 @@ const HARNESS_SOURCE_URLS = {
   "bench/package.json": new URL("../package.json", import.meta.url),
   "bench/src/formula-bench.ts": new URL("./formula-bench.ts", import.meta.url),
   "bench/src/formula-dataset.ts": new URL("./formula-dataset.ts", import.meta.url),
+  "bench/src/formula-trace-recorder.ts": new URL("./formula-trace-recorder.ts", import.meta.url),
   "bench/src/gate-protocol.ts": new URL("./gate-protocol.ts", import.meta.url),
   "bench/src/protocol-meta.ts": new URL("./protocol-meta.ts", import.meta.url),
   "bench/src/stats.ts": new URL("./stats.ts", import.meta.url),
@@ -1764,7 +1776,7 @@ interface FormulaWorkload {
   readonly factory: FixtureFactory;
 }
 
-function formulaWorkloads(smoke: boolean): FormulaWorkload[] {
+export function formulaWorkloads(smoke: boolean): FormulaWorkload[] {
   const workloads: FormulaWorkload[] = [];
   const add = (id: string, size: number, factory: FixtureFactory) =>
     workloads.push({ id, size, factory });
@@ -2839,11 +2851,45 @@ async function runBenchmark(
   console.log(JSON.stringify(result));
 }
 
+/**
+ * Write one call trace per gate workload to `directory`, for the native replay
+ * in `bench/native`. Each trace holds the fixture's setup, one timed run, its
+ * check and, for edit workloads, the restore that makes the run repeatable.
+ */
+async function writeFormulaTraces(directory: string): Promise<void> {
+  assert(
+    process.env.SHEETWRITE_BENCH_TRACE === "1",
+    "--trace needs SHEETWRITE_BENCH_TRACE=1 so fixtures use the recording store",
+  );
+  for (const { id, size, factory } of formulaWorkloads(false)) {
+    beginTraceWorkload();
+    traceFixturePhase("setup");
+    const fixture = factory();
+    traceFixturePhase("run");
+    fixture.run();
+    traceFixturePhase("check");
+    assert(outputsEqual(fixture.check(), expectedFormulaOutput(id, size)), `${id} trace output`);
+    if (fixture.restore !== undefined) {
+      traceFixturePhase("restore");
+      fixture.restore();
+    }
+    const text = endTraceWorkload(id, size, fixture.restore !== undefined);
+    fixture.dispose();
+    await Bun.write(resolve(directory, `${formulaWorkloadKey({ id, size })}.trace`), text);
+  }
+}
+
 if (import.meta.main) {
   const sampleIndex = process.argv.indexOf("--sample");
   if (process.argv.includes("--grid-constant-edit")) {
     await initSheetwrite(undefined, engine);
     process.stdout.write(`${JSON.stringify(gridConstantEditSample(100_000))}\n`);
+    process.exit(0);
+  }
+  const traceDirectory = optionValue(process.argv, "--trace");
+  if (traceDirectory !== undefined) {
+    await engine.load();
+    await writeFormulaTraces(traceDirectory);
     process.exit(0);
   }
   if (process.argv.includes("--gate-capture")) {
