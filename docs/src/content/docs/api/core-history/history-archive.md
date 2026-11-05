@@ -14,12 +14,13 @@ Calls that change the archive run one at a time. Each publishes atomically,
 so a failure or abort leaves the last durable version readable.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/history-archive.ts#L440"><code>packages/core/src/history-archive.ts#L440</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/history-archive.ts#L515"><code>packages/core/src/history-archive.ts#L515</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
 <a href="#history-archive-constructor"><code>constructor</code></a>
 <a href="#history-archive-delete-version"><code>deleteVersion</code></a>
+<a href="#history-archive-diff-versions"><code>diffVersions</code></a>
 <a href="#history-archive-initialize"><code>initialize</code></a>
 <a href="#history-archive-list-versions"><code>listVersions</code></a>
 <a href="#history-archive-prune"><code>prune</code></a>
@@ -31,7 +32,7 @@ so a failure or abort leaves the last durable version readable.
 <a href="#history-archive-open"><code>open</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>11</span>
+## Members <span class="api-count" data-pagefind-ignore>12</span>
 
 <div class="api-member-list">
 
@@ -51,6 +52,25 @@ constructor(options: HistoryArchiveOptions, limits: Readonly<HistoryLimits>, man
 deleteVersion: (id: string, signal?: AbortSignal) => Promise<void>;
 ```
 
+</details>
+
+<details class="api-member" id="history-archive-diff-versions" data-pagefind-weight="1">
+<summary><code>diffVersions</code> <span class="api-member-summary">One page of the difference between two retained versions: the cells that changed, with before and after and who wrote them; sheets added, removed or changed outside their cells; and workbook fields that changed.</span></summary>
+
+```ts generated
+diffVersions: (request: HistoryDiffRequest) => Promise<HistoryDiffPage>;
+```
+
+<p class="api-member-doc">One page of the difference between two retained versions: the cells that
+changed, with before and after and who wrote them; sheets added, removed
+or changed outside their cells; and workbook fields that changed.
+
+Both versions are rebuilt in private engine instances and compared in
+bounded windows by the history diff kernel, a separate WASM module that
+loads on the first diff. Rows and columns are aligned through the
+structural operations of the log, so an inserted row does not make the
+rows below it changed. Nothing is kept between pages: pass `cursor` to
+continue, and each page rebuilds the versions again.</p>
 </details>
 
 <details class="api-member" id="history-archive-initialize" data-pagefind-weight="1">
@@ -166,6 +186,7 @@ class HistoryArchive {
     manifest: HistoryManifest,
   );
   deleteVersion: (id: string, signal?: AbortSignal) => Promise<void>;
+  diffVersions: (request: HistoryDiffRequest) => Promise<HistoryDiffPage>;
   initialize: (
     snapshot: WorkbookSnapshot,
     time: number,

@@ -118,6 +118,7 @@ export function DocsSearch() {
         const pages = await Promise.all(
           response.results.slice(0, 8).map((result) => result.data()),
         );
+
         const seen = new Set<string>();
         const data: SearchEntry[] = [];
         for (const page of pages) {
@@ -127,7 +128,9 @@ export function DocsSearch() {
             data.push(entry);
           }
         }
+
         if (controller.signal.aborted) return;
+
         setResults(data);
         setStatus(data.length === 0 ? "No matching pages." : "");
       } catch (searchError) {
@@ -135,11 +138,13 @@ export function DocsSearch() {
           console.error("Documentation search failed", searchError);
           setResults([]);
           setStatus("");
+
           try {
             const index = await fetch("/pagefind/pagefind-entry.json", {
               signal: controller.signal,
             });
             if (controller.signal.aborted) return;
+
             if (index.status === 404) {
               setStatus("Search becomes available after the static index is built.");
               return;

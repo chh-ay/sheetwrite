@@ -36,6 +36,7 @@ import {
   buildAnalyticsData,
   createAnalyticsWorkbook,
 } from "./scenarios/analytics.js";
+import type { RenderingMode } from "./ui/rendering-mode.js";
 
 /** Summary-sheet row indexes of the global KPI formulas. */
 const KPI_ROW = { total: 0, average: 1, largest: 2 } as const;
@@ -182,8 +183,8 @@ export function useAnalyticsWorkbench(options: AnalyticsWorkbenchOptions = {}) {
   const [formulaDraft, setFormulaDraft] = useState("");
   const [generation, setGeneration] = useState(0);
   const [readyReason, setReadyReason] = useState<GridReadyReason>("initial");
-  const [renderer, setRenderer] = useState<"canvas" | "worker">("canvas");
-  const [activeRenderer, setActiveRenderer] = useState<"canvas" | "worker">("canvas");
+  const [renderer, setRenderer] = useState<RenderingMode>("canvas");
+  const [activeRenderer, setActiveRenderer] = useState<RenderingMode>("canvas");
   const [rendererFallback, setRendererFallback] = useState<{
     count: number;
     reason: string;
@@ -547,7 +548,7 @@ export function useAnalyticsWorkbench(options: AnalyticsWorkbenchOptions = {}) {
     [readOnly, record, workbook, runImport],
   );
 
-  const chooseRenderer = useCallback((mode: "canvas" | "worker"): void => {
+  const chooseRenderer = useCallback((mode: RenderingMode): void => {
     setRenderer(mode);
     setRendererFallback(null);
   }, []);

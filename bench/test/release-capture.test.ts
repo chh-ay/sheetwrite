@@ -12,7 +12,7 @@ function evidencePages(): string {
     .join("\n");
 }
 
-it("captures every artifact the evidence pages publish", () => {
+it("publishes every captured artifact on the evidence pages", () => {
   const pages = evidencePages();
   for (const artifact of RELEASE_ARTIFACTS) {
     expect(pages).toContain(`bench/results/${artifact}`);

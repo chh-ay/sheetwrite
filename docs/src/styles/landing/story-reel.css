@@ -1,0 +1,1008 @@
+/* ---- Story reel ------------------------------------------------------------------
+   Each story plays once (10 s), then the tab timer hands over to the next. The
+   static styles are each story's finished picture. */
+
+.sw-reel {
+  overflow: hidden;
+  border: 1px solid var(--sw-border-strong);
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--sw-surface-1) 92%, transparent);
+}
+
+/* Story changes ease instead of cutting: the indicator slides under the tabs,
+   the tab tint fades, and the new copy and stage rise in. */
+.sw-reel {
+  --sr-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.sw-reel__tabs {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--sr-count, 3), minmax(0, 1fr));
+  border-bottom: 1px solid var(--sw-border);
+}
+
+.sw-reel__tabs::before {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: calc(100% / var(--sr-count, 3));
+  height: 2px;
+  background: color-mix(in srgb, var(--sw-accent) 25%, transparent);
+  content: "";
+  transform: translateX(calc(var(--sr-index, 0) * 100%));
+  transition: transform 0.4s var(--sr-ease);
+}
+
+.sw-reel__tabs button {
+  position: relative;
+  min-height: 3.25rem;
+  padding: 0.9rem 1.25rem;
+  border: 0;
+  background: transparent;
+  color: var(--sw-fg-muted);
+  font: 650 var(--sw-type-sm) / 1.2 var(--sw-font-body);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 0.3s var(--sr-ease),
+    color 0.3s var(--sr-ease);
+}
+
+.sw-reel__tabs button + button {
+  border-left: 1px solid var(--sw-border);
+}
+
+.sw-reel__tabs button:hover {
+  color: var(--sw-fg-strong);
+}
+
+.sw-reel__tabs button[aria-selected="true"] {
+  background: color-mix(in srgb, var(--sw-accent) 7%, transparent);
+  color: var(--sw-fg-strong);
+}
+
+/* The progress bar is the reel's timer: its end selects the next story. */
+.sw-reel__timer {
+  position: absolute;
+  z-index: 1;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: var(--sw-accent-strong);
+  transform-origin: left;
+  animation: sr-timer var(--sr-loop, 10s) linear 1 both;
+}
+
+@keyframes sr-timer {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+.sw-reel__panel {
+  display: grid;
+  grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr);
+  align-items: center;
+}
+
+.sw-reel__copy {
+  padding: clamp(1.5rem, 3vw, 2.5rem);
+  animation: sr-panel-in 0.45s var(--sr-ease) both;
+}
+
+.sw-reel__copy h3 {
+  margin: 0;
+  color: var(--sw-fg-strong);
+  font: 650 clamp(1.35rem, 2.2vw, 1.75rem) / 1.2 var(--sw-font-display);
+  letter-spacing: -0.02em;
+}
+
+.sw-reel__copy p {
+  margin: 0.9rem 0 1.25rem;
+  color: var(--sw-fg-muted);
+  line-height: 1.6;
+}
+
+.sw-reel__copy a {
+  color: var(--sw-accent-strong);
+  font-weight: 650;
+  text-decoration: none;
+}
+
+/* Stops the automatic story change; pressed while the reel is paused. */
+.sw-reel__pause {
+  margin-left: 1rem;
+  padding: 0.25rem 0.65rem;
+  border: 1px solid var(--sw-border-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--sw-fg-muted);
+  font: 600 var(--sw-type-xs) var(--sw-font-body);
+  cursor: pointer;
+}
+
+.sw-reel__pause[aria-pressed="true"] {
+  border-color: var(--sw-accent-strong);
+  color: var(--sw-fg-strong);
+}
+
+.sw-reel__stage {
+  min-width: 0;
+  padding: 1rem 1.25rem;
+  border-left: 1px solid var(--sw-border);
+  background: color-mix(in srgb, var(--sw-surface-0) 55%, transparent);
+  /* The stage follows the copy, so the eye reads the claim, then the proof. */
+  animation: sr-panel-in 0.5s 0.08s var(--sr-ease) both;
+}
+
+@keyframes sr-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.6rem);
+  }
+}
+
+.sr {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.sr text {
+  fill: var(--sw-fg);
+  font: 500 13px var(--sw-font-body);
+  font-variant-numeric: tabular-nums;
+}
+
+.sr text[data-num] {
+  text-anchor: end;
+}
+
+.sr text[data-center] {
+  text-anchor: middle;
+}
+
+.sr-panel {
+  fill: var(--sw-surface-2);
+  stroke: var(--sw-border-strong);
+}
+
+.sr .sr-head {
+  fill: var(--sw-fg-dim);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.sr-rule {
+  stroke: var(--sw-border);
+}
+
+.sr .sr-formula {
+  fill: var(--sw-accent-strong);
+  font: 600 13px var(--sw-font-mono);
+}
+
+.sr .sr-tag {
+  fill: var(--sw-accent-strong);
+  font: 600 12px var(--sw-font-mono);
+}
+
+.sr .sr-count {
+  fill: var(--sw-fg-strong);
+  font: 700 16px var(--sw-font-display);
+}
+
+.sr .sr-note,
+.sr .sr-sub,
+.sr .sr-block-sub {
+  fill: var(--sw-fg-dim);
+  font-size: 12px;
+}
+
+.sr .sr-name {
+  fill: var(--sw-fg-strong);
+  font: 650 15px var(--sw-font-display);
+}
+
+.sr .sr-ver,
+.sr .sr-big {
+  fill: var(--sw-accent-strong);
+  font: 700 13px var(--sw-font-mono);
+}
+
+.sr .sr-big {
+  font-size: 26px;
+}
+
+.sr-spill-edge {
+  fill: color-mix(in srgb, var(--sw-accent) 8%, transparent);
+  stroke: var(--sw-accent);
+  stroke-dasharray: 5 4;
+}
+
+.sr-flash {
+  fill: var(--sw-demo-warn);
+  opacity: 0;
+}
+
+.sr-before {
+  opacity: 0;
+}
+
+.sr .sr-after {
+  fill: var(--sw-fg-strong);
+  font-weight: 700;
+}
+
+.sr-link {
+  fill: none;
+  stroke: var(--sw-demo-warn);
+  stroke-dasharray: 4 4;
+  stroke-width: 1.5;
+}
+
+.sr-mini {
+  fill: color-mix(in srgb, var(--sw-fg) 7%, transparent);
+  stroke: var(--sw-border);
+}
+
+.sr-mini[data-flash] {
+  fill: color-mix(in srgb, var(--sw-accent) 34%, transparent);
+}
+
+.sr-dot {
+  fill: var(--sw-accent);
+}
+
+.sr-wire {
+  stroke: var(--sw-accent);
+  stroke-width: 2;
+}
+
+.sr-state-offline,
+.sr-outbox,
+.sr-packet,
+.sr-pulse,
+.sr-roll:not([data-final]),
+.sr-batch-group {
+  opacity: 0;
+}
+
+/* The server lights its edge as it commits a version. */
+.sr-pulse {
+  fill: none;
+  stroke: var(--sw-accent-strong);
+  stroke-width: 2;
+}
+
+.sr-outbox rect {
+  fill: color-mix(in srgb, var(--sw-demo-warn) 26%, transparent);
+  stroke: var(--sw-demo-warn);
+}
+
+.sr .sr-outbox text {
+  font: 650 11px var(--sw-font-mono);
+}
+
+.sr-packet {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.sr-packet rect {
+  fill: color-mix(in srgb, var(--sw-accent) 24%, var(--sw-surface-2));
+  stroke: var(--sw-accent-strong);
+}
+
+.sr-packet[data-tone="pending"] rect {
+  fill: color-mix(in srgb, var(--sw-demo-warn) 26%, var(--sw-surface-2));
+  stroke: var(--sw-demo-warn);
+}
+
+.sr .sr-packet text {
+  fill: var(--sw-fg-strong);
+  font: 650 11px var(--sw-font-mono);
+}
+
+.sr-data,
+.sr-restored rect {
+  fill: var(--sw-accent);
+  fill-opacity: var(--shade);
+}
+
+.sr-cleared,
+.sr-key,
+.sr-block {
+  opacity: 0;
+}
+
+.sr-cleared rect {
+  fill: var(--sw-surface-2);
+  stroke: var(--sw-demo-warn);
+}
+
+.sr .sr-cleared text {
+  fill: var(--sw-demo-warn);
+  font: 650 12px var(--sw-font-mono);
+}
+
+.sr-key rect {
+  fill: var(--sw-surface-2);
+  stroke: var(--sw-fg-muted);
+  stroke-width: 1.5;
+}
+
+.sr .sr-key text {
+  fill: var(--sw-fg-strong);
+  font: 700 14px var(--sw-font-body);
+}
+
+.sr-block rect {
+  fill: color-mix(in srgb, var(--sw-accent) 22%, var(--sw-surface-2));
+  stroke: var(--sw-accent-strong);
+}
+
+.sr-batch-chip rect {
+  fill: color-mix(in srgb, var(--sw-accent) 24%, var(--sw-surface-2));
+  stroke: var(--sw-accent-strong);
+}
+
+.sr .sr-batch-chip text {
+  fill: var(--sw-fg-strong);
+  font: 650 11px var(--sw-font-mono);
+}
+
+.sr-batch-outline {
+  fill: none;
+  stroke: var(--sw-accent-strong);
+  stroke-dasharray: 4 3;
+}
+
+.sr .sr-block text:first-of-type {
+  fill: var(--sw-fg-strong);
+  font-weight: 700;
+}
+
+.sr-peer-cells rect {
+  fill: color-mix(in srgb, var(--sw-accent) 34%, transparent);
+}
+
+/* The peer's cells before the restore arrives: present, but empty. */
+.sr-peer-empty rect {
+  fill: color-mix(in srgb, var(--sw-fg) 8%, transparent);
+}
+
+.sr .sr-batch {
+  fill: var(--sw-accent-strong);
+  font: 650 12px var(--sw-font-mono);
+}
+
+/* Story timelines (one run each). */
+.sw-reel__stage :where(*) {
+  animation-fill-mode: both;
+}
+
+.sr-spill .sr-type {
+  animation: sr-type 2.2s steps(26) 0.2s both;
+}
+.sr-spill .sr-spill-row {
+  animation: sr-appear 0.4s ease-out both;
+}
+.sr-spill .sr-spill-edge {
+  animation: sr-edge var(--sr-loop, 10s) linear both;
+}
+.sr-spill .sr-change .sr-flash {
+  animation: sr-flash 1.2s ease-out 6s both;
+}
+.sr-spill .sr-change .sr-before,
+.sr-spill .sr-change-count .sr-before {
+  animation: sr-hide 0.2s linear 6.1s both;
+}
+.sr-spill .sr-change .sr-after {
+  animation: sr-appear 0.2s linear 6.1s both;
+}
+.sr-spill .sr-change-count .sr-before {
+  animation-delay: 7s;
+}
+.sr-spill .sr-change-count .sr-after {
+  animation: sr-appear 0.3s linear 7s both;
+}
+.sr-spill .sr-grow {
+  animation: sr-appear 0.4s ease-out 6.7s both;
+}
+.sr-spill .sr-link {
+  animation: sr-appear 0.5s ease-out 6.2s both;
+}
+.sr-spill :where(.sr-tag, .sr-change-count, .sr-note) {
+  animation: sr-appear 0.4s ease-out 3.8s both;
+}
+
+/* Analysis: the pivot fills in, the bars grow, then one order changes and the
+   pivot row, the grand total and the EMEA bar follow it in that order. */
+.sr-bar {
+  fill: color-mix(in srgb, var(--sw-accent) 60%, transparent);
+  transform-box: fill-box;
+  transform-origin: bottom;
+}
+
+.sr-bar[data-edited] {
+  fill: var(--sw-accent-strong);
+}
+
+.sr .sr-total {
+  fill: var(--sw-fg-strong);
+  font-weight: 700;
+}
+
+.sr-analysis .sr-pivot-row {
+  animation: sr-appear 0.4s ease-out both;
+}
+.sr-analysis .sr-bar {
+  animation: sr-bar-grow 0.9s cubic-bezier(0.3, 0.7, 0.3, 1) both;
+}
+/* One animation over the whole loop: grow to the old value, hold, then rise
+   to the new one at the edit. */
+.sr-analysis .sr-bar[data-edited] {
+  animation: sr-bar-follow var(--sr-loop, 10s) linear both;
+}
+.sr-analysis .sr-change[data-step="order"] .sr-flash {
+  animation: sr-flash 1.2s ease-out 6s both;
+}
+.sr-analysis .sr-change[data-step="order"] .sr-before {
+  animation: sr-hide 0.2s linear 6.1s both;
+}
+.sr-analysis .sr-change[data-step="order"] .sr-after {
+  animation: sr-appear 0.2s linear 6.1s both;
+}
+.sr-analysis .sr-change[data-step="pivot"] .sr-flash {
+  animation: sr-flash 1.2s ease-out 6.5s both;
+}
+.sr-analysis .sr-change[data-step="pivot"] .sr-before {
+  animation: sr-hide 0.2s linear 6.6s both;
+}
+.sr-analysis .sr-change[data-step="pivot"] .sr-after {
+  animation: sr-appear 0.2s linear 6.6s both;
+}
+.sr-analysis .sr-link {
+  animation: sr-appear 0.5s ease-out 6.2s both;
+}
+.sr-analysis .sr-note {
+  animation: sr-appear 0.4s ease-out 7.4s both;
+}
+
+@keyframes sr-bar-grow {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+@keyframes sr-bar-follow {
+  0%,
+  24% {
+    transform: scaleY(0);
+  }
+  32%,
+  68% {
+    transform: scaleY(var(--sr-from));
+  }
+  76%,
+  100% {
+    transform: none;
+  }
+}
+
+.sr-offline .sr-dot-bram {
+  animation: sr-dot-bram var(--sr-loop, 10s) linear both;
+}
+.sr-offline .sr-state-online {
+  animation: sr-online var(--sr-loop, 10s) linear both;
+}
+.sr-offline .sr-state-offline {
+  animation: sr-offline var(--sr-loop, 10s) linear both;
+}
+.sr-offline .sr-wire[data-side="bram"] {
+  animation: sr-wire var(--sr-loop, 10s) linear both;
+}
+
+/* Bram's edited cell: pending (amber) while the edit waits, committed (green)
+   once the server gives it a version. */
+.sr-offline [data-device="bram"] .sr-mini[data-flash] {
+  animation:
+    sr-cell-pending 0.3s ease-out var(--edit) both,
+    sr-cell-commit 0.6s ease-out var(--ack) forwards;
+}
+
+/* Ana's matching cell stays plain until the server's packet reaches it. */
+.sr-offline [data-device="ana"] .sr-mini[data-flash] {
+  animation: sr-cell-apply 0.6s ease-out var(--apply) both;
+}
+
+/* A chip lifts out of the edited cell into its outbox slot, waits, moves up the
+   queue as older chips leave, then travels Bram's wire into the server. */
+.sr-offline .sr-outbox {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation:
+    sr-chip-queue 0.5s cubic-bezier(0.2, 0.8, 0.3, 1) var(--edit) both,
+    sr-chip-drain 0.6s cubic-bezier(0.45, 0, 0.55, 1) var(--drain) forwards;
+}
+.sr-offline .sr-queue[data-shifts="1"] {
+  animation: sr-queue-1 0.3s ease-out var(--shift-1) forwards;
+}
+.sr-offline .sr-queue[data-shifts="2"] {
+  animation:
+    sr-queue-1 0.3s ease-out var(--shift-1) forwards,
+    sr-queue-2 0.3s ease-out var(--shift-2) forwards;
+}
+
+/* The committed version runs Ana's wire, then lands in the cell it changes. */
+.sr-offline .sr-packet {
+  animation: sr-packet 0.55s cubic-bezier(0.45, 0, 0.55, 1) var(--send) both;
+}
+
+/* Odometer: the first value is shown from the start, every later value rolls
+   in, and every value but the last rolls out when the next arrives. */
+.sr .sr-roll {
+  --roll: 14px;
+}
+.sr .sr-roll[data-first] {
+  animation:
+    sr-roll-in 1ms linear 0s both,
+    sr-roll-out 0.35s ease-in var(--out) forwards;
+}
+.sr .sr-roll:not([data-first], [data-final]) {
+  animation:
+    sr-roll-in 0.35s ease-out var(--in) both,
+    sr-roll-out 0.35s ease-in var(--out) forwards;
+}
+.sr .sr-roll[data-final] {
+  animation: sr-roll-in 0.35s ease-out var(--in) both;
+}
+.sr .sr-big.sr-roll {
+  --roll: 24px;
+}
+
+.sr-undo .sr-data {
+  animation: sr-wipe 0.35s ease-in both;
+}
+/* Undo restores the whole local grid in one step, right after the key press. */
+.sr-undo .sr-restored {
+  animation: sr-restore 0.6s ease-out var(--local-restore) both;
+}
+.sr-undo .sr-cleared {
+  animation: sr-cleared var(--sr-loop, 10s) linear both;
+}
+.sr-undo .sr-key {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: sr-key var(--sr-loop, 10s) ease-out both;
+}
+.sr-undo .sr-packet {
+  animation: sr-hop 0.4s cubic-bezier(0.45, 0, 0.55, 1) var(--at) both;
+}
+
+/* The one compressed restore leaves the grid on the wire and merges into the server. */
+.sr-undo .sr-block {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: sr-restore-send 1s cubic-bezier(0.45, 0, 0.55, 1) var(--restore-send) both;
+}
+
+/* Inside the server it becomes five versions, then one outline groups them. */
+.sr-undo .sr-batch-chip {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: sr-pop 0.25s ease-out var(--at) both;
+}
+.sr-undo .sr-batch-outline {
+  animation: sr-appear 0.3s ease-out var(--at) both;
+}
+
+/* The batch travels to the peer as a unit. */
+.sr-undo .sr-batch-group {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: sr-batch-send 0.7s cubic-bezier(0.45, 0, 0.55, 1) var(--batch-send) both;
+}
+
+/* The peer's cells empty with the clear (v50), then all fill at once when the
+   batch lands: all of it or none. */
+.sr-undo .sr-peer-cells {
+  animation:
+    sr-hide 0.3s ease-out var(--clear-applied) both,
+    sr-show 0.3s ease-out var(--batch-applied) forwards;
+}
+.sr-undo .sr-batch {
+  animation: sr-appear 0.4s ease-out var(--batch-applied) both;
+}
+
+.sr .sr-pulse {
+  animation: sr-pulse 0.7s ease-out var(--at) both;
+}
+
+@keyframes sr-type {
+  from {
+    width: 0;
+  }
+}
+
+@keyframes sr-appear {
+  from {
+    opacity: 0;
+  }
+}
+
+/* The hidden "before" values are visible until the change. */
+@keyframes sr-hide {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes sr-flash {
+  0% {
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.45;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes sr-edge {
+  0%,
+  27% {
+    height: 62px;
+    opacity: 0;
+  }
+  30%,
+  64% {
+    height: 62px;
+    opacity: 1;
+  }
+  70%,
+  100% {
+    height: 92px;
+    opacity: 1;
+  }
+}
+
+@keyframes sr-dot-bram {
+  0%,
+  9% {
+    fill: var(--sw-accent);
+  }
+  10%,
+  49% {
+    fill: var(--sw-demo-warn);
+  }
+  50%,
+  100% {
+    fill: var(--sw-accent);
+  }
+}
+
+@keyframes sr-online {
+  0%,
+  9% {
+    opacity: 1;
+  }
+  10%,
+  49% {
+    opacity: 0;
+  }
+  50%,
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes sr-offline {
+  0%,
+  9% {
+    opacity: 0;
+  }
+  10%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes sr-wire {
+  0%,
+  9% {
+    stroke: var(--sw-accent);
+    stroke-dasharray: none;
+  }
+  10%,
+  49% {
+    stroke: var(--sw-fg-dim);
+    stroke-dasharray: 3 5;
+  }
+  50%,
+  100% {
+    stroke: var(--sw-accent);
+    stroke-dasharray: none;
+  }
+}
+
+@keyframes sr-cell-pending {
+  from {
+    fill: color-mix(in srgb, var(--sw-fg) 7%, transparent);
+  }
+  to {
+    fill: color-mix(in srgb, var(--sw-demo-warn) 45%, transparent);
+  }
+}
+
+@keyframes sr-cell-commit {
+  from {
+    fill: color-mix(in srgb, var(--sw-demo-warn) 45%, transparent);
+  }
+  30% {
+    fill: var(--sw-accent);
+  }
+  to {
+    fill: color-mix(in srgb, var(--sw-accent) 34%, transparent);
+  }
+}
+
+@keyframes sr-cell-apply {
+  from {
+    fill: color-mix(in srgb, var(--sw-fg) 7%, transparent);
+  }
+  30% {
+    fill: var(--sw-accent);
+  }
+  to {
+    fill: color-mix(in srgb, var(--sw-accent) 34%, transparent);
+  }
+}
+
+@keyframes sr-chip-queue {
+  from {
+    opacity: 0;
+    transform: translate(var(--from-x), var(--from-y)) scale(0.4);
+  }
+  50% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sr-chip-drain {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  40% {
+    transform: translate(var(--exit-x), var(--exit-y));
+  }
+  85% {
+    opacity: 1;
+    transform: translate(var(--to-x), var(--to-y)) scale(0.6);
+  }
+  to {
+    opacity: 0;
+    transform: translate(var(--to-x), var(--to-y)) scale(0.3);
+  }
+}
+
+@keyframes sr-queue-1 {
+  to {
+    transform: translateX(calc(var(--pitch) * -1));
+  }
+}
+
+@keyframes sr-queue-2 {
+  from {
+    transform: translateX(calc(var(--pitch) * -1));
+  }
+  to {
+    transform: translateX(calc(var(--pitch) * -2));
+  }
+}
+
+@keyframes sr-pulse {
+  from {
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes sr-packet {
+  from {
+    opacity: 0;
+    transform: none;
+  }
+  10% {
+    opacity: 1;
+  }
+  45% {
+    transform: translate(var(--wire-x), 0);
+  }
+  85% {
+    opacity: 1;
+    transform: translate(var(--to-x), var(--to-y)) scale(0.7);
+  }
+  to {
+    opacity: 0;
+    transform: translate(var(--to-x), var(--to-y)) scale(0.7);
+  }
+}
+
+/* A packet travels one wire segment and is absorbed at the far end. */
+@keyframes sr-hop {
+  from {
+    opacity: 0;
+    transform: none;
+  }
+  15% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+    transform: translate(var(--dx), var(--dy));
+  }
+  to {
+    opacity: 0;
+    transform: translate(var(--dx), var(--dy)) scale(0.6);
+  }
+}
+
+@keyframes sr-roll-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--roll));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sr-roll-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(calc(var(--roll) * -1));
+  }
+}
+
+@keyframes sr-wipe {
+  to {
+    fill-opacity: 0.04;
+  }
+}
+
+@keyframes sr-restore {
+  0% {
+    opacity: 0;
+  }
+  40% {
+    opacity: 1;
+    filter: brightness(1.6);
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes sr-cleared {
+  0%,
+  25% {
+    opacity: 0;
+  }
+  28%,
+  39% {
+    opacity: 1;
+  }
+  42%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes sr-restore-send {
+  from {
+    opacity: 0;
+    transform: translateX(-40px) scale(0.9);
+  }
+  25%,
+  45% {
+    opacity: 1;
+    transform: none;
+  }
+  90% {
+    opacity: 1;
+    transform: translateX(var(--dx)) scale(0.4);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(var(--dx)) scale(0.3);
+  }
+}
+
+/* Unlike sr-appear, ends at an explicit 1: it follows sr-hide on the same
+   element, whose held 0 would otherwise be the implicit end value. */
+@keyframes sr-show {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sr-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sr-batch-send {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  85% {
+    opacity: 1;
+    transform: translateY(var(--peer-drop)) scale(0.7);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(var(--peer-drop)) scale(0.7);
+  }
+}
+
+@keyframes sr-key {
+  0%,
+  33% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  36% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  38% {
+    transform: scale(0.92);
+  }
+  40%,
+  44% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  48%,
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}

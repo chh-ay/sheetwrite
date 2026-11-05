@@ -45,6 +45,11 @@ const RUST_CRATES = [
     testArguments: ["--features", "analysis"],
   },
   {
+    name: "history",
+    directory: "packages/wasm/history",
+    testArguments: [],
+  },
+  {
     name: "queries",
     directory: "packages/queries/engine",
     testArguments: [],
