@@ -2537,10 +2537,9 @@ impl CellStore {
     /// range to the used extent the same way.
     ///
     /// Out of line, and named `*_family`, so neither LLVM nor wasm-opt puts
-    /// its loops into `eval_ast`. A SIMD version of this scan was rejected
-    /// (#342): enabling `simd128` for one function enables it for the whole
-    /// module, and the changed code made other range formulas up to 1.8x
-    /// slower on x86-64.
+    /// its loops into `eval_ast`. The scan is scalar: enabling `simd128` for
+    /// one function enables it for the whole module, which makes other range
+    /// formulas up to 1.8x slower on x86-64 (#342).
     #[inline(never)]
     fn dense_number_count_if_family(
         &self,
@@ -2553,10 +2552,12 @@ impl CellStore {
         if reader_depth >= FORMULA_RECURSION_LIMIT {
             return None;
         }
+
         let cells = &self.sheets.get(range.sheet as usize)?.cells;
         let row_start = range.row_start as usize;
         let row_end = (range.row_end as usize).min(cells.row_count().checked_sub(1)?);
         let col_end = (range.col_end as usize).min(cells.n_cols().checked_sub(1)?);
+
         let mut count = 0;
         for col in range.col_start as usize..=col_end {
             let column = cells.dense_column(col)?;

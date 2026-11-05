@@ -95,6 +95,7 @@ impl Criterion {
         if self.wildcard.is_some() {
             return None;
         }
+
         // One loop per operator keeps the operator match out of the loop.
         Some(match self.op {
             CmpOp::Eq => count_numbers_where(numbers, |number| number == threshold),
