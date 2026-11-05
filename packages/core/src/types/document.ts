@@ -11,6 +11,7 @@ import type {
 } from "./cell.js";
 import type { ChartDefinition } from "./chart.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "./coordinates.js";
+import type { Dashboard, DashboardItem, SheetKind } from "./dashboard.js";
 import type { DataModel, TableRelationship } from "./data-model.js";
 import type { PivotDefinition } from "./pivot.js";
 import type { SavedQuery } from "./query.js";
@@ -47,6 +48,10 @@ export interface Sheet {
   id: SheetId;
   /** User-facing sheet name shown in tabs and workbook exports. */
   name: string;
+  /** A dashboard holds items and no cells; absent means a worksheet. */
+  kind?: SheetKind;
+  /** Items of a dashboard sheet; only on `kind: "dashboard"`. */
+  dashboard?: Dashboard;
   /** Hidden worksheets remain addressable but are omitted from the tab strip. */
   visibility?: SheetVisibility;
   /** Ordered schema; array positions are the zero-based column coordinates. */
@@ -153,6 +158,8 @@ export interface Workbook {
 export interface AddSheetInput {
   id?: SheetId;
   name: string;
+  /** `"dashboard"` adds a dashboard, which ignores `rowCount` and `columns`. */
+  kind?: SheetKind;
   rowCount?: number;
   columns?: Column[];
 }
@@ -413,6 +420,10 @@ export interface SheetSnapshot {
   id: SheetId;
   name: string;
   order: number;
+  /** A dashboard holds items and no cells; absent means a worksheet. */
+  kind?: SheetKind;
+  /** Items of a dashboard sheet; only on `kind: "dashboard"`. */
+  dashboard?: Dashboard;
   /** Hidden worksheets remain in the workbook and retain formulas/references. */
   visibility?: SheetVisibility;
   rowCount: number;
@@ -585,4 +596,8 @@ export type DocumentOp =
 
   /** Insert or replace the pivot with `pivot.id` on `sheet`. */
   | { op: "setPivot"; sheet: SheetId; pivot: PivotDefinition }
-  | { op: "removePivot"; sheet: SheetId; id: string };
+  | { op: "removePivot"; sheet: SheetId; id: string }
+
+  /** Insert or replace the item with `item.id` on the dashboard `sheet`. */
+  | { op: "setDashboardItem"; sheet: SheetId; item: DashboardItem }
+  | { op: "removeDashboardItem"; sheet: SheetId; id: string };

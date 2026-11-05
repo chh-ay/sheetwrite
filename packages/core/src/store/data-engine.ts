@@ -15,6 +15,16 @@ import {
 import { capturedClearCells } from "../clear-capture.js";
 import { validConditionalRules } from "../conditional-format.js";
 import {
+  dashboardFields,
+  dashboardPivotAllowed,
+  dashboardTakes,
+  findDashboardItem,
+  isDashboard,
+  validateDashboardItemAdmission,
+  withDashboardItem,
+  withoutDashboardItem,
+} from "../dashboard.js";
+import {
   type DataModelIssue,
   findRelationship,
   validateRelationshipAdmission,
@@ -2855,12 +2865,21 @@ export class StoreDataEngine {
     }
   }
 
+  /** Whether the sheet that `patch` targets takes it; a dashboard has no cells, rows or columns. */
+  private sheetTakes(patch: DocumentOp): boolean {
+    if (dashboardTakes(patch.op)) return true;
+    const target = patchSheetId(patch);
+    return !isDashboard(this.workbook.sheets.find((sheet) => sheet.id === target));
+  }
+
   private applyPatch(
     patch: DocumentOp,
     changes: ChangeEvent["changes"] | null,
     captureDetailedChanges = false,
     trustedHistory = false,
   ): boolean {
+    if (!this.sheetTakes(patch)) return false;
+
     switch (patch.op) {
       case "set": {
         if (!this.isCellInBounds(patch.addr)) return false;
@@ -3582,7 +3601,11 @@ export class StoreDataEngine {
 
       case "setPivot": {
         const sheet = this.workbook.sheets.find((candidate) => candidate.id === patch.sheet);
-        if (!sheet || this.pivotIssues(patch.pivot, sheet, this.workbook.sheets).length > 0) {
+        if (
+          !sheet ||
+          !dashboardPivotAllowed(sheet, patch.pivot) ||
+          this.pivotIssues(patch.pivot, sheet, this.workbook.sheets).length > 0
+        ) {
           return false;
         }
 
@@ -3719,6 +3742,23 @@ export class StoreDataEngine {
       case "setCalculation": {
         if (!this.syncCalculation(patch.calculation)) return false;
         this.workbook.calculation = storedCalculationSettings(patch.calculation);
+        return true;
+      }
+
+      case "setDashboardItem": {
+        const sheet = this.workbook.sheets.find((candidate) => candidate.id === patch.sheet);
+        const issues: DataModelIssue[] = [];
+        if (!sheet) return false;
+        validateDashboardItemAdmission(patch.item, sheet, issues);
+        if (issues.length > 0) return false;
+        sheet.dashboard = withDashboardItem(sheet.dashboard, patch.item);
+        return true;
+      }
+
+      case "removeDashboardItem": {
+        const sheet = this.workbook.sheets.find((candidate) => candidate.id === patch.sheet);
+        if (!sheet || !findDashboardItem(sheet, patch.id)) return false;
+        sheet.dashboard = withoutDashboardItem(sheet.dashboard, patch.id);
         return true;
       }
 
@@ -4186,6 +4226,7 @@ export class StoreDataEngine {
     const sheet: Sheet = {
       id: snapshot.id,
       name: name.name,
+      ...dashboardFields(snapshot),
       visibility: snapshot.visibility,
       rowCount: snapshot.rowCount,
       columns: snapshot.columns.map((column) => ({ ...column })),

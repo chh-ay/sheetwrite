@@ -1,3 +1,4 @@
+import { dashboardFields } from "../dashboard.js";
 import {
   SnapshotValidationError,
   type SnapshotValidationOptions,
@@ -55,6 +56,7 @@ export function decodeWorkbookSnapshot(
       return {
         id: source.id,
         name: source.name,
+        ...dashboardFields(source),
         visibility: source.visibility,
         rowCount: source.rowCount,
         columns: cloneJsonValue(source.columns) ?? [],
@@ -142,6 +144,7 @@ export class StoreSnapshotCodec {
         id: sheet.id,
         name: sheet.name,
         order,
+        ...dashboardFields(sheet),
         ...(sheet.visibility !== undefined ? { visibility: sheet.visibility } : {}),
         rowCount: sheet.rowCount,
         columns: cloneJsonValue(sheet.columns) ?? [],

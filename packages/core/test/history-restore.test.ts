@@ -445,3 +445,52 @@ describe("restore through sync", () => {
     expect(value(alice.grid, "data", 3, 0)).toBe(44);
   });
 });
+
+describe("restore a dashboard", () => {
+  it("restores the items of a dashboard in place, without cell operations on it", async () => {
+    const { adapter, archive } = await session();
+    const alice = await client(adapter, "alice");
+    const slicer = {
+      id: "region",
+      box: { x: 0, y: 0, w: 4, h: 4 },
+      kind: "slicer" as const,
+      field: { table: "orders", column: "region" },
+      selected: ["East"],
+    };
+    await edit(alice, [
+      {
+        op: "addSheet",
+        sheet: {
+          id: "dash",
+          name: "Dash",
+          order: 2,
+          kind: "dashboard",
+          dashboard: { items: [slicer] },
+          rowCount: 0,
+          columns: [],
+          cells: [],
+        },
+      },
+    ]);
+    const version = await archive.saveVersion("Dashboard", "alice", 0);
+
+    await edit(alice, [
+      { op: "setDashboardItem", sheet: "dash", item: { ...slicer, selected: ["West"] } },
+      {
+        op: "setDashboardItem",
+        sheet: "dash",
+        item: { ...slicer, id: "later", box: { x: 4, y: 0, w: 4, h: 4 } },
+      },
+    ]);
+
+    const outcome = await archive.restoreVersion(
+      alice.grid,
+      version.id,
+      { kind: "workbook" },
+      { sync: alice.sync },
+    );
+
+    expect(outcome.status).toBe("applied");
+    expect(alice.grid.store.getWorkbook().sheets[2]?.dashboard).toEqual({ items: [slicer] });
+  });
+});
