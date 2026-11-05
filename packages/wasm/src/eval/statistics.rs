@@ -9,7 +9,8 @@ use super::functions::{
 };
 use super::value::aggregate_number;
 
-const MAX_SELECTION_VALUES: usize = RANGE_CELL_LIMIT as usize;
+/// The most values `MEDIAN`, `PERCENTILE.INC` and the other selections read.
+pub(super) const MAX_SELECTION_VALUES: usize = RANGE_CELL_LIMIT as usize;
 const MAX_CRITERIA_PAIRS: usize = 126;
 
 pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> {
@@ -165,7 +166,8 @@ fn quartile_inc(values: &FuncAccumulator) -> Result<f64, FormulaError> {
     percentile(numbers, quartile as f64 * 0.25)
 }
 
-fn percentile(mut numbers: Vec<f64>, fraction: f64) -> Result<f64, FormulaError> {
+/// The `PERCENTILE.INC` of `numbers` at `fraction`.
+pub(super) fn percentile(mut numbers: Vec<f64>, fraction: f64) -> Result<f64, FormulaError> {
     if numbers.is_empty() || !(0.0..=1.0).contains(&fraction) {
         return Err(FormulaError::Num);
     }
@@ -327,11 +329,24 @@ fn geomean(values: &FuncAccumulator) -> Result<f64, FormulaError> {
     }
 }
 
+/// The statistic a paired function computes.
 #[derive(Clone, Copy)]
-enum PairedKind {
+pub(super) enum PairedKind {
     Correlation,
     SampleCovariance,
     PopulationCovariance,
+}
+
+impl PairedKind {
+    /// The statistic of `func`, or `None` when it is not a paired function.
+    pub(super) fn of(func: Func) -> Option<Self> {
+        match func {
+            Func::Correl => Some(Self::Correlation),
+            Func::CovarianceS => Some(Self::SampleCovariance),
+            Func::CovarianceP => Some(Self::PopulationCovariance),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Default)]
@@ -375,14 +390,46 @@ fn paired_result(values: &FuncAccumulator, kind: PairedKind) -> Result<f64, Form
     if left.len() != right.len() {
         return Err(FormulaError::Na);
     }
+    let pairs = left
+        .iter()
+        .zip(right)
+        .map(|(left, right)| (PairedCell::of(&left.value), PairedCell::of(&right.value)));
+    paired_statistic(pairs, kind)
+}
+
+/// One cell of a paired statistic's argument, as the statistic reads it.
+pub(super) enum PairedCell {
+    Number(f64),
+    Error(FormulaError),
+    /// Text, a logical value or a blank: the pair is left out.
+    Skipped,
+}
+
+impl PairedCell {
+    fn of(value: &Value) -> Self {
+        match value {
+            Value::Number(number) => Self::Number(*number),
+            Value::Error(error) => Self::Error(*error),
+            Value::Text(_) | Value::Bool(_) | Value::Blank => Self::Skipped,
+        }
+    }
+}
+
+/// `CORREL`, `COVARIANCE.S` or `COVARIANCE.P` of the pairs, in order: the
+/// first error in either cell decides the result, a pair of numbers with a
+/// non-finite one is `#NUM!`, and any other pair is left out.
+pub(super) fn paired_statistic(
+    pairs: impl IntoIterator<Item = (PairedCell, PairedCell)>,
+    kind: PairedKind,
+) -> Result<f64, FormulaError> {
     let mut moments = PairedMoments::default();
-    for (left, right) in left.iter().zip(right) {
-        match (&left.value, &right.value) {
-            (Value::Error(error), _) | (_, Value::Error(error)) => return Err(*error),
-            (Value::Number(x), Value::Number(y)) if x.is_finite() && y.is_finite() => {
-                moments.push(*x, *y)?;
+    for pair in pairs {
+        match pair {
+            (PairedCell::Error(error), _) | (_, PairedCell::Error(error)) => return Err(error),
+            (PairedCell::Number(x), PairedCell::Number(y)) if x.is_finite() && y.is_finite() => {
+                moments.push(x, y)?;
             }
-            (Value::Number(_), Value::Number(_)) => return Err(FormulaError::Num),
+            (PairedCell::Number(_), PairedCell::Number(_)) => return Err(FormulaError::Num),
             _ => {}
         }
     }
