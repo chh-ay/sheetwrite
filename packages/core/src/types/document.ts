@@ -265,6 +265,8 @@ export type CommitReason =
   | "style"
   /** Find-and-replace. */
   | "replace"
+  /** In-place sort that moves the rows of a range. */
+  | "sort"
   | "undo"
   | "redo"
   /** `store.applyTransaction` from host code / unclassified. */

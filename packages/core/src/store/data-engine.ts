@@ -68,9 +68,11 @@ import {
 import { restoreBlockFacts } from "../restore-block.js";
 import {
   decodeRowOrder,
+  encodeRowOrder,
   invertRowOrder,
   isRowPermutation,
   type PermuteRowsOperation,
+  ROW_ORDER_ENCODING,
 } from "../row-order.js";
 import { canAddSheetSnapshot } from "../sheet-lifecycle.js";
 import { validateSheetName } from "../sheet-name.js";
@@ -109,6 +111,7 @@ import type {
   Sheet,
   SheetSnapshot,
   SnapshotCell,
+  SortKey,
   Workbook,
   WorkbookSnapshot,
 } from "../types/document.js";
@@ -1984,6 +1987,75 @@ export class StoreDataEngine {
   }
 
   /**
+   * The `permuteRows` operation that sorts the data rows of `range` by
+   * `keys`, or `null` when no row moves. Rows that are hidden or filtered
+   * out keep their place, as in Excel; the others take the sorted order
+   * among the visible positions. Keys are columns inside the range.
+   */
+  sortRangeOperation(
+    range: Range,
+    keys: readonly SortKey[],
+    hasHeader: boolean,
+  ): PermuteRowsOperation | null {
+    const bounds = normalizedRange(range);
+    const sheet = this.sheetMeta(bounds.sheet);
+    const dataStart = bounds.start.row + (hasHeader ? 1 : 0);
+    const keysInside = keys.every(
+      (key) => integerAt(key.col) && key.col >= bounds.start.col && key.col <= bounds.end.col,
+    );
+    if (
+      keys.length === 0 ||
+      !keysInside ||
+      bounds.start.row < 0 ||
+      bounds.start.col < 0 ||
+      bounds.end.row >= sheet.rowCount ||
+      bounds.end.col >= sheet.columns.length ||
+      dataStart > bounds.end.row
+    ) {
+      return null;
+    }
+
+    const visible = this.visibleRowsBetween(bounds.sheet, dataStart, bounds.end.row);
+    if (visible.length < 2) return null;
+
+    const cols = Uint32Array.from(keys, (key) => key.col);
+    const ascending = Uint8Array.from(keys, (key) => (key.ascending ? 1 : 0));
+    const sorted = this.wasm.sortRowsMulti(this.handleOf(bounds.sheet), cols, ascending, visible);
+
+    const order = new Uint32Array(bounds.end.row - dataStart + 1);
+    for (let offset = 0; offset < order.length; offset++) order[offset] = offset;
+    for (const [position, target] of visible.entries()) {
+      order[target - dataStart] = (sorted[position] ?? target) - dataStart;
+    }
+
+    return {
+      op: "permuteRows",
+      range: {
+        sheet: bounds.sheet,
+        start: { row: dataStart, col: bounds.start.col },
+        end: { row: bounds.end.row, col: bounds.end.col },
+      },
+      encoding: ROW_ORDER_ENCODING,
+      order: encodeRowOrder(order),
+    };
+  }
+
+  /** Rows from `first` to `last` that the view shows, in sheet order. */
+  private visibleRowsBetween(sheet: SheetId, first: number, last: number): Uint32Array {
+    const hidden = this.sheetMeta(sheet).hiddenRows;
+    const filtered = this.view.hasView(sheet);
+    const rows = new Uint32Array(last - first + 1);
+    let count = 0;
+    for (let row = first; row <= last; row++) {
+      if (hidden?.has(row)) continue;
+      if (filtered && this.view.viewRowOf(sheet, row) === null) continue;
+      rows[count] = row;
+      count += 1;
+    }
+    return rows.subarray(0, count);
+  }
+
+  /**
    * Capture resolved cells and serializable sources in input order. Rows with
    * the same selected columns share a source read, without capturing the empty
    * bounding rectangle of a sparse selection.
@@ -2770,7 +2842,7 @@ export class StoreDataEngine {
         return this.moveRows(patch, changes);
 
       case "permuteRows":
-        return this.permuteRows(patch);
+        return this.permuteRows(patch, changes, captureDetailedChanges);
 
       case "addColumns": {
         const meta = this.sheetMeta(patch.sheet);
@@ -3590,7 +3662,11 @@ export class StoreDataEngine {
    * cells and adjusts their formulas; notes, hyperlinks and merged cells of
    * the range move here. Nothing changes when a check fails.
    */
-  private permuteRows(patch: PermuteRowsOperation): boolean {
+  private permuteRows(
+    patch: PermuteRowsOperation,
+    changes: ChangeEvent["changes"] | null,
+    captureDetailedChanges: boolean,
+  ): boolean {
     const bounds = normalizedRange(patch.range);
     const sheet = this.sheetMeta(bounds.sheet);
     const order = decodeRowOrder(patch);
@@ -3609,12 +3685,17 @@ export class StoreDataEngine {
     const merges = permutedMerges(sheet.merges ?? [], move);
     if (!merges || merges.some((merge) => mergeCrossesFreeze(sheet, merge))) return false;
 
+    const rows = bounds.end.row - bounds.start.row + 1;
+    const cols = bounds.end.col - bounds.start.col + 1;
+    const beforeCells =
+      changes && captureDetailedChanges ? this.captureBlockBeforeCells(bounds, rows, cols) : null;
+
     this.noteRangeMutationFfi(order.length);
     const status = this.wasm.permuteRows(
       this.handleOf(bounds.sheet),
       bounds.start.row,
       bounds.start.col,
-      bounds.end.col - bounds.start.col + 1,
+      cols,
       order,
     );
     if (status !== 0) return false;
@@ -3625,7 +3706,35 @@ export class StoreDataEngine {
     }
     if (sheet.notes) sheet.notes = permutedNotes(sheet.notes, move);
     if (sheet.hyperlinks) sheet.hyperlinks = permutedHyperlinks(sheet.hyperlinks, move);
+
+    if (beforeCells && changes) this.pushPermutedChanges(bounds, beforeCells, changes);
     return true;
+  }
+
+  /**
+   * Cell-level effects of a row permutation, for listeners that ask for them
+   * (such as a row bridge). Other listeners read the operation's range.
+   */
+  private pushPermutedChanges(
+    bounds: Range,
+    beforeCells: Array<{ addr: CellAddress; before: ResolvedCell }>,
+    changes: ChangeEvent["changes"],
+  ): void {
+    const after = this.captureCells(
+      bounds.sheet,
+      beforeCells.map(({ addr }) => addr),
+    );
+    for (const [index, entry] of beforeCells.entries()) {
+      const next = after[index];
+      if (!next) continue;
+
+      changes.push({
+        addr: entry.addr,
+        oldValue: literalOf(entry.before.resolved),
+        newValue: next.value,
+        oldStyle: entry.before.style,
+      });
+    }
   }
 
   private moveColumns(

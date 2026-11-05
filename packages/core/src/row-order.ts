@@ -77,7 +77,7 @@ export function isRowPermutation(order: Uint32Array): boolean {
   for (const row of order) {
     if (row >= order.length) return false;
     const word = Math.floor(row / BITS_PER_MARK_WORD);
-    const bit = 1 << row % BITS_PER_MARK_WORD;
+    const bit = 1 << (row % BITS_PER_MARK_WORD);
     const marks = seen[word] ?? 0;
     if ((marks & bit) !== 0) return false;
     seen[word] = marks | bit;

@@ -81,10 +81,7 @@ export function permutedHyperlinks(
  * Learn, "An error message when you sort a range that contains merged cells
  * in Excel": a sort needs identically sized merged cells.
  */
-export function permutedMerges(
-  merges: readonly MergeRange[],
-  move: RowMove,
-): MergeRange[] | null {
+export function permutedMerges(merges: readonly MergeRange[], move: RowMove): MergeRange[] | null {
   const { start, end } = move.bounds;
   const moved: MergeRange[] = [];
 

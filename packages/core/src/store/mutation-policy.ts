@@ -273,6 +273,7 @@ export class StoreMutationPolicy {
       case "restoreBlock":
       case "setRangeStyle":
       case "clearRange":
+      case "permuteRows":
         return [normalizedRange(patch.range)];
 
       case "addMerge":
