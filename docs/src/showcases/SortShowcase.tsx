@@ -1,5 +1,4 @@
 import type { CommitReason } from "@sheetwrite/core";
-import { ArrowDownWideNarrow, Eye, EyeOff, SlidersHorizontal, Undo2 } from "lucide-react";
 
 import { ActionError } from "../lib/use-action.js";
 import { ControlActions, ControlButton, DemoGrid } from "./feature-controls.js";
@@ -85,7 +84,7 @@ function SortControls({
           {SORT_IDS.map((id) => (
             <ControlButton
               disabled={disabled}
-              icon={ArrowDownWideNarrow}
+              icon="sort-desc"
               key={id}
               onClick={() => void run("Sort", (current) => current.sortInPlace(id))}
               variant="primary"
@@ -95,7 +94,7 @@ function SortControls({
           ))}
           <ControlButton
             disabled={disabled}
-            icon={SlidersHorizontal}
+            icon="sliders"
             onClick={() => void run("Custom Sort", (current) => current.openSortPanel())}
           >
             Custom Sort…
@@ -110,7 +109,7 @@ function SortControls({
           {SORT_IDS.map((id) => (
             <ControlButton
               disabled={disabled}
-              icon={Eye}
+              icon="eye"
               key={id}
               onClick={() => void run("View sort", (current) => current.sortView(id))}
             >
@@ -119,7 +118,7 @@ function SortControls({
           ))}
           <ControlButton
             disabled={disabled || snapshot?.viewSort === null}
-            icon={EyeOff}
+            icon="eye-off"
             onClick={() => void run("Clear view sort", (current) => current.clearViewSort())}
             variant="quiet"
           >
@@ -135,7 +134,7 @@ function SortControls({
         <ControlActions>
           <ControlButton
             disabled={disabled}
-            icon={Undo2}
+            icon="undo"
             onClick={() => void run("Undo", (current) => current.undo())}
             variant="quiet"
           >

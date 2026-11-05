@@ -1,5 +1,3 @@
-import { Layers, PackagePlus, RefreshCw, Undo2 } from "lucide-react";
-
 import { ActionError } from "../lib/use-action.js";
 import { ControlActions, ControlButton, DemoGrid } from "./feature-controls.js";
 import {
@@ -88,7 +86,7 @@ function QueriesControls({
         <ControlActions>
           <ControlButton
             disabled={busy}
-            icon={RefreshCw}
+            icon="refresh"
             onClick={() => void run("Refresh All", (current) => current.refreshAll())}
             variant="primary"
           >
@@ -96,7 +94,7 @@ function QueriesControls({
           </ControlButton>
           <ControlButton
             disabled={busy}
-            icon={PackagePlus}
+            icon="plus"
             onClick={() => void run("New orders", (current) => current.addOrders())}
           >
             {FEED_BATCH_ROWS.toLocaleString("en")} new orders arrive
@@ -127,7 +125,7 @@ function QueriesControls({
         <ControlActions>
           <ControlButton
             disabled={busy}
-            icon={Layers}
+            icon="layers"
             onClick={() =>
               void run("Queries & Connections", (current) => current.openQueriesPanel())
             }
@@ -136,7 +134,7 @@ function QueriesControls({
           </ControlButton>
           <ControlButton
             disabled={busy}
-            icon={Undo2}
+            icon="undo"
             onClick={() => void run("Undo", (current) => current.undo())}
             variant="quiet"
           >

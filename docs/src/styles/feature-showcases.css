@@ -19,3 +19,23 @@
 .sw-feature-actions[data-columns="2"] {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
+
+/* A list of named checks, each with its status badge. */
+.sw-feature-statuses {
+  display: grid;
+  gap: var(--sw-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sw-feature-statuses > li {
+  display: grid;
+  gap: var(--sw-space-1);
+  justify-items: start;
+}
+
+.sw-feature-statuses code {
+  color: var(--sw-fg);
+  font: var(--sw-text-caption) / var(--sw-leading-ui) var(--sw-font-mono);
+}

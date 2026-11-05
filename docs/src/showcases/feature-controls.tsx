@@ -1,20 +1,20 @@
-import type { LucideIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 
+import { Icon, type IconName } from "../components/Icon.js";
 import { DemoButton, type DemoButtonProps } from "./ui/DemoButton.js";
 
 import "../styles/feature-showcases.css";
 
 /** A full-width side-panel button with a leading icon. */
 export function ControlButton({
-  icon: Icon,
+  icon,
   children,
   className = "",
   ...props
-}: DemoButtonProps & { readonly icon: LucideIcon; readonly children: ReactNode }) {
+}: DemoButtonProps & { readonly icon: IconName; readonly children: ReactNode }) {
   return (
     <DemoButton className={`sw-button sw-feature-button ${className}`.trim()} {...props}>
-      <Icon aria-hidden="true" className="sw-icon" />
+      <Icon name={icon} />
       <span>{children}</span>
     </DemoButton>
   );
@@ -31,7 +31,7 @@ export function DemoGrid({
   label,
   testId,
 }: {
-  readonly hostRef: React.RefObject<HTMLDivElement | null>;
+  readonly hostRef: RefObject<HTMLDivElement | null>;
   readonly label: string;
   readonly testId: string;
 }) {

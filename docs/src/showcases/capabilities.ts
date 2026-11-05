@@ -26,7 +26,8 @@ export type CapabilityOwnerId =
   | "spreadsheet"
   | "analysis"
   | "sort"
-  | "queries";
+  | "queries"
+  | "data-model";
 
 export type CapabilityArea =
   | "editing"
@@ -231,6 +232,15 @@ export const CAPABILITY_OWNERS: readonly CapabilityOwner[] = [
     routeFile: "docs/src/routes/showcases.queries.tsx",
     responsibility:
       "Power Query-style saved queries over host-loaded CSV and JSON sources: steps, merge, group, refresh into tables, and Queries & Connections.",
+    kind: "capability",
+  },
+  {
+    id: "data-model",
+    label: "Data model",
+    href: "/showcases/data-model/",
+    routeFile: "docs/src/routes/showcases.data-model.tsx",
+    responsibility:
+      "Relationships between workbook tables, key checks, pivots over fields of related tables, measures, GETPIVOTDATA over a model pivot, and the Relationships panel.",
     kind: "capability",
   },
 ];
@@ -591,6 +601,24 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     sharedModules: ["docs/src/showcases/scenarios/queries.ts"],
     boundary:
       "Source fetching, credentials and network policy are host-owned; the session never calls fetch itself.",
+  },
+  {
+    id: "modeling.data-model",
+    title: "Data model and measures",
+    area: "modeling",
+    primary: "data-model",
+    secondary: [
+      { owner: "analysis", reason: "Single-table pivots and their charts stay on Analysis." },
+    ],
+    interaction:
+      "Switch the model pivot's rows between fields of two related tables, repeat a lookup key and orphan an order, and read the key status and the GETPIVOTDATA totals.",
+    scope: "browser",
+    accessibility:
+      "Each relationship's key status is a polite status badge; the pivot totals are text in the side panel.",
+    testPath: "test/browser/showcase-data-model.spec.ts",
+    sharedModules: ["docs/src/showcases/scenarios/data-model.ts"],
+    boundary:
+      "Key checks and model pivots run in the full engine; Excel's data model binary is not written, so Excel opens an exported file without relationships.",
   },
   {
     id: "workflow.ribbon",
