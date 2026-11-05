@@ -32,7 +32,6 @@
     "dist/**/*.js",
     "dist/**/*.d.ts",
     "pkg/sheetwrite_queries.js",
-    "pkg/sheetwrite_queries.d.ts",
     "pkg/sheetwrite_queries_bg.wasm"
   ],
   "publishConfig": {
