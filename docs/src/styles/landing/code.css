@@ -1,0 +1,269 @@
+/* ---- Code tabs --------------------------------------------------------------- */
+
+/* Heading over result on the left, code on the right. One column puts the
+   result after the code it shows. */
+.sw-lp-split {
+  display: grid;
+  grid-template-areas:
+    "head code"
+    "result code";
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  grid-template-rows: auto 1fr;
+  gap: 2rem clamp(2rem, 5vw, 4.5rem);
+  align-items: start;
+}
+
+.sw-lp-split .sw-lp-head {
+  display: block;
+  grid-area: head;
+  margin: 0;
+}
+
+.sw-lp-split .sw-code-tabs {
+  grid-area: code;
+}
+
+.sw-lp-split .sw-lp-result {
+  grid-area: result;
+}
+
+.sw-lp-split .sw-lp-head h2 {
+  margin-bottom: 1rem;
+}
+
+.sw-code-tabs {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--sw-border-strong);
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--sw-surface-1) 94%, transparent);
+}
+
+.sw-code-tabs__list {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--sw-border);
+}
+
+.sw-code-tabs__list button {
+  padding: 0.5rem 0.9rem;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--sw-fg-muted);
+  font: 600 var(--sw-type-sm) / 1 var(--sw-font-body);
+  cursor: pointer;
+}
+
+.sw-code-tabs__list button:hover {
+  color: var(--sw-fg-strong);
+}
+
+.sw-code-tabs__list button[aria-selected="true"] {
+  border-color: var(--sw-border-strong);
+  background: var(--sw-surface-2);
+  color: var(--sw-fg-strong);
+}
+
+.sw-code-tabs__panel {
+  min-height: 25rem;
+}
+
+/* The highlighted snippet sits flush in the panel instead of as a second card. */
+.sw-code-tabs__panel .expressive-code .frame,
+.sw-code-tabs__panel .expressive-code .frame pre {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* On the landing, the snippet is read, not studied: hover popovers still work,
+   but names do not carry the docs' dotted underline. */
+.sw-code-tabs__panel .sw-code-popover__trigger,
+.sw-code-tabs__panel .sw-code-popover__trigger[data-hover-kind] {
+  text-decoration: none;
+}
+
+/* The result beside the code: the same rows as a small sheet. The grid gap
+   spaces it, so it has no margin of its own. */
+.sw-lp-result {
+  margin: 0;
+}
+
+.sw-lp-result table {
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--sw-border-strong);
+  border-radius: 0.75rem;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: color-mix(in srgb, var(--sw-surface-1) 94%, transparent);
+  font-variant-numeric: tabular-nums;
+}
+
+.sw-lp-result th,
+.sw-lp-result td {
+  padding: 0.6rem 0.85rem;
+  border-bottom: 1px solid var(--sw-border);
+  text-align: left;
+}
+
+.sw-lp-result tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+.sw-lp-result thead th {
+  background: var(--sw-surface-2);
+  color: var(--sw-fg-strong);
+  font: 650 var(--sw-type-sm) / 1.2 var(--sw-font-body);
+}
+
+.sw-lp-result th:first-child {
+  width: 2.5rem;
+  border-right: 1px solid var(--sw-border);
+  background: var(--sw-surface-2);
+  color: var(--sw-fg-dim);
+  font: 600 var(--sw-type-xs) / 1.2 var(--sw-font-mono);
+  text-align: center;
+}
+
+.sw-lp-result td {
+  color: var(--sw-fg);
+}
+
+.sw-lp-result td:last-child,
+.sw-lp-result thead th:last-child {
+  text-align: right;
+}
+
+.sw-lp-result figcaption {
+  margin-top: 0.75rem;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-type-sm);
+  line-height: 1.55;
+}
+
+/* ---- Engine choice ----------------------------------------------------------- */
+
+.sw-lp-engines__choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.sw-lp-engines__choices article {
+  display: grid;
+  align-content: start;
+  gap: 0.6rem;
+  padding: 1.5rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.9rem;
+  background: color-mix(in srgb, var(--sw-surface-1) 92%, transparent);
+}
+
+.sw-lp-engines__choices article[data-variant="full"] {
+  border-color: color-mix(in srgb, var(--sw-accent) 45%, var(--sw-border));
+  background: color-mix(in srgb, var(--sw-surface-1) 92%, transparent);
+}
+
+.sw-lp-engines__choices article > span {
+  color: var(--sw-accent-strong);
+  font: 650 var(--sw-type-xs) / 1 var(--sw-font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sw-lp-engines__choices article strong {
+  color: var(--sw-fg-strong);
+  font: 650 1.25rem / 1.2 var(--sw-font-mono);
+}
+
+.sw-lp-engines__choices article p {
+  margin: 0;
+  color: var(--sw-fg-muted);
+  line-height: 1.6;
+}
+
+.sw-lp-engines__choices article code {
+  justify-self: start;
+  margin-top: 0.4rem;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.45rem;
+  background: var(--sw-surface-0);
+  color: var(--sw-fg);
+  font-size: var(--sw-type-sm);
+}
+
+.sw-lp-engines__choices .sw-lp-engines__size {
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-type-sm);
+}
+
+.sw-lp-engines__size b {
+  color: var(--sw-fg-strong);
+  font: 700 1.5rem / 1 var(--sw-font-display);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* ---- New in this release ---------------------------------------------------- */
+
+.sw-lp-new {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 1rem 2.5rem;
+  align-items: center;
+  margin-top: 1.25rem;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.9rem;
+  background: color-mix(in srgb, var(--sw-surface-1) 92%, transparent);
+}
+
+.sw-lp-new h3 {
+  margin: 0;
+  color: var(--sw-accent-strong);
+  font: 650 var(--sw-type-xs) / 1.4 var(--sw-font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.sw-lp-new ul {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem 2rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sw-lp-new li {
+  position: relative;
+  padding-left: 1.1rem;
+  color: var(--sw-fg);
+  font-size: var(--sw-type-sm);
+  line-height: 1.5;
+}
+
+.sw-lp-new li::before {
+  position: absolute;
+  top: 0.55em;
+  left: 0;
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: var(--sw-accent);
+  content: "";
+}
+
+.sw-lp-new > a {
+  color: var(--sw-accent-strong);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
