@@ -217,6 +217,36 @@ pub enum Func {
     Offset,
     Indirect,
     Areas,
+    Acos,
+    Acosh,
+    Acot,
+    Acoth,
+    Arabic,
+    Asin,
+    Asinh,
+    Atan,
+    Atan2,
+    Atanh,
+    Base,
+    CeilingPrecise,
+    Cos,
+    Cosh,
+    Cot,
+    Coth,
+    Csc,
+    Csch,
+    Decimal,
+    Degrees,
+    FloorPrecise,
+    IsoCeiling,
+    Radians,
+    Roman,
+    Sec,
+    Sech,
+    Sin,
+    Sinh,
+    Tan,
+    Tanh,
     /// `A1#`: the current spill of the anchor cell. Only `#` after a cell
     /// reference makes it; the name is not in the function table.
     AnchorArray,
@@ -330,6 +360,9 @@ define_function_registry! {
         Abs => "ABS";
         And => "AND";
         Avg => "AVG";
+        Cos => "COS";
+        Cot => "COT";
+        Csc => "CSC";
         Day => "DAY";
         Exp => "EXP";
         Gcd => "GCD";
@@ -351,11 +384,22 @@ define_function_registry! {
         Pmt => "PMT";
         Pow => "POW";
         Row => "ROW";
+        Sec => "SEC";
+        Sin => "SIN";
         Sum => "SUM";
+        Tan => "TAN";
         Xor => "XOR";
+        Acos => "ACOS";
+        Acot => "ACOT";
+        Asin => "ASIN";
+        Atan => "ATAN";
+        Base => "BASE";
         Cell => "CELL";
         Char => "CHAR";
         Code => "CODE";
+        Cosh => "COSH";
+        Coth => "COTH";
+        Csch => "CSCH";
         Date => "DATE";
         Days => "DAYS";
         Drop => "DROP";
@@ -371,17 +415,25 @@ define_function_registry! {
         Rate => "RATE";
         Rept => "REPT";
         Rows => "ROWS";
+        Sech => "SECH";
         Sign => "SIGN";
+        Sinh => "SINH";
         Sort => "SORT";
         Sqrt => "SQRT";
         Take => "TAKE";
+        Tanh => "TANH";
         Text => "TEXT";
         Time => "TIME";
         Trim => "TRIM";
         True => "TRUE";
         Type => "TYPE";
         Year => "YEAR";
+        Acosh => "ACOSH";
+        Acoth => "ACOTH";
         Areas => "AREAS";
+        Asinh => "ASINH";
+        Atan2 => "ATAN2";
+        Atanh => "ATANH";
         Clean => "CLEAN";
         Count => "COUNT";
         EDate => "EDATE";
@@ -397,6 +449,7 @@ define_function_registry! {
         Month => "MONTH";
         Power => "POWER";
         Right => "RIGHT";
+        Roman => "ROMAN";
         Round => "ROUND";
         Small => "SMALL";
         SumIf => "SUMIF";
@@ -406,6 +459,7 @@ define_function_registry! {
         Value => "VALUE";
         VarP => "VAR.P";
         VarS => "VAR.S";
+        Arabic => "ARABIC";
         Choose => "CHOOSE";
         Column => "COLUMN";
         Concat => "CONCAT";
@@ -431,6 +485,8 @@ define_function_registry! {
         Columns => "COLUMNS";
         CountIf => "COUNTIF";
         Days360 => "DAYS360";
+        Decimal => "DECIMAL";
+        Degrees => "DEGREES";
         EOMonth => "EOMONTH";
         GeoMean => "GEOMEAN";
         HLookup => "HLOOKUP";
@@ -438,6 +494,7 @@ define_function_registry! {
         IsBlank => "ISBLANK";
         IsError => "ISERROR";
         Product => "PRODUCT";
+        Radians => "RADIANS";
         RankEq => "RANK.EQ";
         Replace => "REPLACE";
         RoundUp => "ROUNDUP";
@@ -475,13 +532,16 @@ define_function_registry! {
         SumProduct => "SUMPRODUCT";
         Concatenate => "CONCATENATE";
         FormulaText => "FORMULATEXT";
+        IsoCeiling => "ISO.CEILING";
         NetworkDays => "NETWORKDAYS";
         NumberValue => "NUMBERVALUE";
         RandBetween => "RANDBETWEEN";
         CovarianceP => "COVARIANCE.P";
         CovarianceS => "COVARIANCE.S";
         QuartileInc => "QUARTILE.INC";
+        FloorPrecise => "FLOOR.PRECISE";
         PercentileInc => "PERCENTILE.INC";
+        CeilingPrecise => "CEILING.PRECISE";
     }
     aliases {
         "AVERAGE" => Avg;
