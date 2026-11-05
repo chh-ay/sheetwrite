@@ -59,6 +59,9 @@ const changelogs: Readonly<Record<string, string>> = {
       provenance,
     ],
   }),
+  "@sheetwrite/queries": changelog("@sheetwrite/queries", {
+    "Patch Changes": [provenance, dependencyUpdate],
+  }),
   "@sheetwrite/xlsx": changelog("@sheetwrite/xlsx", {
     "Minor Changes": [dependencyUpdate],
     "Patch Changes": [provenance],

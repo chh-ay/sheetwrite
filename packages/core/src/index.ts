@@ -377,6 +377,7 @@ export type {
   ProtectionResolver,
   QueryCapability,
   Range,
+  RelationshipStatus,
   RemoteOperationOptions,
   RemoteOperationSource,
   ReplaceResult,

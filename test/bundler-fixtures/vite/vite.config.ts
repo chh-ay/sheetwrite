@@ -18,6 +18,7 @@ export default defineConfig({
         worker: resolve(import.meta.dirname, "worker.html"),
         xlsx: resolve(import.meta.dirname, "xlsx.html"),
         charts: resolve(import.meta.dirname, "charts.html"),
+        queries: resolve(import.meta.dirname, "queries.html"),
         shell: resolve(import.meta.dirname, "shell.html"),
       },
     },

@@ -8,7 +8,7 @@ description: "API reference for @sheetwrite/core/history."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/history-archive.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>23</dd></div>
+<div><dt>Exports</dt><dd>24</dd></div>
 </dl>
 
 Source entry: `packages/core/src/history-archive.ts`
@@ -23,10 +23,11 @@ Source entry: `packages/core/src/history-archive.ts`
 <a class="api-symbol-card" href="/docs/api/core-history/memory-history-storage/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>MemoryHistoryStorage</code></span><span class="api-symbol-card__desc">In-memory history for one page session and for tests.</span></a>
 </div>
 
-### Interfaces <span class="api-count" data-pagefind-ignore>15</span>
+### Interfaces <span class="api-count" data-pagefind-ignore>16</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core-history/history-archive-options/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>HistoryArchiveOptions</code></span><span class="api-symbol-card__desc">Host-controlled archive configuration.</span></a>
+<a class="api-symbol-card" href="/docs/api/core-history/history-commit/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>HistoryCommit</code></span><span class="api-symbol-card__desc">One committed transaction, confirmed by the document authority; never an optimistic local edit.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-history/history-head/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>HistoryHead</code></span><span class="api-symbol-card__desc">Durable recorder cursor: the newest checkpoint, the log tail since it, and cadence counters.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-history/history-limits/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>HistoryLimits</code></span><span class="api-symbol-card__desc">Resource and retention ceilings for an opt-in history archive.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-history/history-list-page/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>HistoryListPage</code></span><span class="api-symbol-card__desc">Metadata-only response in newest-first order.</span></a>
