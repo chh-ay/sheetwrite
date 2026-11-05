@@ -20,13 +20,12 @@ import type {
   WorkbookTableXmlElement,
 } from "@sheetwrite/core";
 import {
+  cellA1,
   colToA1,
   DEFAULT_MAX_CHANGE,
   DEFAULT_MAX_ITERATIONS,
   DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
-  dateToSerial,
   isSafeExternalHyperlink,
-  labelToCol,
   MAX_CONDITIONAL_FORMAT_FORMULA_LENGTH,
   MAX_CONDITIONAL_FORMAT_RULES,
   MAX_HYPERLINK_DISPLAY_LENGTH,
@@ -38,8 +37,17 @@ import {
   validWorkbookTableXmlElement,
 } from "@sheetwrite/core";
 
+import { parseCellRect, parseCellReference } from "./cell-reference.js";
 import { readCharts } from "./chart-read.js";
 import { hasExcelDataModel, readExcelDataModel } from "./data-model.js";
+import {
+  columnWidthCharacters,
+  columnWidthPixels,
+  isoDateSerial,
+  MAIN_NAMESPACES,
+  META_MARKER,
+  META_STEM,
+} from "./format.js";
 import { convertWorkbookFormulas, formulaContainsExternalReference } from "./formula.js";
 import { OpcPackage, type OpcRelationship, relationshipTypeMatches } from "./opc.js";
 import { readPivots } from "./pivot.js";
@@ -70,13 +78,7 @@ import {
 } from "./xml.js";
 import { normalizePartName } from "./zip.js";
 
-const META_MARKER = "sheetwrite-workbook-metadata-v1";
-const META_STEM = "__sheetwrite_meta__";
 const BUFFERED_WORKSHEET_XML_BYTES = 64 * 1024;
-const MAIN_NAMESPACES = [
-  "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
-  "http://purl.oclc.org/ooxml/spreadsheetml/main",
-] as const;
 
 /** Columns' style records and numeric literals, gathered as rows stream past. */
 interface ColumnCells {
@@ -230,15 +232,6 @@ function displayText(element: XmlElement): string {
   return text;
 }
 
-function strictDateSerial(value: string, address: string): number {
-  const hasZone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(value);
-  const dateTimeWithoutZone = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value) && !hasZone;
-  const parsed = new Date(dateTimeWithoutZone ? `${value}Z` : value);
-  if (!Number.isFinite(parsed.getTime()))
-    return readerFailure(`date value at ${address} is invalid`);
-  return dateToSerial(parsed);
-}
-
 function parseUnsigned(value: string | undefined, description: string): number {
   const text = value?.trim() ?? "";
   if (!/^\d+$/.test(text)) return readerFailure(`${description} is invalid`);
@@ -247,27 +240,8 @@ function parseUnsigned(value: string | undefined, description: string): number {
   return parsed;
 }
 
-function parseCellAddress(value: string): { row: number; col: number } {
-  const match = /^\$?([A-Z]{1,3})\$?([1-9]\d*)$/i.exec(value);
-  if (!match) return readerFailure(`cell reference ${value} is invalid`);
-  const row = Number(match[2]) - 1;
-  if (!Number.isSafeInteger(row)) return readerFailure(`cell reference ${value} is invalid`);
-  return { row, col: labelToCol(match[1]!) };
-}
-
 function parseRange(value: string): MergeRange {
-  const parts = value.split(":");
-  if (parts.length > 2) return readerFailure(`range ${value} is invalid`);
-  const [startRaw, endRaw = startRaw] = parts;
-  if (!startRaw || !endRaw) return readerFailure(`range ${value} is invalid`);
-  const start = parseCellAddress(startRaw);
-  const end = parseCellAddress(endRaw);
-  return {
-    r0: Math.min(start.row, end.row),
-    c0: Math.min(start.col, end.col),
-    r1: Math.max(start.row, end.row),
-    c1: Math.max(start.col, end.col),
-  };
+  return parseCellRect(value) ?? readerFailure(`range ${value} is invalid`);
 }
 
 function uniqueSheetId(name: string, order: number, used: Set<string>): string {
@@ -402,7 +376,8 @@ function literalFromCell(
   if (type === "b")
     return { kind: "literal", value: valueText === "1" || valueText.toLowerCase() === "true" };
   if (type === "d") {
-    return { kind: "literal", value: strictDateSerial(valueText, address) };
+    const serial = isoDateSerial(valueText) ?? readerFailure(`date value at ${address} is invalid`);
+    return { kind: "literal", value: serial };
   }
   if (type === "e") {
     emitWarning(context, {
@@ -891,7 +866,8 @@ function parseComments(
   const comments = xmlChildren(list, "comment").map((comment) => {
     const reference = xmlAttribute(comment, "ref");
     if (!reference) return readerFailure(`comment in ${sheetPart} has no cell reference`);
-    const address = parseCellAddress(reference);
+    const address =
+      parseCellReference(reference) ?? readerFailure(`cell reference ${reference} is invalid`);
     const text = xmlChild(comment, "text") ?? comment;
     if (xmlChildren(text, "r").length > 0) {
       emitWarning(context, {
@@ -904,23 +880,6 @@ function parseComments(
     return { ...address, text: displayText(text) };
   });
   return { comments, present: true };
-}
-
-const MAXIMUM_DIGIT_WIDTH_PX = 7;
-const COLUMN_WIDTH_FRACTIONS = 256;
-
-function columnWidthPixels(width: number): number {
-  // CT_Col width already includes the five pixels of padding. ECMA-376's
-  // half-digit rounding is truncated before converting character units to pixels.
-  return Math.max(
-    1,
-    Math.floor(
-      ((COLUMN_WIDTH_FRACTIONS * width +
-        Math.floor(COLUMN_WIDTH_FRACTIONS / 2 / MAXIMUM_DIGIT_WIDTH_PX)) /
-        COLUMN_WIDTH_FRACTIONS) *
-        MAXIMUM_DIGIT_WIDTH_PX,
-    ),
-  );
 }
 
 function parseColumns(
@@ -1314,8 +1273,10 @@ async function parseSheet(
       : undefined;
     let inferredCol = 0;
     for (const cellElement of xmlChildren(rowElement, "c")) {
-      const addressText = xmlAttribute(cellElement, "r") ?? `${colToA1(inferredCol)}${row + 1}`;
-      const address = parseCellAddress(addressText);
+      const addressText = xmlAttribute(cellElement, "r") ?? cellA1(row, inferredCol);
+      const address =
+        parseCellReference(addressText) ??
+        readerFailure(`cell reference ${addressText} is invalid`);
       if (address.row !== row) readerFailure(`cell ${addressText} is outside its row`);
       inferredCol = address.col + 1;
       assertResource(context, "maxColumnsPerSheet", address.col + 1);
@@ -1828,7 +1789,7 @@ function restoreSidecarFields(snapshot: WorkbookSnapshot, metadata: WorkbookSnap
             (candidate) => candidate.id === reference.target.sheet,
           );
           if (!target) continue;
-          const expected = `='${target.name.replaceAll("'", "''")}'!${colToA1(reference.target.col)}${reference.target.row + 1}`;
+          const expected = `='${target.name.replaceAll("'", "''")}'!${cellA1(reference.target.row, reference.target.col)}`;
           if (existing.value.src === expected) existing.value = structuredClone(reference);
         }
         const sidecarBorder = sidecar.style?.border;
@@ -2040,6 +2001,15 @@ function externalNamedRanges(
   return ranges.length > 0 ? ranges : undefined;
 }
 
+/** The first of `stem`, `stem_2`, `stem_3`… that `keys` does not hold, added to `keys`. */
+function claimColumnKey(stem: string, keys: Set<string>): string {
+  let key = stem;
+  let suffix = 2;
+  while (keys.has(key)) key = `${stem}_${suffix++}`;
+  keys.add(key);
+  return key;
+}
+
 /** Grow `sheet` so that `row` and `col` lie inside it; references may point past the cells. */
 function extendSheet(sheet: SheetSnapshot, row: number, col: number): void {
   sheet.rowCount = Math.max(sheet.rowCount, row + 1);
@@ -2047,11 +2017,7 @@ function extendSheet(sheet: SheetSnapshot, row: number, col: number): void {
     const keys = new Set(sheet.columns.map((column) => column.key));
     while (sheet.columns.length <= col) {
       const index = sheet.columns.length;
-      const stem = `column${index + 1}`;
-      let key = stem;
-      let suffix = 2;
-      while (keys.has(key)) key = `${stem}_${suffix++}`;
-      keys.add(key);
+      const key = claimColumnKey(`column${index + 1}`, keys);
       sheet.columns.push({ key, header: colToA1(index), width: 75, type: "text" });
     }
   }
@@ -2260,11 +2226,7 @@ export async function readWorkbook(
     const keys = new Set<string>();
     for (let col = 0; col < columnCount; col++) {
       const metaColumn = meta?.columns[col];
-      const preferredKey = metaColumn?.key ?? `column${col + 1}`;
-      let key = preferredKey;
-      let suffix = 2;
-      while (keys.has(key)) key = `${preferredKey}_${suffix++}`;
-      keys.add(key);
+      const key = claimColumnKey(metaColumn?.key ?? `column${col + 1}`, keys);
       const nativeColumn = columnFromParsed(source, styles, col, key);
       if (!metaColumn) {
         columns.push(nativeColumn);
@@ -2281,11 +2243,7 @@ export async function readWorkbook(
           // still represents the metadata width; native edits remain authoritative.
           if (
             property === "width" &&
-            value ===
-              columnWidthPixels(
-                Math.floor((metaColumn.width / MAXIMUM_DIGIT_WIDTH_PX) * COLUMN_WIDTH_FRACTIONS) /
-                  COLUMN_WIDTH_FRACTIONS,
-              )
+            value === columnWidthPixels(columnWidthCharacters(metaColumn.width))
           )
             continue;
           if (value !== undefined) Object.assign(column, { [property]: structuredClone(value) });
@@ -2503,18 +2461,7 @@ export async function readWorkbook(
       if (hyperlink.target.kind !== "internal") continue;
       const targetRange = hyperlink.target.range;
       const target = sheets.find((candidate) => candidate.id === targetRange.sheet);
-      if (!target) continue;
-      target.rowCount = Math.max(target.rowCount, targetRange.end.row + 1);
-      const keys = new Set(target.columns.map((column) => column.key));
-      while (target.columns.length <= targetRange.end.col) {
-        const col = target.columns.length;
-        const stem = `column${col + 1}`;
-        let key = stem;
-        let suffix = 2;
-        while (keys.has(key)) key = `${stem}_${suffix++}`;
-        keys.add(key);
-        target.columns.push({ key, header: colToA1(col), width: 75, type: "text" });
-      }
+      if (target) extendSheet(target, targetRange.end.row, targetRange.end.col);
     }
   }
   const workbookViews = xmlChildren(
