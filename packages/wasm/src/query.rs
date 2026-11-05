@@ -1460,7 +1460,11 @@ fn edge_scan(mut pos: usize, limit: usize, step: isize, occupied: impl Fn(usize)
 pub(crate) enum ComparableCell<'a> {
     Number(OrderedNumber),
     Bool(bool),
-    Text(&'a str),
+    /// A string of the pool and its id.
+    Text {
+        id: u32,
+        text: &'a str,
+    },
     Error,
     Empty,
 }
@@ -1484,18 +1488,22 @@ impl<'a> ComparableCell<'a> {
                     ComparableCell::Empty
                 } else if sheet.cells.formula_value_kind(index) == FormulaValueKind::Bool {
                     ComparableCell::Bool(sheet.cells.num_at(index) != 0.0)
-                } else if let Some(text) =
-                    string_from_pool_ref(strings, sheet.cells.str_id_at(index))
-                {
-                    ComparableCell::Text(text)
+                } else if let Some(text) = Self::pool_text(strings, sheet.cells.str_id_at(index)) {
+                    text
                 } else {
                     ComparableCell::Number(OrderedNumber(sheet.cells.num_at(index)))
                 }
             }
-            KIND_STRING => string_from_pool_ref(strings, sheet.cells.str_id_at(index))
-                .map_or(ComparableCell::Empty, ComparableCell::Text),
+            KIND_STRING => Self::pool_text(strings, sheet.cells.str_id_at(index))
+                .unwrap_or(ComparableCell::Empty),
             _ => ComparableCell::Empty,
         }
+    }
+
+    /// Text of pool string `id`, which keeps its id so that a sort collates
+    /// each distinct string once.
+    fn pool_text(strings: &'a StringStorage, id: u32) -> Option<Self> {
+        string_from_pool_ref(strings, id).map(|text| Self::Text { id, text })
     }
 
     fn from_run(
@@ -1518,8 +1526,7 @@ impl<'a> ComparableCell<'a> {
         match kind {
             KIND_NUMBER => Self::Number(OrderedNumber(f64::from_bits(payload))),
             KIND_BOOL => Self::Bool(payload_num(payload) != 0.0),
-            KIND_STRING => string_from_pool_ref(strings, payload_str_id(payload))
-                .map_or(Self::Empty, Self::Text),
+            KIND_STRING => Self::pool_text(strings, payload_str_id(payload)).unwrap_or(Self::Empty),
             KIND_FORMULA => {
                 let Some(key) = key_for_index(sheet, index) else {
                     return Self::Empty;
@@ -1531,10 +1538,8 @@ impl<'a> ComparableCell<'a> {
                 match kind {
                     KIND_EMPTY => Self::Empty,
                     KIND_BOOL => Self::Bool(payload_num(payload) != 0.0),
-                    KIND_STRING => string_from_pool_ref(strings, payload_str_id(payload)).map_or(
-                        Self::Number(OrderedNumber(payload_num(payload))),
-                        Self::Text,
-                    ),
+                    KIND_STRING => Self::pool_text(strings, payload_str_id(payload))
+                        .unwrap_or(Self::Number(OrderedNumber(payload_num(payload)))),
                     _ => Self::Number(OrderedNumber(payload_num(payload))),
                 }
             }
@@ -1548,11 +1553,8 @@ impl<'a> ComparableCell<'a> {
 #[derive(Clone, Copy)]
 enum SortKey {
     Number(OrderedNumber),
-    Text {
-        start: u32,
-        end: u32,
-        has_hyphen: bool,
-    },
+    /// Index of the text's collation key in [`SortKeys::texts`].
+    Text(u32),
     Bool(bool),
     Error,
     Empty,
@@ -1562,7 +1564,7 @@ impl SortKey {
     fn type_rank(self) -> u8 {
         match self {
             SortKey::Number(_) => 0,
-            SortKey::Text { .. } => 1,
+            SortKey::Text(_) => 1,
             SortKey::Bool(_) => 2,
             SortKey::Error => 3,
             SortKey::Empty => 4,
@@ -1570,11 +1572,27 @@ impl SortKey {
     }
 }
 
-/// Sort keys decorated once per row. Text is collated a single time into one
-/// flat byte arena, so a comparison is a plain byte comparison of two slices
-/// and the sort holds no per-row heap objects.
+/// The collation key of one distinct string: its span in the arena, and
+/// whether the string holds a hyphen, which decides a tie.
+#[derive(Clone, Copy)]
+struct CollatedText {
+    start: u32,
+    end: u32,
+    has_hyphen: bool,
+}
+
+/// Marks a pool id whose string is not collated yet.
+const NOT_COLLATED: u32 = u32::MAX;
+
+/// Sort keys decorated once per row for one sort call. Each distinct pool
+/// string is collated once into one flat byte arena; a flat table indexed
+/// by pool id finds the key of a string seen before. Rows that share a
+/// string compare equal without a byte comparison, and other texts compare
+/// as plain byte slices.
 pub(crate) struct SortKeys {
     keys: Vec<SortKey>,
+    texts: Vec<CollatedText>,
+    text_by_pool_id: Vec<u32>,
     arena: Vec<u8>,
 }
 
@@ -1582,6 +1600,8 @@ impl SortKeys {
     pub(crate) fn with_capacity(rows: usize) -> Self {
         Self {
             keys: Vec::with_capacity(rows),
+            texts: Vec::new(),
+            text_by_pool_id: Vec::new(),
             arena: Vec::new(),
         }
     }
@@ -1592,23 +1612,43 @@ impl SortKeys {
             ComparableCell::Bool(value) => SortKey::Bool(value),
             ComparableCell::Error => SortKey::Error,
             ComparableCell::Empty => SortKey::Empty,
-            ComparableCell::Text(text) => {
-                let start = self.arena.len() as u32;
-                let has_hyphen = push_collation_key(text, &mut self.arena);
-                SortKey::Text {
-                    start,
-                    end: self.arena.len() as u32,
-                    has_hyphen,
-                }
-            }
+            ComparableCell::Text { id, text } => SortKey::Text(self.collate(id, text)),
         };
         self.keys.push(key);
     }
 
-    /// Bytes the collation arena has allocated.
+    /// The index of the collation key of pool string `id`, collated on its
+    /// first use.
+    fn collate(&mut self, id: u32, text: &str) -> u32 {
+        let slot = id as usize;
+        if slot >= self.text_by_pool_id.len() {
+            self.text_by_pool_id.resize(slot + 1, NOT_COLLATED);
+        }
+
+        let known = self.text_by_pool_id[slot];
+        if known != NOT_COLLATED {
+            return known;
+        }
+
+        let start = self.arena.len() as u32;
+        let has_hyphen = push_collation_key(text, &mut self.arena);
+        let index = self.texts.len() as u32;
+        self.texts.push(CollatedText {
+            start,
+            end: self.arena.len() as u32,
+            has_hyphen,
+        });
+        self.text_by_pool_id[slot] = index;
+        index
+    }
+
+    /// Bytes the sort keys have allocated besides the per-row keys: the
+    /// arena, the distinct-text spans and the pool-id table.
     #[cfg(test)]
-    pub(crate) fn arena_bytes(&self) -> usize {
+    pub(crate) fn collation_bytes(&self) -> usize {
         self.arena.capacity()
+            + self.texts.capacity() * std::mem::size_of::<CollatedText>()
+            + self.text_by_pool_id.capacity() * std::mem::size_of::<u32>()
     }
 
     /// Bytes of collation keys in the arena.
@@ -1635,21 +1675,13 @@ impl SortKeys {
         match (a, b) {
             (SortKey::Number(a), SortKey::Number(b)) => a.cmp(&b),
             (SortKey::Bool(a), SortKey::Bool(b)) => a.cmp(&b),
-            (
-                SortKey::Text {
-                    start: a_start,
-                    end: a_end,
-                    has_hyphen: a_hyphen,
-                },
-                SortKey::Text {
-                    start: b_start,
-                    end: b_end,
-                    has_hyphen: b_hyphen,
-                },
-            ) => {
-                let a_key = &self.arena[a_start as usize..a_end as usize];
-                let b_key = &self.arena[b_start as usize..b_end as usize];
-                a_key.cmp(b_key).then(a_hyphen.cmp(&b_hyphen))
+            (SortKey::Text(a), SortKey::Text(b)) if a == b => Ordering::Equal,
+            (SortKey::Text(a), SortKey::Text(b)) => {
+                let a = self.texts[a as usize];
+                let b = self.texts[b as usize];
+                let a_key = &self.arena[a.start as usize..a.end as usize];
+                let b_key = &self.arena[b.start as usize..b.end as usize];
+                a_key.cmp(b_key).then(a.has_hyphen.cmp(&b.has_hyphen))
             }
             _ => a.type_rank().cmp(&b.type_rank()),
         }
