@@ -12,6 +12,8 @@ import type { Grid, Workbook } from "../src/types.js";
 
 const GRIDS = 5;
 const GC_TURNS = 5;
+const SETTLE_DEADLINE_MS = 2_000;
+const SETTLE_DELAY_MS = 10;
 
 interface TrackedObject {
   readonly name: string;
@@ -124,13 +126,33 @@ async function useAndImport(): Promise<{ grid: Grid; objects: TrackedObject[] }>
 }
 
 /** Collect from a timer callback, so no caller frame still holds a referent. */
-function collectInFreshStack(): Promise<void> {
+function collectInFreshStack(delayMs = 0): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(() => {
       Bun.gc(true);
       resolve();
-    }, 0);
+    }, delayMs);
   });
+}
+
+function retainedObjects(objects: readonly TrackedObject[]): TrackedObject[] {
+  return objects.filter((object) => object.ref.deref() !== undefined);
+}
+
+/**
+ * JavaScriptCore marks the objects that a compilation in its concurrent JIT
+ * worklist profiled, and the code blocks of that compilation, as GC roots until
+ * the compilation finishes. A destroyed grid stays alive while a compilation
+ * that observed it is in flight, so collect again until every object is free
+ * or the deadline passes. A real owner keeps its object alive past the deadline.
+ */
+async function collectUntilFreed(objects: readonly TrackedObject[]): Promise<void> {
+  for (let turn = 0; turn < GC_TURNS; turn++) await collectInFreshStack();
+
+  const deadline = performance.now() + SETTLE_DEADLINE_MS;
+  while (retainedObjects(objects).length > 0 && performance.now() < deadline) {
+    await collectInFreshStack(SETTLE_DELAY_MS);
+  }
 }
 
 const restoreStubs = installCanvasTestStubs();
@@ -139,10 +161,10 @@ let objects: TrackedObject[] = [];
 for (let index = 0; index < GRIDS; index++) objects = objects.concat(useAndDestroy(index));
 const imported = await useAndImport();
 objects = objects.concat(imported.objects);
-for (let turn = 0; turn < GC_TURNS; turn++) await collectInFreshStack();
+await collectUntilFreed(objects);
 restoreStubs();
 
-const retained = objects.filter((object) => object.ref.deref() !== undefined);
+const retained = retainedObjects(objects);
 imported.grid.destroy();
 document.body.replaceChildren();
 process.stdout.write(
