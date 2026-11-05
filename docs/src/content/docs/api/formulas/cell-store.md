@@ -1113,15 +1113,16 @@ keeps its cache. Output appears at the next recalculation. Returns
 </details>
 
 <details class="api-member" id="cell-store-set-relationships" data-pagefind-weight="1">
-<summary><code>setRelationships</code> <span class="api-member-summary">Replaces every relationship with the packed definitions: five strings each, [id, fromTable, fromColumn, toTable, toColumn], by stable table and column IDs.</span></summary>
+<summary><code>setRelationships</code> <span class="api-member-summary">Replaces every relationship and measure with the packed definitions: five strings each, [id, fromTable, fromColumn, toTable, toColumn], by stable table and column IDs, or [id, homeTable, formula, &quot;&quot;, name] for a measure.</span></summary>
 
 ```ts generated
 setRelationships: (strings: string[]) => boolean;
 ```
 
-<p class="api-member-doc">Replaces every relationship with the packed definitions: five strings
-each, `[id, fromTable, fromColumn, toTable, toColumn]`, by stable
-table and column IDs. Returns `false`, changing nothing, for a
+<p class="api-member-doc">Replaces every relationship and measure with the packed definitions:
+five strings each, `[id, fromTable, fromColumn, toTable, toColumn]`,
+by stable table and column IDs, or `[id, homeTable, formula, &quot;&quot;,
+name]` for a measure. Returns `false`, changing nothing, for a
 malformed payload.</p>
 </details>
 

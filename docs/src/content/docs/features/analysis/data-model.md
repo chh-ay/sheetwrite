@@ -148,3 +148,52 @@ The result equals a pivot over the table you get by looking up each related colu
 | The many-side key is an error | That error |
 
 A duplicate one-side key or a key type mismatch shows `#VALUE!` at the anchor. A missing table, column or relationship shows `#REF!`. The default engine keeps and syncs model pivots but does not compute them. XLSX export keeps them in Sheetwrite metadata, because Excel needs its own data-model binary for a model pivot.
+
+## Measures
+
+A measure is a named formula over model columns, saved in `workbook.dataModel.measures`. A pivot with a model source shows it as a value field, `{ measure: id }`. As in Excel, each value cell, subtotal and grand total calculates the formula again over the base rows that its row items, column items and report filters select. So a total of `=SUM(Orders[Amount])/COUNT(Orders[Amount])` is the mean of all its rows, not the sum of the means above it ([Measures in Power Pivot](https://support.microsoft.com/en-us/office/measures-in-power-pivot-86484821-a324-4da3-803b-82fd2e5033f4), [filter context](https://learn.microsoft.com/en-us/dax/dax-overview#filter-context)).
+
+```ts prelude="core" partial="requires a full-engine grid with the tables and relationship above" title="Mean amount by customer region"
+grid.store.applyTransaction({
+  patches: [
+    {
+      op: "setMeasure",
+      measure: {
+        id: "mean-amount",
+        name: "Mean Amount",
+        table: "orders",
+        formula: "=SUM(Orders[Amount])/COUNT(Orders[Amount])",
+      },
+    },
+  ],
+});
+grid.setPivot({
+  id: "mean-by-region",
+  name: "Mean by region",
+  source: {
+    model: {
+      table: "orders",
+      fields: [{ table: "customers", column: "region" }],
+    },
+  },
+  anchor: { row: 0, col: 0 },
+  rows: [0],
+  columns: [],
+  values: [{ measure: "mean-amount" }],
+});
+```
+
+- **Names.** Every measure belongs to a home table. Measure names are unique ignoring case and differ from the column names of the home table, following the DAX [naming requirements](https://learn.microsoft.com/en-us/dax/dax-syntax-reference#naming-requirements). The default header of a measure value is the measure name.
+- **Formulas.** A measure uses the formula language of cells. Its references are qualified data columns of the pivot's base table, such as `Orders[Amount]`. Cell and range references, defined names, unqualified columns and the `#All`, `#Headers`, `#Totals` and `@` sections are refused, because a measure has no cell position.
+- **Errors.** A formula that does not parse shows `#NAME?` in its value cells, a missing table or column shows `#REF!`, and an unsupported reference shows `#VALUE!`. A formula that returns more than one value also shows `#VALUE!`. A pivot whose measure was removed shows `#REF!` at its anchor until undo restores the measure. A cell with no rows stays blank.
+- **Names in formulas** resolve against the current table and column names, as defined-name formulas do.
+- **Engines.** The default engine keeps and synchronizes measures but does not compute them. The full engine keeps no measure results between recomputes.
+
+| Store method | Result |
+| --- | --- |
+| `getMeasures()` | Copies of the saved measures |
+| `setMeasure(measure)` | Inserts it, or replaces the one with its ID |
+| `removeMeasure(id)` | Removes it |
+| `getMeasureStatus(id)` | `missingTable` when the home table is gone, `syntax` when the formula does not parse, otherwise `ok`; `unavailable` for an unknown ID. Checked on every engine; reference errors show in the pivot cells. |
+
+`setMeasure` and `removeMeasure` are document operations: each change is one undo step, and it is saved, synchronized and restored from version history. Two concurrent data model changes conflict. XLSX export keeps measures and the pivots that use them in Sheetwrite metadata, because Excel keeps measures in its data model part.

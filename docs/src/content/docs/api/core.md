@@ -8,7 +8,7 @@ description: "API reference for @sheetwrite/core."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/index.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>392</dd></div>
+<div><dt>Exports</dt><dd>394</dd></div>
 </dl>
 
 Source entry: `packages/core/src/index.ts`
@@ -113,7 +113,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/workbook-table-name-key/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>workbookTableNameKey</code></span><span class="api-symbol-card__desc">Locale-independent key used for table and table-column collision checks.</span></a>
 </div>
 
-### Interfaces <span class="api-count" data-pagefind-ignore>176</span>
+### Interfaces <span class="api-count" data-pagefind-ignore>177</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/boundary-operation-stats/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>BoundaryOperationStats</code></span><span class="api-symbol-card__desc">Fixed-cardinality boundary crossing counters for one operation.</span></a>
@@ -181,6 +181,8 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/highlight-range/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>HighlightRange</code></span><span class="api-symbol-card__desc">A highlight target: a range plus an optional per-range color override.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/keyboard-options/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>KeyboardOptions</code></span><span class="api-symbol-card__desc">Overrides replace all default keys for an action; null disables that action's keys.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/legacy-row-page/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>LegacyRowPage</code></span><span class="api-symbol-card__desc">Row-only page shape accepted by the full-width compatibility adapter.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/measure/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>Measure</code></span><span class="api-symbol-card__desc">A model formula evaluated separately in each pivot cell's filter context.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/measure-status/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>MeasureStatus</code></span><span class="api-symbol-card__desc">Status of a saved measure, checked from the saved model: missingTable when its home table is gone, syntax when the formula does not parse, unavailable for an unknown ID.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/merge-range/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>MergeRange</code></span><span class="api-symbol-card__desc">Inclusive merged-cell rectangle in data-row/column coordinates.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/mounted-chart/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>MountedChart</code></span><span class="api-symbol-card__desc">Draws one chart into a box that core places and sizes.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/packed-cell-block/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PackedCellBlock</code></span><span class="api-symbol-card__desc">Dense row-major mutation payload.</span></a>
@@ -196,7 +198,6 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/pivot-result-view/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PivotResultView</code></span><span class="api-symbol-card__desc">Plain-JSON view of one pivot's output, for the field list and other UI.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/pivot-sort/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PivotSort</code></span><span class="api-symbol-card__desc">Sort of one axis field by its labels.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/pivot-source-field/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PivotSourceField</code></span><span class="api-symbol-card__desc">One source field offered by the field list.</span></a>
-<a class="api-symbol-card" href="/docs/api/core/pivot-value-field/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PivotValueField</code></span><span class="api-symbol-card__desc">One aggregated value field.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/power-query-codec/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PowerQueryCodec</code></span><span class="api-symbol-card__desc">Translates saved queries to and from Power Query M.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/power-query-export/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PowerQueryExport</code></span><span class="api-symbol-card__desc">A Section1.m document and the member name each query was written under.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/power-query-import/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PowerQueryImport</code></span><span class="api-symbol-card__desc">Queries read from M, without outputs; the XLSX reader binds them to tables.</span></a>
@@ -294,7 +295,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/xlsx-workbook-warning/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>XlsxWorkbookWarning</code></span><span class="api-symbol-card__desc">Structured fidelity warning emitted during XLSX conversion.</span></a>
 </div>
 
-### Types <span class="api-count" data-pagefind-ignore>101</span>
+### Types <span class="api-count" data-pagefind-ignore>102</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/aggregate-op/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>AggregateOp</code></span><span class="api-symbol-card__desc">Column aggregate operation for Grid.aggregate / Store data ops.</span></a>
@@ -348,6 +349,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/pivot-field-type/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>PivotFieldType</code></span><span class="api-symbol-card__desc">Inferred type of one source field from its data rows.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/pivot-layout/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>PivotLayout</code></span><span class="api-symbol-card__desc">Layout of row labels: one indented label column, or one label column per row field.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/pivot-source/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>PivotSource</code></span><span class="api-symbol-card__desc">Data a pivot summarizes. - A range source includes its header row: the first range row names the fields, and field i is the column range.start.col + i.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/pivot-value-field/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>PivotValueField</code></span><span class="api-symbol-card__desc">One implicit aggregation or saved measure; name overrides its caption.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/presence-coordinator-event/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>PresenceCoordinatorEvent</code></span><span class="api-symbol-card__desc">Connection or actor transition emitted by presence coordination.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/protection-resolver/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>ProtectionResolver</code></span><span class="api-symbol-card__desc">Host-owned client UX permission callback for protected mutations.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/query-capability/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>QueryCapability</code></span><span class="api-symbol-card__desc">Whether a query is complete for the currently loaded datasource pages.</span></a>

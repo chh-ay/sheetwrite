@@ -2315,6 +2315,8 @@ const DOCUMENT_OPERATION_KINDS: Record<DocumentOp["op"], true> = {
   setCalculation: true,
   setRelationship: true,
   removeRelationship: true,
+  setMeasure: true,
+  removeMeasure: true,
   setQuery: true,
   removeQuery: true,
   setChart: true,

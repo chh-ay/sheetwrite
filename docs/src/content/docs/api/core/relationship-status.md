@@ -18,7 +18,7 @@ values. Rows are data-row offsets in their table, header row excluded.
   engine), or no relationship has this ID.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/data-model.ts#L50"><code>packages/core/src/types/data-model.ts#L50</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/data-model.ts#L74"><code>packages/core/src/types/data-model.ts#L74</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>6</span>

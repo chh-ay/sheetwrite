@@ -305,9 +305,14 @@ function areaSection(
     const name = document.createElement("span");
     name.className = "sheetwrite-panel-field-name";
     const value = area === "values" ? pivot.values[index] : undefined;
-    const aggregation = AGGREGATION_LABELS.find(([key]) => key === value?.aggregation)?.[1];
+    const measure = value && "measure" in value ? value.measure : undefined;
+    const aggregation =
+      value && "aggregation" in value
+        ? AGGREGATION_LABELS.find(([key]) => key === value.aggregation)?.[1]
+        : undefined;
     name.textContent =
       value?.name ??
+      measure ??
       (aggregation === undefined ? header(field) : `${aggregation} of ${header(field)}`);
     item.appendChild(name);
 
@@ -335,8 +340,8 @@ function areaSection(
     const actionsLabel = `${name.textContent} in ${label} actions`;
     item.appendChild(menuButton(actionsLabel, `${area}-${index}-menu`, menuItems, actions.signal));
 
-    if (area === "values") {
-      const select = selectOf(AGGREGATION_LABELS, value?.aggregation ?? "SUM");
+    if (area === "values" && value && "aggregation" in value) {
+      const select = selectOf(AGGREGATION_LABELS, value.aggregation);
       select.className = "sheetwrite-panel-control";
       select.dataset.focusKey = `${area}-${index}-aggregation`;
       select.setAttribute("aria-label", `Summarize ${header(field)} by`);
@@ -357,7 +362,7 @@ function areaSection(
         actions.commit(setSortOrder(pivot, area, field, select.value === "descending")),
       );
       item.appendChild(select);
-    } else {
+    } else if (area === "filters") {
       item.appendChild(filterValues(pivot, index, field, header(field), actions));
     }
 

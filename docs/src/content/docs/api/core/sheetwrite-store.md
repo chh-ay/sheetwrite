@@ -29,7 +29,7 @@ async function total(workbook: Workbook) {
 - [createGrid](/docs/api/core/create-grid/)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/store.ts#L155"><code>packages/core/src/store.ts#L155</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/store.ts#L160"><code>packages/core/src/store.ts#L160</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -55,6 +55,8 @@ async function total(workbook: Workbook) {
 <a href="#sheetwrite-store-get-data-window"><code>getDataWindow</code></a>
 <a href="#sheetwrite-store-get-formula"><code>getFormula</code></a>
 <a href="#sheetwrite-store-get-formula-matrix-resource-peak"><code>getFormulaMatrixResourcePeak</code></a>
+<a href="#sheetwrite-store-get-measure-status"><code>getMeasureStatus</code></a>
+<a href="#sheetwrite-store-get-measures"><code>getMeasures</code></a>
 <a href="#sheetwrite-store-get-paged-stats"><code>getPagedStats</code></a>
 <a href="#sheetwrite-store-get-pivot-fields"><code>getPivotFields</code></a>
 <a href="#sheetwrite-store-get-pivot-result"><code>getPivotResult</code></a>
@@ -77,6 +79,7 @@ async function total(workbook: Workbook) {
 <a href="#sheetwrite-store-on"><code>on</code></a>
 <a href="#sheetwrite-store-query-capability"><code>queryCapability</code></a>
 <a href="#sheetwrite-store-recalculate-volatile"><code>recalculateVolatile</code></a>
+<a href="#sheetwrite-store-remove-measure"><code>removeMeasure</code></a>
 <a href="#sheetwrite-store-remove-pivot"><code>removePivot</code></a>
 <a href="#sheetwrite-store-remove-relationship"><code>removeRelationship</code></a>
 <a href="#sheetwrite-store-remove-sheet-formula-identity"><code>removeSheetFormulaIdentity</code></a>
@@ -91,6 +94,7 @@ async function total(workbook: Workbook) {
 <a href="#sheetwrite-store-set-column-filter"><code>setColumnFilter</code></a>
 <a href="#sheetwrite-store-set-detailed-change-capture"><code>setDetailedChangeCapture</code></a>
 <a href="#sheetwrite-store-set-group-collapsed"><code>setGroupCollapsed</code></a>
+<a href="#sheetwrite-store-set-measure"><code>setMeasure</code></a>
 <a href="#sheetwrite-store-set-pivot"><code>setPivot</code></a>
 <a href="#sheetwrite-store-set-protection-resolver"><code>setProtectionResolver</code></a>
 <a href="#sheetwrite-store-set-relationship"><code>setRelationship</code></a>
@@ -104,7 +108,7 @@ async function total(workbook: Workbook) {
 <a href="#sheetwrite-store-from-snapshot"><code>fromSnapshot</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>69</span>
+## Members <span class="api-count" data-pagefind-ignore>73</span>
 
 <div class="api-member-list">
 
@@ -335,6 +339,24 @@ getFormulaMatrixResourcePeak: () => TransientResourcePeak;
 
 </details>
 
+<details class="api-member" id="sheetwrite-store-get-measure-status" data-pagefind-weight="1">
+<summary><code>getMeasureStatus</code> <span class="api-member-summary">Check a measure in the full engine, or report unavailable.</span></summary>
+
+```ts generated
+getMeasureStatus: (id: string) => MeasureStatus;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-store-get-measures" data-pagefind-weight="1">
+<summary><code>getMeasures</code> <span class="api-member-summary">Detached copies of the workbook's saved measures.</span></summary>
+
+```ts generated
+getMeasures: () => Measure[];
+```
+
+</details>
+
 <details class="api-member" id="sheetwrite-store-get-paged-stats" data-pagefind-weight="1">
 <summary><code>getPagedStats</code></summary>
 
@@ -543,6 +565,15 @@ Edits already recompute volatile formulas and read the clock once per
 recalculation; this call uses `now` instead, until the next edit.</p>
 </details>
 
+<details class="api-member" id="sheetwrite-store-remove-measure" data-pagefind-weight="1">
+<summary><code>removeMeasure</code> <span class="api-member-summary">Remove a saved measure, retaining pivot references for undo.</span></summary>
+
+```ts generated
+removeMeasure: (id: string) => ApplyTransactionResult;
+```
+
+</details>
+
 <details class="api-member" id="sheetwrite-store-remove-pivot" data-pagefind-weight="1">
 <summary><code>removePivot</code> <span class="api-member-summary">Remove a pivot; sheet defaults to the sheet that holds it.</span></summary>
 
@@ -665,6 +696,15 @@ setDetailedChangeCapture: (enabled: boolean) => void;
 
 ```ts generated
 setGroupCollapsed: (sheet: SheetId, start: number, collapsed: boolean) => ApplyTransactionResult;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-store-set-measure" data-pagefind-weight="1">
+<summary><code>setMeasure</code> <span class="api-member-summary">Save or replace a model measure.</span></summary>
+
+```ts generated
+setMeasure: (measure: Measure) => ApplyTransactionResult;
 ```
 
 </details>
@@ -884,6 +924,8 @@ class SheetwriteStore implements Store {
   ) => VisibleWindowView;
   getFormula: (addr: CellAddress) => string | null;
   getFormulaMatrixResourcePeak: () => TransientResourcePeak;
+  getMeasureStatus: (id: string) => MeasureStatus;
+  getMeasures: () => Measure[];
   getPagedStats: (sheet: SheetId) => PagedStoreStats;
   getPivotFields: (sheet: SheetId, id: string) => PivotSourceField[];
   getPivotResult: (sheet: SheetId, id: string) => PivotResultView | null;
@@ -930,6 +972,7 @@ class SheetwriteStore implements Store {
   on: (_evt: "change", fn: ChangeListener) => () => void;
   queryCapability: (sheet: SheetId) => QueryCapability;
   recalculateVolatile: (now?: Date) => void;
+  removeMeasure: (id: string) => ApplyTransactionResult;
   removePivot: (id: string, sheet?: SheetId) => ApplyTransactionResult;
   removeRelationship: (id: string) => ApplyTransactionResult;
   removeSheetFormulaIdentity: (sheet: SheetId) => boolean;
@@ -968,6 +1011,7 @@ class SheetwriteStore implements Store {
     start: number,
     collapsed: boolean,
   ) => ApplyTransactionResult;
+  setMeasure: (measure: Measure) => ApplyTransactionResult;
   setPivot: (
     pivot: PivotDefinition,
     sheet?: SheetId,

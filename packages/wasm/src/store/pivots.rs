@@ -32,6 +32,8 @@ use crate::pivot::{
 use crate::sheet::SheetData;
 use crate::spill::SpillRange;
 use crate::types::{CellKey, FormulaError, StringStorage, Value, KIND_EMPTY};
+/// Value field whose field slot names a measure ID in the string payload.
+const MEASURE_VALUE_CODE: u32 = 7;
 
 /// Pivots one sheet may hold; a payload with more is malformed. Core's
 /// workbook pivot bound is lower.
@@ -166,6 +168,11 @@ impl Payload<'_> {
         let rows = self.fields()?;
         let columns = self.fields()?;
         let values = self.value_fields()?;
+        if values.iter().any(|value| value.measure.is_some())
+            && !matches!(source, SourceRef::Model { .. })
+        {
+            return None;
+        }
         let filters = self.filters()?;
         let (row_descending, column_descending) = self.sort(&rows, &columns)?;
         let flags = self.index()?;
@@ -239,8 +246,19 @@ impl Payload<'_> {
         let count = self.count(VALUE_NUMBERS)?;
         let mut values = Vec::with_capacity(count);
         for _ in 0..count {
-            let field = self.index()? as usize;
-            let aggregation = Aggregation::from_code(self.index()?)?;
+            let field_slot = self.index()? as usize;
+            let aggregation_code = self.index()?;
+            let measure = if aggregation_code == MEASURE_VALUE_CODE {
+                Some(self.strings.get(field_slot)?.clone())
+            } else {
+                None
+            };
+            let field = if measure.is_some() { 0 } else { field_slot };
+            let aggregation = if measure.is_some() {
+                Aggregation::Count
+            } else {
+                Aggregation::from_code(aggregation_code)?
+            };
             let name_slot = self.number()?;
             let name = if name_slot == NO_NAME {
                 None
@@ -252,6 +270,7 @@ impl Payload<'_> {
                 field,
                 aggregation,
                 name,
+                measure,
             });
         }
         Some(values)
@@ -1024,6 +1043,12 @@ impl CellStore {
         let shown = pivot.error.is_none() && !readmit;
         let intact = pivot.layout.as_ref().filter(|layout| {
             shown
+                && !pivot
+                    .saved
+                    .definition
+                    .values
+                    .iter()
+                    .any(|value| value.measure.is_some())
                 && self.sheets[owner].spill.installed(anchor)
                     == SpillRange::new(anchor, layout.rows, layout.cols)
         });
@@ -1054,14 +1079,22 @@ impl CellStore {
             return self.show_pivot_error(owner, pivot, FormulaError::Spill, Some(range));
         }
 
+        let measure_cells = match &pivot.saved.source {
+            SourceRef::Model { table, .. } => self.pivot_measure_cells(cache, &layout, table),
+            _ => Vec::new(),
+        };
         let (changed, placed) =
             self.place_pivot_output(owner, range, |offset| cache.cell(&layout, offset));
         pivot.attempt = Some(range);
         match placed {
             Ok(()) => {
                 pivot.error = None;
+                let cols = layout.cols;
                 pivot.layout = Some(layout);
-                self.mark_pivot_cells_dirty(owner, changed)
+                let placed_changed = self.mark_pivot_cells_dirty(owner, changed);
+                // Measure cells are blank in the cache's output; their values
+                // go in after the output is installed.
+                self.write_pivot_values(owner, anchor, cols, measure_cells) || placed_changed
             }
             Err(error) => {
                 let vacated = self.mark_pivot_cells_dirty(owner, changed);
@@ -1074,6 +1107,13 @@ impl CellStore {
     /// otherwise updates the pending rows and headers. Leaves the pending
     /// work for the caller to clear.
     fn refresh_pivot_cache(&self, pivot: &mut Pivot) -> Result<(), FormulaError> {
+        for value in &pivot.saved.definition.values {
+            if let Some(id) = &value.measure {
+                if self.measure_by_id(id).is_none() {
+                    return Err(FormulaError::Ref);
+                }
+            }
+        }
         let mut source = match self.read_pivot_source(&pivot.saved.source) {
             Ok(source) => source,
             Err(error) => {
@@ -1108,7 +1148,12 @@ impl CellStore {
                 // `None` when the build fails.
                 pivot.cache = None;
                 pivot.source = Some(rect);
-                pivot.cache = Some(PivotCache::build(&pivot.saved.definition, &source)?);
+                let mut cache = PivotCache::build(&pivot.saved.definition, &source)?;
+                cache.name_measures(|id| {
+                    self.measure_by_id(id)
+                        .map(|measure| measure.to.column.clone())
+                });
+                pivot.cache = Some(cache);
             }
         }
         Ok(())
@@ -1123,21 +1168,37 @@ impl CellStore {
         layout: &PivotLayout,
         offsets: &[usize],
     ) -> bool {
+        // Changes are value cells below the header rows: the anchor is a
+        // header cell, and a changed header forces a relayout instead.
+        debug_assert!(
+            offsets
+                .iter()
+                .all(|&offset| offset >= layout.header_rows * layout.cols),
+            "a changed offset inside the header rows"
+        );
+
+        let values = offsets
+            .iter()
+            .map(|&offset| (offset, cache.cell(layout, offset)));
+        self.write_pivot_values(owner, anchor, layout.cols, values)
+    }
+
+    /// Writes `(offset, value)` cells into installed output that is `cols`
+    /// wide, and marks the cells whose value changed dirty.
+    fn write_pivot_values(
+        &mut self,
+        owner: usize,
+        anchor: CellKey,
+        cols: usize,
+        values: impl IntoIterator<Item = (usize, Value)>,
+    ) -> bool {
         let data = &mut self.sheets[owner];
         let mut changed = Vec::new();
-        for &offset in offsets {
-            // Changes are value cells below the header rows: the anchor is a
-            // header cell, and a changed header forces a relayout instead.
-            debug_assert!(
-                offset >= layout.header_rows * layout.cols,
-                "a changed offset inside the header rows"
-            );
-
+        for (offset, value) in values {
             let cell = (
-                anchor.0 + (offset / layout.cols) as u32,
-                anchor.1 + (offset % layout.cols) as u32,
+                anchor.0 + (offset / cols) as u32,
+                anchor.1 + (offset % cols) as u32,
             );
-            let value = cache.cell(layout, offset);
             let index = data.cells.idx(cell.0 as usize, cell.1 as usize);
             let slot = calculated_slot(&mut self.strings, &value);
             if data.cells.calculated_cell_at(index) != Some(slot) {

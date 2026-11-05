@@ -588,6 +588,15 @@ function planWorkbook(
     }
   }
 
+  // Measure names are unique, so removed measures leave before others take their names.
+  const historicalMeasures = historical.workbook.dataModel?.measures ?? [];
+  const measureIds = new Set(historicalMeasures.map((measure) => measure.id));
+  for (const measure of current.dataModel?.measures ?? []) {
+    if (!measureIds.has(measure.id)) {
+      plan.removals.push({ op: "removeMeasure", id: measure.id });
+    }
+  }
+
   // A current sheet holding a name that another sheet takes back moves to a free name first.
   let free = 1;
   const taken = new Set([
@@ -667,6 +676,15 @@ function planWorkbook(
   for (const relationship of historicalRelationships) {
     if (!same(currentRelationships.get(relationship.id), relationship)) {
       plan.additions.push({ op: "setRelationship", relationship });
+    }
+  }
+
+  const currentMeasures = new Map(
+    (current.dataModel?.measures ?? []).map((measure) => [measure.id, measure]),
+  );
+  for (const measure of historicalMeasures) {
+    if (!same(currentMeasures.get(measure.id), measure)) {
+      plan.additions.push({ op: "setMeasure", measure });
     }
   }
 

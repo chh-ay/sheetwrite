@@ -12,7 +12,7 @@ also change on any commit that changes cell values. Returns an unsubscribe
 function; the index is dropped with the last listener.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/charts-live.ts#L553"><code>packages/core/src/charts-live.ts#L553</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/charts-live.ts#L555"><code>packages/core/src/charts-live.ts#L555</code></a></dd></div>
 </dl>
 
 ## Declaration

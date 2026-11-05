@@ -15,7 +15,11 @@ import {
   MAX_CONDITIONAL_FORMAT_FORMULA_LENGTH,
   MAX_CONDITIONAL_FORMAT_RULES,
 } from "./conditional-format.js";
-import { validateDataModelShape, validateRelationshipShape } from "./data-model.js";
+import {
+  validateDataModelShape,
+  validateMeasureShape,
+  validateRelationshipShape,
+} from "./data-model.js";
 import { boundedJsonByteLength, JsonByteLengthError, SheetwriteError } from "./errors.js";
 import {
   cloneCellHyperlink,
@@ -2638,6 +2642,14 @@ export function validateDocumentOperationShape(
       validateCalculationShape(ownValue(operation, "calculation"), `${path}.calculation`, errors);
       break;
 
+    case "setMeasure":
+      validateMeasureShape(ownValue(operation, "measure"), `${path}.measure`, errors);
+      break;
+
+    case "removeMeasure":
+      requireString(operation, "id", path, errors, true);
+      break;
+
     case "setRelationship":
       validateRelationshipShape(
         ownValue(operation, "relationship"),
@@ -3783,6 +3795,12 @@ export function documentOpTarget(operation: DocumentOp): string {
 
     case "setCalculation":
       return "calculation";
+
+    case "setMeasure":
+      return `measure:${operation.measure.id}`;
+
+    case "removeMeasure":
+      return `measure:${operation.id}`;
 
     case "setRelationship":
       return `relationship:${operation.relationship.id}`;

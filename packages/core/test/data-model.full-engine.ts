@@ -163,7 +163,8 @@ it("refuses a relationship in the panel while its lookup keys repeat", async () 
   }
 });
 
-it("keeps model pivot results equal to a flattened range through edits, undo and transfer", async () => {
+/** Orders with amounts on Data, a lookup-flattened copy in E:F, and an empty Report sheet. */
+const mountReport = () => {
   const restore = installCanvasTestStubs();
   const input = snapshot();
   const data = input.sheets[0];
@@ -198,6 +199,16 @@ it("keeps model pivot results equal to a flattened range through edits, undo and
   const host = document.createElement("div");
   document.body.append(host);
   const grid = createGridFromSnapshot(host, input);
+  const destroy = () => {
+    grid.destroy();
+    host.remove();
+    restore();
+  };
+  return { grid, destroy };
+};
+
+it("keeps model pivot results equal to a flattened range through edits, undo and transfer", async () => {
+  const { grid, destroy } = mountReport();
   const pivot: PivotDefinition = {
     id: "related",
     name: "Related",
@@ -301,8 +312,81 @@ it("keeps model pivot results equal to a flattened range through edits, undo and
       pivot.source,
     );
   } finally {
-    grid.destroy();
-    host.remove();
-    restore();
+    destroy();
+  }
+});
+
+it("evaluates a measure in each pivot cell like the flattened rows of that cell", async () => {
+  const { grid, destroy } = mountReport();
+  const measure = {
+    id: "mean",
+    name: "Mean Amount",
+    table: "orders",
+    formula: "=SUM(Orders[Amount])/COUNT(Orders[Amount])",
+  };
+  const modelPivot = (values: PivotDefinition["values"]): PivotDefinition => ({
+    id: "related",
+    name: "Related",
+    anchor: { row: 0, col: 0 },
+    source: {
+      model: {
+        table: "orders",
+        fields: [
+          { table: "customers", column: "id" },
+          { table: "orders", column: "amount" },
+        ],
+      },
+    },
+    rows: [0],
+    columns: [],
+    values,
+  });
+  const body = (id: string) => grid.getPivotResult("report", id)?.cells.slice(2);
+  const compare = () => {
+    expect(grid.getPivotResult("report", "related")?.status).toBe("ok");
+    expect(body("related")).toEqual(body("flat"));
+  };
+  try {
+    const store = grid.store;
+    if (!(store instanceof SheetwriteStore)) throw new Error("the grid must use a SheetwriteStore");
+    expect(store.setMeasure(measure).status).toBe("applied");
+    expect(store.getMeasureStatus(measure.id)).toEqual({ status: "ok" });
+    expect(grid.setPivot(modelPivot([{ measure: measure.id }])).status).toBe("applied");
+    expect(
+      grid.setPivot({
+        ...modelPivot([{ field: 1, aggregation: "AVERAGE" }]),
+        id: "flat",
+        name: "Flat",
+        anchor: { row: 15, col: 0 },
+        source: { range: { sheet: "data", start: { row: 0, col: 4 }, end: { row: 4, col: 5 } } },
+      }).status,
+    ).toBe("applied");
+    expect(grid.getPivotResult("report", "related")?.cells[1]).toBe("Mean Amount");
+    compare();
+
+    const edits: DocumentOp[] = [1, 5].map((col) => ({
+      op: "set",
+      addr: { sheet: "data", row: 2, col },
+      value: { kind: "literal", value: 40 },
+    }));
+    expect(grid.applyTransaction({ patches: edits }).status).toBe("applied");
+    compare();
+    grid.undo();
+    compare();
+
+    const removal: DocumentOp = { op: "removeMeasure", id: measure.id };
+    expect(grid.applyTransaction({ patches: [removal] }).status).toBe("applied");
+    expect(grid.getPivotResult("report", "related")?.error).toBe("#REF!");
+    grid.undo();
+    compare();
+
+    expect(
+      grid.setPivot({ ...modelPivot([{ measure: measure.id }]), source: { table: "orders" } })
+        .status,
+    ).not.toBe("applied");
+    await releaseEngineMemory();
+    compare();
+  } finally {
+    destroy();
   }
 });

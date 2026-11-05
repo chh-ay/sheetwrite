@@ -5,7 +5,7 @@ import {
   splitOversizedBlocks,
 } from "./atomic-batch.js";
 import { chartTouchesSheet, cloneChartDefinition } from "./chart-definition.js";
-import { cloneRelationship, findRelationship } from "./data-model.js";
+import { cloneMeasure, cloneRelationship, findRelationship } from "./data-model.js";
 import {
   type AdmittedTransactionResources,
   admitTransactionResources,
@@ -941,6 +941,19 @@ export class DocumentController {
         const previous =
           this.options.store.getWorkbook().calculation ?? DEFAULT_CALCULATION_SETTINGS;
         return [{ op: "setCalculation", calculation: { ...previous } }];
+      }
+
+      case "setMeasure":
+      case "removeMeasure": {
+        const id = patch.op === "setMeasure" ? patch.measure.id : patch.id;
+        const previous = this.options.store
+          .getWorkbook()
+          .dataModel?.measures?.find((measure) => measure.id === id);
+        return previous
+          ? [{ op: "setMeasure", measure: cloneMeasure(previous) }]
+          : patch.op === "setMeasure"
+            ? [{ op: "removeMeasure", id }]
+            : [];
       }
 
       case "setRelationship": {

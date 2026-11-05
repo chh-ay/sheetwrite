@@ -17,6 +17,9 @@ import { validConditionalRules } from "../conditional-format.js";
 import {
   type DataModelIssue,
   findRelationship,
+  validateMeasureAdmission,
+  withMeasure,
+  withoutMeasure,
   validateRelationshipAdmission,
   withoutRelationship,
   withRelationship,
@@ -101,7 +104,7 @@ import type {
 } from "../types/cell.js";
 import type { ChartDefinition } from "../types/chart.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "../types/coordinates.js";
-import type { DataModel, RelationshipStatus } from "../types/data-model.js";
+import type { DataModel, MeasureStatus, RelationshipStatus } from "../types/data-model.js";
 import type {
   AggregateOp,
   ColumnarData,
@@ -1010,9 +1013,11 @@ export class StoreDataEngine {
   }
 
   /**
-   * Sends every relationship of `model` to an engine that checks keys.
-   * Returns false when the engine refuses them; an engine without the call
-   * keeps them only in the workbook.
+   * Sends every relationship and measure of `model` to an engine that
+   * computes model pivots. A measure travels as a relationship record with
+   * an empty one-side table: `[id, homeTable, formula, "", name]`. Returns
+   * false when the engine refuses them; an engine without the call keeps
+   * them only in the workbook.
    */
   private syncRelationships(
     model: DataModel | undefined,
@@ -1026,6 +1031,9 @@ export class StoreDataEngine {
       relationship.to.table,
       relationship.to.column,
     ]);
+    for (const measure of model?.measures ?? []) {
+      strings.push(measure.id, measure.table, measure.formula, "", measure.name);
+    }
     return wasm.setRelationships(strings);
   }
 
@@ -1604,6 +1612,23 @@ export class StoreDataEngine {
     const record = this.wasm.relationshipStatus?.(id);
     if (!record || record.length < RELATIONSHIP_STATUS_STRIDE) return { status: "unavailable" };
     return relationshipStatusOf(record);
+  }
+
+  /**
+   * Checks a measure from the saved model: its home table and its formula
+   * syntax, with the engine's parser. References are checked where the
+   * measure is calculated, so a pivot cell shows those errors.
+   */
+  getMeasureStatus(id: string): MeasureStatus {
+    const measure = this.workbook.dataModel?.measures?.find((candidate) => candidate.id === id);
+    if (!measure) return { status: "unavailable" };
+
+    const tableExists = this.workbook.sheets.some((sheet) =>
+      sheet.tables?.some((table) => table.id === measure.table),
+    );
+    if (!tableExists) return { status: "missingTable" };
+    if (getEngine().checkFormulaSyntax(measure.formula) !== undefined) return { status: "syntax" };
+    return { status: "ok" };
   }
 
   /**
@@ -2646,6 +2671,8 @@ export class StoreDataEngine {
           patch.op !== "setCalculation" &&
           patch.op !== "setRelationship" &&
           patch.op !== "removeRelationship" &&
+          patch.op !== "setMeasure" &&
+          patch.op !== "removeMeasure" &&
           patch.op !== "setQuery" &&
           patch.op !== "removeQuery" &&
           patch.op !== "removeSheet"
@@ -3601,6 +3628,26 @@ export class StoreDataEngine {
       case "setCalculation": {
         if (!this.syncCalculation(patch.calculation)) return false;
         this.workbook.calculation = storedCalculationSettings(patch.calculation);
+        return true;
+      }
+
+      case "setMeasure":
+      case "removeMeasure": {
+        const current = this.workbook.dataModel;
+        if (patch.op === "setMeasure") {
+          const issues: DataModelIssue[] = [];
+          validateMeasureAdmission(patch.measure, current, this.workbook.sheets, issues);
+          if (issues.length > 0) return false;
+        } else if (!current?.measures?.some((measure) => measure.id === patch.id)) {
+          return false;
+        }
+
+        const model =
+          patch.op === "setMeasure"
+            ? withMeasure(current, patch.measure)
+            : withoutMeasure(current, patch.id);
+        if (!this.syncRelationships(model)) return false;
+        this.workbook.dataModel = model;
         return true;
       }
 

@@ -586,6 +586,8 @@ function transformDirectTarget(
     case "setCalculation":
     case "setRelationship":
     case "removeRelationship":
+    case "setMeasure":
+    case "removeMeasure":
     case "setQuery":
     case "removeQuery":
     case "removeChart":
@@ -1158,6 +1160,8 @@ function operationIdentity(operation: DocumentOp): string {
     // tables), so any two concurrent relationship changes conflict.
     case "setRelationship":
     case "removeRelationship":
+    case "setMeasure":
+    case "removeMeasure":
       return "data-model";
 
     // Joins and output tables are checked across all queries, so any two

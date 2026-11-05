@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "817ee5dddafec99744515401990305cda39c1ea702534a7587b4a388c2f59b84",
+  "sha256": "297340c2c7d9ef938dbf2d61a6bc1ea7d417ac5da562df44dcd2b3057a0e32b7",
   "intentionalExports": [
     {
       "package": "@sheetwrite/charts",
@@ -30,7 +30,9 @@
     {
       "package": "@sheetwrite/charts",
       "entryPoint": "./register",
-      "exports": ["registerChartsBackend"]
+      "exports": [
+        "registerChartsBackend"
+      ]
     },
     {
       "package": "@sheetwrite/core",
@@ -159,6 +161,8 @@
         "MAX_HYPERLINK_DISPLAY_LENGTH",
         "MAX_HYPERLINK_ID_LENGTH",
         "MAX_HYPERLINK_TARGET_LENGTH",
+        "Measure",
+        "MeasureStatus",
         "MemoryPersistenceAdapter",
         "MergeRange",
         "MountedChart",
@@ -482,7 +486,10 @@
     {
       "package": "@sheetwrite/core",
       "entryPoint": "./browser/history",
-      "exports": ["IndexedDbHistoryStorage", "IndexedDbHistoryStorageOptions"]
+      "exports": [
+        "IndexedDbHistoryStorage",
+        "IndexedDbHistoryStorageOptions"
+      ]
     },
     {
       "package": "@sheetwrite/core",
@@ -573,7 +580,10 @@
     {
       "package": "@sheetwrite/core",
       "entryPoint": "./worker",
-      "exports": ["WorkerAcknowledgement", "createWorkerMessageHandler"]
+      "exports": [
+        "WorkerAcknowledgement",
+        "createWorkerMessageHandler"
+      ]
     },
     {
       "package": "@sheetwrite/formulas",
@@ -764,7 +774,9 @@
     {
       "package": "@sheetwrite/xlsx",
       "entryPoint": "./register",
-      "exports": ["registerXlsxBackends"]
+      "exports": [
+        "registerXlsxBackends"
+      ]
     }
   ]
 }

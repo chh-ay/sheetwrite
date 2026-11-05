@@ -11143,6 +11143,55 @@ The result equals a pivot over the table you get by looking up each related colu
 
 A duplicate one-side key or a key type mismatch shows `#VALUE!` at the anchor. A missing table, column or relationship shows `#REF!`. The default engine keeps and syncs model pivots but does not compute them. XLSX export keeps them in Sheetwrite metadata, because Excel needs its own data-model binary for a model pivot.
 
+## Measures
+
+A measure is a named formula over model columns, saved in `workbook.dataModel.measures`. A pivot with a model source shows it as a value field, `{ measure: id }`. As in Excel, each value cell, subtotal and grand total calculates the formula again over the base rows that its row items, column items and report filters select. So a total of `=SUM(Orders[Amount])/COUNT(Orders[Amount])` is the mean of all its rows, not the sum of the means above it ([Measures in Power Pivot](https://support.microsoft.com/en-us/office/measures-in-power-pivot-86484821-a324-4da3-803b-82fd2e5033f4), [filter context](https://learn.microsoft.com/en-us/dax/dax-overview#filter-context)).
+
+```ts
+grid.store.applyTransaction({
+  patches: [
+    {
+      op: "setMeasure",
+      measure: {
+        id: "mean-amount",
+        name: "Mean Amount",
+        table: "orders",
+        formula: "=SUM(Orders[Amount])/COUNT(Orders[Amount])",
+      },
+    },
+  ],
+});
+grid.setPivot({
+  id: "mean-by-region",
+  name: "Mean by region",
+  source: {
+    model: {
+      table: "orders",
+      fields: [{ table: "customers", column: "region" }],
+    },
+  },
+  anchor: { row: 0, col: 0 },
+  rows: [0],
+  columns: [],
+  values: [{ measure: "mean-amount" }],
+});
+```
+
+- **Names.** Every measure belongs to a home table. Measure names are unique ignoring case and differ from the column names of the home table, following the DAX [naming requirements](https://learn.microsoft.com/en-us/dax/dax-syntax-reference#naming-requirements). The default header of a measure value is the measure name.
+- **Formulas.** A measure uses the formula language of cells. Its references are qualified data columns of the pivot's base table, such as `Orders[Amount]`. Cell and range references, defined names, unqualified columns and the `#All`, `#Headers`, `#Totals` and `@` sections are refused, because a measure has no cell position.
+- **Errors.** A formula that does not parse shows `#NAME?` in its value cells, a missing table or column shows `#REF!`, and an unsupported reference shows `#VALUE!`. A formula that returns more than one value also shows `#VALUE!`. A pivot whose measure was removed shows `#REF!` at its anchor until undo restores the measure. A cell with no rows stays blank.
+- **Names in formulas** resolve against the current table and column names, as defined-name formulas do.
+- **Engines.** The default engine keeps and synchronizes measures but does not compute them. The full engine keeps no measure results between recomputes.
+
+| Store method | Result |
+| --- | --- |
+| `getMeasures()` | Copies of the saved measures |
+| `setMeasure(measure)` | Inserts it, or replaces the one with its ID |
+| `removeMeasure(id)` | Removes it |
+| `getMeasureStatus(id)` | `missingTable` when the home table is gone, `syntax` when the formula does not parse, otherwise `ok`; `unavailable` for an unknown ID. Checked on every engine; reference errors show in the pivot cells. |
+
+`setMeasure` and `removeMeasure` are document operations: each change is one undo step, and it is saved, synchronized and restored from version history. Two concurrent data model changes conflict. XLSX export keeps measures and the pivots that use them in Sheetwrite metadata, because Excel keeps measures in its data model part.
+
 <a id="import-and-export"></a>
 
 ### Import and export
@@ -12331,12 +12380,13 @@ Datasource cell value with optional cell-specific styling.
 ##### `DataModel` — interface
 
 ```ts
-export interface DataModel { relationships: TableRelationship[]; }
+export interface DataModel { relationships: TableRelationship[]; measures?: Measure[]; }
 ```
 
 The workbook's data model. Every workbook table is a model table.
 
 Members:
+- `measures` — Saved model formulas; absent means none.
 - `relationships` — Relationships; at most one joins a pair of tables, and they form no cycle.
 
 ##### `DataSource` — interface
@@ -12623,7 +12673,7 @@ Diff two validated phases of the same operation by exclusive resource owner.
 ##### `DocumentOp` — type
 
 ```ts
-export type DocumentOp = | { op: "set"; addr: CellAddress; value: CellValue; style?: CellStyle } | { op: "setRange"; range: Range; cells: SnapshotCell[] } | { op: "setBlock"; range: Range; block: PackedCellBlock } | { op: "restoreBlock"; range: Range; encoding: "deflate-json-v1"; decodedBytes: number; data: string; } | { op: "setRangeStyle"; range: Range; style: Partial<CellStyle> | null } | { op: "clearRange"; range: Range; contents?: boolean; style?: boolean } | { op: "permuteRows"; range: Range; encoding: "u32le-base64-v1"; order: string } | { op: "addRows"; sheet: SheetId; at: number; count: number } | { op: "removeRows"; sheet: SheetId; at: number; count: number } | { op: "moveRows"; sheet: SheetId; from: number; count: number; to: number } | { op: "addColumns"; sheet: SheetId; at: number; columns: Column[] } | { op: "removeColumns"; sheet: SheetId; at: number; count: number } | { op: "moveColumns"; sheet: SheetId; from: number; count: number; to: number } | { op: "setColumn"; sheet: SheetId; col: number; patch: Partial<Column> } | { op: "setRowMeta"; sheet: SheetId; row: number; meta: RowMetadata | null } | { op: "addMerge"; sheet: SheetId; merge: MergeRange } | { op: "removeMerge"; sheet: SheetId; merge: MergeRange } | { op: "addSheet"; sheet: SheetSnapshot } | { op: "removeSheet"; sheet: SheetId } | { op: "renameSheet"; sheet: SheetId; name: string } | { op: "moveSheet"; sheet: SheetId; to: number } | { op: "setSheetVisibility"; sheet: SheetId; visibility: SheetVisibility } | { op: "addTable"; table: WorkbookTable } | { op: "updateTable"; sheet: SheetId; tableId: string; patch: WorkbookTablePatch } | { op: "removeTable"; sheet: SheetId; tableId: string } | { op: "setSheetMeta"; sheet: SheetId; patch: { frozenRows?: number; frozenCols?: number; conditionalFormats?: ConditionalFormatRule[]; rowGroups?: RowGroup[]; sortKeys?: SortKey[]; filters?: Array<[col: number, filter: ColumnFilter]>; }; } | { op: "setValidationRule"; sheet: SheetId; rule: DataValidationRule } | { op: "removeValidationRule"; sheet: SheetId; id: string } | { op: "setHyperlink"; sheet: SheetId; hyperlink: CellHyperlink } | { op: "removeHyperlink"; sheet: SheetId; id: string } | { op: "setProtectedRange"; sheet: SheetId; protectedRange: ProtectedRange } | { op: "removeProtectedRange"; sheet: SheetId; id: string } | { op: "setNote"; addr: CellAddress; text: string | null } | { op: "setNamedRange"; namedRange: NamedRangeSnapshot } | { op: "removeNamedRange"; name: string; scope?: SheetId } | { op: "setCalculation"; calculation: CalculationSettings } | { op: "setRelationship"; relationship: TableRelationship } | { op: "removeRelationship"; id: string } | { op: "setQuery"; query: SavedQuery } | { op: "removeQuery"; id: string } | { op: "setChart"; sheet: SheetId; chart: ChartDefinition } | { op: "removeChart"; sheet: SheetId; id: string } | { op: "setPivot"; sheet: SheetId; pivot: PivotDefinition } | { op: "removePivot"; sheet: SheetId; id: string };
+export type DocumentOp = | { op: "set"; addr: CellAddress; value: CellValue; style?: CellStyle } | { op: "setRange"; range: Range; cells: SnapshotCell[] } | { op: "setBlock"; range: Range; block: PackedCellBlock } | { op: "restoreBlock"; range: Range; encoding: "deflate-json-v1"; decodedBytes: number; data: string; } | { op: "setRangeStyle"; range: Range; style: Partial<CellStyle> | null } | { op: "clearRange"; range: Range; contents?: boolean; style?: boolean } | { op: "permuteRows"; range: Range; encoding: "u32le-base64-v1"; order: string } | { op: "addRows"; sheet: SheetId; at: number; count: number } | { op: "removeRows"; sheet: SheetId; at: number; count: number } | { op: "moveRows"; sheet: SheetId; from: number; count: number; to: number } | { op: "addColumns"; sheet: SheetId; at: number; columns: Column[] } | { op: "removeColumns"; sheet: SheetId; at: number; count: number } | { op: "moveColumns"; sheet: SheetId; from: number; count: number; to: number } | { op: "setColumn"; sheet: SheetId; col: number; patch: Partial<Column> } | { op: "setRowMeta"; sheet: SheetId; row: number; meta: RowMetadata | null } | { op: "addMerge"; sheet: SheetId; merge: MergeRange } | { op: "removeMerge"; sheet: SheetId; merge: MergeRange } | { op: "addSheet"; sheet: SheetSnapshot } | { op: "removeSheet"; sheet: SheetId } | { op: "renameSheet"; sheet: SheetId; name: string } | { op: "moveSheet"; sheet: SheetId; to: number } | { op: "setSheetVisibility"; sheet: SheetId; visibility: SheetVisibility } | { op: "addTable"; table: WorkbookTable } | { op: "updateTable"; sheet: SheetId; tableId: string; patch: WorkbookTablePatch } | { op: "removeTable"; sheet: SheetId; tableId: string } | { op: "setSheetMeta"; sheet: SheetId; patch: { frozenRows?: number; frozenCols?: number; conditionalFormats?: ConditionalFormatRule[]; rowGroups?: RowGroup[]; sortKeys?: SortKey[]; filters?: Array<[col: number, filter: ColumnFilter]>; }; } | { op: "setValidationRule"; sheet: SheetId; rule: DataValidationRule } | { op: "removeValidationRule"; sheet: SheetId; id: string } | { op: "setHyperlink"; sheet: SheetId; hyperlink: CellHyperlink } | { op: "removeHyperlink"; sheet: SheetId; id: string } | { op: "setProtectedRange"; sheet: SheetId; protectedRange: ProtectedRange } | { op: "removeProtectedRange"; sheet: SheetId; id: string } | { op: "setNote"; addr: CellAddress; text: string | null } | { op: "setNamedRange"; namedRange: NamedRangeSnapshot } | { op: "removeNamedRange"; name: string; scope?: SheetId } | { op: "setCalculation"; calculation: CalculationSettings } | { op: "setRelationship"; relationship: TableRelationship } | { op: "removeRelationship"; id: string } | { op: "setMeasure"; measure: Measure } | { op: "removeMeasure"; id: string } | { op: "setQuery"; query: SavedQuery } | { op: "removeQuery"; id: string } | { op: "setChart"; sheet: SheetId; chart: ChartDefinition } | { op: "removeChart"; sheet: SheetId; id: string } | { op: "setPivot"; sheet: SheetId; pivot: PivotDefinition } | { op: "removePivot"; sheet: SheetId; id: string };
 ```
 
 Exhaustive serializable operation union for workbook mutations.
@@ -13569,6 +13619,31 @@ Renderer/codec ceiling for one sheet's hyperlink metadata.
 
 Largest iteration count Excel accepts.
 
+##### `Measure` — interface
+
+```ts
+export interface Measure { id: string; name: string; table: WorkbookTableId; formula: string; }
+```
+
+A model formula evaluated separately in each pivot cell's filter context.
+
+Members:
+- `formula` — Formula with its leading `=` and qualified model-column references.
+- `id` — Stable identity, unique in the workbook.
+- `name` — Caption, unique among measures ignoring case.
+- `table` — Home table, used to organize the field list.
+
+##### `MeasureStatus` — interface
+
+```ts
+export interface MeasureStatus { status: "ok" | "syntax" | "missingTable" | "unavailable"; }
+```
+
+Status of a saved measure, checked from the saved model: `missingTable`
+when its home table is gone, `syntax` when the formula does not parse,
+`unavailable` for an unknown ID. A reference that does not resolve shows
+its error in the pivot cells that calculate the measure.
+
 ##### `MemoryPersistenceAdapter` — class
 
 ```ts
@@ -14027,18 +14102,13 @@ Members:
 - `index` — Source field index, as used by `rows`, `columns`, `values` and `filters`.
 - `type` — Type inferred from the field's data rows.
 
-##### `PivotValueField` — interface
+##### `PivotValueField` — type
 
 ```ts
-export interface PivotValueField { field: number; aggregation: PivotAggregation; name?: string; }
+export type PivotValueField = | { field: number; aggregation: PivotAggregation; name?: string } | { measure: string; name?: string };
 ```
 
-One aggregated value field. `name` replaces the default caption.
-
-Members:
-- `aggregation` — How the field's values in each output cell combine.
-- `field` — Source field index that the value aggregates.
-- `name` — Custom caption; without it the output shows the default caption.
+One implicit aggregation or saved measure; `name` overrides its caption.
 
 ##### `PowerQueryCodec` — interface
 
@@ -14562,7 +14632,7 @@ Context supplied when a canonical row insertion needs a host identity.
 ##### `RowBridgeMetadataDelta` — interface
 
 ```ts
-export interface RowBridgeMetadataDelta<Id extends RowBridgeId = RowBridgeId> { readonly kind: "metadata"; readonly metadata: | "column" | "row" | "sheet" | "merge" | "table" | "validation" | "hyperlink" | "protected-range" | "note" | "named-range" | "calculation" | "relationship" | "query" | "chart" | "pivot"; readonly transaction: RowBridgeTransaction; readonly transactionId: string; readonly source: OperationSource; readonly previous: unknown; readonly next: unknown; readonly operation: DocumentOp; readonly rowIds: readonly (Id | null)[]; }
+export interface RowBridgeMetadataDelta<Id extends RowBridgeId = RowBridgeId> { readonly kind: "metadata"; readonly metadata: | "column" | "row" | "sheet" | "merge" | "table" | "validation" | "hyperlink" | "protected-range" | "note" | "named-range" | "calculation" | "relationship" | "measure" | "query" | "chart" | "pivot"; readonly transaction: RowBridgeTransaction; readonly transactionId: string; readonly source: OperationSource; readonly previous: unknown; readonly next: unknown; readonly operation: DocumentOp; readonly rowIds: readonly (Id | null)[]; }
 ```
 
 A document operation that changes workbook or column metadata.
@@ -15074,7 +15144,7 @@ Members:
 ##### `SheetwriteStore` — class
 
 ```ts
-class SheetwriteStore implements Store { constructor(workbook: Workbook, data?: ColumnarData, options?: SheetwriteStoreOptions); acknowledgeOperations: (operations: readonly DocumentOp[], storageRevision?: bigint) => void; aggregate: (sheet: SheetId, col: number, op: AggregateOp) => number; applyTransaction: (tx: Transaction, reasonOrOptions?: CommitReason | TransactionApplicationOptions) => ApplyTransactionResult; areColumnsFullyLoaded: (sheet: SheetId, startRow: number, endRow: number, columns: readonly number[]) => boolean; canApplyLocally: (patch: DocumentOp) => boolean; captureRangeHistory: (input: Range) => CompactRangeHistory | null; clearView: (sheet: SheetId) => ApplyTransactionResult; columnFilters: (sheet: SheetId) => ReadonlyMap<number, ColumnFilter>; dataEdge: (sheet: SheetId, row: number, col: number, dRow: number, dCol: number) => number; dataRowAt: (sheet: SheetId, viewRow: number) => number; dispose: () => void; distinctValues: (sheet: SheetId, col: number, limit?: number) => CellScalar[]; ensureColumns: (sheet: SheetId, columns: readonly Column[]) => void; exportSnapshot: () => WorkbookSnapshot; filterBy: (sheet: SheetId, col: number, needle: string) => ApplyTransactionResult; getCell: (addr: CellAddress) => ResolvedCell; getCellLoadState: (addr: CellAddress) => CellLoadState; getClipboardWindow: (sheet: SheetId, viewRows: { start: number; end: number; }, cols: readonly number[]) => ClipboardWindowView; getDataWindow: (sheet: SheetId, rows: { start: number; end: number; }, cols: readonly number[]) => VisibleWindowView; getFormula: (addr: CellAddress) => string | null; getFormulaMatrixResourcePeak: () => TransientResourcePeak; getPagedStats: (sheet: SheetId) => PagedStoreStats; getPivotFields: (sheet: SheetId, id: string) => PivotSourceField[]; getPivotResult: (sheet: SheetId, id: string) => PivotResultView | null; getPivots: (sheet?: SheetId) => PivotDefinition[]; getRangeMutationAllocationStats: () => RangeMutationAllocationStats; getRefTarget: (addr: CellAddress) => CellAddress | null; getRelationshipStatus: (id: string) => RelationshipStatus; getRelationships: () => TableRelationship[]; getRuntimeResourceSnapshot: (operation: RuntimeResourceOperation, phase: RuntimeResourcePhase, runtime?: RuntimeMemoryObservation) => RuntimeResourceSnapshot; getSpillAnchor: (addr: CellAddress) => CellAddress | null; getVisibleWindow: (sheet: SheetId, rows: { start: number; end: number; }, cols: readonly number[]) => VisibleWindowView; getWorkbook: () => Workbook; groupRows: (sheet: SheetId, start: number, end: number) => ApplyTransactionResult; hasView: (sheet: SheetId) => boolean; hiddenRows: (sheet: SheetId) => number[]; hideRows: (sheet: SheetId, rows: readonly number[]) => ApplyTransactionResult; isPaged: (sheet: SheetId) => boolean; isRangeFullyLoaded: (input: Range) => boolean; loadPage: (sheet: SheetId, start: number, columns: readonly DataSourceColumnBand[], rows: readonly RowData[], protect?: (addr: CellAddress) => boolean) => void; on: (_evt: "change", fn: ChangeListener) => () => void; queryCapability: (sheet: SheetId) => QueryCapability; recalculateVolatile: (now?: Date) => void; removePivot: (id: string, sheet?: SheetId) => ApplyTransactionResult; removeRelationship: (id: string) => ApplyTransactionResult; removeSheetFormulaIdentity: (sheet: SheetId) => boolean; renameSheetFormulaIdentity: (sheet: SheetId, name: string) => boolean; replaceSnapshot: (snapshot: WorkbookSnapshot) => void; resetFormulaMatrixResourcePeak: () => void; resetRangeMutationAllocationStats: () => void; resetRuntimeResourceAccounting: () => void; rowGroups: (sheet: SheetId) => readonly RowGroup[]; searchCells: (sheet: SheetId, query: string, opts?: { matchCase?: boolean; wholeCell?: boolean; columns?: number[]; }) => CellAddress[]; searchCellsFlat: (sheet: SheetId, query: string, opts?: { matchCase?: boolean; wholeCell?: boolean; columns?: number[]; }) => Uint32Array; setColumnFilter: (sheet: SheetId, col: number, filter: ColumnFilter | null) => ApplyTransactionResult; setDetailedChangeCapture: (enabled: boolean) => void; setGroupCollapsed: (sheet: SheetId, start: number, collapsed: boolean) => ApplyTransactionResult; setPivot: (pivot: PivotDefinition, sheet?: SheetId) => ApplyTransactionResult; setProtectionResolver: (resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode) => void; setRelationship: (relationship: TableRelationship) => ApplyTransactionResult; setViewSort: (sheet: SheetId, keys: readonly SortKey[]) => ApplyTransactionResult; showRows: (sheet: SheetId, rows?: readonly number[]) => ApplyTransactionResult; sortRange: (range: Range, keys: readonly SortKey[], options?: { hasHeader?: boolean; }) => ApplyTransactionResult; ungroupRows: (sheet: SheetId, start: number, end: number) => ApplyTransactionResult; viewRowCount: (sheet: SheetId) => number; viewRowOf: (sheet: SheetId, dataRow: number) => number | null; withResourceOperation: <T>(operation: RuntimeResourceOperation, run: () => T) => T; static fromSnapshot: (input: unknown, options?: SheetwriteStoreOptions) => SheetwriteStore }
+class SheetwriteStore implements Store { constructor(workbook: Workbook, data?: ColumnarData, options?: SheetwriteStoreOptions); acknowledgeOperations: (operations: readonly DocumentOp[], storageRevision?: bigint) => void; aggregate: (sheet: SheetId, col: number, op: AggregateOp) => number; applyTransaction: (tx: Transaction, reasonOrOptions?: CommitReason | TransactionApplicationOptions) => ApplyTransactionResult; areColumnsFullyLoaded: (sheet: SheetId, startRow: number, endRow: number, columns: readonly number[]) => boolean; canApplyLocally: (patch: DocumentOp) => boolean; captureRangeHistory: (input: Range) => CompactRangeHistory | null; clearView: (sheet: SheetId) => ApplyTransactionResult; columnFilters: (sheet: SheetId) => ReadonlyMap<number, ColumnFilter>; dataEdge: (sheet: SheetId, row: number, col: number, dRow: number, dCol: number) => number; dataRowAt: (sheet: SheetId, viewRow: number) => number; dispose: () => void; distinctValues: (sheet: SheetId, col: number, limit?: number) => CellScalar[]; ensureColumns: (sheet: SheetId, columns: readonly Column[]) => void; exportSnapshot: () => WorkbookSnapshot; filterBy: (sheet: SheetId, col: number, needle: string) => ApplyTransactionResult; getCell: (addr: CellAddress) => ResolvedCell; getCellLoadState: (addr: CellAddress) => CellLoadState; getClipboardWindow: (sheet: SheetId, viewRows: { start: number; end: number; }, cols: readonly number[]) => ClipboardWindowView; getDataWindow: (sheet: SheetId, rows: { start: number; end: number; }, cols: readonly number[]) => VisibleWindowView; getFormula: (addr: CellAddress) => string | null; getFormulaMatrixResourcePeak: () => TransientResourcePeak; getMeasureStatus: (id: string) => MeasureStatus; getMeasures: () => Measure[]; getPagedStats: (sheet: SheetId) => PagedStoreStats; getPivotFields: (sheet: SheetId, id: string) => PivotSourceField[]; getPivotResult: (sheet: SheetId, id: string) => PivotResultView | null; getPivots: (sheet?: SheetId) => PivotDefinition[]; getRangeMutationAllocationStats: () => RangeMutationAllocationStats; getRefTarget: (addr: CellAddress) => CellAddress | null; getRelationshipStatus: (id: string) => RelationshipStatus; getRelationships: () => TableRelationship[]; getRuntimeResourceSnapshot: (operation: RuntimeResourceOperation, phase: RuntimeResourcePhase, runtime?: RuntimeMemoryObservation) => RuntimeResourceSnapshot; getSpillAnchor: (addr: CellAddress) => CellAddress | null; getVisibleWindow: (sheet: SheetId, rows: { start: number; end: number; }, cols: readonly number[]) => VisibleWindowView; getWorkbook: () => Workbook; groupRows: (sheet: SheetId, start: number, end: number) => ApplyTransactionResult; hasView: (sheet: SheetId) => boolean; hiddenRows: (sheet: SheetId) => number[]; hideRows: (sheet: SheetId, rows: readonly number[]) => ApplyTransactionResult; isPaged: (sheet: SheetId) => boolean; isRangeFullyLoaded: (input: Range) => boolean; loadPage: (sheet: SheetId, start: number, columns: readonly DataSourceColumnBand[], rows: readonly RowData[], protect?: (addr: CellAddress) => boolean) => void; on: (_evt: "change", fn: ChangeListener) => () => void; queryCapability: (sheet: SheetId) => QueryCapability; recalculateVolatile: (now?: Date) => void; removeMeasure: (id: string) => ApplyTransactionResult; removePivot: (id: string, sheet?: SheetId) => ApplyTransactionResult; removeRelationship: (id: string) => ApplyTransactionResult; removeSheetFormulaIdentity: (sheet: SheetId) => boolean; renameSheetFormulaIdentity: (sheet: SheetId, name: string) => boolean; replaceSnapshot: (snapshot: WorkbookSnapshot) => void; resetFormulaMatrixResourcePeak: () => void; resetRangeMutationAllocationStats: () => void; resetRuntimeResourceAccounting: () => void; rowGroups: (sheet: SheetId) => readonly RowGroup[]; searchCells: (sheet: SheetId, query: string, opts?: { matchCase?: boolean; wholeCell?: boolean; columns?: number[]; }) => CellAddress[]; searchCellsFlat: (sheet: SheetId, query: string, opts?: { matchCase?: boolean; wholeCell?: boolean; columns?: number[]; }) => Uint32Array; setColumnFilter: (sheet: SheetId, col: number, filter: ColumnFilter | null) => ApplyTransactionResult; setDetailedChangeCapture: (enabled: boolean) => void; setGroupCollapsed: (sheet: SheetId, start: number, collapsed: boolean) => ApplyTransactionResult; setMeasure: (measure: Measure) => ApplyTransactionResult; setPivot: (pivot: PivotDefinition, sheet?: SheetId) => ApplyTransactionResult; setProtectionResolver: (resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode) => void; setRelationship: (relationship: TableRelationship) => ApplyTransactionResult; setViewSort: (sheet: SheetId, keys: readonly SortKey[]) => ApplyTransactionResult; showRows: (sheet: SheetId, rows?: readonly number[]) => ApplyTransactionResult; sortRange: (range: Range, keys: readonly SortKey[], options?: { hasHeader?: boolean; }) => ApplyTransactionResult; ungroupRows: (sheet: SheetId, start: number, end: number) => ApplyTransactionResult; viewRowCount: (sheet: SheetId) => number; viewRowOf: (sheet: SheetId, dataRow: number) => number | null; withResourceOperation: <T>(operation: RuntimeResourceOperation, run: () => T) => T; static fromSnapshot: (input: unknown, options?: SheetwriteStoreOptions) => SheetwriteStore }
 ```
 
 Stable public facade and the sole transaction, epoch, policy, and event barrier.
@@ -15126,6 +15196,8 @@ preserves the per-cell Store fallback contract.
 - `getDataWindow` — Optional packed canonical data-row window used by file export. Unlike
 `getVisibleWindow`, sort/filter state never remaps `rows`.
 - `getFormula` — Formula source at `addr`, or null when the cell is not a formula.
+- `getMeasures` — Detached copies of the workbook's saved measures.
+- `getMeasureStatus` — Check a measure in the full engine, or report `unavailable`.
 - `getPivotFields` — Source fields of one pivot; empty on the default engine or for an unknown pivot.
 - `getPivotResult` — Plain-JSON output of one pivot. The default engine reports the saved
 output (`saved`), or `unavailable` without one. Null when `sheet` holds
@@ -15143,10 +15215,12 @@ the cell values. The default engine checks no keys and reports
 `INDIRECT`) from one captured instant. The supplied Date is interpreted as an absolute UTC instant.
 Edits already recompute volatile formulas and read the clock once per
 recalculation; this call uses `now` instead, until the next edit.
+- `removeMeasure` — Remove a saved measure, retaining pivot references for undo.
 - `removePivot` — Remove a pivot; `sheet` defaults to the sheet that holds it.
 - `removeRelationship` — Remove the relationship with `id`.
 - `replaceSnapshot` — Replace only after a separate store has validated and hydrated every sheet.
 - `setDetailedChangeCapture` — Opt in to per-cell before/after capture for packed and clear operations.
+- `setMeasure` — Save or replace a model measure.
 - `setPivot` — Insert or replace a pivot. `sheet` defaults to the sheet that holds the
 pivot's ID, then to the active sheet. The pivot's `savedOutput` is
 removed: saved values do not match a definition the caller changed.
@@ -16680,7 +16754,7 @@ Context supplied when a canonical row insertion needs a host identity.
 ##### `RowBridgeMetadataDelta` — interface
 
 ```ts
-export interface RowBridgeMetadataDelta<Id extends RowBridgeId = RowBridgeId> { readonly kind: "metadata"; readonly metadata: | "column" | "row" | "sheet" | "merge" | "table" | "validation" | "hyperlink" | "protected-range" | "note" | "named-range" | "calculation" | "relationship" | "query" | "chart" | "pivot"; readonly transaction: RowBridgeTransaction; readonly transactionId: string; readonly source: OperationSource; readonly previous: unknown; readonly next: unknown; readonly operation: DocumentOp; readonly rowIds: readonly (Id | null)[]; }
+export interface RowBridgeMetadataDelta<Id extends RowBridgeId = RowBridgeId> { readonly kind: "metadata"; readonly metadata: | "column" | "row" | "sheet" | "merge" | "table" | "validation" | "hyperlink" | "protected-range" | "note" | "named-range" | "calculation" | "relationship" | "measure" | "query" | "chart" | "pivot"; readonly transaction: RowBridgeTransaction; readonly transactionId: string; readonly source: OperationSource; readonly previous: unknown; readonly next: unknown; readonly operation: DocumentOp; readonly rowIds: readonly (Id | null)[]; }
 ```
 
 A document operation that changes workbook or column metadata.
@@ -17987,9 +18061,10 @@ anchorCol, nRows, ...rowFields, nCols, ...colFields, nValues,
 Text slots index `strings`. A pivot whose definition did not change
 keeps its cache. Output appears at the next recalculation. Returns
 `false`, changing nothing, for a malformed payload or a dead sheet.
-- `setRelationships` — Replaces every relationship with the packed definitions: five strings
-each, `[id, fromTable, fromColumn, toTable, toColumn]`, by stable
-table and column IDs. Returns `false`, changing nothing, for a
+- `setRelationships` — Replaces every relationship and measure with the packed definitions:
+five strings each, `[id, fromTable, fromColumn, toTable, toColumn]`,
+by stable table and column IDs, or `[id, homeTable, formula, "",
+name]` for a measure. Returns `false`, changing nothing, for a
 malformed payload.
 - `setSheetOrder` — Set the workbook tab order: every live sheet handle exactly once.
 3-D references such as `Sheet1:Sheet3!A1` span the tabs between their

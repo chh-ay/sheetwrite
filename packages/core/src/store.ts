@@ -1,6 +1,6 @@
 import { atomicBatchLimits, isAtomicBatch } from "./atomic-batch.js";
 import { chartSourceRanges } from "./chart-definition.js";
-import { cloneRelationship, cloneRelationships } from "./data-model.js";
+import { cloneMeasure, cloneRelationship, cloneRelationships } from "./data-model.js";
 import {
   assertWorkbookAllocationLimits,
   DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
@@ -43,7 +43,12 @@ import { setTransactionStorageRevision } from "./transaction-admission.js";
 import { preparedRestore, TransactionPreparation } from "./transaction-preparation.js";
 import type { CellScalar, Column } from "./types/cell.js";
 import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
-import type { RelationshipStatus, TableRelationship } from "./types/data-model.js";
+import type {
+  Measure,
+  MeasureStatus,
+  RelationshipStatus,
+  TableRelationship,
+} from "./types/data-model.js";
 import type { AggregateOp, ColumnarData, DataSourceColumnBand, RowData } from "./types/data.js";
 import type {
   ColumnFilter,
@@ -367,6 +372,29 @@ export class SheetwriteStore implements Store {
   /** Remove the relationship with `id`. */
   removeRelationship(id: string): ApplyTransactionResult {
     return this.applyTransaction({ patches: [{ op: "removeRelationship", id }] }, "api");
+  }
+
+  /** Detached copies of the workbook's saved measures. */
+  getMeasures(): Measure[] {
+    return (this.engine.getWorkbook().dataModel?.measures ?? []).map(cloneMeasure);
+  }
+
+  /** Save or replace a model measure. */
+  setMeasure(measure: Measure): ApplyTransactionResult {
+    return this.applyTransaction(
+      { patches: [{ op: "setMeasure", measure: cloneMeasure(measure) }] },
+      "api",
+    );
+  }
+
+  /** Remove a saved measure, retaining pivot references for undo. */
+  removeMeasure(id: string): ApplyTransactionResult {
+    return this.applyTransaction({ patches: [{ op: "removeMeasure", id }] }, "api");
+  }
+
+  /** Check a measure in the full engine, or report `unavailable`. */
+  getMeasureStatus(id: string): MeasureStatus {
+    return this.engine.getMeasureStatus(id);
   }
 
   getRangeMutationAllocationStats(): RangeMutationAllocationStats {

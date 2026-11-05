@@ -9,7 +9,7 @@ Remove only identifier prefixes. Quoted text, sheet names and structured
 references are not function or parameter names and must remain unchanged.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/formulas/pkg/sheetwrite_wasm.d.ts#L662"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L662</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/formulas/pkg/sheetwrite_wasm.d.ts#L663"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L663</code></a></dd></div>
 </dl>
 
 ## Declaration

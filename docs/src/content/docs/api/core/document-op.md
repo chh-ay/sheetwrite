@@ -11,7 +11,7 @@ Exhaustive serializable operation union for workbook mutations.
 <div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L508"><code>packages/core/src/types/document.ts#L508</code></a></dd></div>
 </dl>
 
-## Variants <span class="api-count" data-pagefind-ignore>44</span>
+## Variants <span class="api-count" data-pagefind-ignore>46</span>
 
 <div class="api-variant-list" data-pagefind-ignore>
 <div class="api-variant">
@@ -377,6 +377,20 @@ Exhaustive serializable operation union for workbook mutations.
 <div class="api-variant">
 
 ```ts generated
+{ op: "setMeasure"; measure: Measure }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ op: "removeMeasure"; id: string }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
 { op: "setQuery"; query: SavedQuery }
 ```
 
@@ -629,6 +643,14 @@ export type DocumentOp =
     }
   | {
       op: "removeRelationship";
+      id: string;
+    }
+  | {
+      op: "setMeasure";
+      measure: Measure;
+    }
+  | {
+      op: "removeMeasure";
       id: string;
     }
   | {

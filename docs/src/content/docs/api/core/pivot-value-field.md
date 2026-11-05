@@ -1,46 +1,37 @@
 ---
 title: "PivotValueField | @sheetwrite/core"
-description: "PivotValueField interface in @sheetwrite/core: One aggregated value field."
+description: "PivotValueField type in @sheetwrite/core: One implicit aggregation or saved measure; name overrides its caption."
 ---
 <!-- api-export:@sheetwrite/core|.|PivotValueField -->
-<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
 
-One aggregated value field. `name` replaces the default caption.
+One implicit aggregation or saved measure; `name` overrides its caption.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/pivot.ts#L40"><code>packages/core/src/types/pivot.ts#L40</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>3</span>
+## Variants <span class="api-count" data-pagefind-ignore>2</span>
 
-<div class="api-member-list">
-
-<details class="api-member" id="pivot-value-field-field" data-pagefind-weight="1">
-<summary><code>field</code> <span class="api-member-summary">Source field index that the value aggregates.</span></summary>
+<div class="api-variant-list" data-pagefind-ignore>
+<div class="api-variant">
 
 ```ts generated
-field: number;
+{
+  field: number;
+  aggregation: PivotAggregation;
+  name?: string;
+}
 ```
 
-</details>
-
-<details class="api-member" id="pivot-value-field-aggregation" data-pagefind-weight="1">
-<summary><code>aggregation</code> <span class="api-member-summary">How the field's values in each output cell combine.</span></summary>
+</div>
+<div class="api-variant">
 
 ```ts generated
-aggregation: PivotAggregation;
+{ measure: string; name?: string }
 ```
 
-</details>
-
-<details class="api-member" id="pivot-value-field-name" data-pagefind-weight="1">
-<summary><code>name</code> <span class="api-member-summary">Custom caption; without it the output shows the default caption.</span></summary>
-
-```ts generated
-name?: string;
-```
-
-</details>
+</div>
 </div>
 
 ## Declaration
@@ -49,11 +40,16 @@ name?: string;
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export interface PivotValueField {
-  field: number;
-  aggregation: PivotAggregation;
-  name?: string;
-}
+export type PivotValueField =
+  | {
+      field: number;
+      aggregation: PivotAggregation;
+      name?: string;
+    }
+  | {
+      measure: string;
+      name?: string;
+    };
 ```
 
 </details>

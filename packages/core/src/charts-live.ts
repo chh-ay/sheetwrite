@@ -468,7 +468,9 @@ function classifyPatch(patch: DocumentOp, context: PatchContext): void {
 
     case "setRelationship":
     case "removeRelationship":
-      // A relationship change can change pivot output read by a chart.
+    case "setMeasure":
+    case "removeMeasure":
+      // A model change can change pivot output read by a chart.
       context.valuesChanged = true;
       return;
 

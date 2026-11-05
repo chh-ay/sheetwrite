@@ -351,6 +351,8 @@ export class StoreMutationPolicy {
       case "setCalculation":
       case "setRelationship":
       case "removeRelationship":
+      case "setMeasure":
+      case "removeMeasure":
       case "setQuery":
       case "removeQuery":
       case "setPivot":

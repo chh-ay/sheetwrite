@@ -49,7 +49,7 @@ export function areaFields(pivot: PivotDefinition, area: PivotArea): number[] {
     case "columns":
       return [...pivot.columns];
     case "values":
-      return pivot.values.map((value) => value.field);
+      return pivot.values.map((value) => ("field" in value ? value.field : -1));
     case "filters":
       return (pivot.filters ?? []).map((filter) => filter.field);
   }
@@ -104,6 +104,8 @@ function removePlacement(
     case "values": {
       const value = pivot.values[index];
       if (value === undefined) return [pivot, null];
+      if ("measure" in value)
+        return [{ ...pivot, values: withoutIndex(pivot.values, index) }, null];
       return [
         { ...pivot, values: withoutIndex(pivot.values, index) },
         { field: value.field, value },
@@ -206,7 +208,7 @@ export function setAggregation(
   return {
     ...pivot,
     values: pivot.values.map((value, position) =>
-      position === index ? { ...value, aggregation } : value,
+      position === index && "field" in value ? { ...value, aggregation } : value,
     ),
   };
 }
