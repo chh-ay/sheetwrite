@@ -240,7 +240,7 @@ to show Review › **Version History** and **Save Version** in the full ribbon, 
 compact ribbon and the toolbar. The grid's first paint does not change: the panel
 loads as a separate chunk on the first command.
 
-```ts title="Opt in to the version history commands"
+```ts compile title="Opt in to the version history commands"
 import { createGrid } from "@sheetwrite/core";
 import { createHistoryCommands, type HistoryArchive } from "@sheetwrite/core/history";
 
