@@ -1,6 +1,6 @@
 import { colToA1, labelToCol } from "./a1.js";
+import { sanitizeCellStyle } from "./cell-style-fields.js";
 import { SheetwriteError } from "./errors.js";
-import { sanitizeHyperlinkStyle } from "./hyperlink.js";
 import { formulaNameKey } from "./name-key.js";
 import { rangesIntersect } from "./store/ranges.js";
 import type { Sheet } from "./types/document.js";
@@ -190,7 +190,7 @@ export function validWorkbookTableXmlElement(
     if (element.differentialStyle !== undefined) {
       if (
         (element.name !== "colorFilter" && element.name !== "sortCondition") ||
-        sanitizeHyperlinkStyle(element.differentialStyle) === null
+        sanitizeCellStyle(element.differentialStyle) === null
       )
         return false;
     }

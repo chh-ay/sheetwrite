@@ -6,8 +6,9 @@
 import { colToA1, labelToCol } from "../a1.js";
 import { FormulaAssist } from "../formula-assist.js";
 import { Scope } from "../scope.js";
+import { selectionCell } from "../selection.js";
 import type { CellInputSnapshot, Grid } from "../types/grid.js";
-import { commitCellInput, selectionFocus } from "./grid-binding.js";
+import { commitCellInput } from "./grid-binding.js";
 
 /** A mounted shell piece: its root element plus an idempotent teardown. */
 export interface ShellPiece {
@@ -49,7 +50,7 @@ export function createNameBox(
 
   const refresh = (): void => {
     if (document.activeElement === input && dirty) return;
-    const focus = selectionFocus(grid.getSelection());
+    const focus = selectionCell(grid.getSelection());
     committed = focus ? `${colToA1(focus.col)}${focus.row + 1}` : "";
     input.value = committed;
     input.removeAttribute("aria-invalid");
@@ -171,7 +172,7 @@ export function createFormulaBar(
 
   const refresh = (): void => {
     if (document.activeElement === input && dirty) return;
-    const focus = selectionFocus(grid.getSelection());
+    const focus = selectionCell(grid.getSelection());
     snapshot = focus ? grid.getCellInput(focus.row, focus.col) : null;
     committed = snapshot?.text ?? "";
     input.value = committed;

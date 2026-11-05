@@ -1,5 +1,6 @@
 import type { SourceSnapshot, WindowView } from "@sheetwrite/wasm";
 
+import { MAX_CONDITIONAL_FORMAT_RULES } from "../conditional-format.js";
 import type { StyleDictionary } from "../style-dictionary.js";
 import type { CellScalar, CellStyle, ConditionalFormatRule } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
@@ -31,7 +32,6 @@ const EMPTY_PIN_COLUMNS = new Uint32Array(0);
 // Kept independent from the worker cache cap so each thread can be tuned separately.
 const STRING_CACHE_CAP = 65_536;
 const WINDOW_SCRATCH_MAX_REUSE = 65_536;
-const CONDITIONAL_MASK_BITS = Uint32Array.BYTES_PER_ELEMENT * 8;
 const UTF8_DECODER = new TextDecoder();
 const DEFAULT_HYPERLINK_STYLE: CellStyle = { color: "#0563C1", underline: true };
 
@@ -798,7 +798,7 @@ export class StoreWindowReader {
     const rules = this.sheets.sheetMeta(sheet).conditionalFormats ?? [];
     const packable = rules
       .filter((rule) => rule.range.sheet === sheet)
-      .slice(0, CONDITIONAL_MASK_BITS);
+      .slice(0, MAX_CONDITIONAL_FORMAT_RULES);
     const signature = conditionalRulesSignature(packable);
     if (this.condRulesSynced.get(sheet) === signature) {
       this.conditionalRuleInputBytes = 0;
@@ -937,7 +937,7 @@ export class StoreWindowReader {
       let local = mergedIds.get(comboKey);
       if (local === undefined) {
         let merged = styles[base] ?? {};
-        for (let bit = Math.min(rules.length, CONDITIONAL_MASK_BITS) - 1; bit >= 0; bit--) {
+        for (let bit = Math.min(rules.length, MAX_CONDITIONAL_FORMAT_RULES) - 1; bit >= 0; bit--) {
           if ((fullMask & (1 << bit)) !== 0) merged = { ...merged, ...rules[bit]?.style };
         }
         local = styles.length;
