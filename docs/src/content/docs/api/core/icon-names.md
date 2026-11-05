@@ -79,6 +79,8 @@ const ICON_NAMES: readonly [
   "sortDesc",
   "sortFilter",
   "clearFilter",
+  "sortCustom",
+  "sortView",
   "chart",
   "chartColumn",
   "chartBar",

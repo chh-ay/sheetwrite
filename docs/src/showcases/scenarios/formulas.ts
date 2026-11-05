@@ -174,7 +174,7 @@ export interface FormulaPanel {
 }
 
 /** The dashboard. Every panel is one formula; its result spills from the anchor. */
-export const FORMULA_PANELS: readonly FormulaPanel[] = [
+export const FORMULA_PANELS: readonly [FormulaPanel, ...FormulaPanel[]] = [
   {
     id: "region",
     title: "Revenue by region",

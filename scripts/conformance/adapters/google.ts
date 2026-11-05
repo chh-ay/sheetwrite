@@ -5,6 +5,7 @@ import type {
   ConformanceCase,
   ConformanceCorpus,
   ConformanceResult,
+  CellResult,
 } from "../types.js";
 
 export const MAX_GOOGLE_CASES_PER_WORKBOOK = 50;
@@ -98,7 +99,7 @@ async function googleRequest(
   return response;
 }
 
-function scalarResult(cell: unknown, expected: ConformanceResult): ConformanceResult {
+function scalarResult(cell: unknown, expected: ConformanceResult): CellResult {
   if (!isObject(cell)) return { type: "blank" };
   const effective = isObject(cell.effectiveValue) ? cell.effectiveValue : {};
   const formula = isObject(cell.userEnteredValue)
@@ -106,7 +107,11 @@ function scalarResult(cell: unknown, expected: ConformanceResult): ConformanceRe
     : undefined;
   const displayedText = typeof cell.formattedValue === "string" ? cell.formattedValue : undefined;
   const display =
-    expected.displayedText !== undefined && displayedText !== undefined ? { displayedText } : {};
+    "displayedText" in expected &&
+    expected.displayedText !== undefined &&
+    displayedText !== undefined
+      ? { displayedText }
+      : {};
   const source = formula !== undefined ? { formula } : {};
   if (typeof effective.numberValue === "number") {
     return { type: "number", value: effective.numberValue, ...display, ...source };

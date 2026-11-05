@@ -176,6 +176,24 @@ for (const marker of CHROME_MARKERS) {
   }
 }
 
+// The Sort panel is a dynamic entry of its own, apart from the other side
+// panels, so it loads only when it opens. Minifiers keep this panel text.
+const SORT_PANEL_MARKER = "My data has headers";
+const sortPanelKeys = Object.keys(manifest).filter(
+  (key) => manifest[key].isDynamicEntry && manifest[key].src?.endsWith("panels/sort-panel.js"),
+);
+if (sortPanelKeys.length !== 1) {
+  throw new Error(`Expected one lazy Vite Sort panel chunk, got ${sortPanelKeys.length}`);
+}
+if (!(await chunkSource(sortPanelKeys[0])).includes(SORT_PANEL_MARKER)) {
+  throw new Error("The lazy Vite Sort panel chunk does not contain the Sort panel");
+}
+for (const key of [...defaultInitialChunks, ...chromeVisited]) {
+  if (key !== sortPanelKeys[0] && (await chunkSource(key)).includes(SORT_PANEL_MARKER)) {
+    throw new Error(`The Sort panel is also in ${manifest[key].file}`);
+  }
+}
+
 const emitted = await walk(root);
 const publicFiles = emitted
   .map((path) => relative(root, path).replaceAll("\\", "/"))

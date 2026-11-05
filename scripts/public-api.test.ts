@@ -4,15 +4,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
-  analyzePublicApi,
   checkManifestBaseline,
-  findUnusedPublicExports,
   type PublicApiBaseline,
-  type PublicApiManifest,
   publicApiDigest,
   readPublicApiBaseline,
   writePublicApiBaseline,
-} from "./public-api.js";
+} from "./public-api-baseline.js";
+import { findUnusedPublicExports } from "./public-api-usage.js";
+import { analyzePublicApi, type PublicApiManifest } from "./public-api.js";
 
 const roots: string[] = [];
 

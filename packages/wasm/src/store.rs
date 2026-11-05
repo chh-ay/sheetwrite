@@ -31,6 +31,8 @@ use crate::types::{
 use crate::window::ConditionalRules;
 
 mod hidden_rows;
+#[cfg(feature = "analysis")]
+mod model_source;
 mod names;
 pub(crate) mod pivot_output;
 #[cfg(feature = "analysis")]
@@ -220,10 +222,10 @@ impl RangeSnapshot {
     }
 }
 
-const BLOCK_OK: u32 = 0;
-const BLOCK_INVALID: u32 = 1;
+pub(crate) const BLOCK_OK: u32 = 0;
+pub(crate) const BLOCK_INVALID: u32 = 1;
 const BLOCK_SOURCE_INVALID: u32 = 2;
-const BLOCK_RESOURCE_LIMIT: u32 = 3;
+pub(crate) const BLOCK_RESOURCE_LIMIT: u32 = 3;
 
 const MAX_TABLES: usize = 1_024;
 const MAX_TABLE_COLUMNS: usize = 16_384;
@@ -420,7 +422,7 @@ impl CellStore {
         self.mutation_revision
     }
 
-    fn local_dirty_revision(&mut self) -> Option<u64> {
+    pub(crate) fn local_dirty_revision(&mut self) -> Option<u64> {
         if self.loading_page > 0 {
             return None;
         }
@@ -457,7 +459,12 @@ impl CellStore {
     #[wasm_bindgen(js_name = addSheet)]
     pub fn add_sheet(&mut self, n_cols: usize, row_count: usize) -> usize {
         match self.try_add_sheet(n_cols, row_count) {
-            Ok(index) => index,
+            Ok(index) => {
+                // SHEET and SHEETS count the tabs, so volatile formulas
+                // recompute when one is added.
+                self.recompute_with_volatile_sheets(Vec::new());
+                index
+            }
             Err(error) => wasm_bindgen::throw_str(&error),
         }
     }
@@ -474,7 +481,10 @@ impl CellStore {
     ) -> usize {
         match self.try_add_paged_sheet(n_cols, row_count, chunk_rows, byte_budget, max_dirty_cells)
         {
-            Ok(index) => index,
+            Ok(index) => {
+                self.recompute_with_volatile_sheets(Vec::new());
+                index
+            }
             Err(error) => wasm_bindgen::throw_str(&error),
         }
     }
@@ -893,9 +903,9 @@ impl CellStore {
 
         self.sheet_order = Some(Box::new(order.to_vec()));
         let affected = self.refresh_sheet_spans();
-        if !affected.is_empty() {
-            self.recompute_seed_sheets(&affected);
-        }
+        // SHEET and SHEETS read the tab order, so volatile formulas
+        // recompute too.
+        self.recompute_with_volatile_sheets(affected);
         true
     }
 
@@ -2959,7 +2969,7 @@ impl CellStore {
     /// The rectangle is dirtied and its spills detached once, so readers
     /// outside it keep their calculated values and the per-cell writes skip
     /// both the spill scan and the dirty mark.
-    fn replace_range_sources(
+    pub(crate) fn replace_range_sources(
         &mut self,
         sheet: usize,
         start: (usize, usize),

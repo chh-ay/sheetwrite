@@ -602,6 +602,15 @@ function excelDifference(
   return { partial, notes };
 }
 
+/** The issue that tracks an open gap, as a sentence that links it. */
+function trackingIssue(value: unknown, name: string): string {
+  if (value === undefined) return "";
+  if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
+    throw new Error(`Excel function ${name} has an invalid tracking issue`);
+  }
+  return ` Tracked in [#${value}](https://github.com/chh-ay/sheetwrite/issues/${value}).`;
+}
+
 function renderExcelCoverageRow(value: unknown, context: ExcelCoverageContext): string {
   const entry = object(value, "Excel function");
   const name = string(entry.name, "Excel function name");
@@ -620,7 +629,7 @@ function renderExcelCoverageRow(value: unknown, context: ExcelCoverageContext): 
     const exclusion = context.exclusions.get(name);
     const note =
       exclusion === undefined
-        ? "Not registered in either engine."
+        ? `Not registered in either engine.${trackingIssue(entry.issue, name)}`
         : `Unsupported by design: ${exclusion}`;
     return `| [\`${name}\`](${url}) | Not supported | Not supported | ${cell(note)} |`;
   }

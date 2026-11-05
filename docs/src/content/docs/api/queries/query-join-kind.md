@@ -8,7 +8,7 @@ description: "QueryJoinKind type in @sheetwrite/queries: Join kinds retain dupli
 Join kinds retain duplicate matches and match null keys to null keys.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/types.ts#L58"><code>packages/queries/src/types.ts#L58</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/query.d.ts#L32"><code>packages/core/dist/types/query.d.ts#L32</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -41,6 +41,7 @@ export type QueryJoinKind =
 <p class="api-consumers-label">Public exports naming <code>QueryJoinKind</code></p>
 
 <ul class="api-consumer-list">
+<li><a href="/docs/api/core/query-step/"><code>QueryStep</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/queries/query-step/"><code>QueryStep</code></a><span class="api-consumer-kind">@sheetwrite/queries</span></li>
 </ul>
 </div>

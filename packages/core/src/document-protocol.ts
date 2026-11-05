@@ -33,6 +33,8 @@ import {
   validatePivotShape,
 } from "./pivot.js";
 import { compareCodeUnits, isPlainRecord, ownValue, type PlainRecord } from "./plain-data.js";
+import { ROW_ORDER_ENCODING } from "./row-order.js";
+import { validateSavedQueriesShape, validateSavedQueryShape } from "./saved-query.js";
 import { preparedRestore } from "./transaction-preparation.js";
 import type { MergeRange, Range } from "./types/coordinates.js";
 import type {
@@ -1921,6 +1923,11 @@ function validateSheetShape(value: unknown, path: string, errors: DocumentValida
     }
   });
 
+  const sortState = ownValue(sheet, "sortState");
+  if (sortState !== undefined && !validWorkbookTableXmlElement(sortState, "sortState")) {
+    invalid(errors, `${path}.sortState`, "Sort state must be a valid sortState element");
+  }
+
   const filters = optionalArray(sheet, "filters", path, errors);
   filters?.forEach((entry, index) => {
     const filterPath = `${path}.filters[${index}]`;
@@ -2386,6 +2393,17 @@ export function validateDocumentOperationShape(
       optionalBoolean(operation, "style", path, errors);
       break;
 
+    case "permuteRows":
+      validateRangeShape(ownValue(operation, "range"), `${path}.range`, errors);
+      if (ownValue(operation, "encoding") !== ROW_ORDER_ENCODING) {
+        invalid(errors, `${path}.encoding`, "Row order encoding is invalid");
+      }
+
+      if (typeof ownValue(operation, "order") !== "string") {
+        invalid(errors, `${path}.order`, "Row order must be a string");
+      }
+      break;
+
     case "addRows":
     case "removeRows":
       validateOperationSheetId(operation, path, errors);
@@ -2634,6 +2652,14 @@ export function validateDocumentOperationShape(
       break;
 
     case "removeRelationship":
+      requireString(operation, "id", path, errors, true);
+      break;
+
+    case "setQuery":
+      validateSavedQueryShape(ownValue(operation, "query"), `${path}.query`, errors);
+      break;
+
+    case "removeQuery":
       requireString(operation, "id", path, errors, true);
       break;
 
@@ -2995,6 +3021,11 @@ function validateXlsxSource(value: unknown, errors: DocumentValidationError[]): 
       invalid(errors, `${graphPath}.cacheId`, "cacheId must be an unsigned integer string");
     }
 
+    const queries = ownValue(graph, "queries");
+    if (queries !== undefined && (typeof queries !== "string" || !/^[0-9a-f]{16}$/.test(queries))) {
+      invalid(errors, `${graphPath}.queries`, "queries must be a 64-bit hex digest");
+    }
+
     const members = arrayAt(ownValue(graph, "parts"), `${graphPath}.parts`, errors);
     if (
       !members ||
@@ -3164,6 +3195,11 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
     const dataModel = ownValue(workbook, "dataModel");
     if (dataModel !== undefined) {
       validateDataModelShape(dataModel, "workbook.dataModel", errors);
+    }
+
+    const queries = ownValue(workbook, "queries");
+    if (queries !== undefined) {
+      validateSavedQueriesShape(queries, "workbook.queries", errors);
     }
   }
 
@@ -3706,6 +3742,7 @@ export function documentOpTarget(operation: DocumentOp): string {
     case "restoreBlock":
     case "setRangeStyle":
     case "clearRange":
+    case "permuteRows":
       return operation.range.sheet;
 
     case "addTable":
@@ -3757,6 +3794,12 @@ export function documentOpTarget(operation: DocumentOp): string {
 
     case "removeRelationship":
       return `relationship:${operation.id}`;
+
+    case "setQuery":
+      return `query:${operation.query.id}`;
+
+    case "removeQuery":
+      return `query:${operation.id}`;
 
     default: {
       const exhaustive: never = operation;

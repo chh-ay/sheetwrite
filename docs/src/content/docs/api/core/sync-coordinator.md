@@ -28,7 +28,7 @@ async function connect(grid: Grid, adapter: PersistenceAdapter, documentId: stri
 - [SyncCoordinator.recoverConflict](/docs/api/core/sync-coordinator/#sync-coordinator-recover-conflict)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/sync.ts#L345"><code>packages/core/src/sync.ts#L345</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/sync.ts#L263"><code>packages/core/src/sync.ts#L263</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -322,6 +322,6 @@ class SyncCoordinator {
 <p class="api-consumers-label">Public exports naming <code>SyncCoordinator</code></p>
 
 <ul class="api-consumer-list">
-<li>None.</li>
+<li><a href="/docs/api/core-history/history-restore-options/"><code>HistoryRestoreOptions</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>

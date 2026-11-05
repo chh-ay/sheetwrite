@@ -169,7 +169,7 @@ it("reads the focused data cell over its column style under an active sort", () 
     { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 1, col: 0 } },
     { bold: true, fontSize: 20 },
   );
-  grid.sortBy(0, false);
+  grid.setViewSort([{ col: 0, ascending: false }]);
   const sortedRow = Array.from({ length: 5 }, (_, row) => row).find(
     (row) => store.dataRowAt("s1", row) === 1,
   );
@@ -181,7 +181,7 @@ it("reads the focused data cell over its column style under an active sort", () 
 
 it("freezes above the focus view row under a sort and unfreezes at A1", () => {
   const { grid, store, select } = setup();
-  grid.sortBy(0, false);
+  grid.setViewSort([{ col: 0, ascending: false }]);
   const viewRow = Array.from({ length: 5 }, (_, row) => row).find(
     (row) => row > 0 && store.dataRowAt("s1", row) !== row,
   );

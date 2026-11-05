@@ -6,6 +6,9 @@ import { ENGINE_LOADER_FILES } from "./wasm-factory.js";
 
 const COPIED_LOADERS: readonly string[] = ENGINE_LOADER_FILES;
 
+/** Build output directories that the canonical tarballs carry. */
+const GENERATED_DIRECTORIES = ["dist", "pkg", "pkg-history"] as const;
+
 const artifactRoot = resolve(process.argv[2] ?? "test-results/release-artifacts");
 const repositoryRoot = resolve(import.meta.dir, "..");
 const manifest = await verifyReleaseArtifacts(artifactRoot);
@@ -17,15 +20,13 @@ for (const artifact of manifest.packages) {
   // Engine packages other than `@sheetwrite/wasm` get their loaders copied at build time.
   const generatedFiles = artifact.files.filter(
     (file) =>
-      file === "dist" ||
-      file.startsWith("dist/") ||
-      file === "pkg" ||
-      file.startsWith("pkg/") ||
+      GENERATED_DIRECTORIES.some((root) => file === root || file.startsWith(`${root}/`)) ||
       (directory !== "wasm" && COPIED_LOADERS.includes(file)),
   );
   if (generatedFiles.length === 0) continue;
-  await rm(join(packageRoot, "dist"), { recursive: true, force: true });
-  await rm(join(packageRoot, "pkg"), { recursive: true, force: true });
+  for (const root of GENERATED_DIRECTORIES) {
+    await rm(join(packageRoot, root), { recursive: true, force: true });
+  }
   await mkdir(packageRoot, { recursive: true });
   const child = Bun.spawn(
     [

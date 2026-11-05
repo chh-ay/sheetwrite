@@ -250,6 +250,31 @@ window.addEventListener("offline", () => sync.setOnline(false));
 
 IndexedDB record migration is versioned. Unsupported future schemas, blocked upgrades, quota exhaustion, transaction failures, and aborts surface as typed `IndexedDbPendingCommitStorageError` codes. Core continues to work without IndexedDB when no durable adapter is supplied.
 
+## Authors and version history
+
+Set `authorId` in `SyncCoordinatorOptions` to the authenticated ID of the person who edits through the grid. Each new pending commit carries it in `PendingCommit.authorId`, and `IndexedDbPendingCommitStorage` stores it, so a commit restored after a reload keeps the author it was made with. The server must confirm or replace the ID from its own authentication; it must never trust it alone.
+
+A server that records history writes each committed transaction, with its author and commit time, to the history journal in the same database transaction as the operation log, or to a durable transactional outbox in that transaction. Acknowledge the commit only after that write. A journal written from a client event can miss a committed version, so it is not a durable record.
+
+When the server publishes a version, set `VersionedOperation.authorId` and `committedAt`. `SyncCoordinator` validates both, keeps them on `remote-applied` events, and rejects an atomic batch whose members name different authors.
+
+`MemoryPersistenceAdapter.recordHistory(documentId, journal)` is the reference for this contract. It calls the journal as the last step of each commit; when the journal rejects, the commit is not applied, published or acknowledged, and the client keeps it pending. `HistoryArchive` from `@sheetwrite/core/history` implements `CommitJournal`:
+
+```ts prelude="collaboration" partial="requires a loaded snapshot" title="Record history at the reference authority"
+import { MemoryPersistenceAdapter } from "@sheetwrite/core";
+import { HistoryArchive, MemoryHistoryStorage } from "@sheetwrite/core/history";
+
+const authority = new MemoryPersistenceAdapter(snapshot);
+const archive = await HistoryArchive.open({
+  documentId: "workbook-42",
+  storage: new MemoryHistoryStorage(),
+});
+await archive.initialize(snapshot, Date.now());
+authority.recordHistory("workbook-42", archive);
+```
+
+While a journal is attached, a commit without `authorId` is rejected with `commit-rejected`.
+
 ## Remote operations and version gaps
 
 `SyncCoordinator.subscribe` accepts either `RemoteOperationSource` or `AsyncIterable<VersionedOperation>`. Operations apply only at `serverVersion + 1`; own echoed mutation IDs and already acknowledged IDs are deduplicated. Remote application uses `Grid.applyRemoteOperations`, so it does not create outgoing dirty work or local undo entries. Remote row and column inserts and deletes move existing undo entries, so a later undo restores the cell the user edited.
@@ -403,9 +428,25 @@ Two ordering rules keep recovery from losing work:
 
 Presence is advisory UI state. Do not use it for authorization, locking, or conflict prevention.
 
-## Revisions
+## Restoring versions
 
-`RevisionCoordinator` delegates revision listing, loading, and restore to a `RevisionAdapter`. Preview snapshots pass through the optional host schema migrator and mount with `readOnly: true`. Restore requests include `targetVersion`, current `baseVersion`, and a stable mutation ID. The adapter contract requires restore to create a newer auditable server version; it must never rewind database state in place.
+`HistoryArchive.restoreVersion(grid, versionId, scope, { sync })` from `@sheetwrite/core/history` restores a whole workbook, one sheet or one range of a history version. The grid commits it as one local transaction: one undo step, one `change` event, and one pending commit that `SyncCoordinator` sends as one transaction (an atomic batch when it needs several server versions). Every other client applies it as one remote transaction; it does not enter their undo history.
+
+Restore is strict about concurrency. It needs an online coordinator with no pending or conflicted commits, and it is rejected with `conflict` if the grid changes while the version is read. The pending commit carries `PendingCommit.restore` and is never rebased: if two people restore against the same server version, the first commit wins and `recoverConflict()` returns `reload-required` with reason `restore` for the other, who reloads, previews and restores again. See [Restore a version](/docs/features/data/persistence/#restore-a-version) for what each scope covers.
+
+### Migrating from `RevisionCoordinator`
+
+`RevisionCoordinator` and `RevisionAdapter` are removed. Replace them as follows:
+
+| Removed | Use instead |
+| --- | --- |
+| `RevisionAdapter.listRevisions` | `HistoryStorageAdapter` (`list`) behind `HistoryArchive.listVersions` |
+| `RevisionAdapter.loadRevision`, `RevisionCoordinator.preview` | `HistoryArchive.readVersion`, then `createGridFromSnapshot(host, snapshot, { readOnly: true })` |
+| `RevisionAdapter.restoreRevision`, `RevisionCoordinator.restore` | `HistoryArchive.restoreVersion`; the restore is an ordinary commit through `PersistenceAdapter.commit` or `commitBatch` |
+| `RevisionSummary` | `HistoryVersion` |
+| `revision-failed` errors | `HistoryError` codes |
+
+A server that kept revisions as full snapshots can serve them through a `HistoryStorageAdapter`, or start a history archive from its current snapshot with `HistoryArchive.initialize` and record commits with `CommitJournal`.
 
 ## Comments
 

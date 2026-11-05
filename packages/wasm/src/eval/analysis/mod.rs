@@ -1,11 +1,17 @@
 //! Optional function families for the complete analysis engine.
 
 mod aggregate;
+mod bessel;
+mod bytes;
 mod compatibility;
+mod complex;
 mod database;
 mod dates;
+mod depreciation;
 mod descriptive;
+mod discrete;
 mod distributions;
+mod engineering;
 mod finance;
 mod groupby;
 mod hypothesis;
@@ -15,7 +21,9 @@ pub(super) mod math;
 mod matrices;
 mod regression;
 mod reshape;
+mod securities;
 mod text;
+mod units;
 
 use crate::calc::Ast;
 use crate::store::CellStore;
@@ -117,6 +125,13 @@ const FAMILIES: &[Family] = &[
         array: None,
     },
     Family {
+        names: discrete::NAMES,
+        reference_cells: &[],
+        evaluate: Some(discrete::evaluate),
+        evaluate_ast: None,
+        array: None,
+    },
+    Family {
         names: hypothesis::NAMES,
         reference_cells: &[],
         evaluate: Some(hypothesis::evaluate),
@@ -124,9 +139,58 @@ const FAMILIES: &[Family] = &[
         array: None,
     },
     Family {
+        names: engineering::NAMES,
+        reference_cells: &[],
+        evaluate: Some(engineering::evaluate),
+        evaluate_ast: None,
+        array: None,
+    },
+    Family {
+        names: complex::NAMES,
+        reference_cells: &[],
+        evaluate: Some(complex::evaluate),
+        evaluate_ast: None,
+        array: None,
+    },
+    Family {
+        names: bessel::NAMES,
+        reference_cells: &[],
+        evaluate: Some(bessel::evaluate),
+        evaluate_ast: None,
+        array: None,
+    },
+    Family {
+        names: units::NAMES,
+        reference_cells: &[],
+        evaluate: Some(units::evaluate),
+        evaluate_ast: None,
+        array: None,
+    },
+    Family {
+        names: bytes::NAMES,
+        reference_cells: &[],
+        evaluate: Some(bytes::evaluate),
+        evaluate_ast: None,
+        array: None,
+    },
+    Family {
         names: finance::NAMES,
         reference_cells: &[],
         evaluate: Some(finance::evaluate),
+        evaluate_ast: None,
+        array: None,
+    },
+    Family {
+        names: depreciation::NAMES,
+        reference_cells: &[],
+        evaluate: Some(depreciation::evaluate),
+        evaluate_ast: None,
+        array: None,
+    },
+    Family {
+        names: securities::NAMES,
+        reference_cells: &[],
+        evaluate: Some(securities::evaluate),
         evaluate_ast: None,
         array: None,
     },

@@ -393,7 +393,7 @@ export function documentNeighbours(activeHref: string | undefined): DocumentNeig
  * instead; these power in-page cross-links (ShowcasePage next/prev) and the
  * landing/hub link graphs. Every href here is a preserved public URL.
  */
-export const SHOWCASE_NAVIGATION: readonly NavigationPage[] = [
+export const SHOWCASE_NAVIGATION: readonly [NavigationPage, ...NavigationPage[]] = [
   { label: "Vanilla", href: "/vanilla/" },
   { label: "React", href: "/react/" },
   { label: "Vue", href: "/vue/" },

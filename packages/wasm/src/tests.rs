@@ -732,6 +732,54 @@ fn criteria_wildcards_approximate_lookup_and_empty_logic_follow_spreadsheet_sema
     }
 }
 
+/// COUNTIF reads a dense column of number literals from its stored payloads.
+/// Column C holds the same numbers, but its last cell is a formula, so C is
+/// read cell by cell: both reads must count alike for every operator.
+#[test]
+fn countif_over_dense_numbers_counts_like_the_cell_reader() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(12, 8);
+    let numbers = [-1.5, 0.0, -0.0, 2.0, 2.0, 7.0];
+    for (row, value) in numbers.into_iter().enumerate() {
+        store.set_number(sheet, row, 0, value, 0);
+        store.set_number(sheet, row, 1, 3.0 - row as f64, 0);
+        store.set_number(sheet, row, 2, value, 0);
+    }
+    store.set_formula(sheet, numbers.len() - 1, 2, "=7", 0);
+    let cases = [
+        ("2", 2.0),
+        ("\"=2\"", 2.0),
+        ("\"<>2\"", 4.0),
+        ("\"<2\"", 3.0),
+        ("\"<=2\"", 5.0),
+        ("\">2\"", 1.0),
+        ("\">=2\"", 3.0),
+        ("0", 2.0),
+        ("\"a\"", 0.0),
+        ("\"2*\"", 0.0),
+    ];
+    for (index, (criterion, _)) in cases.iter().enumerate() {
+        store.set_formula(sheet, 6, index, &format!("=COUNTIF(A1:A6,{criterion})"), 0);
+        store.set_formula(sheet, 7, index, &format!("=COUNTIF(C1:C6,{criterion})"), 0);
+    }
+    store.set_formula(sheet, 6, cases.len(), "=COUNTIF(A1:B6,\">=2\")", 0);
+    store.recompute(sheet);
+
+    for (index, (criterion, expected)) in cases.into_iter().enumerate() {
+        assert_eq!(
+            number(&store, sheet, 6, index),
+            expected,
+            "dense {criterion}"
+        );
+        assert_eq!(
+            number(&store, sheet, 7, index),
+            expected,
+            "cell reader {criterion}"
+        );
+    }
+    assert_eq!(number(&store, sheet, 6, cases.len()), 5.0);
+}
+
 /// Number text and wildcards each have one rule, so every function that reads
 /// them answers alike: arithmetic and SUM read text the way VALUE does, and
 /// criteria, wildcard lookups and SEARCH match patterns the same way.
@@ -5836,6 +5884,25 @@ mod reference_operators {
 
     fn order(handles: &[usize]) -> Vec<u32> {
         handles.iter().map(|&handle| handle as u32).collect()
+    }
+
+    #[test]
+    fn sheet_numbers_follow_added_and_moved_tabs() {
+        let (mut store, [first, middle, last, summary]) = span_workbook();
+        store.set_formula(summary, 0, 0, "=SHEETS()", 0);
+        store.set_formula(summary, 1, 0, "=SHEET()", 0);
+        store.set_formula(summary, 2, 0, "=SHEET(\"middle\")", 0);
+        store.commit_sources();
+        assert_close(number(&store, summary, 0, 0), 4.0);
+        assert_close(number(&store, summary, 1, 0), 4.0);
+        assert_close(number(&store, summary, 2, 0), 2.0);
+
+        let added = store.add_sheet(2, 2);
+        assert_close(number(&store, summary, 0, 0), 5.0);
+
+        assert!(store.set_sheet_order(&order(&[summary, last, middle, first, added])));
+        assert_close(number(&store, summary, 1, 0), 1.0);
+        assert_close(number(&store, summary, 2, 0), 3.0);
     }
 
     #[test]

@@ -3,9 +3,9 @@
   "testSet": {
     "version": 1,
     "libraryVersion": "0.6.1",
-    "checksum": "b22b04f8b7556cc6fe87361e7932a55b29168064023774a2d26e233b7a09af40",
+    "checksum": "989f68c57553ec787ff3e97cff0a7affa88e081390da3b5752be01b28eefca94",
     "totalTests": 2350,
-    "publishedExamples": 190,
+    "publishedExamples": 235,
     "formulaTests": 2000,
     "editSequenceTests": 250,
     "workbookTests": 100,
@@ -682,6 +682,186 @@
       {
         "value": "function:PPMT",
         "label": "Function · PPMT"
+      },
+      {
+        "value": "function:ACOS",
+        "label": "Function · ACOS"
+      },
+      {
+        "value": "function:ACOSH",
+        "label": "Function · ACOSH"
+      },
+      {
+        "value": "function:ACOT",
+        "label": "Function · ACOT"
+      },
+      {
+        "value": "function:ACOTH",
+        "label": "Function · ACOTH"
+      },
+      {
+        "value": "function:ARABIC",
+        "label": "Function · ARABIC"
+      },
+      {
+        "value": "function:ASIN",
+        "label": "Function · ASIN"
+      },
+      {
+        "value": "function:ASINH",
+        "label": "Function · ASINH"
+      },
+      {
+        "value": "function:ATAN",
+        "label": "Function · ATAN"
+      },
+      {
+        "value": "function:ATAN2",
+        "label": "Function · ATAN2"
+      },
+      {
+        "value": "function:ATANH",
+        "label": "Function · ATANH"
+      },
+      {
+        "value": "function:BASE",
+        "label": "Function · BASE"
+      },
+      {
+        "value": "function:CEILING.PRECISE",
+        "label": "Function · CEILING.PRECISE"
+      },
+      {
+        "value": "function:COS",
+        "label": "Function · COS"
+      },
+      {
+        "value": "function:COSH",
+        "label": "Function · COSH"
+      },
+      {
+        "value": "function:COT",
+        "label": "Function · COT"
+      },
+      {
+        "value": "function:COTH",
+        "label": "Function · COTH"
+      },
+      {
+        "value": "function:CSC",
+        "label": "Function · CSC"
+      },
+      {
+        "value": "function:CSCH",
+        "label": "Function · CSCH"
+      },
+      {
+        "value": "function:DECIMAL",
+        "label": "Function · DECIMAL"
+      },
+      {
+        "value": "function:DEGREES",
+        "label": "Function · DEGREES"
+      },
+      {
+        "value": "function:FLOOR.PRECISE",
+        "label": "Function · FLOOR.PRECISE"
+      },
+      {
+        "value": "function:ISO.CEILING",
+        "label": "Function · ISO.CEILING"
+      },
+      {
+        "value": "function:RADIANS",
+        "label": "Function · RADIANS"
+      },
+      {
+        "value": "function:ROMAN",
+        "label": "Function · ROMAN"
+      },
+      {
+        "value": "function:SEC",
+        "label": "Function · SEC"
+      },
+      {
+        "value": "function:SECH",
+        "label": "Function · SECH"
+      },
+      {
+        "value": "function:SIN",
+        "label": "Function · SIN"
+      },
+      {
+        "value": "function:SINH",
+        "label": "Function · SINH"
+      },
+      {
+        "value": "function:TAN",
+        "label": "Function · TAN"
+      },
+      {
+        "value": "function:TANH",
+        "label": "Function · TANH"
+      },
+      {
+        "value": "function:AVERAGEA",
+        "label": "Function · AVERAGEA"
+      },
+      {
+        "value": "function:MAXA",
+        "label": "Function · MAXA"
+      },
+      {
+        "value": "function:MINA",
+        "label": "Function · MINA"
+      },
+      {
+        "value": "function:STDEVA",
+        "label": "Function · STDEVA"
+      },
+      {
+        "value": "function:STDEVPA",
+        "label": "Function · STDEVPA"
+      },
+      {
+        "value": "function:VARA",
+        "label": "Function · VARA"
+      },
+      {
+        "value": "function:VARPA",
+        "label": "Function · VARPA"
+      },
+      {
+        "value": "function:ERROR.TYPE",
+        "label": "Function · ERROR.TYPE"
+      },
+      {
+        "value": "function:ISEVEN",
+        "label": "Function · ISEVEN"
+      },
+      {
+        "value": "function:ISNONTEXT",
+        "label": "Function · ISNONTEXT"
+      },
+      {
+        "value": "function:ISODD",
+        "label": "Function · ISODD"
+      },
+      {
+        "value": "function:ISREF",
+        "label": "Function · ISREF"
+      },
+      {
+        "value": "function:SHEET",
+        "label": "Function · SHEET"
+      },
+      {
+        "value": "function:SHEETS",
+        "label": "Function · SHEETS"
+      },
+      {
+        "value": "function:INFO",
+        "label": "Function · INFO"
       },
       {
         "value": "function:LOOKUP",
@@ -7439,6 +7619,1476 @@
     },
     {
       "position": 990,
+      "id": "formula.function.acos.normal.1",
+      "label": "ACOS · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "math",
+      "behavior": "shared",
+      "featureValue": "function:ACOS",
+      "featureLabel": "Function · ACOS",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=ACOS(1)=0",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
+      "testChecksum": "3f3c5dce2fbe21063e4a51c550bfa6a21cc4b2d0d86a72697245c5c9941117f3",
+      "observations": []
+    },
+    {
+      "position": 996,
+      "id": "formula.function.acosh.normal.1",
+      "label": "ACOSH · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "math",
+      "behavior": "shared",
+      "featureValue": "function:ACOSH",
+      "featureLabel": "Function · ACOSH",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=ACOSH(1)=0",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
+      "testChecksum": "e17e679f54783f05704e562771686dd523a28cc309d6f596b5c8a5305dc77e80",
+      "observations": []
+    },
+    {
+      "position": 1002,
+      "id": "formula.function.acot.normal.1",
+      "label": "ACOT · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "math",
+      "behavior": "shared",
+      "featureValue": "function:ACOT",
+      "featureLabel": "Function · ACOT",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=ABS(ACOT(0)-PI()/2)<1E-15",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
+      "testChecksum": "652982361646d3a5097ad44c2016fa1dbe325213934dd1e704bc539dca1bb079",
+      "observations": []
+    },
+    {
+      "position": 1008,
+      "id": "formula.function.acoth.normal.1",
+      "label": "ACOTH · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "math",
+      "behavior": "shared",
+      "featureValue": "function:ACOTH",
+      "featureLabel": "Function · ACOTH",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=ABS(COTH(ACOTH(2))-2)<1E-14",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
+      "testChecksum": "762cd38c2aec4fd7817d8205b3f33eb5ee908c73661f30a9a562cdba1be59ad2",
+      "observations": []
+    },
+    {
+      "position": 1014,
+      "id": "formula.function.arabic.normal.1",
+      "label": "ARABIC · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "math",
+      "behavior": "shared",
+      "featureValue": "function:ARABIC",
+      "featureLabel": "Function · ARABIC",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=ARABIC(\"LVII\")=57",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
+      "testChecksum": "61917e59399913a6b95c84970e8754f6f2ff784aa09c135469242505b0cc0a29",
+      "observations": []
+    },
+    {
+      "position": 1020,
+      "id": "formula.function.asin.normal.1",
+      "label": "ASIN · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "math",
+      "behavior": "shared",
+      "featureValue": "function:ASIN",
+      "featureLabel": "Function · ASIN",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=ASIN(0)=0",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
+      "testChecksum": "334de22ef2915d988109b62d0ea6a633da358c5ce0606d1ebba0527eb6ee71ad",
+      "observations": []
+    },
+    {
+      "position": 1026,
+      "id": "formula.function.asinh.normal.1",
+      "label": "ASINH · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "math",
+      "behavior": "shared",
+      "featureValue": "function:ASINH",
+      "featureLabel": "Function · ASINH",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=ASINH(0)=0",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
+      "testChecksum": "4d2ca8a975068edc24ca8500fb9c8b140e3ce8c403d228087388cf74f13e1dc0",
+      "observations": []
+    },
+    {
+      "position": 1032,
+      "id": "formula.function.atan.normal.1",
+      "label": "ATAN · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "math",
+      "behavior": "shared",
+      "featureValue": "function:ATAN",
+      "featureLabel": "Function · ATAN",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=ATAN(0)=0",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
+      "testChecksum": "aaee26d0335f5aacb14bff05aa1a0bbfb596179731ccd01871e75cdbe6b3165d",
+      "observations": []
+    },
+    {
+      "position": 1038,
+      "id": "formula.function.atan2.normal.1",
+      "label": "ATAN2 · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "math",
+      "behavior": "shared",
+      "featureValue": "function:ATAN2",
+      "featureLabel": "Function · ATAN2",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=ABS(ATAN2(1,1)-PI()/4)<1E-15",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
+      "testChecksum": "3391e4db655cd67e1a41a675c1c9ea9e439949dfc0dacaabd01fc5fda0b10024",
+      "observations": []
+    },
+    {
+      "position": 1044,
+      "id": "formula.function.atanh.normal.1",
+      "label": "ATANH · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "math",
+      "behavior": "shared",
+      "featureValue": "function:ATANH",
+      "featureLabel": "Function · ATANH",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=ATANH(0)=0",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
+      "testChecksum": "25b6db37a4b2f2cac0a074d2c758781ff270ef3318f7bd3e21672bd76d8f2f11",
+      "observations": []
+    },
+    {
+      "position": 1050,
+      "id": "formula.function.base.normal.1",
+      "label": "BASE · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "math",
+      "behavior": "shared",
+      "featureValue": "function:BASE",
+      "featureLabel": "Function · BASE",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=BASE(7,2)=\"111\"",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
+      "testChecksum": "659361787fb527703eb5fd898e2e9a90ca71cf1cfce7f2d0c17cc097612a5967",
+      "observations": []
+    },
+    {
+      "position": 1056,
+      "id": "formula.function.ceiling.precise.normal.1",
+      "label": "CEILING.PRECISE · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "math",
+      "behavior": "shared",
+      "featureValue": "function:CEILING.PRECISE",
+      "featureLabel": "Function · CEILING.PRECISE",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=CEILING.PRECISE(4.3)=5",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
+      "testChecksum": "02d905a9b26240d1d469430a7db6c6f52526c5af6e29f1ae410c4af3ccf0c3a3",
+      "observations": []
+    },
+    {
+      "position": 1062,
+      "id": "formula.function.cos.normal.1",
+      "label": "COS · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "math",
+      "behavior": "shared",
+      "featureValue": "function:COS",
+      "featureLabel": "Function · COS",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=COS(0)=1",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
+      "testChecksum": "a673cdc919bb7417f7a4b026781c7b942cf8eac0070a3d7f4ab4764cc2e1e154",
+      "observations": []
+    },
+    {
+      "position": 1068,
+      "id": "formula.function.cosh.normal.1",
+      "label": "COSH · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "math",
+      "behavior": "shared",
+      "featureValue": "function:COSH",
+      "featureLabel": "Function · COSH",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=COSH(0)=1",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
+      "testChecksum": "30692da4990814a005cf8dec9ac897ac4c38ad5c1f576202a5d6358c047c733e",
+      "observations": []
+    },
+    {
+      "position": 1074,
+      "id": "formula.function.cot.normal.1",
+      "label": "COT · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "math",
+      "behavior": "shared",
+      "featureValue": "function:COT",
+      "featureLabel": "Function · COT",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=ABS(COT(PI()/4)-1)<1E-15",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
+      "testChecksum": "09f8716cf55b683926feaa6fd7e3c4df94a85a63e8f9534337e49c53bc69fd0a",
+      "observations": []
+    },
+    {
+      "position": 1080,
+      "id": "formula.function.coth.normal.1",
+      "label": "COTH · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "math",
+      "behavior": "shared",
+      "featureValue": "function:COTH",
+      "featureLabel": "Function · COTH",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=ABS(COTH(1)-COSH(1)/SINH(1))<1E-15",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
+      "testChecksum": "337374167f7388ddb35090a5746c74a97fde725772af62c612def30811cf63e6",
+      "observations": []
+    },
+    {
+      "position": 1086,
+      "id": "formula.function.csc.normal.1",
+      "label": "CSC · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "math",
+      "behavior": "shared",
+      "featureValue": "function:CSC",
+      "featureLabel": "Function · CSC",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=ABS(CSC(PI()/2)-1)<1E-15",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
+      "testChecksum": "7619052e5434074e41b2208c6041de961f3c2fa4a757fc38d651e4c990adf032",
+      "observations": []
+    },
+    {
+      "position": 1092,
+      "id": "formula.function.csch.normal.1",
+      "label": "CSCH · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "math",
+      "behavior": "shared",
+      "featureValue": "function:CSCH",
+      "featureLabel": "Function · CSCH",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=ABS(CSCH(1)*SINH(1)-1)<1E-15",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
+      "testChecksum": "b4d2c1554299e5ba4860518b64a3c8960bbf9f4d02ca878bd1bb601f73645ac6",
+      "observations": []
+    },
+    {
+      "position": 1098,
+      "id": "formula.function.decimal.normal.1",
+      "label": "DECIMAL · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "math",
+      "behavior": "shared",
+      "featureValue": "function:DECIMAL",
+      "featureLabel": "Function · DECIMAL",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=DECIMAL(\"FF\",16)=255",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
+      "testChecksum": "b81a5fbfbab79a379ddcc525c25d69ff6b3531de96a081481ec7782423909e08",
+      "observations": []
+    },
+    {
+      "position": 1104,
+      "id": "formula.function.degrees.normal.1",
+      "label": "DEGREES · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "math",
+      "behavior": "shared",
+      "featureValue": "function:DEGREES",
+      "featureLabel": "Function · DEGREES",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=DEGREES(PI())=180",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
+      "testChecksum": "d6fe09abf78f6dad0621827aa78e5f3f288b01933f90d78de9c9e1aadeda4c4c",
+      "observations": []
+    },
+    {
+      "position": 1110,
+      "id": "formula.function.floor.precise.normal.1",
+      "label": "FLOOR.PRECISE · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "math",
+      "behavior": "shared",
+      "featureValue": "function:FLOOR.PRECISE",
+      "featureLabel": "Function · FLOOR.PRECISE",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=FLOOR.PRECISE(3.2)=3",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
+      "testChecksum": "c0f9e4bfe9a941af85219ab03b3ad425ae8176f30c34d3a2aeb9bc912757712c",
+      "observations": []
+    },
+    {
+      "position": 1116,
+      "id": "formula.function.iso.ceiling.normal.1",
+      "label": "ISO.CEILING · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "math",
+      "behavior": "shared",
+      "featureValue": "function:ISO.CEILING",
+      "featureLabel": "Function · ISO.CEILING",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=ISO.CEILING(4.3,-2)=6",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
+      "testChecksum": "653cebd95489c9629f6ab999843e43997086cb646c8c73ce465fbffc32e02407",
+      "observations": []
+    },
+    {
+      "position": 1122,
+      "id": "formula.function.radians.normal.1",
+      "label": "RADIANS · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "math",
+      "behavior": "shared",
+      "featureValue": "function:RADIANS",
+      "featureLabel": "Function · RADIANS",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=ABS(RADIANS(180)-PI())<1E-15",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
+      "testChecksum": "07e2de3c0b16964445e8d478fbd1effd1dedf760a4293815cb7b49a80675d3b4",
+      "observations": []
+    },
+    {
+      "position": 1128,
+      "id": "formula.function.roman.normal.1",
+      "label": "ROMAN · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "math",
+      "behavior": "shared",
+      "featureValue": "function:ROMAN",
+      "featureLabel": "Function · ROMAN",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=ROMAN(499)=\"CDXCIX\"",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
+      "testChecksum": "7e76d63204f316029a7061dfbb105b82c53bb21860b861abf16fe07efd8a7ebb",
+      "observations": []
+    },
+    {
+      "position": 1134,
+      "id": "formula.function.sec.normal.1",
+      "label": "SEC · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "math",
+      "behavior": "shared",
+      "featureValue": "function:SEC",
+      "featureLabel": "Function · SEC",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=SEC(0)=1",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
+      "testChecksum": "644d2562bcd30321959da6ad9a33f40057c738943ede69a1f831f488c06c9650",
+      "observations": []
+    },
+    {
+      "position": 1140,
+      "id": "formula.function.sech.normal.1",
+      "label": "SECH · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "math",
+      "behavior": "shared",
+      "featureValue": "function:SECH",
+      "featureLabel": "Function · SECH",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=SECH(0)=1",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
+      "testChecksum": "2d44c9cdda6c8581f445f2be04bf6d5f1e0c1cd6b0fe72c4c5604c90422d1bfc",
+      "observations": []
+    },
+    {
+      "position": 1146,
+      "id": "formula.function.sin.normal.1",
+      "label": "SIN · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "math",
+      "behavior": "shared",
+      "featureValue": "function:SIN",
+      "featureLabel": "Function · SIN",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=SIN(0)=0",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
+      "testChecksum": "e3dec9a576cd1100070d8275e5fe469c316a3ae2fb3a950df3d8eccd4c0f58f4",
+      "observations": []
+    },
+    {
+      "position": 1152,
+      "id": "formula.function.sinh.normal.1",
+      "label": "SINH · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "math",
+      "behavior": "shared",
+      "featureValue": "function:SINH",
+      "featureLabel": "Function · SINH",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=SINH(0)=0",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
+      "testChecksum": "fc8c3b844efadddc2d97e515c6a857687d4b3da1ccdd77ccb0c493cd5ba6889c",
+      "observations": []
+    },
+    {
+      "position": 1158,
+      "id": "formula.function.tan.normal.1",
+      "label": "TAN · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "math",
+      "behavior": "shared",
+      "featureValue": "function:TAN",
+      "featureLabel": "Function · TAN",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=TAN(0)=0",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
+      "testChecksum": "fb03eecf518f898b58b3d1716d5a5e63eddf500df9bdc69a84fa623f0a513e45",
+      "observations": []
+    },
+    {
+      "position": 1164,
+      "id": "formula.function.tanh.normal.1",
+      "label": "TANH · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "math",
+      "behavior": "shared",
+      "featureValue": "function:TANH",
+      "featureLabel": "Function · TANH",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=TANH(0)=0",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 8,
+      "evidenceIndex": 11,
+      "testChecksum": "5816b29dfb1388845bea452453e27ed1e9cacaab808077b330ee694fccc8b408",
+      "observations": []
+    },
+    {
+      "position": 1170,
+      "id": "formula.function.averagea.normal.1",
+      "label": "AVERAGEA · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "statistical",
+      "behavior": "shared",
+      "featureValue": "function:AVERAGEA",
+      "featureLabel": "Function · AVERAGEA",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=AVERAGEA(1,TRUE)=1",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
+      "testChecksum": "e0b18748e4109c86070c85c922ec29e77e7c818d18f37adb67d6d98b186de9cd",
+      "observations": []
+    },
+    {
+      "position": 1176,
+      "id": "formula.function.maxa.normal.1",
+      "label": "MAXA · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "statistical",
+      "behavior": "shared",
+      "featureValue": "function:MAXA",
+      "featureLabel": "Function · MAXA",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=MAXA(-1,TRUE)=1",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
+      "testChecksum": "fd0df7dd6e5adf4c4416e9b0a7077b01a64b7a877673bffef009da5ca29f9cca",
+      "observations": []
+    },
+    {
+      "position": 1182,
+      "id": "formula.function.mina.normal.1",
+      "label": "MINA · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "statistical",
+      "behavior": "shared",
+      "featureValue": "function:MINA",
+      "featureLabel": "Function · MINA",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=MINA(2,TRUE)=1",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
+      "testChecksum": "1be977bcc155d6d57731cb57cb802fc2a536a3b82636b961add0f12d004a9185",
+      "observations": []
+    },
+    {
+      "position": 1188,
+      "id": "formula.function.stdeva.normal.1",
+      "label": "STDEVA · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "statistical",
+      "behavior": "shared",
+      "featureValue": "function:STDEVA",
+      "featureLabel": "Function · STDEVA",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=STDEVA(1,3)=SQRT(2)",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
+      "testChecksum": "89ae5d2967bc4a3de39fa629a09c41f4bb7866277687529d35e898e8c38edb2c",
+      "observations": []
+    },
+    {
+      "position": 1194,
+      "id": "formula.function.stdevpa.normal.1",
+      "label": "STDEVPA · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "statistical",
+      "behavior": "shared",
+      "featureValue": "function:STDEVPA",
+      "featureLabel": "Function · STDEVPA",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=STDEVPA(1,3)=1",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
+      "testChecksum": "29ea9fc73864ec93d5052dc0b1cbd26fb67694f4f74a90d1293e276b3375b0cb",
+      "observations": []
+    },
+    {
+      "position": 1200,
+      "id": "formula.function.vara.normal.1",
+      "label": "VARA · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "statistical",
+      "behavior": "shared",
+      "featureValue": "function:VARA",
+      "featureLabel": "Function · VARA",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=VARA(1,3)=2",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
+      "testChecksum": "5f04eae9f65bfceb6edc2fbc01988d69beb7ac5f86843c5a4eb3ff9823a1f05e",
+      "observations": []
+    },
+    {
+      "position": 1206,
+      "id": "formula.function.varpa.normal.1",
+      "label": "VARPA · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "statistical",
+      "behavior": "shared",
+      "featureValue": "function:VARPA",
+      "featureLabel": "Function · VARPA",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=VARPA(1,3)=1",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
+      "testChecksum": "4384e494fa81c9266a93fe5c71d02cacbd58c789b8beeda70afd0339315c99a1",
+      "observations": []
+    },
+    {
+      "position": 1212,
+      "id": "formula.function.error.type.normal.1",
+      "label": "ERROR.TYPE · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "information-error",
+      "behavior": "shared",
+      "featureValue": "function:ERROR.TYPE",
+      "featureLabel": "Function · ERROR.TYPE",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=ERROR.TYPE(1/0)=2",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 11,
+      "evidenceIndex": 11,
+      "testChecksum": "8faf3e0e048cda5c3394747e8584587697ba30d7062bf2dfef6ae0fc76359bfa",
+      "observations": []
+    },
+    {
+      "position": 1218,
+      "id": "formula.function.iseven.normal.1",
+      "label": "ISEVEN · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "information-error",
+      "behavior": "shared",
+      "featureValue": "function:ISEVEN",
+      "featureLabel": "Function · ISEVEN",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=ISEVEN(2.5)",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 11,
+      "evidenceIndex": 11,
+      "testChecksum": "87d753a30c8659701f2aa50ccf4e132012f9d72697c1a003ab4e740d9ced90eb",
+      "observations": []
+    },
+    {
+      "position": 1224,
+      "id": "formula.function.isnontext.normal.1",
+      "label": "ISNONTEXT · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "information-error",
+      "behavior": "shared",
+      "featureValue": "function:ISNONTEXT",
+      "featureLabel": "Function · ISNONTEXT",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=ISNONTEXT(1)",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 11,
+      "evidenceIndex": 11,
+      "testChecksum": "caad18e3823b97a5cb45a18f5644fdd0f11f20625d9677f1ee0ee65613986810",
+      "observations": []
+    },
+    {
+      "position": 1230,
+      "id": "formula.function.isodd.normal.1",
+      "label": "ISODD · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "information-error",
+      "behavior": "shared",
+      "featureValue": "function:ISODD",
+      "featureLabel": "Function · ISODD",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=ISODD(5)",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 11,
+      "evidenceIndex": 11,
+      "testChecksum": "d0c3f7c6268ab507d0a6b26a1519fd0a5fc145f0612b856a846e137e674e1cba",
+      "observations": []
+    },
+    {
+      "position": 1236,
+      "id": "formula.function.isref.normal.1",
+      "label": "ISREF · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "information-error",
+      "behavior": "shared",
+      "featureValue": "function:ISREF",
+      "featureLabel": "Function · ISREF",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=ISREF(A1)",
+      "target": "D4",
+      "inputs": [
+        {
+          "cell": "A1",
+          "value": -100
+        },
+        {
+          "cell": "A2",
+          "value": 60
+        },
+        {
+          "cell": "A3",
+          "value": 60
+        },
+        {
+          "cell": "B1",
+          "value": 1
+        },
+        {
+          "cell": "B2",
+          "value": 2
+        },
+        {
+          "cell": "B3",
+          "value": 3
+        }
+      ],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 11,
+      "evidenceIndex": 11,
+      "testChecksum": "16c29f2f355c62d7c4c8405f3787ccbc937a43d31d561b1b656450b4d3bae97c",
+      "observations": []
+    },
+    {
+      "position": 1242,
+      "id": "formula.function.sheet.normal.1",
+      "label": "SHEET · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "information-error",
+      "behavior": "shared",
+      "featureValue": "function:SHEET",
+      "featureLabel": "Function · SHEET",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=SHEET()=1",
+      "target": "D4",
+      "inputs": [
+        {
+          "cell": "A1",
+          "value": -100
+        },
+        {
+          "cell": "A2",
+          "value": 60
+        },
+        {
+          "cell": "A3",
+          "value": 60
+        },
+        {
+          "cell": "B1",
+          "value": 1
+        },
+        {
+          "cell": "B2",
+          "value": 2
+        },
+        {
+          "cell": "B3",
+          "value": 3
+        }
+      ],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 11,
+      "evidenceIndex": 11,
+      "testChecksum": "9a71f52204943670181d96dcbc5d5b85909cb66765aea0d80d86faec32e7a06f",
+      "observations": []
+    },
+    {
+      "position": 1248,
+      "id": "formula.function.sheets.normal.1",
+      "label": "SHEETS · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "information-error",
+      "behavior": "shared",
+      "featureValue": "function:SHEETS",
+      "featureLabel": "Function · SHEETS",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=SHEETS()>=1",
+      "target": "D4",
+      "inputs": [
+        {
+          "cell": "A1",
+          "value": -100
+        },
+        {
+          "cell": "A2",
+          "value": 60
+        },
+        {
+          "cell": "A3",
+          "value": 60
+        },
+        {
+          "cell": "B1",
+          "value": 1
+        },
+        {
+          "cell": "B2",
+          "value": 2
+        },
+        {
+          "cell": "B3",
+          "value": 3
+        }
+      ],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 11,
+      "evidenceIndex": 11,
+      "testChecksum": "da0635d49a5d245ed2908295c2be8b3f4081ab9d60faac5b2b4d7d96d966a048",
+      "observations": []
+    },
+    {
+      "position": 1254,
+      "id": "formula.function.info.normal.1",
+      "label": "INFO · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "information-error",
+      "behavior": "shared",
+      "featureValue": "function:INFO",
+      "featureLabel": "Function · INFO",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=INFO(\"recalc\")=\"Automatic\"",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 11,
+      "evidenceIndex": 11,
+      "testChecksum": "49b7271490413faefd416808ba8685d3db261908f47302f96af579b02f3ec2ad",
+      "observations": []
+    },
+    {
+      "position": 1260,
       "id": "formula.function.lookup.normal.1",
       "label": "LOOKUP · Normal",
       "kind": "formula",
@@ -7494,7 +9144,7 @@
       "observations": []
     },
     {
-      "position": 996,
+      "position": 1266,
       "id": "formula.function.trimrange.normal.1",
       "label": "TRIMRANGE · Normal",
       "kind": "formula",
@@ -7550,7 +9200,7 @@
       "observations": []
     },
     {
-      "position": 1008,
+      "position": 1278,
       "id": "formula.operator.subtract.normal.1",
       "label": "subtract · Normal",
       "kind": "formula",
@@ -7581,7 +9231,7 @@
       "observations": []
     },
     {
-      "position": 1020,
+      "position": 1290,
       "id": "formula.operator.divide.normal.1",
       "label": "divide · Normal",
       "kind": "formula",
@@ -7612,7 +9262,7 @@
       "observations": []
     },
     {
-      "position": 1026,
+      "position": 1296,
       "id": "formula.operator.power.normal.1",
       "label": "power · Normal",
       "kind": "formula",
@@ -7643,7 +9293,7 @@
       "observations": []
     },
     {
-      "position": 1032,
+      "position": 1302,
       "id": "formula.operator.concatenate.normal.1",
       "label": "concatenate · Normal",
       "kind": "formula",
@@ -7674,7 +9324,7 @@
       "observations": []
     },
     {
-      "position": 1038,
+      "position": 1308,
       "id": "formula.operator.equal.normal.1",
       "label": "equal · Normal",
       "kind": "formula",
@@ -7705,7 +9355,7 @@
       "observations": []
     },
     {
-      "position": 1044,
+      "position": 1314,
       "id": "formula.operator.not-equal.normal.1",
       "label": "not-equal · Normal",
       "kind": "formula",
@@ -7736,7 +9386,7 @@
       "observations": []
     },
     {
-      "position": 1050,
+      "position": 1320,
       "id": "formula.operator.less-than.normal.1",
       "label": "less-than · Normal",
       "kind": "formula",
@@ -7767,7 +9417,7 @@
       "observations": []
     },
     {
-      "position": 1056,
+      "position": 1326,
       "id": "formula.operator.less-than-or-equal.normal.1",
       "label": "less-than-or-equal · Normal",
       "kind": "formula",
@@ -7798,7 +9448,7 @@
       "observations": []
     },
     {
-      "position": 1062,
+      "position": 1332,
       "id": "formula.operator.greater-than.normal.1",
       "label": "greater-than · Normal",
       "kind": "formula",
@@ -7829,7 +9479,7 @@
       "observations": []
     },
     {
-      "position": 1068,
+      "position": 1338,
       "id": "formula.operator.greater-than-or-equal.normal.1",
       "label": "greater-than-or-equal · Normal",
       "kind": "formula",
@@ -7860,7 +9510,7 @@
       "observations": []
     },
     {
-      "position": 1074,
+      "position": 1344,
       "id": "formula.operator.percent.normal.1",
       "label": "percent · Normal",
       "kind": "formula",
@@ -7891,7 +9541,7 @@
       "observations": []
     },
     {
-      "position": 1080,
+      "position": 1350,
       "id": "formula.operator.unary-plus.normal.1",
       "label": "unary-plus · Normal",
       "kind": "formula",
@@ -7922,7 +9572,7 @@
       "observations": []
     },
     {
-      "position": 1086,
+      "position": 1356,
       "id": "formula.operator.unary-minus.normal.1",
       "label": "unary-minus · Normal",
       "kind": "formula",
@@ -7953,7 +9603,7 @@
       "observations": []
     },
     {
-      "position": 1092,
+      "position": 1362,
       "id": "formula.operator.intersection.normal.1",
       "label": "intersection · Normal",
       "kind": "formula",
@@ -8009,7 +9659,7 @@
       "observations": []
     },
     {
-      "position": 1098,
+      "position": 1368,
       "id": "formula.operator.union.normal.1",
       "label": "union · Normal",
       "kind": "formula",

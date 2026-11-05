@@ -3,6 +3,7 @@
 
 import type { CellScalar } from "./cell.js";
 import type { CellAddress, Range } from "./coordinates.js";
+import type { TableColumnRef } from "./data-model.js";
 import type { WorkbookTableId } from "./table.js";
 
 /** Aggregation applied to one value field. Semantics match PIVOTBY's aggregations. */
@@ -22,6 +23,9 @@ export type PivotAggregation =
  *   fields, and field `i` is the column `range.start.col + i`.
  * - A table source names a workbook table by its stable `WorkbookTable.id`.
  *   Field `i` is table column `i`; header and totals rows are excluded.
+ * - A model source has one base table (the many side). Field `i` names
+ *   `model.fields[i]` by stable table and column IDs. Other tables must be
+ *   reachable from the base by following many-to-one relationships.
  *
  * When the source disappears (its sheet, its table, or every source row or
  * column is deleted), core sets `invalid: true` and keeps the reference
@@ -29,7 +33,8 @@ export type PivotAggregation =
  */
 export type PivotSource =
   | { range: Range; invalid?: true }
-  | { table: WorkbookTableId; invalid?: true };
+  | { table: WorkbookTableId; invalid?: true }
+  | { model: { table: WorkbookTableId; fields: TableColumnRef[] }; invalid?: true };
 
 /** One aggregated value field. `name` replaces the default caption. */
 export interface PivotValueField {

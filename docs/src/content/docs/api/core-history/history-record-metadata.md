@@ -8,7 +8,7 @@ description: "HistoryRecordMetadata interface in @sheetwrite/core/history: Metad
 Metadata for one immutable record; listings never return payload bytes.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/types.ts#L152"><code>packages/core/src/version-history/types.ts#L152</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/types.ts#L143"><code>packages/core/src/version-history/types.ts#L143</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>

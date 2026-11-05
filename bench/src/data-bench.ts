@@ -893,7 +893,7 @@ async function benchSheetwrite(
 
   // (d) sort / (e) filter — WASM ops returning a view order; reset between runs.
   const reset: Pick<MeasureOptions, "after"> = { after: () => store.clearView(SHEET) };
-  stats.sort = measure(() => store.sortBy(SHEET, SORT_COL, true), {
+  stats.sort = measure(() => store.setViewSort(SHEET, [{ col: SORT_COL, ascending: true }]), {
     ...plan("sort", rows),
     ...reset,
   });
@@ -955,11 +955,11 @@ async function benchSheetwrite(
     // second sort key. The grouped fixture repeats the leading key on purpose.
     const fixture = makeGroupedCustomerFixture(rows);
     const groupedStore = makeGroupedCustomerStore(ds, fixture);
-    queries["sort-multi-key"] = measure(() => groupedStore.sortByMulti(SHEET, MULTI_KEY_SORT), {
+    queries["sort-multi-key"] = measure(() => groupedStore.setViewSort(SHEET, MULTI_KEY_SORT), {
       ...plan("sort-multi-key", rows),
-      after: () => groupedStore.sortByMulti(SHEET, []),
+      after: () => groupedStore.setViewSort(SHEET, []),
     });
-    groupedStore.sortByMulti(SHEET, MULTI_KEY_SORT);
+    groupedStore.setViewSort(SHEET, MULTI_KEY_SORT);
     assertViewMatchesRows(
       `sort-multi-key ${rows}`,
       groupedStore,
@@ -973,11 +973,14 @@ async function benchSheetwrite(
   // One key over the candidate rows a city filter leaves behind.
   if (measures("sort-with-candidates")) {
     queryStore.setColumnFilter(SHEET, FILTER_COL, { kind: "contains", text: FILTER_NEEDLE });
-    queries["sort-with-candidates"] = measure(() => queryStore.sortBy(SHEET, SORT_COL, true), {
-      ...plan("sort-with-candidates", rows),
-      after: () => queryStore.sortByMulti(SHEET, []),
-    });
-    queryStore.sortBy(SHEET, SORT_COL, true);
+    queries["sort-with-candidates"] = measure(
+      () => queryStore.setViewSort(SHEET, [{ col: SORT_COL, ascending: true }]),
+      {
+        ...plan("sort-with-candidates", rows),
+        after: () => queryStore.setViewSort(SHEET, []),
+      },
+    );
+    queryStore.setViewSort(SHEET, [{ col: SORT_COL, ascending: true }]);
     assertViewMatchesRows(
       `sort-with-candidates ${rows}`,
       queryStore,
@@ -1217,13 +1220,13 @@ function warmSheetwriteDataPath(): void {
     });
   }
 
-  store.sortBy(SHEET, SORT_COL, true);
+  store.setViewSort(SHEET, [{ col: SORT_COL, ascending: true }]);
   store.clearView(SHEET);
   const smallRows = 1_000;
   const smallDs = makeColumnar(smallRows);
   const smallStore = new SheetwriteStore(makeWorkbook(smallRows), toSheetwriteColumnar(smallDs));
-  smallStore.sortBy(SHEET, SORT_COL, true);
-  smallStore.sortByMulti(SHEET, MULTI_KEY_SORT);
+  smallStore.setViewSort(SHEET, [{ col: SORT_COL, ascending: true }]);
+  smallStore.setViewSort(SHEET, MULTI_KEY_SORT);
   smallStore.setColumnFilter(SHEET, COL.customer, {
     kind: "values",
     values: smallDs.customer.slice(0, 8),

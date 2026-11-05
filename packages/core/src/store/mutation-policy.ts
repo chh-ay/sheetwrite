@@ -273,6 +273,7 @@ export class StoreMutationPolicy {
       case "restoreBlock":
       case "setRangeStyle":
       case "clearRange":
+      case "permuteRows":
         return [normalizedRange(patch.range)];
 
       case "addMerge":
@@ -350,6 +351,8 @@ export class StoreMutationPolicy {
       case "setCalculation":
       case "setRelationship":
       case "removeRelationship":
+      case "setQuery":
+      case "removeQuery":
       case "setPivot":
       case "removePivot":
       // A chart only reads its sources, so protection and validation never apply.

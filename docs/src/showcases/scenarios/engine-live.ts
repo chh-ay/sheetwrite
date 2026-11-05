@@ -15,6 +15,7 @@ import { createGrid, initSheetwrite } from "@sheetwrite/core";
 import { errorText } from "../../lib/errors.js";
 import { formatBytes } from "../../lib/format.js";
 import { observeSiteTheme } from "../../lib/site-theme.js";
+import type { RenderingMode } from "../ui/rendering-mode.js";
 import {
   createEngineLiveWorkbook,
   ENGINE_ACCOUNT_ROWS,
@@ -49,7 +50,6 @@ const ENGINE_LIVE_THEME: Partial<Theme> = {
   rowHeaderWidth: 48,
 };
 
-export type EngineRenderer = "canvas" | "worker";
 export type EngineAction = "jump" | "edit" | "undo" | "save" | "renderer";
 export type EngineResourceReason = "load" | "jump" | "edit" | "undo" | "save";
 
@@ -119,8 +119,8 @@ export type EngineEvent =
     })
   | (EngineEventBase & {
       readonly type: "renderer";
-      readonly requested: EngineRenderer;
-      readonly active: EngineRenderer;
+      readonly requested: RenderingMode;
+      readonly active: RenderingMode;
       readonly fallback: string | null;
     })
   | (EngineEventBase & {
@@ -182,7 +182,13 @@ function createEngineTrace(limit = ENGINE_TRACE_LIMIT): EngineTrace {
       events.fill(undefined as never);
     },
     snapshot() {
-      return Array.from({ length: size }, (_, index) => events[(start + index) % limit]!);
+      const retained = [];
+      for (let index = 0; index < size; index++) {
+        const event = events[(start + index) % limit];
+        if (event !== undefined) retained.push(event);
+      }
+
+      return retained;
     },
     get size() {
       return size;
@@ -280,7 +286,7 @@ interface EngineDependencySnapshot {
 }
 
 interface EngineEventBindings {
-  announceRenderer(requested: EngineRenderer, fallback?: string | null): void;
+  announceRenderer(requested: RenderingMode, fallback?: string | null): void;
   announceResult(
     action: "edit" | "undo" | "grid-edit",
     status: "noop" | "rejected" | "conflict",
@@ -572,8 +578,8 @@ function nextEngineFrame(signal: AbortSignal): Promise<void> {
 
 export interface EngineScenarioSnapshot {
   readonly events: readonly EngineEvent[];
-  readonly requestedRenderer: EngineRenderer;
-  readonly activeRenderer: EngineRenderer;
+  readonly requestedRenderer: RenderingMode;
+  readonly activeRenderer: RenderingMode;
   readonly rendererFallback: string | null;
   readonly ready: boolean;
   readonly error: string | null;
@@ -593,7 +599,7 @@ export interface EngineScenarioSnapshot {
 /** Owns the live story and its ordering; React only subscribes and presents it. */
 export function createEngineScenario(
   host: HTMLElement,
-  options: { workerUrl: string; narrow?: () => boolean; renderer?: EngineRenderer },
+  options: { workerUrl: string; narrow?: () => boolean; renderer?: RenderingMode },
 ): EngineScenario {
   const trace = createEngineTrace();
   const saver = createEngineHostSaver();
@@ -1068,7 +1074,7 @@ export function createEngineScenario(
     grid: () => grid,
     traceLength: () => trace.size,
     run: executeAction,
-    requestRenderer(renderer: EngineRenderer) {
+    requestRenderer(renderer: RenderingMode) {
       if (disposed || renderer === state.requestedRenderer) return;
       set("requestedRenderer", renderer);
       start();
@@ -1092,7 +1098,7 @@ export interface EngineScenario {
   grid(): Grid | null;
   traceLength(): number;
   run(action: EngineAction, rowInput?: string): Promise<void>;
-  requestRenderer(renderer: EngineRenderer): void;
+  requestRenderer(renderer: RenderingMode): void;
   followChange(): Promise<void>;
   rewriteFormula(): void;
   reset(): void;
