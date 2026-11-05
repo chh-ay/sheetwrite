@@ -1,0 +1,96 @@
+/* ---- Benchmarks -------------------------------------------------------------- */
+
+.sw-bench {
+  overflow: hidden;
+  border: 1px solid var(--sw-border-strong);
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--sw-surface-1) 92%, transparent);
+}
+
+.sw-bench__bars {
+  display: grid;
+  margin: 0;
+  padding: 0.5rem 1.5rem;
+  list-style: none;
+}
+
+.sw-bench__bars li {
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr) 5.5rem;
+  gap: 0.4rem 1.25rem;
+  align-items: center;
+  padding: 1rem 0;
+}
+
+.sw-bench__bars li + li {
+  border-top: 1px solid var(--sw-border);
+}
+
+.sw-bench__size {
+  color: var(--sw-fg-muted);
+  font: 600 var(--sw-type-sm) / 1 var(--sw-font-mono);
+}
+
+.sw-bench__track {
+  height: 0.6rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sw-fg) 8%, transparent);
+}
+
+.sw-bench__track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--sw-accent), var(--sw-accent-strong));
+  animation: sw-bench-grow 1.4s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.sw-bench__bars strong {
+  color: var(--sw-accent-strong);
+  font: 700 1.35rem / 1 var(--sw-font-display);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.sw-bench__detail {
+  grid-column: 2 / -1;
+  color: var(--sw-fg-dim);
+  font-size: var(--sw-type-xs);
+}
+
+.sw-bench__scale {
+  margin: 0;
+  padding: 0 1.5rem 0.9rem;
+  color: var(--sw-fg-dim);
+  font-size: var(--sw-type-xs);
+}
+
+.sw-bench__capture {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 0;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--sw-border);
+  background: color-mix(in srgb, var(--sw-surface-0) 60%, transparent);
+}
+
+.sw-bench__capture dt {
+  color: var(--sw-fg-dim);
+  font: 650 var(--sw-type-xs) / 1.3 var(--sw-font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sw-bench__capture dd {
+  margin: 0.25rem 0 0;
+  color: var(--sw-fg);
+  font-size: var(--sw-type-sm);
+}
+
+@keyframes sw-bench-grow {
+  from {
+    width: 0;
+  }
+}
