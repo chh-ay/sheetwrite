@@ -26,7 +26,11 @@ import {
 } from "../dashboard.js";
 import {
   type DataModelIssue,
+  findMeasure,
   findRelationship,
+  validateMeasureAdmission,
+  withMeasure,
+  withoutMeasure,
   validateRelationshipAdmission,
   withoutRelationship,
   withRelationship,
@@ -205,11 +209,6 @@ import { StoreSnapshotCodec } from "./snapshot-codec.js";
 import { StoreViewState } from "./view-state.js";
 import type { RecomputingCellStore } from "./wasm-contract.js";
 import { StoreWindowReader } from "./window-reader.js";
-/**
- * Cell kinds cross the WASM boundary in bulk paths here.
- * Shared tags keep these encodings aligned with window reads
- * and the paint worker.
- */
 import {
   KIND_BOOL,
   KIND_FORMULA,
@@ -1131,15 +1130,6 @@ export class StoreDataEngine {
     this.pivotSheetsDirty.clear();
   }
 
-  private spillAnchor(addr: CellAddress): CellAddress | null {
-    const handle = this.sheets.handleOf(addr.sheet);
-    const row = this.wasm.spillAnchorRow(handle, addr.row, addr.col);
-    if (row === NO_CELL_COORDINATE) return null;
-    const col = this.wasm.spillAnchorCol(handle, addr.row, addr.col);
-    if (col === NO_CELL_COORDINATE) return null;
-    return { sheet: addr.sheet, row, col };
-  }
-
   private admitsSourceRange(range: Range): boolean {
     const bounds = normalizedRange(range);
     return this.wasm.admitSourceRange(
@@ -1174,9 +1164,11 @@ export class StoreDataEngine {
   }
 
   /**
-   * Sends every relationship of `model` to an engine that checks keys.
-   * Returns false when the engine refuses them; an engine without the call
-   * keeps them only in the workbook.
+   * Sends every relationship and measure of `model` to an engine that
+   * computes model pivots. A measure travels as a relationship record with
+   * an empty one-side table: `[id, homeTable, formula, "", name]`. Returns
+   * false when the engine refuses them; an engine without the call keeps
+   * them only in the workbook.
    */
   private syncRelationships(
     model: DataModel | undefined,
@@ -1190,6 +1182,9 @@ export class StoreDataEngine {
       relationship.to.table,
       relationship.to.column,
     ]);
+    for (const measure of model?.measures ?? []) {
+      strings.push(measure.id, measure.table, measure.formula, "", measure.name);
+    }
     return wasm.setRelationships(strings);
   }
 
@@ -1791,7 +1786,7 @@ export class StoreDataEngine {
       const range = savedOutputRange(sheet, pivot);
       if (!range) continue;
       // An installed output owns its anchor; a blocked one does not.
-      const owner = this.spillAnchor({ sheet, row: range.start.row, col: range.start.col });
+      const owner = this.getSpillAnchor({ sheet, row: range.start.row, col: range.start.col });
       if (owner && owner.row === range.start.row && owner.col === range.start.col) {
         outputs.push({ id: pivot.id, range });
       }
@@ -1820,7 +1815,7 @@ export class StoreDataEngine {
     if (!record) {
       const result = uncomputedPivotResult(sheet, pivot);
       if (!pivot.savedOutput) return result;
-      const owner = this.spillAnchor({ sheet, ...pivot.anchor });
+      const owner = this.getSpillAnchor({ sheet, ...pivot.anchor });
       if (owner && owner.row === pivot.anchor.row && owner.col === pivot.anchor.col) return result;
       return { ...result, status: "error", error: "#SPILL!", rows: 0, cols: 0, cells: [] };
     }
@@ -1888,16 +1883,12 @@ export class StoreDataEngine {
     }
   }
 
-  private rawCell(addr: CellAddress): ResolvedCell {
+  getCell(addr: CellAddress): ResolvedCell {
     const cell = this.wasm.getCell(this.sheets.handleOf(addr.sheet), addr.row, addr.col);
     const resolved = resolvedScalar(cell.kind, cell.num, cell.string ?? null);
     const style = this.styles.get(cell.style);
     cell.free();
     return { resolved, style };
-  }
-
-  getCell(addr: CellAddress): ResolvedCell {
-    return this.rawCell(addr);
   }
 
   /** The formula source at `addr`, or null if the cell isn't a formula. */
@@ -1907,7 +1898,12 @@ export class StoreDataEngine {
 
   /** The owning formula anchor for a spill cell, including the anchor itself. */
   getSpillAnchor(addr: CellAddress): CellAddress | null {
-    return this.spillAnchor(addr);
+    const handle = this.sheets.handleOf(addr.sheet);
+    const row = this.wasm.spillAnchorRow(handle, addr.row, addr.col);
+    if (row === NO_CELL_COORDINATE) return null;
+    const col = this.wasm.spillAnchorCol(handle, addr.row, addr.col);
+    if (col === NO_CELL_COORDINATE) return null;
+    return { sheet: addr.sheet, row, col };
   }
 
   /** Plain-reference target at `addr`, or null when the cell is not a ref. */
@@ -2842,7 +2838,6 @@ export class StoreDataEngine {
 
       this.flushSpillBlockers();
       this.flushPivots();
-      if (appliedPatches.length === 0) return { appliedPatches, changes, storageRevision };
       this.rangeMutationStats.documentOperations += appliedPatches.length;
       this.rangeMutationStats.jsPatchObjects += appliedPatches.length;
 
@@ -3456,7 +3451,7 @@ export class StoreDataEngine {
         return this.addSheetSnapshot(patch.sheet, changes);
 
       case "removeSheet":
-        return this.removeSheetSnapshot(patch.sheet, changes);
+        return this.removeSheetSnapshot(patch.sheet);
 
       case "renameSheet": {
         const sheet = this.workbook.sheets.find((candidate) => candidate.id === patch.sheet);
@@ -3742,6 +3737,26 @@ export class StoreDataEngine {
       case "setCalculation": {
         if (!this.syncCalculation(patch.calculation)) return false;
         this.workbook.calculation = storedCalculationSettings(patch.calculation);
+        return true;
+      }
+
+      case "setMeasure":
+      case "removeMeasure": {
+        const current = this.workbook.dataModel;
+        if (patch.op === "setMeasure") {
+          const issues: DataModelIssue[] = [];
+          validateMeasureAdmission(patch.measure, current, this.workbook.sheets, issues);
+          if (issues.length > 0) return false;
+        } else if (!findMeasure(current, patch.id)) {
+          return false;
+        }
+
+        const model =
+          patch.op === "setMeasure"
+            ? withMeasure(current, patch.measure)
+            : withoutMeasure(current, patch.id);
+        if (!this.syncRelationships(model)) return false;
+        this.workbook.dataModel = model;
         return true;
       }
 
@@ -4335,7 +4350,7 @@ export class StoreDataEngine {
     return true;
   }
 
-  private removeSheetSnapshot(sheetId: SheetId, _changes: ChangeEvent["changes"] | null): boolean {
+  private removeSheetSnapshot(sheetId: SheetId): boolean {
     const index = this.workbook.sheets.findIndex((sheet) => sheet.id === sheetId);
     if (index < 0 || this.workbook.sheets.length <= 1) return false;
     const removed = this.workbook.sheets[index]!;
@@ -4623,15 +4638,13 @@ export class StoreDataEngine {
   /** Rewrite resolved formula sheet identity without changing the stable WASM handle. */
   renameSheetFormulaIdentity(sheet: SheetId, name: string): boolean {
     const handle = this.sheets.handleOf(sheet);
-    if (!this.wasm.renameSheet(handle, sheet, name)) return false;
-    return true;
+    return this.wasm.renameSheet(handle, sheet, name);
   }
 
   /** Tombstone a stable WASM handle and rewrite surviving formulas to `#REF!`. */
   removeSheetFormulaIdentity(sheet: SheetId): boolean {
     const handle = this.sheets.handleOf(sheet);
-    if (!this.wasm.removeSheet(handle)) return false;
-    return true;
+    return this.wasm.removeSheet(handle);
   }
 
   /** Give the engine the tab order, which 3-D references such as `Sheet1:Sheet3!A1` span. */

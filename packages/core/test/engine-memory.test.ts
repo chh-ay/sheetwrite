@@ -153,4 +153,25 @@ describe("explicit engine memory release", () => {
       expect(JSON.parse(stdout)).toEqual({ engine, atomic: true, waitedForPage: true });
     });
   }
+
+  it("rejects a transfer that declares an array larger than engine memory", () => {
+    // Store transfer tag, one pooled string, and that string's byte length.
+    const STORE_TAG = 0x32524d53;
+    const OVERSIZED_LENGTH = 0xffff_fff0;
+    const bytes = new Uint8Array(16);
+    const view = new DataView(bytes.buffer);
+    view.setUint32(0, STORE_TAG, true);
+    view.setUint32(4, 1, true);
+    view.setUint32(8, OVERSIZED_LENGTH, true);
+
+    let failure: unknown;
+    try {
+      getEngine().CellStore.importMemoryState(bytes);
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure).toBeDefined();
+    expect(failure).not.toBeInstanceOf(WebAssembly.RuntimeError);
+  });
 });

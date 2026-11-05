@@ -123,11 +123,6 @@ impl SpillState {
         self.ranges.is_empty() && self.owners.is_empty()
     }
 
-    #[inline]
-    pub(crate) fn has_owners(&self) -> bool {
-        !self.owners.is_empty()
-    }
-
     pub(crate) fn owner_count(&self) -> usize {
         self.owners.len()
     }
@@ -449,14 +444,22 @@ impl SpillState {
         Ok(())
     }
 
-    /// Reserves owner and calculated-slot room for `cells_needed` outputs.
+    /// Reserves owner and calculated-slot room for every output of `range`.
     /// Failure leaves the attempt registered and compacts what was reserved.
-    pub(crate) fn reserve(&mut self, cells_needed: usize, cells: &mut CellStorage) -> bool {
-        if self.owners.try_reserve(cells_needed).is_err() || !cells.reserve_derived(cells_needed) {
+    pub(crate) fn reserve(&mut self, range: SpillRange, cells: &mut CellStorage) -> bool {
+        let reserved = self.owners.try_reserve(range.cells()).is_ok()
+            && cells.reserve_derived(
+                range.anchor.0 as usize,
+                range.anchor.1 as usize,
+                range.row_end as usize,
+                range.col_end as usize,
+            );
+
+        if !reserved {
             self.compact(cells);
-            return false;
         }
-        true
+
+        reserved
     }
 
     /// Installs an admitted, reserved `range`: every cell becomes owned by the

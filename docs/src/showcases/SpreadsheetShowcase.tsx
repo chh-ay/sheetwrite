@@ -107,7 +107,7 @@ export default function SpreadsheetShowcase() {
           description="The composable shell puts an Excel-style ribbon, name box, formula bar and sheet tabs around one grid. Everything here is the public API."
           facts={[
             { label: "Chrome", value: "Ribbon, formula bar, tabs" },
-            { label: "Workbook", value: "2 sheets, cross-sheet SUMIF" },
+            { label: "Workbook", value: "3 sheets, cross-sheet SUMIF, a saved query" },
             { label: "Setup", value: 'createSpreadsheetShell({ ribbon: { mode: "auto" } })' },
           ]}
         />

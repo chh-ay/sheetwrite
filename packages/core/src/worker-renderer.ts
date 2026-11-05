@@ -232,8 +232,8 @@ export class WorkerRenderer implements Renderer {
         return;
       }
 
-      // The renderer transfers only buffers it allocated: RenderCoordinator
-      // reuses view-owned buffers across repaints.
+      // The renderer transfers only buffers it allocated: the view reuses its
+      // own buffers across repaints.
       const ownedValueKinds = valueKinds.slice();
       const ownedNumberValues = numberValues.slice();
       const ownedStringPoolIds = stringPoolIds.slice();

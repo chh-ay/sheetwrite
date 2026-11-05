@@ -5,6 +5,7 @@ import type { DomMergeAnchorRequest, DomOverlay } from "./dom-overlay.js";
 import { isEngineTrap } from "./engine.js";
 import type { GeometryLayoutController } from "./geometry-layout-controller.js";
 import type { OverlayPainter } from "./overlay-painter.js";
+import { scheduleFrame } from "./scope.js";
 import { storeEngine } from "./store/engine-registry.js";
 import type { CellScalar } from "./types/cell.js";
 import type { SheetId } from "./types/coordinates.js";
@@ -82,17 +83,6 @@ export interface ReadWindowControllerOptions {
   }) => void;
   /** Receives a WASM trap from a frame's engine reads; without it the trap is rethrown. */
   onEngineTrap?: (cause: unknown) => void;
-}
-
-/** Runs `callback` on the next animation frame, or after 16 ms without one; returns its canceller. */
-function scheduleFrame(callback: () => void): () => void {
-  if (globalThis.requestAnimationFrame !== undefined) {
-    const frame = requestAnimationFrame(callback);
-    return () => cancelAnimationFrame(frame);
-  }
-
-  const timer = setTimeout(callback, 16);
-  return () => clearTimeout(timer);
 }
 
 /** Owns paint/read plans, hydration demand, formula closure and residency. */
@@ -200,16 +190,6 @@ export class ReadWindowController {
     }
 
     return new PaintedCells(this.options.activeSheet(), rows.sort(), cols.sort());
-  }
-
-  /** Preserve autofit's operation-owned sampling band without changing viewport protection. */
-  sampleRows(): { start: number; end: number } {
-    const { geometry } = this.options;
-    return geometry.visibleRowWindow(
-      geometry.toContent(this.options.scrollTop()),
-      this.options.viewportHeight(),
-      this.options.overscan(),
-    );
   }
 
   /** Invalidates pixel/layout paint state without discarding stable data windows. */

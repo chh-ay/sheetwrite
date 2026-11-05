@@ -1,4 +1,11 @@
-import type { CellStyle, SheetSnapshot, Store, Workbook, WorkbookSnapshot } from "@sheetwrite/core";
+import type {
+  CellStyle,
+  MergeRange,
+  Sheet,
+  Store,
+  Workbook,
+  WorkbookSnapshot,
+} from "@sheetwrite/core";
 
 import { assertResource, checkAbort, type XlsxCodecContext } from "./resources.js";
 import {
@@ -11,28 +18,41 @@ import {
 const WINDOW_CELLS = 64 * 1024;
 const WINDOW_ROWS = 4096;
 
-function tableSource(
+/**
+ * The active sheet as a table: its visible columns, with a header row above
+ * the cells. Output row 0 is the header and output columns count only
+ * visible ones.
+ */
+export interface TableProjection {
+  readonly sheet: Sheet;
+  /** Source index of each output column. */
+  readonly columns: readonly number[];
+  /** Merges in output coordinates, clipped to visible columns and sheet rows, by first row. */
+  readonly merges: readonly MergeRange[];
+}
+
+/** Project the active sheet, or undefined for a workbook without sheets. */
+export function projectTable(
   workbook: Workbook,
-  store: Store,
   context: XlsxCodecContext,
-): { snapshot: WorkbookSnapshot; hook: WorkbookWriteHook } | undefined {
-  const activeSheet =
+): TableProjection | undefined {
+  const sheet =
     workbook.sheets.find((candidate) => candidate.id === workbook.activeSheet) ??
     workbook.sheets[0];
-  if (!activeSheet) return undefined;
-  const sheet = activeSheet;
-  const visible = sheet.columns.flatMap((column, index) =>
-    column.visible === false ? [] : [{ index, column }],
+  if (!sheet) return undefined;
+
+  const columns = sheet.columns.flatMap((column, index) =>
+    column.visible === false ? [] : [index],
   );
-  const columns = visible.map(({ index }) => index);
   assertResource(context, "maxRowsPerSheet", sheet.rowCount + 1);
   assertResource(context, "maxColumnsPerSheet", columns.length);
   assertResource(context, "maxCells", (sheet.rowCount + 1) * columns.length);
+
   const outputColumns = new Int32Array(sheet.columns.length).fill(-1);
   columns.forEach((column, index) => {
     outputColumns[column] = index;
   });
-  const merges: NonNullable<SheetSnapshot["merges"]> = [];
+  const merges: MergeRange[] = [];
   for (const merge of sheet.merges ?? []) {
     const anchor = outputColumns[merge.c0] ?? -1;
     if (anchor < 0 || merge.r0 < 0 || merge.r0 >= sheet.rowCount) continue;
@@ -47,7 +67,110 @@ function tableSource(
   }
   assertResource(context, "maxMerges", merges.length);
   merges.sort((left, right) => left.r0 - right.r0);
-  const rowMeta: NonNullable<SheetSnapshot["rowMeta"]> = [];
+
+  return { sheet, columns, merges };
+}
+
+/**
+ * Every output row of a projected table: the header, then each sheet row with
+ * the cells that hold a value or a style, read in bounded windows. Cells that
+ * a merge covers are left out; the merge anchor stays.
+ */
+export function* projectedRows(
+  projection: TableProjection,
+  store: Store,
+  context: XlsxCodecContext,
+): Generator<{ row: number; cells: readonly AbsoluteCell[] }> {
+  const { sheet, columns, merges } = projection;
+  const header = columns.map((source, col): AbsoluteCell => {
+    const column = sheet.columns[source];
+    return {
+      row: 0,
+      col,
+      source: {
+        rowOffset: 0,
+        colOffset: col,
+        value: { kind: "literal", value: column?.header ?? "" },
+        ...(column?.headerStyle ? { style: column.headerStyle } : {}),
+      },
+    };
+  });
+  yield { row: 0, cells: header };
+
+  const windowRows = Math.min(
+    WINDOW_ROWS,
+    Math.max(1, Math.floor(WINDOW_CELLS / Math.max(1, columns.length))),
+  );
+  const covered = new Uint8Array(columns.length);
+  let nextMerge = 0;
+  let activeMerges: MergeRange[] = [];
+  const expectedRows = sheet.rowCount;
+  const expectedColumns = sheet.columns.length;
+  for (let start = 0; start < expectedRows; start += windowRows) {
+    checkAbort(context);
+    const end = Math.min(expectedRows, start + windowRows);
+    const live = store.getWorkbook().sheets.find((candidate) => candidate.id === sheet.id);
+    if (live?.rowCount !== expectedRows || live.columns.length !== expectedColumns) {
+      throw new TypeError("Sheetwrite: table changed during streaming XLSX export");
+    }
+
+    const window = store.getVisibleWindow(sheet.id, { start, end }, columns);
+    for (let row = start; row < end; row++) {
+      const outputRow = row + 1;
+      covered.fill(0);
+      activeMerges = activeMerges.filter((merge) => merge.r1 >= outputRow);
+      while (nextMerge < merges.length) {
+        const merge = merges[nextMerge];
+        if (!merge || merge.r0 > outputRow) break;
+        activeMerges.push(merge);
+        nextMerge++;
+      }
+      for (const merge of activeMerges)
+        covered.fill(1, merge.c0 + (merge.r0 === outputRow ? 1 : 0), merge.c1 + 1);
+
+      const cells: AbsoluteCell[] = [];
+      columns.forEach((source, col) => {
+        if (covered[col]) return;
+        const flat = (row - start) * columns.length + col;
+        const style: CellStyle = {
+          ...sheet.columns[source]?.cellStyle,
+          ...window.styles[window.styleIds[flat] ?? 0],
+        };
+        const value = window.values[flat] ?? null;
+        if (value === null && Object.keys(style).length === 0) return;
+        cells.push({
+          row: outputRow,
+          col,
+          source: {
+            rowOffset: outputRow,
+            colOffset: col,
+            value: { kind: "literal", value },
+            ...(Object.keys(style).length > 0 ? { style } : {}),
+          },
+        });
+      });
+      yield { row: outputRow, cells };
+    }
+  }
+}
+
+/** The one-sheet workbook the writer streams for a projected table. */
+function tableSource(
+  workbook: Workbook,
+  store: Store,
+  context: XlsxCodecContext,
+): { snapshot: WorkbookSnapshot; hook: WorkbookWriteHook } | undefined {
+  const projection = projectTable(workbook, context);
+  return projection ? projectionSource(projection, store, context) : undefined;
+}
+
+function projectionSource(
+  projection: TableProjection,
+  store: Store,
+  context: XlsxCodecContext,
+): { snapshot: WorkbookSnapshot; hook: WorkbookWriteHook } {
+  const { sheet, columns, merges } = projection;
+  const rowMeta: NonNullable<WorkbookSnapshot["sheets"][number]["rowMeta"]> = [];
   for (const [row, height] of sheet.rowHeights ?? []) {
     if (row >= 0 && row < sheet.rowCount) rowMeta.push([row + 1, { height }]);
   }
@@ -60,82 +183,28 @@ function tableSource(
         name: sheet.name,
         order: 0,
         rowCount: sheet.rowCount + 1,
-        columns: visible.map(({ column }, index) => ({
-          key: `column${index + 1}`,
-          header: `Column ${index + 1}`,
-          width: column.width,
-          type: "text" as const,
-          ...(column.numberFormat ? { numberFormat: column.numberFormat } : {}),
-        })),
+        columns: columns.map((source, index) => {
+          const column = sheet.columns[source];
+          return {
+            key: `column${index + 1}`,
+            header: `Column ${index + 1}`,
+            width: column?.width ?? 0,
+            type: "text" as const,
+            ...(column?.numberFormat ? { numberFormat: column.numberFormat } : {}),
+          };
+        }),
         cells: [],
-        merges,
+        merges: [...merges],
         rowMeta,
       },
     ],
   };
+
   function* rows(): Generator<{ row: number; cells: readonly AbsoluteCell[] }> {
-    const header = visible.map(({ column }, col): AbsoluteCell => ({
-      row: 0,
-      col,
-      source: {
-        rowOffset: 0,
-        colOffset: col,
-        value: { kind: "literal", value: column.header },
-        ...(column.headerStyle ? { style: column.headerStyle } : {}),
-      },
-    }));
-    yield { row: 0, cells: header };
-    const windowRows = Math.min(
-      WINDOW_ROWS,
-      Math.max(1, Math.floor(WINDOW_CELLS / Math.max(1, columns.length))),
-    );
-    const covered = new Uint8Array(columns.length);
-    let nextMerge = 0;
-    let activeMerges: typeof merges = [];
-    const expectedRows = sheet.rowCount;
-    const expectedColumns = sheet.columns.length;
-    for (let start = 0; start < expectedRows; start += windowRows) {
-      checkAbort(context);
-      const end = Math.min(expectedRows, start + windowRows);
-      const live = store.getWorkbook().sheets.find((candidate) => candidate.id === sheet.id);
-      if (live?.rowCount !== expectedRows || live.columns.length !== expectedColumns) {
-        throw new TypeError("Sheetwrite: table changed during streaming XLSX export");
-      }
-      const window = store.getVisibleWindow(sheet.id, { start, end }, columns);
-      for (let row = start; row < end; row++) {
-        const outputRow = row + 1;
-        covered.fill(0);
-        activeMerges = activeMerges.filter((merge) => merge.r1 >= outputRow);
-        while (nextMerge < merges.length) {
-          const merge = merges[nextMerge];
-          if (!merge || merge.r0 > outputRow) break;
-          activeMerges.push(merge);
-          nextMerge++;
-        }
-        for (const merge of activeMerges)
-          covered.fill(1, merge.c0 + (merge.r0 === outputRow ? 1 : 0), merge.c1 + 1);
-        const cells: AbsoluteCell[] = [];
-        for (const [col, { column }] of visible.entries()) {
-          if (covered[col]) continue;
-          const flat = (row - start) * columns.length + col;
-          const style: CellStyle = {
-            ...column.cellStyle,
-            ...window.styles[window.styleIds[flat] ?? 0],
-          };
-          const value = window.values[flat] ?? null;
-          if (value === null && Object.keys(style).length === 0) continue;
-          cells.push({
-            row: outputRow,
-            col,
-            source: {
-              rowOffset: outputRow,
-              colOffset: col,
-              value: { kind: "literal", value },
-              ...(Object.keys(style).length > 0 ? { style } : {}),
-            },
-          });
-        }
-        if (cells.length > 0 || sheet.rowHeights?.has(row)) yield { row: outputRow, cells };
+    for (const output of projectedRows(projection, store, context)) {
+      const sourceRow = output.row - 1;
+      if (output.row === 0 || output.cells.length > 0 || sheet.rowHeights?.has(sourceRow)) {
+        yield output;
       }
     }
   }

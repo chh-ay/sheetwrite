@@ -10,3 +10,5 @@
 - The XLSX codec checks the signal once per ZIP entry, worksheet and chunk of cells, also while it builds the snapshot. An aborted import keeps no partial snapshot.
 
 **Upgrade checklist:** if your code tells an aborted XLSX or CSV/TSV call apart with `error.code === "aborted"`, check `signal.aborted` (or `error === signal.reason`) instead. Persistence and IndexedDB storage still use `code: "aborted"`.
+
+Changed: aborted XLSX and CSV/TSV calls reject with `signal.reason`, not a `SheetwriteError` with code `aborted`; check `signal.aborted` instead.

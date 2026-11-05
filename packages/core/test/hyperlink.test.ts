@@ -1,5 +1,10 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
+import {
+  MAX_CELL_FONT_SIZE,
+  MIN_CELL_FONT_SIZE,
+  sanitizeCellStyle,
+} from "../src/cell-style-fields.js";
 import { SheetwriteError } from "../src/errors.js";
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import {
@@ -7,7 +12,6 @@ import {
   isSafeExternalHyperlink,
   resolveHyperlinkTarget,
   sanitizeCellHyperlink,
-  sanitizeHyperlinkStyle,
 } from "../src/hyperlink.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
@@ -67,9 +71,9 @@ describe("hyperlink policy", () => {
     }
   });
 
-  it("sanitizes hyperlink styles without invoking accessors or cloning hostile graphs", () => {
+  it("sanitizes cell styles without invoking accessors or cloning hostile graphs", () => {
     expect(
-      sanitizeHyperlinkStyle({
+      sanitizeCellStyle({
         color: "#123456",
         bold: true,
         fontSize: 16,
@@ -81,10 +85,17 @@ describe("hyperlink policy", () => {
       fontSize: 16,
       border: { bottom: { color: "#654321", width: 2, style: "solid" } },
     });
-    expect(sanitizeHyperlinkStyle({ fontSize: Number.POSITIVE_INFINITY })).toBeNull();
-    expect(sanitizeHyperlinkStyle({ fontSize: 1_025 })).toBeNull();
-    expect(sanitizeHyperlinkStyle({ color: "x".repeat(1_000_000) })).toBeNull();
-    expect(sanitizeHyperlinkStyle({ unknown: { deep: { graph: new Array(10_000) } } })).toBeNull();
+    expect(sanitizeCellStyle({ fontSize: Number.POSITIVE_INFINITY })).toBeNull();
+    expect(sanitizeCellStyle({ fontSize: MAX_CELL_FONT_SIZE })).toEqual({
+      fontSize: MAX_CELL_FONT_SIZE,
+    });
+    expect(sanitizeCellStyle({ fontSize: 546 })).toBeNull();
+    expect(sanitizeCellStyle({ fontSize: MIN_CELL_FONT_SIZE })).toEqual({
+      fontSize: MIN_CELL_FONT_SIZE,
+    });
+    expect(sanitizeCellStyle({ fontSize: 1 })).toBeNull();
+    expect(sanitizeCellStyle({ color: "x".repeat(1_000_000) })).toBeNull();
+    expect(sanitizeCellStyle({ unknown: { deep: { graph: new Array(10_000) } } })).toBeNull();
 
     let getterCalls = 0;
     const getterStyle = Object.defineProperty({}, "color", {
@@ -94,7 +105,7 @@ describe("hyperlink policy", () => {
         return "#123456";
       },
     });
-    expect(sanitizeHyperlinkStyle(getterStyle)).toBeNull();
+    expect(sanitizeCellStyle(getterStyle)).toBeNull();
     expect(getterCalls).toBe(0);
     const throwingProxy = new Proxy(
       {},
@@ -104,7 +115,7 @@ describe("hyperlink policy", () => {
         },
       },
     );
-    expect(sanitizeHyperlinkStyle(throwingProxy)).toBeNull();
+    expect(sanitizeCellStyle(throwingProxy)).toBeNull();
     expect(sanitizeCellHyperlink({ ...externalLink(), style: getterStyle })).toBeNull();
   });
 

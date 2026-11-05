@@ -32,6 +32,10 @@ use crate::window::ConditionalRules;
 
 mod external_links;
 mod hidden_rows;
+#[cfg(all(test, feature = "analysis"))]
+mod measure_tests;
+#[cfg(feature = "analysis")]
+mod measures;
 #[cfg(feature = "analysis")]
 mod model_source;
 mod names;

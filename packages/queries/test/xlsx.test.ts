@@ -205,6 +205,11 @@ shared Files = Folder.Files("C:\\data");
     expect(warnings.map((warning) => warning.message)).toContainEqual(
       expect.stringContaining("Power Query member Files was kept as M text"),
     );
+    // The panel lists kept members from the mashup graph, which leaves with the kept part.
+    const mashup = imported.workbook.xlsxSource?.graphs.find(
+      (graph) => graph.unsupportedQueries !== undefined,
+    );
+    expect(mashup?.unsupportedQueries).toEqual([{ member: "Files", reason: "expression" }]);
   });
 });
 

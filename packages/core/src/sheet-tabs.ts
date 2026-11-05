@@ -1,3 +1,4 @@
+import { type PopupPlacement, popupPosition } from "./menu-surface.js";
 import type { SheetId } from "./types/coordinates.js";
 import type { DocumentOp } from "./types/document.js";
 import type { SheetLifecycleResult } from "./types/grid.js";
@@ -61,6 +62,10 @@ let nextErrorId = 0;
 // per-grid id: the browser keeps a parsed copy of each different selector text
 // for the page, so an id selector would keep one entry for every grid created.
 const TAB_MENU_SELECTOR = ".sheetwrite-tab-menu";
+/** The sheet menu opens under its trigger, flush with it. */
+const MENU_PLACEMENT: PopupPlacement = { side: "below", gap: 0 };
+/** The hidden-sheet choices open over the tab bar, which sits at the bottom of the grid. */
+const CHOICES_PLACEMENT: PopupPlacement = { side: "above", gap: 4 };
 
 function createTabIcon(pathData: string): SVGSVGElement {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -148,8 +153,7 @@ export class SheetTabs {
   /** Reconciles the controlled workbook records while preserving transient focus/editor state by ID. */
   update(sheets: readonly SheetTabRecord[], activeId: SheetId): void {
     if (this.destroyed) return;
-    this.removeMenuDismissListeners();
-    this.menuSheetId = null;
+    this.clearMenuState();
 
     const oldVisible = this.visibleSheets();
     const oldFocusIndex = oldVisible.findIndex(({ sheet }) => sheet.id === this.focusedId);
@@ -197,8 +201,7 @@ export class SheetTabs {
     if (readOnly) {
       this.editing = null;
       this.feedback = null;
-      this.removeMenuDismissListeners();
-      this.menuSheetId = null;
+      this.clearMenuState();
     }
     this.render(hadFocus);
   }
@@ -210,7 +213,7 @@ export class SheetTabs {
     this.rendering = true;
     this.host.removeEventListener("keydown", this.onKeydown);
     this.host.removeEventListener("focusout", this.onFocusOut);
-    this.removeMenuDismissListeners();
+    this.clearMenuState();
     this.unhideDismiss?.();
     this.unhideDismiss = null;
     this.host.replaceChildren();
@@ -223,7 +226,6 @@ export class SheetTabs {
     this.moveIndexes = [];
     this.editing = null;
     this.feedback = null;
-    this.menuSheetId = null;
     this.focusedId = null;
     this.draggedId = null;
   }
@@ -649,13 +651,13 @@ export class SheetTabs {
       choices.hidden = false;
       if (typeof choices.showPopover === "function") {
         choices.showPopover();
-        const triggerRect = trigger.getBoundingClientRect();
-        const choicesRect = choices.getBoundingClientRect();
-        choices.style.left = `${Math.max(
-          4,
-          Math.min(triggerRect.left, window.innerWidth - choicesRect.width - 4),
-        )}px`;
-        choices.style.top = `${Math.max(4, triggerRect.top - choicesRect.height - 4)}px`;
+        const { left, top } = popupPosition(
+          trigger.getBoundingClientRect(),
+          choices.getBoundingClientRect(),
+          CHOICES_PLACEMENT,
+        );
+        choices.style.left = `${left}px`;
+        choices.style.top = `${top}px`;
       }
 
       trigger.setAttribute("aria-expanded", "true");
@@ -787,10 +789,7 @@ export class SheetTabs {
     if (!trigger) return;
     const triggerRect = trigger.getBoundingClientRect();
     this.menuAnchor = { left: triggerRect.left, top: triggerRect.top };
-    const menuRect = menu.getBoundingClientRect();
-    const left = Math.max(0, Math.min(triggerRect.left, window.innerWidth - menuRect.width));
-    const below = triggerRect.bottom + menuRect.height <= window.innerHeight;
-    const top = below ? triggerRect.bottom : Math.max(0, triggerRect.top - menuRect.height);
+    const { left, top } = popupPosition(triggerRect, menu.getBoundingClientRect(), MENU_PLACEMENT);
     menu.style.left = `${left}px`;
     menu.style.top = `${top}px`;
   }

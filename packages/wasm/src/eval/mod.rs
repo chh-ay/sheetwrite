@@ -17,6 +17,8 @@ mod index;
 mod info;
 mod iteration;
 mod lookup;
+#[cfg(test)]
+mod lookup_rule_tests;
 mod math;
 mod matrix;
 mod number_format;
@@ -36,7 +38,6 @@ mod wildcard;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
 use std::cmp::Ordering;
-use std::rc::Rc;
 
 use crate::calc::{Ast, Func, SHEET_COLS, SHEET_ROWS};
 use crate::cells::{encode_num, encode_str_id, payload_num, payload_str_id, DenseSourceRun};
@@ -67,11 +68,8 @@ use dependency::{
 use functions::{apply_func, treats_cell_as_reference, FuncAccumulator, ReductionFold};
 pub(crate) use iteration::IterationLimits;
 use iteration::IterationPassGuard;
-use lookup::{
-    find_match_index_indexed, list_reuse, option_code, positive_index, remember_list,
-    remember_result, remember_table, result_reuse, table_reuse, CachedList, CachedResult,
-    CachedTable, LookupPassGuard, LookupReuse, ReuseEntry, TablePart,
-};
+pub(crate) use lookup::LookupStates;
+use lookup::{option_code, positive_index};
 pub(crate) use matrix::range_from_ast as static_range;
 pub(crate) use matrix::{intersection_range, matrix_resource_stats, reset_matrix_resource_stats};
 use matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_BYTES};
@@ -818,7 +816,6 @@ impl CellStore {
             return;
         }
 
-        let _lookup_pass = LookupPassGuard::begin();
         let _iteration_pass = IterationPassGuard::begin(self.iteration.is_some());
 
         let mut memo = self.formula_results.take().unwrap_or_default();
@@ -1332,7 +1329,7 @@ impl CellStore {
             results.insert(id, Value::Error(FormulaError::Num));
             return Vec::new();
         }
-        if !data.spill.reserve(matrix.values.len(), &mut data.cells) {
+        if !data.spill.reserve(range, &mut data.cells) {
             results.insert(id, Value::Error(FormulaError::Num));
             return Vec::new();
         }
@@ -2877,314 +2874,6 @@ impl CellStore {
                     extreme_if(&value_range, &pairs, func == Func::MaxIfs)
                 } else {
                     aggregate_if(&value_range, &pairs, func == Func::AverageIfs)
-                }
-            }
-            _ => Value::Error(FormulaError::Value),
-        }
-    }
-
-    fn lookup_table_argument(
-        &self,
-        ast: &Ast,
-        sheet: usize,
-        part: TablePart,
-        pass: &mut EvalPass<'_>,
-        depth: usize,
-    ) -> Result<Rc<CachedTable>, FormulaError> {
-        let reuse = LookupReuse::new(
-            range_from_ast(ast, sheet),
-            |range| table_reuse(range, part),
-            |range, state| remember_table(range, part, state),
-        );
-        self.reused_lookup_range(
-            ast,
-            sheet,
-            reuse,
-            |rows, cols, values| match part {
-                TablePart::FirstColumn => CachedTable::from_column(rows, cols, values),
-                TablePart::FirstRow => CachedTable::from_row(rows, cols, values),
-            },
-            pass,
-            depth,
-        )
-    }
-
-    fn lookup_list_argument(
-        &self,
-        ast: &Ast,
-        sheet: usize,
-        pass: &mut EvalPass<'_>,
-        depth: usize,
-    ) -> Result<Rc<CachedList>, FormulaError> {
-        let reuse = LookupReuse::new(range_from_ast(ast, sheet), list_reuse, remember_list);
-        self.reused_lookup_range(ast, sheet, reuse, CachedList::new, pass, depth)
-    }
-
-    fn lookup_result_argument(
-        &self,
-        ast: &Ast,
-        sheet: usize,
-        pass: &mut EvalPass<'_>,
-        depth: usize,
-    ) -> Result<Rc<CachedResult>, FormulaError> {
-        let reuse = LookupReuse::new(range_from_ast(ast, sheet), result_reuse, remember_result);
-        self.reused_lookup_range(
-            ast,
-            sheet,
-            reuse,
-            |_, _, values| CachedResult::new(values),
-            pass,
-            depth,
-        )
-    }
-
-    /// Materializes a lookup range and records what this pass may reuse.
-    ///
-    /// A range is materialized once per pass. The first lookup only records
-    /// that the range was seen; the second pays one reusability scan and,
-    /// when nothing in the range can change mid-pass, every later lookup
-    /// reuses the entry. A range searched once pays no reusability scan.
-    fn reused_lookup_range<Materialized>(
-        &self,
-        ast: &Ast,
-        sheet: usize,
-        reuse: LookupReuse<Materialized, impl FnOnce(CellRange, ReuseEntry<Materialized>)>,
-        build: impl FnOnce(usize, usize, Vec<Value>) -> Materialized,
-        pass: &mut EvalPass<'_>,
-        depth: usize,
-    ) -> Result<Rc<Materialized>, FormulaError> {
-        let LookupReuse {
-            range,
-            previous,
-            remember,
-        } = reuse;
-        if let Some(ReuseEntry::Reusable(entry)) = &previous {
-            return Ok(Rc::clone(entry));
-        }
-        let (rows, cols, values) = self.eval_matrix_values(ast, sheet, pass, depth)?;
-        let entry = Rc::new(build(rows, cols, values));
-        if let Some(range) = range {
-            match previous {
-                None => remember(range, ReuseEntry::Seen),
-                Some(ReuseEntry::Seen) => {
-                    let state = if self.range_is_reusable(range) {
-                        ReuseEntry::Reusable(Rc::clone(&entry))
-                    } else {
-                        ReuseEntry::Blocked
-                    };
-                    remember(range, state);
-                }
-                Some(ReuseEntry::Blocked) | Some(ReuseEntry::Reusable(_)) => {}
-            }
-        }
-        Ok(entry)
-    }
-
-    /// Materializes a range into its shape and row-major values, exactly as
-    /// `eval_matrix_arg` returns them.
-    fn eval_matrix_values(
-        &self,
-        ast: &Ast,
-        sheet: usize,
-        pass: &mut EvalPass<'_>,
-        depth: usize,
-    ) -> Result<(usize, usize, Vec<Value>), FormulaError> {
-        let mut matrix = self.eval_matrix_arg(ast, sheet, pass, depth)?;
-        let rows = matrix.rows;
-        let cols = matrix.cols;
-        let values = std::mem::take(&mut matrix.values);
-        Ok((rows, cols, values))
-    }
-
-    /// True when a lookup may keep a range's decoded cells for the rest of
-    /// the pass: the sheet is fully resident, and no cell of the range is a
-    /// formula or a spilled value, so nothing in it can change mid-pass.
-    fn range_is_reusable(&self, range: CellRange) -> bool {
-        let Some(data) = self.sheets.get(range.sheet as usize) else {
-            return false;
-        };
-        if data.cells.is_paged() {
-            return false;
-        }
-        let has_spills = data.spill.has_owners();
-        let row_end = (range.row_end as usize).min(data.cells.row_count().saturating_sub(1));
-        let col_end = (range.col_end as usize).min(data.cells.n_cols().saturating_sub(1));
-        for col in range.col_start as usize..=col_end {
-            for row in range.row_start as usize..=row_end {
-                let index = data.cells.idx(row, col);
-                if data.cells.kind_at(index) == KIND_FORMULA {
-                    return false;
-                }
-                if has_spills && data.spill.owner((row as u32, col as u32)).is_some() {
-                    return false;
-                }
-            }
-        }
-        true
-    }
-
-    #[inline(never)]
-    fn eval_lookup_family(
-        &self,
-        func: Func,
-        args: &[Ast],
-        sheet: usize,
-        pass: &mut EvalPass<'_>,
-        depth: usize,
-    ) -> EvalResult {
-        let scalar =
-            |ast: &Ast, pass: &mut EvalPass<'_>| self.eval_ast(ast, sheet, pass, depth + 1);
-        match func {
-            Func::Index => self.eval_index(args, sheet, pass, depth),
-            Func::Match => {
-                if !(2..=3).contains(&args.len()) {
-                    return Value::Error(FormulaError::Value);
-                }
-                let key = scalar(&args[0], pass);
-                if let Value::Error(error) = key {
-                    return Value::Error(error);
-                }
-                let lookup = match self.lookup_list_argument(&args[1], sheet, pass, depth + 1) {
-                    Ok(list) => list,
-                    Err(error) => return Value::Error(error),
-                };
-                let (lookup_rows, lookup_cols) = lookup.shape();
-                if lookup_rows != 1 && lookup_cols != 1 {
-                    return Value::Error(FormulaError::Na);
-                }
-                let mode = optional_ast(args, 2)
-                    .map(|arg| scalar(arg, pass))
-                    .map_or(Ok(1), |value| option_code(&value));
-                let mode = match mode {
-                    Ok(mode @ (-1..=1)) => mode,
-                    Ok(_) => return Value::Error(FormulaError::Value),
-                    Err(error) => return Value::Error(error),
-                };
-                let (match_mode, search_mode) = match mode {
-                    1 => (-1, 2),
-                    -1 => (1, -2),
-                    _ => (0, 1),
-                };
-                match find_match_index_indexed(lookup.search(), &key, match_mode, search_mode) {
-                    Ok(Some(index)) => Value::number((index + 1) as f64),
-                    Ok(None) => Value::Error(FormulaError::Na),
-                    Err(error) => Value::Error(error),
-                }
-            }
-            Func::XMatch => {
-                if !(2..=4).contains(&args.len()) {
-                    return Value::Error(FormulaError::Value);
-                }
-                let key = scalar(&args[0], pass);
-                if let Value::Error(error) = key {
-                    return Value::Error(error);
-                }
-                let lookup = match self.lookup_list_argument(&args[1], sheet, pass, depth + 1) {
-                    Ok(list) => list,
-                    Err(error) => return Value::Error(error),
-                };
-                let (lookup_rows, lookup_cols) = lookup.shape();
-                if lookup_rows != 1 && lookup_cols != 1 {
-                    return Value::Error(FormulaError::Value);
-                }
-                let modes = lookup_modes(
-                    optional_ast(args, 2).map(|arg| scalar(arg, pass)),
-                    optional_ast(args, 3).map(|arg| scalar(arg, pass)),
-                );
-                let (match_mode, search_mode) = match modes {
-                    Ok(modes) => modes,
-                    Err(error) => return Value::Error(error),
-                };
-                match find_match_index_indexed(lookup.search(), &key, match_mode, search_mode) {
-                    Ok(Some(index)) => Value::number((index + 1) as f64),
-                    Ok(None) => Value::Error(FormulaError::Na),
-                    Err(error) => Value::Error(error),
-                }
-            }
-            Func::VLookup | Func::HLookup => {
-                if !(3..=4).contains(&args.len()) {
-                    return Value::Error(FormulaError::Value);
-                }
-                let key = scalar(&args[0], pass);
-                if let Value::Error(error) = key {
-                    return Value::Error(error);
-                }
-                let part = if func == Func::VLookup {
-                    TablePart::FirstColumn
-                } else {
-                    TablePart::FirstRow
-                };
-                let table = match self.lookup_table_argument(&args[1], sheet, part, pass, depth + 1)
-                {
-                    Ok(table) => table,
-                    Err(error) => return Value::Error(error),
-                };
-                let result_index = match positive_index(&scalar(&args[2], pass)) {
-                    Ok(index) => index,
-                    Err(error) => return Value::Error(error),
-                };
-                let sorted = match optional_ast(args, 3) {
-                    Some(arg) => match bool_from_value(&scalar(arg, pass)) {
-                        Ok(value) => value,
-                        Err(error) => return Value::Error(error),
-                    },
-                    None => true,
-                };
-                let found = match find_match_index_indexed(
-                    table.search(),
-                    &key,
-                    if sorted { -1 } else { 0 },
-                    if sorted { 2 } else { 1 },
-                ) {
-                    Ok(Some(index)) => index,
-                    Ok(None) => return Value::Error(FormulaError::Na),
-                    Err(error) => return Value::Error(error),
-                };
-                let value = if func == Func::VLookup {
-                    table.cell(found, result_index)
-                } else {
-                    table.cell(result_index, found)
-                };
-                value.cloned().unwrap_or(Value::Error(FormulaError::Ref))
-            }
-            Func::XLookup => {
-                if !(3..=6).contains(&args.len()) {
-                    return Value::Error(FormulaError::Value);
-                }
-                let key = scalar(&args[0], pass);
-                if let Value::Error(error) = key {
-                    return Value::Error(error);
-                }
-                let lookup = match self.lookup_list_argument(&args[1], sheet, pass, depth + 1) {
-                    Ok(list) => list,
-                    Err(error) => return Value::Error(error),
-                };
-                let result = match self.lookup_result_argument(&args[2], sheet, pass, depth + 1) {
-                    Ok(range) => range,
-                    Err(error) => return Value::Error(error),
-                };
-                let (lookup_rows, lookup_cols) = lookup.shape();
-                if lookup.search().values().len() != result.len()
-                    || (lookup_rows != 1 && lookup_cols != 1)
-                {
-                    return Value::Error(FormulaError::Value);
-                }
-                let modes = lookup_modes(
-                    optional_ast(args, 4).map(|arg| scalar(arg, pass)),
-                    optional_ast(args, 5).map(|arg| scalar(arg, pass)),
-                );
-                let (match_mode, search_mode) = match modes {
-                    Ok(modes) => modes,
-                    Err(error) => return Value::Error(error),
-                };
-                match find_match_index_indexed(lookup.search(), &key, match_mode, search_mode) {
-                    Ok(Some(index)) => result
-                        .value(index)
-                        .cloned()
-                        .unwrap_or(Value::Error(FormulaError::Ref)),
-                    Ok(None) => optional_ast(args, 3)
-                        .map_or(Value::Error(FormulaError::Na), |arg| scalar(arg, pass)),
-                    Err(error) => Value::Error(error),
                 }
             }
             _ => Value::Error(FormulaError::Value),

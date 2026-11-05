@@ -51,6 +51,7 @@ const STORE_EDGES: Readonly<Record<string, readonly string[]>> = {
   "wasm-contract.ts": [],
   "wire-tags.ts": [],
   "window-reader.ts": [
+    "../conditional-format.ts",
     "../errors.ts",
     "../style-dictionary.ts",
     "../utf8.ts",
@@ -102,7 +103,14 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
   "data-model": {
     source: "packages/core/src/types/data-model.ts",
     dependencies: ["table"],
-    exports: ["DataModel", "RelationshipStatus", "TableColumnRef", "TableRelationship"],
+    exports: [
+      "DataModel",
+      "Measure",
+      "MeasureStatus",
+      "RelationshipStatus",
+      "TableColumnRef",
+      "TableRelationship",
+    ],
   },
   dashboard: {
     source: "packages/core/src/types/dashboard.ts",
@@ -237,6 +245,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "XlsxSourceGraph",
       "XlsxSourcePart",
       "XlsxSourceSnapshot",
+      "XlsxUnsupportedQuery",
     ],
   },
   transaction: {

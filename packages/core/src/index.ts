@@ -7,7 +7,7 @@ export {
   parseCurrencyInput,
 } from "./cell-input.js";
 
-export { isCellFontFamily } from "./cell-style-fields.js";
+export { isCellFontFamily, sanitizeCellStyle } from "./cell-style-fields.js";
 
 export {
   openChartViews,
@@ -126,7 +126,7 @@ export {
   type XlsxWorkbookWarning,
 } from "./xlsx-bridge.js";
 
-export { convertXlsxFormulas } from "./engine.js";
+export { withXlsxFormulaEngine, type XlsxFormulaEngine } from "./xlsx-formulas.js";
 
 export {
   createGrid,
@@ -148,7 +148,6 @@ export {
   type ResolvedHyperlinkTarget,
   resolveHyperlinkTarget,
   sanitizeCellHyperlink,
-  sanitizeHyperlinkStyle,
 } from "./hyperlink.js";
 
 export { ICON_NAMES, type IconName } from "./icons/icon-names.js";
@@ -169,6 +168,7 @@ export {
   type SnapshotGridOptions,
 } from "./persistence.js";
 
+export { type QueryCommands, registerQueryCommands } from "./query-commands.js";
 export {
   type DocumentRebaseResult,
   type RebaseConflict,
@@ -419,6 +419,8 @@ export type {
   SyncMutationStatus,
   TableColumnRef,
   TableRelationship,
+  Measure,
+  MeasureStatus,
   Theme,
   ToolbarActionName,
   ToolbarIcon,
@@ -444,6 +446,7 @@ export type {
   XlsxSourceGraph,
   XlsxSourcePart,
   XlsxSourceSnapshot,
+  XlsxUnsupportedQuery,
 } from "./types.js";
 
 export {

@@ -5,9 +5,10 @@
 // in a pivot's output. A grid that never does any of these never fetches it.
 
 import { Scope } from "../scope.js";
+import { selectionCell } from "../selection.js";
 import { storeEngine } from "../store/engine-registry.js";
 import type { ChartRef } from "../types/chart.js";
-import type { Selection, SheetId } from "../types/coordinates.js";
+import type { SheetId } from "../types/coordinates.js";
 import type { Grid, IconOverrides } from "../types/grid.js";
 import type {
   attachPanels,
@@ -19,6 +20,7 @@ import type {
   openExplainPanel,
   openNamePanel,
   openPivotPanel,
+  openQueryPanel,
   openSortPanel,
   syncPivotPanel,
 } from "./panel-controller.js";
@@ -33,6 +35,7 @@ interface PanelController {
   openExplainPanel: typeof openExplainPanel;
   openNamePanel: typeof openNamePanel;
   openPivotPanel: typeof openPivotPanel;
+  openQueryPanel: typeof openQueryPanel;
   openSortPanel: typeof openSortPanel;
   syncPivotPanel: typeof syncPivotPanel;
 }
@@ -148,35 +151,6 @@ export function showSortPanel(grid: Grid): void {
   requestPanel(grid, (controller) => controller.openSortPanel(grid));
 }
 
-/** The focus cell of a selection; whole rows and columns are never inside a pivot. */
-function focusCell(
-  selection: Selection | null,
-): { sheet: SheetId; row: number; col: number } | null {
-  if (selection === null) return null;
-  switch (selection.kind) {
-    case "cell":
-      return selection.addr;
-    case "range":
-      return {
-        sheet: selection.range.sheet,
-        row: Math.min(selection.range.start.row, selection.range.end.row),
-        col: Math.min(selection.range.start.col, selection.range.end.col),
-      };
-    case "multi": {
-      const first = selection.ranges[0];
-      if (first === undefined) return null;
-      return {
-        sheet: first.sheet,
-        row: Math.min(first.start.row, first.end.row),
-        col: Math.min(first.start.col, first.end.col),
-      };
-    }
-    case "row":
-    case "column":
-      return null;
-  }
-}
-
 /** Output cells of one pivot; an empty or failed pivot covers its anchor. */
 interface OutputRect {
   readonly id: string;
@@ -218,7 +192,7 @@ export function pivotAt(
  * first use. Does nothing when the focus cell is outside every pivot's output.
  */
 export function showPivotFields(grid: Grid): void {
-  const cell = focusCell(grid.getSelection());
+  const cell = selectionCell(grid.getSelection());
   const hit = cell === null ? null : pivotAt(grid, cell);
   if (hit === null) return;
 
@@ -236,7 +210,7 @@ export function attachPanelTriggers(grid: Grid, icons?: IconOverrides): () => vo
   // Output rectangles, cached until the next change: selection moves on every arrow key.
   const outputs = new Map<SheetId, OutputRect[]>();
   const pivotHit = (): PivotHit | null => {
-    const cell = focusCell(grid.getSelection());
+    const cell = selectionCell(grid.getSelection());
     if (cell === null) return null;
     let rects = outputs.get(cell.sheet);
     if (rects === undefined) {
