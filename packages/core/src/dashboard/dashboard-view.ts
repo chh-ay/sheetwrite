@@ -9,6 +9,8 @@ import { pivotsAvailable } from "../panels/panel-loader.js";
 import { menuButton, type PanelMenuItem } from "../panels/panel-menu.js";
 import { compareScalars, scalarLabel, sourceDataRange } from "../panels/pivot-model.js";
 import { Scope } from "../scope.js";
+import { PIVOT_ERRORS } from "../store/data-engine.js";
+import { storeEngine } from "../store/engine-registry.js";
 import type { CellScalar } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
 import type {
@@ -256,7 +258,9 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
     if (owner === null) return;
     const list = items();
     const results = list.map((item) =>
-      item.kind === "pivot" ? grid.getPivotResult(owner, item.pivot) : slicerValues(grid, item),
+      item.kind === "pivot"
+        ? dashboardPivotResult(grid, owner, item.pivot)
+        : slicerValues(grid, item),
     );
     const signature = JSON.stringify([list, results, readOnly, mode, message]);
     if (!force && signature === rendered) return;
@@ -327,12 +331,43 @@ function renderPivot(
     return;
   }
 
-  const result = grid.getPivotResult(sheet, item.pivot);
+  const result = dashboardPivotResult(grid, sheet, item.pivot);
   if (result === null || result.status !== "ok") {
     body.appendChild(note(result?.error ?? "#REF!"));
     return;
   }
   body.appendChild(pivotTable(result));
+}
+
+/**
+ * The pivot's result with its cells read from the engine: a dashboard pivot
+ * places no output, so `getPivotResult` has its size but no cells.
+ */
+export function dashboardPivotResult(
+  grid: Grid,
+  sheet: SheetId,
+  id: string,
+): PivotResultView | null {
+  const result = grid.getPivotResult(sheet, id);
+  const output = storeEngine(grid.store)?.dashboardPivotOutput(sheet, id) ?? null;
+  if (result === null || result.status !== "ok" || output === null) return result;
+  try {
+    const kinds = output.kinds();
+    const numbers = output.numbers();
+    const texts = output.texts();
+    let text = 0;
+    const cells = Array.from(kinds, (kind, cell): CellScalar => {
+      const number = numbers[cell] ?? 0;
+      if (kind === 1) return number;
+      if (kind === 2) return texts[text++] ?? "";
+      if (kind === 3) return number !== 0;
+      if (kind === 4) return PIVOT_ERRORS[number] ?? "#VALUE!";
+      return null;
+    });
+    return { ...result, cells };
+  } finally {
+    output.free();
+  }
 }
 
 function pivotTable(result: PivotResultView): HTMLTableElement {

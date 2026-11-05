@@ -39,7 +39,7 @@ export type RecomputingCellStore = Omit<CellStore, "setSavedPivots" | "setHostFu
   };
 
 /** Dashboard pivot output in row-major order; free after reading. */
-interface PivotOutputCells {
+export interface PivotOutputCells {
   /** 0 blank, 1 number, 2 text, 3 boolean, 4 error. */
   kinds(): Uint8Array;
   /** Per cell: the number, the boolean as 0 or 1, or the error slot. */

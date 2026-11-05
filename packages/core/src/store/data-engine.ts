@@ -203,7 +203,7 @@ import {
 import { SheetRegistry } from "./sheet-registry.js";
 import { StoreSnapshotCodec } from "./snapshot-codec.js";
 import { StoreViewState } from "./view-state.js";
-import type { RecomputingCellStore } from "./wasm-contract.js";
+import type { PivotOutputCells, RecomputingCellStore } from "./wasm-contract.js";
 import { StoreWindowReader } from "./window-reader.js";
 import {
   KIND_BOOL,
@@ -231,7 +231,7 @@ const PIVOT_FIELD_TYPES: readonly PivotFieldType[] = [
 const PIVOT_STATUS_STRIDE = 7;
 
 /** Error sentinels by engine `FormulaError` slot; `pivotStatus` sends slot + 1. */
-const PIVOT_ERRORS: readonly string[] = [
+export const PIVOT_ERRORS: readonly string[] = [
   "#CYCLE!",
   "#DIV/0!",
   "#REF!",
@@ -1826,9 +1826,8 @@ export class StoreDataEngine {
     }
 
     const owner = this.workbook.sheets.find((candidate) => candidate.id === sheet);
-    const cells = isDashboard(owner)
-      ? this.dashboardPivotCells(sheet, index)
-      : this.pivotWindowCells(sheet, record);
+    // A dashboard has no cells: its view reads the output with `dashboardPivotOutput`.
+    const cells = isDashboard(owner) ? [] : this.pivotWindowCells(sheet, record);
     return {
       status: "ok",
       anchor: { sheet, row: record.row, col: record.col },
@@ -1851,26 +1850,17 @@ export class StoreDataEngine {
     return Array.from(window.values);
   }
 
-  /** Output cells of a dashboard pivot, read from its cache: a dashboard has no cells. */
-  private dashboardPivotCells(sheet: SheetId, index: number): CellScalar[] {
-    if (!this.wasm.pivotOutput) return [];
-    const output = this.wasm.pivotOutput(this.sheets.handleOf(sheet), index);
-    try {
-      const kinds = output.kinds();
-      const numbers = output.numbers();
-      const texts = output.texts();
-      let text = 0;
-      return Array.from(kinds, (kind, cell): CellScalar => {
-        const number = numbers[cell] ?? 0;
-        if (kind === 1) return number;
-        if (kind === 2) return texts[text++] ?? "";
-        if (kind === 3) return number !== 0;
-        if (kind === 4) return PIVOT_ERRORS[number] ?? "#VALUE!";
-        return null;
-      });
-    } finally {
-      output.free();
-    }
+  /**
+   * The engine output of a pivot on a dashboard, which places none in cells;
+   * the caller frees it. Null on the default engine or for an unknown pivot.
+   */
+  dashboardPivotOutput(sheet: SheetId, id: string): PivotOutputCells | null {
+    const index =
+      this.workbook.sheets
+        .find((candidate) => candidate.id === sheet)
+        ?.pivots?.findIndex((pivot) => pivot.id === id) ?? -1;
+    if (index < 0 || !this.wasm.pivotOutput) return null;
+    return this.wasm.pivotOutput(this.sheets.handleOf(sheet), index);
   }
 
   /**

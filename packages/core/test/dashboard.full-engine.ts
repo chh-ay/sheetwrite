@@ -4,6 +4,7 @@ import { afterEach, beforeAll, beforeEach, expect, it } from "bun:test";
 
 import * as formulas from "@sheetwrite/formulas";
 
+import { dashboardPivotResult } from "../src/dashboard/dashboard-view.js";
 import {
   createGridFromSnapshot,
   type Grid,
@@ -119,8 +120,10 @@ function mount(): Grid {
 
 it("computes a dashboard pivot without cells, equal to the same pivot on a worksheet, after edits", () => {
   const grid = mount();
+  // A dashboard pivot places no output; the dashboard view reads its cells from the engine.
   const cells = (sheet: string, id: string) => {
-    const result = grid.getPivotResult(sheet, id);
+    const result =
+      sheet === "dash" ? dashboardPivotResult(grid, sheet, id) : grid.getPivotResult(sheet, id);
     expect(result?.status).toBe("ok");
     return result?.cells;
   };
