@@ -26,6 +26,7 @@ import { Route as ShowcasesDatabaseRouteImport } from './routes/showcases.databa
 import { Route as ShowcasesEngineRouteImport } from './routes/showcases.engine'
 import { Route as ShowcasesFormattingRouteImport } from './routes/showcases.formatting'
 import { Route as ShowcasesFormulasRouteImport } from './routes/showcases.formulas'
+import { Route as ShowcasesFunctionsRouteImport } from './routes/showcases.functions'
 import { Route as ShowcasesHostRowsRouteImport } from './routes/showcases.host-rows'
 import { Route as ShowcasesInteroperabilityRouteImport } from './routes/showcases.interoperability'
 import { Route as ShowcasesPerformanceRouteImport } from './routes/showcases.performance'
@@ -127,6 +128,11 @@ const ShowcasesFormulasRoute = ShowcasesFormulasRouteImport.update({
   path: '/showcases/formulas',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ShowcasesFunctionsRoute = ShowcasesFunctionsRouteImport.update({
+  id: '/showcases/functions',
+  path: '/showcases/functions',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ShowcasesHostRowsRoute = ShowcasesHostRowsRouteImport.update({
   id: '/showcases/host-rows',
   path: '/showcases/host-rows',
@@ -221,6 +227,7 @@ export interface FileRoutesByFullPath {
   '/showcases/engine': typeof ShowcasesEngineRoute
   '/showcases/formatting': typeof ShowcasesFormattingRoute
   '/showcases/formulas': typeof ShowcasesFormulasRoute
+  '/showcases/functions': typeof ShowcasesFunctionsRoute
   '/showcases/host-rows': typeof ShowcasesHostRowsRoute
   '/showcases/interoperability': typeof ShowcasesInteroperabilityRoute
   '/showcases/performance': typeof ShowcasesPerformanceRoute
@@ -255,6 +262,7 @@ export interface FileRoutesByTo {
   '/showcases/engine': typeof ShowcasesEngineRoute
   '/showcases/formatting': typeof ShowcasesFormattingRoute
   '/showcases/formulas': typeof ShowcasesFormulasRoute
+  '/showcases/functions': typeof ShowcasesFunctionsRoute
   '/showcases/host-rows': typeof ShowcasesHostRowsRoute
   '/showcases/interoperability': typeof ShowcasesInteroperabilityRoute
   '/showcases/performance': typeof ShowcasesPerformanceRoute
@@ -290,6 +298,7 @@ export interface FileRoutesById {
   '/showcases/engine': typeof ShowcasesEngineRoute
   '/showcases/formatting': typeof ShowcasesFormattingRoute
   '/showcases/formulas': typeof ShowcasesFormulasRoute
+  '/showcases/functions': typeof ShowcasesFunctionsRoute
   '/showcases/host-rows': typeof ShowcasesHostRowsRoute
   '/showcases/interoperability': typeof ShowcasesInteroperabilityRoute
   '/showcases/performance': typeof ShowcasesPerformanceRoute
@@ -326,6 +335,7 @@ export interface FileRouteTypes {
     | '/showcases/engine'
     | '/showcases/formatting'
     | '/showcases/formulas'
+    | '/showcases/functions'
     | '/showcases/host-rows'
     | '/showcases/interoperability'
     | '/showcases/performance'
@@ -360,6 +370,7 @@ export interface FileRouteTypes {
     | '/showcases/engine'
     | '/showcases/formatting'
     | '/showcases/formulas'
+    | '/showcases/functions'
     | '/showcases/host-rows'
     | '/showcases/interoperability'
     | '/showcases/performance'
@@ -394,6 +405,7 @@ export interface FileRouteTypes {
     | '/showcases/engine'
     | '/showcases/formatting'
     | '/showcases/formulas'
+    | '/showcases/functions'
     | '/showcases/host-rows'
     | '/showcases/interoperability'
     | '/showcases/performance'
@@ -429,6 +441,7 @@ export interface RootRouteChildren {
   ShowcasesEngineRoute: typeof ShowcasesEngineRoute
   ShowcasesFormattingRoute: typeof ShowcasesFormattingRoute
   ShowcasesFormulasRoute: typeof ShowcasesFormulasRoute
+  ShowcasesFunctionsRoute: typeof ShowcasesFunctionsRoute
   ShowcasesHostRowsRoute: typeof ShowcasesHostRowsRoute
   ShowcasesInteroperabilityRoute: typeof ShowcasesInteroperabilityRoute
   ShowcasesPerformanceRoute: typeof ShowcasesPerformanceRoute
@@ -569,6 +582,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShowcasesFormulasRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/showcases/functions': {
+      id: '/showcases/functions'
+      path: '/showcases/functions'
+      fullPath: '/showcases/functions'
+      preLoaderRoute: typeof ShowcasesFunctionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/showcases/host-rows': {
       id: '/showcases/host-rows'
       path: '/showcases/host-rows'
@@ -693,6 +713,7 @@ const rootRouteChildren: RootRouteChildren = {
   ShowcasesEngineRoute: ShowcasesEngineRoute,
   ShowcasesFormattingRoute: ShowcasesFormattingRoute,
   ShowcasesFormulasRoute: ShowcasesFormulasRoute,
+  ShowcasesFunctionsRoute: ShowcasesFunctionsRoute,
   ShowcasesHostRowsRoute: ShowcasesHostRowsRoute,
   ShowcasesInteroperabilityRoute: ShowcasesInteroperabilityRoute,
   ShowcasesPerformanceRoute: ShowcasesPerformanceRoute,

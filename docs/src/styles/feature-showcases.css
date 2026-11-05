@@ -75,3 +75,37 @@
   color: var(--sw-fg-muted);
   font-size: var(--sw-text-caption);
 }
+
+/* A labeled text field with its submit button, such as a cell input. */
+.sw-feature-input {
+  display: grid;
+  gap: var(--sw-space-2);
+}
+
+.sw-feature-input label {
+  display: grid;
+  gap: var(--sw-space-1);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
+  line-height: var(--sw-leading-ui);
+}
+
+.sw-feature-input code {
+  color: var(--sw-accent-strong);
+  font-family: var(--sw-font-mono);
+}
+
+.sw-feature-input input {
+  min-height: var(--sw-control-height);
+  padding: 0 var(--sw-space-3);
+  border: var(--sw-border-width) solid var(--sw-field-edge);
+  border-radius: var(--sw-radius-md);
+  background: var(--sw-surface-0);
+  color: var(--sw-fg-strong);
+  font: var(--sw-text-small) / 1 var(--sw-font-mono);
+}
+
+.sw-feature-input input:focus-visible {
+  outline: var(--sw-focus-ring-width) solid var(--sw-accent);
+  outline-offset: var(--sw-space-0-5);
+}

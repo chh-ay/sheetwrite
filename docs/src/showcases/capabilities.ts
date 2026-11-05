@@ -28,7 +28,8 @@ export type CapabilityOwnerId =
   | "sort"
   | "queries"
   | "data-model"
-  | "version-history";
+  | "version-history"
+  | "functions";
 
 export type CapabilityArea =
   | "editing"
@@ -251,6 +252,15 @@ export const CAPABILITY_OWNERS: readonly CapabilityOwner[] = [
     routeFile: "docs/src/routes/showcases.version-history.tsx",
     responsibility:
       "History archives journaled by the document authority: named versions, authors, compare with the current document, restore of a range or a sheet, and the Version History panel.",
+    kind: "capability",
+  },
+  {
+    id: "functions",
+    label: "Excel functions",
+    href: "/showcases/functions/",
+    routeFile: "docs/src/routes/showcases.functions.tsx",
+    responsibility:
+      "The function families 0.7.0 adds: engineering, financial, statistics, information, math and text, LOOKUP and TRIMRANGE, GETPIVOTDATA, regex, and references to other workbooks.",
     kind: "capability",
   },
 ];
@@ -650,6 +660,27 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     sharedModules: ["docs/src/showcases/scenarios/version-history.ts"],
     boundary:
       "The page's authority and archive live in memory; a real host keeps commits and the journal in one database transaction.",
+  },
+  {
+    id: "formulas.excel-function-families",
+    title: "Excel function families",
+    area: "modeling",
+    primary: "functions",
+    secondary: [
+      {
+        owner: "formulas",
+        reason: "Formula analysis keeps grouping, dynamic arrays and LAMBDA over a ledger.",
+      },
+    ],
+    interaction:
+      "Pick a function family, change its first input, and read each live result; references to other workbooks keep their text and show #REF!.",
+    scope: "browser",
+    accessibility:
+      "The family is a labeled select, the input a labeled field, and every result is text in the side panel.",
+    testPath: "test/browser/showcase-functions.spec.ts",
+    sharedModules: ["docs/src/showcases/scenarios/functions.ts"],
+    boundary:
+      "Most families run only in the full engine; values for links to other workbooks are not loaded yet.",
   },
   {
     id: "workflow.ribbon",
