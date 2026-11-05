@@ -1,8 +1,9 @@
 //! Bulk render-window assembly: one boundary crossing per visible window,
 //! including the conditional-format rules evaluated against it.
 
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 
+use crate::formula_slots::{FormulaResults, FormulaStore};
 use wasm_bindgen::prelude::*;
 
 use crate::calc::{translate_relative_refs, Ast};
@@ -12,8 +13,8 @@ use crate::query::matches_needle;
 use crate::sheet::{formula_error_with_entry, SheetData};
 use crate::store::CellStore;
 use crate::types::{
-    cell_key, AbsCellKey, EvalResult, FormulaError, StringStorage, Value, KIND_BOOL, KIND_EMPTY,
-    KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
+    cell_key, FormulaError, StringStorage, Value, KIND_BOOL, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER,
+    KIND_STRING, NO_STRING,
 };
 
 /// Global style id of a cell with no style of its own.
@@ -212,7 +213,14 @@ impl CellStore {
             if let Some(column) = s.cells.dense_column(col) {
                 for row in row_start..row_end {
                     let dst = (row - row_start) * n_cols + col_index;
-                    cells.fill(s, row, col, dst, Some(column.cell(row)));
+                    cells.fill(
+                        s,
+                        row,
+                        col,
+                        dst,
+                        Some(column.cell(row)),
+                        &self.formula_slots,
+                    );
                 }
                 continue;
             }
@@ -224,7 +232,7 @@ impl CellStore {
                 run.visit_paged(|src, resolved| {
                     let row = src - col * s.cells.row_count();
                     let dst = (row - row_start) * n_cols + col_index;
-                    cells.fill(s, row, col, dst, resolved);
+                    cells.fill(s, row, col, dst, resolved, &self.formula_slots);
                 });
                 start = run.end;
             }
@@ -260,7 +268,14 @@ impl CellStore {
                     let row = row as usize;
                     if row < s.cells.row_count() {
                         let dst = row_index * n_cols + col_index;
-                        cells.fill(s, row, col, dst, Some(column.cell(row)));
+                        cells.fill(
+                            s,
+                            row,
+                            col,
+                            dst,
+                            Some(column.cell(row)),
+                            &self.formula_slots,
+                        );
                     }
                 }
                 continue;
@@ -269,7 +284,7 @@ impl CellStore {
             s.cells
                 .visit_paged_rows(rows, col, |row_index, row, resolved| {
                     let dst = row_index * n_cols + col_index;
-                    cells.fill(s, row, col, dst, resolved);
+                    cells.fill(s, row, col, dst, resolved, &self.formula_slots);
                 });
         }
 
@@ -329,6 +344,7 @@ impl WindowCells {
         col: usize,
         dst: usize,
         resolved: Option<(u8, u64, u32)>,
+        slots: &FormulaStore,
     ) {
         let Some((stored_kind, payload, style)) = resolved else {
             self.kind[dst] = KIND_STRING;
@@ -355,7 +371,7 @@ impl WindowCells {
             }
             KIND_FORMULA => {
                 let key = cell_key(row, col);
-                let entry = key.and_then(|key| sheet.formulas.get(key));
+                let entry = key.and_then(|key| sheet.formulas.get(key, slots));
                 let error = key.and_then(|key| formula_error_with_entry(sheet, key, entry));
                 if let Some(error) = error {
                     self.kind[dst] = KIND_STRING;
@@ -417,8 +433,7 @@ fn cond_matches_for_window<F: Fn(usize) -> u32>(
 
     let n_cols = cols.len();
     let mut matches = vec![0u32; n_rows * n_cols];
-    let mut memo: FxHashMap<AbsCellKey, EvalResult> = FxHashMap::default();
-    let mut visiting: FxHashSet<AbsCellKey> = FxHashSet::default();
+    let mut results = FormulaResults::default();
     for ri in 0..n_rows {
         let data_row = data_row_at(ri);
         for (cj, &col) in cols.iter().enumerate() {
@@ -441,15 +456,13 @@ fn cond_matches_for_window<F: Fn(usize) -> u32>(
                             i64::from(data_row) - i64::from(*anchor_row),
                             i64::from(col) - i64::from(*anchor_col),
                         );
-                        memo.clear();
-                        visiting.clear();
+                        results.clear();
                         match store.eval_conditional_ast(
                             &translated,
                             sheet_index,
                             data_row,
                             col,
-                            &mut memo,
-                            &mut visiting,
+                            &mut results,
                         ) {
                             Value::Bool(value) => value,
                             Value::Number(value) => value != 0.0,
