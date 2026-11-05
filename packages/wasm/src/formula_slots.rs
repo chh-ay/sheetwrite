@@ -9,10 +9,29 @@ const NO_RESULT_POSITION: u32 = u32::MAX;
 const SLOT_CAPACITY_SLACK: usize = 4096;
 const SLOT_GROWTH_DIVISOR: usize = 8;
 const MIN_SLOT_GROWTH: usize = 1;
+/// Below this many slots, location growth takes several steps at once.
 const DOUBLING_SLOT_LIMIT: usize = 4096;
 
 // One membership word of ids per page bounds moves of occupied entry storage.
 const SLOT_PAGE_LEN: usize = BITS_PER_WORD;
+
+/// The location capacity after `len` slots fill it. Every capacity is a step
+/// of one eighth from the last, so a large store keeps the same bounded
+/// slack. A small store takes several steps at once, until its capacity at
+/// least doubles, so loading copies the array a few times instead of tens.
+fn location_capacity_after(len: usize) -> usize {
+    let target = if len < DOUBLING_SLOT_LIMIT {
+        len.saturating_mul(2).max(SLOT_PAGE_LEN)
+    } else {
+        len + 1
+    };
+
+    let mut capacity = len;
+    while capacity < target {
+        capacity = capacity.saturating_add((capacity / SLOT_GROWTH_DIVISOR).max(MIN_SLOT_GROWTH));
+    }
+    capacity
+}
 
 /// Stable workbook identity; moving a cell changes its location, not this id.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -326,15 +345,8 @@ impl FormulaStore {
         let page = self.entries.last_mut()?;
         page.push(FormulaSlot::Occupied(entry));
         if index == self.locations.capacity() {
-            // A small store doubles: steps of one eighth would copy its
-            // location array tens of times while it loads. A large store
-            // keeps the one-eighth step to bound unused capacity.
-            let growth = if index < DOUBLING_SLOT_LIMIT {
-                index.max(SLOT_PAGE_LEN)
-            } else {
-                index / SLOT_GROWTH_DIVISOR
-            };
-            self.locations.reserve_exact(growth);
+            self.locations
+                .reserve_exact(location_capacity_after(index) - index);
         }
         self.locations.push(location);
         Some(FormulaId(id))
