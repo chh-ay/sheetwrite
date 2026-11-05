@@ -9,8 +9,11 @@ pub(crate) const NAMES: &[&str] = &[
     "CUMPRINC",
     "DB",
     "DDB",
+    "DOLLARDE",
+    "DOLLARFR",
     "EFFECT",
     "FVSCHEDULE",
+    "ISPMT",
     "MIRR",
     "NOMINAL",
     "NPER",
@@ -48,6 +51,18 @@ fn calculate(name: &str, arguments: &FuncAccumulator) -> NumberResult {
         "XNPV" | "XIRR" => dated_return(arguments, name == "XIRR"),
         "MIRR" => modified_return(arguments),
         "FVSCHEDULE" => scheduled_value(arguments),
+        "DOLLARDE" | "DOLLARFR" => dollar_fraction(arguments, name == "DOLLARDE"),
+        "ISPMT" => {
+            require_arity(arguments, 4, 4)?;
+            let rate = number_arg(arguments, 0, None)?;
+            let period = number_arg(arguments, 1, None)?;
+            let periods = number_arg(arguments, 2, None)?;
+            let present = number_arg(arguments, 3, None)?;
+            if periods == 0.0 {
+                return Err(FormulaError::DivZero);
+            }
+            Ok(present * rate * (period / periods - 1.0))
+        }
         "EFFECT" | "NOMINAL" => {
             require_arity(arguments, 2, 2)?;
             let rate = number_arg(arguments, 0, None)?;
@@ -232,6 +247,30 @@ fn depreciation(arguments: &FuncAccumulator, is_fixed: bool) -> NumberResult {
         };
         Ok((previous * rate).min(previous - salvage).max(0.0))
     }
+}
+
+/// DOLLARDE and DOLLARFR(dollar, fraction). The fraction is truncated; a
+/// negative fraction is `#NUM!` and a fraction below 1 is `#DIV/0!`. The
+/// fractional part is read and written as digits over the next power of 10
+/// at or above the fraction, so 1.02 with fraction 16 means 1 and 2/16.
+fn dollar_fraction(arguments: &FuncAccumulator, is_decimal: bool) -> NumberResult {
+    require_arity(arguments, 2, 2)?;
+    let dollar = number_arg(arguments, 0, None)?;
+    let fraction = number_arg(arguments, 1, None)?.trunc();
+    if fraction < 0.0 {
+        return Err(FormulaError::Num);
+    }
+    if fraction == 0.0 {
+        return Err(FormulaError::DivZero);
+    }
+    let whole = dollar.trunc();
+    let part = dollar - whole;
+    let digits = 10f64.powf(fraction.log10().ceil());
+    Ok(if is_decimal {
+        whole + part * digits / fraction
+    } else {
+        whole + part * fraction / digits
+    })
 }
 
 fn scheduled_value(arguments: &FuncAccumulator) -> NumberResult {

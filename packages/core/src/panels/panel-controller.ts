@@ -19,11 +19,12 @@ import { rejectionMessage } from "./panel-dom.js";
 import { nextPivotIdentity, pivotSourceFor } from "./pivot-model.js";
 import { pivotPanel } from "./pivot-panel.js";
 import { parseRangeText } from "./range-text.js";
+import { relationshipPanel } from "./relationship-panel.js";
 
 /** What the open panel shows, so selection changes can switch or close it. */
 type OpenPanel =
   | { readonly kind: "chart" | "pivot"; readonly sheet: SheetId; readonly id: string }
-  | { readonly kind: "explain" | "names" | "queries" | "sort" };
+  | { readonly kind: "explain" | "names" | "queries" | "sort" | "dataModel" };
 
 interface PanelState {
   icons: IconOverrides | undefined;
@@ -91,6 +92,17 @@ export function openNamePanel(grid: Grid, define = false): void {
   const state = stateOf(grid);
   const open: OpenPanel = { kind: "names" };
   const panel = namePanel(grid, define);
+  grid.openPanel({
+    ...panel,
+    render: (body) => trackOpen(state, open, panel.render(body)),
+  });
+}
+
+/** Data › Data Model and Data › Relationships open the data model panel. */
+export function openDataModelPanel(grid: Grid): void {
+  const state = stateOf(grid);
+  const open: OpenPanel = { kind: "dataModel" };
+  const panel = relationshipPanel(grid);
   grid.openPanel({
     ...panel,
     render: (body) => trackOpen(state, open, panel.render(body)),

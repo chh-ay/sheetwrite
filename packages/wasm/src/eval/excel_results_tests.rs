@@ -133,6 +133,28 @@ fn legacy_statistics_names_read_references_as_their_successors() {
     ]);
 }
 
+#[cfg(feature = "analysis")]
+#[test]
+fn financial_functions_read_cells_text_dates_and_blanks() {
+    assert_results(&[
+        ("=DOLLARDE(Data!A1+0.02,16)", "1.125"),
+        ("=ISPMT(Data!A1/10,Data!A1,Data!A3,Data!B3)", "-2"),
+        (
+            "=COUPNUM(DATE(2007,1,25),DATE(2008,11,15),Data!A2,Data!A1)",
+            "4",
+        ),
+        (
+            "=ROUND(ACCRINTM(DATE(2008,4,1),DATE(2008,6,15),Data!B1%,1000,Data!A3),8)",
+            "20.54794521",
+        ),
+        (
+            "=COUPDAYS(DATE(2011,1,25),DATE(2011,11,15),2,Data!F1)",
+            "180",
+        ),
+        ("=COUPPCD(\"2011-01-25\",\"2011-11-15\",2,1)", "40497"),
+    ]);
+}
+
 #[test]
 fn whole_columns_and_rows_read_the_used_part_of_the_sheet() {
     assert_results(&[
