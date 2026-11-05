@@ -297,6 +297,17 @@ const insertChartOf =
   async (grid: Grid): Promise<boolean> =>
     (await loadPanels(grid)).insertChart(grid, kind);
 
+/** Data › Data Tools opens the data model panel; the panel code loads on first use. */
+const openDataModel = async (grid: Grid): Promise<void> =>
+  (await loadPanels(grid)).openDataModelPanel(grid);
+
+/** The data model needs workbook tables: one to manage, two to relate. */
+function workbookTableCount(grid: Grid): number {
+  let count = 0;
+  for (const sheet of grid.store.getWorkbook().sheets) count += sheet.tables?.length ?? 0;
+  return count;
+}
+
 /**
  * Excel's Insert › Charts: the face inserts a column chart, as Excel's
  * Recommended Charts usually does for a table, and the menu picks a kind.
@@ -684,7 +695,7 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
   },
   {
     label: "Data",
-    reduceOrder: ["export", "showHide", "outline", "sortFilter"],
+    reduceOrder: ["export", "showHide", "outline", "dataTools", "sortFilter"],
     groups: [
       {
         id: "sortFilter",
@@ -701,6 +712,22 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
             flags: SORT,
           }),
           button("Clear Filter", "clearFilter", (grid) => grid.actions.clearFilter()),
+        ],
+      },
+      {
+        id: "dataTools",
+        label: "Data Tools",
+        icon: "dataModel",
+        layout: "flow",
+        controls: [
+          {
+            ...button("Manage Data Model", "dataModel", openDataModel, "view", { large: true }),
+            available: (grid) => workbookTableCount(grid) > 0,
+          },
+          {
+            ...button("Relationships", "relationships", openDataModel, "view", { large: true }),
+            available: (grid) => workbookTableCount(grid) > 1,
+          },
         ],
       },
       {

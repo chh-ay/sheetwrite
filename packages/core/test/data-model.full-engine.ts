@@ -4,8 +4,15 @@ import { beforeAll, expect, it } from "bun:test";
 
 import * as formulas from "@sheetwrite/formulas";
 
-import { initSheetwrite, releaseEngineMemory, SheetwriteStore } from "../src/index.js";
+import {
+  createGridFromSnapshot,
+  initSheetwrite,
+  releaseEngineMemory,
+  SheetwriteStore,
+} from "../src/index.js";
 import type { TableRelationship, WorkbookSnapshot } from "../src/index.js";
+import { loadPanels } from "../src/panels/panel-loader.js";
+import { installCanvasTestStubs } from "../src/testing.js";
 
 beforeAll(async () => {
   await initSheetwrite(undefined, formulas);
@@ -98,5 +105,55 @@ it("checks keys from the current cells and keeps checking after a memory release
     expect(store.getRelationshipStatus(relationship.id)).toEqual({ status: "unavailable" });
   } finally {
     store.dispose();
+  }
+});
+
+it("refuses a relationship in the panel while its lookup keys repeat", async () => {
+  const restore = installCanvasTestStubs();
+  const input = snapshot();
+  delete input.workbook.dataModel;
+  const host = document.createElement("div");
+  document.body.append(host);
+  const grid = createGridFromSnapshot(host, input);
+  const press = (target: Element | null) => {
+    if (target === null) throw new Error("missing control");
+    target.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 0 }));
+  };
+  const panelText = () => host.querySelector(".sheetwrite-panel")?.textContent ?? "";
+  const setId = (value: string) =>
+    grid.applyTransaction({
+      patches: [
+        { op: "set", addr: { sheet: "data", row: 3, col: 2 }, value: { kind: "literal", value } },
+      ],
+    });
+  try {
+    expect(setId("c1").status).toBe("applied");
+    (await loadPanels(grid)).openDataModelPanel(grid);
+    const save = host.querySelector('[data-focus-key="save-relationship"]');
+
+    // Orders is the data table and Customers the lookup table; each has one key column.
+    const [dataTable, , lookupTable] = host.querySelectorAll<HTMLSelectElement>(
+      ".sheetwrite-panel select",
+    );
+    if (dataTable === undefined || lookupTable === undefined) throw new Error("missing pickers");
+    for (const [picker, value] of [
+      [dataTable, "orders"],
+      [lookupTable, "customers"],
+    ] as const) {
+      picker.value = value;
+      picker.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    press(save);
+    expect(grid.store.getWorkbook().dataModel).toBeUndefined();
+    expect(panelText()).toContain("The lookup table repeats a key in rows 1 and 3.");
+
+    expect(setId("C3").status).toBe("applied");
+    press(save);
+    expect(grid.store.getWorkbook().dataModel?.relationships).toHaveLength(1);
+    expect(panelText()).toContain("1 keys match no row and show as blank.");
+  } finally {
+    grid.destroy();
+    host.remove();
+    restore();
   }
 });
