@@ -8,16 +8,11 @@ const STABLE_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 const REPOSITORY_ROOT = resolve(import.meta.dir, "..");
 const PACKAGE_SIZE_HISTORY_PREFIX = "automation/package-size-history-";
 const RELEASE_VERSION_PREFIX = "release/version-";
-const REQUIRED_PACKAGE_SIZE_HISTORY_FILES = new Set([
-  "docs/src/content/docs/performance/delivery-size.md",
-  "scripts/size-history.json",
-]);
+const REQUIRED_PACKAGE_SIZE_HISTORY_FILES = new Set(["scripts/size-history.json"]);
 const ALLOWED_PACKAGE_SIZE_HISTORY_FILES = new Set([
   ...REQUIRED_PACKAGE_SIZE_HISTORY_FILES,
-  "docs/src/generated/docs-contract.json",
-  // The release's measured size report and the landing data built from it.
+  // The release's measured size report; the docs build renders the landing data from it.
   "scripts/size-report.json",
-  "docs/src/generated/landing-bench.json",
 ]);
 
 export interface ChangesetComparison {
