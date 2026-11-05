@@ -28,7 +28,7 @@ import {
   QUERY_TABLE_REL,
   type QueryTableBinding,
   queryTableXml,
-} from "./power-query.js";
+} from "./query-table.js";
 import {
   assertResource,
   boundedErrorText,

@@ -8,7 +8,9 @@ import { validateWorkbookSnapshot } from "@sheetwrite/core";
 import { inflateSync, unzipSync, zipSync } from "fflate";
 
 import { type OpcPackage, relationshipTypeMatches } from "./opc.js";
-import { emitWarning, type XlsxCodecContext } from "./resources.js";
+import { queriesDigest, queryWarning, textDigest } from "./query-digest.js";
+import type { QueryTableBinding } from "./query-table.js";
+import type { XlsxCodecContext } from "./resources.js";
 import type { WorkbookWriteHook } from "./writer.js";
 import { escapeXml, parseXml, xmlAttribute, xmlChild, xmlChildren } from "./xml.js";
 import type { ZipPart } from "./zip.js";
@@ -31,13 +33,10 @@ const OFFICE_REL = "http://schemas.openxmlformats.org/officeDocument/2006/relati
 const CUSTOM_XML_REL = `${OFFICE_REL}/customXml`;
 const CUSTOM_XML_PROPS_REL = `${OFFICE_REL}/customXmlProps`;
 const CONNECTIONS_REL = `${OFFICE_REL}/connections`;
-export const QUERY_TABLE_REL = `${OFFICE_REL}/queryTable`;
 const CUSTOM_XML_PROPS_CONTENT =
   "application/vnd.openxmlformats-officedocument.customXmlProperties+xml";
 const CONNECTIONS_CONTENT =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.connections+xml";
-export const QUERY_TABLE_CONTENT =
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.queryTable+xml";
 const XML_CONTENT = "application/xml";
 const RELATIONSHIPS_CONTENT = "application/vnd.openxmlformats-package.relationships+xml";
 
@@ -55,53 +54,9 @@ const MAX_MASHUP_BYTES = 16 * 1024 * 1024;
 const MAX_SECTION_BYTES = 4 * 1024 * 1024;
 const UTF16_LE_BOM = [0xff, 0xfe] as const;
 const UTF16_BE_BOM = [0xfe, 0xff] as const;
-const FNV_OFFSET = 0x811c9dc5;
-const FNV_PRIME = 0x01000193;
-const SECOND_LANE_SEED = 0x9e3779b9;
-const HEX_RADIX = 16;
-const HEX_DIGITS_PER_LANE = 8;
 
 const utf8 = new TextEncoder();
 const utf8Decoder = new TextDecoder("utf-8", { fatal: true });
-
-function canonical(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonical);
-  if (value === null || typeof value !== "object") return value;
-
-  const output: Record<string, unknown> = {};
-  for (const [key, entry] of Object.entries(value).sort(([left], [right]) =>
-    left < right ? -1 : left > right ? 1 : 0,
-  )) {
-    if (entry !== undefined) output[key] = canonical(entry);
-  }
-
-  return output;
-}
-
-/** 64-bit hex fingerprint of text, with two FNV-1a lanes. */
-function textDigest(text: string): string {
-  let low = FNV_OFFSET;
-  let high = SECOND_LANE_SEED;
-  for (let index = 0; index < text.length; index++) {
-    const code = text.charCodeAt(index);
-    low = Math.imul(low ^ code, FNV_PRIME) >>> 0;
-    high = (Math.imul(high ^ code, FNV_PRIME) ^ (high >>> 15)) >>> 0;
-  }
-
-  return (
-    high.toString(HEX_RADIX).padStart(HEX_DIGITS_PER_LANE, "0") +
-    low.toString(HEX_RADIX).padStart(HEX_DIGITS_PER_LANE, "0")
-  );
-}
-
-/** Fingerprint of `workbook.queries`; retained query parts are valid only while it matches. */
-export function queriesDigest(queries: readonly SavedQuery[] | undefined): string {
-  return textDigest(JSON.stringify(canonical(queries ?? [])));
-}
-
-export function queryWarning(context: XlsxCodecContext, message: string, part?: string): void {
-  emitWarning(context, { code: "query-loss", message, ...(part ? { part } : {}) });
-}
 
 // --- Reading -----------------------------------------------------------------
 
@@ -479,11 +434,6 @@ function guid(): string {
   return `{${crypto.randomUUID().toUpperCase()}}`;
 }
 
-/** Binding of one output table to its connection, for the writer's table part. */
-export interface QueryTableBinding {
-  readonly connectionId: number;
-}
-
 interface PowerQueryParts {
   readonly workbookRelationships: ReadonlyArray<{ type: string; target: string }>;
   readonly contentTypeOverrides: ReadonlyArray<{ part: string; contentType: string }>;
@@ -636,24 +586,6 @@ function retainedBindings(
   });
 
   return bindings;
-}
-
-/** A queryTable part that maps each table column to the query's result column. */
-export function queryTableXml(
-  table: WorkbookTable,
-  number: number,
-  binding: QueryTableBinding,
-): Uint8Array {
-  const fields = table.columns
-    .map(
-      (column, index) =>
-        `<queryTableField id="${index + 1}" name="${escapeXml(column.name)}" tableColumnId="${index + 1}"/>`,
-    )
-    .join("");
-
-  return utf8.encode(
-    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><queryTable xmlns="${MAIN_NS}" name="${escapeXml(`ExternalData_${number}`)}" connectionId="${binding.connectionId}"><queryTableRefresh nextId="${table.columns.length + 1}"><queryTableFields count="${table.columns.length}">${fields}</queryTableFields></queryTableRefresh></queryTable>`,
-  );
 }
 
 /**

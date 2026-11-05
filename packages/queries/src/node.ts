@@ -7,33 +7,29 @@ import {
   loadPowerQueryCodec as loadCodecWithArtifact,
   loadQueryEngine as loadWithArtifact,
 } from "./index.js";
-import type {
-  PowerQueryCodecOptions,
-  QueryEngineOptions,
-  QuerySession,
-  QuerySessionOptions,
-} from "./index.js";
+import type { QueryEngineOptions, QuerySession, QuerySessionOptions } from "./index.js";
 import type { QueryEngine } from "./types.js";
 
 export * from "./index.js";
 
-/** Node reads optional artifacts only on demand; source I/O still belongs to the host. */
-export async function loadQueryEngine(options: QueryEngineOptions = {}): Promise<QueryEngine> {
-  const wasm =
-    options.wasm ?? (await readFile(new URL("../pkg/sheetwrite_queries_bg.wasm", import.meta.url)));
-
-  return loadWithArtifact({ wasm });
+async function artifact(options: QueryEngineOptions): Promise<QueryEngineOptions> {
+  return {
+    wasm:
+      options.wasm ??
+      (await readFile(new URL("../pkg/sheetwrite_queries_bg.wasm", import.meta.url))),
+  };
 }
 
-/** Node variant of `loadPowerQueryCodec`; it reads the codec artifact from this package. */
-export async function loadPowerQueryCodec(
-  options: PowerQueryCodecOptions = {},
-): Promise<PowerQueryCodec> {
-  const wasm =
-    options.wasm ??
-    (await readFile(new URL("../pkg-power-query/sheetwrite_power_query_bg.wasm", import.meta.url)));
+/** Node reads the optional artifact only on demand; source I/O still belongs to the host. */
+export async function loadQueryEngine(options: QueryEngineOptions = {}): Promise<QueryEngine> {
+  return loadWithArtifact(await artifact(options));
+}
 
-  return loadCodecWithArtifact({ wasm });
+/** Node variant of `loadPowerQueryCodec`; it reads the artifact from this package. */
+export async function loadPowerQueryCodec(
+  options: QueryEngineOptions = {},
+): Promise<PowerQueryCodec> {
+  return loadCodecWithArtifact(await artifact(options));
 }
 
 /** Node variant of `createQuerySession`; it reads the artifact from this package. */

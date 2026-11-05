@@ -198,24 +198,9 @@ if (/\bfrom\s*["']\.{1,2}\/|\bimport\s*\(\s*["']\.{1,2}\//.test(defaultWorker)) 
   throw new Error(`Core default worker ${defaultWorkers[0]} was copied, not bundled`);
 }
 const wasmFiles = publicFiles.filter((path) => path.endsWith(".wasm"));
-
-// The Power Query codec is a second lazy artifact of the queries package. Vite
-// lists it as a manifest asset but not under the chunk that loads it, so it is
-// classified by its package path, and it must stay out of every initial graph.
-for (const [key, chunk] of Object.entries(manifest)) {
-  if (
-    key.startsWith("node_modules/@sheetwrite/queries/pkg-power-query/") &&
-    chunk.file.endsWith(".wasm")
-  ) {
-    addFile(chunk.file, "queries-async");
-  }
-}
-
 const queryWasmFiles = wasmFiles.filter((file) => rolesByFile.get(file)?.has("queries-async"));
-if (queryWasmFiles.length !== 2) {
-  throw new Error(
-    `Expected the lazy query engine and codec WASM assets, got ${queryWasmFiles.length}`,
-  );
+if (queryWasmFiles.length !== 1) {
+  throw new Error(`Expected one lazy query WASM asset, got ${queryWasmFiles.length}`);
 }
 
 const defaultWasmFiles = wasmFiles.filter((file) => !queryWasmFiles.includes(file));

@@ -52,9 +52,7 @@ pub(crate) fn field(out: &mut String, name: &str) {
 
 /// A finite number literal. Negative values use the unary minus operator.
 pub(crate) fn number(out: &mut String, value: f64) {
-    // Debug formatting is the shortest text that reads back to the same f64,
-    // with an `e` exponent for very large or small values, as M allows.
-    let _ = write!(out, "{value:?}");
+    crate::column::number_text_family(out, value);
 }
 
 /// Section member names must not contain `.`, `"`, tabs or line breaks, nor

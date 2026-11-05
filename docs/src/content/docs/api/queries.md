@@ -8,7 +8,7 @@ description: "API reference for @sheetwrite/queries."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/index.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>30</dd></div>
+<div><dt>Exports</dt><dd>29</dd></div>
 </dl>
 
 Source entry: `packages/queries/src/index.ts`
@@ -29,10 +29,9 @@ Source entry: `packages/queries/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/queries/load-query-engine/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>loadQueryEngine</code></span><span class="api-symbol-card__desc">Importing this package loads no WASM; only this explicit call loads query execution.</span></a>
 </div>
 
-### Interfaces <span class="api-count" data-pagefind-ignore>15</span>
+### Interfaces <span class="api-count" data-pagefind-ignore>14</span>
 
 <div class="api-symbol-grid">
-<a class="api-symbol-card" href="/docs/api/queries/power-query-codec-options/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PowerQueryCodecOptions</code></span><span class="api-symbol-card__desc">Hosts can provide the compiled codec artifact, @sheetwrite/queries/power-query-wasm.</span></a>
 <a class="api-symbol-card" href="/docs/api/queries/query-aggregate/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>QueryAggregate</code></span><span class="api-symbol-card__desc">Column is required except for countRows; numeric aggregates ignore nulls.</span></a>
 <a class="api-symbol-card" href="/docs/api/queries/query-batch/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>QueryBatch</code></span><span class="api-symbol-card__desc">Equal-length columns with a u32 row count; returned buffers are owned by the caller.</span></a>
 <a class="api-symbol-card" href="/docs/api/queries/query-column-spec/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>QueryColumnSpec</code></span><span class="api-symbol-card__desc">Stable identity is separate from the field name used by source records.</span></a>

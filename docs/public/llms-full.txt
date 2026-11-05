@@ -18204,17 +18204,6 @@ async function selectLargeTotals() {
 }
 ```
 
-##### `PowerQueryCodecOptions` — interface
-
-```ts
-export interface PowerQueryCodecOptions { readonly wasm?: PowerQuerySyncInitInput; }
-```
-
-Hosts can provide the compiled codec artifact, `@sheetwrite/queries/power-query-wasm`.
-
-Members:
-- `wasm` — Compiled module or artifact bytes, as accepted by the generated bindings.
-
 ##### `QueryAggregate` — interface
 
 ```ts
@@ -18451,11 +18440,6 @@ export type QueryStep = { readonly kind: "filter"; readonly predicate: QueryPred
 
 Saved step order is execution order; each column reference is a stable identity.
 In a saved query, a join `input` is the ID of another saved query.
-
-#### `@sheetwrite/queries/power-query-wasm` — asset
-
-Declaration target: `./pkg-power-query/sheetwrite_power_query_bg.wasm`
-Page: https://www.sheetwrite.dev/docs/api/queries-power-query-wasm/
 
 #### `@sheetwrite/queries/wasm` — asset
 

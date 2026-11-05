@@ -10349,7 +10349,7 @@
               "owners": [
                 "src/index.ts"
               ],
-              "source": "src/index.ts#L104",
+              "source": "src/index.ts#L97",
               "jsDocTags": [
                 "example"
               ],
@@ -10363,7 +10363,7 @@
               "owners": [
                 "src/index.ts"
               ],
-              "source": "src/index.ts#L126",
+              "source": "src/index.ts#L119",
               "jsDocTags": [
                 "example"
               ],
@@ -10377,29 +10377,12 @@
               "owners": [
                 "src/index.ts"
               ],
-              "source": "src/index.ts#L71",
+              "source": "src/index.ts#L64",
               "jsDocTags": [
                 "example"
               ],
               "documentation": "Importing this package loads no WASM; only this explicit call loads query execution.\n@example\n```ts\nimport { loadQueryEngine } from \"@sheetwrite/queries\";\n\nasync function selectLargeTotals() {\n  const engine = await loadQueryEngine();\n  const source = engine.parse(\n    new TextEncoder().encode('[{\"Total\":120},{\"Total\":75}]'),\n    { format: \"json\", columns: [{ id: \"total\", name: \"Total\", type: \"number\" }] },\n  );\n\n  return engine.execute(source, [\n    { kind: \"filter\", predicate: { kind: \"compare\", column: \"total\", op: \"gte\", value: 100 } },\n  ]);\n}\n```",
               "memberDocs": []
-            },
-            {
-              "name": "PowerQueryCodecOptions",
-              "kind": "interface",
-              "signature": "export interface PowerQueryCodecOptions { readonly wasm?: PowerQuerySyncInitInput; }",
-              "owners": [
-                "src/index.ts"
-              ],
-              "source": "src/index.ts#L40",
-              "jsDocTags": [],
-              "documentation": "Hosts can provide the compiled codec artifact, `@sheetwrite/queries/power-query-wasm`.",
-              "memberDocs": [
-                {
-                  "name": "wasm",
-                  "documentation": "Compiled module or artifact bytes, as accepted by the generated bindings."
-                }
-              ]
             },
             {
               "name": "QueryAggregate",
@@ -10513,7 +10496,7 @@
               "owners": [
                 "src/index.ts"
               ],
-              "source": "src/index.ts#L46",
+              "source": "src/index.ts#L39",
               "jsDocTags": [],
               "documentation": "Hosts can provide the compiled artifact instead of using browser artifact loading.",
               "memberDocs": [
@@ -10777,13 +10760,6 @@
               "memberDocs": []
             }
           ]
-        },
-        {
-          "subpath": "./power-query-wasm",
-          "target": "./pkg-power-query/sheetwrite_power_query_bg.wasm",
-          "kind": "asset",
-          "classification": "asset",
-          "exports": []
         },
         {
           "subpath": "./wasm",
@@ -14409,7 +14385,7 @@
               "owners": [
                 "src/workbook.ts"
               ],
-              "source": "src/workbook.ts#L10",
+              "source": "src/workbook.ts#L29",
               "jsDocTags": [],
               "documentation": "Deterministic optional OOXML workbook backend implemented by Sheetwrite.",
               "memberDocs": []

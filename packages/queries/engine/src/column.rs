@@ -5,9 +5,9 @@ use crate::buffers::{at, flat_index, row_index, Bits, Texts};
 use crate::mixed::Mixed;
 use crate::plan::{ColumnSpec, ColumnType, Diagnostic, Limits};
 use std::cmp::Ordering;
+use std::fmt::Write;
 
 mod transfer;
-#[cfg(feature = "engine")]
 pub(crate) use transfer::ColumnBuffers;
 
 /// A borrowed scalar view; null and error remain distinct from every typed value.
@@ -336,11 +336,23 @@ fn type_rank(value: Value<'_>) -> u8 {
     }
 }
 
+/// Display is the shortest decimal text that reads back to the same f64, with
+/// no exponent. The engine and the M writer share this one out-of-line copy,
+/// so the float formatter is linked once.
+#[inline(never)]
+pub(crate) fn number_text_family(out: &mut String, value: f64) {
+    let _ = write!(out, "{value}");
+}
+
 /// Formatting is invariant so refresh does not depend on the host's locale.
 pub(crate) fn formatted(value: Value<'_>) -> Option<String> {
     match value {
         Value::Text(value) => Some(value.to_owned()),
-        Value::Number(value) => Some(value.to_string()),
+        Value::Number(value) => {
+            let mut text = String::new();
+            number_text_family(&mut text, value);
+            Some(text)
+        }
         Value::Logical(value) => Some(value.to_string()),
         Value::Date(days) => crate::calendar::format_date(days),
         Value::DateTime(micros) => crate::calendar::format_datetime(micros),

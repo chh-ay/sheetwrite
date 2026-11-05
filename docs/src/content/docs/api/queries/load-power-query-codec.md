@@ -21,7 +21,7 @@ async function exportedM(snapshot: WorkbookSnapshot) {
 ```
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/index.ts#L126"><code>packages/queries/src/index.ts#L126</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/index.ts#L119"><code>packages/queries/src/index.ts#L119</code></a></dd></div>
 </dl>
 
 ## Declaration

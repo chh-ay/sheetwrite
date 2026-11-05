@@ -26,25 +26,21 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
-    "./wasm": "./pkg/sheetwrite_queries_bg.wasm",
-    "./power-query-wasm": "./pkg-power-query/sheetwrite_power_query_bg.wasm"
+    "./wasm": "./pkg/sheetwrite_queries_bg.wasm"
   },
   "files": [
     "dist/**/*.js",
     "dist/**/*.d.ts",
     "pkg/sheetwrite_queries.js",
     "pkg/sheetwrite_queries.d.ts",
-    "pkg/sheetwrite_queries_bg.wasm",
-    "pkg-power-query/sheetwrite_power_query.js",
-    "pkg-power-query/sheetwrite_power_query.d.ts",
-    "pkg-power-query/sheetwrite_power_query_bg.wasm"
+    "pkg/sheetwrite_queries_bg.wasm"
   ],
   "publishConfig": {
     "access": "public",
     "provenance": true
   },
   "scripts": {
-    "build": "rm -rf dist && wasm-pack build engine --target web --out-dir ../pkg && wasm-pack build engine --target web --out-dir ../pkg-power-query --out-name sheetwrite_power_query --no-default-features --features power-query && bun build.ts && tsc -p tsconfig.build.json && rm -f dist/types.js && bun ../../scripts/package-dist.ts .",
+    "build": "rm -rf dist && wasm-pack build engine --target web --out-dir ../pkg && bun build.ts && tsc -p tsconfig.build.json && rm -f dist/types.js && bun ../../scripts/package-dist.ts .",
     "prepublishOnly": "bun run build",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },

@@ -22,7 +22,7 @@ import {
   relationshipTypeMatches,
   resolveRelationshipTarget,
 } from "./opc.js";
-import { queriesDigest, queryWarning } from "./power-query.js";
+import { queriesDigest, queryWarning } from "./query-digest.js";
 import { checkAbort, emitWarning, isAbort, type XlsxCodecContext } from "./resources.js";
 import type { WorkbookWriteHook } from "./writer.js";
 import {
