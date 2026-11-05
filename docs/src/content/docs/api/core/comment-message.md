@@ -8,7 +8,7 @@ description: "CommentMessage interface in @sheetwrite/core: One immutable author
 One immutable author message in a comment thread.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/collaboration.ts#L257"><code>packages/core/src/collaboration.ts#L257</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/collaboration.ts#L259"><code>packages/core/src/collaboration.ts#L259</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>

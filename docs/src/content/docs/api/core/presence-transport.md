@@ -8,7 +8,7 @@ description: "PresenceTransport interface in @sheetwrite/core: Host transport co
 Host transport contract for ephemeral presence messages.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/collaboration.ts#L22"><code>packages/core/src/collaboration.ts#L22</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/collaboration.ts#L24"><code>packages/core/src/collaboration.ts#L24</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>
