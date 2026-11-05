@@ -46,9 +46,17 @@ pub(super) type MatrixEvaluator = fn(
     usize,
 ) -> Result<EvalMatrix, FormulaError>;
 
-pub(super) type ShapeEvaluator =
-    fn(&CellStore, &str, &[Ast], usize) -> Result<(usize, usize, usize), FormulaError>;
-pub(super) type BoundEvaluator = fn(&CellStore, &str, &[Ast], usize) -> Result<usize, FormulaError>;
+/// Shape and bound hooks receive the pass that asks, so work they share with
+/// the evaluation that follows, such as compiled regex programs, is done once.
+pub(super) type ShapeEvaluator = fn(
+    &CellStore,
+    &str,
+    &[Ast],
+    usize,
+    &mut EvalPass<'_>,
+) -> Result<(usize, usize, usize), FormulaError>;
+pub(super) type BoundEvaluator =
+    fn(&CellStore, &str, &[Ast], usize, &mut EvalPass<'_>) -> Result<usize, FormulaError>;
 
 /// Array hooks must use the same shape, byte and work limits as built-in arrays.
 pub(super) struct ArrayHooks {

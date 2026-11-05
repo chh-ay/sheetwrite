@@ -138,6 +138,10 @@ export type GridPresentation = "spreadsheet" | "data-grid";
 
 /** Imperative operations the toolbar and context menu bind to; also exposed as `Grid.actions`. */
 export interface GridActions {
+  /** Open the configured version history panel. Requires `GridConfig.history`. */
+  versionHistory(): void;
+  /** Open the configured named-version form. Requires `GridConfig.history`. */
+  saveVersion(): void;
   toggleBold(): void;
   toggleItalic(): void;
   toggleUnderline(): void;
@@ -270,6 +274,8 @@ export type ToolbarActionName =
   | "exportCsv"
   | "exportXlsx"
   | "importXlsx"
+  | "versionHistory"
+  | "saveVersion"
   | "undo"
   | "redo"
   | "separator";
@@ -562,6 +568,11 @@ export interface GridConfig {
    * toolbar instead.
    */
   ribbon?: boolean | RibbonConfig;
+  /**
+   * Optional history command capability, supplied by `createHistoryCommands`
+   * from `@sheetwrite/core/history`. No history code loads until it is invoked.
+   */
+  history?: (grid: Grid, action: "open" | "save") => void;
   /** Replace built-in command icons by glyph name, in the toolbar, ribbon, ribbon menus and context menu. See {@link IconOverrides}. */
   icons?: IconOverrides;
   /** Built-in menu, disabled menu, static rows, or a request-aware row factory. */

@@ -230,6 +230,8 @@ const GRID_COMMANDS: readonly GridCommandName[] = [
   "exportCsv",
   "exportXlsx",
   "importXlsx",
+  "versionHistory",
+  "saveVersion",
   "undo",
   "redo",
 ];
@@ -2943,12 +2945,15 @@ export class GridImpl implements Grid {
       input.name,
       this.store.getWorkbook().sheets.map((sheet) => sheet.name),
     );
+    // A dashboard has no rows or columns.
+    const dashboard = input.kind === "dashboard";
     const snapshot: SheetSnapshot = {
       id,
       name: name.name,
       order: this.store.getWorkbook().sheets.length,
-      rowCount: input.rowCount ?? 100,
-      columns,
+      ...(dashboard ? { kind: "dashboard", dashboard: { items: [] } } : {}),
+      rowCount: dashboard ? 0 : (input.rowCount ?? 100),
+      columns: dashboard ? [] : columns,
       cells: [],
     };
     const result = this.document.commit([{ op: "addSheet", sheet: snapshot }], "structure");
@@ -3430,6 +3435,10 @@ export class GridImpl implements Grid {
         const { pickXlsxWorkbook } = await import("./workbook-io.js");
         await pickXlsxWorkbook(this, this.host, this.lifetime);
       },
+      versionHistory: () => this.config?.history?.(this, "open"),
+      saveVersion: () => {
+        if (!this.readOnly) this.config?.history?.(this, "save");
+      },
       editNote: () => {
         // Same gate as the cell editor: do not open an editor whose save must fail.
         const focus = this.selection.focusCell;
@@ -3582,6 +3591,12 @@ export class GridImpl implements Grid {
     if (command === "redo") {
       return {
         disabled: this.readOnly || !this.document.canRedo,
+        activity: "inactive",
+      };
+    }
+    if (command === "versionHistory" || command === "saveVersion") {
+      return {
+        disabled: !this.config?.history || (command === "saveVersion" && this.readOnly),
         activity: "inactive",
       };
     }

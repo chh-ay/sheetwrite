@@ -1,5 +1,6 @@
 import { atomicBatchLimits, isAtomicBatch } from "./atomic-batch.js";
 import { chartSourceRanges } from "./chart-definition.js";
+import { dashboardFields } from "./dashboard.js";
 import { cloneRelationship, cloneRelationships } from "./data-model.js";
 import {
   assertWorkbookAllocationLimits,
@@ -50,6 +51,7 @@ import { setTransactionStorageRevision } from "./transaction-admission.js";
 import { preparedRestore, TransactionPreparation } from "./transaction-preparation.js";
 import type { CellScalar, Column } from "./types/cell.js";
 import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
+import type { Dashboard, DashboardItem } from "./types/dashboard.js";
 import type { RelationshipStatus, TableRelationship } from "./types/data-model.js";
 import type { AggregateOp, ColumnarData, DataSourceColumnBand, RowData } from "./types/data.js";
 import type {
@@ -382,6 +384,29 @@ export class SheetwriteStore implements Store {
   /** Remove the relationship with `id`. */
   removeRelationship(id: string): ApplyTransactionResult {
     return this.applyTransaction({ patches: [{ op: "removeRelationship", id }] }, "api");
+  }
+
+  /** A copy of the items of the dashboard `sheet`, or `null` when it is not a dashboard. */
+  getDashboard(sheet: SheetId): Dashboard | null {
+    const owner = this.engine.getWorkbook().sheets.find((candidate) => candidate.id === sheet);
+    return owner ? (dashboardFields(owner).dashboard ?? null) : null;
+  }
+
+  /**
+   * Insert an item on the dashboard `sheet`, or replace the one with its ID.
+   * Items stay inside the 12 columns and do not overlap; otherwise the result
+   * is a no-op.
+   */
+  setDashboardItem(sheet: SheetId, item: DashboardItem): ApplyTransactionResult {
+    return this.applyTransaction(
+      { patches: [{ op: "setDashboardItem", sheet, item: structuredClone(item) }] },
+      "api",
+    );
+  }
+
+  /** Remove the item with `id` from the dashboard `sheet`. */
+  removeDashboardItem(sheet: SheetId, id: string): ApplyTransactionResult {
+    return this.applyTransaction({ patches: [{ op: "removeDashboardItem", sheet, id }] }, "api");
   }
 
   getRangeMutationAllocationStats(): RangeMutationAllocationStats {

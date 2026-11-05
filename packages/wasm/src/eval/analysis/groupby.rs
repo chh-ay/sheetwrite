@@ -424,6 +424,7 @@ pub(crate) fn shape(
     _: &str,
     _: &[Ast],
     _: usize,
+    _: &mut EvalPass<'_>,
 ) -> Result<(usize, usize, usize), FormulaError> {
     Ok((1, 1, 1))
 }
@@ -432,19 +433,20 @@ pub(crate) fn bound(
     name: &str,
     arguments: &[Ast],
     sheet: usize,
+    pass: &mut EvalPass<'_>,
 ) -> Result<usize, FormulaError> {
     let is_pivot = name == "PIVOTBY";
     let required = if is_pivot { 4 } else { 3 };
     if arguments.len() < required {
         return Err(FormulaError::Value);
     }
-    let extent = |expression: &Ast| -> Result<(usize, usize), FormulaError> {
+    let mut extent = |expression: &Ast| -> Result<(usize, usize), FormulaError> {
         if !super::super::array::ast_produces_array(expression) {
             return Ok((1, 1));
         }
-        let (rows, cols, cells) = store.matrix_shape(expression, sheet)?;
+        let (rows, cols, cells) = store.matrix_shape(expression, sheet, pass)?;
         let bound = store
-            .dynamic_array_bound(expression, sheet)
+            .dynamic_array_bound(expression, sheet, pass)
             .transpose()?
             .unwrap_or(cells);
         Ok(if bound > cells {

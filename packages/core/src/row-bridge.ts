@@ -146,7 +146,8 @@ export interface RowBridgeMetadataDelta<
     | "relationship"
     | "query"
     | "chart"
-    | "pivot";
+    | "pivot"
+    | "dashboard";
 }
 
 /** A document operation that needs a host-side action rather than row mutation. */
@@ -894,6 +895,10 @@ export class RowBridge<
       case "setChart":
       case "removeChart":
         return this.metadata(transaction, operation, "chart");
+
+      case "setDashboardItem":
+      case "removeDashboardItem":
+        return this.metadata(transaction, operation, "dashboard");
 
       case "setPivot":
       case "removePivot":

@@ -203,13 +203,12 @@ A family is one Rust file that owns a group of functions. Only the full engine c
    cargo test --features analysis
    ```
 
-5. Add each function to `test/conformance/formula-contract.inventory.json` with `"builds": ["@sheetwrite/formulas"]` and its signature, semantics, dialect, and implementation profiles. Update the function counts in `scripts/formula-contract.test.ts`, then run:
+5. Add each function to `test/conformance/formula-contract.inventory.json` with `"builds": ["@sheetwrite/formulas"]` and its signature, semantics, dialect, and implementation profiles, then run:
 
    ```sh
-   bun scripts/conformance.ts generate && bun fmt test/conformance/corpus.manifest.json
    bun test scripts/formula-contract.test.ts
    ```
 
-   The core build regenerates the function table in `packages/core/src/generated/`, and the docs build regenerates the formula reference pages; neither is committed. The contract test fails if a `NAMES` spelling is not in the inventory, if a family file is not registered in `mod.rs`, or if the full engine reports names that the inventory does not list.
+   The core build regenerates the function table in `packages/core/src/generated/`, and the docs build regenerates the formula reference pages; neither is committed. The compatibility test set is generated from the inventory when it runs, and the contract test derives its counts from the inventory, so nothing else needs updating. The contract test fails if a `NAMES` spelling is not in the inventory, if a family file is not registered in `mod.rs`, or if the full engine reports names that the inventory does not list.
 
 6. Build both engines and confirm that the default `packages/wasm/pkg/sheetwrite_wasm_bg.wasm` did not change size.
