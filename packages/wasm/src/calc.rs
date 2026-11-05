@@ -217,6 +217,16 @@ pub enum Func {
     Offset,
     Indirect,
     Areas,
+    Lookup,
+    TrimRange,
+    ErrorType,
+    Info,
+    IsEven,
+    IsNonText,
+    IsOdd,
+    IsRef,
+    Sheet,
+    Sheets,
     AverageA,
     MaxA,
     MinA,
@@ -414,6 +424,7 @@ define_function_registry! {
         Find => "FIND";
         Hour => "HOUR";
         IfNa => "IFNA";
+        Info => "INFO";
         Ipmt => "IPMT";
         IsNa => "ISNA";
         Left => "LEFT";
@@ -452,6 +463,8 @@ define_function_registry! {
         Floor => "FLOOR";
         Index => "INDEX";
         IsErr => "ISERR";
+        IsOdd => "ISODD";
+        IsRef => "ISREF";
         Large => "LARGE";
         Log10 => "LOG10";
         Lower => "LOWER";
@@ -461,6 +474,7 @@ define_function_registry! {
         Right => "RIGHT";
         Roman => "ROMAN";
         Round => "ROUND";
+        Sheet => "SHEET";
         Small => "SMALL";
         SumIf => "SUMIF";
         Today => "TODAY";
@@ -477,7 +491,9 @@ define_function_registry! {
         Correl => "CORREL";
         CountA => "COUNTA";
         Filter => "FILTER";
+        IsEven => "ISEVEN";
         IsText => "ISTEXT";
+        Lookup => "LOOKUP";
         MaxIfs => "MAXIFS";
         Median => "MEDIAN";
         MinIfs => "MINIFS";
@@ -487,6 +503,7 @@ define_function_registry! {
         Proper => "PROPER";
         Search => "SEARCH";
         Second => "SECOND";
+        Sheets => "SHEETS";
         StdevA => "STDEVA";
         SumIfs => "SUMIFS";
         Switch => "SWITCH";
@@ -534,14 +551,17 @@ define_function_registry! {
         Hyperlink => "HYPERLINK";
         IsFormula => "ISFORMULA";
         IsLogical => "ISLOGICAL";
+        IsNonText => "ISNONTEXT";
         ModeSngl => "MODE.SNGL";
         RoundDown => "ROUNDDOWN";
         TimeValue => "TIMEVALUE";
         Transpose => "TRANSPOSE";
+        TrimRange => "TRIMRANGE";
         AverageIfs => "AVERAGEIFS";
         ChooseCols => "CHOOSECOLS";
         ChooseRows => "CHOOSEROWS";
         CountBlank => "COUNTBLANK";
+        ErrorType => "ERROR.TYPE";
         Substitute => "SUBSTITUTE";
         SumProduct => "SUMPRODUCT";
         Concatenate => "CONCATENATE";

@@ -4,6 +4,7 @@ import {
   validateWorkbookSnapshot,
   WORKBOOK_SCHEMA_VERSION,
 } from "../document-protocol.js";
+import { cloneJsonValue } from "../plain-data.js";
 import { RangeSourceProjection } from "../reference.js";
 import type { CellValue } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
@@ -199,10 +200,6 @@ export class StoreSnapshotCodec {
       sheets,
     };
   }
-}
-
-function cloneJsonValue<T>(value: T): T {
-  return value === undefined ? value : (JSON.parse(JSON.stringify(value)) as T);
 }
 
 /**

@@ -231,6 +231,8 @@ pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
         | Func::Gcd
         | Func::Lcm
         | Func::Subtotal
+        | Func::IsEven
+        | Func::IsOdd
         | Func::CeilingPrecise
         | Func::FloorPrecise
         | Func::IsoCeiling => math_family(func, values),
