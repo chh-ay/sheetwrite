@@ -1201,6 +1201,31 @@ fn group_positions(groups: &[u32], axis: &Axis) -> Vec<u32> {
     positions
 }
 
+/// Buffers of one counting pass over the base rows, reused across depth
+/// pairs and freed with the pass.
+struct CellScratch {
+    /// Start of each cell's rows in `order`; `starts[cell + 1]` first holds
+    /// the cell's row count.
+    starts: Vec<u32>,
+    /// Next free slot of each cell while rows are placed.
+    next: Vec<u32>,
+    /// The cell of each base row, or `NO_GROUP`.
+    cell_of_row: Vec<u32>,
+    /// Base rows grouped by cell.
+    order: Vec<u32>,
+}
+
+impl CellScratch {
+    fn new(cells: usize, rows: usize) -> Self {
+        Self {
+            starts: vec![0; cells + 1],
+            next: Vec::with_capacity(cells + 1),
+            cell_of_row: vec![NO_GROUP; rows],
+            order: vec![0; rows],
+        }
+    }
+}
+
 fn pair_key(row_group: u32, col_group: u32) -> u64 {
     (u64::from(row_group) << 32) | u64::from(col_group)
 }
@@ -1223,9 +1248,9 @@ impl PivotCache {
 
     /// Calls `evaluate(offset, slot, rows)` for every measure cell of
     /// `layout`, where `rows` (ascending) are the base rows of that cell's
-    /// filter context. For each pair of axis depths, every row is listed
-    /// under the output cell of its ancestors at those depths, and one sort
-    /// of `(cell, row)` pairs makes each cell one run.
+    /// filter context. For each pair of axis depths, every leaf group maps
+    /// to the output position of its ancestor at that depth, and one
+    /// counting pass over the rows lists each cell's rows together.
     #[inline(never)]
     pub(crate) fn visit_measure_cells(
         &self,
@@ -1240,44 +1265,97 @@ impl PivotCache {
         let col_positions = group_positions(&layout.col_groups, &self.col_axis);
         // Cell index `row position * width + column position` stays under
         // the output cell bound, so it fits in `u32`.
-        let width = layout.col_groups.len() as u32;
-        let mut cells: Vec<(u32, u32)> = Vec::new();
-        let mut rows = Vec::new();
+        let width = layout.col_groups.len();
+        let mut scratch = CellScratch::new(layout.row_groups.len() * width, self.row_leaf.len());
 
         for row_depth in 0..=self.row_axis.width as u32 {
+            let row_cells =
+                self.ancestor_positions(&self.row_axis, row_depth, &row_positions, true);
             for col_depth in 0..=self.col_axis.width as u32 {
-                cells.clear();
-                for (row, (&row_leaf, &col_leaf)) in
-                    self.row_leaf.iter().zip(&self.col_leaf).enumerate()
-                {
+                let col_cells =
+                    self.ancestor_positions(&self.col_axis, col_depth, &col_positions, false);
+                scratch.starts.fill(0);
+                for (row, cell) in scratch.cell_of_row.iter_mut().enumerate() {
+                    let row_leaf = self.row_leaf[row];
+                    *cell = NO_GROUP;
                     if row_leaf == NO_GROUP {
                         continue;
                     }
-                    let row_group = self.row_axis.ancestor(row_leaf, row_depth);
-                    let col_group = self.col_axis.ancestor(col_leaf, col_depth);
-                    let position = row_positions[row_group as usize];
-                    let col = col_positions[col_group as usize];
-                    if position != NO_GROUP && col != NO_GROUP && self.shows_values(row_group) {
-                        cells.push((position * width + col, row as u32));
+                    let position = row_cells[row_leaf as usize];
+                    let col = col_cells[self.col_leaf[row] as usize];
+                    if position != NO_GROUP && col != NO_GROUP {
+                        *cell = position * width as u32 + col;
+                        scratch.starts[*cell as usize + 1] += 1;
                     }
                 }
-                cells.sort_unstable();
+                self.visit_cells(layout, &mut scratch, evaluate);
+            }
+        }
+    }
 
-                for run in cells.chunk_by(|left, right| left.0 == right.0) {
-                    rows.clear();
-                    rows.extend(run.iter().map(|&(_, row)| row));
-                    let cell = run[0].0;
-                    let offset = (layout.header_rows + (cell / width) as usize) * layout.cols
-                        + layout.label_cols
-                        + (cell % width) as usize * layout.value_slots;
-                    for (slot, value) in self.outputs.iter().enumerate() {
-                        if value.measure.is_some() {
-                            evaluate(offset + slot, slot, &rows);
-                        }
-                    }
+    /// Places each row under its cell (counts in `starts[cell + 1]`, rows
+    /// stay ascending inside a cell) and evaluates every non-empty cell.
+    fn visit_cells(
+        &self,
+        layout: &PivotLayout,
+        scratch: &mut CellScratch,
+        evaluate: &mut dyn FnMut(usize, usize, &[u32]),
+    ) {
+        let CellScratch {
+            starts,
+            next,
+            cell_of_row,
+            order,
+        } = scratch;
+        for index in 1..starts.len() {
+            starts[index] += starts[index - 1];
+        }
+        next.clone_from(starts);
+        for (row, &cell) in cell_of_row.iter().enumerate() {
+            if cell != NO_GROUP {
+                order[next[cell as usize] as usize] = row as u32;
+                next[cell as usize] += 1;
+            }
+        }
+
+        let width = layout.col_groups.len();
+        for cell in 0..starts.len() - 1 {
+            let rows = &order[starts[cell] as usize..starts[cell + 1] as usize];
+            if rows.is_empty() {
+                continue;
+            }
+            let offset = (layout.header_rows + cell / width) * layout.cols
+                + layout.label_cols
+                + (cell % width) * layout.value_slots;
+            for (slot, value) in self.outputs.iter().enumerate() {
+                if value.measure.is_some() {
+                    evaluate(offset + slot, slot, rows);
                 }
             }
         }
+    }
+
+    /// For each leaf group of `axis`, the output position of its ancestor at
+    /// `depth`; `NO_GROUP` when the layout does not show that ancestor or,
+    /// on the row axis (`rows`), shows it without value cells.
+    fn ancestor_positions(
+        &self,
+        axis: &Axis,
+        depth: u32,
+        positions: &[u32],
+        rows: bool,
+    ) -> Vec<u32> {
+        let mut leaf_positions = vec![NO_GROUP; axis.groups.len()];
+        for (group, leaf_position) in leaf_positions.iter_mut().enumerate() {
+            if axis.groups[group].depth as usize != axis.width {
+                continue;
+            }
+            let ancestor = axis.ancestor(group as u32, depth);
+            if !rows || self.shows_values(ancestor) {
+                *leaf_position = positions[ancestor as usize];
+            }
+        }
+        leaf_positions
     }
 
     /// Whether a row group shows value cells; compact rows without
