@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use regex_lite::{Captures, Regex};
 
-use super::regex_patterns::build_regex;
+use super::super::regex_patterns::build_regex;
 
 use super::super::matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_CELLS};
 use super::super::number_format::{format_number, general_text, round_decimal, Rounding};

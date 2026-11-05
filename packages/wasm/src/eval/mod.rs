@@ -25,6 +25,8 @@ mod random;
 mod range_fold;
 mod range_reader;
 mod reference;
+#[cfg(feature = "analysis")]
+pub(crate) mod regex_patterns;
 mod statistics;
 mod subtotal;
 #[cfg(test)]

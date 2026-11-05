@@ -287,8 +287,7 @@ pub struct CellStore {
     /// Weak index of the literal REGEX patterns this store's formulas share.
     /// `None` until a formula uses one, and only the full engine has it.
     #[cfg(feature = "analysis")]
-    regex_patterns:
-        std::cell::RefCell<Option<Box<crate::eval::analysis::regex_patterns::PatternIndex>>>,
+    regex_patterns: std::cell::RefCell<Option<Box<crate::eval::regex_patterns::PatternIndex>>>,
     loading_page: usize,
     defined_names: HashMap<(Option<u32>, String), names::DefinedName>,
     tables: HashMap<String, TableDefinition>,
@@ -3651,7 +3650,7 @@ impl CellStore {
     /// store's formulas share, so formulas with one pattern compile it once.
     #[cfg(feature = "analysis")]
     fn bind_regex_patterns(&self, source: &str, mut ast: Ast) -> Ast {
-        if crate::eval::analysis::regex_patterns::may_call_regex(source) {
+        if crate::eval::regex_patterns::may_call_regex(source) {
             self.regex_patterns
                 .borrow_mut()
                 .get_or_insert_with(Box::default)

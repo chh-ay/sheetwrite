@@ -20,7 +20,6 @@ pub(crate) mod lambda;
 pub(super) mod math;
 mod matrices;
 mod pivot_data;
-pub(crate) mod regex_patterns;
 mod regression;
 mod reshape;
 mod securities;

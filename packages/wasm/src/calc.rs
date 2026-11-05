@@ -723,7 +723,7 @@ pub enum Ast {
     /// as the formulas that hold it.
     #[cfg(feature = "analysis")]
     #[allow(private_interfaces)] // Shared patterns are not part of the public AST API.
-    RegexPattern(std::rc::Rc<crate::eval::analysis::regex_patterns::SharedPattern>),
+    RegexPattern(std::rc::Rc<crate::eval::regex_patterns::SharedPattern>),
     Name(String),
     NamedRange(NamedRangeRef),
     /// A defined name that holds a formula. Shared, because one name can be

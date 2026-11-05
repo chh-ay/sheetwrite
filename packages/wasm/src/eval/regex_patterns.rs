@@ -161,7 +161,7 @@ impl PatternIndex {
 
 fn is_regex_function(id: u16) -> bool {
     matches!(
-        super::name(id),
+        super::analysis::name(id),
         "REGEXTEST" | "REGEXREPLACE" | "REGEXEXTRACT"
     )
 }
