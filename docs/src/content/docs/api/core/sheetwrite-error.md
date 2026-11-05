@@ -10,7 +10,7 @@ The message is cut to an 8 KiB UTF-8 budget, and so is the sum of the
 context strings, because both can quote host or file data.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/errors.ts#L485"><code>packages/core/src/errors.ts#L485</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/errors.ts#L483"><code>packages/core/src/errors.ts#L483</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -141,11 +141,11 @@ class SheetwriteError extends Error implements SheetwriteErrorEnvelope {
 <li><a href="/docs/api/core/incomplete-data-error/"><code>IncompleteDataError</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/persistence-error/"><code>PersistenceError</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/presence-coordinator-event/"><code>PresenceCoordinatorEvent</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li><a href="/docs/api/core/revision-coordinator-event/"><code>RevisionCoordinatorEvent</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/snapshot-resource-error/"><code>SnapshotResourceError</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/snapshot-validation-error/"><code>SnapshotValidationError</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/sync-coordinator-event/"><code>SyncCoordinatorEvent</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/sync-pending-capacity-error/"><code>SyncPendingCapacityError</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li class="api-consumer-more">and 10 more</li>
+<li><a href="/docs/api/core/sync-protocol-error/"><code>SyncProtocolError</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li class="api-consumer-more">and 9 more</li>
 </ul>
 </div>

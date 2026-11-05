@@ -3,7 +3,7 @@ title: "Math and trigonometry functions"
 description: "Every math and trigonometry formula function, its engine build, and its signature, semantic, dialect, and implementation profiles."
 ---
 
-This page lists the 52 functions of the math and trigonometry family. Taxonomy/source: [Math and trigonometry functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb). The [formula function contract](/docs/reference/formula-functions/) has every family, the engine builds, and the evaluation limits.
+This page lists the 82 functions of the math and trigonometry family. Taxonomy/source: [Math and trigonometry functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb). The [formula function contract](/docs/reference/formula-functions/) has every family, the engine builds, and the evaluation limits.
 
 ## Functions
 
@@ -64,6 +64,36 @@ This page lists the 52 functions of the math and trigonometry family. Taxonomy/s
 <tr data-formula-name="SUMX2MY2" data-engine="full"><td><code>SUMX2MY2</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-pair-arrays">Signature: <code>pair-arrays</code></a><br /><a href="#semantics-analysis-math">Semantics: <code>analysis-math</code></a><br /><a href="#dialect-analysis-math">Dialect: <code>analysis-math</code></a><br /><a href="#implementation-analysis-math">Implementation: <code>analysis-math</code></a></details></td></tr>
 <tr data-formula-name="SUMX2PY2" data-engine="full"><td><code>SUMX2PY2</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-pair-arrays">Signature: <code>pair-arrays</code></a><br /><a href="#semantics-analysis-math">Semantics: <code>analysis-math</code></a><br /><a href="#dialect-analysis-math">Dialect: <code>analysis-math</code></a><br /><a href="#implementation-analysis-math">Implementation: <code>analysis-math</code></a></details></td></tr>
 <tr data-formula-name="SUMXMY2" data-engine="full"><td><code>SUMXMY2</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-pair-arrays">Signature: <code>pair-arrays</code></a><br /><a href="#semantics-analysis-math">Semantics: <code>analysis-math</code></a><br /><a href="#dialect-analysis-math">Dialect: <code>analysis-math</code></a><br /><a href="#implementation-analysis-math">Implementation: <code>analysis-math</code></a></details></td></tr>
+<tr data-formula-name="ACOS" data-engine="default"><td><code>ACOS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="ACOSH" data-engine="default"><td><code>ACOSH</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="ACOT" data-engine="default"><td><code>ACOT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="ACOTH" data-engine="default"><td><code>ACOTH</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="ARABIC" data-engine="default"><td><code>ARABIC</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-roman-text">Signature: <code>roman-text</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="ASIN" data-engine="default"><td><code>ASIN</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="ASINH" data-engine="default"><td><code>ASINH</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="ATAN" data-engine="default"><td><code>ATAN</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="ATAN2" data-engine="default"><td><code>ATAN2</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-point-angle">Signature: <code>point-angle</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="ATANH" data-engine="default"><td><code>ATANH</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="BASE" data-engine="default"><td><code>BASE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-radix-text">Signature: <code>radix-text</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="CEILING.PRECISE" data-engine="default"><td><code>CEILING.PRECISE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-precise-rounding">Signature: <code>precise-rounding</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="COS" data-engine="default"><td><code>COS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="COSH" data-engine="default"><td><code>COSH</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="COT" data-engine="default"><td><code>COT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="COTH" data-engine="default"><td><code>COTH</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="CSC" data-engine="default"><td><code>CSC</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="CSCH" data-engine="default"><td><code>CSCH</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="DECIMAL" data-engine="default"><td><code>DECIMAL</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-radix-number">Signature: <code>radix-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="DEGREES" data-engine="default"><td><code>DEGREES</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="FLOOR.PRECISE" data-engine="default"><td><code>FLOOR.PRECISE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-precise-rounding">Signature: <code>precise-rounding</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="ISO.CEILING" data-engine="default"><td><code>ISO.CEILING</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-precise-rounding">Signature: <code>precise-rounding</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="RADIANS" data-engine="default"><td><code>RADIANS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="ROMAN" data-engine="default"><td><code>ROMAN</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-roman">Signature: <code>roman</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="SEC" data-engine="default"><td><code>SEC</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="SECH" data-engine="default"><td><code>SECH</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="SIN" data-engine="default"><td><code>SIN</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="SINH" data-engine="default"><td><code>SINH</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="TAN" data-engine="default"><td><code>TAN</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="TANH" data-engine="default"><td><code>TANH</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 </tbody></table>
 
 </section>
@@ -292,6 +322,72 @@ Return shape: `scalar`.
 
 </details>
 
+<details id="signature-roman-text"><summary>Signature: roman-text</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `text` | yes | none | `scalar`, `reference` | `once` |
+
+</details>
+
+<details id="signature-point-angle"><summary>Signature: point-angle</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `xNum` | yes | none | `scalar`, `reference` | `once` |
+| `yNum` | yes | none | `scalar`, `reference` | `once` |
+
+</details>
+
+<details id="signature-radix-text"><summary>Signature: radix-text</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `number` | yes | none | `scalar`, `reference` | `once` |
+| `radix` | yes | none | `scalar`, `reference` | `once` |
+| `minLength` | no | 0 | `scalar`, `reference` | `once` |
+
+</details>
+
+<details id="signature-precise-rounding"><summary>Signature: precise-rounding</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `number` | yes | none | `scalar`, `reference` | `once` |
+| `significance` | no | 1 | `scalar`, `reference` | `once` |
+
+</details>
+
+<details id="signature-radix-number"><summary>Signature: radix-number</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `text` | yes | none | `scalar`, `reference` | `once` |
+| `radix` | yes | none | `scalar`, `reference` | `once` |
+
+</details>
+
+<details id="signature-roman"><summary>Signature: roman</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `number` | yes | none | `scalar`, `reference` | `once` |
+| `form` | no | 0 | `scalar`, `reference` | `once` |
+
+</details>
+
 ## Semantic profiles
 
 These values are normative for the listed Sheetwrite subset. `function-defined` and `contextual` are explicit limitations: consult the formula guides' function-specific sections rather than assuming another spreadsheet's edge behavior.
@@ -411,7 +507,7 @@ Limitations: Available only in the optional @sheetwrite/formulas analysis build;
 | Layer | Status and source/evidence |
 | --- | --- |
 | Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/calc.rs) |
-| Evaluator | implemented<br />[`packages/wasm/src/eval/mod.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/mod.rs)<br />[`packages/wasm/src/eval/functions.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/functions.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/mod.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/mod.rs)<br />[`packages/wasm/src/eval/functions.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/functions.rs)<br />[`packages/wasm/src/eval/math.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/math.rs)<br />[`packages/wasm/src/eval/math/trigonometry.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/math/trigonometry.rs)<br />[`packages/wasm/src/eval/math/numerals.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/math/numerals.rs)<br />[`packages/wasm/src/eval/statistics.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/statistics.rs) |
 | Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/formula-assist.ts) |
 | Evidence | source-linked<br />[`packages/wasm/src/tests.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/tests.rs)<br />[`packages/core/test/formula-assist.test.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/test/formula-assist.test.ts) |
 

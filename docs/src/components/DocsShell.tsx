@@ -88,6 +88,7 @@ function LatestReleaseCard({
   onNavigate,
 }: Readonly<{ activeHref?: string; onNavigate?: () => void }>) {
   const href = releaseHref(LATEST_RELEASE.version);
+
   return (
     <Link
       aria-current={activeHref === href ? "page" : undefined}
@@ -114,6 +115,7 @@ const BADGE_TEXT = { new: "New", updated: "Updated" } as const;
 function NavigationBadgeLabel({ item }: Readonly<{ item: NavigationItem }>) {
   const badge = navigationBadge(item, LATEST_RELEASE.version);
   if (badge === undefined) return null;
+
   return (
     <span className="sw-nav-badge" data-badge={badge}>
       {BADGE_TEXT[badge]}
@@ -192,6 +194,7 @@ function NavigationSections({
   onNavigate,
 }: Readonly<{ activeHref?: string; onNavigate?: () => void }>) {
   const current = nearestNavigationItem(activeHref);
+
   return (
     <nav aria-label="Documentation" className="sw-sidebar__nav">
       <LatestReleaseCard activeHref={activeHref} onNavigate={onNavigate} />
@@ -296,6 +299,7 @@ function NavigationDrawer({
 /** Reading order: the neighbours of this page, when it sits in one. */
 function DocumentPager({ previous, next }: Readonly<DocumentNeighbours>) {
   if (previous === undefined && next === undefined) return null;
+
   return (
     <nav aria-label="Documentation pages" className="sw-doc-pager">
       {previous === undefined ? (
@@ -367,11 +371,14 @@ export function DocsShell({
   // API page titles arrive as "Symbol | @sheetwrite/pkg"; the package reads
   // better as a chip than as part of a display-size heading.
   const [titleMain, titlePackage] = title.split(" | ", 2);
+
   const outline = useDocumentOutline();
   const neighbours = documentNeighbours(activeHref);
+
   const release = releaseContext(activeHref);
   // Release notes are their own header section; every other page is Docs.
   const inReleases = activeHref?.startsWith(RELEASES_HREF) ?? false;
+
   const navigationDialog = useRef<HTMLDialogElement>(null);
   const [navigationOpen, setNavigationOpen] = useState(false);
 
@@ -388,6 +395,7 @@ export function DocsShell({
   const openNavigation = () => {
     const dialog = navigationDialog.current;
     if (dialog === null) return;
+
     dialog.showModal();
     setNavigationOpen(true);
     // The current page can sit far down a long section list.

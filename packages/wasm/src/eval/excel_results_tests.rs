@@ -86,6 +86,42 @@ fn lambda_arguments_can_be_errors_that_the_body_handles() {
 
 #[cfg(feature = "analysis")]
 #[test]
+fn engineering_functions_read_cells_and_ranges() {
+    assert_results(&[
+        ("=DEC2HEX(Data!B3)", "1E"),
+        ("=BIN2DEC(Data!A1&Data!A2-Data!A2)", "2"),
+        ("=BITAND(Data!B1,Data!A3)", "2"),
+        ("=ERF(Data!F1)", "0"),
+    ]);
+}
+
+#[cfg(feature = "analysis")]
+#[test]
+fn complex_functions_read_cells_and_ranges() {
+    assert_results(&[
+        ("=IMSUM(Data!A1:A3)", "6"),
+        ("=IMSUM(Data!D1:D3)", "#NUM!"),
+        ("=IMPRODUCT(Data!A2:A3,COMPLEX(0,1))", "6i"),
+    ]);
+}
+
+#[cfg(feature = "analysis")]
+#[test]
+fn bessel_functions_read_cells() {
+    assert_results(&[
+        ("=ROUND(BESSELJ(Data!A3,1),6)", "0.339059"),
+        ("=BESSELI(Data!F1,0)", "1"),
+    ]);
+}
+
+#[cfg(feature = "analysis")]
+#[test]
+fn convert_reads_cells() {
+    assert_results(&[("=CONVERT(Data!A1,\"m\",\"cm\")", "100")]);
+}
+
+#[cfg(feature = "analysis")]
+#[test]
 fn legacy_statistics_names_read_references_as_their_successors() {
     assert_results(&[
         ("=STDEV(Data!A1:A3)", "1"),
@@ -109,6 +145,92 @@ fn byte_width_and_baht_functions_read_cells() {
         ("=DBCS(Data!D2)", "ｘ"),
         ("=ASC(DBCS(Data!D2&Data!A1))", "x1"),
         ("=BAHTTEXT(1234)", "หนึ่งพันสองร้อยสามสิบสี่บาทถ้วน"),
+    ]);
+}
+
+/// The examples of the ERROR.TYPE, ISEVEN, ISODD, SHEET and SHEETS pages on
+/// Microsoft Support, and the IS functions page for ISNONTEXT and ISREF.
+#[test]
+fn information_functions_follow_the_microsoft_examples() {
+    assert_results(&[
+        ("=ERROR.TYPE(1/0)", "2"),
+        ("=ERROR.TYPE(NA())", "7"),
+        ("=ERROR.TYPE(Data!A1)", "#N/A"),
+        ("=ISEVEN(-1)", "FALSE"),
+        ("=ISEVEN(2.5)", "TRUE"),
+        ("=ISEVEN(5)", "FALSE"),
+        ("=ISEVEN(0)", "TRUE"),
+        ("=ISEVEN(DATE(2011,12,23))", "TRUE"),
+        ("=ISODD(-1)", "TRUE"),
+        ("=ISODD(2.5)", "FALSE"),
+        ("=ISODD(5)", "TRUE"),
+        ("=ISEVEN(TRUE)", "#VALUE!"),
+        ("=ISNONTEXT(Data!F1)", "TRUE"),
+        ("=ISNONTEXT(Data!D2)", "FALSE"),
+        ("=ISNONTEXT(1/0)", "TRUE"),
+        ("=ISREF(Data!A1)", "TRUE"),
+        ("=ISREF(Data!A1:B2)", "TRUE"),
+        ("=ISREF(INDIRECT(\"Data!A1\"))", "TRUE"),
+        ("=ISREF(1)", "FALSE"),
+        ("=ISREF(\"A1\")", "FALSE"),
+        ("=SHEET()", "1"),
+        ("=SHEET(Data!A1)", "2"),
+        ("=SHEET(\"data\")", "2"),
+        ("=SHEET(\"Missing\")", "#N/A"),
+        ("=SHEETS()", "2"),
+        ("=SHEETS(Data!A1)", "1"),
+        ("=SHEETS(Report:Data!A1)", "2"),
+        ("=INFO(\"numfile\")", "2"),
+        ("=INFO(\"RECALC\")", "Automatic"),
+        ("=INFO(\"osversion\")", "#N/A"),
+        ("=INFO(\"memavail\")", "#N/A"),
+        ("=INFO(\"colour\")", "#VALUE!"),
+    ]);
+}
+
+#[cfg(feature = "analysis")]
+#[test]
+fn financial_functions_read_cells_text_dates_and_blanks() {
+    assert_results(&[
+        ("=DOLLARDE(Data!A1+0.02,16)", "1.125"),
+        ("=ISPMT(Data!A1/10,Data!A1,Data!A3,Data!B3)", "-2"),
+        (
+            "=COUPNUM(DATE(2007,1,25),DATE(2008,11,15),Data!A2,Data!A1)",
+            "4",
+        ),
+        (
+            "=ROUND(ACCRINTM(DATE(2008,4,1),DATE(2008,6,15),Data!B1%,1000,Data!A3),8)",
+            "20.54794521",
+        ),
+        (
+            "=COUPDAYS(DATE(2011,1,25),DATE(2011,11,15),2,Data!F1)",
+            "180",
+        ),
+        ("=COUPPCD(\"2011-01-25\",\"2011-11-15\",2,1)", "40497"),
+    ]);
+}
+
+#[test]
+fn trigonometry_and_numeral_functions_read_cells() {
+    assert_results(&[
+        ("=DEGREES(ATAN2(Data!A1,Data!A1))", "45"),
+        ("=SIN(Data!F1)", "0"),
+        ("=COS(Data!F1)", "1"),
+        ("=ROMAN(Data!B3*10+Data!A3)", "CCCIII"),
+        ("=ARABIC(ROMAN(1999,4))", "1999"),
+        ("=BASE(Data!B2,16,4)", "0014"),
+        ("=DECIMAL(\"ff\",Data!A2*8)", "255"),
+        ("=CEILING.PRECISE(-Data!A3-0.5,Data!A2)", "-2"),
+    ]);
+}
+
+#[test]
+fn counted_statistics_read_text_and_logical_values() {
+    assert_results(&[
+        ("=AVERAGEA(Data!D1:D3)", "2.5"),
+        ("=MAXA(Data!D2,-1)", "0"),
+        ("=VARPA(Data!A1:A3,TRUE)", "0.6875"),
+        ("=ROUND(STDEVA(\"2\",4),6)", "1.414214"),
     ]);
 }
 

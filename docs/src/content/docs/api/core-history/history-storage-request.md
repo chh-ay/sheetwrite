@@ -8,7 +8,7 @@ description: "HistoryStorageRequest interface in @sheetwrite/core/history: Commo
 Common document identity, ceilings, and cancellation for adapter calls.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/types.ts#L118"><code>packages/core/src/version-history/types.ts#L118</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/types.ts#L109"><code>packages/core/src/version-history/types.ts#L109</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

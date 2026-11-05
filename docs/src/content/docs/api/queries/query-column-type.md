@@ -8,7 +8,7 @@ description: "QueryColumnType type in @sheetwrite/queries: Physical column types
 Physical column types; mixed columns use compact typed payload lanes.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/types.ts#L2"><code>packages/queries/src/types.ts#L2</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/query.d.ts#L4"><code>packages/core/dist/types/query.d.ts#L4</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -34,6 +34,8 @@ export type QueryColumnType =
 <p class="api-consumers-label">Public exports naming <code>QueryColumnType</code></p>
 
 <ul class="api-consumer-list">
+<li><a href="/docs/api/core/query-column-spec/"><code>QueryColumnSpec</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/query-step/"><code>QueryStep</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/queries/query-column-spec/"><code>QueryColumnSpec</code></a><span class="api-consumer-kind">@sheetwrite/queries</span></li>
 <li><a href="/docs/api/queries/query-step/"><code>QueryStep</code></a><span class="api-consumer-kind">@sheetwrite/queries</span></li>
 </ul>

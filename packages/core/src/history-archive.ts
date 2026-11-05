@@ -5,12 +5,21 @@ import {
   validateDocumentOperationShape,
 } from "./document-protocol.js";
 import { buildOnEngineInstance, prepareEngineInstance } from "./engine.js";
+import { commitRestore } from "./restore-commit.js";
 import { SheetwriteStore } from "./store.js";
 import { forgetLiveStoreEngine } from "./store/engine-registry.js";
 import type { DocumentOp, WorkbookSnapshot } from "./types/document.js";
+import type { Grid } from "./types/grid.js";
+import type {
+  ApplyTransactionResult,
+  CommittedTransaction,
+  RestoreProvenance,
+} from "./types/transaction.js";
 import {
+  type CheckpointLog,
   type HistoryRecordReader,
   readCheckpoint,
+  readCheckpointLog,
   writeCheckpoint,
 } from "./version-history/checkpoint.js";
 import {
@@ -27,9 +36,20 @@ import {
   resolveHistoryLimits,
   strings,
 } from "./version-history/codec.js";
+import {
+  diffPageSize,
+  diffStores,
+  type HistoryDiffPage,
+  type HistoryDiffRequest,
+} from "./version-history/diff.js";
+import {
+  assertIdle,
+  type HistoryRestoreOptions,
+  type HistoryRestoreScope,
+  planRestore,
+} from "./version-history/restore.js";
 import type {
   HistoryArchiveOptions,
-  HistoryCommit,
   HistoryHead,
   HistoryLimits,
   HistoryListPage,
@@ -43,10 +63,24 @@ import type {
 
 export { DEFAULT_HISTORY_LIMITS, HistoryError } from "./version-history/codec.js";
 export type { HistoryErrorCode } from "./version-history/codec.js";
+export {
+  HISTORY_DIFF_NONE,
+  HistoryDiffFlag,
+  MAX_HISTORY_DIFF_ENTRIES,
+} from "./version-history/diff.js";
+export type {
+  HistoryDiffCell,
+  HistoryDiffCells,
+  HistoryDiffCursor,
+  HistoryDiffDetail,
+  HistoryDiffPage,
+  HistoryDiffRequest,
+  HistoryDiffSheet,
+} from "./version-history/diff.js";
+export type { HistoryRestoreOptions, HistoryRestoreScope } from "./version-history/restore.js";
 export { MemoryHistoryStorage } from "./version-history/storage.js";
 export type {
   HistoryArchiveOptions,
-  HistoryCommit,
   HistoryGetRequest,
   HistoryHead,
   HistoryLimits,
@@ -107,12 +141,23 @@ function validId(value: unknown): value is string {
   return typeof value === "string" && value.length > 0 && value.length <= MAX_ID_LENGTH;
 }
 
+function restoreValue(value: unknown): RestoreProvenance | undefined {
+  if (!object(value)) {
+    return undefined;
+  }
+
+  const { versionId, scope } = value;
+  const validScope = scope === "workbook" || scope === "sheet" || scope === "range";
+
+  return validId(versionId) && validScope ? { versionId, scope } : undefined;
+}
+
 /**
  * Validate one committed transaction that follows `baseRevision`, and return
  * its encoded operation bytes. A transaction spans at most one atomic batch.
  */
 function checkCommit(
-  commit: HistoryCommit,
+  commit: CommittedTransaction,
   baseRevision: number,
   notBefore: number,
   limits: Readonly<HistoryLimits>,
@@ -132,7 +177,8 @@ function checkCommit(
     Array.isArray(commit.operations) &&
     commit.operations.length > 0 &&
     commit.operations.length <= MAX_OPERATIONS &&
-    commit.operations.every(isOperation);
+    commit.operations.every(isOperation) &&
+    (commit.restore === undefined || restoreValue(commit.restore) !== undefined);
 
   if (!valid) {
     throw new HistoryError(
@@ -154,7 +200,7 @@ function checkCommit(
  * envelope with its author and revision. The envelope is the last record.
  */
 async function writeCommit(
-  commit: HistoryCommit,
+  commit: CommittedTransaction,
   limits: Readonly<HistoryLimits>,
 ): Promise<HistoryStoredRecord[]> {
   const payload = jsonBytes(commit.operations, limits.maxTransactionBytes);
@@ -178,6 +224,7 @@ async function writeCommit(
       time: commit.time,
       operationBytes: payload.length,
       segments,
+      ...(commit.restore !== undefined ? { restore: commit.restore } : {}),
     },
     [...new Set(segments)],
   );
@@ -191,7 +238,7 @@ async function readCommit(
   id: string,
   read: HistoryRecordReader,
   limits: Readonly<HistoryLimits>,
-): Promise<HistoryCommit> {
+): Promise<CommittedTransaction> {
   const record = await read(id);
   const envelope = await decodeRecord(record, limits);
   if (record.kind !== "transaction" || !object(envelope)) {
@@ -199,6 +246,7 @@ async function readCommit(
   }
 
   const { baseRevision, revision, mutationId, authorId, time, operationBytes, segments } = envelope;
+  const restore = restoreValue(envelope.restore);
   const maxSegments = Math.ceil(limits.maxTransactionBytes / limits.maxSegmentBytes);
   const valid =
     integer(baseRevision) &&
@@ -209,7 +257,8 @@ async function readCommit(
     integer(operationBytes) &&
     operationBytes <= limits.maxTransactionBytes &&
     strings(segments) &&
-    segments.length <= maxSegments;
+    segments.length <= maxSegments &&
+    (envelope.restore === undefined || restore !== undefined);
 
   if (!valid) {
     throw new HistoryError("integrity", "Invalid archived transaction envelope");
@@ -256,7 +305,15 @@ async function readCommit(
     throw new HistoryError("integrity", "Invalid archived document operations");
   }
 
-  return { baseRevision, revision, mutationId, authorId, time, operations };
+  return {
+    baseRevision,
+    revision,
+    mutationId,
+    authorId,
+    time,
+    operations,
+    ...(restore !== undefined ? { restore } : {}),
+  };
 }
 
 function manifestResponse(
@@ -315,22 +372,24 @@ function applyBatch(store: SheetwriteStore, operations: DocumentOp[]): void {
 }
 
 /**
- * Build a replay store in its own engine instance, apply `tail`, and export
- * the result. The private instance holds all replay memory, so the document
- * engine keeps its size; the store and the instance are freed on every exit.
+ * Build a replay store in its own engine instance, apply `tail`, and pass the
+ * store and its revision to `use`. The private instance holds all replay
+ * memory, so the document engine keeps its size; the store and the instance
+ * are freed on every exit, so `use` must not keep the store.
  *
  * Consecutive transactions are applied as one store transaction of at most
  * `REPLAY_BATCH_BYTES`: operations apply in order inside a transaction, so the
  * result is the same, and the store recalculates once per batch instead of
  * once per archived transaction.
  */
-async function replay(
+async function withReplayStore<T>(
   snapshot: WorkbookSnapshot,
   tail: readonly string[],
   read: HistoryRecordReader,
   limits: Readonly<HistoryLimits>,
-  signal?: AbortSignal,
-): Promise<WorkbookSnapshot> {
+  signal: AbortSignal | undefined,
+  use: (store: SheetwriteStore, revision: number) => T | Promise<T>,
+): Promise<T> {
   const instance = await prepareEngineInstance();
 
   let store: SheetwriteStore;
@@ -384,10 +443,63 @@ async function replay(
 
     applyBatch(store, batch);
 
-    return { ...store.exportSnapshot(), version: revision };
+    // Awaited here, so an asynchronous `use` finishes before the store is freed.
+    return await use(store, revision);
   } finally {
     store.dispose();
     instance.retire();
+  }
+}
+
+/**
+ * Transactions from the checkpoint at or before `revision` up to `later`, by
+ * following `later`'s checkpoint back through each checkpoint's `previous`
+ * link. `complete` is `false` when a checkpoint on the way was pruned.
+ */
+async function intervalLog(
+  later: HistoryVersion,
+  revision: number,
+  read: HistoryRecordReader,
+  limits: Readonly<HistoryLimits>,
+): Promise<{ transactions: string[]; complete: boolean }> {
+  const parts: Array<readonly string[]> = [later.tail];
+  let checkpoint: string | undefined = later.checkpoint;
+
+  while (checkpoint !== undefined) {
+    let log: CheckpointLog;
+    try {
+      log = await readCheckpointLog(checkpoint, read, limits);
+    } catch (error) {
+      if (error instanceof HistoryError && error.code === "not-found") {
+        return { transactions: parts.reverse().flat(), complete: false };
+      }
+
+      throw error;
+    }
+
+    if (log.revision <= revision) {
+      return { transactions: parts.reverse().flat(), complete: true };
+    }
+
+    parts.push(log.transactions);
+    checkpoint = log.previous;
+  }
+
+  return { transactions: parts.reverse().flat(), complete: false };
+}
+
+/** Read `transactions` one at a time and yield those after `revision`. */
+async function* commitsAfter(
+  transactions: readonly string[],
+  revision: number,
+  read: HistoryRecordReader,
+  limits: Readonly<HistoryLimits>,
+): AsyncGenerator<CommittedTransaction> {
+  for (const id of transactions) {
+    const commit = await readCommit(id, read, limits);
+    if (commit.revision > revision) {
+      yield commit;
+    }
   }
 }
 
@@ -486,6 +598,7 @@ export class HistoryArchive {
         revision,
         checkpoint: checkpoint.checkpoint,
         tail: [],
+        checkpoints: [],
         time,
         activeMs: 0,
         automaticAt: 0,
@@ -504,7 +617,7 @@ export class HistoryArchive {
    * automatic version is made after `automaticIntervalMs` of active time.
    */
   async record(
-    commit: HistoryCommit,
+    commit: CommittedTransaction,
     capture?: HistorySnapshotProvider,
     signal?: AbortSignal,
   ): Promise<void> {
@@ -560,6 +673,7 @@ export class HistoryArchive {
           commit.revision,
           this.limits,
           head.tail,
+          current.checkpoint,
         );
 
         publication = [...records, ...checkpoint.records];
@@ -567,6 +681,7 @@ export class HistoryArchive {
           ...head,
           checkpoint: checkpoint.checkpoint,
           tail: [],
+          checkpoints: [...head.checkpoints, checkpoint.checkpoint],
           checkpointAt: activeMs,
           checkpointTransactions: 0,
           checkpointLogBytes: 0,
@@ -576,7 +691,7 @@ export class HistoryArchive {
       let version: HistoryVersion | undefined;
       if (activeMs - current.automaticAt >= this.limits.automaticIntervalMs) {
         version = await this.version(head, "automatic", commit.authorId, commit.time);
-        head = { ...head, automaticAt: activeMs };
+        head = { ...head, automaticAt: activeMs, checkpoints: [] };
       }
 
       await this.publish(publication, head, version, signal);
@@ -598,6 +713,7 @@ export class HistoryArchive {
       time,
       checkpoint: head.checkpoint,
       tail: [...head.tail],
+      checkpoints: [...head.checkpoints],
       ...(name === undefined ? {} : { name }),
     };
 
@@ -625,7 +741,10 @@ export class HistoryArchive {
       }
 
       const version = await this.version(head, "named", authorId, time, name.trim());
-      await this.publish([], undefined, version, signal);
+
+      // The marker takes over the checkpoints since the previous one.
+      const next = head.checkpoints.length > 0 ? { ...head, checkpoints: [] } : undefined;
+      await this.publish([], next, version, signal);
 
       return version;
     });
@@ -646,6 +765,144 @@ export class HistoryArchive {
    * alive while a concurrent prune runs; the lease is released on every exit.
    */
   async readVersion(id: string, signal?: AbortSignal): Promise<WorkbookSnapshot> {
+    return this.withPinnedVersion(id, signal, async (checkpoint, version, read) => {
+      const rebuilt =
+        version.tail.length === 0
+          ? checkpoint
+          : await withReplayStore(
+              checkpoint,
+              version.tail,
+              read,
+              this.limits,
+              signal,
+              (store, revision) => ({ ...store.exportSnapshot(), version: revision }),
+            );
+
+      if (rebuilt.version !== version.revision) {
+        throw new HistoryError("integrity", "History log does not reach its version marker");
+      }
+
+      return rebuilt;
+    });
+  }
+
+  /**
+   * Restore one version, or one sheet or range of it, on `grid` as one undoable
+   * transaction. The version is rebuilt in a private engine instance and
+   * compared with the grid's current document; the difference is committed as
+   * one atomic restore, which `SyncCoordinator` sends as one transaction that
+   * is never rebased.
+   *
+   * With `options.sync`, the coordinator must be online with no pending or
+   * conflicted commits. A change to the grid while the version is read, or a
+   * scope that cuts a merged cell or hyperlink, rejects before anything changes.
+   * See the restore section of the persistence guide for what each scope covers.
+   */
+  async restoreVersion(
+    grid: Grid,
+    id: string,
+    scope: HistoryRestoreScope,
+    options: HistoryRestoreOptions = {},
+  ): Promise<ApplyTransactionResult> {
+    assertIdle(options.sync);
+
+    let changed = false;
+    const stop = grid.on("change", () => {
+      changed = true;
+    });
+
+    try {
+      return await this.withPinnedVersion(id, options.signal, (checkpoint, version, read) =>
+        withReplayStore(
+          checkpoint,
+          version.tail,
+          read,
+          this.limits,
+          options.signal,
+          (store, revision) => {
+            if (revision !== version.revision) {
+              throw new HistoryError("integrity", "History log does not reach its version marker");
+            }
+
+            if (changed) {
+              throw new HistoryError("conflict", "The document changed while the version was read");
+            }
+
+            assertIdle(options.sync);
+
+            const plan = planRestore(grid.store, store, scope);
+
+            const outcome = commitRestore(grid, plan.operations, plan.guards, {
+              versionId: id,
+              scope: scope.kind,
+            });
+
+            if (!outcome) {
+              throw new HistoryError(
+                "capacity",
+                "A restored cell block does not fit one server version",
+              );
+            }
+
+            return outcome;
+          },
+        ),
+      );
+    } finally {
+      stop();
+    }
+  }
+
+  /**
+   * One page of the difference between two retained versions: the cells that
+   * changed, with before and after and who wrote them; sheets added, removed
+   * or changed outside their cells; and workbook fields that changed.
+   *
+   * Both versions are rebuilt in private engine instances and compared in
+   * bounded windows by the history diff kernel, a separate WASM module that
+   * loads on the first diff. Rows and columns are aligned through the
+   * structural operations of the log, so an inserted row does not make the
+   * rows below it changed. Nothing is kept between pages: pass `cursor` to
+   * continue, and each page rebuilds the versions again.
+   */
+  async diffVersions(request: HistoryDiffRequest): Promise<HistoryDiffPage> {
+    diffPageSize(request);
+    const { signal } = request;
+
+    return this.withPinnedVersion(request.from, signal, (earlierCheckpoint, earlier, readEarlier) =>
+      this.withPinnedVersion(request.to, signal, async (laterCheckpoint, later, read) => {
+        if (later.revision < earlier.revision) {
+          throw new HistoryError("invalid-scope", "The later version precedes the earlier one");
+        }
+
+        const log = await intervalLog(later, earlier.revision, read, this.limits);
+        const commits = commitsAfter(log.transactions, earlier.revision, read, this.limits);
+
+        return withReplayStore(
+          earlierCheckpoint,
+          earlier.tail,
+          readEarlier,
+          this.limits,
+          signal,
+          (before) =>
+            withReplayStore(laterCheckpoint, later.tail, read, this.limits, signal, (after) =>
+              diffStores({ before, after, commits, logComplete: log.complete, request }),
+            ),
+        );
+      }),
+    );
+  }
+
+  /** Lease one version and pass its checkpoint and a leased record reader to `use`. */
+  private async withPinnedVersion<T>(
+    id: string,
+    signal: AbortSignal | undefined,
+    use: (
+      checkpoint: WorkbookSnapshot,
+      version: HistoryVersion,
+      read: HistoryRecordReader,
+    ) => Promise<T>,
+  ): Promise<T> {
     checkAbort(signal);
 
     const version = versionResponse(
@@ -656,58 +913,41 @@ export class HistoryArchive {
     await this.storage.put({ ...this.request(signal), kind: "pin", token, versionId: id });
 
     try {
-      return await this.readPinned(version, token, signal);
+      const maxReadBytes = this.limits.maxSnapshotBytes + this.limits.maxTransactionBytes;
+      let readBytes = 0;
+
+      const read = async (recordId: string): Promise<HistoryStoredRecord> => {
+        checkAbort(signal);
+
+        const stored = await this.storage.get({
+          ...this.request(signal),
+          kind: "record",
+          id: recordId,
+          maxBytes: this.limits.maxSnapshotBytes,
+          pin: token,
+        });
+
+        if (!("bytes" in stored)) {
+          throw new HistoryError("integrity", "History adapter returned an invalid record");
+        }
+
+        readBytes += stored.decodedBytes;
+        if (readBytes > maxReadBytes) {
+          throw new HistoryError("capacity", "History replay exceeds its input reservation");
+        }
+
+        return stored;
+      };
+
+      const checkpoint = await readCheckpoint(version.checkpoint, read, this.limits);
+      if (checkpoint.documentId !== this.documentId) {
+        throw new HistoryError("integrity", "History checkpoint belongs to another document");
+      }
+
+      return await use(checkpoint, version, read);
     } finally {
       await this.storage.put({ ...this.request(), kind: "release", token, versionId: id });
     }
-  }
-
-  private async readPinned(
-    version: HistoryVersion,
-    token: string,
-    signal?: AbortSignal,
-  ): Promise<WorkbookSnapshot> {
-    const maxReadBytes = this.limits.maxSnapshotBytes + this.limits.maxTransactionBytes;
-    let readBytes = 0;
-
-    const read = async (recordId: string): Promise<HistoryStoredRecord> => {
-      checkAbort(signal);
-
-      const stored = await this.storage.get({
-        ...this.request(signal),
-        kind: "record",
-        id: recordId,
-        maxBytes: this.limits.maxSnapshotBytes,
-        pin: token,
-      });
-
-      if (!("bytes" in stored)) {
-        throw new HistoryError("integrity", "History adapter returned an invalid record");
-      }
-
-      readBytes += stored.decodedBytes;
-      if (readBytes > maxReadBytes) {
-        throw new HistoryError("capacity", "History replay exceeds its input reservation");
-      }
-
-      return stored;
-    };
-
-    const snapshot = await readCheckpoint(version.checkpoint, read, this.limits);
-    if (snapshot.documentId !== this.documentId) {
-      throw new HistoryError("integrity", "History checkpoint belongs to another document");
-    }
-
-    const rebuilt =
-      version.tail.length === 0
-        ? snapshot
-        : await replay(snapshot, version.tail, read, this.limits, signal);
-
-    if (rebuilt.version !== version.revision) {
-      throw new HistoryError("integrity", "History log does not reach its version marker");
-    }
-
-    return rebuilt;
   }
 
   /** Retained bytes and counts, read from the manifest without fetching any payload. */

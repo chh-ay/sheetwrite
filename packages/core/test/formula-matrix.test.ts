@@ -137,7 +137,7 @@ describe("formula behavior matrix", () => {
     expect(Array.from(clipboard.values)).toEqual(values);
     expect(Array.from(clipboard.spillDerived)).toEqual([0, 1, 1, 1, 1]);
     expect(clipboard.formulas).toEqual([{ offset: 0, source: "=FILTER(A1:A5,B1:B5)" }]);
-    store.sortBy("s1", 0, false);
+    store.setViewSort("s1", [{ col: 0, ascending: false }]);
     const sortedClipboard = store.getClipboardWindow("s1", { start: 0, end: 12 }, [2]);
     const spillOffsets = Array.from(sortedClipboard.dataRows, (row, offset) =>
       row < values.length ? offset : -1,

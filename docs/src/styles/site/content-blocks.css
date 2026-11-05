@@ -1,0 +1,315 @@
+/* Framework pages: four facts a reader compares across adapters. The 1px gap
+   over a border-coloured background draws dividers at any column count. */
+.sw-prose dl.sw-fw-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
+  gap: 1px;
+  margin: 1.5rem 0 0.5rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.75rem;
+  background: var(--sw-border);
+  overflow: hidden;
+}
+.sw-prose .sw-fw-facts > div {
+  padding: 0.8rem 1rem;
+  background: var(--sw-surface-1);
+}
+.sw-prose .sw-fw-facts dt {
+  color: var(--sw-fg-dim);
+  font: 600 0.68rem / 1.6 var(--sw-font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.sw-prose .sw-fw-facts dd {
+  margin: 0.2rem 0 0;
+  color: var(--sw-fg-strong);
+  font-size: 0.88rem;
+}
+
+/* Next steps close a page as cards, not as a bare bullet list. */
+.sw-prose .sw-next-links {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.7rem;
+  margin: 2rem 0 0;
+}
+.sw-prose .sw-next-links a {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.65rem;
+  background: var(--sw-surface-1);
+  text-decoration: none;
+  transition:
+    border-color 140ms ease,
+    transform 140ms ease;
+}
+.sw-prose .sw-next-links a:hover {
+  border-color: color-mix(in srgb, var(--sw-accent) 55%, var(--sw-border));
+  transform: translateY(-1px);
+}
+.sw-prose .sw-next-links span {
+  color: var(--sw-fg-dim);
+  font: 600 0.68rem / 1.6 var(--sw-font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.sw-prose .sw-next-links strong {
+  color: var(--sw-fg-strong);
+  font-weight: 600;
+}
+.sw-prose .sw-next-links strong::after {
+  content: " →";
+  color: var(--sw-accent);
+}
+
+/* Collaboration sequence diagram. Colours come from the theme tokens, so the
+   SVG follows the light and dark themes; on phones the frame scrolls sideways
+   instead of shrinking the labels below a readable size. */
+.sw-collab-flow {
+  margin: 1.75rem 0;
+}
+.sw-collab-flow__frame {
+  overflow-x: auto;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.85rem;
+  padding: 0.75rem;
+  background: var(--sw-surface-1);
+}
+.sw-collab-flow svg {
+  display: block;
+  width: 100%;
+  min-width: 40rem;
+  height: auto;
+  font-family: var(--sw-font-body);
+}
+.sw-collab-flow__lane rect {
+  fill: var(--sw-surface-2);
+  stroke: var(--sw-border-strong);
+}
+.sw-collab-flow__lane line {
+  stroke: var(--sw-border-strong);
+  stroke-dasharray: 4 5;
+}
+.sw-collab-flow__lane-title {
+  fill: var(--sw-fg-strong);
+  font-size: 14px;
+  font-weight: 650;
+}
+.sw-collab-flow__lane-detail {
+  fill: var(--sw-fg-dim);
+  font-family: var(--sw-font-mono);
+  font-size: 10.5px;
+}
+.sw-collab-flow__message line {
+  stroke: var(--sw-accent);
+  stroke-width: 1.6;
+}
+.sw-collab-flow__message path {
+  fill: var(--sw-accent);
+}
+.sw-collab-flow__message text {
+  fill: var(--sw-fg);
+  font-family: var(--sw-font-mono);
+  font-size: 11.5px;
+  paint-order: stroke;
+  stroke: var(--sw-surface-1);
+  stroke-width: 4px;
+}
+.sw-collab-flow__message[data-kind="conflict"] line {
+  stroke: var(--sw-type-number);
+  stroke-dasharray: 6 4;
+}
+.sw-collab-flow__message[data-kind="conflict"] path {
+  fill: var(--sw-type-number);
+}
+.sw-collab-flow__note rect {
+  fill: color-mix(in srgb, var(--sw-accent) 9%, var(--sw-surface-1));
+  stroke: color-mix(in srgb, var(--sw-accent) 35%, var(--sw-border));
+}
+.sw-collab-flow__note[data-kind="conflict"] rect {
+  fill: color-mix(in srgb, var(--sw-type-number) 10%, var(--sw-surface-1));
+  stroke: color-mix(in srgb, var(--sw-type-number) 40%, var(--sw-border));
+}
+.sw-collab-flow__note text {
+  fill: var(--sw-fg);
+  font-size: 12px;
+}
+.sw-collab-flow__alt rect {
+  fill: none;
+  stroke: color-mix(in srgb, var(--sw-type-number) 45%, var(--sw-border));
+  stroke-dasharray: 5 4;
+}
+.sw-collab-flow__alt text {
+  fill: var(--sw-type-number);
+  font-family: var(--sw-font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.sw-collab-flow figcaption {
+  margin-top: 0.6rem;
+  color: var(--sw-fg-muted);
+  font-size: 0.86rem;
+}
+
+/* A framed shell, with package-manager tabs in its header. */
+.sw-terminal {
+  margin: 1.25rem 0;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--sw-demo-border);
+  border-radius: 0.65rem;
+  background: var(--sw-demo-deep);
+  color: var(--sw-demo-fg);
+}
+.sw-terminal__bar {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 0 0.8rem 0 1rem;
+  border-bottom: 1px solid var(--sw-demo-border);
+  background: var(--sw-demo-raised);
+}
+.sw-terminal__dots {
+  display: flex;
+  gap: 0.4rem;
+}
+.sw-terminal__dots i {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--sw-demo-muted);
+}
+.sw-terminal__dots i:first-child {
+  background: var(--sw-demo-danger);
+}
+.sw-terminal__dots i:nth-child(2) {
+  background: var(--sw-demo-warn);
+}
+.sw-terminal__dots i:last-child {
+  background: var(--sw-demo-accent);
+}
+.sw-terminal__tabs {
+  display: flex;
+  gap: 1.15rem;
+}
+.sw-terminal__tabs button,
+.sw-terminal__copy {
+  border: 0;
+  background: transparent;
+  color: var(--sw-demo-muted);
+  font: 500 0.8rem / 1.5 var(--sw-font-mono);
+  cursor: pointer;
+}
+.sw-terminal__tabs button {
+  margin-bottom: -1px;
+  padding: 0.7rem 0;
+  border-bottom: 2px solid transparent;
+}
+.sw-terminal__tabs button:hover,
+.sw-terminal__copy:hover {
+  color: var(--sw-demo-fg-strong);
+}
+.sw-terminal__tabs button[aria-selected="true"] {
+  color: var(--sw-demo-fg-strong);
+  border-bottom-color: var(--sw-demo-accent);
+}
+.sw-terminal__copy {
+  margin-left: auto;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.3rem;
+  font-family: var(--sw-font-body);
+}
+.sw-terminal__copy:hover {
+  background: var(--sw-demo-surface);
+}
+.sw-prose .sw-terminal__body,
+.sw-terminal__body {
+  margin: 0;
+  padding: 1.15rem 1.25rem;
+  overflow-x: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--sw-demo-fg-strong);
+  font: 0.88rem / 1.65 var(--sw-font-mono);
+}
+.sw-terminal__body code {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+.sw-terminal__prompt {
+  color: var(--sw-demo-muted);
+  user-select: none;
+}
+.sw-terminal__note {
+  margin: 0;
+  padding: 0 1.25rem 1.15rem;
+  color: var(--sw-demo-muted);
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+
+.sw-engine-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 1.25rem 0;
+}
+.sw-engine-choice {
+  padding: 1.25rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.65rem;
+  background: var(--sw-surface-1);
+}
+.sw-engine-choice > span,
+.sw-engine-choice > small {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--sw-fg-muted);
+}
+/* The performance page lifts the card heading to h3; it keeps the h4 size. */
+.sw-docs .sw-prose .sw-engine-choice h3 {
+  margin: 0.5rem 0;
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+}
+.sw-prose .sw-engine-choice p {
+  margin: 0.75rem 0 1.25rem;
+  color: var(--sw-fg-muted);
+  font-size: 0.9rem;
+}
+.sw-engine-choice > strong {
+  display: block;
+  color: var(--sw-fg-strong);
+  font: 600 1.8rem / 1.4 var(--sw-font-display);
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 40rem) {
+  .sw-engine-choices {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 40.01rem) {
+  .bench-viz--unlabelled .bench-bar {
+    grid-template-columns: minmax(0, 1fr) var(--bench-value);
+    grid-template-areas: "track value";
+  }
+  .bench-viz--unlabelled .bench-bar__engine {
+    display: none;
+  }
+}
+
+.sw-prose .sw-next-links.sw-moved-guides {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+}
+.sw-prose .sw-moved-guides code {
+  justify-self: start;
+  font-size: 0.75rem;
+}

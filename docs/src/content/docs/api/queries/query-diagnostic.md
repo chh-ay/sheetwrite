@@ -8,7 +8,7 @@ description: "QueryDiagnostic interface in @sheetwrite/queries: A stable failure
 A stable failure code and optional coordinates, without source values or credentials.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/types.ts#L22"><code>packages/queries/src/types.ts#L22</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/types.ts#L24"><code>packages/queries/src/types.ts#L24</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>
@@ -80,6 +80,8 @@ export interface QueryDiagnostic {
 <p class="api-consumers-label">Public exports naming <code>QueryDiagnostic</code></p>
 
 <ul class="api-consumer-list">
+<li><a href="/docs/api/queries/query-definition-result/"><code>QueryDefinitionResult</code></a><span class="api-consumer-kind">@sheetwrite/queries</span></li>
 <li><a href="/docs/api/queries/query-error/"><code>QueryError</code></a><span class="api-consumer-kind">@sheetwrite/queries</span></li>
+<li><a href="/docs/api/queries/query-refresh-result/"><code>QueryRefreshResult</code></a><span class="api-consumer-kind">@sheetwrite/queries</span></li>
 </ul>
 </div>

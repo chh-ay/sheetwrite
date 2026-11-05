@@ -8,7 +8,7 @@ description: "SheetSnapshot interface in @sheetwrite/core: Serializable complete
 Serializable complete state for one workbook sheet.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L398"><code>packages/core/src/types/document.ts#L398</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L412"><code>packages/core/src/types/document.ts#L412</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -28,6 +28,7 @@ Serializable complete state for one workbook sheet.
 <a href="#sheet-snapshot-protected-ranges"><code>protectedRanges</code></a>
 <a href="#sheet-snapshot-notes"><code>notes</code></a>
 <a href="#sheet-snapshot-sort-keys"><code>sortKeys</code></a>
+<a href="#sheet-snapshot-sort-state"><code>sortState</code></a>
 <a href="#sheet-snapshot-filters"><code>filters</code></a>
 <a href="#sheet-snapshot-row-groups"><code>rowGroups</code></a>
 <a href="#sheet-snapshot-tables"><code>tables</code></a>
@@ -36,7 +37,7 @@ Serializable complete state for one workbook sheet.
 <a href="#sheet-snapshot-cells"><code>cells</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>22</span>
+## Members <span class="api-count" data-pagefind-ignore>23</span>
 
 <div class="api-member-list">
 
@@ -184,6 +185,15 @@ sortKeys?: SortKey[];
 
 </details>
 
+<details class="api-member" id="sheet-snapshot-sort-state" data-pagefind-weight="1">
+<summary><code>sortState</code> <span class="api-member-summary">See Sheet.sortState.</span></summary>
+
+```ts generated
+sortState?: WorkbookTableXmlElement;
+```
+
+</details>
+
 <details class="api-member" id="sheet-snapshot-filters" data-pagefind-weight="1">
 <summary><code>filters</code></summary>
 
@@ -262,6 +272,7 @@ export interface SheetSnapshot {
   protectedRanges?: ProtectedRange[];
   notes?: CellNote[];
   sortKeys?: SortKey[];
+  sortState?: WorkbookTableXmlElement;
   filters?: Array<[col: number, filter: ColumnFilter]>;
   rowGroups?: RowGroup[];
   tables?: WorkbookTable[];

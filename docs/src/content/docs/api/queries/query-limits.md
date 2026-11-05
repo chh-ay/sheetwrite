@@ -8,7 +8,7 @@ description: "QueryLimits interface in @sheetwrite/queries: Per-execution ceilin
 Per-execution ceilings; expanding operations reject output before allocation.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/types.ts#L12"><code>packages/queries/src/types.ts#L12</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/types.ts#L14"><code>packages/queries/src/types.ts#L14</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>
@@ -91,5 +91,6 @@ export interface QueryLimits {
 
 <ul class="api-consumer-list">
 <li><a href="/docs/api/queries/query-engine/"><code>QueryEngine</code></a><span class="api-consumer-kind">@sheetwrite/queries</span></li>
+<li><a href="/docs/api/queries/query-session-options/"><code>QuerySessionOptions</code></a><span class="api-consumer-kind">@sheetwrite/queries</span></li>
 </ul>
 </div>

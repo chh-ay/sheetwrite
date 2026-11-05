@@ -7,7 +7,16 @@ use super::super::functions::{
 use super::distributions::{ensure, f_probability, gamma_probability, normal_cdf, student_tail};
 use crate::types::{EvalResult, FormulaError, Value, RANGE_CELL_LIMIT};
 
-pub(crate) const NAMES: &[&str] = &["CHITEST", "FTEST", "TTEST", "ZTEST"];
+pub(crate) const NAMES: &[&str] = &[
+    "CHISQ.TEST",
+    "CHITEST",
+    "F.TEST",
+    "FTEST",
+    "T.TEST",
+    "TTEST",
+    "Z.TEST",
+    "ZTEST",
+];
 
 const ONE_TAIL: f64 = 1.0;
 const TWO_TAILS: f64 = 2.0;
@@ -30,10 +39,10 @@ pub(crate) fn evaluate(name: &str, values: &FuncAccumulator) -> EvalResult {
 
 fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
     match name {
-        "CHITEST" => chi_squared_test(values),
-        "FTEST" => f_test(values),
-        "TTEST" => t_test(values),
-        "ZTEST" => z_test(values),
+        "CHITEST" | "CHISQ.TEST" => chi_squared_test(values),
+        "FTEST" | "F.TEST" => f_test(values),
+        "TTEST" | "T.TEST" => t_test(values),
+        "ZTEST" | "Z.TEST" => z_test(values),
         _ => Err(FormulaError::Name),
     }
 }
@@ -388,6 +397,29 @@ mod tests {
             ),
             "0.863043",
         );
+    }
+
+    /// The CHISQ.TEST, F.TEST, T.TEST and Z.TEST pages publish the same
+    /// examples as the Excel 2007 names.
+    #[test]
+    fn current_names_match_their_microsoft_examples() {
+        let tables = [
+            Argument::Table(ACTUAL, 3, 2),
+            Argument::Table(EXPECTED, 3, 2),
+        ];
+        let pairs = [Argument::List(FTEST_FIRST), Argument::List(FTEST_SECOND)];
+        let paired = [
+            Argument::List(TTEST_FIRST),
+            Argument::List(TTEST_SECOND),
+            Argument::Number(2.0),
+            Argument::Number(1.0),
+        ];
+        let sample = [Argument::List(ZTEST_DATA), Argument::Number(6.0)];
+
+        assert_published("CHISQ.TEST", call("CHISQ.TEST", &tables), "0.0003082");
+        assert_published("F.TEST", call("F.TEST", &pairs), "0.64831785");
+        assert_published("T.TEST", call("T.TEST", &paired), "0.196016");
+        assert_published("Z.TEST", call("Z.TEST", &sample), "0.863043");
     }
 
     #[test]

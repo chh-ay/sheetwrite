@@ -9,13 +9,13 @@ import {
   HistoryArchive,
   HistoryError,
   MemoryHistoryStorage,
-  type HistoryCommit,
   type HistoryLimits,
   type HistoryStorageAdapter,
 } from "../src/history-archive.js";
 import { IndexedDbHistoryStorage } from "../src/history-indexeddb.js";
 import type { CellValue } from "../src/types/cell.js";
 import type { SnapshotCell, WorkbookSnapshot } from "../src/types/document.js";
+import type { CommittedTransaction } from "../src/types/transaction.js";
 
 const MINUTE_MS = 60_000;
 
@@ -88,7 +88,7 @@ function withColumn(
 }
 
 /** Commit `revision` that sets A1 to `value`, one minute per revision. */
-function change(revision: number, value: string | number = revision): HistoryCommit {
+function change(revision: number, value: string | number = revision): CommittedTransaction {
   const cell: CellValue = { kind: "literal", value };
 
   return {
