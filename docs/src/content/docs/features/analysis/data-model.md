@@ -104,3 +104,37 @@ The full engine checks the key values each time `getRelationshipStatus` is calle
 | `typeMismatch` | The key at `row` on side `from` or `to` is a boolean, an error on the one side, or a number among text keys (or text among numbers). |
 | `duplicateKey` | Two one-side rows hold equal keys. `rows` are their data-row offsets. |
 | `unavailable` | The default engine checks no keys, or no relationship has this ID. |
+
+## Pivots across related tables
+
+A model source names a base table (the many side) and the fields to read. Each field is a table and column ID. A field's table must be the base table or a table the base reaches through many-to-one relationships. Field `i` in `rows`, `columns`, `values` and `filters` is `model.fields[i]`.
+
+```ts prelude="core" partial="requires a full-engine grid with the tables and relationship above" title="Amount by customer region"
+grid.setPivot({
+  id: "by-region",
+  name: "By region",
+  source: {
+    model: {
+      table: "orders",
+      fields: [
+        { table: "customers", column: "region" },
+        { table: "orders", column: "amount" },
+      ],
+    },
+  },
+  anchor: { row: 0, col: 0 },
+  rows: [0],
+  columns: [],
+  values: [{ field: 1, aggregation: "SUM" }],
+});
+```
+
+The result equals a pivot over the table you get by looking up each related column for every base row:
+
+| Case | Related value |
+| --- | --- |
+| The key matches one row | That row's cell |
+| The key matches no row, or is blank | Blank |
+| The many-side key is an error | That error |
+
+A duplicate one-side key or a key type mismatch shows `#VALUE!` at the anchor. A missing table, column or relationship shows `#REF!`. The default engine keeps and syncs model pivots but does not compute them. XLSX export keeps them in Sheetwrite metadata, because Excel needs its own data-model binary for a model pivot.

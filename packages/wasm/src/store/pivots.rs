@@ -13,12 +13,15 @@
 
 use std::collections::BTreeMap;
 use std::mem::size_of;
+use std::rc::Rc;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 use wasm_bindgen::prelude::*;
 
+use super::model_source::ModelSource;
 use super::pivot_output::{attempt_cut, shift_anchor, ShiftAxis};
-use super::{CellStore, TableColumnDefinition};
+use super::relationships::ColumnRef;
+use super::{CellStore, TableColumnDefinition, TableDefinition};
 use crate::calc::shift_range;
 use crate::eval::{calculated_slot, settled_cell_value};
 use crate::formula_slots::{FormulaStore, FormulaWork};
@@ -42,6 +45,7 @@ const MAX_SETTLE_ROUNDS: usize = 32;
 const SOURCE_RANGE: u32 = 0;
 const SOURCE_TABLE: u32 = 1;
 const SOURCE_INVALID: u32 = 2;
+const SOURCE_MODEL: u32 = 3;
 
 /// Unused bound slots after a table id, and after the absent-string slot of
 /// an invalid source, so every source takes the slots of a range (sheet,
@@ -86,6 +90,10 @@ enum SourceRef {
         cols: (u32, u32),
     },
     Table(String),
+    Model {
+        table: String,
+        fields: Vec<ColumnRef>,
+    },
     Invalid,
 }
 
@@ -198,6 +206,22 @@ impl Payload<'_> {
                 self.skip(TABLE_SOURCE_PADDING)?;
                 Some(SourceRef::Table(table))
             }
+            SOURCE_MODEL => {
+                let table = self.text()?;
+                let count = self.count(2)?;
+                if count > 256 {
+                    return None;
+                }
+                let fields = (0..count)
+                    .map(|_| {
+                        Some(ColumnRef {
+                            table: self.text()?,
+                            column: self.text()?,
+                        })
+                    })
+                    .collect::<Option<Vec<_>>>()?;
+                Some(SourceRef::Model { table, fields })
+            }
             SOURCE_INVALID => {
                 // Core sends no sheet or table here: the slot holds its
                 // absent-string marker.
@@ -302,7 +326,7 @@ fn decode_definitions(numbers: &[f64], strings: &[String]) -> Option<Vec<SheetPi
 /// The source cells a cache was built from: an optional header row, then
 /// `rows` data rows from `first`, over `cols` columns from `col_start`.
 #[derive(Clone, Copy, Debug, PartialEq)]
-struct SourceRect {
+pub(super) struct SourceRect {
     sheet: usize,
     header: Option<u32>,
     first: u32,
@@ -312,6 +336,19 @@ struct SourceRect {
 }
 
 impl SourceRect {
+    pub(super) fn table(table: &TableDefinition) -> Self {
+        let first = table.row_start + u32::from(table.header_row);
+        let end = table.row_end + 1 - u32::from(table.totals_row);
+        Self {
+            sheet: table.sheet as usize,
+            header: table.header_row.then_some(table.row_start),
+            first,
+            rows: end.saturating_sub(first),
+            col_start: table.col_start,
+            cols: table.col_end - table.col_start + 1,
+        }
+    }
+
     fn bounds(self) -> Option<DirtyRect> {
         let top = self.header.unwrap_or(self.first);
         let bottom = (self.first + self.rows).checked_sub(1)?.max(top);
@@ -381,6 +418,7 @@ struct StoreSource<'a> {
     rect: SourceRect,
     /// A table's column names, which are its field names.
     names: Option<&'a [TableColumnDefinition]>,
+    model: Option<ModelSource<'a>>,
 }
 
 impl PivotSource for StoreSource<'_> {
@@ -389,10 +427,15 @@ impl PivotSource for StoreSource<'_> {
     }
 
     fn width(&self) -> usize {
-        self.rect.cols as usize
+        self.model
+            .as_ref()
+            .map_or(self.rect.cols as usize, ModelSource::width)
     }
 
     fn header(&self, field: usize) -> Value {
+        if let Some(model) = &self.model {
+            return model.header(field);
+        }
         if let Some(names) = self.names {
             return names
                 .get(field)
@@ -410,6 +453,9 @@ impl PivotSource for StoreSource<'_> {
     }
 
     fn value(&self, row: usize, field: usize) -> Value {
+        if let Some(model) = &self.model {
+            return model.value(row, field);
+        }
         settled_cell_value(
             self.sheet,
             self.strings,
@@ -454,6 +500,8 @@ struct Pivot {
     cache: Option<PivotCache>,
     /// The source the cache holds.
     source: Option<SourceRect>,
+    /// Related table rectangles, shared with the overlap checker; no key indexes.
+    related: Option<Rc<[SourceRect]>>,
     /// The layout of the installed output.
     layout: Option<PivotLayout>,
     error: Option<FormulaError>,
@@ -468,6 +516,7 @@ impl Pivot {
             saved,
             cache: None,
             source: None,
+            related: None,
             layout: None,
             error: None,
             attempt: None,
@@ -484,6 +533,14 @@ impl Pivot {
         let saved = &self.saved;
         let table = match &saved.source {
             SourceRef::Table(id) => id.capacity(),
+            SourceRef::Model { table, fields } => {
+                table.capacity()
+                    + fields.capacity() * size_of::<ColumnRef>()
+                    + fields
+                        .iter()
+                        .map(|field| field.table.capacity() + field.column.capacity())
+                        .sum::<usize>()
+            }
             _ => 0,
         };
         saved.id.capacity()
@@ -492,15 +549,20 @@ impl Pivot {
             + self.cache.as_ref().map_or(0, PivotCache::retained_bytes)
             + self.layout.as_ref().map_or(0, PivotLayout::retained_bytes)
             + self.pending.rows.capacity() * size_of::<u32>()
+            + self
+                .related
+                .as_ref()
+                .map_or(0, |rects| rects.len() * size_of::<SourceRect>())
     }
 }
 
 /// Where a pivot reads and writes, for the overlap check.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct Footprint {
     owner: usize,
     source: Option<SourceRect>,
     attempt: Option<SpillRange>,
+    related: Option<Rc<[SourceRect]>>,
 }
 
 /// Every pivot of the workbook by owning sheet, in the order the host sent
@@ -556,6 +618,7 @@ impl PivotRegistry {
                     owner,
                     source: pivot.source,
                     attempt: pivot.attempt,
+                    related: pivot.related.clone(),
                 })
             }));
     }
@@ -571,21 +634,26 @@ fn meets_upstream_source(footprints: &[Footprint], index: usize, range: SpillRan
     let mut next = 0;
     while let Some(&current) = upstream.get(next) {
         next += 1;
-        let Some(source) = footprints[current].source else {
-            continue;
-        };
-        if source.sheet == owner && source.meets(range) {
-            return true;
-        }
-        for (other, footprint) in footprints.iter().enumerate() {
-            if !seen[other]
-                && footprint.owner == source.sheet
-                && footprint
-                    .attempt
-                    .is_some_and(|attempt| source.meets(attempt))
-            {
-                seen[other] = true;
-                upstream.push(other);
+        let sources = footprints[current].source.into_iter().chain(
+            footprints[current]
+                .related
+                .iter()
+                .flat_map(|rects| rects.iter().copied()),
+        );
+        for source in sources {
+            if source.sheet == owner && source.meets(range) {
+                return true;
+            }
+            for (other, footprint) in footprints.iter().enumerate() {
+                if !seen[other]
+                    && footprint.owner == source.sheet
+                    && footprint
+                        .attempt
+                        .is_some_and(|attempt| source.meets(attempt))
+                {
+                    seen[other] = true;
+                    upstream.push(other);
+                }
             }
         }
     }
@@ -729,22 +797,33 @@ impl CellStore {
             .pivots
             .as_deref()
             .and_then(|registry| registry.sheets.get(&sheet)?.get(index))
-            .and_then(|pivot| self.resolve_pivot_source(&pivot.saved.source).ok())
-            .map(|(rect, names)| {
-                source_fields(&StoreSource {
-                    sheet: &self.sheets[rect.sheet],
-                    strings: &self.strings,
-                    slots: &self.formula_slots,
-                    rect,
-                    names,
-                })
-            });
+            .and_then(|pivot| self.read_pivot_source(&pivot.saved.source).ok())
+            .map(|source| source_fields(&source));
         let (names, types) = fields.unwrap_or_default();
         PivotFields { names, types }
     }
 }
 
 impl CellStore {
+    fn read_pivot_source<'a>(
+        &'a self,
+        source: &'a SourceRef,
+    ) -> Result<StoreSource<'a>, FormulaError> {
+        let (rect, names) = self.resolve_pivot_source(source)?;
+        let model = match source {
+            SourceRef::Model { table, fields } => Some(ModelSource::build(self, table, fields)?),
+            _ => None,
+        };
+        Ok(StoreSource {
+            sheet: &self.sheets[rect.sheet],
+            strings: &self.strings,
+            slots: &self.formula_slots,
+            rect,
+            names,
+            model,
+        })
+    }
+
     fn resolve_pivot_source(
         &self,
         source: &SourceRef,
@@ -773,25 +852,13 @@ impl CellStore {
                     None,
                 ))
             }
-            SourceRef::Table(id) => {
+            SourceRef::Table(id) | SourceRef::Model { table: id, .. } => {
                 let table = self
                     .tables
                     .values()
                     .find(|table| &table.id == id)
                     .ok_or(FormulaError::Ref)?;
-                let first = table.row_start + u32::from(table.header_row);
-                let end = table.row_end + 1 - u32::from(table.totals_row);
-                Ok((
-                    SourceRect {
-                        sheet: table.sheet as usize,
-                        header: table.header_row.then_some(table.row_start),
-                        first,
-                        rows: end.saturating_sub(first),
-                        col_start: table.col_start,
-                        cols: table.col_end - table.col_start + 1,
-                    },
-                    Some(&table.columns),
-                ))
+                Ok((SourceRect::table(table), Some(&table.columns)))
             }
             SourceRef::Invalid => Err(FormulaError::Ref),
         }
@@ -821,6 +888,38 @@ impl CellStore {
                         &mut pivot.pending,
                         &self.formula_slots,
                     );
+                }
+                if matches!(pivot.saved.source, SourceRef::Model { .. }) {
+                    let mut dependency_changes = Pending::default();
+                    if let Some(related) = &pivot.related {
+                        for &rect in related.iter().skip(1) {
+                            capture_source(
+                                &self.sheets[rect.sheet],
+                                rect,
+                                finished(rect.sheet),
+                                affected,
+                                &mut dependency_changes,
+                                &self.formula_slots,
+                            );
+                        }
+                    } else {
+                        // A failed initial key check still reads its dimension tables,
+                        // so fixing a key must wake it without a saved row map.
+                        for table in self.tables.values() {
+                            let rect = SourceRect::table(table);
+                            capture_source(
+                                &self.sheets[rect.sheet],
+                                rect,
+                                finished(rect.sheet),
+                                affected,
+                                &mut dependency_changes,
+                                &self.formula_slots,
+                            );
+                        }
+                    }
+                    if !dependency_changes.is_empty() {
+                        pivot.pending.rebuild = true;
+                    }
                 }
 
                 if let Some(attempt) = pivot.attempt.filter(|_| finished(owner)) {
@@ -929,6 +1028,7 @@ impl CellStore {
         let refreshed = self.refresh_pivot_cache(pivot);
         pivot.pending.clear();
         footprints[index].source = pivot.source;
+        footprints[index].related = pivot.related.clone();
         if let Err(error) = refreshed {
             footprints[index].attempt = None;
             return self.show_pivot_error(owner, pivot, error, None);
@@ -992,22 +1092,18 @@ impl CellStore {
     /// otherwise updates the pending rows and headers. Leaves the pending
     /// work for the caller to clear.
     fn refresh_pivot_cache(&self, pivot: &mut Pivot) -> Result<(), FormulaError> {
-        let resolved = self.resolve_pivot_source(&pivot.saved.source);
-        let (rect, names) = match resolved {
-            Ok(resolved) => resolved,
+        let source = match self.read_pivot_source(&pivot.saved.source) {
+            Ok(source) => source,
             Err(error) => {
                 pivot.cache = None;
-                pivot.source = None;
                 return Err(error);
             }
         };
-        let source = StoreSource {
-            sheet: &self.sheets[rect.sheet],
-            strings: &self.strings,
-            slots: &self.formula_slots,
-            rect,
-            names,
-        };
+        let rect = source.rect;
+        pivot.related = source
+            .model
+            .as_ref()
+            .map(|model| model.dependencies.clone());
 
         let pending = &mut pivot.pending;
         match pivot.cache.as_mut() {
@@ -1150,13 +1246,32 @@ impl CellStore {
         }
     }
 
+    /// Relationships changed: model pivots resolve their paths again.
+    /// Returns whether any pivot reads a model source.
+    pub(crate) fn invalidate_model_pivots(&mut self) -> bool {
+        let Some(registry) = self.pivots.as_deref_mut() else {
+            return false;
+        };
+        let mut found = false;
+        for pivot in registry.pivots_mut() {
+            if matches!(pivot.saved.source, SourceRef::Model { .. }) {
+                pivot.pending.rebuild = true;
+                found = true;
+            }
+        }
+        found
+    }
+
     /// A table changed: pivots that read a table resolve and build again.
     pub(crate) fn invalidate_table_pivots(&mut self) {
         let Some(registry) = self.pivots.as_deref_mut() else {
             return;
         };
         for pivot in registry.pivots_mut() {
-            if matches!(pivot.saved.source, SourceRef::Table(_)) {
+            if matches!(
+                pivot.saved.source,
+                SourceRef::Table(_) | SourceRef::Model { .. }
+            ) {
                 pivot.pending.rebuild = true;
             }
         }

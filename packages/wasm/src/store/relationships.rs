@@ -111,6 +111,10 @@ impl CellStore {
             });
         }
         self.relationships = (!relationships.is_empty()).then(|| Box::new(relationships));
+        // Only model pivots read relationships, so formulas stay clean.
+        if self.invalidate_model_pivots() {
+            self.settle_pivots();
+        }
         true
     }
 
@@ -165,7 +169,7 @@ impl CellStore {
     }
 
     /// The settled value of data row `row` of `column`.
-    fn key_value(&self, column: KeyColumn, row: u32) -> crate::types::Value {
+    pub(super) fn key_value(&self, column: KeyColumn, row: u32) -> crate::types::Value {
         settled_cell_value(
             &self.sheets[column.sheet],
             &self.strings,

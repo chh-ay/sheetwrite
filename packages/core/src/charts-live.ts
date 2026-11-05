@@ -466,7 +466,8 @@ function classifyPatch(patch: DocumentOp, context: PatchContext): void {
 
     case "setRelationship":
     case "removeRelationship":
-      // A relationship is a link between tables; it writes no cell.
+      // A relationship change can change pivot output read by a chart.
+      context.valuesChanged = true;
       return;
 
     default: {

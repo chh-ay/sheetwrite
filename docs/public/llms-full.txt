@@ -13643,7 +13643,7 @@ Sort of one axis field by its labels. Fields without a sort key sort ascending.
 ##### `PivotSource` — type
 
 ```ts
-export type PivotSource = | { range: Range; invalid?: true } | { table: WorkbookTableId; invalid?: true };
+export type PivotSource = | { range: Range; invalid?: true } | { table: WorkbookTableId; invalid?: true } | { model: { table: WorkbookTableId; fields: TableColumnRef[] }; invalid?: true };
 ```
 
 Data a pivot summarizes.
@@ -13652,6 +13652,9 @@ Data a pivot summarizes.
  fields, and field `i` is the column `range.start.col + i`.
 - A table source names a workbook table by its stable `WorkbookTable.id`.
  Field `i` is table column `i`; header and totals rows are excluded.
+- A model source has one base table (the many side). Field `i` names
+ `model.fields[i]` by stable table and column IDs. Other tables must be
+ reachable from the base by following many-to-one relationships.
 
 When the source disappears (its sheet, its table, or every source row or
 column is deleted), core sets `invalid: true` and keeps the reference
